@@ -1,3 +1,5 @@
+import { isCalendarDate } from './validate.js';
+
 const CATEGORY = {
   meal: 'nutrition',
   workout: 'fitness',
@@ -50,8 +52,8 @@ export function buildCalendarMarkers(events) {
 }
 
 export function getSearchExtension(currentStart) {
+  if (!isCalendarDate(currentStart)) throw new TypeError(`Invalid calendar date: ${currentStart}`);
   const match = /^(\d{4})-(\d{2})-\d{2}$/.exec(currentStart);
-  if (!match) throw new TypeError(`Invalid calendar date: ${currentStart}`);
 
   const monthIndex = Number(match[1]) * 12 + Number(match[2]) - 4;
   const year = Math.floor(monthIndex / 12);
