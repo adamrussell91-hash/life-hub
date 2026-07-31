@@ -7,6 +7,9 @@ export function resolveTargetSet(config, dateKey) {
 
 export function getDayTargets(config, dateKey, dayType = 'movement', recovery = false) {
   const set = resolveTargetSet(config, dateKey);
+  if (!Object.hasOwn(set.calories, dayType)) {
+    throw new TypeError(`Unknown day type: ${String(dayType)}`);
+  }
   return {
     calories: set.calories[dayType] + (recovery ? set.calories.recovery_bonus : 0),
     protein_g: recovery ? set.protein.recovery_daily : set.protein.daily,

@@ -128,6 +128,26 @@ test('validates common metadata for non-legacy records', () => {
   }
 });
 
+test('accepts both actual Sydney offsets during the autumn repeated hour', () => {
+  const base = {
+    ...common,
+    type: 'weight',
+    date: '2026-04-05',
+    time: '02:30',
+    weight_kg: 86.3
+  };
+  assert.deepEqual(validateRecord({
+    ...base,
+    created_at: '2026-04-05T02:30:00+11:00',
+    updated_at: '2026-04-05T02:30:00+10:00'
+  }), []);
+  assert.match(validateRecord({
+    ...base,
+    created_at: '2026-04-05T03:30:00+11:00',
+    updated_at: '2026-04-05T03:30:00+11:00'
+  }).join('; '), /created_at|updated_at/);
+});
+
 test('accepts every canonical domain record and nullable observations', () => {
   const records = [
     {

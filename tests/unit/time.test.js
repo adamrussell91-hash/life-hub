@@ -14,6 +14,19 @@ test('Sydney timestamp uses standard time in July', () => {
   assert.equal(getSydneyTimestamp(new Date('2026-07-31T08:00:00Z')), '2026-07-31T18:00:00+10:00');
 });
 
+test('Sydney autumn transition represents both repeated-hour offsets', () => {
+  assert.equal(
+    getSydneyTimestamp(new Date('2026-04-04T15:30:00Z')),
+    '2026-04-05T02:30:00+11:00'
+  );
+  assert.equal(
+    getSydneyTimestamp(new Date('2026-04-04T16:30:00Z')),
+    '2026-04-05T02:30:00+10:00'
+  );
+  assert.equal(addCalendarDays('2026-04-04', 1), '2026-04-05');
+  assert.equal(addCalendarDays('2026-04-05', 1), '2026-04-06');
+});
+
 test('calendar arithmetic never passes through the device timezone', () => {
   assert.equal(addCalendarDays('2026-10-04', 1), '2026-10-05');
   assert.equal(getSydneyWeekStart('2026-07-31'), '2026-07-27');

@@ -7,8 +7,22 @@ import { getDayTargets, resolveTargetSet } from '../../js/core/targets.js';
 const config = load(await readFile(new URL('../../config/targets.yml', import.meta.url), 'utf8'));
 
 test('resolves the greatest valid_from not after the date', () => {
-  assert.equal(resolveTargetSet(config, '2026-07-31').valid_from, '2020-01-01');
-  assert.throws(() => resolveTargetSet(config, '2019-12-31'), /No target set/);
+  const unsorted = {
+    target_sets: [
+      { valid_from: '2025-06-01', marker: 'middle' },
+      { valid_from: '2030-01-01', marker: 'latest' },
+      { valid_from: '2020-01-01', marker: 'earliest' }
+    ]
+  };
+  const before = structuredClone(unsorted);
+
+  assert.equal(resolveTargetSet(unsorted, '2020-01-01').marker, 'earliest');
+  assert.equal(resolveTargetSet(unsorted, '2025-05-31').marker, 'earliest');
+  assert.equal(resolveTargetSet(unsorted, '2025-06-01').marker, 'middle');
+  assert.equal(resolveTargetSet(unsorted, '2029-12-31').marker, 'middle');
+  assert.equal(resolveTargetSet(unsorted, '2030-01-01').marker, 'latest');
+  assert.throws(() => resolveTargetSet(unsorted, '2019-12-31'), /No target set/);
+  assert.deepEqual(unsorted, before);
 });
 
 test('applies recovery to the following day targets without changing day type', () => {
@@ -21,4 +35,11 @@ test('applies recovery to the following day targets without changing day type', 
     polyphenol_daily_aim: 10,
     meal_protein_g: { breakfast: 30, lunch: 30, dinner: 40, snack: 20, minimum: 25 }
   });
+});
+
+test('rejects an unknown day type with a typed error before calculating calories', () => {
+  assert.throws(
+    () => getDayTargets(config, '2026-07-31', 'ultra_marathon', true),
+    error => error instanceof TypeError && /day type/i.test(error.message)
+  );
 });
