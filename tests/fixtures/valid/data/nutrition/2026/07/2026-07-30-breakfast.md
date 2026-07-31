@@ -11,6 +11,14 @@ meal: breakfast
 calories: 520
 protein_g: 38
 fat_g: 12
+saturated_fat_g: 3
+unsaturated_fat_g: 9
+carbs_g: 48
+sugar_g: 6
+fibre_g: 5
+sodium_mg: 420
+calcium_mg: 380
 polyphenol_score: 6
+omega3: medium
 ---
-Protein smoothie.
+Protein smoothie + flaxseed oil + berries + high protein yoghurt.
