@@ -6,15 +6,31 @@ function parts(instant, options) {
   }).formatToParts(instant).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
 }
 
+export function isCalendarDate(value) {
+  if (typeof value !== 'string') return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1) return false;
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const monthLengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= monthLengths[month - 1];
+}
+
 function parseKey(key) {
+  if (!isCalendarDate(key)) throw new TypeError(`Invalid calendar date: ${key}`);
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
-  if (!match) throw new TypeError(`Invalid calendar date: ${key}`);
   return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
 }
 
 function utcDate(key) {
   const { year, month, day } = parseKey(key);
-  return new Date(Date.UTC(year, month - 1, day));
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
+  return date;
 }
 
 export function getSydneyDateKey(instant = new Date()) {
@@ -45,6 +61,8 @@ export function getSydneyWeekStart(key) {
 export const daysBetween = (a, b) => Math.round((utcDate(b) - utcDate(a)) / 86400000);
 
 export function enumerateDateKeys(start, end) {
+  parseKey(start);
+  parseKey(end);
   const keys = [];
   for (let key = start; key <= end; key = addCalendarDays(key, 1)) keys.push(key);
   return keys;
