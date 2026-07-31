@@ -1,4 +1,4 @@
-import { isCalendarDate } from './validate.js';
+import { isCalendarDate } from './time.js';
 
 const CATEGORY = {
   meal: 'nutrition',

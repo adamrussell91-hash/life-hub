@@ -1,12 +1,8 @@
-import { daysBetween, enumerateDateKeys, getSydneyWeekStart } from './time.js';
+import { addCalendarDays, daysBetween, getSydneyWeekStart, isCalendarDate } from './time.js';
 
 const MAX_WEEKLY_POINTS = 120;
-const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
-
 function assertSemanticDateKey(key) {
-  const instant = new Date(`${key}T00:00:00Z`);
-  if (typeof key !== 'string' || !DATE_KEY.test(key)
-      || Number.isNaN(instant.getTime()) || instant.toISOString().slice(0, 10) !== key) {
+  if (!isCalendarDate(key)) {
     throw new TypeError(`Invalid calendar date: ${key}`);
   }
 }
@@ -88,11 +84,15 @@ export function downsampleWeekly(points, valueField) {
   const sortedPoints = [...points].sort((a, b) => a.date.localeCompare(b.date));
   const firstWeek = getSydneyWeekStart(sortedPoints[0].date);
   const lastWeek = getSydneyWeekStart(sortedPoints.at(-1).date);
-  const weeks = enumerateDateKeys(firstWeek, lastWeek)
-    .filter((date, index) => index % 7 === 0);
+  const weekCount = Math.floor(daysBetween(firstWeek, lastWeek) / 7) + 1;
 
-  if (weeks.length > MAX_WEEKLY_POINTS) {
+  if (weekCount > MAX_WEEKLY_POINTS) {
     throw new RangeError(`Weekly series exceeds ${MAX_WEEKLY_POINTS} points`);
+  }
+
+  const weeks = [];
+  for (let week = firstWeek; week <= lastWeek; week = addCalendarDays(week, 7)) {
+    weeks.push(week);
   }
 
   const valuesByWeek = new Map();

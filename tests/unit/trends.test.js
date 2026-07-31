@@ -191,6 +191,18 @@ test('weekly output enforces the 120-point cap', () => {
   ], 'value').length, 120);
 });
 
+test('weekly output rejects a millennia span before day-scale allocation', () => {
+  const started = performance.now();
+  assert.throws(
+    () => downsampleWeekly([
+      { date: '1000-01-01', value: 1 },
+      { date: '9000-01-01', value: 2 }
+    ], 'value'),
+    error => error instanceof RangeError && /120/.test(error.message)
+  );
+  assert.ok(performance.now() - started < 500, 'millennia span must be rejected in constant space');
+});
+
 test('empty weekly series stays empty', () => {
   assert.deepEqual(downsampleWeekly([], 'value'), []);
 });

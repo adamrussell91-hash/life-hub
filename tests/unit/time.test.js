@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addCalendarDays, daysBetween, enumerateDateKeys,
-  getSydneyDateKey, getSydneyTimestamp, getSydneyWeekStart
+  getSydneyDateKey, getSydneyTimestamp, getSydneyWeekStart, isCalendarDate
 } from '../../js/core/time.js';
 
 test('Sydney date key crosses the spring DST boundary by calendar date', () => {
@@ -21,4 +21,24 @@ test('calendar arithmetic never passes through the device timezone', () => {
   assert.deepEqual(enumerateDateKeys('2026-07-30', '2026-08-01'), [
     '2026-07-30', '2026-07-31', '2026-08-01'
   ]);
+});
+
+test('calendar helpers reject impossible dates and preserve leap-day arithmetic', () => {
+  assert.equal(isCalendarDate('2024-02-29'), true);
+  assert.equal(isCalendarDate('2026-02-29'), false);
+  assert.equal(addCalendarDays('2024-02-29', 1), '2024-03-01');
+  assert.equal(getSydneyWeekStart('2024-02-29'), '2024-02-26');
+  assert.equal(daysBetween('2024-02-28', '2024-03-01'), 2);
+  assert.deepEqual(enumerateDateKeys('2024-02-28', '2024-03-01'), [
+    '2024-02-28', '2024-02-29', '2024-03-01'
+  ]);
+
+  for (const impossible of ['2026-02-29', '2026-02-30', '2026-04-31']) {
+    assert.throws(() => addCalendarDays(impossible, 1), TypeError);
+    assert.throws(() => getSydneyWeekStart(impossible), TypeError);
+    assert.throws(() => daysBetween(impossible, '2026-03-01'), TypeError);
+    assert.throws(() => daysBetween('2026-02-01', impossible), TypeError);
+    assert.throws(() => enumerateDateKeys(impossible, '2026-03-01'), TypeError);
+    assert.throws(() => enumerateDateKeys('2026-02-01', impossible), TypeError);
+  }
 });

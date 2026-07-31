@@ -107,6 +107,12 @@ test('requires frontmatter and matching record type for the canonical domain', (
 test('validates common metadata for non-legacy records', () => {
   const base = { ...common, type: 'weight', weight_kg: 86.3 };
   assert.deepEqual(validateRecord(base), []);
+  assert.deepEqual(validateRecord({
+    ...base,
+    date: '2024-02-29',
+    created_at: '2024-02-29T07:45:00+11:00',
+    updated_at: '2024-02-29T07:45:00+11:00'
+  }), []);
 
   for (const [field, value] of [
     ['schema_version', 2],
