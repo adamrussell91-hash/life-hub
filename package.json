@@ -1,0 +1,17 @@
+{
+  "name": "life-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "test:unit": "node --test",
+    "validate:fixtures": "node scripts/validate-fixtures.mjs"
+  },
+  "devDependencies": {
+    "js-yaml": "4.3.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,14 @@
+target_sets:
+  - valid_from: '2020-01-01'
+    calories: { movement: 1660, workout_30: 1900, workout_45_60: 2200, recovery_bonus: 200 }
+    protein: { daily: 120, recovery_daily: 140, breakfast: 30, lunch: 30, dinner: 40, snack: 20, min_per_meal: 25 }
+    fat_ceiling_g: 50
+    sodium_ceiling_mg: 2000
+    calcium_target_mg: 1000
+    polyphenol_daily_aim: 10
+trend_thresholds:
+  weight_kg: [0.2, 0.5, 1.0]
+  body_fat_pct: [0.2, 0.5, 1.0]
+  skeletal_muscle_kg: [0.1, 0.3, 0.6]
+  measurement_cm: [0.3, 0.8, 1.5]
+  mood_score: [1, 2, 3]
