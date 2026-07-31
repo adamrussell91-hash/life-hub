@@ -4,9 +4,9 @@
 
 **Goal:** Build the framework-free, browser-compatible data engine that turns canonical Life Hub Markdown events into validated records, targets, aggregates, trends, calendar/search models, and deterministic fixture results.
 
-**Architecture:** Pure ECMAScript modules under `js/core/` contain all domain logic and depend on no browser globals. YAML parsing is injected so the browser can use js-yaml from the pinned CDN while Node tests use the same parser package. Configuration and hand-writable Markdown remain the durable source format; generated view models never become stored records. Phase 2 browser/CDN integration must use exact js-yaml 4.1.1; no browser/CDN file exists in Phase 1.
+**Architecture:** Pure ECMAScript modules under `js/core/` contain all domain logic and depend on no browser globals. YAML parsing is injected so the browser can use js-yaml from the pinned CDN while Node tests use the same parser package. Configuration and hand-writable Markdown remain the durable source format; generated view models never become stored records. Phase 2 browser/CDN integration must use exact js-yaml 4.3.0; no browser/CDN file exists in Phase 1.
 
-**Tech Stack:** HTML/CSS/vanilla JavaScript modules, Node.js 22+, Node's built-in test runner, js-yaml 4.1.1 for tests, npm only for development tooling, Markdown with YAML frontmatter.
+**Tech Stack:** HTML/CSS/vanilla JavaScript modules, Node.js 22+, Node's built-in test runner, js-yaml 4.3.0 for tests, npm only for development tooling, Markdown with YAML frontmatter.
 
 ## Global Constraints
 
@@ -75,7 +75,7 @@ Expected: FAIL because `package.json` does not exist.
     "validate:fixtures": "node scripts/validate-fixtures.mjs"
   },
   "devDependencies": {
-    "js-yaml": "4.1.1"
+    "js-yaml": "4.3.0"
   },
   "engines": {
     "node": ">=22"
