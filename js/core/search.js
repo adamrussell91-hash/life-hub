@@ -34,6 +34,8 @@ export function searchEvents(events, query) {
     .sort((a, b) => b.event.record.date.localeCompare(a.event.record.date) || a.index - b.index)
     .map(({ event, raw }) => ({
       id: event.record.id,
+      key: event.record.id ?? event.path,
+      path: event.path,
       date: event.record.date,
       type: event.record.type,
       snippet: raw.slice(0, 160)
