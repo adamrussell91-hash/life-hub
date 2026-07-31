@@ -1,1 +1,9 @@
 .worktrees/
+node_modules/
+.env
+.env.*
+!.env.example
+coverage/
+test-results/
+playwright-report/
+.DS_Store
