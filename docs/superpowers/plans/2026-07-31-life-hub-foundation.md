@@ -27,7 +27,7 @@
 ## File map
 
 - `package.json` — test and fixture-validation commands; no production bundling.
-- `.gitignore` — local dependencies, environment files, test output, and operating-system noise.
+- `.gitignore` — isolated worktrees, local dependencies, environment files, test output, and operating-system noise.
 - `config/targets.yml` — effective-dated targets and trend thresholds.
 - `config/agents.yml` — launch roster, route index, domain, tab, and provisional colours explicitly marked by their source.
 - `js/core/time.js` — Sydney date keys, offsets, Monday week starts, ranges, and date arithmetic.
@@ -48,42 +48,20 @@
 
 **Files:**
 - Create: `package.json`
-- Create: `.gitignore`
-- Create: `tests/unit/project.test.js`
+- Modify: `.gitignore`
 - Create: `docs/IMPLEMENTATION_STATUS.md`
 - Create: `docs/REVIEW.md`
 
 **Interfaces:**
 - Consumes: the approved design at `docs/superpowers/specs/2026-07-31-life-hub-design.md`.
-- Produces: `npm test`, `npm run test:unit`, and `npm run validate:fixtures` commands used by every later task.
+- Produces: `npm test`, `npm run test:unit`, and `npm run validate:fixtures` commands used by every later task. This configuration-only task uses the user-approved TDD exception; behavior tests begin before the first production module in Task 2.
 
-- [ ] **Step 1: Write the failing project-contract test**
+- [ ] **Step 1: Confirm the baseline commands are absent**
 
-```js
-// tests/unit/project.test.js
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-
-test('project is framework-free and exposes required checks', async () => {
-  const pkg = JSON.parse(await readFile(new URL('../../package.json', import.meta.url)));
-  assert.equal(pkg.type, 'module');
-  assert.equal(pkg.scripts.test, 'node --test');
-  assert.equal(pkg.scripts['test:unit'], 'node --test tests/unit');
-  assert.equal(pkg.scripts['validate:fixtures'], 'node scripts/validate-fixtures.mjs');
-  for (const forbidden of ['react', 'next', 'vue', 'vite']) {
-    assert.equal(pkg.dependencies?.[forbidden], undefined);
-    assert.equal(pkg.devDependencies?.[forbidden], undefined);
-  }
-});
-```
-
-- [ ] **Step 2: Run the test and verify the missing baseline fails**
-
-Run: `node --test tests/unit/project.test.js`  
+Run: `npm test`  
 Expected: FAIL because `package.json` does not exist.
 
-- [ ] **Step 3: Add the project manifest and ignore rules**
+- [ ] **Step 2: Add the project manifest and extend the ignore rules**
 
 ```json
 {
@@ -106,6 +84,7 @@ Expected: FAIL because `package.json` does not exist.
 ```
 
 ```gitignore
+.worktrees/
 node_modules/
 .env
 .env.*
@@ -116,18 +95,19 @@ playwright-report/
 .DS_Store
 ```
 
-Create `docs/IMPLEMENTATION_STATUS.md` with the phase name, the three commands above, and the statement that production providers are intentionally disconnected. Create `docs/REVIEW.md` with columns for severity, finding, reproduction, fix commit, and verification, followed by “No findings recorded.”
+Preserve the existing `.worktrees/` entry. Create `docs/IMPLEMENTATION_STATUS.md` with the phase name, the three commands above, and the statement that production providers are intentionally disconnected. Create `docs/REVIEW.md` with columns for severity, finding, reproduction, fix commit, and verification, followed by “No findings recorded.”
 
-- [ ] **Step 4: Install and verify the baseline**
+- [ ] **Step 3: Install and verify the baseline commands**
 
 Run: `npm install`  
 Run: `npm test`  
-Expected: PASS with one project-contract test.
+Run: `npm run test:unit`  
+Expected: both test commands exit successfully with zero tests because behavior modules begin in Task 2.
 
-- [ ] **Step 5: Commit the baseline**
+- [ ] **Step 4: Commit the baseline**
 
 ```bash
-git add package.json package-lock.json .gitignore tests/unit/project.test.js docs/IMPLEMENTATION_STATUS.md docs/REVIEW.md
+git add package.json package-lock.json .gitignore docs/IMPLEMENTATION_STATUS.md docs/REVIEW.md
 git commit -m "chore: establish Life Hub test baseline"
 ```
 
