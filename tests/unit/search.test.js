@@ -74,3 +74,10 @@ test('search extension moves exactly three calendar months backward', () => {
 test('search extension crosses January into the prior year and normalizes to the first', () => {
   assert.equal(getSearchExtension('2026-01-31'), '2025-10-01');
 });
+
+test('search extension rejects impossible calendar starts and accepts leap days', () => {
+  for (const date of ['2026-00-01', '2026-13-01', '2026-02-30', '2026-02-29']) {
+    assert.throws(() => getSearchExtension(date), TypeError);
+  }
+  assert.equal(getSearchExtension('2024-02-29'), '2023-11-01');
+});
