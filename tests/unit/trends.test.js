@@ -57,6 +57,21 @@ test('flat observation is neutral with no intensity', () => {
   );
 });
 
+test('observation trends reject non-finite and non-number metric values', () => {
+  for (const invalid of [Number.NaN, Infinity, -Infinity, '86.3']) {
+    assert.throws(() => getTrend(
+      { date: '2026-07-31', weight_kg: invalid },
+      { date: '2026-07-30', weight_kg: 86.4 },
+      weight
+    ), TypeError);
+    assert.throws(() => getTrend(
+      { date: '2026-07-31', weight_kg: 86.3 },
+      { date: '2026-07-30', weight_kg: invalid },
+      weight
+    ), TypeError);
+  }
+});
+
 test('comparison with no previous data is neutral', () => {
   assert.deepEqual(comparePeriods(120, null, weight), {
     direction: 'neutral',
@@ -86,6 +101,13 @@ test('period comparison operates on scalar aggregates', () => {
   });
 });
 
+test('period comparisons reject non-finite and non-number aggregates', () => {
+  for (const invalid of [Number.NaN, Infinity, -Infinity, '120']) {
+    assert.throws(() => comparePeriods(invalid, 100, steps), TypeError);
+    assert.throws(() => comparePeriods(120, invalid, steps), TypeError);
+  }
+});
+
 test('weeks without observations remain null gaps', () => {
   const weekly = downsampleWeekly([
     { date: '2026-07-01', value: 80 },
@@ -100,6 +122,34 @@ test('weeks without observations remain null gaps', () => {
   ]);
 });
 
+test('weekly downsampling sorts a copy without mutating caller order', () => {
+  const points = [
+    { date: '2026-07-20', value: 79 },
+    { date: '2026-07-03', value: 82 },
+    { date: '2026-07-01', value: 80 }
+  ];
+
+  assert.deepEqual(downsampleWeekly(points, 'value'), [
+    { date: '2026-06-29', value: 81 },
+    { date: '2026-07-06', value: null },
+    { date: '2026-07-13', value: null },
+    { date: '2026-07-20', value: 79 }
+  ]);
+  assert.deepEqual(points, [
+    { date: '2026-07-20', value: 79 },
+    { date: '2026-07-03', value: 82 },
+    { date: '2026-07-01', value: 80 }
+  ]);
+});
+
+test('weekly downsampling rejects semantically impossible date keys', () => {
+  assert.throws(() => downsampleWeekly([
+    { date: '2026-02-01', value: 1 },
+    { date: '2026-02-30', value: 2 },
+    { date: '2026-03-10', value: 3 }
+  ], 'value'), TypeError);
+});
+
 test('weekly means use only available non-null observations', () => {
   assert.deepEqual(downsampleWeekly([
     { date: '2026-07-06', score: null },
@@ -107,6 +157,23 @@ test('weekly means use only available non-null observations', () => {
     { date: '2026-07-12', score: 6 }
   ], 'score'), [
     { date: '2026-07-06', value: 4.5 }
+  ]);
+});
+
+test('weekly downsampling rejects present non-finite and non-number values', () => {
+  for (const invalid of [Number.NaN, Infinity, -Infinity, '3']) {
+    assert.throws(() => downsampleWeekly([
+      { date: '2026-07-06', score: invalid }
+    ], 'score'), TypeError);
+  }
+});
+
+test('weekly downsampling treats null and undefined values as missing', () => {
+  assert.deepEqual(downsampleWeekly([
+    { date: '2026-07-06', score: null },
+    { date: '2026-07-07' }
+  ], 'score'), [
+    { date: '2026-07-06', value: null }
   ]);
 });
 
