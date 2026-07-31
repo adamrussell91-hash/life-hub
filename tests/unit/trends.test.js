@@ -203,6 +203,14 @@ test('weekly output rejects a millennia span before day-scale allocation', () =>
   assert.ok(performance.now() - started < 500, 'millennia span must be rejected in constant space');
 });
 
+test('weekly output supports observations at the maximum calendar date', () => {
+  assert.deepEqual(downsampleWeekly([
+    { date: '9999-12-31', value: 7 }
+  ], 'value'), [
+    { date: '9999-12-27', value: 7 }
+  ]);
+});
+
 test('empty weekly series stays empty', () => {
   assert.deepEqual(downsampleWeekly([], 'value'), []);
 });
