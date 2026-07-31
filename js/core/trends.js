@@ -91,8 +91,9 @@ export function downsampleWeekly(points, valueField) {
   }
 
   const weeks = [];
-  for (let week = firstWeek; week <= lastWeek; week = addCalendarDays(week, 7)) {
+  for (let week = firstWeek; ; week = addCalendarDays(week, 7)) {
     weeks.push(week);
+    if (week === lastWeek) break;
   }
 
   const valuesByWeek = new Map();

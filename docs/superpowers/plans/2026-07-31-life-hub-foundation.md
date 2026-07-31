@@ -29,7 +29,7 @@
 - `package.json` — test and fixture-validation commands; no production bundling.
 - `.gitignore` — isolated worktrees, local dependencies, environment files, test output, and operating-system noise.
 - `config/targets.yml` — effective-dated targets and trend thresholds.
-- `config/agents.yml` — launch roster, route index, domain, tab, and provisional colours explicitly marked by their source.
+- `config/agents.yml` — approved v1 launch roster, route index, domain, tab, six confirmed colours, and Hammond's explicitly provisional colour.
 - `js/core/time.js` — Sydney date keys, offsets, Monday week starts, ranges, and date arithmetic.
 - `js/core/targets.js` — target-set parsing, resolution, and daily calorie/protein rules.
 - `js/core/records.js` — frontmatter splitting, canonical path parsing, common metadata normalization, and event construction.
@@ -289,7 +289,7 @@ trend_thresholds:
   mood_score: [1, 2, 3]
 ```
 
-Create `config/agents.yml` with all seven names, slugs, domains, tabs, exact name triggers from the Notion spec, Brisket `#F6C945`, and source-labelled temporary colours for the six unconfirmed covers. Use `colour_source: provisional_until_cover_migration` so the state is explicit and machine-testable.
+Create `config/agents.yml` with the approved seven-agent v1 roster, slugs, domains, tabs, and exact name triggers from the Notion spec. Record the confirmed mappings Brisket `#F0B843`, Chadwick `#2E7BD6`, Hyaluronica `#B99EE0`, Penelope `#C85A64`, Sara `#BBD9B4`, and Vera `#37598A` with `colour_source: confirmed`. Hammond alone remains `#142B51` with `colour_source: provisional_until_cover_migration`. Sterling `#4E7A48` is known but excluded from the approved v1 roster.
 
 ```js
 // js/core/targets.js
