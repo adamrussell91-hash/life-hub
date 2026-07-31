@@ -71,7 +71,7 @@ Expected: FAIL because `package.json` does not exist.
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "test:unit": "node --test tests/unit",
+    "test:unit": "node --test",
     "validate:fixtures": "node scripts/validate-fixtures.mjs"
   },
   "devDependencies": {
