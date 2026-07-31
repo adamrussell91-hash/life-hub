@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { load } from 'js-yaml';
 import { parseCanonicalPath, parseEventDocument } from '../../js/core/records.js';
 import { validateRecord } from '../../js/core/validate.js';
+import * as recordValidation from '../../js/core/validate.js';
 
 const valid = `---
 schema_version: 1
@@ -50,6 +51,17 @@ test('marks missing historical common metadata as legacy without inventing value
   assert.equal(Object.hasOwn(event.record, 'schema_version'), false);
   assert.equal(Object.hasOwn(event.record, 'id'), false);
   assert.equal(Object.hasOwn(event.record, 'source'), false);
+});
+
+test('rejects schema-versioned records missing common metadata instead of treating them as legacy', () => {
+  assert.throws(
+    () => parseEventDocument(
+      valid.replace('id: meal-1\n', ''),
+      'data/nutrition/2026/07/2026-07-30-breakfast.md',
+      load
+    ),
+    /id is required/
+  );
 });
 
 test('rejects negative nutrition and path/date disagreement', () => {
@@ -163,6 +175,23 @@ test('rejects unknown types and invalid enumerations', () => {
   for (const [record, pattern] of invalid) {
     assert.match(validateRecord(record).join('; '), new RegExp(pattern));
   }
+});
+
+test('reports every duplicate non-empty ID deterministically across records and parsed events', () => {
+  const errors = recordValidation.validateUniqueIds?.([
+    { id: 'zeta' },
+    { record: { id: 'alpha' } },
+    { id: '' },
+    { record: { id: 'zeta' } },
+    { id: 'alpha' },
+    { record: { id: 'zeta' } },
+    { id: null }
+  ]);
+
+  assert.deepEqual(errors, [
+    'duplicate id "alpha" appears 2 times',
+    'duplicate id "zeta" appears 3 times'
+  ]);
 });
 
 test('rejects non-finite and negative domain numbers', () => {

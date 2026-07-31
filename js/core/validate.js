@@ -245,6 +245,22 @@ const VALIDATORS = {
   fragrance: validateFragrance
 };
 
+export function validateUniqueIds(eventsOrRecords) {
+  if (!Array.isArray(eventsOrRecords)) return ['eventsOrRecords must be an array'];
+  const counts = new Map();
+  for (const item of eventsOrRecords) {
+    const record = isObject(item?.record) ? item.record : item;
+    const id = record?.id;
+    if (typeof id === 'string' && id.trim() !== '') {
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+    .map(([id, count]) => `duplicate id "${id}" appears ${count} times`);
+}
+
 export function validateRecord(record, { allowLegacy = false } = {}) {
   const errors = [];
   if (!isObject(record)) return ['record must be an object'];

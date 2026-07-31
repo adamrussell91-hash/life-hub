@@ -93,3 +93,93 @@ tests 15; pass 15; fail 0
 
 - The specification intentionally permits historical records with incomplete common metadata by marking them `legacy`; without a separate migration provenance flag, missing metadata itself is the only available legacy signal.
 - Domain observation fields other than the explicitly structural fields are nullable/optional to preserve sparse historical data. If a future write API requires a non-null primary observation for newly created weight, composition, sleep, or heart events, that stricter write-payload rule should be applied before this historical-compatible record boundary.
+
+## Fix Round 1
+
+### Changes
+
+- Tightened legacy provenance in `js/core/records.js`: a record is legacy only when the `schema_version` property is absent. A record that declares `schema_version`—including `schema_version: 1` with another common field missing—uses strict common-field validation and cannot bypass it by being reclassified as legacy. Schema-less historical records remain accepted without adding any metadata or observations.
+- Added browser-compatible `validateUniqueIds(eventsOrRecords) -> string[]` in `js/core/validate.js`. It accepts raw records or parsed event wrappers, ignores missing/empty IDs (which record validation handles separately), counts every non-empty string ID, sorts duplicate IDs by code-point order, and emits one deterministic error per duplicated ID with its occurrence count.
+- There is no existing recursive fixture/corpus boundary in Tasks 1–4. Task 8's planned recursive fixture validator is therefore documented as the first production consumer: after parsing the corpus, it must append `validateUniqueIds(events)` errors before reporting fixture validity.
+
+### Regression tests
+
+Updated `tests/unit/records.test.js` with:
+
+- `rejects schema-versioned records missing common metadata instead of treating them as legacy`
+- `reports every duplicate non-empty ID deterministically across records and parsed events`
+
+The existing `marks missing historical common metadata as legacy without inventing values` test remains the regression guard for genuine schema-less history.
+
+### RED evidence
+
+Provenance regression command:
+
+```sh
+/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
+```
+
+Observed expected failure before changing production code:
+
+```text
+✖ rejects schema-versioned records missing common metadata instead of treating them as legacy
+AssertionError [ERR_ASSERTION]: Missing expected exception.
+tests 11; pass 10; fail 1
+```
+
+The parser returned successfully because missing `id` incorrectly made the schema-v1 event legacy.
+
+Duplicate-ID regression command after adding the second test and before adding the API:
+
+```sh
+/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
+```
+
+Observed expected failure:
+
+```text
+✖ reports every duplicate non-empty ID deterministically across records and parsed events
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
++ undefined
+- [
+-   'duplicate id "alpha" appears 2 times',
+-   'duplicate id "zeta" appears 3 times'
+- ]
+tests 12; pass 11; fail 1
+```
+
+The wished-for collection API was absent, so the optional lookup returned `undefined` rather than deterministic duplicate errors.
+
+### GREEN evidence
+
+Focused command after both fixes:
+
+```sh
+/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/unit/records.test.js
+```
+
+Exact summary:
+
+```text
+tests 12; pass 12; fail 0
+```
+
+Full-suite command, run once after focused GREEN:
+
+```sh
+/Users/adamrussell/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test
+```
+
+Exact summary:
+
+```text
+tests 17; pass 17; fail 0
+```
+
+### Fix-round self-review and concerns
+
+- `Object.hasOwn(record, 'schema_version')` distinguishes truly absent historical provenance from a declared-but-null/invalid schema field; the latter is strict and rejected.
+- Duplicate ordering uses an explicit lexical comparator rather than locale-dependent sorting.
+- The collection validator contains no Node imports and does not mutate its input.
+- Global uniqueness is now enforceable through a tested public API but is not automatic during single-document parsing. Task 8 must invoke it at the recursive corpus boundary as documented above.

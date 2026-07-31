@@ -15,8 +15,6 @@ const TYPE_DOMAINS = {
   fragrance: 'fragrance'
 };
 
-const LEGACY_METADATA = ['schema_version', 'id', 'time', 'created_at', 'updated_at', 'source'];
-
 function rawScalar(yaml, key) {
   const match = new RegExp(`^${key}:[ \\t]*(.*?)[ \\t]*$`, 'm').exec(yaml);
   if (!match) return undefined;
@@ -57,8 +55,7 @@ export function parseEventDocument(text, path, loadYaml) {
   const record = preserveTemporalScalars(loadYaml(match[1]), match[1]);
   const location = parseCanonicalPath(path);
   const legacy = record !== null && typeof record === 'object' && !Array.isArray(record)
-    ? LEGACY_METADATA.some(key => record[key] == null)
-    : false;
+    && !Object.hasOwn(record, 'schema_version');
   const errors = validateRecord(record, { allowLegacy: legacy });
 
   if (record !== null && typeof record === 'object' && !Array.isArray(record)) {
