@@ -15,7 +15,8 @@ const validEnv = {
   SESSION_SECRET: SECRET,
   GITHUB_REPOSITORY: 'life-owner/life-repo',
   GITHUB_BRANCH: 'main',
-  GITHUB_TOKEN: TOKEN
+  GITHUB_TOKEN: TOKEN,
+  GITHUB_TOKEN_EXPIRES: '2026-09-01'
 };
 const validCookie = `life_hub_session=${createSessionToken({
   now: Date.parse('2026-08-01T00:00:00Z'),

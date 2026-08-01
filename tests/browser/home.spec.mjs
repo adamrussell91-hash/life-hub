@@ -13,7 +13,10 @@ let server;
 let baseUrl;
 
 before(async () => {
-  server = createStaticServer({ root: new URL('../..', import.meta.url) });
+  server = createStaticServer({
+    root: new URL('../../dist/', import.meta.url),
+    apiRoot: new URL('../..', import.meta.url)
+  });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -57,14 +60,28 @@ async function monitorApiResponses(page, { expectResponse = true } = {}) {
   };
 }
 
-async function signIn(page) {
-  await page.clock.setFixedTime(new Date('2026-07-30T12:00:00+10:00'));
-  await page.goto(baseUrl);
+async function signIn(page, { origin = baseUrl, fixedTime = true } = {}) {
+  if (fixedTime) await page.clock.setFixedTime(new Date('2026-07-30T12:00:00+10:00'));
+  await page.goto(origin);
   await page.locator('#sign-in-view').waitFor();
   await page.locator('#passphrase-input').fill(LOCAL_PASSPHRASE);
   await page.locator('#sign-in-button').click();
   await page.locator('#app[data-state="ready"]').waitFor();
   assert.equal(await page.locator('#passphrase-input').inputValue(), '');
+}
+
+async function startShortSessionServer(sessionMs) {
+  const shortServer = createStaticServer({
+    root: new URL('../../dist/', import.meta.url),
+    apiRoot: new URL('../..', import.meta.url),
+    sessionMs
+  });
+  shortServer.listen(0, '127.0.0.1');
+  await once(shortServer, 'listening');
+  return {
+    origin: `http://127.0.0.1:${shortServer.address().port}`,
+    close: () => shortServer.close()
+  };
 }
 
 async function waitForServiceWorkerControl(page) {
@@ -86,6 +103,22 @@ async function readHome(page) {
     mobileDisplay: getComputedStyle(document.querySelector('.mobile-nav')).display
   }));
 }
+
+test('browser-visible origin exposes the allowlisted publish artifact only', async () => {
+  const response = await fetch(`${baseUrl}/vendor/js-yaml.mjs`);
+  assert.equal(response.status, 200);
+
+  for (const path of [
+    '/central-node.md',
+    '/config/targets.yml',
+    '/tests/browser/home.spec.mjs',
+    '/scripts/serve.mjs',
+    '/netlify/functions/auth.mjs',
+    '/.env.example'
+  ]) {
+    assert.equal((await fetch(`${baseUrl}${path}`)).status, 404, path);
+  }
+});
 
 test('rejects the wrong passphrase and clears the password field', async () => {
   const context = await browser.newContext();
@@ -258,5 +291,79 @@ test('offline reload is limited to the authenticated tab before expiry', async (
 
   await assertFreshNoSecretResponses();
   await assertNoSecretResponses();
+  await context.close();
+});
+
+test('known server deadline hides private data when crossed online or offline', async t => {
+  const short = await startShortSessionServer(1_500);
+  t.after(short.close);
+
+  for (const offline of [false, true]) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await signIn(page, { origin: short.origin, fixedTime: false });
+    assert.equal(await page.locator('#app-shell').isVisible(), true);
+    if (offline) await context.setOffline(true);
+
+    await page.locator('#sign-in-view').waitFor({ state: 'visible', timeout: 5_000 });
+    assert.equal(await page.locator('#app-shell').isHidden(), true);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('life-hub:session-expiry')), null);
+    assert.match(await page.locator('#sign-in-error').textContent(), /session expired/i);
+    await context.close();
+  }
+});
+
+test('offline logout survives reload and clears the server cookie on reconnect', async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await signIn(page);
+  await waitForServiceWorkerControl(page);
+
+  await context.setOffline(true);
+  await page.locator('#sign-out-button').click();
+  await page.locator('#sign-in-view').waitFor();
+  await page.waitForFunction(() => localStorage.getItem('life-hub:logout-pending') === '1');
+  await page.reload();
+  await page.locator('#sign-in-view').waitFor();
+  assert.equal(await page.locator('#app-shell').isHidden(), true);
+
+  const completedLogout = page.waitForResponse(response => (
+    new URL(response.url()).pathname === '/api/logout' && response.status() === 204
+  ));
+  await context.setOffline(false);
+  await completedLogout;
+  await page.waitForFunction(() => localStorage.getItem('life-hub:logout-pending') === null);
+
+  assert.equal((await context.cookies()).some(cookie => cookie.name === 'life_hub_mock'), false);
+  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v1')), false);
+  await context.close();
+});
+
+test('rapid sign-in waits behind a delayed logout request', async () => {
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const page = await context.newPage();
+  let authRequests = 0;
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/auth') authRequests += 1;
+  });
+  await signIn(page);
+
+  let releaseLogout;
+  const logoutGate = new Promise(resolve => { releaseLogout = resolve; });
+  await page.route('**/api/logout', async route => {
+    await logoutGate;
+    await route.continue();
+  });
+  await page.locator('#sign-out-button').click();
+  await page.locator('#sign-in-view').waitFor();
+  await page.locator('#passphrase-input').fill(LOCAL_PASSPHRASE);
+  await page.locator('#sign-in-button').click();
+  await page.waitForTimeout(100);
+  assert.equal(authRequests, 1);
+
+  releaseLogout();
+  await page.locator('#app[data-state="ready"]').waitFor();
+  assert.equal(authRequests, 2);
+  assert.equal(await page.evaluate(() => localStorage.getItem('life-hub:logout-pending')), null);
   await context.close();
 });

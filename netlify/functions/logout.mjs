@@ -1,5 +1,5 @@
 import { serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
-import { errorResponse, methodNotAllowed, requireSameOrigin } from './_shared/http.mjs';
+import { guardRequestOrigin, methodNotAllowed } from './_shared/http.mjs';
 
 export const config = { path: '/api/logout' };
 
@@ -8,9 +8,8 @@ export function createLogoutHandler({
 } = {}) {
   return async function logoutHandler(request) {
     if (request.method !== 'POST') return methodNotAllowed('POST');
-    if (!requireSameOrigin(request)) {
-      return errorResponse(403, 'forbidden', 'This request origin is not allowed.', false);
-    }
+    const originError = guardRequestOrigin(request);
+    if (originError) return originError;
     return new Response(null, {
       status: 204,
       headers: {

@@ -7,18 +7,20 @@ export function createRepositoryCache(cacheStorage) {
   }
 
   return {
-    async read() {
+    async read(range) {
       const cache = await cacheStorage.open(CACHE_NAME);
-      const response = await cache.match(CACHE_KEY);
+      const response = await cache.match(rangeCacheKey(range));
       if (!response) return null;
       return response.json();
     },
 
-    async write({ manifest, files }) {
+    async write({ manifest, files, warnings = [] }) {
       const cache = await cacheStorage.open(CACHE_NAME);
-      await cache.put(CACHE_KEY, Response.json({
-        manifest: sanitizeManifest(manifest),
-        files: files.map(sanitizeFile)
+      const sanitizedManifest = sanitizeManifest(manifest);
+      await cache.put(rangeCacheKey(sanitizedManifest), Response.json({
+        manifest: sanitizedManifest,
+        files: files.map(sanitizeFile),
+        warnings: warnings.map(sanitizeWarning)
       }));
     },
 
@@ -39,6 +41,28 @@ function sanitizeManifest({ manifestId, commitSha, treeSha, from, to, files }) {
   };
 }
 
-function sanitizeFile({ path, sha, content }) {
-  return { path, sha, content };
+function sanitizeFile({ path, sha, content, fallback }) {
+  return {
+    path,
+    sha,
+    content,
+    ...(fallback && typeof fallback.contentSha === 'string' && typeof fallback.code === 'string'
+      ? { fallback: { contentSha: fallback.contentSha, code: fallback.code } }
+      : {})
+  };
+}
+
+function sanitizeWarning({ path, code }) {
+  return {
+    ...(typeof path === 'string' ? { path } : {}),
+    code: typeof code === 'string' ? code : 'invalid_file'
+  };
+}
+
+function rangeCacheKey(range) {
+  if (typeof range?.from !== 'string' || typeof range?.to !== 'string') {
+    throw new TypeError('An exact repository range is required');
+  }
+  const query = new URLSearchParams({ from: range.from, to: range.to });
+  return `${CACHE_KEY}?${query}`;
 }

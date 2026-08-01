@@ -17,7 +17,7 @@ export function createSessionApi(fetchImpl = fetch) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ passphrase })
     }),
-    signOut: () => requestJson(fetchImpl, '/api/logout', { method: 'POST' })
+    signOut: () => requestJson(fetchImpl, '/api/logout', { method: 'POST', keepalive: true })
   };
 }
 

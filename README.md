@@ -8,6 +8,8 @@ The read-only Home PWA is gated by a single-user passphrase and syncs allowliste
 
 Local development uses a fixture-backed mock of the same `/api/*` contract. Chat, writes, and domain detail views arrive in later phases.
 
+Both local development and Netlify serve the generated `dist/` artifact. The build copies only the browser shell, styles, application modules, icons, manifest, service worker, and generated `js-yaml` runtime. Repository Markdown, configuration, tests, scripts, dotfiles, and Netlify Function source are outside the public directory.
+
 ## Run locally
 
 Requires Node.js 22 or later.
@@ -20,6 +22,12 @@ npm run dev
 Open the local URL printed in the terminal.
 
 The local-only passphrase is `life-hub-local`. It is isolated to the mock server and tests and is not a production credential. Local repository reads use checked-in fixtures and never contact GitHub.
+
+To inspect the same static artifact Netlify publishes without starting the server:
+
+```bash
+npm run build
+```
 
 ## Configure a Netlify preview
 
@@ -43,6 +51,10 @@ GITHUB_TOKEN_EXPIRES=<YYYY-MM-DD>
 ```
 
 Use `.env.example` only as a symbolic checklist. This branch and its pull request deliberately contain no production credentials, and production providers remain disconnected until deployment review.
+
+`GITHUB_TOKEN_EXPIRES` is required and must be a real calendar date. Health treats the token as expired from the start of that date in `Australia/Sydney` (`expiry <= today`), and reports an upcoming expiry during the preceding fourteen Sydney calendar days.
+
+The committed `netlify.toml` runs the allowlisted build, publishes only `dist/`, and deploys functions separately from `netlify/functions`.
 
 After deploying a preview, inspect its deploy log and confirm Netlify registered the `/api/auth` code-based rate limit: five requests per 60 seconds, aggregated by IP and domain. Do not promote a deploy if that rule is absent.
 

@@ -16,12 +16,16 @@ export async function loadLiveEvents({ sync, loadYaml, date }) {
   let to = date;
   let commitSha = null;
   let priorBoundary = null;
+  let changed = false;
+  let freshness = 'confirmed';
   const filesByPath = new Map();
   const warnings = [];
 
   while (true) {
     const result = await sync({ from, to, validateFile: createValidator(loadYaml) });
     commitSha = result.commitSha ?? commitSha;
+    changed ||= result.changed === true;
+    if (result.freshness === 'fallback') freshness = 'fallback';
     warnings.push(...(result.warnings ?? []));
 
     for (const file of result.files ?? []) {
@@ -50,7 +54,9 @@ export async function loadLiveEvents({ sync, loadYaml, date }) {
     events: parsed.events,
     targetsConfig: parsed.targetsConfig,
     warnings: [...warnings, ...parsed.warnings],
-    commitSha
+    commitSha,
+    changed,
+    freshness
   };
 }
 

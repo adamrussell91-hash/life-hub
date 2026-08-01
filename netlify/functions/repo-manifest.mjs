@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { serializeExpiredSessionCookie, verifySessionToken } from './_shared/auth-security.mjs';
 import {
   errorResponse,
+  guardRequestOrigin,
   isConfigured,
   jsonResponse,
   methodNotAllowed,
@@ -30,6 +31,8 @@ export function createRepoManifestHandler({
 } = {}) {
   return async function repoManifestHandler(request) {
     if (request.method !== 'GET') return withPrivateCache(methodNotAllowed('GET'));
+    const originError = guardRequestOrigin(request);
+    if (originError) return withPrivateCache(originError);
     if (!isConfigured(env)) return withPrivateCache(misconfiguredResponse());
 
     let session;

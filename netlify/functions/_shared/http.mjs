@@ -19,7 +19,15 @@ export function errorResponse(status, code, message, retryable, headers = {}) {
 
 export function requireSameOrigin(request) {
   const origin = request.headers.get('origin');
-  return origin === null || origin === new URL(request.url).origin;
+  const fetchSite = request.headers.get('sec-fetch-site');
+  return (origin === null || origin === new URL(request.url).origin) &&
+    (fetchSite === null || fetchSite.toLowerCase() === 'same-origin');
+}
+
+export function guardRequestOrigin(request) {
+  return requireSameOrigin(request)
+    ? null
+    : errorResponse(403, 'forbidden', 'This request origin is not allowed.', false);
 }
 
 export function readCookie(request, name) {

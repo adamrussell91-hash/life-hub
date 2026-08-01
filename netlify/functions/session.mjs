@@ -1,6 +1,7 @@
 import { serializeExpiredSessionCookie, verifySessionToken } from './_shared/auth-security.mjs';
 import {
   errorResponse,
+  guardRequestOrigin,
   isConfigured,
   jsonResponse,
   methodNotAllowed,
@@ -18,6 +19,8 @@ export function createSessionHandler({
 } = {}) {
   return async function sessionHandler(request) {
     if (request.method !== 'GET') return methodNotAllowed('GET');
+    const originError = guardRequestOrigin(request);
+    if (originError) return originError;
     if (!isConfigured(env)) return misconfiguredResponse();
 
     let session;

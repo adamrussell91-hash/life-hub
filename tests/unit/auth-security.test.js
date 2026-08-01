@@ -25,6 +25,7 @@ test('signed session expires after eight hours and rejects tampering', () => {
     randomBytes: () => Buffer.alloc(16, 3)
   }, secret);
   assert.equal(verifySessionToken(issued.token, secret, Date.parse('2026-08-01T07:59:59Z')).valid, true);
+  assert.equal(verifySessionToken(issued.token, secret, Date.parse('2026-08-01T08:00:00Z')).reason, 'expired');
   assert.equal(verifySessionToken(`${issued.token}x`, secret, Date.parse('2026-08-01T01:00:00Z')).valid, false);
   assert.equal(verifySessionToken(issued.token, secret, Date.parse('2026-08-01T08:00:01Z')).reason, 'expired');
 });

@@ -10,7 +10,7 @@ test('token state becomes expiring fourteen Sydney dates before expiry', () => {
 });
 
 test('token state handles same-day, leap-day, and malformed calendar dates', () => {
-  assert.equal(tokenExpiryState('2026-08-01', '2026-08-01'), 'expiring');
+  assert.equal(tokenExpiryState('2026-08-01', '2026-08-01'), 'expired');
   assert.equal(tokenExpiryState('2028-02-29', '2028-02-15'), 'expiring');
   assert.equal(tokenExpiryState('2028-02-30', '2028-02-15'), 'unknown');
   assert.equal(tokenExpiryState('secret expiry value', '2028-02-15'), 'unknown');

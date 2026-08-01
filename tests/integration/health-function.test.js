@@ -128,6 +128,29 @@ test('health maps missing provider environment to a sanitized misconfigured stat
   assert.equal(text.includes('secret expiry value'), false);
 });
 
+test('health requires a canonical GitHub token expiry before provider work', async () => {
+  for (const expiry of [undefined, '', '2026-02-30', 'secret expiry value']) {
+    const provider = createClientSequence([{ commitSha: 'a'.repeat(40), tree: [] }]);
+    const response = await createHealthHandler({
+      env: { ...validEnv, GITHUB_TOKEN_EXPIRES: expiry },
+      now: () => BASE_NOW,
+      createGitHubClient: provider.createClient
+    })(request());
+    const text = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(JSON.parse(text).data, {
+      github: 'misconfigured',
+      token: 'unknown',
+      expiresOn: null,
+      code: 'misconfigured',
+      retryable: false
+    });
+    assert.deepEqual(provider.calls, { create: 0, resolve: 0 });
+    assert.equal(text.includes('secret expiry value'), false);
+  }
+});
+
 test('health sanitizes provider failures and never caches them', async () => {
   const privateMessage = `private upstream ${TOKEN}`;
   const provider = createClientSequence([

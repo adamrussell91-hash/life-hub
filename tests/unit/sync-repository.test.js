@@ -70,7 +70,8 @@ test('unchanged range-specific manifest uses its manifestId and makes zero file 
     warnings: [],
     commitSha: SHA.c,
     manifestId: 'range-specific-id',
-    changed: false
+    changed: false,
+    freshness: 'confirmed'
   });
   assert.equal(cache.writes.length, 0);
 });
@@ -102,6 +103,7 @@ test('a cached manifest from another range is never sent as a conditional', asyn
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].init.headers, {});
   assert.equal(result.manifestId, 'july-range');
+  assert.equal(result.freshness, 'confirmed');
   assert.deepEqual(cache.value.manifest, nextManifest);
 });
 
@@ -142,8 +144,9 @@ test('changed manifest requests one exact pair and atomically replaces the cache
     { path: 'b.md', sha: SHA.b, content: 'B' }
   ]);
   assert.equal(result.changed, true);
+  assert.equal(result.freshness, 'confirmed');
   assert.equal(cache.writes.length, 1);
-  assert.deepEqual(cache.value, { manifest: nextManifest, files: result.files });
+  assert.deepEqual(cache.value, { manifest: nextManifest, files: result.files, warnings: [] });
 });
 
 test('changed files are split into batches of at most fifty files and one MiB', async () => {
@@ -202,7 +205,8 @@ test('provider failure returns prior content with a stable warning and does not 
     warnings: [{ code: 'github_unavailable' }],
     commitSha: SHA.c,
     manifestId: 'old-range',
-    changed: false
+    changed: false,
+    freshness: 'fallback'
   });
   assert.equal(cache.writes.length, 0);
 });
@@ -234,10 +238,20 @@ test('invalid changed content retains prior valid content under the new remote S
       : { valid: false, code: 'invalid_event' }
   });
 
-  assert.deepEqual(result.files, [{ path: 'a.md', sha: SHA.b, content: 'valid old content' }]);
+  assert.deepEqual(result.files, [{
+    path: 'a.md',
+    sha: SHA.b,
+    content: 'valid old content',
+    fallback: { contentSha: SHA.a, code: 'invalid_event' }
+  }]);
   assert.deepEqual(result.warnings, [{ path: 'a.md', code: 'invalid_event' }]);
+  assert.equal(result.freshness, 'fallback');
   assert.equal(fileCalls, 1);
-  assert.deepEqual(cache.value, { manifest: nextManifest, files: result.files });
+  assert.deepEqual(cache.value, {
+    manifest: nextManifest,
+    files: result.files,
+    warnings: [{ path: 'a.md', code: 'invalid_event' }]
+  });
 });
 
 test('mismatched file response falls back without partially replacing the cache', async () => {
@@ -260,7 +274,208 @@ test('mismatched file response falls back without partially replacing the cache'
 
   assert.deepEqual(result.files, previous.files);
   assert.deepEqual(result.warnings, [{ code: 'github_invalid_response' }]);
+  assert.equal(result.freshness, 'fallback');
   assert.equal(cache.writes.length, 0);
+});
+
+test('invalid fallback provenance and warning survive 304 and offline refreshes', async () => {
+  const oldManifest = manifest('old-range', [file('a.md', SHA.a)]);
+  const nextManifest = manifest('new-range', [file('a.md', SHA.b)]);
+  const cache = memoryCache({
+    manifest: oldManifest,
+    files: [{ path: 'a.md', sha: SHA.a, content: 'valid old content' }],
+    warnings: []
+  });
+  let phase = 'invalid';
+  const fetchImpl = async url => {
+    if (phase === 'offline') throw new TypeError('offline');
+    if (url.startsWith('/api/repo/manifest')) {
+      return phase === 'unchanged' ? new Response(null, { status: 304 }) : json(nextManifest);
+    }
+    return json({
+      commitSha: SHA.c,
+      files: [{ path: 'a.md', sha: SHA.b, content: 'invalid new content' }]
+    });
+  };
+  const options = {
+    fetchImpl,
+    cache,
+    from: '2026-07-01',
+    to: '2026-07-31',
+    validateFile: candidate => candidate.content.startsWith('valid')
+      ? { valid: true }
+      : { valid: false, code: 'invalid_event' }
+  };
+
+  const invalid = await syncRepository(options);
+  phase = 'unchanged';
+  const unchanged = await syncRepository(options);
+  phase = 'offline';
+  const offline = await syncRepository(options);
+
+  assert.deepEqual(cache.value.files, [{
+    path: 'a.md',
+    sha: SHA.b,
+    content: 'valid old content',
+    fallback: { contentSha: SHA.a, code: 'invalid_event' }
+  }]);
+  assert.deepEqual(cache.value.warnings, [{ path: 'a.md', code: 'invalid_event' }]);
+  assert.deepEqual(invalid.warnings, [{ path: 'a.md', code: 'invalid_event' }]);
+  assert.deepEqual(unchanged.warnings, [{ path: 'a.md', code: 'invalid_event' }]);
+  assert.deepEqual(offline.warnings, [
+    { path: 'a.md', code: 'invalid_event' },
+    { code: 'github_unavailable' }
+  ]);
+  assert.equal(invalid.freshness, 'fallback');
+  assert.equal(unchanged.freshness, 'fallback');
+  assert.equal(unchanged.changed, false);
+  assert.equal(offline.freshness, 'fallback');
+});
+
+test('retained fallback warnings survive a later 200 manifest for an unrelated file', async () => {
+  const oldManifest = manifest('old-range', [file('a.md', SHA.a)]);
+  const invalidManifest = manifest('invalid-range', [file('a.md', SHA.b)]);
+  const unrelatedManifest = manifest('unrelated-range', [
+    file('a.md', SHA.b),
+    file('c.md', SHA.c)
+  ], SHA.d);
+  const cache = memoryCache({
+    manifest: oldManifest,
+    files: [{ path: 'a.md', sha: SHA.a, content: 'valid old content' }],
+    warnings: []
+  });
+  let phase = 'invalid';
+  const fetchImpl = async url => {
+    if (url.startsWith('/api/repo/manifest')) {
+      return json(phase === 'invalid' ? invalidManifest : unrelatedManifest);
+    }
+    return phase === 'invalid'
+      ? json({
+          commitSha: SHA.c,
+          files: [{ path: 'a.md', sha: SHA.b, content: 'invalid new content' }]
+        })
+      : json({
+          commitSha: SHA.d,
+          files: [{ path: 'c.md', sha: SHA.c, content: 'valid unrelated content' }]
+        });
+  };
+  const options = {
+    fetchImpl,
+    cache,
+    from: '2026-07-01',
+    to: '2026-07-31',
+    validateFile: candidate => candidate.content.startsWith('valid')
+      ? { valid: true }
+      : { valid: false, code: 'invalid_event' }
+  };
+
+  await syncRepository(options);
+  phase = 'unrelated';
+  const result = await syncRepository(options);
+
+  assert.deepEqual(result.files, [
+    {
+      path: 'a.md',
+      sha: SHA.b,
+      content: 'valid old content',
+      fallback: { contentSha: SHA.a, code: 'invalid_event' }
+    },
+    { path: 'c.md', sha: SHA.c, content: 'valid unrelated content' }
+  ]);
+  assert.deepEqual(result.warnings, [{ path: 'a.md', code: 'invalid_event' }]);
+  assert.equal(result.freshness, 'fallback');
+  assert.deepEqual(cache.value.warnings, [{ path: 'a.md', code: 'invalid_event' }]);
+});
+
+test('malformed manifest falls back visibly without replacing a warm cache', async () => {
+  const previous = {
+    manifest: manifest('old-range', [file('a.md', SHA.a)]),
+    files: [{ path: 'a.md', sha: SHA.a, content: 'A' }],
+    warnings: []
+  };
+  const cache = memoryCache(previous);
+  const response = await syncRepository({
+    fetchImpl: async () => Response.json({ ok: true, data: { malformed: true } }),
+    cache,
+    from: '2026-07-01',
+    to: '2026-07-31',
+    validateFile: () => ({ valid: true })
+  });
+
+  assert.deepEqual(response.files, previous.files);
+  assert.deepEqual(response.warnings, [{ code: 'github_invalid_response' }]);
+  assert.equal(response.changed, false);
+  assert.equal(response.freshness, 'fallback');
+  assert.equal(cache.writes.length, 0);
+});
+
+test('stale manifest replays the whole cycle once and commits only the current manifest', async () => {
+  const firstManifest = manifest('first', [file('a.md', SHA.a)], SHA.c);
+  const currentManifest = manifest('current', [file('b.md', SHA.b)], SHA.d);
+  const cache = memoryCache();
+  const calls = [];
+  const responses = [
+    json(firstManifest),
+    Response.json({ ok: false, error: { code: 'stale_manifest' } }, { status: 409 }),
+    json(currentManifest),
+    json({ commitSha: SHA.d, files: [{ path: 'b.md', sha: SHA.b, content: 'B' }] })
+  ];
+  const result = await syncRepository({
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return responses.shift();
+    },
+    cache,
+    from: '2026-07-01',
+    to: '2026-07-31',
+    validateFile: () => ({ valid: true })
+  });
+
+  assert.deepEqual(calls.map(call => call.url), [
+    '/api/repo/manifest?from=2026-07-01&to=2026-07-31',
+    '/api/repo/files',
+    '/api/repo/manifest?from=2026-07-01&to=2026-07-31',
+    '/api/repo/files'
+  ]);
+  assert.deepEqual(result.files, [{ path: 'b.md', sha: SHA.b, content: 'B' }]);
+  assert.equal(result.manifestId, 'current');
+  assert.equal(result.freshness, 'confirmed');
+  assert.equal(cache.writes.length, 1);
+});
+
+test('a second stale manifest falls back visibly when warm and fails when cold', async () => {
+  const cached = {
+    manifest: manifest('cached', [file('a.md', SHA.a)]),
+    files: [{ path: 'a.md', sha: SHA.a, content: 'A' }],
+    warnings: []
+  };
+  const changingManifest = manifest('moving', [file('b.md', SHA.b)]);
+  const fetchSequence = () => {
+    const responses = [
+      json(changingManifest),
+      new Response(null, { status: 409 }),
+      json(changingManifest),
+      new Response(null, { status: 409 })
+    ];
+    return async () => responses.shift();
+  };
+  const common = {
+    from: '2026-07-01',
+    to: '2026-07-31',
+    validateFile: () => ({ valid: true })
+  };
+
+  const warmCache = memoryCache(cached);
+  const warm = await syncRepository({ ...common, cache: warmCache, fetchImpl: fetchSequence() });
+  assert.deepEqual(warm.files, cached.files);
+  assert.deepEqual(warm.warnings, [{ code: 'stale_manifest' }]);
+  assert.equal(warm.freshness, 'fallback');
+  assert.equal(warmCache.writes.length, 0);
+
+  await assert.rejects(
+    syncRepository({ ...common, cache: memoryCache(), fetchImpl: fetchSequence() }),
+    error => error instanceof SyncError && error.code === 'stale_manifest'
+  );
 });
 
 test('unauthenticated responses raise a stable session-expired error', async () => {
