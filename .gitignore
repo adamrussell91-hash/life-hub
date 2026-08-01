@@ -3,8 +3,10 @@ node_modules/
 .env
 .env.*
 !.env.example
+.auth-secrets
 coverage/
 test-results/
 playwright-report/
 /vendor/
+/dist/
 .DS_Store

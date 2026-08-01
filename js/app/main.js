@@ -1,66 +1,57 @@
 import { load } from '/vendor/js-yaml.mjs';
-import { loadEventManifest } from './load-events.js';
-import { buildHomeModel, selectDisplayDate } from './home-model.js';
+import { createSessionApi } from './api-session.js';
+import { createAppController } from './app-controller.js';
+import { buildHomeModel } from './home-model.js';
+import { loadLiveEvents } from './load-live-events.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
+import { createRepositoryCache } from './repository-cache.js';
+import { syncRepository } from './sync-repository.js';
 
-const LAST_SUCCESS_KEY = 'life-hub:last-success';
+const fetchImpl = (...args) => fetch(...args);
+const cache = createRepositoryCache(caches);
+const sessionApi = createSessionApi(fetchImpl);
 
-function updateNetworkStatus(root = document) {
-  const chip = root.querySelector('#network-status');
-  if (!chip) return;
-  chip.hidden = navigator.onLine;
-  if (!navigator.onLine) {
-    const savedAt = localStorage.getItem(LAST_SUCCESS_KEY);
-    chip.querySelector('span:last-child').textContent = savedAt
-      ? `Offline · saved ${new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit' }).format(new Date(savedAt))}`
-      : 'Offline · saved view';
-  }
-}
+const loadLive = ({ date, signal }) => loadLiveEvents({
+  date,
+  loadYaml: load,
+  sync: options => syncRepository({ ...options, fetchImpl, cache, signal })
+});
 
-export async function startApp({ root = document, fetchImpl = fetch } = {}) {
-  root.querySelector('#app')?.setAttribute('data-state', 'loading');
-  try {
-    const [source, targetsResponse] = await Promise.all([
-      loadEventManifest({ fetchImpl, loadYaml: load }),
-      fetchImpl('/config/targets.yml')
-    ]);
-    if (!targetsResponse.ok) throw new Error('Targets are unavailable');
-
-    const date = selectDisplayDate(source.events);
-    const model = buildHomeModel({
-      events: source.events,
-      targetsConfig: load(await targetsResponse.text()),
-      date
-    });
-    renderHome(root, model);
-    renderWarnings(root, source.warnings);
-    localStorage.setItem(LAST_SUCCESS_KEY, new Date().toISOString());
-    updateNetworkStatus(root);
-  } catch {
-    renderUnavailable(
-      root,
-      'Life Hub could not load its saved data. Check your connection and try again.'
-    );
-  }
-}
-
-function bindInterface(root = document) {
-  root.querySelector('#retry-button')?.addEventListener('click', () => startApp({ root }));
-
-  root.querySelectorAll('[data-section]').forEach(button => {
-    if (button.dataset.section === 'home') return;
-    button.addEventListener('click', () => {
-      const status = root.querySelector('#app-status');
-      if (status) status.textContent = 'This section arrives in a later Life Hub phase.';
-    });
+const loadCached = async ({ date }) => {
+  return loadLiveEvents({
+    date,
+    loadYaml: load,
+    sync: async ({ from, to }) => {
+      const snapshot = await cache.read({ from, to });
+      if (!snapshot) throw new Error('Private cache is unavailable');
+      return {
+        files: snapshot.files,
+        warnings: snapshot.warnings ?? [],
+        commitSha: snapshot.manifest.commitSha,
+        manifestId: snapshot.manifest.manifestId,
+        changed: false,
+        freshness: 'fallback'
+      };
+    }
   });
+};
 
-  window.addEventListener('online', () => updateNetworkStatus(root));
-  window.addEventListener('offline', () => updateNetworkStatus(root));
-}
+const controller = createAppController({
+  root: document,
+  sessionApi,
+  cache,
+  loadLive,
+  loadCached,
+  buildHomeModel,
+  renderHome,
+  renderWarnings,
+  renderUnavailable,
+  fetchImpl,
+  sessionStorage,
+  localStorage
+});
 
-bindInterface();
-startApp();
+controller.start();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/service-worker.js').catch(() => undefined);

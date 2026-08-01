@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createMockApi } from './mock-api.mjs';
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -25,10 +26,13 @@ const send = (response, status, body, contentType = 'text/plain; charset=utf-8')
   response.end(body);
 };
 
-export function createStaticServer({ root }) {
+export function createStaticServer({ root, apiRoot = new URL('../', import.meta.url), now, sessionMs } = {}) {
   const rootPath = resolve(root instanceof URL ? fileURLToPath(root) : root);
+  const handleMockApi = createMockApi({ root: apiRoot, now, sessionMs });
 
   return createServer(async (request, response) => {
+    if (await handleMockApi(request, response)) return;
+
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       send(response, 405, 'Method not allowed');
       return;
@@ -71,7 +75,10 @@ const invokedDirectly = process.argv[1]
 if (invokedDirectly) {
   const host = '127.0.0.1';
   const port = Number(process.env.PORT ?? 4173);
-  const server = createStaticServer({ root: new URL('../', import.meta.url) });
+  const server = createStaticServer({
+    root: new URL('../dist/', import.meta.url),
+    apiRoot: new URL('../', import.meta.url)
+  });
   server.listen(port, host, () => {
     process.stdout.write(`Life Hub ready at http://${host}:${port}/\n`);
   });
