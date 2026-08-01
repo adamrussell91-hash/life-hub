@@ -16,7 +16,8 @@ const validEnv = {
   SESSION_SECRET: SECRET,
   GITHUB_REPOSITORY: 'life-owner/life-repo',
   GITHUB_BRANCH: 'feature/live-sync',
-  GITHUB_TOKEN: TOKEN
+  GITHUB_TOKEN: TOKEN,
+  GITHUB_TOKEN_EXPIRES: '2026-09-01'
 };
 const session = createSessionToken({
   now: Date.parse('2026-08-01T00:00:00Z'),
@@ -30,17 +31,50 @@ function request(query = '?from=2026-07-02&to=2026-08-01', headers = {}, method 
   });
 }
 
-function createGitHubFetch({ tree = standardTree(), status = 200, upstreamBody = { private: 'do not expose' } } = {}) {
+function createGitHubFetch({
+  tree = standardTree(),
+  status = 200,
+  upstreamBody = { private: 'do not expose' },
+  responseHeaders = {}
+} = {}) {
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push({ url, options });
-    if (status !== 200) return Response.json(upstreamBody, { status });
+    if (status !== 200) return Response.json(upstreamBody, { status, headers: responseHeaders });
     if (url.includes('/commits/')) {
       return Response.json({ sha: COMMIT_SHA, commit: { tree: { sha: TREE_SHA } } });
     }
     return Response.json(tree);
   };
   return { calls, fetchImpl };
+}
+
+for (const responseHeaders of [
+  { 'x-ratelimit-remaining': '0' },
+  { 'retry-after': '60' }
+]) {
+  test(`manifest recognizes a GitHub 403 rate limit from ${Object.keys(responseHeaders)[0]}`, async () => {
+    const github = createGitHubFetch({
+      status: 403,
+      responseHeaders,
+      upstreamBody: { message: `private upstream ${TOKEN}` }
+    });
+    const response = await createRepoManifestHandler({
+      env: validEnv,
+      now: () => Date.parse('2026-08-01T01:00:00Z'),
+      fetchImpl: github.fetchImpl
+    })(request());
+    const text = await response.text();
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(JSON.parse(text).error, {
+      code: 'github_rate_limited',
+      message: 'The repository is temporarily unavailable.',
+      retryable: true
+    });
+    assert.equal(text.includes(TOKEN), false);
+    assert.equal(text.includes('private upstream'), false);
+  });
 }
 
 function standardTree() {

@@ -2,6 +2,7 @@ import { getSydneyDateKey } from '../core/time.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
 const LAST_SUCCESS_KEY = 'life-hub:last-success';
+const LOGOUT_PENDING_KEY = 'life-hub:logout-pending';
 const REFRESH_INTERVAL_MS = 120_000;
 const GENERIC_LOAD_ERROR = 'Life Hub could not load your data. Check your connection and try again.';
 
@@ -24,7 +25,9 @@ export function createAppController(dependencies) {
     localStorage,
     now = () => new Date(),
     setIntervalImpl = setInterval,
-    clearIntervalImpl = clearInterval
+    clearIntervalImpl = clearInterval,
+    setTimeoutImpl = setTimeout,
+    clearTimeoutImpl = clearTimeout
   } = dependencies ?? {};
 
   if (!root || !sessionApi || !cache || typeof loadLive !== 'function' ||
@@ -39,6 +42,9 @@ export function createAppController(dependencies) {
   let refreshAbortController = null;
   let lifecycleVersion = 0;
   let intervalId = null;
+  let expiryTimeoutId = null;
+  let pendingLogoutPromise = null;
+  let pendingLogoutCleanupPromise = null;
   let destroyed = false;
   const listeners = [];
 
@@ -53,64 +59,93 @@ export function createAppController(dependencies) {
     if (button.dataset.section === 'home') continue;
     bind(button, 'click', () => setStatus('This section arrives in a later Life Hub phase.'));
   }
-  bind(windowTarget, 'online', updateNetworkState);
-  bind(windowTarget, 'offline', updateNetworkState);
-  bind(documentTarget, 'visibilitychange', () => {
-    if (documentTarget.visibilityState === 'visible' && authenticated) void refresh();
-  });
+  bind(windowTarget, 'online', () => void handleOnline());
+  bind(windowTarget, 'offline', () => handleOffline());
+  bind(documentTarget, 'visibilitychange', () => void handleVisibilityChange());
 
   async function start() {
     if (destroyed) return;
+    const version = ++lifecycleVersion;
     setAppState('loading');
-    try {
-      const session = await sessionApi.getSession();
-      if (!session?.authenticated || !validFutureExpiry(session.expiresAt)) {
+    restoreLastSuccess();
+
+    if (hasPendingLogout() || pendingLogoutCleanupPromise) {
+      const settled = await settleLogoutBarrier();
+      if (!isCurrentLifecycle(version)) return;
+      if (!settled) {
         showSignedOut();
         return;
       }
-      rememberExpiry(session.expiresAt);
+    }
+
+    try {
+      const session = await sessionApi.getSession();
+      if (!isCurrentLifecycle(version)) return;
+      if (!session?.authenticated || !validFutureExpiry(session.expiresAt)) {
+        invalidateSession();
+        return;
+      }
+      acceptExpiry(session.expiresAt);
       authenticated = true;
       showAuthenticated();
       await refresh();
-      if (authenticated) scheduleRefresh();
+      if (isCurrentLifecycle(version) && authenticated) scheduleRefresh();
     } catch (error) {
+      if (!isCurrentLifecycle(version)) return;
       if (canUseOfflineCache(error)) {
-        await showOfflineCache();
+        await showOfflineCache(version);
         return;
       }
-      showSignedOut();
+      invalidateSession();
     }
   }
 
   async function signIn(passphrase) {
     if (destroyed) return;
+    const version = ++lifecycleVersion;
+    abortActiveRefresh(new DOMException('New sign-in lifecycle', 'AbortError'));
     setSignInBusy(true);
     clearSignInError();
     try {
+      if ((hasPendingLogout() || pendingLogoutCleanupPromise) && !await settleLogoutBarrier()) {
+        if (!isCurrentLifecycle(version)) return;
+        throw Object.assign(new Error('Logout pending'), { code: 'logout_pending' });
+      }
+      if (!isCurrentLifecycle(version)) return;
       const session = await sessionApi.signIn(passphrase);
-      if (!session?.authenticated || !validFutureExpiry(session.expiresAt)) throw new Error('Invalid session');
-      rememberExpiry(session.expiresAt);
+      if (!isCurrentLifecycle(version)) return;
+      if (!session?.authenticated || !validFutureExpiry(session.expiresAt)) {
+        clearPassphrase();
+        invalidateSession();
+        return;
+      }
+      acceptExpiry(session.expiresAt);
       authenticated = true;
       clearPassphrase();
       showAuthenticated();
       await refresh();
-      if (authenticated) scheduleRefresh();
+      if (isCurrentLifecycle(version) && authenticated) scheduleRefresh();
     } catch (error) {
+      if (!isCurrentLifecycle(version)) return;
       authenticated = false;
-      forgetExpiry();
+      clearSessionExpiry();
       setSignInBusy(false);
       clearPassphrase();
       showSignedOut(error?.status === 401
         ? 'That passphrase was not accepted.'
         : 'Sign-in is unavailable right now. Please try again.');
     } finally {
-      setSignInBusy(false);
+      if (isCurrentLifecycle(version)) {
+        clearPassphrase();
+        setSignInBusy(false);
+      }
     }
   }
 
   function refresh(options = {}) {
     if (destroyed) return Promise.resolve();
     if (activeRefresh) return activeRefresh;
+    if (!requireUnexpiredSession()) return Promise.resolve();
     if (!navigatorTarget.onLine && rendered) {
       updateNetworkState();
       return Promise.resolve();
@@ -125,27 +160,32 @@ export function createAppController(dependencies) {
     const version = lifecycleVersion;
     const abortController = new AbortController();
     refreshAbortController = abortController;
-    activeRefresh = performRefresh({ signal: abortController.signal, version })
+    const refreshPromise = performRefresh({ signal: abortController.signal, version })
       .finally(() => {
+        if (activeRefresh !== refreshPromise) return;
         if (button) button.disabled = !navigatorTarget.onLine;
         if (refreshAbortController === abortController) refreshAbortController = null;
         activeRefresh = null;
       });
-    return activeRefresh;
+    activeRefresh = refreshPromise;
+    return refreshPromise;
   }
 
   async function performRefresh({ signal, version }) {
     try {
       const date = getSydneyDateKey(currentDate());
       const result = await loadLive({ date, signal });
-      if (!isCurrentRefresh(version, signal)) return;
-      const model = buildHomeModel({ ...result, date });
-      renderHome(root, model);
+      if (!isCurrentRefresh(version, signal) || !requireUnexpiredSession()) return;
+      if (!rendered || result.changed === true) {
+        const model = buildHomeModel({ ...result, date });
+        renderHome(root, model);
+      }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
       rendered = true;
-      recordSuccess();
+      if (result.freshness === 'confirmed') recordSuccess();
+      else restoreLastSuccess();
 
-      const stale = result.warnings.some(warning => warning.code === 'github_unavailable');
+      const stale = result.freshness === 'fallback';
       if (stale) {
         showProvider('GitHub is unavailable. Showing your last saved view.', 'warning');
         setAppState('stale');
@@ -160,8 +200,7 @@ export function createAppController(dependencies) {
     } catch (error) {
       if (!isCurrentRefresh(version, signal)) return;
       if (isSessionExpired(error)) {
-        forgetExpiry();
-        showSignedOut('Your session expired. Please sign in again.');
+        invalidateSession('Your session expired. Please sign in again.');
         return;
       }
       if (rendered) {
@@ -182,8 +221,7 @@ export function createAppController(dependencies) {
     }
     if (!isCurrentRefresh(version, signal)) return;
     if (response.status === 401) {
-      forgetExpiry();
-      showSignedOut('Your session expired. Please sign in again.');
+      invalidateSession('Your session expired. Please sign in again.');
       return;
     }
     if (!response.ok) return;
@@ -202,10 +240,12 @@ export function createAppController(dependencies) {
     }
   }
 
-  async function showOfflineCache() {
+  async function showOfflineCache(version) {
     try {
+      if (!requireUnexpiredSession()) return;
       const date = getSydneyDateKey(currentDate());
       const result = await loadCached({ date });
+      if (!isCurrentLifecycle(version) || !requireUnexpiredSession()) return;
       const model = buildHomeModel({ ...result, date });
       renderHome(root, model);
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
@@ -226,27 +266,22 @@ export function createAppController(dependencies) {
     lifecycleVersion += 1;
     authenticated = false;
     clearRefreshTimer();
-    forgetExpiry();
+    clearSessionExpiry();
     rendered = false;
+    clearPassphrase();
     showSignedOut();
-    refreshAbortController?.abort(new DOMException('Signed out', 'AbortError'));
-
-    try {
-      Promise.resolve(sessionApi.signOut()).catch(() => undefined);
-    } catch {
-      // The server request is best effort; local privacy cleanup is authoritative.
-    }
-
-    await cache.clear();
-    if (refreshToSettle) {
-      await refreshToSettle.catch(() => undefined);
-      await cache.clear();
-    }
+    abortActiveRefresh(new DOMException('Signed out', 'AbortError'));
+    localStorage.setItem(LOGOUT_PENDING_KEY, '1');
+    void settlePendingLogout();
+    await beginLogoutCleanup(refreshToSettle);
   }
 
   function destroy() {
     destroyed = true;
+    lifecycleVersion += 1;
     clearRefreshTimer();
+    clearSessionExpiryTimer();
+    abortActiveRefresh(new DOMException('Application destroyed', 'AbortError'));
     for (const [target, type, listener] of listeners.splice(0)) {
       target.removeEventListener(type, listener);
     }
@@ -261,10 +296,8 @@ export function createAppController(dependencies) {
   function scheduleRefresh() {
     if (intervalId !== null || destroyed) return;
     intervalId = setIntervalImpl(() => {
-      if (authenticated && !validFutureExpiry(sessionStorage.getItem(SESSION_EXPIRY_KEY))) {
-        forgetExpiry();
-        showSignedOut('Your session expired. Please sign in again.');
-      } else if (documentTarget.visibilityState === 'visible' && authenticated && navigatorTarget.onLine) {
+      if (authenticated && !requireUnexpiredSession()) return;
+      if (documentTarget.visibilityState === 'visible' && authenticated && navigatorTarget.onLine) {
         void refresh();
       }
     }, REFRESH_INTERVAL_MS);
@@ -286,6 +319,8 @@ export function createAppController(dependencies) {
   function showSignedOut(message = '') {
     authenticated = false;
     clearRefreshTimer();
+    clearSessionExpiryTimer();
+    setSignInBusy(false);
     const signInView = root.querySelector('#sign-in-view');
     const shell = root.querySelector('#app-shell');
     if (signInView) signInView.hidden = false;
@@ -356,6 +391,16 @@ export function createAppController(dependencies) {
   function recordSuccess() {
     const instant = currentDate();
     localStorage.setItem(LAST_SUCCESS_KEY, instant.toISOString());
+    renderLastSuccess(instant);
+  }
+
+  function restoreLastSuccess() {
+    const timestamp = localStorage.getItem(LAST_SUCCESS_KEY);
+    const instant = new Date(timestamp ?? '');
+    if (Number.isFinite(instant.getTime())) renderLastSuccess(instant);
+  }
+
+  function renderLastSuccess(instant) {
     const element = root.querySelector('#last-synced');
     if (element) element.textContent = `Last synced ${new Intl.DateTimeFormat('en-AU', {
       hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Sydney'
@@ -371,12 +416,37 @@ export function createAppController(dependencies) {
     if (offline && rendered) setAppState('offline');
   }
 
-  function rememberExpiry(expiry) {
+  function acceptExpiry(expiry) {
     sessionStorage.setItem(SESSION_EXPIRY_KEY, expiry);
+    scheduleSessionExpiry(expiry);
   }
 
-  function forgetExpiry() {
+  function clearSessionExpiry() {
     sessionStorage.removeItem(SESSION_EXPIRY_KEY);
+    clearSessionExpiryTimer();
+  }
+
+  function scheduleSessionExpiry(expiry) {
+    clearSessionExpiryTimer();
+    const delay = Date.parse(expiry) - currentDate().getTime();
+    if (!Number.isFinite(delay) || delay <= 0) {
+      invalidateSession('Your session expired. Please sign in again.');
+      return;
+    }
+    expiryTimeoutId = setTimeoutImpl(() => {
+      expiryTimeoutId = null;
+      if (!validFutureExpiry(sessionStorage.getItem(SESSION_EXPIRY_KEY))) {
+        invalidateSession('Your session expired. Please sign in again.');
+      } else {
+        scheduleSessionExpiry(sessionStorage.getItem(SESSION_EXPIRY_KEY));
+      }
+    }, delay);
+  }
+
+  function clearSessionExpiryTimer() {
+    if (expiryTimeoutId === null) return;
+    clearTimeoutImpl(expiryTimeoutId);
+    expiryTimeoutId = null;
   }
 
   function validFutureExpiry(expiry) {
@@ -387,9 +457,101 @@ export function createAppController(dependencies) {
   function canUseOfflineCache(error) {
     if (navigatorTarget.onLine || !isNetworkFailure(error)) return false;
     const expiry = sessionStorage.getItem(SESSION_EXPIRY_KEY);
-    if (validFutureExpiry(expiry)) return true;
-    forgetExpiry();
+    if (validFutureExpiry(expiry)) {
+      scheduleSessionExpiry(expiry);
+      return true;
+    }
+    invalidateSession();
     return false;
+  }
+
+  function requireUnexpiredSession() {
+    const expiry = sessionStorage.getItem(SESSION_EXPIRY_KEY);
+    if (validFutureExpiry(expiry)) return true;
+    invalidateSession('Your session expired. Please sign in again.');
+    return false;
+  }
+
+  function invalidateSession(message = '') {
+    lifecycleVersion += 1;
+    authenticated = false;
+    rendered = false;
+    clearRefreshTimer();
+    clearSessionExpiry();
+    abortActiveRefresh(new DOMException('Session invalidated', 'AbortError'));
+    showSignedOut(message);
+  }
+
+  function abortActiveRefresh(reason) {
+    const controller = refreshAbortController;
+    activeRefresh = null;
+    refreshAbortController = null;
+    controller?.abort(reason);
+  }
+
+  function hasPendingLogout() {
+    return localStorage.getItem(LOGOUT_PENDING_KEY) === '1';
+  }
+
+  function settlePendingLogout() {
+    if (!hasPendingLogout()) return Promise.resolve(true);
+    if (pendingLogoutPromise) return pendingLogoutPromise;
+
+    pendingLogoutPromise = Promise.resolve()
+      .then(() => sessionApi.signOut())
+      .then(() => {
+        localStorage.removeItem(LOGOUT_PENDING_KEY);
+        return true;
+      })
+      .catch(() => false)
+      .finally(() => {
+        pendingLogoutPromise = null;
+      });
+    return pendingLogoutPromise;
+  }
+
+  function beginLogoutCleanup(refreshToSettle) {
+    const priorCleanup = pendingLogoutCleanupPromise;
+    const cleanupPromise = (async () => {
+      if (priorCleanup) await priorCleanup;
+      await cache.clear();
+      if (refreshToSettle) {
+        await refreshToSettle.catch(() => undefined);
+        await cache.clear();
+      }
+    })();
+    const trackedPromise = cleanupPromise.finally(() => {
+      if (pendingLogoutCleanupPromise === trackedPromise) pendingLogoutCleanupPromise = null;
+    });
+    pendingLogoutCleanupPromise = trackedPromise;
+    return trackedPromise;
+  }
+
+  async function settleLogoutBarrier() {
+    while (pendingLogoutCleanupPromise) {
+      await pendingLogoutCleanupPromise;
+    }
+    return hasPendingLogout() ? settlePendingLogout() : true;
+  }
+
+  async function handleOnline() {
+    updateNetworkState();
+    if (hasPendingLogout() || pendingLogoutCleanupPromise) {
+      await settleLogoutBarrier();
+      return;
+    }
+    if (authenticated) requireUnexpiredSession();
+  }
+
+  function handleOffline() {
+    if (authenticated) requireUnexpiredSession();
+    updateNetworkState();
+  }
+
+  async function handleVisibilityChange() {
+    if (!authenticated || documentTarget.visibilityState !== 'visible') return;
+    if (!requireUnexpiredSession()) return;
+    await refresh();
   }
 
   function currentDate() {
@@ -399,6 +561,10 @@ export function createAppController(dependencies) {
 
   function isCurrentRefresh(version, signal) {
     return version === lifecycleVersion && !signal.aborted;
+  }
+
+  function isCurrentLifecycle(version) {
+    return version === lifecycleVersion && !destroyed;
   }
 
   return { start, refresh, signIn, signOut, destroy };

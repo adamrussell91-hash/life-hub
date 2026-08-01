@@ -26,9 +26,9 @@ const send = (response, status, body, contentType = 'text/plain; charset=utf-8')
   response.end(body);
 };
 
-export function createStaticServer({ root }) {
+export function createStaticServer({ root, apiRoot = new URL('../', import.meta.url), now, sessionMs } = {}) {
   const rootPath = resolve(root instanceof URL ? fileURLToPath(root) : root);
-  const handleMockApi = createMockApi({ root: rootPath });
+  const handleMockApi = createMockApi({ root: apiRoot, now, sessionMs });
 
   return createServer(async (request, response) => {
     if (await handleMockApi(request, response)) return;
@@ -75,7 +75,10 @@ const invokedDirectly = process.argv[1]
 if (invokedDirectly) {
   const host = '127.0.0.1';
   const port = Number(process.env.PORT ?? 4173);
-  const server = createStaticServer({ root: new URL('../', import.meta.url) });
+  const server = createStaticServer({
+    root: new URL('../dist/', import.meta.url),
+    apiRoot: new URL('../', import.meta.url)
+  });
   server.listen(port, host, () => {
     process.stdout.write(`Life Hub ready at http://${host}:${port}/\n`);
   });

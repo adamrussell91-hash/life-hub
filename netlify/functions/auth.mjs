@@ -5,14 +5,15 @@ import {
 } from './_shared/auth-security.mjs';
 import {
   errorResponse,
+  guardRequestOrigin,
   isConfigured,
   jsonResponse,
   methodNotAllowed,
-  misconfiguredResponse,
-  requireSameOrigin
+  misconfiguredResponse
 } from './_shared/http.mjs';
 
 const MAX_BODY_BYTES = 1_024;
+const BODY_TOO_LARGE = Symbol('body_too_large');
 
 export const config = {
   path: '/api/auth',
@@ -29,9 +30,8 @@ export function createAuthHandler({
 } = {}) {
   return async function authHandler(request) {
     if (request.method !== 'POST') return methodNotAllowed('POST');
-    if (!requireSameOrigin(request)) {
-      return errorResponse(403, 'forbidden', 'This request origin is not allowed.', false);
-    }
+    const originError = guardRequestOrigin(request);
+    if (originError) return originError;
     if (!isJsonRequest(request)) {
       return errorResponse(415, 'unsupported_media_type', 'This endpoint accepts JSON requests only.', false);
     }
@@ -67,14 +67,19 @@ function isJsonRequest(request) {
 }
 
 async function parseBody(request) {
+  const contentLength = request.headers.get('content-length');
+  if (contentLength !== null && /^\d+$/.test(contentLength) &&
+      decimalExceeds(contentLength, MAX_BODY_BYTES)) {
+    void request.body?.cancel().catch(() => undefined);
+    return { error: requestTooLarge() };
+  }
+
   let bytes;
   try {
-    bytes = new Uint8Array(await request.arrayBuffer());
-  } catch {
+    bytes = await readAtMost(request.body, MAX_BODY_BYTES);
+  } catch (error) {
+    if (error === BODY_TOO_LARGE) return { error: requestTooLarge() };
     return { error: errorResponse(400, 'invalid_request', 'The request body was not valid JSON.', false) };
-  }
-  if (bytes.byteLength > MAX_BODY_BYTES) {
-    return { error: errorResponse(413, 'request_too_large', 'The request body is too large.', false) };
   }
 
   let body;
@@ -87,6 +92,47 @@ async function parseBody(request) {
     return { error: errorResponse(400, 'invalid_request', 'The request body was not valid JSON.', false) };
   }
   return { passphrase: body.passphrase };
+}
+
+async function readAtMost(stream, limit) {
+  if (!stream) return new Uint8Array();
+  const reader = stream.getReader();
+  const chunks = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > limit) {
+        await reader.cancel().catch(() => undefined);
+        throw BODY_TOO_LARGE;
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error === BODY_TOO_LARGE) throw error;
+    throw new Error('request_read_failed');
+  }
+
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+function requestTooLarge() {
+  return errorResponse(413, 'request_too_large', 'The request body is too large.', false);
+}
+
+function decimalExceeds(value, limit) {
+  const normalized = value.replace(/^0+/, '') || '0';
+  const maximum = String(limit);
+  return normalized.length > maximum.length ||
+    (normalized.length === maximum.length && normalized > maximum);
 }
 
 export default createAuthHandler();

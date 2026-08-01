@@ -1,3 +1,5 @@
+import { isCalendarDate } from '../../../js/core/time.js';
+
 const API_VERSION = '2026-03-10';
 const GITHUB_ORIGIN = 'https://api.github.com';
 const SHA = /^[0-9a-f]{40}$/;
@@ -40,7 +42,7 @@ export function createGitHubClient({ env = process.env, fetchImpl = fetch } = {}
     } catch {
       throw new GitHubClientError('github_unavailable', true);
     }
-    if (!response?.ok) throw mapGitHubFailure(response?.status);
+    if (!response?.ok) throw mapGitHubFailure(response);
     try {
       return await response.json();
     } catch {
@@ -77,17 +79,23 @@ function parseConfiguration(env) {
   const repository = typeof env?.GITHUB_REPOSITORY === 'string' ? REPOSITORY.exec(env.GITHUB_REPOSITORY) : null;
   const branch = env?.GITHUB_BRANCH;
   const token = env?.GITHUB_TOKEN;
+  const tokenExpires = env?.GITHUB_TOKEN_EXPIRES;
   if (!repository || typeof branch !== 'string' || branch.length === 0 || branch.length > 255 ||
       /[\u0000-\u001f\u007f]/.test(branch) || branch.trim() !== branch ||
       typeof token !== 'string' || token.length === 0 || token.trim() !== token ||
-      /[\u0000-\u001f\u007f]/.test(token)) {
+      /[\u0000-\u001f\u007f]/.test(token) || !isCalendarDate(tokenExpires)) {
     throw new GitHubConfigurationError();
   }
   return { ...repository.groups, branch, token };
 }
 
-function mapGitHubFailure(status) {
+function mapGitHubFailure(response) {
+  const status = response?.status;
   if (status === 401) return new GitHubClientError('github_authentication_failed', false);
+  if (status === 403 && (
+    response.headers?.get('x-ratelimit-remaining') === '0' ||
+    response.headers?.has('retry-after')
+  )) return new GitHubClientError('github_rate_limited', true);
   if (status === 403) return new GitHubClientError('github_access_denied', false);
   if (status === 404) return new GitHubClientError('repository_not_found', false);
   if (status === 429) return new GitHubClientError('github_rate_limited', true);

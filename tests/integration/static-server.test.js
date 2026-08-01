@@ -1,16 +1,45 @@
-import test from 'node:test';
+import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import { execFile } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { resolve, sep } from 'node:path';
+import { promisify } from 'node:util';
 import { createStaticServer } from '../../scripts/serve.mjs';
 
-async function startServer(t) {
-  const server = createStaticServer({ root: new URL('../..', import.meta.url) });
+const execute = promisify(execFile);
+const projectRoot = new URL('../..', import.meta.url);
+const netlifyConfiguration = await readFile(new URL('../../netlify.toml', import.meta.url), 'utf8');
+const publishDirectory = readConfigurationValue(netlifyConfiguration, 'build', 'publish');
+const functionsDirectory = readConfigurationValue(netlifyConfiguration, 'functions', 'directory');
+const publishRoot = new URL(`../../${publishDirectory ?? '__missing_publish_root__'}/`, import.meta.url);
+
+before(async () => {
+  await execute(process.execPath, ['scripts/prepare-web.mjs'], {
+    cwd: projectRoot,
+    env: { ...process.env }
+  });
+});
+
+async function startServer(t, options = {}) {
+  const server = createStaticServer({ root: publishRoot, apiRoot: projectRoot, ...options });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => server.close());
   return `http://127.0.0.1:${server.address().port}`;
 }
+
+test('Netlify publishes the tested dist artifact and keeps functions outside it', () => {
+  assert.equal(publishDirectory, 'dist');
+  assert.equal(functionsDirectory, 'netlify/functions');
+
+  const rootPath = fileURLToPath(projectRoot);
+  const publishPath = resolve(rootPath, publishDirectory);
+  const functionsPath = resolve(rootPath, functionsDirectory);
+  assert.equal(functionsPath === publishPath || functionsPath.startsWith(`${publishPath}${sep}`), false);
+});
 
 test('serves the Home shell with the correct content type', async t => {
   const baseUrl = await startServer(t);
@@ -21,18 +50,52 @@ test('serves the Home shell with the correct content type', async t => {
   assert.match(await response.text(), /Life Hub/);
 });
 
-test('serves module, YAML, and Markdown MIME types', async t => {
+function readConfigurationValue(configuration, section, key) {
+  let inSection = false;
+  for (const line of configuration.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed === `[${section}]`) {
+      inSection = true;
+      continue;
+    }
+    if (trimmed.startsWith('[')) inSection = false;
+    if (!inSection) continue;
+    const setting = new RegExp(`^${key}\\s*=\\s*"([^"]+)"$`).exec(trimmed);
+    if (setting) return setting[1];
+  }
+  return null;
+}
+
+test('serves only browser modules and the generated YAML runtime', async t => {
   const baseUrl = await startServer(t);
   const cases = [
     ['/js/app/main.js', /^text\/javascript/],
-    ['/config/targets.yml', /^(?:application|text)\/yaml/],
-    ['/tests/fixtures/valid/meal.md', /^text\/markdown/]
+    ['/vendor/js-yaml.mjs', /^text\/javascript/],
+    ['/manifest.webmanifest', /^application\/manifest\+json/]
   ];
 
   for (const [path, contentType] of cases) {
     const response = await fetch(`${baseUrl}${path}`);
     assert.equal(response.status, 200, path);
     assert.match(response.headers.get('content-type'), contentType, path);
+  }
+});
+
+test('publish artifact denies repository data, source tooling, functions, and dotfiles', async t => {
+  const baseUrl = await startServer(t);
+  for (const path of [
+    '/central-node.md',
+    '/config/targets.yml',
+    '/config/agents.yml',
+    '/tests/fixtures/valid/meal.md',
+    '/scripts/serve.mjs',
+    '/netlify/functions/session.mjs',
+    '/.env.example',
+    '/.gitignore',
+    '/package.json'
+  ]) {
+    const response = await fetch(`${baseUrl}${path}`);
+    assert.equal(response.status, 404, path);
   }
 });
 
@@ -131,6 +194,32 @@ test('local session and logout expose the production authentication shapes', asy
   const signedOut = await fetch(`${baseUrl}/api/session`);
   assert.equal(signedOut.status, 401);
   assert.equal((await signedOut.json()).error.code, 'unauthenticated');
+});
+
+test('local mock session keeps one server-side expiry and rejects it at equality', async t => {
+  let now = Date.parse('2026-08-01T00:00:00Z');
+  const baseUrl = await startServer(t, { now: () => now });
+  const auth = await fetch(`${baseUrl}/api/auth`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ passphrase: 'life-hub-local' })
+  });
+  const cookie = auth.headers.get('set-cookie').split(';', 1)[0];
+  const expiresAt = (await auth.json()).data.expiresAt;
+
+  now += 60 * 60 * 1000;
+  const session = await fetch(`${baseUrl}/api/session`, { headers: { cookie } });
+  assert.equal(session.status, 200);
+  assert.equal((await session.json()).data.expiresAt, expiresAt);
+
+  now = Date.parse(expiresAt);
+  const expiredSession = await fetch(`${baseUrl}/api/session`, { headers: { cookie } });
+  const expiredManifest = await fetch(
+    `${baseUrl}/api/repo/manifest?from=2026-07-01&to=2026-08-01`,
+    { headers: { cookie } }
+  );
+  assert.equal(expiredSession.status, 401);
+  assert.equal(expiredManifest.status, 401);
 });
 
 test('local manifests return 304 for an unchanged range-specific identifier', async t => {

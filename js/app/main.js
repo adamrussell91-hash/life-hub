@@ -18,18 +18,21 @@ const loadLive = ({ date, signal }) => loadLiveEvents({
 });
 
 const loadCached = async ({ date }) => {
-  const snapshot = await cache.read();
-  if (!snapshot) throw new Error('Private cache is unavailable');
   return loadLiveEvents({
     date,
     loadYaml: load,
-    sync: async () => ({
-      files: snapshot.files,
-      warnings: [],
-      commitSha: snapshot.manifest.commitSha,
-      manifestId: snapshot.manifest.manifestId,
-      changed: false
-    })
+    sync: async ({ from, to }) => {
+      const snapshot = await cache.read({ from, to });
+      if (!snapshot) throw new Error('Private cache is unavailable');
+      return {
+        files: snapshot.files,
+        warnings: snapshot.warnings ?? [],
+        commitSha: snapshot.manifest.commitSha,
+        manifestId: snapshot.manifest.manifestId,
+        changed: false,
+        freshness: 'fallback'
+      };
+    }
   });
 };
 

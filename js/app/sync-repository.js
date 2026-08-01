@@ -52,12 +52,12 @@ export function syncRepository(options) {
   return promise;
 }
 
-async function performSync({ fetchImpl, cache, from, to, signal, validateFile }) {
+async function performSync({ fetchImpl, cache, from, to, signal, validateFile }, replay = 0) {
   if (typeof fetchImpl !== 'function' || typeof validateFile !== 'function') {
     throw new TypeError('Repository sync dependencies are unavailable');
   }
 
-  const previous = await cache.read();
+  const previous = await cache.read({ from, to });
   const previousMatchesRange = isExactRange(previous?.manifest, from, to);
   signal.throwIfAborted();
 
@@ -121,6 +121,13 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile })
     signal.throwIfAborted();
 
     if (response.status === 401) throw new SyncError('session_expired');
+    if (response.status === 409) {
+      if (replay === 0) {
+        signal.throwIfAborted();
+        return performSync({ fetchImpl, cache, from, to, signal, validateFile }, 1);
+      }
+      return staleOrThrow(previous, 'stale_manifest');
+    }
     if (!response.ok) return staleOrThrow(previous, responseCode(response));
 
     let data;
@@ -147,7 +154,15 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile })
 
       const prior = previousFiles.get(candidate.path);
       if (prior && typeof prior.content === 'string') {
-        received.set(candidate.path, { ...prior, sha: candidate.sha });
+        received.set(candidate.path, {
+          path: candidate.path,
+          sha: candidate.sha,
+          content: prior.content,
+          fallback: {
+            contentSha: prior.fallback?.contentSha ?? prior.sha,
+            code: typeof validation?.code === 'string' ? validation.code : 'invalid_file'
+          }
+        });
       }
       warnings.push({
         path: candidate.path,
@@ -160,11 +175,22 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile })
   for (const entry of manifest.files) {
     const candidate = received.get(entry.path) ?? previousFiles.get(entry.path);
     if (candidate && candidate.sha === entry.sha && typeof candidate.content === 'string') {
-      files.push({ path: entry.path, sha: entry.sha, content: candidate.content });
+      files.push({
+        path: entry.path,
+        sha: entry.sha,
+        content: candidate.content,
+        ...(candidate.fallback ? { fallback: candidate.fallback } : {})
+      });
     }
   }
 
-  const record = { manifest, files };
+  const persistentWarnings = uniqueWarnings([
+    ...warnings,
+    ...files
+      .filter(file => file.fallback)
+      .map(file => ({ path: file.path, code: file.fallback.code }))
+  ]);
+  const record = { manifest, files, warnings: persistentWarnings };
   try {
     signal.throwIfAborted();
     await cache.write(record);
@@ -172,7 +198,8 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile })
     if (signal.aborted) throw signal.reason;
     return staleOrThrow(previous, 'cache_unavailable');
   }
-  return resultFrom(record, warnings, true);
+  const changed = !previousMatchesRange || diff.changed.length > 0 || diff.removed.length > 0;
+  return resultFrom(record, [], changed);
 }
 
 function createBatches(files) {
@@ -227,17 +254,32 @@ function responseCode(response) {
 
 function staleOrThrow(previous, code) {
   if (!previous) throw new SyncError(code);
-  return resultFrom(previous, [{ code }], false);
+  return resultFrom(previous, [{ code }], false, 'fallback');
 }
 
-function resultFrom(record, warnings, changed) {
+function resultFrom(record, extraWarnings, changed, forcedFreshness) {
+  const warnings = uniqueWarnings([...(record.warnings ?? []), ...extraWarnings]);
+  const freshness = forcedFreshness ?? (
+    record.files.some(file => file.fallback) ? 'fallback' : 'confirmed'
+  );
   return {
     files: record.files,
     warnings,
     commitSha: record.manifest.commitSha,
     manifestId: record.manifest.manifestId,
-    changed
+    changed,
+    freshness
   };
+}
+
+function uniqueWarnings(warnings) {
+  const seen = new Set();
+  return warnings.filter(warning => {
+    const key = `${warning.path ?? ''}\0${warning.code ?? ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function forwardAbort(signal, controller) {

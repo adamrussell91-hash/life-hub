@@ -90,6 +90,70 @@ test('auth accepts only bounded well-formed JSON', async () => {
   }
 });
 
+test('auth rejects all declared oversized bodies before reading or verifying them', async () => {
+  let verifyCalls = 0;
+  const handler = createAuthHandler({
+    env: validEnv,
+    verifyPassphrase: async () => {
+      verifyCalls += 1;
+      return true;
+    }
+  });
+  for (const declaredLength of ['1025', '9007199254740992', '9'.repeat(100)]) {
+    let pulls = 0;
+    const body = new ReadableStream({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new Uint8Array([123]));
+        controller.close();
+      }
+    });
+    const response = await handler(new Request('https://life.example/api/auth', {
+      method: 'POST',
+      headers: {
+        origin: 'https://life.example',
+        'content-type': 'application/json',
+        'content-length': declaredLength
+      },
+      body,
+      duplex: 'half'
+    }));
+
+    assert.equal(response.status, 413, declaredLength);
+    assert.equal(pulls, 0, declaredLength);
+  }
+  assert.equal(verifyCalls, 0);
+});
+
+test('auth cancels a streamed body as soon as it crosses 1,024 bytes', async () => {
+  let pulls = 0;
+  let cancelled = false;
+  const chunks = [new Uint8Array(700), new Uint8Array(400), new Uint8Array(1024 * 1024)];
+  const body = new ReadableStream({
+    pull(controller) {
+      controller.enqueue(chunks[pulls]);
+      pulls += 1;
+    },
+    cancel() {
+      cancelled = true;
+      throw new Error('transport cancellation failed');
+    }
+  });
+  const response = await createAuthHandler({ env: validEnv })(new Request(
+    'https://life.example/api/auth',
+    {
+      method: 'POST',
+      headers: { origin: 'https://life.example', 'content-type': 'application/json' },
+      body,
+      duplex: 'half'
+    }
+  ));
+
+  assert.equal(response.status, 413);
+  assert.equal(cancelled, true);
+  assert.equal(pulls, 2);
+});
+
 test('auth reports absent required environment as misconfigured', async () => {
   const response = await createAuthHandler({ env: {} })(authRequest('accepted'));
   assert.equal(response.status, 503);
@@ -108,8 +172,11 @@ test('session clears invalid and expired cookies', async () => {
   const expired = await createSessionHandler({ env: validEnv, now: () => 1_754_038_400_001 })(
     requestWithCookie(signed.headers.get('set-cookie'))
   );
+  const exactBoundary = await createSessionHandler({ env: validEnv, now: () => 1_754_038_400_000 })(
+    requestWithCookie(signed.headers.get('set-cookie'))
+  );
 
-  for (const response of [invalid, expired]) {
+  for (const response of [invalid, exactBoundary, expired]) {
     assert.equal(response.status, 401);
     assert.match(response.headers.get('set-cookie'), /Max-Age=0/);
     assert.equal((await response.json()).ok, false);

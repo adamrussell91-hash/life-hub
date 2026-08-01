@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { parseDateRange } from '../netlify/functions/_shared/repo-policy.mjs';
 
 const PASSPHRASE = 'life-hub-local';
-const SESSION_COOKIE = 'life_hub_mock=1; HttpOnly; SameSite=Strict; Path=/';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const FIXTURE_FILES = [
@@ -29,8 +28,20 @@ const FIXTURE_FILES = [
   }
 ];
 
-export function createMockApi({ root, now = Date.now }) {
+export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) {
   const rootPath = resolve(root instanceof URL ? fileURLToPath(root) : root);
+  const sessions = new Map();
+  let nextSessionId = 0;
+
+  const readSession = request => {
+    const id = readCookie(request, 'life_hub_mock');
+    const session = sessions.get(id);
+    if (!session || now() >= session.expiresAt) {
+      if (id) sessions.delete(id);
+      return null;
+    }
+    return session;
+  };
 
   return async function handleMockApi(request, response) {
     const url = new URL(request.url, 'http://localhost');
@@ -49,26 +60,31 @@ export function createMockApi({ root, now = Date.now }) {
       } else if (body.passphrase !== PASSPHRASE) {
         error(response, 401, 'invalid_credentials', 'That passphrase was not accepted.', true);
       } else {
+        const id = String(++nextSessionId);
+        const expiresAt = now() + sessionMs;
+        sessions.set(id, { expiresAt });
         json(response, 200, {
           ok: true,
-          data: { authenticated: true, expiresAt: new Date(now() + SESSION_MS).toISOString() }
-        }, { 'Set-Cookie': SESSION_COOKIE });
+          data: { authenticated: true, expiresAt: new Date(expiresAt).toISOString() }
+        }, { 'Set-Cookie': sessionCookie(id) });
       }
       return true;
     }
 
     if (url.pathname === '/api/session') {
       if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
-      if (!hasSession(request)) return unauthenticated(response);
+      const session = readSession(request);
+      if (!session) return unauthenticated(response);
       json(response, 200, {
         ok: true,
-        data: { authenticated: true, expiresAt: new Date(now() + SESSION_MS).toISOString() }
+        data: { authenticated: true, expiresAt: new Date(session.expiresAt).toISOString() }
       });
       return true;
     }
 
     if (url.pathname === '/api/logout') {
       if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
+      sessions.delete(readCookie(request, 'life_hub_mock'));
       response.writeHead(204, {
         ...PRIVATE_HEADERS,
         'Set-Cookie': 'life_hub_mock=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/'
@@ -79,7 +95,7 @@ export function createMockApi({ root, now = Date.now }) {
 
     if (url.pathname === '/api/health') {
       if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
-      if (!hasSession(request)) return unauthenticated(response);
+      if (!readSession(request)) return unauthenticated(response);
       json(response, 200, {
         ok: true,
         data: {
@@ -95,7 +111,7 @@ export function createMockApi({ root, now = Date.now }) {
 
     if (url.pathname === '/api/repo/manifest') {
       if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
-      if (!hasSession(request)) return unauthenticated(response);
+      if (!readSession(request)) return unauthenticated(response);
 
       let range;
       try {
@@ -128,7 +144,7 @@ export function createMockApi({ root, now = Date.now }) {
 
     if (url.pathname === '/api/repo/files') {
       if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
-      if (!hasSession(request)) return unauthenticated(response);
+      if (!readSession(request)) return unauthenticated(response);
       const body = await readJson(request);
       const range = parseFileRange(body);
       if (!range || !Array.isArray(body.files)) {
@@ -198,8 +214,17 @@ function isLocalRequest(request) {
   return localHost && localAddress;
 }
 
-function hasSession(request) {
-  return request.headers.cookie?.split(';').some(value => value.trim() === 'life_hub_mock=1') === true;
+function readCookie(request, name) {
+  const prefix = `${name}=`;
+  for (const value of request.headers.cookie?.split(';') ?? []) {
+    const cookie = value.trim();
+    if (cookie.startsWith(prefix)) return cookie.slice(prefix.length);
+  }
+  return null;
+}
+
+function sessionCookie(id) {
+  return `life_hub_mock=${id}; HttpOnly; SameSite=Strict; Path=/`;
 }
 
 function etagMatches(value, etag) {

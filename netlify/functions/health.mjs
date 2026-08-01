@@ -2,6 +2,7 @@ import { serializeExpiredSessionCookie, verifySessionToken } from './_shared/aut
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
 import {
   errorResponse,
+  guardRequestOrigin,
   isConfigured,
   jsonResponse,
   methodNotAllowed,
@@ -38,6 +39,8 @@ export function createHealthHandler({
 
   return async function healthHandler(request) {
     if (request.method !== 'GET') return withPrivateCache(methodNotAllowed('GET'));
+    const originError = guardRequestOrigin(request);
+    if (originError) return withPrivateCache(originError);
     if (!isConfigured(env)) return withPrivateCache(misconfiguredResponse());
 
     const checkedAt = now();
@@ -55,6 +58,15 @@ export function createHealthHandler({
     }
 
     const token = tokenDetails(env.GITHUB_TOKEN_EXPIRES, checkedAt);
+    if (token.expiresOn === null) {
+      return healthResponse({
+        github: 'misconfigured',
+        token: 'unknown',
+        expiresOn: null,
+        code: 'misconfigured',
+        retryable: false
+      });
+    }
     if (successfulCheckAt !== null && checkedAt >= successfulCheckAt &&
         checkedAt - successfulCheckAt < SUCCESS_CACHE_MS) {
       return healthResponse({ github: 'healthy', ...token, code: 'ok', retryable: false });

@@ -58,7 +58,7 @@ export function verifySessionToken(token, secret, now = Date.now()) {
     return { valid: false, reason: 'malformed' };
   }
   if (!isValidSessionPayload(payload)) return { valid: false, reason: 'malformed' };
-  if (now > payload.exp) return { valid: false, reason: 'expired' };
+  if (now >= payload.exp) return { valid: false, reason: 'expired' };
   return { valid: true, payload };
 }
 

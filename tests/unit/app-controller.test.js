@@ -82,6 +82,7 @@ function memoryStorage(initial = {}) {
 function createClock() {
   let nextId = 0;
   const intervals = new Map();
+  const timeouts = new Map();
   return {
     setInterval(callback) {
       const id = ++nextId;
@@ -91,11 +92,31 @@ function createClock() {
     clearInterval(id) {
       intervals.delete(id);
     },
+    setTimeout(callback, delay) {
+      const id = ++nextId;
+      timeouts.set(id, { callback, delay });
+      return id;
+    },
+    clearTimeout(id) {
+      timeouts.delete(id);
+    },
     tick() {
       for (const callback of [...intervals.values()]) callback();
     },
+    fireTimeouts() {
+      for (const [id, timeout] of [...timeouts]) {
+        timeouts.delete(id);
+        timeout.callback();
+      }
+    },
     get activeIntervals() {
       return intervals.size;
+    },
+    get activeTimeouts() {
+      return timeouts.size;
+    },
+    get timeoutDelays() {
+      return [...timeouts.values()].map(timeout => timeout.delay);
     }
   };
 }
@@ -106,6 +127,8 @@ function liveData(overrides = {}) {
     targetsConfig: {},
     warnings: [],
     commitSha: 'a'.repeat(40),
+    changed: true,
+    freshness: 'confirmed',
     ...overrides
   };
 }
@@ -117,7 +140,10 @@ function harness(options = {}) {
   const sessionStorage = memoryStorage(options.sessionMarker
     ? { 'life-hub:session-expiry': options.sessionMarker }
     : {});
-  const localStorage = memoryStorage();
+  const localStorage = memoryStorage({
+    ...(options.logoutPending ? { 'life-hub:logout-pending': '1' } : {}),
+    ...(options.lastSuccess ? { 'life-hub:last-success': options.lastSuccess } : {})
+  });
   const navigatorTarget = { onLine: options.online !== false };
   const calls = {
     sessions: 0,
@@ -130,11 +156,16 @@ function harness(options = {}) {
     renders: 0,
     refreshSignals: []
   };
+  calls.order = [];
   let currentNow = new Date(NOW);
   let privateCachePresent = options.privateCachePresent !== false;
   const session = options.session ?? { authenticated: true, expiresAt: EXPIRY };
   let releaseSync;
   const heldSync = options.holdSync ? new Promise(resolve => { releaseSync = resolve; }) : null;
+  let releaseCached;
+  const heldCached = options.holdCached ? new Promise(resolve => { releaseCached = resolve; }) : null;
+  let releaseSignIn;
+  const heldSignIn = options.holdSignIn ? new Promise(resolve => { releaseSignIn = resolve; }) : null;
   let releaseLogout;
   const heldLogout = options.holdLogout ? new Promise(resolve => { releaseLogout = resolve; }) : null;
 
@@ -148,22 +179,29 @@ function harness(options = {}) {
     now: () => new Date(currentNow),
     setIntervalImpl: callback => clock.setInterval(callback),
     clearIntervalImpl: id => clock.clearInterval(id),
+    setTimeoutImpl: (callback, delay) => clock.setTimeout(callback, delay),
+    clearTimeoutImpl: id => clock.clearTimeout(id),
     sessionApi: {
       async getSession() {
         calls.sessions += 1;
+        calls.order.push('session');
         if (options.sessionError) throw options.sessionError;
         return session;
       },
       async signIn(passphrase) {
         calls.signsIn.push(passphrase);
+        calls.order.push('sign-in');
+        if (heldSignIn) await heldSignIn;
         if (passphrase !== (options.acceptedPassphrase ?? 'secret')) {
           throw Object.assign(new Error('invalid'), { status: 401, code: 'invalid_credentials' });
         }
-        return { authenticated: true, expiresAt: EXPIRY };
+        return options.signInSession ?? { authenticated: true, expiresAt: EXPIRY };
       },
       async signOut() {
         calls.signsOut += 1;
+        calls.order.push('logout');
         if (heldLogout) await heldLogout;
+        if (options.logoutError) throw options.logoutError;
       }
     },
     cache: {
@@ -176,16 +214,26 @@ function harness(options = {}) {
     async loadLive({ signal } = {}) {
       calls.syncs += 1;
       calls.refreshSignals.push(signal);
+      if (typeof options.loadLiveImpl === 'function') {
+        return options.loadLiveImpl({
+          call: calls.syncs,
+          signal,
+          setPrivateCachePresent(value = true) {
+            privateCachePresent = value;
+          }
+        });
+      }
       if (heldSync) {
         const result = await heldSync;
         if (options.repopulateOnSync) privateCachePresent = true;
         return result;
       }
       if (options.liveError) throw options.liveError;
-      return options.liveResult ?? liveData();
+      return options.liveResults?.shift() ?? options.liveResult ?? liveData();
     },
     async loadCached() {
       calls.cached += 1;
+      if (heldCached) return heldCached;
       if (!options.cachedResult) throw new Error('cache unavailable');
       return options.cachedResult;
     },
@@ -221,6 +269,8 @@ function harness(options = {}) {
     navigatorTarget,
     controller: createAppController(dependencies),
     releaseSync: value => releaseSync?.(value ?? liveData()),
+    releaseCached: value => releaseCached?.(value ?? liveData({ freshness: 'fallback', changed: false })),
+    releaseSignIn: value => releaseSignIn?.(value),
     releaseLogout: () => releaseLogout?.(),
     privateCachePresent: () => privateCachePresent,
     setNow: value => { currentNow = new Date(value); }
@@ -243,6 +293,7 @@ test('session API sends only the passphrase contract and unwraps successful data
   assert.deepEqual(JSON.parse(calls[1].init.body), { passphrase: 'only-on-the-wire' });
   assert.equal(calls[1].init.method, 'POST');
   assert.equal(calls[2].init.method, 'POST');
+  assert.equal(calls[2].init.keepalive, true);
 });
 
 test('session API maps sanitized HTTP failures without exposing response messages', async () => {
@@ -265,6 +316,21 @@ test('signed-out startup reveals only the sign-in view and focuses the passphras
   assert.equal(state.root.querySelector('#app-shell').hidden, true);
   assert.equal(state.root.querySelector('#passphrase-input').focused, true);
   assert.equal(state.calls.syncs, 0);
+});
+
+test('authoritative signed-out or malformed session data clears any prior expiry marker', async () => {
+  for (const session of [
+    { authenticated: false },
+    { authenticated: true, expiresAt: 'not-a-date' },
+    { authenticated: true, expiresAt: NOW.toISOString() }
+  ]) {
+    const state = harness({ session, sessionMarker: EXPIRY });
+    await state.controller.start();
+
+    assert.equal(state.sessionStorage.getItem('life-hub:session-expiry'), null);
+    assert.equal(state.root.querySelector('#app-shell').hidden, true);
+    assert.equal(state.calls.syncs, 0);
+  }
 });
 
 test('successful sign-in loads live Home and stores only a tab expiry marker', async () => {
@@ -297,8 +363,21 @@ test('invalid credentials re-enable the passphrase before restoring focus', asyn
   assert.equal(input.focused, true);
 });
 
+test('malformed sign-in session fails closed and clears the submitted passphrase', async () => {
+  const state = harness({ signInSession: { authenticated: true, expiresAt: 'not-a-date' } });
+  const input = state.root.querySelector('#passphrase-input');
+  input.value = 'secret';
+
+  await state.controller.signIn('secret');
+
+  assert.equal(input.value, '');
+  assert.equal(state.root.querySelector('#app-shell').hidden, true);
+  assert.equal(state.sessionStorage.getItem('life-hub:session-expiry'), null);
+  assert.equal(state.calls.syncs, 0);
+});
+
 test('concurrent refreshes collapse and automatic refresh pauses while hidden', async () => {
-  const state = harness({ holdSync: true });
+  const state = harness({ holdSync: true, sessionMarker: EXPIRY });
   const first = state.controller.refresh();
   const second = state.controller.refresh();
 
@@ -310,6 +389,67 @@ test('concurrent refreshes collapse and automatic refresh pauses while hidden', 
   state.root.visibilityState = 'hidden';
   state.clock.tick();
   assert.equal(state.calls.syncs, 1);
+});
+
+test('known session expiry is scheduled at the exact deadline and invalidates the shell', async () => {
+  const state = harness();
+  await state.controller.start();
+
+  assert.deepEqual(state.clock.timeoutDelays, [Date.parse(EXPIRY) - NOW.getTime()]);
+  state.setNow(EXPIRY);
+  state.clock.fireTimeouts();
+
+  assert.equal(state.root.querySelector('#app-shell').hidden, true);
+  assert.equal(state.root.querySelector('#sign-in-view').hidden, false);
+  assert.equal(state.sessionStorage.getItem('life-hub:session-expiry'), null);
+  assert.equal(state.clock.activeIntervals, 0);
+  assert.equal(state.calls.clears, 0);
+});
+
+test('expiry while live or cached data is loading prevents private rendering', async () => {
+  const live = harness({ holdSync: true, sessionMarker: EXPIRY });
+  const liveStart = live.controller.start();
+  await new Promise(resolve => setImmediate(resolve));
+  live.setNow(EXPIRY);
+  live.releaseSync();
+  await liveStart;
+  assert.equal(live.calls.renders, 0);
+  assert.equal(live.root.querySelector('#app-shell').hidden, true);
+  assert.equal(live.sessionStorage.getItem('life-hub:session-expiry'), null);
+
+  const offline = Object.assign(new TypeError('Failed to fetch'), { code: 'network_error' });
+  const cached = harness({
+    online: false,
+    sessionError: offline,
+    sessionMarker: EXPIRY,
+    holdCached: true
+  });
+  const cachedStart = cached.controller.start();
+  await new Promise(resolve => setImmediate(resolve));
+  cached.setNow(EXPIRY);
+  cached.releaseCached();
+  await cachedStart;
+  assert.equal(cached.calls.renders, 0);
+  assert.equal(cached.root.querySelector('#app-shell').hidden, true);
+  assert.equal(cached.sessionStorage.getItem('life-hub:session-expiry'), null);
+});
+
+test('refresh, visibility, and online entry fail closed after known expiry', async () => {
+  for (const entry of ['refresh', 'visibility', 'online']) {
+    const state = harness();
+    await state.controller.start();
+    const syncs = state.calls.syncs;
+    state.setNow(EXPIRY);
+
+    if (entry === 'refresh') await state.controller.refresh();
+    if (entry === 'visibility') state.root.dispatchEvent(new Event('visibilitychange'));
+    if (entry === 'online') state.windowTarget.dispatchEvent(new Event('online'));
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.equal(state.calls.syncs, syncs, entry);
+    assert.equal(state.root.querySelector('#app-shell').hidden, true, entry);
+    assert.equal(state.sessionStorage.getItem('life-hub:session-expiry'), null, entry);
+  }
 });
 
 test('session expiry during refresh returns to sign-in without clearing private cache', async () => {
@@ -337,8 +477,16 @@ test('session expiry reported by health returns to sign-in', async () => {
   assert.equal(state.clock.activeIntervals, 0);
 });
 
-test('stale GitHub warning retains the rendered cached Home', async () => {
-  const state = harness({ liveResult: liveData({ warnings: [{ code: 'github_unavailable' }] }) });
+test('fallback freshness retains Home visibly stale without advancing the prior confirmed time', async () => {
+  const priorSuccess = '2026-08-01T00:30:00.000Z';
+  const state = harness({
+    lastSuccess: priorSuccess,
+    liveResult: liveData({
+      warnings: [{ code: 'github_invalid_response' }],
+      changed: false,
+      freshness: 'fallback'
+    })
+  });
 
   await state.controller.start();
 
@@ -347,6 +495,25 @@ test('stale GitHub warning retains the rendered cached Home', async () => {
   assert.equal(state.root.querySelector('#provider-status').hidden, false);
   assert.match(state.root.querySelector('#provider-status').textContent, /GitHub.*saved/i);
   assert.equal(state.root.querySelector('#app').dataset.state, 'stale');
+  assert.equal(state.localStorage.getItem('life-hub:last-success'), priorSuccess);
+  assert.match(state.root.querySelector('#last-synced').textContent, /Last synced/);
+});
+
+test('confirmed unchanged refresh avoids rerender while advancing confirmation time', async () => {
+  const state = harness({
+    liveResults: [
+      liveData({ changed: true, freshness: 'confirmed' }),
+      liveData({ changed: false, freshness: 'confirmed' })
+    ]
+  });
+  await state.controller.start();
+  assert.equal(state.calls.renders, 1);
+
+  state.setNow('2026-08-01T02:00:00.000Z');
+  await state.controller.refresh();
+
+  assert.equal(state.calls.renders, 1);
+  assert.equal(state.localStorage.getItem('life-hub:last-success'), '2026-08-01T02:00:00.000Z');
 });
 
 test('health token expiry displays a provider notice without hiding Home', async () => {
@@ -362,7 +529,7 @@ test('health token expiry displays a provider notice without hiding Home', async
 });
 
 test('manual refresh exposes progress then records the successful sync time', async () => {
-  const state = harness({ holdSync: true });
+  const state = harness({ holdSync: true, sessionMarker: EXPIRY });
   const click = new Event('click');
   state.root.querySelector('#refresh-button').dispatchEvent(click);
 
@@ -442,11 +609,65 @@ test('explicit logout clears the private cache and tab marker', async () => {
   const state = harness({ sessionMarker: EXPIRY });
 
   await state.controller.signOut();
+  await new Promise(resolve => setImmediate(resolve));
 
   assert.equal(state.calls.signsOut, 1);
   assert.equal(state.calls.clears, 1);
   assert.equal(state.sessionStorage.getItem('life-hub:session-expiry'), null);
   assert.equal(state.root.querySelector('#sign-in-view').hidden, false);
+  assert.equal(state.localStorage.getItem('life-hub:logout-pending'), null);
+});
+
+test('offline logout persists a tombstone and reload retries it before session validation', async () => {
+  const failed = harness({
+    sessionMarker: EXPIRY,
+    logoutError: new TypeError('offline')
+  });
+  await failed.controller.signOut();
+
+  assert.equal(failed.localStorage.getItem('life-hub:logout-pending'), '1');
+  assert.equal(failed.root.querySelector('#app-shell').hidden, true);
+  assert.equal(failed.calls.clears, 1);
+
+  const reloaded = harness({
+    logoutPending: true,
+    sessionError: Object.assign(new Error('unauthenticated'), { status: 401 })
+  });
+  await reloaded.controller.start();
+
+  assert.deepEqual(reloaded.calls.order.slice(0, 2), ['logout', 'session']);
+  assert.equal(reloaded.localStorage.getItem('life-hub:logout-pending'), null);
+  assert.equal(reloaded.calls.syncs, 0);
+  assert.equal(reloaded.root.querySelector('#app-shell').hidden, true);
+});
+
+test('rapid sign-in waits for delayed logout completion before authenticating', async () => {
+  const state = harness({ holdLogout: true, sessionMarker: EXPIRY });
+  await state.controller.signOut();
+  const signingIn = state.controller.signIn('secret');
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(state.calls.signsIn.length, 0);
+  assert.equal(state.localStorage.getItem('life-hub:logout-pending'), '1');
+
+  state.releaseLogout();
+  await signingIn;
+  assert.deepEqual(state.calls.order.slice(0, 2), ['logout', 'sign-in']);
+  assert.equal(state.localStorage.getItem('life-hub:logout-pending'), null);
+  assert.equal(state.root.querySelector('#app-shell').hidden, false);
+});
+
+test('a delayed sign-in cannot reveal the shell after a newer logout lifecycle', async () => {
+  const state = harness({ holdSignIn: true });
+  const signingIn = state.controller.signIn('secret');
+  await new Promise(resolve => setImmediate(resolve));
+  await state.controller.signOut();
+  state.releaseSignIn();
+  await signingIn;
+
+  assert.equal(state.root.querySelector('#app-shell').hidden, true);
+  assert.equal(state.sessionStorage.getItem('life-hub:session-expiry'), null);
+  assert.equal(state.calls.syncs, 0);
 });
 
 test('logout hides immediately and clears again after invalidating an active refresh', async () => {
@@ -479,6 +700,35 @@ test('logout hides immediately and clears again after invalidating an active ref
   assert.equal(state.calls.renders, 0);
   assert.equal(state.calls.clears, 2);
   assert.equal(state.privateCachePresent(), false);
+});
+
+test('rapid re-authentication waits for all prior logout cache cleanup', async () => {
+  let releaseOldRefresh;
+  const oldRefreshResult = new Promise(resolve => { releaseOldRefresh = resolve; });
+  const state = harness({
+    sessionMarker: EXPIRY,
+    loadLiveImpl: async ({ call, setPrivateCachePresent }) => {
+      if (call === 1) return oldRefreshResult;
+      setPrivateCachePresent(true);
+      return liveData();
+    }
+  });
+  const oldRefresh = state.controller.refresh();
+
+  const logout = state.controller.signOut();
+  const signingIn = state.controller.signIn('secret');
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(state.calls.signsIn.length, 0);
+  assert.equal(state.calls.refreshSignals[0].aborted, true);
+
+  releaseOldRefresh(liveData());
+  await Promise.all([oldRefresh, logout, signingIn]);
+
+  assert.equal(state.calls.syncs, 2);
+  assert.equal(state.calls.clears, 2);
+  assert.equal(state.privateCachePresent(), true);
+  assert.equal(state.root.querySelector('#app-shell').hidden, false);
 });
 
 test('destroy clears refresh timers and removes bound listeners', async () => {

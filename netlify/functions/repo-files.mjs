@@ -1,6 +1,7 @@
 import { serializeExpiredSessionCookie, verifySessionToken } from './_shared/auth-security.mjs';
 import {
   errorResponse,
+  guardRequestOrigin,
   isConfigured,
   jsonResponse,
   methodNotAllowed,
@@ -36,6 +37,8 @@ export function createRepoFilesHandler({
 } = {}) {
   return async function repoFilesHandler(request) {
     if (request.method !== 'POST') return withPrivateCache(methodNotAllowed('POST'));
+    const originError = guardRequestOrigin(request);
+    if (originError) return withPrivateCache(originError);
     if (!isConfigured(env)) return withPrivateCache(misconfiguredResponse());
 
     let session;
