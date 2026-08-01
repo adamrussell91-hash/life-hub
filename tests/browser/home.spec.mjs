@@ -6,6 +6,7 @@ import '../../scripts/prepare-web.mjs';
 import { createStaticServer } from '../../scripts/serve.mjs';
 
 const LOCAL_PASSPHRASE = 'life-hub-local';
+const SECRET_RESPONSE_PATTERN = /life-hub-local|github_pat_|ghp_|gho_|Authorization:\s*Bearer|LIFE_HUB_PASSPHRASE_HASH|SESSION_SECRET|GITHUB_TOKEN/i;
 
 let browser;
 let server;
@@ -24,33 +25,36 @@ after(async () => {
   server?.close();
 });
 
-function monitorApiResponses(page) {
-  const responseBodies = [];
-  page.on('response', response => {
-    const url = new URL(response.url());
-    if (url.origin === baseUrl && url.pathname.startsWith('/api/')) {
-      responseBodies.push(readResponseBody(response));
-    }
-  });
+async function monitorApiResponses(page, { expectResponse = true } = {}) {
+  const responses = [];
+  await page.exposeFunction('__recordLifeHubApiResponse', response => responses.push(response));
+  await page.addInitScript(({ origin }) => {
+    const nativeFetch = globalThis.fetch.bind(globalThis);
+    globalThis.fetch = async (...arguments_) => {
+      const response = await nativeFetch(...arguments_);
+      const url = new URL(response.url);
+      if (url.origin === origin && url.pathname.startsWith('/api/')) {
+        const body = response.status === 204 || response.status === 304
+          ? ''
+          : await response.clone().text();
+        await globalThis.__recordLifeHubApiResponse({
+          url: url.pathname,
+          status: response.status,
+          body
+        });
+      }
+      return response;
+    };
+  }, { origin: baseUrl });
+
   return async () => {
-    const bodies = await Promise.all(responseBodies);
-    for (const body of bodies) {
-      if (body !== null) assert.doesNotMatch(body, /life-hub-local/);
+    if (expectResponse) {
+      assert.ok(responses.length > 0, 'expected at least one audited API response');
+    }
+    for (const response of responses) {
+      assert.doesNotMatch(response.body, SECRET_RESPONSE_PATTERN, `${response.status} ${response.url}`);
     }
   };
-}
-
-function readResponseBody(response) {
-  return new Promise(resolve => {
-    const timeout = setTimeout(() => resolve(null), 1_000);
-    response.text().then(body => {
-      clearTimeout(timeout);
-      resolve(body);
-    }, () => {
-      clearTimeout(timeout);
-      resolve(null);
-    });
-  });
 }
 
 async function signIn(page) {
@@ -86,7 +90,7 @@ async function readHome(page) {
 test('rejects the wrong passphrase and clears the password field', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
-  const assertNoSecretResponses = monitorApiResponses(page);
+  const assertNoSecretResponses = await monitorApiResponses(page);
   await page.goto(baseUrl);
   await page.locator('#sign-in-view').waitFor();
 
@@ -105,7 +109,7 @@ test('rejects the wrong passphrase and clears the password field', async () => {
 test('signs in and renders the approved Home values at desktop width', async () => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
-  const assertNoSecretResponses = monitorApiResponses(page);
+  const assertNoSecretResponses = await monitorApiResponses(page);
   await signIn(page);
   const home = await readHome(page);
 
@@ -128,7 +132,7 @@ test('signs in and renders the approved Home values at desktop width', async () 
 test('uses mobile navigation without overflow at 390 px after sign-in', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
-  const assertNoSecretResponses = monitorApiResponses(page);
+  const assertNoSecretResponses = await monitorApiResponses(page);
   await signIn(page);
   const home = await readHome(page);
 
@@ -153,7 +157,7 @@ test('uses mobile navigation without overflow at 390 px after sign-in', async ()
 test('manual refresh uses the unchanged manifest without downloading files again', async () => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
-  const assertNoSecretResponses = monitorApiResponses(page);
+  const assertNoSecretResponses = await monitorApiResponses(page);
   let fileRequests = 0;
   page.on('request', request => {
     if (new URL(request.url()).pathname === '/api/repo/files') fileRequests += 1;
@@ -177,7 +181,7 @@ test('manual refresh uses the unchanged manifest without downloading files again
 test('sign-out clears the session marker, cookie, and private repository cache', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
-  const assertNoSecretResponses = monitorApiResponses(page);
+  const assertNoSecretResponses = await monitorApiResponses(page);
   await signIn(page);
   assert.equal(await page.evaluate(() => caches.has('life-hub-private-v1')), true);
 
@@ -197,7 +201,7 @@ test('sign-out clears the session marker, cookie, and private repository cache',
 test('session expiry is not masked by the public service-worker cache', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
-  const assertNoSecretResponses = monitorApiResponses(page);
+  const assertNoSecretResponses = await monitorApiResponses(page);
   await signIn(page);
   await waitForServiceWorkerControl(page);
 
@@ -225,7 +229,7 @@ test('session expiry is not masked by the public service-worker cache', async ()
 test('offline reload is limited to the authenticated tab before expiry', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
-  const assertNoSecretResponses = monitorApiResponses(page);
+  const assertNoSecretResponses = await monitorApiResponses(page);
   await signIn(page);
   await waitForServiceWorkerControl(page);
 
@@ -246,7 +250,7 @@ test('offline reload is limited to the authenticated tab before expiry', async (
   assert.equal(await page.locator('#network-status').isVisible(), true);
 
   const freshPage = await context.newPage();
-  const assertFreshNoSecretResponses = monitorApiResponses(freshPage);
+  const assertFreshNoSecretResponses = await monitorApiResponses(freshPage, { expectResponse: false });
   await freshPage.goto(baseUrl);
   await freshPage.locator('#sign-in-view').waitFor();
   assert.equal(await freshPage.locator('#sign-in-view').isVisible(), true);

@@ -1,6 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
+
+async function browserAssetText() {
+  const root = new URL('../../', import.meta.url);
+  const paths = [
+    'index.html',
+    'css/app.css',
+    'manifest.webmanifest',
+    'service-worker.js',
+    'node_modules/js-yaml/dist/js-yaml.mjs'
+  ];
+  for (const directory of ['js/app', 'js/core']) {
+    const entries = await readdir(new URL(directory, root));
+    paths.push(...entries.filter(name => name.endsWith('.js')).map(name => `${directory}/${name}`));
+  }
+  return (await Promise.all(paths.map(path => readFile(new URL(path, root), 'utf8')))).join('\n');
+}
 
 test('Home shell exposes landmarks and named rendering regions', async () => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
@@ -41,6 +57,32 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
     assert.ok(html.includes(fragment), fragment);
   }
   assert.match(html, /id="app-shell"[^>]*hidden/);
+});
+
+test('skip link is unavailable until the authenticated shell is revealed', async () => {
+  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const shellStart = html.indexOf('id="app-shell"');
+  const skipLink = html.indexOf('class="skip-link"');
+  const mainContent = html.indexOf('id="main-content"');
+
+  assert.ok(shellStart >= 0);
+  assert.ok(skipLink > shellStart);
+  assert.ok(mainContent > skipLink);
+});
+
+test('browser assets contain no server environment names that reveal values', async () => {
+  const assets = await browserAssetText();
+  assert.doesNotMatch(assets, /github_pat_|ghp_|gho_/);
+  for (const name of [
+    'LIFE_HUB_PASSPHRASE_HASH',
+    'SESSION_SECRET',
+    'GITHUB_REPOSITORY',
+    'GITHUB_BRANCH',
+    'GITHUB_TOKEN',
+    'GITHUB_TOKEN_EXPIRES'
+  ]) {
+    assert.doesNotMatch(assets, new RegExp(name));
+  }
 });
 
 test('renderer assigns untrusted values as text instead of HTML', async () => {

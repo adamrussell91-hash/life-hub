@@ -83,7 +83,7 @@ test('session cookie uses every required browser security attribute', () => {
 
 - [ ] **Step 2: Run the focused test and confirm the missing-module failure**
 
-Run: `node --test tests/unit/auth-security.test.js`  
+Run: `node --test tests/unit/auth-security.test.js`
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `auth-security.mjs`.
 
 - [ ] **Step 3: Implement the cryptographic boundary**
@@ -110,10 +110,10 @@ The generator reads the passphrase twice from a TTY without echo, refuses non-in
 
 - [ ] **Step 4: Run focused tests and the generator smoke test**
 
-Run: `node --test tests/unit/auth-security.test.js`  
+Run: `node --test tests/unit/auth-security.test.js`
 Expected: all auth-security tests PASS.
 
-Run: `node scripts/generate-auth-secrets.mjs </dev/null`  
+Run: `node scripts/generate-auth-secrets.mjs </dev/null`
 Expected: non-zero exit with `Run this command in an interactive terminal.` and no secret output.
 
 - [ ] **Step 5: Commit the security primitives**
@@ -193,7 +193,7 @@ Also cover wrong methods (`405` plus `Allow`), missing JSON content type (`415`)
 
 - [ ] **Step 2: Run the integration test and confirm missing handlers**
 
-Run: `node --test tests/integration/auth-functions.test.js`  
+Run: `node --test tests/integration/auth-functions.test.js`
 Expected: FAIL with missing function modules.
 
 - [ ] **Step 3: Implement response helpers and injectable handlers**
@@ -225,7 +225,7 @@ Session and logout export `config.path` values `/api/session` and `/api/logout`.
 
 - [ ] **Step 4: Run authentication integration and regression tests**
 
-Run: `node --test tests/unit/auth-security.test.js tests/integration/auth-functions.test.js`  
+Run: `node --test tests/unit/auth-security.test.js tests/integration/auth-functions.test.js`
 Expected: all tests PASS.
 
 - [ ] **Step 5: Commit the authenticated API boundary**
@@ -279,7 +279,7 @@ test('policy rejects traversal, URLs, backslashes, bad dates, and ranges over 36
 
 - [ ] **Step 2: Run policy tests and confirm missing-module failure**
 
-Run: `node --test tests/unit/repo-policy.test.js`  
+Run: `node --test tests/unit/repo-policy.test.js`
 Expected: FAIL with `ERR_MODULE_NOT_FOUND`.
 
 - [ ] **Step 3: Implement strict allowlisting and the GitHub adapter**
@@ -313,7 +313,7 @@ Cover missing session (`401` with zero GitHub calls), invalid range (`400`), hap
 
 The handler accepts GET only, validates the session before parsing any provider configuration, sets `Cache-Control: private, no-store`, returns no GitHub URLs, and calculates `manifestId` as a SHA-256 digest of `commitSha`, `from`, and `to` separated by NUL bytes. Quote `manifestId`, not `commitSha`, as the ETag. Run:
 
-`node --test tests/unit/repo-policy.test.js tests/integration/repo-manifest-function.test.js`  
+`node --test tests/unit/repo-policy.test.js tests/integration/repo-manifest-function.test.js`
 Expected: all tests PASS.
 
 - [ ] **Step 6: Commit the repository manifest boundary**
@@ -372,7 +372,7 @@ Also test duplicate pairs, malformed SHA, unknown path, base64 decoding, non-bas
 
 - [ ] **Step 2: Run the focused test and confirm the missing-handler failure**
 
-Run: `node --test tests/integration/repo-files-function.test.js`  
+Run: `node --test tests/integration/repo-files-function.test.js`
 Expected: FAIL with missing `repo-files.mjs`.
 
 - [ ] **Step 3: Implement current-tree validation and bounded blob reads**
@@ -394,7 +394,7 @@ The health handler validates the session, resolves the branch, and returns only 
 
 - [ ] **Step 5: Run repository and health tests**
 
-Run: `node --test tests/integration/repo-files-function.test.js tests/unit/provider-health.test.js tests/integration/health-function.test.js`  
+Run: `node --test tests/integration/repo-files-function.test.js tests/unit/provider-health.test.js tests/integration/health-function.test.js`
 Expected: all tests PASS.
 
 - [ ] **Step 6: Commit bounded reads and health reporting**
@@ -444,7 +444,7 @@ Cache one JSON response under `/__life-hub-private-cache__/repository` in a cach
 
 - [ ] **Step 2: Run cache tests and confirm missing-module failures**
 
-Run: `node --test tests/unit/repository-cache.test.js tests/unit/sync-repository.test.js`  
+Run: `node --test tests/unit/repository-cache.test.js tests/unit/sync-repository.test.js`
 Expected: FAIL with missing modules.
 
 - [ ] **Step 3: Implement atomic incremental sync**
@@ -475,7 +475,7 @@ Use one in-flight promise per date range so refresh callers share work. Abort su
 
 - [ ] **Step 5: Run sync, parser, and existing Home tests**
 
-Run: `node --test tests/unit/repository-cache.test.js tests/unit/sync-repository.test.js tests/unit/load-live-events.test.js tests/unit/home-model.test.js tests/unit/load-events.test.js`  
+Run: `node --test tests/unit/repository-cache.test.js tests/unit/sync-repository.test.js tests/unit/load-live-events.test.js tests/unit/home-model.test.js tests/unit/load-events.test.js`
 Expected: all tests PASS, including unchanged manifest with zero file calls, one changed file with one requested pair, stale fallback, invalid changed-file fallback, and exact Home values.
 
 - [ ] **Step 6: Commit incremental browser sync**
@@ -536,7 +536,7 @@ Also cover invalid credentials and focus, expired-session transition, stale GitH
 
 - [ ] **Step 2: Run controller tests and confirm missing-module failure**
 
-Run: `node --test tests/unit/app-controller.test.js tests/unit/web-assets.test.js`  
+Run: `node --test tests/unit/app-controller.test.js tests/unit/web-assets.test.js`
 Expected: FAIL for missing controller and sign-in landmarks.
 
 - [ ] **Step 3: Add semantic sign-in and authenticated controls**
@@ -563,7 +563,7 @@ export function createSessionApi(fetchImpl = fetch) {
 
 - [ ] **Step 5: Run controller and static UI tests**
 
-Run: `node --test tests/unit/app-controller.test.js tests/unit/web-assets.test.js tests/unit/home-model.test.js`  
+Run: `node --test tests/unit/app-controller.test.js tests/unit/web-assets.test.js tests/unit/home-model.test.js`
 Expected: all tests PASS.
 
 - [ ] **Step 6: Commit authenticated UI states**
@@ -608,7 +608,7 @@ test('local sign-in exposes the fixture repository contract', async () => {
 
 - [ ] **Step 2: Run the integration test and confirm unauthenticated behavior is missing**
 
-Run: `node --test tests/integration/static-server.test.js`  
+Run: `node --test tests/integration/static-server.test.js`
 Expected: FAIL because the current server serves no `/api/*` contract.
 
 - [ ] **Step 3: Implement fixture-backed API routing**
@@ -625,10 +625,10 @@ Add a helper that signs in with `life-hub-local`. Preserve desktop, mobile, and 
 
 - [ ] **Step 6: Run integration and browser tests**
 
-Run: `node --test tests/integration/static-server.test.js`  
+Run: `node --test tests/integration/static-server.test.js`
 Expected: all server tests PASS.
 
-Run: `node --test tests/browser/home.spec.mjs`  
+Run: `node --test tests/browser/home.spec.mjs`
 Expected: all desktop, 390-pixel, auth, refresh, logout, expiry, and offline tests PASS.
 
 - [ ] **Step 7: Commit the local authenticated runtime**
@@ -670,7 +670,7 @@ test('browser assets contain no server environment names that reveal values', as
 
 - [ ] **Step 2: Run security tests and confirm the missing environment example**
 
-Run: `node --test tests/unit/dependency-security.test.js tests/unit/web-assets.test.js`  
+Run: `node --test tests/unit/dependency-security.test.js tests/unit/web-assets.test.js`
 Expected: FAIL because `.env.example` does not exist.
 
 - [ ] **Step 3: Document safe local and Netlify setup**
