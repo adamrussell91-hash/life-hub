@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A1536">
+  <meta name="description" content="A private, read-only view of your Life Hub.">
+  <title>Life Hub · Home</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to Life Hub Home</a>
+
+  <div class="app-shell" id="app" data-state="loading">
+    <aside class="desktop-rail" aria-label="Life Hub navigation">
+      <header class="brand">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span class="brand-copy">
+          <strong>Life Hub</strong>
+          <small>Private dashboard</small>
+        </span>
+      </header>
+
+      <nav class="rail-nav" aria-label="Primary">
+        <button class="nav-item is-active" type="button" data-section="home" aria-current="page">
+          <span class="nav-glyph" aria-hidden="true">⌂</span><span>Home</span>
+        </button>
+        <button class="nav-item" type="button" data-section="chat">
+          <span class="nav-glyph" aria-hidden="true">◌</span><span>Chat</span>
+        </button>
+        <p class="nav-label">Domains</p>
+        <button class="nav-item" type="button" data-section="nutrition"><span class="nav-dot nutrition" aria-hidden="true"></span><span>Nutrition</span></button>
+        <button class="nav-item" type="button" data-section="fitness"><span class="nav-dot fitness" aria-hidden="true"></span><span>Fitness</span></button>
+        <button class="nav-item" type="button" data-section="body"><span class="nav-dot body" aria-hidden="true"></span><span>Body</span></button>
+        <button class="nav-item" type="button" data-section="mind"><span class="nav-dot mind" aria-hidden="true"></span><span>Mind</span></button>
+        <button class="nav-item" type="button" data-section="skincare"><span class="nav-dot skincare" aria-hidden="true"></span><span>Skincare</span></button>
+        <button class="nav-item" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true">□</span><span>Calendar</span></button>
+        <button class="nav-item" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true">◎</span><span>Central Node</span></button>
+      </nav>
+
+      <div class="rail-footer">
+        <span class="privacy-dot" aria-hidden="true"></span>
+        <span>Fixture mode · read only</span>
+      </div>
+    </aside>
+
+    <div class="page-frame">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Your day at a glance</p>
+          <h1>Home</h1>
+        </div>
+        <div class="topbar-actions">
+          <p class="date-chip"><span aria-hidden="true">◷</span> <span data-value="date">Loading date</span></p>
+          <p class="system-chip" id="network-status" hidden><span class="status-dot" aria-hidden="true"></span><span>Offline · saved view</span></p>
+        </div>
+      </header>
+
+      <main id="main-content" tabindex="-1">
+        <section class="status-region" aria-label="Application status">
+          <p id="app-status" class="sr-only" aria-live="polite">Loading your Life Hub.</p>
+          <div class="warning-panel" id="data-warning" hidden>
+            <div>
+              <strong>Some records could not be read</strong>
+              <p>Available data is still shown below.</p>
+            </div>
+            <ul id="warning-list"></ul>
+          </div>
+          <div class="unavailable-panel" id="unavailable-panel" hidden>
+            <span class="unavailable-mark" aria-hidden="true">↻</span>
+            <div>
+              <strong>Your saved view is unavailable</strong>
+              <p data-error-message>Life Hub could not load its saved data.</p>
+            </div>
+            <button id="retry-button" type="button">Try again</button>
+          </div>
+        </section>
+
+        <section id="home-dashboard" class="dashboard" aria-labelledby="today-heading">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Daily pulse</p>
+              <h2 id="today-heading">Today</h2>
+            </div>
+            <p class="sync-note"><span class="sync-pulse" aria-hidden="true"></span><span data-value="sync">Preparing your view</span></p>
+          </div>
+
+          <div class="hero-grid">
+            <article class="metric-card metric-card--hero" aria-labelledby="calories-label">
+              <div class="metric-heading">
+                <div>
+                  <p class="metric-label" id="calories-label">Energy</p>
+                  <p class="metric-context">Daily fuel</p>
+                </div>
+                <span class="metric-icon energy" aria-hidden="true">◇</span>
+              </div>
+              <div class="hero-metric">
+                <p><strong data-value="calories">—</strong><span>kcal</span></p>
+                <p data-target="calories">of — kcal</p>
+              </div>
+              <div class="progress-track" data-progress="calories" role="progressbar" aria-label="Calorie progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+              <div class="metric-footer"><span>Daily target</span><strong data-percent="calories">—%</strong></div>
+            </article>
+
+            <article class="metric-card" aria-labelledby="protein-label">
+              <div class="metric-heading">
+                <div>
+                  <p class="metric-label" id="protein-label">Protein</p>
+                  <p class="metric-context">Muscle support</p>
+                </div>
+                <span class="metric-icon protein" aria-hidden="true">P</span>
+              </div>
+              <p class="metric-value"><strong data-value="protein">—</strong><span data-target="protein">/ — g</span></p>
+              <div class="progress-track progress-track--marine" data-progress="protein" role="progressbar" aria-label="Protein progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+              <p class="metric-caption"><strong data-percent="protein">—%</strong> of target</p>
+            </article>
+
+            <article class="metric-card" aria-labelledby="fat-label">
+              <div class="metric-heading">
+                <div>
+                  <p class="metric-label" id="fat-label">Fat</p>
+                  <p class="metric-context">Clinical ceiling</p>
+                </div>
+                <span class="metric-icon fat" aria-hidden="true">F</span>
+              </div>
+              <p class="metric-value"><strong data-value="fat">—</strong><span data-target="fat">/ — g</span></p>
+              <div class="progress-track progress-track--calm" data-progress="fat" role="progressbar" aria-label="Fat ceiling used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+              <p class="metric-caption"><strong data-percent="fat">—%</strong> of daily ceiling</p>
+            </article>
+          </div>
+
+          <div class="support-grid">
+            <article class="metric-card workout-card" aria-labelledby="workout-label">
+              <div class="metric-heading">
+                <div>
+                  <p class="metric-label" id="workout-label">Movement</p>
+                  <p class="metric-context">Today's training</p>
+                </div>
+                <span class="metric-icon workout" aria-hidden="true">↗</span>
+              </div>
+              <div class="workout-summary">
+                <div>
+                  <strong data-value="workout">—</strong>
+                  <span data-value="workout-state">Checking records</span>
+                </div>
+                <div class="streak-block">
+                  <span class="flame" aria-hidden="true">◆</span>
+                  <p><strong data-value="streak">—</strong><span>day streak</span></p>
+                </div>
+              </div>
+            </article>
+
+            <article class="metric-card logging-card" aria-labelledby="logging-label">
+              <div class="metric-heading">
+                <div>
+                  <p class="metric-label" id="logging-label">Logging</p>
+                  <p class="metric-context">Daily completeness</p>
+                </div>
+                <span class="logging-total" data-value="logging">— of 5</span>
+              </div>
+              <div class="logging-list" aria-label="Logging categories">
+                <span data-complete="nutrition"><i></i>Nutrition</span>
+                <span data-complete="fitness"><i></i>Fitness</span>
+                <span data-complete="diary"><i></i>Diary</span>
+                <span data-complete="body"><i></i>Body</span>
+                <span data-complete="skincare"><i></i>Skincare</span>
+              </div>
+              <div class="progress-track progress-track--logging" data-progress="logging" role="progressbar" aria-label="Logging completeness" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+            </article>
+          </div>
+
+          <section class="week-card" aria-labelledby="week-label">
+            <div>
+              <p class="section-kicker">This week</p>
+              <h2 id="week-label">A quiet start is still a start.</h2>
+              <p>More history will appear here as authenticated GitHub sync comes online.</p>
+            </div>
+            <div class="week-strip" aria-label="Fixture week coverage">
+              <span><small>M</small><i></i></span>
+              <span><small>T</small><i></i></span>
+              <span class="is-current"><small>W</small><i></i></span>
+              <span><small>T</small><i></i></span>
+              <span><small>F</small><i></i></span>
+              <span><small>S</small><i></i></span>
+              <span><small>S</small><i></i></span>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <nav class="mobile-nav" aria-label="Mobile primary">
+      <button class="is-active" type="button" data-section="home" aria-current="page"><span aria-hidden="true">⌂</span>Home</button>
+      <button type="button" data-section="chat"><span aria-hidden="true">◌</span>Chat</button>
+      <button type="button" data-section="calendar"><span aria-hidden="true">□</span>Calendar</button>
+      <button type="button" data-section="more"><span aria-hidden="true">•••</span>More</button>
+    </nav>
+  </div>
+
+  <noscript>Life Hub needs JavaScript to calculate your read-only dashboard.</noscript>
+  <script type="module" src="/js/app/main.js"></script>
+</body>
+</html>
