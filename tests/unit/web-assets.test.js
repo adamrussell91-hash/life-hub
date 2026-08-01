@@ -37,6 +37,12 @@ test('responsive stylesheet contains the approved palette and mobile breakpoint'
   assert.match(css, /min-height:\s*44px/);
 });
 
+test('author styles preserve the semantic hidden state', async () => {
+  const css = await readFile(new URL('../../css/app.css', import.meta.url), 'utf8');
+
+  assert.match(css, /\[hidden\]\s*{\s*display:\s*none\s*!important;?\s*}/);
+});
+
 test('web app manifest is installable and uses only local icons', async () => {
   const manifest = JSON.parse(await readFile(new URL('../../manifest.webmanifest', import.meta.url)));
 
