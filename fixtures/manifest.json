@@ -1,0 +1,20 @@
+{
+  "files": [
+    {
+      "path": "data/nutrition/2026/07/2026-07-30-breakfast.md",
+      "url": "/tests/fixtures/valid/data/nutrition/2026/07/2026-07-30-breakfast.md"
+    },
+    {
+      "path": "data/nutrition/2026/07/2026-07-30-lunch.md",
+      "url": "/tests/fixtures/valid/data/nutrition/2026/07/2026-07-30-lunch.md"
+    },
+    {
+      "path": "data/fitness/2026/07/2026-07-30-chest-curls.md",
+      "url": "/tests/fixtures/valid/data/fitness/2026/07/2026-07-30-chest-curls.md"
+    },
+    {
+      "path": "data/mind/2026/07/2026-07-30-diary.md",
+      "url": "/tests/fixtures/valid/data/mind/2026/07/2026-07-30-diary.md"
+    }
+  ]
+}
