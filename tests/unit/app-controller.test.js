@@ -29,6 +29,7 @@ class FakeElement extends EventTarget {
   }
 
   focus() {
+    if (this.disabled) return;
     this.focused = true;
   }
 }
@@ -118,11 +119,24 @@ function harness(options = {}) {
     : {});
   const localStorage = memoryStorage();
   const navigatorTarget = { onLine: options.online !== false };
-  const calls = { sessions: 0, signsIn: [], signsOut: 0, syncs: 0, cached: 0, health: 0, clears: 0, renders: 0 };
+  const calls = {
+    sessions: 0,
+    signsIn: [],
+    signsOut: 0,
+    syncs: 0,
+    cached: 0,
+    health: 0,
+    clears: 0,
+    renders: 0,
+    refreshSignals: []
+  };
   let currentNow = new Date(NOW);
+  let privateCachePresent = options.privateCachePresent !== false;
   const session = options.session ?? { authenticated: true, expiresAt: EXPIRY };
   let releaseSync;
   const heldSync = options.holdSync ? new Promise(resolve => { releaseSync = resolve; }) : null;
+  let releaseLogout;
+  const heldLogout = options.holdLogout ? new Promise(resolve => { releaseLogout = resolve; }) : null;
 
   const dependencies = {
     root,
@@ -149,15 +163,24 @@ function harness(options = {}) {
       },
       async signOut() {
         calls.signsOut += 1;
+        if (heldLogout) await heldLogout;
       }
     },
     cache: {
-      async clear() { calls.clears += 1; },
+      async clear() {
+        calls.clears += 1;
+        privateCachePresent = false;
+      },
       async read() { return options.cachedRecord ?? null; }
     },
-    async loadLive() {
+    async loadLive({ signal } = {}) {
       calls.syncs += 1;
-      if (heldSync) return heldSync;
+      calls.refreshSignals.push(signal);
+      if (heldSync) {
+        const result = await heldSync;
+        if (options.repopulateOnSync) privateCachePresent = true;
+        return result;
+      }
       if (options.liveError) throw options.liveError;
       return options.liveResult ?? liveData();
     },
@@ -198,6 +221,8 @@ function harness(options = {}) {
     navigatorTarget,
     controller: createAppController(dependencies),
     releaseSync: value => releaseSync?.(value ?? liveData()),
+    releaseLogout: () => releaseLogout?.(),
+    privateCachePresent: () => privateCachePresent,
     setNow: value => { currentNow = new Date(value); }
   };
 }
@@ -256,7 +281,7 @@ test('successful sign-in loads live Home and stores only a tab expiry marker', a
   assert.equal(state.calls.syncs, 1);
 });
 
-test('invalid credentials retain sign-in, show a generic error, and restore focus', async () => {
+test('invalid credentials re-enable the passphrase before restoring focus', async () => {
   const state = harness({ acceptedPassphrase: 'secret' });
   const input = state.root.querySelector('#passphrase-input');
   input.value = 'wrong';
@@ -268,6 +293,7 @@ test('invalid credentials retain sign-in, show a generic error, and restore focu
   assert.equal(state.root.querySelector('#sign-in-error').hidden, false);
   assert.equal(state.root.querySelector('#sign-in-error').textContent, 'That passphrase was not accepted.');
   assert.equal(input.value, '');
+  assert.equal(input.disabled, false);
   assert.equal(input.focused, true);
 });
 
@@ -381,6 +407,26 @@ test('offline startup uses private cache only with an unexpired same-tab marker'
   assert.equal(expiredTab.sessionStorage.getItem('life-hub:session-expiry'), null);
 });
 
+test('offline cache rejects non-network session-validation failures', async () => {
+  for (const sessionError of [
+    Object.assign(new Error('server failure'), { status: 500, code: 'request_failed' }),
+    Object.assign(new Error('malformed success'), { status: 200, code: 'request_failed' })
+  ]) {
+    const state = harness({
+      online: false,
+      sessionError,
+      sessionMarker: EXPIRY,
+      cachedResult: liveData()
+    });
+
+    await state.controller.start();
+
+    assert.equal(state.calls.cached, 0);
+    assert.equal(state.root.querySelector('#app-shell').hidden, true);
+    assert.equal(state.root.querySelector('#sign-in-view').hidden, false);
+  }
+});
+
 test('future navigation retains its existing status announcement', () => {
   const state = harness();
 
@@ -401,6 +447,38 @@ test('explicit logout clears the private cache and tab marker', async () => {
   assert.equal(state.calls.clears, 1);
   assert.equal(state.sessionStorage.getItem('life-hub:session-expiry'), null);
   assert.equal(state.root.querySelector('#sign-in-view').hidden, false);
+});
+
+test('logout hides immediately and clears again after invalidating an active refresh', async () => {
+  const state = harness({
+    sessionMarker: EXPIRY,
+    holdSync: true,
+    holdLogout: true,
+    repopulateOnSync: true
+  });
+  state.root.querySelector('#app-shell').hidden = false;
+  state.root.querySelector('#sign-in-view').hidden = true;
+  const refresh = state.controller.refresh();
+
+  const logout = state.controller.signOut();
+
+  assert.equal(state.root.querySelector('#app-shell').hidden, true);
+  assert.equal(state.root.querySelector('#sign-in-view').hidden, false);
+  assert.equal(state.sessionStorage.getItem('life-hub:session-expiry'), null);
+  assert.equal(state.calls.clears, 1);
+  assert.equal(state.calls.refreshSignals[0]?.aborted, true);
+
+  state.releaseSync();
+  await refresh;
+  const outcome = await Promise.race([
+    logout.then(() => 'complete'),
+    new Promise(resolve => setTimeout(() => resolve('network-blocked'), 25))
+  ]);
+
+  assert.equal(outcome, 'complete');
+  assert.equal(state.calls.renders, 0);
+  assert.equal(state.calls.clears, 2);
+  assert.equal(state.privateCachePresent(), false);
 });
 
 test('destroy clears refresh timers and removes bound listeners', async () => {

@@ -36,6 +36,8 @@ export function createAppController(dependencies) {
   let authenticated = false;
   let rendered = false;
   let activeRefresh = null;
+  let refreshAbortController = null;
+  let lifecycleVersion = 0;
   let intervalId = null;
   let destroyed = false;
   const listeners = [];
@@ -96,6 +98,7 @@ export function createAppController(dependencies) {
     } catch (error) {
       authenticated = false;
       forgetExpiry();
+      setSignInBusy(false);
       clearPassphrase();
       showSignedOut(error?.status === 401
         ? 'That passphrase was not accepted.'
@@ -119,18 +122,23 @@ export function createAppController(dependencies) {
     if (manual) setStatus('Refreshing your Life Hub…');
     setAppState(rendered ? 'refreshing' : 'loading');
 
-    activeRefresh = performRefresh()
+    const version = lifecycleVersion;
+    const abortController = new AbortController();
+    refreshAbortController = abortController;
+    activeRefresh = performRefresh({ signal: abortController.signal, version })
       .finally(() => {
         if (button) button.disabled = !navigatorTarget.onLine;
+        if (refreshAbortController === abortController) refreshAbortController = null;
         activeRefresh = null;
       });
     return activeRefresh;
   }
 
-  async function performRefresh() {
+  async function performRefresh({ signal, version }) {
     try {
       const date = getSydneyDateKey(currentDate());
-      const result = await loadLive({ date });
+      const result = await loadLive({ date, signal });
+      if (!isCurrentRefresh(version, signal)) return;
       const model = buildHomeModel({ ...result, date });
       renderHome(root, model);
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
@@ -145,11 +153,12 @@ export function createAppController(dependencies) {
         hideProvider();
         setAppState('ready');
       }
-      await checkHealth();
+      await checkHealth({ signal, version });
       if (authenticated && !stale && root.querySelector('#provider-status')?.hidden !== false) {
         setAppState('ready');
       }
     } catch (error) {
+      if (!isCurrentRefresh(version, signal)) return;
       if (isSessionExpired(error)) {
         forgetExpiry();
         showSignedOut('Your session expired. Please sign in again.');
@@ -164,13 +173,14 @@ export function createAppController(dependencies) {
     }
   }
 
-  async function checkHealth() {
+  async function checkHealth({ signal, version }) {
     let response;
     try {
-      response = await fetchImpl('/api/health');
+      response = await fetchImpl('/api/health', { signal });
     } catch {
       return;
     }
+    if (!isCurrentRefresh(version, signal)) return;
     if (response.status === 401) {
       forgetExpiry();
       showSignedOut('Your session expired. Please sign in again.');
@@ -212,19 +222,25 @@ export function createAppController(dependencies) {
   }
 
   async function signOut() {
+    const refreshToSettle = activeRefresh;
+    lifecycleVersion += 1;
     authenticated = false;
     clearRefreshTimer();
     forgetExpiry();
+    rendered = false;
+    showSignedOut();
+    refreshAbortController?.abort(new DOMException('Signed out', 'AbortError'));
+
     try {
-      await sessionApi.signOut();
+      Promise.resolve(sessionApi.signOut()).catch(() => undefined);
     } catch {
-      // Local privacy cleanup must not depend on the network response.
+      // The server request is best effort; local privacy cleanup is authoritative.
     }
-    try {
+
+    await cache.clear();
+    if (refreshToSettle) {
+      await refreshToSettle.catch(() => undefined);
       await cache.clear();
-    } finally {
-      rendered = false;
-      showSignedOut();
     }
   }
 
@@ -369,7 +385,7 @@ export function createAppController(dependencies) {
   }
 
   function canUseOfflineCache(error) {
-    if (navigatorTarget.onLine || isSessionExpired(error)) return false;
+    if (navigatorTarget.onLine || !isNetworkFailure(error)) return false;
     const expiry = sessionStorage.getItem(SESSION_EXPIRY_KEY);
     if (validFutureExpiry(expiry)) return true;
     forgetExpiry();
@@ -381,11 +397,19 @@ export function createAppController(dependencies) {
     return value instanceof Date ? new Date(value) : new Date(value);
   }
 
+  function isCurrentRefresh(version, signal) {
+    return version === lifecycleVersion && !signal.aborted;
+  }
+
   return { start, refresh, signIn, signOut, destroy };
 }
 
 function isSessionExpired(error) {
   return error?.status === 401 || error?.code === 'session_expired' || error?.code === 'unauthenticated';
+}
+
+function isNetworkFailure(error) {
+  return error?.code === 'network_error' || (error instanceof TypeError && error?.status == null);
 }
 
 function formatCalendarDate(value) {
