@@ -2,6 +2,44 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { load } from 'js-yaml';
+import { config as authConfig } from '../../netlify/functions/auth.mjs';
+
+test('environment example contains names but no usable credentials', async () => {
+  const example = await readFile(new URL('../../.env.example', import.meta.url), 'utf8');
+  const values = new Map(example
+    .split('\n')
+    .filter(line => line && !line.startsWith('#'))
+    .map(line => line.split('=', 2)));
+  for (const name of [
+    'LIFE_HUB_PASSPHRASE_HASH',
+    'SESSION_SECRET',
+    'GITHUB_REPOSITORY',
+    'GITHUB_BRANCH',
+    'GITHUB_TOKEN',
+    'GITHUB_TOKEN_EXPIRES'
+  ]) {
+    assert.match(example, new RegExp(`^${name}=`, 'm'));
+  }
+  assert.equal(values.get('LIFE_HUB_PASSPHRASE_HASH'), 'replace-in-netlify');
+  assert.equal(values.get('SESSION_SECRET'), 'replace-in-netlify');
+  assert.equal(values.get('GITHUB_REPOSITORY'), 'owner/private-repository');
+  assert.equal(values.get('GITHUB_BRANCH'), 'main');
+  assert.equal(values.get('GITHUB_TOKEN'), 'replace-in-netlify');
+  assert.equal(values.get('GITHUB_TOKEN_EXPIRES'), 'YYYY-MM-DD');
+  assert.doesNotMatch(example, /github_pat_|ghp_|gho_|Bearer\s+[A-Za-z0-9]/);
+});
+
+test('authentication declares the reviewed Netlify rate limit', () => {
+  assert.deepEqual(authConfig, {
+    path: '/api/auth',
+    rateLimit: {
+      action: 'rate_limit',
+      aggregateBy: ['ip', 'domain'],
+      windowLimit: 5,
+      windowSize: 60
+    }
+  });
+});
 
 test('runtime YAML parser is pinned to the patched js-yaml release', async () => {
   const packageMetadata = JSON.parse(await readFile(

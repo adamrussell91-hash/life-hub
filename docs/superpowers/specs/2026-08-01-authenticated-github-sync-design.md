@@ -1,7 +1,7 @@
 # Authenticated GitHub Sync Design
 
-Date: 1 August 2026  
-Status: Approved  
+Date: 1 August 2026
+Status: Approved
 Phase: 3 of the Life Hub delivery roadmap
 
 ## Outcome

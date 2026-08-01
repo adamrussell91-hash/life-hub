@@ -4,9 +4,9 @@ Private personal dashboard and conversational logging application.
 
 ## Current slice
 
-The read-only Home PWA renders checked-in Markdown fixtures through the production parsing, validation, target, and aggregation modules. It is responsive, installable, and keeps the last successful view readable offline.
+The read-only Home PWA is gated by a single-user passphrase and syncs allowlisted Markdown records from a private GitHub repository through same-origin Netlify Functions. The browser receives only bounded manifest and file responses; it never receives the GitHub token, passphrase verifier, session secret, or unrestricted repository access.
 
-Authenticated GitHub sync, chat, writes, and domain detail views arrive in later phases.
+Local development uses a fixture-backed mock of the same `/api/*` contract. Chat, writes, and domain detail views arrive in later phases.
 
 ## Run locally
 
@@ -18,6 +18,33 @@ npm run dev
 ```
 
 Open the local URL printed in the terminal.
+
+The local-only passphrase is `life-hub-local`. It is isolated to the mock server and tests and is not a production credential. Local repository reads use checked-in fixtures and never contact GitHub.
+
+## Configure a Netlify preview
+
+Generate a scrypt passphrase verifier and an independent random session secret in an interactive terminal:
+
+```bash
+npm run generate:auth
+```
+
+The command prompts twice without echoing the passphrase, then prints `LIFE_HUB_PASSPHRASE_HASH` and `SESSION_SECRET` assignments. Copy those values directly into the Netlify environment; do not commit them or save them in `.env.example`.
+
+Create a fine-grained GitHub personal access token scoped to the one private Life Hub repository with **Contents: Read-only** permission. Set these six environment variables in Netlify:
+
+```text
+LIFE_HUB_PASSPHRASE_HASH=<generated verifier>
+SESSION_SECRET=<generated random secret>
+GITHUB_REPOSITORY=<owner/private-repository>
+GITHUB_BRANCH=<branch name>
+GITHUB_TOKEN=<fine-grained read-only token>
+GITHUB_TOKEN_EXPIRES=<YYYY-MM-DD>
+```
+
+Use `.env.example` only as a symbolic checklist. This branch and its pull request deliberately contain no production credentials, and production providers remain disconnected until deployment review.
+
+After deploying a preview, inspect its deploy log and confirm Netlify registered the `/api/auth` code-based rate limit: five requests per 60 seconds, aggregated by IP and domain. Do not promote a deploy if that rule is absent.
 
 ## Verify
 
