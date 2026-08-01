@@ -11,10 +11,10 @@ const fetchImpl = (...args) => fetch(...args);
 const cache = createRepositoryCache(caches);
 const sessionApi = createSessionApi(fetchImpl);
 
-const loadLive = ({ date }) => loadLiveEvents({
+const loadLive = ({ date, signal }) => loadLiveEvents({
   date,
   loadYaml: load,
-  sync: options => syncRepository({ ...options, fetchImpl, cache })
+  sync: options => syncRepository({ ...options, fetchImpl, cache, signal })
 });
 
 const loadCached = async ({ date }) => {
