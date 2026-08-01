@@ -13,6 +13,23 @@
 <body>
   <a class="skip-link" href="#main-content">Skip to Life Hub Home</a>
 
+  <section class="sign-in-view" id="sign-in-view" aria-labelledby="sign-in-heading">
+    <div class="sign-in-card">
+      <span class="brand-mark sign-in-mark" aria-hidden="true"><span></span></span>
+      <p class="eyebrow">Private dashboard</p>
+      <h1 id="sign-in-heading">Welcome to Life Hub</h1>
+      <p class="sign-in-copy">Sign in to open your private, read-only health dashboard.</p>
+      <form id="sign-in-form">
+        <label for="passphrase-input">Passphrase</label>
+        <input id="passphrase-input" name="passphrase" type="password" autocomplete="current-password" required>
+        <button id="sign-in-button" type="submit">Sign in</button>
+      </form>
+      <p class="sign-in-error" id="sign-in-error" role="alert" hidden></p>
+      <p class="privacy-note"><span class="privacy-dot" aria-hidden="true"></span>Your passphrase stays private.</p>
+    </div>
+  </section>
+
+  <div id="app-shell" hidden>
   <div class="app-shell" id="app" data-state="loading">
     <aside class="desktop-rail" aria-label="Life Hub navigation">
       <header class="brand">
@@ -55,12 +72,15 @@
         <div class="topbar-actions">
           <p class="date-chip"><span aria-hidden="true">◷</span> <span data-value="date">Loading date</span></p>
           <p class="system-chip" id="network-status" hidden><span class="status-dot" aria-hidden="true"></span><span>Offline · saved view</span></p>
+          <button class="quiet-button" id="refresh-button" type="button">Refresh</button>
+          <button class="quiet-button" id="sign-out-button" type="button">Sign out</button>
         </div>
       </header>
 
       <main id="main-content" tabindex="-1">
         <section class="status-region" aria-label="Application status">
           <p id="app-status" class="sr-only" aria-live="polite">Loading your Life Hub.</p>
+          <div class="provider-status" id="provider-status" role="status" hidden></div>
           <div class="warning-panel" id="data-warning" hidden>
             <div>
               <strong>Some records could not be read</strong>
@@ -84,7 +104,10 @@
               <p class="section-kicker">Daily pulse</p>
               <h2 id="today-heading">Today</h2>
             </div>
-            <p class="sync-note"><span class="sync-pulse" aria-hidden="true"></span><span data-value="sync">Preparing your view</span></p>
+            <div class="sync-details">
+              <p class="sync-note"><span class="sync-pulse" aria-hidden="true"></span><span data-value="sync">Preparing your view</span></p>
+              <p id="last-synced">Not synced yet</p>
+            </div>
           </div>
 
           <div class="hero-grid">
@@ -197,6 +220,7 @@
       <button type="button" data-section="calendar"><span aria-hidden="true">□</span>Calendar</button>
       <button type="button" data-section="more"><span aria-hidden="true">•••</span>More</button>
     </nav>
+  </div>
   </div>
 
   <noscript>Life Hub needs JavaScript to calculate your read-only dashboard.</noscript>

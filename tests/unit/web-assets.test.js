@@ -20,6 +20,29 @@ test('Home shell exposes landmarks and named rendering regions', async () => {
   assert.doesNotMatch(html, /https?:\/\//);
 });
 
+test('authenticated shell provides a semantic sign-in gate and reachable controls', async () => {
+  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+
+  for (const fragment of [
+    'id="sign-in-view"',
+    'id="sign-in-form"',
+    '<label for="passphrase-input"',
+    'id="passphrase-input"',
+    'type="password"',
+    'autocomplete="current-password"',
+    'id="sign-in-error"',
+    'role="alert"',
+    'id="app-shell"',
+    'id="refresh-button"',
+    'id="last-synced"',
+    'id="provider-status"',
+    'id="sign-out-button"'
+  ]) {
+    assert.ok(html.includes(fragment), fragment);
+  }
+  assert.match(html, /id="app-shell"[^>]*hidden/);
+});
+
 test('renderer assigns untrusted values as text instead of HTML', async () => {
   const source = await readFile(new URL('../../js/app/render-home.js', import.meta.url), 'utf8');
 

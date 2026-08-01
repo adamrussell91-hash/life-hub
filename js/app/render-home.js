@@ -37,7 +37,7 @@ export function renderHome(root, model) {
   setText(root, '[data-value="workout-state"]', model.dayType === 'movement' ? 'No completed session' : 'Completed');
   setText(root, '[data-value="streak"]', model.workoutStreak);
   setText(root, '[data-value="logging"]', `${model.completeness.complete} of ${model.completeness.total}`);
-  setText(root, '[data-value="sync"]', 'Fixture data ready');
+  setText(root, '[data-value="sync"]', 'Live data ready');
 
   for (const [name, value] of Object.entries(model.progress)) {
     setProgress(root, name, value);
