@@ -103,8 +103,12 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
   if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
     return { valid: false, errors: ['fields must be an object'] };
   }
+  if (typeof now !== 'string' || !now) {
+    return { valid: false, errors: ['now must be a non-empty string'] };
+  }
 
   const record = {
+    ...fields,
     schema_version: 1,
     id,
     type,
@@ -112,8 +116,7 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
     time: time ?? now.slice(11, 16),
     created_at: now,
     updated_at: now,
-    source,
-    ...fields
+    source
   };
   const errors = validateRecord(record);
   return errors.length ? { valid: false, errors } : { valid: true, record };
