@@ -36,3 +36,34 @@ test('responsive stylesheet contains the approved palette and mobile breakpoint'
   assert.match(css, /@media\s*\([^)]*max-width:\s*48rem/);
   assert.match(css, /min-height:\s*44px/);
 });
+
+test('web app manifest is installable and uses only local icons', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../../manifest.webmanifest', import.meta.url)));
+
+  assert.equal(manifest.name, 'Life Hub');
+  assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.start_url, '/');
+  assert.deepEqual(manifest.icons.map(icon => icon.sizes), ['192x192', '512x512']);
+  assert.ok(manifest.icons.every(icon => icon.src.startsWith('/assets/icons/')));
+});
+
+test('service worker precaches the full read-only fixture slice', async () => {
+  const worker = await readFile(new URL('../../service-worker.js', import.meta.url), 'utf8');
+
+  for (const path of [
+    '/index.html',
+    '/css/app.css',
+    '/js/app/main.js',
+    '/vendor/js-yaml.mjs',
+    '/config/targets.yml',
+    '/fixtures/manifest.json',
+    '/tests/fixtures/valid/data/nutrition/2026/07/2026-07-30-breakfast.md',
+    '/tests/fixtures/valid/data/nutrition/2026/07/2026-07-30-lunch.md',
+    '/tests/fixtures/valid/data/fitness/2026/07/2026-07-30-chest-curls.md',
+    '/tests/fixtures/valid/data/mind/2026/07/2026-07-30-diary.md'
+  ]) {
+    assert.ok(worker.includes(`'${path}'`), path);
+  }
+  assert.match(worker, /caches\.match/);
+  assert.doesNotMatch(worker, /\b(?:POST|PUT|PATCH|DELETE)\b/);
+});
