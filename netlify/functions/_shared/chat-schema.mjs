@@ -1,0 +1,122 @@
+import { TYPE_DOMAINS } from '../../../js/core/records.js';
+import { validateRecord } from '../../../js/core/validate.js';
+import { isCalendarDate } from '../../../js/core/time.js';
+
+const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare'];
+const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+const DOMAIN_PROPERTIES = {
+  meal: {
+    meal: { type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack'] },
+    calories: { type: 'number' },
+    protein_g: { type: 'number' },
+    fat_g: { type: 'number' },
+    sodium_mg: { type: 'number' },
+    calcium_mg: { type: 'number' },
+    polyphenol_score: { type: 'number' }
+  },
+  workout: {
+    title: { type: 'string' },
+    day_type: { type: 'string', enum: ['movement', 'workout_30', 'workout_45_60'] },
+    status: { type: 'string', enum: ['planned', 'completed', 'skipped'] },
+    duration_min: { type: 'number' },
+    exercises: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          sets: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { reps: { type: 'number' }, weight_kg: { type: 'number' } },
+              required: ['reps', 'weight_kg']
+            }
+          }
+        },
+        required: ['name', 'sets']
+      }
+    }
+  },
+  diary: {
+    mood_score: { type: 'number' },
+    mood: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] },
+    energy: { type: 'string', enum: ['high', 'medium', 'low'] },
+    highlights: { type: 'string' },
+    challenges: { type: 'string' }
+  },
+  weight: { weight_kg: { type: 'number' } },
+  composition: {
+    weight_kg: { type: 'number' },
+    body_fat_pct: { type: 'number' },
+    skeletal_muscle_kg: { type: 'number' },
+    visceral_fat_level: { type: 'number' },
+    body_age: { type: 'number' }
+  },
+  measurements: {
+    chest: { type: 'number' }, waist: { type: 'number' }, hips: { type: 'number' },
+    right_arm: { type: 'number' }, left_arm: { type: 'number' },
+    right_thigh: { type: 'number' }, left_thigh: { type: 'number' },
+    calves: { type: 'number' }, neck: { type: 'number' }, shoulders: { type: 'number' }
+  },
+  skincare: {
+    routine: { type: 'string', enum: ['am', 'pm'] },
+    completed: { type: 'boolean' },
+    products: { type: 'array', items: { type: 'string' } },
+    skin_note: { type: 'string' }
+  }
+};
+
+export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
+  return {
+    name: 'log_entry',
+    description: 'Propose one Life Hub record for Adam to review and confirm before it is saved. Never call this unless Adam has clearly described a specific record.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: allowedTypes },
+        date: { type: 'string', description: 'YYYY-MM-DD' },
+        time: { type: 'string', description: 'HH:MM, optional' },
+        fields: { type: 'object', description: 'Domain-specific fields for the chosen type.' }
+      },
+      required: ['type', 'date', 'fields']
+    }
+  };
+}
+
+export function buildCanonicalPath({ type, date, slug }) {
+  const domain = TYPE_DOMAINS[type];
+  if (!domain) throw new TypeError(`Unknown record type: ${type}`);
+  if (!isCalendarDate(date)) throw new TypeError(`Invalid date: ${date}`);
+  if (!SLUG.test(slug)) throw new TypeError(`Invalid slug: ${slug}`);
+  const [year, month] = date.split('-');
+  return `data/${domain}/${year}/${month}/${date}-${slug}.md`;
+}
+
+export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    return { valid: false, errors: ['log_entry payload must be an object'] };
+  }
+  const { type, date, time, fields } = candidate;
+  if (!RECORD_TYPES.includes(type)) return { valid: false, errors: [`Unknown record type: ${type}`] };
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+    return { valid: false, errors: ['fields must be an object'] };
+  }
+
+  const record = {
+    schema_version: 1,
+    id,
+    type,
+    date,
+    time: time ?? now.slice(11, 16),
+    created_at: now,
+    updated_at: now,
+    source,
+    ...fields
+  };
+  const errors = validateRecord(record);
+  return errors.length ? { valid: false, errors } : { valid: true, record };
+}
+
+export { DOMAIN_PROPERTIES };
