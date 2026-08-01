@@ -1,10 +1,18 @@
 import { randomBytes } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { createPassphraseHash } from '../netlify/functions/_shared/auth-security.mjs';
 
-if (!process.stdin.isTTY || !process.stdout.isTTY) {
-  console.error('Run this command in an interactive terminal.');
-  process.exitCode = 1;
-} else {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}
+
+async function main() {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.error('Run this command in an interactive terminal.');
+    process.exitCode = 1;
+    return;
+  }
+
   const first = await readHiddenPassphrase('Passphrase: ');
   const second = await readHiddenPassphrase('Confirm passphrase: ');
 
@@ -27,30 +35,33 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
   }
 }
 
-async function readHiddenPassphrase(prompt) {
-  process.stderr.write(prompt);
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-  process.stdin.setEncoding('utf8');
+export async function readHiddenPassphrase(prompt, { input = process.stdin, output = process.stderr } = {}) {
+  output.write(prompt);
+  input.setRawMode(true);
+  input.resume();
+  input.setEncoding('utf8');
   let value = '';
 
   return new Promise((resolve) => {
-    const onData = (character) => {
-      if (character === '\r' || character === '\n') {
-        process.stdin.off('data', onData);
-        process.stdin.setRawMode(false);
-        process.stderr.write('\n');
-        resolve(value);
-      } else if (character === '\u0003') {
-        process.stdin.off('data', onData);
-        process.stdin.setRawMode(false);
-        process.exit(130);
-      } else if (character === '\u007f' || character === '\b') {
-        value = value.slice(0, -1);
-      } else {
-        value += character;
+    const onData = (chunk) => {
+      for (const character of chunk) {
+        if (character === '\r' || character === '\n') {
+          input.off('data', onData);
+          input.setRawMode(false);
+          output.write('\n');
+          resolve(value);
+          return;
+        } else if (character === '\u0003') {
+          input.off('data', onData);
+          input.setRawMode(false);
+          process.exit(130);
+        } else if (character === '\u007f' || character === '\b') {
+          value = value.slice(0, -1);
+        } else {
+          value += character;
+        }
       }
     };
-    process.stdin.on('data', onData);
+    input.on('data', onData);
   });
 }

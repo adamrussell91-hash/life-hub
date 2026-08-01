@@ -40,24 +40,20 @@ export function verifySessionToken(token, secret, now = Date.now()) {
   if (typeof token !== 'string') return { valid: false, reason: 'malformed' };
 
   const [encoded, signature, ...extra] = token.split('.');
-  if (extra.length || !isBase64Url(encoded) || !isBase64Url(signature)) {
+  const encodedPayload = decodeCanonicalBase64Url(encoded);
+  const supplied = decodeCanonicalBase64Url(signature);
+  if (extra.length || !encodedPayload || !supplied) {
     return { valid: false, reason: 'malformed' };
   }
 
   const expected = createHmac('sha256', secret).update(encoded).digest();
-  let supplied;
-  try {
-    supplied = Buffer.from(signature, 'base64url');
-  } catch {
-    return { valid: false, reason: 'malformed' };
-  }
   if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
     return { valid: false, reason: 'invalid-signature' };
   }
 
   let payload;
   try {
-    payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    payload = JSON.parse(encodedPayload.toString('utf8'));
   } catch {
     return { valid: false, reason: 'malformed' };
   }
@@ -88,26 +84,28 @@ function parsePassphraseHash(encoded) {
   const parts = encoded.split('$');
   if (parts.length !== 7 || parts[0] !== 'scrypt' || parts[1] !== 'v1' ||
       parts[2] !== String(SCRYPT_COST) || parts[3] !== String(SCRYPT_BLOCK_SIZE) ||
-      parts[4] !== String(SCRYPT_PARALLELIZATION) || !isBase64Url(parts[5]) || !isBase64Url(parts[6])) {
+      parts[4] !== String(SCRYPT_PARALLELIZATION)) {
     return null;
   }
+  const salt = decodeCanonicalBase64Url(parts[5]);
+  const hash = decodeCanonicalBase64Url(parts[6]);
+  return salt && hash && salt.length > 0 && hash.length === HASH_LENGTH ? { salt, hash } : null;
+}
+
+function decodeCanonicalBase64Url(value) {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value)) return null;
   try {
-    const salt = Buffer.from(parts[5], 'base64url');
-    const hash = Buffer.from(parts[6], 'base64url');
-    return salt.length > 0 && hash.length === HASH_LENGTH ? { salt, hash } : null;
+    const decoded = Buffer.from(value, 'base64url');
+    return decoded.toString('base64url') === value ? decoded : null;
   } catch {
     return null;
   }
 }
 
-function isBase64Url(value) {
-  return typeof value === 'string' && /^[A-Za-z0-9_-]+$/.test(value);
-}
-
 function isValidSessionPayload(payload) {
   return payload && typeof payload === 'object' && payload.v === 1 &&
     Number.isFinite(payload.iat) && Number.isFinite(payload.exp) &&
-    payload.exp === payload.iat + SESSION_MS && typeof payload.jti === 'string' && isBase64Url(payload.jti);
+    payload.exp === payload.iat + SESSION_MS && Boolean(decodeCanonicalBase64Url(payload.jti));
 }
 
 function assertSessionSecret(secret) {
