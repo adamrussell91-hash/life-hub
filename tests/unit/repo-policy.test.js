@@ -1,0 +1,89 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  isAllowedRepositoryPath,
+  parseDateRange,
+  selectManifestEntries
+} from '../../netlify/functions/_shared/repo-policy.mjs';
+
+const blob = (path, sha, size, type = 'blob') => ({ path, sha, size, type });
+
+test('manifest policy returns sorted config and in-range canonical events', () => {
+  const [MEAL, OLD, TARGETS, AGENTS, SECRET] = ['a', 'b', 'c', 'd', 'e'].map(value => value.repeat(40));
+  const tree = [
+    blob('data/nutrition/2026/08/2026-08-01-breakfast.md', MEAL, 120),
+    blob('data/nutrition/2026/07/2026-07-01-old.md', OLD, 100),
+    blob('config/targets.yml', TARGETS, 90),
+    blob('config/agents.yml', AGENTS, 80),
+    blob('private/secret.md', SECRET, 20)
+  ];
+
+  assert.deepEqual(selectManifestEntries(tree, { from: '2026-07-02', to: '2026-08-01' }), [
+    { path: 'config/agents.yml', sha: AGENTS, size: 80 },
+    { path: 'config/targets.yml', sha: TARGETS, size: 90 },
+    { path: 'data/nutrition/2026/08/2026-08-01-breakfast.md', sha: MEAL, size: 120 }
+  ]);
+});
+
+test('repository path policy rejects noncanonical and nonallowlisted paths', () => {
+  const rejected = [
+    '../data/x.md',
+    'https://evil/x.md',
+    'data\\nutrition\\x.md',
+    'data//nutrition/2026/08/2026-08-01-x.md',
+    'data/./nutrition/2026/08/2026-08-01-x.md',
+    'data/nutrition/2026/02/2026-02-30-x.md',
+    'data/nutrition/2026/08/2026-07-31-x.md',
+    'data/sleep/2026/08/2026-08-01-x.md',
+    'data/mind/2026/08/2026-08-01-x.yml',
+    'central-node.md',
+    'config/other.yml',
+    'data/mind/2026/08/2026-08-01-x\u0000.md'
+  ];
+
+  for (const path of rejected) assert.equal(isAllowedRepositoryPath(path), false, path);
+  for (const path of [
+    'config/agents.yml',
+    'config/targets.yml',
+    'data/nutrition/2026/08/2026-08-01-breakfast.md',
+    'data/fitness/2026/08/2026-08-01-workout.md',
+    'data/body/2026/08/2026-08-01-weight.md',
+    'data/mind/2026/08/2026-08-01-diary.md',
+    'data/skincare/2026/08/2026-08-01-morning.md'
+  ]) assert.equal(isAllowedRepositoryPath(path), true, path);
+});
+
+test('manifest policy accepts only canonical bounded blob metadata', () => {
+  const valid = blob('config/targets.yml', 'a'.repeat(40), 256 * 1024);
+  const invalid = [
+    { ...valid, type: 'tree' },
+    { ...valid, sha: 'A'.repeat(40) },
+    { ...valid, sha: 'a'.repeat(39) },
+    { ...valid, size: -1 },
+    { ...valid, size: 1.5 },
+    { ...valid, size: 256 * 1024 + 1 }
+  ];
+
+  assert.deepEqual(selectManifestEntries([valid, ...invalid], { from: '2026-08-01', to: '2026-08-01' }), [
+    { path: valid.path, sha: valid.sha, size: valid.size }
+  ]);
+});
+
+test('date ranges require one canonical ordered date pair no longer than 366 days', () => {
+  assert.deepEqual(
+    parseDateRange(new URL('https://life.test/api/repo/manifest?from=2025-08-02&to=2026-08-02')),
+    { from: '2025-08-02', to: '2026-08-02' }
+  );
+
+  for (const query of [
+    '',
+    '?from=2026-08-01',
+    '?from=2026-02-30&to=2026-08-01',
+    '?from=2026-08-02&to=2026-08-01',
+    '?from=2025-08-01&to=2026-08-02',
+    '?from=2026-08-01&from=2026-08-02&to=2026-08-03',
+    '?from=2026-08-01&to=2026-08-01&extra=yes'
+  ]) {
+    assert.throws(() => parseDateRange(new URL(`https://life.test/api/repo/manifest${query}`)), TypeError, query);
+  }
+});

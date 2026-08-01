@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "node scripts/prepare-web.mjs",
+    "generate:auth": "node scripts/generate-auth-secrets.mjs",
     "prepare:web": "node scripts/prepare-web.mjs",
     "dev": "node scripts/prepare-web.mjs && node scripts/serve.mjs",
     "test": "node --test tests/unit/*.test.js tests/integration/*.test.js",
