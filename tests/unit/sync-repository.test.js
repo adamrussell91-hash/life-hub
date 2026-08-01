@@ -13,7 +13,10 @@ const SHA = {
   d: 'd'.repeat(40)
 };
 const file = (path, sha, size = 10) => ({ path, sha, size });
-const manifest = (manifestId, files, commitSha = SHA.c) => ({ manifestId, commitSha, files });
+const manifest = (manifestId, files, commitSha = SHA.c, range = {
+  from: '2026-07-01',
+  to: '2026-07-31'
+}) => ({ manifestId, commitSha, ...range, files });
 const json = (data, status = 200) => Response.json({ ok: status < 400, data }, { status });
 
 function memoryCache(previous = null) {
@@ -70,6 +73,36 @@ test('unchanged range-specific manifest uses its manifestId and makes zero file 
     changed: false
   });
   assert.equal(cache.writes.length, 0);
+});
+
+test('a cached manifest from another range is never sent as a conditional', async () => {
+  const cachedManifest = manifest('june-range', [file('a.md', SHA.a)], SHA.c, {
+    from: '2026-06-01',
+    to: '2026-06-30'
+  });
+  const nextManifest = manifest('july-range', [file('a.md', SHA.a)]);
+  const cache = memoryCache({
+    manifest: cachedManifest,
+    files: [{ path: 'a.md', sha: SHA.a, content: 'cached' }]
+  });
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init });
+    return json(nextManifest);
+  };
+
+  const result = await syncRepository({
+    fetchImpl,
+    cache,
+    from: '2026-07-01',
+    to: '2026-07-31',
+    validateFile: () => ({ valid: true })
+  });
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].init.headers, {});
+  assert.equal(result.manifestId, 'july-range');
+  assert.deepEqual(cache.value.manifest, nextManifest);
 });
 
 test('changed manifest requests one exact pair and atomically replaces the cache', async () => {
@@ -255,7 +288,11 @@ test('same-range refreshes share one request while a superseding range aborts th
       firstSignal = init.signal;
       await blocked;
     }
-    return json(manifest(`range-${calls}`, []));
+    const requestUrl = new URL(url, 'https://life.example');
+    return json(manifest(`range-${calls}`, [], SHA.c, {
+      from: requestUrl.searchParams.get('from'),
+      to: requestUrl.searchParams.get('to')
+    }));
   };
   const common = { fetchImpl, cache, validateFile: () => ({ valid: true }) };
   const first = syncRepository({ ...common, from: '2026-07-01', to: '2026-07-31' });
