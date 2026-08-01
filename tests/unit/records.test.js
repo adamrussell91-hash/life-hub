@@ -43,7 +43,7 @@ test('parses a canonical meal and body', () => {
 test('marks missing historical common metadata as legacy without inventing values', () => {
   const event = parseEventDocument(
     '---\ntype: weight\ndate: 2020-01-02\nweight_kg: 90\n---',
-    'data/body/weight/2020/01/2020-01-02-weight.md',
+    'data/body/2020/01/2020-01-02-weight.md',
     load
   );
   assert.equal(event.legacy, true);
@@ -76,8 +76,8 @@ test('rejects negative nutrition and path/date disagreement', () => {
 });
 
 test('canonical paths require matching directories and semantic calendar dates', () => {
-  assert.deepEqual(parseCanonicalPath('data/body/composition/2024/02/2024-02-29-aeke.md'), {
-    domain: 'body/composition', year: '2024', month: '02', date: '2024-02-29'
+  assert.deepEqual(parseCanonicalPath('data/body/2024/02/2024-02-29-aeke.md'), {
+    domain: 'body', year: '2024', month: '02', date: '2024-02-29'
   });
   assert.throws(
     () => parseCanonicalPath('data/nutrition/2026/02/2026-02-30-breakfast.md'),

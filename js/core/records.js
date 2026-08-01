@@ -1,15 +1,15 @@
 import { isCalendarDate } from './time.js';
 import { validateRecord } from './validate.js';
 
-const PATH = /^data\/(nutrition|fitness|mind|sleep|heart|skincare|fragrance|body\/(?:weight|composition|measurements))\/(\d{4})\/(\d{2})\/(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/;
+const PATH = /^data\/(nutrition|fitness|mind|sleep|heart|skincare|fragrance|body)\/(\d{4})\/(\d{2})\/(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/;
 
-const TYPE_DOMAINS = {
+export const TYPE_DOMAINS = {
   meal: 'nutrition',
   workout: 'fitness',
   diary: 'mind',
-  weight: 'body/weight',
-  composition: 'body/composition',
-  measurements: 'body/measurements',
+  weight: 'body',
+  composition: 'body',
+  measurements: 'body',
   sleep: 'sleep',
   heart: 'heart',
   skincare: 'skincare',
