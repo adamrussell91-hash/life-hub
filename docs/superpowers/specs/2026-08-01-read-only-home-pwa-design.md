@@ -1,7 +1,7 @@
 # Read-only Home PWA Vertical Slice
 
-Date: 1 August 2026  
-Status: Approved  
+Date: 1 August 2026
+Status: Approved
 Parent design: `docs/superpowers/specs/2026-07-31-life-hub-design.md`
 
 ## Outcome
