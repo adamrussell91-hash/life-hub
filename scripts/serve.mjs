@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createMockApi } from './mock-api.mjs';
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -27,8 +28,11 @@ const send = (response, status, body, contentType = 'text/plain; charset=utf-8')
 
 export function createStaticServer({ root }) {
   const rootPath = resolve(root instanceof URL ? fileURLToPath(root) : root);
+  const handleMockApi = createMockApi({ root: rootPath });
 
   return createServer(async (request, response) => {
+    if (await handleMockApi(request, response)) return;
+
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       send(response, 405, 'Method not allowed');
       return;
