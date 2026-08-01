@@ -55,3 +55,33 @@ test('rejects a payload whose fields is missing or not an object', () => {
     false
   );
 });
+
+test('fields cannot clobber protected record keys', () => {
+  const result = validateLogEntry({
+    type: 'meal',
+    date: '2026-08-01',
+    fields: {
+      meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12,
+      id: 'attacker-id', type: 'workout', date: '1999-01-01',
+      source: 'attacker', schema_version: 999,
+      created_at: 'bogus', updated_at: 'bogus'
+    }
+  }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.record.id, 'meal-1');
+  assert.equal(result.record.type, 'meal');
+  assert.equal(result.record.date, '2026-08-01');
+  assert.equal(result.record.source, 'chat');
+  assert.equal(result.record.schema_version, 1);
+  assert.equal(result.record.created_at, '2026-08-01T07:45:00+10:00');
+  assert.equal(result.record.updated_at, '2026-08-01T07:45:00+10:00');
+});
+
+test('rejects rather than throws when now is missing or not a string', () => {
+  const missing = validateLogEntry({ type: 'meal', date: '2026-08-01', fields: { meal: 'breakfast' } }, { id: 'x' });
+  assert.equal(missing.valid, false);
+
+  const nonString = validateLogEntry({ type: 'meal', date: '2026-08-01', fields: { meal: 'breakfast' } }, { id: 'x', now: 12345 });
+  assert.equal(nonString.valid, false);
+});
