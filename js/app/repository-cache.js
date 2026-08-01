@@ -16,11 +16,29 @@ export function createRepositoryCache(cacheStorage) {
 
     async write({ manifest, files }) {
       const cache = await cacheStorage.open(CACHE_NAME);
-      await cache.put(CACHE_KEY, Response.json({ manifest, files }));
+      await cache.put(CACHE_KEY, Response.json({
+        manifest: sanitizeManifest(manifest),
+        files: files.map(sanitizeFile)
+      }));
     },
 
     clear() {
       return cacheStorage.delete(CACHE_NAME);
     }
   };
+}
+
+function sanitizeManifest({ manifestId, commitSha, treeSha, from, to, files }) {
+  return {
+    manifestId,
+    commitSha,
+    treeSha,
+    from,
+    to,
+    files: files.map(({ path, sha, size }) => ({ path, sha, size }))
+  };
+}
+
+function sanitizeFile({ path, sha, content }) {
+  return { path, sha, content };
 }

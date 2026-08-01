@@ -58,12 +58,13 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile })
   }
 
   const previous = await cache.read();
+  const previousMatchesRange = isExactRange(previous?.manifest, from, to);
   signal.throwIfAborted();
 
   let manifestResponse;
   try {
     manifestResponse = await fetchImpl(`/api/repo/manifest?from=${from}&to=${to}`, {
-      headers: previous?.manifest?.manifestId
+      headers: previousMatchesRange && previous.manifest.manifestId
         ? { 'if-none-match': `"${previous.manifest.manifestId}"` }
         : {},
       signal
@@ -75,7 +76,7 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile })
   signal.throwIfAborted();
 
   if (manifestResponse.status === 304) {
-    if (!previous) throw new SyncError('github_invalid_response');
+    if (!previousMatchesRange) throw new SyncError('github_invalid_response');
     return resultFrom(previous, [], false);
   }
   if (manifestResponse.status === 401) throw new SyncError('session_expired');
@@ -87,7 +88,9 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile })
   } catch {
     return staleOrThrow(previous, 'github_invalid_response');
   }
-  if (!isManifest(manifest)) return staleOrThrow(previous, 'github_invalid_response');
+  if (!isManifest(manifest) || !isExactRange(manifest, from, to)) {
+    return staleOrThrow(previous, 'github_invalid_response');
+  }
 
   const diff = diffManifest(previous?.manifest, manifest);
   const previousFiles = new Map((previous?.files ?? []).map(entry => [entry.path, entry]));
@@ -204,6 +207,10 @@ function isManifest(value) {
     paths.add(entry?.path);
     return valid;
   });
+}
+
+function isExactRange(manifest, from, to) {
+  return manifest?.from === from && manifest?.to === to;
 }
 
 function isExactBatch(data, requested, commitSha) {
