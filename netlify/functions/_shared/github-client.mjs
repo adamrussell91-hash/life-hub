@@ -71,6 +71,50 @@ export function createGitHubClient({ env = process.env, fetchImpl = fetch } = {}
     readBlob(sha) {
       if (!SHA.test(sha)) throw new TypeError('Invalid blob SHA.');
       return github(`${repositoryPath}/git/blobs/${sha}`);
+    },
+
+    async writeFile({ path, content, sha, message }) {
+      if (typeof path !== 'string' || path.length === 0) throw new TypeError('A file path is required.');
+      if (typeof content !== 'string') throw new TypeError('File content must be a string.');
+      if (sha != null && !SHA.test(sha)) throw new TypeError('Invalid blob SHA.');
+      if (typeof message !== 'string' || message.length === 0) throw new TypeError('A commit message is required.');
+
+      const body = {
+        message,
+        content: Buffer.from(content, 'utf8').toString('base64'),
+        branch: config.branch,
+        ...(sha ? { sha } : {})
+      };
+
+      let response;
+      try {
+        response = await fetchImpl(`${GITHUB_ORIGIN}${repositoryPath}/contents/${path.split('/').map(encodeURIComponent).join('/')}`, {
+          method: 'PUT',
+          headers: {
+            accept: 'application/vnd.github+json',
+            authorization: `Bearer ${config.token}`,
+            'content-type': 'application/json',
+            'user-agent': 'life-hub',
+            'x-github-api-version': API_VERSION
+          },
+          body: JSON.stringify(body)
+        });
+      } catch {
+        throw new GitHubClientError('github_unavailable', true);
+      }
+      if (response.status === 409 || response.status === 422) throw new GitHubClientError('write_conflict', true);
+      if (!response.ok) throw mapGitHubFailure(response);
+
+      let payload;
+      try {
+        payload = await response.json();
+      } catch {
+        throw new GitHubClientError('github_invalid_response', true);
+      }
+      if (!SHA.test(payload?.content?.sha) || !SHA.test(payload?.commit?.sha)) {
+        throw new GitHubClientError('github_invalid_response', true);
+      }
+      return { sha: payload.content.sha, commitSha: payload.commit.sha };
     }
   };
 }
