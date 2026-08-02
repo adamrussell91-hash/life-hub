@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v3';
+const CACHE_NAME = 'life-hub-shell-v4';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -6,6 +6,9 @@ const PRECACHE_URLS = [
   '/js/app/main.js',
   '/js/app/api-session.js',
   '/js/app/app-controller.js',
+  '/js/app/chat-api.js',
+  '/js/app/chat-controller.js',
+  '/js/app/render-chat.js',
   '/js/app/home-model.js',
   '/js/app/load-live-events.js',
   '/js/app/render-home.js',
