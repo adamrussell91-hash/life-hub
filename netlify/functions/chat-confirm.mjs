@@ -16,6 +16,7 @@ import { getSydneyTimestamp } from '../../js/core/time.js';
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const BODY_TOO_LARGE = Symbol('body_too_large');
 
 export const config = { path: '/api/chat/confirm' };
 
@@ -110,11 +111,23 @@ function renderMarkdown(record) {
 async function parseRequest(request) {
   const contentLength = Number(request.headers.get('content-length'));
   if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    void request.body?.cancel().catch(() => undefined);
     return { error: errorResponse(413, 'request_too_large', 'The request body is too large.', false, PRIVATE_CACHE) };
   }
+
+  let bytes;
+  try {
+    bytes = await readAtMost(request.body, MAX_BODY_BYTES);
+  } catch (error) {
+    if (error === BODY_TOO_LARGE) {
+      return { error: errorResponse(413, 'request_too_large', 'The request body is too large.', false, PRIVATE_CACHE) };
+    }
+    return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
+  }
+
   let body;
   try {
-    body = await request.json();
+    body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   } catch {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
@@ -123,6 +136,36 @@ async function parseRequest(request) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
   return { candidate: body.candidate, slug: body.slug, overwrite: body.overwrite === true };
+}
+
+async function readAtMost(stream, limit) {
+  if (!stream) return new Uint8Array();
+  const reader = stream.getReader();
+  const chunks = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > limit) {
+        await reader.cancel().catch(() => undefined);
+        throw BODY_TOO_LARGE;
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error === BODY_TOO_LARGE) throw error;
+    throw new Error('request_read_failed');
+  }
+
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 function mapRepositoryError(error) {

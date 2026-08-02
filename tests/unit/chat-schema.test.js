@@ -56,7 +56,7 @@ test('rejects a payload whose fields is missing or not an object', () => {
   );
 });
 
-test('fields cannot clobber protected record keys', () => {
+test('rejects fields outside the domain whitelist instead of letting them reach the record', () => {
   const result = validateLogEntry({
     type: 'meal',
     date: '2026-08-01',
@@ -68,6 +68,19 @@ test('fields cannot clobber protected record keys', () => {
     }
   }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
 
+  assert.equal(result.valid, false);
+  for (const key of ['id', 'type', 'date', 'source', 'schema_version', 'created_at', 'updated_at']) {
+    assert.ok(result.errors.some(error => error.includes(key)), `expected an error mentioning ${key}`);
+  }
+});
+
+test('spread order still protects protected keys if a field name were ever whitelisted', () => {
+  const result = validateLogEntry({
+    type: 'meal',
+    date: '2026-08-01',
+    fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12 }
+  }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
+
   assert.equal(result.valid, true);
   assert.equal(result.record.id, 'meal-1');
   assert.equal(result.record.type, 'meal');
@@ -76,6 +89,19 @@ test('fields cannot clobber protected record keys', () => {
   assert.equal(result.record.schema_version, 1);
   assert.equal(result.record.created_at, '2026-08-01T07:45:00+10:00');
   assert.equal(result.record.updated_at, '2026-08-01T07:45:00+10:00');
+});
+
+test('a field name crafted to break YAML frontmatter is rejected as an unknown field', () => {
+  const result = validateLogEntry({
+    type: 'meal',
+    date: '2026-08-01',
+    fields: {
+      meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12,
+      'innocent\n---\ninjected_type: hacked\nreal_key': 'attempted frontmatter injection'
+    }
+  }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
+
+  assert.equal(result.valid, false);
 });
 
 test('rejects rather than throws when now is missing or not a string', () => {

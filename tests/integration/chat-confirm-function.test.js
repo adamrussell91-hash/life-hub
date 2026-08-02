@@ -84,6 +84,32 @@ test('maps a write conflict to 409 for the client to prompt an overwrite', async
   assert.equal(response.status, 409);
 });
 
+test('overwrite:true resolves the existing blob sha and sends it as the update precondition', async () => {
+  const path = 'data/nutrition/2026/08/2026-08-01-breakfast.md';
+  const existingSha = 'e'.repeat(40);
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path, type: 'blob', sha: existingSha }] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T06:00:00Z') });
+
+  const response = await handler(request({ candidate, slug: 'breakfast', overwrite: true }));
+  assert.equal(response.status, 200);
+
+  const putCall = calls.find(call => call.options?.method === 'PUT');
+  assert.equal(JSON.parse(putCall.options.body).sha, existingSha);
+});
+
 test('rejects an unauthenticated request', async () => {
   const handler = createChatConfirmHandler({ env: validEnv });
   const response = await handler(new Request('https://life.example/api/chat/confirm', {

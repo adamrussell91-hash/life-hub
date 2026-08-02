@@ -106,6 +106,11 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
   if (typeof now !== 'string' || !now) {
     return { valid: false, errors: ['now must be a non-empty string'] };
   }
+  const allowedFields = Object.keys(DOMAIN_PROPERTIES[type]);
+  const unknownFields = Object.keys(fields).filter(key => !allowedFields.includes(key));
+  if (unknownFields.length) {
+    return { valid: false, errors: unknownFields.map(key => `Unknown field for ${type}: ${key}`) };
+  }
 
   const record = {
     ...fields,
