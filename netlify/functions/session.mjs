@@ -6,7 +6,9 @@ import {
   jsonResponse,
   methodNotAllowed,
   misconfiguredResponse,
-  readCookie
+  preflightResponse,
+  readCookie,
+  withCors
 } from './_shared/http.mjs';
 
 export const config = { path: '/api/session' };
@@ -18,30 +20,31 @@ export function createSessionHandler({
   now = Date.now
 } = {}) {
   return async function sessionHandler(request) {
-    if (request.method !== 'GET') return methodNotAllowed('GET');
-    const originError = guardRequestOrigin(request);
-    if (originError) return originError;
-    if (!isConfigured(env)) return misconfiguredResponse();
+    if (request.method === 'OPTIONS') return preflightResponse(request, env);
+    if (request.method !== 'GET') return withCors(methodNotAllowed('GET'), request, env);
+    const originError = guardRequestOrigin(request, env);
+    if (originError) return withCors(originError, request, env);
+    if (!isConfigured(env)) return withCors(misconfiguredResponse(), request, env);
 
     let session;
     try {
       session = verify(readCookie(request, 'life_hub_session'), env.SESSION_SECRET, now());
     } catch {
-      return misconfiguredResponse();
+      return withCors(misconfiguredResponse(), request, env);
     }
     if (!session.valid) {
-      return errorResponse(401, 'unauthenticated', 'Please sign in to continue.', false, {
+      return withCors(errorResponse(401, 'unauthenticated', 'Please sign in to continue.', false, {
         'set-cookie': clearCookie()
-      });
+      }), request, env);
     }
 
-    return jsonResponse(200, {
+    return withCors(jsonResponse(200, {
       ok: true,
       data: {
         authenticated: true,
         expiresAt: new Date(session.payload.exp).toISOString()
       }
-    });
+    }), request, env);
   };
 }
 

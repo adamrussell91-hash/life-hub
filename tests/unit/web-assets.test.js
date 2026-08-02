@@ -113,7 +113,7 @@ test('web app manifest is installable and uses only local icons', async () => {
 
   assert.equal(manifest.name, 'Life Hub');
   assert.equal(manifest.display, 'standalone');
-  assert.equal(manifest.start_url, '/');
+  assert.equal(manifest.start_url, './');
   assert.deepEqual(manifest.icons.map(icon => icon.sizes), ['192x192', '512x512']);
-  assert.ok(manifest.icons.every(icon => icon.src.startsWith('/assets/icons/')));
+  assert.ok(manifest.icons.every(icon => icon.src.startsWith('assets/icons/')));
 });

@@ -51,7 +51,7 @@ test('rejects non-canonical base64url session signatures and password hash compo
 
 test('session cookie uses every required browser security attribute', () => {
   const cookie = serializeSessionCookie('abc');
-  for (const value of ['life_hub_session=abc', 'Secure', 'HttpOnly', 'SameSite=Strict', 'Path=/', 'Max-Age=28800']) {
+  for (const value of ['life_hub_session=abc', 'Secure', 'HttpOnly', 'SameSite=None', 'Path=/', 'Max-Age=28800']) {
     assert.match(cookie, new RegExp(value.replace('/', '\\/')));
   }
 });

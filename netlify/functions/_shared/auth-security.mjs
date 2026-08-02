@@ -7,7 +7,9 @@ const SCRYPT_BLOCK_SIZE = 8;
 const SCRYPT_PARALLELIZATION = 1;
 const HASH_LENGTH = 32;
 const SESSION_MS = 8 * 60 * 60 * 1000;
-const SESSION_COOKIE_ATTRIBUTES = 'Path=/; Secure; HttpOnly; SameSite=Strict';
+// SameSite=None (not Strict) because the site (GitHub Pages) and this cookie's issuer
+// (Netlify Functions) are different origins; Secure is required whenever SameSite=None.
+const SESSION_COOKIE_ATTRIBUTES = 'Path=/; Secure; HttpOnly; SameSite=None';
 
 export async function createPassphraseHash(passphrase, { salt = randomBytes(16) } = {}) {
   const saltBuffer = Buffer.from(salt);

@@ -9,7 +9,9 @@ import {
   isConfigured,
   jsonResponse,
   methodNotAllowed,
-  misconfiguredResponse
+  misconfiguredResponse,
+  preflightResponse,
+  withCors
 } from './_shared/http.mjs';
 
 const MAX_BODY_BYTES = 1_024;
@@ -29,16 +31,17 @@ export function createAuthHandler({
   randomBytes
 } = {}) {
   return async function authHandler(request) {
-    if (request.method !== 'POST') return methodNotAllowed('POST');
-    const originError = guardRequestOrigin(request);
-    if (originError) return originError;
+    if (request.method === 'OPTIONS') return preflightResponse(request, env);
+    if (request.method !== 'POST') return withCors(methodNotAllowed('POST'), request, env);
+    const originError = guardRequestOrigin(request, env);
+    if (originError) return withCors(originError, request, env);
     if (!isJsonRequest(request)) {
-      return errorResponse(415, 'unsupported_media_type', 'This endpoint accepts JSON requests only.', false);
+      return withCors(errorResponse(415, 'unsupported_media_type', 'This endpoint accepts JSON requests only.', false), request, env);
     }
-    if (!isConfigured(env)) return misconfiguredResponse();
+    if (!isConfigured(env)) return withCors(misconfiguredResponse(), request, env);
 
     const parsed = await parseBody(request);
-    if (parsed.error) return parsed.error;
+    if (parsed.error) return withCors(parsed.error, request, env);
 
     let accepted = false;
     try {
@@ -47,17 +50,17 @@ export function createAuthHandler({
       accepted = false;
     }
     if (!accepted) {
-      return errorResponse(401, 'invalid_credentials', 'That passphrase was not accepted.', true);
+      return withCors(errorResponse(401, 'invalid_credentials', 'That passphrase was not accepted.', true), request, env);
     }
 
     try {
       const session = createToken({ now: now(), ...(randomBytes ? { randomBytes } : {}) }, env.SESSION_SECRET);
-      return jsonResponse(200, {
+      return withCors(jsonResponse(200, {
         ok: true,
         data: { authenticated: true, expiresAt: session.expiresAt }
-      }, { 'set-cookie': serializeCookie(session.token) });
+      }, { 'set-cookie': serializeCookie(session.token) }), request, env);
     } catch {
-      return misconfiguredResponse();
+      return withCors(misconfiguredResponse(), request, env);
     }
   };
 }

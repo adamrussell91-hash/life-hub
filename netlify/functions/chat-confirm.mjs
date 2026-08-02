@@ -7,7 +7,9 @@ import {
   jsonResponse,
   methodNotAllowed,
   misconfiguredResponse,
-  readCookie
+  preflightResponse,
+  readCookie,
+  withCors
 } from './_shared/http.mjs';
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { buildCanonicalPath, validateLogEntry } from './_shared/chat-schema.mjs';
@@ -29,8 +31,13 @@ export function createChatConfirmHandler({
   now = Date.now
 } = {}) {
   return async function chatConfirmHandler(request) {
+    if (request.method === 'OPTIONS') return preflightResponse(request, env);
+    return withCors(await handle(request), request, env);
+  };
+
+  async function handle(request) {
     if (request.method !== 'POST') return withPrivateCache(methodNotAllowed('POST'));
-    const originError = guardRequestOrigin(request);
+    const originError = guardRequestOrigin(request, env);
     if (originError) return withPrivateCache(originError);
     if (!isConfigured(env)) return withPrivateCache(misconfiguredResponse());
 
