@@ -6,7 +6,7 @@ Private personal dashboard and conversational logging application.
 
 The read-only Home PWA is gated by a single-user passphrase and syncs allowlisted Markdown records from a private GitHub repository through same-origin Netlify Functions. The browser receives only bounded manifest and file responses; it never receives the GitHub token, passphrase verifier, session secret, or unrestricted repository access.
 
-Local development uses a fixture-backed mock of the same `/api/*` contract. Chat, writes, and domain detail views arrive in later phases.
+Local development uses a fixture-backed mock of the same `/api/*` contract. Chat with routed agents, confirmable record writes, and offline-aware sync are implemented; domain detail views arrive in a later phase.
 
 Both local development and Netlify serve the generated `dist/` artifact. The build copies only the browser shell, styles, application modules, icons, manifest, service worker, and generated `js-yaml` runtime. Repository Markdown, configuration, tests, scripts, dotfiles, and Netlify Function source are outside the public directory.
 

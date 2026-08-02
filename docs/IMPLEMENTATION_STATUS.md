@@ -47,7 +47,7 @@ Production credentials remain deliberately absent and providers remain disconnec
 Verified on 2026-08-02:
 
 - `npm ci --ignore-scripts`: clean install, 5 packages added and 6 packages audited.
-- `npm test`: 255 unit and integration tests passed, 0 failed.
+- `npm test`: 257 unit and integration tests passed, 0 failed (includes regression coverage added after final branch review for `chat-controller.js`'s field-edit coercion and write-conflict retry paths).
 - `npm run test:browser`: 14 Chromium acceptance tests passed, 0 failed, covering routed chat replies, record-proposal confirmation and discard, and Chat/Home navigation. Two offline Home tests (`offline reload is limited to the authenticated tab before expiry`, `offline logout survives reload and clears the server cookie on reconnect`) initially failed during this phase's verification: `service-worker.js`'s `PRECACHE_URLS` had not been updated for the `chat-api.js`, `chat-controller.js`, and `render-chat.js` modules `main.js` now imports, so the precached shell's module graph failed to resolve offline. Fixed by adding the three modules to `PRECACHE_URLS` and bumping `CACHE_NAME` to `life-hub-shell-v4`; all 14 tests pass cleanly afterward.
 - `npm run validate:fixtures`: 4 valid files, 0 invalid files.
 - `npm audit --audit-level=high`: 0 vulnerabilities.
