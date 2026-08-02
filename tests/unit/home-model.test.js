@@ -65,3 +65,18 @@ test('rejects a Home model without a display date', () => {
     /display date/i
   );
 });
+
+test('a repository with no config/targets.yml yet renders zeroed targets instead of crashing', () => {
+  const model = buildHomeModel({ events: [], targetsConfig: null, date: '2026-08-03' });
+
+  assert.deepEqual(model.targets, {
+    calories: 0,
+    protein_g: 0,
+    fat_ceiling_g: 0,
+    sodium_ceiling_mg: 0,
+    calcium_target_mg: 0,
+    polyphenol_daily_aim: 0,
+    meal_protein_g: { breakfast: 0, lunch: 0, dinner: 0, snack: 0, minimum: 0 }
+  });
+  assert.deepEqual(model.progress, { calories: 0, protein: 0, fat: 0, logging: 0 });
+});
