@@ -1,3 +1,7 @@
+function httpError(message, status, code) {
+  return Object.assign(new Error(message), { status, code });
+}
+
 export function createChatApi(fetchImpl = fetch) {
   if (typeof fetchImpl !== 'function') throw new TypeError('Fetch is unavailable');
 
@@ -11,12 +15,9 @@ export function createChatApi(fetchImpl = fetch) {
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw Object.assign(new Error('Chat request failed'), {
-          status: response.status,
-          code: payload?.error?.code ?? 'request_failed'
-        });
+        throw httpError('Chat request failed', response.status, payload?.error?.code ?? 'request_failed');
       }
-      if (!response.body) throw new Error('Chat response has no body');
+      if (!response.body) throw httpError('Chat response has no body', response.status, 'no_body');
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
@@ -48,10 +49,7 @@ export function createChatApi(fetchImpl = fetch) {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || payload?.ok !== true) {
-        throw Object.assign(new Error('Confirm request failed'), {
-          status: response.status,
-          code: payload?.error?.code ?? 'request_failed'
-        });
+        throw httpError('Confirm request failed', response.status, payload?.error?.code ?? 'request_failed');
       }
       return payload.data;
     }

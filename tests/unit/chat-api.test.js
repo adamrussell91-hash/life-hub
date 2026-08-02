@@ -59,3 +59,37 @@ test('confirm throws a structured error when the write fails', async () => {
 test('createChatApi requires a fetch implementation', () => {
   assert.throws(() => createChatApi(null), TypeError);
 });
+
+test('send throws a structured error when an ok response has no body', async () => {
+  const chatApi = createChatApi(async () => new Response(null, { status: 200 }));
+  await assert.rejects(
+    (async () => { for await (const event of chatApi.send('hi')) void event; })(),
+    error => error.status === 200 && error.code === 'no_body'
+  );
+});
+
+test('send silently skips a malformed SSE frame and keeps yielding valid ones', async () => {
+  const frames = [
+    'data: {"type":"agent","slug":"chadwick"}\n\n',
+    'data: {not valid json\n\n',
+    'data: {"type":"done"}\n\n'
+  ];
+  const chatApi = createChatApi(async () => sseResponse(frames));
+
+  const events = [];
+  for await (const event of chatApi.send('hello')) events.push(event);
+  assert.deepEqual(events, [
+    { type: 'agent', slug: 'chadwick' },
+    { type: 'done' }
+  ]);
+});
+
+test('confirm throws a structured error when the response body is not JSON', async () => {
+  const chatApi = createChatApi(async () => new Response('<html>Bad Gateway</html>', {
+    status: 502, headers: { 'content-type': 'text/html' }
+  }));
+  await assert.rejects(
+    chatApi.confirm({ candidate: {}, slug: 'x' }),
+    error => error.status === 502 && error.code === 'request_failed'
+  );
+});
