@@ -42,4 +42,18 @@ Verified on 2026-08-01:
 
 Production credentials remain deliberately absent and providers remain disconnected until deployment review.
 
-## Next Phase: Agent chat and write loop
+## Phase 4: Agent Chat and Write Loop — Complete
+
+Verified on 2026-08-02:
+
+- `npm ci --ignore-scripts`: clean install, 5 packages added and 6 packages audited.
+- `npm test`: 255 unit and integration tests passed, 0 failed.
+- `npm run test:browser`: 12 of 14 Chromium acceptance tests passed, covering routed chat replies, record-proposal confirmation and discard, and Chat/Home navigation (all 3 new Chat tests pass). Two pre-existing Home tests — `offline reload is limited to the authenticated tab before expiry` and `offline logout survives reload and clears the server cookie on reconnect` — time out on `context.setOffline()` + service-worker interaction in this sandboxed verification environment. This was reproduced identically running `home.spec.mjs` alone against the pre-Phase-4 branch tip, so it is a pre-existing, environment-specific limitation rather than a regression from this phase's work; it needs verification in a non-sandboxed environment before being considered resolved.
+- `npm run validate:fixtures`: 4 valid files, 0 invalid files.
+- `npm audit --audit-level=high`: 0 vulnerabilities.
+- Routing is deterministic per message (not pinned across a whole conversation); Dr Vera Lenz and General Hammond are conversational-only pending a record type for psychology/life-coaching domains.
+- Persona system prompts are assembled from `config/agents.yml`, `config/targets.yml`, and the live `central-node.md` Constraints section — not a verbatim migration of Notion-authored agent instructions, which remains a follow-up once Notion access is available.
+
+Production credentials (including `ANTHROPIC_API_KEY`) remain deliberately absent from this repository; local verification against the live Anthropic API uses a gitignored `.env.local`.
+
+## Next Phase: Day One diary delivery

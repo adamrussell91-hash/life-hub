@@ -58,6 +58,14 @@ The committed `netlify.toml` runs the allowlisted build, publishes only `dist/`,
 
 After deploying a preview, inspect its deploy log and confirm Netlify registered the `/api/auth` code-based rate limit: five requests per 60 seconds, aggregated by IP and domain. Do not promote a deploy if that rule is absent.
 
+## Chat
+
+Local development and the browser acceptance suite use a small scripted mock at `/api/chat` and `/api/chat/confirm` (see `scripts/mock-api.mjs`) — no Anthropic key is required to run `npm run dev` or `npm test`.
+
+To manually verify against the real Anthropic API, add `ANTHROPIC_API_KEY=<your key>` to a local `.env.local` (already gitignored, never commit it) and run the dev server with that variable loaded into the environment. Set the same variable in Netlify for a deployed preview or production.
+
+Routing is re-evaluated independently for each message rather than pinned for a whole conversation: name an agent (for example "Chadwick") to route directly to them, or leave a message unaddressed to reach the general router, which infers the right domain or asks a brief clarifying question. Only Brisket (nutrition), Chadwick (fitness), Hyaluronica (skincare), Penelope (diary), and Dr Sara Tonin (body: weight, composition, measurements) can propose a `log_entry`; Dr Vera Lenz and General Hammond are conversational only in this phase. Every proposed record is shown for confirmation, with inline-editable scalar fields, before anything is written — nothing is saved automatically.
+
 ## Verify
 
 Run the unit and integration suite plus fixture validation:
