@@ -103,3 +103,47 @@ test('reports misconfiguration when ANTHROPIC_API_KEY is absent', async () => {
   const response = await handler(request({ message: 'hi' }));
   assert.equal(response.status, 503);
 });
+
+test('still streams a reply with an empty digest and constraints when GitHub reads fail', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: async () => Response.json({ message: 'server error' }, { status: 500 }),
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([
+        { type: 'text', delta: 'Here to help.' },
+        { type: 'done' }
+      ])
+    })
+  });
+
+  const response = await handler(request({ message: 'hi' }));
+  assert.equal(response.status, 200);
+
+  const events = await readSse(response);
+  assert.deepEqual(events[0], { type: 'agent', slug: 'router' });
+  assert.deepEqual(events[1], { type: 'text', delta: 'Here to help.' });
+  assert.deepEqual(events[2], { type: 'done' });
+});
+
+test('emits record_rejected instead of a proposal for a semantically invalid tool call', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([
+        { type: 'tool_call', id: 'call_1', name: 'log_entry', input: {
+          type: 'meal', date: '2026-08-01', fields: { meal: 'brunch', calories: 1, protein_g: 1, fat_g: 1 }
+        } },
+        { type: 'done' }
+      ])
+    })
+  });
+
+  const response = await handler(request({ message: 'Brisket, log breakfast' }));
+  const events = await readSse(response);
+  assert.equal(events[1].type, 'record_rejected');
+  assert.ok(Array.isArray(events[1].errors) && events[1].errors.length > 0);
+  assert.deepEqual(events[2], { type: 'done' });
+});

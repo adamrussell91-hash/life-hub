@@ -22,6 +22,7 @@ import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays } from '../../js/
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 8 * 1024;
 const MAX_MESSAGE_LENGTH = 4000;
+const BODY_TOO_LARGE = Symbol('body_too_large');
 
 export const config = { path: '/api/chat' };
 
@@ -76,19 +77,21 @@ export function createChatHandler({
     try {
       const current = await client.resolveTree();
       const manifest = selectManifestEntries(current.tree, { from, to: today });
-      const files = [];
-      for (const entry of manifest) {
-        if (!entry.path.startsWith('data/')) continue;
-        const decoded = decodeBlob(await client.readBlob(entry.sha));
-        if (decoded !== null) files.push({ path: entry.path, content: decoded });
-      }
+      const dataEntries = manifest.filter(entry => entry.path.startsWith('data/'));
+      const centralNodeEntry = current.tree.find(entry => entry.path === 'central-node.md' && entry.type === 'blob');
+
+      const [dataBlobs, centralNodeBlob] = await Promise.all([
+        Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
+        centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null
+      ]);
+
+      const files = dataEntries
+        .map((entry, index) => ({ path: entry.path, content: decodeBlob(dataBlobs[index]) }))
+        .filter(file => file.content !== null);
       digest = summarizeRecentHistory(files, TARGETS_CONFIG, today);
 
-      const centralNodeEntry = current.tree.find(entry => entry.path === 'central-node.md' && entry.type === 'blob');
-      if (centralNodeEntry) {
-        const decoded = decodeBlob(await client.readBlob(centralNodeEntry.sha));
-        if (decoded !== null) constraints = extractConstraints(decoded);
-      }
+      const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
+      if (decodedCentralNode !== null) constraints = extractConstraints(decodedCentralNode);
     } catch {
       digest = '';
       constraints = '';
@@ -178,11 +181,23 @@ async function parseRequest(request) {
   }
   const contentLength = Number(request.headers.get('content-length'));
   if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    void request.body?.cancel().catch(() => undefined);
     return { error: errorResponse(413, 'request_too_large', 'The request body is too large.', false, PRIVATE_CACHE) };
   }
+
+  let bytes;
+  try {
+    bytes = await readAtMost(request.body, MAX_BODY_BYTES);
+  } catch (error) {
+    if (error === BODY_TOO_LARGE) {
+      return { error: errorResponse(413, 'request_too_large', 'The request body is too large.', false, PRIVATE_CACHE) };
+    }
+    return { error: errorResponse(400, 'invalid_request', 'Provide a valid chat message.', false, PRIVATE_CACHE) };
+  }
+
   let body;
   try {
-    body = await request.json();
+    body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   } catch {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid chat message.', false, PRIVATE_CACHE) };
   }
@@ -190,6 +205,36 @@ async function parseRequest(request) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid chat message.', false, PRIVATE_CACHE) };
   }
   return { message: body.message };
+}
+
+async function readAtMost(stream, limit) {
+  if (!stream) return new Uint8Array();
+  const reader = stream.getReader();
+  const chunks = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > limit) {
+        await reader.cancel().catch(() => undefined);
+        throw BODY_TOO_LARGE;
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error === BODY_TOO_LARGE) throw error;
+    throw new Error('request_read_failed');
+  }
+
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 function repositoryError() {
