@@ -1,5 +1,7 @@
 import { load } from 'js-yaml';
 import { parseEventDocument } from '../../../js/core/records.js';
+// Deliberately reused from the browser bundle: pure aggregation logic with no DOM
+// dependency, kept as one source of truth rather than re-derived for the server digest.
 import { buildHomeModel } from '../../../js/app/home-model.js';
 import { addCalendarDays } from '../../../js/core/time.js';
 
