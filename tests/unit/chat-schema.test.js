@@ -104,6 +104,49 @@ test('a field name crafted to break YAML frontmatter is rejected as an unknown f
   assert.equal(result.valid, false);
 });
 
+test('the meal whitelist accepts every field validateMeal actually recognizes', () => {
+  const result = validateLogEntry({
+    type: 'meal',
+    date: '2026-08-01',
+    fields: {
+      meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12,
+      saturated_fat_g: 3, unsaturated_fat_g: 9, carbs_g: 40, sugar_g: 5, fibre_g: 6,
+      sodium_mg: 400, calcium_mg: 120, polyphenol_score: 7, omega3: 'high'
+    }
+  }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+
+test('the workout whitelist accepts every field validateWorkout actually recognizes', () => {
+  const result = validateLogEntry({
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Push day', day_type: 'workout_30', status: 'completed', duration_min: 30,
+      focus: ['chest', 'triceps'], recovery_flag_next_day: true,
+      exercises: [{ name: 'Bench press', sets: [{ reps: 8, weight_kg: 60 }] }],
+      pain_flags: [{ site: 'left shoulder', note: 'mild twinge' }]
+    }
+  }, { id: 'workout-1', now: '2026-08-01T07:45:00+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+
+test('the diary whitelist accepts every field validateDiary actually recognizes', () => {
+  const result = validateLogEntry({
+    type: 'diary',
+    date: '2026-08-01',
+    fields: {
+      mood_score: 7, mood: 'good', energy: 'medium',
+      tags: ['grateful', 'tired'], highlights: 'Good run', challenges: 'Poor sleep',
+      dayone_sent: true
+    }
+  }, { id: 'diary-1', now: '2026-08-01T07:45:00+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+
 test('rejects rather than throws when now is missing or not a string', () => {
   const missing = validateLogEntry({ type: 'meal', date: '2026-08-01', fields: { meal: 'breakfast' } }, { id: 'x' });
   assert.equal(missing.valid, false);

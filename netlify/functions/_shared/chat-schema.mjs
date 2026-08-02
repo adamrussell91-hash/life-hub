@@ -11,15 +11,23 @@ const DOMAIN_PROPERTIES = {
     calories: { type: 'number' },
     protein_g: { type: 'number' },
     fat_g: { type: 'number' },
+    saturated_fat_g: { type: 'number' },
+    unsaturated_fat_g: { type: 'number' },
+    carbs_g: { type: 'number' },
+    sugar_g: { type: 'number' },
+    fibre_g: { type: 'number' },
     sodium_mg: { type: 'number' },
     calcium_mg: { type: 'number' },
-    polyphenol_score: { type: 'number' }
+    polyphenol_score: { type: 'number' },
+    omega3: { type: 'string', enum: ['high', 'medium', 'low', 'none'] }
   },
   workout: {
     title: { type: 'string' },
     day_type: { type: 'string', enum: ['movement', 'workout_30', 'workout_45_60'] },
     status: { type: 'string', enum: ['planned', 'completed', 'skipped'] },
     duration_min: { type: 'number' },
+    focus: { type: 'array', items: { type: 'string' } },
+    recovery_flag_next_day: { type: 'boolean' },
     exercises: {
       type: 'array',
       items: {
@@ -37,14 +45,24 @@ const DOMAIN_PROPERTIES = {
         },
         required: ['name', 'sets']
       }
+    },
+    pain_flags: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { site: { type: 'string' }, note: { type: 'string' } },
+        required: ['site']
+      }
     }
   },
   diary: {
     mood_score: { type: 'number' },
     mood: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] },
     energy: { type: 'string', enum: ['high', 'medium', 'low'] },
+    tags: { type: 'array', items: { type: 'string' } },
     highlights: { type: 'string' },
-    challenges: { type: 'string' }
+    challenges: { type: 'string' },
+    dayone_sent: { type: 'boolean' }
   },
   weight: { weight_kg: { type: 'number' } },
   composition: {
