@@ -178,7 +178,7 @@ test('uses mobile navigation without overflow at 390 px after sign-in', async ()
   );
   assert.ok(targetHeights.every(height => height >= 44));
 
-  await page.locator('.mobile-nav [data-section="chat"]').click();
+  await page.locator('.mobile-nav [data-section="calendar"]').click();
   assert.equal(
     await page.locator('#app-status').textContent(),
     'This section arrives in a later Life Hub phase.'
