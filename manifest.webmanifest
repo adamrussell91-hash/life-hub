@@ -2,20 +2,20 @@
   "name": "Life Hub",
   "short_name": "Life Hub",
   "description": "A private, read-only view of your Life Hub.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#FAF8F2",
   "theme_color": "#0A1536",
   "icons": [
     {
-      "src": "/assets/icons/life-hub-192.png",
+      "src": "assets/icons/life-hub-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/assets/icons/life-hub-512.png",
+      "src": "assets/icons/life-hub-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

@@ -7,7 +7,9 @@ import {
   jsonResponse,
   methodNotAllowed,
   misconfiguredResponse,
-  readCookie
+  preflightResponse,
+  readCookie,
+  withCors
 } from './_shared/http.mjs';
 import { tokenExpiryState } from './_shared/provider-health.mjs';
 import { getSydneyDateKey, isCalendarDate } from '../../js/core/time.js';
@@ -38,8 +40,13 @@ export function createHealthHandler({
   let successfulCheckAt = null;
 
   return async function healthHandler(request) {
+    if (request.method === 'OPTIONS') return preflightResponse(request, env);
+    return withCors(await handle(request), request, env);
+  };
+
+  async function handle(request) {
     if (request.method !== 'GET') return withPrivateCache(methodNotAllowed('GET'));
-    const originError = guardRequestOrigin(request);
+    const originError = guardRequestOrigin(request, env);
     if (originError) return withPrivateCache(originError);
     if (!isConfigured(env)) return withPrivateCache(misconfiguredResponse());
 

@@ -6,7 +6,9 @@ import {
   isConfigured,
   methodNotAllowed,
   misconfiguredResponse,
-  readCookie
+  preflightResponse,
+  readCookie,
+  withCors
 } from './_shared/http.mjs';
 import { createGitHubClient, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
@@ -36,8 +38,13 @@ export function createChatHandler({
   now = Date.now
 } = {}) {
   return async function chatHandler(request) {
+    if (request.method === 'OPTIONS') return preflightResponse(request, env);
+    return withCors(await handle(request), request, env);
+  };
+
+  async function handle(request) {
     if (request.method !== 'POST') return withPrivateCache(methodNotAllowed('POST'));
-    const originError = guardRequestOrigin(request);
+    const originError = guardRequestOrigin(request, env);
     if (originError) return withPrivateCache(originError);
     if (!isConfigured(env) || typeof env.ANTHROPIC_API_KEY !== 'string' || env.ANTHROPIC_API_KEY.length === 0) {
       return withPrivateCache(misconfiguredResponse());

@@ -1,15 +1,23 @@
-import { load } from '/vendor/js-yaml.mjs';
+import { load } from '../../vendor/js-yaml.mjs';
 import { createSessionApi } from './api-session.js';
 import { createAppController } from './app-controller.js';
 import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
+import { API_BASE_URL } from './config.js';
 import { buildHomeModel } from './home-model.js';
 import { loadLiveEvents } from './load-live-events.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
 import { createRepositoryCache } from './repository-cache.js';
 import { syncRepository } from './sync-repository.js';
 
-const fetchImpl = (...args) => fetch(...args);
+// The API lives on a different origin (Netlify Functions) from the site (GitHub
+// Pages), so every /api/* call needs the full URL and must send the session cookie
+// cross-site explicitly -- browsers never do that by default.
+const fetchImpl = (input, init = {}) => {
+  const path = typeof input === 'string' ? input : input.url;
+  if (!path.startsWith('/api/')) return fetch(input, init);
+  return fetch(`${API_BASE_URL}${path}`, { ...init, credentials: 'include' });
+};
 const cache = createRepositoryCache(caches);
 const sessionApi = createSessionApi(fetchImpl);
 
@@ -63,5 +71,5 @@ createChatController({
 });
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js').catch(() => undefined);
+  navigator.serviceWorker.register('service-worker.js').catch(() => undefined);
 }

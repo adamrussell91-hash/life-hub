@@ -24,10 +24,43 @@ export function requireSameOrigin(request) {
     (fetchSite === null || fetchSite.toLowerCase() === 'same-origin');
 }
 
-export function guardRequestOrigin(request) {
-  return requireSameOrigin(request)
+// The site (GitHub Pages) and this API (Netlify Functions) are different origins by
+// design, so a request is allowed if it's same-origin (local dev, direct calls) OR
+// from the one explicitly configured SITE_ORIGIN.
+export function requireAllowedOrigin(request, env) {
+  if (requireSameOrigin(request)) return true;
+  const origin = request.headers.get('origin');
+  const allowed = typeof env?.SITE_ORIGIN === 'string' ? env.SITE_ORIGIN : '';
+  return Boolean(allowed) && origin === allowed;
+}
+
+export function guardRequestOrigin(request, env) {
+  return requireAllowedOrigin(request, env)
     ? null
     : errorResponse(403, 'forbidden', 'This request origin is not allowed.', false);
+}
+
+export function corsHeaders(request, env) {
+  const origin = request.headers.get('origin');
+  const allowed = typeof env?.SITE_ORIGIN === 'string' ? env.SITE_ORIGIN : '';
+  if (!allowed || origin !== allowed) return {};
+  return {
+    'access-control-allow-origin': allowed,
+    'access-control-allow-credentials': 'true',
+    'access-control-allow-headers': 'content-type',
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    vary: 'origin'
+  };
+}
+
+export function withCors(response, request, env) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(corsHeaders(request, env))) headers.set(key, value);
+  return new Response(response.body, { status: response.status, headers });
+}
+
+export function preflightResponse(request, env) {
+  return new Response(null, { status: 204, headers: corsHeaders(request, env) });
 }
 
 export function readCookie(request, name) {

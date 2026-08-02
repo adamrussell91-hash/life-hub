@@ -4,11 +4,13 @@ Private personal dashboard and conversational logging application.
 
 ## Current slice
 
-The read-only Home PWA is gated by a single-user passphrase and syncs allowlisted Markdown records from a private GitHub repository through same-origin Netlify Functions. The browser receives only bounded manifest and file responses; it never receives the GitHub token, passphrase verifier, session secret, or unrestricted repository access.
+The site is hosted on **GitHub Pages** (via `.github/workflows/pages.yml`, on every push to `main`). **Netlify hosts nothing but the API Functions** — the GitHub token, passphrase verifier, session secret, and Anthropic key live only there, never in the deployed site. The two are different origins by design; every `/api/*` call is a cross-origin request from the GitHub Pages site to the Netlify Functions site, with an explicit `SITE_ORIGIN` allow-list and `credentials: 'include'` carrying the session cookie across.
 
-Local development uses a fixture-backed mock of the same `/api/*` contract. Chat with routed agents, confirmable record writes, and offline-aware sync are implemented; domain detail views arrive in a later phase.
+The read-only Home PWA is gated by a single-user passphrase and syncs allowlisted Markdown records from a private GitHub repository through those Functions. The browser receives only bounded manifest and file responses; it never receives the GitHub token, passphrase verifier, session secret, or unrestricted repository access.
 
-Both local development and Netlify serve the generated `dist/` artifact. The build copies only the browser shell, styles, application modules, icons, manifest, service worker, and generated `js-yaml` runtime. Repository Markdown, configuration, tests, scripts, dotfiles, and Netlify Function source are outside the public directory.
+Local development uses a fixture-backed mock of the same `/api/*` contract, served from the same local origin as the site (no cross-origin setup needed for `npm run dev`). Chat with routed agents, confirmable record writes, and offline-aware sync are implemented; domain detail views arrive in a later phase.
+
+The build (`npm run build`) copies only the browser shell, styles, application modules, icons, manifest, service worker, and generated `js-yaml` runtime into `dist/` — this is what both local dev and GitHub Pages serve. Repository Markdown, configuration, tests, scripts, dotfiles, and Netlify Function source are outside it.
 
 ## Run locally
 
@@ -29,7 +31,11 @@ To inspect the same static artifact Netlify publishes without starting the serve
 npm run build
 ```
 
-## Configure a Netlify preview
+## Deploy
+
+**The site: GitHub Pages.** In this repo's Settings → Pages, set Source to "GitHub Actions" — `.github/workflows/pages.yml` builds and publishes `dist/` on every push to `main`. No secrets involved; this repo is public and contains only application code, never production credentials or the private data repo's contents.
+
+**The API: Netlify Functions only.** Netlify never serves the site itself — `netlify.toml`'s publish directory is a one-line placeholder (`netlify/public`), and only `netlify/functions` is deployed. Create a Netlify site pointed at this repo (Add new site → Import from Git); its own `.netlify.app` URL is never linked to from anywhere.
 
 Generate a scrypt passphrase verifier and an independent random session secret in an interactive terminal:
 
@@ -39,24 +45,27 @@ npm run generate:auth
 
 The command prompts twice without echoing the passphrase, then prints `LIFE_HUB_PASSPHRASE_HASH` and `SESSION_SECRET` assignments. Copy those values directly into the Netlify environment; do not commit them or save them in `.env.example`.
 
-Create a fine-grained GitHub personal access token scoped to the one private Life Hub repository with **Contents: Read-only** permission. Set these six environment variables in Netlify:
+Create a fine-grained GitHub personal access token scoped to the one private Life Hub **data** repository (a separate repository from this one) with **Contents: Read-only** permission. Set these seven environment variables in Netlify:
 
 ```text
 LIFE_HUB_PASSPHRASE_HASH=<generated verifier>
 SESSION_SECRET=<generated random secret>
-GITHUB_REPOSITORY=<owner/private-repository>
+GITHUB_REPOSITORY=<owner/private-data-repository>
 GITHUB_BRANCH=<branch name>
 GITHUB_TOKEN=<fine-grained read-only token>
 GITHUB_TOKEN_EXPIRES=<YYYY-MM-DD>
+SITE_ORIGIN=<https://your-username.github.io>
 ```
+
+`SITE_ORIGIN` is the exact origin GitHub Pages serves this site from (protocol + host, no path, no trailing slash). Every Function checks incoming requests' `Origin` header against it before doing anything else; requests from any other origin are rejected, and only this one origin is echoed back in `Access-Control-Allow-Origin`.
 
 Use `.env.example` only as a symbolic checklist. This branch and its pull request deliberately contain no production credentials, and production providers remain disconnected until deployment review.
 
 `GITHUB_TOKEN_EXPIRES` is required and must be a real calendar date. Health treats the token as expired from the start of that date in `Australia/Sydney` (`expiry <= today`), and reports an upcoming expiry during the preceding fourteen Sydney calendar days.
 
-The committed `netlify.toml` runs the allowlisted build, publishes only `dist/`, and deploys functions separately from `netlify/functions`.
+**Point the site at the Functions.** Once the Netlify site exists, edit `js/app/config.js`'s `API_BASE_URL` to that site's URL (e.g. `https://your-site-name.netlify.app`) and commit it — this isn't a secret, just where the API lives, and the site won't be able to reach it otherwise.
 
-After deploying a preview, inspect its deploy log and confirm Netlify registered the `/api/auth` code-based rate limit: five requests per 60 seconds, aggregated by IP and domain. Do not promote a deploy if that rule is absent.
+After deploying, inspect the Netlify deploy log and confirm it registered the `/api/auth` code-based rate limit: five requests per 60 seconds, aggregated by IP and domain. Do not promote a deploy if that rule is absent.
 
 ## Chat
 

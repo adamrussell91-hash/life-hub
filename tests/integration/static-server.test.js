@@ -14,7 +14,11 @@ const projectRoot = new URL('../..', import.meta.url);
 const netlifyConfiguration = await readFile(new URL('../../netlify.toml', import.meta.url), 'utf8');
 const publishDirectory = readConfigurationValue(netlifyConfiguration, 'build', 'publish');
 const functionsDirectory = readConfigurationValue(netlifyConfiguration, 'functions', 'directory');
-const publishRoot = new URL(`../../${publishDirectory ?? '__missing_publish_root__'}/`, import.meta.url);
+// The real site is served from GitHub Pages, not Netlify -- Netlify's own publish dir
+// (netlify/public) is just a tiny placeholder for anyone who visits its .netlify.app URL
+// directly. Local dev still serves the built dist/ artifact, matching what GitHub Pages
+// deploys, so these tests exercise dist/ directly rather than netlify.toml's publish dir.
+const publishRoot = new URL('../../dist/', import.meta.url);
 
 before(async () => {
   await execute(process.execPath, ['scripts/prepare-web.mjs'], {
@@ -31,8 +35,8 @@ async function startServer(t, options = {}) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
-test('Netlify publishes the tested dist artifact and keeps functions outside it', () => {
-  assert.equal(publishDirectory, 'dist');
+test('Netlify keeps its own placeholder publish directory separate from the functions directory', () => {
+  assert.equal(publishDirectory, 'netlify/public');
   assert.equal(functionsDirectory, 'netlify/functions');
 
   const rootPath = fileURLToPath(projectRoot);
