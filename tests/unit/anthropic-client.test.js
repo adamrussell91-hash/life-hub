@@ -55,3 +55,52 @@ test('maps a 429 response to a retryable error before reading a body', async () 
 test('requires a non-empty API key', () => {
   assert.throws(() => createAnthropicClient({ apiKey: '' }), TypeError);
 });
+
+test('yields a null input when the accumulated tool-call JSON never parses', async () => {
+  const frames = [
+    frame('content_block_start', { index: 0, content_block: { type: 'tool_use', id: 'call_1', name: 'log_entry' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'input_json_delta', partial_json: '{not valid json' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_stop', {})
+  ];
+  const client = createAnthropicClient({ apiKey: 'k', fetchImpl: async () => sseResponse(frames) });
+
+  const events = [];
+  for await (const event of client.streamMessage({ system: '', messages: [], tools: [] })) events.push(event);
+
+  assert.deepEqual(events, [
+    { type: 'tool_call', id: 'call_1', name: 'log_entry', input: null },
+    { type: 'done' }
+  ]);
+});
+
+test('maps a 401 response to a non-retryable error', async () => {
+  const client = createAnthropicClient({ apiKey: 'k', fetchImpl: async () => new Response(null, { status: 401 }) });
+  await assert.rejects(
+    (async () => {
+      for await (const event of client.streamMessage({ system: '', messages: [], tools: [] })) void event;
+    })(),
+    error => error instanceof AnthropicClientError && error.code === 'anthropic_request_failed' && error.retryable === false
+  );
+});
+
+test('re-throws the underlying error unwrapped when the caller has aborted', async () => {
+  const abortController = new AbortController();
+  const abortError = new DOMException('The operation was aborted.', 'AbortError');
+  const body = new ReadableStream({
+    pull() {
+      abortController.abort();
+      throw abortError;
+    }
+  });
+  const client = createAnthropicClient({ apiKey: 'k', fetchImpl: async () => new Response(body, { status: 200 }) });
+
+  await assert.rejects(
+    (async () => {
+      for await (const event of client.streamMessage({
+        system: '', messages: [], tools: [], signal: abortController.signal
+      })) void event;
+    })(),
+    error => error === abortError
+  );
+});
