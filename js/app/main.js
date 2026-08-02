@@ -1,6 +1,8 @@
 import { load } from '/vendor/js-yaml.mjs';
 import { createSessionApi } from './api-session.js';
 import { createAppController } from './app-controller.js';
+import { createChatApi } from './chat-api.js';
+import { createChatController } from './chat-controller.js';
 import { buildHomeModel } from './home-model.js';
 import { loadLiveEvents } from './load-live-events.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
@@ -52,6 +54,13 @@ const controller = createAppController({
 });
 
 controller.start();
+
+const chatApi = createChatApi(fetchImpl);
+createChatController({
+  root: document,
+  chatApi,
+  onRecordWritten: () => void controller.refresh({ manual: true })
+});
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/service-worker.js').catch(() => undefined);

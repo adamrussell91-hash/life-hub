@@ -6,6 +6,31 @@ import { createAppController } from '../../js/app/app-controller.js';
 const EXPIRY = '2026-08-01T18:00:00.000Z';
 const NOW = new Date('2026-08-01T01:00:00.000Z');
 
+class FakeClassList {
+  constructor() {
+    this.classes = new Set();
+  }
+
+  toggle(name, force) {
+    const shouldAdd = force ?? !this.classes.has(name);
+    if (shouldAdd) this.classes.add(name);
+    else this.classes.delete(name);
+    return shouldAdd;
+  }
+
+  add(name) {
+    this.classes.add(name);
+  }
+
+  remove(name) {
+    this.classes.delete(name);
+  }
+
+  contains(name) {
+    return this.classes.has(name);
+  }
+}
+
 class FakeElement extends EventTarget {
   constructor({ hidden = false } = {}) {
     super();
@@ -16,6 +41,7 @@ class FakeElement extends EventTarget {
     this.dataset = {};
     this.attributes = new Map();
     this.focused = false;
+    this.classList = new FakeClassList();
   }
 
   setAttribute(name, value) {
@@ -57,7 +83,7 @@ class FakeDocument extends EventTarget {
       ['#retry-button', new FakeElement()]
     ]);
     this.futureNavigation = new FakeElement();
-    this.futureNavigation.dataset.section = 'chat';
+    this.futureNavigation.dataset.section = 'nutrition';
   }
 
   querySelector(selector) {
