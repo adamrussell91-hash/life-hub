@@ -35,8 +35,10 @@ export function createChatController({ root, chatApi, onRecordWritten }) {
         } else if (event.type === 'record_proposal') {
           const proposal = appendRecordProposal(root, event);
           bindProposal(proposal, event);
-        } else if (event.type === 'record_rejected' || event.type === 'error') {
-          showChatError(root, 'Life Hub could not prepare that record. Try rephrasing it.');
+        } else if (event.type === 'record_rejected') {
+          showChatError(root, formatRejectionMessage(event.errors));
+        } else if (event.type === 'error') {
+          showChatError(root, 'Chat is unavailable right now. Please try again.');
         }
       }
     } catch {
@@ -102,4 +104,11 @@ function toCandidate(record) {
 
 function slugFromPath(path) {
   return path.split('/').at(-1).replace(/\.md$/, '').split('-').slice(3).join('-');
+}
+
+function formatRejectionMessage(errors) {
+  if (!Array.isArray(errors) || errors.length === 0) {
+    return 'Life Hub could not prepare that record. Try rephrasing it.';
+  }
+  return `Life Hub could not save that record: ${errors.join('; ')}`;
 }
