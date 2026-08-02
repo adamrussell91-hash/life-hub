@@ -83,7 +83,14 @@ function collectEdits(record, inputs) {
   const edited = { ...record };
   for (const [key, input] of Object.entries(inputs ?? {})) {
     const original = record[key];
-    edited[key] = typeof original === 'number' ? Number(input.value) : input.value;
+    if (typeof original === 'number') {
+      const parsed = input.value.trim() === '' ? NaN : Number(input.value);
+      edited[key] = Number.isFinite(parsed) ? parsed : original;
+    } else if (typeof original === 'boolean') {
+      edited[key] = input.value === 'true';
+    } else {
+      edited[key] = input.value;
+    }
   }
   return edited;
 }
