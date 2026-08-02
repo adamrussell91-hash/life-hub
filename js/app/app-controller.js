@@ -56,8 +56,15 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#retry-button'), 'click', () => void refresh({ manual: true }));
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
-    if (button.dataset.section === 'home') continue;
+    const target = button.dataset.section;
+    if (target === 'home' || target === 'chat') continue;
     bind(button, 'click', () => setStatus('This section arrives in a later Life Hub phase.'));
+  }
+  for (const button of root.querySelectorAll?.('[data-section="chat"]') ?? []) {
+    bind(button, 'click', () => showSection('chat'));
+  }
+  for (const button of root.querySelectorAll?.('[data-section="home"]') ?? []) {
+    bind(button, 'click', () => showSection('home'));
   }
   bind(windowTarget, 'online', () => void handleOnline());
   bind(windowTarget, 'offline', () => handleOffline());
@@ -314,6 +321,20 @@ export function createAppController(dependencies) {
     const shell = root.querySelector('#app-shell');
     if (signInView) signInView.hidden = true;
     if (shell) shell.hidden = false;
+    showSection('home');
+  }
+
+  function showSection(name) {
+    const home = root.querySelector('#home-dashboard');
+    const chat = root.querySelector('#chat-view');
+    if (home) home.hidden = name !== 'home';
+    if (chat) chat.hidden = name !== 'chat';
+    for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
+      const active = button.dataset.section === name;
+      button.classList.toggle('is-active', active);
+      if (active) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    }
   }
 
   function showSignedOut(message = '') {
