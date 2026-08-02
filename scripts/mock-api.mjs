@@ -171,6 +171,37 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
       return true;
     }
 
+    if (url.pathname === '/api/chat') {
+      if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
+      if (!readSession(request)) return unauthenticated(response);
+      const body = await readJson(request);
+      if (!body || typeof body.message !== 'string' || body.message.trim() === '') {
+        error(response, 400, 'invalid_request', 'Provide a valid chat message.', false);
+        return true;
+      }
+      streamMockChat(response, body.message);
+      return true;
+    }
+
+    if (url.pathname === '/api/chat/confirm') {
+      if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
+      if (!readSession(request)) return unauthenticated(response);
+      const body = await readJson(request);
+      if (!body || typeof body.slug !== 'string' || !body.candidate) {
+        error(response, 400, 'invalid_request', 'Provide a valid confirmation request.', false);
+        return true;
+      }
+      json(response, 200, {
+        ok: true,
+        data: {
+          path: `data/fitness/mock/${body.slug}.md`,
+          sha: hash(body.slug).slice(0, 40),
+          commitSha: hash('mock-commit').slice(0, 40)
+        }
+      });
+      return true;
+    }
+
     error(response, 404, 'not_found', 'Not found.', false);
     return true;
   };
@@ -285,4 +316,29 @@ async function readJson(request) {
 
 function hash(value) {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function streamMockChat(response, message) {
+  response.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    ...PRIVATE_HEADERS,
+    Connection: 'keep-alive'
+  });
+  const isWorkout = /chad|chadwick|workout/i.test(message);
+  const send = event => response.write(`data: ${JSON.stringify(event)}\n\n`);
+  send({ type: 'agent', slug: isWorkout ? 'chadwick' : 'router' });
+  send({ type: 'text', delta: isWorkout ? 'Logging that session now.' : 'Got it — who should I route this to?' });
+  if (isWorkout) {
+    send({
+      type: 'record_proposal',
+      path: 'data/fitness/2026/08/2026-08-01-workout.md',
+      record: {
+        schema_version: 1, id: 'mock-workout-1', type: 'workout', date: '2026-08-01',
+        day_type: 'workout_30', status: 'completed', duration_min: 30, exercises: [],
+        created_at: '2026-08-01T18:00:00+10:00', updated_at: '2026-08-01T18:00:00+10:00', source: 'chat'
+      }
+    });
+  }
+  send({ type: 'done' });
+  response.end();
 }
