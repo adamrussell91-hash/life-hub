@@ -161,3 +161,75 @@ test('a write_conflict on first confirm prompts a retry, and confirming again se
   assert.equal(chatApi.confirmCalls.length, 2, 'exactly one retry request should have been sent, not more');
   assert.equal(chatApi.confirmCalls[1].overwrite, true);
 });
+
+function messageBubbles(root) {
+  return root.querySelector('#chat-messages').children.filter(child => child.className?.startsWith('chat-message'));
+}
+
+function bubbleText(bubble) {
+  return bubble.children.map(node => node.textContent).join('');
+}
+
+test('a paragraph break in streamed text starts a new bubble instead of one growing wall of text', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'First point.' };
+      yield { type: 'text', delta: '\n\nSecond point.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('brisket, log lunch');
+
+  const bubbles = messageBubbles(root);
+  // index 0 is the user's own message; the assistant's two paragraphs follow as separate bubbles
+  assert.equal(bubbles.length, 3, 'expected the user bubble plus two separate assistant bubbles');
+  assert.equal(bubbleText(bubbles[1]), 'First point.');
+  assert.equal(bubbleText(bubbles[2]), 'Second point.');
+});
+
+test('a search event ends the current bubble so text before and after it does not merge', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Let me check that.' };
+      yield { type: 'search', query: 'McChicken nutrition' };
+      yield { type: 'text', delta: 'Found it, 452 kcal.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('brisket, log a mcchicken for lunch');
+
+  const bubbles = messageBubbles(root);
+  assert.equal(bubbles.length, 4, 'user bubble, pre-search text, the search note, and post-search text');
+  assert.equal(bubbleText(bubbles[1]), 'Let me check that.');
+  assert.equal(bubbles[2].textContent, '🔍 Searched the web: McChicken nutrition');
+  assert.equal(bubbleText(bubbles[3]), 'Found it, 452 kcal.');
+});
+
+test('bold markdown in streamed text renders as a strong element, not literal asterisks', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'That is **452 calories**, buddy.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('brisket, log a mcchicken for lunch');
+
+  const bubbles = messageBubbles(root);
+  const assistantBubble = bubbles[1];
+  const bold = assistantBubble.children.find(node => node.tagName === 'strong');
+  assert.ok(bold, 'expected a strong element for the bolded segment');
+  assert.equal(bold.textContent, '452 calories');
+  assert.doesNotMatch(bubbleText(assistantBubble), /\*\*/);
+});

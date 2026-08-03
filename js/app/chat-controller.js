@@ -1,4 +1,6 @@
-import { appendMessage, appendRecordProposal, setChatBusy, showChatError } from './render-chat.js';
+import { appendMessage, appendRecordProposal, renderInlineMarkdown, setChatBusy, showChatError } from './render-chat.js';
+
+const PARAGRAPH_BREAK = /\n{2,}/;
 
 export function createChatController({ root, chatApi, onRecordWritten }) {
   if (!root || !chatApi) throw new TypeError('Chat controller dependencies are unavailable');
@@ -24,15 +26,55 @@ export function createChatController({ root, chatApi, onRecordWritten }) {
     setChatBusy(root, true);
     showChatError(root, '');
     appendMessage(root, { role: 'user', text: message });
+
+    let assistantSlug = null;
     let assistantBubble = null;
+    let assistantBuffer = '';
+
+    // Streamed text arrives as one long buffer; splitting on paragraph breaks into
+    // separate bubbles reads like an actual back-and-forth instead of one wall of text.
+    function renderLiveText(text) {
+      if (!text) return;
+      if (!assistantBubble) assistantBubble = appendMessage(root, { role: 'assistant', agentSlug: assistantSlug });
+      renderInlineMarkdown(root, assistantBubble, text);
+      scrollChatToBottom();
+    }
+
+    // Marks the current bubble as finished so the next bit of text starts a fresh one,
+    // without touching assistantBuffer -- used mid-paragraph-loop where the buffer still
+    // holds an unflushed remainder that must keep accumulating.
+    function startNewBubble() {
+      assistantBubble = null;
+    }
+
+    // Used when a non-text event (a proposal, a search note, ...) interrupts the
+    // stream: whatever was mid-paragraph is already rendered, so drop the buffer too.
+    function endTextTurn() {
+      assistantBubble = null;
+      assistantBuffer = '';
+    }
+
+    function scrollChatToBottom() {
+      const list = root.querySelector('#chat-messages');
+      if (list) list.scrollTop = list.scrollHeight;
+    }
 
     try {
       for await (const event of chatApi.send(message)) {
         if (event.type === 'agent') {
-          assistantBubble = appendMessage(root, { role: 'assistant', agentSlug: event.slug });
-        } else if (event.type === 'text' && assistantBubble) {
-          assistantBubble.textContent += event.delta;
+          assistantSlug = event.slug;
+        } else if (event.type === 'text') {
+          assistantBuffer += event.delta;
+          let boundary;
+          while ((boundary = PARAGRAPH_BREAK.exec(assistantBuffer))) {
+            const paragraph = assistantBuffer.slice(0, boundary.index).trim();
+            assistantBuffer = assistantBuffer.slice(boundary.index + boundary[0].length);
+            renderLiveText(paragraph);
+            startNewBubble();
+          }
+          renderLiveText(assistantBuffer);
         } else if (event.type === 'record_proposal') {
+          endTextTurn();
           const proposal = appendRecordProposal(root, event);
           bindProposal(proposal, event);
         } else if (event.type === 'record_rejected') {
@@ -40,8 +82,10 @@ export function createChatController({ root, chatApi, onRecordWritten }) {
         } else if (event.type === 'error') {
           showChatError(root, 'Chat is unavailable right now. Please try again.');
         } else if (event.type === 'search') {
-          appendMessage(root, { role: 'assistant', text: `🔍 Searching the web: ${event.query ?? '…'}` });
+          endTextTurn();
+          appendMessage(root, { role: 'assistant', text: `🔍 Searched the web: ${event.query ?? '…'}` });
         } else if (event.type === 'food_library_saved') {
+          endTextTurn();
           appendMessage(root, { role: 'assistant', text: `📚 Saved "${event.name}" to the Food Library for next time.` });
         }
       }

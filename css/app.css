@@ -376,7 +376,7 @@ main { max-width: 76rem; margin: 0 auto; }
   .sign-in-card, .metric-card, .week-card, .warning-panel, .unavailable-panel, .date-chip, .system-chip, .mobile-nav { background: #fff; }
 }
 
-.chat-view { display: flex; flex-direction: column; gap: 1rem; max-width: 42rem; }
+.chat-view { display: flex; flex-direction: column; gap: 1rem; }
 
 .chat-error { color: #B3261E; font-weight: 600; }
 
@@ -387,7 +387,7 @@ main { max-width: 76rem; margin: 0 auto; }
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-height: 32rem;
+  max-height: 60vh;
   overflow-y: auto;
 }
 
@@ -396,7 +396,7 @@ main { max-width: 76rem; margin: 0 auto; }
   border-radius: var(--radius-md);
   background: var(--glass);
   box-shadow: var(--shadow);
-  max-width: 32rem;
+  max-width: 48rem;
 }
 
 .chat-message--user { align-self: flex-end; background: var(--marine); color: white; }
