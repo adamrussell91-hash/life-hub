@@ -87,6 +87,20 @@ const DOMAIN_PROPERTIES = {
 };
 
 export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
+  const fieldsSchema = allowedTypes.length === 1
+    ? {
+        type: 'object',
+        description: `The exact fields for a ${allowedTypes[0]} record. Only these keys are allowed — using any other key name is rejected.`,
+        properties: DOMAIN_PROPERTIES[allowedTypes[0]],
+        additionalProperties: false
+      }
+    : {
+        type: 'object',
+        description: `Domain-specific fields for the chosen type. Only these exact keys are allowed per type — using any other key name is rejected:\n${
+          allowedTypes.map(t => `- ${t}: ${Object.keys(DOMAIN_PROPERTIES[t]).join(', ')}`).join('\n')
+        }`
+      };
+
   return {
     name: 'log_entry',
     description: 'Propose one Life Hub record for Adam to review and confirm before it is saved. Never call this unless Adam has clearly described a specific record.',
@@ -97,7 +111,7 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
         date: { type: 'string', description: 'YYYY-MM-DD' },
         time: { type: 'string', description: 'HH:MM, optional' },
         notes: { type: 'string', description: 'Optional free-text note saved as the record body, e.g. what food was eaten or how a workout felt. Not a domain field — do not put this in fields.' },
-        fields: { type: 'object', description: 'Domain-specific fields for the chosen type.' }
+        fields: fieldsSchema
       },
       required: ['type', 'date', 'fields']
     }
