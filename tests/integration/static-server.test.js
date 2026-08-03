@@ -144,7 +144,9 @@ test('local sign-in exposes the fixture repository contract', async t => {
     sha: '592630799f9b76b0b056a816625ef0e9196b9efa',
     size: 1335
   });
-  assert.deepEqual(payload.data.files[2], {
+  const centralNode = payload.data.files.find(f => f.path === 'central-node.md');
+  assert.ok(centralNode);
+  assert.deepEqual(centralNode, {
     path: 'central-node.md',
     sha: 'cc697eca71888316c1dda5bbfe38d7a1d9376816',
     size: 1309
