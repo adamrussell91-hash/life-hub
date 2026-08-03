@@ -138,11 +138,16 @@ test('local sign-in exposes the fixture repository contract', async t => {
   });
   assert.equal(manifest.status, 200);
   const payload = await manifest.json();
-  assert.equal(payload.data.files.length, 6);
+  assert.equal(payload.data.files.length, 7);
   assert.deepEqual(payload.data.files[0], {
     path: 'config/agents.yml',
     sha: '592630799f9b76b0b056a816625ef0e9196b9efa',
     size: 1335
+  });
+  assert.deepEqual(payload.data.files[2], {
+    path: 'central-node.md',
+    sha: 'cc697eca71888316c1dda5bbfe38d7a1d9376816',
+    size: 1309
   });
 });
 

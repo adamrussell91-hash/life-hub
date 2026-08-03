@@ -10,6 +10,7 @@ const SESSION_MS = 8 * 60 * 60 * 1000;
 const FIXTURE_FILES = [
   { path: 'config/agents.yml', source: 'config/agents.yml' },
   { path: 'config/targets.yml', source: 'config/targets.yml' },
+  { path: 'central-node.md', source: 'tests/fixtures/valid/central-node.md' },
   {
     path: 'data/fitness/2026/07/2026-07-30-chest-curls.md',
     source: 'tests/fixtures/valid/data/fitness/2026/07/2026-07-30-chest-curls.md'
@@ -210,7 +211,7 @@ async function readFixtureRepository(rootPath) {
 }
 
 function isInRange(path, { from, to }) {
-  if (path.startsWith('config/')) return true;
+  if (path.startsWith('config/') || path === 'central-node.md') return true;
   const date = /\/(\d{4}-\d{2}-\d{2})-[^/]+\.md$/.exec(path)?.[1];
   return date >= from && date <= to;
 }
