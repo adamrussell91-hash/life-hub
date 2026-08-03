@@ -3,7 +3,7 @@ import { getSydneyDateKey } from '../core/time.js';
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
 const LAST_SUCCESS_KEY = 'life-hub:last-success';
 const LOGOUT_PENDING_KEY = 'life-hub:logout-pending';
-const REFRESH_INTERVAL_MS = 60_000;
+const REFRESH_INTERVAL_MS = 600_000;
 const GENERIC_LOAD_ERROR = 'Life Hub could not load your data. Check your connection and try again.';
 
 export function createAppController(dependencies) {
