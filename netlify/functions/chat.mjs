@@ -137,6 +137,7 @@ export function createChatHandler({
                 send({
                   type: 'record_proposal',
                   record: validation.record,
+                  notes: validation.notes,
                   path: buildCanonicalPath({
                     type: validation.record.type,
                     date: validation.record.date,

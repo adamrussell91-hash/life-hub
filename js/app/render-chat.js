@@ -12,7 +12,7 @@ export function appendMessage(root, { role, agentSlug, text = '' }) {
   return item;
 }
 
-export function appendRecordProposal(root, { path, record }) {
+export function appendRecordProposal(root, { path, record, notes }) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
   const card = root.createElement('li');
@@ -38,6 +38,17 @@ export function appendRecordProposal(root, { path, record }) {
     fields.append(dt, dd);
     inputs[key] = input;
   }
+
+  const notesDt = root.createElement('dt');
+  notesDt.textContent = 'notes';
+  const notesDd = root.createElement('dd');
+  const notesInput = root.createElement('input');
+  notesInput.value = notes ?? '';
+  notesInput.dataset.field = 'notes';
+  notesDd.append(notesInput);
+  fields.append(notesDt, notesDd);
+  inputs.notes = notesInput;
+
   card.append(fields);
 
   const confirm = root.createElement('button');

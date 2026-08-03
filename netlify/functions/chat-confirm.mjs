@@ -93,7 +93,7 @@ export function createChatConfirmHandler({
     try {
       const result = await client.writeFile({
         path,
-        content: renderMarkdown(validation.record),
+        content: renderMarkdown(validation.record, validation.notes),
         ...(existingSha ? { sha: existingSha } : {}),
         message: `feat(chat): log ${validation.record.type} for ${validation.record.date}`
       });
@@ -107,12 +107,13 @@ export function createChatConfirmHandler({
   };
 }
 
-function renderMarkdown(record) {
+function renderMarkdown(record, notes) {
   const frontmatter = Object.entries(record)
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
     .join('\n');
-  return `---\n${frontmatter}\n---\n`;
+  const body = typeof notes === 'string' && notes.trim() !== '' ? `${notes.trim()}\n` : '';
+  return `---\n${frontmatter}\n---\n${body}`;
 }
 
 async function parseRequest(request) {
