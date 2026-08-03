@@ -72,11 +72,13 @@ test('loads the current Sydney date window through existing parsers and exact Ho
 test('returns stable warnings for invalid Markdown and target configuration', async () => {
   const files = [
     raw('config/targets.yml', 'target_sets: [invalid'),
-    raw('data/fitness/2026/07/2026-07-30-workout.md', 'not frontmatter')
+    raw('data/fitness/2026/07/2026-07-30-workout.md', 'not frontmatter'),
+    raw('config/agents.yml', 'agents: [invalid')
   ];
   const sync = async ({ validateFile }) => {
     assert.equal(validateFile(files[0]).valid, false);
     assert.equal(validateFile(files[1]).valid, false);
+    assert.deepEqual(validateFile(files[2]), { valid: false, code: 'invalid_agents' });
     return {
       files,
       warnings: [{ code: 'github_unavailable' }],
@@ -95,7 +97,8 @@ test('returns stable warnings for invalid Markdown and target configuration', as
   assert.deepEqual(result.warnings, [
     { code: 'github_unavailable' },
     { path: 'config/targets.yml', code: 'invalid_targets' },
-    { path: 'data/fitness/2026/07/2026-07-30-workout.md', code: 'invalid_event' }
+    { path: 'data/fitness/2026/07/2026-07-30-workout.md', code: 'invalid_event' },
+    { path: 'config/agents.yml', code: 'invalid_agents' }
   ]);
 });
 
