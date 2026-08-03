@@ -219,3 +219,53 @@ test('rejects invalid dates before starting repository sync', async () => {
   );
   assert.equal(called, false);
 });
+
+test('exposes parsed config/agents.yml and raw central-node.md content when both are present', async () => {
+  const agentsYaml = await readFile(new URL('../../config/agents.yml', import.meta.url), 'utf8');
+  const centralNodeMarkdown = '# Purpose\n---\n## ⚡ Today\'s Status\nAll clear.\n';
+  const files = [
+    raw('config/agents.yml', agentsYaml),
+    raw('central-node.md', centralNodeMarkdown)
+  ];
+  const sync = async () => ({
+    files, warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+    changed: true, freshness: 'confirmed'
+  });
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01' });
+
+  assert.equal(result.agentsConfig.agents.find(agent => agent.slug === 'brisket').colour, '#F0B843');
+  assert.equal(result.centralNodeMarkdown, centralNodeMarkdown);
+});
+
+test('an unparseable config/agents.yml produces a warning instead of throwing, and central-node.md needs no parsing to fail', async () => {
+  const files = [
+    raw('config/agents.yml', 'agents: [invalid'),
+    raw('central-node.md', 'anything at all is valid markdown here')
+  ];
+  const sync = async () => ({
+    files, warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+    changed: true, freshness: 'confirmed'
+  });
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01' });
+
+  assert.equal(result.agentsConfig, null);
+  assert.equal(result.centralNodeMarkdown, 'anything at all is valid markdown here');
+  assert.deepEqual(
+    result.warnings.filter(warning => warning.path === 'config/agents.yml'),
+    [{ path: 'config/agents.yml', code: 'invalid_agents' }]
+  );
+});
+
+test('agentsConfig and centralNodeMarkdown default to null when neither file is present', async () => {
+  const sync = async () => ({
+    files: [], warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+    changed: true, freshness: 'confirmed'
+  });
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01' });
+
+  assert.equal(result.agentsConfig, null);
+  assert.equal(result.centralNodeMarkdown, null);
+});
