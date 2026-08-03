@@ -12,13 +12,18 @@ import {
   withCors
 } from './_shared/http.mjs';
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
+import { decodeBlob } from './_shared/decode-blob.mjs';
 import { buildCanonicalPath, validateLogEntry } from './_shared/chat-schema.mjs';
+import { AGENTS } from './_shared/agent-directory.mjs';
+import { RECENT_ACTIONS_HEADING } from './_shared/constraints.mjs';
 import { getSydneyTimestamp } from '../../js/core/time.js';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const BODY_TOO_LARGE = Symbol('body_too_large');
+const CENTRAL_NODE_PATH = 'central-node.md';
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export const config = { path: '/api/chat/confirm' };
 
@@ -97,6 +102,13 @@ export function createChatConfirmHandler({
         ...(existingSha ? { sha: existingSha } : {}),
         message: `feat(chat): log ${validation.record.type} for ${validation.record.date}`
       });
+      try {
+        await appendCentralNodeAction(client, validation.record, validation.notes);
+      } catch {
+        // Best-effort running log -- the record itself already saved successfully, so a
+        // failure here (conflict, missing file, transient GitHub error) must never surface
+        // as a failed confirmation.
+      }
       return jsonResponse(200, { ok: true, data: { path, sha: result.sha, commitSha: result.commitSha } }, PRIVATE_CACHE);
     } catch (error) {
       if (error instanceof GitHubClientError && error.code === 'write_conflict') {
@@ -114,6 +126,70 @@ function renderMarkdown(record, notes) {
     .join('\n');
   const body = typeof notes === 'string' && notes.trim() !== '' ? `${notes.trim()}\n` : '';
   return `---\n${frontmatter}\n---\n${body}`;
+}
+
+async function appendCentralNodeAction(client, record, notes) {
+  const current = await client.resolveTree();
+  const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
+  if (!entry) return;
+
+  const content = decodeBlob(await client.readBlob(entry.sha));
+  if (content === null) return;
+
+  const headingIndex = content.indexOf(RECENT_ACTIONS_HEADING);
+  if (headingIndex === -1) return;
+
+  const insertAt = headingIndex + RECENT_ACTIONS_HEADING.length;
+  const line = `\n**${formatLogDate(record.date)}:** ${agentNameForType(record.type)}: ${describeRecordForLog(record, notes)}`;
+  const updated = `${content.slice(0, insertAt)}${line}${content.slice(insertAt)}`;
+
+  await client.writeFile({
+    path: CENTRAL_NODE_PATH,
+    content: updated,
+    sha: entry.sha,
+    message: `chore(central-node): log ${record.type} action`
+  });
+}
+
+function agentNameForType(type) {
+  return AGENTS.find(agent => agent.recordTypes.includes(type))?.name ?? 'Life Hub';
+}
+
+function formatLogDate(dateKey) {
+  const [, month, day] = dateKey.split('-').map(Number);
+  return `${day} ${SHORT_MONTHS[month - 1]}`;
+}
+
+function describeRecordForLog(record, notes) {
+  const label = typeof notes === 'string' && notes.trim() !== '' ? notes.trim() : null;
+  switch (record.type) {
+    case 'meal': {
+      const macros = [
+        record.calories != null ? `${record.calories} kcal` : null,
+        record.protein_g != null ? `${record.protein_g}g protein` : null,
+        record.fat_g != null ? `${record.fat_g}g fat` : null
+      ].filter(Boolean).join(', ');
+      const what = label ? `${label} for ${record.meal}` : record.meal;
+      return `Logged ${what}${macros ? ` (${macros})` : ''}.`;
+    }
+    case 'workout': {
+      const duration = record.duration_min != null ? `${record.duration_min}-min ` : '';
+      const title = record.title ? ` (${record.title})` : '';
+      return `Logged a ${duration}${record.day_type ?? 'workout'} session${title}.`;
+    }
+    case 'skincare':
+      return `Logged ${record.routine ?? ''} skincare${record.completed === false ? ' (incomplete)' : ''}.`.replace(/\s+/g, ' ');
+    case 'diary':
+      return `Logged a diary entry${record.mood ? ` (mood: ${record.mood})` : ''}.`;
+    case 'weight':
+      return `Logged weight${record.weight_kg != null ? `: ${record.weight_kg}kg` : ''}.`;
+    case 'composition':
+      return `Logged body composition${record.weight_kg != null ? ` (${record.weight_kg}kg${record.body_fat_pct != null ? `, ${record.body_fat_pct}% body fat` : ''})` : ''}.`;
+    case 'measurements':
+      return 'Logged body measurements.';
+    default:
+      return `Logged a ${record.type} record.`;
+  }
 }
 
 async function parseRequest(request) {

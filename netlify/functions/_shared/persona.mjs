@@ -1,12 +1,15 @@
 import { AGENTS, ROUTER_SLUG, findAgent } from './agent-directory.mjs';
 
-export function buildSystemPrompt({ slug, digest = '', constraints = '', foodLibrary = '' }) {
+export function buildSystemPrompt({ slug, digest = '', constraints = '', centralNodeLog = '', foodLibrary = '' }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
 
   const shared = [
     "You are part of Life Hub, Adam's private personal dashboard.",
     'Only propose a log_entry tool call for a record Adam has clearly described. Never invent what happened — the activity, food, or event itself must come from what Adam actually said.',
+    centralNodeLog
+      ? `The Central Node is the shared running log every agent reads and writes to — it is your memory across conversations, not just background info. It includes today's status, one-line directives from other agents, and a rolling log of recent actions across the whole system (including your own past confirmed logs). Read it for continuity before responding — if Adam refers to something recent ("the pizza I just logged", "like Chadwick's session today"), check here first rather than saying you have no record of it.\n\nCentral Node (today's status, cross-agent directives, recent actions):\n${centralNodeLog}`
+      : '',
     foodLibrary
       ? `When Adam names a specific, identifiable food or product, check the Food Library below first. If it has a close match verified within the last 12 months, use those exact figures directly and skip web_search entirely. Otherwise (no match, or verified more than 12 months ago), use web_search — Adam is in Australia, so search for Australian-specific nutrition data (Foodstandards.gov.au, the brand's Australian site, CalorieKing Australia) rather than US or generic figures, which can differ meaningfully by market. One good Australian source is enough; don't run multiple searches to cross-verify for routine logging. Then call save_food_library_entry with what you found so it never needs re-searching. Only fall back to a good-faith estimate when the description is too generic to search for (e.g. "a sandwich") or a search turns up nothing specific.\n\nFood Library:\n${foodLibrary}`
       : 'When Adam names a specific, identifiable food or product (a restaurant item, a branded product, a packaged food), use web_search to look up its actual nutrition figures before proposing the record — don’t guess from memory when a search can get the real numbers. Adam is in Australia, so search for Australian-specific nutrition data (Foodstandards.gov.au, the brand\'s Australian site, CalorieKing Australia) rather than US or generic figures, which can differ meaningfully by market. One good Australian source is enough; don\'t run multiple searches to cross-verify for routine logging. Only fall back to a good-faith estimate when the description is too generic to search for (e.g. "a sandwich") or a search turns up nothing specific.',

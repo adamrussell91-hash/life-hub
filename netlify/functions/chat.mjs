@@ -11,10 +11,16 @@ import {
   withCors
 } from './_shared/http.mjs';
 import { createGitHubClient, GitHubConfigurationError } from './_shared/github-client.mjs';
+import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
 import { buildSystemPrompt } from './_shared/persona.mjs';
-import { extractConstraints } from './_shared/constraints.mjs';
+import {
+  extractConstraints,
+  extractCrossAgentCoordination,
+  extractRecentAgentActions,
+  extractTodaysStatus
+} from './_shared/constraints.mjs';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
 import { logEntryToolSchema, validateLogEntry, buildCanonicalPath } from './_shared/chat-schema.mjs';
@@ -91,6 +97,7 @@ export function createChatHandler({
 
     let digest = '';
     let constraints = '';
+    let centralNodeLog = '';
     let foodLibraryEntries = [];
     let foodLibrary = '';
     let foodLibrarySha;
@@ -116,7 +123,14 @@ export function createChatHandler({
       digest = summarizeRecentHistory(files, TARGETS_CONFIG, today);
 
       const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
-      if (decodedCentralNode !== null) constraints = extractConstraints(decodedCentralNode);
+      if (decodedCentralNode !== null) {
+        constraints = extractConstraints(decodedCentralNode);
+        centralNodeLog = [
+          extractTodaysStatus(decodedCentralNode),
+          extractCrossAgentCoordination(decodedCentralNode),
+          extractRecentAgentActions(decodedCentralNode)
+        ].filter(Boolean).join('\n\n');
+      }
 
       const decodedFoodLibrary = foodLibraryBlob ? decodeBlob(foodLibraryBlob) : null;
       if (decodedFoodLibrary !== null) {
@@ -126,12 +140,13 @@ export function createChatHandler({
     } catch {
       digest = '';
       constraints = '';
+      centralNodeLog = '';
       foodLibraryEntries = [];
       foodLibrary = '';
       foodLibrarySha = undefined;
     }
 
-    const system = buildSystemPrompt({ slug, digest, constraints, foodLibrary });
+    const system = buildSystemPrompt({ slug, digest, constraints, centralNodeLog, foodLibrary });
     const tools = [
       { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
       ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
@@ -222,17 +237,6 @@ function slugFor(record) {
 
 function slugTime(time) {
   return typeof time === 'string' ? time.replace(':', '') : '0000';
-}
-
-function decodeBlob(blob) {
-  if (!blob || blob.encoding !== 'base64' || typeof blob.content !== 'string') return null;
-  const content = blob.content.replace(/\n/g, '');
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(content)) return null;
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(Buffer.from(content, 'base64'));
-  } catch {
-    return null;
-  }
 }
 
 async function parseRequest(request) {
