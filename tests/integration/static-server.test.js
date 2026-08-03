@@ -279,26 +279,3 @@ test('local repository file reads return exact fixture pairs in request order', 
   assert.match(payload.data.files[0].content, /Marley Spoon chicken bowl\./);
   assert.match(payload.data.files[1].content, /^agents:/m);
 });
-
-test('local health reports the sanitized production response shape', async t => {
-  const baseUrl = await startServer(t);
-  const auth = await fetch(`${baseUrl}/api/auth`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ passphrase: 'life-hub-local' })
-  });
-  const cookie = auth.headers.get('set-cookie').split(';', 1)[0];
-  const response = await fetch(`${baseUrl}/api/health`, { headers: { cookie } });
-
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), {
-    ok: true,
-    data: {
-      github: 'healthy',
-      token: 'unknown',
-      expiresOn: null,
-      code: 'ok',
-      retryable: false
-    }
-  });
-});

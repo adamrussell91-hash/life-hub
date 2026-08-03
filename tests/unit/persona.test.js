@@ -15,11 +15,11 @@ test('a conversational-only agent is told it cannot log records', () => {
   assert.match(prompt, /do not log structured records/);
 });
 
-test('the router lists every agent and is told to infer rather than guess silently', () => {
+test('the router lists every agent, infers the right one, and never narrates the handoff', () => {
   const prompt = buildSystemPrompt({ slug: 'router', digest: '', constraints: '' });
-  assert.match(prompt, /Life Hub router/);
   assert.match(prompt, /Brisket Lasso/);
   assert.match(prompt, /infer/i);
+  assert.match(prompt, /[Nn]ever narrate or announce this inference/);
 });
 
 test('rejects an unknown slug', () => {

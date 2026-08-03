@@ -56,6 +56,23 @@ test('requires a non-empty API key', () => {
   assert.throws(() => createAnthropicClient({ apiKey: '' }), TypeError);
 });
 
+test('sends the system prompt as a cacheable block so repeat calls in one conversation stay cheap', async () => {
+  let requestBody;
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async (url, init) => {
+      requestBody = JSON.parse(init.body);
+      return sseResponse([frame('message_stop', {})]);
+    }
+  });
+
+  for await (const event of client.streamMessage({ system: 'You are Brisket Lasso.', messages: [], tools: [] })) void event;
+
+  assert.deepEqual(requestBody.system, [
+    { type: 'text', text: 'You are Brisket Lasso.', cache_control: { type: 'ephemeral', ttl: '1h' } }
+  ]);
+});
+
 test('yields a null input when the accumulated tool-call JSON never parses', async () => {
   const frames = [
     frame('content_block_start', { index: 0, content_block: { type: 'tool_use', id: 'call_1', name: 'log_entry' } }),

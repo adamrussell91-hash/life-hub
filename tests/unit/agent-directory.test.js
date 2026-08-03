@@ -25,6 +25,19 @@ test('falls back to the router when no agent is named', () => {
   assert.equal(routeAgent('log today'), ROUTER_SLUG);
 });
 
+test('an unnamed message stays with the sticky agent from the current conversation', () => {
+  assert.equal(routeAgent('actually make that 3 eggs', 'brisket'), 'brisket');
+});
+
+test('an explicit name always wins over a sticky agent from a different conversation', () => {
+  assert.equal(routeAgent('chad, log a workout', 'brisket'), 'chadwick');
+});
+
+test('a stale or unknown sticky slug falls back to the router rather than being trusted blindly', () => {
+  assert.equal(routeAgent('log today', 'not-a-real-agent'), ROUTER_SLUG);
+  assert.equal(routeAgent('log today', 'router'), ROUTER_SLUG);
+});
+
 test('routeAgent requires a string message', () => {
   assert.throws(() => routeAgent(null), TypeError);
 });

@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAuthHandler } from '../../netlify/functions/auth.mjs';
-import { createHealthHandler } from '../../netlify/functions/health.mjs';
 import { createLogoutHandler } from '../../netlify/functions/logout.mjs';
 import { createRepoFilesHandler } from '../../netlify/functions/repo-files.mjs';
 import { createRepoManifestHandler } from '../../netlify/functions/repo-manifest.mjs';
@@ -56,10 +55,6 @@ for (const [label, headers] of [
           headers: { ...headers, 'content-type': 'application/json' },
           body: JSON.stringify({ from: '2026-07-02', to: '2026-08-01', files: [] })
         }
-      )],
-      [createHealthHandler({ env, verifySessionToken, createGitHubClient }), new Request(
-        'https://life.example/api/health',
-        { headers }
       )]
     ];
 

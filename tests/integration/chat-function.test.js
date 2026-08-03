@@ -77,6 +77,83 @@ test('streams an agent event, text, and a validated record proposal for a routed
   assert.deepEqual(events[3], { type: 'done' });
 });
 
+test('conversation history is forwarded to Anthropic ahead of the new message', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'Got it.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  await handler(request({
+    message: 'actually make that 3 eggs',
+    priorAgentSlug: 'brisket',
+    history: [
+      { role: 'user', content: 'Brisket, log 2 eggs for breakfast' },
+      { role: 'assistant', content: 'Logging that now, buddy.' }
+    ]
+  }));
+
+  assert.deepEqual(receivedArgs.messages, [
+    { role: 'user', content: 'Brisket, log 2 eggs for breakfast' },
+    { role: 'assistant', content: 'Logging that now, buddy.' },
+    { role: 'user', content: 'actually make that 3 eggs' }
+  ]);
+});
+
+test('an unnamed follow-up stays with the sticky agent instead of falling back to the router', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([{ type: 'text', delta: 'On it.' }, { type: 'done' }])
+    })
+  });
+
+  const response = await handler(request({ message: 'actually make that 3 eggs', priorAgentSlug: 'brisket' }));
+  const events = await readSse(response);
+  assert.deepEqual(events[0], { type: 'agent', slug: 'brisket' });
+});
+
+test('malformed history entries are dropped rather than breaking the request', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await handler(request({
+    message: 'hi',
+    history: [
+      { role: 'user', content: 'fine' },
+      { role: 'system', content: 'not a valid role' },
+      { role: 'assistant', content: '' },
+      'not even an object',
+      { role: 'assistant', content: 'also fine' }
+    ]
+  }));
+
+  assert.deepEqual(receivedArgs.messages, [
+    { role: 'user', content: 'fine' },
+    { role: 'assistant', content: 'also fine' },
+    { role: 'user', content: 'hi' }
+  ]);
+});
+
 test('rejects an unauthenticated request', async () => {
   const handler = createChatHandler({ env: validEnv });
   const response = await handler(new Request('https://life.example/api/chat', {

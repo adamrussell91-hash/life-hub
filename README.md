@@ -61,7 +61,7 @@ SITE_ORIGIN=<https://your-username.github.io>
 
 Use `.env.example` only as a symbolic checklist. This branch and its pull request deliberately contain no production credentials, and production providers remain disconnected until deployment review.
 
-`GITHUB_TOKEN_EXPIRES` is required and must be a real calendar date. Health treats the token as expired from the start of that date in `Australia/Sydney` (`expiry <= today`), and reports an upcoming expiry during the preceding fourteen Sydney calendar days.
+`GITHUB_TOKEN_EXPIRES` is required and must be a real calendar date; the GitHub client rejects any other value as misconfiguration. There is no separate health-check endpoint or expiry banner — rotate the token yourself ahead of that date.
 
 **Point the site at the Functions.** Once the Netlify site exists, edit `js/app/config.js`'s `API_BASE_URL` to that site's URL (e.g. `https://your-site-name.netlify.app`) and commit it — this isn't a secret, just where the API lives, and the site won't be able to reach it otherwise.
 

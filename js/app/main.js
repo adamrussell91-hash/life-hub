@@ -56,7 +56,6 @@ const controller = createAppController({
   renderHome,
   renderWarnings,
   renderUnavailable,
-  fetchImpl,
   sessionStorage,
   localStorage
 });

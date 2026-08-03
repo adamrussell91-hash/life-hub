@@ -177,7 +177,6 @@ function harness(options = {}) {
     signsOut: 0,
     syncs: 0,
     cached: 0,
-    health: 0,
     clears: 0,
     renders: 0,
     refreshSignals: []
@@ -274,14 +273,6 @@ function harness(options = {}) {
     renderUnavailable(documentRoot, message) {
       documentRoot.querySelector('#unavailable-panel').hidden = false;
       documentRoot.querySelector('#app-status').textContent = message;
-    },
-    async fetchImpl(url) {
-      assert.equal(url, '/api/health');
-      calls.health += 1;
-      if (options.healthResponse) return options.healthResponse;
-      return Response.json({ ok: true, data: options.health ?? {
-        github: 'healthy', token: 'healthy', expiresOn: '2026-09-01', code: 'ok', retryable: false
-      } });
     }
   };
 
@@ -490,19 +481,6 @@ test('session expiry during refresh returns to sign-in without clearing private 
   assert.equal(state.calls.clears, 0);
 });
 
-test('session expiry reported by health returns to sign-in', async () => {
-  const state = harness({ healthResponse: Response.json({
-    ok: false, error: { code: 'unauthenticated', message: 'Please sign in.' }
-  }, { status: 401 }) });
-
-  await state.controller.start();
-
-  assert.equal(state.root.querySelector('#sign-in-view').hidden, false);
-  assert.equal(state.root.querySelector('#app-shell').hidden, true);
-  assert.equal(state.root.querySelector('#app').dataset.state, 'signed-out');
-  assert.equal(state.clock.activeIntervals, 0);
-});
-
 test('fallback freshness retains Home visibly stale without advancing the prior confirmed time', async () => {
   const priorSuccess = '2026-08-01T00:30:00.000Z';
   const state = harness({
@@ -518,8 +496,6 @@ test('fallback freshness retains Home visibly stale without advancing the prior 
 
   assert.equal(state.calls.renders, 1);
   assert.equal(state.root.querySelector('#home-dashboard').hidden, false);
-  assert.equal(state.root.querySelector('#provider-status').hidden, false);
-  assert.match(state.root.querySelector('#provider-status').textContent, /GitHub.*saved/i);
   assert.equal(state.root.querySelector('#app').dataset.state, 'stale');
   assert.equal(state.localStorage.getItem('life-hub:last-success'), priorSuccess);
   assert.match(state.root.querySelector('#last-synced').textContent, /Last synced/);
@@ -540,18 +516,6 @@ test('confirmed unchanged refresh avoids rerender while advancing confirmation t
 
   assert.equal(state.calls.renders, 1);
   assert.equal(state.localStorage.getItem('life-hub:last-success'), '2026-08-01T02:00:00.000Z');
-});
-
-test('health token expiry displays a provider notice without hiding Home', async () => {
-  const state = harness({ health: {
-    github: 'healthy', token: 'expiring', expiresOn: '2026-08-10', code: 'ok', retryable: false
-  } });
-
-  await state.controller.start();
-
-  assert.equal(state.root.querySelector('#provider-status').hidden, false);
-  assert.match(state.root.querySelector('#provider-status').textContent, /10 August 2026/);
-  assert.equal(state.root.querySelector('#home-dashboard').hidden, false);
 });
 
 test('manual refresh exposes progress then records the successful sync time', async () => {

@@ -17,7 +17,6 @@ export function createAppController(dependencies) {
     renderHome,
     renderWarnings,
     renderUnavailable,
-    fetchImpl,
     windowTarget = window,
     documentTarget = document,
     navigatorTarget = navigator,
@@ -32,7 +31,7 @@ export function createAppController(dependencies) {
 
   if (!root || !sessionApi || !cache || typeof loadLive !== 'function' ||
       typeof loadCached !== 'function' || typeof buildHomeModel !== 'function' ||
-      typeof renderHome !== 'function' || typeof fetchImpl !== 'function') {
+      typeof renderHome !== 'function') {
     throw new TypeError('Application controller dependencies are unavailable');
   }
 
@@ -195,17 +194,10 @@ export function createAppController(dependencies) {
       if (result.freshness === 'confirmed') recordSuccess();
       else restoreLastSuccess();
 
-      const stale = result.freshness === 'fallback';
-      if (stale) {
-        const code = result.warnings.find(warning => !warning.path)?.code;
-        showProvider(`GitHub is unavailable${code ? ` (${code})` : ''}. Showing your last saved view.`, 'warning');
+      if (result.freshness === 'fallback') {
         setAppState('stale');
       } else {
         hideProvider();
-        setAppState('ready');
-      }
-      await checkHealth({ signal, version });
-      if (authenticated && !stale && root.querySelector('#provider-status')?.hidden !== false) {
         setAppState('ready');
       }
     } catch (error) {
@@ -215,39 +207,10 @@ export function createAppController(dependencies) {
         return;
       }
       if (rendered) {
-        showProvider(`GitHub is unavailable${error?.code ? ` (${error.code})` : ''}. Showing your last saved view.`, 'warning');
         setAppState(navigatorTarget.onLine ? 'stale' : 'offline');
         return;
       }
       renderUnavailable?.(root, GENERIC_LOAD_ERROR);
-    }
-  }
-
-  async function checkHealth({ signal, version }) {
-    let response;
-    try {
-      response = await fetchImpl('/api/health', { signal });
-    } catch {
-      return;
-    }
-    if (!isCurrentRefresh(version, signal)) return;
-    if (response.status === 401) {
-      invalidateSession('Your session expired. Please sign in again.');
-      return;
-    }
-    if (!response.ok) return;
-
-    let health;
-    try {
-      health = (await response.json()).data;
-    } catch {
-      return;
-    }
-    if (health.github !== 'healthy') {
-      showProvider(`GitHub is unavailable (${health.code}). Your saved view remains available.`, 'warning');
-    } else if (health.token === 'expiring' || health.token === 'expired') {
-      const date = formatCalendarDate(health.expiresOn);
-      showProvider(`GitHub access ${health.token === 'expired' ? 'expired' : 'expires'} ${date}.`, 'critical');
     }
   }
 
@@ -328,6 +291,11 @@ export function createAppController(dependencies) {
     showSection('home');
   }
 
+  const SECTION_TITLES = {
+    home: { eyebrow: 'Your day at a glance', title: 'Home' },
+    chat: { eyebrow: 'Life Hub', title: 'Chat' }
+  };
+
   function showSection(name) {
     const home = root.querySelector('#home-dashboard');
     const chat = root.querySelector('#chat-view');
@@ -338,6 +306,13 @@ export function createAppController(dependencies) {
       button.classList.toggle('is-active', active);
       if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
+    }
+    const titles = SECTION_TITLES[name];
+    if (titles) {
+      const eyebrow = root.querySelector('#page-eyebrow');
+      const title = root.querySelector('#page-title');
+      if (eyebrow) eyebrow.textContent = titles.eyebrow;
+      if (title) title.textContent = titles.title;
     }
   }
 
@@ -601,11 +576,4 @@ function isSessionExpired(error) {
 
 function isNetworkFailure(error) {
   return error?.code === 'network_error' || (error instanceof TypeError && error?.status == null);
-}
-
-function formatCalendarDate(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? '')) return 'soon';
-  return new Intl.DateTimeFormat('en-AU', {
-    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney'
-  }).format(new Date(`${value}T12:00:00+10:00`));
 }

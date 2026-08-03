@@ -30,6 +30,27 @@ test('send yields each parsed SSE frame in order', async () => {
   ]);
 });
 
+test('send omits history and priorAgentSlug entirely when there is nothing to carry forward', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (url, init) => {
+    sentBody = JSON.parse(init.body);
+    return sseResponse(['data: {"type":"done"}\n\n']);
+  });
+  for await (const event of chatApi.send('hello')) void event;
+  assert.deepEqual(sentBody, { message: 'hello' });
+});
+
+test('send forwards a non-empty history and priorAgentSlug alongside the message', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (url, init) => {
+    sentBody = JSON.parse(init.body);
+    return sseResponse(['data: {"type":"done"}\n\n']);
+  });
+  const history = [{ role: 'user', content: 'earlier' }, { role: 'assistant', content: 'reply' }];
+  for await (const event of chatApi.send('hello', { history, priorAgentSlug: 'brisket' })) void event;
+  assert.deepEqual(sentBody, { message: 'hello', history, priorAgentSlug: 'brisket' });
+});
+
 test('send throws a structured error for a non-OK response', async () => {
   const chatApi = createChatApi(async () => Response.json({ ok: false, error: { code: 'misconfigured' } }, { status: 503 }));
   await assert.rejects(

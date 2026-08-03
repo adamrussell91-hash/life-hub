@@ -27,7 +27,14 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
             'x-api-key': apiKey,
             'anthropic-version': API_VERSION
           },
-          body: JSON.stringify({ model: MODEL, max_tokens: 4096, system, messages, tools, stream: true }),
+          body: JSON.stringify({
+            model: MODEL,
+            max_tokens: 4096,
+            system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral', ttl: '1h' } }],
+            messages,
+            tools,
+            stream: true
+          }),
           signal
         });
       } catch {
