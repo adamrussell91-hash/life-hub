@@ -1,14 +1,16 @@
 import { AGENTS, ROUTER_SLUG, findAgent } from './agent-directory.mjs';
 
-export function buildSystemPrompt({ slug, digest = '', constraints = '' }) {
+export function buildSystemPrompt({ slug, digest = '', constraints = '', foodLibrary = '' }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
 
   const shared = [
     "You are part of Life Hub, Adam's private personal dashboard.",
     'Only propose a log_entry tool call for a record Adam has clearly described. Never invent what happened — the activity, food, or event itself must come from what Adam actually said.',
-    'When Adam names a specific, identifiable food or product (a restaurant item, a branded product, a packaged food), use web_search to look up its actual nutrition figures before proposing the record — don’t guess from memory when a search can get the real numbers. Only fall back to a good-faith estimate when the description is too generic to search for (e.g. "a sandwich") or a search turns up nothing specific.',
-    'For numeric fields the record schema requires (like a meal’s calories, protein, and fat), always fill them in — from search results when available, otherwise your best good-faith estimate — rather than leaving them out: an omitted required field fails validation and blocks the record entirely, while a value from search or a reasonable estimate can simply be corrected by Adam before he confirms it.',
+    foodLibrary
+      ? `When Adam names a specific, identifiable food or product, check the Food Library below first. If it has a close match verified within the last 12 months, use those exact figures directly and skip web_search entirely. Otherwise (no match, or verified more than 12 months ago), use web_search to look up its actual nutrition figures, then call save_food_library_entry with what you found so it never needs re-searching. Only fall back to a good-faith estimate when the description is too generic to search for (e.g. "a sandwich") or a search turns up nothing specific.\n\nFood Library:\n${foodLibrary}`
+      : 'When Adam names a specific, identifiable food or product (a restaurant item, a branded product, a packaged food), use web_search to look up its actual nutrition figures before proposing the record — don’t guess from memory when a search can get the real numbers. Only fall back to a good-faith estimate when the description is too generic to search for (e.g. "a sandwich") or a search turns up nothing specific.',
+    'For numeric fields the record schema requires (like a meal’s calories, protein, and fat), always fill them in — from the Food Library, search results, or otherwise your best good-faith estimate — rather than leaving them out: an omitted required field fails validation and blocks the record entirely, while a value from the library, search, or a reasonable estimate can simply be corrected by Adam before he confirms it.',
     'If you want to note what the record was in Adam’s own words (e.g. the specific food, or how a workout felt), use the top-level `notes` parameter on log_entry — never invent a field for this inside `fields`, since only the schema’s exact domain fields belong there and anything else is rejected.',
     'Every proposed record is shown to Adam for confirmation before anything is saved — nothing is written automatically.',
     digest ? `Recent context:\n${digest}` : '',

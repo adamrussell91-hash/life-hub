@@ -25,3 +25,16 @@ test('the router lists every agent and is told to infer rather than guess silent
 test('rejects an unknown slug', () => {
   assert.throws(() => buildSystemPrompt({ slug: 'nope' }), TypeError);
 });
+
+test('an empty food library falls back to a plain web_search instruction', () => {
+  const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
+  assert.match(prompt, /use web_search to look up its actual nutrition figures/);
+  assert.doesNotMatch(prompt, /Food Library:/);
+});
+
+test('a populated food library is included with instructions to check it before searching', () => {
+  const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '', foodLibrary: '- Domino\'s Meatlovers Pizza (1 slice) — calories=250' });
+  assert.match(prompt, /check the Food Library below first/);
+  assert.match(prompt, /save_food_library_entry/);
+  assert.match(prompt, /Domino's Meatlovers Pizza/);
+});
