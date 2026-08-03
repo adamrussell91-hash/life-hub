@@ -41,6 +41,8 @@ export function createChatController({ root, chatApi, onRecordWritten }) {
           showChatError(root, 'Chat is unavailable right now. Please try again.');
         } else if (event.type === 'search') {
           appendMessage(root, { role: 'assistant', text: `🔍 Searching the web: ${event.query ?? '…'}` });
+        } else if (event.type === 'food_library_saved') {
+          appendMessage(root, { role: 'assistant', text: `📚 Saved "${event.name}" to the Food Library for next time.` });
         }
       }
     } catch {

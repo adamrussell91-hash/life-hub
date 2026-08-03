@@ -18,6 +18,14 @@ import { extractConstraints } from './_shared/constraints.mjs';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
 import { logEntryToolSchema, validateLogEntry, buildCanonicalPath } from './_shared/chat-schema.mjs';
+import {
+  FOOD_LIBRARY_PATH,
+  foodLibraryEntrySchema,
+  formatFoodLibraryForPrompt,
+  parseFoodLibrary,
+  upsertFoodLibraryEntry,
+  validateFoodLibraryEntry
+} from './_shared/food-library.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
 import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays } from '../../js/core/time.js';
 
@@ -78,18 +86,28 @@ export function createChatHandler({
     const agent = slug === ROUTER_SLUG ? null : findAgent(slug);
     const today = getSydneyDateKey(new Date(now()));
     const from = addCalendarDays(today, -6);
+    const allowedTypes = agent?.recordTypes.length ? agent.recordTypes : undefined;
+    const needsFoodLibrary = Boolean(allowedTypes?.includes('meal'));
 
     let digest = '';
     let constraints = '';
+    let foodLibraryEntries = [];
+    let foodLibrary = '';
+    let foodLibrarySha;
     try {
       const current = await client.resolveTree();
       const manifest = selectManifestEntries(current.tree, { from, to: today });
       const dataEntries = manifest.filter(entry => entry.path.startsWith('data/'));
       const centralNodeEntry = current.tree.find(entry => entry.path === 'central-node.md' && entry.type === 'blob');
+      const foodLibraryEntry = needsFoodLibrary
+        ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
+        : null;
+      foodLibrarySha = foodLibraryEntry?.sha;
 
-      const [dataBlobs, centralNodeBlob] = await Promise.all([
+      const [dataBlobs, centralNodeBlob, foodLibraryBlob] = await Promise.all([
         Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
-        centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null
+        centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
+        foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null
       ]);
 
       const files = dataEntries
@@ -99,16 +117,25 @@ export function createChatHandler({
 
       const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
       if (decodedCentralNode !== null) constraints = extractConstraints(decodedCentralNode);
+
+      const decodedFoodLibrary = foodLibraryBlob ? decodeBlob(foodLibraryBlob) : null;
+      if (decodedFoodLibrary !== null) {
+        foodLibraryEntries = parseFoodLibrary(decodedFoodLibrary);
+        foodLibrary = formatFoodLibraryForPrompt(foodLibraryEntries);
+      }
     } catch {
       digest = '';
       constraints = '';
+      foodLibraryEntries = [];
+      foodLibrary = '';
+      foodLibrarySha = undefined;
     }
 
-    const system = buildSystemPrompt({ slug, digest, constraints });
-    const allowedTypes = agent?.recordTypes.length ? agent.recordTypes : undefined;
+    const system = buildSystemPrompt({ slug, digest, constraints, foodLibrary });
     const tools = [
       { type: 'web_search_20250305', name: 'web_search', max_uses: 3 },
-      ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : [])
+      ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
+      ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : [])
     ];
 
     let anthropic;
@@ -149,6 +176,23 @@ export function createChatHandler({
                 });
               } else {
                 send({ type: 'record_rejected', errors: validation.errors });
+              }
+            } else if (event.type === 'tool_call' && event.name === 'save_food_library_entry') {
+              const entry = validateFoodLibraryEntry(event.input);
+              if (entry) {
+                try {
+                  foodLibraryEntries = upsertFoodLibraryEntry(foodLibraryEntries, entry, today);
+                  const result = await client.writeFile({
+                    path: FOOD_LIBRARY_PATH,
+                    content: JSON.stringify(foodLibraryEntries, null, 2),
+                    ...(foodLibrarySha ? { sha: foodLibrarySha } : {}),
+                    message: `chore(food-library): cache ${entry.name}`
+                  });
+                  foodLibrarySha = result.sha;
+                  send({ type: 'food_library_saved', name: entry.name });
+                } catch {
+                  // Best-effort cache -- a failed save must never interrupt the chat response.
+                }
               }
             } else {
               send(event);
