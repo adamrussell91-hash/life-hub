@@ -82,12 +82,16 @@ function parseFrame(frame) {
 }
 
 function* interpretEvent(event, toolBuffers) {
-  if (event.name === 'content_block_start' && event.payload.content_block?.type === 'tool_use') {
-    toolBuffers.set(event.payload.index, {
-      name: event.payload.content_block.name,
-      id: event.payload.content_block.id,
-      json: ''
-    });
+  if (event.name === 'content_block_start') {
+    const blockType = event.payload.content_block?.type;
+    if (blockType === 'tool_use' || blockType === 'server_tool_use') {
+      toolBuffers.set(event.payload.index, {
+        blockType,
+        name: event.payload.content_block.name,
+        id: event.payload.content_block.id,
+        json: ''
+      });
+    }
     return;
   }
   if (event.name === 'content_block_delta') {
@@ -110,7 +114,11 @@ function* interpretEvent(event, toolBuffers) {
       } catch {
         input = null;
       }
-      yield { type: 'tool_call', id: buffered.id, name: buffered.name, input };
+      if (buffered.blockType === 'server_tool_use') {
+        if (buffered.name === 'web_search') yield { type: 'search', query: input?.query ?? null };
+      } else {
+        yield { type: 'tool_call', id: buffered.id, name: buffered.name, input };
+      }
     }
     return;
   }

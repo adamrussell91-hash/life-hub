@@ -39,6 +39,8 @@ export function createChatController({ root, chatApi, onRecordWritten }) {
           showChatError(root, formatRejectionMessage(event.errors));
         } else if (event.type === 'error') {
           showChatError(root, 'Chat is unavailable right now. Please try again.');
+        } else if (event.type === 'search') {
+          appendMessage(root, { role: 'assistant', text: `🔍 Searching the web: ${event.query ?? '…'}` });
         }
       }
     } catch {

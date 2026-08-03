@@ -106,7 +106,10 @@ export function createChatHandler({
 
     const system = buildSystemPrompt({ slug, digest, constraints });
     const allowedTypes = agent?.recordTypes.length ? agent.recordTypes : undefined;
-    const tools = allowedTypes ? [logEntryToolSchema(allowedTypes)] : [];
+    const tools = [
+      { type: 'web_search_20250305', name: 'web_search', max_uses: 3 },
+      ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : [])
+    ];
 
     let anthropic;
     try {
