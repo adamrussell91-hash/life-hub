@@ -57,14 +57,11 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat') continue;
+    if (target === 'home') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
     });
-  }
-  for (const button of root.querySelectorAll?.('[data-section="chat"]') ?? []) {
-    bind(button, 'click', () => showSection('chat'));
   }
   for (const button of root.querySelectorAll?.('[data-section="home"]') ?? []) {
     bind(button, 'click', () => showSection('home'));
@@ -330,9 +327,7 @@ export function createAppController(dependencies) {
 
   function showSection(name) {
     const home = root.querySelector('#home-dashboard');
-    const chat = root.querySelector('#chat-view');
     if (home) home.hidden = name !== 'home';
-    if (chat) chat.hidden = name !== 'chat';
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const active = button.dataset.section === name;
       button.classList.toggle('is-active', active);
