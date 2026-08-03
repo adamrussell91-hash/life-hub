@@ -3,7 +3,7 @@ import { getSydneyDateKey } from '../core/time.js';
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
 const LAST_SUCCESS_KEY = 'life-hub:last-success';
 const LOGOUT_PENDING_KEY = 'life-hub:logout-pending';
-const REFRESH_INTERVAL_MS = 120_000;
+const REFRESH_INTERVAL_MS = 60_000;
 const GENERIC_LOAD_ERROR = 'Life Hub could not load your data. Check your connection and try again.';
 
 export function createAppController(dependencies) {
@@ -58,7 +58,10 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
     if (target === 'home' || target === 'chat') continue;
-    bind(button, 'click', () => setStatus('This section arrives in a later Life Hub phase.'));
+    bind(button, 'click', () => {
+      setStatus('This section arrives in a later Life Hub phase.');
+      showProvider('This section arrives in a later Life Hub phase.', 'info');
+    });
   }
   for (const button of root.querySelectorAll?.('[data-section="chat"]') ?? []) {
     bind(button, 'click', () => showSection('chat'));
