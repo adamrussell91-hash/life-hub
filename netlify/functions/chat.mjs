@@ -20,7 +20,7 @@ import {
   extractCrossAgentCoordination,
   extractRecentAgentActions,
   extractTodaysStatus
-} from './_shared/constraints.mjs';
+} from '../../js/core/constraints.js';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
 import { logEntryToolSchema, validateLogEntry, buildCanonicalPath } from './_shared/chat-schema.mjs';

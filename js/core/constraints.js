@@ -1,5 +1,7 @@
 const CONSTRAINTS_HEADING = '## 🔴 Current Constraints & Priorities';
 const TODAYS_STATUS_HEADING = "## ⚡ Today's Status";
+const THIS_WEEK_HEADING = '## 📅 This Week';
+const THIS_MONTH_HEADING = '## 📊 This Month';
 const CROSS_AGENT_HEADING = '## 🤝 Cross-Agent Coordination';
 const RECENT_ACTIONS_HEADING = '## 📝 Recent Agent Actions';
 
@@ -22,6 +24,14 @@ export function extractConstraints(markdown) {
 
 export function extractTodaysStatus(markdown) {
   return extractSection(markdown, TODAYS_STATUS_HEADING);
+}
+
+export function extractThisWeek(markdown) {
+  return extractSection(markdown, THIS_WEEK_HEADING);
+}
+
+export function extractThisMonth(markdown) {
+  return extractSection(markdown, THIS_MONTH_HEADING);
 }
 
 export function extractCrossAgentCoordination(markdown) {
