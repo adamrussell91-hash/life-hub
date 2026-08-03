@@ -98,8 +98,8 @@ function collectEdits(record, inputs) {
 }
 
 function toCandidate(record) {
-  const { schema_version, id, created_at, updated_at, source, type, date, time, ...fields } = record;
-  return { type, date, ...(time ? { time } : {}), fields };
+  const { schema_version, id, created_at, updated_at, source, type, date, time, notes, ...fields } = record;
+  return { type, date, ...(time ? { time } : {}), ...(notes ? { notes } : {}), fields };
 }
 
 function slugFromPath(path) {

@@ -96,6 +96,7 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
         type: { type: 'string', enum: allowedTypes },
         date: { type: 'string', description: 'YYYY-MM-DD' },
         time: { type: 'string', description: 'HH:MM, optional' },
+        notes: { type: 'string', description: 'Optional free-text note saved as the record body, e.g. what food was eaten or how a workout felt. Not a domain field — do not put this in fields.' },
         fields: { type: 'object', description: 'Domain-specific fields for the chosen type.' }
       },
       required: ['type', 'date', 'fields']
@@ -116,10 +117,13 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
     return { valid: false, errors: ['log_entry payload must be an object'] };
   }
-  const { type, date, time, fields } = candidate;
+  const { type, date, time, fields, notes } = candidate;
   if (!RECORD_TYPES.includes(type)) return { valid: false, errors: [`Unknown record type: ${type}`] };
   if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
     return { valid: false, errors: ['fields must be an object'] };
+  }
+  if (notes != null && typeof notes !== 'string') {
+    return { valid: false, errors: ['notes must be a string'] };
   }
   if (typeof now !== 'string' || !now) {
     return { valid: false, errors: ['now must be a non-empty string'] };
@@ -142,7 +146,7 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
     source
   };
   const errors = validateRecord(record);
-  return errors.length ? { valid: false, errors } : { valid: true, record };
+  return errors.length ? { valid: false, errors } : { valid: true, record, notes: notes ?? null };
 }
 
 export { DOMAIN_PROPERTIES };
