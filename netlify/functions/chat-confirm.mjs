@@ -15,7 +15,7 @@ import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from 
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { buildCanonicalPath, validateLogEntry } from './_shared/chat-schema.mjs';
 import { AGENTS } from './_shared/agent-directory.mjs';
-import { RECENT_ACTIONS_HEADING } from './_shared/constraints.mjs';
+import { RECENT_ACTIONS_HEADING } from '../../js/core/constraints.js';
 import { getSydneyTimestamp } from '../../js/core/time.js';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
