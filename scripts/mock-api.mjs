@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseDateRange } from '../netlify/functions/_shared/repo-policy.mjs';
+import { parseDateRange, CONFIG_PATHS } from '../netlify/functions/_shared/repo-policy.mjs';
 
 const PASSPHRASE = 'life-hub-local';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
@@ -211,7 +211,7 @@ async function readFixtureRepository(rootPath) {
 }
 
 function isInRange(path, { from, to }) {
-  if (path.startsWith('config/') || path === 'central-node.md') return true;
+  if (CONFIG_PATHS.has(path)) return true;
   const date = /\/(\d{4}-\d{2}-\d{2})-[^/]+\.md$/.exec(path)?.[1];
   return date >= from && date <= to;
 }
