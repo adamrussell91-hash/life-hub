@@ -2,6 +2,8 @@ import { parseEventDocument } from '../core/records.js';
 import { addCalendarDays, daysBetween, isCalendarDate } from '../core/time.js';
 
 const TARGETS_PATH = 'config/targets.yml';
+const AGENTS_PATH = 'config/agents.yml';
+const CENTRAL_NODE_PATH = 'central-node.md';
 const EVENT_PATH = /^data\/.+\.md$/;
 const INITIAL_LOOKBACK_DAYS = 30;
 const EXTENSION_DAYS = 90;
@@ -53,6 +55,8 @@ export async function loadLiveEvents({ sync, loadYaml, date }) {
   return {
     events: parsed.events,
     targetsConfig: parsed.targetsConfig,
+    agentsConfig: parsed.agentsConfig,
+    centralNodeMarkdown: parsed.centralNodeMarkdown,
     warnings: [...warnings, ...parsed.warnings],
     commitSha,
     changed,
@@ -63,8 +67,10 @@ export async function loadLiveEvents({ sync, loadYaml, date }) {
 function createValidator(loadYaml) {
   return file => {
     try {
-      if (file.path === TARGETS_PATH || file.path === 'config/agents.yml') {
+      if (file.path === TARGETS_PATH || file.path === AGENTS_PATH) {
         loadYaml(file.content);
+      } else if (file.path === CENTRAL_NODE_PATH) {
+        // Freeform markdown, no schema to violate -- any string content is acceptable.
       } else if (EVENT_PATH.test(file.path)) {
         parseEventDocument(file.content, file.path, loadYaml);
       } else {
@@ -84,18 +90,26 @@ function parseFiles(files, loadYaml) {
   const events = [];
   const warnings = [];
   let targetsConfig = null;
+  let agentsConfig = null;
+  let centralNodeMarkdown = null;
 
   for (const file of files) {
     try {
       if (file.path === TARGETS_PATH) {
         targetsConfig = loadYaml(file.content);
+      } else if (file.path === AGENTS_PATH) {
+        agentsConfig = loadYaml(file.content);
+      } else if (file.path === CENTRAL_NODE_PATH) {
+        centralNodeMarkdown = file.content;
       } else if (EVENT_PATH.test(file.path)) {
         events.push(parseEventDocument(file.content, file.path, loadYaml));
       }
     } catch {
       warnings.push({
         path: file.path,
-        code: file.path === TARGETS_PATH ? 'invalid_targets' : 'invalid_event'
+        code: file.path === TARGETS_PATH ? 'invalid_targets'
+          : file.path === AGENTS_PATH ? 'invalid_agents'
+          : 'invalid_event'
       });
     }
   }
@@ -103,7 +117,7 @@ function parseFiles(files, loadYaml) {
   if (!files.some(file => file.path === TARGETS_PATH)) {
     warnings.push({ path: TARGETS_PATH, code: 'missing_targets' });
   }
-  return { events, targetsConfig, warnings };
+  return { events, targetsConfig, agentsConfig, centralNodeMarkdown, warnings };
 }
 
 function streakReaches(events, boundary) {
