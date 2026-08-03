@@ -29,5 +29,10 @@ export function buildSystemPrompt({ slug, digest = '', constraints = '' }) {
     ? `You may propose a log_entry tool call for these record types: ${agent.recordTypes.join(', ')}.`
     : 'You do not log structured records. Respond conversationally only.';
 
-  return [shared, `You are ${agent.name}, Adam's ${agent.domain ?? 'general'} agent.`, capability].join('\n\n');
+  return [
+    shared,
+    `You are ${agent.name}, Adam's ${agent.domain ?? 'general'} agent.`,
+    agent.voice,
+    capability
+  ].filter(Boolean).join('\n\n');
 }
