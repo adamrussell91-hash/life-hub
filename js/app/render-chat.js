@@ -12,6 +12,20 @@ export function appendMessage(root, { role, agentSlug, text = '' }) {
   return item;
 }
 
+// Renders a safe subset of markdown (currently just **bold**) as real DOM nodes --
+// never innerHTML, so model output can never be interpreted as markup. Caller is
+// responsible for scrolling the list into view afterwards.
+export function renderInlineMarkdown(root, container, text) {
+  container.replaceChildren();
+  const segments = text.split(/(\*\*[^*\n]+\*\*)/g).filter(Boolean);
+  for (const segment of segments) {
+    const isBold = segment.startsWith('**') && segment.endsWith('**') && segment.length > 4;
+    const node = root.createElement(isBold ? 'strong' : 'span');
+    node.textContent = isBold ? segment.slice(2, -2) : segment;
+    container.append(node);
+  }
+}
+
 export function appendRecordProposal(root, { path, record, notes }) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
