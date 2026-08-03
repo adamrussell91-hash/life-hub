@@ -80,7 +80,9 @@ function createValidator(loadYaml) {
     } catch {
       return {
         valid: false,
-        code: file.path === TARGETS_PATH ? 'invalid_targets' : 'invalid_event'
+        code: file.path === TARGETS_PATH ? 'invalid_targets'
+          : file.path === AGENTS_PATH ? 'invalid_agents'
+          : 'invalid_event'
       };
     }
   };
