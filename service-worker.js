@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v13';
+const CACHE_NAME = 'life-hub-shell-v14';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -72,7 +72,18 @@ self.addEventListener('fetch', event => {
 
   if (!SHELL_PATHS.has(url.pathname)) return;
 
+  // Network-first, cache as an offline fallback only. A cache-first strategy here
+  // meant every deploy needed a manual "clear site data" to actually reach returning
+  // users -- the cache only updates on install (i.e. when this file's own bytes
+  // change), so any deploy that didn't touch service-worker.js was invisible until
+  // then. Matches the navigate handler's existing philosophy below.
   event.respondWith(
-    caches.match(request).then(cached => cached ?? fetch(request))
+    fetch(request)
+      .then(response => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+        return response;
+      })
+      .catch(() => caches.match(request))
   );
 });
