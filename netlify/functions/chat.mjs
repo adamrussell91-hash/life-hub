@@ -133,7 +133,7 @@ export function createChatHandler({
 
     const system = buildSystemPrompt({ slug, digest, constraints, foodLibrary });
     const tools = [
-      { type: 'web_search_20250305', name: 'web_search', max_uses: 3 },
+      { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
       ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
       ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : [])
     ];
