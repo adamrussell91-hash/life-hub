@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v14';
+const CACHE_NAME = 'life-hub-shell-v15';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -10,9 +10,6 @@ const SHELL_FILES = [
   'js/app/main.js',
   'js/app/api-session.js',
   'js/app/app-controller.js',
-  'js/app/chat-api.js',
-  'js/app/chat-controller.js',
-  'js/app/render-chat.js',
   'js/app/config.js',
   'js/app/home-model.js',
   'js/app/load-live-events.js',

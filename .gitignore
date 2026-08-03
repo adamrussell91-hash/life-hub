@@ -10,3 +10,4 @@ playwright-report/
 /vendor/
 /dist/
 .DS_Store
+.netlify/
