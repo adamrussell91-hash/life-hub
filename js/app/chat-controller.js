@@ -1,11 +1,45 @@
 import { appendMessage, appendRecordProposal, renderInlineMarkdown, setChatBusy, showChatError } from './render-chat.js';
 
 const PARAGRAPH_BREAK = /\n{2,}/;
+const HISTORY_WINDOW_MS = 20 * 60 * 1000;
+const MAX_HISTORY_MESSAGES = 8;
+const MAX_HISTORY_ENTRY_CHARS = 1000;
 
-export function createChatController({ root, chatApi, onRecordWritten }) {
+export function createChatController({ root, chatApi, onRecordWritten, now = () => Date.now() }) {
   if (!root || !chatApi) throw new TypeError('Chat controller dependencies are unavailable');
 
   let sending = false;
+  let transcript = [];
+  let lastAgentSlug = null;
+  let lastAgentAt = 0;
+
+  // Prunes anything outside the memory window as a side effect, then returns a
+  // bounded, API-shaped slice of what's left -- called before the new user turn
+  // is added, so it only ever reflects prior turns.
+  function recentHistory() {
+    const cutoff = now() - HISTORY_WINDOW_MS;
+    transcript = transcript.filter(entry => entry.at >= cutoff);
+    return transcript.slice(-MAX_HISTORY_MESSAGES).map(({ role, content }) => ({ role, content }));
+  }
+
+  // A name only needs to be said once per topic: if the same agent replied within
+  // the memory window, keep talking to them without repeating it -- but never
+  // stick to the router itself, since that's not a real persona to continue as.
+  function stickyAgentSlug() {
+    if (!lastAgentSlug || lastAgentSlug === 'router') return undefined;
+    if (now() - lastAgentAt > HISTORY_WINDOW_MS) return undefined;
+    return lastAgentSlug;
+  }
+
+  function remember(role, content) {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    transcript.push({
+      role,
+      content: trimmed.length > MAX_HISTORY_ENTRY_CHARS ? trimmed.slice(0, MAX_HISTORY_ENTRY_CHARS) : trimmed,
+      at: now()
+    });
+  }
 
   function bindForm() {
     const form = root.querySelector('#chat-form');
@@ -25,11 +59,15 @@ export function createChatController({ root, chatApi, onRecordWritten }) {
     sending = true;
     setChatBusy(root, true);
     showChatError(root, '');
+    const history = recentHistory();
+    const priorAgentSlug = stickyAgentSlug();
+    remember('user', message);
     appendMessage(root, { role: 'user', text: message });
 
     let assistantSlug = null;
     let assistantBubble = null;
     let assistantBuffer = '';
+    let assistantFullText = '';
 
     // Streamed text arrives as one long buffer; splitting on paragraph breaks into
     // separate bubbles reads like an actual back-and-forth instead of one wall of text.
@@ -60,11 +98,14 @@ export function createChatController({ root, chatApi, onRecordWritten }) {
     }
 
     try {
-      for await (const event of chatApi.send(message)) {
+      for await (const event of chatApi.send(message, { history, priorAgentSlug })) {
         if (event.type === 'agent') {
           assistantSlug = event.slug;
+          lastAgentSlug = event.slug;
+          lastAgentAt = now();
         } else if (event.type === 'text') {
           assistantBuffer += event.delta;
+          assistantFullText += event.delta;
           let boundary;
           while ((boundary = PARAGRAPH_BREAK.exec(assistantBuffer))) {
             const paragraph = assistantBuffer.slice(0, boundary.index).trim();
@@ -89,6 +130,7 @@ export function createChatController({ root, chatApi, onRecordWritten }) {
           appendMessage(root, { role: 'assistant', text: `📚 Saved "${event.name}" to the Food Library for next time.` });
         }
       }
+      remember('assistant', assistantFullText);
     } catch {
       showChatError(root, 'Chat is unavailable right now. Please try again.');
     } finally {

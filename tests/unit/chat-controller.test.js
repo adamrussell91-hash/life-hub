@@ -213,6 +213,56 @@ test('a search event ends the current bubble so text before and after it does no
   assert.equal(bubbleText(bubbles[3]), 'Found it, 452 kcal.');
 });
 
+test('a second message within the memory window carries the prior turn as history and stays with the same agent', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  let clock = Date.parse('2026-08-01T18:00:00Z');
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Logging that now, buddy.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi, now: () => clock });
+
+  await controller.send('Brisket, log 2 eggs for breakfast');
+  clock += 60_000; // one minute later, still well inside the 20-minute window
+  await controller.send('actually make that 3 eggs');
+
+  assert.equal(sendCalls.length, 2);
+  assert.deepEqual(sendCalls[0].history, []);
+  assert.equal(sendCalls[0].priorAgentSlug, undefined);
+  assert.deepEqual(sendCalls[1].history, [
+    { role: 'user', content: 'Brisket, log 2 eggs for breakfast' },
+    { role: 'assistant', content: 'Logging that now, buddy.' }
+  ]);
+  assert.equal(sendCalls[1].priorAgentSlug, 'brisket');
+});
+
+test('memory expires after the window so a stale conversation does not stick to the wrong agent', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  let clock = Date.parse('2026-08-01T18:00:00Z');
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Logged.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi, now: () => clock });
+
+  await controller.send('Brisket, log 2 eggs for breakfast');
+  clock += 21 * 60_000; // just past the 20-minute memory window
+  await controller.send('what should I have for lunch');
+
+  assert.deepEqual(sendCalls[1].history, []);
+  assert.equal(sendCalls[1].priorAgentSlug, undefined);
+});
+
 test('bold markdown in streamed text renders as a strong element, not literal asterisks', async () => {
   const root = new FakeDocument();
   const chatApi = {

@@ -93,22 +93,6 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
       return true;
     }
 
-    if (url.pathname === '/api/health') {
-      if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
-      if (!readSession(request)) return unauthenticated(response);
-      json(response, 200, {
-        ok: true,
-        data: {
-          github: 'healthy',
-          token: 'unknown',
-          expiresOn: null,
-          code: 'ok',
-          retryable: false
-        }
-      });
-      return true;
-    }
-
     if (url.pathname === '/api/repo/manifest') {
       if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
       if (!readSession(request)) return unauthenticated(response);

@@ -36,8 +36,11 @@ import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic
 import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays } from '../../js/core/time.js';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
-const MAX_BODY_BYTES = 8 * 1024;
+const MAX_BODY_BYTES = 24 * 1024;
 const MAX_MESSAGE_LENGTH = 4000;
+const MAX_HISTORY_MESSAGES = 8;
+const MAX_HISTORY_ENTRY_CHARS = 1500;
+const MAX_HISTORY_TOTAL_CHARS = 6000;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 
 export const config = { path: '/api/chat' };
@@ -88,7 +91,7 @@ export function createChatHandler({
       return repositoryError();
     }
 
-    const slug = routeAgent(parsed.message);
+    const slug = routeAgent(parsed.message, parsed.priorAgentSlug);
     const agent = slug === ROUTER_SLUG ? null : findAgent(slug);
     const today = getSydneyDateKey(new Date(now()));
     const from = addCalendarDays(today, -6);
@@ -169,7 +172,7 @@ export function createChatHandler({
         try {
           for await (const event of anthropic.streamMessage({
             system,
-            messages: [{ role: 'user', content: parsed.message }],
+            messages: [...parsed.history, { role: 'user', content: parsed.message }],
             tools,
             signal: request.signal
           })) {
@@ -268,7 +271,29 @@ async function parseRequest(request) {
   if (!body || typeof body.message !== 'string' || body.message.trim().length === 0 || body.message.length > MAX_MESSAGE_LENGTH) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid chat message.', false, PRIVATE_CACHE) };
   }
-  return { message: body.message };
+  return {
+    message: body.message,
+    history: sanitizeHistory(body.history),
+    priorAgentSlug: typeof body.priorAgentSlug === 'string' ? body.priorAgentSlug : undefined
+  };
+}
+
+function sanitizeHistory(value) {
+  if (!Array.isArray(value)) return [];
+  let totalChars = 0;
+  const sanitized = [];
+  for (const entry of value.slice(-MAX_HISTORY_MESSAGES)) {
+    if (!entry || typeof entry !== 'object') continue;
+    if (entry.role !== 'user' && entry.role !== 'assistant') continue;
+    if (typeof entry.content !== 'string' || entry.content.trim() === '') continue;
+    const content = entry.content.length > MAX_HISTORY_ENTRY_CHARS
+      ? entry.content.slice(0, MAX_HISTORY_ENTRY_CHARS)
+      : entry.content;
+    totalChars += content.length;
+    if (totalChars > MAX_HISTORY_TOTAL_CHARS) break;
+    sanitized.push({ role: entry.role, content });
+  }
+  return sanitized;
 }
 
 async function readAtMost(stream, limit) {
