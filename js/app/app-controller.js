@@ -197,7 +197,8 @@ export function createAppController(dependencies) {
 
       const stale = result.freshness === 'fallback';
       if (stale) {
-        showProvider('GitHub is unavailable. Showing your last saved view.', 'warning');
+        const code = result.warnings.find(warning => !warning.path)?.code;
+        showProvider(`GitHub is unavailable${code ? ` (${code})` : ''}. Showing your last saved view.`, 'warning');
         setAppState('stale');
       } else {
         hideProvider();
@@ -214,7 +215,7 @@ export function createAppController(dependencies) {
         return;
       }
       if (rendered) {
-        showProvider('GitHub is unavailable. Showing your last saved view.', 'warning');
+        showProvider(`GitHub is unavailable${error?.code ? ` (${error.code})` : ''}. Showing your last saved view.`, 'warning');
         setAppState(navigatorTarget.onLine ? 'stale' : 'offline');
         return;
       }
@@ -243,7 +244,7 @@ export function createAppController(dependencies) {
       return;
     }
     if (health.github !== 'healthy') {
-      showProvider('GitHub is unavailable. Your saved view remains available.', 'warning');
+      showProvider(`GitHub is unavailable (${health.code}). Your saved view remains available.`, 'warning');
     } else if (health.token === 'expiring' || health.token === 'expired') {
       const date = formatCalendarDate(health.expiresOn);
       showProvider(`GitHub access ${health.token === 'expired' ? 'expired' : 'expires'} ${date}.`, 'critical');
