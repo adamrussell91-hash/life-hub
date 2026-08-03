@@ -73,7 +73,7 @@ test('streams an agent event, text, and a validated record proposal for a routed
   assert.deepEqual(events[1], { type: 'text', delta: 'Logging it now.' });
   assert.equal(events[2].type, 'record_proposal');
   assert.equal(events[2].record.type, 'workout');
-  assert.equal(events[2].path, 'data/fitness/2026/08/2026-08-01-workout.md');
+  assert.equal(events[2].path, 'data/fitness/2026/08/2026-08-01-workout-1600.md');
   assert.deepEqual(events[3], { type: 'done' });
 });
 

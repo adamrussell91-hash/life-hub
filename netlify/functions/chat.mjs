@@ -170,9 +170,14 @@ export function createChatHandler({
 }
 
 function slugFor(record) {
-  if (record.type === 'meal') return record.meal;
-  if (record.type === 'skincare') return record.routine;
-  return record.type;
+  const label = record.type === 'meal' ? record.meal
+    : record.type === 'skincare' ? record.routine
+    : record.type;
+  return `${label}-${slugTime(record.time)}`;
+}
+
+function slugTime(time) {
+  return typeof time === 'string' ? time.replace(':', '') : '0000';
 }
 
 function decodeBlob(blob) {
