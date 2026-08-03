@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { extractConstraints } from '../../netlify/functions/_shared/constraints.mjs';
+import {
+  extractConstraints,
+  extractCrossAgentCoordination,
+  extractRecentAgentActions,
+  extractTodaysStatus
+} from '../../netlify/functions/_shared/constraints.mjs';
 
 const sample = `# Purpose
 Intro text.
@@ -11,7 +16,13 @@ Intro text.
 - Line two
 ---
 ## ⚡ Today's Status (Friday 19 June 2026)
-Should not appear.
+**Health:** Flare-up confirmed today.
+---
+## 🤝 Cross-Agent Coordination
+- Chadwick→Brisket: 31 Jul session completed. Set Day Type to 45 to 60 min Workout.
+---
+## 📝 Recent Agent Actions
+**30 Jul:** Chadwick: Chest and Curls session completed and logged.
 `;
 
 test('extracts only the Constraints & Priorities section', () => {
@@ -27,4 +38,21 @@ test('returns an empty string when the heading is missing', () => {
 
 test('rejects non-string input', () => {
   assert.throws(() => extractConstraints(null), TypeError);
+});
+
+test('extractTodaysStatus matches the heading even though its date suffix changes daily', () => {
+  const result = extractTodaysStatus(sample);
+  assert.match(result, /Flare-up confirmed today/);
+  assert.doesNotMatch(result, /Cross-Agent Coordination/);
+});
+
+test('extractCrossAgentCoordination extracts the directives section', () => {
+  const result = extractCrossAgentCoordination(sample);
+  assert.match(result, /Chadwick→Brisket/);
+  assert.doesNotMatch(result, /Recent Agent Actions/);
+});
+
+test('extractRecentAgentActions extracts the rolling action log', () => {
+  const result = extractRecentAgentActions(sample);
+  assert.match(result, /Chest and Curls session completed/);
 });

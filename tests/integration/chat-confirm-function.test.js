@@ -110,6 +110,48 @@ test('overwrite:true resolves the existing blob sha and sends it as the update p
   assert.equal(JSON.parse(putCall.options.body).sha, existingSha);
 });
 
+test('appends a one-line entry to the central node running log after a successful write', async () => {
+  const centralNodeSha = 'f'.repeat(40);
+  const centralNodeContent = [
+    '# Purpose',
+    'Intro.',
+    '---',
+    '## 📝 Recent Agent Actions',
+    '**30 Jul:** Chadwick: Chest and Curls session completed and logged.'
+  ].join('\n');
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: 'central-node.md', type: 'blob', sha: centralNodeSha }] });
+    }
+    if (url.includes(`/git/blobs/${centralNodeSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(centralNodeContent, 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate, slug: 'breakfast' }));
+  assert.equal(response.status, 200);
+
+  const putCalls = calls.filter(call => call.options?.method === 'PUT');
+  assert.equal(putCalls.length, 2, 'expected one PUT for the record and one for the central node log');
+  const centralNodePut = putCalls.find(call => call.url.includes('central-node.md'));
+  assert.ok(centralNodePut, 'expected a PUT to central-node.md');
+  assert.equal(JSON.parse(centralNodePut.options.body).sha, centralNodeSha);
+
+  const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
+  assert.match(writtenContent, /\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast \(520 kcal, 38g protein, 12g fat\)\./);
+  assert.match(writtenContent, /Chest and Curls session completed and logged/, 'must preserve the existing log rather than replacing it');
+});
+
 test('rejects an unauthenticated request', async () => {
   const handler = createChatConfirmHandler({ env: validEnv });
   const response = await handler(new Request('https://life.example/api/chat/confirm', {

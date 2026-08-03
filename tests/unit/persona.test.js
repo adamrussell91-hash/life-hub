@@ -38,3 +38,17 @@ test('a populated food library is included with instructions to check it before 
   assert.match(prompt, /save_food_library_entry/);
   assert.match(prompt, /Domino's Meatlovers Pizza/);
 });
+
+test('an empty central node log is omitted entirely', () => {
+  const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
+  assert.doesNotMatch(prompt, /Central Node/);
+});
+
+test('a populated central node log is included with instructions to treat it as memory', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket', digest: '', constraints: '',
+    centralNodeLog: '**3 Aug:** Brisket Lasso: Logged Domino\'s Meatlovers pizza for lunch (280 kcal).'
+  });
+  assert.match(prompt, /your memory across conversations/);
+  assert.match(prompt, /Logged Domino's Meatlovers pizza for lunch/);
+});
