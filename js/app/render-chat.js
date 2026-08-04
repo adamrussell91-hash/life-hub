@@ -12,14 +12,22 @@ export function appendMessage(root, { role, agentSlug, text = '' }) {
   return item;
 }
 
-// Renders a safe subset of markdown (**bold** and "- " bullet lists) as real DOM
-// nodes -- never innerHTML, so model output can never be interpreted as markup.
-// Single-line input (every existing streaming-chat caller) takes a fast path that
-// reproduces the original flat span/strong output exactly, so chat bubbles are
-// unaffected by the multi-line/bullet support added for Central Node's cards.
+// Renders a safe subset of markdown as real DOM nodes -- never innerHTML, so model
+// output can never be interpreted as markup. Multi-line/bullet-list parsing
+// ("- " lines grouped into <ul>, other non-blank lines as <p>) is opt-in via
+// { multiline: true } -- with no options, this is byte-for-byte identical to the
+// function's original single-pass bold-segment behaviour regardless of what's in
+// `text` (including any embedded single "\n"), so every existing streaming-chat
+// call site is provably unaffected. Central Node's card renderer passes
+// { multiline: true } explicitly for its multi-paragraph/list markdown blocks.
 // Caller is responsible for scrolling the list into view afterwards.
-export function renderInlineMarkdown(root, container, text) {
+export function renderInlineMarkdown(root, container, text, { multiline = false } = {}) {
   container.replaceChildren();
+  if (!multiline) {
+    appendInlineSegments(root, container, text);
+    return;
+  }
+
   const lines = text.split('\n');
   if (lines.length === 1) {
     appendInlineSegments(root, container, text);
@@ -29,6 +37,7 @@ export function renderInlineMarkdown(root, container, text) {
   let currentList = null;
   for (const rawLine of lines) {
     const line = rawLine.trim();
+    if (line === '') continue;
     if (line.startsWith('- ')) {
       if (!currentList) {
         currentList = root.createElement('ul');
@@ -39,7 +48,6 @@ export function renderInlineMarkdown(root, container, text) {
       currentList.append(item);
     } else {
       currentList = null;
-      if (line === '') continue;
       const paragraph = root.createElement('p');
       appendInlineSegments(root, paragraph, line);
       container.append(paragraph);
