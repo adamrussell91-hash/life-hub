@@ -11,7 +11,7 @@
     "test": "node --test tests/unit/*.test.js tests/integration/*.test.js",
     "test:unit": "node --test tests/unit/*.test.js",
     "test:integration": "node --test tests/integration/*.test.js",
-    "test:browser": "node --test --test-concurrency=1 tests/browser/home.spec.mjs tests/browser/chat.spec.mjs tests/browser/nutrition.spec.mjs tests/browser/central-node.spec.mjs",
+    "test:browser": "node --test --test-concurrency=1 tests/browser/home.spec.mjs tests/browser/chat.spec.mjs tests/browser/nutrition.spec.mjs tests/browser/central-node.spec.mjs tests/browser/fitness.spec.mjs",
     "validate:fixtures": "node scripts/validate-fixtures.mjs"
   },
   "dependencies": {
