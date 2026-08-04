@@ -24,3 +24,8 @@ test('falls back to the default accent when the config is missing, empty, or the
 test('falls back to the default accent when a colour value is present but not a string', () => {
   assert.equal(agentColour({ agents: [{ slug: 'brisket', colour: null }] }, 'brisket'), DEFAULT_AGENT_COLOUR);
 });
+
+test('falls back to the default accent when agents is present but not an array', () => {
+  assert.equal(agentColour({ agents: 'not-an-array' }, 'brisket'), DEFAULT_AGENT_COLOUR);
+  assert.equal(agentColour({ agents: {} }, 'brisket'), DEFAULT_AGENT_COLOUR);
+});
