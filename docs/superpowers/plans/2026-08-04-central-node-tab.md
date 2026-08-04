@@ -545,6 +545,8 @@ components instead of duplicating geometry code."
 
 **Why this is safe to change:** every existing caller of `renderInlineMarkdown` (the streaming chat renderer in `chat-controller.js`) always passes single-paragraph text with no `\n` in it — `chat-controller.js` itself splits on paragraph breaks before ever calling it. The extension below keeps a fast path that reproduces today's exact output (flat `span`/`strong` children, no wrapping `p`) whenever the input has no newline, so none of chat's existing behavior or tests change. Multi-line/bullet structure only appears for the new multi-paragraph markdown blocks Central Node's cards pass in.
 
+> **Amendment (caught by this task's own spec-compliance review, before Task 5 was dispatched):** the "safe to change" claim above doesn't actually hold — `chat-controller.js`'s `PARAGRAPH_BREAK` only splits on double-or-more newlines, so a single streamed paragraph can still contain internal single `\n`s (e.g. a one-line-per-item list), which would have silently changed already-shipped chat-bubble rendering. The steps below were superseded by a follow-up commit that makes the multi-line/bullet parsing an explicit opt-in: `renderInlineMarkdown(root, container, text, { multiline = false } = {})`. With no third argument (every existing call site, unchanged), the function is byte-for-byte identical to its pre-Task-4 form regardless of what's in `text`. Only Central Node's card renderer (Task 5) passes `{ multiline: true }`. That same follow-up commit also fixed a real bug in the steps below: a blank line between two bullet lines was splitting one list into two, because the blank-line check ran after resetting the in-progress list instead of before it. Task 5's code block later in this document already reflects the corrected call signature.
+
 - [ ] **Step 1: Write the failing tests**
 
 Append to `tests/unit/render-chat.test.js`, after the existing `renderInlineMarkdown` tests (do not remove or modify those three — they must keep passing unchanged, proving backward compatibility):
@@ -736,7 +738,7 @@ const setText = (root, selector, value) => {
 export function renderCentralNode(root, model) {
   for (const [key, selector] of Object.entries(SECTION_SELECTORS)) {
     const container = root.querySelector(selector);
-    if (container) renderInlineMarkdown(root, container, model.sections[key]);
+    if (container) renderInlineMarkdown(root, container, model.sections[key], { multiline: true });
   }
 
   renderCompletionRing(root, model.completeness);
