@@ -158,6 +158,64 @@ test('appends a one-line entry to the central node running log after a successfu
   assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F\./);
 });
 
+test('appends Chadwick→Brisket Day Type on completed workout confirm', async () => {
+  const workoutCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Chest and Curls',
+      day_type: 'workout_30',
+      status: 'completed',
+      duration_min: 26,
+      focus: ['chest', 'arms'],
+      recovery_flag_next_day: false,
+      exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32 }] }],
+      pain_flags: []
+    }
+  };
+  const centralNodeSha = 'f'.repeat(40);
+  const centralNodeContent = [
+    '# Purpose',
+    'Intro.',
+    '---',
+    "## ⚡ Today's Status (Friday 19 June 2026)",
+    '**Health:** Stable.',
+    '---',
+    '## 🤝 Cross-Agent Coordination',
+    '- Keep prior directives.',
+    '---',
+    '## 📝 Recent Agent Actions',
+    '**30 Jul:** Chadwick: prior session.'
+  ].join('\n');
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: 'central-node.md', type: 'blob', sha: centralNodeSha }] });
+    }
+    if (url.includes(`/git/blobs/${centralNodeSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(centralNodeContent, 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: workoutCandidate, slug: 'chest-curls' }));
+  assert.equal(response.status, 200);
+
+  const centralNodePut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('central-node.md'));
+  assert.ok(centralNodePut, 'expected a PUT to central-node.md');
+  const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
+  assert.match(writtenContent, /Chadwick→Brisket: 1 Aug session completed, Chest and Curls\. Set Day Type to 30-min Workout\./);
+  assert.match(writtenContent, /Keep prior directives/);
+});
+
 test('rejects an unauthenticated request', async () => {
   const handler = createChatConfirmHandler({ env: validEnv });
   const response = await handler(new Request('https://life.example/api/chat/confirm', {

@@ -49,5 +49,6 @@ export function extractRecentAgentActions(markdown) {
 
 export {
   RECENT_ACTIONS_HEADING,
-  TODAYS_STATUS_HEADING
+  TODAYS_STATUS_HEADING,
+  CROSS_AGENT_HEADING
 };
