@@ -89,7 +89,7 @@ test('appendMessage still sets plain textContent for simple system-style bubbles
 test('renderInlineMarkdown groups consecutive "- " lines into a single bulleted list', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');
-  renderInlineMarkdown(root, container, 'Notes:\n- First point\n- Second point with **bold**');
+  renderInlineMarkdown(root, container, 'Notes:\n- First point\n- Second point with **bold**', { multiline: true });
 
   assert.equal(container.children.length, 2);
   const [paragraph, list] = container.children;
@@ -107,7 +107,7 @@ test('renderInlineMarkdown groups consecutive "- " lines into a single bulleted 
 test('renderInlineMarkdown starts a fresh list when bullet lines are interrupted by a paragraph', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');
-  renderInlineMarkdown(root, container, '- One\n- Two\nInterruption.\n- Three');
+  renderInlineMarkdown(root, container, '- One\n- Two\nInterruption.\n- Three', { multiline: true });
 
   assert.equal(container.children.length, 3);
   assert.equal(container.children[0].tagName, 'ul');
@@ -121,7 +121,7 @@ test('renderInlineMarkdown starts a fresh list when bullet lines are interrupted
 test('renderInlineMarkdown skips blank lines between paragraphs', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');
-  renderInlineMarkdown(root, container, 'First.\n\nSecond.');
+  renderInlineMarkdown(root, container, 'First.\n\nSecond.', { multiline: true });
 
   assert.equal(container.children.length, 2);
   assert.equal(container.children[0].children[0].textContent, 'First.');
@@ -131,10 +131,32 @@ test('renderInlineMarkdown skips blank lines between paragraphs', () => {
 test('renderInlineMarkdown re-renders cleanly when switching from multi-line to single-line output', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');
-  renderInlineMarkdown(root, container, '- One\n- Two');
+  renderInlineMarkdown(root, container, '- One\n- Two', { multiline: true });
   renderInlineMarkdown(root, container, 'Plain text.');
 
   assert.equal(container.children.length, 1);
   assert.equal(container.children[0].tagName, 'span');
   assert.equal(container.children[0].textContent, 'Plain text.');
+});
+
+test('renderInlineMarkdown without { multiline: true } renders embedded newlines as flat text, matching the original single-pass behaviour exactly', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, 'Here are the options:\n- Option A\n- Option B');
+
+  assert.equal(container.children.length, 1);
+  assert.equal(container.children[0].tagName, 'span');
+  assert.equal(container.children[0].textContent, 'Here are the options:\n- Option A\n- Option B');
+});
+
+test('renderInlineMarkdown keeps bullet lines in one list even when a blank line separates them', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, '- One\n\n- Two', { multiline: true });
+
+  assert.equal(container.children.length, 1);
+  assert.equal(container.children[0].tagName, 'ul');
+  assert.equal(container.children[0].children.length, 2);
+  assert.equal(container.children[0].children[0].children[0].textContent, 'One');
+  assert.equal(container.children[0].children[1].children[0].textContent, 'Two');
 });
