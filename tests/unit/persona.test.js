@@ -52,3 +52,39 @@ test('a populated central node log is included with instructions to treat it as 
   assert.match(prompt, /your memory across conversations/);
   assert.match(prompt, /Logged Domino's Meatlovers pizza for lunch/);
 });
+
+test('chadwick prompt includes protocol when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    chadwickProtocol: '## Logging protocol\nComplete-only writes.'
+  });
+  assert.match(prompt, /Complete-only writes/);
+  assert.match(prompt, /operating manual/i);
+});
+
+test('chadwick prompt omits the protocol block when none is provided', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick' });
+  assert.doesNotMatch(prompt, /operating manual/i);
+});
+
+test('chadwick prompt includes saved templates when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    workoutTemplates: '- Chest and Curls (strength, last actuals from 2026-07-30)'
+  });
+  assert.match(prompt, /Saved workout templates/);
+  assert.match(prompt, /Chest and Curls/);
+});
+
+test('chadwick prompt always carries design-only and schema-gap instructions', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick' });
+  assert.match(prompt, /Design sessions in chat only/);
+  assert.match(prompt, /cable_type on every strength set/);
+  assert.match(prompt, /Never invent YAML fields/);
+});
+
+test('other agents never receive the chadwick-only protocol instructions', () => {
+  const prompt = buildSystemPrompt({ slug: 'brisket' });
+  assert.doesNotMatch(prompt, /Design sessions in chat only/);
+  assert.doesNotMatch(prompt, /operating manual/i);
+});
