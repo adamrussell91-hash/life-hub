@@ -5,6 +5,7 @@ const LAST_SUCCESS_KEY = 'life-hub:last-success';
 const LOGOUT_PENDING_KEY = 'life-hub:logout-pending';
 const REFRESH_INTERVAL_MS = 600_000;
 const GENERIC_LOAD_ERROR = 'Life Hub could not load your data. Check your connection and try again.';
+const NUTRITION_AGENT_SLUG = 'brisket';
 
 export function createAppController(dependencies) {
   const {
@@ -84,7 +85,7 @@ export function createAppController(dependencies) {
       return;
     }
     const slot = root.querySelector('#nutrition-dashboard');
-    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, 'brisket'));
+    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, NUTRITION_AGENT_SLUG));
   });
   bind(windowTarget, 'online', () => void handleOnline());
   bind(windowTarget, 'offline', () => handleOffline());
@@ -324,6 +325,10 @@ export function createAppController(dependencies) {
     const nutrition = root.querySelector('#nutrition-dashboard');
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
+    // #chat-view's own `hidden` attribute is owned by chatPanel while the panel is
+    // open as an overlay elsewhere (its hosting section's hidden-cascade controls
+    // visibility instead) -- only manage it here when the panel isn't currently open,
+    // to avoid fighting chatPanel's own state.
     if (name === 'chat') {
       if (chatPanel?.isOpen()) chatPanel.close();
       if (chat) chat.hidden = false;
@@ -351,7 +356,7 @@ export function createAppController(dependencies) {
     if (!latestResult || !buildNutritionModel || !renderNutrition) return;
     renderNutrition(root, buildNutritionModel(latestResult));
     const button = root.querySelector('#nutrition-chat-button');
-    button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, 'brisket'));
+    button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, NUTRITION_AGENT_SLUG));
   }
 
   function showSignedOut(message = '') {
