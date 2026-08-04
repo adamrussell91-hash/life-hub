@@ -1,0 +1,93 @@
+import { buildCompletionRing } from './central-node-charts.js';
+import { buildProteinLineChart } from './nutrition-charts.js';
+import { renderInlineMarkdown } from './render-chat.js';
+
+const SECTION_SELECTORS = {
+  todaysStatus: '[data-central-node="todays-status"]',
+  thisWeek: '[data-central-node="this-week"]',
+  thisMonth: '[data-central-node="this-month"]',
+  longTermTrends: '[data-central-node="long-term-trends"]',
+  crossAgentCoordination: '[data-central-node="cross-agent"]',
+  recentAgentActions: '[data-central-node="recent-actions"]',
+  constraints: '[data-central-node="constraints"]'
+};
+
+const setText = (root, selector, value) => {
+  const element = root.querySelector(selector);
+  if (element) element.textContent = String(value);
+};
+
+export function renderCentralNode(root, model) {
+  for (const [key, selector] of Object.entries(SECTION_SELECTORS)) {
+    const container = root.querySelector(selector);
+    if (container) renderInlineMarkdown(root, container, model.sections[key], { multiline: true });
+  }
+
+  renderCompletionRing(root, model.completeness);
+  renderWeekChart(root, model.week);
+  renderHeatmap(root, '#central-node-logging-heatmap', model.loggingMonth, day => day.complete);
+  renderHeatmap(root, '#central-node-exercise-heatmap', model.exerciseMonth, day => day.completed);
+  renderHeatmap(root, '#central-node-eating-heatmap', model.eatingMonth, day => day.hitEatingTargets);
+
+  root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
+}
+
+function renderCompletionRing(root, completeness) {
+  const svg = root.querySelector('#central-node-completion-ring');
+  if (!svg) return;
+  const ring = buildCompletionRing(completeness);
+
+  for (const role of ['track', 'fill']) {
+    const circle = svg.querySelector(`[data-role="${role}"]`);
+    if (!circle) continue;
+    circle.setAttribute('cx', ring.center);
+    circle.setAttribute('cy', ring.center);
+    circle.setAttribute('r', ring.radius);
+    circle.setAttribute('stroke-width', ring.strokeWidth);
+  }
+
+  const fill = svg.querySelector('[data-role="fill"]');
+  if (fill) {
+    fill.setAttribute('stroke-dasharray', ring.circumference);
+    fill.setAttribute('stroke-dashoffset', ring.dashoffset);
+  }
+
+  setText(root, '[data-value="completion-ring-label"]', `${completeness.complete} of ${completeness.total}`);
+}
+
+function renderWeekChart(root, week) {
+  const svg = root.querySelector('#central-node-week-chart');
+  if (!svg) return;
+  const chart = buildProteinLineChart(week);
+  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+
+  const line = svg.querySelector('[data-role="line"]');
+  if (line) line.setAttribute('points', chart.linePoints);
+
+  const area = svg.querySelector('[data-role="area"]');
+  if (area) area.setAttribute('points', chart.areaPoints);
+
+  const dot = svg.querySelector('[data-role="last-point"]');
+  if (dot) {
+    if (chart.last) {
+      dot.setAttribute('cx', chart.last.x);
+      dot.setAttribute('cy', chart.last.y);
+      dot.removeAttribute('hidden');
+    } else {
+      dot.setAttribute('hidden', '');
+    }
+  }
+}
+
+function renderHeatmap(root, selector, series, hit) {
+  const grid = root.querySelector(selector);
+  if (!grid) return;
+  grid.replaceChildren();
+  for (const day of series) {
+    const tile = root.createElement('span');
+    tile.className = 'heatmap-tile';
+    tile.dataset.hit = String(hit(day));
+    tile.title = day.date;
+    grid.append(tile);
+  }
+}
