@@ -74,6 +74,8 @@ This reuses Home's existing manifest+blob sync exactly as-is — same GitHub API
 - **7-day hit/miss strip**: rounded bars, one per day, orange when that day's protein target was met.
 - **Month overview**: calendar-heatmap grid, one tile per day, colour intensity by closeness to target.
 
+> **Implementation note (Nutrition tab, 2026-08-04):** the dashed target line was dropped from the shipped 7-day trend chart. `getDayTargets` returns a day-type-dependent protein target, so a single flat dashed line across a 7-day span spanning mixed day types would misrepresent the actual target on several of those days. The hit/miss strip and month heatmap carry per-day target-consistency instead — the trend chart itself shows the line/area/latest-point only. See `docs/superpowers/plans/2026-08-04-nutrition-tab.md` (Task 2) for the full rationale. Relevant for Central Node, which reuses this same trend-chart component.
+
 **Layout**: metric cards reusing Home's existing `.metric-card` styling (energy/protein/fat/sodium/calcium/polyphenol), a meal-by-meal breakdown list, the three charts, and the floating Brisket-accented chat button.
 
 ## Central Node tab
