@@ -17,6 +17,8 @@ The existing `createChatController` (`js/app/chat-controller.js`) is a single in
 
 Because it is the same DOM node and the same controller closure, transcript, scroll position, and in-flight streaming all carry over automatically — zero changes needed to `chat-controller.js`'s or `render-chat.js`'s internals for history sharing itself.
 
+**Implementation note for the Nutrition/Central Node plans:** the shared-infrastructure plan built `js/app/chat-panel.js`'s `createChatPanelController({ root })`, which requires `index.html` to have an `id="chat-view-home"` element wrapping `#chat-view`'s current resting position (the Chat tab's slot) — this id does not exist yet and must be added when those plans touch `index.html`. Without it, `createChatPanelController` throws immediately on construction. Also note `open()` has no same-slot short-circuit (calling it twice for the same slot re-appends unconditionally, which could cause focus/scroll disruption on a real click handler that fires more than once) — worth a guard when wiring in the floating buttons.
+
 ### Default agent per tab (sticky-hint fallback only)
 
 Nutrition's panel should default to **Brisket**; Central Node's to **Hammond** — but only as a fallback, never overriding a real recent exchange. `chat-controller.js`'s `stickyAgentSlug()` already returns `undefined` when there's no agent reply within the last 20 minutes; we add an optional `getDefaultAgentSlug()` dependency that `stickyAgentSlug()` falls back to *only* when it would otherwise return `undefined`:
