@@ -411,6 +411,64 @@
           <button id="nutrition-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Brisket">💬</button>
         </section>
 
+        <section id="fitness-dashboard" class="dashboard" aria-labelledby="fitness-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Fitness</p>
+              <h2 id="fitness-heading">Training</h2>
+            </div>
+          </div>
+
+          <article class="metric-card fitness-streak-card">
+            <div class="fitness-streak-strip">
+              <div>
+                <p class="metric-label">Streak</p>
+                <p class="metric-value"><strong data-fitness="streak">—</strong><span> day streak</span></p>
+              </div>
+              <p class="fitness-day-type" data-fitness="day-type">—</p>
+              <div id="fitness-week-dots" class="fitness-week-dots" aria-label="Last 7 days of sessions"></div>
+            </div>
+          </article>
+
+          <article class="metric-card fitness-hero-card" aria-labelledby="fitness-hero-label">
+            <p class="metric-label" id="fitness-hero-label">Session</p>
+            <p data-fitness="hero-empty" hidden>No session yet — talk to Chadwick</p>
+            <div data-fitness-hero>
+              <h3 data-fitness="hero-title">—</h3>
+              <p class="metric-caption">
+                <span data-fitness="hero-duration">—</span>
+                · <span data-fitness="hero-status">—</span>
+              </p>
+              <div id="fitness-focus-tags" class="fitness-tags"></div>
+              <div id="fitness-exercise-list" class="fitness-exercise-list"></div>
+              <div id="fitness-pain-flags" class="fitness-tags"></div>
+              <p class="metric-caption" data-fitness="hero-notes"></p>
+            </div>
+          </article>
+
+          <article class="metric-card chart-card">
+            <p class="metric-label">7-day volume</p>
+            <div id="fitness-week-volume" class="column-chart" aria-label="Training volume last 7 days"></div>
+          </article>
+
+          <article class="metric-card">
+            <p class="metric-label">Focus this week</p>
+            <div id="fitness-focus-strip" class="fitness-focus-strip"></div>
+          </article>
+
+          <article class="metric-card">
+            <p class="metric-label">Vs last time</p>
+            <div id="fitness-comparisons" class="fitness-comparisons"></div>
+          </article>
+
+          <article class="metric-card chart-card">
+            <p class="metric-label">30-day consistency</p>
+            <div id="fitness-heatmap" class="heatmap-grid" aria-label="Completed workouts last 30 days"></div>
+          </article>
+
+          <button id="fitness-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Chadwick">💬</button>
+        </section>
+
         <section id="central-node-dashboard" class="dashboard" aria-labelledby="central-node-heading" hidden>
           <div class="section-heading">
             <div>

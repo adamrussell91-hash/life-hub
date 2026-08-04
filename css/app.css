@@ -20,6 +20,7 @@
   --ring-protein: #3d6df2;
   --ring-fat: #2aa8a0;
   --ring-accent: #3d6df2;
+  --fitness-accent: #2E7BD6;
   --area-fill: rgba(61, 109, 242, 0.18);
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
@@ -526,6 +527,133 @@ main { max-width: 76rem; margin: 0 auto; }
 .heatmap-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 0.3rem; margin-top: 0.85rem; }
 .heatmap-tile { aspect-ratio: 1; border-radius: 0.3rem; background: rgba(20,43,81,0.08); }
 .heatmap-tile[data-hit="true"] { background: var(--wave); }
+
+.fitness-streak-strip {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1rem;
+  align-items: center;
+}
+.fitness-day-type {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+  text-align: center;
+}
+.fitness-week-dots {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+.fitness-week-dots span {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: rgba(20, 43, 81, 0.1);
+}
+.fitness-week-dots span[data-hit="true"] { background: var(--fitness-accent); }
+.fitness-week-dots span[data-today="true"] { box-shadow: 0 0 0 2px rgba(46, 123, 214, 0.35); }
+
+.fitness-hero-card h3 {
+  margin: 0.35rem 0 0.15rem;
+  color: var(--depth);
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+.fitness-tags,
+.fitness-focus-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+.fitness-tag,
+.fitness-focus-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 0.65rem;
+  background: rgba(46, 123, 214, 0.1);
+  color: var(--marine);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.fitness-focus-pill span { color: var(--muted); font-weight: 650; }
+.fitness-exercise-list {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+  max-height: 14rem;
+  overflow: auto;
+}
+.fitness-exercise {
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.85rem;
+  background: rgba(20, 43, 81, 0.04);
+}
+.fitness-exercise strong {
+  display: block;
+  color: var(--depth);
+  font-size: 0.88rem;
+}
+.fitness-exercise p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.fitness-comparisons {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+.fitness-compare-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.85rem;
+  background: rgba(20, 43, 81, 0.04);
+}
+.fitness-compare-row strong {
+  color: var(--depth);
+  font-size: 0.85rem;
+}
+.fitness-compare-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.pr-badge {
+  justify-self: end;
+  padding: 0.25rem 0.55rem;
+  border-radius: 0.55rem;
+  background: rgba(246, 134, 32, 0.16);
+  color: #b85a0c;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.fitness-first-logged {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+#fitness-week-volume .column-bar > span:first-child { background: var(--fitness-accent); }
+#fitness-heatmap .heatmap-tile[data-hit="true"] { background: var(--fitness-accent); }
+
+@media (max-width: 48rem) {
+  .fitness-streak-strip { grid-template-columns: 1fr; justify-items: start; }
+  .fitness-week-dots { justify-content: flex-start; }
+  .fitness-compare-row { grid-template-columns: 1fr; }
+  .pr-badge,
+  .fitness-first-logged { justify-self: start; }
+}
 
 .floating-chat-button {
   position: fixed;
