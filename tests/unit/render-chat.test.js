@@ -85,3 +85,56 @@ test('appendMessage still sets plain textContent for simple system-style bubbles
   assert.equal(item.textContent, '🔍 Searched the web: pizza');
   assert.equal(item.className, 'chat-message chat-message--assistant');
 });
+
+test('renderInlineMarkdown groups consecutive "- " lines into a single bulleted list', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, 'Notes:\n- First point\n- Second point with **bold**');
+
+  assert.equal(container.children.length, 2);
+  const [paragraph, list] = container.children;
+  assert.equal(paragraph.tagName, 'p');
+  assert.equal(paragraph.children[0].textContent, 'Notes:');
+  assert.equal(list.tagName, 'ul');
+  assert.equal(list.children.length, 2);
+  assert.equal(list.children[0].tagName, 'li');
+  assert.equal(list.children[0].children[0].textContent, 'First point');
+  assert.equal(list.children[1].children[0].textContent, 'Second point with ');
+  assert.equal(list.children[1].children[1].tagName, 'strong');
+  assert.equal(list.children[1].children[1].textContent, 'bold');
+});
+
+test('renderInlineMarkdown starts a fresh list when bullet lines are interrupted by a paragraph', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, '- One\n- Two\nInterruption.\n- Three');
+
+  assert.equal(container.children.length, 3);
+  assert.equal(container.children[0].tagName, 'ul');
+  assert.equal(container.children[0].children.length, 2);
+  assert.equal(container.children[1].tagName, 'p');
+  assert.equal(container.children[1].children[0].textContent, 'Interruption.');
+  assert.equal(container.children[2].tagName, 'ul');
+  assert.equal(container.children[2].children.length, 1);
+});
+
+test('renderInlineMarkdown skips blank lines between paragraphs', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, 'First.\n\nSecond.');
+
+  assert.equal(container.children.length, 2);
+  assert.equal(container.children[0].children[0].textContent, 'First.');
+  assert.equal(container.children[1].children[0].textContent, 'Second.');
+});
+
+test('renderInlineMarkdown re-renders cleanly when switching from multi-line to single-line output', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, '- One\n- Two');
+  renderInlineMarkdown(root, container, 'Plain text.');
+
+  assert.equal(container.children.length, 1);
+  assert.equal(container.children[0].tagName, 'span');
+  assert.equal(container.children[0].textContent, 'Plain text.');
+});

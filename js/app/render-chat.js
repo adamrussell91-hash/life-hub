@@ -12,11 +12,42 @@ export function appendMessage(root, { role, agentSlug, text = '' }) {
   return item;
 }
 
-// Renders a safe subset of markdown (currently just **bold**) as real DOM nodes --
-// never innerHTML, so model output can never be interpreted as markup. Caller is
-// responsible for scrolling the list into view afterwards.
+// Renders a safe subset of markdown (**bold** and "- " bullet lists) as real DOM
+// nodes -- never innerHTML, so model output can never be interpreted as markup.
+// Single-line input (every existing streaming-chat caller) takes a fast path that
+// reproduces the original flat span/strong output exactly, so chat bubbles are
+// unaffected by the multi-line/bullet support added for Central Node's cards.
+// Caller is responsible for scrolling the list into view afterwards.
 export function renderInlineMarkdown(root, container, text) {
   container.replaceChildren();
+  const lines = text.split('\n');
+  if (lines.length === 1) {
+    appendInlineSegments(root, container, text);
+    return;
+  }
+
+  let currentList = null;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line.startsWith('- ')) {
+      if (!currentList) {
+        currentList = root.createElement('ul');
+        container.append(currentList);
+      }
+      const item = root.createElement('li');
+      appendInlineSegments(root, item, line.slice(2));
+      currentList.append(item);
+    } else {
+      currentList = null;
+      if (line === '') continue;
+      const paragraph = root.createElement('p');
+      appendInlineSegments(root, paragraph, line);
+      container.append(paragraph);
+    }
+  }
+}
+
+function appendInlineSegments(root, container, text) {
   const segments = text.split(/(\*\*[^*\n]+\*\*)/g).filter(Boolean);
   for (const segment of segments) {
     const isBold = segment.startsWith('**') && segment.endsWith('**') && segment.length > 4;
