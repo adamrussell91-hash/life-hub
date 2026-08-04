@@ -1,12 +1,16 @@
 import { load } from '../../vendor/js-yaml.mjs';
+import { agentColour } from './agent-colour.js';
 import { createSessionApi } from './api-session.js';
 import { createAppController } from './app-controller.js';
 import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
+import { createChatPanelController } from './chat-panel.js';
 import { API_BASE_URL } from './config.js';
 import { buildHomeModel } from './home-model.js';
 import { loadLiveEvents } from './load-live-events.js';
+import { buildNutritionModel } from './nutrition-model.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
+import { renderNutrition } from './render-nutrition.js';
 import { createRepositoryCache } from './repository-cache.js';
 import { syncRepository } from './sync-repository.js';
 
@@ -46,6 +50,8 @@ const loadCached = async ({ date }) => {
   });
 };
 
+const chatPanel = createChatPanelController({ root: document });
+
 const controller = createAppController({
   root: document,
   sessionApi,
@@ -56,6 +62,10 @@ const controller = createAppController({
   renderHome,
   renderWarnings,
   renderUnavailable,
+  buildNutritionModel,
+  renderNutrition,
+  agentColour,
+  chatPanel,
   sessionStorage,
   localStorage
 });
@@ -66,7 +76,8 @@ const chatApi = createChatApi(fetchImpl);
 createChatController({
   root: document,
   chatApi,
-  onRecordWritten: () => void controller.refresh({ manual: true })
+  onRecordWritten: () => void controller.refresh({ manual: true }),
+  getDefaultAgentSlug: () => (controller.getCurrentSection() === 'nutrition' ? 'brisket' : undefined)
 });
 
 if ('serviceWorker' in navigator) {
