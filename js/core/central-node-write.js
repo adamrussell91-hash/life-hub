@@ -1,4 +1,8 @@
-import { RECENT_ACTIONS_HEADING, TODAYS_STATUS_HEADING } from './constraints.js';
+import {
+  RECENT_ACTIONS_HEADING,
+  TODAYS_STATUS_HEADING,
+  CROSS_AGENT_HEADING
+} from './constraints.js';
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const STATUS_HEADING_RE = /^## ⚡ Today's Status.*$/m;
@@ -71,6 +75,37 @@ export function upsertStatusField(statusBody, fieldLabel, fieldLine) {
   return trimmed ? `${trimmed}\n${fieldLine}` : fieldLine;
 }
 
+export function humanizeDayType(dayType) {
+  switch (dayType) {
+    case 'workout_30': return '30-min Workout';
+    case 'workout_45_60': return '45–60 min Workout';
+    case 'movement': return 'Movement day';
+    default: return dayType ?? 'Workout';
+  }
+}
+
+export function buildCrossAgentDayTypeLine(record) {
+  const title = record.title?.trim() || 'session';
+  return `- Chadwick→Brisket: ${formatLogDate(record.date)} session completed, ${title}. Set Day Type to ${humanizeDayType(record.day_type)}.`;
+}
+
+export function appendCrossAgentDayType(content, record) {
+  if (record?.type !== 'workout' || record.status !== 'completed') return content;
+  const line = buildCrossAgentDayTypeLine(record);
+  const headingIndex = content.indexOf(CROSS_AGENT_HEADING);
+  if (headingIndex === -1) return content;
+  const dateToken = formatLogDate(record.date);
+  const sectionStart = headingIndex + CROSS_AGENT_HEADING.length;
+  const after = content.slice(sectionStart);
+  const endRel = after.search(/\n## /);
+  const section = endRel === -1 ? after : after.slice(0, endRel);
+  if (section.includes(dateToken) && section.includes('Set Day Type to') && section.includes('Chadwick→Brisket')) {
+    return content;
+  }
+  const insertAt = sectionStart;
+  return `${content.slice(0, insertAt)}\n${line}${content.slice(insertAt)}`;
+}
+
 export function extractTodaysStatusBlock(content) {
   const match = STATUS_HEADING_RE.exec(content);
   if (!match) return { heading: null, body: '', dateKey: null };
@@ -133,7 +168,9 @@ export function applyLogToCentralNode(content, {
     return next;
   }
 
-  return replaceTodaysStatus(next, { dateKey: record.date, body });
+  next = replaceTodaysStatus(next, { dateKey: record.date, body });
+  next = appendCrossAgentDayType(next, record);
+  return next;
 }
 
-export { TODAYS_STATUS_HEADING, RECENT_ACTIONS_HEADING };
+export { TODAYS_STATUS_HEADING, RECENT_ACTIONS_HEADING, CROSS_AGENT_HEADING };

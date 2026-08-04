@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  appendCrossAgentDayType,
   appendRecentAction,
   applyLogToCentralNode,
   buildNutritionStatusLine,
   formatStatusHeadingDate,
+  humanizeDayType,
   replaceTodaysStatus,
   upsertStatusField
 } from '../../js/core/central-node-write.js';
@@ -74,4 +76,58 @@ test('same-day meal log preserves other Status fields', () => {
   });
   assert.match(next, /\*\*Health:\*\* Stable\./);
   assert.match(next, /\*\*Nutrition:\*\* 920 kcal, 78g P, 22g F\./);
+});
+
+test('humanizeDayType matches Home labels', () => {
+  assert.equal(humanizeDayType('workout_30'), '30-min Workout');
+  assert.equal(humanizeDayType('workout_45_60'), '45–60 min Workout');
+  assert.equal(humanizeDayType('movement'), 'Movement day');
+});
+
+test('appendCrossAgentDayType inserts under Cross-Agent heading and is idempotent', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    '- Old directive.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+  const record = {
+    type: 'workout',
+    date: '2026-07-30',
+    status: 'completed',
+    title: 'Chest and Curls',
+    day_type: 'workout_30'
+  };
+  const once = appendCrossAgentDayType(base, record);
+  assert.match(once, /Chadwick→Brisket: 30 Jul session completed, Chest and Curls\. Set Day Type to 30-min Workout\./);
+  const twice = appendCrossAgentDayType(once, record);
+  assert.equal(twice, once);
+});
+
+test('applyLogToCentralNode adds Cross-Agent line for completed workouts', () => {
+  const base = [
+    '# Purpose',
+    '---',
+    "## ⚡ Today's Status (Wednesday 30 July 2026)",
+    '**Exercise:** prior.',
+    '---',
+    '## 🤝 Cross-Agent Coordination',
+    '- Keep me.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+  const record = {
+    type: 'workout',
+    date: '2026-07-30',
+    status: 'completed',
+    title: 'Chest and Curls',
+    day_type: 'workout_30',
+    duration_min: 26
+  };
+  const next = applyLogToCentralNode(base, {
+    record,
+    actionLine: '\n**30 Jul:** Chadwick Flexington: Logged a session.'
+  });
+  assert.match(next, /Chadwick→Brisket: 30 Jul session completed/);
+  assert.match(next, /\*\*30 Jul:\*\* Chadwick Flexington/);
 });
