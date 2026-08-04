@@ -211,20 +211,106 @@
           </section>
         </section>
 
-        <section id="chat-view" class="chat-view" aria-labelledby="chat-heading" hidden>
+        <div id="chat-view-home">
+          <section id="chat-view" class="chat-view" aria-labelledby="chat-heading" hidden>
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker">Talk to your agents</p>
+                <h2 id="chat-heading">Chat</h2>
+              </div>
+            </div>
+            <p id="chat-error" class="chat-error" role="alert" hidden></p>
+            <ul id="chat-messages" class="chat-messages" aria-live="polite"></ul>
+            <form id="chat-form" class="chat-form">
+              <label class="sr-only" for="chat-input">Message</label>
+              <input id="chat-input" name="message" type="text" autocomplete="off" required>
+              <button id="chat-send" type="submit">Send</button>
+            </form>
+          </section>
+        </div>
+
+        <section id="nutrition-dashboard" class="dashboard" aria-labelledby="nutrition-heading" hidden>
           <div class="section-heading">
             <div>
-              <p class="section-kicker">Talk to your agents</p>
-              <h2 id="chat-heading">Chat</h2>
+              <p class="section-kicker">Nutrition</p>
+              <h2 id="nutrition-heading">Today's macros</h2>
             </div>
           </div>
-          <p id="chat-error" class="chat-error" role="alert" hidden></p>
-          <ul id="chat-messages" class="chat-messages" aria-live="polite"></ul>
-          <form id="chat-form" class="chat-form">
-            <label class="sr-only" for="chat-input">Message</label>
-            <input id="chat-input" name="message" type="text" autocomplete="off" required>
-            <button id="chat-send" type="submit">Send</button>
-          </form>
+
+          <div class="nutrition-grid">
+            <article class="metric-card" aria-labelledby="nutrition-calories-label">
+              <div class="metric-heading">
+                <p class="metric-label" id="nutrition-calories-label">Energy</p>
+                <span class="metric-icon energy" aria-hidden="true">◇</span>
+              </div>
+              <p class="metric-value"><strong data-nutrition="calories">—</strong><span data-target="nutrition-calories">of — kcal</span></p>
+            </article>
+            <article class="metric-card" aria-labelledby="nutrition-protein-label">
+              <div class="metric-heading">
+                <p class="metric-label" id="nutrition-protein-label">Protein</p>
+                <span class="metric-icon" aria-hidden="true">P</span>
+              </div>
+              <p class="metric-value"><strong data-nutrition="protein">—</strong><span data-target="nutrition-protein">/ — g</span></p>
+            </article>
+            <article class="metric-card" aria-labelledby="nutrition-fat-label">
+              <div class="metric-heading">
+                <p class="metric-label" id="nutrition-fat-label">Fat</p>
+                <span class="metric-icon fat" aria-hidden="true">F</span>
+              </div>
+              <p class="metric-value"><strong data-nutrition="fat">—</strong><span data-target="nutrition-fat">/ — g</span></p>
+            </article>
+            <article class="metric-card" aria-labelledby="nutrition-sodium-label">
+              <div class="metric-heading">
+                <p class="metric-label" id="nutrition-sodium-label">Sodium</p>
+                <span class="metric-icon" aria-hidden="true">Na</span>
+              </div>
+              <p class="metric-value"><strong data-nutrition="sodium">—</strong><span data-target="nutrition-sodium">/ — mg</span></p>
+            </article>
+            <article class="metric-card" aria-labelledby="nutrition-calcium-label">
+              <div class="metric-heading">
+                <p class="metric-label" id="nutrition-calcium-label">Calcium</p>
+                <span class="metric-icon" aria-hidden="true">Ca</span>
+              </div>
+              <p class="metric-value"><strong data-nutrition="calcium">—</strong><span data-target="nutrition-calcium">/ — mg</span></p>
+            </article>
+            <article class="metric-card" aria-labelledby="nutrition-polyphenol-label">
+              <div class="metric-heading">
+                <p class="metric-label" id="nutrition-polyphenol-label">Polyphenols</p>
+                <span class="metric-icon" aria-hidden="true">◆</span>
+              </div>
+              <p class="metric-value"><strong data-nutrition="polyphenol">—</strong><span data-target="nutrition-polyphenol">/ —</span></p>
+            </article>
+          </div>
+
+          <article class="metric-card meal-breakdown-card" aria-labelledby="meal-breakdown-label">
+            <p class="metric-label" id="meal-breakdown-label">Protein by meal</p>
+            <dl class="meal-breakdown">
+              <dt>Breakfast</dt><dd data-meal-protein="breakfast">— g</dd>
+              <dt>Lunch</dt><dd data-meal-protein="lunch">— g</dd>
+              <dt>Dinner</dt><dd data-meal-protein="dinner">— g</dd>
+              <dt>Snack</dt><dd data-meal-protein="snack">— g</dd>
+            </dl>
+          </article>
+
+          <article class="metric-card chart-card" aria-labelledby="protein-trend-label">
+            <div class="metric-heading">
+              <p class="metric-label" id="protein-trend-label">7-day protein trend</p>
+              <span class="trend-badge" data-value="protein-trend">—</span>
+            </div>
+            <svg id="nutrition-protein-chart" class="line-chart" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Protein trend over the last 7 days">
+              <polygon data-role="area" points=""></polygon>
+              <polyline data-role="line" points=""></polyline>
+              <circle data-role="last-point" r="4" hidden></circle>
+            </svg>
+            <div id="nutrition-hit-strip" class="hit-strip" aria-label="Whether the protein target was met each day, last 7 days"></div>
+          </article>
+
+          <article class="metric-card chart-card" aria-labelledby="month-heatmap-label">
+            <p class="metric-label" id="month-heatmap-label">30-day protein target consistency</p>
+            <div id="nutrition-heatmap" class="heatmap-grid" aria-label="Whether the protein target was met each day, last 30 days"></div>
+          </article>
+
+          <button id="nutrition-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Brisket">💬</button>
         </section>
       </main>
     </div>
