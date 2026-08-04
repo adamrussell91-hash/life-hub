@@ -37,7 +37,8 @@ async function signIn(page) {
 }
 
 test('the Nutrition tab renders today\'s macros from the fixture repository', async () => {
-  const page = await browser.newPage();
+  const context = await browser.newContext();
+  const page = await context.newPage();
   try {
     await signIn(page);
 
@@ -53,12 +54,13 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     const heatmapTiles = page.locator('#nutrition-heatmap .heatmap-tile');
     assert.equal(await heatmapTiles.count(), 30);
   } finally {
-    await page.close();
+    await context.close();
   }
 });
 
 test('the floating chat button opens the shared chat panel themed in Brisket\'s colour', async () => {
-  const page = await browser.newPage();
+  const context = await browser.newContext();
+  const page = await context.newPage();
   try {
     await signIn(page);
     await page.locator('.desktop-rail [data-section="nutrition"]').click();
@@ -75,6 +77,6 @@ test('the floating chat button opens the shared chat panel themed in Brisket\'s 
     await page.locator('#nutrition-chat-button').click();
     await page.locator('#chat-view').waitFor({ state: 'hidden' });
   } finally {
-    await page.close();
+    await context.close();
   }
 });
