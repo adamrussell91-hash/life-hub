@@ -11,7 +11,7 @@ test('agent registry preserves the approved roster and confirmed colours', () =>
     'brisket', 'chadwick', 'hammond', 'hyaluronica', 'penelope', 'sara', 'vera'
   ]);
   assert.deepEqual(Object.fromEntries(
-    ['chadwick', 'hyaluronica', 'penelope', 'sara', 'vera', 'brisket']
+    ['chadwick', 'hyaluronica', 'penelope', 'sara', 'vera', 'brisket', 'hammond']
       .map(slug => [slug, { colour: bySlug[slug].colour, colour_source: bySlug[slug].colour_source }])
   ), {
     chadwick: { colour: '#2E7BD6', colour_source: 'confirmed' },
@@ -19,15 +19,16 @@ test('agent registry preserves the approved roster and confirmed colours', () =>
     penelope: { colour: '#C85A64', colour_source: 'confirmed' },
     sara: { colour: '#BBD9B4', colour_source: 'confirmed' },
     vera: { colour: '#37598A', colour_source: 'confirmed' },
-    brisket: { colour: '#F0B843', colour_source: 'confirmed' }
+    brisket: { colour: '#F0B843', colour_source: 'confirmed' },
+    hammond: { colour: '#3A3A42', colour_source: 'confirmed' }
   });
   assert.deepEqual(bySlug.hammond, {
     name: 'General Hammond',
     slug: 'hammond',
     domain: 'life_coaching',
     tab: 'Central Node',
-    colour: '#142B51',
-    colour_source: 'provisional_until_cover_migration',
+    colour: '#3A3A42',
+    colour_source: 'confirmed',
     name_triggers: ['general hammond', 'hammond']
   });
 });
