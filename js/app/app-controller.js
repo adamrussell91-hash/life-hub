@@ -6,6 +6,7 @@ const LOGOUT_PENDING_KEY = 'life-hub:logout-pending';
 const REFRESH_INTERVAL_MS = 600_000;
 const GENERIC_LOAD_ERROR = 'Life Hub could not load your data. Check your connection and try again.';
 export const NUTRITION_AGENT_SLUG = 'brisket';
+export const CENTRAL_NODE_AGENT_SLUG = 'hammond';
 
 export function createAppController(dependencies) {
   const {
@@ -20,6 +21,8 @@ export function createAppController(dependencies) {
     renderUnavailable,
     buildNutritionModel,
     renderNutrition,
+    buildCentralNodeModel,
+    renderCentralNode,
     agentColour,
     chatPanel,
     windowTarget = window,
@@ -63,7 +66,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition') continue;
+    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'central-node') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -78,6 +81,9 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="nutrition"]') ?? []) {
     bind(button, 'click', () => showSection('nutrition'));
   }
+  for (const button of root.querySelectorAll?.('[data-section="central-node"]') ?? []) {
+    bind(button, 'click', () => showSection('central-node'));
+  }
   bind(root.querySelector('#nutrition-chat-button'), 'click', () => {
     if (!chatPanel) return;
     if (chatPanel.isOpen()) {
@@ -86,6 +92,15 @@ export function createAppController(dependencies) {
     }
     const slot = root.querySelector('#nutrition-dashboard');
     if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, NUTRITION_AGENT_SLUG));
+  });
+  bind(root.querySelector('#central-node-chat-button'), 'click', () => {
+    if (!chatPanel) return;
+    if (chatPanel.isOpen()) {
+      chatPanel.close();
+      return;
+    }
+    const slot = root.querySelector('#central-node-dashboard');
+    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
   });
   bind(windowTarget, 'online', () => void handleOnline());
   bind(windowTarget, 'offline', () => handleOffline());
@@ -209,6 +224,7 @@ export function createAppController(dependencies) {
         const model = buildHomeModel({ ...result, date });
         renderHome(root, model);
         if (currentSection === 'nutrition') renderNutritionSection();
+        if (currentSection === 'central-node') renderCentralNodeSection();
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
       rendered = true;
@@ -316,15 +332,18 @@ export function createAppController(dependencies) {
   const SECTION_TITLES = {
     home: { eyebrow: 'Your day at a glance', title: 'Home' },
     chat: { eyebrow: 'Life Hub', title: 'Chat' },
-    nutrition: { eyebrow: 'Nutrition', title: 'Nutrition' }
+    nutrition: { eyebrow: 'Nutrition', title: 'Nutrition' },
+    'central-node': { eyebrow: 'Central Node', title: 'Central Node' }
   };
 
   function showSection(name) {
     const home = root.querySelector('#home-dashboard');
     const chat = root.querySelector('#chat-view');
     const nutrition = root.querySelector('#nutrition-dashboard');
+    const centralNode = root.querySelector('#central-node-dashboard');
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
+    if (centralNode) centralNode.hidden = name !== 'central-node';
     // #chat-view's own `hidden` attribute is owned by chatPanel while the panel is
     // open as an overlay elsewhere (its hosting section's hidden-cascade controls
     // visibility instead) -- only manage it here when the panel isn't currently open,
@@ -337,6 +356,7 @@ export function createAppController(dependencies) {
     }
     currentSection = name;
     if (name === 'nutrition') renderNutritionSection();
+    if (name === 'central-node') renderCentralNodeSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const active = button.dataset.section === name;
       button.classList.toggle('is-active', active);
@@ -357,6 +377,13 @@ export function createAppController(dependencies) {
     renderNutrition(root, buildNutritionModel(latestResult));
     const button = root.querySelector('#nutrition-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, NUTRITION_AGENT_SLUG));
+  }
+
+  function renderCentralNodeSection() {
+    if (!latestResult || !buildCentralNodeModel || !renderCentralNode) return;
+    renderCentralNode(root, buildCentralNodeModel(latestResult));
+    const button = root.querySelector('#central-node-chat-button');
+    button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
   }
 
   function showSignedOut(message = '') {
