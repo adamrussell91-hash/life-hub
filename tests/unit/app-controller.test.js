@@ -79,11 +79,17 @@ class FakeDocument extends EventTarget {
       ['#network-status', new FakeElement({ hidden: true })],
       ['#app-status', new FakeElement()],
       ['#home-dashboard', new FakeElement({ hidden: true })],
+      ['#nutrition-dashboard', new FakeElement({ hidden: true })],
+      ['#nutrition-chat-button', new FakeElement()],
       ['#unavailable-panel', new FakeElement({ hidden: true })],
       ['#retry-button', new FakeElement()]
     ]);
     this.futureNavigation = new FakeElement();
-    this.futureNavigation.dataset.section = 'nutrition';
+    this.futureNavigation.dataset.section = 'fitness';
+    this.nutritionNavigation = new FakeElement();
+    this.nutritionNavigation.dataset.section = 'nutrition';
+    this.chatNavigation = new FakeElement();
+    this.chatNavigation.dataset.section = 'chat';
   }
 
   querySelector(selector) {
@@ -91,7 +97,10 @@ class FakeDocument extends EventTarget {
   }
 
   querySelectorAll(selector) {
-    return selector === '[data-section]' ? [this.futureNavigation] : [];
+    if (selector === '[data-section]') return [this.futureNavigation, this.nutritionNavigation, this.chatNavigation];
+    if (selector === '[data-section="nutrition"]') return [this.nutritionNavigation];
+    if (selector === '[data-section="chat"]') return [this.chatNavigation];
+    return [];
   }
 }
 
@@ -273,6 +282,25 @@ function harness(options = {}) {
     renderUnavailable(documentRoot, message) {
       documentRoot.querySelector('#unavailable-panel').hidden = false;
       documentRoot.querySelector('#app-status').textContent = message;
+    },
+    buildNutritionModel: input => ({ date: input.date, source: input, kind: 'nutrition' }),
+    renderNutrition(documentRoot, model) {
+      calls.nutritionRenders = (calls.nutritionRenders ?? 0) + 1;
+      documentRoot.querySelector('#nutrition-dashboard').hidden = false;
+    },
+    agentColour: (agentsConfig, slug) => `#colour-for-${slug}`,
+    chatPanel: {
+      opens: [],
+      closes: 0,
+      open(slot, accentColour) {
+        this.opens.push({ slot, accentColour });
+      },
+      close() {
+        this.closes += 1;
+      },
+      isOpen() {
+        return this.opens.length > this.closes;
+      }
     }
   };
 
@@ -290,7 +318,8 @@ function harness(options = {}) {
     releaseSignIn: value => releaseSignIn?.(value),
     releaseLogout: () => releaseLogout?.(),
     privateCachePresent: () => privateCachePresent,
-    setNow: value => { currentNow = new Date(value); }
+    setNow: value => { currentNow = new Date(value); },
+    chatPanelCalls: dependencies.chatPanel
   };
 }
 
@@ -732,4 +761,62 @@ test('destroy clears refresh timers and removes bound listeners', async () => {
 
   assert.equal(state.clock.activeIntervals, 0);
   assert.equal(state.calls.syncs, 1);
+});
+
+test('clicking the Nutrition nav item shows the dashboard and builds/renders it from the latest loaded sync data', async () => {
+  const state = harness();
+  await state.controller.start();
+
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+
+  assert.equal(state.root.querySelector('#nutrition-dashboard').hidden, false);
+  assert.equal(state.root.querySelector('#home-dashboard').hidden, true);
+  assert.equal(state.calls.nutritionRenders, 1);
+});
+
+test('getCurrentSection reflects the most recently shown section', async () => {
+  const state = harness();
+  await state.controller.start();
+  assert.equal(state.controller.getCurrentSection(), 'home');
+
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+  assert.equal(state.controller.getCurrentSection(), 'nutrition');
+});
+
+test('the floating chat button opens the chat panel into the Nutrition section, themed with Brisket\'s colour', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+
+  state.root.querySelector('#nutrition-chat-button').dispatchEvent(new Event('click'));
+
+  assert.equal(state.chatPanelCalls.opens.length, 1);
+  assert.equal(state.chatPanelCalls.opens[0].slot, state.root.querySelector('#nutrition-dashboard'));
+  assert.equal(state.chatPanelCalls.opens[0].accentColour, '#colour-for-brisket');
+});
+
+test('clicking the floating chat button again closes an already-open panel', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+  const button = state.root.querySelector('#nutrition-chat-button');
+  button.dispatchEvent(new Event('click'));
+
+  button.dispatchEvent(new Event('click'));
+
+  assert.equal(state.chatPanelCalls.opens.length, 1);
+  assert.equal(state.chatPanelCalls.closes, 1);
+});
+
+test('navigating to Chat closes an open overlay panel and returns the chat view to its home slot', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+  state.root.querySelector('#nutrition-chat-button').dispatchEvent(new Event('click'));
+  assert.equal(state.chatPanelCalls.opens.length, 1);
+
+  state.root.chatNavigation.dispatchEvent(new Event('click'));
+
+  assert.equal(state.chatPanelCalls.closes, 1);
+  assert.equal(state.controller.getCurrentSection(), 'chat');
 });
