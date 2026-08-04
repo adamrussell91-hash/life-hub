@@ -7,6 +7,7 @@ const REFRESH_INTERVAL_MS = 600_000;
 const GENERIC_LOAD_ERROR = 'Life Hub could not load your data. Check your connection and try again.';
 export const NUTRITION_AGENT_SLUG = 'brisket';
 export const CENTRAL_NODE_AGENT_SLUG = 'hammond';
+export const FITNESS_AGENT_SLUG = 'chadwick';
 
 export function createAppController(dependencies) {
   const {
@@ -21,6 +22,8 @@ export function createAppController(dependencies) {
     renderUnavailable,
     buildNutritionModel,
     renderNutrition,
+    buildFitnessModel,
+    renderFitness,
     buildCentralNodeModel,
     renderCentralNode,
     agentColour,
@@ -66,7 +69,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'central-node') continue;
+    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'central-node') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -81,6 +84,9 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="nutrition"]') ?? []) {
     bind(button, 'click', () => showSection('nutrition'));
   }
+  for (const button of root.querySelectorAll?.('[data-section="fitness"]') ?? []) {
+    bind(button, 'click', () => showSection('fitness'));
+  }
   for (const button of root.querySelectorAll?.('[data-section="central-node"]') ?? []) {
     bind(button, 'click', () => showSection('central-node'));
   }
@@ -92,6 +98,15 @@ export function createAppController(dependencies) {
     }
     const slot = root.querySelector('#nutrition-dashboard');
     if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, NUTRITION_AGENT_SLUG));
+  });
+  bind(root.querySelector('#fitness-chat-button'), 'click', () => {
+    if (!chatPanel) return;
+    if (chatPanel.isOpen()) {
+      chatPanel.close();
+      return;
+    }
+    const slot = root.querySelector('#fitness-dashboard');
+    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, FITNESS_AGENT_SLUG));
   });
   bind(root.querySelector('#central-node-chat-button'), 'click', () => {
     if (!chatPanel) return;
@@ -224,6 +239,7 @@ export function createAppController(dependencies) {
         const model = buildHomeModel({ ...result, date });
         renderHome(root, model);
         if (currentSection === 'nutrition') renderNutritionSection();
+        if (currentSection === 'fitness') renderFitnessSection();
         if (currentSection === 'central-node') renderCentralNodeSection();
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
@@ -333,6 +349,7 @@ export function createAppController(dependencies) {
     home: { eyebrow: 'Your day at a glance', title: 'Home' },
     chat: { eyebrow: 'Life Hub', title: 'Chat' },
     nutrition: { eyebrow: 'Nutrition', title: 'Nutrition' },
+    fitness: { eyebrow: 'Fitness', title: 'Fitness' },
     'central-node': { eyebrow: 'Central Node', title: 'Central Node' }
   };
 
@@ -340,9 +357,11 @@ export function createAppController(dependencies) {
     const home = root.querySelector('#home-dashboard');
     const chat = root.querySelector('#chat-view');
     const nutrition = root.querySelector('#nutrition-dashboard');
+    const fitness = root.querySelector('#fitness-dashboard');
     const centralNode = root.querySelector('#central-node-dashboard');
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
+    if (fitness) fitness.hidden = name !== 'fitness';
     if (centralNode) centralNode.hidden = name !== 'central-node';
     // #chat-view's own `hidden` attribute is owned by chatPanel while the panel is
     // open as an overlay elsewhere (its hosting section's hidden-cascade controls
@@ -356,6 +375,7 @@ export function createAppController(dependencies) {
     }
     currentSection = name;
     if (name === 'nutrition') renderNutritionSection();
+    if (name === 'fitness') renderFitnessSection();
     if (name === 'central-node') renderCentralNodeSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const active = button.dataset.section === name;
@@ -377,6 +397,13 @@ export function createAppController(dependencies) {
     renderNutrition(root, buildNutritionModel(latestResult));
     const button = root.querySelector('#nutrition-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, NUTRITION_AGENT_SLUG));
+  }
+
+  function renderFitnessSection() {
+    if (!latestResult || !buildFitnessModel || !renderFitness) return;
+    renderFitness(root, buildFitnessModel(latestResult));
+    const button = root.querySelector('#fitness-chat-button');
+    button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, FITNESS_AGENT_SLUG));
   }
 
   function renderCentralNodeSection() {

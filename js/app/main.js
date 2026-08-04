@@ -1,16 +1,18 @@
 import { load } from '../../vendor/js-yaml.mjs';
 import { agentColour } from './agent-colour.js';
 import { createSessionApi } from './api-session.js';
-import { createAppController, CENTRAL_NODE_AGENT_SLUG, NUTRITION_AGENT_SLUG } from './app-controller.js';
+import { createAppController, CENTRAL_NODE_AGENT_SLUG, FITNESS_AGENT_SLUG, NUTRITION_AGENT_SLUG } from './app-controller.js';
 import { buildCentralNodeModel } from './central-node-model.js';
 import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
 import { createChatPanelController } from './chat-panel.js';
 import { API_BASE_URL } from './config.js';
+import { buildFitnessModel } from './fitness-model.js';
 import { buildHomeModel } from './home-model.js';
 import { loadLiveEvents } from './load-live-events.js';
 import { buildNutritionModel } from './nutrition-model.js';
 import { renderCentralNode } from './render-central-node.js';
+import { renderFitness } from './render-fitness.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
 import { renderNutrition } from './render-nutrition.js';
 import { createRepositoryCache } from './repository-cache.js';
@@ -66,6 +68,8 @@ const controller = createAppController({
   renderUnavailable,
   buildNutritionModel,
   renderNutrition,
+  buildFitnessModel,
+  renderFitness,
   buildCentralNodeModel,
   renderCentralNode,
   agentColour,
@@ -78,6 +82,7 @@ controller.start();
 
 const DEFAULT_AGENT_BY_SECTION = {
   nutrition: NUTRITION_AGENT_SLUG,
+  fitness: FITNESS_AGENT_SLUG,
   'central-node': CENTRAL_NODE_AGENT_SLUG
 };
 
