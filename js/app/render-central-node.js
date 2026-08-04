@@ -37,6 +37,7 @@ function renderCompletionRing(root, completeness) {
   if (!svg) return;
   const ring = buildCompletionRing(completeness);
 
+  let fill = null;
   for (const role of ['track', 'fill']) {
     const circle = svg.querySelector(`[data-role="${role}"]`);
     if (!circle) continue;
@@ -44,9 +45,9 @@ function renderCompletionRing(root, completeness) {
     circle.setAttribute('cy', ring.center);
     circle.setAttribute('r', ring.radius);
     circle.setAttribute('stroke-width', ring.strokeWidth);
+    if (role === 'fill') fill = circle;
   }
 
-  const fill = svg.querySelector('[data-role="fill"]');
   if (fill) {
     fill.setAttribute('stroke-dasharray', ring.circumference);
     fill.setAttribute('stroke-dashoffset', ring.dashoffset);
