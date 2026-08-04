@@ -78,6 +78,49 @@ test('streams an agent event, text, and a validated record proposal for a routed
   assert.deepEqual(events[3], { type: 'done' });
 });
 
+test('loads saved workout template summaries into Chadwick\'s system prompt', async () => {
+  const templatePath = 'data/fitness/templates/chest-and-curls.md';
+  const templateSha = 'e'.repeat(40);
+  const templateContent = [
+    '---',
+    'schema_version: 1',
+    'type: "workout_template"',
+    'title: "Chest and Curls"',
+    'session_kind: "strength"',
+    'source_session_date: "2026-07-30"',
+    '---'
+  ].join('\n');
+  let receivedArgs;
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: templatePath, type: 'blob', sha: templateSha }] });
+    }
+    if (url.includes(`/git/blobs/${templateSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(templateContent, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await handler(request({ message: 'Chadwick, what should I do today?' }));
+
+  assert.match(receivedArgs.system, /Chest and Curls/);
+  assert.match(receivedArgs.system, /2026-07-30/);
+});
+
 test('conversation history is forwarded to Anthropic ahead of the new message', async () => {
   let receivedArgs;
   const handler = createChatHandler({

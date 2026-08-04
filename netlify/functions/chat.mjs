@@ -33,6 +33,11 @@ import {
   upsertFoodLibraryEntry,
   validateFoodLibraryEntry
 } from './_shared/food-library.mjs';
+import {
+  formatTemplatesForPrompt,
+  isTemplatePath,
+  summarizeTemplatesFromContents
+} from './_shared/workout-templates.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
 import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays } from '../../js/core/time.js';
 
@@ -42,6 +47,7 @@ const MAX_MESSAGE_LENGTH = 4000;
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_ENTRY_CHARS = 1500;
 const MAX_HISTORY_TOTAL_CHARS = 6000;
+const MAX_TEMPLATE_ENTRIES = 50;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 
 export const config = { path: '/api/chat' };
@@ -98,6 +104,7 @@ export function createChatHandler({
     const from = addCalendarDays(today, -6);
     const allowedTypes = agent?.recordTypes.length ? agent.recordTypes : undefined;
     const needsFoodLibrary = Boolean(allowedTypes?.includes('meal'));
+    const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
 
     let digest = '';
     let constraints = '';
@@ -105,6 +112,7 @@ export function createChatHandler({
     let foodLibraryEntries = [];
     let foodLibrary = '';
     let foodLibrarySha;
+    let workoutTemplates = '';
     try {
       const current = await client.resolveTree();
       const manifest = selectManifestEntries(current.tree, { from, to: today });
@@ -114,11 +122,15 @@ export function createChatHandler({
         ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
         : null;
       foodLibrarySha = foodLibraryEntry?.sha;
+      const templateEntries = needsWorkoutTemplates
+        ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_TEMPLATE_ENTRIES)
+        : [];
 
-      const [dataBlobs, centralNodeBlob, foodLibraryBlob] = await Promise.all([
+      const [dataBlobs, centralNodeBlob, foodLibraryBlob, templateBlobs] = await Promise.all([
         Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
         centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
-        foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null
+        foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
+        Promise.all(templateEntries.map(entry => client.readBlob(entry.sha)))
       ]);
 
       const files = dataEntries
@@ -141,6 +153,11 @@ export function createChatHandler({
         foodLibraryEntries = parseFoodLibrary(decodedFoodLibrary);
         foodLibrary = formatFoodLibraryForPrompt(foodLibraryEntries);
       }
+
+      const templateContents = templateEntries
+        .map((entry, index) => ({ path: entry.path, content: decodeBlob(templateBlobs[index]) }))
+        .filter(file => file.content !== null);
+      workoutTemplates = formatTemplatesForPrompt(summarizeTemplatesFromContents(templateContents));
     } catch {
       digest = '';
       constraints = '';
@@ -148,11 +165,10 @@ export function createChatHandler({
       foodLibraryEntries = [];
       foodLibrary = '';
       foodLibrarySha = undefined;
+      workoutTemplates = '';
     }
 
     const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
-    // Task 3 wires real saved templates onto this parameter; keep empty until then.
-    const workoutTemplates = '';
     const system = buildSystemPrompt({
       slug,
       digest,

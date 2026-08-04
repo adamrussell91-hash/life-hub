@@ -217,6 +217,112 @@ test('appends Chadwick→Brisket Day Type on completed workout confirm', async (
   assert.match(writtenContent, /Keep prior directives/);
 });
 
+test('upserts a fitness template after a completed workout confirm', async () => {
+  const workoutCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Chest and Curls',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'completed',
+      duration_min: 26,
+      focus: ['chest', 'arms'],
+      recovery_flag_next_day: false,
+      exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }],
+      pain_flags: []
+    }
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: workoutCandidate, slug: 'chest-curls' }));
+  assert.equal(response.status, 200);
+
+  const templatePut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('data/fitness/templates/chest-and-curls.md'));
+  assert.ok(templatePut, 'expected a PUT to the fitness template path');
+  const writtenContent = Buffer.from(JSON.parse(templatePut.options.body).content, 'base64').toString('utf8');
+  assert.match(writtenContent, /cable_type/);
+  assert.match(writtenContent, /"concentric"/);
+});
+
+test('does not upsert a fitness template for a planned (not completed) workout', async () => {
+  const plannedCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Chest and Curls',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'planned',
+      recovery_flag_next_day: false,
+      exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }],
+      pain_flags: []
+    }
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: plannedCandidate, slug: 'chest-curls' }));
+  assert.equal(response.status, 200);
+  assert.ok(!calls.some(call => call.url.includes('data/fitness/templates/')), 'must not touch templates for a planned workout');
+});
+
+test('a failing template upsert never fails the confirm response', async () => {
+  const workoutCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Chest and Curls',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'completed',
+      duration_min: 26,
+      recovery_flag_next_day: false,
+      exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }],
+      pain_flags: []
+    }
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ message: 'server error' }, { status: 500 });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: workoutCandidate, slug: 'chest-curls' }));
+  assert.equal(response.status, 200, 'a broken template/tree lookup must not fail the confirm response');
+});
+
 test('rejects an unauthenticated request', async () => {
   const handler = createChatConfirmHandler({ env: validEnv });
   const response = await handler(new Request('https://life.example/api/chat/confirm', {

@@ -14,6 +14,7 @@ import {
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { buildCanonicalPath, validateLogEntry } from './_shared/chat-schema.mjs';
+import { buildTemplateRecord, renderTemplateMarkdown, templatePathForTitle } from './_shared/workout-templates.mjs';
 import { AGENTS } from './_shared/agent-directory.mjs';
 import { load } from 'js-yaml';
 import { parseEventDocument, TYPE_DOMAINS } from '../../js/core/records.js';
@@ -106,6 +107,14 @@ export function createChatConfirmHandler({
         ...(existingSha ? { sha: existingSha } : {}),
         message: `feat(chat): log ${validation.record.type} for ${validation.record.date}`
       });
+      if (validation.record.type === 'workout' && validation.record.status === 'completed') {
+        try {
+          await upsertWorkoutTemplate(client, validation.record);
+        } catch {
+          // Best-effort template upsert -- the session itself already saved successfully, so a
+          // failure here (conflict, transient GitHub error) must never surface as a failed confirmation.
+        }
+      }
       try {
         await syncCentralNodeAfterLog(client, validation.record, validation.notes);
       } catch {
@@ -130,6 +139,20 @@ function renderMarkdown(record, notes) {
     .join('\n');
   const body = typeof notes === 'string' && notes.trim() !== '' ? `${notes.trim()}\n` : '';
   return `---\n${frontmatter}\n---\n${body}`;
+}
+
+async function upsertWorkoutTemplate(client, record) {
+  const path = templatePathForTitle(record.title);
+  const template = buildTemplateRecord(record, record.date);
+  const content = renderTemplateMarkdown(template);
+  const current = await client.resolveTree();
+  const existingSha = current.tree.find(entry => entry.path === path && entry.type === 'blob')?.sha;
+  await client.writeFile({
+    path,
+    content,
+    ...(existingSha ? { sha: existingSha } : {}),
+    message: `chore(fitness-templates): upsert ${record.title}`
+  });
 }
 
 async function syncCentralNodeAfterLog(client, record, notes) {
