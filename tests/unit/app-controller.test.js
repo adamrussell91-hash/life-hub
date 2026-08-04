@@ -81,15 +81,19 @@ class FakeDocument extends EventTarget {
       ['#home-dashboard', new FakeElement({ hidden: true })],
       ['#nutrition-dashboard', new FakeElement({ hidden: true })],
       ['#nutrition-chat-button', new FakeElement()],
+      ['#fitness-dashboard', new FakeElement({ hidden: true })],
+      ['#fitness-chat-button', new FakeElement()],
       ['#central-node-dashboard', new FakeElement({ hidden: true })],
       ['#central-node-chat-button', new FakeElement()],
       ['#unavailable-panel', new FakeElement({ hidden: true })],
       ['#retry-button', new FakeElement()]
     ]);
     this.futureNavigation = new FakeElement();
-    this.futureNavigation.dataset.section = 'fitness';
+    this.futureNavigation.dataset.section = 'skincare';
     this.nutritionNavigation = new FakeElement();
     this.nutritionNavigation.dataset.section = 'nutrition';
+    this.fitnessNavigation = new FakeElement();
+    this.fitnessNavigation.dataset.section = 'fitness';
     this.centralNodeNavigation = new FakeElement();
     this.centralNodeNavigation.dataset.section = 'central-node';
     this.chatNavigation = new FakeElement();
@@ -101,8 +105,11 @@ class FakeDocument extends EventTarget {
   }
 
   querySelectorAll(selector) {
-    if (selector === '[data-section]') return [this.futureNavigation, this.nutritionNavigation, this.centralNodeNavigation, this.chatNavigation];
+    if (selector === '[data-section]') {
+      return [this.futureNavigation, this.nutritionNavigation, this.fitnessNavigation, this.centralNodeNavigation, this.chatNavigation];
+    }
     if (selector === '[data-section="nutrition"]') return [this.nutritionNavigation];
+    if (selector === '[data-section="fitness"]') return [this.fitnessNavigation];
     if (selector === '[data-section="central-node"]') return [this.centralNodeNavigation];
     if (selector === '[data-section="chat"]') return [this.chatNavigation];
     return [];
@@ -292,6 +299,11 @@ function harness(options = {}) {
     renderNutrition(documentRoot, model) {
       calls.nutritionRenders = (calls.nutritionRenders ?? 0) + 1;
       documentRoot.querySelector('#nutrition-dashboard').hidden = false;
+    },
+    buildFitnessModel: input => ({ date: input.date, source: input, kind: 'fitness' }),
+    renderFitness(documentRoot, model) {
+      calls.fitnessRenders = (calls.fitnessRenders ?? 0) + 1;
+      documentRoot.querySelector('#fitness-dashboard').hidden = false;
     },
     buildCentralNodeModel: input => ({ date: input.date, source: input, kind: 'central-node' }),
     renderCentralNode(documentRoot, model) {
@@ -845,6 +857,46 @@ test('a completed refresh while viewing Nutrition re-renders the dashboard and r
   await state.controller.refresh();
 
   assert.equal(state.calls.nutritionRenders, 2);
+});
+
+test('clicking the Fitness nav item shows the dashboard and builds/renders it from the latest loaded sync data', async () => {
+  const state = harness();
+  await state.controller.start();
+
+  state.root.fitnessNavigation.dispatchEvent(new Event('click'));
+
+  assert.equal(state.root.querySelector('#fitness-dashboard').hidden, false);
+  assert.equal(state.root.querySelector('#home-dashboard').hidden, true);
+  assert.equal(state.calls.fitnessRenders, 1);
+  assert.equal(state.controller.getCurrentSection(), 'fitness');
+});
+
+test('the floating chat button opens the chat panel into the Fitness section, themed with Chadwick\'s colour', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.fitnessNavigation.dispatchEvent(new Event('click'));
+
+  state.root.querySelector('#fitness-chat-button').dispatchEvent(new Event('click'));
+
+  assert.equal(state.chatPanelCalls.opens.length, 1);
+  assert.equal(state.chatPanelCalls.opens[0].slot, state.root.querySelector('#fitness-dashboard'));
+  assert.equal(state.chatPanelCalls.opens[0].accentColour, '#colour-for-chadwick');
+});
+
+test('a completed refresh while viewing Fitness re-renders the dashboard', async () => {
+  const state = harness({
+    liveResults: [
+      liveData({ changed: true, freshness: 'confirmed' }),
+      liveData({ changed: true, freshness: 'confirmed' })
+    ]
+  });
+  await state.controller.start();
+  state.root.fitnessNavigation.dispatchEvent(new Event('click'));
+  assert.equal(state.calls.fitnessRenders, 1);
+
+  await state.controller.refresh();
+
+  assert.equal(state.calls.fitnessRenders, 2);
 });
 
 test('clicking the Central Node nav item shows the dashboard and builds/renders it from the latest loaded sync data', async () => {
