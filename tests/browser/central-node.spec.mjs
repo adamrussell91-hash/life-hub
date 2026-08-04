@@ -49,6 +49,9 @@ test('the Central Node tab renders its markdown sections and logging-completion 
     assert.match(await page.locator('[data-central-node="todays-status"]').textContent(), /streak 1/);
     assert.match(await page.locator('[data-central-node="cross-agent"]').textContent(), /Chadwick.*Brisket/);
     assert.equal(await page.locator('[data-value="completion-ring-label"]').textContent(), '3 of 5');
+    assert.equal(await page.locator('[data-live-complete="nutrition"]').count(), 1);
+    assert.match(await page.locator('[data-live-snapshot]').textContent(), /Protein/);
+    assert.equal(await page.locator('#central-node-week-chart [data-role="last-point"]').count(), 0);
 
     const constraintsPanel = page.locator('.constraints-card');
     assert.equal(await constraintsPanel.getAttribute('open'), null);

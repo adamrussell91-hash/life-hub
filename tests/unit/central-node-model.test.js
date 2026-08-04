@@ -81,6 +81,15 @@ test('builds today\'s logging completeness the same way Home does', () => {
   });
 });
 
+test('liveStatus exposes checklist flags and macro snapshot from events', () => {
+  const model = buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdown: markdown, date: '2026-07-30' });
+
+  assert.equal(model.liveStatus.completeness.nutrition, true);
+  assert.equal(model.liveStatus.snapshot.protein_g, 80);
+  assert.equal(model.liveStatus.snapshot.calories, 1130);
+  assert.match(model.sections.todaysStatus, /Stable today/);
+});
+
 test('builds a 7-day protein series ending on the display date, for the reused sparkline component', () => {
   const model = buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdown: markdown, date: '2026-07-30' });
 

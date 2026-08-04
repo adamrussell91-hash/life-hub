@@ -50,6 +50,11 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     assert.equal(await page.locator('[data-nutrition="protein"]').textContent(), '80 g');
     assert.equal(await page.locator('[data-meal-protein="breakfast"]').textContent(), '38 g');
     assert.equal(await page.locator('[data-meal-protein="lunch"]').textContent(), '42 g');
+    assert.equal(await page.locator('[data-nutrition-ring="protein"]').count(), 1);
+    assert.equal(await page.locator('#nutrition-protein-chart [data-role="last-point"]').count(), 0);
+    assert.equal(await page.locator('#nutrition-calories-chart').count(), 1);
+    assert.equal(await page.locator('#nutrition-meal-timing').count(), 1);
+    assert.equal(await page.locator('#nutrition-macro-split').count(), 1);
 
     const heatmapTiles = page.locator('#nutrition-heatmap .heatmap-tile');
     assert.equal(await heatmapTiles.count(), 30);

@@ -101,4 +101,17 @@ Verified on 2026-08-04, on branch `central-node-tab` (not yet merged to `main`):
 
 Full design: `docs/superpowers/specs/2026-08-03-nutrition-central-node-design.md`. Full plan: `docs/superpowers/plans/2026-08-04-central-node-tab.md`.
 
-## Next Phase: not yet planned — Central Node was the last tab in the current roadmap; check with the user before starting new work
+## Phase 8: Soft-Medical Charts & Dashboard Density — Complete
+
+Verified on 2026-08-04, on branch `soft-medical-charts` (local only — do not push unless asked):
+
+- `npm test`: 360 unit and integration tests passed, 0 failed.
+- `npm run test:browser`: 18 Chromium acceptance tests passed, 0 failed.
+- Shared `js/app/chart-kit/` (ring, area-line, columns, animate, apply-ring) powers Home macro rings, Nutrition six macro rings + maximal monitor charts, and Central Node completion/week charts.
+- Protein trend and Central Node week sparkline no longer render an end-circle marker; area charts fill-on-load (respecting `prefers-reduced-motion`).
+- Central Node Today’s Status is a hybrid live checklist/snapshot + agent prose panel.
+- **Deferred:** Brisket/persona confirm rewriting Today’s Status prose in `central-node.md` (meal file writes already work; live Status side updates from events).
+
+Full design: `docs/superpowers/specs/2026-08-04-soft-medical-charts-design.md`. Full plan: `docs/superpowers/plans/2026-08-04-soft-medical-charts.md`.
+
+## Next Phase: Brisket / agent confirm → Central Node Status write path (deferred from Phase 8)

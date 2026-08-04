@@ -1,3 +1,5 @@
+import { applyRingTarget } from './chart-kit/apply-ring.js';
+
 const DAY_TYPE_LABELS = {
   movement: 'Movement day',
   workout_30: '30-minute workout',
@@ -39,10 +41,17 @@ export function renderHome(root, model) {
   setText(root, '[data-value="logging"]', `${model.completeness.complete} of ${model.completeness.total}`);
   setText(root, '[data-value="sync"]', 'Live data ready');
 
-  for (const [name, value] of Object.entries(model.progress)) {
-    setProgress(root, name, value);
-    setText(root, `[data-percent="${name}"]`, `${value}%`);
+  const ringMap = {
+    calories: { value: model.nutrition.calories, target: model.targets.calories },
+    protein: { value: model.nutrition.protein_g, target: model.targets.protein_g },
+    fat: { value: model.nutrition.fat_g, target: model.targets.fat_ceiling_g }
+  };
+  for (const [name, config] of Object.entries(ringMap)) {
+    applyRingTarget(root.querySelector(`[data-ring="${name}"]`), config, { size: 72, strokeWidth: 7 });
+    setText(root, `[data-percent="${name}"]`, `${model.progress[name]}%`);
   }
+  setProgress(root, 'logging', model.progress.logging);
+  setText(root, '[data-percent="logging"]', `${model.progress.logging}%`);
 
   for (const [category, complete] of Object.entries(model.completeness)) {
     if (category === 'complete' || category === 'total') continue;

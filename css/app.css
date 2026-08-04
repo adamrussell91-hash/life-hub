@@ -13,6 +13,14 @@
   --radius-lg: 1.5rem;
   --radius-md: 1.05rem;
   --rail-width: 15rem;
+  --chart-track: #e6ebf2;
+  --chart-label: #8a97a8;
+  --chart-ink: #15233a;
+  --ring-energy: #e08a3c;
+  --ring-protein: #3d6df2;
+  --ring-fat: #2aa8a0;
+  --ring-accent: #3d6df2;
+  --area-fill: rgba(61, 109, 242, 0.18);
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
 }
@@ -439,10 +447,77 @@ main { max-width: 76rem; margin: 0 auto; }
 .trend-badge[data-colour="green"] { color: #1f7a52; background: rgba(31,122,82,0.1); }
 .trend-badge[data-colour="red"] { color: #8d351f; background: rgba(141,53,31,0.1); }
 
+.metric-ring-wrap { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.35rem; }
+.metric-ring { width: 4.5rem; height: 4.5rem; flex: 0 0 auto; transform: rotate(-90deg); }
+.metric-ring-track { stroke: var(--chart-track); }
+.metric-ring-fill { fill: none; stroke-linecap: round; stroke: var(--ring-accent); }
+.metric-ring--energy .metric-ring-fill { stroke: var(--ring-energy); }
+.metric-ring--protein .metric-ring-fill { stroke: var(--ring-protein); }
+.metric-ring--fat .metric-ring-fill { stroke: var(--ring-fat); }
+.metric-ring-fill.metric-ring--protein { stroke: var(--ring-protein); }
+.metric-ring-fill.metric-ring--fat { stroke: var(--ring-fat); }
+.chart-day-label { fill: var(--chart-label); font-size: 9px; }
+
 .line-chart { width: 100%; height: 8rem; margin-top: 0.75rem; }
-.line-chart [data-role="area"] { fill: rgba(55,111,183,0.22); stroke: none; }
+.line-chart [data-role="area"] { fill: var(--area-fill); stroke: none; }
 .line-chart [data-role="line"] { fill: none; stroke: var(--wave); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-.line-chart [data-role="last-point"] { fill: var(--warm-white); stroke: var(--wave); stroke-width: 2; }
+.line-chart [data-role="rolling"] { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.line-chart.chart-animating [data-role="area"] {
+  clip-path: inset(0 100% 0 0);
+  animation: area-reveal 700ms cubic-bezier(.2,.8,.2,1) forwards;
+}
+.line-chart.chart-animating [data-role="line"] {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: line-draw 700ms cubic-bezier(.2,.8,.2,1) forwards;
+}
+@keyframes area-reveal { to { clip-path: inset(0 0 0 0); } }
+@keyframes line-draw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .line-chart.chart-animating [data-role="area"],
+  .line-chart.chart-animating [data-role="line"] {
+    animation: none;
+    clip-path: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+.column-chart { display: flex; align-items: flex-end; gap: 0.55rem; min-height: 6rem; margin-top: 0.85rem; }
+.column-bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.35rem; height: 6rem; justify-content: flex-end; }
+.column-bar > span:first-child {
+  display: block;
+  width: 100%;
+  max-width: 1.6rem;
+  border-radius: 0.45rem 0.45rem 0.2rem 0.2rem;
+  background: var(--ring-protein);
+  min-height: 0.15rem;
+}
+.column-bar > span:last-child { color: var(--chart-label); font-size: 0.7rem; font-weight: 650; }
+
+.status-hybrid {
+  display: grid;
+  grid-template-columns: auto minmax(10rem, 1fr) minmax(12rem, 1.2fr);
+  gap: 1rem;
+  align-items: start;
+  margin-top: 0.75rem;
+}
+.status-checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.status-checklist li {
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.65rem;
+  background: rgba(20, 43, 81, 0.05);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.status-checklist li[data-checked="true"] { color: var(--depth); background: rgba(55, 111, 183, 0.12); }
+.status-snapshot { margin: 0.65rem 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.45; }
+.status-prose { margin-top: 0; }
+
+@media (max-width: 48rem) {
+  .status-hybrid { grid-template-columns: 1fr; }
+}
 
 .hit-strip { display: flex; gap: 0.4rem; margin-top: 0.85rem; }
 .hit-bar { flex: 1; height: 0.6rem; border-radius: 999px; background: rgba(20,43,81,0.08); }

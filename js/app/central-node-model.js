@@ -48,6 +48,9 @@ export function buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdo
   const exerciseMonth = monthDates.map(day => ({ date: day, completed: workoutCompleted(events, day) }));
   const eatingMonth = monthDates.map(day => eatingTargetsForDay(events, day, targetsConfig));
 
+  const nutrition = aggregateNutrition(events, date);
+  const completeness = getLoggingCompleteness(events, date);
+
   return {
     date,
     sections: {
@@ -59,7 +62,15 @@ export function buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdo
       crossAgentCoordination: extractCrossAgentCoordination(markdown),
       recentAgentActions: extractRecentAgentActions(markdown)
     },
-    completeness: getLoggingCompleteness(events, date),
+    completeness,
+    liveStatus: {
+      completeness,
+      snapshot: {
+        calories: nutrition.calories,
+        protein_g: nutrition.protein_g,
+        fat_g: nutrition.fat_g
+      }
+    },
     week,
     loggingMonth,
     exerciseMonth,
