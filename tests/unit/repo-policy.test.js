@@ -39,7 +39,8 @@ test('repository path policy rejects noncanonical and nonallowlisted paths', () 
     'data/sleep/2026/08/2026-08-01-x.md',
     'data/mind/2026/08/2026-08-01-x.yml',
     'config/other.yml',
-    'data/mind/2026/08/2026-08-01-x\u0000.md'
+    'data/mind/2026/08/2026-08-01-x\u0000.md',
+    'data/fitness/templates/../x.md'
   ];
 
   for (const path of rejected) assert.equal(isAllowedRepositoryPath(path), false, path);
@@ -51,8 +52,21 @@ test('repository path policy rejects noncanonical and nonallowlisted paths', () 
     'data/fitness/2026/08/2026-08-01-workout.md',
     'data/body/2026/08/2026-08-01-weight.md',
     'data/mind/2026/08/2026-08-01-diary.md',
-    'data/skincare/2026/08/2026-08-01-morning.md'
+    'data/skincare/2026/08/2026-08-01-morning.md',
+    'data/fitness/templates/chest-and-curls.md'
   ]) assert.equal(isAllowedRepositoryPath(path), true, path);
+});
+
+test('manifest policy excludes workout templates from the dated event window', () => {
+  const [MEAL, TEMPLATE] = ['a', 'b'].map(value => value.repeat(40));
+  const tree = [
+    blob('data/nutrition/2026/08/2026-08-01-breakfast.md', MEAL, 120),
+    blob('data/fitness/templates/chest-and-curls.md', TEMPLATE, 90)
+  ];
+
+  assert.deepEqual(selectManifestEntries(tree, { from: '2026-07-02', to: '2026-08-01' }), [
+    { path: 'data/nutrition/2026/08/2026-08-01-breakfast.md', sha: MEAL, size: 120 }
+  ]);
 });
 
 test('manifest policy accepts only canonical bounded blob metadata', () => {
