@@ -1,7 +1,7 @@
 import { load } from '../../vendor/js-yaml.mjs';
 import { agentColour } from './agent-colour.js';
 import { createSessionApi } from './api-session.js';
-import { createAppController } from './app-controller.js';
+import { createAppController, NUTRITION_AGENT_SLUG } from './app-controller.js';
 import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
 import { createChatPanelController } from './chat-panel.js';
@@ -77,7 +77,7 @@ createChatController({
   root: document,
   chatApi,
   onRecordWritten: () => void controller.refresh({ manual: true }),
-  getDefaultAgentSlug: () => (controller.getCurrentSection() === 'nutrition' ? 'brisket' : undefined)
+  getDefaultAgentSlug: () => (controller.getCurrentSection() === 'nutrition' ? NUTRITION_AGENT_SLUG : undefined)
 });
 
 if ('serviceWorker' in navigator) {
