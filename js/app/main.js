@@ -1,7 +1,8 @@
 import { load } from '../../vendor/js-yaml.mjs';
 import { agentColour } from './agent-colour.js';
 import { createSessionApi } from './api-session.js';
-import { createAppController, NUTRITION_AGENT_SLUG } from './app-controller.js';
+import { createAppController, CENTRAL_NODE_AGENT_SLUG, NUTRITION_AGENT_SLUG } from './app-controller.js';
+import { buildCentralNodeModel } from './central-node-model.js';
 import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
 import { createChatPanelController } from './chat-panel.js';
@@ -9,6 +10,7 @@ import { API_BASE_URL } from './config.js';
 import { buildHomeModel } from './home-model.js';
 import { loadLiveEvents } from './load-live-events.js';
 import { buildNutritionModel } from './nutrition-model.js';
+import { renderCentralNode } from './render-central-node.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
 import { renderNutrition } from './render-nutrition.js';
 import { createRepositoryCache } from './repository-cache.js';
@@ -64,6 +66,8 @@ const controller = createAppController({
   renderUnavailable,
   buildNutritionModel,
   renderNutrition,
+  buildCentralNodeModel,
+  renderCentralNode,
   agentColour,
   chatPanel,
   sessionStorage,
@@ -72,12 +76,17 @@ const controller = createAppController({
 
 controller.start();
 
+const DEFAULT_AGENT_BY_SECTION = {
+  nutrition: NUTRITION_AGENT_SLUG,
+  'central-node': CENTRAL_NODE_AGENT_SLUG
+};
+
 const chatApi = createChatApi(fetchImpl);
 createChatController({
   root: document,
   chatApi,
   onRecordWritten: () => void controller.refresh({ manual: true }),
-  getDefaultAgentSlug: () => (controller.getCurrentSection() === 'nutrition' ? NUTRITION_AGENT_SLUG : undefined)
+  getDefaultAgentSlug: () => DEFAULT_AGENT_BY_SECTION[controller.getCurrentSection()]
 });
 
 if ('serviceWorker' in navigator) {
