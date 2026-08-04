@@ -81,6 +81,8 @@ class FakeDocument extends EventTarget {
       ['#home-dashboard', new FakeElement({ hidden: true })],
       ['#nutrition-dashboard', new FakeElement({ hidden: true })],
       ['#nutrition-chat-button', new FakeElement()],
+      ['#central-node-dashboard', new FakeElement({ hidden: true })],
+      ['#central-node-chat-button', new FakeElement()],
       ['#unavailable-panel', new FakeElement({ hidden: true })],
       ['#retry-button', new FakeElement()]
     ]);
@@ -88,6 +90,8 @@ class FakeDocument extends EventTarget {
     this.futureNavigation.dataset.section = 'fitness';
     this.nutritionNavigation = new FakeElement();
     this.nutritionNavigation.dataset.section = 'nutrition';
+    this.centralNodeNavigation = new FakeElement();
+    this.centralNodeNavigation.dataset.section = 'central-node';
     this.chatNavigation = new FakeElement();
     this.chatNavigation.dataset.section = 'chat';
   }
@@ -97,8 +101,9 @@ class FakeDocument extends EventTarget {
   }
 
   querySelectorAll(selector) {
-    if (selector === '[data-section]') return [this.futureNavigation, this.nutritionNavigation, this.chatNavigation];
+    if (selector === '[data-section]') return [this.futureNavigation, this.nutritionNavigation, this.centralNodeNavigation, this.chatNavigation];
     if (selector === '[data-section="nutrition"]') return [this.nutritionNavigation];
+    if (selector === '[data-section="central-node"]') return [this.centralNodeNavigation];
     if (selector === '[data-section="chat"]') return [this.chatNavigation];
     return [];
   }
@@ -287,6 +292,11 @@ function harness(options = {}) {
     renderNutrition(documentRoot, model) {
       calls.nutritionRenders = (calls.nutritionRenders ?? 0) + 1;
       documentRoot.querySelector('#nutrition-dashboard').hidden = false;
+    },
+    buildCentralNodeModel: input => ({ date: input.date, source: input, kind: 'central-node' }),
+    renderCentralNode(documentRoot, model) {
+      calls.centralNodeRenders = (calls.centralNodeRenders ?? 0) + 1;
+      documentRoot.querySelector('#central-node-dashboard').hidden = false;
     },
     agentColour: (agentsConfig, slug) => `#colour-for-${slug}`,
     chatPanel: {
@@ -835,4 +845,57 @@ test('a completed refresh while viewing Nutrition re-renders the dashboard and r
   await state.controller.refresh();
 
   assert.equal(state.calls.nutritionRenders, 2);
+});
+
+test('clicking the Central Node nav item shows the dashboard and builds/renders it from the latest loaded sync data', async () => {
+  const state = harness();
+  await state.controller.start();
+
+  state.root.centralNodeNavigation.dispatchEvent(new Event('click'));
+
+  assert.equal(state.root.querySelector('#central-node-dashboard').hidden, false);
+  assert.equal(state.root.querySelector('#home-dashboard').hidden, true);
+  assert.equal(state.calls.centralNodeRenders, 1);
+  assert.equal(state.controller.getCurrentSection(), 'central-node');
+});
+
+test('the Central Node floating chat button opens the chat panel into its section, themed with Hammond\'s colour', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.centralNodeNavigation.dispatchEvent(new Event('click'));
+
+  state.root.querySelector('#central-node-chat-button').dispatchEvent(new Event('click'));
+
+  assert.equal(state.chatPanelCalls.opens.length, 1);
+  assert.equal(state.chatPanelCalls.opens[0].slot, state.root.querySelector('#central-node-dashboard'));
+  assert.equal(state.chatPanelCalls.opens[0].accentColour, '#colour-for-hammond');
+});
+
+test('clicking the Central Node floating chat button again closes an already-open panel', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.centralNodeNavigation.dispatchEvent(new Event('click'));
+  const button = state.root.querySelector('#central-node-chat-button');
+  button.dispatchEvent(new Event('click'));
+
+  button.dispatchEvent(new Event('click'));
+
+  assert.equal(state.chatPanelCalls.opens.length, 1);
+  assert.equal(state.chatPanelCalls.closes, 1);
+});
+
+test('a completed refresh while viewing Central Node re-renders the dashboard and re-themes the chat button', async () => {
+  const state = harness({
+    liveResults: [
+      liveData({ changed: true, freshness: 'confirmed' }),
+      liveData({ changed: true, freshness: 'confirmed', agentsConfig: { agents: [{ slug: 'hammond', colour: '#UPDATED' }] } })
+    ]
+  });
+  await state.controller.start();
+  state.root.centralNodeNavigation.dispatchEvent(new Event('click'));
+  assert.equal(state.calls.centralNodeRenders, 1);
+
+  await state.controller.refresh();
+
+  assert.equal(state.calls.centralNodeRenders, 2);
 });

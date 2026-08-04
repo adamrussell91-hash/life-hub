@@ -312,6 +312,75 @@
 
           <button id="nutrition-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Brisket">💬</button>
         </section>
+
+        <section id="central-node-dashboard" class="dashboard" aria-labelledby="central-node-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Central Node</p>
+              <h2 id="central-node-heading">Coordination hub</h2>
+            </div>
+          </div>
+
+          <article class="metric-card" aria-labelledby="todays-status-label">
+            <p class="metric-label" id="todays-status-label">Today's Status</p>
+            <div data-central-node="todays-status" class="prose-section"></div>
+            <div class="completion-ring-wrap">
+              <svg id="central-node-completion-ring" class="completion-ring" viewBox="0 0 64 64" role="img" aria-label="Logging completeness ring">
+                <circle data-role="track" class="completion-ring-track" fill="none"></circle>
+                <circle data-role="fill" class="completion-ring-fill" fill="none"></circle>
+              </svg>
+              <span data-value="completion-ring-label" class="completion-ring-label">— of —</span>
+            </div>
+          </article>
+
+          <article class="metric-card chart-card" aria-labelledby="central-node-week-label">
+            <p class="metric-label" id="central-node-week-label">This Week</p>
+            <div data-central-node="this-week" class="prose-section"></div>
+            <svg id="central-node-week-chart" class="line-chart" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Protein trend over the last 7 days">
+              <polygon data-role="area" points=""></polygon>
+              <polyline data-role="line" points=""></polyline>
+              <circle data-role="last-point" r="4" hidden></circle>
+            </svg>
+          </article>
+
+          <article class="metric-card chart-card" aria-labelledby="central-node-month-label">
+            <p class="metric-label" id="central-node-month-label">This Month</p>
+            <div data-central-node="this-month" class="prose-section"></div>
+            <div id="central-node-logging-heatmap" class="heatmap-grid" aria-label="Whether all 5 categories were logged, last 30 days"></div>
+          </article>
+
+          <article class="metric-card chart-card" aria-labelledby="central-node-trends-label">
+            <p class="metric-label" id="central-node-trends-label">Long-Term Trends</p>
+            <div data-central-node="long-term-trends" class="prose-section"></div>
+            <div class="trend-pair">
+              <div>
+                <h3>Exercise consistency</h3>
+                <div id="central-node-exercise-heatmap" class="heatmap-grid" aria-label="Whether a workout was completed, last 30 days"></div>
+              </div>
+              <div>
+                <h3>Eating target consistency</h3>
+                <div id="central-node-eating-heatmap" class="heatmap-grid" aria-label="Whether the protein target and fat ceiling were both met, last 30 days"></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="metric-card" aria-labelledby="central-node-cross-agent-label">
+            <p class="metric-label" id="central-node-cross-agent-label">Cross-Agent Coordination</p>
+            <div data-central-node="cross-agent" class="prose-section"></div>
+          </article>
+
+          <article class="metric-card" aria-labelledby="central-node-recent-actions-label">
+            <p class="metric-label" id="central-node-recent-actions-label">Recent Agent Actions</p>
+            <div data-central-node="recent-actions" class="prose-section"></div>
+          </article>
+
+          <details class="metric-card constraints-card">
+            <summary>Constraints &amp; Priorities</summary>
+            <div data-central-node="constraints" class="prose-section"></div>
+          </details>
+
+          <button id="central-node-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Hammond">💬</button>
+        </section>
       </main>
     </div>
 

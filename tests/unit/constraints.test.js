@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   extractConstraints,
   extractCrossAgentCoordination,
+  extractLongTermTrends,
   extractRecentAgentActions,
   extractThisMonth,
   extractThisWeek,
@@ -27,6 +28,10 @@ Intro text.
 ## 📊 This Month (June 2026)
 **Active Goals:**
 - Crohn's remission (Critical)
+---
+## 📈 Long-Term Trends & Patterns
+**Nutrition:** Protein target consistency improving month over month.
+**Exercise:** Workout streak holding steady since early July.
 ---
 ## 🤝 Cross-Agent Coordination
 - Chadwick→Brisket: 31 Jul session completed. Set Day Type to 45 to 60 min Workout.
@@ -65,6 +70,12 @@ test('extractThisWeek matches the heading even though its date-range suffix chan
 test('extractThisMonth matches the heading even though its month suffix changes monthly', () => {
   const result = extractThisMonth(sample);
   assert.match(result, /Crohn's remission/);
+  assert.doesNotMatch(result, /Cross-Agent Coordination/);
+});
+
+test('extractLongTermTrends matches the heading and stops at the next section', () => {
+  const result = extractLongTermTrends(sample);
+  assert.match(result, /Workout streak holding steady/);
   assert.doesNotMatch(result, /Cross-Agent Coordination/);
 });
 

@@ -86,4 +86,19 @@ Verified on 2026-08-04, on branch `nutrition-tab` (not yet merged to `main`):
 
 Full design: `docs/superpowers/specs/2026-08-03-nutrition-central-node-design.md` (see the dashed-target-line note added there). Full plan: `docs/superpowers/plans/2026-08-04-nutrition-tab.md`.
 
-## Next Phase: Central Node tab
+## Phase 7: Central Node Tab — Complete
+
+Verified on 2026-08-04, on branch `central-node-tab` (not yet merged to `main`):
+
+- `npm test`: 349 unit and integration tests passed, 0 failed (up from the Phase 6 baseline of 324).
+- `npm run validate:fixtures`: 4 valid files, 0 invalid files.
+- `npm audit --audit-level=high`: 0 vulnerabilities.
+- `npm run test:browser`: 18 Chromium acceptance tests passed, 0 failed (16 from Phase 4-6's Home, Chat, and Nutrition coverage plus 2 new, covering the Central Node dashboard rendering real fixture values and the floating chat button opening the shared panel themed in Hammond's colour).
+- Built `central-node-model.js`/`render-central-node.js` as a third model/render pair fed from Home's already-loaded `events`/`targetsConfig`/`centralNodeMarkdown`/`agentsConfig` (no new fetch), plus a small SVG donut-ring geometry builder (`central-node-charts.js`) for the one genuinely new chart shape. Everything else — the week sparkline and all three 30-day heatmaps — reuses Nutrition's existing `buildProteinLineChart` and `.heatmap-tile` components directly rather than duplicating chart code. Added `extractLongTermTrends` to `js/core/constraints.js`, the one Central Node section that module didn't already cover.
+- **Deviations from the design spec's mockup (intentional, documented in the plan before implementation):** all seven card bodies render through `renderInlineMarkdown` (not just Constraints), so `**bold**` markers actually render instead of showing literal asterisks; the Long-Term Trends section renders as one shared caption above both its heatmaps rather than two separately-parsed captions "under each"; the This Month logging-density heatmap and the two Long-Term Trends heatmaps all reuse the existing binary `heatmap-tile[data-hit]` component rather than the mockup's colour-intensity gradient.
+- **A real backward-compatibility bug was caught and fixed before it ever reached `main`:** extending `render-chat.js`'s `renderInlineMarkdown` with multi-line/bullet-list support initially rested on a claim — restated from the plan — that `chat-controller.js` never passes it text containing embedded `\n` characters. A spec-compliance review disproved this by reading `chat-controller.js`'s actual paragraph-splitting logic (`PARAGRAPH_BREAK = /\n{2,}/` only splits on *double*-or-more newlines, so a single streamed paragraph can still contain single `\n`s, e.g. one list item per line) and demonstrated the new multi-line branch really could fire on live chat bubbles. Fixed by making multi-line parsing an explicit `{ multiline: true }` opt-in — with no options passed, the function is now provably byte-for-byte identical to its pre-change form regardless of what's in the text, so every existing chat call site is unaffected without needing to reason about what real model output might contain. The same fix also corrected a genuine bug: a blank line between two bullet points was splitting one list into two.
+- Applying Phase 6's lesson directly: `central-node-model.js` newly imports `js/core/constraints.js` client-side for the first time (previously server-only, like `js/core/trends.js` was for Nutrition). This time the service-worker precache task was written with the full dependency-graph check built in up front, and a dedicated review independently re-walked every transitive import (including second-order imports of already-precached files) before merge — zero precache gaps found, no offline-reload regression.
+
+Full design: `docs/superpowers/specs/2026-08-03-nutrition-central-node-design.md`. Full plan: `docs/superpowers/plans/2026-08-04-central-node-tab.md`.
+
+## Next Phase: not yet planned — Central Node was the last tab in the current roadmap; check with the user before starting new work
