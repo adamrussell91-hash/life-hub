@@ -5,7 +5,7 @@ const LAST_SUCCESS_KEY = 'life-hub:last-success';
 const LOGOUT_PENDING_KEY = 'life-hub:logout-pending';
 const REFRESH_INTERVAL_MS = 600_000;
 const GENERIC_LOAD_ERROR = 'Life Hub could not load your data. Check your connection and try again.';
-const NUTRITION_AGENT_SLUG = 'brisket';
+export const NUTRITION_AGENT_SLUG = 'brisket';
 
 export function createAppController(dependencies) {
   const {
