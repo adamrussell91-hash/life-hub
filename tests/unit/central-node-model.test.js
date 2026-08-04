@@ -125,6 +125,26 @@ test('builds a 30-day eating-target-consistency series requiring both the protei
   assert.deepEqual(hitDates, ['2026-07-24']);
 });
 
+test('eatingMonth applies the higher recovery-day protein target when the prior day had a recovery-flagged workout', () => {
+  const recoveryRecords = [
+    { type: 'workout', date: '2026-07-29', status: 'completed', day_type: 'movement', recovery_flag_next_day: true },
+    { type: 'meal', date: '2026-07-30', meal: 'lunch', calories: 500, protein_g: 130, fat_g: 20, sodium_mg: 300, calcium_mg: 100, polyphenol_score: 2 }
+  ];
+  const recoveryEvents = recoveryRecords.map(record => ({ record, body: '', path: '', legacy: false }));
+
+  const model = buildCentralNodeModel({
+    events: recoveryEvents,
+    targetsConfig,
+    centralNodeMarkdown: '',
+    date: '2026-07-30'
+  });
+
+  const day = model.eatingMonth.find(entry => entry.date === '2026-07-30');
+  // 130g protein clears the normal 120g target but NOT the 140g recovery target --
+  // if this asserted true, it would mean the model ignored the recovery bonus.
+  assert.equal(day.hitEatingTargets, false);
+});
+
 test('rejects a Central Node model without a display date', () => {
   assert.throws(
     () => buildCentralNodeModel({ events: [], targetsConfig, centralNodeMarkdown: '', date: null }),
