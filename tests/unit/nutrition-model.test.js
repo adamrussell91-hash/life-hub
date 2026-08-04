@@ -107,3 +107,27 @@ test('a repository with no config/targets.yml yet renders zeroed targets and unt
   assert.equal(model.week.every(day => day.proteinTarget === 0 && day.hitProtein === false), true);
   assert.equal(model.month.every(day => day.proteinTarget === 0 && day.hitProtein === false), true);
 });
+
+test('day-specific day type and recovery bonus resolve per day within the week series, not from the display date', () => {
+  const eventsWithWorkout = [
+    ...events,
+    { record: { type: 'workout', date: '2026-07-25', status: 'completed', day_type: 'workout_45_60', recovery_flag_next_day: true, exercises: [] }, body: '', path: '', legacy: false }
+  ];
+
+  const model = buildNutritionModel({ events: eventsWithWorkout, targetsConfig, date: '2026-07-30' });
+
+  const workoutDay = model.week.find(day => day.date === '2026-07-25');
+  const recoveryDay = model.week.find(day => day.date === '2026-07-26');
+  const laterDay = model.week.find(day => day.date === '2026-07-27');
+
+  // Protein target only changes via the recovery bonus, never day_type directly (targets.js), so
+  // the workout day itself (not yet recovery-flagged) keeps the standard target...
+  assert.equal(workoutDay.proteinTarget, 120);
+  // ...but the day AFTER a recovery-flagged workout gets the higher recovery target...
+  assert.equal(recoveryDay.proteinTarget, 140);
+  // ...and a day two days out is back to standard -- proving resolution is genuinely per-day,
+  // not a single value computed once from the display date (2026-07-30, which has no workout
+  // logged and would give every day proteinTarget: 120 if the loop had a copy-paste bug reusing
+  // the outer date instead of each day's own).
+  assert.equal(laterDay.proteinTarget, 120);
+});
