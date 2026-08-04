@@ -1,0 +1,139 @@
+import { RECENT_ACTIONS_HEADING, TODAYS_STATUS_HEADING } from './constraints.js';
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const STATUS_HEADING_RE = /^## ⚡ Today's Status.*$/m;
+const NEXT_SECTION_RE = /\n## /;
+
+export function formatStatusHeadingDate(dateKey) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 2, 0, 0));
+  return new Intl.DateTimeFormat('en-AU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Australia/Sydney'
+  }).format(date);
+}
+
+export function formatLogDate(dateKey) {
+  const [, month, day] = dateKey.split('-').map(Number);
+  return `${day} ${SHORT_MONTHS[month - 1]}`;
+}
+
+export function buildNutritionStatusLine(totals) {
+  const parts = [
+    totals.calories != null ? `${Number(totals.calories).toLocaleString('en-AU')} kcal` : null,
+    totals.protein_g != null ? `${totals.protein_g}g P` : null,
+    totals.fat_g != null ? `${totals.fat_g}g F` : null,
+    totals.sodium_mg != null ? `${Number(totals.sodium_mg).toLocaleString('en-AU')}mg Na` : null,
+    totals.calcium_mg != null ? `${Number(totals.calcium_mg).toLocaleString('en-AU')}mg Ca` : null
+  ].filter(Boolean);
+  return `**Nutrition:** ${parts.length > 0 ? `${parts.join(', ')}.` : 'No meals logged.'}`;
+}
+
+export function buildExerciseStatusLine(record) {
+  const duration = record.duration_min != null ? `${record.duration_min} min` : null;
+  const title = record.title ? record.title : (record.day_type ?? 'workout');
+  const bits = [title, duration, record.status].filter(Boolean);
+  return `**Exercise:** ${bits.join(' · ')}.`;
+}
+
+export function appendRecentAction(content, line) {
+  const headingIndex = content.indexOf(RECENT_ACTIONS_HEADING);
+  if (headingIndex === -1) return content;
+  const insertAt = headingIndex + RECENT_ACTIONS_HEADING.length;
+  const normalized = line.startsWith('\n') ? line : `\n${line}`;
+  return `${content.slice(0, insertAt)}${normalized}${content.slice(insertAt)}`;
+}
+
+export function replaceTodaysStatus(content, { dateKey, body }) {
+  const heading = `${TODAYS_STATUS_HEADING} (${formatStatusHeadingDate(dateKey)})`;
+  const section = `${heading}\n${body.trim()}\n`;
+  const match = STATUS_HEADING_RE.exec(content);
+  if (!match) {
+    const recentIndex = content.indexOf(RECENT_ACTIONS_HEADING);
+    if (recentIndex === -1) return `${content.trimEnd()}\n---\n${section}`;
+    return `${content.slice(0, recentIndex)}${section}---\n${content.slice(recentIndex)}`;
+  }
+
+  const start = match.index;
+  const afterHeading = content.slice(start + match[0].length);
+  const endRel = NEXT_SECTION_RE.exec(afterHeading);
+  const end = endRel ? start + match[0].length + endRel.index : content.length;
+  return `${content.slice(0, start)}${section}${content.slice(end).replace(/^\n?/, '')}`;
+}
+
+export function upsertStatusField(statusBody, fieldLabel, fieldLine) {
+  const pattern = new RegExp(`^\\*\\*${fieldLabel}:\\*\\*.*$`, 'm');
+  if (pattern.test(statusBody)) return statusBody.replace(pattern, fieldLine);
+  const trimmed = statusBody.trim();
+  return trimmed ? `${trimmed}\n${fieldLine}` : fieldLine;
+}
+
+export function extractTodaysStatusBlock(content) {
+  const match = STATUS_HEADING_RE.exec(content);
+  if (!match) return { heading: null, body: '', dateKey: null };
+  const afterHeading = content.slice(match.index + match[0].length);
+  const endRel = NEXT_SECTION_RE.exec(afterHeading);
+  const rawBody = (endRel ? afterHeading.slice(0, endRel.index) : afterHeading).trim();
+  const body = rawBody.replace(/\n---\s*$/u, '').trim();
+  return { heading: match[0], body, dateKey: parseStatusHeadingDateKey(match[0]) };
+}
+
+const MONTH_INDEX = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12
+};
+
+function parseStatusHeadingDateKey(heading) {
+  const match = /\((?:[A-Za-z]+,\s*)?(?:[A-Za-z]+\s+)?(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\)/.exec(heading);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = MONTH_INDEX[match[2].toLowerCase()];
+  const year = Number(match[3]);
+  if (!month || !Number.isFinite(day) || !Number.isFinite(year)) return null;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+export function applyLogToCentralNode(content, {
+  record,
+  actionLine,
+  nutritionTotals = null,
+  preserveOtherStatusFields = true
+}) {
+  let next = appendRecentAction(content, actionLine);
+  const existing = extractTodaysStatusBlock(next);
+  const sameDay = existing.dateKey === record.date;
+  let body = sameDay && preserveOtherStatusFields ? existing.body : '';
+
+  if (record.type === 'meal' && nutritionTotals) {
+    body = upsertStatusField(body, 'Nutrition', buildNutritionStatusLine(nutritionTotals));
+  } else if (record.type === 'workout') {
+    body = upsertStatusField(body, 'Exercise', buildExerciseStatusLine(record));
+  } else if (record.type === 'diary') {
+    const mood = record.mood_score != null ? `${record.mood_score}/10` : (record.mood ?? 'logged');
+    body = upsertStatusField(body, 'Mood', `**Mood:** ${mood}.`);
+  } else if (record.type === 'weight' || record.type === 'composition') {
+    const weight = record.weight_kg != null ? `${record.weight_kg} kg` : 'logged';
+    body = upsertStatusField(body, 'Health', `**Health:** Weight ${weight}.`);
+  } else if (record.type === 'skincare') {
+    body = upsertStatusField(body, 'Flags', `**Flags:** Skincare ${record.routine ?? ''} logged.`.replace(/\s+/g, ' ').trim());
+  } else {
+    return next;
+  }
+
+  return replaceTodaysStatus(next, { dateKey: record.date, body });
+}
+
+export { TODAYS_STATUS_HEADING, RECENT_ACTIONS_HEADING };

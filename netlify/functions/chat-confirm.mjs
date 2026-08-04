@@ -15,7 +15,12 @@ import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from 
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { buildCanonicalPath, validateLogEntry } from './_shared/chat-schema.mjs';
 import { AGENTS } from './_shared/agent-directory.mjs';
-import { RECENT_ACTIONS_HEADING } from '../../js/core/constraints.js';
+import { load } from 'js-yaml';
+import { parseEventDocument, TYPE_DOMAINS } from '../../js/core/records.js';
+import {
+  applyLogToCentralNode,
+  formatLogDate
+} from '../../js/core/central-node-write.js';
 import { getSydneyTimestamp } from '../../js/core/time.js';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
@@ -23,7 +28,6 @@ const MAX_BODY_BYTES = 16 * 1024;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 const CENTRAL_NODE_PATH = 'central-node.md';
-const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export const config = { path: '/api/chat/confirm' };
 
@@ -103,7 +107,7 @@ export function createChatConfirmHandler({
         message: `feat(chat): log ${validation.record.type} for ${validation.record.date}`
       });
       try {
-        await appendCentralNodeAction(client, validation.record, validation.notes);
+        await syncCentralNodeAfterLog(client, validation.record, validation.notes);
       } catch {
         // Best-effort running log -- the record itself already saved successfully, so a
         // failure here (conflict, missing file, transient GitHub error) must never surface
@@ -128,7 +132,7 @@ function renderMarkdown(record, notes) {
   return `---\n${frontmatter}\n---\n${body}`;
 }
 
-async function appendCentralNodeAction(client, record, notes) {
+async function syncCentralNodeAfterLog(client, record, notes) {
   const current = await client.resolveTree();
   const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
   if (!entry) return;
@@ -136,28 +140,76 @@ async function appendCentralNodeAction(client, record, notes) {
   const content = decodeBlob(await client.readBlob(entry.sha));
   if (content === null) return;
 
-  const headingIndex = content.indexOf(RECENT_ACTIONS_HEADING);
-  if (headingIndex === -1) return;
+  const actionLine = `\n**${formatLogDate(record.date)}:** ${agentNameForType(record.type)}: ${describeRecordForLog(record, notes)}`;
+  let nutritionTotals = null;
+  if (record.type === 'meal') {
+    nutritionTotals = await sumDayMealTotals(client, current.tree, record);
+  }
 
-  const insertAt = headingIndex + RECENT_ACTIONS_HEADING.length;
-  const line = `\n**${formatLogDate(record.date)}:** ${agentNameForType(record.type)}: ${describeRecordForLog(record, notes)}`;
-  const updated = `${content.slice(0, insertAt)}${line}${content.slice(insertAt)}`;
+  const updated = applyLogToCentralNode(content, {
+    record,
+    actionLine,
+    nutritionTotals
+  });
+  if (updated === content) return;
 
   await client.writeFile({
     path: CENTRAL_NODE_PATH,
     content: updated,
     sha: entry.sha,
-    message: `chore(central-node): log ${record.type} action`
+    message: `chore(central-node): sync ${record.type} log into Status`
   });
+}
+
+async function sumDayMealTotals(client, tree, record) {
+  const domain = TYPE_DOMAINS.meal;
+  const [year, month] = record.date.split('-');
+  const prefix = `data/${domain}/${year}/${month}/${record.date}-`;
+  const mealPaths = tree
+    .filter(item => item.type === 'blob' && item.path.startsWith(prefix) && item.path.endsWith('.md'))
+    .map(item => item.path);
+
+  const totals = {
+    calories: Number(record.calories) || 0,
+    protein_g: Number(record.protein_g) || 0,
+    fat_g: Number(record.fat_g) || 0
+  };
+  if (record.sodium_mg != null) totals.sodium_mg = Number(record.sodium_mg) || 0;
+  if (record.calcium_mg != null) totals.calcium_mg = Number(record.calcium_mg) || 0;
+
+  for (const path of mealPaths) {
+    const blobEntry = tree.find(item => item.path === path);
+    if (!blobEntry) continue;
+    let text;
+    try {
+      text = decodeBlob(await client.readBlob(blobEntry.sha));
+    } catch {
+      continue;
+    }
+    if (text === null) continue;
+    try {
+      const parsed = parseEventDocument(text, path, load);
+      if (parsed.record?.type !== 'meal') continue;
+      if (parsed.record.meal === record.meal) continue;
+      totals.calories += Number(parsed.record.calories) || 0;
+      totals.protein_g += Number(parsed.record.protein_g) || 0;
+      totals.fat_g += Number(parsed.record.fat_g) || 0;
+      if (parsed.record.sodium_mg != null) {
+        totals.sodium_mg = (totals.sodium_mg ?? 0) + (Number(parsed.record.sodium_mg) || 0);
+      }
+      if (parsed.record.calcium_mg != null) {
+        totals.calcium_mg = (totals.calcium_mg ?? 0) + (Number(parsed.record.calcium_mg) || 0);
+      }
+    } catch {
+      // Ignore unreadable siblings; still publish totals from the confirmed record.
+    }
+  }
+
+  return totals;
 }
 
 function agentNameForType(type) {
   return AGENTS.find(agent => agent.recordTypes.includes(type))?.name ?? 'Life Hub';
-}
-
-function formatLogDate(dateKey) {
-  const [, month, day] = dateKey.split('-').map(Number);
-  return `${day} ${SHORT_MONTHS[month - 1]}`;
 }
 
 function describeRecordForLog(record, notes) {
@@ -191,7 +243,6 @@ function describeRecordForLog(record, notes) {
       return `Logged a ${record.type} record.`;
   }
 }
-
 async function parseRequest(request) {
   const contentLength = Number(request.headers.get('content-length'));
   if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {

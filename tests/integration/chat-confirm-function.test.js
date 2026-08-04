@@ -116,6 +116,10 @@ test('appends a one-line entry to the central node running log after a successfu
     '# Purpose',
     'Intro.',
     '---',
+    "## ⚡ Today's Status (Friday 19 June 2026)",
+    '**Health:** Stable.',
+    '**Nutrition:** No data.',
+    '---',
     '## 📝 Recent Agent Actions',
     '**30 Jul:** Chadwick: Chest and Curls session completed and logged.'
   ].join('\n');
@@ -150,6 +154,8 @@ test('appends a one-line entry to the central node running log after a successfu
   const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
   assert.match(writtenContent, /\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast \(520 kcal, 38g protein, 12g fat\)\./);
   assert.match(writtenContent, /Chest and Curls session completed and logged/, 'must preserve the existing log rather than replacing it');
+  assert.match(writtenContent, /## ⚡ Today's Status \([^)]*1 August 2026\)/);
+  assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F\./);
 });
 
 test('rejects an unauthenticated request', async () => {

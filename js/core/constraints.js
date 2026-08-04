@@ -47,4 +47,7 @@ export function extractRecentAgentActions(markdown) {
   return extractSection(markdown, RECENT_ACTIONS_HEADING);
 }
 
-export { RECENT_ACTIONS_HEADING };
+export {
+  RECENT_ACTIONS_HEADING,
+  TODAYS_STATUS_HEADING
+};

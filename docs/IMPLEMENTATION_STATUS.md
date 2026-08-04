@@ -114,4 +114,16 @@ Verified on 2026-08-04, on branch `soft-medical-charts` (local only — do not p
 
 Full design: `docs/superpowers/specs/2026-08-04-soft-medical-charts-design.md`. Full plan: `docs/superpowers/plans/2026-08-04-soft-medical-charts.md`.
 
-## Next Phase: Brisket / agent confirm → Central Node Status write path (deferred from Phase 8)
+## Next Phase: optional Cross-Agent Day Type directives + Recent Actions 48h purge hardening
+
+## Phase 9: Central Node write-on-confirm — Complete
+
+Verified on 2026-08-04, on branch `central-node-log-writes` (local only — do not push unless asked):
+
+- Confirming a chat log still writes the canonical event file, then best-effort syncs `central-node.md`.
+- Meal confirms (Brisket) append Recent Agent Actions **and** refresh Today's Status with dated heading + **Nutrition** totals (sums same-day sibling meals when present in the tree).
+- Workout / diary / weight / skincare confirms refresh the matching Status field and Recent Actions.
+- Pure markdown transforms live in `js/core/central-node-write.js` (unit-tested); `chat-confirm.mjs` wires GitHub read/write.
+- Confirm still succeeds if the Central Node sync fails after the record write.
+
+Full helpers: `js/core/central-node-write.js`. Confirm path: `netlify/functions/chat-confirm.mjs`.
