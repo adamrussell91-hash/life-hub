@@ -283,3 +283,85 @@ test('bold markdown in streamed text renders as a strong element, not literal as
   assert.equal(bold.textContent, '452 calories');
   assert.doesNotMatch(bubbleText(assistantBubble), /\*\*/);
 });
+
+test('a default agent hint is used as priorAgentSlug before any agent has spoken this session', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'text', delta: 'Walk me through it.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi, getDefaultAgentSlug: () => 'hammond' });
+
+  await controller.send('how is this month looking');
+
+  assert.equal(sendCalls[0].priorAgentSlug, 'hammond');
+});
+
+test('a real recent agent reply still wins over the default hint', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  let clock = Date.parse('2026-08-01T18:00:00Z');
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Logging that now, buddy.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({
+    root, chatApi, now: () => clock, getDefaultAgentSlug: () => 'hammond'
+  });
+
+  await controller.send('Brisket, log 2 eggs for breakfast');
+  clock += 60_000;
+  await controller.send('actually make that 3 eggs');
+
+  assert.equal(sendCalls[1].priorAgentSlug, 'brisket', 'the real conversation with Brisket must win over the Hammond default hint');
+});
+
+test('the default hint returns once the memory window lapses, instead of staying stuck or falling to undefined', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  let clock = Date.parse('2026-08-01T18:00:00Z');
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Logged.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({
+    root, chatApi, now: () => clock, getDefaultAgentSlug: () => 'hammond'
+  });
+
+  await controller.send('Brisket, log 2 eggs for breakfast');
+  clock += 21 * 60_000;
+  await controller.send('how is my week looking');
+
+  assert.equal(sendCalls[1].priorAgentSlug, 'hammond');
+});
+
+test('omitting the default hint entirely preserves today\'s existing behaviour (undefined when nothing is sticky)', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'router' };
+      yield { type: 'text', delta: 'Got it.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('what should I eat');
+
+  assert.equal(sendCalls[0].priorAgentSlug, undefined);
+});

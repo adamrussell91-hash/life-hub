@@ -5,7 +5,7 @@ const HISTORY_WINDOW_MS = 20 * 60 * 1000;
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_ENTRY_CHARS = 1000;
 
-export function createChatController({ root, chatApi, onRecordWritten, now = () => Date.now() }) {
+export function createChatController({ root, chatApi, onRecordWritten, now = () => Date.now(), getDefaultAgentSlug }) {
   if (!root || !chatApi) throw new TypeError('Chat controller dependencies are unavailable');
 
   let sending = false;
@@ -25,10 +25,15 @@ export function createChatController({ root, chatApi, onRecordWritten, now = () 
   // A name only needs to be said once per topic: if the same agent replied within
   // the memory window, keep talking to them without repeating it -- but never
   // stick to the router itself, since that's not a real persona to continue as.
+  // Once that window has lapsed (or no agent has spoken yet this session), fall
+  // back to whichever agent the currently-open panel defaults to, if any -- an
+  // explicit name in the message still always wins over both, in routeAgent
+  // server-side.
   function stickyAgentSlug() {
-    if (!lastAgentSlug || lastAgentSlug === 'router') return undefined;
-    if (now() - lastAgentAt > HISTORY_WINDOW_MS) return undefined;
-    return lastAgentSlug;
+    if (lastAgentSlug && lastAgentSlug !== 'router' && now() - lastAgentAt <= HISTORY_WINDOW_MS) {
+      return lastAgentSlug;
+    }
+    return getDefaultAgentSlug?.();
   }
 
   function remember(role, content) {
