@@ -820,3 +820,19 @@ test('navigating to Chat closes an open overlay panel and returns the chat view 
   assert.equal(state.chatPanelCalls.closes, 1);
   assert.equal(state.controller.getCurrentSection(), 'chat');
 });
+
+test('a completed refresh while viewing Nutrition re-renders the dashboard and re-themes the chat button', async () => {
+  const state = harness({
+    liveResults: [
+      liveData({ changed: true, freshness: 'confirmed' }),
+      liveData({ changed: true, freshness: 'confirmed', agentsConfig: { agents: [{ slug: 'brisket', colour: '#UPDATED' }] } })
+    ]
+  });
+  await state.controller.start();
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+  assert.equal(state.calls.nutritionRenders, 1);
+
+  await state.controller.refresh();
+
+  assert.equal(state.calls.nutritionRenders, 2);
+});
