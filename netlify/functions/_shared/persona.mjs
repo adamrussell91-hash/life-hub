@@ -1,6 +1,14 @@
 import { AGENTS, ROUTER_SLUG, findAgent } from './agent-directory.mjs';
 
-export function buildSystemPrompt({ slug, digest = '', constraints = '', centralNodeLog = '', foodLibrary = '' }) {
+export function buildSystemPrompt({
+  slug,
+  digest = '',
+  constraints = '',
+  centralNodeLog = '',
+  foodLibrary = '',
+  chadwickProtocol = '',
+  workoutTemplates = ''
+}) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
 
@@ -34,10 +42,25 @@ export function buildSystemPrompt({ slug, digest = '', constraints = '', central
     ? `You may propose a log_entry tool call for these record types: ${agent.recordTypes.join(', ')}.`
     : 'You do not log structured records. Respond conversationally only.';
 
+  const chadwickBlocks = slug === 'chadwick' ? [
+    centralNodeLog
+      ? 'When designing a session, explicitly use the Central Node\'s Today\'s Status and Cross-Agent Coordination above to shape programming decisions — a nutrition flag, a recovery note, or another agent\'s directive should visibly change what you propose, not just be silently acknowledged.'
+      : '',
+    chadwickProtocol
+      ? `Chadwick operating manual (follow these Life Hub rules; ignore any Notion database mechanics):\n${chadwickProtocol}`
+      : '',
+    workoutTemplates
+      ? `Saved workout templates (living prescriptions — use when Adam says do X again):\n${workoutTemplates}`
+      : '',
+    'Design sessions in chat only. Do not propose a workout log_entry until Adam has finished the session and is logging actuals (unless status is skipped, documenting no session).',
+    'Infer session_kind from what was done. Always include cable_type on every strength set (use none when not on cables). Never invent YAML fields that are not in the log_entry schema; if Adam mentions an unsupported metric, say it needs to be added to the workout book later.'
+  ] : [];
+
   return [
     shared,
     `You are ${agent.name}, Adam's ${agent.domain ?? 'general'} agent.`,
     agent.voice,
-    capability
+    capability,
+    ...chadwickBlocks
   ].filter(Boolean).join('\n\n');
 }

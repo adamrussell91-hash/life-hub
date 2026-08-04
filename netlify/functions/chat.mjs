@@ -15,6 +15,7 @@ import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
 import { buildSystemPrompt } from './_shared/persona.mjs';
+import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
 import {
   extractConstraints,
   extractCrossAgentCoordination,
@@ -149,7 +150,18 @@ export function createChatHandler({
       foodLibrarySha = undefined;
     }
 
-    const system = buildSystemPrompt({ slug, digest, constraints, centralNodeLog, foodLibrary });
+    const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
+    // Task 3 wires real saved templates onto this parameter; keep empty until then.
+    const workoutTemplates = '';
+    const system = buildSystemPrompt({
+      slug,
+      digest,
+      constraints,
+      centralNodeLog,
+      foodLibrary,
+      chadwickProtocol,
+      workoutTemplates
+    });
     const tools = [
       { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
       ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
