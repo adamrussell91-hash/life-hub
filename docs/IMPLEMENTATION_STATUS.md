@@ -114,8 +114,6 @@ Verified on 2026-08-04, on branch `soft-medical-charts` (local only — do not p
 
 Full design: `docs/superpowers/specs/2026-08-04-soft-medical-charts-design.md`. Full plan: `docs/superpowers/plans/2026-08-04-soft-medical-charts.md`.
 
-## Next Phase: optional Cross-Agent Day Type directives + Recent Actions 48h purge hardening
-
 ## Phase 9: Central Node write-on-confirm — Complete
 
 Verified on 2026-08-04, on branch `central-node-log-writes` (local only — do not push unless asked):
@@ -127,3 +125,16 @@ Verified on 2026-08-04, on branch `central-node-log-writes` (local only — do n
 - Confirm still succeeds if the Central Node sync fails after the record write.
 
 Full helpers: `js/core/central-node-write.js`. Confirm path: `netlify/functions/chat-confirm.mjs`.
+
+## Phase 10: Fitness Tab — Complete
+
+Verified on 2026-08-05, on branch `fitness-tab` (local only — do not push unless asked):
+
+- Fitness dashboard: streak strip, session hero (planned today else last completed), 7-day volume columns, focus hits, vs-last / e1RM PRs (Epley), 30-day consistency heatmap.
+- Floating Chadwick chat themed `#2E7BD6`; default agent on Fitness is `chadwick`.
+- Completed workout confirms append an idempotent Chadwick→Brisket Day Type line under Cross-Agent Coordination.
+- Soft-medical visual language + `chart-kit` columns; shell cache bumped to `life-hub-shell-v19`.
+
+Full design: `docs/superpowers/specs/2026-08-04-fitness-tab-design.md`. Full plan: `docs/superpowers/plans/2026-08-05-fitness-tab.md`.
+
+## Next Phase: remaining Life Hub tabs + optional Recent Actions 48h purge hardening
