@@ -45,6 +45,6 @@ agents:
     slug: hammond
     domain: life_coaching
     tab: Central Node
-    colour: '#142B51'
-    colour_source: provisional_until_cover_migration
+    colour: '#3A3A42'
+    colour_source: confirmed
     name_triggers: [general hammond, hammond]
