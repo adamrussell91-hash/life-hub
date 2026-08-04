@@ -164,12 +164,13 @@ test('appends Chadwick→Brisket Day Type on completed workout confirm', async (
     date: '2026-08-01',
     fields: {
       title: 'Chest and Curls',
+      session_kind: 'strength',
       day_type: 'workout_30',
       status: 'completed',
       duration_min: 26,
       focus: ['chest', 'arms'],
       recovery_flag_next_day: false,
-      exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32 }] }],
+      exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }],
       pain_flags: []
     }
   };

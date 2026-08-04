@@ -123,9 +123,15 @@ test('the workout whitelist accepts every field validateWorkout actually recogni
     type: 'workout',
     date: '2026-08-01',
     fields: {
-      title: 'Push day', day_type: 'workout_30', status: 'completed', duration_min: 30,
+      title: 'Push day', session_kind: 'strength', day_type: 'workout_30', status: 'completed',
+      duration_min: 30, avg_hr: 128, calories_kcal: 220, distance_km: 0,
       focus: ['chest', 'triceps'], recovery_flag_next_day: true,
-      exercises: [{ name: 'Bench press', sets: [{ reps: 8, weight_kg: 60 }] }],
+      exercises: [{
+        name: 'Bench press',
+        bench_angle_deg: 30,
+        intensification: 'drop_set',
+        sets: [{ reps: 8, weight_kg: 60, cable_type: 'concentric' }]
+      }],
       pain_flags: [{ site: 'left shoulder', note: 'mild twinge' }]
     }
   }, { id: 'workout-1', now: '2026-08-01T07:45:00+10:00' });

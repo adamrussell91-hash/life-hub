@@ -55,8 +55,9 @@ test('streams an agent event, text, and a validated record proposal for a routed
         { type: 'text', delta: 'Logging it now.' },
         { type: 'tool_call', id: 'call_1', name: 'log_entry', input: {
           type: 'workout', date: '2026-08-01', fields: {
+            title: 'Squat Session', session_kind: 'strength',
             day_type: 'workout_30', status: 'completed', duration_min: 30,
-            exercises: [{ name: 'Squat', sets: [{ reps: 10, weight_kg: 40 }] }]
+            exercises: [{ name: 'Squat', sets: [{ reps: 10, weight_kg: 40, cable_type: 'concentric' }] }]
           }
         } },
         { type: 'done' }

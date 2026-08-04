@@ -13,12 +13,14 @@ function workout(date) {
   return raw(`data/fitness/${date.slice(0, 4)}/${date.slice(5, 7)}/${date}-workout.md`, `---
 type: workout
 date: '${date}'
+title: Daily Workout
+session_kind: strength
 status: completed
 day_type: workout_30
 exercises:
   - name: Walk
     sets:
-      - { reps: 1, weight_kg: 0 }
+      - { reps: 1, weight_kg: 0, cable_type: none }
 ---
 Workout`);
 }

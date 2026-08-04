@@ -156,9 +156,9 @@ test('accepts every canonical domain record and nullable observations', () => {
       fibre_g: 0, sodium_mg: 0, calcium_mg: 0, polyphenol_score: 10, omega3: 'none'
     },
     {
-      ...common, type: 'workout', title: 'Restorative session', focus: ['mobility'],
+      ...common, type: 'workout', title: 'Restorative session', session_kind: 'mobility', focus: ['mobility'],
       duration_min: 0, day_type: 'movement', status: 'planned', recovery_flag_next_day: false,
-      exercises: [{ name: 'Mobility', equipment: 'mat', sets: [{ reps: 0, weight_kg: 0 }] }],
+      exercises: [{ name: 'Mobility', equipment: 'mat', sets: [{ reps: 0, weight_kg: 0, cable_type: 'none' }] }],
       pain_flags: []
     },
     {
@@ -236,16 +236,63 @@ test('rejects non-finite and negative domain numbers', () => {
   }
 });
 
+const CABLE_TYPES = ['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing', 'none'];
+const SESSION_KINDS = ['strength', 'walk', 'ep', 'mobility', 'other'];
+
+test('completed strength workouts require session_kind, title, and per-set cable_type', () => {
+  const base = {
+    ...common,
+    type: 'workout',
+    title: 'Chest and Curls',
+    session_kind: 'strength',
+    day_type: 'workout_30',
+    status: 'completed',
+    recovery_flag_next_day: false,
+    exercises: [{
+      name: 'Bar Press',
+      bench_angle_deg: 0,
+      sets: [{ reps: 12, weight_kg: 42, cable_type: 'concentric' }]
+    }]
+  };
+  assert.deepEqual(validateRecord(base), []);
+
+  assert.match(validateRecord({ ...base, title: '' }).join('; '), /title/);
+  assert.match(validateRecord({ ...base, session_kind: 'nope' }).join('; '), /session_kind/);
+  assert.match(validateRecord({
+    ...base,
+    exercises: [{ name: 'Bar Press', sets: [{ reps: 12, weight_kg: 42 }] }]
+  }).join('; '), /cable_type/);
+});
+
+test('completed walk workouts may omit exercises when duration or distance is present', () => {
+  const walk = {
+    ...common,
+    type: 'workout',
+    title: 'East Ryde Stroll',
+    session_kind: 'walk',
+    day_type: 'movement',
+    status: 'completed',
+    duration_min: 40,
+    distance_km: 3.2,
+    avg_hr: 118,
+    calories_kcal: 180,
+    recovery_flag_next_day: false,
+    exercises: []
+  };
+  assert.deepEqual(validateRecord(walk), []);
+});
+
 test('validates nested workout exercises, sets, reps, and weights', () => {
   const workout = {
     ...common,
     type: 'workout',
     title: 'Chest and Curls',
+    session_kind: 'strength',
     duration_min: 26,
     day_type: 'workout_30',
     status: 'completed',
     recovery_flag_next_day: false,
-    exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32 }] }]
+    exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }]
   };
   assert.deepEqual(validateRecord(workout), []);
 
@@ -254,8 +301,8 @@ test('validates nested workout exercises, sets, reps, and weights', () => {
     [{}],
     [{ name: 'Chest Press', sets: 'not-an-array' }],
     [{ name: 'Chest Press', sets: [{}] }],
-    [{ name: 'Chest Press', sets: [{ reps: -1, weight_kg: 32 }] }],
-    [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: Number.NaN }] }]
+    [{ name: 'Chest Press', sets: [{ reps: -1, weight_kg: 32, cable_type: 'concentric' }] }],
+    [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: Number.NaN, cable_type: 'concentric' }] }]
   ]) {
     assert.notDeepEqual(validateRecord({ ...workout, exercises }), []);
   }

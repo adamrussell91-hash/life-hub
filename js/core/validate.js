@@ -9,6 +9,9 @@ const MOODS = ['great', 'good', 'neutral', 'low', 'bad'];
 const ENERGY_LEVELS = ['high', 'medium', 'low'];
 const DAY_TYPES = ['movement', 'workout_30', 'workout_45_60'];
 const WORKOUT_STATUSES = ['planned', 'completed', 'skipped'];
+const SESSION_KINDS = ['strength', 'walk', 'ep', 'mobility', 'other'];
+const CABLE_TYPES = ['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing', 'none'];
+const INTENSIFICATIONS = ['drop_set', 'rest_pause', 'eccentric_overload', 'elastic_finisher', 'superset', 'other'];
 const ROUTINES = ['am', 'pm'];
 const OMEGA3_LEVELS = ['high', 'medium', 'low', 'none'];
 
@@ -119,19 +122,29 @@ function validateMeal(record, errors) {
 }
 
 function validateWorkout(record, errors) {
-  optionalString(record, 'title', errors);
+  requireString(record, 'title', errors);
   stringArray(record, 'focus', errors);
   finiteNumber(record, 'duration_min', errors);
+  finiteNumber(record, 'avg_hr', errors);
+  finiteNumber(record, 'calories_kcal', errors);
+  finiteNumber(record, 'distance_km', errors);
   enumeration(record, 'day_type', DAY_TYPES, errors, true);
   enumeration(record, 'status', WORKOUT_STATUSES, errors, true);
+  enumeration(record, 'session_kind', SESSION_KINDS, errors, true);
   booleanField(record, 'recovery_flag_next_day', errors);
+
+  const kind = record.session_kind;
+  const strengthLike = kind === 'strength' || kind == null;
 
   if (!Array.isArray(record.exercises)) {
     errors.push('exercises must be an array');
-  } else {
-    if (record.status === 'completed' && record.exercises.length === 0) {
-      errors.push('completed workout exercises must not be empty');
+  } else if (record.status === 'completed' && strengthLike && record.exercises.length === 0) {
+    errors.push('completed strength workout exercises must not be empty');
+  } else if (record.status === 'completed' && kind === 'walk' && record.exercises.length === 0) {
+    if (record.duration_min == null && record.distance_km == null) {
+      errors.push('completed walk workouts need duration_min or distance_km when exercises are empty');
     }
+  } else {
     record.exercises.forEach((exercise, exerciseIndex) => {
       const prefix = `exercises[${exerciseIndex}]`;
       if (!isObject(exercise)) {
@@ -142,11 +155,23 @@ function validateWorkout(record, errors) {
         errors.push(`${prefix}.name must be a non-empty string`);
       }
       optionalString(exercise, 'equipment', errors);
+      finiteNumber(exercise, 'bench_angle_deg', errors, { minimum: 0, maximum: 90 });
+      if (exercise.intensification != null) {
+        enumeration(exercise, 'intensification', INTENSIFICATIONS, errors);
+      }
+      if (exercise.sets == null) {
+        if (strengthLike && record.status === 'completed') {
+          errors.push(`${prefix}.sets must be an array`);
+        }
+        return;
+      }
       if (!Array.isArray(exercise.sets)) {
         errors.push(`${prefix}.sets must be an array`);
         return;
       }
-      if (exercise.sets.length === 0) errors.push(`${prefix}.sets must not be empty`);
+      if (exercise.sets.length === 0 && strengthLike && record.status === 'completed') {
+        errors.push(`${prefix}.sets must not be empty`);
+      }
       exercise.sets.forEach((set, setIndex) => {
         const setPrefix = `${prefix}.sets[${setIndex}]`;
         if (!isObject(set)) {
@@ -154,7 +179,8 @@ function validateWorkout(record, errors) {
           return;
         }
         finiteNumber(set, 'reps', errors, { required: true });
-        finiteNumber(set, 'weight_kg', errors, { required: true });
+        finiteNumber(set, 'weight_kg', errors, { required: true, minimum: 0 });
+        enumeration(set, 'cable_type', CABLE_TYPES, errors, true);
       });
     });
   }
