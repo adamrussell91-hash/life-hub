@@ -427,3 +427,65 @@ main { max-width: 76rem; margin: 0 auto; }
 .chat-form { display: flex; gap: 0.5rem; }
 #chat-input { flex: 1; min-height: 44px; padding: 0.6rem 0.9rem; border-radius: 0.75rem; border: 1px solid var(--line); }
 #chat-send { min-height: 44px; padding: 0 1.25rem; border-radius: 0.75rem; border: none; background: var(--depth); color: white; font-weight: 600; }
+
+.nutrition-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.meal-breakdown-card { margin-top: 1rem; }
+.meal-breakdown { display: grid; grid-template-columns: auto 1fr; gap: 0.4rem 1rem; margin: 0.75rem 0 0; }
+.meal-breakdown dt { color: var(--muted); font-size: 0.78rem; text-transform: capitalize; }
+.meal-breakdown dd { margin: 0; color: var(--depth); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.chart-card { margin-top: 1rem; }
+.trend-badge { padding: 0.3rem 0.6rem; border-radius: 999px; font-size: 0.7rem; font-weight: 750; background: rgba(20,43,81,0.06); color: var(--muted); }
+.trend-badge[data-colour="green"] { color: #1f7a52; background: rgba(31,122,82,0.1); }
+.trend-badge[data-colour="red"] { color: #8d351f; background: rgba(141,53,31,0.1); }
+
+.line-chart { width: 100%; height: 8rem; margin-top: 0.75rem; }
+.line-chart [data-role="area"] { fill: rgba(55,111,183,0.22); stroke: none; }
+.line-chart [data-role="line"] { fill: none; stroke: var(--wave); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.line-chart [data-role="last-point"] { fill: var(--warm-white); stroke: var(--wave); stroke-width: 2; }
+
+.hit-strip { display: flex; gap: 0.4rem; margin-top: 0.85rem; }
+.hit-bar { flex: 1; height: 0.6rem; border-radius: 999px; background: rgba(20,43,81,0.08); }
+.hit-bar[data-hit="true"] { background: var(--high-sea); }
+
+.heatmap-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 0.3rem; margin-top: 0.85rem; }
+.heatmap-tile { aspect-ratio: 1; border-radius: 0.3rem; background: rgba(20,43,81,0.08); }
+.heatmap-tile[data-hit="true"] { background: var(--wave); }
+
+.floating-chat-button {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 30;
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 0;
+  border-radius: 50%;
+  color: white;
+  background: var(--agent-accent, var(--wave));
+  font-size: 1.3rem;
+  box-shadow: 0 0.7rem 1.8rem rgba(10,21,54,0.28);
+  cursor: pointer;
+}
+
+.chat-view[data-panel-mode="overlay"] {
+  position: fixed;
+  z-index: 25;
+  inset: auto 1.5rem 6rem auto;
+  width: min(24rem, calc(100vw - 3rem));
+  max-height: min(70vh, 40rem);
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: var(--warm-white);
+  border-left: 0.25rem solid var(--agent-accent, var(--wave));
+  box-shadow: 0 1.4rem 3.5rem rgba(31,53,91,0.28);
+  overflow: hidden;
+}
+
+.chat-view[data-panel-mode="overlay"] .chat-messages { max-height: 40vh; }
+
+@media (max-width: 48rem) {
+  .nutrition-grid { grid-template-columns: 1fr 1fr; }
+  .chat-view[data-panel-mode="overlay"] { inset: auto 1rem 5.5rem auto; width: calc(100vw - 2rem); }
+  .floating-chat-button { right: 1rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+}
