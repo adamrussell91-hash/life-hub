@@ -71,4 +71,19 @@ Verified on 2026-08-04, on branch `nutrition-central-node-infra` (not yet merged
 
 Full design: `docs/superpowers/specs/2026-08-03-nutrition-central-node-design.md`. Full plan: `docs/superpowers/plans/2026-08-03-nutrition-central-node-infrastructure.md`.
 
-## Next Phase: Nutrition tab (data model, charts, and the embedded-chat wiring this phase's infrastructure was built for), then Central Node tab
+## Phase 6: Nutrition Tab — Complete
+
+Verified on 2026-08-04, on branch `nutrition-tab` (not yet merged to `main`):
+
+- `npm test`: 324 unit and integration tests passed, 0 failed (up from the Phase 5 baseline of 306).
+- `npm run validate:fixtures`: 4 valid files, 0 invalid files.
+- `npm audit --audit-level=high`: 0 vulnerabilities.
+- `npm run test:browser`: 16 Chromium acceptance tests passed, 0 failed (14 from Phase 4/5's Home and Chat coverage plus 2 new, covering the Nutrition dashboard rendering real fixture values and the floating chat button opening the shared panel themed in Brisket's colour).
+- Built `nutrition-model.js`/`render-nutrition.js` as a second model/render pair fed from Home's already-loaded `events`/`targetsConfig` (no new fetch), plus a hand-rolled SVG line-chart geometry builder (`nutrition-charts.js`) to keep the app's zero-runtime-dependency, offline-safe architecture intact. Wired Phase 5's previously-unused `chat-panel.js`/`agent-colour.js` building blocks into real markup for the first time — the embedded chat panel opens themed in Brisket's colour and defaults to him when nothing else is already sticky.
+- **Deviation from the design spec's mockup (intentional):** the 7-day protein trend chart drops the dashed target-line overlay described in the spec. `getDayTargets` returns a day-type-dependent protein target, so a single flat dashed line across a 7-day span spanning mixed day types would misrepresent the actual target on several of those days. The separate hit/miss strip and 30-day heatmap carry per-day target-consistency instead. Relevant for whoever builds the Central Node tab next, since it reuses this same trend-chart component.
+- A real regression surfaced during this phase's own browser-test verification (not present on `main`): `nutrition-model.js` newly imports `js/core/trends.js`, a pre-existing core module nothing on `main` had imported directly, so it had never been added to `service-worker.js`'s precache list. Invisible on a normal online load (the browser just fetches it), but it broke the entire ES module graph on an offline reload once made a live dependency. Root-caused via direct reproduction (not guesswork) and fixed by adding it to `SHELL_FILES` and bumping `CACHE_NAME` to `life-hub-shell-v16`; all 16 browser tests pass cleanly afterward. A full independent trace of `main.js`'s transitive import graph against `SHELL_FILES` during the branch's final review found no further gaps.
+- Known v1 simplification, unchanged from the plan: the chat panel is reparented into `#nutrition-dashboard` itself as its slot, so navigating away from Nutrition visually hides an open panel along with the section it's nested in (the conversation itself is unaffected; reopening from Nutrition shows the same ongoing exchange). The panel does not yet float over other tabs.
+
+Full design: `docs/superpowers/specs/2026-08-03-nutrition-central-node-design.md` (see the dashed-target-line note added there). Full plan: `docs/superpowers/plans/2026-08-04-nutrition-tab.md`.
+
+## Next Phase: Central Node tab
