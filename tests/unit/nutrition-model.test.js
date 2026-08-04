@@ -85,6 +85,22 @@ test('compares this week\'s average protein against the previous week\'s using t
   assert.deepEqual(model.proteinTrend, comparePeriods(40, 30, PROTEIN_TREND_CONFIG));
 });
 
+test('exposes mealTiming from today\'s meal protein breakdown', () => {
+  const model = buildNutritionModel({ events, targetsConfig, date: '2026-07-30' });
+  assert.deepEqual(model.mealTiming, [
+    { key: 'breakfast', label: 'Breakfast', value: 38 },
+    { key: 'lunch', label: 'Lunch', value: 42 },
+    { key: 'dinner', label: 'Dinner', value: 0 },
+    { key: 'snack', label: 'Snack', value: 0 }
+  ]);
+});
+
+test('exposes previousWeek series for comparison columns', () => {
+  const model = buildNutritionModel({ events, targetsConfig, date: '2026-07-30' });
+  assert.equal(model.previousWeek.length, 7);
+  assert.equal(typeof model.previousWeek[0].protein_g, 'number');
+});
+
 test('rejects a Nutrition model without a display date', () => {
   assert.throws(
     () => buildNutritionModel({ events: [], targetsConfig, date: null }),

@@ -62,6 +62,12 @@ export function buildNutritionModel({ events, targetsConfig, date }) {
     targets,
     week,
     month,
+    previousWeek,
+    mealTiming: ['breakfast', 'lunch', 'dinner', 'snack'].map(key => ({
+      key,
+      label: key[0].toUpperCase() + key.slice(1),
+      value: nutrition.meals[key].protein_g
+    })),
     proteinTrend: comparePeriods(averageProtein(week), averageProtein(previousWeek), PROTEIN_TREND_CONFIG)
   };
 }

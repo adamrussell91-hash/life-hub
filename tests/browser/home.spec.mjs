@@ -156,6 +156,8 @@ test('signs in and renders the approved Home values at desktop width', async () 
     railDisplay: 'flex',
     mobileDisplay: 'none'
   });
+  assert.equal(await page.locator('[data-ring="protein"]').count(), 1);
+  assert.equal(await page.locator('[data-progress="protein"]').count(), 0);
   assert.match(await page.evaluate(() => sessionStorage.getItem('life-hub:session-expiry')), /^2026-/);
   assert.equal(await page.locator('#sign-in-view').isHidden(), true);
   await assertNoSecretResponses();
