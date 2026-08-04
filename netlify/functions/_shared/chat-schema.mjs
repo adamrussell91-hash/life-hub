@@ -23,9 +23,13 @@ const DOMAIN_PROPERTIES = {
   },
   workout: {
     title: { type: 'string' },
+    session_kind: { type: 'string', enum: ['strength', 'walk', 'ep', 'mobility', 'other'] },
     day_type: { type: 'string', enum: ['movement', 'workout_30', 'workout_45_60'] },
     status: { type: 'string', enum: ['planned', 'completed', 'skipped'] },
     duration_min: { type: 'number' },
+    avg_hr: { type: 'number' },
+    calories_kcal: { type: 'number' },
+    distance_km: { type: 'number' },
     focus: { type: 'array', items: { type: 'string' } },
     recovery_flag_next_day: { type: 'boolean' },
     exercises: {
@@ -34,16 +38,29 @@ const DOMAIN_PROPERTIES = {
         type: 'object',
         properties: {
           name: { type: 'string' },
+          bench_angle_deg: { type: 'number' },
+          intensification: {
+            type: 'string',
+            enum: ['drop_set', 'rest_pause', 'eccentric_overload', 'elastic_finisher', 'superset', 'other']
+          },
+          equipment: { type: 'string' },
           sets: {
             type: 'array',
             items: {
               type: 'object',
-              properties: { reps: { type: 'number' }, weight_kg: { type: 'number' } },
-              required: ['reps', 'weight_kg']
+              properties: {
+                reps: { type: 'number' },
+                weight_kg: { type: 'number' },
+                cable_type: {
+                  type: 'string',
+                  enum: ['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing', 'none']
+                }
+              },
+              required: ['reps', 'weight_kg', 'cable_type']
             }
           }
         },
-        required: ['name', 'sets']
+        required: ['name']
       }
     },
     pain_flags: {
