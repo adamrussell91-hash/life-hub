@@ -56,4 +56,19 @@ Verified on 2026-08-02:
 
 Production credentials (including `ANTHROPIC_API_KEY`) remain deliberately absent from this repository; local verification against the live Anthropic API uses a gitignored `.env.local`.
 
-## Next Phase: Day One diary delivery
+## Phase 5: Nutrition/Central Node Shared Infrastructure — Complete
+
+Verified on 2026-08-04, on branch `nutrition-central-node-infra` (not yet merged to `main`):
+
+- `npm test`: 306 unit and integration tests passed, 0 failed (up from the Phase 4 baseline of 287).
+- `npm run validate:fixtures`: 4 valid files, 0 invalid files.
+- `npm audit --audit-level=high`: 0 vulnerabilities.
+- `central-node.md` and `config/agents.yml`'s parsed content now flow through the same manifest+blob sync and private cache Home already uses (`agentsConfig`, `centralNodeMarkdown` on the `loadLiveEvents` result) — no new Netlify function, no new sync cadence, no Anthropic cost impact.
+- Markdown-section extraction (`extractConstraints`, `extractTodaysStatus`, `extractCrossAgentCoordination`, `extractRecentAgentActions`, plus new `extractThisWeek`/`extractThisMonth`) moved from a server-only module to `js/core/constraints.js` so the browser can share it with the server.
+- A per-agent `agentColour` lookup and a standalone `chat-panel.js` DOM-reparenting module are built and fully tested, but **not yet wired into any UI** — `index.html`, `app-controller.js`, `main.js`, and `service-worker.js` are all untouched by this phase. `js/app/chat-panel.js` requires an `id="chat-view-home"` element that does not exist yet in `index.html`; the next phase must add it.
+- `config/agents.yml`'s Hammond entry is confirmed (`#3A3A42`, sourced from his Notion page cover) in this repo's local fixture only — the production `config/agents.yml` lives in the private data repo and still needs the same manual update there.
+- No warning is emitted when `config/agents.yml` or `central-node.md` is absent from a sync (unlike `config/targets.yml`'s `missing_targets` warning) — harmless today since nothing renders these fields yet, but the next phase should design explicitly for `agentsConfig`/`centralNodeMarkdown` being `null` on first load or GitHub outage.
+
+Full design: `docs/superpowers/specs/2026-08-03-nutrition-central-node-design.md`. Full plan: `docs/superpowers/plans/2026-08-03-nutrition-central-node-infrastructure.md`.
+
+## Next Phase: Nutrition tab (data model, charts, and the embedded-chat wiring this phase's infrastructure was built for), then Central Node tab
