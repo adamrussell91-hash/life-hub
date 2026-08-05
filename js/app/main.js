@@ -1,7 +1,13 @@
 import { load } from '../../vendor/js-yaml.mjs';
 import { agentColour } from './agent-colour.js';
 import { createSessionApi } from './api-session.js';
-import { createAppController, CENTRAL_NODE_AGENT_SLUG, FITNESS_AGENT_SLUG, NUTRITION_AGENT_SLUG } from './app-controller.js';
+import {
+  createAppController,
+  CENTRAL_NODE_AGENT_SLUG,
+  FITNESS_AGENT_SLUG,
+  NUTRITION_AGENT_SLUG,
+  SKINCARE_AGENT_SLUG
+} from './app-controller.js';
 import { buildCentralNodeModel } from './central-node-model.js';
 import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
@@ -17,6 +23,10 @@ import { renderFitness } from './render-fitness.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
 import { renderNutrition } from './render-nutrition.js';
 import { createRepositoryCache } from './repository-cache.js';
+import { createSkincareController } from './skincare-controller.js';
+import { buildSkincareModel } from './skincare-model.js';
+import { SKINCARE_ROUTINES, currentRoutineKey } from './skincare-routines-data.js';
+import { renderSkincare } from './render-skincare.js';
 import { syncRepository } from './sync-repository.js';
 
 // The API lives on a different origin (Netlify Functions) from the site (GitHub
@@ -65,6 +75,11 @@ const fitnessLogger = createFitnessLoggerController({
   storage: localStorage,
   onSessionWritten: () => void controller.refresh({ manual: true })
 });
+const skincareController = createSkincareController({
+  root: document,
+  chatApi,
+  onRecordWritten: () => void controller.refresh({ manual: true })
+});
 
 controller = createAppController({
   root: document,
@@ -81,6 +96,11 @@ controller = createAppController({
   buildFitnessModel,
   renderFitness,
   fitnessLogger,
+  buildSkincareModel,
+  renderSkincare,
+  skincareController,
+  skincareRoutines: SKINCARE_ROUTINES,
+  getCurrentRoutineKey: currentRoutineKey,
   buildCentralNodeModel,
   renderCentralNode,
   agentColour,
@@ -94,6 +114,7 @@ controller.start();
 const DEFAULT_AGENT_BY_SECTION = {
   nutrition: NUTRITION_AGENT_SLUG,
   fitness: FITNESS_AGENT_SLUG,
+  skincare: SKINCARE_AGENT_SLUG,
   'central-node': CENTRAL_NODE_AGENT_SLUG
 };
 

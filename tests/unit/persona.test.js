@@ -113,3 +113,20 @@ test('non-chadwick agents never receive exercise library instructions', () => {
   assert.doesNotMatch(prompt, /search_exercise_library/);
   assert.doesNotMatch(prompt, /Bar Press/);
 });
+
+test('hyaluronica prompt includes protocol when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hyaluronica',
+    hyaluronicaProtocol: '## Job\nPrefer the Skincare tab.'
+  });
+  assert.match(prompt, /Prefer the Skincare tab/);
+  assert.match(prompt, /Hyaluronica operating manual/);
+});
+
+test('other agents never receive hyaluronica protocol instructions', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    hyaluronicaProtocol: '## Job\nPrefer the Skincare tab.'
+  });
+  assert.doesNotMatch(prompt, /Hyaluronica operating manual/);
+});

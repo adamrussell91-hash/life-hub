@@ -757,6 +757,76 @@ main { max-width: 76rem; margin: 0 auto; }
   cursor: pointer;
 }
 .fitness-logger__finish:disabled { opacity: 0.6; cursor: wait; }
+
+.skincare-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+.skincare-card[data-current="true"] {
+  box-shadow: 0 0 0 2px rgba(185, 158, 224, 0.55);
+}
+.skincare-card__status { margin: 0.25rem 0 0.75rem; }
+.skincare-products,
+.skincare-extras,
+.skincare-notes,
+.skincare-choice {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.skincare-product {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.skincare-chip {
+  border: 1px solid var(--line);
+  background: var(--warm-white);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+}
+.skincare-chip[data-active="true"] {
+  background: rgba(185, 158, 224, 0.25);
+  border-color: #B99EE0;
+  color: var(--depth);
+}
+.skincare-note-chips,
+.skincare-extras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.skincare-notes textarea,
+.skincare-procedure-title,
+#skincare-procedure textarea {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  font: inherit;
+  background: var(--warm-white);
+  color: var(--ink);
+}
+.skincare-done {
+  border: 0;
+  border-radius: 0.85rem;
+  padding: 0.85rem 1rem;
+  background: #B99EE0;
+  color: #1a1424;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  width: 100%;
+}
+#skincare-chat-button { --agent-accent: #B99EE0; }
+
 .fitness-exercise strong {
   display: block;
   color: var(--depth);

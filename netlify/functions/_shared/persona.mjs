@@ -7,6 +7,7 @@ export function buildSystemPrompt({
   centralNodeLog = '',
   foodLibrary = '',
   chadwickProtocol = '',
+  hyaluronicaProtocol = '',
   workoutTemplates = '',
   exerciseLibrary = ''
 }) {
@@ -60,11 +61,19 @@ export function buildSystemPrompt({
     'Infer session_kind from what was done (or planned). Always include cable_type on every strength set (use none when not on cables). Never invent YAML fields that are not in the log_entry schema; if Adam mentions an unsupported metric, say it needs to be added to the workout book later.'
   ] : [];
 
+  const hyaluronicaBlocks = slug === 'hyaluronica' ? [
+    hyaluronicaProtocol
+      ? `Hyaluronica operating manual (follow these Life Hub rules):\n${hyaluronicaProtocol}`
+      : '',
+    'Prefer the Skincare tab for one-tap AM/PM logs. In chat, advise and adjust; only propose skincare log_entry when Adam clearly describes a completed routine or procedure here instead of using the tab.'
+  ] : [];
+
   return [
     shared,
     `You are ${agent.name}, Adam's ${agent.domain ?? 'general'} agent.`,
     agent.voice,
     capability,
-    ...chadwickBlocks
+    ...chadwickBlocks,
+    ...hyaluronicaBlocks
   ].filter(Boolean).join('\n\n');
 }

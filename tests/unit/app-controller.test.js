@@ -89,11 +89,13 @@ class FakeDocument extends EventTarget {
       ['#retry-button', new FakeElement()]
     ]);
     this.futureNavigation = new FakeElement();
-    this.futureNavigation.dataset.section = 'skincare';
+    this.futureNavigation.dataset.section = 'body';
     this.nutritionNavigation = new FakeElement();
     this.nutritionNavigation.dataset.section = 'nutrition';
     this.fitnessNavigation = new FakeElement();
     this.fitnessNavigation.dataset.section = 'fitness';
+    this.skincareNavigation = new FakeElement();
+    this.skincareNavigation.dataset.section = 'skincare';
     this.centralNodeNavigation = new FakeElement();
     this.centralNodeNavigation.dataset.section = 'central-node';
     this.chatNavigation = new FakeElement();
@@ -106,10 +108,18 @@ class FakeDocument extends EventTarget {
 
   querySelectorAll(selector) {
     if (selector === '[data-section]') {
-      return [this.futureNavigation, this.nutritionNavigation, this.fitnessNavigation, this.centralNodeNavigation, this.chatNavigation];
+      return [
+        this.futureNavigation,
+        this.nutritionNavigation,
+        this.fitnessNavigation,
+        this.skincareNavigation,
+        this.centralNodeNavigation,
+        this.chatNavigation
+      ];
     }
     if (selector === '[data-section="nutrition"]') return [this.nutritionNavigation];
     if (selector === '[data-section="fitness"]') return [this.fitnessNavigation];
+    if (selector === '[data-section="skincare"]') return [this.skincareNavigation];
     if (selector === '[data-section="central-node"]') return [this.centralNodeNavigation];
     if (selector === '[data-section="chat"]') return [this.chatNavigation];
     return [];
