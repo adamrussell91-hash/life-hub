@@ -68,6 +68,34 @@ export function buildNutritionModel({ events, targetsConfig, date }) {
       label: key[0].toUpperCase() + key.slice(1),
       value: nutrition.meals[key].protein_g
     })),
+    mealsToday: events
+      .filter(event => event?.record?.type === 'meal' && event.record.date === date)
+      .slice()
+      .sort((left, right) => String(left.record.time ?? '').localeCompare(String(right.record.time ?? '')))
+      .map(event => {
+        const record = event.record;
+        const bodyLine = String(event.body ?? '').trim().split('\n').find(Boolean) ?? '';
+        const notes = typeof record.notes === 'string' ? record.notes.trim() : '';
+        return {
+          meal: record.meal,
+          time: record.time ?? null,
+          calories: record.calories ?? 0,
+          protein_g: record.protein_g ?? 0,
+          fat_g: record.fat_g ?? 0,
+          summary: bodyLine || notes || `${record.meal} logged`
+        };
+      }),
+    macroSplit: {
+      calories: nutrition.calories,
+      caloriesTarget: targets.calories,
+      protein_g: nutrition.protein_g,
+      proteinTarget: targets.protein_g,
+      fat_g: nutrition.fat_g,
+      fatCeiling: targets.fat_ceiling_g,
+      proteinPct: targets.protein_g > 0 ? Math.round((nutrition.protein_g / targets.protein_g) * 100) : 0,
+      fatPct: targets.fat_ceiling_g > 0 ? Math.round((nutrition.fat_g / targets.fat_ceiling_g) * 100) : 0,
+      energyPct: targets.calories > 0 ? Math.round((nutrition.calories / targets.calories) * 100) : 0
+    },
     proteinTrend: comparePeriods(averageProtein(week), averageProtein(previousWeek), PROTEIN_TREND_CONFIG)
   };
 }

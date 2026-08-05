@@ -31,6 +31,8 @@ export function renderNutrition(root, model) {
     setText(root, `[data-meal-protein="${meal}"]`, `${values.protein_g} g`);
   }
 
+  renderMacroSplit(root, model);
+  renderMealsToday(root, model.mealsToday);
   renderMacroRings(root, model);
   renderNamedAreaChart(root, '#nutrition-protein-chart', model.week, 'protein_g', { rollingAverage: 3 });
   renderNamedAreaChart(root, '#nutrition-calories-chart', model.week, 'calories');
@@ -39,7 +41,6 @@ export function renderNutrition(root, model) {
   renderHeatmap(root, model.month);
   renderProteinTrend(root, model.proteinTrend);
   renderMealTiming(root, model.mealTiming);
-  renderMacroSplit(root, model);
   renderWeekCompare(root, model.week, model.previousWeek);
 
   root.querySelector('#nutrition-dashboard')?.removeAttribute('hidden');
@@ -65,13 +66,25 @@ function renderNamedAreaChart(root, selector, series, valueKey, { rollingAverage
   const normalized = series.map(day => ({ date: day.date, value: day[valueKey] }));
   const chart = buildAreaLine(normalized, { rollingAverage });
   svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
-  svg.querySelector('[data-role="line"]')?.setAttribute('points', chart.linePoints);
-  svg.querySelector('[data-role="area"]')?.setAttribute('points', chart.areaPoints);
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  const line = svg.querySelector('[data-role="line"]');
+  const area = svg.querySelector('[data-role="area"]');
+  if (line) {
+    if (line.tagName.toLowerCase() === 'path') line.setAttribute('d', chart.linePath);
+    else line.setAttribute('points', chart.linePoints);
+  }
+  if (area) {
+    if (area.tagName.toLowerCase() === 'path') area.setAttribute('d', chart.areaPath);
+    else area.setAttribute('points', chart.areaPoints);
+  }
 
   const rolling = svg.querySelector('[data-role="rolling"]');
   if (rolling) {
-    if (chart.rollingLinePoints) {
-      rolling.setAttribute('points', chart.rollingLinePoints);
+    const rollingPath = chart.rollingLinePath || chart.rollingLinePoints;
+    if (rollingPath) {
+      if (rolling.tagName.toLowerCase() === 'path') rolling.setAttribute('d', chart.rollingLinePath);
+      else rolling.setAttribute('points', chart.rollingLinePoints);
       rolling.removeAttribute('hidden');
     } else {
       rolling.setAttribute('hidden', '');
@@ -93,6 +106,32 @@ function renderNamedAreaChart(root, selector, series, valueKey, { rollingAverage
   }
 
   animateAreaReveal(svg);
+}
+
+function renderMealsToday(root, mealsToday) {
+  const list = root.querySelector('#nutrition-meal-log');
+  const empty = root.querySelector('[data-nutrition="meal-log-empty"]');
+  if (!list) return;
+  list.replaceChildren();
+  if (!mealsToday?.length) {
+    empty?.removeAttribute('hidden');
+    return;
+  }
+  empty?.setAttribute('hidden', '');
+  for (const meal of mealsToday) {
+    const item = root.createElement('li');
+    item.className = 'meal-log__item';
+    const title = root.createElement('strong');
+    const mealLabel = meal.meal ? meal.meal[0].toUpperCase() + meal.meal.slice(1) : 'Meal';
+    title.textContent = meal.time ? `${mealLabel} · ${meal.time}` : mealLabel;
+    const detail = root.createElement('p');
+    detail.textContent = meal.summary;
+    const macros = root.createElement('p');
+    macros.className = 'meal-log__macros';
+    macros.textContent = `${meal.calories} kcal · ${meal.protein_g} g protein · ${meal.fat_g} g fat`;
+    item.append(title, detail, macros);
+    list.append(item);
+  }
 }
 
 function renderHitStrip(root, week) {
@@ -150,12 +189,31 @@ function renderMacroSplit(root, model) {
   const svg = root.querySelector('#nutrition-macro-split');
   if (!svg) return;
 
+  const split = model.macroSplit ?? {
+    protein_g: model.nutrition.protein_g,
+    proteinTarget: model.targets.protein_g,
+    fat_g: model.nutrition.fat_g,
+    fatCeiling: model.targets.fat_ceiling_g,
+    calories: model.nutrition.calories,
+    caloriesTarget: model.targets.calories,
+    proteinPct: 0,
+    fatPct: 0,
+    energyPct: 0
+  };
+
+  setText(root, '[data-split="protein"]', `${split.protein_g} g / ${split.proteinTarget} g`);
+  setText(root, '[data-split="protein-pct"]', `${split.proteinPct}% of protein target`);
+  setText(root, '[data-split="fat"]', `${split.fat_g} g / ${split.fatCeiling} g`);
+  setText(root, '[data-split="fat-pct"]', `${split.fatPct}% of fat ceiling`);
+  setText(root, '[data-split="energy"]', `${split.calories.toLocaleString('en-AU')} / ${split.caloriesTarget.toLocaleString('en-AU')} kcal`);
+  setText(root, '[data-split="energy-pct"]', `${split.energyPct}% of energy target`);
+
   const protein = buildRingTarget(
-    { value: model.nutrition.protein_g, target: model.targets.protein_g },
+    { value: split.protein_g, target: split.proteinTarget },
     { size: 96, strokeWidth: 8 }
   );
   const fat = buildRingTarget(
-    { value: model.nutrition.fat_g, target: model.targets.fat_ceiling_g },
+    { value: split.fat_g, target: split.fatCeiling },
     { size: 96, strokeWidth: 8 }
   );
   const fatRadius = protein.radius * 0.72;

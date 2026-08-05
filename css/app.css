@@ -43,6 +43,35 @@ body {
 
 button, input { font: inherit; }
 
+button {
+  transition: transform 120ms ease, opacity 120ms ease, filter 120ms ease, background-color 120ms ease;
+}
+button:active:not(:disabled),
+.nav-item:active,
+.mobile-nav button:active,
+.floating-chat-button:active,
+.record-proposal__confirm:active,
+.record-proposal__discard:active,
+.quiet-button:active,
+.sign-in-card button:active {
+  transform: scale(0.96);
+  opacity: 0.88;
+  filter: brightness(0.92);
+}
+@media (prefers-reduced-motion: reduce) {
+  button { transition: none; }
+  button:active:not(:disabled),
+  .nav-item:active,
+  .mobile-nav button:active,
+  .floating-chat-button:active,
+  .record-proposal__confirm:active,
+  .record-proposal__discard:active,
+  .quiet-button:active,
+  .sign-in-card button:active {
+    transform: none;
+  }
+}
+
 button, a { -webkit-tap-highlight-color: transparent; }
 
 button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
@@ -295,7 +324,32 @@ main { max-width: 76rem; margin: 0 auto; }
 .week-strip span { display: grid; justify-items: center; gap: 0.4rem; min-width: 1.5rem; }
 .week-strip small { color: var(--muted); font-size: 0.58rem; font-weight: 700; }
 .week-strip i { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: rgba(20,43,81,0.1); }
+.week-strip span[data-hit="true"] i { background: var(--wave); }
 .week-strip .is-current i { background: var(--high-sea); box-shadow: 0 0 0 5px rgba(246,134,32,0.1); }
+.week-strip .is-current[data-hit="true"] i { background: var(--high-sea); }
+
+.meal-log-card { margin-top: 1rem; }
+.meal-log { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.85rem; }
+.meal-log__item strong { display: block; color: var(--depth); font-size: 0.86rem; }
+.meal-log__item p { margin: 0.2rem 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
+.meal-log__macros { color: var(--depth) !important; font-weight: 650; font-variant-numeric: tabular-nums; }
+.meal-log__empty { margin: 0.75rem 0 0; color: var(--muted); font-size: 0.78rem; }
+
+.macro-split-card { margin-bottom: 1rem; }
+.macro-split {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem 1.25rem;
+  align-items: center;
+  margin-top: 0.65rem;
+}
+.macro-split__copy { margin: 0; display: grid; gap: 0.65rem; }
+.macro-split__copy > div { display: grid; gap: 0.15rem; }
+.macro-split__copy dt { color: var(--muted); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.macro-split__copy dd { margin: 0; display: grid; gap: 0.1rem; }
+.macro-split__copy strong { color: var(--depth); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.macro-split__copy span { color: var(--muted); font-size: 0.74rem; }
+.macro-split-card .metric-caption { margin-top: 0.75rem; }
 
 .warning-panel, .unavailable-panel { margin-bottom: 1.2rem; padding: 1rem 1.2rem; display: flex; align-items: center; gap: 1rem; }
 .provider-status {
@@ -459,18 +513,31 @@ main { max-width: 76rem; margin: 0 auto; }
 .metric-ring-fill.metric-ring--fat { stroke: var(--ring-fat); }
 .chart-day-label { fill: var(--chart-label); font-size: 9px; }
 
-.line-chart { width: 100%; height: 8rem; margin-top: 0.75rem; }
+.line-chart { width: 100%; height: 8rem; margin-top: 0.75rem; overflow: visible; }
 .line-chart [data-role="area"] { fill: var(--area-fill); stroke: none; }
-.line-chart [data-role="line"] { fill: none; stroke: var(--wave); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-.line-chart [data-role="rolling"] { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.line-chart [data-role="line"] {
+  fill: none;
+  stroke: var(--wave);
+  stroke-width: 2.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.line-chart [data-role="rolling"] {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.75;
+  stroke-dasharray: 4 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
 .line-chart.chart-animating [data-role="area"] {
   clip-path: inset(0 100% 0 0);
-  animation: area-reveal 700ms cubic-bezier(.2,.8,.2,1) forwards;
+  animation: area-reveal 900ms cubic-bezier(.2,.8,.2,1) forwards;
 }
 .line-chart.chart-animating [data-role="line"] {
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 1000;
-  animation: line-draw 700ms cubic-bezier(.2,.8,.2,1) forwards;
+  animation: line-draw 900ms cubic-bezier(.2,.8,.2,1) forwards;
 }
 @keyframes area-reveal { to { clip-path: inset(0 0 0 0); } }
 @keyframes line-draw { to { stroke-dashoffset: 0; } }

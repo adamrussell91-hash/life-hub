@@ -40,6 +40,24 @@ export function renderHome(root, model) {
   setText(root, '[data-value="streak"]', model.workoutStreak);
   setText(root, '[data-value="logging"]', `${model.completeness.complete} of ${model.completeness.total}`);
   setText(root, '[data-value="sync"]', 'Live data ready');
+  setText(root, '#week-label', model.weekSummary.headline);
+  setText(root, '[data-week-detail]', model.weekSummary.detail);
+
+  const weekStrip = root.querySelector('.week-strip');
+  if (weekStrip && Array.isArray(model.weekDays)) {
+    weekStrip.replaceChildren();
+    weekStrip.setAttribute('aria-label', 'This week logging coverage');
+    for (const day of model.weekDays) {
+      const cell = root.createElement('span');
+      if (day.isToday) cell.classList.add('is-current');
+      if (day.logged) cell.dataset.hit = 'true';
+      const label = root.createElement('small');
+      label.textContent = day.letter;
+      const dot = root.createElement('i');
+      cell.append(label, dot);
+      weekStrip.append(cell);
+    }
+  }
 
   const ringMap = {
     calories: { value: model.nutrition.calories, target: model.targets.calories },

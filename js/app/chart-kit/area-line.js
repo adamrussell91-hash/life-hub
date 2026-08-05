@@ -10,6 +10,36 @@ function rollingMeans(values, window) {
   });
 }
 
+function fmt(n) {
+  return Number(n).toFixed(1);
+}
+
+/** Catmull-Rom → cubic Bézier path through points (smooth line). */
+export function smoothLinePath(points) {
+  if (!points.length) return '';
+  if (points.length === 1) return `M ${fmt(points[0].x)} ${fmt(points[0].y)}`;
+
+  let d = `M ${fmt(points[0].x)} ${fmt(points[0].y)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? 0 : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${fmt(cp1x)} ${fmt(cp1y)}, ${fmt(cp2x)} ${fmt(cp2y)}, ${fmt(p2.x)} ${fmt(p2.y)}`;
+  }
+  return d;
+}
+
+export function smoothAreaPath(points, { width, height, padding }) {
+  const line = smoothLinePath(points);
+  if (!line) return '';
+  return `${line} L ${fmt(width - padding)} ${fmt(height)} L ${fmt(padding)} ${fmt(height)} Z`;
+}
+
 export function buildAreaLine(
   series,
   {
@@ -33,10 +63,12 @@ export function buildAreaLine(
     value: values[index]
   }));
 
-  const linePoints = points.map(point => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
+  const linePoints = points.map(point => `${fmt(point.x)},${fmt(point.y)}`).join(' ');
   const areaPoints = points.length === 0
     ? ''
     : `${padding},${height} ${linePoints} ${width - padding},${height}`;
+  const linePath = smoothLinePath(points);
+  const areaPath = smoothAreaPath(points, { width, height, padding });
 
   const result = {
     width,
@@ -44,13 +76,18 @@ export function buildAreaLine(
     points,
     linePoints,
     areaPoints,
+    linePath,
+    areaPath,
     dayLabels: points.map(({ date, x }) => ({ date, x }))
   };
 
   if (rollingAverage > 0 && points.length > 0) {
-    result.rollingLinePoints = means
-      .map((mean, index) => `${points[index].x.toFixed(1)},${scaleY(mean).toFixed(1)}`)
-      .join(' ');
+    const meanPoints = means.map((mean, index) => ({
+      x: points[index].x,
+      y: scaleY(mean)
+    }));
+    result.rollingLinePoints = meanPoints.map(point => `${fmt(point.x)},${fmt(point.y)}`).join(' ');
+    result.rollingLinePath = smoothLinePath(meanPoints);
   }
 
   return result;

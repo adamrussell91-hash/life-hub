@@ -95,6 +95,15 @@ test('exposes mealTiming from today\'s meal protein breakdown', () => {
   ]);
 });
 
+test('exposes mealsToday and written macro split for the display date', () => {
+  const model = buildNutritionModel({ events, targetsConfig, date: '2026-07-30' });
+  assert.equal(model.mealsToday.length, 2);
+  assert.equal(model.mealsToday[0].meal, 'breakfast');
+  assert.equal(model.macroSplit.protein_g, 80);
+  assert.equal(model.macroSplit.proteinTarget, 120);
+  assert.equal(model.macroSplit.proteinPct, 67);
+});
+
 test('exposes previousWeek series for comparison columns', () => {
   const model = buildNutritionModel({ events, targetsConfig, date: '2026-07-30' });
   assert.equal(model.previousWeek.length, 7);

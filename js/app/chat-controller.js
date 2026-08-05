@@ -73,11 +73,18 @@ export function createChatController({ root, chatApi, onRecordWritten, now = () 
     let assistantBubble = null;
     let assistantBuffer = '';
     let assistantFullText = '';
+    let searchWaitBubble = null;
+    const abort = new AbortController();
+    const timeoutId = setTimeout(() => abort.abort(), 90_000);
 
     // Streamed text arrives as one long buffer; splitting on paragraph breaks into
     // separate bubbles reads like an actual back-and-forth instead of one wall of text.
     function renderLiveText(text) {
       if (!text) return;
+      if (searchWaitBubble) {
+        searchWaitBubble.remove();
+        searchWaitBubble = null;
+      }
       if (!assistantBubble) assistantBubble = appendMessage(root, { role: 'assistant', agentSlug: assistantSlug });
       renderInlineMarkdown(root, assistantBubble, text);
       scrollChatToBottom();
@@ -103,7 +110,7 @@ export function createChatController({ root, chatApi, onRecordWritten, now = () 
     }
 
     try {
-      for await (const event of chatApi.send(message, { history, priorAgentSlug })) {
+      for await (const event of chatApi.send(message, { history, priorAgentSlug, signal: abort.signal })) {
         if (event.type === 'agent') {
           assistantSlug = event.slug;
           lastAgentSlug = event.slug;
@@ -121,6 +128,10 @@ export function createChatController({ root, chatApi, onRecordWritten, now = () 
           renderLiveText(assistantBuffer);
         } else if (event.type === 'record_proposal') {
           endTextTurn();
+          if (searchWaitBubble) {
+            searchWaitBubble.remove();
+            searchWaitBubble = null;
+          }
           const proposal = appendRecordProposal(root, event);
           bindProposal(proposal, event);
         } else if (event.type === 'record_rejected') {
@@ -130,6 +141,8 @@ export function createChatController({ root, chatApi, onRecordWritten, now = () 
         } else if (event.type === 'search') {
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `🔍 Searched the web: ${event.query ?? '…'}` });
+          searchWaitBubble = appendMessage(root, { role: 'assistant', text: 'Looking that up…' });
+          scrollChatToBottom();
         } else if (event.type === 'food_library_saved') {
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `📚 Saved "${event.name}" to the Food Library for next time.` });
@@ -139,9 +152,18 @@ export function createChatController({ root, chatApi, onRecordWritten, now = () 
         }
       }
       remember('assistant', assistantFullText);
-    } catch {
-      showChatError(root, 'Chat is unavailable right now. Please try again.');
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        showChatError(root, 'That search took too long. Try again in a moment.');
+      } else {
+        showChatError(root, 'Chat is unavailable right now. Please try again.');
+      }
     } finally {
+      clearTimeout(timeoutId);
+      if (searchWaitBubble) {
+        searchWaitBubble.remove();
+        searchWaitBubble = null;
+      }
       sending = false;
       setChatBusy(root, false);
     }

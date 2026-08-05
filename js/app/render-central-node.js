@@ -83,10 +83,16 @@ function renderWeekChart(root, week) {
   svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
 
   const line = svg.querySelector('[data-role="line"]');
-  if (line) line.setAttribute('points', chart.linePoints);
+  if (line) {
+    if (line.tagName.toLowerCase() === 'path') line.setAttribute('d', chart.linePath);
+    else line.setAttribute('points', chart.linePoints);
+  }
 
   const area = svg.querySelector('[data-role="area"]');
-  if (area) area.setAttribute('points', chart.areaPoints);
+  if (area) {
+    if (area.tagName.toLowerCase() === 'path') area.setAttribute('d', chart.areaPath);
+    else area.setAttribute('points', chart.areaPoints);
+  }
 
   const labels = svg.querySelector('[data-role="day-labels"]');
   if (labels) {
