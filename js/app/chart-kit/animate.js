@@ -14,7 +14,7 @@ export function animateRingFill(circle, { circumference, dashoffset }, options =
   circle.style.transition = 'none';
   circle.setAttribute('stroke-dashoffset', String(circumference));
   void circle.getBoundingClientRect();
-  circle.style.transition = 'stroke-dashoffset 600ms cubic-bezier(.2,.8,.2,1)';
+  circle.style.transition = 'stroke-dashoffset 700ms cubic-bezier(.2,.8,.2,1)';
   circle.setAttribute('stroke-dashoffset', String(dashoffset));
 }
 
@@ -22,6 +22,24 @@ export function animateAreaReveal(svg, options = {}) {
   if (!svg) return;
   const reduced = options.reducedMotion ?? prefersReducedMotion();
   svg.classList.remove('chart-animating', 'chart-static');
+  // Force a style recalc so re-entering a tab replays the reveal.
+  void svg.getBoundingClientRect();
+
+  const line = svg.querySelector('[data-role="line"]');
+  if (line) {
+    line.style.strokeDasharray = '';
+    line.style.strokeDashoffset = '';
+    if (!reduced && typeof line.getTotalLength === 'function') {
+      try {
+        const length = Math.max(line.getTotalLength(), 1);
+        line.style.strokeDasharray = String(length);
+        line.style.strokeDashoffset = String(length);
+      } catch {
+        // Some environments lack getTotalLength for the node type.
+      }
+    }
+  }
+
   svg.classList.add(reduced ? 'chart-static' : 'chart-animating');
 }
 
@@ -36,6 +54,6 @@ export function animateColumnGrow(element, heightPct, options = {}) {
   element.style.transition = 'none';
   element.style.height = '0%';
   void element.getBoundingClientRect();
-  element.style.transition = 'height 600ms cubic-bezier(.2,.8,.2,1)';
+  element.style.transition = 'height 700ms cubic-bezier(.2,.8,.2,1)';
   element.style.height = `${heightPct}%`;
 }

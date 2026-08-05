@@ -57,6 +57,10 @@ test('builds the approved Home fixture model through core modules', async () => 
     fat: 54,
     logging: 60
   });
+  assert.equal(model.weekDays.length, 7);
+  assert.equal(model.weekDays.at(-1).date, '2026-07-30');
+  assert.equal(model.weekDays.at(-1).isToday, true);
+  assert.match(model.weekSummary.headline, /logged this week|quiet start/i);
 });
 
 test('rejects a Home model without a display date', () => {

@@ -212,17 +212,9 @@
             <div>
               <p class="section-kicker">This week</p>
               <h2 id="week-label">A quiet start is still a start.</h2>
-              <p>More history will appear here as authenticated GitHub sync comes online.</p>
+              <p data-week-detail>Log a meal, workout, or diary entry and the strip will light up.</p>
             </div>
-            <div class="week-strip" aria-label="Fixture week coverage">
-              <span><small>M</small><i></i></span>
-              <span><small>T</small><i></i></span>
-              <span class="is-current"><small>W</small><i></i></span>
-              <span><small>T</small><i></i></span>
-              <span><small>F</small><i></i></span>
-              <span><small>S</small><i></i></span>
-              <span><small>S</small><i></i></span>
-            </div>
+            <div class="week-strip" aria-label="This week logging coverage"></div>
           </section>
         </section>
 
@@ -251,6 +243,37 @@
               <h2 id="nutrition-heading">Today's macros</h2>
             </div>
           </div>
+
+          <article class="metric-card chart-card macro-split-card" aria-labelledby="macro-split-label">
+            <div class="metric-heading">
+              <p class="metric-label" id="macro-split-label">Macro split</p>
+            </div>
+            <div class="macro-split">
+              <div class="metric-ring-wrap">
+                <svg id="nutrition-macro-split" class="metric-ring metric-ring--split" viewBox="0 0 96 96" role="img" aria-label="Protein and fat progress">
+                  <circle data-role="protein-track" class="metric-ring-track" fill="none"></circle>
+                  <circle data-role="protein-fill" class="metric-ring-fill metric-ring--protein" fill="none"></circle>
+                  <circle data-role="fat-track" class="metric-ring-track" fill="none"></circle>
+                  <circle data-role="fat-fill" class="metric-ring-fill metric-ring--fat" fill="none"></circle>
+                </svg>
+              </div>
+              <dl class="macro-split__copy">
+                <div>
+                  <dt>Protein</dt>
+                  <dd><strong data-split="protein">—</strong><span data-split="protein-pct">—</span></dd>
+                </div>
+                <div>
+                  <dt>Fat</dt>
+                  <dd><strong data-split="fat">—</strong><span data-split="fat-pct">—</span></dd>
+                </div>
+                <div>
+                  <dt>Energy</dt>
+                  <dd><strong data-split="energy">—</strong><span data-split="energy-pct">—</span></dd>
+                </div>
+              </dl>
+            </div>
+            <p class="metric-caption">Outer ring = protein target · inner ring = fat ceiling</p>
+          </article>
 
           <div class="nutrition-grid">
             <article class="metric-card" aria-labelledby="nutrition-calories-label">
@@ -343,15 +366,21 @@
             </dl>
           </article>
 
+          <article class="metric-card meal-log-card" aria-labelledby="meal-log-label">
+            <p class="metric-label" id="meal-log-label">What you ate today</p>
+            <p data-nutrition="meal-log-empty" class="meal-log__empty">No meals logged for this day yet.</p>
+            <ul id="nutrition-meal-log" class="meal-log"></ul>
+          </article>
+
           <article class="metric-card chart-card" aria-labelledby="protein-trend-label">
             <div class="metric-heading">
               <p class="metric-label" id="protein-trend-label">7-day protein trend</p>
               <span class="trend-badge" data-value="protein-trend">—</span>
             </div>
             <svg id="nutrition-protein-chart" class="line-chart" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Protein trend over the last 7 days">
-              <polygon data-role="area" points=""></polygon>
-              <polyline data-role="line" points=""></polyline>
-              <polyline data-role="rolling" points="" hidden></polyline>
+              <path data-role="area" d=""></path>
+              <path data-role="line" d=""></path>
+              <path data-role="rolling" d="" hidden></path>
               <g data-role="day-labels"></g>
             </svg>
             <div id="nutrition-hit-strip" class="hit-strip" aria-label="Whether the protein target was met each day, last 7 days"></div>
@@ -360,8 +389,8 @@
           <article class="metric-card chart-card" aria-labelledby="calories-trend-label">
             <p class="metric-label" id="calories-trend-label">7-day energy trend</p>
             <svg id="nutrition-calories-chart" class="line-chart" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Calorie trend over the last 7 days">
-              <polygon data-role="area" points=""></polygon>
-              <polyline data-role="line" points=""></polyline>
+              <path data-role="area" d=""></path>
+              <path data-role="line" d=""></path>
               <g data-role="day-labels"></g>
             </svg>
           </article>
@@ -369,8 +398,8 @@
           <article class="metric-card chart-card" aria-labelledby="fat-trend-label">
             <p class="metric-label" id="fat-trend-label">7-day fat trend</p>
             <svg id="nutrition-fat-chart" class="line-chart" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Fat trend over the last 7 days">
-              <polygon data-role="area" points=""></polygon>
-              <polyline data-role="line" points=""></polyline>
+              <path data-role="area" d=""></path>
+              <path data-role="line" d=""></path>
               <g data-role="day-labels"></g>
             </svg>
           </article>
@@ -378,21 +407,6 @@
           <article class="metric-card chart-card" aria-labelledby="meal-timing-label">
             <p class="metric-label" id="meal-timing-label">Meal timing · protein</p>
             <div id="nutrition-meal-timing" class="column-chart" aria-label="Protein by meal today"></div>
-          </article>
-
-          <article class="metric-card chart-card" aria-labelledby="macro-split-label">
-            <div class="metric-heading">
-              <p class="metric-label" id="macro-split-label">Macro split</p>
-            </div>
-            <div class="metric-ring-wrap">
-              <svg id="nutrition-macro-split" class="metric-ring metric-ring--split" viewBox="0 0 96 96" role="img" aria-label="Protein and fat progress">
-                <circle data-role="protein-track" class="metric-ring-track" fill="none"></circle>
-                <circle data-role="protein-fill" class="metric-ring-fill metric-ring--protein" fill="none"></circle>
-                <circle data-role="fat-track" class="metric-ring-track" fill="none"></circle>
-                <circle data-role="fat-fill" class="metric-ring-fill metric-ring--fat" fill="none"></circle>
-              </svg>
-              <p class="metric-caption">Outer protein · inner fat ceiling</p>
-            </div>
           </article>
 
           <article class="metric-card chart-card" aria-labelledby="week-compare-label">
@@ -505,8 +519,8 @@
             <p class="metric-label" id="central-node-week-label">This Week</p>
             <div data-central-node="this-week" class="prose-section"></div>
             <svg id="central-node-week-chart" class="line-chart" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Protein trend over the last 7 days">
-              <polygon data-role="area" points=""></polygon>
-              <polyline data-role="line" points=""></polyline>
+              <path data-role="area" d=""></path>
+              <path data-role="line" d=""></path>
               <g data-role="day-labels"></g>
             </svg>
           </article>
