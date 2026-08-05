@@ -249,7 +249,11 @@ export function createAppController(dependencies) {
 
   function refresh(options = {}) {
     if (destroyed) return Promise.resolve();
-    if (activeRefresh) return activeRefresh;
+    const force = options.force === true;
+    if (activeRefresh && !force) return activeRefresh;
+    if (force && activeRefresh) {
+      abortActiveRefresh(new DOMException('Superseded by post-write refresh', 'AbortError'));
+    }
     if (!requireUnexpiredSession()) return Promise.resolve();
     if (!navigatorTarget.onLine && rendered) {
       updateNetworkState();
@@ -265,7 +269,7 @@ export function createAppController(dependencies) {
     const version = lifecycleVersion;
     const abortController = new AbortController();
     refreshAbortController = abortController;
-    const refreshPromise = performRefresh({ signal: abortController.signal, version, manual })
+    const refreshPromise = performRefresh({ signal: abortController.signal, version, manual, force })
       .finally(() => {
         if (activeRefresh !== refreshPromise) return;
         if (button) button.disabled = !navigatorTarget.onLine;
@@ -276,13 +280,13 @@ export function createAppController(dependencies) {
     return refreshPromise;
   }
 
-  async function performRefresh({ signal, version, manual = false }) {
+  async function performRefresh({ signal, version, manual = false, force = false }) {
     try {
       const date = getSydneyDateKey(currentDate());
       const result = await loadLive({ date, signal });
       if (!isCurrentRefresh(version, signal) || !requireUnexpiredSession()) return;
       latestResult = { ...result, date };
-      if (!rendered || result.changed === true) {
+      if (!rendered || result.changed === true || force === true) {
         const model = buildHomeModel({ ...result, date });
         renderHome(root, model);
         if (currentSection === 'nutrition') renderNutritionSection();

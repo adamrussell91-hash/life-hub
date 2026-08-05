@@ -88,13 +88,13 @@ const fitnessLogger = createFitnessLoggerController({
 const skincareController = createSkincareController({
   root: document,
   chatApi,
-  onRecordWritten: () => void controller.refresh({ manual: true })
+  onRecordWritten: () => void controller.refresh({ manual: true, force: true })
 });
 const bodyController = createBodyController({
   root: document,
   chatApi,
   getDate: () => controller.getDisplayDate?.() ?? null,
-  onRecordWritten: () => void controller.refresh({ manual: true })
+  onRecordWritten: () => void controller.refresh({ manual: true, force: true })
 });
 
 controller = createAppController({
@@ -147,7 +147,7 @@ const DEFAULT_AGENT_BY_SECTION = {
 chatController = createChatController({
   root: document,
   chatApi,
-  onRecordWritten: () => void controller.refresh({ manual: true }),
+  onRecordWritten: () => void controller.refresh({ manual: true, force: true }),
   getDefaultAgentSlug: () => DEFAULT_AGENT_BY_SECTION[controller.getCurrentSection()],
   agentColour,
   getAgentsConfig: () => controller.getAgentsConfig?.() ?? null

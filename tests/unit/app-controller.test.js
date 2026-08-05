@@ -308,6 +308,7 @@ function harness(options = {}) {
     buildNutritionModel: input => ({ date: input.date, source: input, kind: 'nutrition' }),
     renderNutrition(documentRoot, model) {
       calls.nutritionRenders = (calls.nutritionRenders ?? 0) + 1;
+      calls.lastNutritionSource = model.source;
       documentRoot.querySelector('#nutrition-dashboard').hidden = false;
     },
     buildFitnessModel: input => ({ date: input.date, source: input, kind: 'fitness' }),
@@ -577,6 +578,65 @@ test('confirmed unchanged refresh avoids rerender while advancing confirmation t
 
   assert.equal(state.calls.renders, 1);
   assert.equal(state.localStorage.getItem('life-hub:last-success'), '2026-08-01T02:00:00.000Z');
+});
+
+test('force refresh aborts in-flight sync and re-renders even when changed is false', async () => {
+  let resolveFirst;
+  const firstHeld = new Promise(resolve => { resolveFirst = resolve; });
+  const dinnerEvent = {
+    record: {
+      type: 'meal',
+      date: '2026-07-30',
+      meal: 'dinner',
+      calories: 900,
+      protein_g: 50,
+      fat_g: 40,
+      sodium_mg: 1,
+      potassium_mg: 1,
+      polyphenol_score: 1
+    },
+    body: '',
+    path: 'x',
+    legacy: false
+  };
+  const state = harness({
+    loadLiveImpl: async ({ call }) => {
+      if (call === 1) {
+        return liveData({ changed: true, freshness: 'confirmed', events: [] });
+      }
+      if (call === 2) {
+        await firstHeld;
+        return liveData({ changed: false, freshness: 'confirmed', events: [] });
+      }
+      return liveData({
+        changed: false,
+        freshness: 'confirmed',
+        events: [dinnerEvent]
+      });
+    }
+  });
+
+  await state.controller.start();
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+  assert.equal(state.calls.nutritionRenders, 1);
+
+  const firstRefresh = state.controller.refresh({ manual: true });
+  assert.equal(state.calls.syncs, 2);
+
+  const forced = state.controller.refresh({ manual: true, force: true });
+  assert.notEqual(forced, firstRefresh);
+  assert.equal(state.calls.refreshSignals[1]?.aborted, true);
+  assert.equal(state.calls.syncs, 3);
+
+  const joined = state.controller.refresh({ manual: true });
+  assert.equal(joined, forced);
+
+  resolveFirst();
+  await firstRefresh;
+  await forced;
+
+  assert.equal(state.calls.nutritionRenders, 2);
+  assert.equal(state.calls.lastNutritionSource?.events?.[0]?.record?.meal, 'dinner');
 });
 
 test('manual refresh exposes progress then records the successful sync time', async () => {
