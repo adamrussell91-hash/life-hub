@@ -1,6 +1,7 @@
 const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
 const MODEL = 'claude-sonnet-5';
+const MAX_TOOL_ROUNDS = 3;
 
 export class AnthropicClientError extends Error {
   constructor(code, retryable) {
@@ -17,60 +18,120 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
   }
 
   return {
-    async *streamMessage({ system, messages, tools, signal }) {
-      let response;
-      try {
-        response = await fetchImpl(`${ANTHROPIC_ORIGIN}/v1/messages`, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': API_VERSION
-          },
-          body: JSON.stringify({
-            model: MODEL,
-            max_tokens: 4096,
-            system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral', ttl: '1h' } }],
-            messages,
-            tools,
-            stream: true
-          }),
+    async *streamMessage({ system, messages, tools, signal, executeTools }) {
+      let roundMessages = messages;
+      for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        const pendingResults = [];
+        let sawDone = false;
+
+        for await (const event of streamOnce({
+          apiKey,
+          fetchImpl,
+          system,
+          messages: roundMessages,
+          tools,
           signal
-        });
-      } catch {
-        throw new AnthropicClientError('anthropic_unavailable', true);
-      }
-      if (!response.ok) {
-        const retryable = response.status === 429 || response.status >= 500;
-        throw new AnthropicClientError(retryable ? 'anthropic_unavailable' : 'anthropic_request_failed', retryable);
-      }
-      if (!response.body) throw new AnthropicClientError('anthropic_invalid_response', true);
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
-      const toolBuffers = new Map();
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          let boundary;
-          while ((boundary = buffer.indexOf('\n\n')) !== -1) {
-            const frame = buffer.slice(0, boundary);
-            buffer = buffer.slice(boundary + 2);
-            const event = parseFrame(frame);
-            if (event) yield* interpretEvent(event, toolBuffers);
+        })) {
+          if (event.type === 'done') {
+            sawDone = true;
+            continue;
           }
+
+          if (event.type === 'tool_call' && typeof executeTools === 'function') {
+            const result = await executeTools(event);
+            if (result != null) {
+              pendingResults.push({ toolCall: event, result });
+              continue;
+            }
+          }
+
+          yield event;
         }
-      } catch (error) {
-        if (signal?.aborted) throw error;
-        throw new AnthropicClientError('anthropic_unavailable', true);
+
+        if (pendingResults.length === 0) {
+          if (sawDone) yield { type: 'done' };
+          return;
+        }
+
+        roundMessages = [
+          ...roundMessages,
+          {
+            role: 'assistant',
+            content: pendingResults.map(({ toolCall }) => ({
+              type: 'tool_use',
+              id: toolCall.id,
+              name: toolCall.name,
+              input: toolCall.input ?? {}
+            }))
+          },
+          {
+            role: 'user',
+            content: pendingResults.map(({ toolCall, result }) => ({
+              type: 'tool_result',
+              tool_use_id: toolCall.id,
+              content: typeof result === 'string' ? result : JSON.stringify(result)
+            }))
+          }
+        ];
       }
+
+      yield { type: 'done' };
     }
   };
+}
+
+async function* streamOnce({ apiKey, fetchImpl, system, messages, tools, signal }) {
+  let response;
+  try {
+    response = await fetchImpl(`${ANTHROPIC_ORIGIN}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': API_VERSION
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 4096,
+        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral', ttl: '1h' } }],
+        messages,
+        tools,
+        stream: true
+      }),
+      signal
+    });
+  } catch {
+    throw new AnthropicClientError('anthropic_unavailable', true);
+  }
+  if (!response.ok) {
+    const retryable = response.status === 429 || response.status >= 500;
+    throw new AnthropicClientError(retryable ? 'anthropic_unavailable' : 'anthropic_request_failed', retryable);
+  }
+  if (!response.body) throw new AnthropicClientError('anthropic_invalid_response', true);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  const toolBuffers = new Map();
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let boundary;
+      while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+        const frame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        const event = parseFrame(frame);
+        if (event) yield* interpretEvent(event, toolBuffers);
+      }
+    }
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new AnthropicClientError('anthropic_unavailable', true);
+  }
 }
 
 function parseFrame(frame) {
