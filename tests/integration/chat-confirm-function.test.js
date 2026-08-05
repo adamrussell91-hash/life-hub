@@ -128,7 +128,9 @@ test('creates central-node.md from the app seed when the private repo is missing
   const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
 
   const response = await handler(request({ candidate, slug: 'breakfast' }));
+  const payload = await response.json();
   assert.equal(response.status, 200);
+  assert.equal(payload.data.centralNodeUpdated, true);
 
   const putCalls = calls.filter(call => call.options?.method === 'PUT');
   assert.equal(putCalls.length, 2, 'expected meal write plus central-node create');
@@ -175,7 +177,9 @@ test('appends a one-line entry to the central node running log after a successfu
   const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
 
   const response = await handler(request({ candidate, slug: 'breakfast' }));
+  const payload = await response.json();
   assert.equal(response.status, 200);
+  assert.equal(payload.data.centralNodeUpdated, true);
 
   const putCalls = calls.filter(call => call.options?.method === 'PUT');
   assert.equal(putCalls.length, 2, 'expected one PUT for the record and one for the central node log');
@@ -188,6 +192,37 @@ test('appends a one-line entry to the central node running log after a successfu
   assert.match(writtenContent, /Chest and Curls session completed and logged/, 'must preserve the existing log rather than replacing it');
   assert.match(writtenContent, /## ⚡ Today's Status \([^)]*1 August 2026\)/);
   assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F\./);
+});
+
+test('confirm still succeeds and reports centralNodeUpdated:false when the central node blob cannot be decoded', async () => {
+  const centralNodeSha = 'f'.repeat(40);
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: 'central-node.md', type: 'blob', sha: centralNodeSha }] });
+    }
+    if (url.includes(`/git/blobs/${centralNodeSha}`)) {
+      return Response.json({ encoding: 'base64', content: '***not valid base64***' });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate, slug: 'breakfast' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200, 'the meal write must still succeed even when Central Node sync cannot decode');
+  assert.equal(payload.data.centralNodeUpdated, false);
+
+  const putCalls = calls.filter(call => call.options?.method === 'PUT');
+  assert.equal(putCalls.length, 1, 'only the meal write should happen; central-node.md must not be written on a decode failure');
 });
 
 test('appends Chadwick→Brisket Day Type on completed workout confirm', async () => {
