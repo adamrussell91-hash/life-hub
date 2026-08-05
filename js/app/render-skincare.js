@@ -16,6 +16,19 @@ export function renderSkincare(root, model, { onLogRoutine, onLogProcedure } = {
   if (!dashboard) return;
 
   setText(root, '[data-skincare="date"]', model.date);
+
+  const dots = root.querySelector('#skincare-week-dots');
+  if (dots) {
+    dots.replaceChildren();
+    for (const day of model.weekDots ?? []) {
+      const el = root.createElement('span');
+      el.dataset.hit = String(day.logged);
+      if (day.isToday) el.dataset.today = 'true';
+      el.title = day.date;
+      dots.append(el);
+    }
+  }
+
   const host = root.querySelector('#skincare-routine-cards');
   if (host) {
     host.replaceChildren();
@@ -38,12 +51,14 @@ export function renderSkincare(root, model, { onLogRoutine, onLogProcedure } = {
       empty.textContent = 'No procedures logged today.';
       logged.append(empty);
     } else {
+      const list = root.createElement('ul');
+      list.className = 'skincare-procedure-list';
       for (const item of model.procedures) {
-        const row = root.createElement('p');
-        row.className = 'metric-caption';
+        const row = root.createElement('li');
         row.textContent = item.notes || 'Procedure logged';
-        logged.append(row);
+        list.append(row);
       }
+      logged.append(list);
     }
   }
 
@@ -52,14 +67,23 @@ export function renderSkincare(root, model, { onLogRoutine, onLogProcedure } = {
 
 function renderRoutineCard(root, key, model, onLogRoutine) {
   const routine = model.routines[key];
+  const isCurrent = model.currentRoutine === key;
   const card = root.createElement('article');
-  card.className = 'metric-card skincare-card';
-  if (model.currentRoutine === key) card.dataset.current = 'true';
+  card.className = isCurrent ? 'metric-card skincare-card skincare-card--current' : 'metric-card skincare-card';
   card.dataset.routine = key;
 
-  const heading = root.createElement('p');
-  heading.className = 'metric-label';
-  heading.textContent = `${routine.label} · ${routine.duration_hint}`;
+  const heading = root.createElement('div');
+  heading.className = 'skincare-card__heading';
+  const headingLabel = root.createElement('p');
+  headingLabel.className = 'metric-label';
+  headingLabel.textContent = `${routine.label} · ${routine.duration_hint}`;
+  heading.append(headingLabel);
+  if (isCurrent) {
+    const nowChip = root.createElement('span');
+    nowChip.className = 'skincare-card__now-chip';
+    nowChip.textContent = 'Now';
+    heading.append(nowChip);
+  }
   card.append(heading);
 
   const status = root.createElement('p');
