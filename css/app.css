@@ -637,7 +637,8 @@ main { max-width: 76rem; margin: 0 auto; }
   color: #b3261e;
 }
 .nutrition--fat-over .metric-ring--fat,
-.nutrition--fat-over .metric-ring-fill.metric-ring--fat {
+.nutrition--fat-over .metric-ring-fill.metric-ring--fat,
+.nutrition--fat-over .metric-ring--fat .metric-ring-fill {
   stroke: #b3261e;
 }
 
