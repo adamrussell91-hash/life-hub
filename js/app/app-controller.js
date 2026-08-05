@@ -1,5 +1,6 @@
 import { getSydneyDateKey } from '../core/time.js';
 import { shiftYearMonth } from './calendar-model.js';
+import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
 const LAST_SUCCESS_KEY = 'life-hub:last-success';
@@ -640,17 +641,12 @@ export function createAppController(dependencies) {
   function showProvider(message, severity) {
     const status = root.querySelector('#provider-status');
     if (!status) return;
-    status.textContent = message;
-    status.dataset.severity = severity;
-    status.hidden = false;
+    showEphemeralMessage(status, message, { severity });
   }
 
   function hideProvider() {
     const status = root.querySelector('#provider-status');
-    if (!status) return;
-    status.textContent = '';
-    status.hidden = true;
-    delete status.dataset.severity;
+    clearEphemeralMessage(status);
   }
 
   function recordSuccess() {
