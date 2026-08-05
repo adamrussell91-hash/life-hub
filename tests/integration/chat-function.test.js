@@ -269,7 +269,7 @@ test('emits record_rejected instead of a proposal for a semantically invalid too
   assert.deepEqual(events[2], { type: 'done' });
 });
 
-test('save_food_library_entry writes the cache to GitHub and emits a food_library_saved event', async () => {
+test('save_food_library_entry writes the cache to GitHub, emits food_library_saved, and continues the round', async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push({ url, options });
@@ -288,21 +288,33 @@ test('save_food_library_entry writes the cache to GitHub and emits a food_librar
     now: () => Date.parse('2026-08-01T06:00:00Z'),
     fetchImpl,
     createAnthropicClient: () => ({
-      streamMessage: () => mockedStream([
-        { type: 'tool_call', id: 'call_1', name: 'save_food_library_entry', input: {
-          name: 'Meatlovers Pizza', brand: 'Domino\'s', servingDescription: '1 slice',
-          calories: 250, protein_g: 11, fat_g: 12
-        } },
-        { type: 'done' }
-      ])
+      // Mirrors the real anthropic-client tool-loop: a save_food_library_entry
+      // tool_call is routed through executeTools and, since it returns a
+      // non-null result, the "model" continues into a second round instead
+      // of the turn stopping dead after the save.
+      streamMessage: async function* ({ executeTools }) {
+        const toolResult = await executeTools({
+          id: 'call_1',
+          name: 'save_food_library_entry',
+          input: {
+            name: 'Meatlovers Pizza', brand: 'Domino\'s', servingDescription: '1 slice',
+            calories: 250, protein_g: 11, fat_g: 12
+          }
+        });
+        assert.ok(toolResult != null, 'executeTools must return a tool result so the round continues');
+        yield { type: 'text', delta: 'That\'s 250 calories a slice.' };
+        yield { type: 'done' };
+      }
     })
   });
 
   const response = await handler(request({ message: 'Brisket, log breakfast pizza' }));
   const events = await readSse(response);
 
+  assert.deepEqual(events[0], { type: 'agent', slug: 'brisket' });
   assert.deepEqual(events[1], { type: 'food_library_saved', name: 'Meatlovers Pizza' });
-  assert.deepEqual(events[2], { type: 'done' });
+  assert.deepEqual(events[2], { type: 'text', delta: 'That\'s 250 calories a slice.' });
+  assert.deepEqual(events[3], { type: 'done' });
 
   const putCall = calls.find(call => call.options?.method === 'PUT');
   assert.ok(putCall, 'expected a PUT request to write the food library');
@@ -315,17 +327,26 @@ test('save_food_library_entry writes the cache to GitHub and emits a food_librar
   assert.equal(written[0].verifiedAt, '2026-08-01');
 });
 
-test('an invalid save_food_library_entry call is silently skipped rather than breaking the response', async () => {
+test('an invalid save_food_library_entry call returns an error tool result without writing to GitHub', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  let receivedArgs;
   const handler = createChatHandler({
     env: validEnv,
     now: () => Date.parse('2026-08-01T06:00:00Z'),
-    fetchImpl: githubFetchStub(),
+    fetchImpl,
     createAnthropicClient: () => ({
-      streamMessage: () => mockedStream([
-        { type: 'tool_call', id: 'call_1', name: 'save_food_library_entry', input: { name: 'Missing macros' } },
-        { type: 'text', delta: 'All good.' },
-        { type: 'done' }
-      ])
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'All good.' }, { type: 'done' }]);
+      }
     })
   });
 
@@ -336,6 +357,10 @@ test('an invalid save_food_library_entry call is silently skipped rather than br
     { type: 'text', delta: 'All good.' },
     { type: 'done' }
   ]);
+
+  const result = await receivedArgs.executeTools({ id: 'call_1', name: 'save_food_library_entry', input: { name: 'Missing macros' } });
+  assert.deepEqual(JSON.parse(result), { ok: false, error: 'invalid_entry' });
+  assert.ok(!calls.some(call => call.options?.method === 'PUT'), 'an invalid entry must not trigger a write');
 });
 
 test('loads exercise library highlights into Chadwick system prompt', async () => {

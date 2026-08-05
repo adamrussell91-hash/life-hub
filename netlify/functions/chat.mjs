@@ -243,8 +243,36 @@ export function createChatHandler({
             tools,
             signal: request.signal,
             executeTools: async event => {
-              if (event.name !== 'search_exercise_library') return null;
-              return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
+              if (event.name === 'search_exercise_library') {
+                return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
+              }
+              if (event.name === 'save_food_library_entry') {
+                const entry = validateFoodLibraryEntry(event.input);
+                if (!entry) {
+                  return JSON.stringify({ ok: false, error: 'invalid_entry' });
+                }
+                try {
+                  foodLibraryEntries = upsertFoodLibraryEntry(foodLibraryEntries, entry, today);
+                  const result = await client.writeFile({
+                    path: FOOD_LIBRARY_PATH,
+                    content: JSON.stringify(foodLibraryEntries, null, 2),
+                    ...(foodLibrarySha ? { sha: foodLibrarySha } : {}),
+                    message: `chore(food-library): cache ${entry.name}`
+                  });
+                  foodLibrarySha = result.sha;
+                  send({ type: 'food_library_saved', name: entry.name });
+                  return JSON.stringify({
+                    ok: true,
+                    name: entry.name,
+                    calories: entry.calories,
+                    protein_g: entry.protein_g,
+                    fat_g: entry.fat_g
+                  });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              return null;
             }
           })) {
             if (event.type === 'tool_call' && event.name === 'log_entry') {
@@ -265,23 +293,6 @@ export function createChatHandler({
                 });
               } else {
                 send({ type: 'record_rejected', errors: validation.errors });
-              }
-            } else if (event.type === 'tool_call' && event.name === 'save_food_library_entry') {
-              const entry = validateFoodLibraryEntry(event.input);
-              if (entry) {
-                try {
-                  foodLibraryEntries = upsertFoodLibraryEntry(foodLibraryEntries, entry, today);
-                  const result = await client.writeFile({
-                    path: FOOD_LIBRARY_PATH,
-                    content: JSON.stringify(foodLibraryEntries, null, 2),
-                    ...(foodLibrarySha ? { sha: foodLibrarySha } : {}),
-                    message: `chore(food-library): cache ${entry.name}`
-                  });
-                  foodLibrarySha = result.sha;
-                  send({ type: 'food_library_saved', name: entry.name });
-                } catch {
-                  // Best-effort cache -- a failed save must never interrupt the chat response.
-                }
               }
             } else if (event.type === 'tool_call' && event.name === 'save_exercise_library_entry') {
               const entry = validateExerciseLibraryEntry(event.input);
