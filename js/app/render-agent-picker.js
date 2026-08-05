@@ -25,8 +25,8 @@ export function renderAgentPicker(root, {
         const img = root.createElement('img');
         img.src = agent.src;
         img.alt = '';
-        img.width = 48;
-        img.height = 48;
+        img.width = 64;
+        img.height = 64;
         img.decoding = 'async';
         button.append(img);
         button.addEventListener('click', () => onSelect?.(agent.slug));
@@ -60,8 +60,8 @@ export function applyAgentAvatarToBubble(bubble, slug) {
     if (!img) return;
     img.className = 'chat-message__avatar';
     img.alt = '';
-    img.width = 36;
-    img.height = 36;
+    img.width = 52;
+    img.height = 52;
     if (typeof bubble.insertBefore === 'function' && bubble.firstChild) {
       bubble.insertBefore(img, bubble.firstChild);
     } else if (typeof bubble.prepend === 'function') {
