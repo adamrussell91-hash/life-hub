@@ -41,6 +41,16 @@ export function animateAreaReveal(svg, options = {}) {
   }
 
   svg.classList.add(reduced ? 'chart-static' : 'chart-animating');
+
+  if (!reduced && line && typeof line.addEventListener === 'function') {
+    const onEnd = event => {
+      if (event?.animationName && event.animationName !== 'line-draw') return;
+      line.style.strokeDasharray = '';
+      line.style.strokeDashoffset = '';
+      line.removeEventListener?.('animationend', onEnd);
+    };
+    line.addEventListener('animationend', onEnd);
+  }
 }
 
 export function animateColumnGrow(element, heightPct, options = {}) {
