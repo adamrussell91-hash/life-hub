@@ -6,6 +6,7 @@ const HISTORY_WINDOW_MS = 20 * 60 * 1000;
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_ENTRY_CHARS = 1000;
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
+const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
 
 // FakeElement (used in unit tests) only models `className` as a plain string, so
 // classList is used when real DOM elements provide it and this string fallback
@@ -122,6 +123,8 @@ export function createChatController({
     setChatBusy(root, true);
     showChatError(root, '');
     let turnSignaled = false;
+    let sawExerciseLibrarySaved = false;
+    let sawRecordProposal = false;
     const history = recentHistory();
     const priorAgentSlug = stickyAgentSlug();
     remember('user', message);
@@ -222,6 +225,7 @@ export function createChatController({
           renderLiveText(assistantBuffer);
         } else if (event.type === 'record_proposal') {
           turnSignaled = true;
+          sawRecordProposal = true;
           clearWorkingBubble();
           endTextTurn();
           const proposal = appendRecordProposal(root, event);
@@ -243,12 +247,18 @@ export function createChatController({
           appendMessage(root, { role: 'assistant', text: `📚 Saved "${event.name}" to the Food Library for next time.` });
           setWorkingStatus('Researching…');
         } else if (event.type === 'exercise_library_saved') {
+          sawExerciseLibrarySaved = true;
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `Saved "${event.name}" to the Exercise Library.` });
           setWorkingStatus('Researching…');
         }
       }
       remember('assistant', assistantFullText);
+      if (sawExerciseLibrarySaved && !sawRecordProposal && (!assistantSlug || assistantSlug === 'chadwick')) {
+        turnSignaled = true;
+        clearWorkingBubble();
+        appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text: LIBRARY_SAVE_NUDGE_TEXT });
+      }
     } catch (error) {
       turnSignaled = true;
       clearWorkingBubble();
