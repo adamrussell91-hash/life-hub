@@ -56,8 +56,8 @@ export function buildSystemPrompt({
     exerciseLibrary
       ? `Exercise Library highlights (prefer these names; search before inventing moves or guessing attachment/cable/bench defaults). Call search_exercise_library for more; call save_exercise_library_entry after refining cues/defaults or adding a move. Library defaults inform design — session sets still need per-set cable_type.\n\n${exerciseLibrary}`
       : '',
-    'Design sessions in chat only. Do not propose a workout log_entry until Adam has finished the session and is logging actuals (unless status is skipped, documenting no session).',
-    'Infer session_kind from what was done. Always include cable_type on every strength set (use none when not on cables). Never invent YAML fields that are not in the log_entry schema; if Adam mentions an unsupported metric, say it needs to be added to the workout book later.'
+    'When Adam asks you to design or build today’s session, propose a workout log_entry with status planned so he can confirm it onto the Fitness tab. When he finishes and reports actuals, propose status completed (same title; overwrite the plan if confirm conflicts). Never write mid-session / in-progress logs. Skipped is fine when documenting a no-train day.',
+    'Infer session_kind from what was done (or planned). Always include cable_type on every strength set (use none when not on cables). Never invent YAML fields that are not in the log_entry schema; if Adam mentions an unsupported metric, say it needs to be added to the workout book later.'
   ] : [];
 
   return [

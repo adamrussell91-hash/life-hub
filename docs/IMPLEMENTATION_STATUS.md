@@ -130,7 +130,7 @@ Full helpers: `js/core/central-node-write.js`. Confirm path: `netlify/functions/
 
 Verified on 2026-08-05, on branch `fitness-tab` (local only — do not push unless asked):
 
-- Fitness dashboard: streak strip, session hero (planned today else last completed), 7-day volume columns, focus hits, vs-last / e1RM PRs (Epley), 30-day consistency heatmap.
+- Fitness dashboard: streak strip, session hero (today completed → today planned → last completed), 7-day volume columns, focus hits, vs-last / e1RM PRs (Epley), 30-day consistency heatmap.
 - Floating Chadwick chat themed `#2E7BD6`; default agent on Fitness is `chadwick`.
 - Completed workout confirms append an idempotent Chadwick→Brisket Day Type line under Cross-Agent Coordination.
 - Soft-medical visual language + `chart-kit` columns; shell cache bumped to `life-hub-shell-v19`.
@@ -143,7 +143,7 @@ Verified on 2026-08-05, on branch `chadwick-protocol-schema` (local only — do 
 
 - `config/chadwick-protocol.md` injected into Chadwick prompts (voice stays in `agent-directory.mjs`).
 - Rich workout schema: required `title` / `session_kind`; per-set `cable_type`; optional bench angle, duration, HR, calories, distance; kind-aware validation.
-- Complete-only Life Hub writes; workout templates under `data/fitness/templates/` create/overwrite on completed confirm.
+- Planned + completed Life Hub writes (no mid-session); workout templates under `data/fitness/templates/` create/overwrite on completed confirm only.
 - Central Node: read before design; on finish keep Status + Recent Actions + Day Type writes.
 - Fitness hero and chat confirm cards show weight×reps, cable type, and bench angle (shared `format-exercise.js`).
 - Shell cache bumped to `life-hub-shell-v20`.
@@ -163,5 +163,16 @@ Verified on 2026-08-05, on branch `exercise-library` (local only — do not push
 - Seed production by importing into the private data repo when ready.
 
 Full design: `docs/superpowers/specs/2026-08-05-exercise-library-design.md`. Full plan: `docs/superpowers/plans/2026-08-05-exercise-library.md`.
+
+## Phase 13: Planned workout on Fitness — Complete
+
+Verified on 2026-08-05 (local only — do not push unless asked):
+
+- Chadwick may propose `status: planned` when Adam asks to build today’s session; confirm lands it on Fitness.
+- Hero order: today completed → today planned → last completed; empty copy asks Chadwick to plan.
+- Rail footer shows live sync / offline cache (no hardcoded “Fixture mode”).
+- Shell cache bumped to `life-hub-shell-v22`.
+
+Full design: `docs/superpowers/specs/2026-08-05-planned-workout-fitness-design.md`.
 
 ## Next Phase: research corpus / remaining Life Hub tabs / optional confirm-time library sync

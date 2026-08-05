@@ -53,8 +53,14 @@ function completedOn(records, date) {
 }
 
 function selectHeroSession(records, date) {
+  const todaysCompleted = records
+    .filter(record => record.date === date && record.status === 'completed')
+    .sort((a, b) => String(b.time ?? '').localeCompare(String(a.time ?? '')));
+  if (todaysCompleted[0]) return todaysCompleted[0];
+
   const planned = records.find(record => record.date === date && record.status === 'planned');
   if (planned) return planned;
+
   return records
     .filter(record => record.status === 'completed' && record.date <= date)
     .sort((a, b) => b.date.localeCompare(a.date) || String(b.time ?? '').localeCompare(String(a.time ?? '')))

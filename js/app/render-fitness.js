@@ -84,7 +84,7 @@ function renderHero(root, session) {
       title.textContent = formatExerciseTitle(exercise);
       row.append(title);
       const detail = root.createElement('p');
-      detail.textContent = formatExerciseSets(exercise) || 'No sets logged';
+      detail.textContent = formatExerciseSets(exercise) || (session.status === 'planned' ? 'Sets to be confirmed' : 'No sets logged');
       row.append(detail);
       list.append(row);
     }
