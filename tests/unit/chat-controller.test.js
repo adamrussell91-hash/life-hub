@@ -802,6 +802,70 @@ test('clearUnread notifies listeners that chat is read, independent of any send'
   assert.deepEqual(calls, [false]);
 });
 
+test('nudge when exercise library saved but no record_proposal in the turn', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'exercise_library_saved', name: 'Bar Press' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('build chest');
+
+  const bubbles = messageBubbles(root);
+  assert.ok(
+    bubbles.some(bubble => /lock it onto Fitness/i.test(bubbleText(bubble)) && /Confirm card/i.test(bubbleText(bubble))),
+    'expected a nudge bubble mentioning locking onto Fitness for a Confirm card'
+  );
+});
+
+test('no nudge when exercise_library_saved then record_proposal', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'exercise_library_saved', name: 'Bar Press' };
+      yield {
+        type: 'record_proposal',
+        path: '2026/2026-08-02-chadwick-workout.md',
+        record: { type: 'workout', date: '2026-08-02' }
+      };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('build chest');
+
+  const bubbles = messageBubbles(root);
+  assert.ok(
+    bubbles.every(bubble => !/lock it onto Fitness/i.test(bubbleText(bubble))),
+    'no nudge should appear once a record_proposal arrived'
+  );
+});
+
+test('no nudge when exercise library saved but the agent is not Chadwick', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'exercise_library_saved', name: 'Bar Press' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('build chest');
+
+  const bubbles = messageBubbles(root);
+  assert.ok(
+    bubbles.every(bubble => !/lock it onto Fitness/i.test(bubbleText(bubble))),
+    'nudge should be Chadwick-specific when the slug is known'
+  );
+});
+
 test('omitting isChatVisible/onUnreadChange entirely preserves existing behaviour (no crash, no-op)', async () => {
   const root = new FakeDocument();
   const chatApi = {
