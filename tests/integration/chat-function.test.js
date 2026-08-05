@@ -337,3 +337,123 @@ test('an invalid save_food_library_entry call is silently skipped rather than br
     { type: 'done' }
   ]);
 });
+
+test('loads exercise library highlights into Chadwick system prompt', async () => {
+  const libraryPath = 'data/exercise-library.json';
+  const librarySha = 'f'.repeat(40);
+  const libraryContent = JSON.stringify([
+    {
+      name: 'Bar Press',
+      target_area: 'Chest',
+      equipment: ['Crossbar'],
+      working_weight_kg: 42,
+      in_rotation: true
+    }
+  ]);
+  let receivedArgs;
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: libraryPath, type: 'blob', sha: librarySha, size: 100 }] });
+    }
+    if (url.includes(`/git/blobs/${librarySha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(libraryContent, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await handler(request({ message: 'Chadwick, plan a chest session' }));
+
+  assert.match(receivedArgs.system, /Exercise Library/);
+  assert.match(receivedArgs.system, /Bar Press/);
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_exercise_library'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_exercise_library_entry'));
+  assert.equal(typeof receivedArgs.executeTools, 'function');
+  const searchHits = await receivedArgs.executeTools({
+    name: 'search_exercise_library',
+    id: 'call_1',
+    input: { query: 'bar chest' }
+  });
+  assert.equal(searchHits.length, 1);
+  assert.equal(searchHits[0].name, 'Bar Press');
+});
+
+test('save_exercise_library_entry writes data/exercise-library.json and emits exercise_library_saved', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([
+        { type: 'tool_call', id: 'call_1', name: 'save_exercise_library_entry', input: {
+          name: 'Bar Press', target_area: 'Chest', default_cable_type: 'concentric'
+        } },
+        { type: 'done' }
+      ])
+    })
+  });
+
+  const response = await handler(request({ message: 'Chadwick, remember Bar Press cues' }));
+  const events = await readSse(response);
+
+  assert.deepEqual(events[1], { type: 'exercise_library_saved', name: 'Bar Press' });
+  assert.deepEqual(events[2], { type: 'done' });
+
+  const putCall = calls.find(call => call.options?.method === 'PUT');
+  assert.ok(putCall, 'expected a PUT request to write the exercise library');
+  assert.ok(putCall.url.includes('data/exercise-library.json'));
+  const body = JSON.parse(putCall.options.body);
+  assert.equal(body.sha, undefined);
+  const written = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
+  assert.equal(written.length, 1);
+  assert.equal(written[0].name, 'Bar Press');
+  assert.equal(written[0].default_cable_type, 'concentric');
+  assert.ok(written[0].updated_at);
+});
+
+test('non-chadwick agents do not register exercise library tools', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await handler(request({ message: 'Brisket, log breakfast' }));
+
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'search_exercise_library'));
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'save_exercise_library_entry'));
+  assert.doesNotMatch(receivedArgs.system, /search_exercise_library/);
+});
