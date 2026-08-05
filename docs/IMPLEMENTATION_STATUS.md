@@ -151,4 +151,17 @@ Verified on 2026-08-05, on branch `chadwick-protocol-schema` (local only — do 
 
 Full design: `docs/superpowers/specs/2026-08-05-chadwick-protocol-schema-design.md`. Full plan: `docs/superpowers/plans/2026-08-05-chadwick-protocol-schema.md`.
 
-## Next Phase: Exercise Library (Slice 2) + remaining Life Hub tabs
+## Phase 12: Chadwick Exercise Library (Slice 2) — Complete
+
+Verified on 2026-08-05, on branch `exercise-library` (local only — do not push unless asked):
+
+- Chat-direct `data/exercise-library.json` (private data repo; not client sync).
+- Chadwick prompt highlights (~20: `in_rotation` first, then recent `last_performed`).
+- Tools: `search_exercise_library` (tool-result continuation) + `save_exercise_library_entry` (GitHub upsert).
+- Import script: `scripts/import-exercise-library.mjs` from Notion CSV (~277–279 moves).
+- No Fitness library UI; workout confirm does not mutate the library.
+- Seed production by importing into the private data repo when ready.
+
+Full design: `docs/superpowers/specs/2026-08-05-exercise-library-design.md`. Full plan: `docs/superpowers/plans/2026-08-05-exercise-library.md`.
+
+## Next Phase: research corpus / remaining Life Hub tabs / optional confirm-time library sync
