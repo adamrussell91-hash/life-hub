@@ -238,6 +238,9 @@ export function createChatController({
       const slug = slugFromPath(event.path);
       const result = await chatApi.confirm({ candidate: toCandidate(edited), slug, overwrite });
       proposal.card.replaceChildren(Object.assign(root.createElement('p'), { textContent: 'Saved.' }));
+      if (result?.centralNodeUpdated === false) {
+        showChatError(root, 'Logged, but Central Node didn\u2019t update — try Refresh.');
+      }
       onRecordWritten?.(result);
     } catch (error) {
       proposal.confirm.disabled = false;

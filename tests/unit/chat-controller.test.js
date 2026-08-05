@@ -164,6 +164,50 @@ test('editing a numeric and a boolean field before confirming sends the coerced 
   assert.equal(typeof candidate.fields.completed, 'boolean');
 });
 
+test('a confirm that reports centralNodeUpdated:false shows an ephemeral warning without failing the save', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: skincareRecord(),
+    path: '2026/2026-08-02-hyaluronica-skincare.md',
+    confirmImpl: async () => ({ ok: true, centralNodeUpdated: false })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hyaluronica, log tonight\'s routine');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className === 'record-proposal');
+  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  confirmButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.match(proposal.children[0]?.textContent ?? '', /Saved/);
+  assert.equal(
+    root.querySelector('#chat-error').textContent,
+    'Logged, but Central Node didn\u2019t update — try Refresh.'
+  );
+});
+
+test('a confirm that reports centralNodeUpdated:true does not show the Central Node warning', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: skincareRecord(),
+    path: '2026/2026-08-02-hyaluronica-skincare.md',
+    confirmImpl: async () => ({ ok: true, centralNodeUpdated: true })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hyaluronica, log tonight\'s routine');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className === 'record-proposal');
+  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  confirmButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(root.querySelector('#chat-error').textContent, '');
+});
+
 test('a write_conflict on first confirm prompts a retry, and confirming again sends exactly one overwrite request', async () => {
   const root = new FakeDocument();
   const chatApi = fakeChatApi({

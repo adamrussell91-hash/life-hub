@@ -116,14 +116,20 @@ export function createChatConfirmHandler({
           // failure here (conflict, transient GitHub error) must never surface as a failed confirmation.
         }
       }
+      let centralNodeUpdated = false;
       try {
-        await syncCentralNodeAfterLog(client, validation.record, validation.notes);
+        const cn = await syncCentralNodeAfterLog(client, validation.record, validation.notes);
+        centralNodeUpdated = cn?.updated === true;
       } catch {
         // Best-effort running log -- the record itself already saved successfully, so a
         // failure here (conflict, missing file, transient GitHub error) must never surface
-        // as a failed confirmation.
+        // as a failed confirmation. The client is told via centralNodeUpdated instead.
+        centralNodeUpdated = false;
       }
-      return jsonResponse(200, { ok: true, data: { path, sha: result.sha, commitSha: result.commitSha } }, PRIVATE_CACHE);
+      return jsonResponse(200, {
+        ok: true,
+        data: { path, sha: result.sha, commitSha: result.commitSha, centralNodeUpdated }
+      }, PRIVATE_CACHE);
     } catch (error) {
       if (error instanceof GitHubClientError && error.code === 'write_conflict') {
         return errorResponse(409, 'write_conflict', 'A record already exists at this path.', true, PRIVATE_CACHE);
@@ -164,11 +170,11 @@ async function syncCentralNodeAfterLog(client, record, notes) {
   let existingSha;
   if (entry) {
     content = decodeBlob(await client.readBlob(entry.sha));
-    if (content === null) return;
+    if (content === null) return { updated: false, reason: 'decode_failed' };
     existingSha = entry.sha;
   } else {
     content = loadCentralNodeSeed();
-    if (!content) return;
+    if (!content) return { updated: false, reason: 'missing_seed' };
     existingSha = undefined;
   }
 
@@ -183,7 +189,7 @@ async function syncCentralNodeAfterLog(client, record, notes) {
     actionLine,
     nutritionTotals
   });
-  if (updated === content) return;
+  if (updated === content) return { updated: false, reason: 'unchanged' };
 
   await client.writeFile({
     path: CENTRAL_NODE_PATH,
@@ -191,6 +197,7 @@ async function syncCentralNodeAfterLog(client, record, notes) {
     ...(existingSha ? { sha: existingSha } : {}),
     message: `chore(central-node): sync ${record.type} log into Status`
   });
+  return { updated: true };
 }
 
 async function sumDayMealTotals(client, tree, record) {
