@@ -246,6 +246,34 @@ export function createChatHandler({
               if (event.name === 'search_exercise_library') {
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
               }
+              if (event.name === 'save_exercise_library_entry') {
+                const entry = validateExerciseLibraryEntry(event.input);
+                if (!entry) {
+                  return JSON.stringify({ ok: false, error: 'invalid_entry' });
+                }
+                try {
+                  exerciseLibraryEntries = upsertExerciseLibraryEntry(
+                    exerciseLibraryEntries,
+                    entry,
+                    getSydneyTimestamp(nowInstant)
+                  );
+                  const result = await client.writeFile({
+                    path: EXERCISE_LIBRARY_PATH,
+                    content: JSON.stringify(exerciseLibraryEntries, null, 2),
+                    ...(exerciseLibrarySha ? { sha: exerciseLibrarySha } : {}),
+                    message: `chore(exercise-library): upsert ${entry.name}`
+                  });
+                  exerciseLibrarySha = result.sha;
+                  send({ type: 'exercise_library_saved', name: entry.name });
+                  return JSON.stringify({
+                    ok: true,
+                    name: entry.name,
+                    target_area: entry.target_area
+                  });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
               if (event.name === 'save_food_library_entry') {
                 const entry = validateFoodLibraryEntry(event.input);
                 if (!entry) {
@@ -293,27 +321,6 @@ export function createChatHandler({
                 });
               } else {
                 send({ type: 'record_rejected', errors: validation.errors });
-              }
-            } else if (event.type === 'tool_call' && event.name === 'save_exercise_library_entry') {
-              const entry = validateExerciseLibraryEntry(event.input);
-              if (entry) {
-                try {
-                  exerciseLibraryEntries = upsertExerciseLibraryEntry(
-                    exerciseLibraryEntries,
-                    entry,
-                    getSydneyTimestamp(nowInstant)
-                  );
-                  const result = await client.writeFile({
-                    path: EXERCISE_LIBRARY_PATH,
-                    content: JSON.stringify(exerciseLibraryEntries, null, 2),
-                    ...(exerciseLibrarySha ? { sha: exerciseLibrarySha } : {}),
-                    message: `chore(exercise-library): upsert ${entry.name}`
-                  });
-                  exerciseLibrarySha = result.sha;
-                  send({ type: 'exercise_library_saved', name: entry.name });
-                } catch {
-                  // Best-effort cache -- a failed save must never interrupt the chat response.
-                }
               }
             } else {
               send(event);
