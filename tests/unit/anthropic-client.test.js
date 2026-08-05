@@ -121,3 +121,82 @@ test('re-throws the underlying error unwrapped when the caller has aborted', asy
     error => error === abortError
   );
 });
+
+test('continues the stream after executeTools returns a search result', async () => {
+  const first = [
+    frame('content_block_start', { index: 0, content_block: { type: 'tool_use', id: 'call_1', name: 'search_exercise_library' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'input_json_delta', partial_json: '{"query":"bar press"}' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_stop', {})
+  ];
+  const second = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Found Bar Press' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_stop', {})
+  ];
+
+  let calls = 0;
+  const bodies = [];
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async (_url, init) => {
+      calls += 1;
+      bodies.push(JSON.parse(init.body));
+      return sseResponse(calls === 1 ? first : second);
+    }
+  });
+
+  const executeCalls = [];
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'find bar press' }],
+    tools: [],
+    executeTools: async event => {
+      executeCalls.push(event);
+      return [{ name: 'Bar Press', target_area: 'Chest' }];
+    }
+  })) events.push(event);
+
+  assert.equal(calls, 2);
+  assert.equal(executeCalls.length, 1);
+  assert.equal(executeCalls[0].name, 'search_exercise_library');
+  assert.equal(bodies[1].messages.at(-1).role, 'user');
+  assert.equal(bodies[1].messages.at(-1).content[0].type, 'tool_result');
+  assert.deepEqual(events, [
+    { type: 'text', delta: 'Found Bar Press' },
+    { type: 'done' }
+  ]);
+});
+
+test('yields fire-and-forget tool_calls when executeTools returns null', async () => {
+  const frames = [
+    frame('content_block_start', { index: 0, content_block: { type: 'tool_use', id: 'call_1', name: 'log_entry' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'input_json_delta', partial_json: '{"type":"meal"}' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_stop', {})
+  ];
+  let calls = 0;
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async () => {
+      calls += 1;
+      return sseResponse(frames);
+    }
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: '',
+    messages: [],
+    tools: [],
+    executeTools: async () => null
+  })) events.push(event);
+
+  assert.equal(calls, 1);
+  assert.deepEqual(events, [
+    { type: 'tool_call', id: 'call_1', name: 'log_entry', input: { type: 'meal' } },
+    { type: 'done' }
+  ]);
+});
