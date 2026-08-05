@@ -1248,6 +1248,19 @@ main { max-width: 76rem; margin: 0 auto; }
 .chat-message__body { min-width: 0; flex: 1; }
 .chat-message--user .chat-message__avatar { display: none; }
 
+.chat-message--status .chat-message__body {
+  opacity: 0.85;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .chat-message--status .chat-message__body {
+    animation: chat-status-pulse 1.4s ease-in-out infinite;
+  }
+}
+@keyframes chat-status-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
 .mind-agents {
   display: grid;
   gap: 0.65rem;
