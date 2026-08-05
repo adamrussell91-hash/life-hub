@@ -7,7 +7,12 @@ const CATEGORY_CLASS = {
   sleep: 'body'
 };
 
-export function renderCalendar(root, model, { onSelectDate, onShiftMonth } = {}) {
+export function renderCalendar(root, model, {
+  onSelectDate,
+  onShiftMonth,
+  scrollToDetail = false,
+  monthDelta = 0
+} = {}) {
   const dashboard = root.querySelector('#calendar-dashboard');
   if (!dashboard || !model) return;
 
@@ -34,6 +39,7 @@ export function renderCalendar(root, model, { onSelectDate, onShiftMonth } = {})
     for (const day of model.monthDays) {
       grid.append(monthCell(root, day, onSelectDate));
     }
+    applyMonthMotion(grid, monthDelta);
   }
 
   const detail = root.querySelector('#calendar-day-detail');
@@ -63,6 +69,10 @@ export function renderCalendar(root, model, { onSelectDate, onShiftMonth } = {})
         detail.append(row);
       }
     }
+    if (scrollToDetail) {
+      detail.dataset.motion = 'in';
+      scrollDetailIntoView(root, detail);
+    }
   }
 
   const prev = root.querySelector('[data-calendar="prev-month"]');
@@ -77,6 +87,19 @@ export function renderCalendar(root, model, { onSelectDate, onShiftMonth } = {})
   }
 
   dashboard.removeAttribute('hidden');
+}
+
+function applyMonthMotion(grid, monthDelta) {
+  delete grid.dataset.motion;
+  if (!monthDelta) return;
+  void grid.offsetWidth;
+  grid.dataset.motion = monthDelta > 0 ? 'forward' : 'back';
+}
+
+function scrollDetailIntoView(root, detail) {
+  if (typeof detail.scrollIntoView !== 'function') return;
+  const reduced = root.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+  detail.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' });
 }
 
 function dayButton(root, day, onSelectDate) {
