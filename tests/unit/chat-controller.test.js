@@ -481,6 +481,151 @@ test('shows On it… immediately and clears it when real text arrives', async ()
   assert.equal(after.every(bubble => bubbleText(bubble) !== 'On it…'), true);
 });
 
+const STATUS_COPY = ['On it…', 'Looking that up…', 'Researching…'];
+
+function statusBubbles(root) {
+  return messageBubbles(root).filter(bubble => bubble.className?.includes('chat-message--status'));
+}
+
+test('a search followed by a saved-library note keeps a sticky Researching… status until real text arrives', async () => {
+  const root = new FakeDocument();
+  let resolveGate;
+  const gate = new Promise(resolve => {
+    resolveGate = resolve;
+  });
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'search', query: 'protein bar nutrition' };
+      yield { type: 'food_library_saved', name: 'Quest Bar' };
+      await gate;
+      yield { type: 'text', delta: 'Logged it, 190 kcal.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  const pending = controller.send('log a quest bar');
+  await flushMicrotasks();
+
+  const duringStatus = statusBubbles(root);
+  assert.equal(duringStatus.length, 1, 'exactly one sticky status bubble should exist while waiting');
+  assert.equal(bubbleText(duringStatus[0]), 'Researching…');
+  assert.match(duringStatus[0].className, /chat-message--status/);
+
+  resolveGate();
+  await pending;
+
+  const after = messageBubbles(root);
+  assert.equal(statusBubbles(root).length, 0, 'the status bubble should be gone once real text arrives');
+  assert.equal(
+    after.every(bubble => !STATUS_COPY.includes(bubbleText(bubble))),
+    true,
+    'no leftover status copy should remain in any bubble'
+  );
+});
+
+test('food_library_saved followed by text leaves no status copy behind', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'food_library_saved', name: 'Quest Bar' };
+      yield { type: 'text', delta: 'Logged it, 190 kcal.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('log a quest bar');
+
+  const after = messageBubbles(root);
+  assert.equal(statusBubbles(root).length, 0);
+  assert.equal(
+    after.every(bubble => !STATUS_COPY.includes(bubbleText(bubble))),
+    true,
+    'no leftover status copy should remain in any bubble'
+  );
+});
+
+test('the sticky status bubble carries the status class while waiting and loses it once real text lands', async () => {
+  const root = new FakeDocument();
+  let resolveGate;
+  const gate = new Promise(resolve => {
+    resolveGate = resolve;
+  });
+  const chatApi = {
+    async *send() {
+      await gate;
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: 'Here is the plan.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  const pending = controller.send('build today\'s session');
+  await flushMicrotasks();
+
+  const during = messageBubbles(root);
+  assert.equal(during.length, 2);
+  assert.match(during[1].className, /chat-message--status/, 'the waiting bubble should carry the status class');
+
+  resolveGate();
+  await pending;
+
+  const after = messageBubbles(root);
+  for (const bubble of after) {
+    assert.doesNotMatch(bubble.className ?? '', /chat-message--status/, 'no bubble should keep the status class once real text has arrived');
+  }
+});
+
+test('the status bubble rotates On it… → Looking that up… → Researching… across a full research turn, then clears on text', async () => {
+  const root = new FakeDocument();
+  const seenStatuses = [];
+  let resolveSearch;
+  let resolveSave;
+  let resolveText;
+  const searchGate = new Promise(resolve => {
+    resolveSearch = resolve;
+  });
+  const saveGate = new Promise(resolve => {
+    resolveSave = resolve;
+  });
+  const textGate = new Promise(resolve => {
+    resolveText = resolve;
+  });
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      await searchGate;
+      yield { type: 'search', query: 'protein bar nutrition' };
+      await saveGate;
+      yield { type: 'food_library_saved', name: 'Quest Bar' };
+      await textGate;
+      yield { type: 'text', delta: 'Logged it, 190 kcal.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  const pending = controller.send('log a quest bar');
+
+  await flushMicrotasks();
+  seenStatuses.push(bubbleText(statusBubbles(root)[0]));
+
+  resolveSearch();
+  await flushMicrotasks();
+  seenStatuses.push(bubbleText(statusBubbles(root)[0]));
+
+  resolveSave();
+  await flushMicrotasks();
+  seenStatuses.push(bubbleText(statusBubbles(root)[0]));
+
+  resolveText();
+  await pending;
+
+  assert.deepEqual(seenStatuses, ['On it…', 'Looking that up…', 'Researching…']);
+  assert.equal(statusBubbles(root).length, 0, 'status bubble should be cleared once the real answer streams in');
+});
+
 test('applies the agent accent colour when the stream names the agent', async () => {
   const root = new FakeDocument();
   const chatApi = {

@@ -5,6 +5,23 @@ const PARAGRAPH_BREAK = /\n{2,}/;
 const HISTORY_WINDOW_MS = 20 * 60 * 1000;
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_ENTRY_CHARS = 1000;
+const STATUS_BUBBLE_CLASS = 'chat-message--status';
+
+// FakeElement (used in unit tests) only models `className` as a plain string, so
+// classList is used when real DOM elements provide it and this string fallback
+// covers the test harness without changing its shape.
+function addStatusClass(element) {
+  if (!element) return;
+  if (element.classList?.add) {
+    element.classList.add(STATUS_BUBBLE_CLASS);
+    return;
+  }
+  const classes = (element.className ?? '').split(/\s+/).filter(Boolean);
+  if (!classes.includes(STATUS_BUBBLE_CLASS)) {
+    classes.push(STATUS_BUBBLE_CLASS);
+    element.className = classes.join(' ');
+  }
+}
 
 export function createChatController({
   root,
@@ -99,12 +116,12 @@ export function createChatController({
     let assistantBubble = null;
     let assistantBuffer = '';
     let assistantFullText = '';
-    let searchWaitBubble = null;
     let workingBubble = appendMessage(root, {
       role: 'assistant',
       agentSlug: assistantSlug,
       text: 'On it…'
     });
+    addStatusClass(workingBubble);
     const abort = new AbortController();
     const timeoutId = setTimeout(() => abort.abort(), 90_000);
 
@@ -114,15 +131,24 @@ export function createChatController({
       workingBubble = null;
     }
 
+    // Keeps a single sticky bubble alive across the "On it… → Looking that up…
+    // → Researching…" turn instead of leaving a trail of separate wait bubbles.
+    function setWorkingStatus(text) {
+      if (!workingBubble) {
+        workingBubble = appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text });
+      } else {
+        const body = workingBubble.querySelector?.('.chat-message__body') ?? workingBubble;
+        body.textContent = text;
+      }
+      addStatusClass(workingBubble);
+      scrollChatToBottom();
+    }
+
     // Streamed text arrives as one long buffer; splitting on paragraph breaks into
     // separate bubbles reads like an actual back-and-forth instead of one wall of text.
     function renderLiveText(text) {
       if (!text) return;
       clearWorkingBubble();
-      if (searchWaitBubble) {
-        searchWaitBubble.remove();
-        searchWaitBubble = null;
-      }
       if (!assistantBubble) assistantBubble = appendMessage(root, { role: 'assistant', agentSlug: assistantSlug });
       const target = assistantBubble.querySelector?.('.chat-message__body') ?? assistantBubble;
       renderInlineMarkdown(root, target, text);
@@ -174,10 +200,6 @@ export function createChatController({
         } else if (event.type === 'record_proposal') {
           clearWorkingBubble();
           endTextTurn();
-          if (searchWaitBubble) {
-            searchWaitBubble.remove();
-            searchWaitBubble = null;
-          }
           const proposal = appendRecordProposal(root, event);
           bindProposal(proposal, event);
         } else if (event.type === 'record_rejected') {
@@ -187,19 +209,17 @@ export function createChatController({
           clearWorkingBubble();
           showChatError(root, 'Chat is unavailable right now. Please try again.');
         } else if (event.type === 'search') {
-          clearWorkingBubble();
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `🔍 Searched the web: ${event.query ?? '…'}` });
-          searchWaitBubble = appendMessage(root, { role: 'assistant', text: 'Looking that up…' });
-          scrollChatToBottom();
+          setWorkingStatus('Looking that up…');
         } else if (event.type === 'food_library_saved') {
-          clearWorkingBubble();
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `📚 Saved "${event.name}" to the Food Library for next time.` });
+          setWorkingStatus('Researching…');
         } else if (event.type === 'exercise_library_saved') {
-          clearWorkingBubble();
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `Saved "${event.name}" to the Exercise Library.` });
+          setWorkingStatus('Researching…');
         }
       }
       remember('assistant', assistantFullText);
@@ -213,10 +233,6 @@ export function createChatController({
     } finally {
       clearTimeout(timeoutId);
       clearWorkingBubble();
-      if (searchWaitBubble) {
-        searchWaitBubble.remove();
-        searchWaitBubble = null;
-      }
       sending = false;
       setChatBusy(root, false);
     }
