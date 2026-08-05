@@ -52,6 +52,20 @@ test('hero prefers today planned over older completed', () => {
   assert.equal(model.heroSession.status, 'planned');
 });
 
+test('hero session carries path and notes body from the event', () => {
+  const model = buildFitnessModel({
+    events: [{
+      record: workout({ status: 'planned', title: 'Planned Pump' }),
+      body: 'Felt sharp today',
+      path: 'data/fitness/2026/07/2026-07-30-planned-pump.md',
+      legacy: false
+    }],
+    date: '2026-07-30'
+  });
+  assert.equal(model.heroSession.path, 'data/fitness/2026/07/2026-07-30-planned-pump.md');
+  assert.equal(model.heroSession.notes, 'Felt sharp today');
+});
+
 test('hero prefers today completed over today planned', () => {
   const model = buildFitnessModel({
     events: events([

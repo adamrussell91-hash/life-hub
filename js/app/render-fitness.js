@@ -22,7 +22,7 @@ const formatLoad = set => {
   return `${set.weight_kg} kg × ${set.reps}`;
 };
 
-export function renderFitness(root, model) {
+export function renderFitness(root, model, { logger } = {}) {
   setText(root, '[data-fitness="streak"]', model.streak);
   setText(root, '[data-fitness="day-type"]', DAY_TYPE_LABELS[model.dayType] ?? model.dayType ?? '—');
 
@@ -43,10 +43,11 @@ export function renderFitness(root, model) {
   if (!model.heroSession) {
     empty?.removeAttribute('hidden');
     heroWrap?.setAttribute('hidden', '');
+    logger?.unmount?.();
   } else {
     empty?.setAttribute('hidden', '');
     heroWrap?.removeAttribute('hidden');
-    renderHero(root, model.heroSession);
+    renderHero(root, model.heroSession, { logger });
   }
 
   renderWeekVolume(root, model.weekVolume);
@@ -57,11 +58,10 @@ export function renderFitness(root, model) {
   root.querySelector('#fitness-dashboard')?.removeAttribute('hidden');
 }
 
-function renderHero(root, session) {
+function renderHero(root, session, { logger } = {}) {
   setText(root, '[data-fitness="hero-title"]', session.title ?? 'Session');
   setText(root, '[data-fitness="hero-duration"]', session.duration_min != null ? `${session.duration_min} min` : '—');
   setText(root, '[data-fitness="hero-status"]', session.status ?? '—');
-  setText(root, '[data-fitness="hero-notes"]', session.notes?.trim() || '');
 
   const tags = root.querySelector('#fitness-focus-tags');
   if (tags) {
@@ -75,18 +75,34 @@ function renderHero(root, session) {
   }
 
   const list = root.querySelector('#fitness-exercise-list');
-  if (list) {
-    list.replaceChildren();
-    for (const exercise of session.exercises ?? []) {
-      const row = root.createElement('div');
-      row.className = 'fitness-exercise';
-      const title = root.createElement('strong');
-      title.textContent = formatExerciseTitle(exercise);
-      row.append(title);
-      const detail = root.createElement('p');
-      detail.textContent = formatExerciseSets(exercise) || (session.status === 'planned' ? 'Sets to be confirmed' : 'No sets logged');
-      row.append(detail);
-      list.append(row);
+  const notesEl = root.querySelector('[data-fitness="hero-notes"]');
+  const planned = session.status === 'planned';
+
+  if (planned && logger) {
+    list?.setAttribute('hidden', '');
+    if (notesEl) {
+      notesEl.textContent = '';
+      notesEl.setAttribute('hidden', '');
+    }
+    logger.mount(session);
+  } else {
+    logger?.unmount?.();
+    list?.removeAttribute('hidden');
+    notesEl?.removeAttribute('hidden');
+    if (notesEl) notesEl.textContent = session.notes?.trim() || '';
+    if (list) {
+      list.replaceChildren();
+      for (const exercise of session.exercises ?? []) {
+        const row = root.createElement('div');
+        row.className = 'fitness-exercise';
+        const title = root.createElement('strong');
+        title.textContent = formatExerciseTitle(exercise);
+        row.append(title);
+        const detail = root.createElement('p');
+        detail.textContent = formatExerciseSets(exercise) || (session.status === 'planned' ? 'Sets to be confirmed' : 'No sets logged');
+        row.append(detail);
+        list.append(row);
+      }
     }
   }
 

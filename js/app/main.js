@@ -7,6 +7,7 @@ import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
 import { createChatPanelController } from './chat-panel.js';
 import { API_BASE_URL } from './config.js';
+import { createFitnessLoggerController } from './fitness-logger-controller.js';
 import { buildFitnessModel } from './fitness-model.js';
 import { buildHomeModel } from './home-model.js';
 import { loadLiveEvents } from './load-live-events.js';
@@ -55,8 +56,17 @@ const loadCached = async ({ date }) => {
 };
 
 const chatPanel = createChatPanelController({ root: document });
+const chatApi = createChatApi(fetchImpl);
 
-const controller = createAppController({
+let controller;
+const fitnessLogger = createFitnessLoggerController({
+  root: document,
+  chatApi,
+  storage: localStorage,
+  onSessionWritten: () => void controller.refresh({ manual: true })
+});
+
+controller = createAppController({
   root: document,
   sessionApi,
   cache,
@@ -70,6 +80,7 @@ const controller = createAppController({
   renderNutrition,
   buildFitnessModel,
   renderFitness,
+  fitnessLogger,
   buildCentralNodeModel,
   renderCentralNode,
   agentColour,
@@ -86,7 +97,6 @@ const DEFAULT_AGENT_BY_SECTION = {
   'central-node': CENTRAL_NODE_AGENT_SLUG
 };
 
-const chatApi = createChatApi(fetchImpl);
 createChatController({
   root: document,
   chatApi,

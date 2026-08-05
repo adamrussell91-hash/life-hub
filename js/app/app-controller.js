@@ -24,6 +24,7 @@ export function createAppController(dependencies) {
     renderNutrition,
     buildFitnessModel,
     renderFitness,
+    fitnessLogger,
     buildCentralNodeModel,
     renderCentralNode,
     agentColour,
@@ -409,7 +410,7 @@ export function createAppController(dependencies) {
 
   function renderFitnessSection() {
     if (!latestResult || !buildFitnessModel || !renderFitness) return;
-    renderFitness(root, buildFitnessModel(latestResult));
+    renderFitness(root, buildFitnessModel(latestResult), { logger: fitnessLogger });
     const button = root.querySelector('#fitness-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, FITNESS_AGENT_SLUG));
   }

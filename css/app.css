@@ -661,6 +661,102 @@ main { max-width: 76rem; margin: 0 auto; }
   border-radius: 0.85rem;
   background: rgba(20, 43, 81, 0.04);
 }
+.fitness-logger {
+  margin-top: 0.85rem;
+  display: grid;
+  gap: 0.85rem;
+}
+.fitness-logger__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+}
+.fitness-logger__timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  color: var(--fitness-accent);
+  font-size: 1.1rem;
+}
+.fitness-logger__save { min-height: 1.1em; margin: 0; }
+.fitness-logger__exercise {
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  background: rgba(20, 43, 81, 0.04);
+}
+.fitness-logger__exercise h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--depth);
+}
+.fitness-logger__bench {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+.fitness-logger__bench input {
+  width: 4.5rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+}
+.fitness-logger__sets { display: grid; gap: 0.35rem; }
+.fitness-logger__set {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(3.5rem, 1fr) minmax(3.5rem, 1fr) minmax(6rem, 1.4fr);
+  gap: 0.35rem;
+  align-items: center;
+}
+.fitness-logger__set--head {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.fitness-logger__set input,
+.fitness-logger__set select {
+  width: 100%;
+  padding: 0.4rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: var(--warm-white);
+  font: inherit;
+}
+.fitness-logger__add-set {
+  margin-top: 0.45rem;
+  color: var(--fitness-accent);
+}
+.fitness-logger__notes {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.fitness-logger__notes textarea {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  font: inherit;
+  resize: vertical;
+  background: var(--warm-white);
+  color: var(--ink);
+}
+.fitness-logger__finish {
+  border: 0;
+  border-radius: 0.85rem;
+  padding: 0.85rem 1rem;
+  background: var(--fitness-accent);
+  color: white;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+.fitness-logger__finish:disabled { opacity: 0.6; cursor: wait; }
 .fitness-exercise strong {
   display: block;
   color: var(--depth);
