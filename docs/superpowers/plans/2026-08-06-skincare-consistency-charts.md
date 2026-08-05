@@ -107,7 +107,7 @@ EOF
 - Modify: `index.html`, `js/app/render-skincare.js`, `css/app.css`
 - Test: `tests/unit/render-skincare.test.js`
 
-- [ ] **Step 1: Failing render tests**
+- [x] **Step 1: Failing render tests**
 
 Assert:
 - `[data-skincare="am-streak"]` / `pm-streak` text
@@ -115,9 +115,9 @@ Assert:
 - Legend present
 - `#skincare-week-dots` gone or unused
 
-- [ ] **Step 2: FAIL**
+- [x] **Step 2: FAIL**
 
-- [ ] **Step 3: HTML**
+- [x] **Step 3: HTML**
 
 Replace week-dots strip with:
 
@@ -148,7 +148,7 @@ Render: set streak texts; `replaceChildren` heatmap tiles with `dataset.skincare
 
 CSS: Hyaluronica fills for `[data-skincare-state="am|pm|both|miss"]`; streak pair flex/grid; legend row.
 
-- [ ] **Step 4: PASS + commit**
+- [x] **Step 4: PASS + commit**
 
 ```bash
 git commit -m "$(cat <<'EOF'

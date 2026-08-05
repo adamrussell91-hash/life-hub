@@ -893,25 +893,42 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .fitness-logger__finish:disabled { opacity: 0.6; cursor: wait; }
 
-.skincare-week-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.skincare-streak-pair {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
+  margin-bottom: 0.5rem;
 }
-.skincare-week-dots {
+.skincare-streak-pair .metric-value { margin: 0.4rem 0 0; }
+.skincare-heatmap .heatmap-tile { background: rgba(185, 158, 224, 0.12); transition: background 220ms ease; }
+.skincare-heatmap .heatmap-tile[data-skincare-state="am"] { background: #E7CFEF; }
+.skincare-heatmap .heatmap-tile[data-skincare-state="pm"] { background: #8F6FB8; }
+.skincare-heatmap .heatmap-tile[data-skincare-state="both"] { background: #B99EE0; }
+.skincare-heatmap .heatmap-tile[data-today="true"] { box-shadow: 0 0 0 2px rgba(185, 158, 224, 0.55); }
+@media (prefers-reduced-motion: reduce) {
+  .skincare-heatmap .heatmap-tile { transition: none; }
+}
+.skincare-heatmap-legend {
   display: flex;
-  gap: 0.35rem;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.66rem;
 }
-.skincare-week-dots span {
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 50%;
-  background: rgba(20, 43, 81, 0.1);
+.skincare-heatmap-legend li { display: flex; align-items: center; gap: 0.35rem; }
+.skincare-heatmap-legend li::before {
+  content: '';
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 0.2rem;
+  background: rgba(185, 158, 224, 0.12);
 }
-.skincare-week-dots span[data-hit="true"] { background: #B99EE0; }
-.skincare-week-dots span[data-today="true"] { box-shadow: 0 0 0 2px rgba(185, 158, 224, 0.45); }
+.skincare-heatmap-legend li[data-state="am"]::before { background: #E7CFEF; }
+.skincare-heatmap-legend li[data-state="pm"]::before { background: #8F6FB8; }
+.skincare-heatmap-legend li[data-state="both"]::before { background: #B99EE0; }
 
 .skincare-grid {
   display: grid;
@@ -1404,8 +1421,8 @@ main { max-width: 76rem; margin: 0 auto; }
   .fitness-compare-row { grid-template-columns: 1fr; }
   .pr-badge,
   .fitness-first-logged { justify-self: start; }
-  .skincare-week-strip { flex-direction: column; align-items: flex-start; }
-  .skincare-week-dots { justify-content: flex-start; }
+  .skincare-streak-pair { grid-template-columns: 1fr; }
+  .skincare-heatmap { grid-template-columns: repeat(6, 1fr); }
 }
 
 .floating-chat-button {

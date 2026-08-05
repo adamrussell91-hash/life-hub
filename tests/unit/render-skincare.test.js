@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { renderSkincare } from '../../js/app/render-skincare.js';
 import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
 
@@ -46,6 +47,15 @@ class FakeElement {
   }
 }
 
+function monthHeatmapFixture() {
+  const states = ['miss', 'am', 'pm', 'both'];
+  return Array.from({ length: 30 }, (_, i) => ({
+    date: `2026-07-${String(i + 7).padStart(2, '0')}`,
+    state: states[i % states.length],
+    isToday: i === 29
+  }));
+}
+
 function baseModel(overrides = {}) {
   return {
     date: '2026-08-05',
@@ -56,15 +66,9 @@ function baseModel(overrides = {}) {
     amRecord: null,
     pmRecord: null,
     procedures: [],
-    weekDots: [
-      { date: '2026-07-30', logged: false, isToday: false },
-      { date: '2026-07-31', logged: true, isToday: false },
-      { date: '2026-08-01', logged: false, isToday: false },
-      { date: '2026-08-02', logged: false, isToday: false },
-      { date: '2026-08-03', logged: true, isToday: false },
-      { date: '2026-08-04', logged: false, isToday: false },
-      { date: '2026-08-05', logged: true, isToday: true }
-    ],
+    amStreak: 3,
+    pmStreak: 2,
+    monthHeatmap: monthHeatmapFixture(),
     ...overrides
   };
 }
@@ -75,14 +79,18 @@ function fakeSkincareRoot() {
   const routineCards = new FakeElement('div');
   const procedureCard = new FakeElement('article');
   const procedureLog = new FakeElement('div');
-  const weekDots = new FakeElement('div');
+  const amStreak = new FakeElement('strong');
+  const pmStreak = new FakeElement('strong');
+  const heatmap = new FakeElement('div');
   const nodes = {
     '#skincare-dashboard': dashboard,
     '[data-skincare="date"]': dateLabel,
     '#skincare-routine-cards': routineCards,
     '#skincare-procedure': procedureCard,
     '#skincare-procedure-log': procedureLog,
-    '#skincare-week-dots': weekDots
+    '[data-skincare="am-streak"]': amStreak,
+    '[data-skincare="pm-streak"]': pmStreak,
+    '#skincare-consistency-heatmap': heatmap
   };
   return {
     createElement: tag => new FakeElement(tag),
@@ -94,28 +102,40 @@ function fakeSkincareRoot() {
     _routineCards: routineCards,
     _procedureCard: procedureCard,
     _procedureLog: procedureLog,
-    _weekDots: weekDots
+    _amStreak: amStreak,
+    _pmStreak: pmStreak,
+    _heatmap: heatmap
   };
 }
 
-test('renderSkincare fills #skincare-week-dots with one dot per day, flagging hits and today', () => {
+test('renderSkincare sets AM and PM streak numerals from the model', () => {
   const root = fakeSkincareRoot();
-  renderSkincare(root, baseModel());
+  renderSkincare(root, baseModel({ amStreak: 5, pmStreak: 0 }));
 
-  const dots = root._weekDots.children;
-  assert.equal(dots.length, 7);
-  assert.equal(dots[0].dataset.hit, 'false');
-  assert.equal(dots[1].dataset.hit, 'true');
-  assert.equal(dots[6].dataset.hit, 'true');
-  assert.equal(dots[6].dataset.today, 'true');
-  assert.equal(dots[0].dataset.today, undefined);
+  assert.equal(root._amStreak.textContent, '5');
+  assert.equal(root._pmStreak.textContent, '0');
 });
 
-test('renderSkincare re-renders week dots cleanly on repeated calls', () => {
+test('renderSkincare fills the consistency heatmap with 30 dated tiles carrying data-skincare-state', () => {
+  const root = fakeSkincareRoot();
+  const monthHeatmap = monthHeatmapFixture();
+  renderSkincare(root, baseModel({ monthHeatmap }));
+
+  const tiles = root._heatmap.children;
+  assert.equal(tiles.length, 30);
+  for (const [index, tile] of tiles.entries()) {
+    assert.equal(tile.dataset.skincareState, monthHeatmap[index].state);
+    assert.equal(tile.title, monthHeatmap[index].date);
+  }
+  assert.equal(tiles[29].dataset.today, 'true');
+  assert.equal(tiles[0].dataset.today, undefined);
+});
+
+test('renderSkincare re-renders the heatmap cleanly on repeated calls', () => {
   const root = fakeSkincareRoot();
   renderSkincare(root, baseModel());
-  renderSkincare(root, baseModel({ weekDots: baseModel().weekDots.slice(0, 3) }));
-  assert.equal(root._weekDots.children.length, 3);
+  renderSkincare(root, baseModel({ monthHeatmap: monthHeatmapFixture().slice(0, 5) }));
+  assert.equal(root._heatmap.children.length, 5);
 });
 
 test('renderSkincare marks the current routine card with skincare-card--current and a Now chip', () => {
@@ -154,4 +174,26 @@ test('renderSkincare shows an empty caption (not a list) when no procedures are 
   const [empty] = root._procedureLog.children;
   assert.equal(empty.tagName, 'p');
   assert.match(empty.textContent, /No procedures logged today\./);
+});
+
+test('index.html leads Skincare with the consistency hero, heatmap, and legend; week-dots strip is gone', async () => {
+  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+
+  const dashboardStart = html.indexOf('id="skincare-dashboard"');
+  const heroIndex = html.indexOf('skincare-consistency-card', dashboardStart);
+  const routineCardsIndex = html.indexOf('id="skincare-routine-cards"', dashboardStart);
+  assert.ok(dashboardStart >= 0, 'skincare-dashboard should exist');
+  assert.ok(heroIndex >= 0, 'skincare-consistency-card hero should exist');
+  assert.ok(heroIndex < routineCardsIndex, 'consistency hero should render before routine cards');
+
+  assert.match(html, /data-skincare="am-streak"/);
+  assert.match(html, /data-skincare="pm-streak"/);
+  assert.match(html, /id="skincare-consistency-heatmap"/);
+  assert.match(html, /class="heatmap-grid skincare-heatmap"/);
+
+  for (const state of ['both', 'am', 'pm', 'miss']) {
+    assert.match(html, new RegExp(`data-state="${state}"`));
+  }
+
+  assert.doesNotMatch(html, /skincare-week-dots/);
 });

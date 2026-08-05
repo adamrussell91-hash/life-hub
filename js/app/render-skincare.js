@@ -16,16 +16,19 @@ export function renderSkincare(root, model, { onLogRoutine, onLogProcedure } = {
   if (!dashboard) return;
 
   setText(root, '[data-skincare="date"]', model.date);
+  setText(root, '[data-skincare="am-streak"]', model.amStreak);
+  setText(root, '[data-skincare="pm-streak"]', model.pmStreak);
 
-  const dots = root.querySelector('#skincare-week-dots');
-  if (dots) {
-    dots.replaceChildren();
-    for (const day of model.weekDots ?? []) {
-      const el = root.createElement('span');
-      el.dataset.hit = String(day.logged);
-      if (day.isToday) el.dataset.today = 'true';
-      el.title = day.date;
-      dots.append(el);
+  const heatmap = root.querySelector('#skincare-consistency-heatmap');
+  if (heatmap) {
+    heatmap.replaceChildren();
+    for (const day of model.monthHeatmap ?? []) {
+      const tile = root.createElement('span');
+      tile.className = 'heatmap-tile';
+      tile.dataset.skincareState = day.state;
+      if (day.isToday) tile.dataset.today = 'true';
+      tile.title = day.date;
+      heatmap.append(tile);
     }
   }
 

@@ -446,11 +446,25 @@
             <p class="metric-caption" data-skincare="date">—</p>
           </div>
           <p id="skincare-status" class="metric-caption" aria-live="polite"></p>
-          <article class="metric-card skincare-streak-card">
-            <div class="skincare-week-strip">
-              <p class="metric-label">This week</p>
-              <div id="skincare-week-dots" class="skincare-week-dots" aria-label="Last 7 days of skincare logs"></div>
+          <article class="metric-card skincare-consistency-card">
+            <div class="skincare-streak-pair">
+              <div>
+                <p class="metric-label">AM streak</p>
+                <p class="metric-value"><strong data-skincare="am-streak">—</strong><span> days</span></p>
+              </div>
+              <div>
+                <p class="metric-label">PM streak</p>
+                <p class="metric-value"><strong data-skincare="pm-streak">—</strong><span> days</span></p>
+              </div>
             </div>
+            <p class="metric-label">Last 30 days</p>
+            <div id="skincare-consistency-heatmap" class="heatmap-grid skincare-heatmap" aria-label="AM and PM skincare consistency, last 30 days"></div>
+            <ul class="skincare-heatmap-legend" aria-label="Heatmap legend">
+              <li data-state="both">Both</li>
+              <li data-state="am">AM</li>
+              <li data-state="pm">PM</li>
+              <li data-state="miss">Miss</li>
+            </ul>
           </article>
           <div id="skincare-routine-cards" class="skincare-grid"></div>
           <article class="metric-card" id="skincare-procedure"></article>
