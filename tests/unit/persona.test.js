@@ -78,14 +78,14 @@ test('chadwick prompt includes saved templates when provided', () => {
 
 test('chadwick prompt always carries design-only and schema-gap instructions', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick' });
-  assert.match(prompt, /Design sessions in chat only/);
+  assert.match(prompt, /status planned/i);
   assert.match(prompt, /cable_type on every strength set/);
   assert.match(prompt, /Never invent YAML fields/);
 });
 
 test('other agents never receive the chadwick-only protocol instructions', () => {
   const prompt = buildSystemPrompt({ slug: 'brisket' });
-  assert.doesNotMatch(prompt, /Design sessions in chat only/);
+  assert.doesNotMatch(prompt, /status planned/i);
   assert.doesNotMatch(prompt, /operating manual/i);
 });
 

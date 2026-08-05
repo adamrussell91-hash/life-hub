@@ -508,8 +508,12 @@ export function createAppController(dependencies) {
     const offline = !navigatorTarget.onLine;
     const chip = root.querySelector('#network-status');
     const button = root.querySelector('#refresh-button');
+    const rail = root.querySelector('#rail-sync-status');
     if (chip) chip.hidden = !offline;
     if (button) button.disabled = offline;
+    if (rail) {
+      rail.textContent = offline ? 'Private · offline cache' : 'Private · live sync';
+    }
     if (offline && rendered) setAppState('offline');
   }
 
