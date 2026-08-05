@@ -3,6 +3,34 @@ import { applyAgentAvatarToBubble } from './render-agent-picker.js';
 import { showEphemeralMessage } from './ephemeral-message.js';
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source']);
+const UNREAD_SELECTOR = '.floating-chat-button, [data-section="chat"]';
+const UNREAD_CLASS = 'has-unread';
+
+// FakeElement-friendly toggle, mirroring the classList-vs-string fallback used
+// elsewhere for the status bubble class -- real DOM elements have classList,
+// the lighter test harnesses only model className as a plain string.
+function toggleClass(element, name, add) {
+  if (element.classList?.add && element.classList?.remove) {
+    if (add) element.classList.add(name);
+    else element.classList.remove(name);
+    return;
+  }
+  const classes = (element.className ?? '').split(/\s+/).filter(Boolean).filter(cls => cls !== name);
+  if (add) classes.push(name);
+  element.className = classes.join(' ');
+}
+
+// Session-only unread indicator: toggles a class (for styling) and a dataset
+// flag (for anything that wants to query state) on every chat entry point --
+// the floating chat FABs and the Chat nav item in both the rail and mobile nav.
+export function setChatUnread(root, unread) {
+  const targets = root.querySelectorAll?.(UNREAD_SELECTOR) ?? [];
+  for (const target of targets) {
+    toggleClass(target, UNREAD_CLASS, unread);
+    if (unread) target.dataset.unread = 'true';
+    else delete target.dataset.unread;
+  }
+}
 
 export function appendMessage(root, { role, agentSlug, text = '' }) {
   const list = root.querySelector('#chat-messages');

@@ -653,3 +653,166 @@ test('applies the agent accent colour when the stream names the agent', async ()
 
   assert.equal(root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'), '#2E7BD6');
 });
+
+function unreadCalls() {
+  const calls = [];
+  return { calls, onUnreadChange: unread => calls.push(unread) };
+}
+
+test('a completed turn with real text marks chat unread when the chat is not visible', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Logged it.' };
+      yield { type: 'done' };
+    }
+  };
+  const { calls, onUnreadChange } = unreadCalls();
+  const controller = createChatController({
+    root, chatApi, isChatVisible: () => false, onUnreadChange
+  });
+
+  await controller.send('log a snack');
+
+  assert.deepEqual(calls, [true]);
+});
+
+test('a completed turn does not mark chat unread while the chat is visible', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Logged it.' };
+      yield { type: 'done' };
+    }
+  };
+  const { calls, onUnreadChange } = unreadCalls();
+  const controller = createChatController({
+    root, chatApi, isChatVisible: () => true, onUnreadChange
+  });
+
+  await controller.send('log a snack');
+
+  assert.deepEqual(calls, []);
+});
+
+test('a record_proposal ending the turn marks chat unread when not visible', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'chadwick' };
+      yield {
+        type: 'record_proposal',
+        path: '2026/2026-08-02-chadwick-workout.md',
+        record: { type: 'workout', date: '2026-08-02' }
+      };
+    }
+  };
+  const { calls, onUnreadChange } = unreadCalls();
+  const controller = createChatController({
+    root, chatApi, isChatVisible: () => false, onUnreadChange
+  });
+
+  await controller.send('log my workout');
+
+  assert.deepEqual(calls, [true]);
+});
+
+test('a record_rejected event marks chat unread when not visible', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'record_rejected', errors: ['bad date'] };
+    }
+  };
+  const { calls, onUnreadChange } = unreadCalls();
+  const controller = createChatController({
+    root, chatApi, isChatVisible: () => false, onUnreadChange
+  });
+
+  await controller.send('log my workout');
+
+  assert.deepEqual(calls, [true]);
+});
+
+test('a stream error marks chat unread when not visible', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'error' };
+    }
+  };
+  const { calls, onUnreadChange } = unreadCalls();
+  const controller = createChatController({
+    root, chatApi, isChatVisible: () => false, onUnreadChange
+  });
+
+  await controller.send('log a snack');
+
+  assert.deepEqual(calls, [true]);
+});
+
+test('a thrown/aborted send marks chat unread when not visible', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      throw new Error('network down');
+    }
+  };
+  const { calls, onUnreadChange } = unreadCalls();
+  const controller = createChatController({
+    root, chatApi, isChatVisible: () => false, onUnreadChange
+  });
+
+  await controller.send('log a snack');
+
+  assert.deepEqual(calls, [true]);
+});
+
+test('a turn that only emits a search note without text/proposal/error does not mark chat unread', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'search', query: 'quest bar' };
+    }
+  };
+  const { calls, onUnreadChange } = unreadCalls();
+  const controller = createChatController({
+    root, chatApi, isChatVisible: () => false, onUnreadChange
+  });
+
+  await controller.send('log a quest bar');
+
+  assert.deepEqual(calls, []);
+});
+
+test('clearUnread notifies listeners that chat is read, independent of any send', () => {
+  const root = new FakeDocument();
+  const chatApi = { async *send() {} };
+  const { calls, onUnreadChange } = unreadCalls();
+  const controller = createChatController({ root, chatApi, onUnreadChange });
+
+  controller.clearUnread();
+
+  assert.deepEqual(calls, [false]);
+});
+
+test('omitting isChatVisible/onUnreadChange entirely preserves existing behaviour (no crash, no-op)', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Logged it.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await assert.doesNotReject(controller.send('log a snack'));
+  assert.doesNotThrow(() => controller.clearUnread());
+});
