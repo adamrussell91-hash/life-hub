@@ -25,9 +25,7 @@ export function renderNutrition(root, model) {
     if (pill.dataset) pill.dataset.colour = model.polyphenolVsAim.colour;
   }
 
-  for (const [meal, values] of Object.entries(model.nutrition.meals)) {
-    setText(root, `[data-meal-protein="${meal}"]`, `${values.protein_g} g`);
-  }
+  renderMealBreakdown(root, model.nutrition.meals);
 
   renderMacroSplit(root, model);
   renderMealsToday(root, model.mealsToday);
@@ -130,6 +128,33 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
   }
 
   animateAreaReveal(svg);
+}
+
+const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
+
+export function renderMealBreakdown(root, meals) {
+  const dl = root.querySelector('.meal-breakdown');
+  const empty = root.querySelector('[data-meal-breakdown-empty]');
+  if (!dl) return;
+  const entries = Object.entries(meals ?? {}).filter(([, values]) => Number(values?.protein_g) > 0);
+
+  dl.replaceChildren();
+  if (entries.length === 0) {
+    dl.setAttribute('hidden', '');
+    empty?.removeAttribute('hidden');
+    return;
+  }
+
+  dl.removeAttribute('hidden');
+  empty?.setAttribute('hidden', '');
+  for (const [meal, values] of entries) {
+    const dt = root.createElement('dt');
+    dt.textContent = MEAL_LABELS[meal] ?? meal;
+    const dd = root.createElement('dd');
+    dd.dataset.mealProtein = meal;
+    dd.textContent = `${values.protein_g} g`;
+    dl.append(dt, dd);
+  }
 }
 
 function renderMealsToday(root, mealsToday) {
