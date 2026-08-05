@@ -133,6 +133,9 @@ export function createChatController({ root, chatApi, onRecordWritten, now = () 
         } else if (event.type === 'food_library_saved') {
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `📚 Saved "${event.name}" to the Food Library for next time.` });
+        } else if (event.type === 'exercise_library_saved') {
+          endTextTurn();
+          appendMessage(root, { role: 'assistant', text: `Saved "${event.name}" to the Exercise Library.` });
         }
       }
       remember('assistant', assistantFullText);

@@ -34,6 +34,16 @@ import {
   validateFoodLibraryEntry
 } from './_shared/food-library.mjs';
 import {
+  EXERCISE_LIBRARY_PATH,
+  formatExerciseLibraryForPrompt,
+  parseExerciseLibrary,
+  saveExerciseLibraryEntrySchema,
+  searchExerciseLibrary,
+  searchExerciseLibrarySchema,
+  upsertExerciseLibraryEntry,
+  validateExerciseLibraryEntry
+} from './_shared/exercise-library.mjs';
+import {
   formatTemplatesForPrompt,
   isTemplatePath,
   MAX_PROMPT_TEMPLATES,
@@ -105,6 +115,7 @@ export function createChatHandler({
     const allowedTypes = agent?.recordTypes.length ? agent.recordTypes : undefined;
     const needsFoodLibrary = Boolean(allowedTypes?.includes('meal'));
     const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
+    const needsExerciseLibrary = slug === 'chadwick';
 
     let digest = '';
     let constraints = '';
@@ -112,6 +123,9 @@ export function createChatHandler({
     let foodLibraryEntries = [];
     let foodLibrary = '';
     let foodLibrarySha;
+    let exerciseLibraryEntries = [];
+    let exerciseLibrary = '';
+    let exerciseLibrarySha;
     let workoutTemplates = '';
     try {
       const current = await client.resolveTree();
@@ -122,14 +136,19 @@ export function createChatHandler({
         ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
         : null;
       foodLibrarySha = foodLibraryEntry?.sha;
+      const exerciseLibraryEntry = needsExerciseLibrary
+        ? current.tree.find(entry => entry.path === EXERCISE_LIBRARY_PATH && entry.type === 'blob')
+        : null;
+      exerciseLibrarySha = exerciseLibraryEntry?.sha;
       const templateEntries = needsWorkoutTemplates
         ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
         : [];
 
-      const [dataBlobs, centralNodeBlob, foodLibraryBlob, templateBlobs] = await Promise.all([
+      const [dataBlobs, centralNodeBlob, foodLibraryBlob, exerciseLibraryBlob, templateBlobs] = await Promise.all([
         Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
         centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
         foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
+        exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
         Promise.all(templateEntries.map(entry => client.readBlob(entry.sha)))
       ]);
 
@@ -154,6 +173,12 @@ export function createChatHandler({
         foodLibrary = formatFoodLibraryForPrompt(foodLibraryEntries);
       }
 
+      const decodedExerciseLibrary = exerciseLibraryBlob ? decodeBlob(exerciseLibraryBlob) : null;
+      if (decodedExerciseLibrary !== null) {
+        exerciseLibraryEntries = parseExerciseLibrary(decodedExerciseLibrary);
+        exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries);
+      }
+
       const templateContents = templateEntries
         .map((entry, index) => ({ path: entry.path, content: decodeBlob(templateBlobs[index]) }))
         .filter(file => file.content !== null);
@@ -165,6 +190,9 @@ export function createChatHandler({
       foodLibraryEntries = [];
       foodLibrary = '';
       foodLibrarySha = undefined;
+      exerciseLibraryEntries = [];
+      exerciseLibrary = '';
+      exerciseLibrarySha = undefined;
       workoutTemplates = '';
     }
 
@@ -176,12 +204,14 @@ export function createChatHandler({
       centralNodeLog,
       foodLibrary,
       chadwickProtocol,
-      workoutTemplates
+      workoutTemplates,
+      exerciseLibrary
     });
     const tools = [
       { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
       ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
-      ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : [])
+      ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
+      ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : [])
     ];
 
     let anthropic;
@@ -202,7 +232,11 @@ export function createChatHandler({
             system,
             messages: [...parsed.history, { role: 'user', content: parsed.message }],
             tools,
-            signal: request.signal
+            signal: request.signal,
+            executeTools: async event => {
+              if (event.name !== 'search_exercise_library') return null;
+              return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
+            }
           })) {
             if (event.type === 'tool_call' && event.name === 'log_entry') {
               const validation = validateLogEntry(event.input, {
@@ -236,6 +270,27 @@ export function createChatHandler({
                   });
                   foodLibrarySha = result.sha;
                   send({ type: 'food_library_saved', name: entry.name });
+                } catch {
+                  // Best-effort cache -- a failed save must never interrupt the chat response.
+                }
+              }
+            } else if (event.type === 'tool_call' && event.name === 'save_exercise_library_entry') {
+              const entry = validateExerciseLibraryEntry(event.input);
+              if (entry) {
+                try {
+                  exerciseLibraryEntries = upsertExerciseLibraryEntry(
+                    exerciseLibraryEntries,
+                    entry,
+                    getSydneyTimestamp(nowInstant)
+                  );
+                  const result = await client.writeFile({
+                    path: EXERCISE_LIBRARY_PATH,
+                    content: JSON.stringify(exerciseLibraryEntries, null, 2),
+                    ...(exerciseLibrarySha ? { sha: exerciseLibrarySha } : {}),
+                    message: `chore(exercise-library): upsert ${entry.name}`
+                  });
+                  exerciseLibrarySha = result.sha;
+                  send({ type: 'exercise_library_saved', name: entry.name });
                 } catch {
                   // Best-effort cache -- a failed save must never interrupt the chat response.
                 }
