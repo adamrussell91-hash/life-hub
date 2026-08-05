@@ -1,4 +1,5 @@
 import { appendMessage, appendRecordProposal, renderInlineMarkdown, setChatBusy, showChatError } from './render-chat.js';
+import { renderAgentPicker } from './render-agent-picker.js';
 
 const PARAGRAPH_BREAK = /\n{2,}/;
 const HISTORY_WINDOW_MS = 20 * 60 * 1000;
@@ -20,6 +21,7 @@ export function createChatController({
   let transcript = [];
   let lastAgentSlug = null;
   let lastAgentAt = 0;
+  let pinnedAgentSlug = null;
 
   // Prunes anything outside the memory window as a side effect, then returns a
   // bounded, API-shaped slice of what's left -- called before the new user turn
@@ -30,18 +32,34 @@ export function createChatController({
     return transcript.slice(-MAX_HISTORY_MESSAGES).map(({ role, content }) => ({ role, content }));
   }
 
-  // A name only needs to be said once per topic: if the same agent replied within
-  // the memory window, keep talking to them without repeating it -- but never
-  // stick to the router itself, since that's not a real persona to continue as.
-  // Once that window has lapsed (or no agent has spoken yet this session), fall
-  // back to whichever agent the currently-open panel defaults to, if any -- an
-  // explicit name in the message still always wins over both, in routeAgent
-  // server-side.
+  // Pinned avatar wins until another avatar is clicked. Otherwise keep talking to
+  // the last agent inside the memory window, then fall back to section default.
+  // An explicit name in the message still wins server-side in routeAgent.
   function stickyAgentSlug() {
+    if (pinnedAgentSlug) return pinnedAgentSlug;
     if (lastAgentSlug && lastAgentSlug !== 'router' && now() - lastAgentAt <= HISTORY_WINDOW_MS) {
       return lastAgentSlug;
     }
     return getDefaultAgentSlug?.();
+  }
+
+  function selectAgent(slug) {
+    if (!slug) return;
+    pinnedAgentSlug = slug;
+    lastAgentSlug = slug;
+    lastAgentAt = now();
+    applyAgentAccent(slug);
+    renderAgentPicker(root, {
+      selectedSlug: slug,
+      onSelect: selectAgent
+    });
+  }
+
+  function applyAgentAccent(slug) {
+    if (!slug || typeof agentColour !== 'function') return;
+    const panel = root.querySelector('#chat-view');
+    if (!panel?.style?.setProperty) return;
+    panel.style.setProperty('--agent-accent', agentColour(getAgentsConfig?.(), slug));
   }
 
   function remember(role, content) {
@@ -102,7 +120,8 @@ export function createChatController({
         searchWaitBubble = null;
       }
       if (!assistantBubble) assistantBubble = appendMessage(root, { role: 'assistant', agentSlug: assistantSlug });
-      renderInlineMarkdown(root, assistantBubble, text);
+      const target = assistantBubble.querySelector?.('.chat-message__body') ?? assistantBubble;
+      renderInlineMarkdown(root, target, text);
       scrollChatToBottom();
     }
 
@@ -125,19 +144,15 @@ export function createChatController({
       if (list) list.scrollTop = list.scrollHeight;
     }
 
-    function applyAgentAccent(slug) {
-      if (!slug || typeof agentColour !== 'function') return;
-      const panel = root.querySelector('#chat-view');
-      if (!panel?.style?.setProperty) return;
-      panel.style.setProperty('--agent-accent', agentColour(getAgentsConfig?.(), slug));
-    }
-
     try {
       for await (const event of chatApi.send(message, { history, priorAgentSlug, signal: abort.signal })) {
         if (event.type === 'agent') {
           assistantSlug = event.slug;
           lastAgentSlug = event.slug;
           lastAgentAt = now();
+          if (!pinnedAgentSlug) {
+            renderAgentPicker(root, { selectedSlug: event.slug, onSelect: selectAgent });
+          }
           applyAgentAccent(event.slug);
         } else if (event.type === 'text') {
           assistantBuffer += event.delta;
@@ -230,7 +245,16 @@ export function createChatController({
   }
 
   bindForm();
-  return { send };
+  renderAgentPicker(root, {
+    selectedSlug: stickyAgentSlug() ?? null,
+    onSelect: selectAgent
+  });
+
+  return {
+    send,
+    selectAgent,
+    getSelectedAgentSlug: () => stickyAgentSlug() ?? null
+  };
 }
 
 function collectEdits(record, inputs) {

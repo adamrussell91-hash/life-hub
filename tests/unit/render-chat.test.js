@@ -41,6 +41,10 @@ class FakeDocument {
   createElement(tag) {
     return new FakeElement(tag);
   }
+
+  querySelectorAll() {
+    return [];
+  }
 }
 
 test('renderInlineMarkdown renders **bold** segments as strong elements and the rest as plain spans', () => {
@@ -82,7 +86,8 @@ test('renderInlineMarkdown treats plain text with no markers as a single span', 
 test('appendMessage still sets plain textContent for simple system-style bubbles', () => {
   const root = new FakeDocument();
   const item = appendMessage(root, { role: 'assistant', text: '🔍 Searched the web: pizza' });
-  assert.equal(item.textContent, '🔍 Searched the web: pizza');
+  const body = item.children.find(child => child.className === 'chat-message__body');
+  assert.equal(body.textContent, '🔍 Searched the web: pizza');
   assert.equal(item.className, 'chat-message chat-message--assistant');
 });
 

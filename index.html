@@ -226,6 +226,7 @@
                 <h2 id="chat-heading">Chat</h2>
               </div>
             </div>
+            <div id="agent-picker" class="agent-picker" aria-label="Choose who to talk to"></div>
             <p id="chat-error" class="chat-error" role="alert" hidden></p>
             <ul id="chat-messages" class="chat-messages" aria-live="polite"></ul>
             <form id="chat-form" class="chat-form">
@@ -542,6 +543,45 @@
           <p id="body-status" class="metric-caption" aria-live="polite"></p>
           <div id="body-sections" class="body-sections"></div>
           <button id="body-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Dr Sara Tonin">💬</button>
+        </section>
+
+        <section id="mind-dashboard" class="dashboard" aria-labelledby="mind-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Mind</p>
+              <h2 id="mind-heading">Mood and themes</h2>
+            </div>
+            <p class="metric-caption" data-mind="entry-count">—</p>
+          </div>
+          <div id="mind-range-control" class="body-range" role="group" aria-label="Mind time range">
+            <button type="button" data-mind-range="weekly" aria-pressed="false">Weekly</button>
+            <button type="button" data-mind-range="monthly" class="is-active" aria-pressed="true">Monthly</button>
+            <button type="button" data-mind-range="six_month" aria-pressed="false">6M</button>
+          </div>
+          <p id="mind-empty" class="metric-caption" hidden>No diary entries in this range yet — talk with Penelope to log one.</p>
+
+          <article class="metric-card chart-card">
+            <p class="metric-label">Mood score</p>
+            <svg id="mind-mood-chart" class="line-chart body-chart" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mood score over time">
+              <path data-role="area" d=""></path>
+              <path data-role="line" d=""></path>
+            </svg>
+          </article>
+
+          <article class="metric-card chart-card">
+            <p class="metric-label">Entries by mood</p>
+            <div id="mind-mood-columns" class="column-chart" aria-label="Diary entries by mood"></div>
+          </article>
+
+          <article class="metric-card chart-card">
+            <p class="metric-label">Recurring themes</p>
+            <div id="mind-theme-columns" class="column-chart" aria-label="Recurring diary tags"></div>
+          </article>
+
+          <div class="mind-agents">
+            <button type="button" class="mind-agent-button" data-mind-agent="penelope">Talk with Penelope</button>
+            <button type="button" class="mind-agent-button mind-agent-button--vera" data-mind-agent="vera">Talk with Vera</button>
+          </div>
         </section>
 
         <section id="central-node-dashboard" class="dashboard" aria-labelledby="central-node-heading" hidden>

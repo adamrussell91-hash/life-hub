@@ -7,6 +7,7 @@ import {
   CENTRAL_NODE_AGENT_SLUG,
   FITNESS_AGENT_SLUG,
   NUTRITION_AGENT_SLUG,
+  PENELOPE_AGENT_SLUG,
   SKINCARE_AGENT_SLUG
 } from './app-controller.js';
 import { createBodyController } from './body-controller.js';
@@ -20,11 +21,13 @@ import { createFitnessLoggerController } from './fitness-logger-controller.js';
 import { buildFitnessModel } from './fitness-model.js';
 import { buildHomeModel } from './home-model.js';
 import { loadLiveEvents } from './load-live-events.js';
+import { buildMindModel } from './mind-model.js';
 import { buildNutritionModel } from './nutrition-model.js';
 import { renderBody } from './render-body.js';
 import { renderCentralNode } from './render-central-node.js';
 import { renderFitness } from './render-fitness.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
+import { renderMind } from './render-mind.js';
 import { renderNutrition } from './render-nutrition.js';
 import { createRepositoryCache } from './repository-cache.js';
 import { createSkincareController } from './skincare-controller.js';
@@ -75,6 +78,7 @@ const chatPanel = createChatPanelController({ root: document });
 const chatApi = createChatApi(fetchImpl);
 
 let controller;
+let chatController;
 const fitnessLogger = createFitnessLoggerController({
   root: document,
   chatApi,
@@ -118,6 +122,9 @@ controller = createAppController({
   buildBodyModel,
   renderBody,
   bodyController,
+  buildMindModel,
+  renderMind,
+  chatSelectAgent: slug => chatController?.selectAgent?.(slug),
   buildCentralNodeModel,
   renderCentralNode,
   agentColour,
@@ -133,10 +140,11 @@ const DEFAULT_AGENT_BY_SECTION = {
   fitness: FITNESS_AGENT_SLUG,
   skincare: SKINCARE_AGENT_SLUG,
   body: BODY_AGENT_SLUG,
+  mind: PENELOPE_AGENT_SLUG,
   'central-node': CENTRAL_NODE_AGENT_SLUG
 };
 
-createChatController({
+chatController = createChatController({
   root: document,
   chatApi,
   onRecordWritten: () => void controller.refresh({ manual: true }),

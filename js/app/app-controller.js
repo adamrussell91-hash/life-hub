@@ -11,6 +11,8 @@ export const CENTRAL_NODE_AGENT_SLUG = 'hammond';
 export const FITNESS_AGENT_SLUG = 'chadwick';
 export const SKINCARE_AGENT_SLUG = 'hyaluronica';
 export const BODY_AGENT_SLUG = 'sara';
+export const PENELOPE_AGENT_SLUG = 'penelope';
+export const VERA_AGENT_SLUG = 'vera';
 
 export function createAppController(dependencies) {
   const {
@@ -38,6 +40,9 @@ export function createAppController(dependencies) {
     buildBodyModel,
     renderBody,
     bodyController,
+    buildMindModel,
+    renderMind,
+    chatSelectAgent,
     buildCentralNodeModel,
     renderCentralNode,
     agentColour,
@@ -67,6 +72,7 @@ export function createAppController(dependencies) {
   let calendarSelectedDate = null;
   let calendarViewMonth = null;
   let bodyRange = 'monthly';
+  let mindRange = 'monthly';
   let activeRefresh = null;
   let refreshAbortController = null;
   let lifecycleVersion = 0;
@@ -86,7 +92,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'central-node') continue;
+    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -112,6 +118,9 @@ export function createAppController(dependencies) {
   }
   for (const button of root.querySelectorAll?.('[data-section="body"]') ?? []) {
     bind(button, 'click', () => showSection('body'));
+  }
+  for (const button of root.querySelectorAll?.('[data-section="mind"]') ?? []) {
+    bind(button, 'click', () => showSection('mind'));
   }
   for (const button of root.querySelectorAll?.('[data-section="central-node"]') ?? []) {
     bind(button, 'click', () => showSection('central-node'));
@@ -287,6 +296,7 @@ export function createAppController(dependencies) {
         if (currentSection === 'skincare') renderSkincareSection();
         if (currentSection === 'calendar') renderCalendarSection();
         if (currentSection === 'body') renderBodySection();
+        if (currentSection === 'mind') renderMindSection();
         if (currentSection === 'central-node') renderCentralNodeSection();
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
@@ -408,6 +418,7 @@ export function createAppController(dependencies) {
     skincare: { eyebrow: 'Skincare', title: 'Skincare' },
     calendar: { eyebrow: 'Calendar', title: 'Calendar' },
     body: { eyebrow: 'Body', title: 'Body' },
+    mind: { eyebrow: 'Mind', title: 'Mind' },
     'central-node': { eyebrow: 'Central Node', title: 'Central Node' }
   };
 
@@ -419,6 +430,7 @@ export function createAppController(dependencies) {
     const skincare = root.querySelector('#skincare-dashboard');
     const calendar = root.querySelector('#calendar-dashboard');
     const body = root.querySelector('#body-dashboard');
+    const mind = root.querySelector('#mind-dashboard');
     const centralNode = root.querySelector('#central-node-dashboard');
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
@@ -426,6 +438,7 @@ export function createAppController(dependencies) {
     if (skincare) skincare.hidden = name !== 'skincare';
     if (calendar) calendar.hidden = name !== 'calendar';
     if (body) body.hidden = name !== 'body';
+    if (mind) mind.hidden = name !== 'mind';
     if (centralNode) centralNode.hidden = name !== 'central-node';
     // #chat-view's own `hidden` attribute is owned by chatPanel while the panel is
     // open as an overlay elsewhere (its hosting section's hidden-cascade controls
@@ -443,6 +456,7 @@ export function createAppController(dependencies) {
     if (name === 'skincare') renderSkincareSection();
     if (name === 'calendar') renderCalendarSection();
     if (name === 'body') renderBodySection();
+    if (name === 'mind') renderMindSection();
     if (name === 'central-node') renderCentralNodeSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const active = button.dataset.section === name;
@@ -537,6 +551,27 @@ export function createAppController(dependencies) {
     });
     const button = root.querySelector('#body-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, BODY_AGENT_SLUG));
+  }
+
+  function renderMindSection() {
+    if (!latestResult || !buildMindModel || !renderMind) return;
+    const model = buildMindModel({
+      events: latestResult.events,
+      date: latestResult.date,
+      range: mindRange
+    });
+    renderMind(root, model, {
+      onRangeChange: next => {
+        mindRange = next;
+        renderMindSection();
+      },
+      onOpenAgent: slug => {
+        chatSelectAgent?.(slug);
+        if (!chatPanel) return;
+        const slot = root.querySelector('#mind-dashboard');
+        if (slot) chatPanel.open(slot, agentColour?.(latestResult.agentsConfig, slug));
+      }
+    });
   }
 
   function renderCentralNodeSection() {
