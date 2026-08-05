@@ -218,7 +218,7 @@ export function createAppController(dependencies) {
     const version = lifecycleVersion;
     const abortController = new AbortController();
     refreshAbortController = abortController;
-    const refreshPromise = performRefresh({ signal: abortController.signal, version })
+    const refreshPromise = performRefresh({ signal: abortController.signal, version, manual })
       .finally(() => {
         if (activeRefresh !== refreshPromise) return;
         if (button) button.disabled = !navigatorTarget.onLine;
@@ -229,7 +229,7 @@ export function createAppController(dependencies) {
     return refreshPromise;
   }
 
-  async function performRefresh({ signal, version }) {
+  async function performRefresh({ signal, version, manual = false }) {
     try {
       const date = getSydneyDateKey(currentDate());
       const result = await loadLive({ date, signal });
@@ -244,8 +244,15 @@ export function createAppController(dependencies) {
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
       rendered = true;
-      if (result.freshness === 'confirmed') recordSuccess();
-      else restoreLastSuccess();
+      if (result.freshness === 'confirmed') {
+        recordSuccess();
+        if (manual) {
+          setStatus(result.changed === true ? 'Synced — updates applied.' : 'Synced — already up to date.');
+        }
+      } else {
+        restoreLastSuccess();
+        if (manual) setStatus('Showing your last saved view.');
+      }
 
       if (result.freshness === 'fallback') {
         setAppState('stale');
@@ -261,6 +268,7 @@ export function createAppController(dependencies) {
       }
       if (rendered) {
         setAppState(navigatorTarget.onLine ? 'stale' : 'offline');
+        if (manual) setStatus('Refresh failed — showing your last saved view.');
         return;
       }
       renderUnavailable?.(root, GENERIC_LOAD_ERROR);
@@ -500,7 +508,7 @@ export function createAppController(dependencies) {
   function renderLastSuccess(instant) {
     const element = root.querySelector('#last-synced');
     if (element) element.textContent = `Last synced ${new Intl.DateTimeFormat('en-AU', {
-      hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Sydney'
+      hour: 'numeric', minute: '2-digit', second: '2-digit', timeZone: 'Australia/Sydney'
     }).format(instant)}`;
   }
 
@@ -668,7 +676,15 @@ export function createAppController(dependencies) {
     return version === lifecycleVersion && !destroyed;
   }
 
-  return { start, refresh, signIn, signOut, destroy, getCurrentSection: () => currentSection };
+  return {
+    start,
+    refresh,
+    signIn,
+    signOut,
+    destroy,
+    getCurrentSection: () => currentSection,
+    getAgentsConfig: () => latestResult?.agentsConfig ?? null
+  };
 }
 
 function isSessionExpired(error) {

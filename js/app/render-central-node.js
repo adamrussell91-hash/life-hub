@@ -100,7 +100,7 @@ function renderWeekChart(root, week) {
     for (const day of chart.dayLabels) {
       const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
       text.setAttribute('x', day.x);
-      text.setAttribute('y', chart.height - 2);
+      text.setAttribute('y', chart.height - 8);
       text.setAttribute('text-anchor', 'middle');
       text.setAttribute('class', 'chart-day-label');
       text.textContent = new Intl.DateTimeFormat('en-AU', { weekday: 'narrow' })

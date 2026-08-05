@@ -463,7 +463,7 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 .chat-message--user { align-self: flex-end; background: var(--marine); color: white; }
-.chat-message--assistant[data-agent] { border-left: 0.3rem solid var(--wave); }
+.chat-message--assistant[data-agent] { border-left: 0.3rem solid var(--agent-accent, var(--wave)); }
 
 .record-proposal {
   padding: 1rem 1.2rem;

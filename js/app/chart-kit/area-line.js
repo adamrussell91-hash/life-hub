@@ -34,10 +34,10 @@ export function smoothLinePath(points) {
   return d;
 }
 
-export function smoothAreaPath(points, { width, height, padding }) {
+export function smoothAreaPath(points, { width, baselineY, padding }) {
   const line = smoothLinePath(points);
   if (!line) return '';
-  return `${line} L ${fmt(width - padding)} ${fmt(height)} L ${fmt(padding)} ${fmt(height)} Z`;
+  return `${line} L ${fmt(width - padding)} ${fmt(baselineY)} L ${fmt(padding)} ${fmt(baselineY)} Z`;
 }
 
 export function buildAreaLine(
@@ -46,6 +46,7 @@ export function buildAreaLine(
     width = DEFAULT_WIDTH,
     height = DEFAULT_HEIGHT,
     padding = DEFAULT_PADDING,
+    paddingBottom = padding,
     valueKey = 'value',
     rollingAverage = 0
   } = {}
@@ -54,7 +55,8 @@ export function buildAreaLine(
   const means = rollingAverage > 0 ? rollingMeans(values, rollingAverage) : [];
   const max = Math.max(1, ...values, ...means);
   const stepX = series.length > 1 ? (width - padding * 2) / (series.length - 1) : 0;
-  const scaleY = value => height - padding - (value / max) * (height - padding * 2);
+  const plotBottom = height - paddingBottom;
+  const scaleY = value => plotBottom - (value / max) * (plotBottom - padding);
 
   const points = series.map((day, index) => ({
     x: padding + stepX * index,
@@ -66,13 +68,14 @@ export function buildAreaLine(
   const linePoints = points.map(point => `${fmt(point.x)},${fmt(point.y)}`).join(' ');
   const areaPoints = points.length === 0
     ? ''
-    : `${padding},${height} ${linePoints} ${width - padding},${height}`;
+    : `${padding},${plotBottom} ${linePoints} ${width - padding},${plotBottom}`;
   const linePath = smoothLinePath(points);
-  const areaPath = smoothAreaPath(points, { width, height, padding });
+  const areaPath = smoothAreaPath(points, { width, baselineY: plotBottom, padding });
 
   const result = {
     width,
     height,
+    paddingBottom,
     points,
     linePoints,
     areaPoints,
