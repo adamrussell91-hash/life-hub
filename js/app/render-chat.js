@@ -104,6 +104,29 @@ export function appendRecordProposal(root, { path, record, notes }) {
 
   card.append(fields);
 
+  if (Array.isArray(record.exercises) && record.exercises.length > 0) {
+    const exercisesList = root.createElement('ul');
+    exercisesList.className = 'record-proposal__exercises';
+    for (const exercise of record.exercises) {
+      const item = root.createElement('li');
+      let title = exercise.name ?? 'Exercise';
+      if (exercise.bench_angle_deg != null) {
+        title += ` @ ${exercise.bench_angle_deg}°`;
+      }
+      const sets = (exercise.sets ?? [])
+        .map(set => {
+          const reps = set.reps != null ? `${set.reps}` : '—';
+          const cable = set.cable_type ? ` · ${String(set.cable_type).replaceAll('_', ' ')}` : '';
+          const weight = set.weight_kg != null ? `${set.weight_kg} kg` : 'BW';
+          return `${weight} × ${reps}${cable}`;
+        })
+        .join(' · ');
+      item.textContent = sets ? `${title}: ${sets}` : title;
+      exercisesList.append(item);
+    }
+    card.append(exercisesList);
+  }
+
   const confirm = root.createElement('button');
   confirm.type = 'button';
   confirm.className = 'record-proposal__confirm';

@@ -80,14 +80,19 @@ function renderHero(root, session) {
       const row = root.createElement('div');
       row.className = 'fitness-exercise';
       const title = root.createElement('strong');
-      title.textContent = exercise.name ?? 'Exercise';
+      let titleText = exercise.name ?? 'Exercise';
+      if (exercise.bench_angle_deg != null) {
+        titleText += ` @ ${exercise.bench_angle_deg}°`;
+      }
+      title.textContent = titleText;
       row.append(title);
       const detail = root.createElement('p');
       const sets = (exercise.sets ?? [])
         .map(set => {
           const reps = set.reps != null ? `${set.reps}` : '—';
+          const cable = set.cable_type ? ` · ${String(set.cable_type).replaceAll('_', ' ')}` : '';
           const weight = set.weight_kg != null ? `${set.weight_kg} kg` : 'BW';
-          return `${weight} × ${reps}`;
+          return `${weight} × ${reps}${cable}`;
         })
         .join(' · ');
       detail.textContent = sets || 'No sets logged';

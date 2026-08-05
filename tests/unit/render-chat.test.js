@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMessage, renderInlineMarkdown } from '../../js/app/render-chat.js';
+import { appendMessage, appendRecordProposal, renderInlineMarkdown } from '../../js/app/render-chat.js';
 
 class FakeElement {
   constructor(tag) {
@@ -147,6 +147,41 @@ test('renderInlineMarkdown without { multiline: true } renders embedded newlines
   assert.equal(container.children.length, 1);
   assert.equal(container.children[0].tagName, 'span');
   assert.equal(container.children[0].textContent, 'Here are the options:\n- Option A\n- Option B');
+});
+
+test('appendRecordProposal adds a read-only exercises summary with cable types', () => {
+  const root = new FakeDocument();
+  const { card } = appendRecordProposal(root, {
+    path: 'data/fitness/2026/07/2026-07-30-test.md',
+    record: {
+      type: 'workout',
+      date: '2026-07-30',
+      title: 'Chest and Curls',
+      session_kind: 'strength',
+      status: 'completed',
+      exercises: [{
+        name: 'Chest Press',
+        bench_angle_deg: 0,
+        sets: [
+          { reps: 10, weight_kg: 32, cable_type: 'concentric' },
+          { reps: 8, weight_kg: 34, cable_type: 'concentric' }
+        ]
+      }, {
+        name: 'Bicep Curl',
+        sets: [{ reps: 12, weight_kg: 12, cable_type: 'constant_force' }]
+      }]
+    },
+    notes: 'Good session.'
+  });
+
+  const summary = card.children.find(child => child.className === 'record-proposal__exercises');
+  assert.ok(summary);
+  assert.equal(summary.tagName, 'ul');
+  assert.equal(summary.children.length, 2);
+  assert.match(summary.children[0].textContent, /Chest Press @ 0°/);
+  assert.match(summary.children[0].textContent, /32 kg × 10 · concentric/);
+  assert.match(summary.children[1].textContent, /Bicep Curl/);
+  assert.match(summary.children[1].textContent, /constant force/);
 });
 
 test('renderInlineMarkdown keeps bullet lines in one list even when a blank line separates them', () => {
