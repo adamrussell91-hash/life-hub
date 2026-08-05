@@ -25,14 +25,14 @@
 ### 1. Central Node seed + confirm safety net
 
 - Copy the app-repo `central-node.md` into `life-hub-data/central-node.md` and commit there (full writing rules, Constraints, section headings).
-- In `chat-confirm`’s `syncCentralNodeAfterLog`: if the blob is missing, **create** the file (seed content from the bundled/app copy or an equivalent checked-in seed the function can read) then apply the log mutation. Soft-fail remains only for genuine GitHub / conflict / transient errors after an attempted write — not for “file missing.”
+- In `chat-confirm`’s `syncCentralNodeAfterLog`: if the blob is missing, **create** the file using the checked-in app-repo `central-node.md` (read at function runtime via the same include/bundle path used for other config files), then apply the log mutation. Soft-fail remains only for genuine GitHub / conflict / transient errors after an attempted write — not for “file missing.”
 - Meal confirm continues to upsert `**Nutrition:** …` under Today’s Status and append a Recent Actions line (existing `applyLogToCentralNode` behaviour).
 
 ### 2. Refresh feedback
 
 - On every successful live refresh with `freshness === 'confirmed'`, call `recordSuccess()` / update `#last-synced` to now — even when `changed === false`.
 - Keep skipping full dashboard re-render when unchanged.
-- Optional: disable or mark the Refresh button busy while a manual refresh is in flight (reuse existing refreshing app state if already wired).
+- While a refresh is in flight, use the existing `refreshing` app state so the Refresh control is visibly busy / disabled.
 
 ### 3. Chat “working” placeholder
 
