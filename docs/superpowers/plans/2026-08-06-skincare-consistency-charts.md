@@ -162,9 +162,9 @@ EOF
 
 ### Task 3: SW bump + full verify
 
-- Bump `life-hub-shell-v36` → `v37`
-- `npm test` + browser suite
-- Commit: `chore: bump shell cache after Skincare consistency charts`
+- [x] Bump `life-hub-shell-v36` → `v37`
+- [x] `npm test` + browser suite
+- [x] Commit: `chore: bump shell cache after Skincare consistency charts`
 
 Stay on feature branch (no detached HEAD).
 
