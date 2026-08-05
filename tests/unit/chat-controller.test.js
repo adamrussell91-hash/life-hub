@@ -512,6 +512,13 @@ test('a search followed by a saved-library note keeps a sticky Researching… st
   assert.equal(bubbleText(duringStatus[0]), 'Researching…');
   assert.match(duringStatus[0].className, /chat-message--status/);
 
+  const list = root.querySelector('#chat-messages');
+  assert.equal(
+    list.children[list.children.length - 1],
+    duringStatus[0],
+    'the sticky status bubble should sit below the search chip and library confirmation, not above them'
+  );
+
   resolveGate();
   await pending;
 
