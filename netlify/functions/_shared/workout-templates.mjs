@@ -1,6 +1,6 @@
 export const TEMPLATES_PREFIX = 'data/fitness/templates/';
-
-const MAX_PROMPT_TEMPLATES = 50;
+export const TEMPLATE_PATH = /^data\/fitness\/templates\/[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
+export const MAX_PROMPT_TEMPLATES = 50;
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
 
 export function slugifyWorkoutTitle(title) {
@@ -19,7 +19,7 @@ export function templatePathForTitle(title) {
 }
 
 export function isTemplatePath(path) {
-  return typeof path === 'string' && path.startsWith(TEMPLATES_PREFIX) && path.endsWith('.md');
+  return typeof path === 'string' && TEMPLATE_PATH.test(path);
 }
 
 export function buildTemplateRecord(session, sourceSessionDate) {
