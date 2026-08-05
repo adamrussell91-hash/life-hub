@@ -606,6 +606,47 @@ main { max-width: 76rem; margin: 0 auto; }
 .metric-ring-fill.metric-ring--fat { stroke: var(--ring-fat); }
 .chart-day-label { fill: var(--chart-label); font-size: 9px; }
 
+.polyphenol-score {
+  margin: 0.85rem 0 0.35rem;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--depth);
+}
+.polyphenol-score strong { font-size: inherit; }
+.polyphenol-pill {
+  display: inline-flex;
+  margin: 0;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.polyphenol-pill[data-colour="green"] {
+  color: #1f6b45;
+  background: rgba(31, 107, 69, 0.12);
+}
+.polyphenol-pill[data-colour="muted"] {
+  color: var(--muted);
+  background: rgba(10, 21, 54, 0.06);
+}
+
+.nutrition--fat-over [data-nutrition="fat"],
+.nutrition--fat-over [data-split="fat"],
+.nutrition--fat-over [data-split="fat-pct"] {
+  color: #b3261e;
+}
+.nutrition--fat-over .metric-ring--fat,
+.nutrition--fat-over .metric-ring-fill.metric-ring--fat {
+  stroke: #b3261e;
+}
+
+.chart-overage-dot {
+  fill: #b3261e;
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
 .line-chart { width: 100%; height: 8rem; margin-top: 0.75rem; overflow: visible; }
 .line-chart [data-role="area"] { fill: var(--area-fill); stroke: none; }
 .line-chart [data-role="line"] {

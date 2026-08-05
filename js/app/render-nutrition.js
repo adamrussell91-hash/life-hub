@@ -25,7 +25,11 @@ export function renderNutrition(root, model) {
   setText(root, '[data-nutrition="calcium"]', `${model.nutrition.calcium_mg} mg`);
   setText(root, '[data-target="nutrition-calcium"]', `/ ${model.targets.calcium_target_mg} mg`);
   setText(root, '[data-nutrition="polyphenol"]', model.nutrition.polyphenol_score);
-  setText(root, '[data-target="nutrition-polyphenol"]', `/ ${model.targets.polyphenol_daily_aim}`);
+  const pill = root.querySelector('[data-nutrition="polyphenol-pill"]');
+  if (pill && model.polyphenolVsAim) {
+    pill.textContent = model.polyphenolVsAim.label;
+    if (pill.dataset) pill.dataset.colour = model.polyphenolVsAim.colour;
+  }
 
   for (const [meal, values] of Object.entries(model.nutrition.meals)) {
     setText(root, `[data-meal-protein="${meal}"]`, `${values.protein_g} g`);
@@ -36,12 +40,17 @@ export function renderNutrition(root, model) {
   renderMacroRings(root, model);
   renderNamedAreaChart(root, '#nutrition-protein-chart', model.week, 'protein_g', { rollingAverage: 3 });
   renderNamedAreaChart(root, '#nutrition-calories-chart', model.week, 'calories');
-  renderNamedAreaChart(root, '#nutrition-fat-chart', model.week, 'fat_g');
+  renderNamedAreaChart(root, '#nutrition-fat-chart', model.week, 'fat_g', {
+    markOverage: true
+  });
   renderHitStrip(root, model.week);
   renderHeatmap(root, model.month);
   renderProteinTrend(root, model.proteinTrend);
-  renderMealTiming(root, model.mealTiming);
   renderWeekCompare(root, model.week, model.previousWeek);
+
+  const fatOver = Boolean(model.overFatCeiling);
+  root.querySelector('#nutrition-dashboard')
+    ?.classList?.toggle?.('nutrition--fat-over', fatOver);
 
   root.querySelector('#nutrition-dashboard')?.removeAttribute('hidden');
 }
@@ -52,21 +61,27 @@ function renderMacroRings(root, model) {
     protein: { value: model.nutrition.protein_g, target: model.targets.protein_g },
     fat: { value: model.nutrition.fat_g, target: model.targets.fat_ceiling_g },
     sodium: { value: model.nutrition.sodium_mg, target: model.targets.sodium_ceiling_mg },
-    calcium: { value: model.nutrition.calcium_mg, target: model.targets.calcium_target_mg },
-    polyphenol: { value: model.nutrition.polyphenol_score, target: model.targets.polyphenol_daily_aim }
+    calcium: { value: model.nutrition.calcium_mg, target: model.targets.calcium_target_mg }
   };
   for (const [name, config] of Object.entries(rings)) {
     applyRingTarget(root.querySelector(`[data-nutrition-ring="${name}"]`), config, { size: 72, strokeWidth: 7 });
   }
 }
 
-function renderNamedAreaChart(root, selector, series, valueKey, { rollingAverage = 0 } = {}) {
+function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
+  const { rollingAverage = 0, markOverage = false } = options;
   const svg = root.querySelector(selector);
   if (!svg) return;
   const normalized = series.map(day => ({ date: day.date, value: day[valueKey] }));
-  const chart = buildAreaLine(normalized, { rollingAverage });
+  const chart = buildAreaLine(normalized, {
+    rollingAverage,
+    width: 320,
+    height: 140,
+    padding: 12,
+    paddingBottom: 24
+  });
   svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
-  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
   const line = svg.querySelector('[data-role="line"]');
   const area = svg.querySelector('[data-role="area"]');
@@ -102,6 +117,24 @@ function renderNamedAreaChart(root, selector, series, valueKey, { rollingAverage
       text.setAttribute('class', 'chart-day-label');
       text.textContent = weekdayLetter(day.date);
       labels.append(text);
+    }
+  }
+
+  const markers = svg.querySelector('[data-role="overage-markers"]');
+  if (markers) {
+    markers.replaceChildren();
+    if (markOverage) {
+      for (let i = 0; i < series.length; i++) {
+        if (!series[i].overFatCeiling) continue;
+        const point = chart.points[i];
+        if (!point) continue;
+        const dot = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', String(point.x));
+        dot.setAttribute('cy', String(point.y));
+        dot.setAttribute('r', '4');
+        dot.setAttribute('class', 'chart-overage-dot');
+        markers.append(dot);
+      }
     }
   }
 
@@ -165,24 +198,6 @@ function renderProteinTrend(root, trend) {
   if (!badge) return;
   badge.textContent = trend.label;
   badge.dataset.colour = trend.colour;
-}
-
-function renderMealTiming(root, mealTiming) {
-  const host = root.querySelector('#nutrition-meal-timing');
-  if (!host) return;
-  const chart = buildColumns(mealTiming);
-  host.replaceChildren();
-  for (const bar of chart.bars) {
-    const col = root.createElement('div');
-    col.className = 'column-bar';
-    const fill = root.createElement('span');
-    col.append(fill);
-    const label = root.createElement('span');
-    label.textContent = bar.label;
-    col.append(label);
-    host.append(col);
-    animateColumnGrow(fill, bar.heightPct);
-  }
 }
 
 function renderMacroSplit(root, model) {
