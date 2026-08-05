@@ -23,10 +23,15 @@ test('templatePathForTitle joins the templates prefix with the slugified title',
   assert.equal(templatePathForTitle('Chest and Curls'), `${TEMPLATES_PREFIX}chest-and-curls.md`);
 });
 
-test('isTemplatePath only matches markdown files under the templates prefix', () => {
+test('isTemplatePath only matches canonical lowercase markdown slugs under the templates prefix', () => {
   assert.equal(isTemplatePath('data/fitness/templates/chest-and-curls.md'), true);
   assert.equal(isTemplatePath('data/fitness/2026/07/2026-07-30-chest-curls.md'), false);
   assert.equal(isTemplatePath('data/fitness/templates/chest-and-curls.json'), false);
+  assert.equal(isTemplatePath('data/fitness/templates/../x.md'), false);
+  assert.equal(isTemplatePath('data/fitness/templates/nested/extra.md'), false);
+  assert.equal(isTemplatePath('data/fitness/templates/Chest-And-Curls.md'), false);
+  assert.equal(isTemplatePath('data/fitness/templates/chest_and_curls.md'), false);
+  assert.equal(isTemplatePath('data/fitness/templates/.md'), false);
   assert.equal(isTemplatePath(null), false);
 });
 

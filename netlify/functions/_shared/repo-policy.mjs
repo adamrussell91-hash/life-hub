@@ -1,8 +1,8 @@
 import { daysBetween, isCalendarDate } from '../../../js/core/time.js';
+import { isTemplatePath } from './workout-templates.mjs';
 
 export const CONFIG_PATHS = new Set(['config/agents.yml', 'config/targets.yml', 'central-node.md']);
 const EVENT_PATH = /^data\/(?<domain>nutrition|fitness|body|mind|skincare)\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
-const TEMPLATE_PATH = /^data\/fitness\/templates\/[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 const BLOB_SHA = /^[0-9a-f]{40}$/;
 const MAX_FILE_BYTES = 256 * 1024;
 
@@ -31,7 +31,7 @@ export function isAllowedRepositoryPath(path) {
     return false;
   }
   if (CONFIG_PATHS.has(path)) return true;
-  if (TEMPLATE_PATH.test(path)) return true;
+  if (isTemplatePath(path)) return true;
 
   const match = EVENT_PATH.exec(path);
   if (!match || !isCalendarDate(match.groups.date)) return false;

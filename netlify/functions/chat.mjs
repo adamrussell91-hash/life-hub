@@ -36,6 +36,7 @@ import {
 import {
   formatTemplatesForPrompt,
   isTemplatePath,
+  MAX_PROMPT_TEMPLATES,
   summarizeTemplatesFromContents
 } from './_shared/workout-templates.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
@@ -47,7 +48,6 @@ const MAX_MESSAGE_LENGTH = 4000;
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_ENTRY_CHARS = 1500;
 const MAX_HISTORY_TOTAL_CHARS = 6000;
-const MAX_TEMPLATE_ENTRIES = 50;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 
 export const config = { path: '/api/chat' };
@@ -123,7 +123,7 @@ export function createChatHandler({
         : null;
       foodLibrarySha = foodLibraryEntry?.sha;
       const templateEntries = needsWorkoutTemplates
-        ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_TEMPLATE_ENTRIES)
+        ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
         : [];
 
       const [dataBlobs, centralNodeBlob, foodLibraryBlob, templateBlobs] = await Promise.all([
