@@ -8,6 +8,7 @@ const GENERIC_LOAD_ERROR = 'Life Hub could not load your data. Check your connec
 export const NUTRITION_AGENT_SLUG = 'brisket';
 export const CENTRAL_NODE_AGENT_SLUG = 'hammond';
 export const FITNESS_AGENT_SLUG = 'chadwick';
+export const SKINCARE_AGENT_SLUG = 'hyaluronica';
 
 export function createAppController(dependencies) {
   const {
@@ -25,6 +26,11 @@ export function createAppController(dependencies) {
     buildFitnessModel,
     renderFitness,
     fitnessLogger,
+    buildSkincareModel,
+    renderSkincare,
+    skincareController,
+    skincareRoutines,
+    getCurrentRoutineKey,
     buildCentralNodeModel,
     renderCentralNode,
     agentColour,
@@ -70,7 +76,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'central-node') continue;
+    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'central-node') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -87,6 +93,9 @@ export function createAppController(dependencies) {
   }
   for (const button of root.querySelectorAll?.('[data-section="fitness"]') ?? []) {
     bind(button, 'click', () => showSection('fitness'));
+  }
+  for (const button of root.querySelectorAll?.('[data-section="skincare"]') ?? []) {
+    bind(button, 'click', () => showSection('skincare'));
   }
   for (const button of root.querySelectorAll?.('[data-section="central-node"]') ?? []) {
     bind(button, 'click', () => showSection('central-node'));
@@ -108,6 +117,15 @@ export function createAppController(dependencies) {
     }
     const slot = root.querySelector('#fitness-dashboard');
     if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, FITNESS_AGENT_SLUG));
+  });
+  bind(root.querySelector('#skincare-chat-button'), 'click', () => {
+    if (!chatPanel) return;
+    if (chatPanel.isOpen()) {
+      chatPanel.close();
+      return;
+    }
+    const slot = root.querySelector('#skincare-dashboard');
+    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, SKINCARE_AGENT_SLUG));
   });
   bind(root.querySelector('#central-node-chat-button'), 'click', () => {
     if (!chatPanel) return;
@@ -241,6 +259,7 @@ export function createAppController(dependencies) {
         renderHome(root, model);
         if (currentSection === 'nutrition') renderNutritionSection();
         if (currentSection === 'fitness') renderFitnessSection();
+        if (currentSection === 'skincare') renderSkincareSection();
         if (currentSection === 'central-node') renderCentralNodeSection();
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
@@ -359,6 +378,7 @@ export function createAppController(dependencies) {
     chat: { eyebrow: 'Life Hub', title: 'Chat' },
     nutrition: { eyebrow: 'Nutrition', title: 'Nutrition' },
     fitness: { eyebrow: 'Fitness', title: 'Fitness' },
+    skincare: { eyebrow: 'Skincare', title: 'Skincare' },
     'central-node': { eyebrow: 'Central Node', title: 'Central Node' }
   };
 
@@ -367,10 +387,12 @@ export function createAppController(dependencies) {
     const chat = root.querySelector('#chat-view');
     const nutrition = root.querySelector('#nutrition-dashboard');
     const fitness = root.querySelector('#fitness-dashboard');
+    const skincare = root.querySelector('#skincare-dashboard');
     const centralNode = root.querySelector('#central-node-dashboard');
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
     if (fitness) fitness.hidden = name !== 'fitness';
+    if (skincare) skincare.hidden = name !== 'skincare';
     if (centralNode) centralNode.hidden = name !== 'central-node';
     // #chat-view's own `hidden` attribute is owned by chatPanel while the panel is
     // open as an overlay elsewhere (its hosting section's hidden-cascade controls
@@ -385,6 +407,7 @@ export function createAppController(dependencies) {
     currentSection = name;
     if (name === 'nutrition') renderNutritionSection();
     if (name === 'fitness') renderFitnessSection();
+    if (name === 'skincare') renderSkincareSection();
     if (name === 'central-node') renderCentralNodeSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const active = button.dataset.section === name;
@@ -413,6 +436,23 @@ export function createAppController(dependencies) {
     renderFitness(root, buildFitnessModel(latestResult), { logger: fitnessLogger });
     const button = root.querySelector('#fitness-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, FITNESS_AGENT_SLUG));
+  }
+
+  function renderSkincareSection() {
+    if (!latestResult || !buildSkincareModel || !renderSkincare || !skincareRoutines) return;
+    const model = buildSkincareModel({
+      ...latestResult,
+      routines: skincareRoutines,
+      nowHourKey: typeof getCurrentRoutineKey === 'function'
+        ? getCurrentRoutineKey(currentDate())
+        : 'pm'
+    });
+    renderSkincare(root, model, {
+      onLogRoutine: skincareController?.onLogRoutine,
+      onLogProcedure: skincareController?.onLogProcedure
+    });
+    const button = root.querySelector('#skincare-chat-button');
+    button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, SKINCARE_AGENT_SLUG));
   }
 
   function renderCentralNodeSection() {

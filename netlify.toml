@@ -3,4 +3,4 @@ publish = "netlify/public"
 
 [functions]
 directory = "netlify/functions"
-included_files = ["config/chadwick-protocol.md", "central-node.md"]
+included_files = ["config/chadwick-protocol.md", "config/hyaluronica-protocol.md", "central-node.md"]

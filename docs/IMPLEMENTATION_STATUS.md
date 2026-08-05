@@ -198,4 +198,15 @@ Verified on 2026-08-05 (local only — do not push unless asked):
 
 Full design: `docs/superpowers/specs/2026-08-05-editable-fitness-session-design.md`.
 
-## Next Phase: Skincare tab (+ optional logger slice B: rest / warm-up / PR)
+## Phase 16: Skincare tab + Hyaluronica — Complete
+
+Verified on 2026-08-05 (local only — do not push unless asked):
+
+- Skincare dashboard with AM + PM one-tap cards (preloaded routines, toner/seal toggles, extras, note chips).
+- Direct confirm save via Hyaluronica slug; Other/procedure card for laser/clinic-style logs.
+- `config/skincare-routines.yml` + client data module; `config/hyaluronica-protocol.md` injected into Hyaluronica prompts.
+- Shell cache bumped to `life-hub-shell-v25`.
+
+Full design: `docs/superpowers/specs/2026-08-05-skincare-tab-design.md`.
+
+## Next Phase: remaining Life Hub tabs (Body / Mind) / optional logger polish

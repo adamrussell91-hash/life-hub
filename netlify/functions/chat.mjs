@@ -16,6 +16,7 @@ import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
 import { buildSystemPrompt } from './_shared/persona.mjs';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
+import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs';
 import {
   extractConstraints,
   extractCrossAgentCoordination,
@@ -197,6 +198,7 @@ export function createChatHandler({
     }
 
     const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
+    const hyaluronicaProtocol = slug === 'hyaluronica' ? loadHyaluronicaProtocol() : '';
     const system = buildSystemPrompt({
       slug,
       digest,
@@ -204,6 +206,7 @@ export function createChatHandler({
       centralNodeLog,
       foodLibrary,
       chadwickProtocol,
+      hyaluronicaProtocol,
       workoutTemplates,
       exerciseLibrary
     });
