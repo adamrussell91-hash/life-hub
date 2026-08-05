@@ -42,34 +42,43 @@ export function sessionVolume(record) {
   return total;
 }
 
-function workoutRecords(events) {
-  return events
-    .map(event => event.record)
-    .filter(record => record?.type === 'workout');
+function workoutEvents(events) {
+  return (events ?? []).filter(event => event?.record?.type === 'workout');
 }
 
-function completedOn(records, date) {
-  return records.some(record => record.date === date && record.status === 'completed');
+function completedOn(events, date) {
+  return events.some(({ record }) => record.date === date && record.status === 'completed');
 }
 
-function selectHeroSession(records, date) {
-  const todaysCompleted = records
-    .filter(record => record.date === date && record.status === 'completed')
-    .sort((a, b) => String(b.time ?? '').localeCompare(String(a.time ?? '')));
-  if (todaysCompleted[0]) return todaysCompleted[0];
-
-  const planned = records.find(record => record.date === date && record.status === 'planned');
-  if (planned) return planned;
-
-  return records
-    .filter(record => record.status === 'completed' && record.date <= date)
-    .sort((a, b) => b.date.localeCompare(a.date) || String(b.time ?? '').localeCompare(String(a.time ?? '')))
-    .at(0) ?? null;
+function withHeroMeta(event) {
+  if (!event) return null;
+  return {
+    ...event.record,
+    path: event.path ?? null,
+    notes: typeof event.body === 'string' ? event.body : (event.record.notes ?? '')
+  };
 }
 
-function buildComparisons(hero, records) {
+function selectHeroSession(events, date) {
+  const todaysCompleted = events
+    .filter(({ record }) => record.date === date && record.status === 'completed')
+    .sort((a, b) => String(b.record.time ?? '').localeCompare(String(a.record.time ?? '')));
+  if (todaysCompleted[0]) return withHeroMeta(todaysCompleted[0]);
+
+  const planned = events.find(({ record }) => record.date === date && record.status === 'planned');
+  if (planned) return withHeroMeta(planned);
+
+  const prior = events
+    .filter(({ record }) => record.status === 'completed' && record.date <= date)
+    .sort((a, b) => b.record.date.localeCompare(a.record.date)
+      || String(b.record.time ?? '').localeCompare(String(a.record.time ?? '')));
+  return withHeroMeta(prior[0] ?? null);
+}
+
+function buildComparisons(hero, events) {
   if (!hero?.exercises?.length) return [];
-  const prior = records
+  const prior = events
+    .map(({ record }) => record)
     .filter(record => record.status === 'completed' && record.date < hero.date)
     .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -111,9 +120,9 @@ function buildComparisons(hero, records) {
   });
 }
 
-function focusHits(records, weekDates) {
+function focusHits(events, weekDates) {
   const counts = new Map();
-  for (const record of records) {
+  for (const { record } of events) {
     if (record.status !== 'completed' || !weekDates.includes(record.date)) continue;
     for (const tag of record.focus ?? []) {
       const key = String(tag).trim().toLowerCase();
@@ -128,10 +137,10 @@ function focusHits(records, weekDates) {
 
 export function buildFitnessModel({ events, date }) {
   if (!date) throw new RangeError('Fitness display date is unavailable');
-  const records = workoutRecords(events);
+  const workoutEvts = workoutEvents(events);
   const weekDates = enumerateDateKeys(addCalendarDays(date, -(WEEK_DAYS - 1)), date);
   const monthDates = enumerateDateKeys(addCalendarDays(date, -(MONTH_DAYS - 1)), date);
-  const heroSession = selectHeroSession(records, date);
+  const heroSession = selectHeroSession(workoutEvts, date);
 
   return {
     date,
@@ -139,21 +148,21 @@ export function buildFitnessModel({ events, date }) {
     streak: calculateWorkoutStreak(events, date),
     weekDots: weekDates.map(day => ({
       date: day,
-      completed: completedOn(records, day),
+      completed: completedOn(workoutEvts, day),
       isToday: day === date
     })),
     heroSession,
     weekVolume: weekDates.map(day => ({
       date: day,
-      volume: records
-        .filter(record => record.date === day && record.status === 'completed')
-        .reduce((sum, record) => sum + sessionVolume(record), 0)
+      volume: workoutEvts
+        .filter(({ record }) => record.date === day && record.status === 'completed')
+        .reduce((sum, { record }) => sum + sessionVolume(record), 0)
     })),
-    focusHits: focusHits(records, weekDates),
-    comparisons: buildComparisons(heroSession, records),
+    focusHits: focusHits(workoutEvts, weekDates),
+    comparisons: buildComparisons(heroSession, workoutEvts),
     month: monthDates.map(day => ({
       date: day,
-      completed: completedOn(records, day)
+      completed: completedOn(workoutEvts, day)
     }))
   };
 }

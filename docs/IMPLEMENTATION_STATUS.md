@@ -187,4 +187,15 @@ Verified on 2026-08-05 (local only — do not push unless asked):
 
 Full design: `docs/superpowers/specs/2026-08-05-bug-pack-cn-refresh-chat-design.md`.
 
-## Next Phase: editable Fitness session → Skincare tab
+## Phase 15: Editable Fitness session (core logger) — Complete
+
+Verified on 2026-08-05 (local only — do not push unless asked):
+
+- Today’s `planned` hero is an editable StrengthLog-style logger (sets, cable, bench, notes, timer).
+- Local-first draft in `localStorage`; debounced planned autosave (~45s / tab hide) via confirm overwrite.
+- Finish CTA (“Pump finished” / “Session finished”) writes `completed`; Chadwick chat finish still works.
+- Shell cache bumped to `life-hub-shell-v24`.
+
+Full design: `docs/superpowers/specs/2026-08-05-editable-fitness-session-design.md`.
+
+## Next Phase: Skincare tab (+ optional logger slice B: rest / warm-up / PR)

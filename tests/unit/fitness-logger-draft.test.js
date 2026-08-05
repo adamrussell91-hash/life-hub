@@ -1,0 +1,98 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  appendSet,
+  cloneLoggerDraft,
+  draftFingerprint,
+  finishLabel,
+  formatElapsed,
+  loadDraft,
+  saveDraft,
+  clearDraft,
+  resolveDraft,
+  slugFromWorkoutPath,
+  slugifyWorkoutTitle,
+  toConfirmPayload
+} from '../../js/app/fitness-logger-draft.js';
+
+const planned = () => ({
+  type: 'workout',
+  date: '2026-08-05',
+  title: 'Chest and Curls',
+  session_kind: 'strength',
+  day_type: 'workout_30',
+  status: 'planned',
+  focus: ['chest'],
+  recovery_flag_next_day: false,
+  pain_flags: [],
+  path: 'data/fitness/2026/08/2026-08-05-chest-and-curls.md',
+  notes: 'Go hard',
+  exercises: [{
+    name: 'Bench',
+    bench_angle_deg: 0,
+    sets: [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }]
+  }]
+});
+
+test('slug helpers match confirm path conventions', () => {
+  assert.equal(slugifyWorkoutTitle('Chest and Curls'), 'chest-and-curls');
+  assert.equal(
+    slugFromWorkoutPath('data/fitness/2026/08/2026-08-05-chest-and-curls.md'),
+    'chest-and-curls'
+  );
+});
+
+test('finishLabel is Pump for strength and Session otherwise', () => {
+  assert.equal(finishLabel('strength'), 'Pump finished');
+  assert.equal(finishLabel('walk'), 'Session finished');
+  assert.equal(finishLabel('ep'), 'Session finished');
+});
+
+test('toConfirmPayload builds overwrite candidate with exercises and notes', () => {
+  const { candidate, slug, overwrite } = toConfirmPayload(planned(), { status: 'planned' });
+  assert.equal(overwrite, true);
+  assert.equal(slug, 'chest-and-curls');
+  assert.equal(candidate.type, 'workout');
+  assert.equal(candidate.notes, 'Go hard');
+  assert.equal(candidate.fields.status, 'planned');
+  assert.equal(candidate.fields.exercises[0].sets[0].cable_type, 'constant_force');
+});
+
+test('appendSet clones the last row defaults', () => {
+  const next = appendSet(planned().exercises[0]);
+  assert.equal(next.sets.length, 2);
+  assert.equal(next.sets[1].weight_kg, 36);
+  assert.equal(next.sets[1].reps, 8);
+});
+
+test('localStorage draft round-trips and resolveDraft prefers stored edits', () => {
+  const store = new Map();
+  const storage = {
+    getItem: key => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key)
+  };
+  const draft = cloneLoggerDraft(planned());
+  draft.exercises[0].sets[0].weight_kg = 40;
+  saveDraft(storage, draft);
+  const loaded = loadDraft(storage, draft.date, draft.path);
+  assert.equal(loaded.exercises[0].sets[0].weight_kg, 40);
+
+  const resolved = resolveDraft(planned(), storage);
+  assert.equal(resolved.exercises[0].sets[0].weight_kg, 40);
+
+  clearDraft(storage, draft.date, draft.path);
+  assert.equal(loadDraft(storage, draft.date, draft.path), null);
+});
+
+test('draftFingerprint changes when a set changes', () => {
+  const a = cloneLoggerDraft(planned());
+  const b = cloneLoggerDraft(planned());
+  b.exercises[0].sets[0].reps = 12;
+  assert.notEqual(draftFingerprint(a), draftFingerprint(b));
+});
+
+test('formatElapsed pads mm:ss', () => {
+  assert.equal(formatElapsed(65_000), '01:05');
+  assert.equal(formatElapsed(3_661_000), '01:01:01');
+});
