@@ -7,7 +7,8 @@ export function buildSystemPrompt({
   centralNodeLog = '',
   foodLibrary = '',
   chadwickProtocol = '',
-  workoutTemplates = ''
+  workoutTemplates = '',
+  exerciseLibrary = ''
 }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
@@ -51,6 +52,9 @@ export function buildSystemPrompt({
       : '',
     workoutTemplates
       ? `Saved workout templates (living prescriptions — use when Adam says do X again):\n${workoutTemplates}`
+      : '',
+    exerciseLibrary
+      ? `Exercise Library highlights (prefer these names; search before inventing moves or guessing attachment/cable/bench defaults). Call search_exercise_library for more; call save_exercise_library_entry after refining cues/defaults or adding a move. Library defaults inform design — session sets still need per-set cable_type.\n\n${exerciseLibrary}`
       : '',
     'Design sessions in chat only. Do not propose a workout log_entry until Adam has finished the session and is logging actuals (unless status is skipped, documenting no session).',
     'Infer session_kind from what was done. Always include cable_type on every strength set (use none when not on cables). Never invent YAML fields that are not in the log_entry schema; if Adam mentions an unsupported metric, say it needs to be added to the workout book later.'
