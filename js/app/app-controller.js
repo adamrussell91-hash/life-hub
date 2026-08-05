@@ -15,6 +15,24 @@ export const BODY_AGENT_SLUG = 'sara';
 export const PENELOPE_AGENT_SLUG = 'penelope';
 export const VERA_AGENT_SLUG = 'vera';
 
+const MORE_SECTIONS = new Set([
+  'nutrition',
+  'fitness',
+  'body',
+  'mind',
+  'skincare',
+  'central-node'
+]);
+
+function clampDateToYearMonth(date, yearMonth) {
+  if (!date || date.slice(0, 7) === yearMonth) return date;
+  const day = Number(date.slice(8, 10));
+  const [year, month] = yearMonth.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const clamped = Math.min(Number.isFinite(day) ? day : 1, lastDay);
+  return `${yearMonth}-${String(clamped).padStart(2, '0')}`;
+}
+
 export function createAppController(dependencies) {
   const {
     root,
@@ -93,7 +111,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node') continue;
+    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'more') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -126,50 +144,25 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="central-node"]') ?? []) {
     bind(button, 'click', () => showSection('central-node'));
   }
+  bind(root.querySelector('#more-nav-button'), 'click', () => openMoreSheet());
+  bind(root.querySelector('#more-sheet-close'), 'click', () => closeMoreSheet());
+  bind(root.querySelector('#more-sheet'), 'click', event => {
+    if (event.target === event.currentTarget) closeMoreSheet();
+  });
   bind(root.querySelector('#nutrition-chat-button'), 'click', () => {
-    if (!chatPanel) return;
-    if (chatPanel.isOpen()) {
-      chatPanel.close();
-      return;
-    }
-    const slot = root.querySelector('#nutrition-dashboard');
-    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, NUTRITION_AGENT_SLUG));
+    toggleSectionChat('#nutrition-dashboard', NUTRITION_AGENT_SLUG);
   });
   bind(root.querySelector('#fitness-chat-button'), 'click', () => {
-    if (!chatPanel) return;
-    if (chatPanel.isOpen()) {
-      chatPanel.close();
-      return;
-    }
-    const slot = root.querySelector('#fitness-dashboard');
-    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, FITNESS_AGENT_SLUG));
+    toggleSectionChat('#fitness-dashboard', FITNESS_AGENT_SLUG);
   });
   bind(root.querySelector('#skincare-chat-button'), 'click', () => {
-    if (!chatPanel) return;
-    if (chatPanel.isOpen()) {
-      chatPanel.close();
-      return;
-    }
-    const slot = root.querySelector('#skincare-dashboard');
-    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, SKINCARE_AGENT_SLUG));
+    toggleSectionChat('#skincare-dashboard', SKINCARE_AGENT_SLUG);
   });
   bind(root.querySelector('#body-chat-button'), 'click', () => {
-    if (!chatPanel) return;
-    if (chatPanel.isOpen()) {
-      chatPanel.close();
-      return;
-    }
-    const slot = root.querySelector('#body-dashboard');
-    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, BODY_AGENT_SLUG));
+    toggleSectionChat('#body-dashboard', BODY_AGENT_SLUG);
   });
   bind(root.querySelector('#central-node-chat-button'), 'click', () => {
-    if (!chatPanel) return;
-    if (chatPanel.isOpen()) {
-      chatPanel.close();
-      return;
-    }
-    const slot = root.querySelector('#central-node-dashboard');
-    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
+    toggleSectionChat('#central-node-dashboard', CENTRAL_NODE_AGENT_SLUG);
   });
   bind(windowTarget, 'online', () => void handleOnline());
   bind(windowTarget, 'offline', () => handleOffline());
@@ -423,7 +416,38 @@ export function createAppController(dependencies) {
     'central-node': { eyebrow: 'Central Node', title: 'Central Node' }
   };
 
+  function closeMoreSheet() {
+    const sheet = root.querySelector('#more-sheet');
+    if (sheet?.open) sheet.close();
+  }
+
+  function openMoreSheet() {
+    const sheet = root.querySelector('#more-sheet');
+    if (!sheet || typeof sheet.showModal !== 'function') return;
+    if (sheet.open) {
+      sheet.close();
+      return;
+    }
+    sheet.showModal();
+  }
+
+  function toggleSectionChat(slotSelector, agentSlug) {
+    if (!chatPanel) return;
+    if (chatPanel.isOpen()) {
+      chatPanel.close();
+      return;
+    }
+    chatSelectAgent?.(agentSlug);
+    const slot = root.querySelector(slotSelector);
+    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, agentSlug));
+  }
+
   function showSection(name) {
+    closeMoreSheet();
+    // Overlay chat lives inside a section host — leave it cleanly on any nav change
+    // so the next FAB open isn't stuck in a half-closed toggle state.
+    if (chatPanel?.isOpen()) chatPanel.close();
+
     const home = root.querySelector('#home-dashboard');
     const chat = root.querySelector('#chat-view');
     const nutrition = root.querySelector('#nutrition-dashboard');
@@ -441,14 +465,9 @@ export function createAppController(dependencies) {
     if (body) body.hidden = name !== 'body';
     if (mind) mind.hidden = name !== 'mind';
     if (centralNode) centralNode.hidden = name !== 'central-node';
-    // #chat-view's own `hidden` attribute is owned by chatPanel while the panel is
-    // open as an overlay elsewhere (its hosting section's hidden-cascade controls
-    // visibility instead) -- only manage it here when the panel isn't currently open,
-    // to avoid fighting chatPanel's own state.
     if (name === 'chat') {
-      if (chatPanel?.isOpen()) chatPanel.close();
       if (chat) chat.hidden = false;
-    } else if (chat && !chatPanel?.isOpen()) {
+    } else if (chat) {
       chat.hidden = true;
     }
     currentSection = name;
@@ -460,9 +479,11 @@ export function createAppController(dependencies) {
     if (name === 'mind') renderMindSection();
     if (name === 'central-node') renderCentralNodeSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
-      const active = button.dataset.section === name;
+      const section = button.dataset.section;
+      const active = section === name
+        || (section === 'more' && MORE_SECTIONS.has(name));
       button.classList.toggle('is-active', active);
-      if (active) button.setAttribute('aria-current', 'page');
+      if (active && section !== 'more') button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     }
     const titles = SECTION_TITLES[name];
@@ -529,6 +550,7 @@ export function createAppController(dependencies) {
       },
       onShiftMonth: delta => {
         calendarViewMonth = shiftYearMonth(calendarViewMonth, delta);
+        calendarSelectedDate = clampDateToYearMonth(calendarSelectedDate, calendarViewMonth);
         renderCalendarSection({ monthDelta: delta });
       }
     });

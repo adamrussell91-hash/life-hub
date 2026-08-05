@@ -1,4 +1,4 @@
-import { showEphemeralMessage } from './ephemeral-message.js';
+import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 
 export function createSkincareController({
   root,
@@ -13,7 +13,8 @@ export function createSkincareController({
     if (!statusEl) return;
     // Keep "Saving…" sticky until the next status replaces it.
     if (message === 'Saving…') {
-      statusEl.classList?.remove?.('is-fading');
+      // Cancel any in-flight ephemeral dismiss so it can't wipe "Saving…" mid-request.
+      clearEphemeralMessage(statusEl);
       statusEl.textContent = message;
       statusEl.hidden = false;
       return;

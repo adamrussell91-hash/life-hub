@@ -34,3 +34,15 @@ test('empty message clears immediately', () => {
   assert.equal(el.hidden, true);
   assert.equal(el.textContent, '');
 });
+
+test('clearEphemeralMessage cancels a pending fade so sticky status can stick', async () => {
+  const { clearEphemeralMessage } = await import('../../js/app/ephemeral-message.js');
+  const el = new FakeEl();
+  showEphemeralMessage(el, 'Logged', { holdMs: 40, fadeMs: 40 });
+  clearEphemeralMessage(el);
+  el.textContent = 'Saving…';
+  el.hidden = false;
+  await new Promise(resolve => setTimeout(resolve, 100));
+  assert.equal(el.textContent, 'Saving…');
+  assert.equal(el.hidden, false);
+});

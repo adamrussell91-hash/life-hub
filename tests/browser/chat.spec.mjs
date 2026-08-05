@@ -42,7 +42,7 @@ test('sending a message routes to the mocked agent and renders a confirmable rec
   await page.locator('#chat-input').fill('Chadwick, log a 30 minute workout');
   await page.locator('#chat-send').click();
 
-  const assistantBubble = page.locator('.chat-message--assistant').first();
+  const assistantBubble = page.locator('.chat-message--assistant[data-agent="chadwick"]').first();
   await assistantBubble.waitFor();
   assert.equal(await assistantBubble.getAttribute('data-agent'), 'chadwick');
 

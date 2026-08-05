@@ -32,9 +32,7 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent } = {}) {
 
   renderMoodChart(root, model.moodSeries);
   renderBarHost(root, '#mind-mood-columns', model.byMood);
-  renderBarHost(root, '#mind-theme-columns', model.themes.length
-    ? model.themes
-    : [{ key: 'none', label: '—', value: 0 }]);
+  renderBarHost(root, '#mind-theme-columns', model.themes);
 
   const empty = root.querySelector('#mind-empty');
   if (empty) empty.hidden = !model.empty;
@@ -56,6 +54,7 @@ function renderMoodChart(root, series) {
   if (!series.length) {
     if (area) area.setAttribute('d', '');
     if (line) line.setAttribute('d', '');
+    svg.classList?.remove?.('chart-animating', 'chart-static');
     return;
   }
   const chart = buildAreaLine(series.map(point => ({ date: point.date, value: point.value })));
@@ -68,6 +67,15 @@ function renderBarHost(root, selector, items) {
   const host = root.querySelector(selector);
   if (!host) return;
   host.replaceChildren();
+  if (!items?.length) {
+    const caption = root.createElement('p');
+    caption.className = 'metric-caption';
+    caption.textContent = selector.includes('theme')
+      ? 'No recurring themes in this range yet.'
+      : 'No mood entries in this range yet.';
+    host.append(caption);
+    return;
+  }
   const built = buildColumns(items, { height: 96 });
   for (const bar of built.bars) {
     const col = root.createElement('div');
