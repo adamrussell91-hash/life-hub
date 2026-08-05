@@ -361,6 +361,13 @@ main { max-width: 76rem; margin: 0 auto; }
   background: rgba(255, 248, 232, 0.92);
   font-size: 0.74rem;
   font-weight: 700;
+  transition: opacity 280ms ease;
+}
+.provider-status.is-fading,
+.chat-error.is-fading,
+#skincare-status.is-fading,
+#body-status.is-fading {
+  opacity: 0;
 }
 .provider-status[data-severity="critical"] { border-color: rgba(141, 53, 31, 0.24); color: #8d351f; background: rgba(255, 238, 232, 0.92); }
 .sync-details { display: grid; justify-items: end; gap: 0.25rem; }
@@ -441,7 +448,11 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .chat-view { display: flex; flex-direction: column; gap: 1rem; }
 
-.chat-error { color: #B3261E; font-weight: 600; }
+.chat-error {
+  color: #B3261E;
+  font-weight: 600;
+  transition: opacity 280ms ease;
+}
 
 .chat-messages {
   list-style: none;

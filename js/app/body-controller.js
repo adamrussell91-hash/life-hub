@@ -3,6 +3,7 @@ import {
   buildMeasurementsPayload,
   buildWeightPayload
 } from './body-model.js';
+import { showEphemeralMessage } from './ephemeral-message.js';
 
 export function createBodyController({
   root,
@@ -15,7 +16,14 @@ export function createBodyController({
 
   function setStatus(message) {
     const statusEl = root.querySelector('#body-status');
-    if (statusEl) statusEl.textContent = message;
+    if (!statusEl) return;
+    if (message === 'Saving…') {
+      statusEl.classList?.remove?.('is-fading');
+      statusEl.textContent = message;
+      statusEl.hidden = false;
+      return;
+    }
+    showEphemeralMessage(statusEl, message);
   }
 
   async function save(payload) {

@@ -1,5 +1,6 @@
 import { formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
 import { applyAgentAvatarToBubble } from './render-agent-picker.js';
+import { showEphemeralMessage } from './ephemeral-message.js';
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source']);
 
@@ -153,6 +154,5 @@ export function setChatBusy(root, busy) {
 export function showChatError(root, message) {
   const banner = root.querySelector('#chat-error');
   if (!banner) return;
-  banner.textContent = message;
-  banner.hidden = !message;
+  showEphemeralMessage(banner, message);
 }

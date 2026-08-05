@@ -1,3 +1,5 @@
+import { showEphemeralMessage } from './ephemeral-message.js';
+
 export function createSkincareController({
   root,
   chatApi,
@@ -6,11 +8,17 @@ export function createSkincareController({
 }) {
   if (!root || !chatApi) throw new TypeError('Skincare controller dependencies are unavailable');
 
-  let statusEl = null;
-
   function setStatus(message) {
-    statusEl = statusEl || root.querySelector('#skincare-status');
-    if (statusEl) statusEl.textContent = message;
+    const statusEl = root.querySelector('#skincare-status');
+    if (!statusEl) return;
+    // Keep "Saving…" sticky until the next status replaces it.
+    if (message === 'Saving…') {
+      statusEl.classList?.remove?.('is-fading');
+      statusEl.textContent = message;
+      statusEl.hidden = false;
+      return;
+    }
+    showEphemeralMessage(statusEl, message);
   }
 
   async function save(payload) {
