@@ -3,11 +3,14 @@ import { agentColour } from './agent-colour.js';
 import { createSessionApi } from './api-session.js';
 import {
   createAppController,
+  BODY_AGENT_SLUG,
   CENTRAL_NODE_AGENT_SLUG,
   FITNESS_AGENT_SLUG,
   NUTRITION_AGENT_SLUG,
   SKINCARE_AGENT_SLUG
 } from './app-controller.js';
+import { createBodyController } from './body-controller.js';
+import { buildBodyModel } from './body-model.js';
 import { buildCentralNodeModel } from './central-node-model.js';
 import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
@@ -18,6 +21,7 @@ import { buildFitnessModel } from './fitness-model.js';
 import { buildHomeModel } from './home-model.js';
 import { loadLiveEvents } from './load-live-events.js';
 import { buildNutritionModel } from './nutrition-model.js';
+import { renderBody } from './render-body.js';
 import { renderCentralNode } from './render-central-node.js';
 import { renderFitness } from './render-fitness.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
@@ -82,6 +86,12 @@ const skincareController = createSkincareController({
   chatApi,
   onRecordWritten: () => void controller.refresh({ manual: true })
 });
+const bodyController = createBodyController({
+  root: document,
+  chatApi,
+  getDate: () => controller.getDisplayDate?.() ?? null,
+  onRecordWritten: () => void controller.refresh({ manual: true })
+});
 
 controller = createAppController({
   root: document,
@@ -105,6 +115,9 @@ controller = createAppController({
   getCurrentRoutineKey: currentRoutineKey,
   buildCalendarModel,
   renderCalendar,
+  buildBodyModel,
+  renderBody,
+  bodyController,
   buildCentralNodeModel,
   renderCentralNode,
   agentColour,
@@ -119,6 +132,7 @@ const DEFAULT_AGENT_BY_SECTION = {
   nutrition: NUTRITION_AGENT_SLUG,
   fitness: FITNESS_AGENT_SLUG,
   skincare: SKINCARE_AGENT_SLUG,
+  body: BODY_AGENT_SLUG,
   'central-node': CENTRAL_NODE_AGENT_SLUG
 };
 

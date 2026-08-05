@@ -1,0 +1,243 @@
+import { animateAreaReveal } from './chart-kit/animate.js';
+import { buildAreaLine } from './chart-kit/area-line.js';
+import { BODY_RANGES } from './body-model.js';
+
+const RANGE_LABELS = {
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  six_month: '6M'
+};
+
+export function renderBody(root, model, {
+  onRangeChange,
+  onLogWeight,
+  onLogComposition,
+  onLogMeasurements
+} = {}) {
+  const dashboard = root.querySelector('#body-dashboard');
+  if (!dashboard || !model) return;
+
+  const ranges = root.querySelector('#body-range-control');
+  if (ranges && !ranges.dataset.bound) {
+    ranges.dataset.bound = '1';
+    ranges.addEventListener('click', event => {
+      const button = event.target.closest?.('[data-body-range]');
+      if (!button) return;
+      onRangeChange?.(button.dataset.bodyRange);
+    });
+  }
+  if (ranges) {
+    for (const button of ranges.querySelectorAll?.('[data-body-range]') ?? []) {
+      const active = button.dataset.bodyRange === model.range;
+      button.classList.toggle('is-active', active);
+      if (active) button.setAttribute('aria-pressed', 'true');
+      else button.setAttribute('aria-pressed', 'false');
+    }
+  }
+
+  const host = root.querySelector('#body-sections');
+  if (host) {
+    host.replaceChildren();
+    host.dataset.motion = 'in';
+    void host.offsetWidth;
+    host.dataset.motion = 'in';
+    host.append(sectionCard(root, model.scale, {
+      onLogWeight,
+      kind: 'scale'
+    }));
+    host.append(sectionCard(root, model.composition, {
+      onLogComposition,
+      kind: 'composition'
+    }));
+    host.append(sectionCard(root, model.tape, {
+      onLogMeasurements,
+      kind: 'tape'
+    }));
+  }
+
+  dashboard.removeAttribute('hidden');
+}
+
+function sectionCard(root, section, hooks) {
+  const article = root.createElement('article');
+  article.className = 'metric-card body-section';
+  article.dataset.bodySection = section.id;
+
+  const heading = root.createElement('div');
+  heading.className = 'body-section__head';
+  const title = root.createElement('h3');
+  title.className = 'metric-label';
+  title.textContent = section.title;
+  heading.append(title);
+  article.append(heading);
+
+  if (!section.metrics.length || section.metrics.every(metric => metric.empty)) {
+    const empty = root.createElement('p');
+    empty.className = 'metric-caption';
+    empty.textContent = emptyCopy(section.id);
+    article.append(empty);
+  } else {
+    for (const metric of section.metrics) {
+      if (metric.empty && section.id !== 'tape') continue;
+      if (metric.empty) continue;
+      article.append(metricBlock(root, metric));
+    }
+  }
+
+  article.append(quickLog(root, section.id, hooks));
+  return article;
+}
+
+function emptyCopy(id) {
+  if (id === 'scale') return 'No weight readings in this range yet.';
+  if (id === 'composition') return 'No composition readings yet.';
+  return 'No tape measurements yet.';
+}
+
+function metricBlock(root, metric) {
+  const wrap = root.createElement('div');
+  wrap.className = 'body-metric';
+
+  const head = root.createElement('div');
+  head.className = 'body-metric__head';
+  const name = root.createElement('strong');
+  name.textContent = metric.label;
+  head.append(name);
+
+  const growth = root.createElement('div');
+  growth.className = 'body-metric__growth';
+  const primary = root.createElement('span');
+  primary.className = 'body-growth';
+  primary.dataset.colour = metric.primaryGrowth.colour;
+  primary.textContent = metric.primaryGrowth.label;
+  const secondary = root.createElement('span');
+  secondary.className = 'body-trend';
+  secondary.dataset.colour = metric.secondaryTrend.colour;
+  secondary.textContent = trendArrow(metric.secondaryTrend) + ' ' + metric.secondaryTrend.label;
+  growth.append(primary, secondary);
+  head.append(growth);
+  wrap.append(head);
+
+  if (metric.latest) {
+    const value = root.createElement('p');
+    value.className = 'body-metric__value';
+    value.textContent = formatLatest(metric);
+    wrap.append(value);
+  }
+
+  if (metric.series.length) {
+    const chart = root.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    chart.setAttribute('class', 'line-chart body-chart');
+    chart.setAttribute('viewBox', '0 0 320 120');
+    chart.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    chart.setAttribute('role', 'img');
+    chart.setAttribute('aria-label', `${metric.label} trend`);
+    const area = root.createElementNS('http://www.w3.org/2000/svg', 'path');
+    area.setAttribute('data-role', 'area');
+    const line = root.createElementNS('http://www.w3.org/2000/svg', 'path');
+    line.setAttribute('data-role', 'line');
+    chart.append(area, line);
+    const built = buildAreaLine(metric.series.map(point => ({
+      date: point.date,
+      value: point.value
+    })));
+    area.setAttribute('d', built.areaPath || built.areaPoints || '');
+    line.setAttribute('d', built.linePath || '');
+    wrap.append(chart);
+    queueMicrotask(() => animateAreaReveal(chart));
+  }
+
+  return wrap;
+}
+
+function formatLatest(metric) {
+  const unit = metric.key === 'body_fat_pct' ? '%' : metric.key.includes('kg') || metric.key === 'weight_kg'
+    ? ' kg'
+    : ' cm';
+  const n = metric.latest.value;
+  const text = metric.key === 'body_fat_pct' ? n.toFixed(1) : Number.isInteger(n) ? String(n) : n.toFixed(1);
+  return `${text}${unit}`;
+}
+
+function trendArrow(trend) {
+  if (trend.direction === 'up') return '↑';
+  if (trend.direction === 'down') return '↓';
+  return '→';
+}
+
+function quickLog(root, sectionId, hooks) {
+  const form = root.createElement('div');
+  form.className = 'body-quick-log';
+
+  if (sectionId === 'scale') {
+    const input = numberInput(root, 'Weight (kg)', 'weight_kg');
+    const button = logButton(root, 'Log weight');
+    button.addEventListener('click', () => {
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || value <= 0) return;
+      hooks.onLogWeight?.(value);
+      input.value = '';
+    });
+    form.append(input, button);
+    return form;
+  }
+
+  if (sectionId === 'composition') {
+    const fat = numberInput(root, 'Body fat %', 'body_fat_pct');
+    const muscle = numberInput(root, 'Muscle kg', 'skeletal_muscle_kg');
+    const button = logButton(root, 'Log composition');
+    button.addEventListener('click', () => {
+      const fields = {};
+      const fatValue = Number(fat.value);
+      const muscleValue = Number(muscle.value);
+      if (Number.isFinite(fatValue) && fatValue > 0) fields.body_fat_pct = fatValue;
+      if (Number.isFinite(muscleValue) && muscleValue > 0) fields.skeletal_muscle_kg = muscleValue;
+      if (!Object.keys(fields).length) return;
+      hooks.onLogComposition?.(fields);
+      fat.value = '';
+      muscle.value = '';
+    });
+    form.append(fat, muscle, button);
+    return form;
+  }
+
+  const waist = numberInput(root, 'Waist cm', 'waist');
+  const chest = numberInput(root, 'Chest cm', 'chest');
+  const button = logButton(root, 'Log tape');
+  button.addEventListener('click', () => {
+    const fields = {};
+    const waistValue = Number(waist.value);
+    const chestValue = Number(chest.value);
+    if (Number.isFinite(waistValue) && waistValue > 0) fields.waist = waistValue;
+    if (Number.isFinite(chestValue) && chestValue > 0) fields.chest = chestValue;
+    if (!Object.keys(fields).length) return;
+    hooks.onLogMeasurements?.(fields);
+    waist.value = '';
+    chest.value = '';
+  });
+  form.append(waist, chest, button);
+  return form;
+}
+
+function numberInput(root, placeholder, name) {
+  const input = root.createElement('input');
+  input.type = 'number';
+  input.inputMode = 'decimal';
+  input.step = '0.1';
+  input.min = '0';
+  input.placeholder = placeholder;
+  input.name = name;
+  input.className = 'body-quick-log__input';
+  input.setAttribute('aria-label', placeholder);
+  return input;
+}
+
+function logButton(root, label) {
+  const button = root.createElement('button');
+  button.type = 'button';
+  button.className = 'body-quick-log__button';
+  button.textContent = label;
+  return button;
+}
+
+export { BODY_RANGES, RANGE_LABELS };

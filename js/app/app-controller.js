@@ -10,6 +10,7 @@ export const NUTRITION_AGENT_SLUG = 'brisket';
 export const CENTRAL_NODE_AGENT_SLUG = 'hammond';
 export const FITNESS_AGENT_SLUG = 'chadwick';
 export const SKINCARE_AGENT_SLUG = 'hyaluronica';
+export const BODY_AGENT_SLUG = 'sara';
 
 export function createAppController(dependencies) {
   const {
@@ -34,6 +35,9 @@ export function createAppController(dependencies) {
     getCurrentRoutineKey,
     buildCalendarModel,
     renderCalendar,
+    buildBodyModel,
+    renderBody,
+    bodyController,
     buildCentralNodeModel,
     renderCentralNode,
     agentColour,
@@ -62,6 +66,7 @@ export function createAppController(dependencies) {
   let currentSection = 'home';
   let calendarSelectedDate = null;
   let calendarViewMonth = null;
+  let bodyRange = 'monthly';
   let activeRefresh = null;
   let refreshAbortController = null;
   let lifecycleVersion = 0;
@@ -81,7 +86,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'central-node') continue;
+    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'central-node') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -104,6 +109,9 @@ export function createAppController(dependencies) {
   }
   for (const button of root.querySelectorAll?.('[data-section="calendar"]') ?? []) {
     bind(button, 'click', () => showSection('calendar'));
+  }
+  for (const button of root.querySelectorAll?.('[data-section="body"]') ?? []) {
+    bind(button, 'click', () => showSection('body'));
   }
   for (const button of root.querySelectorAll?.('[data-section="central-node"]') ?? []) {
     bind(button, 'click', () => showSection('central-node'));
@@ -134,6 +142,15 @@ export function createAppController(dependencies) {
     }
     const slot = root.querySelector('#skincare-dashboard');
     if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, SKINCARE_AGENT_SLUG));
+  });
+  bind(root.querySelector('#body-chat-button'), 'click', () => {
+    if (!chatPanel) return;
+    if (chatPanel.isOpen()) {
+      chatPanel.close();
+      return;
+    }
+    const slot = root.querySelector('#body-dashboard');
+    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, BODY_AGENT_SLUG));
   });
   bind(root.querySelector('#central-node-chat-button'), 'click', () => {
     if (!chatPanel) return;
@@ -269,6 +286,7 @@ export function createAppController(dependencies) {
         if (currentSection === 'fitness') renderFitnessSection();
         if (currentSection === 'skincare') renderSkincareSection();
         if (currentSection === 'calendar') renderCalendarSection();
+        if (currentSection === 'body') renderBodySection();
         if (currentSection === 'central-node') renderCentralNodeSection();
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
@@ -389,6 +407,7 @@ export function createAppController(dependencies) {
     fitness: { eyebrow: 'Fitness', title: 'Fitness' },
     skincare: { eyebrow: 'Skincare', title: 'Skincare' },
     calendar: { eyebrow: 'Calendar', title: 'Calendar' },
+    body: { eyebrow: 'Body', title: 'Body' },
     'central-node': { eyebrow: 'Central Node', title: 'Central Node' }
   };
 
@@ -399,12 +418,14 @@ export function createAppController(dependencies) {
     const fitness = root.querySelector('#fitness-dashboard');
     const skincare = root.querySelector('#skincare-dashboard');
     const calendar = root.querySelector('#calendar-dashboard');
+    const body = root.querySelector('#body-dashboard');
     const centralNode = root.querySelector('#central-node-dashboard');
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
     if (fitness) fitness.hidden = name !== 'fitness';
     if (skincare) skincare.hidden = name !== 'skincare';
     if (calendar) calendar.hidden = name !== 'calendar';
+    if (body) body.hidden = name !== 'body';
     if (centralNode) centralNode.hidden = name !== 'central-node';
     // #chat-view's own `hidden` attribute is owned by chatPanel while the panel is
     // open as an overlay elsewhere (its hosting section's hidden-cascade controls
@@ -421,6 +442,7 @@ export function createAppController(dependencies) {
     if (name === 'fitness') renderFitnessSection();
     if (name === 'skincare') renderSkincareSection();
     if (name === 'calendar') renderCalendarSection();
+    if (name === 'body') renderBodySection();
     if (name === 'central-node') renderCentralNodeSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const active = button.dataset.section === name;
@@ -468,7 +490,7 @@ export function createAppController(dependencies) {
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, SKINCARE_AGENT_SLUG));
   }
 
-  function renderCalendarSection() {
+  function renderCalendarSection({ scrollToDetail = false, monthDelta = 0 } = {}) {
     if (!latestResult || !buildCalendarModel || !renderCalendar) return;
     const date = latestResult.date;
     if (!calendarSelectedDate) calendarSelectedDate = date;
@@ -480,16 +502,41 @@ export function createAppController(dependencies) {
       viewMonth: calendarViewMonth
     });
     renderCalendar(root, model, {
+      scrollToDetail,
+      monthDelta,
       onSelectDate: next => {
+        const nextMonth = next.slice(0, 7);
+        const monthChanged = nextMonth !== calendarViewMonth;
+        const monthDelta = !monthChanged ? 0 : (nextMonth > calendarViewMonth ? 1 : -1);
         calendarSelectedDate = next;
-        calendarViewMonth = next.slice(0, 7);
-        renderCalendarSection();
+        calendarViewMonth = nextMonth;
+        renderCalendarSection({ scrollToDetail: true, monthDelta });
       },
       onShiftMonth: delta => {
         calendarViewMonth = shiftYearMonth(calendarViewMonth, delta);
-        renderCalendarSection();
+        renderCalendarSection({ monthDelta: delta });
       }
     });
+  }
+
+  function renderBodySection() {
+    if (!latestResult || !buildBodyModel || !renderBody) return;
+    const model = buildBodyModel({
+      events: latestResult.events,
+      date: latestResult.date,
+      range: bodyRange
+    });
+    renderBody(root, model, {
+      onRangeChange: next => {
+        bodyRange = next;
+        renderBodySection();
+      },
+      onLogWeight: bodyController?.onLogWeight,
+      onLogComposition: bodyController?.onLogComposition,
+      onLogMeasurements: bodyController?.onLogMeasurements
+    });
+    const button = root.querySelector('#body-chat-button');
+    button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, BODY_AGENT_SLUG));
   }
 
   function renderCentralNodeSection() {
@@ -761,6 +808,7 @@ export function createAppController(dependencies) {
     signOut,
     destroy,
     getCurrentSection: () => currentSection,
+    getDisplayDate: () => latestResult?.date ?? null,
     getAgentsConfig: () => latestResult?.agentsConfig ?? null
   };
 }
