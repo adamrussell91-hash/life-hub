@@ -3,7 +3,7 @@ import {
   buildMeasurementsPayload,
   buildWeightPayload
 } from './body-model.js';
-import { showEphemeralMessage } from './ephemeral-message.js';
+import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 
 export function createBodyController({
   root,
@@ -18,7 +18,8 @@ export function createBodyController({
     const statusEl = root.querySelector('#body-status');
     if (!statusEl) return;
     if (message === 'Saving…') {
-      statusEl.classList?.remove?.('is-fading');
+      // Cancel any in-flight ephemeral dismiss so it can't wipe "Saving…" mid-request.
+      clearEphemeralMessage(statusEl);
       statusEl.textContent = message;
       statusEl.hidden = false;
       return;

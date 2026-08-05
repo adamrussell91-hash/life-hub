@@ -1,5 +1,5 @@
 import { appendMessage, appendRecordProposal, renderInlineMarkdown, setChatBusy, showChatError } from './render-chat.js';
-import { renderAgentPicker } from './render-agent-picker.js';
+import { applyAgentAvatarToBubble, renderAgentPicker } from './render-agent-picker.js';
 
 const PARAGRAPH_BREAK = /\n{2,}/;
 const HISTORY_WINDOW_MS = 20 * 60 * 1000;
@@ -95,12 +95,16 @@ export function createChatController({
     remember('user', message);
     appendMessage(root, { role: 'user', text: message });
 
-    let assistantSlug = null;
+    let assistantSlug = stickyAgentSlug();
     let assistantBubble = null;
     let assistantBuffer = '';
     let assistantFullText = '';
     let searchWaitBubble = null;
-    let workingBubble = appendMessage(root, { role: 'assistant', text: 'On it…' });
+    let workingBubble = appendMessage(root, {
+      role: 'assistant',
+      agentSlug: assistantSlug,
+      text: 'On it…'
+    });
     const abort = new AbortController();
     const timeoutId = setTimeout(() => abort.abort(), 90_000);
 
@@ -154,6 +158,8 @@ export function createChatController({
             renderAgentPicker(root, { selectedSlug: event.slug, onSelect: selectAgent });
           }
           applyAgentAccent(event.slug);
+          if (workingBubble) applyAgentAvatarToBubble(workingBubble, event.slug);
+          if (assistantBubble) applyAgentAvatarToBubble(assistantBubble, event.slug);
         } else if (event.type === 'text') {
           assistantBuffer += event.delta;
           assistantFullText += event.delta;

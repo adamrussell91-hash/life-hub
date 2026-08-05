@@ -671,8 +671,25 @@
       <button class="is-active" type="button" data-section="home" aria-current="page"><span aria-hidden="true">⌂</span>Home</button>
       <button type="button" data-section="chat"><span aria-hidden="true">◌</span>Chat</button>
       <button type="button" data-section="calendar"><span aria-hidden="true">□</span>Calendar</button>
-      <button type="button" data-section="more"><span aria-hidden="true">•••</span>More</button>
+      <button type="button" data-section="more" id="more-nav-button"><span aria-hidden="true">•••</span>More</button>
     </nav>
+
+    <dialog id="more-sheet" class="more-sheet" aria-label="More sections">
+      <div class="more-sheet__panel">
+        <header class="more-sheet__head">
+          <h2>More</h2>
+          <button type="button" id="more-sheet-close" class="more-sheet__close" aria-label="Close">Close</button>
+        </header>
+        <nav class="more-sheet__nav" aria-label="Secondary sections">
+          <button type="button" data-section="nutrition"><span class="nav-dot nutrition" aria-hidden="true"></span>Nutrition</button>
+          <button type="button" data-section="fitness"><span class="nav-dot fitness" aria-hidden="true"></span>Fitness</button>
+          <button type="button" data-section="body"><span class="nav-dot body" aria-hidden="true"></span>Body</button>
+          <button type="button" data-section="mind"><span class="nav-dot mind" aria-hidden="true"></span>Mind</button>
+          <button type="button" data-section="skincare"><span class="nav-dot skincare" aria-hidden="true"></span>Skincare</button>
+          <button type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true">◎</span>Central Node</button>
+        </nav>
+      </div>
+    </dialog>
   </div>
   </div>
 
