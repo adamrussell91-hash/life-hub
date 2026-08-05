@@ -28,6 +28,17 @@ export function renderCentralNode(root, model) {
       else container.textContent = 'No agent notes yet.';
       continue;
     }
+    if (key === 'thisWeek') {
+      const prose = model.sections.thisWeek?.trim();
+      if (prose) {
+        renderInlineMarkdown(root, container, prose, { multiline: true });
+        container.removeAttribute('hidden');
+      } else {
+        container.textContent = '';
+        container.setAttribute('hidden', '');
+      }
+      continue;
+    }
     renderInlineMarkdown(root, container, model.sections[key], { multiline: true });
   }
 
@@ -79,7 +90,7 @@ function renderCompletionRing(root, completeness) {
 function renderWeekChart(root, week) {
   const svg = root.querySelector('#central-node-week-chart');
   if (!svg) return;
-  const chart = buildProteinLineChart(week);
+  const chart = buildProteinLineChart(week, { rollingAverage: 3 });
   svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
 
   const line = svg.querySelector('[data-role="line"]');
@@ -92,6 +103,18 @@ function renderWeekChart(root, week) {
   if (area) {
     if (area.tagName.toLowerCase() === 'path') area.setAttribute('d', chart.areaPath);
     else area.setAttribute('points', chart.areaPoints);
+  }
+
+  const rolling = svg.querySelector('[data-role="rolling"]');
+  if (rolling) {
+    const rollingPath = chart.rollingLinePath || chart.rollingLinePoints;
+    if (rollingPath) {
+      if (rolling.tagName.toLowerCase() === 'path') rolling.setAttribute('d', chart.rollingLinePath);
+      else rolling.setAttribute('points', chart.rollingLinePoints);
+      rolling.removeAttribute('hidden');
+    } else {
+      rolling.setAttribute('hidden', '');
+    }
   }
 
   const labels = svg.querySelector('[data-role="day-labels"]');
