@@ -75,6 +75,59 @@ test('buildSkincareModel marks am/pm logged and lists procedures', () => {
   assert.equal(model.currentRoutine, 'am');
 });
 
+test('amStreak and pmStreak count consecutive routine days independently', () => {
+  const model = buildSkincareModel({
+    date: '2026-08-05',
+    routines: SKINCARE_ROUTINES,
+    nowHourKey: 'pm',
+    events: [
+      { record: { type: 'skincare', date: '2026-08-05', routine: 'am', products: [] }, body: '', path: 'am-05' },
+      { record: { type: 'skincare', date: '2026-08-05', routine: 'pm', products: [] }, body: '', path: 'pm-05' },
+      { record: { type: 'skincare', date: '2026-08-04', routine: 'am', products: [] }, body: '', path: 'am-04' },
+      { record: { type: 'skincare', date: '2026-08-04', routine: 'pm', products: [] }, body: '', path: 'pm-04' },
+      { record: { type: 'skincare', date: '2026-08-03', routine: 'am', products: [] }, body: '', path: 'am-03' },
+      { record: { type: 'skincare', date: '2026-08-02', routine: 'am', products: ['Laser'] }, body: 'Procedure: Laser', path: 'procedure-02' }
+    ]
+  });
+  assert.equal(model.amStreak, 3);
+  assert.equal(model.pmStreak, 2);
+});
+
+test('monthHeatmap encodes miss/am/pm/both over 30 days ending at date', () => {
+  const model = buildSkincareModel({
+    date: '2026-08-05',
+    routines: SKINCARE_ROUTINES,
+    nowHourKey: 'pm',
+    events: [
+      { record: { type: 'skincare', date: '2026-08-05', routine: 'am', products: [] }, body: '', path: 'am-05' },
+      { record: { type: 'skincare', date: '2026-08-05', routine: 'pm', products: [] }, body: '', path: 'pm-05' },
+      { record: { type: 'skincare', date: '2026-08-04', routine: 'am', products: [] }, body: '', path: 'am-04' },
+      { record: { type: 'skincare', date: '2026-08-03', routine: 'pm', products: [] }, body: '', path: 'pm-03' }
+    ]
+  });
+  assert.equal(model.monthHeatmap.length, 30);
+  assert.equal(model.monthHeatmap[0].date, '2026-07-07');
+  assert.equal(model.monthHeatmap.at(-1).date, '2026-08-05');
+  assert.equal(model.monthHeatmap.find(day => day.date === '2026-08-05').state, 'both');
+  assert.equal(model.monthHeatmap.find(day => day.date === '2026-08-05').isToday, true);
+  assert.equal(model.monthHeatmap.find(day => day.date === '2026-08-04').state, 'am');
+  assert.equal(model.monthHeatmap.find(day => day.date === '2026-08-04').isToday, false);
+  assert.equal(model.monthHeatmap.find(day => day.date === '2026-08-03').state, 'pm');
+  assert.equal(model.monthHeatmap.find(day => day.date === '2026-08-02').state, 'miss');
+});
+
+test('procedures do not set am/pm heatmap hits', () => {
+  const model = buildSkincareModel({
+    date: '2026-08-05',
+    routines: SKINCARE_ROUTINES,
+    nowHourKey: 'pm',
+    events: [
+      { record: { type: 'skincare', date: '2026-08-01', routine: 'pm', products: ['Laser'] }, body: 'Procedure: Laser', path: 'procedure-01' }
+    ]
+  });
+  assert.equal(model.monthHeatmap.find(day => day.date === '2026-08-01').state, 'miss');
+});
+
 test('buildSkincareModel builds a 7-day weekDots strip flagging any skincare log', () => {
   const model = buildSkincareModel({
     date: '2026-08-05',
