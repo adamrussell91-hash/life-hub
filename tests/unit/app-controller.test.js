@@ -322,6 +322,9 @@ function harness(options = {}) {
       documentRoot.querySelector('#central-node-dashboard').hidden = false;
     },
     agentColour: (agentsConfig, slug) => `#colour-for-${slug}`,
+    chatClearUnread: () => {
+      calls.chatClearUnreads = (calls.chatClearUnreads ?? 0) + 1;
+    },
     chatPanel: {
       opens: [],
       closes: 0,
@@ -1004,6 +1007,39 @@ test('clicking the Central Node floating chat button again closes an already-ope
 
   assert.equal(state.chatPanelCalls.opens.length, 1);
   assert.equal(state.chatPanelCalls.closes, 1);
+});
+
+test('opening the floating chat button clears the chat unread flag', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+
+  state.root.querySelector('#nutrition-chat-button').dispatchEvent(new Event('click'));
+
+  assert.equal(state.calls.chatClearUnreads, 1);
+});
+
+test('closing the floating chat button does not clear the chat unread flag again', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+  const button = state.root.querySelector('#nutrition-chat-button');
+  button.dispatchEvent(new Event('click'));
+  assert.equal(state.calls.chatClearUnreads, 1);
+
+  button.dispatchEvent(new Event('click'));
+
+  assert.equal(state.calls.chatClearUnreads, 1);
+});
+
+test('navigating to Chat clears the chat unread flag', async () => {
+  const state = harness();
+  await state.controller.start();
+
+  state.root.chatNavigation.dispatchEvent(new Event('click'));
+
+  assert.equal(state.calls.chatClearUnreads, 1);
+  assert.equal(state.controller.getCurrentSection(), 'chat');
 });
 
 test('a completed refresh while viewing Central Node re-renders the dashboard and re-themes the chat button', async () => {

@@ -66,6 +66,7 @@ export function createAppController(dependencies) {
     renderCentralNode,
     agentColour,
     chatPanel,
+    chatClearUnread,
     windowTarget = window,
     documentTarget = document,
     navigatorTarget = navigator,
@@ -443,7 +444,10 @@ export function createAppController(dependencies) {
     }
     chatSelectAgent?.(agentSlug);
     const slot = root.querySelector(slotSelector);
-    if (slot) chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, agentSlug));
+    if (slot) {
+      chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, agentSlug));
+      chatClearUnread?.();
+    }
   }
 
   function showSection(name) {
@@ -471,6 +475,7 @@ export function createAppController(dependencies) {
     if (centralNode) centralNode.hidden = name !== 'central-node';
     if (name === 'chat') {
       if (chat) chat.hidden = false;
+      chatClearUnread?.();
     } else if (chat) {
       chat.hidden = true;
     }
@@ -596,7 +601,10 @@ export function createAppController(dependencies) {
         chatSelectAgent?.(slug);
         if (!chatPanel) return;
         const slot = root.querySelector('#mind-dashboard');
-        if (slot) chatPanel.open(slot, agentColour?.(latestResult.agentsConfig, slug));
+        if (slot) {
+          chatPanel.open(slot, agentColour?.(latestResult.agentsConfig, slug));
+          chatClearUnread?.();
+        }
       }
     });
   }

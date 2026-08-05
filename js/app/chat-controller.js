@@ -30,7 +30,9 @@ export function createChatController({
   now = () => Date.now(),
   getDefaultAgentSlug,
   agentColour,
-  getAgentsConfig
+  getAgentsConfig,
+  isChatVisible,
+  onUnreadChange
 }) {
   if (!root || !chatApi) throw new TypeError('Chat controller dependencies are unavailable');
 
@@ -72,6 +74,18 @@ export function createChatController({
     });
   }
 
+  // A stream "ending" (real text, a proposal, a rejection, or an error/abort) is
+  // what should surface an unread indicator -- but only if the user isn't already
+  // looking at Chat, so an open panel or the Chat section itself never flags itself.
+  function maybeMarkUnread() {
+    if (isChatVisible?.()) return;
+    onUnreadChange?.(true);
+  }
+
+  function clearUnread() {
+    onUnreadChange?.(false);
+  }
+
   function applyAgentAccent(slug) {
     if (!slug || typeof agentColour !== 'function') return;
     const panel = root.querySelector('#chat-view');
@@ -107,6 +121,7 @@ export function createChatController({
     sending = true;
     setChatBusy(root, true);
     showChatError(root, '');
+    let turnSignaled = false;
     const history = recentHistory();
     const priorAgentSlug = stickyAgentSlug();
     remember('user', message);
@@ -194,6 +209,7 @@ export function createChatController({
           if (workingBubble) applyAgentAvatarToBubble(workingBubble, event.slug);
           if (assistantBubble) applyAgentAvatarToBubble(assistantBubble, event.slug);
         } else if (event.type === 'text') {
+          turnSignaled = true;
           assistantBuffer += event.delta;
           assistantFullText += event.delta;
           let boundary;
@@ -205,14 +221,17 @@ export function createChatController({
           }
           renderLiveText(assistantBuffer);
         } else if (event.type === 'record_proposal') {
+          turnSignaled = true;
           clearWorkingBubble();
           endTextTurn();
           const proposal = appendRecordProposal(root, event);
           bindProposal(proposal, event);
         } else if (event.type === 'record_rejected') {
+          turnSignaled = true;
           clearWorkingBubble();
           showChatError(root, formatRejectionMessage(event.errors));
         } else if (event.type === 'error') {
+          turnSignaled = true;
           clearWorkingBubble();
           showChatError(root, 'Chat is unavailable right now. Please try again.');
         } else if (event.type === 'search') {
@@ -231,6 +250,7 @@ export function createChatController({
       }
       remember('assistant', assistantFullText);
     } catch (error) {
+      turnSignaled = true;
       clearWorkingBubble();
       if (error?.name === 'AbortError') {
         showChatError(root, 'That search took too long. Try again in a moment.');
@@ -242,6 +262,7 @@ export function createChatController({
       clearWorkingBubble();
       sending = false;
       setChatBusy(root, false);
+      if (turnSignaled) maybeMarkUnread();
     }
   }
 
@@ -285,7 +306,8 @@ export function createChatController({
   return {
     send,
     selectAgent,
-    getSelectedAgentSlug: () => stickyAgentSlug() ?? null
+    getSelectedAgentSlug: () => stickyAgentSlug() ?? null,
+    clearUnread
   };
 }
 

@@ -25,6 +25,7 @@ import { buildMindModel } from './mind-model.js';
 import { buildNutritionModel } from './nutrition-model.js';
 import { renderBody } from './render-body.js';
 import { renderCentralNode } from './render-central-node.js';
+import { setChatUnread } from './render-chat.js';
 import { renderFitness } from './render-fitness.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
 import { renderMind } from './render-mind.js';
@@ -129,6 +130,7 @@ controller = createAppController({
   renderCentralNode,
   agentColour,
   chatPanel,
+  chatClearUnread: () => chatController?.clearUnread?.(),
   sessionStorage,
   localStorage
 });
@@ -150,7 +152,9 @@ chatController = createChatController({
   onRecordWritten: () => void controller.refresh({ manual: true, force: true }),
   getDefaultAgentSlug: () => DEFAULT_AGENT_BY_SECTION[controller.getCurrentSection()],
   agentColour,
-  getAgentsConfig: () => controller.getAgentsConfig?.() ?? null
+  getAgentsConfig: () => controller.getAgentsConfig?.() ?? null,
+  isChatVisible: () => chatPanel.isOpen() || controller.getCurrentSection?.() === 'chat',
+  onUnreadChange: unread => setChatUnread(document, unread)
 });
 
 if ('serviceWorker' in navigator) {

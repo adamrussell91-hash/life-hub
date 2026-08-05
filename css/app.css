@@ -1365,6 +1365,31 @@ main { max-width: 76rem; margin: 0 auto; }
   cursor: pointer;
 }
 
+/* Session-only unread indicator on every chat entry point: the floating FABs
+   plus the Chat nav item in both the desktop rail and the mobile nav. */
+.nav-item, .mobile-nav button { position: relative; }
+
+.floating-chat-button.has-unread::after,
+[data-section="chat"].has-unread::after {
+  content: '';
+  position: absolute;
+  top: 0.3rem;
+  right: 0.35rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #E5484D;
+  box-shadow: 0 0 0 2px var(--warm-white);
+  pointer-events: none;
+}
+
+.nav-item[data-section="chat"].has-unread::after {
+  top: 0.55rem;
+  right: auto;
+  left: 1.65rem;
+  box-shadow: 0 0 0 2px var(--marine);
+}
+
 .chat-view[data-panel-mode="overlay"] {
   position: fixed;
   z-index: 25;
