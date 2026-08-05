@@ -347,13 +347,11 @@
                 <p class="metric-label" id="nutrition-polyphenol-label">Polyphenols</p>
                 <span class="metric-icon" aria-hidden="true">◆</span>
               </div>
-              <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-nutrition-ring="polyphenol" viewBox="0 0 72 72" role="img" aria-label="Polyphenol progress">
-                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                </svg>
-                <p class="metric-value"><strong data-nutrition="polyphenol">—</strong><span data-target="nutrition-polyphenol">/ —</span></p>
-              </div>
+              <p class="polyphenol-score">
+                <strong data-nutrition="polyphenol">—</strong>
+              </p>
+              <p class="polyphenol-pill" data-nutrition="polyphenol-pill" data-colour="muted">—</p>
+              <p class="metric-caption">Polyphenol score</p>
             </article>
           </div>
 
@@ -378,18 +376,19 @@
               <p class="metric-label" id="protein-trend-label">7-day protein trend</p>
               <span class="trend-badge" data-value="protein-trend">—</span>
             </div>
-            <svg id="nutrition-protein-chart" class="line-chart" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Protein trend over the last 7 days">
+            <svg id="nutrition-protein-chart" class="line-chart" viewBox="0 0 320 140" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Protein trend over the last 7 days">
               <path data-role="area" d=""></path>
               <path data-role="line" d=""></path>
               <path data-role="rolling" d="" hidden></path>
               <g data-role="day-labels"></g>
             </svg>
+            <p class="metric-caption" data-nutrition="rolling-caption">Dotted = 3-day average</p>
             <div id="nutrition-hit-strip" class="hit-strip" aria-label="Whether the protein target was met each day, last 7 days"></div>
           </article>
 
           <article class="metric-card chart-card" aria-labelledby="calories-trend-label">
             <p class="metric-label" id="calories-trend-label">7-day energy trend</p>
-            <svg id="nutrition-calories-chart" class="line-chart" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Calorie trend over the last 7 days">
+            <svg id="nutrition-calories-chart" class="line-chart" viewBox="0 0 320 140" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Calorie trend over the last 7 days">
               <path data-role="area" d=""></path>
               <path data-role="line" d=""></path>
               <g data-role="day-labels"></g>
@@ -398,16 +397,12 @@
 
           <article class="metric-card chart-card" aria-labelledby="fat-trend-label">
             <p class="metric-label" id="fat-trend-label">7-day fat trend</p>
-            <svg id="nutrition-fat-chart" class="line-chart" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label="Fat trend over the last 7 days">
+            <svg id="nutrition-fat-chart" class="line-chart" viewBox="0 0 320 140" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Fat trend over the last 7 days">
               <path data-role="area" d=""></path>
               <path data-role="line" d=""></path>
               <g data-role="day-labels"></g>
+              <g data-role="overage-markers"></g>
             </svg>
-          </article>
-
-          <article class="metric-card chart-card" aria-labelledby="meal-timing-label">
-            <p class="metric-label" id="meal-timing-label">Meal timing · protein</p>
-            <div id="nutrition-meal-timing" class="column-chart" aria-label="Protein by meal today"></div>
           </article>
 
           <article class="metric-card chart-card" aria-labelledby="week-compare-label">
