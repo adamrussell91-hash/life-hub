@@ -74,3 +74,28 @@ test('buildSkincareModel marks am/pm logged and lists procedures', () => {
   assert.equal(model.procedures.length, 1);
   assert.equal(model.currentRoutine, 'am');
 });
+
+test('buildSkincareModel builds a 7-day weekDots strip flagging any skincare log', () => {
+  const model = buildSkincareModel({
+    date: '2026-08-05',
+    routines: SKINCARE_ROUTINES,
+    nowHourKey: 'pm',
+    events: [
+      { record: { type: 'skincare', date: '2026-08-01', routine: 'am', products: [] }, body: '', path: 'a' },
+      { record: { type: 'skincare', date: '2026-08-03', routine: 'pm', products: ['Laser'] }, body: 'Procedure: Laser', path: 'b' },
+      { record: { type: 'skincare', date: '2026-08-05', routine: 'pm', products: [] }, body: '', path: 'c' },
+      { record: { type: 'fitness', date: '2026-08-02', status: 'completed' }, body: '', path: 'd' }
+    ]
+  });
+  assert.equal(model.weekDots.length, 7);
+  assert.deepEqual(model.weekDots.map(day => day.date), [
+    '2026-07-30', '2026-07-31', '2026-08-01', '2026-08-02',
+    '2026-08-03', '2026-08-04', '2026-08-05'
+  ]);
+  assert.equal(model.weekDots.find(day => day.date === '2026-08-01').logged, true);
+  assert.equal(model.weekDots.find(day => day.date === '2026-08-03').logged, true);
+  assert.equal(model.weekDots.find(day => day.date === '2026-08-02').logged, false);
+  assert.equal(model.weekDots.find(day => day.date === '2026-07-30').logged, false);
+  assert.equal(model.weekDots.find(day => day.date === '2026-08-05').isToday, true);
+  assert.equal(model.weekDots.find(day => day.date === '2026-08-01').isToday, false);
+});
