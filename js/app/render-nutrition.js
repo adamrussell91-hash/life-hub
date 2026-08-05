@@ -14,12 +14,6 @@ const weekdayLetter = date => new Intl.DateTimeFormat('en-AU', {
 }).format(new Date(`${date}T12:00:00+10:00`));
 
 export function renderNutrition(root, model) {
-  setText(root, '[data-nutrition="calories"]', model.nutrition.calories.toLocaleString('en-AU'));
-  setText(root, '[data-target="nutrition-calories"]', `of ${model.targets.calories.toLocaleString('en-AU')} kcal`);
-  setText(root, '[data-nutrition="protein"]', `${model.nutrition.protein_g} g`);
-  setText(root, '[data-target="nutrition-protein"]', `/ ${model.targets.protein_g} g`);
-  setText(root, '[data-nutrition="fat"]', `${model.nutrition.fat_g} g`);
-  setText(root, '[data-target="nutrition-fat"]', `/ ${model.targets.fat_ceiling_g} g`);
   setText(root, '[data-nutrition="sodium"]', `${model.nutrition.sodium_mg} mg`);
   setText(root, '[data-target="nutrition-sodium"]', `/ ${model.targets.sodium_ceiling_mg} mg`);
   setText(root, '[data-nutrition="calcium"]', `${model.nutrition.calcium_mg} mg`);
@@ -57,9 +51,6 @@ export function renderNutrition(root, model) {
 
 function renderMacroRings(root, model) {
   const rings = {
-    calories: { value: model.nutrition.calories, target: model.targets.calories },
-    protein: { value: model.nutrition.protein_g, target: model.targets.protein_g },
-    fat: { value: model.nutrition.fat_g, target: model.targets.fat_ceiling_g },
     sodium: { value: model.nutrition.sodium_mg, target: model.targets.sodium_ceiling_mg },
     calcium: { value: model.nutrition.calcium_mg, target: model.targets.calcium_target_mg }
   };
