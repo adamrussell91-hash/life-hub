@@ -875,6 +875,20 @@ main { max-width: 76rem; margin: 0 auto; }
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.35rem;
 }
+.calendar-month-grid[data-motion="forward"] {
+  animation: calendar-month-forward 280ms cubic-bezier(.2, .8, .2, 1);
+}
+.calendar-month-grid[data-motion="back"] {
+  animation: calendar-month-back 280ms cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes calendar-month-forward {
+  from { opacity: 0; transform: translateX(0.85rem); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes calendar-month-back {
+  from { opacity: 0; transform: translateX(-0.85rem); }
+  to { opacity: 1; transform: translateX(0); }
+}
 .calendar-weekday {
   text-align: center;
   color: var(--muted);
@@ -905,6 +919,13 @@ main { max-width: 76rem; margin: 0 auto; }
 .calendar-dot.mind { background: #7a6bb5; }
 .calendar-dot.body { background: var(--high-sea); }
 .calendar-dot.skincare { background: #B99EE0; }
+#calendar-day-detail[data-motion="in"] {
+  animation: calendar-detail-in 240ms cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes calendar-detail-in {
+  from { opacity: 0; transform: translateY(0.45rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .calendar-event {
   display: grid;
   gap: 0.25rem;
@@ -917,6 +938,136 @@ main { max-width: 76rem; margin: 0 auto; }
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+.body-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.85rem;
+}
+.body-range button {
+  border: 1px solid var(--line);
+  background: var(--warm-white);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  min-height: 44px;
+}
+.body-range button.is-active {
+  background: var(--wave);
+  border-color: var(--wave);
+  color: #fff;
+}
+.body-sections {
+  display: grid;
+  gap: 1rem;
+}
+.body-sections[data-motion="in"] {
+  animation: body-sections-in 280ms cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes body-sections-in {
+  from { opacity: 0; transform: translateY(0.4rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.body-section__head {
+  margin-bottom: 0.65rem;
+}
+.body-section__head .metric-label {
+  margin: 0;
+  font-size: 0.78rem;
+}
+.body-metric {
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+.body-metric:last-of-type {
+  border-bottom: 0;
+  margin-bottom: 0.75rem;
+}
+.body-metric__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+.body-metric__growth {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-end;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.body-growth[data-colour="green"],
+.body-trend[data-colour="green"] { color: #2a7a4b; }
+.body-growth[data-colour="red"],
+.body-trend[data-colour="red"] { color: #b3261e; }
+.body-growth[data-colour="neutral"],
+.body-trend[data-colour="neutral"] { color: var(--muted); }
+.body-metric__value {
+  margin: 0.35rem 0 0.55rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--depth);
+}
+.body-chart {
+  width: 100%;
+  height: 7rem;
+}
+.body-chart [data-role="area"] {
+  fill: rgba(187, 217, 180, 0.35);
+}
+.body-chart [data-role="line"] {
+  fill: none;
+  stroke: #7a9f72;
+  stroke-width: 2;
+}
+.body-section[data-body-section="scale"] .body-chart [data-role="area"] {
+  fill: rgba(55, 111, 183, 0.18);
+}
+.body-section[data-body-section="scale"] .body-chart [data-role="line"] {
+  stroke: var(--wave);
+}
+.body-section[data-body-section="tape"] .body-chart [data-role="area"] {
+  fill: rgba(246, 134, 32, 0.18);
+}
+.body-section[data-body-section="tape"] .body-chart [data-role="line"] {
+  stroke: var(--high-sea);
+}
+.body-quick-log {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+.body-quick-log__input {
+  flex: 1 1 6.5rem;
+  min-width: 5.5rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  font: inherit;
+  background: var(--warm-white);
+  color: var(--ink);
+}
+.body-quick-log__button {
+  border: 0;
+  border-radius: 0.85rem;
+  padding: 0.75rem 1rem;
+  background: #BBD9B4;
+  color: #1a2418;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  min-height: 44px;
+}
+#body-chat-button { --agent-accent: #BBD9B4; }
 
 .fitness-exercise strong {
   display: block;
