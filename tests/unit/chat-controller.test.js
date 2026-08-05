@@ -14,6 +14,15 @@ class FakeElement extends EventTarget {
     this.hidden = false;
     this.children = [];
     this.parent = null;
+    this.style = {
+      props: new Map(),
+      setProperty(name, value) {
+        this.props.set(name, value);
+      },
+      getPropertyValue(name) {
+        return this.props.get(name) ?? '';
+      }
+    };
   }
 
   append(...nodes) {
@@ -43,7 +52,8 @@ class FakeDocument {
       ['#chat-input', new FakeElement('input')],
       ['#chat-messages', new FakeElement('ul')],
       ['#chat-error', new FakeElement('p')],
-      ['#chat-send', new FakeElement('button')]
+      ['#chat-send', new FakeElement('button')],
+      ['#chat-view', new FakeElement('section')]
     ]);
   }
 
@@ -364,4 +374,56 @@ test('omitting the default hint entirely preserves today\'s existing behaviour (
   await controller.send('what should I eat');
 
   assert.equal(sendCalls[0].priorAgentSlug, undefined);
+});
+
+test('shows On it… immediately and clears it when real text arrives', async () => {
+  const root = new FakeDocument();
+  let resolveGate;
+  const gate = new Promise(resolve => {
+    resolveGate = resolve;
+  });
+  const chatApi = {
+    async *send() {
+      await gate;
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: 'Here is the plan.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  const pending = controller.send('build today\'s session');
+  await flushMicrotasks();
+
+  const during = messageBubbles(root);
+  assert.equal(during.length, 2);
+  assert.equal(during[1].textContent, 'On it…');
+
+  resolveGate();
+  await pending;
+
+  const after = messageBubbles(root);
+  assert.equal(after.length, 2);
+  assert.equal(bubbleText(after[1]), 'Here is the plan.');
+  assert.equal(after.every(bubble => bubble.textContent !== 'On it…'), true);
+});
+
+test('applies the agent accent colour when the stream names the agent', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: 'Ready.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({
+    root,
+    chatApi,
+    agentColour: (_config, slug) => (slug === 'chadwick' ? '#2E7BD6' : '#000'),
+    getAgentsConfig: () => ({ agents: [] })
+  });
+
+  await controller.send('hey chadwick');
+
+  assert.equal(root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'), '#2E7BD6');
 });

@@ -10,7 +10,7 @@ test('scales a 3-point series and omits any last-point marker field', () => {
   ];
   const chart = buildAreaLine(week, { width: 320, height: 120, padding: 12 });
   assert.equal(chart.linePoints, '12.0,108.0 160.0,60.0 308.0,12.0');
-  assert.equal(chart.areaPoints, '12,120 12.0,108.0 160.0,60.0 308.0,12.0 308,120');
+  assert.equal(chart.areaPoints, '12,108 12.0,108.0 160.0,60.0 308.0,12.0 308,108');
   assert.match(chart.linePath, /^M 12\.0 108\.0/);
   assert.match(chart.linePath, /C /);
   assert.match(chart.areaPath, /Z$/);

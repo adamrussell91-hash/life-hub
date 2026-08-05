@@ -91,7 +91,9 @@ createChatController({
   root: document,
   chatApi,
   onRecordWritten: () => void controller.refresh({ manual: true }),
-  getDefaultAgentSlug: () => DEFAULT_AGENT_BY_SECTION[controller.getCurrentSection()]
+  getDefaultAgentSlug: () => DEFAULT_AGENT_BY_SECTION[controller.getCurrentSection()],
+  agentColour,
+  getAgentsConfig: () => controller.getAgentsConfig?.() ?? null
 });
 
 if ('serviceWorker' in navigator) {

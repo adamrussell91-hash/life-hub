@@ -175,4 +175,16 @@ Verified on 2026-08-05 (local only — do not push unless asked):
 
 Full design: `docs/superpowers/specs/2026-08-05-planned-workout-fitness-design.md`.
 
-## Next Phase: research corpus / remaining Life Hub tabs / optional confirm-time library sync
+## Phase 14: Bug pack (CN / refresh / chat / accents / week chart) — Complete
+
+Verified on 2026-08-05 (local only — do not push unless asked):
+
+- Seeded `central-node.md` into private data repo; confirm creates it from app seed if missing.
+- Manual refresh always advances Last synced (with seconds) and status copy on confirmed fetch.
+- Chat shows “On it…” until real stream content; bubbles use `--agent-accent` from `agents.yml`.
+- Central Node week chart labelled **Protein this week** with label gutter / meet aspect ratio.
+- Shell cache bumped to `life-hub-shell-v23`.
+
+Full design: `docs/superpowers/specs/2026-08-05-bug-pack-cn-refresh-chat-design.md`.
+
+## Next Phase: editable Fitness session → Skincare tab

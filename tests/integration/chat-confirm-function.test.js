@@ -110,6 +110,38 @@ test('overwrite:true resolves the existing blob sha and sends it as the update p
   assert.equal(JSON.parse(putCall.options.body).sha, existingSha);
 });
 
+test('creates central-node.md from the app seed when the private repo is missing it', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate, slug: 'breakfast' }));
+  assert.equal(response.status, 200);
+
+  const putCalls = calls.filter(call => call.options?.method === 'PUT');
+  assert.equal(putCalls.length, 2, 'expected meal write plus central-node create');
+  const centralNodePut = putCalls.find(call => call.url.includes('central-node.md'));
+  assert.ok(centralNodePut);
+  assert.equal(JSON.parse(centralNodePut.options.body).sha, undefined, 'create must not send a sha');
+
+  const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
+  assert.match(writtenContent, /## ⚡ Today's Status/);
+  assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F\./);
+  assert.match(writtenContent, /\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast/);
+});
+
 test('appends a one-line entry to the central node running log after a successful write', async () => {
   const centralNodeSha = 'f'.repeat(40);
   const centralNodeContent = [

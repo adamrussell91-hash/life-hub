@@ -19,7 +19,7 @@ test('scales a 3-point series into SVG coordinates within the given viewport', (
     { x: 308, y: 12, date: '2026-07-30', value: 100 }
   ]);
   assert.equal(chart.linePoints, '12.0,108.0 160.0,60.0 308.0,12.0');
-  assert.equal(chart.areaPoints, '12,120 12.0,108.0 160.0,60.0 308.0,12.0 308,120');
+  assert.equal(chart.areaPoints, '12,108 12.0,108.0 160.0,60.0 308.0,12.0 308,108');
   assert.deepEqual(chart.last, { x: 308, y: 12, date: '2026-07-30', value: 100 });
 });
 
@@ -54,5 +54,5 @@ test('default dimensions are provided when omitted', () => {
   const chart = buildProteinLineChart([{ date: '2026-07-30', protein_g: 10 }]);
 
   assert.equal(chart.width, 320);
-  assert.equal(chart.height, 120);
+  assert.equal(chart.height, 140);
 });

@@ -23,6 +23,7 @@ import {
   formatLogDate
 } from '../../js/core/central-node-write.js';
 import { getSydneyTimestamp } from '../../js/core/time.js';
+import { loadCentralNodeSeed } from './_shared/load-central-node-seed.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
@@ -158,10 +159,18 @@ async function upsertWorkoutTemplate(client, record) {
 async function syncCentralNodeAfterLog(client, record, notes) {
   const current = await client.resolveTree();
   const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
-  if (!entry) return;
 
-  const content = decodeBlob(await client.readBlob(entry.sha));
-  if (content === null) return;
+  let content;
+  let existingSha;
+  if (entry) {
+    content = decodeBlob(await client.readBlob(entry.sha));
+    if (content === null) return;
+    existingSha = entry.sha;
+  } else {
+    content = loadCentralNodeSeed();
+    if (!content) return;
+    existingSha = undefined;
+  }
 
   const actionLine = `\n**${formatLogDate(record.date)}:** ${agentNameForType(record.type)}: ${describeRecordForLog(record, notes)}`;
   let nutritionTotals = null;
@@ -179,7 +188,7 @@ async function syncCentralNodeAfterLog(client, record, notes) {
   await client.writeFile({
     path: CENTRAL_NODE_PATH,
     content: updated,
-    sha: entry.sha,
+    ...(existingSha ? { sha: existingSha } : {}),
     message: `chore(central-node): sync ${record.type} log into Status`
   });
 }
