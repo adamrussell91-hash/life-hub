@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { comparePeriods } from '../../js/core/trends.js';
-import { buildNutritionModel, PROTEIN_TREND_CONFIG } from '../../js/app/nutrition-model.js';
+import {
+  buildNutritionModel,
+  PROTEIN_TREND_CONFIG,
+  polyphenolVsAim
+} from '../../js/app/nutrition-model.js';
 
 const records = [
   { type: 'meal', date: '2026-07-30', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420, calcium_mg: 380, polyphenol_score: 6 },
@@ -57,13 +61,13 @@ test('builds a 7-day series ending on the display date, with each day\'s own pro
   const model = buildNutritionModel({ events, targetsConfig, date: '2026-07-30' });
 
   assert.deepEqual(model.week, [
-    { date: '2026-07-24', calories: 300, protein_g: 140, fat_g: 10, proteinTarget: 120, hitProtein: true },
-    { date: '2026-07-25', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, hitProtein: false },
-    { date: '2026-07-26', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, hitProtein: false },
-    { date: '2026-07-27', calories: 400, protein_g: 60, fat_g: 12, proteinTarget: 120, hitProtein: false },
-    { date: '2026-07-28', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, hitProtein: false },
-    { date: '2026-07-29', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, hitProtein: false },
-    { date: '2026-07-30', calories: 1130, protein_g: 80, fat_g: 27, proteinTarget: 120, hitProtein: false }
+    { date: '2026-07-24', calories: 300, protein_g: 140, fat_g: 10, proteinTarget: 120, hitProtein: true, overFatCeiling: false },
+    { date: '2026-07-25', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, hitProtein: false, overFatCeiling: false },
+    { date: '2026-07-26', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, hitProtein: false, overFatCeiling: false },
+    { date: '2026-07-27', calories: 400, protein_g: 60, fat_g: 12, proteinTarget: 120, hitProtein: false, overFatCeiling: false },
+    { date: '2026-07-28', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, hitProtein: false, overFatCeiling: false },
+    { date: '2026-07-29', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, hitProtein: false, overFatCeiling: false },
+    { date: '2026-07-30', calories: 1130, protein_g: 80, fat_g: 27, proteinTarget: 120, hitProtein: false, overFatCeiling: false }
   ]);
 });
 
@@ -74,7 +78,7 @@ test('builds a 30-day series ending on the display date, within the same window 
   assert.equal(model.month[0].date, '2026-07-01');
   assert.equal(model.month.at(-1).date, '2026-07-30');
   assert.deepEqual(model.month.find(day => day.date === '2026-07-24'), {
-    date: '2026-07-24', calories: 300, protein_g: 140, fat_g: 10, proteinTarget: 120, hitProtein: true
+    date: '2026-07-24', calories: 300, protein_g: 140, fat_g: 10, proteinTarget: 120, hitProtein: true, overFatCeiling: false
   });
 });
 
@@ -85,14 +89,46 @@ test('compares this week\'s average protein against the previous week\'s using t
   assert.deepEqual(model.proteinTrend, comparePeriods(40, 30, PROTEIN_TREND_CONFIG));
 });
 
-test('exposes mealTiming from today\'s meal protein breakdown', () => {
-  const model = buildNutritionModel({ events, targetsConfig, date: '2026-07-30' });
-  assert.deepEqual(model.mealTiming, [
-    { key: 'breakfast', label: 'Breakfast', value: 38 },
-    { key: 'lunch', label: 'Lunch', value: 42 },
-    { key: 'dinner', label: 'Dinner', value: 0 },
-    { key: 'snack', label: 'Snack', value: 0 }
-  ]);
+test('polyphenolVsAim labels score against aim without pretending it is a percent', () => {
+  assert.deepEqual(polyphenolVsAim(14, 10), { delta: 4, label: '+4 vs aim', colour: 'green' });
+  assert.deepEqual(polyphenolVsAim(8, 10), { delta: -2, label: '−2 vs aim', colour: 'muted' });
+  assert.deepEqual(polyphenolVsAim(10, 10), { delta: 0, label: 'at aim', colour: 'green' });
+  assert.deepEqual(polyphenolVsAim(3, 0), { delta: 0, label: 'at aim', colour: 'muted' });
+});
+
+test('marks week days that exceed the fat ceiling', () => {
+  const heavy = [
+    ...events,
+    {
+      record: {
+        type: 'meal', date: '2026-07-29', meal: 'dinner',
+        calories: 900, protein_g: 40, fat_g: 60,
+        sodium_mg: 100, calcium_mg: 50, polyphenol_score: 1
+      },
+      body: '', path: '', legacy: false
+    }
+  ];
+  const model = buildNutritionModel({ events: heavy, targetsConfig, date: '2026-07-30' });
+  const over = model.week.find(day => day.date === '2026-07-29');
+  assert.equal(over.fat_g, 60);
+  assert.equal(over.overFatCeiling, true);
+  assert.equal(model.week.find(day => day.date === '2026-07-30').overFatCeiling, false);
+  assert.equal(model.overFatCeiling, false);
+});
+
+test('today overFatCeiling is true when fat exceeds ceiling', () => {
+  const heavyToday = [{
+    record: {
+      type: 'meal', date: '2026-07-30', meal: 'dinner',
+      calories: 800, protein_g: 40, fat_g: 55,
+      sodium_mg: 100, calcium_mg: 50, polyphenol_score: 1
+    },
+    body: '', path: '', legacy: false
+  }];
+  const model = buildNutritionModel({ events: heavyToday, targetsConfig, date: '2026-07-30' });
+  assert.equal(model.nutrition.fat_g, 55);
+  assert.equal(model.overFatCeiling, true);
+  assert.equal(model.polyphenolVsAim.label, '−9 vs aim'); // score 1, aim 10
 });
 
 test('exposes mealsToday and written macro split for the display date', () => {

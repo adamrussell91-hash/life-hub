@@ -7,6 +7,16 @@ const WEEK_DAYS = 7;
 const MONTH_DAYS = 30;
 export const PROTEIN_TREND_CONFIG = { unit: 'g', good: 'up', thresholds: [5, 15, 30] };
 
+export function polyphenolVsAim(score, aim) {
+  const s = Number(score) || 0;
+  const a = Number(aim) || 0;
+  if (a <= 0) return { delta: 0, label: 'at aim', colour: 'muted' };
+  const delta = s - a;
+  if (delta === 0) return { delta: 0, label: 'at aim', colour: 'green' };
+  if (delta > 0) return { delta, label: `+${delta} vs aim`, colour: 'green' };
+  return { delta, label: `−${Math.abs(delta)} vs aim`, colour: 'muted' };
+}
+
 const EMPTY_TARGETS = {
   calories: 0,
   protein_g: 0,
@@ -23,6 +33,7 @@ function dailyNutrition(events, date, targetsConfig) {
   const recovery = hasRecoveryBonus(events, date);
   const targets = targetsConfig ? getDayTargets(targetsConfig, date, dayType, recovery) : null;
   const proteinTarget = targets?.protein_g ?? 0;
+  const fatCeiling = targets?.fat_ceiling_g ?? 0;
 
   return {
     date,
@@ -30,7 +41,8 @@ function dailyNutrition(events, date, targetsConfig) {
     protein_g: nutrition.protein_g,
     fat_g: nutrition.fat_g,
     proteinTarget,
-    hitProtein: proteinTarget > 0 && nutrition.protein_g >= proteinTarget
+    hitProtein: proteinTarget > 0 && nutrition.protein_g >= proteinTarget,
+    overFatCeiling: fatCeiling > 0 && nutrition.fat_g > fatCeiling
   };
 }
 
@@ -63,11 +75,8 @@ export function buildNutritionModel({ events, targetsConfig, date }) {
     week,
     month,
     previousWeek,
-    mealTiming: ['breakfast', 'lunch', 'dinner', 'snack'].map(key => ({
-      key,
-      label: key[0].toUpperCase() + key.slice(1),
-      value: nutrition.meals[key].protein_g
-    })),
+    overFatCeiling: targets.fat_ceiling_g > 0 && nutrition.fat_g > targets.fat_ceiling_g,
+    polyphenolVsAim: polyphenolVsAim(nutrition.polyphenol_score, targets.polyphenol_daily_aim),
     mealsToday: events
       .filter(event => event?.record?.type === 'meal' && event.record.date === date)
       .slice()
