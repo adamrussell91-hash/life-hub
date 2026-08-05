@@ -181,10 +181,9 @@ test('uses mobile navigation without overflow at 390 px after sign-in', async ()
   assert.ok(targetHeights.every(height => height >= 44));
 
   await page.locator('.mobile-nav [data-section="calendar"]').click();
-  assert.equal(
-    await page.locator('#app-status').textContent(),
-    'This section arrives in a later Life Hub phase.'
-  );
+  await page.locator('#calendar-dashboard:not([hidden])').waitFor();
+  assert.equal(await page.locator('#calendar-month-grid').count(), 1);
+  assert.ok((await page.locator('#calendar-week-strip button').count()) >= 7);
   await assertNoSecretResponses();
   await context.close();
 });
