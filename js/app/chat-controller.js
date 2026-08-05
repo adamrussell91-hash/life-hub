@@ -133,12 +133,19 @@ export function createChatController({
 
     // Keeps a single sticky bubble alive across the "On it… → Looking that up…
     // → Researching…" turn instead of leaving a trail of separate wait bubbles.
+    // Re-appended to the end each update so it stays below search chips and
+    // library confirmations instead of getting stranded above them.
     function setWorkingStatus(text) {
       if (!workingBubble) {
         workingBubble = appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text });
       } else {
         const body = workingBubble.querySelector?.('.chat-message__body') ?? workingBubble;
         body.textContent = text;
+        const list = root.querySelector('#chat-messages');
+        if (list) {
+          workingBubble.remove();
+          list.append(workingBubble);
+        }
       }
       addStatusClass(workingBubble);
       scrollChatToBottom();
