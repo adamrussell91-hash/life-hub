@@ -416,7 +416,7 @@ test('loads exercise library highlights into Chadwick system prompt', async () =
   assert.equal(searchHits[0].name, 'Bar Press');
 });
 
-test('save_exercise_library_entry writes data/exercise-library.json and emits exercise_library_saved', async () => {
+test('save_exercise_library_entry writes the cache to GitHub, emits exercise_library_saved, continues the round, and lets a follow-up log_entry produce a record_proposal', async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push({ url, options });
@@ -435,20 +435,40 @@ test('save_exercise_library_entry writes data/exercise-library.json and emits ex
     now: () => Date.parse('2026-08-01T06:00:00Z'),
     fetchImpl,
     createAnthropicClient: () => ({
-      streamMessage: () => mockedStream([
-        { type: 'tool_call', id: 'call_1', name: 'save_exercise_library_entry', input: {
-          name: 'Bar Press', target_area: 'Chest', default_cable_type: 'concentric'
-        } },
-        { type: 'done' }
-      ])
+      // Mirrors the real anthropic-client tool-loop: a save_exercise_library_entry
+      // tool_call is routed through executeTools and, since it returns a
+      // non-null result, the "model" continues into a second round instead
+      // of the turn stopping dead after the save -- here it goes on to
+      // propose a workout log_entry using the just-saved exercise.
+      streamMessage: async function* ({ executeTools }) {
+        const toolResult = await executeTools({
+          id: 'call_1',
+          name: 'save_exercise_library_entry',
+          input: { name: 'Bar Press', target_area: 'Chest', default_cable_type: 'concentric' }
+        });
+        assert.ok(toolResult != null, 'executeTools must return a tool result so the round continues');
+        yield { type: 'text', delta: 'Saved Bar Press to your library.' };
+        yield { type: 'tool_call', id: 'call_2', name: 'log_entry', input: {
+          type: 'workout', date: '2026-08-01', fields: {
+            title: 'Chest Session', session_kind: 'strength',
+            day_type: 'workout_30', status: 'planned', duration_min: 30,
+            exercises: [{ name: 'Bar Press', sets: [{ reps: 10, weight_kg: 42, cable_type: 'concentric' }] }]
+          }
+        } };
+        yield { type: 'done' };
+      }
     })
   });
 
   const response = await handler(request({ message: 'Chadwick, remember Bar Press cues' }));
   const events = await readSse(response);
 
+  assert.deepEqual(events[0], { type: 'agent', slug: 'chadwick' });
   assert.deepEqual(events[1], { type: 'exercise_library_saved', name: 'Bar Press' });
-  assert.deepEqual(events[2], { type: 'done' });
+  assert.deepEqual(events[2], { type: 'text', delta: 'Saved Bar Press to your library.' });
+  assert.equal(events[3].type, 'record_proposal');
+  assert.equal(events[3].record.type, 'workout');
+  assert.deepEqual(events[4], { type: 'done' });
 
   const putCall = calls.find(call => call.options?.method === 'PUT');
   assert.ok(putCall, 'expected a PUT request to write the exercise library');
@@ -460,6 +480,46 @@ test('save_exercise_library_entry writes data/exercise-library.json and emits ex
   assert.equal(written[0].name, 'Bar Press');
   assert.equal(written[0].default_cable_type, 'concentric');
   assert.ok(written[0].updated_at);
+});
+
+test('an invalid save_exercise_library_entry call returns an error tool result without writing to GitHub', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'All good.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  const response = await handler(request({ message: 'Chadwick, remember an exercise' }));
+  const events = await readSse(response);
+  assert.deepEqual(events, [
+    { type: 'agent', slug: 'chadwick' },
+    { type: 'text', delta: 'All good.' },
+    { type: 'done' }
+  ]);
+
+  const result = await receivedArgs.executeTools({
+    id: 'call_1',
+    name: 'save_exercise_library_entry',
+    input: { name: 'Missing target area' }
+  });
+  assert.deepEqual(JSON.parse(result), { ok: false, error: 'invalid_entry' });
+  assert.ok(!calls.some(call => call.options?.method === 'PUT'), 'an invalid entry must not trigger a write');
 });
 
 test('non-chadwick agents do not register exercise library tools', async () => {
