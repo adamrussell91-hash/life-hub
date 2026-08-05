@@ -88,3 +88,28 @@ test('other agents never receive the chadwick-only protocol instructions', () =>
   assert.doesNotMatch(prompt, /Design sessions in chat only/);
   assert.doesNotMatch(prompt, /operating manual/i);
 });
+
+test('chadwick prompt includes exercise library highlights when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    exerciseLibrary: '- Bar Press — Chest · Crossbar · 42 kg · in rotation'
+  });
+  assert.match(prompt, /Exercise Library/);
+  assert.match(prompt, /search_exercise_library/);
+  assert.match(prompt, /save_exercise_library_entry/);
+  assert.match(prompt, /Bar Press/);
+});
+
+test('chadwick prompt omits exercise library block when empty', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick', exerciseLibrary: '' });
+  assert.doesNotMatch(prompt, /Exercise Library highlights/);
+});
+
+test('non-chadwick agents never receive exercise library instructions', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    exerciseLibrary: '- Bar Press — Chest'
+  });
+  assert.doesNotMatch(prompt, /search_exercise_library/);
+  assert.doesNotMatch(prompt, /Bar Press/);
+});
