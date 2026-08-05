@@ -27,6 +27,8 @@ import { createSkincareController } from './skincare-controller.js';
 import { buildSkincareModel } from './skincare-model.js';
 import { SKINCARE_ROUTINES, currentRoutineKey } from './skincare-routines-data.js';
 import { renderSkincare } from './render-skincare.js';
+import { buildCalendarModel } from './calendar-model.js';
+import { renderCalendar } from './render-calendar.js';
 import { syncRepository } from './sync-repository.js';
 
 // The API lives on a different origin (Netlify Functions) from the site (GitHub
@@ -101,6 +103,8 @@ controller = createAppController({
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,
+  buildCalendarModel,
+  renderCalendar,
   buildCentralNodeModel,
   renderCentralNode,
   agentColour,

@@ -502,6 +502,31 @@
           <button id="skincare-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Hyaluronica">💬</button>
         </section>
 
+        <section id="calendar-dashboard" class="dashboard" aria-labelledby="calendar-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Calendar</p>
+              <h2 id="calendar-heading">Your logged days</h2>
+            </div>
+          </div>
+
+          <article class="metric-card">
+            <p class="metric-label">This week</p>
+            <div id="calendar-week-strip" class="calendar-week-strip" aria-label="Current week"></div>
+          </article>
+
+          <article class="metric-card">
+            <div class="calendar-month-nav">
+              <button type="button" class="quiet-button" data-calendar="prev-month" aria-label="Previous month">‹</button>
+              <p class="metric-label" data-calendar="month-label">—</p>
+              <button type="button" class="quiet-button" data-calendar="next-month" aria-label="Next month">›</button>
+            </div>
+            <div id="calendar-month-grid" class="calendar-month-grid" aria-label="Month grid"></div>
+          </article>
+
+          <article class="metric-card" id="calendar-day-detail" aria-live="polite"></article>
+        </section>
+
         <section id="central-node-dashboard" class="dashboard" aria-labelledby="central-node-heading" hidden>
           <div class="section-heading">
             <div>

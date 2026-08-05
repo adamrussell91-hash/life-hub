@@ -827,6 +827,97 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 #skincare-chat-button { --agent-accent: #B99EE0; }
 
+.calendar-week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+.calendar-week-day,
+.calendar-day {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  border: 1px solid var(--line);
+  background: var(--warm-white);
+  border-radius: 0.85rem;
+  padding: 0.55rem 0.2rem;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  min-height: 2.75rem;
+}
+.calendar-week-day[data-today="true"],
+.calendar-day[data-today="true"] {
+  box-shadow: 0 0 0 2px rgba(55, 111, 183, 0.28);
+}
+.calendar-week-day[data-selected="true"],
+.calendar-day[data-selected="true"] {
+  border-color: var(--wave);
+  background: rgba(55, 111, 183, 0.08);
+}
+.calendar-day[data-outside="true"] {
+  opacity: 0.42;
+}
+.calendar-month-nav {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.calendar-month-nav .metric-label {
+  margin: 0;
+  text-align: center;
+}
+.calendar-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+.calendar-weekday {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0 0.35rem;
+}
+.calendar-day__num {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.calendar-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.18rem;
+  min-height: 0.45rem;
+}
+.calendar-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.calendar-dot.nutrition { background: var(--ring-protein); }
+.calendar-dot.fitness { background: var(--fitness-accent); }
+.calendar-dot.mind { background: #7a6bb5; }
+.calendar-dot.body { background: var(--high-sea); }
+.calendar-dot.skincare { background: #B99EE0; }
+.calendar-event {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--line);
+}
+.calendar-event:first-of-type { border-top: 0; }
+.calendar-event p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .fitness-exercise strong {
   display: block;
   color: var(--depth);

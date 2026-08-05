@@ -209,4 +209,14 @@ Verified on 2026-08-05 (local only — do not push unless asked):
 
 Full design: `docs/superpowers/specs/2026-08-05-skincare-tab-design.md`.
 
+## Phase 17: Calendar tab (read-only) — Complete
+
+Verified on 2026-08-05 (local only — do not push unless asked):
+
+- Calendar nav opens week strip + month grid over existing events (`buildCalendarMarkers`).
+- Tap a day for event detail list; prev/next month; no writes / search / appointments in v1.
+- Shell cache bumped to `life-hub-shell-v26`.
+
+Full design: `docs/superpowers/specs/2026-08-05-calendar-tab-design.md`.
+
 ## Next Phase: remaining Life Hub tabs (Body / Mind) / optional logger polish
