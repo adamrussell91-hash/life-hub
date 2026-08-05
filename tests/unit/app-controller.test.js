@@ -89,7 +89,7 @@ class FakeDocument extends EventTarget {
       ['#retry-button', new FakeElement()]
     ]);
     this.futureNavigation = new FakeElement();
-    this.futureNavigation.dataset.section = 'body';
+    this.futureNavigation.dataset.section = 'mind';
     this.nutritionNavigation = new FakeElement();
     this.nutritionNavigation.dataset.section = 'nutrition';
     this.fitnessNavigation = new FakeElement();

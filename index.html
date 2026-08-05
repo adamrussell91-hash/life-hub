@@ -527,6 +527,23 @@
           <article class="metric-card" id="calendar-day-detail" aria-live="polite"></article>
         </section>
 
+        <section id="body-dashboard" class="dashboard" aria-labelledby="body-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Body</p>
+              <h2 id="body-heading">Scale, composition, tape</h2>
+            </div>
+          </div>
+          <div id="body-range-control" class="body-range" role="group" aria-label="Body time range">
+            <button type="button" data-body-range="weekly" aria-pressed="false">Weekly</button>
+            <button type="button" data-body-range="monthly" class="is-active" aria-pressed="true">Monthly</button>
+            <button type="button" data-body-range="six_month" aria-pressed="false">6M</button>
+          </div>
+          <p id="body-status" class="metric-caption" aria-live="polite"></p>
+          <div id="body-sections" class="body-sections"></div>
+          <button id="body-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Dr Sara Tonin">💬</button>
+        </section>
+
         <section id="central-node-dashboard" class="dashboard" aria-labelledby="central-node-heading" hidden>
           <div class="section-heading">
             <div>

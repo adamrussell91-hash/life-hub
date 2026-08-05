@@ -215,8 +215,19 @@ Verified on 2026-08-05 (local only — do not push unless asked):
 
 - Calendar nav opens week strip + month grid over existing events (`buildCalendarMarkers`).
 - Tap a day for event detail list; prev/next month; no writes / search / appointments in v1.
-- Shell cache bumped to `life-hub-shell-v26`.
+- Shell cache bumped to `life-hub-shell-v26` (motion polish later bumped shell further).
 
 Full design: `docs/superpowers/specs/2026-08-05-calendar-tab-design.md`.
 
-## Next Phase: remaining Life Hub tabs (Body / Mind) / optional logger polish
+## Phase 18: Body tab (Scale · Composition · Tape) — Complete
+
+Verified on 2026-08-05 (local only — do not push unless asked):
+
+- Stacked Scale / Composition / Tape with Weekly · Monthly · 6M ranges.
+- Line charts, primary range growth %, secondary vs-previous trend arrows.
+- Quick-log fields via direct confirm; floating Dr Sara Tonin chat.
+- Shell cache bumped to `life-hub-shell-v28`.
+
+Full design: `docs/superpowers/specs/2026-08-05-body-tab-design.md`.
+
+## Next Phase: Mind tab / sleep·heart on Body / optional logger polish
