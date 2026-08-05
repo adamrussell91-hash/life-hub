@@ -17,6 +17,8 @@ import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mj
 import { buildSystemPrompt } from './_shared/persona.mjs';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
 import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs';
+import { loadPenelopeProtocol } from './_shared/load-penelope-protocol.mjs';
+import { loadVeraProtocol } from './_shared/load-vera-protocol.mjs';
 import {
   extractConstraints,
   extractCrossAgentCoordination,
@@ -199,6 +201,8 @@ export function createChatHandler({
 
     const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
     const hyaluronicaProtocol = slug === 'hyaluronica' ? loadHyaluronicaProtocol() : '';
+    const penelopeProtocol = slug === 'penelope' ? loadPenelopeProtocol() : '';
+    const veraProtocol = slug === 'vera' ? loadVeraProtocol() : '';
     const system = buildSystemPrompt({
       slug,
       digest,
@@ -207,6 +211,8 @@ export function createChatHandler({
       foodLibrary,
       chadwickProtocol,
       hyaluronicaProtocol,
+      penelopeProtocol,
+      veraProtocol,
       workoutTemplates,
       exerciseLibrary
     });

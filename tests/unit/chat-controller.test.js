@@ -43,6 +43,23 @@ class FakeElement extends EventTarget {
     this.parent.children = this.parent.children.filter(child => child !== this);
     this.parent = null;
   }
+
+  querySelector(selector) {
+    if (selector === '.chat-message__body') {
+      return this.children.find(child => child.className === 'chat-message__body') ?? null;
+    }
+    if (selector === '.chat-message__avatar') {
+      return this.children.find(child => child.className === 'chat-message__avatar') ?? null;
+    }
+    return null;
+  }
+
+  querySelectorAll(selector) {
+    if (selector === '[data-agent-slug]') {
+      return this.children.filter(child => child.dataset?.agentSlug);
+    }
+    return [];
+  }
 }
 
 class FakeDocument {
@@ -53,12 +70,21 @@ class FakeDocument {
       ['#chat-messages', new FakeElement('ul')],
       ['#chat-error', new FakeElement('p')],
       ['#chat-send', new FakeElement('button')],
-      ['#chat-view', new FakeElement('section')]
+      ['#chat-view', new FakeElement('section')],
+      ['#agent-picker', new FakeElement('div')]
     ]);
   }
 
   querySelector(selector) {
     return this.elements.get(selector) ?? null;
+  }
+
+  querySelectorAll(selector) {
+    if (selector === '#agent-picker') {
+      const host = this.elements.get('#agent-picker');
+      return host ? [host] : [];
+    }
+    return [];
   }
 
   createElement(tag) {
@@ -177,7 +203,10 @@ function messageBubbles(root) {
 }
 
 function bubbleText(bubble) {
-  return bubble.children.map(node => node.textContent).join('');
+  const body = bubble.children.find(child => child.className === 'chat-message__body');
+  if (!body) return bubble.textContent ?? '';
+  if (body.children.length) return body.children.map(node => node.textContent).join('');
+  return body.textContent ?? '';
 }
 
 test('a paragraph break in streamed text starts a new bubble instead of one growing wall of text', async () => {
@@ -219,7 +248,7 @@ test('a search event ends the current bubble so text before and after it does no
   const bubbles = messageBubbles(root);
   assert.equal(bubbles.length, 4, 'user bubble, pre-search text, the search note, and post-search text');
   assert.equal(bubbleText(bubbles[1]), 'Let me check that.');
-  assert.equal(bubbles[2].textContent, '🔍 Searched the web: McChicken nutrition');
+  assert.equal(bubbleText(bubbles[2]), '🔍 Searched the web: McChicken nutrition');
   assert.equal(bubbleText(bubbles[3]), 'Found it, 452 kcal.');
 });
 
@@ -288,7 +317,8 @@ test('bold markdown in streamed text renders as a strong element, not literal as
 
   const bubbles = messageBubbles(root);
   const assistantBubble = bubbles[1];
-  const bold = assistantBubble.children.find(node => node.tagName === 'strong');
+  const body = assistantBubble.children.find(node => node.className === 'chat-message__body');
+  const bold = body?.children.find(node => node.tagName === 'strong');
   assert.ok(bold, 'expected a strong element for the bolded segment');
   assert.equal(bold.textContent, '452 calories');
   assert.doesNotMatch(bubbleText(assistantBubble), /\*\*/);
@@ -396,7 +426,7 @@ test('shows On it… immediately and clears it when real text arrives', async ()
 
   const during = messageBubbles(root);
   assert.equal(during.length, 2);
-  assert.equal(during[1].textContent, 'On it…');
+  assert.equal(bubbleText(during[1]), 'On it…');
 
   resolveGate();
   await pending;
@@ -404,7 +434,7 @@ test('shows On it… immediately and clears it when real text arrives', async ()
   const after = messageBubbles(root);
   assert.equal(after.length, 2);
   assert.equal(bubbleText(after[1]), 'Here is the plan.');
-  assert.equal(after.every(bubble => bubble.textContent !== 'On it…'), true);
+  assert.equal(after.every(bubble => bubbleText(bubble) !== 'On it…'), true);
 });
 
 test('applies the agent accent colour when the stream names the agent', async () => {

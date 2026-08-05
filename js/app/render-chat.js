@@ -1,4 +1,5 @@
 import { formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
+import { applyAgentAvatarToBubble } from './render-agent-picker.js';
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source']);
 
@@ -7,8 +8,14 @@ export function appendMessage(root, { role, agentSlug, text = '' }) {
   if (!list) return null;
   const item = root.createElement('li');
   item.className = `chat-message chat-message--${role}`;
-  if (agentSlug) item.dataset.agent = agentSlug;
-  item.textContent = text;
+  if (agentSlug) {
+    item.dataset.agent = agentSlug;
+    applyAgentAvatarToBubble(item, agentSlug);
+  }
+  const body = root.createElement('div');
+  body.className = 'chat-message__body';
+  body.textContent = text;
+  item.append(body);
   list.append(item);
   list.scrollTop = list.scrollHeight;
   return item;

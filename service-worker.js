@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v28';
+const CACHE_NAME = 'life-hub-shell-v29';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -10,6 +10,7 @@ const SHELL_FILES = [
   'js/app/main.js',
   'js/app/api-session.js',
   'js/app/app-controller.js',
+  'js/app/agent-avatars.js',
   'js/app/agent-colour.js',
   'js/app/body-controller.js',
   'js/app/body-model.js',
@@ -31,8 +32,10 @@ const SHELL_FILES = [
   'js/app/format-exercise.js',
   'js/app/home-model.js',
   'js/app/load-live-events.js',
+  'js/app/mind-model.js',
   'js/app/nutrition-charts.js',
   'js/app/nutrition-model.js',
+  'js/app/render-agent-picker.js',
   'js/app/render-body.js',
   'js/app/render-calendar.js',
   'js/app/render-central-node.js',
@@ -40,6 +43,7 @@ const SHELL_FILES = [
   'js/app/render-fitness.js',
   'js/app/render-fitness-logger.js',
   'js/app/render-home.js',
+  'js/app/render-mind.js',
   'js/app/render-nutrition.js',
   'js/app/render-skincare.js',
   'js/app/skincare-controller.js',
@@ -58,7 +62,14 @@ const SHELL_FILES = [
   'vendor/js-yaml.mjs',
   'manifest.webmanifest',
   'assets/icons/life-hub-192.png',
-  'assets/icons/life-hub-512.png'
+  'assets/icons/life-hub-512.png',
+  'assets/agents/brisket.jpg',
+  'assets/agents/chadwick.jpg',
+  'assets/agents/hyaluronica.jpg',
+  'assets/agents/hammond.jpg',
+  'assets/agents/penelope.jpg',
+  'assets/agents/vera.jpg',
+  'assets/agents/sara.jpg'
 ];
 const PRECACHE_URLS = SHELL_FILES.map(file => SCOPE_PATH + file);
 const SHELL_PATHS = new Set(PRECACHE_URLS);

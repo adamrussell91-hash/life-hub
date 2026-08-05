@@ -8,6 +8,8 @@ export function buildSystemPrompt({
   foodLibrary = '',
   chadwickProtocol = '',
   hyaluronicaProtocol = '',
+  penelopeProtocol = '',
+  veraProtocol = '',
   workoutTemplates = '',
   exerciseLibrary = ''
 }) {
@@ -68,12 +70,28 @@ export function buildSystemPrompt({
     'Prefer the Skincare tab for one-tap AM/PM logs. In chat, advise and adjust; only propose skincare log_entry when Adam clearly describes a completed routine or procedure here instead of using the tab.'
   ] : [];
 
+  const penelopeBlocks = slug === 'penelope' ? [
+    penelopeProtocol
+      ? `Penelope operating manual (follow these Life Hub rules):\n${penelopeProtocol}`
+      : '',
+    'Interview one question at a time. When ready, propose a diary log_entry. Diary notes must be Adam\'s first-person voice, never theatrical Moira phrasing.'
+  ] : [];
+
+  const veraBlocks = slug === 'vera' ? [
+    veraProtocol
+      ? `Vera operating manual (follow these Life Hub rules):\n${veraProtocol}`
+      : '',
+    'You do not propose log_entry. Reflect and ask; send diary logging to Penelope.'
+  ] : [];
+
   return [
     shared,
     `You are ${agent.name}, Adam's ${agent.domain ?? 'general'} agent.`,
     agent.voice,
     capability,
     ...chadwickBlocks,
-    ...hyaluronicaBlocks
+    ...hyaluronicaBlocks,
+    ...penelopeBlocks,
+    ...veraBlocks
   ].filter(Boolean).join('\n\n');
 }

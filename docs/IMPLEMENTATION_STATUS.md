@@ -230,4 +230,15 @@ Verified on 2026-08-05 (local only — do not push unless asked):
 
 Full design: `docs/superpowers/specs/2026-08-05-body-tab-design.md`.
 
-## Next Phase: Mind tab / sleep·heart on Body / optional logger polish
+## Phase 19: Mind tab + chat avatars — Complete
+
+Verified on 2026-08-05 (local only — do not push unless asked):
+
+- Mind dashboard: mood score line, entries-by-mood columns, recurring themes; Weekly/Monthly/6M.
+- Penelope + Vera protocols injected; Mind opens chat pinned to either.
+- Global avatar rail (Brisket→Sara); click pins sticky agent; assistant bubbles show avatar.
+- Shell cache bumped to `life-hub-shell-v29`.
+
+Full design: `docs/superpowers/specs/2026-08-05-mind-tab-avatars-design.md`.
+
+## Next Phase: sleep·heart on Body / polish

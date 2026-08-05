@@ -10,9 +10,26 @@ test('builds a named agent prompt naming its writable record types', () => {
   assert.match(prompt, /Fat < 50g/);
 });
 
-test('a conversational-only agent is told it cannot log records', () => {
-  const prompt = buildSystemPrompt({ slug: 'vera', digest: '', constraints: '' });
-  assert.match(prompt, /do not log structured records/);
+test('penelope prompt includes protocol when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'penelope',
+    digest: '',
+    constraints: '',
+    penelopeProtocol: '## Diary interview\nOne question at a time.'
+  });
+  assert.match(prompt, /Penelope operating manual/);
+  assert.match(prompt, /One question at a time/);
+});
+
+test('vera prompt includes protocol when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'vera',
+    digest: '',
+    constraints: '',
+    veraProtocol: '## Reflection only\nNo log_entry.'
+  });
+  assert.match(prompt, /Vera operating manual/);
+  assert.match(prompt, /No log_entry/);
 });
 
 test('the router lists every agent, infers the right one, and never narrates the handoff', () => {
