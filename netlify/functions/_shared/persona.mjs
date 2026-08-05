@@ -48,7 +48,7 @@ export function buildSystemPrompt({
 
   const chadwickBlocks = slug === 'chadwick' ? [
     centralNodeLog
-      ? 'When designing a session, explicitly use the Central Node\'s Today\'s Status and Cross-Agent Coordination above to shape programming decisions — a nutrition flag, a recovery note, or another agent\'s directive should visibly change what you propose, not just be silently acknowledged.'
+      ? 'When designing a session you MUST use the Central Node\'s Today\'s Status and Cross-Agent Coordination above to shape the prescription — a nutrition flag, a recovery note, or another agent\'s directive should visibly change the volume, focus, or intensity you propose, not just be silently acknowledged. Mention that influence briefly in chat when you propose the session. If nothing relevant applies, say so in one short line rather than staying silent about it.'
       : '',
     chadwickProtocol
       ? `Chadwick operating manual (follow these Life Hub rules; ignore any Notion database mechanics):\n${chadwickProtocol}`
@@ -59,7 +59,7 @@ export function buildSystemPrompt({
     exerciseLibrary
       ? `Exercise Library highlights (prefer these names; search before inventing moves or guessing attachment/cable/bench defaults). Call search_exercise_library for more; call save_exercise_library_entry after refining cues/defaults or adding a move. Library defaults inform design — session sets still need per-set cable_type.\n\n${exerciseLibrary}`
       : '',
-    'When Adam asks you to design or build today’s session, propose a workout log_entry with status planned so he can confirm it onto the Fitness tab. When he finishes and reports actuals, propose status completed (same title; overwrite the plan if confirm conflicts). Never write mid-session / in-progress logs. Skipped is fine when documenting a no-train day.',
+    'When Adam asks you to design or build today\'s session, you MUST call log_entry with status planned in that same turn once the prescription is ready (full exercise list, cable_type on every strength set). Chat text alone never appears on the Fitness tab — only a Confirm card does. Mid-iteration questions can stay conversational, but a finished plan requires the tool call, not just a description in the message. When he finishes and reports actuals, propose status completed (same title; overwrite the plan if confirm conflicts). Never write mid-session / in-progress logs. Skipped is fine when documenting a no-train day.',
     'Infer session_kind from what was done (or planned). Always include cable_type on every strength set (use none when not on cables). Never invent YAML fields that are not in the log_entry schema; if Adam mentions an unsupported metric, say it needs to be added to the workout book later.'
   ] : [];
 

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
+import { loadChadwickProtocol } from '../../netlify/functions/_shared/load-chadwick-protocol.mjs';
 
 test('builds a named agent prompt naming its writable record types', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick', digest: 'Streak: 2', constraints: 'Fat < 50g' });
@@ -138,6 +139,29 @@ test('hyaluronica prompt includes protocol when provided', () => {
   });
   assert.match(prompt, /Prefer the Skincare tab/);
   assert.match(prompt, /Hyaluronica operating manual/);
+});
+
+test('Chadwick prompt requires planned log_entry after design and CN-shaped programming', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    centralNodeLog: '**Today\'s Status:** Brisket flagged a big deficit yesterday.'
+  });
+  assert.match(prompt, /MUST call log_entry with status planned/i);
+  assert.match(prompt, /Confirm card/i);
+  assert.match(prompt, /Fitness tab/i);
+  assert.match(prompt, /Central Node/i);
+  assert.match(prompt, /MUST use/i);
+  assert.match(prompt, /shape the prescription/i);
+  assert.match(prompt, /mention that influence/i);
+});
+
+test('the checked-in Chadwick protocol resolves the Job/stay-in-chat conflict', () => {
+  const protocol = loadChadwickProtocol();
+  assert.match(protocol, /design, build, or set today.s session/i);
+  assert.match(protocol, /status: planned/i);
+  assert.match(protocol, /Confirm card/i);
+  assert.doesNotMatch(protocol, /stay in chat until he asks to commit/i);
+  assert.doesNotMatch(protocol, /When he asks you to lock today's session onto Fitness/);
 });
 
 test('other agents never receive hyaluronica protocol instructions', () => {
