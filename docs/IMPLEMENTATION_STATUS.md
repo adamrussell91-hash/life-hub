@@ -137,4 +137,18 @@ Verified on 2026-08-05, on branch `fitness-tab` (local only — do not push unle
 
 Full design: `docs/superpowers/specs/2026-08-04-fitness-tab-design.md`. Full plan: `docs/superpowers/plans/2026-08-05-fitness-tab.md`.
 
-## Next Phase: remaining Life Hub tabs + optional Recent Actions 48h purge hardening
+## Phase 11: Chadwick Protocol + Rich Workout Schema — Complete
+
+Verified on 2026-08-05, on branch `chadwick-protocol-schema` (local only — do not push unless asked):
+
+- `config/chadwick-protocol.md` injected into Chadwick prompts (voice stays in `agent-directory.mjs`).
+- Rich workout schema: required `title` / `session_kind`; per-set `cable_type`; optional bench angle, duration, HR, calories, distance; kind-aware validation.
+- Complete-only Life Hub writes; workout templates under `data/fitness/templates/` create/overwrite on completed confirm.
+- Central Node: read before design; on finish keep Status + Recent Actions + Day Type writes.
+- Fitness hero and chat confirm cards show weight×reps, cable type, and bench angle (shared `format-exercise.js`).
+- Shell cache bumped to `life-hub-shell-v20`.
+- **Slice 2 (next):** Exercise Library import/search.
+
+Full design: `docs/superpowers/specs/2026-08-05-chadwick-protocol-schema-design.md`. Full plan: `docs/superpowers/plans/2026-08-05-chadwick-protocol-schema.md`.
+
+## Next Phase: Exercise Library (Slice 2) + remaining Life Hub tabs
