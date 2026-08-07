@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addCalendarDays, daysBetween, enumerateDateKeys,
-  getSydneyDateKey, getSydneyTimestamp, getSydneyWeekStart, isCalendarDate
+  getSydneyDateKey, getSydneyTimestamp, getSydneyWeekStart, isCalendarDate,
+  sydneyLocalStamp
 } from '../../js/core/time.js';
 
 test('Sydney date key crosses the spring DST boundary by calendar date', () => {
@@ -54,4 +55,16 @@ test('calendar helpers reject impossible dates and preserve leap-day arithmetic'
     assert.throws(() => enumerateDateKeys(impossible, '2026-03-01'), TypeError);
     assert.throws(() => enumerateDateKeys('2026-02-01', impossible), TypeError);
   }
+});
+
+test('sydneyLocalStamp picks AEDT (+11) in late March', () => {
+  assert.equal(sydneyLocalStamp('2026-03-29', '12:00'), '2026-03-29T12:00:00+11:00');
+});
+
+test('sydneyLocalStamp picks AEST (+10) in July', () => {
+  assert.equal(sydneyLocalStamp('2026-07-30', '07:00'), '2026-07-30T07:00:00+10:00');
+});
+
+test('sydneyLocalStamp picks AEST after the autumn changeover', () => {
+  assert.equal(sydneyLocalStamp('2026-04-08', '12:00'), '2026-04-08T12:00:00+10:00');
 });

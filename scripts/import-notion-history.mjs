@@ -10,6 +10,7 @@
  */
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { sydneyLocalStamp } from '../js/core/time.js';
 
 const args = parseArgs(process.argv.slice(2));
 const outRoot = resolve(args.out || '../life-hub-data');
@@ -149,13 +150,16 @@ function parseWorkoutMarkdown(text, fileName) {
     .map(part => part.trim().toLowerCase())
     .filter(Boolean);
 
+  const time = '07:00';
+  const stamp = sydneyLocalStamp(dateKey, time);
   const record = {
     schema_version: 1,
     id: `notion-${dateKey}-${slugify(title).slice(0, 40)}`,
     type: 'workout',
     date: dateKey,
-    created_at: `${dateKey}T12:00:00+10:00`,
-    updated_at: `${dateKey}T12:00:00+10:00`,
+    time,
+    created_at: stamp,
+    updated_at: stamp,
     source: 'notion_import',
     title: cleanTitle(title),
     session_kind: sessionKind,
@@ -354,6 +358,9 @@ function bodyEventsFromRow(row) {
   const visceral = num(row['Visceral Fat']);
   const bodyAge = num(row['Body Age']);
 
+  const bodyTime = '12:00';
+  const bodyStamp = sydneyLocalStamp(dateKey, bodyTime);
+
   if (weight != null && (bodyFat != null || muscle != null || visceral != null)) {
     events.push({
       slug: 'composition',
@@ -363,8 +370,9 @@ function bodyEventsFromRow(row) {
         id: `notion-composition-${dateKey}`,
         type: 'composition',
         date: dateKey,
-        created_at: `${dateKey}T12:00:00+10:00`,
-        updated_at: `${dateKey}T12:00:00+10:00`,
+        time: bodyTime,
+        created_at: bodyStamp,
+        updated_at: bodyStamp,
         source: 'notion_import',
         weight_kg: weight,
         ...(bodyFat != null ? { body_fat_pct: bodyFat } : {}),
@@ -382,8 +390,9 @@ function bodyEventsFromRow(row) {
         id: `notion-weight-${dateKey}`,
         type: 'weight',
         date: dateKey,
-        created_at: `${dateKey}T12:00:00+10:00`,
-        updated_at: `${dateKey}T12:00:00+10:00`,
+        time: bodyTime,
+        created_at: bodyStamp,
+        updated_at: bodyStamp,
         source: 'notion_import',
         weight_kg: weight
       }
@@ -411,8 +420,9 @@ function bodyEventsFromRow(row) {
         id: `notion-measurements-${dateKey}`,
         type: 'measurements',
         date: dateKey,
-        created_at: `${dateKey}T12:00:00+10:00`,
-        updated_at: `${dateKey}T12:00:00+10:00`,
+        time: bodyTime,
+        created_at: bodyStamp,
+        updated_at: bodyStamp,
         source: 'notion_import',
         ...Object.fromEntries(Object.entries(measurements).filter(([, value]) => value != null))
       }

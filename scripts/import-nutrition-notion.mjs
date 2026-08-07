@@ -13,7 +13,7 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { getSydneyTimestamp } from '../js/core/time.js';
+import { sydneyLocalStamp } from '../js/core/time.js';
 
 const args = parseArgs(process.argv.slice(2));
 const nutritionRoot = resolve(args.nutritionRoot || '');
@@ -47,6 +47,10 @@ if (logDir) {
     const n = (slotCounts.get(key) ?? 0) + 1;
     slotCounts.set(key, n);
     const slug = n === 1 ? parsed.record.meal : `${parsed.record.meal}-${n}`;
+    if (/\s/.test(slug)) {
+      skipped.push(`spaced-slug:${file}`);
+      continue;
+    }
     const path = eventPath('nutrition', parsed.record.date, slug);
     writeEvent(outRoot, path, parsed.record, parsed.notes, force);
     mealCount += 1;
@@ -221,16 +225,6 @@ function parseDateFromParent(raw) {
 
 function defaultTimeForMeal(meal) {
   return ({ breakfast: '08:00', lunch: '12:30', dinner: '19:00', snack: '15:30' })[meal] ?? '12:00';
-}
-
-/** Build a Sydney-valid (+10/+11) ISO stamp for a calendar date + HH:MM. */
-function sydneyLocalStamp(dateKey, time) {
-  for (const offset of ['+11:00', '+10:00']) {
-    const candidate = `${dateKey}T${time}:00${offset}`;
-    const rebuilt = getSydneyTimestamp(new Date(candidate));
-    if (rebuilt.startsWith(`${dateKey}T${time}:`)) return rebuilt;
-  }
-  return getSydneyTimestamp(new Date(`${dateKey}T${time}:00Z`));
 }
 
 function parseTimeEaten(notes) {
