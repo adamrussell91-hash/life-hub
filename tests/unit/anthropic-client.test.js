@@ -311,3 +311,117 @@ test('client tool continuation preserves prior server_tool_use blocks in the ass
   assert.ok(assistant.content.some(b => b.type === 'tool_use' && b.id === 'call_1'));
   assert.ok(events.some(e => e.type === 'text' && e.delta === 'Logged.'));
 });
+
+test('replays completed thinking blocks on tool continuation and drops incomplete ones', async () => {
+  const first = [
+    frame('content_block_start', { index: 0, content_block: { type: 'thinking' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'thinking_delta', thinking: 'Need sodium for the wrap.' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'signature_delta', signature: 'sig_abc' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('content_block_start', {
+      index: 1,
+      content_block: { type: 'tool_use', id: 'call_1', name: 'save_food_library_entry' }
+    }),
+    frame('content_block_delta', {
+      index: 1,
+      delta: { type: 'input_json_delta', partial_json: '{"name":"Chicken Caesar Wrap"}' }
+    }),
+    frame('content_block_stop', { index: 1 }),
+    frame('message_delta', { delta: { stop_reason: 'tool_use' } }),
+    frame('message_stop', {})
+  ];
+  const second = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Logged the wrap.' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_stop', {})
+  ];
+
+  let calls = 0;
+  const bodies = [];
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async (_url, init) => {
+      calls += 1;
+      bodies.push(JSON.parse(init.body));
+      return sseResponse(calls === 1 ? first : second);
+    }
+  });
+
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'log wrap' }],
+    tools: [],
+    executeTools: async () => JSON.stringify({ ok: true })
+  })) void event;
+
+  assert.equal(calls, 2);
+  const assistant = bodies[1].messages.at(-2);
+  assert.deepEqual(assistant.content[0], {
+    type: 'thinking',
+    thinking: 'Need sodium for the wrap.',
+    signature: 'sig_abc'
+  });
+  assert.equal(assistant.content[1].type, 'tool_use');
+});
+
+test('stub tool_results cover fire-and-forget tool_use when another tool continues the round', async () => {
+  const first = [
+    frame('content_block_start', {
+      index: 0,
+      content_block: { type: 'tool_use', id: 'call_log', name: 'log_entry' }
+    }),
+    frame('content_block_delta', {
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: '{"type":"meal"}' }
+    }),
+    frame('content_block_stop', { index: 0 }),
+    frame('content_block_start', {
+      index: 1,
+      content_block: { type: 'tool_use', id: 'call_save', name: 'save_food_library_entry' }
+    }),
+    frame('content_block_delta', {
+      index: 1,
+      delta: { type: 'input_json_delta', partial_json: '{"name":"Wrap"}' }
+    }),
+    frame('content_block_stop', { index: 1 }),
+    frame('message_stop', {})
+  ];
+  const second = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Done.' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_stop', {})
+  ];
+
+  let calls = 0;
+  const bodies = [];
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async (_url, init) => {
+      calls += 1;
+      bodies.push(JSON.parse(init.body));
+      return sseResponse(calls === 1 ? first : second);
+    }
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'log wrap' }],
+    tools: [],
+    executeTools: async event => (event.name === 'save_food_library_entry'
+      ? JSON.stringify({ ok: true })
+      : null)
+  })) events.push(event);
+
+  assert.equal(calls, 2);
+  const toolResults = bodies[1].messages.at(-1).content;
+  assert.equal(toolResults.length, 2);
+  assert.deepEqual(
+    toolResults.map(block => block.tool_use_id).sort(),
+    ['call_log', 'call_save']
+  );
+  assert.ok(events.some(e => e.type === 'tool_call' && e.id === 'call_log'));
+  assert.ok(events.some(e => e.type === 'text' && e.delta === 'Done.'));
+});
