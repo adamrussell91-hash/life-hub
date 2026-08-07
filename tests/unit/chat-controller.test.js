@@ -70,6 +70,7 @@ class FakeDocument {
       ['#chat-messages', new FakeElement('ul')],
       ['#chat-error', new FakeElement('p')],
       ['#chat-send', new FakeElement('button')],
+      ['#chat-new', new FakeElement('button')],
       ['#chat-view', new FakeElement('section')],
       ['#agent-picker', new FakeElement('div')]
     ]);
@@ -206,6 +207,35 @@ test('a confirm that reports centralNodeUpdated:true does not show the Central N
   await flushMicrotasks();
 
   assert.equal(root.querySelector('#chat-error').textContent, '');
+});
+
+test('a diary confirm that reports dayoneSent:false shows a Day One warning without failing the save', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: {
+      type: 'diary',
+      date: '2026-08-07',
+      mood: 'low',
+      mood_score: 4,
+      energy: 'low',
+      dayone_sent: false
+    },
+    path: 'data/mind/2026/08/2026-08-07-diary.md',
+    notes: 'Felt flat today.',
+    confirmImpl: async () => ({ ok: true, centralNodeUpdated: true, dayoneSent: false, dayoneReason: 'resend_500' })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Penelope, diary time');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className === 'record-proposal');
+  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  confirmButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.match(proposal.children[0]?.textContent ?? '', /Saved/);
+  assert.match(root.querySelector('#chat-error').textContent, /Day One email didn.t send/i);
 });
 
 test('a write_conflict on first confirm prompts a retry, and confirming again sends exactly one overwrite request', async () => {
@@ -879,4 +909,66 @@ test('omitting isChatVisible/onUnreadChange entirely preserves existing behaviou
 
   await assert.doesNotReject(controller.send('log a snack'));
   assert.doesNotThrow(() => controller.clearUnread());
+});
+
+test('API history carries up to 30 prior messages inside the memory window', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  let clock = Date.parse('2026-08-01T18:00:00Z');
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'vera' };
+      yield { type: 'text', delta: `Reply ${sendCalls.length}` };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi, now: () => clock });
+
+  for (let i = 0; i < 20; i += 1) {
+    await controller.send(`turn ${i}`);
+    clock += 1_000;
+  }
+
+  const last = sendCalls.at(-1);
+  assert.equal(last.history.length, 30, 'caps at 30 messages (15 user + 15 assistant before this turn)');
+  assert.equal(last.history[0].content, 'turn 4');
+  assert.equal(last.history.at(-1).content, 'Reply 19');
+});
+
+test('New chat clears the thread and history but keeps the pinned agent', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'penelope' };
+      yield { type: 'text', delta: 'Tell me more.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({
+    root,
+    chatApi,
+    getDefaultAgentSlug: () => 'hammond',
+    agentColour: () => '#C85A64',
+    getAgentsConfig: () => ({})
+  });
+
+  controller.selectAgent('penelope');
+  await controller.send('I had a rough morning');
+  assert.ok(messageBubbles(root).length >= 2);
+
+  controller.startNewChat();
+
+  assert.equal(messageBubbles(root).length, 0);
+  assert.equal(controller.getSelectedAgentSlug(), 'penelope');
+  assert.equal(
+    root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'),
+    '#C85A64'
+  );
+
+  await controller.send('starting fresh');
+  assert.deepEqual(sendCalls[1].history, []);
+  assert.equal(sendCalls[1].priorAgentSlug, 'penelope');
 });

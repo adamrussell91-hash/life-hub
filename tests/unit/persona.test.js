@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
 import { loadChadwickProtocol } from '../../netlify/functions/_shared/load-chadwick-protocol.mjs';
+import { loadBrisketProtocol } from '../../netlify/functions/_shared/load-brisket-protocol.mjs';
 
 test('builds a named agent prompt naming its writable record types', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick', digest: 'Streak: 2', constraints: 'Fat < 50g' });
@@ -20,6 +21,8 @@ test('penelope prompt includes protocol when provided', () => {
   });
   assert.match(prompt, /Penelope operating manual/);
   assert.match(prompt, /One question at a time/);
+  assert.match(prompt, /Never ask him to rate energy/);
+  assert.match(prompt, /dayone_sent:false/);
 });
 
 test('vera prompt includes protocol when provided', () => {
@@ -59,7 +62,8 @@ test('a populated food library is included with instructions to check it before 
 
 test('an empty central node log is omitted entirely', () => {
   const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
-  assert.doesNotMatch(prompt, /Central Node/);
+  assert.doesNotMatch(prompt, /your memory across conversations/);
+  assert.doesNotMatch(prompt, /Central Node \(today's status/);
 });
 
 test('a populated central node log is included with instructions to treat it as memory', () => {
@@ -170,4 +174,45 @@ test('other agents never receive hyaluronica protocol instructions', () => {
     hyaluronicaProtocol: '## Job\nPrefer the Skincare tab.'
   });
   assert.doesNotMatch(prompt, /Hyaluronica operating manual/);
+});
+
+test('brisket prompt includes protocol when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    brisketProtocol: '## Job\nFood Library first.'
+  });
+  assert.match(prompt, /Brisket operating manual/);
+  assert.match(prompt, /Food Library first/);
+  assert.match(prompt, /compact verdict/i);
+});
+
+test('checked-in Brisket protocol requires meal verdicts on Central Node', () => {
+  const protocol = loadBrisketProtocol();
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    brisketProtocol: protocol,
+    centralNodeLog: '**Nutrition:** 400 kcal.'
+  });
+  assert.match(protocol, /Central Node after meal log/i);
+  assert.match(protocol, /\[what he ate\] — \[compact verdict\]/);
+  assert.doesNotMatch(protocol, /leave CN alone/i);
+  assert.match(prompt, /Central Node Flags and Recent Actions/i);
+});
+
+test('sara prompt includes protocol when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'sara',
+    saraProtocol: '## Job\nWeekly health scan.'
+  });
+  assert.match(prompt, /Sara operating manual/);
+  assert.match(prompt, /Weekly health scan/);
+});
+
+test('hammond prompt includes protocol when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    hammondProtocol: '## Job\nSession Triage first.'
+  });
+  assert.match(prompt, /Hammond operating manual/);
+  assert.match(prompt, /Session Triage first/);
 });

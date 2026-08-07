@@ -10,6 +10,9 @@ export function buildSystemPrompt({
   hyaluronicaProtocol = '',
   penelopeProtocol = '',
   veraProtocol = '',
+  brisketProtocol = '',
+  saraProtocol = '',
+  hammondProtocol = '',
   workoutTemplates = '',
   exerciseLibrary = ''
 }) {
@@ -60,28 +63,55 @@ export function buildSystemPrompt({
       ? `Exercise Library highlights (prefer these names; search before inventing moves or guessing attachment/cable/bench defaults). Call search_exercise_library for more; call save_exercise_library_entry after refining cues/defaults or adding a move. Library defaults inform design — session sets still need per-set cable_type.\n\n${exerciseLibrary}`
       : '',
     'When Adam asks you to design or build today\'s session, you MUST call log_entry with status planned in that same turn once the prescription is ready (full exercise list, cable_type on every strength set). Chat text alone never appears on the Fitness tab — only a Confirm card does. Mid-iteration questions can stay conversational, but a finished plan requires the tool call, not just a description in the message. When he finishes and reports actuals, propose status completed (same title; overwrite the plan if confirm conflicts). Never write mid-session / in-progress logs. Skipped is fine when documenting a no-train day.',
-    'Infer session_kind from what was done (or planned). Always include cable_type on every strength set (use none when not on cables). Never invent YAML fields that are not in the log_entry schema; if Adam mentions an unsupported metric, say it needs to be added to the workout book later.'
+    'Infer session_kind from what was done (or planned). AEKE K1 strength sets default to cable_type constant_force — only use none for true non-cable / bodyweight / free-weight moves. Always include cable_type on every strength set. In the same chat message as the plan, write a readable prescription people can scan: numbered exercises with each set labeled (weight, reps, cable type by name — say "cable: constant force", never dump a bare enum). Never invent YAML fields that are not in the log_entry schema; if Adam mentions an unsupported metric, say it needs to be added to the workout book later.'
   ] : [];
 
   const hyaluronicaBlocks = slug === 'hyaluronica' ? [
     hyaluronicaProtocol
       ? `Hyaluronica operating manual (follow these Life Hub rules):\n${hyaluronicaProtocol}`
       : '',
-    'Prefer the Skincare tab for one-tap AM/PM logs. In chat, advise and adjust; only propose skincare log_entry when Adam clearly describes a completed routine or procedure here instead of using the tab.'
+    'Prefer the Skincare tab for one-tap AM/PM logs. In chat, advise and adjust; only propose skincare log_entry when Adam clearly describes a completed routine or procedure here instead of using the tab.',
+    'When you do propose skincare log_entry, put notes as "[routine] — [skin verdict]" when he gave a state so Central Node Flags stay useful after confirm.'
   ] : [];
 
   const penelopeBlocks = slug === 'penelope' ? [
     penelopeProtocol
       ? `Penelope operating manual (follow these Life Hub rules):\n${penelopeProtocol}`
       : '',
-    'Interview one question at a time. When ready, propose a diary log_entry. Diary notes must be Adam\'s first-person voice, never theatrical Moira phrasing.'
+    'Interview one question at a time about his day — what happened and how it felt. Never ask him to rate energy, mood score, or pick schema labels; infer mood, mood_score, and energy when you propose diary log_entry.',
+    'Diary notes must be Adam\'s first-person voice, never theatrical Moira phrasing. Propose dayone_sent:false; Life Hub emails Day One after he confirms.',
+    'Read Central Node before deepening the interview. After diary confirm, Mood + Recent Actions update automatically — add a one-line Cross-Agent handoff in chat only when another agent must act.'
   ] : [];
 
   const veraBlocks = slug === 'vera' ? [
     veraProtocol
       ? `Vera operating manual (follow these Life Hub rules):\n${veraProtocol}`
       : '',
-    'You do not propose log_entry. Reflect and ask; send diary logging to Penelope.'
+    'You do not propose log_entry. Reflect and ask; send diary logging to Penelope.',
+    'Read Central Node before your opening question. When another agent must act, state one Vera→[Agent] line in chat — you cannot silently edit Central Node yourself.'
+  ] : [];
+
+  const brisketBlocks = slug === 'brisket' ? [
+    brisketProtocol
+      ? `Brisket operating manual (follow these Life Hub rules; ignore any Notion database mechanics):\n${brisketProtocol}`
+      : '',
+    'Every meal log_entry MUST include notes in the form "[food] — [compact verdict]" (on track / protein short / fat risk / emulsifier flag, etc.). Life Hub copies that line into Central Node Flags and Recent Actions after confirm — a meal without a verdict leaves CN silent. Keep Cross-Agent directives rare; routine meal judgments stay in notes.'
+  ] : [];
+
+  const saraBlocks = slug === 'sara' ? [
+    saraProtocol
+      ? `Sara operating manual (follow these Life Hub rules):\n${saraProtocol}`
+      : '',
+    'You may propose body log_entry types you are allowed (weight, composition, measurements) when Adam clearly reports those figures. Leave meals to Brisket and workouts to Chadwick.',
+    'Read Central Node before advising. Body log notes should be "[figure] — [compact health verdict]" so confirm can land Flags on Central Node.'
+  ] : [];
+
+  const hammondBlocks = slug === 'hammond' ? [
+    hammondProtocol
+      ? `Hammond operating manual (follow these Life Hub rules):\n${hammondProtocol}`
+      : '',
+    'You do not propose log_entry. Coach and triage; specialists own domain logs.',
+    'Read Central Node before triage or any follow-on protocol. After direction/drift/handoff work, state compact Hammond→[Agent] lines in chat when another specialist must act.'
   ] : [];
 
   return [
@@ -92,6 +122,9 @@ export function buildSystemPrompt({
     ...chadwickBlocks,
     ...hyaluronicaBlocks,
     ...penelopeBlocks,
-    ...veraBlocks
+    ...veraBlocks,
+    ...brisketBlocks,
+    ...saraBlocks,
+    ...hammondBlocks
   ].filter(Boolean).join('\n\n');
 }

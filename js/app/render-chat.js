@@ -1,8 +1,8 @@
-import { formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
+import { formatExerciseSets, formatExerciseTitle, humanizeFieldLabel } from './format-exercise.js';
 import { applyAgentAvatarToBubble } from './render-agent-picker.js';
 import { showEphemeralMessage } from './ephemeral-message.js';
 
-const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source']);
+const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'pain_flags', 'tags', 'highlights', 'challenges', 'products']);
 const UNREAD_SELECTOR = '.floating-chat-button, [data-section="chat"]';
 const UNREAD_CLASS = 'has-unread';
 
@@ -120,7 +120,7 @@ export function appendRecordProposal(root, { path, record, notes }) {
   for (const [key, value] of Object.entries(record)) {
     if (HIDDEN_FIELDS.has(key) || (typeof value === 'object' && value !== null)) continue;
     const dt = root.createElement('dt');
-    dt.textContent = key;
+    dt.textContent = humanizeFieldLabel(key);
     const dd = root.createElement('dd');
     const input = root.createElement('input');
     input.value = String(value ?? '');
@@ -131,7 +131,7 @@ export function appendRecordProposal(root, { path, record, notes }) {
   }
 
   const notesDt = root.createElement('dt');
-  notesDt.textContent = 'notes';
+  notesDt.textContent = humanizeFieldLabel('notes');
   const notesDd = root.createElement('dd');
   const notesInput = root.createElement('input');
   notesInput.value = notes ?? '';
@@ -143,13 +143,24 @@ export function appendRecordProposal(root, { path, record, notes }) {
   card.append(fields);
 
   if (Array.isArray(record.exercises) && record.exercises.length > 0) {
+    const heading = root.createElement('p');
+    heading.className = 'record-proposal__exercises-heading';
+    heading.textContent = 'Exercises';
+    card.append(heading);
     const exercisesList = root.createElement('ul');
     exercisesList.className = 'record-proposal__exercises';
     for (const exercise of record.exercises) {
       const item = root.createElement('li');
-      const title = formatExerciseTitle(exercise);
+      const title = root.createElement('strong');
+      title.textContent = formatExerciseTitle(exercise);
+      item.append(title);
       const sets = formatExerciseSets(exercise);
-      item.textContent = sets ? `${title}: ${sets}` : title;
+      if (sets) {
+        const detail = root.createElement('div');
+        detail.className = 'record-proposal__sets';
+        detail.textContent = sets;
+        item.append(detail);
+      }
       exercisesList.append(item);
     }
     card.append(exercisesList);
