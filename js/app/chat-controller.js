@@ -7,6 +7,7 @@ const MAX_HISTORY_MESSAGES = 30;
 const MAX_HISTORY_ENTRY_CHARS = 1000;
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
+const EMPTY_TURN_RECOVERY = 'I didn’t finish that reply — send again and I’ll pick it up.';
 
 // FakeElement (used in unit tests) only models `className` as a plain string, so
 // classList is used when real DOM elements provide it and this string fallback
@@ -296,6 +297,15 @@ export function createChatController({
         turnSignaled = true;
         clearWorkingBubble();
         appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text: LIBRARY_SAVE_NUDGE_TEXT });
+      }
+      if (!turnSignaled) {
+        turnSignaled = true;
+        clearWorkingBubble();
+        appendMessage(root, {
+          role: 'assistant',
+          agentSlug: assistantSlug,
+          text: EMPTY_TURN_RECOVERY
+        });
       }
     } catch (error) {
       turnSignaled = true;

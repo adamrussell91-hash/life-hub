@@ -803,7 +803,7 @@ test('a thrown/aborted send marks chat unread when not visible', async () => {
   assert.deepEqual(calls, [true]);
 });
 
-test('a turn that only emits a search note without text/proposal/error does not mark chat unread', async () => {
+test('a search-only turn marks unread once empty-turn recovery lands', async () => {
   const root = new FakeDocument();
   const chatApi = {
     async *send() {
@@ -818,7 +818,57 @@ test('a turn that only emits a search note without text/proposal/error does not 
 
   await controller.send('log a quest bar');
 
-  assert.deepEqual(calls, []);
+  assert.deepEqual(calls, [true]);
+});
+
+const EMPTY_TURN_RECOVERY = 'I didn’t finish that reply — send again and I’ll pick it up.';
+
+test('empty stream after On it shows a durable recovery message', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('build a workout');
+  assert.ok(
+    messageBubbles(root).some(b => bubbleText(b).includes(EMPTY_TURN_RECOVERY)),
+    'expected empty-turn recovery copy'
+  );
+  assert.ok(
+    messageBubbles(root).every(b => bubbleText(b) !== 'On it…'),
+    'On it bubble must not linger'
+  );
+});
+
+test('search-only turn without text or proposal shows recovery message', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'search', query: 'bacon egg roll' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('bacon and egg roll');
+  assert.ok(messageBubbles(root).some(b => bubbleText(b).includes(EMPTY_TURN_RECOVERY)));
+});
+
+test('text reply does not show empty-turn recovery', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Shoot, buddy — that roll is about 520 kcal.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('bacon egg roll');
+  assert.ok(messageBubbles(root).every(b => !bubbleText(b).includes(EMPTY_TURN_RECOVERY)));
 });
 
 test('clearUnread notifies listeners that chat is read, independent of any send', () => {
