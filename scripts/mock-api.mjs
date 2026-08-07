@@ -310,10 +310,13 @@ function streamMockChat(response, message) {
     Connection: 'keep-alive'
   });
   const isWorkout = /chad|chadwick|workout/i.test(message);
+  const isMeal = /brisket|meal|breakfast|lunch|dinner|lasagna|snack|ate|food/i.test(message);
   const send = event => response.write(`data: ${JSON.stringify(event)}\n\n`);
-  send({ type: 'agent', slug: isWorkout ? 'chadwick' : 'router' });
-  send({ type: 'text', delta: isWorkout ? 'Logging that session now.' : 'Got it — who should I route this to?' });
+  send({ type: 'agent', slug: isWorkout ? 'chadwick' : isMeal ? 'brisket' : 'router' });
+  send({ type: 'status', text: 'Loading your logs…' });
+  send({ type: 'status', text: 'Thinking…' });
   if (isWorkout) {
+    send({ type: 'text', delta: 'Logging that session now.' });
     send({
       type: 'record_proposal',
       path: 'data/fitness/2026/08/2026-08-01-workout.md',
@@ -323,6 +326,20 @@ function streamMockChat(response, message) {
         created_at: '2026-08-01T18:00:00+10:00', updated_at: '2026-08-01T18:00:00+10:00', source: 'chat'
       }
     });
+  } else if (isMeal) {
+    send({ type: 'text', delta: 'Logging that meal now.' });
+    send({
+      type: 'record_proposal',
+      path: 'data/nutrition/2026/08/2026-08-01-dinner.md',
+      record: {
+        schema_version: 1, id: 'mock-meal-1', type: 'meal', date: '2026-08-01', time: '19:00',
+        meal: 'dinner', calories: 650, protein_g: 42, fat_g: 28, sodium_mg: 980,
+        created_at: '2026-08-01T19:00:00+10:00', updated_at: '2026-08-01T19:00:00+10:00', source: 'chat'
+      },
+      notes: 'Homemade lasagna — solid protein, watch the sodium.'
+    });
+  } else {
+    send({ type: 'text', delta: 'Got it — who should I route this to?' });
   }
   send({ type: 'done' });
   response.end();

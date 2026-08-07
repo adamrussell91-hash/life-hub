@@ -166,8 +166,128 @@ test('an unnamed follow-up stays with the sticky agent instead of falling back t
   });
 
   const response = await handler(request({ message: 'actually make that 3 eggs', priorAgentSlug: 'brisket' }));
-  const events = await readSse(response);
+  const events = contentEvents(await readSse(response));
   assert.deepEqual(events[0], { type: 'agent', slug: 'brisket' });
+});
+
+test('Brisket meal turns emit status heartbeats, only load today+yesterday blobs, and finish with a proposal', async () => {
+  const todaySha = '1'.repeat(40);
+  const yesterdaySha = '2'.repeat(40);
+  const oldSha = '3'.repeat(40);
+  const foodSha = '4'.repeat(40);
+  const mealYaml = `---
+schema_version: 1
+id: meal-today
+type: meal
+date: 2026-08-01
+time: "19:00"
+created_at: 2026-08-01T19:00:00+10:00
+updated_at: 2026-08-01T19:00:00+10:00
+source: test
+meal: dinner
+calories: 600
+protein_g: 40
+fat_g: 20
+---
+`;
+  const readShas = [];
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'data/nutrition/2026/08/2026-08-01-dinner.md', type: 'blob', sha: todaySha, size: mealYaml.length },
+          { path: 'data/nutrition/2026/07/2026-07-31-lunch.md', type: 'blob', sha: yesterdaySha, size: mealYaml.length },
+          { path: 'data/nutrition/2026/07/2026-07-25-lunch.md', type: 'blob', sha: oldSha, size: mealYaml.length },
+          { path: 'data/food-library.json', type: 'blob', sha: foodSha, size: 2 },
+          { path: 'central-node.md', type: 'blob', sha: '5'.repeat(40), size: 20 }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${todaySha}`) || url.includes(`/git/blobs/${yesterdaySha}`)) {
+      readShas.push(url.slice(-40));
+      await new Promise(resolve => setTimeout(resolve, 15));
+      return Response.json({ content: Buffer.from(mealYaml).toString('base64'), encoding: 'base64' });
+    }
+    if (url.includes(`/git/blobs/${oldSha}`)) {
+      readShas.push(oldSha);
+      throw new Error('old blob should not be fetched for chat digest');
+    }
+    if (url.includes(`/git/blobs/${foodSha}`)) {
+      return Response.json({ content: Buffer.from('[]').toString('base64'), encoding: 'base64' });
+    }
+    if (url.includes('/git/blobs/')) {
+      return Response.json({ content: Buffer.from('# Purpose\n').toString('base64'), encoding: 'base64' });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      async *streamMessage({ executeTools }) {
+        yield { type: 'search', query: 'homemade lasagna nutrition AU' };
+        const saved = await executeTools({
+          id: 'call_food',
+          name: 'save_food_library_entry',
+          input: {
+            name: 'Homemade Lasagna',
+            servingDescription: '1 big slice',
+            calories: 650,
+            protein_g: 42,
+            fat_g: 28,
+            sodium_mg: 980
+          }
+        });
+        assert.ok(saved);
+        yield {
+          type: 'tool_call',
+          id: 'call_meal',
+          name: 'log_entry',
+          input: {
+            type: 'meal',
+            date: '2026-08-01',
+            notes: 'Homemade lasagna — solid protein, watch the sodium.',
+            fields: {
+              meal: 'dinner',
+              calories: 650,
+              protein_g: 42,
+              fat_g: 28,
+              sodium_mg: 980
+            }
+          }
+        };
+        yield { type: 'text', delta: 'Logged that lasagna, buddy.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const started = Date.now();
+  const raw = await readSse(await handler(request({ message: 'Brisket, dinner was a big slice of homemade lasagna' })));
+  const elapsed = Date.now() - started;
+  const events = contentEvents(raw);
+
+  assert.ok(raw.some(event => event.type === 'status' && /Loading your logs/i.test(event.text)));
+  assert.ok(raw.some(event => event.type === 'status' && /Thinking/i.test(event.text)));
+  assert.deepEqual(events[0], { type: 'agent', slug: 'brisket' });
+  assert.ok(events.some(event => event.type === 'search'));
+  assert.ok(events.some(event => event.type === 'food_library_saved' && event.name === 'Homemade Lasagna'));
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a meal Confirm proposal');
+  assert.equal(proposal.record.type, 'meal');
+  assert.equal(proposal.record.sodium_mg, 980);
+  assert.ok(events.some(event => event.type === 'text' && /lasagna/i.test(event.delta)));
+  assert.ok(!readShas.includes(oldSha), `chat must not load week-old blobs; read ${readShas.join(',')}`);
+  assert.ok(readShas.includes(todaySha) || readShas.includes(yesterdaySha));
+  assert.ok(elapsed < 5000, `smoke took too long: ${elapsed}ms`);
 });
 
 test('malformed history entries are dropped rather than breaking the request', async () => {
