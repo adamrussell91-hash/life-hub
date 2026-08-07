@@ -5,7 +5,7 @@ const NUMERIC_FIELDS = [
   'carbs_g', 'sugar_g', 'fibre_g', 'sodium_mg', 'calcium_mg', 'polyphenol_score'
 ];
 const OMEGA3_LEVELS = ['high', 'medium', 'low', 'none'];
-const PROMPT_SUMMARY_FIELDS = ['calories', 'protein_g', 'fat_g', 'carbs_g'];
+const PROMPT_SUMMARY_FIELDS = ['calories', 'protein_g', 'fat_g', 'carbs_g', 'sodium_mg', 'calcium_mg'];
 const MAX_PROMPT_ENTRIES = 200;
 
 export function foodLibraryEntrySchema() {
@@ -32,7 +32,7 @@ export function foodLibraryEntrySchema() {
         polyphenol_score: { type: 'number' },
         omega3: { type: 'string', enum: OMEGA3_LEVELS }
       },
-      required: ['name', 'servingDescription', 'calories', 'protein_g', 'fat_g']
+      required: ['name', 'servingDescription', 'calories', 'protein_g', 'fat_g', 'sodium_mg']
     }
   };
 }
@@ -67,6 +67,7 @@ export function validateFoodLibraryEntry(input) {
   if (typeof entry.calories !== 'number' || typeof entry.protein_g !== 'number' || typeof entry.fat_g !== 'number') {
     return null;
   }
+  if (typeof entry.sodium_mg !== 'number') return null;
   if (input.omega3 != null) {
     if (!OMEGA3_LEVELS.includes(input.omega3)) return null;
     entry.omega3 = input.omega3;

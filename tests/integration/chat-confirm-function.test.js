@@ -17,7 +17,7 @@ const session = createSessionToken({
   randomBytes: () => Buffer.alloc(16, 4)
 }, SECRET).token;
 
-const candidate = { type: 'meal', date: '2026-08-01', fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12 } };
+const candidate = { type: 'meal', date: '2026-08-01', fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420 } };
 
 function request(body, headers = {}) {
   return new Request('https://life.example/api/chat/confirm', {
@@ -70,7 +70,7 @@ test('reports a validation failure without contacting GitHub', async () => {
   // session's TTL window keeps this test isolated to the validation branch, same fix
   // Task 10 applied to its own fixtures.
   const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T06:00:00Z') });
-  const invalid = { type: 'meal', date: '2026-08-01', fields: { meal: 'brunch', calories: 1, protein_g: 1, fat_g: 1 } };
+  const invalid = { type: 'meal', date: '2026-08-01', fields: { meal: 'brunch', calories: 1, protein_g: 1, fat_g: 1, sodium_mg: 1 } };
 
   const response = await handler(request({ candidate: invalid, slug: 'breakfast' }));
   assert.equal(response.status, 400);
@@ -140,7 +140,7 @@ test('creates central-node.md from the app seed when the private repo is missing
 
   const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
   assert.match(writtenContent, /## ⚡ Today's Status/);
-  assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F\./);
+  assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F, 420mg Na\./);
   assert.match(writtenContent, /\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast/);
 });
 
@@ -191,7 +191,7 @@ test('appends a one-line entry to the central node running log after a successfu
   assert.match(writtenContent, /\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast \(520 kcal, 38g protein, 12g fat\)\./);
   assert.match(writtenContent, /Chest and Curls session completed and logged/, 'must preserve the existing log rather than replacing it');
   assert.match(writtenContent, /## ⚡ Today's Status \([^)]*1 August 2026\)/);
-  assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F\./);
+  assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F, 420mg Na\./);
 });
 
 test('confirm still succeeds and reports centralNodeUpdated:false when the central node blob cannot be decoded', async () => {

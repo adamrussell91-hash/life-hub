@@ -42,19 +42,38 @@ test('validates a well-formed meal log entry into a canonical record', () => {
   const result = validateLogEntry({
     type: 'meal',
     date: '2026-08-01',
-    fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12 }
+    fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420 }
   }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
 
   assert.equal(result.valid, true);
   assert.equal(result.record.calories, 520);
+  assert.equal(result.record.sodium_mg, 420);
   assert.equal(result.record.source, 'chat');
+});
+
+test('rejects a meal log entry missing sodium_mg', () => {
+  const result = validateLogEntry({
+    type: 'meal',
+    date: '2026-08-01',
+    fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12 }
+  }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(error => error.includes('sodium_mg')));
+});
+
+test('meal tool schema requires sodium_mg among core macros', () => {
+  const schema = logEntryToolSchema(['meal']);
+  assert.deepEqual(schema.input_schema.properties.fields.required, [
+    'meal', 'calories', 'protein_g', 'fat_g', 'sodium_mg'
+  ]);
 });
 
 test('rejects a log entry with semantically invalid fields', () => {
   const result = validateLogEntry({
     type: 'meal',
     date: '2026-08-01',
-    fields: { meal: 'brunch', calories: 520, protein_g: 38, fat_g: 12 }
+    fields: { meal: 'brunch', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420 }
   }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
 
   assert.equal(result.valid, false);
@@ -80,7 +99,7 @@ test('rejects fields outside the domain whitelist instead of letting them reach 
     type: 'meal',
     date: '2026-08-01',
     fields: {
-      meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12,
+      meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420,
       id: 'attacker-id', type: 'workout', date: '1999-01-01',
       source: 'attacker', schema_version: 999,
       created_at: 'bogus', updated_at: 'bogus'
@@ -97,7 +116,7 @@ test('spread order still protects protected keys if a field name were ever white
   const result = validateLogEntry({
     type: 'meal',
     date: '2026-08-01',
-    fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12 }
+    fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420 }
   }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
 
   assert.equal(result.valid, true);
@@ -115,7 +134,7 @@ test('a field name crafted to break YAML frontmatter is rejected as an unknown f
     type: 'meal',
     date: '2026-08-01',
     fields: {
-      meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12,
+      meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420,
       'innocent\n---\ninjected_type: hacked\nreal_key': 'attempted frontmatter injection'
     }
   }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });

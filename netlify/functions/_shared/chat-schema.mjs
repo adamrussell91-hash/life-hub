@@ -103,19 +103,22 @@ const DOMAIN_PROPERTIES = {
   }
 };
 
+const MEAL_REQUIRED_FIELDS = ['meal', 'calories', 'protein_g', 'fat_g', 'sodium_mg'];
+
 export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
   const fieldsSchema = allowedTypes.length === 1
     ? {
         type: 'object',
         description: `The exact fields for a ${allowedTypes[0]} record. Only these keys are allowed — using any other key name is rejected.`,
         properties: DOMAIN_PROPERTIES[allowedTypes[0]],
-        additionalProperties: false
+        additionalProperties: false,
+        ...(allowedTypes[0] === 'meal' ? { required: MEAL_REQUIRED_FIELDS } : {})
       }
     : {
         type: 'object',
         description: `Domain-specific fields for the chosen type. Only these exact keys are allowed per type — using any other key name is rejected:\n${
           allowedTypes.map(t => `- ${t}: ${Object.keys(DOMAIN_PROPERTIES[t]).join(', ')}`).join('\n')
-        }`
+        }\nFor meals, always include: ${MEAL_REQUIRED_FIELDS.join(', ')}.`
       };
 
   return {
@@ -183,6 +186,16 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
   const unknownFields = Object.keys(fields).filter(key => !allowedFields.includes(key));
   if (unknownFields.length) {
     return { valid: false, errors: unknownFields.map(key => `Unknown field for ${type}: ${key}`) };
+  }
+
+  if (type === 'meal') {
+    const missingMealFields = MEAL_REQUIRED_FIELDS.filter(field => fields[field] == null);
+    if (missingMealFields.length) {
+      return {
+        valid: false,
+        errors: missingMealFields.map(field => `${field} is required`)
+      };
+    }
   }
 
   const record = {

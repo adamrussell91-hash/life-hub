@@ -117,7 +117,10 @@ export function appendRecordProposal(root, { path, record, notes }) {
   const fields = root.createElement('dl');
   fields.className = 'record-proposal__fields';
   const inputs = {};
-  for (const [key, value] of Object.entries(record)) {
+  const displayRecord = { ...record };
+  // Always surface sodium on meal proposals so a missing estimate is obvious to edit.
+  if (record.type === 'meal' && displayRecord.sodium_mg == null) displayRecord.sodium_mg = '';
+  for (const [key, value] of Object.entries(displayRecord)) {
     if (HIDDEN_FIELDS.has(key) || (typeof value === 'object' && value !== null)) continue;
     const dt = root.createElement('dt');
     dt.textContent = humanizeFieldLabel(key);

@@ -190,6 +190,26 @@ test('appendRecordProposal adds a read-only exercises summary with cable types',
   assert.match(summary.children[1].children[1].textContent, /cable: constant force/);
 });
 
+test('appendRecordProposal always shows a sodium field for meal proposals', () => {
+  const root = new FakeDocument();
+  const { inputs } = appendRecordProposal(root, {
+    path: 'data/nutrition/2026/08/2026-08-07-breakfast.md',
+    record: {
+      type: 'meal',
+      date: '2026-08-07',
+      meal: 'breakfast',
+      calories: 520,
+      protein_g: 38,
+      fat_g: 12
+    },
+    notes: 'Bacon and egg roll'
+  });
+
+  assert.ok(inputs.sodium_mg);
+  assert.equal(inputs.sodium_mg.value, '');
+  assert.equal(inputs.calories.value, '520');
+});
+
 test('renderInlineMarkdown keeps bullet lines in one list even when a blank line separates them', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');
