@@ -47,6 +47,20 @@ export function getSydneyTimestamp(instant = new Date()) {
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}${offset}`;
 }
 
+/** Build a Sydney-valid (+10/+11) ISO stamp for a calendar date + HH:MM. */
+export function sydneyLocalStamp(dateKey, time) {
+  if (!isCalendarDate(dateKey)) throw new TypeError(`Invalid calendar date: ${dateKey}`);
+  if (typeof time !== 'string' || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    throw new TypeError(`Invalid time: ${time}`);
+  }
+  for (const offset of ['+11:00', '+10:00']) {
+    const candidate = `${dateKey}T${time}:00${offset}`;
+    const rebuilt = getSydneyTimestamp(new Date(candidate));
+    if (rebuilt.startsWith(`${dateKey}T${time}:`)) return rebuilt;
+  }
+  return getSydneyTimestamp(new Date(`${dateKey}T${time}:00Z`));
+}
+
 export function addCalendarDays(key, count) {
   const date = utcDate(key);
   date.setUTCDate(date.getUTCDate() + count);
