@@ -1,6 +1,7 @@
 import { animateColumnGrow } from './chart-kit/animate.js';
 import { buildColumns } from './chart-kit/columns.js';
 import { formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
+import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
 
 const DAY_TYPE_LABELS = {
   movement: 'Movement day',
@@ -22,7 +23,7 @@ const formatLoad = set => {
   return `${set.weight_kg} kg × ${set.reps}`;
 };
 
-export function renderFitness(root, model, { logger } = {}) {
+export function renderFitness(root, model, { logger, templates, libraryByName, onSelectTemplate } = {}) {
   setText(root, '[data-fitness="streak"]', model.streak);
   setText(root, '[data-fitness="day-type"]', DAY_TYPE_LABELS[model.dayType] ?? model.dayType ?? '—');
 
@@ -44,12 +45,14 @@ export function renderFitness(root, model, { logger } = {}) {
     empty?.removeAttribute('hidden');
     heroWrap?.setAttribute('hidden', '');
     logger?.unmount?.();
+    renderMuscleStrip(root.querySelector('#fitness-muscle-maps'), []);
   } else {
     empty?.setAttribute('hidden', '');
     heroWrap?.removeAttribute('hidden');
-    renderHero(root, model.heroSession, { logger });
+    renderHero(root, model.heroSession, { logger, libraryByName });
   }
 
+  renderTemplateRail(root, templates, { libraryByName, onSelectTemplate });
   renderWeekVolume(root, model.weekVolume);
   renderFocusStrip(root, model.focusHits);
   renderComparisons(root, model.comparisons);
@@ -58,10 +61,87 @@ export function renderFitness(root, model, { logger } = {}) {
   root.querySelector('#fitness-dashboard')?.removeAttribute('hidden');
 }
 
-function renderHero(root, session, { logger } = {}) {
+export function renderMuscleStrip(container, keys) {
+  if (!container) return;
+  container.replaceChildren();
+  const create = name => {
+    if (typeof container.createElement === 'function') return container.createElement(name);
+    const doc = container.ownerDocument;
+    if (doc && typeof doc.createElement === 'function') return doc.createElement(name);
+    return globalThis.document.createElement(name);
+  };
+  for (const key of keys ?? []) {
+    const img = create('img');
+    img.className = 'fitness-muscle-strip__img';
+    img.src = muscleAssetPath(key);
+    img.alt = key.replace(/-/g, ' ');
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.addEventListener?.('error', () => img.remove?.());
+    container.append(img);
+  }
+}
+
+export function renderTemplateRail(root, templatesState, { libraryByName, onSelectTemplate } = {}) {
+  const rail = root.querySelector('#fitness-templates-rail');
+  const status = root.querySelector('#fitness-templates-status');
+  if (!rail) return;
+
+  const state = templatesState ?? { status: 'idle', templates: [] };
+  if (status) {
+    if (state.status === 'loading') status.textContent = 'Loading templates…';
+    else if (state.status === 'error') status.textContent = 'Templates unavailable — try Refresh.';
+    else if (state.status === 'ready' && (!state.templates || state.templates.length === 0)) {
+      status.textContent = 'Finish a workout and it’ll show up here.';
+    } else {
+      status.textContent = '';
+    }
+  }
+
+  rail.replaceChildren();
+  if (state.status !== 'ready' || !Array.isArray(state.templates)) return;
+
+  for (const template of state.templates) {
+    const card = root.createElement('button');
+    card.type = 'button';
+    card.className = 'fitness-template-card';
+    card.setAttribute('aria-label', `Open template ${template.title}`);
+
+    const strip = root.createElement('div');
+    strip.className = 'fitness-muscle-strip fitness-muscle-strip--card';
+    const keys = resolveMuscleMapKeys({
+      focus: template.focus,
+      exercises: template.exercises,
+      libraryByName
+    });
+    renderMuscleStrip(strip, keys);
+    card.append(strip);
+
+    const title = root.createElement('strong');
+    title.textContent = template.title ?? 'Template';
+    card.append(title);
+
+    const meta = root.createElement('span');
+    meta.className = 'fitness-template-card__meta';
+    meta.textContent = template.source_session_date ? `Last ${template.source_session_date}` : 'No actuals yet';
+    card.append(meta);
+
+    card.addEventListener('click', () => onSelectTemplate?.(template));
+    rail.append(card);
+  }
+}
+
+function renderHero(root, session, { logger, libraryByName } = {}) {
   setText(root, '[data-fitness="hero-title"]', session.title ?? 'Session');
   setText(root, '[data-fitness="hero-duration"]', session.duration_min != null ? `${session.duration_min} min` : '—');
   setText(root, '[data-fitness="hero-status"]', session.status ?? '—');
+
+  const mapKeys = session.muscleMapKeys ?? resolveMuscleMapKeys({
+    focus: session.focus,
+    exercises: session.exercises,
+    libraryByName
+  });
+  renderMuscleStrip(root.querySelector('#fitness-muscle-maps'), mapKeys);
 
   const tags = root.querySelector('#fitness-focus-tags');
   if (tags) {

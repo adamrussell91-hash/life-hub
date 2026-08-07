@@ -1,5 +1,6 @@
 import { calculateWorkoutStreak, resolveDayType } from '../core/aggregate.js';
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
+import { resolveMuscleMapKeys } from './muscle-maps.js';
 
 const WEEK_DAYS = 7;
 const MONTH_DAYS = 30;
@@ -135,12 +136,19 @@ function focusHits(events, weekDates) {
     .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
 }
 
-export function buildFitnessModel({ events, date }) {
+export function buildFitnessModel({ events, date, libraryByName = null }) {
   if (!date) throw new RangeError('Fitness display date is unavailable');
   const workoutEvts = workoutEvents(events);
   const weekDates = enumerateDateKeys(addCalendarDays(date, -(WEEK_DAYS - 1)), date);
   const monthDates = enumerateDateKeys(addCalendarDays(date, -(MONTH_DAYS - 1)), date);
   const heroSession = selectHeroSession(workoutEvts, date);
+  if (heroSession) {
+    heroSession.muscleMapKeys = resolveMuscleMapKeys({
+      focus: heroSession.focus,
+      exercises: heroSession.exercises,
+      libraryByName
+    });
+  }
 
   return {
     date,

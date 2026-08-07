@@ -18,6 +18,8 @@ import { createChatController } from './chat-controller.js';
 import { createChatPanelController } from './chat-panel.js';
 import { API_BASE_URL } from './config.js';
 import { createFitnessLoggerController } from './fitness-logger-controller.js';
+import { createFitnessTemplateLibrary } from './fitness-template-library.js';
+import { createFitnessTemplatesApi } from './fitness-templates-api.js';
 import { buildFitnessModel } from './fitness-model.js';
 import { buildHomeModel } from './home-model.js';
 import { loadLiveEvents } from './load-live-events.js';
@@ -86,6 +88,14 @@ const fitnessLogger = createFitnessLoggerController({
   storage: localStorage,
   onSessionWritten: () => void controller.refresh({ manual: true })
 });
+const fitnessTemplatesApi = createFitnessTemplatesApi(fetchImpl);
+const fitnessTemplateLibrary = createFitnessTemplateLibrary({
+  root: document,
+  templatesApi: fitnessTemplatesApi,
+  chatApi,
+  getFitnessContext: () => controller?.getFitnessLibraryContext?.() ?? {},
+  onPlanned: () => void controller.refresh({ manual: true, force: true })
+});
 const skincareController = createSkincareController({
   root: document,
   chatApi,
@@ -113,6 +123,7 @@ controller = createAppController({
   buildFitnessModel,
   renderFitness,
   fitnessLogger,
+  fitnessTemplateLibrary,
   buildSkincareModel,
   renderSkincare,
   skincareController,
