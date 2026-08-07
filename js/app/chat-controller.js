@@ -1,5 +1,5 @@
 import { appendMessage, appendRecordProposal, renderInlineMarkdown, setChatBusy, showChatError } from './render-chat.js';
-import { applyAgentAvatarToBubble, renderAgentPicker } from './render-agent-picker.js';
+import { applyAgentAvatarToBubble, renderAgentHero, renderAgentPicker } from './render-agent-picker.js';
 
 const PARAGRAPH_BREAK = /\n{2,}/;
 const HISTORY_WINDOW_MS = 20 * 60 * 1000;
@@ -89,6 +89,7 @@ export function createChatController({
   }
 
   function applyAgentAccent(slug) {
+    renderAgentHero(root, slug);
     if (!slug || typeof agentColour !== 'function') return;
     const panel = root.querySelector('#chat-view');
     if (!panel?.style?.setProperty) return;
@@ -359,10 +360,14 @@ export function createChatController({
 
   bindForm();
   bindNewChat();
-  renderAgentPicker(root, {
-    selectedSlug: stickyAgentSlug() ?? null,
-    onSelect: selectAgent
-  });
+  {
+    const slug = stickyAgentSlug() ?? null;
+    if (slug) applyAgentAccent(slug);
+    renderAgentPicker(root, {
+      selectedSlug: slug,
+      onSelect: selectAgent
+    });
+  }
 
   return {
     send,

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v41';
+const CACHE_NAME = 'life-hub-shell-v42';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -75,6 +75,13 @@ const SHELL_FILES = [
   'assets/agents/penelope.jpg',
   'assets/agents/vera.jpg',
   'assets/agents/sara.jpg',
+  'assets/agents/full/brisket.png',
+  'assets/agents/full/chadwick.png',
+  'assets/agents/full/hyaluronica.png',
+  'assets/agents/full/hammond.png',
+  'assets/agents/full/penelope.png',
+  'assets/agents/full/vera.png',
+  'assets/agents/full/sara.png',
   'assets/fitness/muscles/abs-full.png',
   'assets/fitness/muscles/abs-lower.png',
   'assets/fitness/muscles/abs-obliques.png',

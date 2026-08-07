@@ -1447,6 +1447,32 @@ main { max-width: 76rem; margin: 0 auto; }
   border-color: var(--agent-accent, var(--wave));
   box-shadow: 0 0 0 3px rgba(55, 111, 183, 0.18);
 }
+.chat-agent-hero {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.65rem;
+}
+.chat-agent-hero[hidden] { display: none; }
+.chat-agent-hero__img {
+  width: min(11rem, 42vw);
+  max-height: 14rem;
+  object-fit: contain;
+  border-radius: 1rem;
+  border: 2px solid color-mix(in srgb, var(--agent-accent, var(--wave)) 55%, transparent);
+  background: color-mix(in srgb, var(--agent-accent, var(--wave)) 10%, var(--glass));
+  box-shadow: 0 10px 28px rgba(12, 24, 48, 0.12);
+}
+.chat-agent-hero__name {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--depth);
+}
+.chat-view[data-panel-mode="overlay"] .chat-agent-hero__img {
+  max-height: 8.5rem;
+  width: min(8.5rem, 36vw);
+}
 .chat-message {
   display: flex;
   gap: 0.65rem;
