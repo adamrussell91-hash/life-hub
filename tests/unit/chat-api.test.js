@@ -51,6 +51,17 @@ test('send forwards a non-empty history and priorAgentSlug alongside the message
   assert.deepEqual(sentBody, { message: 'hello', history, priorAgentSlug: 'brisket' });
 });
 
+test('send includes auditSession in the JSON body when provided', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (url, init) => {
+    sentBody = JSON.parse(init.body);
+    return sseResponse(['data: {"type":"done"}\n\n']);
+  });
+  const auditSession = { kind: 'cn_audit', phase: 'triage', intakeCount: 0 };
+  for await (const event of chatApi.send('hello', { auditSession })) void event;
+  assert.deepEqual(sentBody, { message: 'hello', auditSession });
+});
+
 test('send throws a structured error for a non-OK response', async () => {
   const chatApi = createChatApi(async () => Response.json({ ok: false, error: { code: 'misconfigured' } }, { status: 503 }));
   await assert.rejects(

@@ -1072,3 +1072,119 @@ test('New chat clears the thread and history but keeps the pinned agent', async 
   assert.deepEqual(sendCalls[1].history, []);
   assert.equal(sendCalls[1].priorAgentSlug, 'penelope');
 });
+
+test('Hammond Central Node audit starts a triage auditSession on send', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'text', delta: 'Session triage first. What is weighing on you?' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hammond, Central Node audit');
+
+  assert.equal(sendCalls.length, 1);
+  assert.deepEqual(sendCalls[0].auditSession, {
+    kind: 'cn_audit',
+    phase: 'triage',
+    intakeCount: 0
+  });
+});
+
+test('after a successful triage turn the next send advances auditSession to intake', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'text', delta: sendCalls.length === 1 ? 'Triage done. Concerns?' : 'Noted.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hammond, Central Node audit');
+  await controller.send('work stress');
+
+  assert.equal(sendCalls.length, 2);
+  assert.deepEqual(sendCalls[0].auditSession, {
+    kind: 'cn_audit',
+    phase: 'triage',
+    intakeCount: 0
+  });
+  assert.deepEqual(sendCalls[1].auditSession, {
+    kind: 'cn_audit',
+    phase: 'intake',
+    intakeCount: 1
+  });
+});
+
+test('selecting another agent clears auditSession so later sends omit it', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: sendCalls.length === 1 ? 'hammond' : 'brisket' };
+      yield { type: 'text', delta: 'Ok.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hammond, Central Node audit');
+  controller.selectAgent('brisket');
+  await controller.send('log lunch');
+
+  assert.ok(sendCalls[0].auditSession);
+  assert.equal(sendCalls[1].auditSession, undefined);
+});
+
+test('cancel audit clears auditSession so subsequent sends omit it', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'text', delta: 'Understood.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hammond, Central Node audit');
+  await controller.send('cancel audit');
+  await controller.send('what is the protein target?');
+
+  assert.ok(sendCalls[0].auditSession);
+  assert.equal(sendCalls[2].auditSession, undefined);
+});
+
+test('non-trigger Hammond messages without a session do not attach auditSession', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'text', delta: 'Target stays 180g.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({
+    root,
+    chatApi,
+    getDefaultAgentSlug: () => 'hammond'
+  });
+
+  await controller.send('what is the protein target?');
+
+  assert.equal(sendCalls[0].auditSession, undefined);
+});
