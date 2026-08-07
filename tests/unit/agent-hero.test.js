@@ -13,11 +13,13 @@ class FakeEl {
     this.textContent = '';
     this.src = '';
     this.alt = '';
+    this._listeners = {};
   }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = [...nodes]; }
   setAttribute(k, v) { this.attributes[k] = v; }
   removeAttribute(k) { delete this.attributes[k]; }
+  addEventListener(type, fn) { this._listeners[type] = fn; }
   querySelector(sel) {
     if (sel === '.chat-agent-hero__img') return this.children.find(c => c.className === 'chat-agent-hero__img') ?? null;
     if (sel === '.chat-agent-hero__name') return this.children.find(c => c.className === 'chat-agent-hero__name') ?? null;
@@ -47,4 +49,40 @@ test('renderAgentHero shows the full portrait for a known agent and hides when c
   renderAgentHero(root, null);
   assert.equal(host.attributes.hidden, '');
   assert.equal(host.children.length, 0);
+});
+
+test('renderAgentHero can render collapsed and toggles via onToggle', () => {
+  const host = new FakeEl('div');
+  host.classList = {
+    contains(name) { return host.className.split(/\s+/).includes(name); },
+    add(name) { host.className = `${host.className} ${name}`.trim(); },
+    remove(name) {
+      host.className = host.className.split(/\s+/).filter(c => c && c !== name).join(' ');
+    },
+    toggle(name, force) {
+      const has = this.contains(name);
+      const next = force === undefined ? !has : force;
+      if (next) this.add(name);
+      else this.remove(name);
+      return next;
+    }
+  };
+  const root = {
+    createElement: tag => new FakeEl(tag),
+    querySelector: sel => (sel === '#chat-agent-hero' ? host : null)
+  };
+
+  let toggled = null;
+  renderAgentHero(root, 'chadwick', {
+    collapsed: true,
+    onToggle: next => { toggled = next; }
+  });
+  assert.match(host.className, /is-collapsed/);
+  host._listeners.click?.({ preventDefault() {} });
+  assert.equal(toggled, false);
+
+  renderAgentHero(root, 'chadwick', { collapsed: false, onToggle: next => { toggled = next; } });
+  assert.equal(host.className.includes('is-collapsed'), false);
+  host._listeners.click?.({ preventDefault() {} });
+  assert.equal(toggled, true);
 });

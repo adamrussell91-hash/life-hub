@@ -72,7 +72,8 @@ class FakeDocument {
       ['#chat-send', new FakeElement('button')],
       ['#chat-new', new FakeElement('button')],
       ['#chat-view', new FakeElement('section')],
-      ['#agent-picker', new FakeElement('div')]
+      ['#agent-picker', new FakeElement('div')],
+      ['#chat-agent-hero', new FakeElement('div')]
     ]);
   }
 
@@ -126,6 +127,38 @@ function skincareRecord() {
     completed: false
   };
 }
+
+test('confirm shows Saving… while the request is in flight then restores on failure', async () => {
+  const root = new FakeDocument();
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const chatApi = fakeChatApi({
+    record: skincareRecord(),
+    path: '2026/2026-08-02-hyaluronica-skincare.md',
+    confirmImpl: async () => {
+      await gate;
+      throw Object.assign(new Error('fail'), { code: 'request_failed' });
+    }
+  });
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Hyaluronica, log tonight\'s routine');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className === 'record-proposal');
+  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  confirmButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(confirmButton.disabled, true);
+  assert.equal(confirmButton.textContent, 'Saving…');
+
+  release();
+  await flushMicrotasks();
+  await flushMicrotasks();
+
+  assert.equal(confirmButton.disabled, false);
+  assert.equal(confirmButton.textContent, 'Confirm');
+});
 
 test('editing a numeric and a boolean field before confirming sends the coerced values, not the raw strings', async () => {
   const root = new FakeDocument();

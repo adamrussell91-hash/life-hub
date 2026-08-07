@@ -44,6 +44,7 @@ export function createChatController({
   let lastAgentAt = 0;
   let pinnedAgentSlug = null;
   let activeAbort = null;
+  let heroCollapsed = false;
 
   // Prunes anything outside the memory window as a side effect, then returns a
   // bounded, API-shaped slice of what's left -- called before the new user turn
@@ -67,6 +68,7 @@ export function createChatController({
 
   function selectAgent(slug) {
     if (!slug) return;
+    heroCollapsed = false;
     pinnedAgentSlug = slug;
     lastAgentSlug = slug;
     lastAgentAt = now();
@@ -90,7 +92,13 @@ export function createChatController({
   }
 
   function applyAgentAccent(slug) {
-    renderAgentHero(root, slug);
+    renderAgentHero(root, slug, {
+      collapsed: heroCollapsed,
+      onToggle: nextCollapsed => {
+        heroCollapsed = nextCollapsed;
+        applyAgentAccent(slug);
+      }
+    });
     if (!slug || typeof agentColour !== 'function') return;
     const panel = root.querySelector('#chat-view');
     if (!panel?.style?.setProperty) return;
@@ -167,6 +175,10 @@ export function createChatController({
     const priorAgentSlug = stickyAgentSlug();
     remember('user', message);
     appendMessage(root, { role: 'user', text: message });
+    if (!heroCollapsed) {
+      heroCollapsed = true;
+      applyAgentAccent(stickyAgentSlug());
+    }
 
     let assistantSlug = stickyAgentSlug();
     let assistantBubble = null;
@@ -338,7 +350,9 @@ export function createChatController({
   }
 
   async function confirmProposal(proposal, event, overwrite) {
+    const previousLabel = proposal.confirm.textContent;
     proposal.confirm.disabled = true;
+    proposal.confirm.textContent = 'Saving…';
     try {
       const edited = collectEdits(event.record, proposal.inputs);
       const slug = slugFromPath(event.path);
@@ -359,6 +373,7 @@ export function createChatController({
       onRecordWritten?.(result);
     } catch (error) {
       proposal.confirm.disabled = false;
+      proposal.confirm.textContent = previousLabel;
       if (error.code === 'write_conflict' && !overwrite) {
         showChatError(root, 'A record already exists for that day. Confirm again to overwrite it.');
         proposal.confirm.dataset.overwrite = '1';

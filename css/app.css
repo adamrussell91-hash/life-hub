@@ -620,6 +620,10 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 .record-proposal__confirm { background: var(--high-sea); color: white; margin-right: 0.5rem; }
+.record-proposal__confirm:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
 .record-proposal__discard { background: transparent; color: var(--muted); }
 
 .chat-form { display: flex; gap: 0.5rem; }
@@ -1452,6 +1456,7 @@ main { max-width: 76rem; margin: 0 auto; }
   justify-items: center;
   gap: 0.45rem;
   margin: 0 0 0.65rem;
+  cursor: pointer;
 }
 .chat-agent-hero[hidden] { display: none; }
 .chat-agent-hero__img {
@@ -1469,9 +1474,29 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 700;
   color: var(--depth);
 }
+.chat-agent-hero.is-collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 0.45rem;
+}
+.chat-agent-hero.is-collapsed .chat-agent-hero__img {
+  width: 3.25rem;
+  max-height: 3.25rem;
+  border-radius: 0.65rem;
+  box-shadow: none;
+}
+.chat-agent-hero.is-collapsed .chat-agent-hero__name {
+  font-size: 0.78rem;
+}
 .chat-view[data-panel-mode="overlay"] .chat-agent-hero__img {
   max-height: 8.5rem;
   width: min(8.5rem, 36vw);
+}
+.chat-view[data-panel-mode="overlay"] .chat-agent-hero.is-collapsed .chat-agent-hero__img {
+  width: 2.75rem;
+  max-height: 2.75rem;
 }
 .chat-message {
   display: flex;
