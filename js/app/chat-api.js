@@ -6,14 +6,15 @@ export function createChatApi(fetchImpl = fetch) {
   if (typeof fetchImpl !== 'function') throw new TypeError('Fetch is unavailable');
 
   return {
-    async *send(message, { signal, history, priorAgentSlug } = {}) {
+    async *send(message, { signal, history, priorAgentSlug, auditSession } = {}) {
       const response = await fetchImpl('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message,
           ...(history?.length ? { history } : {}),
-          ...(priorAgentSlug ? { priorAgentSlug } : {})
+          ...(priorAgentSlug ? { priorAgentSlug } : {}),
+          ...(auditSession ? { auditSession } : {})
         }),
         signal
       });

@@ -1,5 +1,6 @@
 import { appendMessage, appendRecordProposal, renderInlineMarkdown, setChatBusy, showChatError } from './render-chat.js';
 import { applyAgentAvatarToBubble, renderAgentHero, renderAgentPicker } from './render-agent-picker.js';
+import { isHammondAuditTrigger, nextAuditPhase } from './hammond-audit.js';
 
 const PARAGRAPH_BREAK = /\n{2,}/;
 const HISTORY_WINDOW_MS = 20 * 60 * 1000;
@@ -8,6 +9,8 @@ const MAX_HISTORY_ENTRY_CHARS = 1000;
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
 const EMPTY_TURN_RECOVERY = 'That reply got cut off before it finished (usually a timeout while looking things up). Send the same message again and I’ll continue.';
+const CANCEL_AUDIT_RE = /cancel audit|stop audit/i;
+const SKIP_INTAKE_RE = /skip intake|continue audit|go on|\bnext\b/i;
 
 // FakeElement (used in unit tests) only models `className` as a plain string, so
 // classList is used when real DOM elements provide it and this string fallback
@@ -45,6 +48,40 @@ export function createChatController({
   let pinnedAgentSlug = null;
   let activeAbort = null;
   let heroCollapsed = false;
+  let auditSession = null;
+
+  function clearAuditSession() {
+    auditSession = null;
+  }
+
+  function talkingToHammond(message) {
+    if (stickyAgentSlug() === 'hammond') return true;
+    return /\bhammond\b/i.test(message);
+  }
+
+  function maybeStartAuditSession(message) {
+    if (auditSession) return;
+    if (!isHammondAuditTrigger(message)) return;
+    if (!talkingToHammond(message)) return;
+    auditSession = { kind: 'cn_audit', phase: 'triage', intakeCount: 0 };
+  }
+
+  function advanceAuditSession(message) {
+    if (!auditSession) return;
+    if (CANCEL_AUDIT_RE.test(message)) {
+      clearAuditSession();
+      return;
+    }
+    const phase = auditSession.phase;
+    const flags = (phase === 'triage' || phase === 'intake')
+      ? {
+          askedIntakeQuestion: true,
+          skipRemainingIntake: SKIP_INTAKE_RE.test(message),
+          intakeComplete: SKIP_INTAKE_RE.test(message)
+        }
+      : {};
+    auditSession = nextAuditPhase(auditSession, flags);
+  }
 
   // Prunes anything outside the memory window as a side effect, then returns a
   // bounded, API-shaped slice of what's left -- called before the new user turn
@@ -68,6 +105,7 @@ export function createChatController({
 
   function selectAgent(slug) {
     if (!slug) return;
+    if (slug !== 'hammond') clearAuditSession();
     heroCollapsed = false;
     pinnedAgentSlug = slug;
     lastAgentSlug = slug;
@@ -148,6 +186,7 @@ export function createChatController({
       activeAbort = null;
     }
     transcript = [];
+    clearAuditSession();
     lastAgentSlug = pinnedAgentSlug;
     lastAgentAt = pinnedAgentSlug ? now() : 0;
     sending = false;
@@ -169,10 +208,13 @@ export function createChatController({
     setChatBusy(root, true);
     showChatError(root, '');
     let turnSignaled = false;
+    let gotUsefulOutput = false;
     let sawExerciseLibrarySaved = false;
     let sawRecordProposal = false;
     const history = recentHistory();
     const priorAgentSlug = stickyAgentSlug();
+    maybeStartAuditSession(message);
+    const sessionForSend = auditSession && talkingToHammond(message) ? auditSession : undefined;
     remember('user', message);
     appendMessage(root, { role: 'user', text: message });
     if (!heroCollapsed) {
@@ -251,7 +293,12 @@ export function createChatController({
     }
 
     try {
-      for await (const event of chatApi.send(message, { history, priorAgentSlug, signal: abort.signal })) {
+      for await (const event of chatApi.send(message, {
+        history,
+        priorAgentSlug,
+        signal: abort.signal,
+        ...(sessionForSend ? { auditSession: sessionForSend } : {})
+      })) {
         if (event.type === 'agent') {
           assistantSlug = event.slug;
           lastAgentSlug = event.slug;
@@ -264,6 +311,7 @@ export function createChatController({
           if (assistantBubble) applyAgentAvatarToBubble(assistantBubble, event.slug);
         } else if (event.type === 'text') {
           turnSignaled = true;
+          gotUsefulOutput = true;
           assistantBuffer += event.delta;
           assistantFullText += event.delta;
           let boundary;
@@ -276,6 +324,7 @@ export function createChatController({
           renderLiveText(assistantBuffer);
         } else if (event.type === 'record_proposal') {
           turnSignaled = true;
+          gotUsefulOutput = true;
           sawRecordProposal = true;
           clearWorkingBubble();
           endTextTurn();
@@ -307,10 +356,12 @@ export function createChatController({
           appendMessage(root, { role: 'assistant', text: `Saved "${event.name}" to the Exercise Library.` });
           setWorkingStatus('Researching…');
         }
+        // audit_phase SSE is informational only — client owns advancement
       }
       remember('assistant', assistantFullText);
       if (sawExerciseLibrarySaved && !sawRecordProposal && (!assistantSlug || assistantSlug === 'chadwick')) {
         turnSignaled = true;
+        gotUsefulOutput = true;
         clearWorkingBubble();
         appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text: LIBRARY_SAVE_NUDGE_TEXT });
       }
@@ -322,6 +373,8 @@ export function createChatController({
           agentSlug: assistantSlug,
           text: EMPTY_TURN_RECOVERY
         });
+      } else if (gotUsefulOutput) {
+        advanceAuditSession(message);
       }
     } catch (error) {
       turnSignaled = true;
