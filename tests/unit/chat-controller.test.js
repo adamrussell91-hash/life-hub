@@ -1146,7 +1146,7 @@ test('selecting another agent clears auditSession so later sends omit it', async
   assert.equal(sendCalls[1].auditSession, undefined);
 });
 
-test('cancel audit clears auditSession so subsequent sends omit it', async () => {
+test('cancel audit clears auditSession so the cancel send omits it', async () => {
   const root = new FakeDocument();
   const sendCalls = [];
   const chatApi = {
@@ -1164,6 +1164,7 @@ test('cancel audit clears auditSession so subsequent sends omit it', async () =>
   await controller.send('what is the protein target?');
 
   assert.ok(sendCalls[0].auditSession);
+  assert.equal(sendCalls[1].auditSession, undefined, 'cancel turn itself must not attach auditSession');
   assert.equal(sendCalls[2].auditSession, undefined);
 });
 
@@ -1187,4 +1188,90 @@ test('non-trigger Hammond messages without a session do not attach auditSession'
   await controller.send('what is the protein target?');
 
   assert.equal(sendCalls[0].auditSession, undefined);
+});
+
+test('startNewChat clears auditSession so the next send omits it', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'text', delta: 'Ok.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({
+    root,
+    chatApi,
+    getDefaultAgentSlug: () => 'hammond'
+  });
+
+  await controller.send('Hammond, Central Node audit');
+  controller.startNewChat();
+  await controller.send('what is the protein target?');
+
+  assert.ok(sendCalls[0].auditSession);
+  assert.equal(sendCalls[1].auditSession, undefined);
+});
+
+test('skip intake advances the next send toward stale_drift', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'text', delta: 'Moving on.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hammond, Central Node audit');
+  await controller.send('skip intake');
+  await controller.send('continue');
+
+  assert.deepEqual(sendCalls[1].auditSession, {
+    kind: 'cn_audit',
+    phase: 'intake',
+    intakeCount: 1
+  });
+  assert.deepEqual(sendCalls[2].auditSession, {
+    kind: 'cn_audit',
+    phase: 'stale_drift',
+    intakeCount: 2
+  });
+});
+
+test('empty-turn recovery does not advance the audit phase', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'hammond' };
+      if (sendCalls.length === 1) {
+        yield { type: 'done' };
+        return;
+      }
+      yield { type: 'text', delta: 'Retry landed.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hammond, Central Node audit');
+  await controller.send('still waiting');
+
+  assert.deepEqual(sendCalls[0].auditSession, {
+    kind: 'cn_audit',
+    phase: 'triage',
+    intakeCount: 0
+  });
+  assert.deepEqual(sendCalls[1].auditSession, {
+    kind: 'cn_audit',
+    phase: 'triage',
+    intakeCount: 0
+  });
 });
