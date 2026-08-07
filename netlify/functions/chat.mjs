@@ -123,115 +123,6 @@ export function createChatHandler({
     const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
     const needsExerciseLibrary = slug === 'chadwick';
 
-    let digest = '';
-    let constraints = '';
-    let centralNodeLog = '';
-    let foodLibraryEntries = [];
-    let foodLibrary = '';
-    let foodLibrarySha;
-    let exerciseLibraryEntries = [];
-    let exerciseLibrary = '';
-    let exerciseLibrarySha;
-    let workoutTemplates = '';
-    try {
-      const current = await client.resolveTree();
-      const manifest = selectManifestEntries(current.tree, { from, to: today });
-      const dataEntries = manifest.filter(entry => entry.path.startsWith('data/'));
-      const centralNodeEntry = current.tree.find(entry => entry.path === 'central-node.md' && entry.type === 'blob');
-      const foodLibraryEntry = needsFoodLibrary
-        ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
-        : null;
-      foodLibrarySha = foodLibraryEntry?.sha;
-      const exerciseLibraryEntry = needsExerciseLibrary
-        ? current.tree.find(entry => entry.path === EXERCISE_LIBRARY_PATH && entry.type === 'blob')
-        : null;
-      exerciseLibrarySha = exerciseLibraryEntry?.sha;
-      const templateEntries = needsWorkoutTemplates
-        ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
-        : [];
-
-      const [dataBlobs, centralNodeBlob, foodLibraryBlob, exerciseLibraryBlob, templateBlobs] = await Promise.all([
-        Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
-        centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
-        foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
-        exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
-        Promise.all(templateEntries.map(entry => client.readBlob(entry.sha)))
-      ]);
-
-      const files = dataEntries
-        .map((entry, index) => ({ path: entry.path, content: decodeBlob(dataBlobs[index]) }))
-        .filter(file => file.content !== null);
-      digest = summarizeRecentHistory(files, TARGETS_CONFIG, today);
-
-      const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
-      if (decodedCentralNode !== null) {
-        constraints = extractConstraints(decodedCentralNode);
-        centralNodeLog = [
-          extractTodaysStatus(decodedCentralNode),
-          extractCrossAgentCoordination(decodedCentralNode),
-          extractRecentAgentActions(decodedCentralNode)
-        ].filter(Boolean).join('\n\n');
-      }
-
-      const decodedFoodLibrary = foodLibraryBlob ? decodeBlob(foodLibraryBlob) : null;
-      if (decodedFoodLibrary !== null) {
-        foodLibraryEntries = parseFoodLibrary(decodedFoodLibrary);
-        foodLibrary = formatFoodLibraryForPrompt(foodLibraryEntries);
-      }
-
-      const decodedExerciseLibrary = exerciseLibraryBlob ? decodeBlob(exerciseLibraryBlob) : null;
-      if (decodedExerciseLibrary !== null) {
-        exerciseLibraryEntries = parseExerciseLibrary(decodedExerciseLibrary);
-        exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries);
-      }
-
-      const templateContents = templateEntries
-        .map((entry, index) => ({ path: entry.path, content: decodeBlob(templateBlobs[index]) }))
-        .filter(file => file.content !== null);
-      workoutTemplates = formatTemplatesForPrompt(summarizeTemplatesFromContents(templateContents));
-    } catch {
-      digest = '';
-      constraints = '';
-      centralNodeLog = '';
-      foodLibraryEntries = [];
-      foodLibrary = '';
-      foodLibrarySha = undefined;
-      exerciseLibraryEntries = [];
-      exerciseLibrary = '';
-      exerciseLibrarySha = undefined;
-      workoutTemplates = '';
-    }
-
-    const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
-    const hyaluronicaProtocol = slug === 'hyaluronica' ? loadHyaluronicaProtocol() : '';
-    const penelopeProtocol = slug === 'penelope' ? loadPenelopeProtocol() : '';
-    const veraProtocol = slug === 'vera' ? loadVeraProtocol() : '';
-    const brisketProtocol = slug === 'brisket' ? loadBrisketProtocol() : '';
-    const saraProtocol = slug === 'sara' ? loadSaraProtocol() : '';
-    const hammondProtocol = slug === 'hammond' ? loadHammondProtocol() : '';
-    const system = buildSystemPrompt({
-      slug,
-      digest,
-      constraints,
-      centralNodeLog,
-      foodLibrary,
-      chadwickProtocol,
-      hyaluronicaProtocol,
-      penelopeProtocol,
-      veraProtocol,
-      brisketProtocol,
-      saraProtocol,
-      hammondProtocol,
-      workoutTemplates,
-      exerciseLibrary
-    });
-    const tools = [
-      { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
-      ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
-      ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
-      ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : [])
-    ];
-
     let anthropic;
     try {
       anthropic = createAnthropic({ apiKey: env.ANTHROPIC_API_KEY, fetchImpl });
@@ -240,11 +131,122 @@ export function createChatHandler({
     }
 
     const nowInstant = new Date(now());
+    const tools = [
+      { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
+      ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
+      ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
+      ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : [])
+    ];
+
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
         const send = event => controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
         send({ type: 'agent', slug });
+
+        let digest = '';
+        let constraints = '';
+        let centralNodeLog = '';
+        let foodLibraryEntries = [];
+        let foodLibrary = '';
+        let foodLibrarySha;
+        let exerciseLibraryEntries = [];
+        let exerciseLibrary = '';
+        let exerciseLibrarySha;
+        let workoutTemplates = '';
+        try {
+          const current = await client.resolveTree();
+          const manifest = selectManifestEntries(current.tree, { from, to: today });
+          const dataEntries = manifest.filter(entry => entry.path.startsWith('data/'));
+          const centralNodeEntry = current.tree.find(entry => entry.path === 'central-node.md' && entry.type === 'blob');
+          const foodLibraryEntry = needsFoodLibrary
+            ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
+            : null;
+          foodLibrarySha = foodLibraryEntry?.sha;
+          const exerciseLibraryEntry = needsExerciseLibrary
+            ? current.tree.find(entry => entry.path === EXERCISE_LIBRARY_PATH && entry.type === 'blob')
+            : null;
+          exerciseLibrarySha = exerciseLibraryEntry?.sha;
+          const templateEntries = needsWorkoutTemplates
+            ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
+            : [];
+
+          const [dataBlobs, centralNodeBlob, foodLibraryBlob, exerciseLibraryBlob, templateBlobs] = await Promise.all([
+            Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
+            centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
+            foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
+            exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
+            Promise.all(templateEntries.map(entry => client.readBlob(entry.sha)))
+          ]);
+
+          const files = dataEntries
+            .map((entry, index) => ({ path: entry.path, content: decodeBlob(dataBlobs[index]) }))
+            .filter(file => file.content !== null);
+          digest = summarizeRecentHistory(files, TARGETS_CONFIG, today);
+
+          const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
+          if (decodedCentralNode !== null) {
+            constraints = extractConstraints(decodedCentralNode);
+            centralNodeLog = [
+              extractTodaysStatus(decodedCentralNode),
+              extractCrossAgentCoordination(decodedCentralNode),
+              extractRecentAgentActions(decodedCentralNode)
+            ].filter(Boolean).join('\n\n');
+          }
+
+          const decodedFoodLibrary = foodLibraryBlob ? decodeBlob(foodLibraryBlob) : null;
+          if (decodedFoodLibrary !== null) {
+            foodLibraryEntries = parseFoodLibrary(decodedFoodLibrary);
+            foodLibrary = formatFoodLibraryForPrompt(foodLibraryEntries);
+          }
+
+          const decodedExerciseLibrary = exerciseLibraryBlob ? decodeBlob(exerciseLibraryBlob) : null;
+          if (decodedExerciseLibrary !== null) {
+            exerciseLibraryEntries = parseExerciseLibrary(decodedExerciseLibrary);
+            exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries);
+          }
+
+          const templateContents = templateEntries
+            .map((entry, index) => ({ path: entry.path, content: decodeBlob(templateBlobs[index]) }))
+            .filter(file => file.content !== null);
+          workoutTemplates = formatTemplatesForPrompt(summarizeTemplatesFromContents(templateContents));
+        } catch {
+          digest = '';
+          constraints = '';
+          centralNodeLog = '';
+          foodLibraryEntries = [];
+          foodLibrary = '';
+          foodLibrarySha = undefined;
+          exerciseLibraryEntries = [];
+          exerciseLibrary = '';
+          exerciseLibrarySha = undefined;
+          workoutTemplates = '';
+        }
+
+        const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
+        const hyaluronicaProtocol = slug === 'hyaluronica' ? loadHyaluronicaProtocol() : '';
+        const penelopeProtocol = slug === 'penelope' ? loadPenelopeProtocol() : '';
+        const veraProtocol = slug === 'vera' ? loadVeraProtocol() : '';
+        const brisketProtocol = slug === 'brisket' ? loadBrisketProtocol() : '';
+        const saraProtocol = slug === 'sara' ? loadSaraProtocol() : '';
+        const hammondProtocol = slug === 'hammond' ? loadHammondProtocol() : '';
+        const system = buildSystemPrompt({
+          slug,
+          digest,
+          constraints,
+          centralNodeLog,
+          foodLibrary,
+          chadwickProtocol,
+          hyaluronicaProtocol,
+          penelopeProtocol,
+          veraProtocol,
+          brisketProtocol,
+          saraProtocol,
+          hammondProtocol,
+          workoutTemplates,
+          exerciseLibrary
+        });
+
         try {
           for await (const event of anthropic.streamMessage({
             system,
