@@ -29,6 +29,10 @@ const skipped = [];
 if (workoutsDir) {
   const files = readdirSync(workoutsDir).filter(name => name.endsWith('.md'));
   for (const file of files) {
+    if (/^Template\b/i.test(file)) {
+      skipped.push(`template-page:${file}`);
+      continue;
+    }
     const text = readFileSync(join(workoutsDir, file), 'utf8');
     const parsed = parseWorkoutMarkdown(text, file);
     if (!parsed) {
@@ -94,9 +98,14 @@ function parseArgs(argv) {
 function writeEvent(root, relativePath, record, notes) {
   const full = join(root, relativePath);
   mkdirSync(join(full, '..'), { recursive: true });
-  if (existsSync(full) && !args.force) {
-    // Keep newer Life Hub-native writes; Notion import fills gaps only.
-    return;
+  if (existsSync(full)) {
+    if (!args.force) return;
+    try {
+      const existing = readFileSync(full, 'utf8');
+      if (/^source:\s*"?chat"?/m.test(existing) || /^source:\s*chat\s*$/m.test(existing)) return;
+    } catch {
+      // rewrite if unreadable
+    }
   }
   const yaml = renderFrontmatter(record);
   const body = typeof notes === 'string' && notes.trim() ? `${notes.trim()}\n` : '';
