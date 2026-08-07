@@ -1,7 +1,8 @@
 const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
 const MODEL = 'claude-sonnet-5';
-const MAX_TOOL_ROUNDS = 3;
+const MAX_TOOL_ROUNDS = 6;
+const MAX_PAUSE_CONTINUATIONS = 3;
 
 export class AnthropicClientError extends Error {
   constructor(code, retryable) {
@@ -20,8 +21,11 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
   return {
     async *streamMessage({ system, messages, tools, signal, executeTools }) {
       let roundMessages = messages;
+      let pauseContinuations = 0;
+
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const pendingResults = [];
+        const roundState = { assistantBlocks: [], stopReason: null };
         let sawDone = false;
 
         for await (const event of streamOnce({
@@ -30,7 +34,8 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
           system,
           messages: roundMessages,
           tools,
-          signal
+          signal,
+          roundState
         })) {
           if (event.type === 'done') {
             sawDone = true;
@@ -48,31 +53,45 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
           yield event;
         }
 
-        if (pendingResults.length === 0) {
-          if (sawDone) yield { type: 'done' };
-          return;
-        }
-
-        roundMessages = [
-          ...roundMessages,
-          {
-            role: 'assistant',
-            content: pendingResults.map(({ toolCall }) => ({
+        if (pendingResults.length > 0) {
+          const assistantContent = roundState.assistantBlocks.length > 0
+            ? roundState.assistantBlocks
+            : pendingResults.map(({ toolCall }) => ({
               type: 'tool_use',
               id: toolCall.id,
               name: toolCall.name,
               input: toolCall.input ?? {}
-            }))
-          },
-          {
-            role: 'user',
-            content: pendingResults.map(({ toolCall, result }) => ({
-              type: 'tool_result',
-              tool_use_id: toolCall.id,
-              content: typeof result === 'string' ? result : JSON.stringify(result)
-            }))
-          }
-        ];
+            }));
+          roundMessages = [
+            ...roundMessages,
+            { role: 'assistant', content: assistantContent },
+            {
+              role: 'user',
+              content: pendingResults.map(({ toolCall, result }) => ({
+                type: 'tool_result',
+                tool_use_id: toolCall.id,
+                content: typeof result === 'string' ? result : JSON.stringify(result)
+              }))
+            }
+          ];
+          continue;
+        }
+
+        if (
+          roundState.stopReason === 'pause_turn'
+          && pauseContinuations < MAX_PAUSE_CONTINUATIONS
+          && roundState.assistantBlocks.length > 0
+        ) {
+          pauseContinuations += 1;
+          roundMessages = [
+            ...roundMessages,
+            { role: 'assistant', content: roundState.assistantBlocks }
+          ];
+          continue;
+        }
+
+        if (sawDone) yield { type: 'done' };
+        return;
       }
 
       yield { type: 'done' };
@@ -80,7 +99,7 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
   };
 }
 
-async function* streamOnce({ apiKey, fetchImpl, system, messages, tools, signal }) {
+async function* streamOnce({ apiKey, fetchImpl, system, messages, tools, signal, roundState }) {
   let response;
   try {
     response = await fetchImpl(`${ANTHROPIC_ORIGIN}/v1/messages`, {
@@ -125,7 +144,7 @@ async function* streamOnce({ apiKey, fetchImpl, system, messages, tools, signal 
         const frame = buffer.slice(0, boundary);
         buffer = buffer.slice(boundary + 2);
         const event = parseFrame(frame);
-        if (event) yield* interpretEvent(event, toolBuffers);
+        if (event) yield* interpretEvent(event, toolBuffers, roundState);
       }
     }
   } catch (error) {
@@ -149,25 +168,32 @@ function parseFrame(frame) {
   }
 }
 
-function* interpretEvent(event, toolBuffers) {
+function* interpretEvent(event, toolBuffers, roundState) {
   if (event.name === 'content_block_start') {
-    const blockType = event.payload.content_block?.type;
+    const block = event.payload.content_block;
+    const blockType = block?.type;
     if (blockType === 'tool_use' || blockType === 'server_tool_use') {
       toolBuffers.set(event.payload.index, {
         blockType,
-        name: event.payload.content_block.name,
-        id: event.payload.content_block.id,
+        name: block.name,
+        id: block.id,
         json: ''
       });
+    } else if (blockType === 'text') {
+      toolBuffers.set(event.payload.index, { blockType: 'text', text: '' });
+    } else if (block && typeof blockType === 'string') {
+      // Server result blocks (e.g. web_search_tool_result) arrive complete.
+      roundState?.assistantBlocks.push(structuredClone(block));
     }
     return;
   }
   if (event.name === 'content_block_delta') {
     const delta = event.payload.delta;
+    const buffered = toolBuffers.get(event.payload.index);
     if (delta?.type === 'text_delta') {
       yield { type: 'text', delta: delta.text };
+      if (buffered?.blockType === 'text') buffered.text += delta.text ?? '';
     } else if (delta?.type === 'input_json_delta') {
-      const buffered = toolBuffers.get(event.payload.index);
       if (buffered) buffered.json += delta.partial_json;
     }
     return;
@@ -176,6 +202,10 @@ function* interpretEvent(event, toolBuffers) {
     const buffered = toolBuffers.get(event.payload.index);
     if (buffered) {
       toolBuffers.delete(event.payload.index);
+      if (buffered.blockType === 'text') {
+        roundState?.assistantBlocks.push({ type: 'text', text: buffered.text });
+        return;
+      }
       let input;
       try {
         input = JSON.parse(buffered.json || '{}');
@@ -183,11 +213,28 @@ function* interpretEvent(event, toolBuffers) {
         input = null;
       }
       if (buffered.blockType === 'server_tool_use') {
+        roundState?.assistantBlocks.push({
+          type: 'server_tool_use',
+          id: buffered.id,
+          name: buffered.name,
+          input: input ?? {}
+        });
         if (buffered.name === 'web_search') yield { type: 'search', query: input?.query ?? null };
       } else {
+        roundState?.assistantBlocks.push({
+          type: 'tool_use',
+          id: buffered.id,
+          name: buffered.name,
+          input: input ?? {}
+        });
         yield { type: 'tool_call', id: buffered.id, name: buffered.name, input };
       }
     }
+    return;
+  }
+  if (event.name === 'message_delta') {
+    const reason = event.payload.delta?.stop_reason;
+    if (reason != null && roundState) roundState.stopReason = reason;
     return;
   }
   if (event.name === 'message_stop') yield { type: 'done' };
