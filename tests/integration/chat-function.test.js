@@ -115,7 +115,7 @@ test('loads saved workout template summaries into Chadwick\'s system prompt', as
     })
   });
 
-  await handler(request({ message: 'Chadwick, what should I do today?' }));
+  await readSse(await handler(request({ message: 'Chadwick, what should I do today?' })));
 
   assert.match(receivedArgs.system, /Chest and Curls/);
   assert.match(receivedArgs.system, /2026-07-30/);
@@ -135,14 +135,14 @@ test('conversation history is forwarded to Anthropic ahead of the new message', 
     })
   });
 
-  await handler(request({
+  await readSse(await handler(request({
     message: 'actually make that 3 eggs',
     priorAgentSlug: 'brisket',
     history: [
       { role: 'user', content: 'Brisket, log 2 eggs for breakfast' },
       { role: 'assistant', content: 'Logging that now, buddy.' }
     ]
-  }));
+  })));
 
   assert.deepEqual(receivedArgs.messages, [
     { role: 'user', content: 'Brisket, log 2 eggs for breakfast' },
@@ -180,7 +180,7 @@ test('malformed history entries are dropped rather than breaking the request', a
     })
   });
 
-  await handler(request({
+  await readSse(await handler(request({
     message: 'hi',
     history: [
       { role: 'user', content: 'fine' },
@@ -189,7 +189,7 @@ test('malformed history entries are dropped rather than breaking the request', a
       'not even an object',
       { role: 'assistant', content: 'also fine' }
     ]
-  }));
+  })));
 
   assert.deepEqual(receivedArgs.messages, [
     { role: 'user', content: 'fine' },
@@ -400,7 +400,7 @@ test('loads exercise library highlights into Chadwick system prompt', async () =
     })
   });
 
-  await handler(request({ message: 'Chadwick, plan a chest session' }));
+  await readSse(await handler(request({ message: 'Chadwick, plan a chest session' })));
 
   assert.match(receivedArgs.system, /Exercise Library/);
   assert.match(receivedArgs.system, /Bar Press/);
@@ -536,7 +536,7 @@ test('non-chadwick agents do not register exercise library tools', async () => {
     })
   });
 
-  await handler(request({ message: 'Brisket, log breakfast' }));
+  await readSse(await handler(request({ message: 'Brisket, log breakfast' })));
 
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'search_exercise_library'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'save_exercise_library_entry'));
