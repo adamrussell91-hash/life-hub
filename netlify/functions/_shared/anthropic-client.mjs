@@ -1,6 +1,7 @@
 const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
 const MODEL = 'claude-sonnet-5';
+const MAX_TOKENS = 8192;
 const MAX_TOOL_ROUNDS = 6;
 const MAX_PAUSE_CONTINUATIONS = 3;
 
@@ -133,7 +134,11 @@ async function* streamOnce({ apiKey, fetchImpl, system, messages, tools, signal,
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4096,
+        max_tokens: MAX_TOKENS,
+        // Sonnet 5 thinks by default; thinking tokens count toward max_tokens and
+        // routinely burn 40s+ before the first visible token on CN audits — past
+        // Netlify's function budget, which surfaces as a stalled/empty chat turn.
+        thinking: { type: 'disabled' },
         system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral', ttl: '1h' } }],
         messages,
         tools,

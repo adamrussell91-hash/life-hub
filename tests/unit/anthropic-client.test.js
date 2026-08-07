@@ -71,6 +71,8 @@ test('sends the system prompt as a cacheable block so repeat calls in one conver
   assert.deepEqual(requestBody.system, [
     { type: 'text', text: 'You are Brisket Lasso.', cache_control: { type: 'ephemeral', ttl: '1h' } }
   ]);
+  assert.deepEqual(requestBody.thinking, { type: 'disabled' });
+  assert.equal(requestBody.max_tokens, 8192);
 });
 
 test('yields a null input when the accumulated tool-call JSON never parses', async () => {
