@@ -54,9 +54,31 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
         }
 
         if (pendingResults.length > 0) {
+          const resultsById = new Map(
+            pendingResults.map(({ toolCall, result }) => [toolCall.id, { toolCall, result }])
+          );
+          for (const block of roundState.assistantBlocks) {
+            if (block?.type === 'tool_use' && typeof block.id === 'string' && !resultsById.has(block.id)) {
+              // log_entry (and similar) are handled by the Life Hub client; Anthropic still
+              // requires a matching tool_result for every tool_use in the assistant turn.
+              resultsById.set(block.id, {
+                toolCall: { id: block.id, name: block.name, input: block.input },
+                result: JSON.stringify({ ok: true, status: 'client_handled' })
+              });
+            }
+          }
+          const orderedResults = [];
+          for (const block of roundState.assistantBlocks) {
+            if (block?.type === 'tool_use' && resultsById.has(block.id)) {
+              orderedResults.push(resultsById.get(block.id));
+              resultsById.delete(block.id);
+            }
+          }
+          for (const leftover of resultsById.values()) orderedResults.push(leftover);
+
           const assistantContent = roundState.assistantBlocks.length > 0
-            ? roundState.assistantBlocks
-            : pendingResults.map(({ toolCall }) => ({
+            ? sanitizeAssistantBlocks(roundState.assistantBlocks)
+            : orderedResults.map(({ toolCall }) => ({
               type: 'tool_use',
               id: toolCall.id,
               name: toolCall.name,
@@ -67,7 +89,7 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
             { role: 'assistant', content: assistantContent },
             {
               role: 'user',
-              content: pendingResults.map(({ toolCall, result }) => ({
+              content: orderedResults.map(({ toolCall, result }) => ({
                 type: 'tool_result',
                 tool_use_id: toolCall.id,
                 content: typeof result === 'string' ? result : JSON.stringify(result)
@@ -85,7 +107,7 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
           pauseContinuations += 1;
           roundMessages = [
             ...roundMessages,
-            { role: 'assistant', content: roundState.assistantBlocks }
+            { role: 'assistant', content: sanitizeAssistantBlocks(roundState.assistantBlocks) }
           ];
           continue;
         }
@@ -168,6 +190,17 @@ function parseFrame(frame) {
   }
 }
 
+function sanitizeAssistantBlocks(blocks) {
+  return blocks.flatMap(block => {
+    if (block?.type !== 'thinking') return [block];
+    // Adaptive/extended thinking streams thinking + signature across deltas.
+    // Replaying a start-only clone (missing `thinking`) 400s the next round.
+    if (typeof block.thinking !== 'string') return [];
+    if (block.thinking.length === 0 && typeof block.signature !== 'string') return [];
+    return [block];
+  });
+}
+
 function* interpretEvent(event, toolBuffers, roundState) {
   if (event.name === 'content_block_start') {
     const block = event.payload.content_block;
@@ -181,8 +214,14 @@ function* interpretEvent(event, toolBuffers, roundState) {
       });
     } else if (blockType === 'text') {
       toolBuffers.set(event.payload.index, { blockType: 'text', text: '' });
+    } else if (blockType === 'thinking') {
+      toolBuffers.set(event.payload.index, {
+        blockType: 'thinking',
+        thinking: typeof block.thinking === 'string' ? block.thinking : '',
+        signature: typeof block.signature === 'string' ? block.signature : undefined
+      });
     } else if (block && typeof blockType === 'string') {
-      // Server result blocks (e.g. web_search_tool_result) arrive complete.
+      // Complete blocks (web_search_tool_result, redacted_thinking, etc.).
       roundState?.assistantBlocks.push(structuredClone(block));
     }
     return;
@@ -195,6 +234,12 @@ function* interpretEvent(event, toolBuffers, roundState) {
       if (buffered?.blockType === 'text') buffered.text += delta.text ?? '';
     } else if (delta?.type === 'input_json_delta') {
       if (buffered) buffered.json += delta.partial_json;
+    } else if (delta?.type === 'thinking_delta') {
+      if (buffered?.blockType === 'thinking') buffered.thinking += delta.thinking ?? '';
+    } else if (delta?.type === 'signature_delta') {
+      if (buffered?.blockType === 'thinking') {
+        buffered.signature = `${buffered.signature ?? ''}${delta.signature ?? ''}`;
+      }
     }
     return;
   }
@@ -204,6 +249,14 @@ function* interpretEvent(event, toolBuffers, roundState) {
       toolBuffers.delete(event.payload.index);
       if (buffered.blockType === 'text') {
         roundState?.assistantBlocks.push({ type: 'text', text: buffered.text });
+        return;
+      }
+      if (buffered.blockType === 'thinking') {
+        const thinkingBlock = { type: 'thinking', thinking: buffered.thinking };
+        if (typeof buffered.signature === 'string' && buffered.signature.length > 0) {
+          thinkingBlock.signature = buffered.signature;
+        }
+        roundState?.assistantBlocks.push(thinkingBlock);
         return;
       }
       let input;
