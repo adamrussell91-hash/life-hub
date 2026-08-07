@@ -75,7 +75,9 @@ export function applyAgentAvatarToBubble(bubble, slug) {
 }
 
 export function renderAgentHero(root, slug, {
-  hostSelector = '#chat-agent-hero'
+  hostSelector = '#chat-agent-hero',
+  collapsed = false,
+  onToggle
 } = {}) {
   const host = root.querySelector?.(hostSelector);
   if (!host) return;
@@ -83,6 +85,10 @@ export function renderAgentHero(root, slug, {
   if (!agent?.fullSrc) {
     host.setAttribute?.('hidden', '');
     host.replaceChildren?.();
+    host.classList?.remove?.('is-collapsed');
+    if (!host.classList?.remove && typeof host.className === 'string') {
+      host.className = host.className.split(/\s+/).filter(c => c && c !== 'is-collapsed').join(' ');
+    }
     return;
   }
 
@@ -103,6 +109,41 @@ export function renderAgentHero(root, slug, {
   img.alt = agent.name;
   name.textContent = agent.name;
   host.dataset.agent = agent.slug;
+
+  if (host.classList?.toggle) {
+    host.classList.toggle('is-collapsed', collapsed);
+  } else if (typeof host.className === 'string') {
+    const classes = host.className.split(/\s+/).filter(c => c && c !== 'is-collapsed');
+    if (collapsed) classes.push('is-collapsed');
+    host.className = classes.join(' ');
+  }
+
+  host.setAttribute?.('role', 'button');
+  host.setAttribute?.('tabindex', '0');
+  host.setAttribute?.('aria-expanded', collapsed ? 'false' : 'true');
+  host.setAttribute?.('aria-label', collapsed
+    ? `Expand ${agent.name} portrait`
+    : `Collapse ${agent.name} portrait`);
+
+  if (!host.dataset.toggleBound) {
+    host.dataset.toggleBound = '1';
+    const fireToggle = () => {
+      const currentlyCollapsed = host.classList?.contains?.('is-collapsed')
+        || (typeof host.className === 'string' && /\bis-collapsed\b/.test(host.className));
+      // currently collapsed → expand (pass collapsed=false); else collapse (true)
+      host._onToggle?.(currentlyCollapsed ? false : true);
+    };
+    host.addEventListener?.('click', event => {
+      event?.preventDefault?.();
+      fireToggle();
+    });
+    host.addEventListener?.('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault?.();
+      fireToggle();
+    });
+  }
+  host._onToggle = onToggle;
 }
 
 export { AGENT_AVATARS, avatarForSlug };
