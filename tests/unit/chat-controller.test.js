@@ -1146,6 +1146,35 @@ test('selecting another agent clears auditSession so later sends omit it', async
   assert.equal(sendCalls[1].auditSession, undefined);
 });
 
+test('stream naming a non-Hammond agent clears auditSession for the next send', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      if (sendCalls.length === 1) {
+        yield { type: 'agent', slug: 'hammond' };
+        yield { type: 'text', delta: 'Triage first.' };
+      } else if (sendCalls.length === 2) {
+        yield { type: 'agent', slug: 'brisket' };
+        yield { type: 'text', delta: 'Logging lunch instead.' };
+      } else {
+        yield { type: 'agent', slug: 'brisket' };
+        yield { type: 'text', delta: 'Done.' };
+      }
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hammond, Central Node audit');
+  await controller.send('actually log lunch');
+  await controller.send('and a snack');
+
+  assert.ok(sendCalls[0].auditSession);
+  assert.equal(sendCalls[2].auditSession, undefined);
+});
+
 test('cancel audit clears auditSession so the cancel send omits it', async () => {
   const root = new FakeDocument();
   const sendCalls = [];
