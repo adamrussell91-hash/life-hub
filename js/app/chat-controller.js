@@ -10,7 +10,7 @@ const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
 const EMPTY_TURN_RECOVERY = 'That reply got cut off before it finished (usually a timeout while looking things up). Send the same message again and I’ll continue.';
 const CANCEL_AUDIT_RE = /cancel audit|stop audit/i;
-const SKIP_INTAKE_RE = /skip intake|continue audit|go on|\bnext\b/i;
+const SKIP_INTAKE_RE = /skip intake|continue audit|go on/i;
 
 // FakeElement (used in unit tests) only models `className` as a plain string, so
 // classList is used when real DOM elements provide it and this string fallback
@@ -213,6 +213,7 @@ export function createChatController({
     let sawRecordProposal = false;
     const history = recentHistory();
     const priorAgentSlug = stickyAgentSlug();
+    if (CANCEL_AUDIT_RE.test(message)) clearAuditSession();
     maybeStartAuditSession(message);
     const sessionForSend = auditSession && talkingToHammond(message) ? auditSession : undefined;
     remember('user', message);
