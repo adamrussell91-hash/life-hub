@@ -200,3 +200,114 @@ test('yields fire-and-forget tool_calls when executeTools returns null', async (
     { type: 'done' }
   ]);
 });
+
+test('continues when stop_reason is pause_turn by re-sending assistant content as-is', async () => {
+  const first = [
+    frame('content_block_start', {
+      index: 0,
+      content_block: { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search' }
+    }),
+    frame('content_block_delta', {
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: '{"query":"bacon egg roll sodium AU"}' }
+    }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'pause_turn' } }),
+    frame('message_stop', {})
+  ];
+  const second = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'About 850 mg sodium.' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'end_turn' } }),
+    frame('message_stop', {})
+  ];
+
+  let calls = 0;
+  const bodies = [];
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async (_url, init) => {
+      calls += 1;
+      bodies.push(JSON.parse(init.body));
+      return sseResponse(calls === 1 ? first : second);
+    }
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'bacon and egg roll' }],
+    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 2 }]
+  })) events.push(event);
+
+  assert.equal(calls, 2);
+  const continued = bodies[1].messages.at(-1);
+  assert.equal(continued.role, 'assistant');
+  assert.ok(continued.content.some(block => block.type === 'server_tool_use' && block.id === 'srvtoolu_1'));
+  assert.deepEqual(
+    events.filter(e => e.type === 'search' || e.type === 'text' || e.type === 'done'),
+    [
+      { type: 'search', query: 'bacon egg roll sodium AU' },
+      { type: 'text', delta: 'About 850 mg sodium.' },
+      { type: 'done' }
+    ]
+  );
+});
+
+test('client tool continuation preserves prior server_tool_use blocks in the assistant message', async () => {
+  const first = [
+    frame('content_block_start', {
+      index: 0,
+      content_block: { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search' }
+    }),
+    frame('content_block_delta', {
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: '{"query":"quest bar"}' }
+    }),
+    frame('content_block_stop', { index: 0 }),
+    frame('content_block_start', {
+      index: 1,
+      content_block: { type: 'tool_use', id: 'call_1', name: 'save_food_library_entry' }
+    }),
+    frame('content_block_delta', {
+      index: 1,
+      delta: { type: 'input_json_delta', partial_json: '{"name":"Quest Bar"}' }
+    }),
+    frame('content_block_stop', { index: 1 }),
+    frame('message_delta', { delta: { stop_reason: 'tool_use' } }),
+    frame('message_stop', {})
+  ];
+  const second = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Logged.' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_stop', {})
+  ];
+
+  let calls = 0;
+  const bodies = [];
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async (_url, init) => {
+      calls += 1;
+      bodies.push(JSON.parse(init.body));
+      return sseResponse(calls === 1 ? first : second);
+    }
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'quest bar' }],
+    tools: [],
+    executeTools: async () => JSON.stringify({ ok: true })
+  })) events.push(event);
+
+  assert.equal(calls, 2);
+  const assistant = bodies[1].messages.at(-2);
+  assert.equal(assistant.role, 'assistant');
+  assert.ok(assistant.content.some(b => b.type === 'server_tool_use'));
+  assert.ok(assistant.content.some(b => b.type === 'tool_use' && b.id === 'call_1'));
+  assert.ok(events.some(e => e.type === 'text' && e.delta === 'Logged.'));
+});
