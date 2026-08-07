@@ -298,7 +298,7 @@ test('save_food_library_entry writes the cache to GitHub, emits food_library_sav
           name: 'save_food_library_entry',
           input: {
             name: 'Meatlovers Pizza', brand: 'Domino\'s', servingDescription: '1 slice',
-            calories: 250, protein_g: 11, fat_g: 12
+            calories: 250, protein_g: 11, fat_g: 12, sodium_mg: 640
           }
         });
         assert.ok(toolResult != null, 'executeTools must return a tool result so the round continues');
