@@ -41,8 +41,12 @@ function dailyNutrition(events, date, targetsConfig) {
     protein_g: nutrition.protein_g,
     fat_g: nutrition.fat_g,
     proteinTarget,
+    fatCeiling,
     hitProtein: proteinTarget > 0 && nutrition.protein_g >= proteinTarget,
-    overFatCeiling: fatCeiling > 0 && nutrition.fat_g > fatCeiling
+    overFatCeiling: fatCeiling > 0 && nutrition.fat_g > fatCeiling,
+    proteinPct: proteinTarget > 0
+      ? Math.round((nutrition.protein_g / proteinTarget) * 100)
+      : 0
   };
 }
 
@@ -67,6 +71,41 @@ export function buildNutritionModel({ events, targetsConfig, date }) {
     addCalendarDays(date, -WEEK_DAYS)
   ).map(day => dailyNutrition(events, day, targetsConfig));
 
+  const mealsToday = events
+    .filter(event => event?.record?.type === 'meal' && event.record.date === date)
+    .slice()
+    .sort((left, right) => String(left.record.time ?? '').localeCompare(String(right.record.time ?? '')))
+    .map(event => {
+      const record = event.record;
+      const bodyLine = String(event.body ?? '').trim().split('\n').find(Boolean) ?? '';
+      const notes = typeof record.notes === 'string' ? record.notes.trim() : '';
+      return {
+        meal: record.meal,
+        time: record.time ?? null,
+        calories: record.calories ?? 0,
+        protein_g: record.protein_g ?? 0,
+        fat_g: record.fat_g ?? 0,
+        notes,
+        summary: bodyLine || notes || `${record.meal} logged`
+      };
+    });
+
+  let advice = '';
+  for (let i = mealsToday.length - 1; i >= 0; i--) {
+    if (mealsToday[i].notes) {
+      advice = mealsToday[i].notes;
+      break;
+    }
+  }
+  if (!advice) {
+    for (let i = mealsToday.length - 1; i >= 0; i--) {
+      if (mealsToday[i].summary && !/logged$/i.test(mealsToday[i].summary)) {
+        advice = mealsToday[i].summary;
+        break;
+      }
+    }
+  }
+
   return {
     date,
     nutrition,
@@ -77,23 +116,8 @@ export function buildNutritionModel({ events, targetsConfig, date }) {
     previousWeek,
     overFatCeiling: targets.fat_ceiling_g > 0 && nutrition.fat_g > targets.fat_ceiling_g,
     polyphenolVsAim: polyphenolVsAim(nutrition.polyphenol_score, targets.polyphenol_daily_aim),
-    mealsToday: events
-      .filter(event => event?.record?.type === 'meal' && event.record.date === date)
-      .slice()
-      .sort((left, right) => String(left.record.time ?? '').localeCompare(String(right.record.time ?? '')))
-      .map(event => {
-        const record = event.record;
-        const bodyLine = String(event.body ?? '').trim().split('\n').find(Boolean) ?? '';
-        const notes = typeof record.notes === 'string' ? record.notes.trim() : '';
-        return {
-          meal: record.meal,
-          time: record.time ?? null,
-          calories: record.calories ?? 0,
-          protein_g: record.protein_g ?? 0,
-          fat_g: record.fat_g ?? 0,
-          summary: bodyLine || notes || `${record.meal} logged`
-        };
-      }),
+    mealsToday,
+    advice,
     macroSplit: {
       calories: nutrition.calories,
       caloriesTarget: targets.calories,

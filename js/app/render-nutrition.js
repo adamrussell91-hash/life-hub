@@ -30,10 +30,20 @@ export function renderNutrition(root, model) {
   renderMacroSplit(root, model);
   renderMealsToday(root, model.mealsToday);
   renderMacroRings(root, model);
-  renderNamedAreaChart(root, '#nutrition-protein-chart', model.week, 'protein_g', { rollingAverage: 3 });
-  renderNamedAreaChart(root, '#nutrition-calories-chart', model.week, 'calories');
+  const proteinGuide = model.week.find(day => day.proteinTarget > 0)?.proteinTarget ?? model.targets.protein_g;
+  const fatGuide = model.week.find(day => day.fatCeiling > 0)?.fatCeiling ?? model.targets.fat_ceiling_g;
+  renderNamedAreaChart(root, '#nutrition-protein-chart', model.week, 'protein_g', {
+    rollingAverage: 3,
+    guideValue: proteinGuide,
+    valueLabels: true
+  });
+  renderNamedAreaChart(root, '#nutrition-calories-chart', model.week, 'calories', {
+    valueLabels: true
+  });
   renderNamedAreaChart(root, '#nutrition-fat-chart', model.week, 'fat_g', {
-    markOverage: true
+    markOverage: true,
+    guideValue: fatGuide,
+    valueLabels: true
   });
   renderHitStrip(root, model.week);
   renderHeatmap(root, model.month);
@@ -58,16 +68,17 @@ function renderMacroRings(root, model) {
 }
 
 function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
-  const { rollingAverage = 0, markOverage = false } = options;
+  const { rollingAverage = 0, markOverage = false, guideValue = null, valueLabels = false } = options;
   const svg = root.querySelector(selector);
   if (!svg) return;
   const normalized = series.map(day => ({ date: day.date, value: day[valueKey] }));
   const chart = buildAreaLine(normalized, {
     rollingAverage,
     width: 320,
-    height: 140,
-    padding: 12,
-    paddingBottom: 24
+    height: 72,
+    padding: 10,
+    paddingBottom: 16,
+    guideValue
   });
   svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -95,6 +106,19 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
     }
   }
 
+  const guide = svg.querySelector('[data-role="guide"]');
+  if (guide) {
+    if (chart.guideY != null) {
+      guide.setAttribute('x1', String(chart.points[0]?.x ?? 10));
+      guide.setAttribute('x2', String(chart.points.at(-1)?.x ?? 310));
+      guide.setAttribute('y1', String(chart.guideY));
+      guide.setAttribute('y2', String(chart.guideY));
+      guide.removeAttribute('hidden');
+    } else {
+      guide.setAttribute('hidden', '');
+    }
+  }
+
   const labels = svg.querySelector('[data-role="day-labels"]');
   if (labels) {
     labels.replaceChildren();
@@ -109,6 +133,23 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
     }
   }
 
+  const valueLabelGroup = svg.querySelector('[data-role="value-labels"]');
+  if (valueLabelGroup) {
+    valueLabelGroup.replaceChildren();
+    if (valueLabels) {
+      for (const point of chart.points) {
+        if (!point.value) continue;
+        const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', point.x);
+        text.setAttribute('y', Math.max(9, point.y - 5));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('class', 'chart-value-label');
+        text.textContent = String(Math.round(point.value));
+        valueLabelGroup.append(text);
+      }
+    }
+  }
+
   const markers = svg.querySelector('[data-role="overage-markers"]');
   if (markers) {
     markers.replaceChildren();
@@ -120,7 +161,7 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
         const dot = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
         dot.setAttribute('cx', String(point.x));
         dot.setAttribute('cy', String(point.y));
-        dot.setAttribute('r', '4');
+        dot.setAttribute('r', '3');
         dot.setAttribute('class', 'chart-overage-dot');
         markers.append(dot);
       }
@@ -202,9 +243,13 @@ function renderHeatmap(root, month) {
   grid.replaceChildren();
   for (const day of month) {
     const tile = root.createElement('span');
-    tile.className = 'heatmap-tile';
+    tile.className = 'heatmap-tile heatmap-tile--protein';
+    const pct = Math.max(0, Math.min(100, day.proteinPct ?? 0));
+    tile.dataset.pct = String(pct);
     tile.dataset.hit = String(day.hitProtein);
-    tile.title = day.date;
+    tile.style?.setProperty?.('--protein-pct', String(pct));
+    tile.title = `${day.date}: ${day.protein_g}g / ${day.proteinTarget}g`;
+    tile.textContent = day.protein_g > 0 ? String(Math.round(day.protein_g)) : '';
     grid.append(tile);
   }
 }
@@ -238,6 +283,13 @@ function renderMacroSplit(root, model) {
   setText(root, '[data-split="fat-pct"]', `${split.fatPct}% of fat ceiling`);
   setText(root, '[data-split="energy"]', `${split.calories.toLocaleString('en-AU')} / ${split.caloriesTarget.toLocaleString('en-AU')} kcal`);
   setText(root, '[data-split="energy-pct"]', `${split.energyPct}% of energy target`);
+
+  const advice = root.querySelector('[data-nutrition="advice"]');
+  if (advice) {
+    const text = String(model.advice ?? '').trim();
+    advice.textContent = text || 'Log a meal with Brisket and his notes show up here.';
+    advice.classList?.toggle?.('is-empty', !text);
+  }
 
   const protein = buildRingTarget(
     { value: split.protein_g, target: split.proteinTarget },
