@@ -274,6 +274,10 @@
                   <dd><strong data-split="energy">—</strong><span data-split="energy-pct">—</span></dd>
                 </div>
               </dl>
+              <div class="macro-split__advice">
+                <p class="metric-label">Brisket notes</p>
+                <p data-nutrition="advice" class="macro-split__advice-body is-empty">Log a meal with Brisket and his notes show up here.</p>
+              </div>
             </div>
             <p class="metric-caption">Outer ring = protein target · inner ring = fat ceiling</p>
           </article>
@@ -330,37 +334,45 @@
             <ul id="nutrition-meal-log" class="meal-log"></ul>
           </article>
 
-          <article class="metric-card chart-card" aria-labelledby="protein-trend-label">
-            <div class="metric-heading">
-              <p class="metric-label" id="protein-trend-label">7-day protein trend</p>
-              <span class="trend-badge" data-value="protein-trend">—</span>
-            </div>
-            <svg id="nutrition-protein-chart" class="line-chart" viewBox="0 0 320 140" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Protein trend over the last 7 days">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <path data-role="rolling" d="" hidden></path>
-              <g data-role="day-labels"></g>
-            </svg>
-            <p class="metric-caption" data-nutrition="rolling-caption">Dotted = 3-day average</p>
-            <div id="nutrition-hit-strip" class="hit-strip" aria-label="Whether the protein target was met each day, last 7 days"></div>
-          </article>
+          <div class="nutrition-week-charts">
+            <article class="metric-card chart-card" aria-labelledby="protein-trend-label">
+              <div class="metric-heading">
+                <p class="metric-label" id="protein-trend-label">7-day protein</p>
+                <span class="trend-badge" data-value="protein-trend">—</span>
+              </div>
+              <svg id="nutrition-protein-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Protein trend over the last 7 days">
+                <path data-role="area" d=""></path>
+                <path data-role="line" d=""></path>
+                <path data-role="rolling" d="" hidden></path>
+                <line data-role="guide" class="chart-guide" hidden></line>
+                <g data-role="value-labels"></g>
+                <g data-role="day-labels"></g>
+              </svg>
+              <p class="metric-caption" data-nutrition="rolling-caption">Dotted avg · dashed = protein goal</p>
+              <div id="nutrition-hit-strip" class="hit-strip" aria-label="Whether the protein target was met each day, last 7 days"></div>
+            </article>
+
+            <article class="metric-card chart-card" aria-labelledby="fat-trend-label">
+              <p class="metric-label" id="fat-trend-label">7-day fat</p>
+              <svg id="nutrition-fat-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Fat trend over the last 7 days">
+                <path data-role="area" d=""></path>
+                <path data-role="line" d=""></path>
+                <line data-role="guide" class="chart-guide" hidden></line>
+                <g data-role="value-labels"></g>
+                <g data-role="day-labels"></g>
+                <g data-role="overage-markers"></g>
+              </svg>
+              <p class="metric-caption">Dashed = fat ceiling</p>
+            </article>
+          </div>
 
           <article class="metric-card chart-card" aria-labelledby="calories-trend-label">
             <p class="metric-label" id="calories-trend-label">7-day energy trend</p>
-            <svg id="nutrition-calories-chart" class="line-chart" viewBox="0 0 320 140" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Calorie trend over the last 7 days">
+            <svg id="nutrition-calories-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Calorie trend over the last 7 days">
               <path data-role="area" d=""></path>
               <path data-role="line" d=""></path>
+              <g data-role="value-labels"></g>
               <g data-role="day-labels"></g>
-            </svg>
-          </article>
-
-          <article class="metric-card chart-card" aria-labelledby="fat-trend-label">
-            <p class="metric-label" id="fat-trend-label">7-day fat trend</p>
-            <svg id="nutrition-fat-chart" class="line-chart" viewBox="0 0 320 140" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Fat trend over the last 7 days">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <g data-role="day-labels"></g>
-              <g data-role="overage-markers"></g>
             </svg>
           </article>
 

@@ -338,9 +338,9 @@ main { max-width: 76rem; margin: 0 auto; }
 .macro-split-card { margin-bottom: 1rem; }
 .macro-split {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr 1.2fr;
   gap: 1rem 1.25rem;
-  align-items: center;
+  align-items: start;
   margin-top: 0.65rem;
 }
 .macro-split__copy { margin: 0; display: grid; gap: 0.65rem; }
@@ -349,7 +349,25 @@ main { max-width: 76rem; margin: 0 auto; }
 .macro-split__copy dd { margin: 0; display: grid; gap: 0.1rem; }
 .macro-split__copy strong { color: var(--depth); font-size: 1rem; font-variant-numeric: tabular-nums; }
 .macro-split__copy span { color: var(--muted); font-size: 0.74rem; }
+.macro-split__advice {
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--wave) 8%, var(--glass));
+}
+.macro-split__advice .metric-label { margin-bottom: 0.35rem; }
+.macro-split__advice-body {
+  margin: 0;
+  color: var(--depth);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.macro-split__advice-body.is-empty { color: var(--muted); font-style: italic; }
 .macro-split-card .metric-caption { margin-top: 0.75rem; }
+@media (max-width: 720px) {
+  .macro-split { grid-template-columns: auto 1fr; }
+  .macro-split__advice { grid-column: 1 / -1; }
+}
 
 .warning-panel, .unavailable-panel { margin-bottom: 1.2rem; padding: 1rem 1.2rem; display: flex; align-items: center; gap: 1rem; }
 .provider-status {
@@ -650,7 +668,14 @@ main { max-width: 76rem; margin: 0 auto; }
 .metric-ring--fat .metric-ring-fill { stroke: var(--ring-fat); }
 .metric-ring-fill.metric-ring--protein { stroke: var(--ring-protein); }
 .metric-ring-fill.metric-ring--fat { stroke: var(--ring-fat); }
-.chart-day-label { fill: var(--chart-label); font-size: 9px; }
+.chart-day-label { fill: var(--chart-label); font-size: 7px; }
+.chart-value-label { fill: var(--muted); font-size: 7px; font-variant-numeric: tabular-nums; }
+.chart-guide {
+  stroke: var(--muted);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
 
 .polyphenol-score {
   margin: 0.85rem 0 0.35rem;
@@ -701,6 +726,19 @@ main { max-width: 76rem; margin: 0 auto; }
   aspect-ratio: 320 / 140;
   margin-top: 0.75rem;
   overflow: visible;
+}
+.line-chart--dense {
+  aspect-ratio: 320 / 72;
+  margin-top: 0.45rem;
+}
+.nutrition-week-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+@media (max-width: 720px) {
+  .nutrition-week-charts { grid-template-columns: 1fr; }
 }
 .line-chart.body-chart { aspect-ratio: 320 / 120; }
 .line-chart [data-role="area"] { fill: var(--area-fill); stroke: none; }
@@ -783,6 +821,16 @@ main { max-width: 76rem; margin: 0 auto; }
 .heatmap-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 0.3rem; margin-top: 0.85rem; }
 .heatmap-tile { aspect-ratio: 1; border-radius: 0.3rem; background: rgba(20,43,81,0.08); }
 .heatmap-tile[data-hit="true"] { background: var(--wave); }
+.heatmap-tile--protein {
+  display: grid;
+  place-items: center;
+  color: var(--depth);
+  font-size: 0.58rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--wave) calc(var(--protein-pct, 0) * 1%), rgba(20, 43, 81, 0.08));
+}
+.heatmap-tile--protein[data-pct="0"] { color: var(--muted); }
 
 .fitness-streak-strip {
   display: grid;
