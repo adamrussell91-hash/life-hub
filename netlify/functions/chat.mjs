@@ -22,6 +22,7 @@ import { loadVeraProtocol } from './_shared/load-vera-protocol.mjs';
 import { loadBrisketProtocol } from './_shared/load-brisket-protocol.mjs';
 import { loadSaraProtocol } from './_shared/load-sara-protocol.mjs';
 import { loadHammondProtocol } from './_shared/load-hammond-protocol.mjs';
+import { normalizeAuditSession, buildHammondAuditContract } from './_shared/hammond-audit.mjs';
 import {
   extractConstraints,
   extractCrossAgentCoordination,
@@ -116,6 +117,9 @@ export function createChatHandler({
 
     const slug = routeAgent(parsed.message, parsed.priorAgentSlug);
     const agent = slug === ROUTER_SLUG ? null : findAgent(slug);
+    const hammondAuditContract = slug === 'hammond' && parsed.auditSession
+      ? buildHammondAuditContract(parsed.auditSession)
+      : '';
     const today = getSydneyDateKey(new Date(now()));
     // Chat only needs a thin digest (today + yesterday). A full week of blob
     // reads routinely ate the Netlify budget before Anthropic produced a reply.
@@ -145,6 +149,13 @@ export function createChatHandler({
         const encoder = new TextEncoder();
         const send = event => controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
         send({ type: 'agent', slug });
+        if (hammondAuditContract && parsed.auditSession) {
+          send({
+            type: 'audit_phase',
+            phase: parsed.auditSession.phase,
+            intakeCount: parsed.auditSession.intakeCount
+          });
+        }
         send({ type: 'status', text: 'Loading your logs…' });
 
         let digest = '';
@@ -246,6 +257,7 @@ export function createChatHandler({
           brisketProtocol,
           saraProtocol,
           hammondProtocol,
+          hammondAuditContract,
           workoutTemplates,
           exerciseLibrary
         });
@@ -388,7 +400,8 @@ async function parseRequest(request) {
   return {
     message: body.message,
     history: sanitizeHistory(body.history),
-    priorAgentSlug: typeof body.priorAgentSlug === 'string' ? body.priorAgentSlug : undefined
+    priorAgentSlug: typeof body.priorAgentSlug === 'string' ? body.priorAgentSlug : undefined,
+    auditSession: normalizeAuditSession(body.auditSession)
   };
 }
 

@@ -666,3 +666,49 @@ test('non-chadwick agents do not register exercise library tools', async () => {
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'save_exercise_library_entry'));
   assert.doesNotMatch(receivedArgs.system, /search_exercise_library/);
 });
+
+test('Hammond auditSession injects phase contract into the system prompt', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'Triage complete. What is weighing on you?' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'Hammond, Central Node audit',
+    auditSession: { kind: 'cn_audit', phase: 'triage', intakeCount: 0 }
+  })));
+
+  assert.match(receivedArgs.system, /audit phase contract/i);
+  assert.match(receivedArgs.system, /THIS TURN ONLY/i);
+  assert.match(receivedArgs.system, /triage/i);
+});
+
+test('invalid auditSession is ignored for prompt injection', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'Protein target is 120g.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'Hammond, what is the protein target?',
+    auditSession: { kind: 'cn_audit', phase: 'not-a-phase', intakeCount: 0 }
+  })));
+
+  assert.doesNotMatch(receivedArgs.system, /audit phase contract/i);
+});

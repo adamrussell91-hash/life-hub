@@ -219,3 +219,19 @@ test('hammond prompt includes protocol when provided', () => {
   assert.match(prompt, /Hammond operating manual/);
   assert.match(prompt, /Session Triage first/);
 });
+
+test('hammond prompt includes audit phase contract when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    hammondAuditContract: 'THIS TURN ONLY: triage then one intake question.'
+  });
+  assert.match(prompt, /THIS TURN ONLY: triage then one intake question/);
+});
+
+test('non-hammond prompts never include hammond audit contract', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    hammondAuditContract: 'THIS TURN ONLY: triage'
+  });
+  assert.doesNotMatch(prompt, /THIS TURN ONLY: triage/);
+});

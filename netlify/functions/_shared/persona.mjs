@@ -13,6 +13,7 @@ export function buildSystemPrompt({
   brisketProtocol = '',
   saraProtocol = '',
   hammondProtocol = '',
+  hammondAuditContract = '',
   workoutTemplates = '',
   exerciseLibrary = ''
 }) {
@@ -110,6 +111,9 @@ export function buildSystemPrompt({
   const hammondBlocks = slug === 'hammond' ? [
     hammondProtocol
       ? `Hammond operating manual (follow these Life Hub rules):\n${hammondProtocol}`
+      : '',
+    hammondAuditContract
+      ? `Hammond audit phase contract (hard rules for this turn):\n${hammondAuditContract}`
       : '',
     'You do not propose log_entry. Coach and triage; specialists own domain logs.',
     'Read Central Node before triage or any follow-on protocol. After direction/drift/handoff work, state compact Hammond→[Agent] lines in chat when another specialist must act.'
