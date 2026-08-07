@@ -79,3 +79,25 @@ test('navigating back to Home hides the chat view again', async () => {
   assert.equal(await page.locator('#home-dashboard').isVisible(), true);
   await context.close();
 });
+
+test('Brisket meal log reaches a Confirm card with sodium, not the cut-off recovery bubble', async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#chat-input').fill(
+    'Hi brisket, for dinner I had a big slice of home made lasagna, beef and pork'
+  );
+  await page.locator('#chat-send').click();
+
+  const proposal = page.locator('.record-proposal');
+  await proposal.waitFor({ timeout: 10_000 });
+  assert.equal(await page.locator('.chat-message--assistant[data-agent="brisket"]').count() > 0, true);
+  const body = await page.locator('#chat-messages').innerText();
+  assert.doesNotMatch(body, /got cut off before it finished/i);
+  assert.doesNotMatch(body, /didn.?t finish that reply/i);
+  assert.match(await proposal.innerText(), /Sodium/i);
+  await context.close();
+});
