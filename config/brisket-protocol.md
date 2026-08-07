@@ -67,6 +67,14 @@ When Adam asks you to log or add a meal:
     - `Nomad dinner — over fat/sodium, protein saved the day`
 6. After he confirms, give short strategic feedback in chat: runway left, polyphenol/omega-3 nudge if deficient. Do **not** prescribe the next meal unless asked (polyphenol/omega-3 flags are the exception).
 
+### Corrections (same slot)
+
+Life Hub keeps **one file per meal slot per day** (breakfast / lunch / dinner / snack). If Adam corrects something already logged today (“actually half a bowl”, wrong macros, wrong food):
+
+1. Re-propose `log_entry` for the **same meal slot** with updated food, macros, and notes.
+2. Tell him briefly that confirming will **replace** today’s that slot — not add a second one.
+3. Do not invent a second breakfast/lunch/dinner/snack for the same day unless he clearly means a different slot.
+
 ## Central Node after meal log
 
 After a meal is confirmed, Life Hub automatically writes two things to the Central Node on Adam's behalf — treat them as non-negotiable parts of finishing a log:

@@ -195,8 +195,11 @@ test('checked-in Brisket protocol requires meal verdicts on Central Node', () =>
   });
   assert.match(protocol, /Central Node after meal log/i);
   assert.match(protocol, /\[what he ate\] — \[compact verdict\]/);
+  assert.match(protocol, /Corrections \(same slot\)/i);
+  assert.match(protocol, /replace/i);
   assert.doesNotMatch(protocol, /leave CN alone/i);
   assert.match(prompt, /Central Node Flags and Recent Actions/i);
+  assert.match(prompt, /replace that slot/i);
 });
 
 test('sara prompt includes protocol when provided', () => {

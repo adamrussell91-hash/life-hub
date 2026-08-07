@@ -30,7 +30,7 @@ import {
 } from '../../js/core/constraints.js';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
-import { logEntryToolSchema, validateLogEntry, buildCanonicalPath } from './_shared/chat-schema.mjs';
+import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug } from './_shared/chat-schema.mjs';
 import {
   FOOD_LIBRARY_PATH,
   foodLibraryEntrySchema,
@@ -325,7 +325,7 @@ export function createChatHandler({
                   path: buildCanonicalPath({
                     type: validation.record.type,
                     date: validation.record.date,
-                    slug: slugFor(validation.record)
+                    slug: buildRecordSlug(validation.record)
                   })
                 });
               } else {
@@ -348,17 +348,6 @@ export function createChatHandler({
       headers: { 'content-type': 'text/event-stream', ...PRIVATE_CACHE, connection: 'keep-alive' }
     });
   };
-}
-
-function slugFor(record) {
-  const label = record.type === 'meal' ? record.meal
-    : record.type === 'skincare' ? record.routine
-    : record.type;
-  return `${label}-${slugTime(record.time)}`;
-}
-
-function slugTime(time) {
-  return typeof time === 'string' ? time.replace(':', '') : '0000';
 }
 
 async function parseRequest(request) {

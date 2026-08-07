@@ -144,6 +144,26 @@ export function buildCanonicalPath({ type, date, slug }) {
   return `data/${domain}/${year}/${month}/${date}-${slug}.md`;
 }
 
+/**
+ * Stable path slug for a validated record.
+ * Meals use slot-only slugs so same-day corrections overwrite the same file.
+ */
+export function buildRecordSlug(record) {
+  if (!record || typeof record !== 'object') throw new TypeError('record is required');
+  if (record.type === 'meal') {
+    if (typeof record.meal !== 'string' || !SLUG.test(record.meal)) {
+      throw new TypeError(`Invalid meal slot: ${record.meal}`);
+    }
+    return record.meal;
+  }
+  const label = record.type === 'skincare' ? record.routine : record.type;
+  if (typeof label !== 'string' || !SLUG.test(label)) {
+    throw new TypeError(`Invalid slug label: ${label}`);
+  }
+  const time = typeof record.time === 'string' ? record.time.replace(':', '') : '0000';
+  return `${label}-${time}`;
+}
+
 export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
     return { valid: false, errors: ['log_entry payload must be an object'] };
