@@ -407,6 +407,7 @@
                 <span data-fitness="hero-duration">—</span>
                 · <span data-fitness="hero-status">—</span>
               </p>
+              <div id="fitness-muscle-maps" class="fitness-muscle-strip" aria-label="Muscles trained"></div>
               <div id="fitness-focus-tags" class="fitness-tags"></div>
               <div id="fitness-logger" class="fitness-logger" hidden></div>
               <div id="fitness-exercise-list" class="fitness-exercise-list"></div>
@@ -414,6 +415,28 @@
               <p class="metric-caption" data-fitness="hero-notes"></p>
             </div>
           </article>
+
+          <article class="metric-card fitness-templates-card" aria-labelledby="fitness-templates-label">
+            <p class="metric-label" id="fitness-templates-label">Templates</p>
+            <p id="fitness-templates-status" class="metric-caption" aria-live="polite"></p>
+            <div id="fitness-templates-rail" class="fitness-templates-rail"></div>
+          </article>
+
+          <dialog id="fitness-template-sheet" class="fitness-template-sheet">
+            <form method="dialog" class="fitness-template-sheet__inner">
+              <header class="fitness-template-sheet__header">
+                <h3 id="fitness-template-sheet-title">Template</h3>
+                <button type="submit" class="quiet-button" value="cancel" aria-label="Close">Close</button>
+              </header>
+              <div id="fitness-template-sheet-maps" class="fitness-muscle-strip fitness-muscle-strip--lg"></div>
+              <div id="fitness-template-sheet-focus" class="fitness-tags"></div>
+              <div id="fitness-template-sheet-exercises" class="fitness-exercise-list"></div>
+              <p id="fitness-template-sheet-note" class="metric-caption"></p>
+              <menu class="fitness-template-sheet__actions">
+                <button type="button" id="fitness-template-use-today" class="quiet-button fitness-template-use">Use today</button>
+              </menu>
+            </form>
+          </dialog>
 
           <article class="metric-card chart-card">
             <p class="metric-label">7-day volume</p>

@@ -241,4 +241,16 @@ Verified on 2026-08-05 (local only — do not push unless asked):
 
 Full design: `docs/superpowers/specs/2026-08-05-mind-tab-avatars-design.md`.
 
+## Phase 20: Fitness muscle maps + template library — Complete
+
+Verified on 2026-08-07 (local only — do not push unless asked):
+
+- Muscle highlight assets under `assets/fitness/muscles/` with client resolver (`muscle-maps.js`) using exercise-library fine tokens + coarse focus fallback.
+- Authenticated `GET /api/fitness/templates` returns templates + compact library index (templates stay out of dated event manifest).
+- Fitness hero shows icon-strip maps; horizontal Templates rail under hero; detail sheet with **Use today** → planned confirm via existing chat-confirm path.
+- Shell cache bumped to `life-hub-shell-v41`.
+- Standing product rule: no Notion sync.
+
+Full design: `docs/superpowers/specs/2026-08-07-fitness-muscle-maps-templates-design.md`.
+
 ## Next Phase: sleep·heart on Body / polish

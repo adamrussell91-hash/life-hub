@@ -49,6 +49,7 @@ export function createAppController(dependencies) {
     buildFitnessModel,
     renderFitness,
     fitnessLogger,
+    fitnessTemplateLibrary,
     buildSkincareModel,
     renderSkincare,
     skincareController,
@@ -513,9 +514,39 @@ export function createAppController(dependencies) {
 
   function renderFitnessSection() {
     if (!latestResult || !buildFitnessModel || !renderFitness) return;
-    renderFitness(root, buildFitnessModel(latestResult), { logger: fitnessLogger });
+    const libraryByName = fitnessTemplateLibrary?.getState?.()?.libraryByName ?? null;
+    const model = buildFitnessModel({ ...latestResult, libraryByName });
+    const templates = fitnessTemplateLibrary?.getState?.() ?? { status: 'idle', templates: [] };
+    renderFitness(root, model, {
+      logger: fitnessLogger,
+      templates,
+      libraryByName,
+      onSelectTemplate: template => fitnessTemplateLibrary?.openTemplate?.(template)
+    });
     const button = root.querySelector('#fitness-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, FITNESS_AGENT_SLUG));
+    void fitnessTemplateLibrary?.ensureLoaded?.().then(() => {
+      if (currentSection !== 'fitness' || !latestResult) return;
+      const nextLibrary = fitnessTemplateLibrary.getState()?.libraryByName ?? null;
+      const nextModel = buildFitnessModel({ ...latestResult, libraryByName: nextLibrary });
+      renderFitness(root, nextModel, {
+        logger: fitnessLogger,
+        templates: fitnessTemplateLibrary.getState(),
+        libraryByName: nextLibrary,
+        onSelectTemplate: template => fitnessTemplateLibrary.openTemplate(template)
+      });
+    });
+  }
+
+  function fitnessLibraryContext() {
+    const date = latestResult?.date;
+    const events = latestResult?.events ?? [];
+    const todays = events.filter(({ record }) => record?.type === 'workout' && record.date === date);
+    return {
+      date,
+      completedToday: todays.some(({ record }) => record.status === 'completed'),
+      plannedToday: todays.find(({ record }) => record.status === 'planned')?.record ?? null
+    };
   }
 
   function renderSkincareSection() {
@@ -874,7 +905,8 @@ export function createAppController(dependencies) {
     destroy,
     getCurrentSection: () => currentSection,
     getDisplayDate: () => latestResult?.date ?? null,
-    getAgentsConfig: () => latestResult?.agentsConfig ?? null
+    getAgentsConfig: () => latestResult?.agentsConfig ?? null,
+    getFitnessLibraryContext: () => fitnessLibraryContext()
   };
 }
 

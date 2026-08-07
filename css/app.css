@@ -807,11 +807,102 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-week-dots span[data-hit="true"] { background: var(--fitness-accent); }
 .fitness-week-dots span[data-today="true"] { box-shadow: 0 0 0 2px rgba(46, 123, 214, 0.35); }
 
-.fitness-hero-card h3 {
-  margin: 0.35rem 0 0.15rem;
+.fitness-muscle-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  align-items: flex-end;
+  margin: 0.65rem 0 0.25rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.fitness-muscle-strip__img {
+  height: 56px;
+  width: auto;
+  border-radius: 0.55rem;
+  background: rgba(20, 43, 81, 0.06);
+  flex: 0 0 auto;
+}
+.fitness-muscle-strip--lg .fitness-muscle-strip__img { height: 96px; }
+.fitness-muscle-strip--card .fitness-muscle-strip__img { height: 44px; }
+
+.fitness-templates-card { overflow: hidden; }
+.fitness-templates-rail {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding: 0.35rem 0.15rem 0.5rem;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.fitness-template-card {
+  min-width: 9.5rem;
+  max-width: 11rem;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.65rem;
+  border: 1px solid rgba(20, 43, 81, 0.1);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.55);
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.fitness-template-card strong {
+  font-size: 0.85rem;
   color: var(--depth);
-  font-size: 1.35rem;
-  font-weight: 800;
+}
+.fitness-template-card__meta {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.fitness-template-sheet {
+  border: none;
+  border-radius: 1rem;
+  padding: 0;
+  max-width: min(28rem, calc(100vw - 2rem));
+  width: 100%;
+  background: var(--glass, #f4f7fb);
+  color: inherit;
+  box-shadow: 0 18px 48px rgba(12, 24, 48, 0.28);
+}
+.fitness-template-sheet::backdrop {
+  background: rgba(10, 18, 32, 0.45);
+}
+.fitness-template-sheet__inner {
+  margin: 0;
+  padding: 1rem 1.1rem 1.15rem;
+  display: grid;
+  gap: 0.75rem;
+}
+.fitness-template-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.fitness-template-sheet__header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--depth);
+}
+.fitness-template-sheet__actions {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+.fitness-template-use {
+  background: rgba(46, 123, 214, 0.16);
+  color: var(--marine);
+  font-weight: 700;
+}
+.fitness-template-use:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .fitness-tags,
 .fitness-focus-strip {

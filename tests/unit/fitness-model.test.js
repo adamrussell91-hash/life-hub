@@ -135,3 +135,11 @@ test('first logged exercise is not a PR', () => {
 test('rejects missing display date', () => {
   assert.throws(() => buildFitnessModel({ events: [], date: null }), /display date/i);
 });
+
+test('heroSession includes muscleMapKeys from coarse focus', () => {
+  const model = buildFitnessModel({
+    events: events([workout({ date: '2026-08-07', status: 'planned' })]),
+    date: '2026-08-07'
+  });
+  assert.deepEqual(model.heroSession.muscleMapKeys, ['chest-whole', 'arm-bicep']);
+});
