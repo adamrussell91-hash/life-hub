@@ -3,8 +3,6 @@ publish = "netlify/public"
 
 [functions]
 directory = "netlify/functions"
-# Brisket/Chadwick turns often need web_search + tool rounds; keep the platform max.
-timeout = 26
 included_files = [
   "config/chadwick-protocol.md",
   "config/hyaluronica-protocol.md",
