@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v40';
+const CACHE_NAME = 'life-hub-shell-v41';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -34,6 +34,7 @@ const SHELL_FILES = [
   'js/app/home-model.js',
   'js/app/load-live-events.js',
   'js/app/mind-model.js',
+  'js/app/muscle-maps.js',
   'js/app/nutrition-charts.js',
   'js/app/nutrition-model.js',
   'js/app/render-agent-picker.js',
@@ -70,7 +71,27 @@ const SHELL_FILES = [
   'assets/agents/hammond.jpg',
   'assets/agents/penelope.jpg',
   'assets/agents/vera.jpg',
-  'assets/agents/sara.jpg'
+  'assets/agents/sara.jpg',
+  'assets/fitness/muscles/abs-full.png',
+  'assets/fitness/muscles/abs-lower.png',
+  'assets/fitness/muscles/abs-obliques.png',
+  'assets/fitness/muscles/abs-upper.png',
+  'assets/fitness/muscles/arm-bicep.png',
+  'assets/fitness/muscles/arm-forearm.png',
+  'assets/fitness/muscles/back-full.png',
+  'assets/fitness/muscles/back-lower.png',
+  'assets/fitness/muscles/back-triceps.png',
+  'assets/fitness/muscles/back-upper.png',
+  'assets/fitness/muscles/calves.png',
+  'assets/fitness/muscles/chest-inner.png',
+  'assets/fitness/muscles/chest-lower.png',
+  'assets/fitness/muscles/chest-traps.png',
+  'assets/fitness/muscles/chest-upper.png',
+  'assets/fitness/muscles/chest-whole.png',
+  'assets/fitness/muscles/glutes.png',
+  'assets/fitness/muscles/shoulders.png',
+  'assets/fitness/muscles/thighs-back.png',
+  'assets/fitness/muscles/thighs-front.png'
 ];
 const PRECACHE_URLS = SHELL_FILES.map(file => SCOPE_PATH + file);
 const SHELL_PATHS = new Set(PRECACHE_URLS);
