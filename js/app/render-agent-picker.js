@@ -74,4 +74,35 @@ export function applyAgentAvatarToBubble(bubble, slug) {
   img.alt = agent.name;
 }
 
+export function renderAgentHero(root, slug, {
+  hostSelector = '#chat-agent-hero'
+} = {}) {
+  const host = root.querySelector?.(hostSelector);
+  if (!host) return;
+  const agent = slug ? avatarForSlug(slug) : null;
+  if (!agent?.fullSrc) {
+    host.setAttribute?.('hidden', '');
+    host.replaceChildren?.();
+    return;
+  }
+
+  host.removeAttribute?.('hidden');
+  let img = host.querySelector?.('.chat-agent-hero__img');
+  let name = host.querySelector?.('.chat-agent-hero__name');
+  if (!img || !name) {
+    host.replaceChildren?.();
+    img = root.createElement('img');
+    img.className = 'chat-agent-hero__img';
+    img.alt = '';
+    img.decoding = 'async';
+    name = root.createElement('p');
+    name.className = 'chat-agent-hero__name';
+    host.append(img, name);
+  }
+  img.src = agent.fullSrc;
+  img.alt = agent.name;
+  name.textContent = agent.name;
+  host.dataset.agent = agent.slug;
+}
+
 export { AGENT_AVATARS, avatarForSlug };
