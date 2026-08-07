@@ -183,10 +183,11 @@ test('appendRecordProposal adds a read-only exercises summary with cable types',
   assert.ok(summary);
   assert.equal(summary.tagName, 'ul');
   assert.equal(summary.children.length, 2);
-  assert.match(summary.children[0].textContent, /Chest Press @ 0°/);
-  assert.match(summary.children[0].textContent, /32 kg × 10 · concentric/);
-  assert.match(summary.children[1].textContent, /Bicep Curl/);
-  assert.match(summary.children[1].textContent, /constant force/);
+  assert.equal(summary.children[0].children[0].tagName, 'strong');
+  assert.match(summary.children[0].children[0].textContent, /Chest Press @ 0°/);
+  assert.match(summary.children[0].children[1].textContent, /Set 1: 32 kg × 10 reps · cable: concentric/);
+  assert.match(summary.children[1].children[0].textContent, /Bicep Curl/);
+  assert.match(summary.children[1].children[1].textContent, /cable: constant force/);
 });
 
 test('renderInlineMarkdown keeps bullet lines in one list even when a blank line separates them', () => {

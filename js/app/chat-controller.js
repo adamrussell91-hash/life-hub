@@ -3,7 +3,7 @@ import { applyAgentAvatarToBubble, renderAgentPicker } from './render-agent-pick
 
 const PARAGRAPH_BREAK = /\n{2,}/;
 const HISTORY_WINDOW_MS = 20 * 60 * 1000;
-const MAX_HISTORY_MESSAGES = 8;
+const MAX_HISTORY_MESSAGES = 30;
 const MAX_HISTORY_ENTRY_CHARS = 1000;
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
@@ -42,6 +42,7 @@ export function createChatController({
   let lastAgentSlug = null;
   let lastAgentAt = 0;
   let pinnedAgentSlug = null;
+  let activeAbort = null;
 
   // Prunes anything outside the memory window as a side effect, then returns a
   // bounded, API-shaped slice of what's left -- called before the new user turn
@@ -118,6 +119,41 @@ export function createChatController({
     });
   }
 
+  function bindNewChat() {
+    const button = root.querySelector('#chat-new');
+    if (!button || button.dataset.bound === '1') return;
+    button.dataset.bound = '1';
+    button.addEventListener('click', () => startNewChat());
+  }
+
+  // Hard-reset the visible thread and API memory, but keep whoever Adam pinned
+  // so the next message still goes to the same agent with the same accent.
+  function startNewChat() {
+    if (activeAbort) {
+      try {
+        activeAbort.abort('new-chat');
+      } catch {
+        /* ignore */
+      }
+      activeAbort = null;
+    }
+    transcript = [];
+    lastAgentSlug = pinnedAgentSlug;
+    lastAgentAt = pinnedAgentSlug ? now() : 0;
+    sending = false;
+    setChatBusy(root, false);
+    showChatError(root, '');
+    const list = root.querySelector('#chat-messages');
+    list?.replaceChildren?.();
+    const slug = stickyAgentSlug();
+    if (slug) applyAgentAccent(slug);
+    renderAgentPicker(root, {
+      selectedSlug: slug ?? null,
+      onSelect: selectAgent
+    });
+    clearUnread();
+  }
+
   async function send(message) {
     sending = true;
     setChatBusy(root, true);
@@ -141,6 +177,7 @@ export function createChatController({
     });
     addStatusClass(workingBubble);
     const abort = new AbortController();
+    activeAbort = abort;
     const timeoutId = setTimeout(() => abort.abort(), 90_000);
 
     function clearWorkingBubble() {
@@ -262,13 +299,17 @@ export function createChatController({
     } catch (error) {
       turnSignaled = true;
       clearWorkingBubble();
+      const abortedForNewChat = abort.signal.reason === 'new-chat';
       if (error?.name === 'AbortError') {
-        showChatError(root, 'That search took too long. Try again in a moment.');
+        if (!abortedForNewChat) {
+          showChatError(root, 'That search took too long. Try again in a moment.');
+        }
       } else {
         showChatError(root, 'Chat is unavailable right now. Please try again.');
       }
     } finally {
       clearTimeout(timeoutId);
+      if (activeAbort === abort) activeAbort = null;
       clearWorkingBubble();
       sending = false;
       setChatBusy(root, false);
@@ -295,6 +336,15 @@ export function createChatController({
       if (result?.centralNodeUpdated === false) {
         showChatError(root, 'Logged, but Central Node didn\u2019t update — try Refresh.');
       }
+      if (result?.dayoneSent === false) {
+        const reason = result.dayoneReason;
+        const message = reason === 'not_configured'
+          ? 'Diary saved, but Day One email isn\u2019t configured yet.'
+          : reason === 'empty_notes'
+            ? 'Diary saved, but there was no entry text to email to Day One.'
+            : 'Diary saved, but Day One email didn\u2019t send — you can retry later.';
+        showChatError(root, message);
+      }
       onRecordWritten?.(result);
     } catch (error) {
       proposal.confirm.disabled = false;
@@ -308,6 +358,7 @@ export function createChatController({
   }
 
   bindForm();
+  bindNewChat();
   renderAgentPicker(root, {
     selectedSlug: stickyAgentSlug() ?? null,
     onSelect: selectAgent
@@ -316,6 +367,7 @@ export function createChatController({
   return {
     send,
     selectAgent,
+    startNewChat,
     getSelectedAgentSlug: () => stickyAgentSlug() ?? null,
     clearUnread
   };

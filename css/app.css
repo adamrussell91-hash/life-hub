@@ -555,8 +555,30 @@ main { max-width: 76rem; margin: 0 auto; }
   max-width: 48rem;
 }
 
-.chat-message--user { align-self: flex-end; background: var(--marine); color: white; }
-.chat-message--assistant[data-agent] { border-left: 0.3rem solid var(--agent-accent, var(--wave)); }
+.chat-message--user {
+  align-self: flex-end;
+  /* Pastel agent colours (Sara, Hyaluronica) need a darker mix for white text. */
+  background: color-mix(in srgb, var(--agent-accent, var(--marine)) 72%, var(--marine));
+  color: white;
+}
+.chat-message--assistant[data-agent] {
+  border-left: 0.3rem solid var(--agent-accent, var(--wave));
+  background: color-mix(in srgb, var(--agent-accent, var(--wave)) 14%, var(--glass));
+}
+.chat-new-button {
+  min-height: 44px;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  background: var(--warm-white);
+  color: var(--depth);
+  font-weight: 600;
+  cursor: pointer;
+}
+.chat-new-button:hover {
+  border-color: var(--agent-accent, var(--wave));
+  color: var(--agent-accent, var(--depth));
+}
 
 .record-proposal {
   padding: 1rem 1.2rem;
@@ -568,6 +590,26 @@ main { max-width: 76rem; margin: 0 auto; }
 .record-proposal__fields { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 0.75rem; margin: 0.75rem 0; }
 .record-proposal__fields dt { color: var(--muted); font-size: 0.85rem; }
 .record-proposal__fields input { width: 100%; padding: 0.4rem 0.6rem; border-radius: 0.5rem; border: 1px solid var(--line); }
+
+.record-proposal__exercises-heading {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.record-proposal__exercises {
+  margin: 0 0 0.75rem;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+.record-proposal__exercises li { color: var(--depth); }
+.record-proposal__sets {
+  margin-top: 0.25rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
 
 .record-proposal__confirm, .record-proposal__discard {
   min-height: 44px;
@@ -648,7 +690,15 @@ main { max-width: 76rem; margin: 0 auto; }
   stroke-width: 1.5;
 }
 
-.line-chart { width: 100%; height: 8rem; margin-top: 0.75rem; overflow: visible; }
+/* Width-driven sizing: a fixed height + meet letterboxes the plot on wide cards. */
+.line-chart {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 320 / 140;
+  margin-top: 0.75rem;
+  overflow: visible;
+}
+.line-chart.body-chart { aspect-ratio: 320 / 120; }
 .line-chart [data-role="area"] { fill: var(--area-fill); stroke: none; }
 .line-chart [data-role="line"] {
   fill: none;

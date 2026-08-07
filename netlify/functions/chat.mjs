@@ -19,6 +19,9 @@ import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
 import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs';
 import { loadPenelopeProtocol } from './_shared/load-penelope-protocol.mjs';
 import { loadVeraProtocol } from './_shared/load-vera-protocol.mjs';
+import { loadBrisketProtocol } from './_shared/load-brisket-protocol.mjs';
+import { loadSaraProtocol } from './_shared/load-sara-protocol.mjs';
+import { loadHammondProtocol } from './_shared/load-hammond-protocol.mjs';
 import {
   extractConstraints,
   extractCrossAgentCoordination,
@@ -203,6 +206,9 @@ export function createChatHandler({
     const hyaluronicaProtocol = slug === 'hyaluronica' ? loadHyaluronicaProtocol() : '';
     const penelopeProtocol = slug === 'penelope' ? loadPenelopeProtocol() : '';
     const veraProtocol = slug === 'vera' ? loadVeraProtocol() : '';
+    const brisketProtocol = slug === 'brisket' ? loadBrisketProtocol() : '';
+    const saraProtocol = slug === 'sara' ? loadSaraProtocol() : '';
+    const hammondProtocol = slug === 'hammond' ? loadHammondProtocol() : '';
     const system = buildSystemPrompt({
       slug,
       digest,
@@ -213,6 +219,9 @@ export function createChatHandler({
       hyaluronicaProtocol,
       penelopeProtocol,
       veraProtocol,
+      brisketProtocol,
+      saraProtocol,
+      hammondProtocol,
       workoutTemplates,
       exerciseLibrary
     });

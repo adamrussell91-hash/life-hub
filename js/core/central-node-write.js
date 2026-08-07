@@ -36,6 +36,13 @@ export function buildNutritionStatusLine(totals) {
   return `**Nutrition:** ${parts.length > 0 ? `${parts.join(', ')}.` : 'No meals logged.'}`;
 }
 
+export function buildMealFlagsLine(notes) {
+  const text = typeof notes === 'string' ? notes.trim().replace(/\s+/g, ' ') : '';
+  if (!text) return null;
+  const compact = text.length > 140 ? `${text.slice(0, 137)}...` : text;
+  return `**Flags:** ${compact}`;
+}
+
 export function buildExerciseStatusLine(record) {
   const duration = record.duration_min != null ? `${record.duration_min} min` : null;
   const title = record.title ? record.title : (record.day_type ?? 'workout');
@@ -145,6 +152,7 @@ export function applyLogToCentralNode(content, {
   record,
   actionLine,
   nutritionTotals = null,
+  flagNotes = null,
   preserveOtherStatusFields = true
 }) {
   let next = appendRecentAction(content, actionLine);
@@ -154,6 +162,8 @@ export function applyLogToCentralNode(content, {
 
   if (record.type === 'meal' && nutritionTotals) {
     body = upsertStatusField(body, 'Nutrition', buildNutritionStatusLine(nutritionTotals));
+    const flags = buildMealFlagsLine(flagNotes);
+    if (flags) body = upsertStatusField(body, 'Flags', flags);
   } else if (record.type === 'workout') {
     body = upsertStatusField(body, 'Exercise', buildExerciseStatusLine(record));
   } else if (record.type === 'diary') {
@@ -162,8 +172,16 @@ export function applyLogToCentralNode(content, {
   } else if (record.type === 'weight' || record.type === 'composition') {
     const weight = record.weight_kg != null ? `${record.weight_kg} kg` : 'logged';
     body = upsertStatusField(body, 'Health', `**Health:** Weight ${weight}.`);
+    const flags = buildMealFlagsLine(flagNotes);
+    if (flags) body = upsertStatusField(body, 'Flags', flags);
+  } else if (record.type === 'measurements') {
+    body = upsertStatusField(body, 'Health', '**Health:** Measurements logged.');
+    const flags = buildMealFlagsLine(flagNotes);
+    if (flags) body = upsertStatusField(body, 'Flags', flags);
   } else if (record.type === 'skincare') {
-    body = upsertStatusField(body, 'Flags', `**Flags:** Skincare ${record.routine ?? ''} logged.`.replace(/\s+/g, ' ').trim());
+    const flags = buildMealFlagsLine(flagNotes)
+      ?? `**Flags:** Skincare ${record.routine ?? ''} logged.`.replace(/\s+/g, ' ').trim();
+    body = upsertStatusField(body, 'Flags', flags);
   } else {
     return next;
   }

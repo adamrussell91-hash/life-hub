@@ -5,6 +5,7 @@ import { loadHyaluronicaProtocol } from '../../netlify/functions/_shared/load-hy
 test('loads the checked-in Hyaluronica protocol markdown', () => {
   const text = loadHyaluronicaProtocol();
   assert.match(text, /Skincare tab|Operating Manual/i);
+  assert.match(text, /Before advising or logging|Central Node after skincare/i);
 });
 
 test('returns an empty string when the seed file cannot be read', () => {

@@ -4,6 +4,7 @@ import {
   appendCrossAgentDayType,
   appendRecentAction,
   applyLogToCentralNode,
+  buildMealFlagsLine,
   buildNutritionStatusLine,
   formatStatusHeadingDate,
   humanizeDayType,
@@ -39,6 +40,14 @@ test('buildNutritionStatusLine formats totals only', () => {
   );
 });
 
+test('buildMealFlagsLine compacts notes into a Flags status line', () => {
+  assert.equal(
+    buildMealFlagsLine('Coles tofu bowl — on track, solid protein'),
+    '**Flags:** Coles tofu bowl — on track, solid protein'
+  );
+  assert.equal(buildMealFlagsLine('  '), null);
+});
+
 test('upsertStatusField replaces an existing field line', () => {
   const body = upsertStatusField('**Health:** Stable.\n**Nutrition:** Old.', 'Nutrition', '**Nutrition:** 400 kcal, 21g P.');
   assert.equal(body, '**Health:** Stable.\n**Nutrition:** 400 kcal, 21g P.');
@@ -59,12 +68,31 @@ test('applyLogToCentralNode appends Recent Actions and refreshes Nutrition on me
   const next = applyLogToCentralNode(base, {
     record: { type: 'meal', date: '2026-08-01', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12 },
     actionLine: '\n**1 Aug:** Brisket Lasso: Logged breakfast (520 kcal, 38g protein, 12g fat).',
-    nutritionTotals: { calories: 520, protein_g: 38, fat_g: 12 }
+    nutritionTotals: { calories: 520, protein_g: 38, fat_g: 12 },
+    flagNotes: 'Eggs and toast — on track, solid protein'
   });
   assert.match(next, /## ⚡ Today's Status \([^)]*1 August 2026\)/);
   assert.match(next, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F\./);
+  assert.match(next, /\*\*Flags:\*\* Eggs and toast — on track, solid protein/);
   assert.match(next, /\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast/);
   assert.match(next, /Chest and Curls|session logged/);
+});
+
+test('skincare and body logs can land Flags from notes', () => {
+  const nextSkin = applyLogToCentralNode(base, {
+    record: { type: 'skincare', date: '2026-08-01', routine: 'am', completed: true },
+    actionLine: '\n**1 Aug:** Hyaluronica: Logged am skincare.',
+    flagNotes: 'AM stack — looking good, mild tightness'
+  });
+  assert.match(nextSkin, /\*\*Flags:\*\* AM stack — looking good, mild tightness/);
+
+  const nextBody = applyLogToCentralNode(base, {
+    record: { type: 'weight', date: '2026-08-01', weight_kg: 88.2 },
+    actionLine: '\n**1 Aug:** Sara: Logged weight.',
+    flagNotes: '88.2 kg — stable vs last'
+  });
+  assert.match(nextBody, /\*\*Health:\*\* Weight 88.2 kg\./);
+  assert.match(nextBody, /\*\*Flags:\*\* 88.2 kg — stable vs last/);
 });
 
 test('same-day meal log preserves other Status fields', () => {

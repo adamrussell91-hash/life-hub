@@ -24,6 +24,7 @@ import {
 } from '../../js/core/central-node-write.js';
 import { getSydneyTimestamp } from '../../js/core/time.js';
 import { loadCentralNodeSeed } from './_shared/load-central-node-seed.mjs';
+import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
@@ -126,9 +127,48 @@ export function createChatConfirmHandler({
         // as a failed confirmation. The client is told via centralNodeUpdated instead.
         centralNodeUpdated = false;
       }
+
+      let dayoneSent = null;
+      let dayoneReason = null;
+      let sha = result.sha;
+      let commitSha = result.commitSha;
+      if (validation.record.type === 'diary') {
+        const dispatch = await sendDiaryToDayOne({
+          notes: validation.notes,
+          date: validation.record.date,
+          env,
+          fetchImpl
+        });
+        if (dispatch.reason !== 'not_configured') {
+          dayoneSent = dispatch.sent === true;
+          dayoneReason = dispatch.reason ?? null;
+          if (dayoneSent && validation.record.dayone_sent !== true) {
+            try {
+              const patched = { ...validation.record, dayone_sent: true };
+              const updated = await client.writeFile({
+                path,
+                content: renderMarkdown(patched, validation.notes),
+                sha,
+                message: `chore(chat): mark diary dayone_sent for ${validation.record.date}`
+              });
+              sha = updated.sha;
+              commitSha = updated.commitSha;
+            } catch {
+              // Entry already saved and emailed; leaving dayone_sent false is recoverable.
+            }
+          }
+        }
+      }
+
       return jsonResponse(200, {
         ok: true,
-        data: { path, sha: result.sha, commitSha: result.commitSha, centralNodeUpdated }
+        data: {
+          path,
+          sha,
+          commitSha,
+          centralNodeUpdated,
+          ...(dayoneSent != null ? { dayoneSent, ...(dayoneReason ? { dayoneReason } : {}) } : {})
+        }
       }, PRIVATE_CACHE);
     } catch (error) {
       if (error instanceof GitHubClientError && error.code === 'write_conflict') {
@@ -187,7 +227,10 @@ async function syncCentralNodeAfterLog(client, record, notes) {
   const updated = applyLogToCentralNode(content, {
     record,
     actionLine,
-    nutritionTotals
+    nutritionTotals,
+    flagNotes: ['meal', 'skincare', 'weight', 'composition', 'measurements'].includes(record.type)
+      ? notes
+      : null
   });
   if (updated === content) return { updated: false, reason: 'unchanged' };
 
