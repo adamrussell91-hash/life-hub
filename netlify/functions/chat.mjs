@@ -117,7 +117,9 @@ export function createChatHandler({
     const slug = routeAgent(parsed.message, parsed.priorAgentSlug);
     const agent = slug === ROUTER_SLUG ? null : findAgent(slug);
     const today = getSydneyDateKey(new Date(now()));
-    const from = addCalendarDays(today, -6);
+    // Chat only needs a thin digest (today + yesterday). A full week of blob
+    // reads routinely ate the Netlify budget before Anthropic produced a reply.
+    const from = addCalendarDays(today, -1);
     const allowedTypes = agent?.recordTypes.length ? agent.recordTypes : undefined;
     const needsFoodLibrary = Boolean(allowedTypes?.includes('meal'));
     const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
@@ -143,6 +145,7 @@ export function createChatHandler({
         const encoder = new TextEncoder();
         const send = event => controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
         send({ type: 'agent', slug });
+        send({ type: 'status', text: 'Loading your logs…' });
 
         let digest = '';
         let constraints = '';
@@ -248,6 +251,7 @@ export function createChatHandler({
         });
 
         try {
+          send({ type: 'status', text: 'Thinking…' });
           for await (const event of anthropic.streamMessage({
             system,
             messages: [...parsed.history, { role: 'user', content: parsed.message }],

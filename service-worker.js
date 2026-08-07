@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v46';
+const CACHE_NAME = 'life-hub-shell-v47';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".

@@ -45,6 +45,10 @@ async function readSse(response) {
   return text.trim().split('\n\n').map(frame => JSON.parse(frame.replace(/^data: /, '')));
 }
 
+function contentEvents(events) {
+  return events.filter(event => event.type !== 'status');
+}
+
 test('streams an agent event, text, and a validated record proposal for a routed message', async () => {
   const handler = createChatHandler({
     env: validEnv,
@@ -69,7 +73,7 @@ test('streams an agent event, text, and a validated record proposal for a routed
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('content-type'), 'text/event-stream');
 
-  const events = await readSse(response);
+  const events = contentEvents(await readSse(response));
   assert.deepEqual(events[0], { type: 'agent', slug: 'chadwick' });
   assert.deepEqual(events[1], { type: 'text', delta: 'Logging it now.' });
   assert.equal(events[2].type, 'record_proposal');
@@ -241,7 +245,7 @@ test('still streams a reply with an empty digest and constraints when GitHub rea
   const response = await handler(request({ message: 'hi' }));
   assert.equal(response.status, 200);
 
-  const events = await readSse(response);
+  const events = contentEvents(await readSse(response));
   assert.deepEqual(events[0], { type: 'agent', slug: 'router' });
   assert.deepEqual(events[1], { type: 'text', delta: 'Here to help.' });
   assert.deepEqual(events[2], { type: 'done' });
@@ -263,7 +267,7 @@ test('emits record_rejected instead of a proposal for a semantically invalid too
   });
 
   const response = await handler(request({ message: 'Brisket, log breakfast' }));
-  const events = await readSse(response);
+  const events = contentEvents(await readSse(response));
   assert.equal(events[1].type, 'record_rejected');
   assert.ok(Array.isArray(events[1].errors) && events[1].errors.length > 0);
   assert.deepEqual(events[2], { type: 'done' });
@@ -309,7 +313,7 @@ test('save_food_library_entry writes the cache to GitHub, emits food_library_sav
   });
 
   const response = await handler(request({ message: 'Brisket, log breakfast pizza' }));
-  const events = await readSse(response);
+  const events = contentEvents(await readSse(response));
 
   assert.deepEqual(events[0], { type: 'agent', slug: 'brisket' });
   assert.deepEqual(events[1], { type: 'food_library_saved', name: 'Meatlovers Pizza' });
@@ -351,7 +355,7 @@ test('an invalid save_food_library_entry call returns an error tool result witho
   });
 
   const response = await handler(request({ message: 'Brisket, log breakfast' }));
-  const events = await readSse(response);
+  const events = contentEvents(await readSse(response));
   assert.deepEqual(events, [
     { type: 'agent', slug: 'brisket' },
     { type: 'text', delta: 'All good.' },
@@ -461,7 +465,7 @@ test('save_exercise_library_entry writes the cache to GitHub, emits exercise_lib
   });
 
   const response = await handler(request({ message: 'Chadwick, remember Bar Press cues' }));
-  const events = await readSse(response);
+  const events = contentEvents(await readSse(response));
 
   assert.deepEqual(events[0], { type: 'agent', slug: 'chadwick' });
   assert.deepEqual(events[1], { type: 'exercise_library_saved', name: 'Bar Press' });
@@ -506,7 +510,7 @@ test('an invalid save_exercise_library_entry call returns an error tool result w
   });
 
   const response = await handler(request({ message: 'Chadwick, remember an exercise' }));
-  const events = await readSse(response);
+  const events = contentEvents(await readSse(response));
   assert.deepEqual(events, [
     { type: 'agent', slug: 'chadwick' },
     { type: 'text', delta: 'All good.' },
