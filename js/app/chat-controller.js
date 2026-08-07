@@ -7,7 +7,7 @@ const MAX_HISTORY_MESSAGES = 30;
 const MAX_HISTORY_ENTRY_CHARS = 1000;
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
-const EMPTY_TURN_RECOVERY = 'I didn’t finish that reply — send again and I’ll pick it up.';
+const EMPTY_TURN_RECOVERY = 'That reply got cut off before it finished (usually a timeout while looking things up). Send the same message again and I’ll continue.';
 
 // FakeElement (used in unit tests) only models `className` as a plain string, so
 // classList is used when real DOM elements provide it and this string fallback
@@ -289,6 +289,10 @@ export function createChatController({
           turnSignaled = true;
           clearWorkingBubble();
           showChatError(root, 'Chat is unavailable right now. Please try again.');
+        } else if (event.type === 'status') {
+          if (typeof event.text === 'string' && event.text.trim()) {
+            setWorkingStatus(event.text.trim());
+          }
         } else if (event.type === 'search') {
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `🔍 Searched the web: ${event.query ?? '…'}` });

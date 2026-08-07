@@ -854,7 +854,7 @@ test('a search-only turn marks unread once empty-turn recovery lands', async () 
   assert.deepEqual(calls, [true]);
 });
 
-const EMPTY_TURN_RECOVERY = 'I didn’t finish that reply — send again and I’ll pick it up.';
+const EMPTY_TURN_RECOVERY = 'That reply got cut off before it finished (usually a timeout while looking things up). Send the same message again and I’ll continue.';
 
 test('empty stream after On it shows a durable recovery message', async () => {
   const root = new FakeDocument();
@@ -888,6 +888,23 @@ test('search-only turn without text or proposal shows recovery message', async (
   const controller = createChatController({ root, chatApi });
   await controller.send('bacon and egg roll');
   assert.ok(messageBubbles(root).some(b => bubbleText(b).includes(EMPTY_TURN_RECOVERY)));
+});
+
+test('status events update the working bubble without counting as a finished turn', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'status', text: 'Loading your logs…' };
+      yield { type: 'status', text: 'Thinking…' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('lasagna');
+  assert.ok(messageBubbles(root).some(b => bubbleText(b).includes(EMPTY_TURN_RECOVERY)));
+  assert.ok(messageBubbles(root).every(b => bubbleText(b) !== 'Loading your logs…'));
+  assert.ok(messageBubbles(root).every(b => bubbleText(b) !== 'Thinking…'));
 });
 
 test('text reply does not show empty-turn recovery', async () => {
