@@ -16,3 +16,10 @@ test('returns an empty string when the seed file cannot be read', () => {
   });
   assert.equal(text, '');
 });
+
+test('protocol documents phased Central Node audit', () => {
+  const text = loadHammondProtocol();
+  assert.match(text, /Central Node audit \(phased\)/i);
+  assert.match(text, /intake/i);
+  assert.match(text, /triage/i);
+});
