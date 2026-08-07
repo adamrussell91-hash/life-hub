@@ -7,7 +7,7 @@ test('loads the checked-in Brisket protocol markdown', () => {
   assert.match(text, /Operating Manual|flare-up|Food Library/i);
   assert.match(text, /Logging protocol|Central Node after meal/i);
   assert.match(text, /compact verdict|on track/i);
-  assert.doesNotMatch(text, /If nothing notable, leave CN alone/);
+  assert.match(text, /Corrections \(same slot\)|replace/i);
 });
 
 test('returns an empty string when the seed file cannot be read', () => {

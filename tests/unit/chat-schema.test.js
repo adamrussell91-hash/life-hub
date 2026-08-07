@@ -1,10 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCanonicalPath, logEntryToolSchema, validateLogEntry } from '../../netlify/functions/_shared/chat-schema.mjs';
+import { buildCanonicalPath, logEntryToolSchema, validateLogEntry, buildRecordSlug } from '../../netlify/functions/_shared/chat-schema.mjs';
 
 test('builds the canonical path for each writable record type', () => {
   assert.equal(buildCanonicalPath({ type: 'meal', date: '2026-08-01', slug: 'breakfast' }), 'data/nutrition/2026/08/2026-08-01-breakfast.md');
   assert.equal(buildCanonicalPath({ type: 'weight', date: '2026-08-01', slug: 'weight' }), 'data/body/2026/08/2026-08-01-weight.md');
+});
+
+test('meal slugs are slot-only so same-day corrections overwrite', () => {
+  assert.equal(buildRecordSlug({ type: 'meal', meal: 'lunch', time: '13:45' }), 'lunch');
+  assert.equal(buildRecordSlug({ type: 'meal', meal: 'snack', time: '16:00' }), 'snack');
+  assert.equal(
+    buildCanonicalPath({
+      type: 'meal',
+      date: '2026-08-07',
+      slug: buildRecordSlug({ type: 'meal', meal: 'lunch', time: '13:45' })
+    }),
+    'data/nutrition/2026/08/2026-08-07-lunch.md'
+  );
+});
+
+test('non-meal slugs still include time when present', () => {
+  assert.equal(buildRecordSlug({ type: 'workout', time: '07:30' }), 'workout-0730');
+  assert.equal(buildRecordSlug({ type: 'skincare', routine: 'am', time: '08:00' }), 'am-0800');
+  assert.equal(buildRecordSlug({ type: 'diary', time: '21:15' }), 'diary-2115');
 });
 
 test('rejects an unknown type, invalid date, or invalid slug', () => {

@@ -95,7 +95,8 @@ export function buildSystemPrompt({
     brisketProtocol
       ? `Brisket operating manual (follow these Life Hub rules; ignore any Notion database mechanics):\n${brisketProtocol}`
       : '',
-    'Every meal log_entry MUST include notes in the form "[food] — [compact verdict]" (on track / protein short / fat risk / emulsifier flag, etc.). Life Hub copies that line into Central Node Flags and Recent Actions after confirm — a meal without a verdict leaves CN silent. Keep Cross-Agent directives rare; routine meal judgments stay in notes.'
+    'Every meal log_entry MUST include notes in the form "[food] — [compact verdict]" (on track / protein short / fat risk / emulsifier flag, etc.). Life Hub copies that line into Central Node Flags and Recent Actions after confirm — a meal without a verdict leaves CN silent. Keep Cross-Agent directives rare; routine meal judgments stay in notes.',
+    'One breakfast/lunch/dinner/snack file per day. If Adam corrects a meal already logged today, re-propose the same meal slot with updated macros/notes and say confirming will replace that slot (overwrite), not add another.'
   ] : [];
 
   const saraBlocks = slug === 'sara' ? [
