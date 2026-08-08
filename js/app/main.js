@@ -33,6 +33,7 @@ import { renderHome, renderUnavailable, renderWarnings } from './render-home.js'
 import { renderMind } from './render-mind.js';
 import { renderNutrition } from './render-nutrition.js';
 import { createRepositoryCache } from './repository-cache.js';
+import { createSkincareApi } from './skincare-api.js';
 import { createSkincareController } from './skincare-controller.js';
 import { buildSkincareModel } from './skincare-model.js';
 import { SKINCARE_ROUTINES, currentRoutineKey } from './skincare-routines-data.js';
@@ -79,6 +80,7 @@ const loadCached = async ({ date }) => {
 
 const chatPanel = createChatPanelController({ root: document });
 const chatApi = createChatApi(fetchImpl);
+const skincareApi = createSkincareApi(fetchImpl);
 
 let controller;
 let chatController;
@@ -99,7 +101,9 @@ const fitnessTemplateLibrary = createFitnessTemplateLibrary({
 const skincareController = createSkincareController({
   root: document,
   chatApi,
-  onRecordWritten: () => void controller.refresh({ manual: true, force: true })
+  skincareApi,
+  onRecordWritten: () => void controller.refresh({ manual: true, force: true }),
+  onCatalogChanged: catalog => controller?.applySkincareCatalog?.(catalog)
 });
 const bodyController = createBodyController({
   root: document,
@@ -126,6 +130,7 @@ controller = createAppController({
   fitnessTemplateLibrary,
   buildSkincareModel,
   renderSkincare,
+  skincareApi,
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,

@@ -1,4 +1,5 @@
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
+import { resolveActiveProducts } from './skincare-catalog.js';
 
 const WEEK_DAYS = 7;
 const MONTH_DAYS = 30;
@@ -28,7 +29,7 @@ function dayState(entries, day) {
   return 'miss';
 }
 
-export function buildSkincareModel({ events, date, routines, nowHourKey }) {
+export function buildSkincareModel({ events, date, routines, nowHourKey, catalog = null }) {
   if (!date) throw new RangeError('Skincare display date is unavailable');
   const skincareEntries = (events ?? [])
     .map(event => ({ record: event.record, path: event.path, body: event.body }))
@@ -41,11 +42,18 @@ export function buildSkincareModel({ events, date, routines, nowHourKey }) {
 
   const weekDates = enumerateDateKeys(addCalendarDays(date, -(WEEK_DAYS - 1)), date);
   const monthDates = enumerateDateKeys(addCalendarDays(date, -(MONTH_DAYS - 1)), date);
+  const base = routines ?? {};
+  const resolvedRoutines = {
+    ...base,
+    am: base.am ? { ...base.am, products: resolveActiveProducts('am', catalog, base) } : base.am,
+    pm: base.pm ? { ...base.pm, products: resolveActiveProducts('pm', catalog, base) } : base.pm,
+    extras: base.extras
+  };
 
   return {
     date,
     currentRoutine: nowHourKey === 'am' || nowHourKey === 'pm' ? nowHourKey : 'pm',
-    routines,
+    routines: resolvedRoutines,
     amLogged: Boolean(am),
     pmLogged: Boolean(pm),
     amRecord: am?.record ?? null,

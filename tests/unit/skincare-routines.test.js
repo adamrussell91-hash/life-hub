@@ -25,6 +25,19 @@ test('buildProductList includes chosen toner and extras', () => {
   assert.ok(products.includes('Sheet mask'));
 });
 
+test('buildProductList filters active products and one-offs by enabled products', () => {
+  const products = buildProductList('am', {
+    activeProducts: ['Catalog serum', 'Catalog moisturiser', 'Catalog serum'],
+    oneOffs: ['One-off treatment', 'Hidden treatment'],
+    enabledProducts: ['Catalog moisturiser', 'One-off treatment']
+  });
+  assert.deepEqual(products, [
+    'Anua Rice 70 + Ceramide Glow Milky Toner',
+    'Catalog moisturiser',
+    'One-off treatment'
+  ]);
+});
+
 test('appendNoteChip dedupes case-insensitively', () => {
   assert.equal(appendNoteChip('', 'Redness'), 'Redness');
   assert.equal(appendNoteChip('Redness', 'Tightness'), 'Redness, Tightness');
@@ -73,6 +86,51 @@ test('buildSkincareModel marks am/pm logged and lists procedures', () => {
   assert.equal(model.pmLogged, false);
   assert.equal(model.procedures.length, 1);
   assert.equal(model.currentRoutine, 'am');
+});
+
+test('buildSkincareModel overlays catalog products and excludes retired products', () => {
+  const catalog = {
+    schema_version: 1,
+    am: {
+      products: ['Catalog serum', 'Retired serum'],
+      retired: ['Retired serum'],
+      extras: []
+    },
+    pm: {
+      products: ['Catalog cleanser'],
+      retired: [],
+      extras: []
+    }
+  };
+  const model = buildSkincareModel({
+    date: '2026-08-05',
+    routines: SKINCARE_ROUTINES,
+    nowHourKey: 'am',
+    catalog,
+    events: []
+  });
+  assert.deepEqual(model.routines.am.products, ['Catalog serum']);
+  assert.deepEqual(model.routines.pm.products, ['Catalog cleanser']);
+  assert.deepEqual(SKINCARE_ROUTINES.am.products, [
+    'Azclear Azelaic Acid 20%',
+    'Korres Greek Yoghurt Probiotic Gel Cream',
+    'La Roche Posay Anthelios SPF 50+',
+    'Dr Jart+ Cicapair Colour Corrector',
+    'Maybelline Green and Peach Correctors with BareMinerals Concealer',
+    'Kosas Cloud Set Translucent Loose Setting and Blurring Powder'
+  ]);
+});
+
+test('buildSkincareModel preserves default products without a catalog', () => {
+  const model = buildSkincareModel({
+    date: '2026-08-05',
+    routines: SKINCARE_ROUTINES,
+    nowHourKey: 'am',
+    catalog: null,
+    events: []
+  });
+  assert.deepEqual(model.routines.am.products, SKINCARE_ROUTINES.am.products);
+  assert.deepEqual(model.routines.pm.products, SKINCARE_ROUTINES.pm.products);
 });
 
 test('amStreak and pmStreak count consecutive routine days independently', () => {

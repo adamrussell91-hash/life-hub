@@ -66,7 +66,13 @@ export function currentRoutineKey(date = new Date(), timeZone = 'Australia/Sydne
   return hour < 12 ? 'am' : 'pm';
 }
 
-export function buildProductList(routineKey, { choiceSelections = {}, enabledProducts = null, extras = [] } = {}) {
+export function buildProductList(routineKey, {
+  choiceSelections = {},
+  enabledProducts = null,
+  extras = [],
+  activeProducts = null,
+  oneOffs = []
+} = {}) {
   const routine = SKINCARE_ROUTINES[routineKey];
   if (!routine) return [];
   const selected = [];
@@ -74,10 +80,11 @@ export function buildProductList(routineKey, { choiceSelections = {}, enabledPro
     const value = choiceSelections[choice.id] ?? choice.default;
     if (value) selected.push(value);
   }
-  const fixed = routine.products ?? [];
+  const pool = [...(activeProducts ?? routine.products ?? []), ...(oneOffs ?? [])];
+  const uniquePool = [...new Set(pool)];
   const enabled = enabledProducts == null
-    ? fixed
-    : fixed.filter(name => enabledProducts.includes(name));
+    ? uniquePool
+    : uniquePool.filter(name => enabledProducts.includes(name));
   return [...selected, ...enabled, ...extras.filter(Boolean)];
 }
 
