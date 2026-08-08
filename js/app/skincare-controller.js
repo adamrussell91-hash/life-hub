@@ -3,7 +3,9 @@ import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message
 export function createSkincareController({
   root,
   chatApi,
+  skincareApi,
   onRecordWritten,
+  onCatalogChanged,
   isOnline = () => globalThis.navigator?.onLine !== false
 }) {
   if (!root || !chatApi) throw new TypeError('Skincare controller dependencies are unavailable');
@@ -42,10 +44,49 @@ export function createSkincareController({
     }
   }
 
+  async function addProduct({ routine, name, keep }) {
+    if (!keep) return { oneOff: true, name };
+    if (!isOnline()) {
+      setStatus('Connect to update routine.');
+      return;
+    }
+    setStatus('Saving…');
+    try {
+      const catalog = await skincareApi.appendProduct({ routine, name });
+      setStatus('Added to routine');
+      onCatalogChanged?.(catalog);
+      return catalog;
+    } catch (error) {
+      if (error?.code === 'retired_product') {
+        setStatus('That product was retired — restore not available yet');
+        return;
+      }
+      setStatus('Couldn’t update routine — try again.');
+    }
+  }
+
+  async function retireProduct({ routine, name }) {
+    if (!isOnline()) {
+      setStatus('Connect to update routine.');
+      return;
+    }
+    setStatus('Saving…');
+    try {
+      const catalog = await skincareApi.retireProduct({ routine, name });
+      setStatus('Removed from rotation');
+      onCatalogChanged?.(catalog);
+      return catalog;
+    } catch {
+      setStatus('Couldn’t update routine — try again.');
+    }
+  }
+
   return {
     setStatus,
     onLogRoutine: ({ payload }) => void save(payload),
     onLogProcedure: ({ payload }) => void save(payload),
+    onAddProduct: addProduct,
+    onRetireProduct: retireProduct,
     save
   };
 }

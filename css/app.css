@@ -1166,6 +1166,16 @@ main { max-width: 76rem; margin: 0 auto; }
   font-size: 0.85rem;
   color: var(--ink);
 }
+.skincare-products--pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.skincare-product-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
 .skincare-chip {
   border: 1px solid var(--line);
   background: var(--warm-white);
@@ -1180,6 +1190,34 @@ main { max-width: 76rem; margin: 0 auto; }
   background: rgba(185, 158, 224, 0.25);
   border-color: #B99EE0;
   color: var(--depth);
+}
+.skincare-product-pill__menu {
+  align-self: stretch;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 0.45rem;
+  background: var(--warm-white);
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.skincare-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin: -0.35rem 0 0.75rem;
+}
+.skincare-add input {
+  min-width: 12rem;
+  flex: 1 1 12rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.75rem;
+  background: var(--warm-white);
+  color: var(--ink);
 }
 .skincare-note-chips,
 .skincare-extras {
