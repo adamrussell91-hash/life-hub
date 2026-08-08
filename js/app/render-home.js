@@ -80,7 +80,8 @@ export function renderHome(root, model) {
   const status = root.querySelector('#app-status');
   if (status) status.textContent = `Life Hub loaded for ${formatDate(model.date)}.`;
   root.querySelector('#unavailable-panel')?.setAttribute('hidden', '');
-  root.querySelector('#home-dashboard')?.removeAttribute('hidden');
+  // Visibility is owned by showSection / setSectionVisibility — do not force-show
+  // Home here, or a refresh while on Chat resurfaces Daily Pulse over the chat.
 }
 
 export function renderWarnings(root, warnings) {

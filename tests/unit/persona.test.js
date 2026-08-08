@@ -49,7 +49,9 @@ test('rejects an unknown slug', () => {
 
 test('an empty food library falls back to a plain web_search instruction', () => {
   const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
-  assert.match(prompt, /use web_search to look up its actual nutrition figures/);
+  assert.match(prompt, /use web_search to look up its actual Australian nutrition figures/);
+  assert.match(prompt, /Never use US Nutrition Facts/);
+  assert.match(prompt, /do not silently cite the US bottle/);
   assert.doesNotMatch(prompt, /Food Library:/);
 });
 
@@ -58,6 +60,8 @@ test('a populated food library is included with instructions to check it before 
   assert.match(prompt, /check the Food Library below first/);
   assert.match(prompt, /save_food_library_entry/);
   assert.match(prompt, /Domino's Meatlovers Pizza/);
+  assert.match(prompt, /Never use US Nutrition Facts/);
+  assert.match(prompt, /Coles\/Woolworths/);
 });
 
 test('an empty central node log is omitted entirely', () => {

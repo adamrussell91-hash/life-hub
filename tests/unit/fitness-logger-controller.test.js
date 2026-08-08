@@ -52,22 +52,29 @@ const session = () => ({
   exercises: [{ name: 'Bench', sets: [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }] }]
 });
 
-test('finish confirms completed overwrite and clears the draft', async () => {
+function makeController(overrides = {}) {
+  const intervals = [];
+  let clock = 1_000_000;
   const confirms = [];
-  const store = new Map();
-  const storage = {
-    getItem: key => (store.has(key) ? store.get(key) : null),
-    setItem: (key, value) => store.set(key, value),
-    removeItem: key => store.delete(key)
-  };
   const root = new FakeRoot();
-  const written = [];
   const controller = createFitnessLoggerController({
     root,
-    storage,
+    storage: {
+      getItem: () => null,
+      setItem() {},
+      removeItem() {}
+    },
     documentTarget: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} },
-    setIntervalImpl: () => 1,
-    clearIntervalImpl() {},
+    now: () => clock,
+    setIntervalImpl: (fn, ms) => {
+      const id = intervals.length + 1;
+      intervals.push({ id, fn, ms, cleared: false });
+      return id;
+    },
+    clearIntervalImpl(id) {
+      const row = intervals.find(item => item.id === id);
+      if (row) row.cleared = true;
+    },
     setTimeoutImpl: () => 1,
     clearTimeoutImpl() {},
     chatApi: {
@@ -76,9 +83,33 @@ test('finish confirms completed overwrite and clears the draft', async () => {
         return { path: session().path };
       }
     },
-    onSessionWritten: result => written.push(result),
     isOnline: () => true,
-    idleMs: 60_000
+    idleMs: 60_000,
+    ...overrides
+  });
+  return {
+    controller,
+    root,
+    confirms,
+    intervals,
+    advance(ms) { clock += ms; },
+    tickTimers() {
+      for (const row of intervals.filter(item => !item.cleared)) row.fn();
+    }
+  };
+}
+
+test('finish confirms completed overwrite and clears the draft', async () => {
+  const store = new Map();
+  const storage = {
+    getItem: key => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key)
+  };
+  const written = [];
+  const { controller, confirms } = makeController({
+    storage,
+    onSessionWritten: result => written.push(result)
   });
 
   controller.mount(session());
@@ -94,29 +125,7 @@ test('finish confirms completed overwrite and clears the draft', async () => {
 });
 
 test('autosave sends planned overwrite when the draft changed', async () => {
-  const confirms = [];
-  const root = new FakeRoot();
-  const controller = createFitnessLoggerController({
-    root,
-    storage: {
-      getItem: () => null,
-      setItem() {},
-      removeItem() {}
-    },
-    documentTarget: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} },
-    setIntervalImpl: () => 1,
-    clearIntervalImpl() {},
-    setTimeoutImpl: () => 1,
-    clearTimeoutImpl() {},
-    chatApi: {
-      async confirm(payload) {
-        confirms.push(payload);
-        return {};
-      }
-    },
-    isOnline: () => true,
-    idleMs: 60_000
-  });
+  const { controller, confirms } = makeController();
 
   controller.mount(session());
   const draft = controller.getDraft();
@@ -126,5 +135,84 @@ test('autosave sends planned overwrite when the draft changed', async () => {
   assert.equal(confirms.length, 1);
   assert.equal(confirms[0].candidate.fields.status, 'planned');
   assert.equal(confirms[0].candidate.fields.exercises[0].sets[0].weight_kg, 40);
+  controller.destroy();
+});
+
+test('mount leaves the timer idle without starting an interval', () => {
+  const { controller, intervals } = makeController();
+  controller.mount(session());
+
+  const timer = controller.getTimerState();
+  assert.equal(timer.state, 'idle');
+  assert.equal(timer.elapsedMs, 0);
+  assert.equal(timer.everStarted, false);
+  assert.equal(timer.completeVisible, false);
+  assert.equal(intervals.filter(item => !item.cleared).length, 0);
+  controller.destroy();
+});
+
+test('start pause resume accumulate only running time', () => {
+  const { controller, intervals, advance } = makeController();
+  controller.mount(session());
+
+  controller.startTimer();
+  assert.equal(controller.getTimerState().state, 'running');
+  assert.equal(controller.getTimerState().completeVisible, true);
+  assert.equal(intervals.filter(item => !item.cleared).length, 1);
+
+  advance(10_000);
+  assert.equal(controller.getTimerState().elapsedMs, 10_000);
+
+  controller.pauseTimer();
+  assert.equal(controller.getTimerState().state, 'paused');
+  assert.equal(controller.getTimerState().elapsedMs, 10_000);
+  assert.equal(intervals.every(item => item.cleared), true);
+
+  advance(60_000);
+  assert.equal(controller.getTimerState().elapsedMs, 10_000);
+
+  controller.startTimer();
+  advance(5_000);
+  assert.equal(controller.getTimerState().state, 'running');
+  assert.equal(controller.getTimerState().elapsedMs, 15_000);
+  controller.destroy();
+});
+
+test('complete locks the clock and undo returns to paused', () => {
+  const { controller, advance } = makeController();
+  controller.mount(session());
+  controller.startTimer();
+  advance(12_000);
+  controller.completeTimer();
+
+  assert.equal(controller.getTimerState().state, 'completed');
+  assert.equal(controller.getTimerState().elapsedMs, 12_000);
+  advance(30_000);
+  assert.equal(controller.getTimerState().elapsedMs, 12_000);
+
+  controller.undoCompleteTimer();
+  assert.equal(controller.getTimerState().state, 'paused');
+  assert.equal(controller.getTimerState().elapsedMs, 12_000);
+  controller.destroy();
+});
+
+test('complete is a no-op before the first start', () => {
+  const { controller } = makeController();
+  controller.mount(session());
+  controller.completeTimer();
+  assert.equal(controller.getTimerState().state, 'idle');
+  assert.equal(controller.getTimerState().completeVisible, false);
+  controller.destroy();
+});
+
+test('finish includes duration_min from accumulated elapsed', async () => {
+  const { controller, confirms, advance } = makeController();
+  controller.mount(session());
+  controller.startTimer();
+  advance(125_000);
+  controller.pauseTimer();
+  await controller.finish();
+
+  assert.equal(confirms[0].candidate.fields.duration_min, 2);
   controller.destroy();
 });

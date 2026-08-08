@@ -301,6 +301,9 @@ export function createAppController(dependencies) {
         if (currentSection === 'body') renderBodySection();
         if (currentSection === 'mind') renderMindSection();
         if (currentSection === 'central-node') renderCentralNodeSection();
+        // Renderers historically force-unhide their dashboards; refresh must not
+        // resurface Home (or any other section) while Adam is elsewhere.
+        setSectionVisibility(currentSection);
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
       rendered = true;
@@ -454,12 +457,7 @@ export function createAppController(dependencies) {
     }
   }
 
-  function showSection(name) {
-    closeMoreSheet();
-    // Overlay chat lives inside a section host — leave it cleanly on any nav change
-    // so the next FAB open isn't stuck in a half-closed toggle state.
-    if (chatPanel?.isOpen()) chatPanel.close();
-
+  function setSectionVisibility(name) {
     const home = root.querySelector('#home-dashboard');
     const chat = root.querySelector('#chat-view');
     const nutrition = root.querySelector('#nutrition-dashboard');
@@ -477,12 +475,17 @@ export function createAppController(dependencies) {
     if (body) body.hidden = name !== 'body';
     if (mind) mind.hidden = name !== 'mind';
     if (centralNode) centralNode.hidden = name !== 'central-node';
-    if (name === 'chat') {
-      if (chat) chat.hidden = false;
-      chatClearUnread?.();
-    } else if (chat) {
-      chat.hidden = true;
-    }
+    if (chat) chat.hidden = name !== 'chat';
+  }
+
+  function showSection(name) {
+    closeMoreSheet();
+    // Overlay chat lives inside a section host — leave it cleanly on any nav change
+    // so the next FAB open isn't stuck in a half-closed toggle state.
+    if (chatPanel?.isOpen()) chatPanel.close();
+
+    setSectionVisibility(name);
+    if (name === 'chat') chatClearUnread?.();
     currentSection = name;
     if (name === 'nutrition') renderNutritionSection();
     if (name === 'fitness') renderFitnessSection();
