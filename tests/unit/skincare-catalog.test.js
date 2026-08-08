@@ -49,6 +49,14 @@ test('appendProduct refuses blank names', () => {
   assert.equal(appendProduct(catalog, 'am', '  '), null);
 });
 
+test('appendProduct refuses retired names without un-retiring', () => {
+  const catalog = emptyCatalog(SKINCARE_ROUTINES);
+  catalog.am.retired = ['Old Serum'];
+  assert.equal(appendProduct(catalog, 'am', 'Old Serum'), null);
+  assert.equal(catalog.am.products.includes('Old Serum'), false);
+  assert.deepEqual(catalog.am.retired, ['Old Serum']);
+});
+
 test('retireProduct moves from products to retired', () => {
   const catalog = emptyCatalog(SKINCARE_ROUTINES);
   const name = catalog.pm.products[0];

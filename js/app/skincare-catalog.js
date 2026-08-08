@@ -57,6 +57,7 @@ export function appendProduct(catalog, routineKey, name) {
   if (!parsed || (routineKey !== 'am' && routineKey !== 'pm')) return null;
   const trimmed = String(name ?? '').trim();
   if (!trimmed) return null;
+  if (parsed[routineKey].retired.includes(trimmed)) return null;
   if (parsed[routineKey].products.includes(trimmed)) return parsed;
   return {
     ...parsed,
