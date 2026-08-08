@@ -311,6 +311,28 @@ test('adding an existing routine product with keep in routine does not call onAd
   assert.equal(chip?.dataset.active, 'true', 'existing product pill should be selected');
 });
 
+test('keeping a new product creates a selected draft pill immediately', () => {
+  const root = fakeSkincareRoot();
+  const addCalls = [];
+  renderSkincare(root, baseModel(), {
+    onAddProduct: payload => addCalls.push(payload)
+  });
+
+  const [, pmCard] = root._routineCards.children;
+  const product = 'Brand New Night Oil';
+
+  addProductViaUi(pmCard, { name: product, keepInRoutine: true });
+
+  assert.deepEqual(addCalls, [{ routine: 'pm', name: product, keep: true }]);
+  assert.equal(countProductPills(pmCard, product), 1);
+  const chip = findDescendant(pmCard, node =>
+    node.tagName === 'button'
+    && node.className === 'skincare-chip'
+    && node.textContent === product
+  );
+  assert.equal(chip?.dataset.active, 'true');
+});
+
 test('index.html leads Skincare with the consistency hero, heatmap, and legend; week-dots strip is gone', async () => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
 

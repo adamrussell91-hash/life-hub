@@ -56,7 +56,11 @@ export function createSkincareController({
       setStatus('Added to routine');
       onCatalogChanged?.(catalog);
       return catalog;
-    } catch {
+    } catch (error) {
+      if (error?.code === 'retired_product') {
+        setStatus('That product was retired — restore not available yet');
+        return;
+      }
       setStatus('Couldn’t update routine — try again.');
     }
   }

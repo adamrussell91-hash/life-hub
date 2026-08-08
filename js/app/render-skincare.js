@@ -218,12 +218,15 @@ function renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetir
         renderProductChips();
         return;
       }
-      if (keepInRoutine) {
-        onAddProduct?.({ routine: key, name: product, keep: true });
-      } else if (!state.oneOffs.includes(product)) {
+      // Always create a selected draft pill first so Log can include it
+      // before a Keep write finishes (and so Keep failure does not clear it).
+      if (!state.oneOffs.includes(product)) {
         state.oneOffs.push(product);
         state.enabled.add(product);
         renderProductChips();
+      }
+      if (keepInRoutine) {
+        onAddProduct?.({ routine: key, name: product, keep: true });
       }
     });
     add.replaceChildren(name, keep, confirm);

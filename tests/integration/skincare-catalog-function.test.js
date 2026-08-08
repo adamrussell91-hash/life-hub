@@ -150,6 +150,25 @@ test('POST does not overwrite an existing corrupt catalog blob', async () => {
   assert.equal(calls.some(call => call.options.method === 'PUT'), false);
 });
 
+test('POST refuses appending a retired product without writing', async () => {
+  const catalog = {
+    schema_version: 1,
+    am: { products: ['Cleanser'], retired: ['Old Serum'], extras: [] },
+    pm: { products: [], retired: [], extras: [] }
+  };
+  const { calls, fetchImpl } = githubFetchStub({ catalog });
+
+  const response = await handler(fetchImpl)(request({
+    method: 'POST',
+    body: { action: 'append', routine: 'am', name: 'Old Serum' }
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'retired_product');
+  assert.equal(calls.some(call => call.options.method === 'PUT'), false);
+});
+
 test('rejects unauthenticated requests before GitHub calls', async () => {
   let githubCalls = 0;
   const response = await handler(async () => { githubCalls += 1; })(

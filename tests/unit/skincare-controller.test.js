@@ -74,6 +74,31 @@ test('retiring a product saves it, reports success, and publishes the catalog', 
   assert.equal(root.status.textContent, 'Removed from rotation');
 });
 
+test('adding a retired product reports restore-unavailable status', async () => {
+  const root = createRoot();
+  let apiCalls = 0;
+  const controller = createSkincareController({
+    root,
+    chatApi: { confirm() {} },
+    skincareApi: {
+      async appendProduct() {
+        apiCalls += 1;
+        throw Object.assign(new Error('retired'), { code: 'retired_product', status: 400 });
+      }
+    },
+    onCatalogChanged: () => {
+      throw new Error('catalog should not change for retired append');
+    },
+    isOnline: () => true
+  });
+
+  const result = await controller.onAddProduct({ routine: 'am', name: 'Old Serum', keep: true });
+
+  assert.equal(result, undefined);
+  assert.equal(apiCalls, 1);
+  assert.equal(root.status.textContent, 'That product was retired — restore not available yet');
+});
+
 test('catalog updates report an offline status without making API requests', async () => {
   const root = createRoot();
   let apiCalls = 0;

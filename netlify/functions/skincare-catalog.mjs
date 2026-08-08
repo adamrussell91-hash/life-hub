@@ -112,6 +112,15 @@ export function createSkincareCatalogHandler({
         ? appendProduct(seed, routine, name)
         : retireProduct(seed, routine, name);
       if (!catalog) {
+        if (action === 'append' && seed[routine].retired.includes(String(name).trim())) {
+          return errorResponse(
+            400,
+            'retired_product',
+            'That product was retired — restore not available yet',
+            false,
+            PRIVATE_CACHE
+          );
+        }
         return errorResponse(400, 'invalid_request', 'Provide a valid skincare catalog update.', false, PRIVATE_CACHE);
       }
       const result = await github.writeFile({
