@@ -28,7 +28,10 @@ export function createFitnessLoggerController({
 
   let draft = null;
   let syncedFingerprint = null;
-  let startedAt = null;
+  let timerState = 'idle';
+  let accumulatedMs = 0;
+  let segmentStartedAt = null;
+  let everStarted = false;
   let timerId = null;
   let idleId = null;
   let saving = false;
@@ -36,21 +39,50 @@ export function createFitnessLoggerController({
   let mountedPath = null;
   let saveState = '';
 
+  function elapsedMs() {
+    if (timerState === 'running' && segmentStartedAt != null) {
+      return accumulatedMs + Math.max(0, now() - segmentStartedAt);
+    }
+    return accumulatedMs;
+  }
+
+  function getTimerState() {
+    return {
+      state: timerState,
+      elapsedMs: elapsedMs(),
+      everStarted,
+      completeVisible: everStarted && (timerState === 'running' || timerState === 'paused' || timerState === 'completed')
+    };
+  }
+
   function setSaveState(text) {
     saveState = text;
-    updateLoggerChrome(root, { saveState });
+    updateLoggerChrome(root, { saveState, timer: getTimerState() });
+  }
+
+  function refreshChrome() {
+    updateLoggerChrome(root, {
+      elapsedMs: elapsedMs(),
+      saveState,
+      timer: getTimerState()
+    });
   }
 
   function tick() {
-    if (!startedAt) return;
-    updateLoggerChrome(root, { elapsedMs: now() - startedAt });
+    if (timerState !== 'running') return;
+    refreshChrome();
   }
 
-  function stopTimer() {
+  function stopInterval() {
     if (timerId != null) {
       clearIntervalImpl(timerId);
       timerId = null;
     }
+  }
+
+  function ensureInterval() {
+    if (timerId != null) return;
+    timerId = setIntervalImpl(tick, 1000);
   }
 
   function clearIdle() {
@@ -103,14 +135,68 @@ export function createFitnessLoggerController({
     scheduleAutosave();
   }
 
+  function captureRunningSegment() {
+    if (timerState !== 'running' || segmentStartedAt == null) return;
+    accumulatedMs += Math.max(0, now() - segmentStartedAt);
+    segmentStartedAt = null;
+  }
+
+  function startTimer() {
+    if (!draft) return;
+    if (timerState !== 'idle' && timerState !== 'paused') return;
+    everStarted = true;
+    timerState = 'running';
+    segmentStartedAt = now();
+    ensureInterval();
+    rerender();
+  }
+
+  function pauseTimer() {
+    if (!draft || timerState !== 'running') return;
+    captureRunningSegment();
+    timerState = 'paused';
+    stopInterval();
+    rerender();
+  }
+
+  function completeTimer() {
+    if (!draft || !everStarted) return;
+    if (timerState === 'completed') return;
+    if (timerState === 'running') captureRunningSegment();
+    timerState = 'completed';
+    stopInterval();
+    rerender();
+  }
+
+  function undoCompleteTimer() {
+    if (!draft || timerState !== 'completed') return;
+    timerState = 'paused';
+    segmentStartedAt = null;
+    stopInterval();
+    rerender();
+  }
+
+  function resetTimer() {
+    stopInterval();
+    timerState = 'idle';
+    accumulatedMs = 0;
+    segmentStartedAt = null;
+    everStarted = false;
+  }
+
   function rerender() {
     if (!draft) return;
     renderFitnessLogger(root, draft, {
-      elapsedMs: startedAt ? now() - startedAt : 0,
+      elapsedMs: elapsedMs(),
       saveState,
+      timer: getTimerState(),
       onChange: applyChange,
       onAddSet: addSet,
-      onFinish: () => void finish()
+      onFinish: () => void finish(),
+      onStart: startTimer,
+      onPause: pauseTimer,
+      onComplete: completeTimer,
+      onUndoComplete: undoCompleteTimer
     });
   }
 
@@ -144,6 +230,10 @@ export function createFitnessLoggerController({
     if (!draft || finishing) return;
     finishing = true;
     clearIdle();
+    if (timerState === 'running') captureRunningSegment();
+    stopInterval();
+    const mins = Math.round(elapsedMs() / 60_000);
+    if (mins > 0) draft.duration_min = mins;
     setSaveState('Finishing…');
     const finishButton = root.querySelector('[data-fitness-logger="finish"]');
     if (finishButton) finishButton.disabled = true;
@@ -152,7 +242,6 @@ export function createFitnessLoggerController({
       const payload = toConfirmPayload(draft, { status: 'completed' });
       const result = await chatApi.confirm(payload);
       clearDraft(storage, draft.date, draft.path);
-      const path = draft.path;
       unmount();
       onSessionWritten?.(result);
       return result;
@@ -172,12 +261,11 @@ export function createFitnessLoggerController({
 
   function unmount() {
     clearIdle();
-    stopTimer();
+    resetTimer();
     documentTarget?.removeEventListener?.('visibilitychange', onVisibility);
     hideFitnessLogger(root);
     draft = null;
     mountedPath = null;
-    startedAt = null;
     saving = false;
     finishing = false;
     saveState = '';
@@ -194,10 +282,7 @@ export function createFitnessLoggerController({
     const sameSession = mountedPath && nextDraft.path && mountedPath === nextDraft.path && draft;
 
     if (sameSession) {
-      updateLoggerChrome(root, {
-        elapsedMs: startedAt ? now() - startedAt : 0,
-        saveState
-      });
+      refreshChrome();
       return;
     }
 
@@ -207,9 +292,7 @@ export function createFitnessLoggerController({
     syncedFingerprint = draftFingerprint(cloneLoggerDraft(session));
     if (draftFingerprint(draft) !== syncedFingerprint) setSaveState('Unsaved edits');
     else setSaveState('');
-    startedAt = now();
     documentTarget?.addEventListener?.('visibilitychange', onVisibility);
-    timerId = setIntervalImpl(tick, 1000);
     rerender();
   }
 
@@ -217,5 +300,17 @@ export function createFitnessLoggerController({
     unmount();
   }
 
-  return { mount, unmount, destroy, flushAutosave, finish, getDraft: () => draft };
+  return {
+    mount,
+    unmount,
+    destroy,
+    flushAutosave,
+    finish,
+    getDraft: () => draft,
+    getTimerState,
+    startTimer,
+    pauseTimer,
+    completeTimer,
+    undoCompleteTimer
+  };
 }

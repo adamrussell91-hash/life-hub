@@ -217,7 +217,23 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
 
 .nav-item:hover { color: white; background: rgba(255, 255, 255, 0.07); transform: translateX(2px); }
 .nav-item.is-active { color: white; background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.09); }
-.nav-glyph { width: 1.2rem; color: rgba(255, 255, 255, 0.64); text-align: center; font-size: 1.1rem; }
+.nav-item.is-active .nav-glyph { color: white; }
+.nav-glyph {
+  width: 1.2rem;
+  height: 1.2rem;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.64);
+  text-align: center;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.nav-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+}
 .nav-dot { width: 0.48rem; height: 0.48rem; margin-inline: 0.36rem; border-radius: 50%; background: var(--wave); box-shadow: 0 0 0 4px rgba(55, 111, 183, 0.12); }
 .nav-dot.fitness { background: var(--high-sea); box-shadow: 0 0 0 4px rgba(246, 134, 32, 0.12); }
 .nav-dot.body { background: #70a8b8; }
@@ -525,7 +541,15 @@ main { max-width: 76rem; margin: 0 auto; }
     backdrop-filter: blur(22px);
   }
   .mobile-nav button { min-height: 44px; display: grid; place-items: center; align-content: center; gap: 0.2rem; border: 0; border-radius: 0.8rem; color: var(--muted); background: transparent; font-size: 0.62rem; font-weight: 700; cursor: pointer; }
-  .mobile-nav button span { font-size: 1.08rem; line-height: 1; }
+  .mobile-nav button .nav-glyph {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: inherit;
+  }
+  .mobile-nav button .nav-icon {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
   .mobile-nav button.is-active { color: var(--depth); background: rgba(55,111,183,0.08); }
   .warning-panel, .unavailable-panel { align-items: flex-start; flex-wrap: wrap; }
   .warning-panel ul { width: 100%; margin: 0; padding-left: 1.2rem; }
@@ -1005,6 +1029,30 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 800;
   color: var(--fitness-accent);
   font-size: 1.1rem;
+}
+.fitness-logger__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.fitness-logger__control {
+  min-height: 40px;
+  padding: 0.35rem 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  background: var(--warm-white);
+  color: var(--depth);
+  font-weight: 650;
+  cursor: pointer;
+}
+.fitness-logger__control:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.fitness-logger__control[data-fitness-logger="start"]:not(:disabled),
+.fitness-logger__control[data-fitness-logger="complete"]:not(:disabled) {
+  border-color: color-mix(in srgb, var(--fitness-accent) 35%, var(--line));
+  background: color-mix(in srgb, var(--fitness-accent) 12%, var(--warm-white));
 }
 .fitness-logger__save { min-height: 1.1em; margin: 0; }
 .fitness-logger__exercise {

@@ -5,9 +5,14 @@ const cableLabel = value => String(value ?? 'none').replaceAll('_', ' ');
 export function renderFitnessLogger(root, draft, {
   elapsedMs = 0,
   saveState = '',
+  timer = { state: 'idle', everStarted: false, completeVisible: false },
   onChange,
   onAddSet,
-  onFinish
+  onFinish,
+  onStart,
+  onPause,
+  onComplete,
+  onUndoComplete
 } = {}) {
   const host = root.querySelector('#fitness-logger');
   if (!host || !draft) return;
@@ -19,15 +24,56 @@ export function renderFitnessLogger(root, draft, {
   header.className = 'fitness-logger__header';
   const title = root.createElement('strong');
   title.textContent = draft.title ?? 'Session';
-  const timer = root.createElement('span');
-  timer.className = 'fitness-logger__timer';
-  timer.dataset.fitnessLogger = 'timer';
-  timer.textContent = formatElapsed(elapsedMs);
+  const timerEl = root.createElement('span');
+  timerEl.className = 'fitness-logger__timer';
+  timerEl.dataset.fitnessLogger = 'timer';
+  timerEl.textContent = formatElapsed(elapsedMs);
   const kind = root.createElement('span');
   kind.className = 'metric-caption';
   kind.textContent = draft.session_kind ?? '';
-  header.append(title, timer, kind);
+  header.append(title, timerEl, kind);
   host.append(header);
+
+  const controls = root.createElement('div');
+  controls.className = 'fitness-logger__controls';
+  controls.dataset.fitnessLogger = 'controls';
+
+  const start = root.createElement('button');
+  start.type = 'button';
+  start.className = 'fitness-logger__control';
+  start.dataset.fitnessLogger = 'start';
+  const startable = timer.state === 'idle' || timer.state === 'paused';
+  start.textContent = timer.state === 'paused' ? 'Resume' : 'Start';
+  start.disabled = !startable;
+  start.addEventListener('click', () => onStart?.());
+
+  const pause = root.createElement('button');
+  pause.type = 'button';
+  pause.className = 'fitness-logger__control';
+  pause.dataset.fitnessLogger = 'pause';
+  pause.textContent = 'Pause';
+  pause.disabled = timer.state !== 'running';
+  pause.addEventListener('click', () => onPause?.());
+
+  controls.append(start, pause);
+
+  if (timer.completeVisible || timer.state === 'completed') {
+    const complete = root.createElement('button');
+    complete.type = 'button';
+    complete.className = 'fitness-logger__control';
+    complete.dataset.fitnessLogger = 'complete';
+    if (timer.state === 'completed') {
+      complete.textContent = 'Undo Complete';
+      complete.addEventListener('click', () => onUndoComplete?.());
+    } else {
+      complete.textContent = 'Complete';
+      complete.disabled = timer.state !== 'running' && timer.state !== 'paused';
+      complete.addEventListener('click', () => onComplete?.());
+    }
+    controls.append(complete);
+  }
+
+  host.append(controls);
 
   const status = root.createElement('p');
   status.className = 'fitness-logger__save metric-caption';
@@ -143,11 +189,31 @@ export function renderFitnessLogger(root, draft, {
   host.append(finish);
 }
 
-export function updateLoggerChrome(root, { elapsedMs, saveState }) {
-  const timer = root.querySelector('[data-fitness-logger="timer"]');
-  if (timer && elapsedMs != null) timer.textContent = formatElapsed(elapsedMs);
+export function updateLoggerChrome(root, { elapsedMs, saveState, timer }) {
+  const timerEl = root.querySelector('[data-fitness-logger="timer"]');
+  if (timerEl && elapsedMs != null) timerEl.textContent = formatElapsed(elapsedMs);
   const save = root.querySelector('[data-fitness-logger="save-state"]');
   if (save && saveState != null) save.textContent = saveState;
+  if (!timer) return;
+
+  const start = root.querySelector('[data-fitness-logger="start"]');
+  if (start) {
+    const startable = timer.state === 'idle' || timer.state === 'paused';
+    start.textContent = timer.state === 'paused' ? 'Resume' : 'Start';
+    start.disabled = !startable;
+  }
+  const pause = root.querySelector('[data-fitness-logger="pause"]');
+  if (pause) pause.disabled = timer.state !== 'running';
+  const complete = root.querySelector('[data-fitness-logger="complete"]');
+  if (complete) {
+    if (timer.state === 'completed') {
+      complete.textContent = 'Undo Complete';
+      complete.disabled = false;
+    } else {
+      complete.textContent = 'Complete';
+      complete.disabled = timer.state !== 'running' && timer.state !== 'paused';
+    }
+  }
 }
 
 export function hideFitnessLogger(root) {

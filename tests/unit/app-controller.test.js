@@ -79,6 +79,7 @@ class FakeDocument extends EventTarget {
       ['#network-status', new FakeElement({ hidden: true })],
       ['#app-status', new FakeElement()],
       ['#home-dashboard', new FakeElement({ hidden: true })],
+      ['#chat-view', new FakeElement({ hidden: true })],
       ['#nutrition-dashboard', new FakeElement({ hidden: true })],
       ['#nutrition-chat-button', new FakeElement()],
       ['#fitness-dashboard', new FakeElement({ hidden: true })],
@@ -930,6 +931,27 @@ test('a completed refresh while viewing Nutrition re-renders the dashboard and r
   await state.controller.refresh();
 
   assert.equal(state.calls.nutritionRenders, 2);
+  assert.equal(state.root.querySelector('#home-dashboard').hidden, true);
+  assert.equal(state.root.querySelector('#nutrition-dashboard').hidden, false);
+});
+
+test('a completed refresh while viewing Chat does not resurface the Home dashboard', async () => {
+  const state = harness({
+    liveResults: [
+      liveData({ changed: true, freshness: 'confirmed' }),
+      liveData({ changed: true, freshness: 'confirmed' })
+    ]
+  });
+  await state.controller.start();
+  state.root.chatNavigation.dispatchEvent(new Event('click'));
+  assert.equal(state.controller.getCurrentSection(), 'chat');
+  assert.equal(state.root.querySelector('#chat-view').hidden, false);
+  assert.equal(state.root.querySelector('#home-dashboard').hidden, true);
+
+  await state.controller.refresh();
+
+  assert.equal(state.root.querySelector('#home-dashboard').hidden, true);
+  assert.equal(state.root.querySelector('#chat-view').hidden, false);
 });
 
 test('clicking the Fitness nav item shows the dashboard and builds/renders it from the latest loaded sync data', async () => {
