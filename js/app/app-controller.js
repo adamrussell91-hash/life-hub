@@ -52,6 +52,7 @@ export function createAppController(dependencies) {
     fitnessTemplateLibrary,
     buildSkincareModel,
     renderSkincare,
+    skincareApi,
     skincareController,
     skincareRoutines,
     getCurrentRoutineKey,
@@ -94,6 +95,7 @@ export function createAppController(dependencies) {
   let calendarViewMonth = null;
   let bodyRange = 'monthly';
   let mindRange = 'monthly';
+  let latestCatalog = null;
   let activeRefresh = null;
   let refreshAbortController = null;
   let lifecycleVersion = 0;
@@ -483,7 +485,10 @@ export function createAppController(dependencies) {
     currentSection = name;
     if (name === 'nutrition') renderNutritionSection();
     if (name === 'fitness') renderFitnessSection();
-    if (name === 'skincare') renderSkincareSection();
+    if (name === 'skincare') {
+      renderSkincareSection();
+      void refreshSkincareCatalog();
+    }
     if (name === 'calendar') renderCalendarSection();
     if (name === 'body') renderBodySection();
     if (name === 'mind') renderMindSection();
@@ -554,16 +559,34 @@ export function createAppController(dependencies) {
     const model = buildSkincareModel({
       ...latestResult,
       routines: skincareRoutines,
+      catalog: latestCatalog,
       nowHourKey: typeof getCurrentRoutineKey === 'function'
         ? getCurrentRoutineKey(currentDate())
         : 'pm'
     });
     renderSkincare(root, model, {
       onLogRoutine: skincareController?.onLogRoutine,
-      onLogProcedure: skincareController?.onLogProcedure
+      onLogProcedure: skincareController?.onLogProcedure,
+      onAddProduct: skincareController?.onAddProduct,
+      onRetireProduct: skincareController?.onRetireProduct
     });
     const button = root.querySelector('#skincare-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, SKINCARE_AGENT_SLUG));
+  }
+
+  async function refreshSkincareCatalog() {
+    if (typeof skincareApi?.getCatalog !== 'function') return;
+    try {
+      latestCatalog = await skincareApi.getCatalog();
+      if (currentSection === 'skincare') renderSkincareSection();
+    } catch {
+      // Retain the currently rendered catalog if it cannot be refreshed.
+    }
+  }
+
+  function applySkincareCatalog(catalog) {
+    latestCatalog = catalog ?? null;
+    if (currentSection === 'skincare') renderSkincareSection();
   }
 
   function renderCalendarSection({ scrollToDetail = false, monthDelta = 0 } = {}) {
@@ -906,7 +929,8 @@ export function createAppController(dependencies) {
     getCurrentSection: () => currentSection,
     getDisplayDate: () => latestResult?.date ?? null,
     getAgentsConfig: () => latestResult?.agentsConfig ?? null,
-    getFitnessLibraryContext: () => fitnessLibraryContext()
+    getFitnessLibraryContext: () => fitnessLibraryContext(),
+    applySkincareCatalog
   };
 }
 
