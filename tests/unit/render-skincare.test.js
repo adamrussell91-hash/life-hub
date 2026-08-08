@@ -9,6 +9,7 @@ class FakeElement {
     this.tagName = tag;
     this.className = '';
     this.dataset = {};
+    this.attributes = {};
     this._textContent = '';
     this.children = [];
     this.hidden = false;
@@ -34,17 +35,23 @@ class FakeElement {
 
   addEventListener() {}
 
-  setAttribute(name) {
+  setAttribute(name, value = '') {
+    this.attributes[name] = String(value);
     if (name === 'hidden') this.hidden = true;
   }
 
   removeAttribute(name) {
+    delete this.attributes[name];
     if (name === 'hidden') this.hidden = false;
   }
 
   querySelector() {
     return null;
   }
+}
+
+function descendants(element) {
+  return element.children.flatMap(child => [child, ...descendants(child)]);
 }
 
 function monthHeatmapFixture() {
@@ -147,6 +154,46 @@ test('renderSkincare marks the current routine card with skincare-card--current 
   assert.equal(amCard.textContent.includes('Now'), false);
   assert.equal(pmCard.className.includes('skincare-card--current'), true);
   assert.match(pmCard.textContent, /Now/);
+});
+
+test('renderSkincare renders routine products as selectable pills with add and retire controls', () => {
+  const root = fakeSkincareRoot();
+  renderSkincare(root, baseModel());
+
+  const routineCards = root._routineCards.children;
+  const controls = routineCards.flatMap(descendants);
+  const productNames = new Set([
+    ...SKINCARE_ROUTINES.am.products,
+    ...SKINCARE_ROUTINES.pm.products
+  ]);
+
+  assert.equal(
+    controls.some(control => control.tagName === 'input' && control.type === 'checkbox'),
+    false,
+    'routine cards should not use checkbox controls'
+  );
+  for (const product of productNames) {
+    const chip = controls.find(control =>
+      control.tagName === 'button'
+      && control.className === 'skincare-chip'
+      && control.textContent === product
+    );
+    assert.ok(chip, `${product} should render as a skincare chip`);
+  }
+  assert.ok(controls.some(control => control.tagName === 'button' && control.textContent === '+ Add'));
+  assert.ok(controls.some(control =>
+    control.attributes['aria-label']?.includes('Remove')
+    && control.attributes['aria-label']?.includes('from rotation')
+  ));
+});
+
+test('renderSkincare labels routine actions Log or Log again', () => {
+  const root = fakeSkincareRoot();
+  renderSkincare(root, baseModel({ amLogged: false, pmLogged: true }));
+
+  const [amCard, pmCard] = root._routineCards.children;
+  assert.ok(descendants(amCard).some(control => control.className === 'skincare-done' && control.textContent === 'Log'));
+  assert.ok(descendants(pmCard).some(control => control.className === 'skincare-done' && control.textContent === 'Log again'));
 });
 
 test('renderSkincare renders logged procedures as a compact ul/li list', () => {

@@ -11,7 +11,12 @@ function setText(root, selector, value) {
   if (el) el.textContent = String(value);
 }
 
-export function renderSkincare(root, model, { onLogRoutine, onLogProcedure } = {}) {
+export function renderSkincare(root, model, {
+  onLogRoutine,
+  onLogProcedure,
+  onAddProduct,
+  onRetireProduct
+} = {}) {
   const dashboard = root.querySelector('#skincare-dashboard');
   if (!dashboard) return;
 
@@ -36,7 +41,7 @@ export function renderSkincare(root, model, { onLogRoutine, onLogProcedure } = {
   if (host) {
     host.replaceChildren();
     for (const key of ['am', 'pm']) {
-      host.append(renderRoutineCard(root, key, model, onLogRoutine));
+      host.append(renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetireProduct));
     }
   }
 
@@ -68,7 +73,7 @@ export function renderSkincare(root, model, { onLogRoutine, onLogProcedure } = {
   dashboard.removeAttribute('hidden');
 }
 
-function renderRoutineCard(root, key, model, onLogRoutine) {
+function renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetireProduct) {
   const routine = model.routines[key];
   const isCurrent = model.currentRoutine === key;
   const card = root.createElement('article');
@@ -98,6 +103,7 @@ function renderRoutineCard(root, key, model, onLogRoutine) {
   const state = {
     choices: {},
     enabled: new Set(routine.products),
+    oneOffs: [],
     extras: new Set(),
     notes: ''
   };
@@ -133,23 +139,92 @@ function renderRoutineCard(root, key, model, onLogRoutine) {
   }
 
   const list = root.createElement('div');
-  list.className = 'skincare-products';
-  for (const product of routine.products) {
-    const row = root.createElement('label');
-    row.className = 'skincare-product';
-    const box = root.createElement('input');
-    box.type = 'checkbox';
-    box.checked = true;
-    box.addEventListener('change', () => {
-      if (box.checked) state.enabled.add(product);
-      else state.enabled.delete(product);
-    });
-    const name = root.createElement('span');
-    name.textContent = product;
-    row.append(box, name);
-    list.append(row);
+  list.className = 'skincare-products skincare-products--pills';
+  function renderProductChips() {
+    list.replaceChildren();
+    const names = [...routine.products, ...state.oneOffs];
+    for (const product of names) {
+      const wrap = root.createElement('div');
+      wrap.className = 'skincare-product-pill';
+      const button = root.createElement('button');
+      button.type = 'button';
+      button.className = 'skincare-chip';
+      if (state.enabled.has(product)) button.dataset.active = 'true';
+      button.textContent = product;
+      button.addEventListener('click', () => {
+        if (state.enabled.has(product)) {
+          state.enabled.delete(product);
+          delete button.dataset.active;
+        } else {
+          state.enabled.add(product);
+          button.dataset.active = 'true';
+        }
+      });
+      wrap.append(button);
+
+      if (!state.oneOffs.includes(product)) {
+        const menu = root.createElement('button');
+        menu.type = 'button';
+        menu.className = 'skincare-product-pill__menu';
+        menu.setAttribute('aria-label', `Remove ${product} from rotation`);
+        menu.textContent = '⋯';
+        menu.addEventListener('click', event => {
+          event.stopPropagation();
+          onRetireProduct?.({ routine: key, name: product });
+        });
+        wrap.append(menu);
+      }
+      list.append(wrap);
+    }
   }
+  renderProductChips();
   card.append(list);
+
+  const add = root.createElement('div');
+  add.className = 'skincare-add';
+  const addButton = root.createElement('button');
+  addButton.type = 'button';
+  addButton.className = 'skincare-chip';
+  addButton.textContent = '+ Add';
+  addButton.addEventListener('click', () => {
+    const name = root.createElement('input');
+    name.type = 'text';
+    name.placeholder = 'Product name';
+    name.setAttribute('aria-label', 'Product name');
+
+    let keepInRoutine = true;
+    const keep = root.createElement('button');
+    keep.type = 'button';
+    keep.className = 'skincare-chip';
+    keep.dataset.active = 'true';
+    keep.setAttribute('aria-pressed', 'true');
+    keep.textContent = 'Keep in routine';
+    keep.addEventListener('click', () => {
+      keepInRoutine = !keepInRoutine;
+      if (keepInRoutine) keep.dataset.active = 'true';
+      else delete keep.dataset.active;
+      keep.setAttribute('aria-pressed', String(keepInRoutine));
+    });
+
+    const confirm = root.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'skincare-chip';
+    confirm.textContent = 'Add product';
+    confirm.addEventListener('click', () => {
+      const product = name.value.trim();
+      if (!product) return;
+      if (keepInRoutine) {
+        onAddProduct?.({ routine: key, name: product, keep: true });
+      } else if (!state.oneOffs.includes(product)) {
+        state.oneOffs.push(product);
+        state.enabled.add(product);
+        renderProductChips();
+      }
+    });
+    add.replaceChildren(name, keep, confirm);
+  });
+  add.append(addButton);
+  card.append(add);
 
   if (model.routines.extras?.length) {
     const extras = root.createElement('div');
@@ -207,12 +282,14 @@ function renderRoutineCard(root, key, model, onLogRoutine) {
   const done = root.createElement('button');
   done.type = 'button';
   done.className = 'skincare-done';
-  done.textContent = already ? 'Log again' : 'Done';
+  done.textContent = already ? 'Log again' : 'Log';
   done.addEventListener('click', () => {
     const products = buildProductList(key, {
       choiceSelections: state.choices,
       enabledProducts: [...state.enabled],
-      extras: [...state.extras]
+      extras: [...state.extras],
+      activeProducts: routine.products,
+      oneOffs: state.oneOffs
     });
     onLogRoutine?.({
       routine: key,
