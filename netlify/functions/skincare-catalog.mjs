@@ -106,6 +106,7 @@ export function createSkincareCatalogHandler({
       const { tree } = await github.resolveTree();
       const entry = tree.find(item => item.path === SKINCARE_CATALOG_PATH && item.type === 'blob');
       const existing = entry ? parseCatalog(decodeBlob(await github.readBlob(entry.sha))) : null;
+      if (entry && !existing) return repositoryError('catalog_corrupt', false);
       const seed = existing ?? emptyCatalog(SKINCARE_ROUTINES);
       const catalog = action === 'append'
         ? appendProduct(seed, routine, name)
@@ -143,6 +144,9 @@ async function parseRequest(request) {
 }
 
 function mapRepositoryError(error) {
+  if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+    return errorResponse(409, 'write_conflict', 'The skincare catalog was updated elsewhere. Please try again.', true, PRIVATE_CACHE);
+  }
   if (error instanceof GitHubClientError) return repositoryError(error.code, error.retryable);
   return repositoryError('github_unavailable', true);
 }

@@ -41,7 +41,7 @@ function encodeBlob(value) {
   };
 }
 
-function githubFetchStub({ catalog = undefined } = {}) {
+function githubFetchStub({ catalog = undefined, writeStatus = 200 } = {}) {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     calls.push({ url, options });
@@ -56,7 +56,9 @@ function githubFetchStub({ catalog = undefined } = {}) {
     }
     if (url.includes(`/git/blobs/${CATALOG_SHA}`)) return Response.json(encodeBlob(catalog));
     if (options.method === 'PUT') {
-      return Response.json({ content: { sha: UPDATED_SHA }, commit: { sha: COMMIT_SHA } });
+      return writeStatus === 200
+        ? Response.json({ content: { sha: UPDATED_SHA }, commit: { sha: COMMIT_SHA } })
+        : Response.json({ message: 'conflict' }, { status: writeStatus });
     }
     return Response.json({ message: 'unexpected' }, { status: 500 });
   };
@@ -121,6 +123,31 @@ test('POST retire moves an existing product to retired', async () => {
   assert.deepEqual(payload.data.catalog.am.retired, ['Cleanser']);
   assert.equal(write.sha, CATALOG_SHA);
   assert.equal(write.message, 'chore(skincare): retire am product');
+});
+
+test('POST reports a write conflict as 409', async () => {
+  const { fetchImpl } = githubFetchStub({ writeStatus: 422 });
+
+  const response = await handler(fetchImpl)(request({
+    method: 'POST',
+    body: { action: 'append', routine: 'am', name: 'Test Serum' }
+  }));
+
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error.code, 'write_conflict');
+});
+
+test('POST does not overwrite an existing corrupt catalog blob', async () => {
+  const { calls, fetchImpl } = githubFetchStub({ catalog: 'not a catalog' });
+
+  const response = await handler(fetchImpl)(request({
+    method: 'POST',
+    body: { action: 'append', routine: 'am', name: 'Test Serum' }
+  }));
+
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, 'catalog_corrupt');
+  assert.equal(calls.some(call => call.options.method === 'PUT'), false);
 });
 
 test('rejects unauthenticated requests before GitHub calls', async () => {
