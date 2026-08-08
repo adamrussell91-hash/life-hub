@@ -13,6 +13,9 @@ class FakeElement {
     this._textContent = '';
     this.children = [];
     this.hidden = false;
+    this._listeners = {};
+    this.value = '';
+    this.type = '';
   }
 
   set textContent(value) {
@@ -33,7 +36,16 @@ class FakeElement {
     this.children = [...nodes];
   }
 
-  addEventListener() {}
+  addEventListener(type, handler) {
+    if (!this._listeners[type]) this._listeners[type] = [];
+    this._listeners[type].push(handler);
+  }
+
+  click(event = {}) {
+    for (const handler of this._listeners.click ?? []) {
+      handler({ stopPropagation: () => {}, ...event, target: this });
+    }
+  }
 
   setAttribute(name, value = '') {
     this.attributes[name] = String(value);
@@ -52,6 +64,44 @@ class FakeElement {
 
 function descendants(element) {
   return element.children.flatMap(child => [child, ...descendants(child)]);
+}
+
+function findDescendant(root, predicate) {
+  return descendants(root).find(predicate) ?? null;
+}
+
+function countProductPills(card, productName) {
+  return descendants(card).filter(node =>
+    node.tagName === 'button'
+    && node.className === 'skincare-chip'
+    && node.textContent === productName
+  ).length;
+}
+
+function addProductViaUi(card, { name, keepInRoutine = true }) {
+  const addButton = findDescendant(card, node =>
+    node.tagName === 'button' && node.textContent === '+ Add'
+  );
+  assert.ok(addButton, '+ Add control should exist');
+  addButton.click();
+
+  const nameInput = findDescendant(card, node => node.tagName === 'input');
+  assert.ok(nameInput, 'product name input should appear');
+  nameInput.value = name;
+
+  if (!keepInRoutine) {
+    const keepToggle = findDescendant(card, node =>
+      node.tagName === 'button' && node.textContent === 'Keep in routine'
+    );
+    assert.ok(keepToggle, 'Keep in routine toggle should exist');
+    keepToggle.click();
+  }
+
+  const confirm = findDescendant(card, node =>
+    node.tagName === 'button' && node.textContent === 'Add product'
+  );
+  assert.ok(confirm, 'Add product confirm should exist');
+  confirm.click();
 }
 
 function monthHeatmapFixture() {
@@ -221,6 +271,44 @@ test('renderSkincare shows an empty caption (not a list) when no procedures are 
   const [empty] = root._procedureLog.children;
   assert.equal(empty.tagName, 'p');
   assert.match(empty.textContent, /No procedures logged today\./);
+});
+
+test('adding an existing routine product as one-off does not duplicate the pill', () => {
+  const root = fakeSkincareRoot();
+  renderSkincare(root, baseModel());
+
+  const [, pmCard] = root._routineCards.children;
+  const existingProduct = SKINCARE_ROUTINES.pm.products[0];
+  const initialCount = countProductPills(pmCard, existingProduct);
+
+  addProductViaUi(pmCard, { name: existingProduct, keepInRoutine: false });
+
+  assert.equal(
+    countProductPills(pmCard, existingProduct),
+    initialCount,
+    'existing routine product should not render a second pill when added as one-off'
+  );
+});
+
+test('adding an existing routine product with keep in routine does not call onAddProduct', () => {
+  const root = fakeSkincareRoot();
+  const addCalls = [];
+  renderSkincare(root, baseModel(), {
+    onAddProduct: payload => addCalls.push(payload)
+  });
+
+  const [, pmCard] = root._routineCards.children;
+  const existingProduct = SKINCARE_ROUTINES.pm.products[0];
+
+  addProductViaUi(pmCard, { name: existingProduct, keepInRoutine: true });
+
+  assert.equal(addCalls.length, 0, 'onAddProduct should be skipped for an existing routine product');
+  const chip = findDescendant(pmCard, node =>
+    node.tagName === 'button'
+    && node.className === 'skincare-chip'
+    && node.textContent === existingProduct
+  );
+  assert.equal(chip?.dataset.active, 'true', 'existing product pill should be selected');
 });
 
 test('index.html leads Skincare with the consistency hero, heatmap, and legend; week-dots strip is gone', async () => {

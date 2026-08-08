@@ -213,6 +213,11 @@ function renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetir
     confirm.addEventListener('click', () => {
       const product = name.value.trim();
       if (!product) return;
+      if (routine.products.includes(product)) {
+        state.enabled.add(product);
+        renderProductChips();
+        return;
+      }
       if (keepInRoutine) {
         onAddProduct?.({ routine: key, name: product, keep: true });
       } else if (!state.oneOffs.includes(product)) {
