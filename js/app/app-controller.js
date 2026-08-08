@@ -96,6 +96,7 @@ export function createAppController(dependencies) {
   let bodyRange = 'monthly';
   let mindRange = 'monthly';
   let latestCatalog = null;
+  let catalogRefreshToken = 0;
   let activeRefresh = null;
   let refreshAbortController = null;
   let lifecycleVersion = 0;
@@ -576,8 +577,11 @@ export function createAppController(dependencies) {
 
   async function refreshSkincareCatalog() {
     if (typeof skincareApi?.getCatalog !== 'function') return;
+    const token = ++catalogRefreshToken;
     try {
-      latestCatalog = await skincareApi.getCatalog();
+      const catalog = await skincareApi.getCatalog();
+      if (token !== catalogRefreshToken) return;
+      latestCatalog = catalog;
       if (currentSection === 'skincare') renderSkincareSection();
     } catch {
       // Retain the currently rendered catalog if it cannot be refreshed.
@@ -585,6 +589,7 @@ export function createAppController(dependencies) {
   }
 
   function applySkincareCatalog(catalog) {
+    catalogRefreshToken += 1;
     latestCatalog = catalog ?? null;
     if (currentSection === 'skincare') renderSkincareSection();
   }
