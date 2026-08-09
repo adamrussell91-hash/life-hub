@@ -14,7 +14,7 @@ const PHASE_CONTRACTS = {
   intake: `You are mid a Central Node audit. THIS TURN ONLY: acknowledge Adam's answer and either ask the next intake question (concerns / feeling / goals) or state that intake is complete and stop. Cap three intake questions total. Do not dump stale/drift/open-loops/lock yet.`,
   stale_drift: `You are mid a Central Node audit. THIS TURN ONLY: say what is stale and what is drifting, shaped by Central Node and intake answers in history. Keep it compact. Do not run open loops or lock yet.`,
   open_loops: `You are mid a Central Node audit. THIS TURN ONLY: name open loops that matter this week/month, shaped by intake. Keep it compact. Do not lock yet.`,
-  lock: `You are mid a Central Node audit. THIS TURN ONLY: give one non-negotiable objective for the rest of today/week and emit compact Central Node write-back lines (Flags / Cross-Agent / Recent Actions wording) in chat. Do not invent a database write. This ends the audit.`
+  lock: `You are mid a Central Node audit. THIS TURN ONLY: give one non-negotiable objective for the rest of today/week; call append_governance_log for this audit's Closed Loop / Goal Audit summary, and propose_central_node_patch for compact Flags / Cross-Agent / Recent Actions (and Confirm-class patches if removing Constraints or rewriting Week/Month/Trends). This ends the audit.`
 };
 
 export function isHammondAuditTrigger(message) {

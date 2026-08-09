@@ -23,3 +23,13 @@ test('protocol documents phased Central Node audit', () => {
   assert.match(text, /intake/i);
   assert.match(text, /triage/i);
 });
+
+test('protocol points write-back at CN tools and Governance Log', () => {
+  const text = loadHammondProtocol();
+  assert.match(text, /append_governance_log/);
+  assert.match(text, /propose_central_node_patch/);
+  assert.match(text, /## Tools/);
+  assert.match(text, /entry_type/);
+  assert.doesNotMatch(text, /Life Hub persists CN from confirmed specialist logs/);
+  assert.doesNotMatch(text, /No fake database write/);
+});
