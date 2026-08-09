@@ -164,7 +164,7 @@ function renderRoutineCard(root, key, model, {
   function closeOpenMenu() {
     if (!openMenuWrap) return;
     openMenuWrap.replaceChildren(
-      ...openMenuWrap.children.filter(child => child.className !== 'skincare-product-pill__menu-panel')
+      ...[...openMenuWrap.children].filter(child => child.className !== 'skincare-product-pill__menu-panel')
     );
     openMenuWrap = null;
   }

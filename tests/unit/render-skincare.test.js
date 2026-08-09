@@ -406,6 +406,25 @@ test('⋯ opens menu with Remove from routine and does not call remove until cho
   );
   assert.ok(removeAction, 'Remove from routine action should be present');
 
+  // Real DOM Node.children is an HTMLCollection (no .filter). Mimic that so
+  // closeOpenMenu cannot rely on Array.prototype methods on children.
+  const pill = findDescendant(amCard, node =>
+    node.className === 'skincare-product-pill'
+    && node.children.some?.(child => child === panel)
+  ) || findDescendant(amCard, node =>
+    node.className === 'skincare-product-pill'
+    && [...node.children].includes(panel)
+  );
+  assert.ok(pill, 'product pill wrap should host the menu panel');
+  const childNodes = [...pill.children];
+  const htmlCollectionLike = {
+    length: childNodes.length,
+    item(index) { return childNodes[index]; },
+    *[Symbol.iterator]() { yield* childNodes; }
+  };
+  childNodes.forEach((child, index) => { htmlCollectionLike[index] = child; });
+  pill.children = htmlCollectionLike;
+
   removeAction.click();
   assert.deepEqual(removeCalls, [{ routine: 'am', productId: 'catalog-serum' }]);
 });
