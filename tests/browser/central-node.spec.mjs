@@ -83,7 +83,7 @@ test('the floating chat button opens the shared chat panel themed in Hammond\'s 
     const accent = await page.locator('#chat-view').evaluate(element => (
       getComputedStyle(element).getPropertyValue('--agent-accent').trim()
     ));
-    assert.equal(accent, '#3A3A42');
+    assert.equal(accent, '#2D2D2D');
 
     await page.locator('#central-node-chat-button').click();
     await page.locator('#chat-view').waitFor({ state: 'hidden' });

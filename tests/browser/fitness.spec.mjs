@@ -74,7 +74,7 @@ test('the floating chat button opens the shared chat panel themed in Chadwick\'s
     const accent = await page.locator('#chat-view').evaluate(element => (
       getComputedStyle(element).getPropertyValue('--agent-accent').trim()
     ));
-    assert.equal(accent, '#2E7BD6');
+    assert.equal(accent, '#D9683A');
   } finally {
     await context.close();
   }

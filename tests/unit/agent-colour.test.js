@@ -4,14 +4,14 @@ import { agentColour, DEFAULT_AGENT_COLOUR } from '../../js/app/agent-colour.js'
 
 const agentsConfig = {
   agents: [
-    { slug: 'brisket', colour: '#F0B843' },
-    { slug: 'hammond', colour: '#3A3A42' }
+    { slug: 'brisket', colour: '#EEB046' },
+    { slug: 'hammond', colour: '#2D2D2D' }
   ]
 };
 
 test('returns the configured colour for a known agent', () => {
-  assert.equal(agentColour(agentsConfig, 'brisket'), '#F0B843');
-  assert.equal(agentColour(agentsConfig, 'hammond'), '#3A3A42');
+  assert.equal(agentColour(agentsConfig, 'brisket'), '#EEB046');
+  assert.equal(agentColour(agentsConfig, 'hammond'), '#2D2D2D');
 });
 
 test('falls back to the default accent when the config is missing, empty, or the agent is unknown', () => {

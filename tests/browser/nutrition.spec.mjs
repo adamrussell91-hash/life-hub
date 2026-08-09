@@ -94,7 +94,7 @@ test('the floating chat button opens the shared chat panel themed in Brisket\'s 
     const accent = await page.locator('#chat-view').evaluate(element => (
       getComputedStyle(element).getPropertyValue('--agent-accent').trim()
     ));
-    assert.equal(accent, '#F0B843');
+    assert.equal(accent, '#EEB046');
 
     await page.locator('#nutrition-chat-button').click();
     await page.locator('#chat-view').waitFor({ state: 'hidden' });

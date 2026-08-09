@@ -42,12 +42,12 @@ test('opening the panel moves it into the given slot, unhides it, and sets the a
   const controller = createChatPanelController({ root });
   const nutritionSlot = new FakeElement('div');
 
-  controller.open(nutritionSlot, '#F0B843');
+  controller.open(nutritionSlot, '#EEB046');
 
   const panel = root.querySelector('#chat-view');
   assert.equal(panel.parent, nutritionSlot);
   assert.equal(panel.hidden, false);
-  assert.equal(panel.style.getPropertyValue('--agent-accent'), '#F0B843');
+  assert.equal(panel.style.getPropertyValue('--agent-accent'), '#EEB046');
   assert.equal(panel.dataset.panelMode, 'overlay');
   assert.equal(controller.isOpen(), true);
 });
@@ -56,7 +56,7 @@ test('closing the panel returns it to the home slot, hides it, and clears the ac
   const root = new FakeDocument();
   const controller = createChatPanelController({ root });
   const nutritionSlot = new FakeElement('div');
-  controller.open(nutritionSlot, '#F0B843');
+  controller.open(nutritionSlot, '#EEB046');
 
   controller.close();
 
@@ -85,20 +85,20 @@ test('opening a second slot moves the same panel again rather than cloning it', 
   const nutritionSlot = new FakeElement('div');
   const centralNodeSlot = new FakeElement('div');
 
-  controller.open(nutritionSlot, '#F0B843');
-  controller.open(centralNodeSlot, '#3A3A42');
+  controller.open(nutritionSlot, '#EEB046');
+  controller.open(centralNodeSlot, '#2D2D2D');
 
   const panel = root.querySelector('#chat-view');
   assert.equal(panel.parent, centralNodeSlot);
   assert.equal(nutritionSlot.children.length, 0);
-  assert.equal(panel.style.getPropertyValue('--agent-accent'), '#3A3A42');
+  assert.equal(panel.style.getPropertyValue('--agent-accent'), '#2D2D2D');
 });
 
 test('open requires a slot element', () => {
   const root = new FakeDocument();
   const controller = createChatPanelController({ root });
 
-  assert.throws(() => controller.open(null, '#F0B843'), TypeError);
+  assert.throws(() => controller.open(null, '#EEB046'), TypeError);
 });
 
 test('throws when required DOM elements are unavailable', () => {
