@@ -200,7 +200,7 @@ function renderRoutineCard(root, key, model, {
         const menu = root.createElement('button');
         menu.type = 'button';
         menu.className = 'skincare-product-pill__menu';
-        menu.setAttribute('aria-label', `Remove ${product} from routine`);
+        menu.setAttribute('aria-label', `Options for ${product}`);
         menu.setAttribute('aria-haspopup', 'true');
         menu.textContent = '⋯';
         menu.addEventListener('click', event => {
@@ -286,7 +286,21 @@ function renderRoutineCard(root, key, model, {
       const empty = root.createElement('p');
       empty.className = 'metric-caption skincare-add__empty';
       empty.textContent = 'Nothing left on the shelf — create a product.';
-      panel.append(empty);
+      const actions = root.createElement('div');
+      actions.className = 'skincare-add__actions';
+      const back = root.createElement('button');
+      back.type = 'button';
+      back.className = 'skincare-chip';
+      back.textContent = 'Back';
+      back.addEventListener('click', () => showAddChooser());
+      const create = root.createElement('button');
+      create.type = 'button';
+      create.className = 'skincare-chip';
+      create.dataset.active = 'true';
+      create.textContent = 'Create a product';
+      create.addEventListener('click', () => showNewOneOff());
+      actions.append(back, create);
+      panel.append(empty, actions);
       add.replaceChildren(panel);
       return;
     }
