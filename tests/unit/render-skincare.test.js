@@ -16,6 +16,7 @@ class FakeElement {
     this._listeners = {};
     this.value = '';
     this.type = '';
+    this.checked = false;
   }
 
   set textContent(value) {
@@ -43,13 +44,20 @@ class FakeElement {
 
   click(event = {}) {
     for (const handler of this._listeners.click ?? []) {
-      handler({ stopPropagation: () => {}, ...event, target: this });
+      handler({ stopPropagation: () => {}, ...event, target: this, currentTarget: this });
+    }
+  }
+
+  dispatch(type, event = {}) {
+    for (const handler of this._listeners[type] ?? []) {
+      handler({ stopPropagation: () => {}, preventDefault: () => {}, ...event, target: this, currentTarget: this });
     }
   }
 
   setAttribute(name, value = '') {
     this.attributes[name] = String(value);
     if (name === 'hidden') this.hidden = true;
+    if (name === 'type') this.type = String(value);
   }
 
   removeAttribute(name) {
@@ -78,30 +86,52 @@ function countProductPills(card, productName) {
   ).length;
 }
 
-function addProductViaUi(card, { name, keepInRoutine = true }) {
+function openNewOneOff(card) {
   const addButton = findDescendant(card, node =>
     node.tagName === 'button' && node.textContent === '+ Add'
   );
   assert.ok(addButton, '+ Add control should exist');
   addButton.click();
 
-  const nameInput = findDescendant(card, node => node.tagName === 'input');
-  assert.ok(nameInput, 'product name input should appear');
-  nameInput.value = name;
-
-  if (!keepInRoutine) {
-    const keepToggle = findDescendant(card, node =>
-      node.tagName === 'button' && node.textContent === 'Keep in routine'
-    );
-    assert.ok(keepToggle, 'Keep in routine toggle should exist');
-    keepToggle.click();
-  }
-
-  const confirm = findDescendant(card, node =>
-    node.tagName === 'button' && node.textContent === 'Add product'
+  const newPath = findDescendant(card, node =>
+    node.tagName === 'button' && node.textContent === 'New / one-off…'
   );
-  assert.ok(confirm, 'Add product confirm should exist');
+  assert.ok(newPath, 'New / one-off path should appear');
+  newPath.click();
+
+  const nameInput = findDescendant(card, node =>
+    node.tagName === 'input' && node.type !== 'checkbox'
+  );
+  assert.ok(nameInput, 'product name input should appear');
+  return nameInput;
+}
+
+function addProductViaUi(card, { name, keepInRoutine = true }) {
+  const nameInput = openNewOneOff(card);
+  nameInput.value = name;
+  nameInput.dispatch('input');
+
+  const confirmLabel = keepInRoutine ? 'Add to library + routine' : 'Just this time';
+  const confirm = findDescendant(card, node =>
+    node.tagName === 'button' && node.textContent === confirmLabel
+  );
+  assert.ok(confirm, `${confirmLabel} should exist`);
   confirm.click();
+}
+
+function libraryFixture(products) {
+  return { schema_version: 1, products };
+}
+
+function amRoutineWithEntries(entries) {
+  return {
+    ...SKINCARE_ROUTINES,
+    am: {
+      ...SKINCARE_ROUTINES.am,
+      products: entries.map(entry => entry.name),
+      productEntries: entries
+    }
+  };
 }
 
 function monthHeatmapFixture() {
@@ -304,7 +334,7 @@ test('adding an existing routine product as one-off does not duplicate the pill'
   );
 });
 
-test('adding an existing routine product with keep in routine does not call onCreateProduct', () => {
+test('adding an existing routine product via New / one-off does not call onCreateProduct', () => {
   const root = fakeSkincareRoot();
   const addCalls = [];
   renderSkincare(root, baseModel(), {
@@ -325,7 +355,7 @@ test('adding an existing routine product with keep in routine does not call onCr
   assert.equal(chip?.dataset.active, 'true', 'existing product pill should be selected');
 });
 
-test('keeping a new product creates a selected draft pill immediately', () => {
+test('Add to library + routine creates a selected draft pill immediately', () => {
   const root = fakeSkincareRoot();
   const addCalls = [];
   renderSkincare(root, baseModel(), {
@@ -345,6 +375,164 @@ test('keeping a new product creates a selected draft pill immediately', () => {
     && node.textContent === product
   );
   assert.equal(chip?.dataset.active, 'true');
+});
+
+test('⋯ opens menu with Remove from routine and does not call remove until chosen', () => {
+  const root = fakeSkincareRoot();
+  const removeCalls = [];
+  const routines = amRoutineWithEntries([
+    { id: 'catalog-serum', name: 'Catalog serum' }
+  ]);
+  renderSkincare(root, baseModel({ routines }), {
+    onRemoveFromRoutine: payload => removeCalls.push(payload)
+  });
+
+  const [amCard] = root._routineCards.children;
+  const menuButton = findDescendant(amCard, node =>
+    node.className === 'skincare-product-pill__menu'
+    && node.attributes['aria-label']?.includes('Remove Catalog serum from routine')
+  );
+  assert.ok(menuButton, '⋯ menu trigger should exist');
+
+  menuButton.click();
+  assert.equal(removeCalls.length, 0, '⋯ click alone should not remove');
+
+  const panel = findDescendant(amCard, node =>
+    node.className === 'skincare-product-pill__menu-panel'
+  );
+  assert.ok(panel, 'menu panel should open');
+  const removeAction = findDescendant(panel, node =>
+    node.tagName === 'button' && node.textContent === 'Remove from routine'
+  );
+  assert.ok(removeAction, 'Remove from routine action should be present');
+
+  removeAction.click();
+  assert.deepEqual(removeCalls, [{ routine: 'am', productId: 'catalog-serum' }]);
+});
+
+test('+ Add shows From library and New / one-off chooser', () => {
+  const root = fakeSkincareRoot();
+  renderSkincare(root, baseModel(), {
+    library: libraryFixture([])
+  });
+
+  const [, pmCard] = root._routineCards.children;
+  const addButton = findDescendant(pmCard, node =>
+    node.tagName === 'button' && node.textContent === '+ Add'
+  );
+  addButton.click();
+
+  assert.ok(findDescendant(pmCard, node =>
+    node.tagName === 'button' && node.textContent === 'From library'
+  ));
+  assert.ok(findDescendant(pmCard, node =>
+    node.tagName === 'button' && node.textContent === 'New / one-off…'
+  ));
+  assert.equal(
+    findDescendant(pmCard, node =>
+      node.tagName === 'button' && node.textContent === 'Keep in routine'
+    ),
+    null,
+    'Keep in routine toggle should be gone'
+  );
+});
+
+test('From library lists shelf products not on routine and adds selected', () => {
+  const root = fakeSkincareRoot();
+  const addCalls = [];
+  const routines = amRoutineWithEntries([
+    { id: 'product-a', name: 'Product A' }
+  ]);
+  const library = libraryFixture([
+    { id: 'product-a', name: 'Product A', notes: '' },
+    { id: 'product-b', name: 'Product B', notes: '' }
+  ]);
+
+  renderSkincare(root, baseModel({ routines }), {
+    library,
+    onAddFromLibrary: payload => addCalls.push(payload)
+  });
+
+  const [amCard] = root._routineCards.children;
+  findDescendant(amCard, node => node.tagName === 'button' && node.textContent === '+ Add').click();
+  findDescendant(amCard, node => node.tagName === 'button' && node.textContent === 'From library').click();
+
+  const checkboxes = descendants(amCard).filter(node =>
+    node.tagName === 'input' && node.type === 'checkbox'
+  );
+  assert.equal(checkboxes.length, 1, 'only products not already on routine should list');
+  assert.equal(checkboxes[0].attributes['aria-label'], 'Product B');
+  checkboxes[0].checked = true;
+  checkboxes[0].dispatch('change');
+
+  const confirm = findDescendant(amCard, node =>
+    node.tagName === 'button' && node.textContent === 'Add selected'
+  );
+  assert.ok(confirm, 'confirm add should exist');
+  confirm.click();
+
+  assert.deepEqual(addCalls, [{ routine: 'am', productIds: ['product-b'] }]);
+});
+
+test('New / one-off typeahead surfaces library matches', () => {
+  const root = fakeSkincareRoot();
+  const addCalls = [];
+  const library = libraryFixture([
+    { id: 'cerave-hydrating', name: 'CeraVe Hydrating Cleanser', notes: '' },
+    { id: 'other', name: 'Other Cream', notes: '' }
+  ]);
+
+  renderSkincare(root, baseModel(), {
+    library,
+    onAddFromLibrary: payload => addCalls.push(payload)
+  });
+
+  const [, pmCard] = root._routineCards.children;
+  const nameInput = openNewOneOff(pmCard);
+  nameInput.value = 'cera';
+  nameInput.dispatch('input');
+
+  const match = findDescendant(pmCard, node =>
+    node.tagName === 'button' && node.textContent.includes('CeraVe Hydrating Cleanser')
+  );
+  assert.ok(match, 'typeahead should surface library match');
+  match.click();
+
+  assert.deepEqual(addCalls, [{ routine: 'pm', productIds: ['cerave-hydrating'] }]);
+  assert.equal(countProductPills(pmCard, 'CeraVe Hydrating Cleanser'), 1);
+  const chip = findDescendant(pmCard, node =>
+    node.tagName === 'button'
+    && node.className === 'skincare-chip'
+    && node.textContent === 'CeraVe Hydrating Cleanser'
+  );
+  assert.equal(chip?.dataset.active, 'true');
+});
+
+test('Just this time creates one-off without keep create', () => {
+  const root = fakeSkincareRoot();
+  const createCalls = [];
+  renderSkincare(root, baseModel(), {
+    library: libraryFixture([]),
+    onCreateProduct: payload => createCalls.push(payload)
+  });
+
+  const [, pmCard] = root._routineCards.children;
+  const product = 'Clinic Sample Serum';
+  addProductViaUi(pmCard, { name: product, keepInRoutine: false });
+
+  assert.equal(countProductPills(pmCard, product), 1);
+  const chip = findDescendant(pmCard, node =>
+    node.tagName === 'button'
+    && node.className === 'skincare-chip'
+    && node.textContent === product
+  );
+  assert.equal(chip?.dataset.active, 'true');
+  assert.deepEqual(createCalls, [{ routine: 'pm', name: product, keep: false }]);
+  assert.equal(
+    createCalls.some(call => call.keep === true),
+    false,
+    'Just this time must not keep-create into the library'
+  );
 });
 
 test('index.html leads Skincare with the consistency hero, heatmap, and legend; week-dots strip is gone', async () => {

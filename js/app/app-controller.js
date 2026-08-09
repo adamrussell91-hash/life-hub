@@ -571,6 +571,7 @@ export function createAppController(dependencies) {
         : 'pm'
     });
     renderSkincare(root, model, {
+      library: latestLibrary,
       onLogRoutine: skincareController?.onLogRoutine,
       onLogProcedure: skincareController?.onLogProcedure,
       onRemoveFromRoutine: skincareController?.onRemoveFromRoutine,

@@ -5,6 +5,7 @@ import {
   currentRoutineKey,
   toSkincareConfirmPayload
 } from './skincare-routines-data.js';
+import { searchProductLibrary } from './skincare-product-library.js';
 
 function setText(root, selector, value) {
   const el = root.querySelector(selector);
@@ -16,7 +17,8 @@ export function renderSkincare(root, model, {
   onLogProcedure,
   onRemoveFromRoutine,
   onAddFromLibrary,
-  onCreateProduct
+  onCreateProduct,
+  library = null
 } = {}) {
   const dashboard = root.querySelector('#skincare-dashboard');
   if (!dashboard) return;
@@ -46,7 +48,8 @@ export function renderSkincare(root, model, {
         onLogRoutine,
         onRemoveFromRoutine,
         onAddFromLibrary,
-        onCreateProduct
+        onCreateProduct,
+        library
       }));
     }
   }
@@ -83,7 +86,8 @@ function renderRoutineCard(root, key, model, {
   onLogRoutine,
   onRemoveFromRoutine,
   onAddFromLibrary,
-  onCreateProduct
+  onCreateProduct,
+  library = null
 } = {}) {
   const routine = model.routines[key];
   const isCurrent = model.currentRoutine === key;
@@ -155,7 +159,18 @@ function renderRoutineCard(root, key, model, {
 
   const list = root.createElement('div');
   list.className = 'skincare-products skincare-products--pills';
+  let openMenuWrap = null;
+
+  function closeOpenMenu() {
+    if (!openMenuWrap) return;
+    openMenuWrap.replaceChildren(
+      ...openMenuWrap.children.filter(child => child.className !== 'skincare-product-pill__menu-panel')
+    );
+    openMenuWrap = null;
+  }
+
   function renderProductChips() {
+    closeOpenMenu();
     list.replaceChildren();
     const entries = [
       ...productEntries,
@@ -170,6 +185,7 @@ function renderRoutineCard(root, key, model, {
       if (state.enabled.has(product)) button.dataset.active = 'true';
       button.textContent = product;
       button.addEventListener('click', () => {
+        closeOpenMenu();
         if (state.enabled.has(product)) {
           state.enabled.delete(product);
           delete button.dataset.active;
@@ -185,10 +201,31 @@ function renderRoutineCard(root, key, model, {
         menu.type = 'button';
         menu.className = 'skincare-product-pill__menu';
         menu.setAttribute('aria-label', `Remove ${product} from routine`);
+        menu.setAttribute('aria-haspopup', 'true');
         menu.textContent = '⋯';
         menu.addEventListener('click', event => {
           event.stopPropagation();
-          onRemoveFromRoutine?.({ routine: key, productId: id });
+          if (openMenuWrap === wrap) {
+            closeOpenMenu();
+            return;
+          }
+          closeOpenMenu();
+          const panel = root.createElement('div');
+          panel.className = 'skincare-product-pill__menu-panel';
+          panel.setAttribute('role', 'menu');
+          const removeAction = root.createElement('button');
+          removeAction.type = 'button';
+          removeAction.className = 'skincare-product-pill__menu-action';
+          removeAction.setAttribute('role', 'menuitem');
+          removeAction.textContent = 'Remove from routine';
+          removeAction.addEventListener('click', event2 => {
+            event2.stopPropagation();
+            closeOpenMenu();
+            onRemoveFromRoutine?.({ routine: key, productId: id });
+          });
+          panel.append(removeAction);
+          wrap.append(panel);
+          openMenuWrap = wrap;
         });
         wrap.append(menu);
       }
@@ -198,54 +235,183 @@ function renderRoutineCard(root, key, model, {
   renderProductChips();
   card.append(list);
 
+  function draftSelectProduct(name) {
+    if (
+      !productEntries.some(entry => entry.name === name)
+      && !(routine.products ?? []).includes(name)
+      && !state.oneOffs.includes(name)
+    ) {
+      state.oneOffs.push(name);
+    }
+    state.enabled.add(name);
+    renderProductChips();
+  }
+
   const add = root.createElement('div');
   add.className = 'skincare-add';
   const addButton = root.createElement('button');
   addButton.type = 'button';
   addButton.className = 'skincare-chip';
   addButton.textContent = '+ Add';
-  addButton.addEventListener('click', () => {
+
+  function resetAdd() {
+    add.replaceChildren(addButton);
+  }
+
+  function showAddChooser() {
+    const fromLibrary = root.createElement('button');
+    fromLibrary.type = 'button';
+    fromLibrary.className = 'skincare-chip';
+    fromLibrary.textContent = 'From library';
+    fromLibrary.addEventListener('click', () => showFromLibrary());
+
+    const newOneOff = root.createElement('button');
+    newOneOff.type = 'button';
+    newOneOff.className = 'skincare-chip';
+    newOneOff.textContent = 'New / one-off…';
+    newOneOff.addEventListener('click', () => showNewOneOff());
+
+    add.replaceChildren(fromLibrary, newOneOff);
+  }
+
+  function showFromLibrary() {
+    const onRoutine = new Set(
+      productEntries.map(entry => entry.id).filter(Boolean)
+    );
+    const available = (library?.products ?? []).filter(product => !onRoutine.has(product.id));
+    const panel = root.createElement('div');
+    panel.className = 'skincare-add__panel skincare-add__panel--library';
+
+    if (!available.length) {
+      const empty = root.createElement('p');
+      empty.className = 'metric-caption skincare-add__empty';
+      empty.textContent = 'Nothing left on the shelf — create a product.';
+      panel.append(empty);
+      add.replaceChildren(panel);
+      return;
+    }
+
+    const selected = new Set();
+    for (const product of available) {
+      const row = root.createElement('label');
+      row.className = 'skincare-add__option';
+      const checkbox = root.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.dataset.productId = product.id;
+      checkbox.setAttribute('aria-label', product.name);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) selected.add(product.id);
+        else selected.delete(product.id);
+      });
+      const name = root.createElement('span');
+      name.textContent = product.name;
+      row.append(checkbox, name);
+      panel.append(row);
+    }
+
+    const confirm = root.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'skincare-chip';
+    confirm.textContent = 'Add selected';
+    confirm.addEventListener('click', () => {
+      const productIds = [...selected];
+      if (!productIds.length) return;
+      for (const id of productIds) {
+        const match = available.find(product => product.id === id);
+        if (match) draftSelectProduct(match.name);
+      }
+      onAddFromLibrary?.({ routine: key, productIds });
+      resetAdd();
+    });
+    panel.append(confirm);
+    add.replaceChildren(panel);
+  }
+
+  function showNewOneOff() {
+    const panel = root.createElement('div');
+    panel.className = 'skincare-add__panel skincare-add__panel--new';
+
     const name = root.createElement('input');
     name.type = 'text';
     name.placeholder = 'Product name';
     name.setAttribute('aria-label', 'Product name');
 
-    let keepInRoutine = true;
-    const keep = root.createElement('button');
-    keep.type = 'button';
-    keep.className = 'skincare-chip';
-    keep.dataset.active = 'true';
-    keep.setAttribute('aria-pressed', 'true');
-    keep.textContent = 'Keep in routine';
-    keep.addEventListener('click', () => {
-      keepInRoutine = !keepInRoutine;
-      if (keepInRoutine) keep.dataset.active = 'true';
-      else delete keep.dataset.active;
-      keep.setAttribute('aria-pressed', String(keepInRoutine));
-    });
+    const matchesHost = root.createElement('div');
+    matchesHost.className = 'skincare-add__matches';
 
-    const confirm = root.createElement('button');
-    confirm.type = 'button';
-    confirm.className = 'skincare-chip';
-    confirm.textContent = 'Add product';
-    confirm.addEventListener('click', () => {
+    function renderMatches() {
+      matchesHost.replaceChildren();
+      const matches = searchProductLibrary(library, name.value);
+      for (const match of matches) {
+        const button = root.createElement('button');
+        button.type = 'button';
+        button.className = 'skincare-chip skincare-add__match';
+        button.textContent = match.name;
+        button.addEventListener('click', () => {
+          draftSelectProduct(match.name);
+          onAddFromLibrary?.({ routine: key, productIds: [match.id] });
+          resetAdd();
+        });
+        matchesHost.append(button);
+      }
+    }
+
+    name.addEventListener('input', renderMatches);
+
+    const keepCreate = root.createElement('button');
+    keepCreate.type = 'button';
+    keepCreate.className = 'skincare-chip';
+    keepCreate.dataset.active = 'true';
+    keepCreate.textContent = 'Add to library + routine';
+    keepCreate.addEventListener('click', () => {
       const product = name.value.trim();
       if (!product) return;
-      if (productEntries.some(entry => entry.name === product) || routine.products?.includes(product)) {
+      if (
+        productEntries.some(entry => entry.name === product)
+        || (routine.products ?? []).includes(product)
+      ) {
         state.enabled.add(product);
         renderProductChips();
+        resetAdd();
         return;
       }
-      // Always create a selected draft pill first so Log can include it
-      // before a Keep write finishes (and so Keep failure does not clear it).
-      if (!state.oneOffs.includes(product)) {
-        state.oneOffs.push(product);
+      draftSelectProduct(product);
+      onCreateProduct?.({ routine: key, name: product, keep: true });
+      resetAdd();
+    });
+
+    const justOnce = root.createElement('button');
+    justOnce.type = 'button';
+    justOnce.className = 'skincare-chip';
+    justOnce.textContent = 'Just this time';
+    justOnce.addEventListener('click', () => {
+      const product = name.value.trim();
+      if (!product) return;
+      if (
+        productEntries.some(entry => entry.name === product)
+        || (routine.products ?? []).includes(product)
+      ) {
         state.enabled.add(product);
         renderProductChips();
+        resetAdd();
+        return;
       }
-      onCreateProduct?.({ routine: key, name: product, keep: keepInRoutine });
+      draftSelectProduct(product);
+      onCreateProduct?.({ routine: key, name: product, keep: false });
+      resetAdd();
     });
-    add.replaceChildren(name, keep, confirm);
+
+    const actions = root.createElement('div');
+    actions.className = 'skincare-add__actions';
+    actions.append(keepCreate, justOnce);
+
+    panel.append(name, matchesHost, actions);
+    add.replaceChildren(panel);
+  }
+
+  addButton.addEventListener('click', () => {
+    closeOpenMenu();
+    showAddChooser();
   });
   add.append(addButton);
   card.append(add);
