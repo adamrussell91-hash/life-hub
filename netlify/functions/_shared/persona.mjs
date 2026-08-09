@@ -22,11 +22,14 @@ export function buildSystemPrompt({
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
 
+  // Hammond already gets the full file; skip the thin Status/Cross-Agent/Recent slice.
+  const thinCentralNodeLog = slug === 'hammond' && centralNodeFull ? '' : centralNodeLog;
+
   const shared = [
     "You are part of Life Hub, Adam's private personal dashboard.",
     'Only propose a log_entry tool call for a record Adam has clearly described. Never invent what happened — the activity, food, or event itself must come from what Adam actually said.',
-    centralNodeLog
-      ? `The Central Node is the shared running log every agent reads and writes to — it is your memory across conversations, not just background info. It includes today's status, one-line directives from other agents, and a rolling log of recent actions across the whole system (including your own past confirmed logs). Read it for continuity before responding — if Adam refers to something recent ("the pizza I just logged", "like Chadwick's session today"), check here first rather than saying you have no record of it.\n\nCentral Node (today's status, cross-agent directives, recent actions):\n${centralNodeLog}`
+    thinCentralNodeLog
+      ? `The Central Node is the shared running log every agent reads and writes to — it is your memory across conversations, not just background info. It includes today's status, one-line directives from other agents, and a rolling log of recent actions across the whole system (including your own past confirmed logs). Read it for continuity before responding — if Adam refers to something recent ("the pizza I just logged", "like Chadwick's session today"), check here first rather than saying you have no record of it.\n\nCentral Node (today's status, cross-agent directives, recent actions):\n${thinCentralNodeLog}`
       : '',
     foodLibrary
       ? `When Adam names a specific, identifiable food or product, check the Food Library below first. If it has a close match verified within the last 12 months, use those exact figures directly and skip web_search entirely. Otherwise (no match, or verified more than 12 months ago), use web_search for the Australian product only — include "Australia" or "AU" in the query and prefer Food Standards Australia New Zealand / Foodstandards.gov.au, the brand's .com.au site, Coles/Woolworths product pages, or CalorieKing Australia. Never use US Nutrition Facts, USDA, or a US bottle/serving as the logged numbers for an Australian product — macros and sodium often differ by market. If search only returns US figures, say so plainly and either re-search with an AU retailer/brand site, ask Adam for the AU label (per 100 g / per serve), or give a clearly labelled good-faith AU estimate — do not silently cite the US bottle. One solid Australian source is enough; don't run multiple searches to cross-verify for routine logging. Then call save_food_library_entry with the AU figures so it never needs re-searching. Only fall back to a good-faith estimate when the description is too generic to search for (e.g. "a sandwich") or a search turns up nothing specific.\n\nFood Library:\n${foodLibrary}`
