@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createSkincareRoutinesHandler } from '../../netlify/functions/skincare-routines.mjs';
-import { SKINCARE_PRODUCT_LIBRARY_PATH } from '../../js/app/skincare-product-library.js';
+import {
+  SKINCARE_PRODUCT_LIBRARY_PATH,
+  slugifyProductId
+} from '../../js/app/skincare-product-library.js';
 import { SKINCARE_ROUTINE_MEMBERSHIP_PATH } from '../../js/app/skincare-routine-membership.js';
 import { SKINCARE_CATALOG_PATH } from '../../js/app/skincare-catalog.js';
 import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
@@ -46,6 +49,12 @@ function encodeBlob(value) {
   };
 }
 
+function pathFromContentsUrl(url) {
+  const marker = '/contents/';
+  const index = url.indexOf(marker);
+  return decodeURIComponent(url.slice(index + marker.length));
+}
+
 function githubFetchStub({
   library = undefined,
   membership = undefined,
@@ -53,6 +62,10 @@ function githubFetchStub({
   writeStatus = 200
 } = {}) {
   const calls = [];
+  const knownShaByPath = new Map();
+  if (library !== undefined) knownShaByPath.set(SKINCARE_PRODUCT_LIBRARY_PATH, LIBRARY_SHA);
+  if (membership !== undefined) knownShaByPath.set(SKINCARE_ROUTINE_MEMBERSHIP_PATH, MEMBERSHIP_SHA);
+  if (catalog !== undefined) knownShaByPath.set(SKINCARE_CATALOG_PATH, CATALOG_SHA);
   const blobBySha = {};
   if (library !== undefined) blobBySha[LIBRARY_SHA] = library;
   if (membership !== undefined) blobBySha[MEMBERSHIP_SHA] = membership;
@@ -80,9 +93,17 @@ function githubFetchStub({
       if (url.includes(`/git/blobs/${sha}`)) return Response.json(encodeBlob(value));
     }
     if (options.method === 'PUT') {
-      return writeStatus === 200
-        ? Response.json({ content: { sha: UPDATED_SHA }, commit: { sha: COMMIT_SHA } })
-        : Response.json({ message: 'conflict' }, { status: writeStatus });
+      if (writeStatus !== 200) {
+        return Response.json({ message: 'conflict' }, { status: writeStatus });
+      }
+      const path = pathFromContentsUrl(url);
+      const body = JSON.parse(options.body);
+      const existingSha = knownShaByPath.get(path);
+      if (existingSha && body.sha !== existingSha) {
+        return Response.json({ message: 'conflict' }, { status: 422 });
+      }
+      knownShaByPath.set(path, UPDATED_SHA);
+      return Response.json({ content: { sha: UPDATED_SHA }, commit: { sha: COMMIT_SHA } });
     }
     return Response.json({ message: 'unexpected' }, { status: 500 });
   };
@@ -150,6 +171,29 @@ test('POST add and remove update membership', async () => {
   assert.equal(removeResponse.status, 200);
   assert.deepEqual(removePayload.data.membership.am.product_ids, []);
   assert.deepEqual(removePayload.data.membership.pm.product_ids, ['cream']);
+});
+
+test('POST add on cold start seeds library and membership then updates', async () => {
+  const { calls, fetchImpl } = githubFetchStub();
+  const productId = slugifyProductId(SKINCARE_ROUTINES.am.products[0]);
+
+  const response = await handler(fetchImpl)(request({
+    method: 'POST',
+    body: { action: 'add', routine: 'pm', product_id: productId }
+  }));
+  const payload = await response.json();
+  const membershipPuts = calls
+    .filter(call => call.options.method === 'PUT' && call.url.includes(SKINCARE_ROUTINE_MEMBERSHIP_PATH))
+    .map(call => JSON.parse(call.options.body));
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.ok(payload.data.membership.pm.product_ids.includes(productId));
+  assert.ok(membershipPuts.length >= 1);
+  if (membershipPuts.length >= 2) {
+    assert.equal(membershipPuts[0].sha, undefined);
+    assert.equal(membershipPuts[1].sha, UPDATED_SHA);
+  }
 });
 
 test('POST add unknown product id returns 400 unknown_product', async () => {

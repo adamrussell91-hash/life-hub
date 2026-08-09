@@ -46,6 +46,12 @@ function encodeBlob(value) {
   };
 }
 
+function pathFromContentsUrl(url) {
+  const marker = '/contents/';
+  const index = url.indexOf(marker);
+  return decodeURIComponent(url.slice(index + marker.length));
+}
+
 function githubFetchStub({
   library = undefined,
   membership = undefined,
@@ -53,11 +59,10 @@ function githubFetchStub({
   writeStatus = 200
 } = {}) {
   const calls = [];
-  const shaByPath = {
-    [SKINCARE_PRODUCT_LIBRARY_PATH]: LIBRARY_SHA,
-    [SKINCARE_ROUTINE_MEMBERSHIP_PATH]: MEMBERSHIP_SHA,
-    [SKINCARE_CATALOG_PATH]: CATALOG_SHA
-  };
+  const knownShaByPath = new Map();
+  if (library !== undefined) knownShaByPath.set(SKINCARE_PRODUCT_LIBRARY_PATH, LIBRARY_SHA);
+  if (membership !== undefined) knownShaByPath.set(SKINCARE_ROUTINE_MEMBERSHIP_PATH, MEMBERSHIP_SHA);
+  if (catalog !== undefined) knownShaByPath.set(SKINCARE_CATALOG_PATH, CATALOG_SHA);
   const blobBySha = {};
   if (library !== undefined) blobBySha[LIBRARY_SHA] = library;
   if (membership !== undefined) blobBySha[MEMBERSHIP_SHA] = membership;
@@ -85,13 +90,21 @@ function githubFetchStub({
       if (url.includes(`/git/blobs/${sha}`)) return Response.json(encodeBlob(value));
     }
     if (options.method === 'PUT') {
-      return writeStatus === 200
-        ? Response.json({ content: { sha: UPDATED_SHA }, commit: { sha: COMMIT_SHA } })
-        : Response.json({ message: 'conflict' }, { status: writeStatus });
+      if (writeStatus !== 200) {
+        return Response.json({ message: 'conflict' }, { status: writeStatus });
+      }
+      const path = pathFromContentsUrl(url);
+      const body = JSON.parse(options.body);
+      const existingSha = knownShaByPath.get(path);
+      if (existingSha && body.sha !== existingSha) {
+        return Response.json({ message: 'conflict' }, { status: 422 });
+      }
+      knownShaByPath.set(path, UPDATED_SHA);
+      return Response.json({ content: { sha: UPDATED_SHA }, commit: { sha: COMMIT_SHA } });
     }
     return Response.json({ message: 'unexpected' }, { status: 500 });
   };
-  return { calls, fetchImpl, shaByPath };
+  return { calls, fetchImpl };
 }
 
 function handler(fetchImpl) {
@@ -149,6 +162,29 @@ test('POST save adds a product to the library', async () => {
   assert.equal(put.url.includes(SKINCARE_PRODUCT_LIBRARY_PATH), true);
   const write = JSON.parse(put.options.body);
   assert.equal(write.sha, LIBRARY_SHA);
+});
+
+test('POST save on cold start seeds then updates with seed sha', async () => {
+  const { calls, fetchImpl } = githubFetchStub();
+
+  const response = await handler(fetchImpl)(request({
+    method: 'POST',
+    body: { action: 'save', name: 'Cold Start Serum' }
+  }));
+  const payload = await response.json();
+  const puts = calls
+    .filter(call => call.options.method === 'PUT' && call.url.includes(SKINCARE_PRODUCT_LIBRARY_PATH))
+    .map(call => JSON.parse(call.options.body));
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.ok(payload.data.library.products.some(p => p.name === 'Cold Start Serum'));
+  assert.ok(puts.length >= 1);
+  if (puts.length >= 2) {
+    assert.equal(puts[0].sha, undefined);
+    assert.equal(puts[1].sha, UPDATED_SHA);
+  }
+  assert.equal(payload.data.sha, UPDATED_SHA);
 });
 
 test('rejects unauthenticated requests before GitHub calls', async () => {

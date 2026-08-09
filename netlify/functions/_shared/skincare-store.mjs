@@ -54,8 +54,17 @@ export async function loadOrSeedLibrary(github) {
     library = seedProductLibraryFromDefaults(SKINCARE_ROUTINES);
   }
 
-  await writeJson(github, SKINCARE_PRODUCT_LIBRARY_PATH, library, 'chore(skincare): seed product library');
-  return { library, entry: undefined, created: true };
+  const result = await writeJson(
+    github,
+    SKINCARE_PRODUCT_LIBRARY_PATH,
+    library,
+    'chore(skincare): seed product library'
+  );
+  return {
+    library,
+    entry: { path: SKINCARE_PRODUCT_LIBRARY_PATH, type: 'blob', sha: result.sha },
+    created: true
+  };
 }
 
 export async function loadOrSeedMembership(github, library) {
@@ -76,11 +85,15 @@ export async function loadOrSeedMembership(github, library) {
     membership = seedMembershipFromDefaults(SKINCARE_ROUTINES, library);
   }
 
-  await writeJson(
+  const result = await writeJson(
     github,
     SKINCARE_ROUTINE_MEMBERSHIP_PATH,
     membership,
     'chore(skincare): seed routine membership'
   );
-  return { membership, entry: undefined, created: true };
+  return {
+    membership,
+    entry: { path: SKINCARE_ROUTINE_MEMBERSHIP_PATH, type: 'blob', sha: result.sha },
+    created: true
+  };
 }
