@@ -16,6 +16,8 @@ test('schemas expose expected tool names and required fields', () => {
 
   assert.equal(saveSkincareLibraryEntrySchema().name, 'save_skincare_library_entry');
   assert.deepEqual(saveSkincareLibraryEntrySchema().input_schema.required, ['name']);
+  assert.ok(saveSkincareLibraryEntrySchema().input_schema.properties.category);
+  assert.ok(saveSkincareLibraryEntrySchema().input_schema.properties.status);
 
   assert.equal(setSkincareRoutineMembershipSchema().name, 'set_skincare_routine_membership');
   assert.deepEqual(
@@ -59,11 +61,12 @@ test('executeSearchSkincareLibrary returns a JSON string of matches', () => {
 test('applySaveSkincareLibraryEntry creates and updates shelf rows', () => {
   const created = applySaveSkincareLibraryEntry(
     { schema_version: 1, products: [] },
-    { name: 'CeraVe Moisturiser', notes: 'PM' }
+    { name: 'CeraVe Moisturiser', category: 'Moisturiser', notes: 'PM' }
   );
   assert.equal(created.ok, true);
   assert.equal(created.name, 'CeraVe Moisturiser');
   assert.ok(created.id);
+  assert.equal(created.library.products[0].category, 'Moisturiser');
 
   const updated = applySaveSkincareLibraryEntry(created.library, {
     id: created.id,
@@ -73,7 +76,12 @@ test('applySaveSkincareLibraryEntry creates and updates shelf rows', () => {
   assert.equal(updated.ok, true);
   assert.equal(updated.name, 'CeraVe PM Moisturiser');
   assert.equal(updated.library.products[0].notes, 'night');
+  assert.equal(updated.library.products[0].category, 'Moisturiser');
   assert.equal(applySaveSkincareLibraryEntry(created.library, { name: '' }).ok, false);
+  assert.equal(
+    applySaveSkincareLibraryEntry({ schema_version: 1, products: [] }, { name: 'No Category' }).ok,
+    false
+  );
 });
 
 test('applySetSkincareRoutineMembership validates product and mutates membership', () => {

@@ -20,11 +20,41 @@ export function createSkincareApi(fetchImpl = fetch) {
       return data?.library ?? null;
     },
 
-    async saveLibraryEntry({ name, id, notes }) {
+    async saveLibraryEntry(entry) {
+      const {
+        name,
+        id,
+        brand,
+        category,
+        status,
+        purpose,
+        active_ingredients,
+        cost,
+        purchase_date,
+        opened_date,
+        finished_date,
+        notes,
+        hint
+      } = entry ?? {};
       const data = await request('/api/skincare/library', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'save', name, id, notes })
+        body: JSON.stringify({
+          action: 'save',
+          name,
+          id,
+          brand,
+          category,
+          status,
+          purpose,
+          active_ingredients,
+          cost,
+          purchase_date,
+          opened_date,
+          finished_date,
+          notes,
+          hint
+        })
       });
       return data?.library ?? null;
     },

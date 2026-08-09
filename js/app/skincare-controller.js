@@ -92,7 +92,7 @@ export function createSkincareController({
     setStatus('Saving…');
     let library = null;
     try {
-      library = await skincareApi.saveLibraryEntry({ name });
+      library = await skincareApi.saveLibraryEntry({ name, category: 'Other', status: 'in_use' });
       const product = findProductByName(library, name);
       if (!product?.id) {
         if (library) onShelfChanged?.({ library });
