@@ -239,7 +239,7 @@ test('exposes parsed config/agents.yml and raw central-node.md content when both
 
   const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01' });
 
-  assert.equal(result.agentsConfig.agents.find(agent => agent.slug === 'brisket').colour, '#F0B843');
+  assert.equal(result.agentsConfig.agents.find(agent => agent.slug === 'brisket').colour, '#EEB046');
   assert.equal(result.centralNodeMarkdown, centralNodeMarkdown);
 });
 

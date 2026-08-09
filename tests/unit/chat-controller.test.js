@@ -708,13 +708,13 @@ test('applies the agent accent colour when the stream names the agent', async ()
   const controller = createChatController({
     root,
     chatApi,
-    agentColour: (_config, slug) => (slug === 'chadwick' ? '#2E7BD6' : '#000'),
+    agentColour: (_config, slug) => (slug === 'chadwick' ? '#D9683A' : '#000'),
     getAgentsConfig: () => ({ agents: [] })
   });
 
   await controller.send('hey chadwick');
 
-  assert.equal(root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'), '#2E7BD6');
+  assert.equal(root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'), '#D9683A');
 });
 
 function unreadCalls() {
@@ -1051,7 +1051,7 @@ test('New chat clears the thread and history but keeps the pinned agent', async 
     root,
     chatApi,
     getDefaultAgentSlug: () => 'hammond',
-    agentColour: () => '#C85A64',
+    agentColour: () => '#8F373E',
     getAgentsConfig: () => ({})
   });
 
@@ -1065,7 +1065,7 @@ test('New chat clears the thread and history but keeps the pinned agent', async 
   assert.equal(controller.getSelectedAgentSlug(), 'penelope');
   assert.equal(
     root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'),
-    '#C85A64'
+    '#8F373E'
   );
 
   await controller.send('starting fresh');

@@ -1403,7 +1403,7 @@ main { max-width: 76rem; margin: 0 auto; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-#skincare-chat-button { --agent-accent: #B99EE0; }
+#skincare-chat-button { --agent-accent: #C7AEEA; }
 
 .calendar-week-strip {
   display: grid;
