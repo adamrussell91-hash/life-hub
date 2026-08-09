@@ -36,14 +36,19 @@ function resolveRoutineShelf(routineKey, baseRoutine, library, membership) {
     return {
       ...baseRoutine,
       products: resolved.map(entry => entry.name),
-      productEntries: resolved.map(entry => ({ id: entry.id, name: entry.name }))
+      productEntries: resolved.map(entry => ({
+        id: entry.id,
+        name: entry.name,
+        category: entry.category || '',
+        hint: entry.hint || ''
+      }))
     };
   }
   const products = baseRoutine.products ?? [];
   return {
     ...baseRoutine,
     products,
-    productEntries: products.map(name => ({ id: null, name }))
+    productEntries: products.map(name => ({ id: null, name, category: '', hint: '' }))
   };
 }
 

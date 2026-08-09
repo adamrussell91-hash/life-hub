@@ -5,7 +5,7 @@ import {
   currentRoutineKey,
   toSkincareConfirmPayload
 } from './skincare-routines-data.js';
-import { searchProductLibrary } from './skincare-product-library.js';
+import { groupProductsByCategory, searchProductLibrary } from './skincare-product-library.js';
 
 function setText(root, selector, value) {
   const el = root.querySelector(selector);
@@ -158,7 +158,7 @@ function renderRoutineCard(root, key, model, {
   }
 
   const list = root.createElement('div');
-  list.className = 'skincare-products skincare-products--pills';
+  list.className = 'skincare-product-groups';
   let openMenuWrap = null;
 
   function closeOpenMenu() {
@@ -174,62 +174,88 @@ function renderRoutineCard(root, key, model, {
     list.replaceChildren();
     const entries = [
       ...productEntries,
-      ...state.oneOffs.map(name => ({ id: null, name }))
+      ...state.oneOffs.map(name => ({ id: null, name, category: 'Other', hint: '' }))
     ];
-    for (const { id, name: product } of entries) {
-      const wrap = root.createElement('div');
-      wrap.className = 'skincare-product-pill';
-      const button = root.createElement('button');
-      button.type = 'button';
-      button.className = 'skincare-chip';
-      if (state.enabled.has(product)) button.dataset.active = 'true';
-      button.textContent = product;
-      button.addEventListener('click', () => {
-        closeOpenMenu();
-        if (state.enabled.has(product)) {
-          state.enabled.delete(product);
-          delete button.dataset.active;
-        } else {
-          state.enabled.add(product);
-          button.dataset.active = 'true';
-        }
-      });
-      wrap.append(button);
+    const groups = groupProductsByCategory(entries);
 
-      if (id && !state.oneOffs.includes(product)) {
-        const menu = root.createElement('button');
-        menu.type = 'button';
-        menu.className = 'skincare-product-pill__menu';
-        menu.setAttribute('aria-label', `Options for ${product}`);
-        menu.setAttribute('aria-haspopup', 'true');
-        menu.textContent = '⋯';
-        menu.addEventListener('click', event => {
-          event.stopPropagation();
-          if (openMenuWrap === wrap) {
-            closeOpenMenu();
-            return;
-          }
+    for (const group of groups) {
+      const section = root.createElement('div');
+      section.className = 'skincare-product-group';
+      const label = root.createElement('p');
+      label.className = 'metric-caption skincare-product-group__label';
+      label.textContent = group.category;
+      section.append(label);
+
+      const pills = root.createElement('div');
+      pills.className = 'skincare-products skincare-products--pills';
+
+      for (const { id, name: product, hint } of group.products) {
+        const wrap = root.createElement('div');
+        wrap.className = 'skincare-product-pill';
+        const row = root.createElement('div');
+        row.className = 'skincare-product-pill__row';
+        const button = root.createElement('button');
+        button.type = 'button';
+        button.className = 'skincare-chip';
+        if (state.enabled.has(product)) button.dataset.active = 'true';
+        button.textContent = product;
+        button.addEventListener('click', () => {
           closeOpenMenu();
-          const panel = root.createElement('div');
-          panel.className = 'skincare-product-pill__menu-panel';
-          panel.setAttribute('role', 'menu');
-          const removeAction = root.createElement('button');
-          removeAction.type = 'button';
-          removeAction.className = 'skincare-product-pill__menu-action';
-          removeAction.setAttribute('role', 'menuitem');
-          removeAction.textContent = 'Remove from routine';
-          removeAction.addEventListener('click', event2 => {
-            event2.stopPropagation();
-            closeOpenMenu();
-            onRemoveFromRoutine?.({ routine: key, productId: id });
-          });
-          panel.append(removeAction);
-          wrap.append(panel);
-          openMenuWrap = wrap;
+          if (state.enabled.has(product)) {
+            state.enabled.delete(product);
+            delete button.dataset.active;
+          } else {
+            state.enabled.add(product);
+            button.dataset.active = 'true';
+          }
         });
-        wrap.append(menu);
+        row.append(button);
+
+        if (id && !state.oneOffs.includes(product)) {
+          const menu = root.createElement('button');
+          menu.type = 'button';
+          menu.className = 'skincare-product-pill__menu';
+          menu.setAttribute('aria-label', `Options for ${product}`);
+          menu.setAttribute('aria-haspopup', 'true');
+          menu.textContent = '⋯';
+          menu.addEventListener('click', event => {
+            event.stopPropagation();
+            if (openMenuWrap === wrap) {
+              closeOpenMenu();
+              return;
+            }
+            closeOpenMenu();
+            const panel = root.createElement('div');
+            panel.className = 'skincare-product-pill__menu-panel';
+            panel.setAttribute('role', 'menu');
+            const removeAction = root.createElement('button');
+            removeAction.type = 'button';
+            removeAction.className = 'skincare-product-pill__menu-action';
+            removeAction.setAttribute('role', 'menuitem');
+            removeAction.textContent = 'Remove from routine';
+            removeAction.addEventListener('click', event2 => {
+              event2.stopPropagation();
+              closeOpenMenu();
+              onRemoveFromRoutine?.({ routine: key, productId: id });
+            });
+            panel.append(removeAction);
+            wrap.append(panel);
+            openMenuWrap = wrap;
+          });
+          row.append(menu);
+        }
+        wrap.append(row);
+
+        if (hint) {
+          const hintEl = root.createElement('span');
+          hintEl.className = 'skincare-product-pill__hint';
+          hintEl.textContent = hint;
+          wrap.append(hintEl);
+        }
+        pills.append(wrap);
       }
-      list.append(wrap);
+      section.append(pills);
+      list.append(section);
     }
   }
   renderProductChips();

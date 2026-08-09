@@ -15,14 +15,13 @@ test('currentRoutineKey is am before noon Sydney', () => {
   assert.equal(currentRoutineKey(new Date('2026-08-05T03:00:00Z')), 'pm');
 });
 
-test('buildProductList includes chosen toner and extras', () => {
+test('buildProductList includes extras without exclusive choices', () => {
   const products = buildProductList('am', {
-    choiceSelections: { toner: 'Dr Ceuracle Vegan Kombucha Tea Essence' },
     extras: ['Sheet mask']
   });
-  assert.equal(products[0], 'Dr Ceuracle Vegan Kombucha Tea Essence');
   assert.ok(products.includes('Azclear Azelaic Acid 20%'));
   assert.ok(products.includes('Sheet mask'));
+  assert.equal(products.at(-1), 'Sheet mask');
 });
 
 test('buildProductList filters active products and one-offs by enabled products', () => {
@@ -32,7 +31,6 @@ test('buildProductList filters active products and one-offs by enabled products'
     enabledProducts: ['Catalog moisturiser', 'One-off treatment']
   });
   assert.deepEqual(products, [
-    'Anua Rice 70 + Ceramide Glow Milky Toner',
     'Catalog moisturiser',
     'One-off treatment'
   ]);
@@ -92,9 +90,9 @@ test('buildSkincareModel resolves products and entries from library + membership
   const library = {
     schema_version: 1,
     products: [
-      { id: 'catalog-serum', name: 'Catalog serum', notes: '' },
-      { id: 'catalog-cleanser', name: 'Catalog cleanser', notes: '' },
-      { id: 'unused', name: 'Unused product', notes: '' }
+      { id: 'catalog-serum', name: 'Catalog serum', category: 'Serum', hint: 'AM pick', notes: '' },
+      { id: 'catalog-cleanser', name: 'Catalog cleanser', category: 'Cleanser', notes: '' },
+      { id: 'unused', name: 'Unused product', category: 'Other', notes: '' }
     ]
   };
   const membership = {
@@ -112,11 +110,11 @@ test('buildSkincareModel resolves products and entries from library + membership
   });
   assert.deepEqual(model.routines.am.products, ['Catalog serum']);
   assert.deepEqual(model.routines.am.productEntries, [
-    { id: 'catalog-serum', name: 'Catalog serum' }
+    { id: 'catalog-serum', name: 'Catalog serum', category: 'Serum', hint: 'AM pick' }
   ]);
   assert.deepEqual(model.routines.pm.products, ['Catalog cleanser']);
   assert.deepEqual(model.routines.pm.productEntries, [
-    { id: 'catalog-cleanser', name: 'Catalog cleanser' }
+    { id: 'catalog-cleanser', name: 'Catalog cleanser', category: 'Cleanser', hint: '' }
   ]);
   assert.deepEqual(SKINCARE_ROUTINES.am.products, [
     'Azclear Azelaic Acid 20%',
@@ -140,12 +138,12 @@ test('buildSkincareModel preserves default products without shelf data', () => {
   assert.deepEqual(model.routines.am.products, SKINCARE_ROUTINES.am.products);
   assert.deepEqual(
     model.routines.am.productEntries,
-    SKINCARE_ROUTINES.am.products.map(name => ({ id: null, name }))
+    SKINCARE_ROUTINES.am.products.map(name => ({ id: null, name, category: '', hint: '' }))
   );
   assert.deepEqual(model.routines.pm.products, SKINCARE_ROUTINES.pm.products);
   assert.deepEqual(
     model.routines.pm.productEntries,
-    SKINCARE_ROUTINES.pm.products.map(name => ({ id: null, name }))
+    SKINCARE_ROUTINES.pm.products.map(name => ({ id: null, name, category: '', hint: '' }))
   );
 });
 
