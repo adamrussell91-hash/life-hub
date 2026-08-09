@@ -59,6 +59,20 @@ import {
   setSkincareRoutineMembershipSchema
 } from './_shared/skincare-library-tools.mjs';
 import {
+  proposeCentralNodePatchSchema,
+  appendGovernanceLogSchema,
+  validateCentralNodePatchInput,
+  validateGovernanceLogAppendInput,
+  classifyCentralNodePatchRisk,
+  applyCentralNodePatch
+} from './_shared/hammond-tools.mjs';
+import {
+  GOVERNANCE_LOG_PATH,
+  appendGovernanceEntry,
+  emptyGovernanceLog,
+  recentGovernanceTail
+} from '../../js/core/governance-log.js';
+import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   emptyProductLibrary,
   migrateProductLibraryFromCatalog,
@@ -153,6 +167,7 @@ export function createChatHandler({
     const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
     const needsExerciseLibrary = slug === 'chadwick';
     const needsSkincareLibrary = slug === 'hyaluronica';
+    const needsHammondTools = slug === 'hammond';
 
     let anthropic;
     try {
@@ -173,6 +188,9 @@ export function createChatHandler({
             saveSkincareLibraryEntrySchema(),
             setSkincareRoutineMembershipSchema()
           ]
+        : []),
+      ...(needsHammondTools
+        ? [proposeCentralNodePatchSchema(), appendGovernanceLogSchema()]
         : [])
     ];
 
@@ -193,6 +211,12 @@ export function createChatHandler({
         let digest = '';
         let constraints = '';
         let centralNodeLog = '';
+        let centralNodeFull = '';
+        let centralNodeMarkdown = '';
+        let centralNodeSha;
+        let governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
+        let governanceLogSha;
+        let governanceLogTail = '';
         let foodLibraryEntries = [];
         let foodLibrary = '';
         let foodLibrarySha;
@@ -216,6 +240,11 @@ export function createChatHandler({
           const manifest = selectManifestEntries(current.tree, { from, to: today });
           const dataEntries = manifest.filter(entry => entry.path.startsWith('data/'));
           const centralNodeEntry = current.tree.find(entry => entry.path === 'central-node.md' && entry.type === 'blob');
+          centralNodeSha = centralNodeEntry?.sha;
+          const governanceLogEntry = needsHammondTools
+            ? current.tree.find(entry => entry.path === GOVERNANCE_LOG_PATH && entry.type === 'blob')
+            : null;
+          governanceLogSha = governanceLogEntry?.sha;
           const foodLibraryEntry = needsFoodLibrary
             ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
             : null;
@@ -245,6 +274,7 @@ export function createChatHandler({
           const [
             dataBlobs,
             centralNodeBlob,
+            governanceLogBlob,
             foodLibraryBlob,
             exerciseLibraryBlob,
             skincareLibraryBlob,
@@ -254,6 +284,7 @@ export function createChatHandler({
           ] = await Promise.all([
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
+            governanceLogEntry ? client.readBlob(governanceLogEntry.sha) : null,
             foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
             skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
@@ -275,6 +306,20 @@ export function createChatHandler({
               extractCrossAgentCoordination(decodedCentralNode),
               extractRecentAgentActions(decodedCentralNode)
             ].filter(Boolean).join('\n\n');
+            if (needsHammondTools) {
+              centralNodeFull = decodedCentralNode;
+              centralNodeMarkdown = decodedCentralNode;
+            }
+          }
+
+          if (needsHammondTools) {
+            const decodedGovernanceLog = governanceLogBlob ? decodeBlob(governanceLogBlob) : null;
+            if (decodedGovernanceLog !== null) {
+              governanceLog = decodedGovernanceLog;
+            } else {
+              governanceLog = emptyGovernanceLog();
+            }
+            governanceLogTail = recentGovernanceTail(governanceLog);
           }
 
           const decodedFoodLibrary = foodLibraryBlob ? decodeBlob(foodLibraryBlob) : null;
@@ -333,6 +378,12 @@ export function createChatHandler({
           digest = '';
           constraints = '';
           centralNodeLog = '';
+          centralNodeFull = '';
+          centralNodeMarkdown = '';
+          centralNodeSha = undefined;
+          governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
+          governanceLogSha = undefined;
+          governanceLogTail = '';
           foodLibraryEntries = [];
           foodLibrary = '';
           foodLibrarySha = undefined;
@@ -362,6 +413,8 @@ export function createChatHandler({
           digest,
           constraints,
           centralNodeLog,
+          centralNodeFull,
+          governanceLogTail,
           foodLibrary,
           chadwickProtocol,
           hyaluronicaProtocol,
@@ -489,6 +542,70 @@ export function createChatHandler({
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
               }
+              if (event.name === 'append_governance_log') {
+                const entry = validateGovernanceLogAppendInput(event.input);
+                if (!entry) {
+                  return JSON.stringify({ ok: false, error: 'invalid_entry' });
+                }
+                const dated = { ...entry, dateKey: entry.dateKey ?? today };
+                try {
+                  const next = appendGovernanceEntry(governanceLog, dated);
+                  const result = await client.writeFile({
+                    path: GOVERNANCE_LOG_PATH,
+                    content: next,
+                    ...(governanceLogSha ? { sha: governanceLogSha } : {}),
+                    message: `chore(governance): ${dated.entryType}`
+                  });
+                  governanceLog = next;
+                  governanceLogSha = result.sha;
+                  return JSON.stringify({ ok: true, path: GOVERNANCE_LOG_PATH });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (event.name === 'propose_central_node_patch') {
+                const patch = validateCentralNodePatchInput(event.input);
+                if (!patch) {
+                  return JSON.stringify({ ok: false, error: 'invalid_patch' });
+                }
+                const risk = classifyCentralNodePatchRisk(patch);
+                if (risk === 'confirm') {
+                  return JSON.stringify({
+                    ok: true,
+                    status: 'awaiting_confirm',
+                    summary: patch.payload.summary
+                  });
+                }
+                if (!centralNodeMarkdown) {
+                  return JSON.stringify({ ok: false, error: 'central_node_missing' });
+                }
+                const next = applyCentralNodePatch(centralNodeMarkdown, patch);
+                if (!next) {
+                  return JSON.stringify({ ok: false, error: 'apply_failed' });
+                }
+                try {
+                  const result = await client.writeFile({
+                    path: 'central-node.md',
+                    content: next,
+                    ...(centralNodeSha ? { sha: centralNodeSha } : {}),
+                    message: `chore(cn): ${patch.payload.summary}`
+                  });
+                  centralNodeMarkdown = next;
+                  centralNodeSha = result.sha;
+                  send({
+                    type: 'central_node_patched',
+                    summary: patch.payload.summary,
+                    risk: 'auto'
+                  });
+                  return JSON.stringify({
+                    ok: true,
+                    status: 'applied',
+                    summary: patch.payload.summary
+                  });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
               return null;
             }
           })) {
@@ -510,6 +627,13 @@ export function createChatHandler({
                 });
               } else {
                 send({ type: 'record_rejected', errors: validation.errors });
+              }
+            } else if (event.type === 'tool_call' && event.name === 'propose_central_node_patch') {
+              const patch = validateCentralNodePatchInput(event.input);
+              if (patch && classifyCentralNodePatchRisk(patch) === 'confirm') {
+                send({ type: 'cn_patch_proposal', patch });
+              } else {
+                send(event);
               }
             } else {
               send(event);

@@ -239,3 +239,34 @@ test('non-hammond prompts never include hammond audit contract', () => {
   });
   assert.doesNotMatch(prompt, /THIS TURN ONLY: triage/);
 });
+
+test('Hammond prompt includes full central node markdown when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    centralNodeFull: '## 📅 This Week\n- Lift',
+    centralNodeLog: 'thin',
+    constraints: 'c'
+  });
+  assert.match(prompt, /This Week/);
+  assert.match(prompt, /full Central Node/i);
+  assert.match(prompt, /propose_central_node_patch/);
+  assert.match(prompt, /append_governance_log/);
+});
+
+test('Brisket prompt does not include centralNodeFull', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    centralNodeFull: '## 📅 This Week\n- SECRET',
+    centralNodeLog: 'thin only'
+  });
+  assert.equal(prompt.includes('SECRET'), false);
+});
+
+test('Hammond prompt includes governance log tail when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    governanceLogTail: "## 2026-08-01 — Coach's Notes\nHold the line."
+  });
+  assert.match(prompt, /Governance Log \(recent tail/);
+  assert.match(prompt, /Hold the line/);
+});
