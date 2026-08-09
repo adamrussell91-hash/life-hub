@@ -3,48 +3,48 @@ agents:
     slug: brisket
     domain: nutrition
     tab: Nutrition
-    colour: '#F0B843'
+    colour: '#EEB046'
     colour_source: confirmed
     name_triggers: [brisket lasso, brisket]
   - name: Chadwick Flexington
     slug: chadwick
     domain: fitness
     tab: Fitness
-    colour: '#2E7BD6'
+    colour: '#D9683A'
     colour_source: confirmed
     name_triggers: [chadwick flexington, chadwick, chad]
   - name: Hyaluronica St. Claire
     slug: hyaluronica
     domain: skincare
     tab: Skincare
-    colour: '#B99EE0'
+    colour: '#C7AEEA'
     colour_source: confirmed
     name_triggers: [hyaluronica st. claire, hyaluronica]
   - name: Penelope Rose Quillian
     slug: penelope
     domain: diary
     tab: Mind
-    colour: '#C85A64'
+    colour: '#8F373E'
     colour_source: confirmed
     name_triggers: [penelope rose quillian, penelope]
   - name: Dr Sara Tonin
     slug: sara
     domain: body
     tab: Body
-    colour: '#BBD9B4'
+    colour: '#BED3BC'
     colour_source: confirmed
     name_triggers: [dr sara tonin, sara tonin, sara]
   - name: Dr Vera Lenz
     slug: vera
     domain: psychology
     tab: Mind
-    colour: '#37598A'
+    colour: '#263450'
     colour_source: confirmed
     name_triggers: [dr vera lenz, vera lenz, vera]
   - name: General Hammond
     slug: hammond
     domain: life_coaching
     tab: Central Node
-    colour: '#3A3A42'
+    colour: '#2D2D2D'
     colour_source: confirmed
     name_triggers: [general hammond, hammond]
