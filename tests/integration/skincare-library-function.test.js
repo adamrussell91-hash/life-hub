@@ -164,6 +164,21 @@ test('POST save adds a product to the library', async () => {
   assert.equal(write.sha, LIBRARY_SHA);
 });
 
+test('GET with corrupt catalog seeds defaults instead of empty library', async () => {
+  const { fetchImpl } = githubFetchStub({ catalog: 'not a catalog' });
+
+  const response = await handler(fetchImpl)(request());
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.data.library.products.length, defaultNameCount);
+  assert.ok(payload.data.library.products.length > 0);
+  assert.ok(
+    payload.data.library.products.some(p => p.name === SKINCARE_ROUTINES.am.products[0])
+  );
+});
+
 test('POST save on cold start seeds then updates with seed sha', async () => {
   const { calls, fetchImpl } = githubFetchStub();
 
@@ -179,11 +194,9 @@ test('POST save on cold start seeds then updates with seed sha', async () => {
   assert.equal(response.status, 200);
   assert.equal(payload.ok, true);
   assert.ok(payload.data.library.products.some(p => p.name === 'Cold Start Serum'));
-  assert.ok(puts.length >= 1);
-  if (puts.length >= 2) {
-    assert.equal(puts[0].sha, undefined);
-    assert.equal(puts[1].sha, UPDATED_SHA);
-  }
+  assert.equal(puts.length, 2);
+  assert.equal(puts[0].sha, undefined);
+  assert.equal(puts[1].sha, UPDATED_SHA);
   assert.equal(payload.data.sha, UPDATED_SHA);
 });
 

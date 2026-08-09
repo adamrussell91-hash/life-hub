@@ -49,7 +49,9 @@ export async function loadOrSeedLibrary(github) {
   let library;
   if (catalogEntry) {
     const catalog = parseCatalog(decodeBlob(await github.readBlob(catalogEntry.sha)));
-    library = migrateProductLibraryFromCatalog(catalog);
+    library = catalog
+      ? migrateProductLibraryFromCatalog(catalog)
+      : seedProductLibraryFromDefaults(SKINCARE_ROUTINES);
   } else {
     library = seedProductLibraryFromDefaults(SKINCARE_ROUTINES);
   }
@@ -80,7 +82,9 @@ export async function loadOrSeedMembership(github, library) {
   let membership;
   if (catalogEntry) {
     const catalog = parseCatalog(decodeBlob(await github.readBlob(catalogEntry.sha)));
-    membership = migrateMembershipFromCatalog(catalog, library);
+    membership = catalog
+      ? migrateMembershipFromCatalog(catalog, library)
+      : seedMembershipFromDefaults(SKINCARE_ROUTINES, library);
   } else {
     membership = seedMembershipFromDefaults(SKINCARE_ROUTINES, library);
   }
