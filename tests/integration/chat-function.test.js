@@ -1073,3 +1073,340 @@ test('set_skincare_routine_membership writes routine-membership.json', async () 
   assert.deepEqual(written.pm.product_ids, ['cerave-foaming']);
   assert.deepEqual(written.am.product_ids, []);
 });
+
+const HAMMOND_CN_FIXTURE = `# Purpose
+Purpose body.
+
+## 📏 Writing Rules (All Agents Must Follow)
+Rule one.
+
+## 🤖 Agent Directory
+- Hammond
+
+## 🔴 Current Constraints & Priorities
+- Steroid taper active
+
+## ⚡ Today's Status — Monday, 1 January 2026
+**Flags:** Quiet day.
+**Energy:** Ok.
+
+## 📅 This Week
+- Lift Mon
+
+## 📊 This Month
+### Active Goals
+- Sleep by 11
+
+## 📈 Long-Term Trends & Patterns
+- Sleep debt rising
+
+## 🤝 Cross-Agent Coordination
+- Chadwick→Brisket: training day
+
+## 📝 Recent Agent Actions
+- 1 Jan — Brisket: meal logged
+`;
+
+test('Hammond registers CN patch and governance tools and gets full CN in system prompt', async () => {
+  let receivedArgs;
+  const cnSha = '5'.repeat(40);
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'central-node.md', type: 'blob', sha: cnSha, size: HAMMOND_CN_FIXTURE.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(HAMMOND_CN_FIXTURE, 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Hammond, what should I focus on?' })));
+
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'propose_central_node_patch'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'append_governance_log'));
+  assert.match(receivedArgs.system, /propose_central_node_patch/);
+  assert.match(receivedArgs.system, /append_governance_log/);
+  assert.match(receivedArgs.system, /full Central Node/i);
+  assert.match(receivedArgs.system, /This Week/);
+  assert.match(receivedArgs.system, /Lift Mon/);
+});
+
+test('non-hammond agents do not register Hammond CN or governance tools', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Brisket, log lunch' })));
+
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'propose_central_node_patch'));
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'append_governance_log'));
+  assert.doesNotMatch(receivedArgs.system, /propose_central_node_patch/);
+  assert.doesNotMatch(receivedArgs.system, /append_governance_log/);
+});
+
+test('propose_central_node_patch auto cross_agent append writes central-node.md', async () => {
+  const cnSha = '5'.repeat(40);
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'central-node.md', type: 'blob', sha: cnSha, size: HAMMOND_CN_FIXTURE.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(HAMMOND_CN_FIXTURE, 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        const toolResult = await executeTools({
+          id: 'call_1',
+          name: 'propose_central_node_patch',
+          input: {
+            section: 'cross_agent',
+            op: 'append_line',
+            payload: {
+              text: '- Hammond→Brisket: hold surplus tonight',
+              summary: 'Direct Brisket to hold surplus'
+            }
+          }
+        });
+        assert.ok(toolResult != null);
+        assert.deepEqual(JSON.parse(toolResult), {
+          ok: true,
+          status: 'applied',
+          summary: 'Direct Brisket to hold surplus'
+        });
+        yield { type: 'text', delta: 'Posted the handoff.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Hammond, post a cross-agent surplus hold' }))));
+  assert.deepEqual(events[0], { type: 'agent', slug: 'hammond' });
+  assert.deepEqual(events[1], {
+    type: 'central_node_patched',
+    summary: 'Direct Brisket to hold surplus',
+    risk: 'auto'
+  });
+  assert.deepEqual(events[2], { type: 'text', delta: 'Posted the handoff.' });
+
+  const putCall = calls.find(call => call.options?.method === 'PUT');
+  assert.ok(putCall, 'expected a PUT request to write central-node.md');
+  assert.ok(putCall.url.includes('central-node.md'));
+  const body = JSON.parse(putCall.options.body);
+  const written = Buffer.from(body.content, 'base64').toString('utf8');
+  assert.match(written, /Hammond→Brisket: hold surplus tonight/);
+  assert.match(body.message, /chore\(cn\): Direct Brisket to hold surplus/);
+});
+
+test('propose_central_node_patch confirm-class does not write and emits cn_patch_proposal', async () => {
+  const cnSha = '5'.repeat(40);
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'central-node.md', type: 'blob', sha: cnSha, size: HAMMOND_CN_FIXTURE.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(HAMMOND_CN_FIXTURE, 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        const input = {
+          section: 'constraints',
+          op: 'delete_lines',
+          payload: {
+            match: 'Steroid taper',
+            summary: 'Remove taper constraint'
+          }
+        };
+        const toolResult = await executeTools({
+          id: 'call_1',
+          name: 'propose_central_node_patch',
+          input
+        });
+        assert.ok(toolResult != null);
+        assert.deepEqual(JSON.parse(toolResult), {
+          ok: true,
+          status: 'awaiting_confirm',
+          summary: 'Remove taper constraint'
+        });
+        yield {
+          type: 'tool_call',
+          id: 'call_1',
+          name: 'propose_central_node_patch',
+          input
+        };
+        yield { type: 'text', delta: 'Queued for confirm.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Hammond, clear the taper flag' }))));
+  assert.deepEqual(events[0], { type: 'agent', slug: 'hammond' });
+  assert.equal(events[1].type, 'cn_patch_proposal');
+  assert.equal(events[1].patch.section, 'constraints');
+  assert.equal(events[1].patch.op, 'delete_lines');
+  assert.equal(events[1].patch.payload.match, 'Steroid taper');
+  assert.deepEqual(events[2], { type: 'text', delta: 'Queued for confirm.' });
+
+  assert.equal(
+    calls.filter(call => call.options?.method === 'PUT').length,
+    0,
+    'confirm-class CN patch must not write'
+  );
+});
+
+test('append_governance_log cold-starts empty log then writes governance-log.md', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        const toolResult = await executeTools({
+          id: 'call_1',
+          name: 'append_governance_log',
+          input: {
+            entry_type: "Coach's Notes",
+            body: 'Hold surplus through the weekend.',
+            title: 'Surplus hold'
+          }
+        });
+        assert.ok(toolResult != null);
+        assert.deepEqual(JSON.parse(toolResult), {
+          ok: true,
+          path: 'data/governance/governance-log.md'
+        });
+        yield { type: 'text', delta: 'Logged the note.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Hammond, note the surplus hold' }))));
+  assert.deepEqual(events[0], { type: 'agent', slug: 'hammond' });
+  assert.deepEqual(events[1], { type: 'text', delta: 'Logged the note.' });
+
+  const putCall = calls.find(call => call.options?.method === 'PUT');
+  assert.ok(putCall, 'expected a PUT request to write governance log');
+  assert.ok(putCall.url.includes('data/governance/governance-log.md'));
+  const body = JSON.parse(putCall.options.body);
+  const written = Buffer.from(body.content, 'base64').toString('utf8');
+  assert.match(written, /# Governance Log/);
+  assert.match(written, /## 2026-08-01 — Coach's Notes/);
+  assert.match(written, /Hold surplus through the weekend/);
+  assert.match(written, /\*\*Title:\*\* Surplus hold/);
+});
+
+test('propose_central_node_patch returns error JSON when central-node.md is missing', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        const toolResult = await executeTools({
+          id: 'call_1',
+          name: 'propose_central_node_patch',
+          input: {
+            section: 'cross_agent',
+            op: 'append_line',
+            payload: {
+              text: '- Hammond→Brisket: hold',
+              summary: 'Direct Brisket'
+            }
+          }
+        });
+        assert.deepEqual(JSON.parse(toolResult), { ok: false, error: 'central_node_missing' });
+        yield { type: 'text', delta: 'CN missing.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Hammond, post the handoff',
+    priorAgentSlug: 'hammond'
+  }))));
+  assert.deepEqual(events[0], { type: 'agent', slug: 'hammond' });
+  assert.deepEqual(events[1], { type: 'text', delta: 'CN missing.' });
+});

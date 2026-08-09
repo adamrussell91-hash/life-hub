@@ -5,6 +5,8 @@ export function buildSystemPrompt({
   digest = '',
   constraints = '',
   centralNodeLog = '',
+  centralNodeFull = '',
+  governanceLogTail = '',
   foodLibrary = '',
   chadwickProtocol = '',
   hyaluronicaProtocol = '',
@@ -115,8 +117,14 @@ export function buildSystemPrompt({
     hammondAuditContract
       ? `Hammond audit phase contract (hard rules for this turn):\n${hammondAuditContract}`
       : '',
+    centralNodeFull
+      ? `Full Central Node (complete markdown — your primary coordination document this turn):\n${centralNodeFull}`
+      : '',
+    governanceLogTail
+      ? `Governance Log (recent tail — durable protocol notes and Coach's Notes):\n${governanceLogTail}`
+      : '',
     'You do not propose log_entry. Coach and triage; specialists own domain logs.',
-    'Read Central Node before triage or any follow-on protocol. After direction/drift/handoff work, state compact Hammond→[Agent] lines in chat when another specialist must act.'
+    'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.'
   ] : [];
 
   return [
