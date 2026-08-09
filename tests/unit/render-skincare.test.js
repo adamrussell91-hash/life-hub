@@ -269,7 +269,7 @@ test('renderSkincare renders routine products as selectable pills with add and r
   assert.ok(controls.some(control => control.tagName === 'button' && control.textContent === '+ Add'));
   assert.ok(controls.some(control =>
     control.className === 'skincare-product-pill__menu'
-    && control.attributes['aria-label']?.includes('Remove Catalog serum from routine')
+    && control.attributes['aria-label']?.includes('Options for Catalog serum')
   ));
   assert.equal(
     controls.some(control =>
@@ -390,7 +390,7 @@ test('⋯ opens menu with Remove from routine and does not call remove until cho
   const [amCard] = root._routineCards.children;
   const menuButton = findDescendant(amCard, node =>
     node.className === 'skincare-product-pill__menu'
-    && node.attributes['aria-label']?.includes('Remove Catalog serum from routine')
+    && node.attributes['aria-label']?.includes('Options for Catalog serum')
   );
   assert.ok(menuButton, '⋯ menu trigger should exist');
 
@@ -454,6 +454,52 @@ test('+ Add shows From library and New / one-off chooser', () => {
     null,
     'Keep in routine toggle should be gone'
   );
+});
+
+test('empty From library offers Back and Create a product escape hatches', () => {
+  const root = fakeSkincareRoot();
+  const routines = amRoutineWithEntries([
+    { id: 'product-a', name: 'Product A' }
+  ]);
+  renderSkincare(root, baseModel({ routines }), {
+    library: libraryFixture([
+      { id: 'product-a', name: 'Product A', notes: '' }
+    ])
+  });
+
+  const [amCard] = root._routineCards.children;
+  findDescendant(amCard, node => node.tagName === 'button' && node.textContent === '+ Add').click();
+  findDescendant(amCard, node => node.tagName === 'button' && node.textContent === 'From library').click();
+
+  assert.match(
+    findDescendant(amCard, node => node.className?.includes('skincare-add__empty'))?.textContent ?? '',
+    /Nothing left on the shelf/
+  );
+
+  const back = findDescendant(amCard, node =>
+    node.tagName === 'button' && node.textContent === 'Back'
+  );
+  assert.ok(back, 'Back should return to chooser');
+  back.click();
+  assert.ok(findDescendant(amCard, node =>
+    node.tagName === 'button' && node.textContent === 'From library'
+  ));
+  assert.ok(findDescendant(amCard, node =>
+    node.tagName === 'button' && node.textContent === 'New / one-off…'
+  ));
+
+  findDescendant(amCard, node => node.tagName === 'button' && node.textContent === 'From library').click();
+  const create = findDescendant(amCard, node =>
+    node.tagName === 'button' && node.textContent === 'Create a product'
+  );
+  assert.ok(create, 'Create a product should open new/one-off');
+  create.click();
+  assert.ok(findDescendant(amCard, node =>
+    node.tagName === 'input' && node.type !== 'checkbox'
+  ), 'new/one-off name input should appear');
+  assert.ok(findDescendant(amCard, node =>
+    node.tagName === 'button' && node.textContent === 'Just this time'
+  ));
 });
 
 test('From library lists shelf products not on routine and adds selected', () => {
