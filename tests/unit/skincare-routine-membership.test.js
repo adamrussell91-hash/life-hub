@@ -29,8 +29,8 @@ test('parseMembership rejects bad shapes', () => {
 
 test('resolveRoutineProducts maps ids through library in order', () => {
   let lib = emptyProductLibrary();
-  lib = saveProductLibraryEntry(lib, { name: 'A' });
-  lib = saveProductLibraryEntry(lib, { name: 'B' });
+  lib = saveProductLibraryEntry(lib, { name: 'A', category: 'Other' });
+  lib = saveProductLibraryEntry(lib, { name: 'B', category: 'Other' });
   const a = findProductByName(lib, 'A');
   const b = findProductByName(lib, 'B');
   const membership = {
@@ -45,7 +45,7 @@ test('resolveRoutineProducts maps ids through library in order', () => {
 });
 
 test('addToRoutine appends id once', () => {
-  const lib = saveProductLibraryEntry(emptyProductLibrary(), { name: 'A' });
+  const lib = saveProductLibraryEntry(emptyProductLibrary(), { name: 'A', category: 'Other' });
   const id = lib.products[0].id;
   let m = emptyMembership();
   m = addToRoutine(m, 'am', id);
@@ -54,7 +54,7 @@ test('addToRoutine appends id once', () => {
 });
 
 test('removeFromRoutine drops id only from that routine', () => {
-  const lib = saveProductLibraryEntry(emptyProductLibrary(), { name: 'A' });
+  const lib = saveProductLibraryEntry(emptyProductLibrary(), { name: 'A', category: 'Other' });
   const id = lib.products[0].id;
   let m = emptyMembership();
   m = addToRoutine(m, 'am', id);
@@ -78,8 +78,8 @@ test('migrateMembershipFromCatalog uses products not retired', () => {
     pm: { products: [], retired: [], extras: [] }
   };
   let lib = emptyProductLibrary();
-  lib = saveProductLibraryEntry(lib, { name: 'Keep' });
-  lib = saveProductLibraryEntry(lib, { name: 'Gone' });
+  lib = saveProductLibraryEntry(lib, { name: 'Keep', category: 'Other' });
+  lib = saveProductLibraryEntry(lib, { name: 'Gone', category: 'Other' });
   const m = migrateMembershipFromCatalog(catalog, lib);
   assert.deepEqual(
     m.am.product_ids,
