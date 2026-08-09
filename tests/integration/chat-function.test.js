@@ -1245,7 +1245,7 @@ test('propose_central_node_patch auto cross_agent append writes central-node.md'
   assert.match(body.message, /chore\(cn\): Direct Brisket to hold surplus/);
 });
 
-test('propose_central_node_patch confirm-class does not write and emits cn_patch_proposal', async () => {
+test('propose_central_node_patch confirm-class does not write and emits cn_patch_proposal from executeTools', async () => {
   const cnSha = '5'.repeat(40);
   const calls = [];
   const fetchImpl = async (url, options) => {
@@ -1274,33 +1274,31 @@ test('propose_central_node_patch confirm-class does not write and emits cn_patch
     env: validEnv,
     now: () => Date.parse('2026-08-01T06:00:00Z'),
     fetchImpl,
+    // Mirror anthropic-client: when executeTools returns non-null, swallow tool_call
+    // (do not yield it). Confirm SSE must come from inside executeTools via send().
     createAnthropicClient: () => ({
       streamMessage: async function* ({ executeTools }) {
-        const input = {
-          section: 'constraints',
-          op: 'delete_lines',
-          payload: {
-            match: 'Steroid taper',
-            summary: 'Remove taper constraint'
-          }
-        };
-        const toolResult = await executeTools({
+        const toolCall = {
+          type: 'tool_call',
           id: 'call_1',
           name: 'propose_central_node_patch',
-          input
-        });
-        assert.ok(toolResult != null);
+          input: {
+            section: 'constraints',
+            op: 'delete_lines',
+            payload: {
+              match: 'Steroid taper',
+              summary: 'Remove taper constraint'
+            }
+          }
+        };
+        const toolResult = await executeTools(toolCall);
+        assert.ok(toolResult != null, 'confirm patch must return a tool_result so the round continues');
         assert.deepEqual(JSON.parse(toolResult), {
           ok: true,
           status: 'awaiting_confirm',
           summary: 'Remove taper constraint'
         });
-        yield {
-          type: 'tool_call',
-          id: 'call_1',
-          name: 'propose_central_node_patch',
-          input
-        };
+        // Intentionally do not yield toolCall — production anthropic-client continues past it.
         yield { type: 'text', delta: 'Queued for confirm.' };
         yield { type: 'done' };
       }
@@ -1314,6 +1312,7 @@ test('propose_central_node_patch confirm-class does not write and emits cn_patch
   assert.equal(events[1].patch.op, 'delete_lines');
   assert.equal(events[1].patch.payload.match, 'Steroid taper');
   assert.deepEqual(events[2], { type: 'text', delta: 'Queued for confirm.' });
+  assert.ok(!events.some(event => event.type === 'tool_call'), 'swallowed tool_call must not appear in SSE');
 
   assert.equal(
     calls.filter(call => call.options?.method === 'PUT').length,

@@ -244,13 +244,15 @@ test('Hammond prompt includes full central node markdown when provided', () => {
   const prompt = buildSystemPrompt({
     slug: 'hammond',
     centralNodeFull: '## 📅 This Week\n- Lift',
-    centralNodeLog: 'thin',
+    centralNodeLog: 'thin-slice-only',
     constraints: 'c'
   });
   assert.match(prompt, /This Week/);
   assert.match(prompt, /full Central Node/i);
   assert.match(prompt, /propose_central_node_patch/);
   assert.match(prompt, /append_governance_log/);
+  assert.doesNotMatch(prompt, /thin-slice-only/);
+  assert.doesNotMatch(prompt, /Central Node \(today's status, cross-agent directives, recent actions\)/);
 });
 
 test('Brisket prompt does not include centralNodeFull', () => {

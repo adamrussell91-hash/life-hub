@@ -570,6 +570,9 @@ export function createChatHandler({
                 }
                 const risk = classifyCentralNodePatchRisk(patch);
                 if (risk === 'confirm') {
+                  // Anthropic client swallows tool_call when executeTools returns
+                  // non-null — emit Confirm SSE here (same as central_node_patched).
+                  send({ type: 'cn_patch_proposal', patch });
                   return JSON.stringify({
                     ok: true,
                     status: 'awaiting_confirm',
