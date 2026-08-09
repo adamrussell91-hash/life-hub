@@ -61,13 +61,16 @@ import {
 import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   emptyProductLibrary,
-  parseProductLibrary
+  parseProductLibrary,
+  seedProductLibraryFromDefaults
 } from '../../js/app/skincare-product-library.js';
 import {
   SKINCARE_ROUTINE_MEMBERSHIP_PATH,
   emptyMembership,
-  parseMembership
+  parseMembership,
+  seedMembershipFromDefaults
 } from '../../js/app/skincare-routine-membership.js';
+import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
 import {
   formatTemplatesForPrompt,
   isTemplatePath,
@@ -193,9 +196,16 @@ export function createChatHandler({
         let exerciseLibraryEntries = [];
         let exerciseLibrary = '';
         let exerciseLibrarySha;
-        let skincareLibrary = emptyProductLibrary();
+        // Cold-start: seed in memory from defaults so the first Hyaluronica write
+        // merges onto a full shelf instead of persisting a sparse 1-item library
+        // that would block HTTP seed-on-missing forever.
+        let skincareLibrary = needsSkincareLibrary
+          ? seedProductLibraryFromDefaults(SKINCARE_ROUTINES)
+          : emptyProductLibrary();
         let skincareLibrarySha;
-        let skincareMembership = emptyMembership();
+        let skincareMembership = needsSkincareLibrary
+          ? seedMembershipFromDefaults(SKINCARE_ROUTINES, skincareLibrary)
+          : emptyMembership();
         let skincareMembershipSha;
         let workoutTemplates = '';
         try {
@@ -270,12 +280,23 @@ export function createChatHandler({
 
           const decodedSkincareLibrary = skincareLibraryBlob ? decodeBlob(skincareLibraryBlob) : null;
           if (decodedSkincareLibrary !== null) {
-            skincareLibrary = parseProductLibrary(decodedSkincareLibrary) ?? emptyProductLibrary();
+            const parsed = parseProductLibrary(decodedSkincareLibrary);
+            if (parsed) skincareLibrary = parsed;
           }
 
+          let membershipLoaded = false;
           const decodedSkincareMembership = skincareMembershipBlob ? decodeBlob(skincareMembershipBlob) : null;
           if (decodedSkincareMembership !== null) {
-            skincareMembership = parseMembership(decodedSkincareMembership) ?? emptyMembership();
+            const parsed = parseMembership(decodedSkincareMembership);
+            if (parsed) {
+              skincareMembership = parsed;
+              membershipLoaded = true;
+            }
+          }
+          // Re-seed against the shelf we actually have when membership blob is absent/corrupt,
+          // so a sparse loaded library does not keep default ids from the cold-start seed.
+          if (!membershipLoaded && needsSkincareLibrary) {
+            skincareMembership = seedMembershipFromDefaults(SKINCARE_ROUTINES, skincareLibrary);
           }
 
           const templateContents = templateEntries
@@ -292,9 +313,13 @@ export function createChatHandler({
           exerciseLibraryEntries = [];
           exerciseLibrary = '';
           exerciseLibrarySha = undefined;
-          skincareLibrary = emptyProductLibrary();
+          skincareLibrary = needsSkincareLibrary
+            ? seedProductLibraryFromDefaults(SKINCARE_ROUTINES)
+            : emptyProductLibrary();
           skincareLibrarySha = undefined;
-          skincareMembership = emptyMembership();
+          skincareMembership = needsSkincareLibrary
+            ? seedMembershipFromDefaults(SKINCARE_ROUTINES, skincareLibrary)
+            : emptyMembership();
           skincareMembershipSha = undefined;
           workoutTemplates = '';
         }
@@ -398,13 +423,13 @@ export function createChatHandler({
                   return JSON.stringify({ ok: false, error: applied.error });
                 }
                 try {
-                  skincareLibrary = applied.library;
                   const result = await client.writeFile({
                     path: SKINCARE_PRODUCT_LIBRARY_PATH,
-                    content: JSON.stringify(skincareLibrary, null, 2),
+                    content: JSON.stringify(applied.library, null, 2),
                     ...(skincareLibrarySha ? { sha: skincareLibrarySha } : {}),
                     message: `chore(skincare): upsert ${applied.name}`
                   });
+                  skincareLibrary = applied.library;
                   skincareLibrarySha = result.sha;
                   return JSON.stringify({ ok: true, id: applied.id, name: applied.name });
                 } catch {
@@ -421,13 +446,13 @@ export function createChatHandler({
                   return JSON.stringify({ ok: false, error: applied.error });
                 }
                 try {
-                  skincareMembership = applied.membership;
                   const result = await client.writeFile({
                     path: SKINCARE_ROUTINE_MEMBERSHIP_PATH,
-                    content: JSON.stringify(skincareMembership, null, 2),
+                    content: JSON.stringify(applied.membership, null, 2),
                     ...(skincareMembershipSha ? { sha: skincareMembershipSha } : {}),
                     message: `chore(skincare): ${event.input?.op} ${event.input?.product_id} on ${applied.routine}`
                   });
+                  skincareMembership = applied.membership;
                   skincareMembershipSha = result.sha;
                   return JSON.stringify({
                     ok: true,
