@@ -24,6 +24,10 @@ Adam's product shelf and AM/PM rotation live in Life Hub (`product-library` + ro
 
 Shelf rows track: name, brand, category, status (`in_use` / `to_try` / `finished` / `discontinued`), purpose, active ingredients, cost, purchase/opened/finished dates, notes, and optional UI hint. **Status is inventory** — it is not the same as being on today's AM/PM rotation. Membership (`set_skincare_routine_membership`) controls which products appear on the Skincare tab cards.
 
+When he asks what is currently on AM or PM:
+1. Use the injected **Current AM/PM rotation** block, or call `list_skincare_routines`
+2. Do **not** reconstruct a routine from shelf `status`, `in_use`, or notes keyword search — that invents a different list than the tab
+
 When he asks to add, rename, update metadata, or rotate products:
 1. `search_skincare_library` before creating duplicates (matches name/brand/category/status/purpose/notes/ingredients)
 2. `save_skincare_library_entry` to create/update any shelf fields (category required on create)

@@ -1,6 +1,7 @@
 import { getSydneyDateKey } from '../core/time.js';
 import { shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
+import { upgradeOtherProductCategories } from './skincare-product-library.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
 const LAST_SUCCESS_KEY = 'life-hub:last-success';
@@ -64,6 +65,7 @@ export function createAppController(dependencies) {
     buildMindModel,
     renderMind,
     chatSelectAgent,
+    chatSyncAccent,
     buildCentralNodeModel,
     renderCentralNode,
     agentColour,
@@ -486,7 +488,10 @@ export function createAppController(dependencies) {
     if (chatPanel?.isOpen()) chatPanel.close();
 
     setSectionVisibility(name);
-    if (name === 'chat') chatClearUnread?.();
+    if (name === 'chat') {
+      chatClearUnread?.();
+      chatSyncAccent?.();
+    }
     currentSection = name;
     if (name === 'nutrition') renderNutritionSection();
     if (name === 'fitness') renderFitnessSection();
@@ -594,7 +599,9 @@ export function createAppController(dependencies) {
         skincareApi.getRoutines()
       ]);
       if (token !== shelfRefreshToken) return;
-      latestLibrary = library;
+      latestLibrary = library
+        ? upgradeOtherProductCategories(library).library
+        : null;
       latestMembership = membership;
       if (currentSection === 'skincare') renderSkincareSection();
     } catch {
@@ -604,7 +611,11 @@ export function createAppController(dependencies) {
 
   function applySkincareShelf({ library, membership } = {}) {
     shelfRefreshToken += 1;
-    if (library !== undefined) latestLibrary = library ?? null;
+    if (library !== undefined) {
+      latestLibrary = library
+        ? upgradeOtherProductCategories(library).library
+        : null;
+    }
     if (membership !== undefined) latestMembership = membership ?? null;
     if (currentSection === 'skincare') renderSkincareSection();
   }

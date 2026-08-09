@@ -147,6 +147,26 @@ test('hyaluronica prompt includes protocol when provided', () => {
   });
   assert.match(prompt, /Prefer the Skincare tab/);
   assert.match(prompt, /Hyaluronica operating manual/);
+  assert.match(prompt, /list_skincare_routines/);
+});
+
+test('hyaluronica prompt injects current AM/PM rotation when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hyaluronica',
+    skincareRoutines: 'Current AM/PM rotation (Skincare tab source of truth; not the same as shelf status):\nAM:\n- La Roche SPF (spf-50) [Sunscreen]\nPM:\n(empty)'
+  });
+  assert.match(prompt, /Current AM\/PM rotation/);
+  assert.match(prompt, /La Roche SPF/);
+  assert.match(prompt, /Never invent a routine from shelf status/);
+});
+
+test('other agents never receive skincare routines block', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    skincareRoutines: 'Current AM/PM rotation:\nAM:\n- La Roche SPF'
+  });
+  assert.doesNotMatch(prompt, /Current AM\/PM rotation/);
+  assert.doesNotMatch(prompt, /La Roche SPF/);
 });
 
 test('Chadwick prompt requires planned log_entry after design and CN-shaped programming', () => {

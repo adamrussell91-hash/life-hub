@@ -54,7 +54,6 @@ export function createChatController({
   let lastAgentAt = 0;
   let pinnedAgentSlug = null;
   let activeAbort = null;
-  let heroCollapsed = false;
   let auditSession = null;
 
   function clearAuditSession() {
@@ -113,7 +112,6 @@ export function createChatController({
   function selectAgent(slug) {
     if (!slug) return;
     if (slug !== 'hammond') clearAuditSession();
-    heroCollapsed = false;
     pinnedAgentSlug = slug;
     lastAgentSlug = slug;
     lastAgentAt = now();
@@ -137,17 +135,20 @@ export function createChatController({
   }
 
   function applyAgentAccent(slug) {
-    renderAgentHero(root, slug, {
-      collapsed: heroCollapsed,
-      onToggle: nextCollapsed => {
-        heroCollapsed = nextCollapsed;
-        applyAgentAccent(slug);
-      }
-    });
+    renderAgentHero(root, slug);
     if (!slug || typeof agentColour !== 'function') return;
     const panel = root.querySelector('#chat-view');
     if (!panel?.style?.setProperty) return;
     panel.style.setProperty('--agent-accent', agentColour(getAgentsConfig?.(), slug));
+  }
+
+  function syncAccent() {
+    const slug = stickyAgentSlug();
+    if (slug) applyAgentAccent(slug);
+    renderAgentPicker(root, {
+      selectedSlug: slug ?? null,
+      onSelect: selectAgent
+    });
   }
 
   function remember(role, content) {
@@ -225,10 +226,6 @@ export function createChatController({
     const sessionForSend = auditSession && talkingToHammond(message) ? auditSession : undefined;
     remember('user', message);
     appendMessage(root, { role: 'user', text: message });
-    if (!heroCollapsed) {
-      heroCollapsed = true;
-      applyAgentAccent(stickyAgentSlug());
-    }
 
     let assistantSlug = stickyAgentSlug();
     let assistantBubble = null;
@@ -515,6 +512,7 @@ export function createChatController({
     send,
     selectAgent,
     startNewChat,
+    syncAccent,
     getSelectedAgentSlug: () => stickyAgentSlug() ?? null,
     clearUnread
   };

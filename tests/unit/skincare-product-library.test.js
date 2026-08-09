@@ -11,7 +11,9 @@ import {
   seedProductLibraryFromDefaults,
   migrateProductLibraryFromCatalog,
   normalizeProductStatus,
-  groupProductsByCategory
+  groupProductsByCategory,
+  defaultCategoryForProductName,
+  upgradeOtherProductCategories
 } from '../../js/app/skincare-product-library.js';
 import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
 
@@ -138,6 +140,41 @@ test('groupProductsByCategory orders and skips empty', () => {
   ]);
   assert.deepEqual(groups.map(g => g.category), ['Cleanser', 'Serum']);
   assert.deepEqual(groups[1].products.map(p => p.name), ['A', 'C']);
+});
+
+test('defaultCategoryForProductName maps SPF and known defaults', () => {
+  assert.equal(defaultCategoryForProductName('La Roche Posay Anthelios SPF 50+'), 'Sunscreen');
+  assert.equal(defaultCategoryForProductName('Korres Greek Yoghurt Probiotic Gel Cream'), 'Moisturiser');
+  assert.equal(defaultCategoryForProductName('Dr Jart+ Cicapair Colour Corrector'), 'Makeup');
+  assert.equal(defaultCategoryForProductName('Korres Greek Yoghurt Foaming Cream Cleanser'), 'Cleanser');
+  assert.equal(defaultCategoryForProductName('Retrieve Tretinoin 0.05% (sandwich method)'), 'Treatment');
+  assert.equal(defaultCategoryForProductName('Mystery Bottle'), 'Other');
+});
+
+test('seedProductLibraryFromDefaults assigns real categories not Other for SPF', () => {
+  const lib = seedProductLibraryFromDefaults(SKINCARE_ROUTINES);
+  const spf = lib.products.find(p => p.name.includes('Anthelios'));
+  assert.ok(spf);
+  assert.equal(spf.category, 'Sunscreen');
+  const gel = lib.products.find(p => p.name === 'Korres Greek Yoghurt Probiotic Gel Cream');
+  assert.equal(gel.category, 'Moisturiser');
+});
+
+test('upgradeOtherProductCategories rewrites Other using name inference', () => {
+  const library = {
+    schema_version: 1,
+    products: [
+      { id: 'spf', name: 'La Roche Posay Anthelios SPF 50+', category: 'Other', notes: '' },
+      { id: 'keep', name: 'Custom Gadget', category: 'Other', notes: '' },
+      { id: 'serum', name: 'Already Serum', category: 'Serum', notes: '' }
+    ]
+  };
+  const { library: next, changed } = upgradeOtherProductCategories(library);
+  assert.equal(changed, true);
+  assert.equal(next.products.find(p => p.id === 'spf').category, 'Sunscreen');
+  assert.equal(next.products.find(p => p.id === 'keep').category, 'Other');
+  assert.equal(next.products.find(p => p.id === 'serum').category, 'Serum');
+  assert.equal(upgradeOtherProductCategories(next).changed, false);
 });
 
 test('seedProductLibraryFromDefaults includes AM and PM unique names', () => {

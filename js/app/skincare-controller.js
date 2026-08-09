@@ -1,5 +1,5 @@
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
-import { findProductByName } from './skincare-product-library.js';
+import { defaultCategoryForProductName, findProductByName } from './skincare-product-library.js';
 
 export function createSkincareController({
   root,
@@ -92,7 +92,11 @@ export function createSkincareController({
     setStatus('Saving…');
     let library = null;
     try {
-      library = await skincareApi.saveLibraryEntry({ name, category: 'Other', status: 'in_use' });
+      library = await skincareApi.saveLibraryEntry({
+        name,
+        category: defaultCategoryForProductName(name),
+        status: 'in_use'
+      });
       const product = findProductByName(library, name);
       if (!product?.id) {
         if (library) onShelfChanged?.({ library });

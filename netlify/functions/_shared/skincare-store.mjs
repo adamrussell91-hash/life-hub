@@ -3,7 +3,8 @@ import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   migrateProductLibraryFromCatalog,
   parseProductLibrary,
-  seedProductLibraryFromDefaults
+  seedProductLibraryFromDefaults,
+  upgradeOtherProductCategories
 } from '../../../js/app/skincare-product-library.js';
 import {
   SKINCARE_ROUTINE_MEMBERSHIP_PATH,
@@ -40,9 +41,22 @@ export async function loadOrSeedLibrary(github) {
   const { tree } = await github.resolveTree();
   const entry = findBlob(tree, SKINCARE_PRODUCT_LIBRARY_PATH);
   if (entry) {
-    const library = parseProductLibrary(decodeBlob(await github.readBlob(entry.sha)));
-    if (!library) throw corruptError('library_corrupt');
-    return { library, entry, created: false };
+    const parsed = parseProductLibrary(decodeBlob(await github.readBlob(entry.sha)));
+    if (!parsed) throw corruptError('library_corrupt');
+    const { library, changed } = upgradeOtherProductCategories(parsed);
+    if (!changed) return { library, entry, created: false };
+    const result = await writeJson(
+      github,
+      SKINCARE_PRODUCT_LIBRARY_PATH,
+      library,
+      'chore(skincare): upgrade Other product categories',
+      entry.sha
+    );
+    return {
+      library,
+      entry: { path: SKINCARE_PRODUCT_LIBRARY_PATH, type: 'blob', sha: result.sha },
+      created: false
+    };
   }
 
   const catalogEntry = findBlob(tree, SKINCARE_CATALOG_PATH);

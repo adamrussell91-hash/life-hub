@@ -243,6 +243,86 @@ export function groupProductsByCategory(products) {
   return ordered;
 }
 
+/** Exact names from hardcoded AM/PM defaults → category. */
+const KNOWN_DEFAULT_CATEGORIES = {
+  'Azclear Azelaic Acid 20%': 'Treatment',
+  'Korres Greek Yoghurt Probiotic Gel Cream': 'Moisturiser',
+  'La Roche Posay Anthelios SPF 50+': 'Sunscreen',
+  'Dr Jart+ Cicapair Colour Corrector': 'Makeup',
+  'Maybelline Green and Peach Correctors with BareMinerals Concealer': 'Makeup',
+  'Kosas Cloud Set Translucent Loose Setting and Blurring Powder': 'Makeup',
+  'Dr.G Green Deep Pore Cleansing Balm': 'Cleanser',
+  'Korres Greek Yoghurt Foaming Cream Cleanser': 'Cleanser',
+  Toner: 'Toner',
+  'Retrieve Tretinoin 0.05% (sandwich method)': 'Treatment',
+  'La Roche Posay Cicaplast B5+': 'Moisturiser',
+  'Avene Cicalfate+': 'Moisturiser'
+};
+
+/**
+ * Best-effort category for seed/fallback/create when the shelf has no category yet.
+ * Prefer exact default-name matches, then light name heuristics; else Other.
+ */
+export function defaultCategoryForProductName(name) {
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  if (!trimmed) return 'Other';
+  if (KNOWN_DEFAULT_CATEGORIES[trimmed]) return KNOWN_DEFAULT_CATEGORIES[trimmed];
+  const lower = trimmed.toLowerCase();
+  if (/\bspf\b/.test(lower) || lower.includes('sunscreen') || lower.includes('superscreen')) {
+    return 'Sunscreen';
+  }
+  if (lower.includes('cleanser') || lower.includes('cleansing balm') || lower.includes('foaming cream')) {
+    return 'Cleanser';
+  }
+  if (lower.includes('toner') || lower.includes('essence')) return 'Toner';
+  if (lower.includes('serum')) return 'Serum';
+  if (lower.includes('tretinoin') || lower.includes('azelaic') || lower.includes('retinol')) {
+    return 'Treatment';
+  }
+  if (
+    lower.includes('moisturis')
+    || lower.includes('moisturiz')
+    || lower.includes('gel cream')
+    || lower.includes('cicaplast')
+    || lower.includes('cicalfate')
+    || lower.includes('baume')
+  ) {
+    return 'Moisturiser';
+  }
+  if (
+    lower.includes('concealer')
+    || lower.includes('corrector')
+    || lower.includes('foundation')
+    || lower.includes('setting')
+    || lower.includes('powder')
+  ) {
+    return 'Makeup';
+  }
+  if (lower.includes('mask')) return 'Mask';
+  if (lower.includes('mist') || lower.includes('spray')) return 'Mist';
+  if (lower.includes('shampoo') || lower.includes('conditioner') || lower.includes('dandruff')) {
+    return 'Hair';
+  }
+  return 'Other';
+}
+
+/** Upgrade products stuck on Other/empty when a better category can be inferred. */
+export function upgradeOtherProductCategories(library) {
+  const products = library?.products;
+  if (!Array.isArray(products)) return { library, changed: false };
+  let changed = false;
+  const nextProducts = products.map(p => {
+    const current = typeof p.category === 'string' ? p.category.trim() : '';
+    if (current && current !== 'Other') return p;
+    const inferred = defaultCategoryForProductName(p.name);
+    if (!inferred || inferred === 'Other' || inferred === current) return p;
+    changed = true;
+    return { ...p, category: inferred };
+  });
+  if (!changed) return { library, changed: false };
+  return { library: { schema_version: 1, products: nextProducts }, changed: true };
+}
+
 export function seedProductLibraryFromDefaults(defaults) {
   let lib = emptyProductLibrary();
   const names = [
@@ -251,7 +331,10 @@ export function seedProductLibraryFromDefaults(defaults) {
   ];
   for (const name of names) {
     if (findProductByName(lib, name)) continue;
-    lib = saveProductLibraryEntry(lib, { name, category: 'Other' }) ?? lib;
+    lib = saveProductLibraryEntry(lib, {
+      name,
+      category: defaultCategoryForProductName(name)
+    }) ?? lib;
   }
   return lib;
 }
@@ -266,7 +349,11 @@ export function migrateProductLibraryFromCatalog(catalog) {
   for (const name of names) {
     if (typeof name !== 'string' || !name.trim()) continue;
     if (findProductByName(lib, name)) continue;
-    lib = saveProductLibraryEntry(lib, { name: name.trim(), category: 'Other' }) ?? lib;
+    const trimmed = name.trim();
+    lib = saveProductLibraryEntry(lib, {
+      name: trimmed,
+      category: defaultCategoryForProductName(trimmed)
+    }) ?? lib;
   }
   return lib;
 }

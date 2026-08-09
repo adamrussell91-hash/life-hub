@@ -1,5 +1,6 @@
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
 import { resolveRoutineProducts } from './skincare-routine-membership.js';
+import { defaultCategoryForProductName } from './skincare-product-library.js';
 
 const WEEK_DAYS = 7;
 const MONTH_DAYS = 30;
@@ -48,7 +49,12 @@ function resolveRoutineShelf(routineKey, baseRoutine, library, membership) {
   return {
     ...baseRoutine,
     products,
-    productEntries: products.map(name => ({ id: null, name, category: '', hint: '' }))
+    productEntries: products.map(name => ({
+      id: null,
+      name,
+      category: defaultCategoryForProductName(name),
+      hint: ''
+    }))
   };
 }
 
