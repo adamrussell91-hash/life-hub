@@ -189,11 +189,9 @@ test('POST add on cold start seeds library and membership then updates', async (
   assert.equal(response.status, 200);
   assert.equal(payload.ok, true);
   assert.ok(payload.data.membership.pm.product_ids.includes(productId));
-  assert.ok(membershipPuts.length >= 1);
-  if (membershipPuts.length >= 2) {
-    assert.equal(membershipPuts[0].sha, undefined);
-    assert.equal(membershipPuts[1].sha, UPDATED_SHA);
-  }
+  assert.equal(membershipPuts.length, 2);
+  assert.equal(membershipPuts[0].sha, undefined);
+  assert.equal(membershipPuts[1].sha, UPDATED_SHA);
 });
 
 test('POST add unknown product id returns 400 unknown_product', async () => {
