@@ -1304,3 +1304,88 @@ test('empty-turn recovery does not advance the audit phase', async () => {
     intakeCount: 0
   });
 });
+
+test('cn_patch_proposal Confirm posts kind cn_patch with the patch candidate', async () => {
+  const root = new FakeDocument();
+  const patch = {
+    section: 'constraints',
+    op: 'delete_lines',
+    payload: { match: 'Steroid taper', summary: 'Remove taper constraint' }
+  };
+  const confirmCalls = [];
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'cn_patch_proposal', patch };
+      yield { type: 'done' };
+    },
+    async confirm(payload) {
+      confirmCalls.push(payload);
+      return { path: 'central-node.md', summary: patch.payload.summary };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Hammond, clear the taper flag');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
+  assert.ok(proposal, 'expected a CN patch proposal card');
+  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  confirmButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(confirmCalls.length, 1);
+  assert.equal(confirmCalls[0].kind, 'cn_patch');
+  assert.equal(confirmCalls[0].slug, 'hammond');
+  assert.deepEqual(confirmCalls[0].candidate, patch);
+  assert.match(proposal.children[0]?.textContent ?? '', /Central Node updated: Remove taper constraint/);
+});
+
+test('cn_patch_proposal Discard removes the card without confirming', async () => {
+  const root = new FakeDocument();
+  const patch = {
+    section: 'constraints',
+    op: 'delete_lines',
+    payload: { match: 'Steroid taper', summary: 'Remove taper constraint' }
+  };
+  const confirmCalls = [];
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'cn_patch_proposal', patch };
+      yield { type: 'done' };
+    },
+    async confirm(payload) {
+      confirmCalls.push(payload);
+      return { path: 'central-node.md', summary: patch.payload.summary };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Hammond, clear the taper flag');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
+  const discardButton = proposal.children.find(child => child.className === 'record-proposal__discard');
+  discardButton.dispatchEvent(new Event('click'));
+
+  assert.equal(confirmCalls.length, 0);
+  assert.equal(list.children.includes(proposal), false);
+});
+
+test('central_node_patched shows an ephemeral status toast with the summary', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'central_node_patched', summary: 'Direct Brisket to hold surplus', risk: 'auto' };
+      yield { type: 'done' };
+    },
+    async confirm() {
+      throw new Error('confirm should not be called');
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Hammond, nudge Brisket');
+
+  assert.equal(root.querySelector('#chat-error').textContent, 'Direct Brisket to hold surplus');
+});

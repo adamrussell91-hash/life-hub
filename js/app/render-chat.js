@@ -186,6 +186,43 @@ export function appendRecordProposal(root, { path, record, notes }) {
   return { card, confirm, discard, inputs };
 }
 
+export function appendCnPatchProposal(root, { patch }) {
+  const list = root.querySelector('#chat-messages');
+  if (!list) return null;
+  const card = root.createElement('li');
+  card.className = 'record-proposal cn-patch-proposal';
+
+  const summary = root.createElement('p');
+  summary.className = 'cn-patch-proposal__summary';
+  summary.textContent = typeof patch?.payload?.summary === 'string' && patch.payload.summary.trim()
+    ? patch.payload.summary.trim()
+    : 'Proposed Central Node change';
+  card.append(summary);
+
+  const meta = root.createElement('p');
+  meta.className = 'cn-patch-proposal__meta';
+  const section = typeof patch?.section === 'string' ? patch.section : 'unknown';
+  const op = typeof patch?.op === 'string' ? patch.op : 'unknown';
+  meta.textContent = `${section} · ${op}`;
+  card.append(meta);
+
+  const confirm = root.createElement('button');
+  confirm.type = 'button';
+  confirm.className = 'record-proposal__confirm';
+  confirm.textContent = 'Confirm';
+  card.append(confirm);
+
+  const discard = root.createElement('button');
+  discard.type = 'button';
+  discard.className = 'record-proposal__discard';
+  discard.textContent = 'Discard';
+  card.append(discard);
+
+  list.append(card);
+  list.scrollTop = list.scrollHeight;
+  return { card, confirm, discard };
+}
+
 export function setChatBusy(root, busy) {
   const input = root.querySelector('#chat-input');
   const button = root.querySelector('#chat-send');

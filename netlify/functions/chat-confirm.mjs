@@ -25,12 +25,18 @@ import {
 import { getSydneyTimestamp } from '../../js/core/time.js';
 import { loadCentralNodeSeed } from './_shared/load-central-node-seed.mjs';
 import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
+import {
+  validateCentralNodePatchInput,
+  classifyCentralNodePatchRisk,
+  applyCentralNodePatch
+} from './_shared/hammond-tools.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 const CENTRAL_NODE_PATH = 'central-node.md';
+const HAMMOND_SLUG = 'hammond';
 
 export const config = { path: '/api/chat/confirm' };
 
@@ -68,6 +74,10 @@ export function createChatConfirmHandler({
 
     const parsed = await parseRequest(request);
     if (parsed.error) return parsed.error;
+
+    if (parsed.kind === 'cn_patch') {
+      return handleCnPatchConfirm(parsed);
+    }
 
     const validation = validateLogEntry(parsed.candidate, {
       id: `${parsed.candidate.type}-${parsed.candidate.date}-${randomBytes(3).toString('hex')}`,
@@ -177,6 +187,79 @@ export function createChatConfirmHandler({
       return mapRepositoryError(error);
     }
   };
+
+  async function handleCnPatchConfirm(parsed) {
+    if (parsed.slug !== HAMMOND_SLUG) {
+      return errorResponse(400, 'invalid_request', 'Central Node patches require the hammond slug.', false, PRIVATE_CACHE);
+    }
+
+    const patch = validateCentralNodePatchInput(parsed.candidate);
+    if (!patch) {
+      return errorResponse(400, 'invalid_patch', 'This Central Node patch could not be validated.', false, PRIVATE_CACHE);
+    }
+
+    const risk = classifyCentralNodePatchRisk(patch);
+    if (risk !== 'confirm') {
+      return errorResponse(
+        400,
+        'auto_class_rejected',
+        'Auto-class Central Node patches cannot be confirmed via this endpoint.',
+        false,
+        PRIVATE_CACHE
+      );
+    }
+
+    let client;
+    try {
+      client = createClient({ env, fetchImpl });
+    } catch (error) {
+      if (error instanceof GitHubConfigurationError) return withPrivateCache(misconfiguredResponse());
+      return repositoryError('github_unavailable', true);
+    }
+
+    let content;
+    let existingSha;
+    try {
+      const current = await client.resolveTree();
+      const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
+      if (!entry) {
+        return errorResponse(404, 'central_node_missing', 'Central Node is not available.', true, PRIVATE_CACHE);
+      }
+      content = decodeBlob(await client.readBlob(entry.sha));
+      if (content === null) {
+        return errorResponse(503, 'central_node_unreadable', 'Central Node could not be read.', true, PRIVATE_CACHE);
+      }
+      existingSha = entry.sha;
+    } catch (error) {
+      return mapRepositoryError(error);
+    }
+
+    const next = applyCentralNodePatch(content, patch);
+    if (!next) {
+      return errorResponse(400, 'apply_failed', 'This Central Node patch could not be applied.', false, PRIVATE_CACHE);
+    }
+
+    try {
+      await client.writeFile({
+        path: CENTRAL_NODE_PATH,
+        content: next,
+        sha: existingSha,
+        message: `chore(cn): ${patch.payload.summary}`
+      });
+      return jsonResponse(200, {
+        ok: true,
+        data: {
+          path: CENTRAL_NODE_PATH,
+          summary: patch.payload.summary
+        }
+      }, PRIVATE_CACHE);
+    } catch (error) {
+      if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+        return errorResponse(409, 'write_conflict', 'Central Node changed while confirming. Try again.', true, PRIVATE_CACHE);
+      }
+      return mapRepositoryError(error);
+    }
+  }
 }
 
 function renderMarkdown(record, notes) {
@@ -349,10 +432,11 @@ async function parseRequest(request) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
   if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.slug !== 'string' ||
-      !SLUG.test(body.slug) || !body.candidate || typeof body.candidate !== 'object') {
+      !SLUG.test(body.slug) || !body.candidate || typeof body.candidate !== 'object' || Array.isArray(body.candidate)) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
-  return { candidate: body.candidate, slug: body.slug, overwrite: body.overwrite === true };
+  const kind = body.kind === 'cn_patch' ? 'cn_patch' : 'log';
+  return { candidate: body.candidate, slug: body.slug, overwrite: body.overwrite === true, kind };
 }
 
 async function readAtMost(stream, limit) {
