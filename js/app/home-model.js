@@ -74,6 +74,7 @@ export function buildHomeModel({ events, targetsConfig, date }) {
         ? 'Log a meal, workout, or diary entry and the strip will light up.'
         : 'Dots mark days with at least one Life Hub log.'
     },
+    overFatCeiling: targets.fat_ceiling_g > 0 && nutrition.fat_g > targets.fat_ceiling_g,
     progress: {
       calories: percentage(nutrition.calories, targets.calories),
       protein: percentage(nutrition.protein_g, targets.protein_g),

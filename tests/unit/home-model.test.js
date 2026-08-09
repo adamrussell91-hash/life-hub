@@ -83,4 +83,31 @@ test('a repository with no config/targets.yml yet renders zeroed targets instead
     meal_protein_g: { breakfast: 0, lunch: 0, dinner: 0, snack: 0, minimum: 0 }
   });
   assert.deepEqual(model.progress, { calories: 0, protein: 0, fat: 0, logging: 0 });
+  assert.equal(model.overFatCeiling, false);
+});
+
+test('overFatCeiling is true on Home when fat exceeds the daily ceiling', () => {
+  const heavyToday = [{
+    record: {
+      type: 'meal', date: '2026-07-30', meal: 'dinner',
+      calories: 800, protein_g: 40, fat_g: 55,
+      sodium_mg: 100, calcium_mg: 50, polyphenol_score: 1
+    },
+    body: '', path: '', legacy: false
+  }];
+  const model = buildHomeModel({ events: heavyToday, targetsConfig, date: '2026-07-30' });
+  assert.equal(model.nutrition.fat_g, 55);
+  assert.equal(model.targets.fat_ceiling_g, 50);
+  assert.equal(model.overFatCeiling, true);
+});
+
+test('overFatCeiling is false on Home when fat is within the ceiling', async () => {
+  const { events } = await loadEventManifest({ fetchImpl, loadYaml: load });
+  const model = buildHomeModel({
+    events,
+    targetsConfig,
+    date: selectDisplayDate(events)
+  });
+  assert.equal(model.nutrition.fat_g, 27);
+  assert.equal(model.overFatCeiling, false);
 });

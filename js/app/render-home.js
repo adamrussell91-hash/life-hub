@@ -77,6 +77,10 @@ export function renderHome(root, model) {
     if (item) item.dataset.checked = String(complete);
   }
 
+  const fatOver = Boolean(model.overFatCeiling);
+  root.querySelector('#home-dashboard')
+    ?.classList?.toggle?.('nutrition--fat-over', fatOver);
+
   const status = root.querySelector('#app-status');
   if (status) status.textContent = `Life Hub loaded for ${formatDate(model.date)}.`;
   root.querySelector('#unavailable-panel')?.setAttribute('hidden', '');
