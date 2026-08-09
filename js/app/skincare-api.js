@@ -5,34 +5,51 @@ function httpError(message, status, code) {
 export function createSkincareApi(fetchImpl = fetch) {
   if (typeof fetchImpl !== 'function') throw new TypeError('Fetch is unavailable');
 
-  async function request(options) {
-    const response = await fetchImpl('/api/skincare/catalog', options);
+  async function request(path, options) {
+    const response = await fetchImpl(path, options);
     const payload = await response.json().catch(() => null);
     if (!response.ok || payload?.ok !== true) {
-      throw httpError('Skincare catalog request failed', response.status, payload?.error?.code ?? 'request_failed');
+      throw httpError('Skincare request failed', response.status, payload?.error?.code ?? 'request_failed');
     }
-    return payload.data?.catalog ?? null;
+    return payload.data ?? null;
   }
 
   return {
-    getCatalog() {
-      return request();
+    async getLibrary() {
+      const data = await request('/api/skincare/library');
+      return data?.library ?? null;
     },
 
-    appendProduct({ routine, name }) {
-      return request({
+    async saveLibraryEntry({ name, id, notes }) {
+      const data = await request('/api/skincare/library', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'append', routine, name })
+        body: JSON.stringify({ action: 'save', name, id, notes })
       });
+      return data?.library ?? null;
     },
 
-    retireProduct({ routine, name }) {
-      return request({
+    async getRoutines() {
+      const data = await request('/api/skincare/routines');
+      return data?.membership ?? null;
+    },
+
+    async addToRoutine({ routine, productId }) {
+      const data = await request('/api/skincare/routines', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'retire', routine, name })
+        body: JSON.stringify({ action: 'add', routine, product_id: productId })
       });
+      return data?.membership ?? null;
+    },
+
+    async removeFromRoutine({ routine, productId }) {
+      const data = await request('/api/skincare/routines', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'remove', routine, product_id: productId })
+      });
+      return data?.membership ?? null;
     }
   };
 }

@@ -1,11 +1,12 @@
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
+import { findProductByName } from './skincare-product-library.js';
 
 export function createSkincareController({
   root,
   chatApi,
   skincareApi,
   onRecordWritten,
-  onCatalogChanged,
+  onShelfChanged,
   isOnline = () => globalThis.navigator?.onLine !== false
 }) {
   if (!root || !chatApi) throw new TypeError('Skincare controller dependencies are unavailable');
@@ -44,7 +45,42 @@ export function createSkincareController({
     }
   }
 
-  async function addProduct({ routine, name, keep }) {
+  async function removeFromRoutine({ routine, productId }) {
+    if (!isOnline()) {
+      setStatus('Connect to update routine.');
+      return;
+    }
+    setStatus('Saving…');
+    try {
+      const membership = await skincareApi.removeFromRoutine({ routine, productId });
+      setStatus('Removed from routine');
+      onShelfChanged?.({ membership });
+      return membership;
+    } catch {
+      setStatus('Couldn’t update routine — try again.');
+    }
+  }
+
+  async function addFromLibrary({ routine, productIds }) {
+    if (!isOnline()) {
+      setStatus('Connect to update routine.');
+      return;
+    }
+    setStatus('Saving…');
+    try {
+      let membership = null;
+      for (const productId of productIds ?? []) {
+        membership = await skincareApi.addToRoutine({ routine, productId });
+      }
+      setStatus('Added to routine');
+      onShelfChanged?.({ membership });
+      return membership;
+    } catch {
+      setStatus('Couldn’t update routine — try again.');
+    }
+  }
+
+  async function createProduct({ routine, name, keep }) {
     if (!keep) return { oneOff: true, name };
     if (!isOnline()) {
       setStatus('Connect to update routine.');
@@ -52,30 +88,19 @@ export function createSkincareController({
     }
     setStatus('Saving…');
     try {
-      const catalog = await skincareApi.appendProduct({ routine, name });
-      setStatus('Added to routine');
-      onCatalogChanged?.(catalog);
-      return catalog;
-    } catch (error) {
-      if (error?.code === 'retired_product') {
-        setStatus('That product was retired — restore not available yet');
+      const library = await skincareApi.saveLibraryEntry({ name });
+      const product = findProductByName(library, name);
+      if (!product?.id) {
+        setStatus('Couldn’t update routine — try again.');
         return;
       }
-      setStatus('Couldn’t update routine — try again.');
-    }
-  }
-
-  async function retireProduct({ routine, name }) {
-    if (!isOnline()) {
-      setStatus('Connect to update routine.');
-      return;
-    }
-    setStatus('Saving…');
-    try {
-      const catalog = await skincareApi.retireProduct({ routine, name });
-      setStatus('Removed from rotation');
-      onCatalogChanged?.(catalog);
-      return catalog;
+      const membership = await skincareApi.addToRoutine({
+        routine,
+        productId: product.id
+      });
+      setStatus('Added to routine');
+      onShelfChanged?.({ library, membership });
+      return { library, membership };
     } catch {
       setStatus('Couldn’t update routine — try again.');
     }
@@ -85,8 +110,9 @@ export function createSkincareController({
     setStatus,
     onLogRoutine: ({ payload }) => void save(payload),
     onLogProcedure: ({ payload }) => void save(payload),
-    onAddProduct: addProduct,
-    onRetireProduct: retireProduct,
+    onRemoveFromRoutine: removeFromRoutine,
+    onAddFromLibrary: addFromLibrary,
+    onCreateProduct: createProduct,
     save
   };
 }

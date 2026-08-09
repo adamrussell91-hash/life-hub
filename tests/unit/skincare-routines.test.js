@@ -88,29 +88,36 @@ test('buildSkincareModel marks am/pm logged and lists procedures', () => {
   assert.equal(model.currentRoutine, 'am');
 });
 
-test('buildSkincareModel overlays catalog products and excludes retired products', () => {
-  const catalog = {
+test('buildSkincareModel resolves products and entries from library + membership', () => {
+  const library = {
     schema_version: 1,
-    am: {
-      products: ['Catalog serum', 'Retired serum'],
-      retired: ['Retired serum'],
-      extras: []
-    },
-    pm: {
-      products: ['Catalog cleanser'],
-      retired: [],
-      extras: []
-    }
+    products: [
+      { id: 'catalog-serum', name: 'Catalog serum', notes: '' },
+      { id: 'catalog-cleanser', name: 'Catalog cleanser', notes: '' },
+      { id: 'unused', name: 'Unused product', notes: '' }
+    ]
+  };
+  const membership = {
+    schema_version: 1,
+    am: { product_ids: ['catalog-serum', 'missing-id'] },
+    pm: { product_ids: ['catalog-cleanser'] }
   };
   const model = buildSkincareModel({
     date: '2026-08-05',
     routines: SKINCARE_ROUTINES,
     nowHourKey: 'am',
-    catalog,
+    library,
+    membership,
     events: []
   });
   assert.deepEqual(model.routines.am.products, ['Catalog serum']);
+  assert.deepEqual(model.routines.am.productEntries, [
+    { id: 'catalog-serum', name: 'Catalog serum' }
+  ]);
   assert.deepEqual(model.routines.pm.products, ['Catalog cleanser']);
+  assert.deepEqual(model.routines.pm.productEntries, [
+    { id: 'catalog-cleanser', name: 'Catalog cleanser' }
+  ]);
   assert.deepEqual(SKINCARE_ROUTINES.am.products, [
     'Azclear Azelaic Acid 20%',
     'Korres Greek Yoghurt Probiotic Gel Cream',
@@ -121,16 +128,25 @@ test('buildSkincareModel overlays catalog products and excludes retired products
   ]);
 });
 
-test('buildSkincareModel preserves default products without a catalog', () => {
+test('buildSkincareModel preserves default products without shelf data', () => {
   const model = buildSkincareModel({
     date: '2026-08-05',
     routines: SKINCARE_ROUTINES,
     nowHourKey: 'am',
-    catalog: null,
+    library: null,
+    membership: null,
     events: []
   });
   assert.deepEqual(model.routines.am.products, SKINCARE_ROUTINES.am.products);
+  assert.deepEqual(
+    model.routines.am.productEntries,
+    SKINCARE_ROUTINES.am.products.map(name => ({ id: null, name }))
+  );
   assert.deepEqual(model.routines.pm.products, SKINCARE_ROUTINES.pm.products);
+  assert.deepEqual(
+    model.routines.pm.productEntries,
+    SKINCARE_ROUTINES.pm.products.map(name => ({ id: null, name }))
+  );
 });
 
 test('amStreak and pmStreak count consecutive routine days independently', () => {

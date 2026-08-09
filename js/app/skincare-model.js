@@ -1,5 +1,5 @@
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
-import { resolveActiveProducts } from './skincare-catalog.js';
+import { resolveRoutineProducts } from './skincare-routine-membership.js';
 
 const WEEK_DAYS = 7;
 const MONTH_DAYS = 30;
@@ -29,7 +29,25 @@ function dayState(entries, day) {
   return 'miss';
 }
 
-export function buildSkincareModel({ events, date, routines, nowHourKey, catalog = null }) {
+function resolveRoutineShelf(routineKey, baseRoutine, library, membership) {
+  if (!baseRoutine) return baseRoutine;
+  if (library && membership) {
+    const resolved = resolveRoutineProducts(routineKey, membership, library);
+    return {
+      ...baseRoutine,
+      products: resolved.map(entry => entry.name),
+      productEntries: resolved.map(entry => ({ id: entry.id, name: entry.name }))
+    };
+  }
+  const products = baseRoutine.products ?? [];
+  return {
+    ...baseRoutine,
+    products,
+    productEntries: products.map(name => ({ id: null, name }))
+  };
+}
+
+export function buildSkincareModel({ events, date, routines, nowHourKey, library = null, membership = null }) {
   if (!date) throw new RangeError('Skincare display date is unavailable');
   const skincareEntries = (events ?? [])
     .map(event => ({ record: event.record, path: event.path, body: event.body }))
@@ -45,8 +63,8 @@ export function buildSkincareModel({ events, date, routines, nowHourKey, catalog
   const base = routines ?? {};
   const resolvedRoutines = {
     ...base,
-    am: base.am ? { ...base.am, products: resolveActiveProducts('am', catalog, base) } : base.am,
-    pm: base.pm ? { ...base.pm, products: resolveActiveProducts('pm', catalog, base) } : base.pm,
+    am: resolveRoutineShelf('am', base.am, library, membership),
+    pm: resolveRoutineShelf('pm', base.pm, library, membership),
     extras: base.extras
   };
 

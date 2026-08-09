@@ -103,7 +103,7 @@ const skincareController = createSkincareController({
   chatApi,
   skincareApi,
   onRecordWritten: () => void controller.refresh({ manual: true, force: true }),
-  onCatalogChanged: catalog => controller?.applySkincareCatalog?.(catalog)
+  onShelfChanged: patch => controller?.applySkincareShelf?.(patch)
 });
 const bodyController = createBodyController({
   root: document,

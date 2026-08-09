@@ -206,7 +206,7 @@ test('renderSkincare marks the current routine card with skincare-card--current 
   assert.match(pmCard.textContent, /Now/);
 });
 
-test('renderSkincare renders routine products as selectable pills with add and retire controls', () => {
+test('renderSkincare renders routine products as selectable pills with add and remove controls', () => {
   const root = fakeSkincareRoot();
   renderSkincare(root, baseModel());
 
@@ -233,7 +233,7 @@ test('renderSkincare renders routine products as selectable pills with add and r
   assert.ok(controls.some(control => control.tagName === 'button' && control.textContent === '+ Add'));
   assert.ok(controls.some(control =>
     control.attributes['aria-label']?.includes('Remove')
-    && control.attributes['aria-label']?.includes('from rotation')
+    && control.attributes['aria-label']?.includes('from routine')
   ));
 });
 
@@ -290,11 +290,11 @@ test('adding an existing routine product as one-off does not duplicate the pill'
   );
 });
 
-test('adding an existing routine product with keep in routine does not call onAddProduct', () => {
+test('adding an existing routine product with keep in routine does not call onCreateProduct', () => {
   const root = fakeSkincareRoot();
   const addCalls = [];
   renderSkincare(root, baseModel(), {
-    onAddProduct: payload => addCalls.push(payload)
+    onCreateProduct: payload => addCalls.push(payload)
   });
 
   const [, pmCard] = root._routineCards.children;
@@ -302,7 +302,7 @@ test('adding an existing routine product with keep in routine does not call onAd
 
   addProductViaUi(pmCard, { name: existingProduct, keepInRoutine: true });
 
-  assert.equal(addCalls.length, 0, 'onAddProduct should be skipped for an existing routine product');
+  assert.equal(addCalls.length, 0, 'onCreateProduct should be skipped for an existing routine product');
   const chip = findDescendant(pmCard, node =>
     node.tagName === 'button'
     && node.className === 'skincare-chip'
@@ -315,7 +315,7 @@ test('keeping a new product creates a selected draft pill immediately', () => {
   const root = fakeSkincareRoot();
   const addCalls = [];
   renderSkincare(root, baseModel(), {
-    onAddProduct: payload => addCalls.push(payload)
+    onCreateProduct: payload => addCalls.push(payload)
   });
 
   const [, pmCard] = root._routineCards.children;
