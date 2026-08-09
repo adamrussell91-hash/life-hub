@@ -1372,7 +1372,7 @@ test('cn_patch_proposal Discard removes the card without confirming', async () =
   assert.equal(list.children.includes(proposal), false);
 });
 
-test('central_node_patched shows an ephemeral status toast with the summary', async () => {
+test('central_node_patched appends a success chat line without using the error banner', async () => {
   const root = new FakeDocument();
   const chatApi = {
     async *send() {
@@ -1387,5 +1387,13 @@ test('central_node_patched shows an ephemeral status toast with the summary', as
   const controller = createChatController({ root, chatApi });
   await controller.send('Hammond, nudge Brisket');
 
-  assert.equal(root.querySelector('#chat-error').textContent, 'Direct Brisket to hold surplus');
+  assert.equal(root.querySelector('#chat-error').textContent, '');
+  const list = root.querySelector('#chat-messages');
+  const success = list.children.find(child =>
+    child.className.includes('chat-message--assistant')
+    && (child.querySelector?.('.chat-message__body')?.textContent
+      ?? child.children.find(node => node.className === 'chat-message__body')?.textContent
+      ?? '') === 'Central Node updated: Direct Brisket to hold surplus'
+  );
+  assert.ok(success, 'expected an assistant success line for the auto CN patch');
 });

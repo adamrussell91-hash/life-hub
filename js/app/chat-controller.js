@@ -349,11 +349,16 @@ export function createChatController({
         } else if (event.type === 'central_node_patched') {
           turnSignaled = true;
           gotUsefulOutput = true;
+          endTextTurn();
           const summary = typeof event.summary === 'string' && event.summary.trim()
             ? event.summary.trim()
             : 'Central Node updated';
-          setWorkingStatus(summary);
-          showChatError(root, summary);
+          // Success feedback mirrors food_library_saved — a chat line, not #chat-error.
+          appendMessage(root, {
+            role: 'assistant',
+            agentSlug: assistantSlug,
+            text: `Central Node updated: ${summary}`
+          });
         } else if (event.type === 'record_rejected') {
           turnSignaled = true;
           clearWorkingBubble();

@@ -186,6 +186,27 @@ export function appendRecordProposal(root, { path, record, notes }) {
   return { card, confirm, discard, inputs };
 }
 
+const CN_PATCH_DETAIL_MAX = 160;
+
+function truncateCnPatchDetail(text, max = CN_PATCH_DETAIL_MAX) {
+  const normalized = String(text).replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  if (normalized.length <= max) return normalized;
+  return `${normalized.slice(0, Math.max(1, max - 1))}…`;
+}
+
+function cnPatchAffectedDetail(patch) {
+  const payload = patch?.payload && typeof patch.payload === 'object' ? patch.payload : {};
+  const parts = [];
+  if (typeof payload.match === 'string' && payload.match.trim()) {
+    parts.push(truncateCnPatchDetail(payload.match));
+  }
+  if (typeof payload.text === 'string' && payload.text.trim()) {
+    parts.push(truncateCnPatchDetail(payload.text));
+  }
+  return parts.filter(Boolean).join(' · ');
+}
+
 export function appendCnPatchProposal(root, { patch }) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
@@ -205,6 +226,14 @@ export function appendCnPatchProposal(root, { patch }) {
   const op = typeof patch?.op === 'string' ? patch.op : 'unknown';
   meta.textContent = `${section} · ${op}`;
   card.append(meta);
+
+  const detailText = cnPatchAffectedDetail(patch);
+  if (detailText) {
+    const detail = root.createElement('p');
+    detail.className = 'cn-patch-proposal__detail';
+    detail.textContent = detailText;
+    card.append(detail);
+  }
 
   const confirm = root.createElement('button');
   confirm.type = 'button';
