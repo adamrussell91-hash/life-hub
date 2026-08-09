@@ -9,7 +9,9 @@ import {
   saveProductLibraryEntry,
   findProductByName,
   seedProductLibraryFromDefaults,
-  migrateProductLibraryFromCatalog
+  migrateProductLibraryFromCatalog,
+  normalizeProductStatus,
+  groupProductsByCategory
 } from '../../js/app/skincare-product-library.js';
 import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
 
@@ -29,37 +31,113 @@ test('slugifyProductId lowercases and dashes', () => {
 
 test('saveProductLibraryEntry creates with unique id', () => {
   const lib = emptyProductLibrary();
-  const next = saveProductLibraryEntry(lib, { name: 'CeraVe Foam' });
+  const next = saveProductLibraryEntry(lib, { name: 'CeraVe Foam', category: 'Cleanser' });
   assert.equal(next.products.length, 1);
   assert.equal(next.products[0].name, 'CeraVe Foam');
   assert.equal(next.products[0].id, 'cerave-foam');
+  assert.equal(next.products[0].category, 'Cleanser');
 });
 
 test('saveProductLibraryEntry rejects blank name', () => {
-  assert.equal(saveProductLibraryEntry(emptyProductLibrary(), { name: '  ' }), null);
+  assert.equal(saveProductLibraryEntry(emptyProductLibrary(), { name: '  ', category: 'Serum' }), null);
+});
+
+test('saveProductLibraryEntry requires category on create', () => {
+  assert.equal(saveProductLibraryEntry(emptyProductLibrary(), { name: 'X' }), null);
+  const next = saveProductLibraryEntry(emptyProductLibrary(), {
+    name: 'X',
+    category: 'Serum',
+    brand: 'Brand'
+  });
+  assert.equal(next.products[0].category, 'Serum');
+  assert.equal(next.products[0].status, 'in_use');
+  assert.equal(next.products[0].brand, 'Brand');
 });
 
 test('saveProductLibraryEntry updates existing by id', () => {
-  let lib = saveProductLibraryEntry(emptyProductLibrary(), { name: 'CeraVe Foam' });
+  let lib = saveProductLibraryEntry(emptyProductLibrary(), { name: 'CeraVe Foam', category: 'Cleanser' });
   const id = lib.products[0].id;
   lib = saveProductLibraryEntry(lib, { id, name: 'CeraVe Foaming Cleanser', notes: 'AM' });
   assert.equal(lib.products.length, 1);
   assert.equal(lib.products[0].name, 'CeraVe Foaming Cleanser');
   assert.equal(lib.products[0].notes, 'AM');
+  assert.equal(lib.products[0].category, 'Cleanser');
+});
+
+test('saveProductLibraryEntry update preserves omitted fields', () => {
+  let lib = saveProductLibraryEntry(emptyProductLibrary(), {
+    name: 'X', category: 'Serum', brand: 'B', notes: 'n'
+  });
+  const id = lib.products[0].id;
+  lib = saveProductLibraryEntry(lib, { id, name: 'X2', category: 'Serum' });
+  assert.equal(lib.products[0].brand, 'B');
+  assert.equal(lib.products[0].notes, 'n');
+  assert.equal(lib.products[0].name, 'X2');
 });
 
 test('findProductByName is case-insensitive exact', () => {
-  const lib = saveProductLibraryEntry(emptyProductLibrary(), { name: 'CeraVe Foam' });
+  const lib = saveProductLibraryEntry(emptyProductLibrary(), { name: 'CeraVe Foam', category: 'Cleanser' });
   assert.equal(findProductByName(lib, 'cerave foam').id, 'cerave-foam');
 });
 
 test('searchProductLibrary matches tokens', () => {
   let lib = emptyProductLibrary();
-  lib = saveProductLibraryEntry(lib, { name: 'CeraVe Foaming Cleanser' });
-  lib = saveProductLibraryEntry(lib, { name: 'The Ordinary HA' });
+  lib = saveProductLibraryEntry(lib, { name: 'CeraVe Foaming Cleanser', category: 'Cleanser' });
+  lib = saveProductLibraryEntry(lib, { name: 'The Ordinary HA', category: 'Serum' });
   const hits = searchProductLibrary(lib, 'cerave clean');
   assert.equal(hits.length, 1);
   assert.equal(hits[0].name, 'CeraVe Foaming Cleanser');
+});
+
+test('searchProductLibrary matches brand category status', () => {
+  const lib = saveProductLibraryEntry(emptyProductLibrary(), {
+    name: 'Cicaplast',
+    category: 'Moisturiser',
+    brand: 'La Roche Posay',
+    status: 'in_use'
+  });
+  assert.equal(searchProductLibrary(lib, 'roche moisturiser').length, 1);
+});
+
+test('parseProductLibrary normalizes rich fields', () => {
+  const lib = parseProductLibrary({
+    schema_version: 1,
+    products: [{
+      id: 'ha',
+      name: 'HA 2% + B5',
+      brand: 'The Ordinary',
+      category: 'Serum',
+      status: 'In Use',
+      purpose: 'Hydration',
+      active_ingredients: ['Hyaluronic Acid'],
+      cost: 'A$12',
+      purchase_date: '2026-01-01',
+      opened_date: null,
+      finished_date: null,
+      notes: 'AM/PM',
+      hint: 'backup'
+    }]
+  });
+  assert.equal(lib.products[0].status, 'in_use');
+  assert.equal(lib.products[0].brand, 'The Ordinary');
+  assert.deepEqual(lib.products[0].active_ingredients, ['Hyaluronic Acid']);
+  assert.equal(lib.products[0].hint, 'backup');
+});
+
+test('normalizeProductStatus maps Notion labels', () => {
+  assert.equal(normalizeProductStatus('In Use'), 'in_use');
+  assert.equal(normalizeProductStatus('To Try'), 'to_try');
+  assert.equal(normalizeProductStatus('bogus'), null);
+});
+
+test('groupProductsByCategory orders and skips empty', () => {
+  const groups = groupProductsByCategory([
+    { id: '1', name: 'A', category: 'Serum' },
+    { id: '2', name: 'B', category: 'Cleanser' },
+    { id: '3', name: 'C', category: 'Serum' }
+  ]);
+  assert.deepEqual(groups.map(g => g.category), ['Cleanser', 'Serum']);
+  assert.deepEqual(groups[1].products.map(p => p.name), ['A', 'C']);
 });
 
 test('seedProductLibraryFromDefaults includes AM and PM unique names', () => {
