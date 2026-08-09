@@ -44,6 +44,13 @@ test('buildHammondAuditContract names the active phase and forbids later dumps o
   assert.doesNotMatch(text, /this turn.*open_loops/i);
 });
 
+test('lock contract requires governance log and CN patch tools', () => {
+  const text = buildHammondAuditContract({ kind: 'cn_audit', phase: 'lock', intakeCount: 2 });
+  assert.match(text, /append_governance_log/);
+  assert.match(text, /propose_central_node_patch/);
+  assert.doesNotMatch(text, /Do not invent a database write/);
+});
+
 test('nextAuditPhase advances and clears after lock', () => {
   assert.deepEqual(
     nextAuditPhase({ kind: 'cn_audit', phase: 'triage', intakeCount: 0 }, { askedIntakeQuestion: true }),
