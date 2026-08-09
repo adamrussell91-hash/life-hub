@@ -91,13 +91,13 @@ export function createSkincareLibraryHandler({
     }
   }
 
-  async function saveLibrary({ name, id, notes }) {
+  async function saveLibrary(body) {
     let github;
     try {
       github = client();
       if (!github) return withPrivateCache(misconfiguredResponse());
       const { library: seed, entry } = await loadOrSeedLibrary(github);
-      const library = saveProductLibraryEntry(seed, { name, id, notes });
+      const library = saveProductLibraryEntry(seed, body);
       if (!library) {
         return errorResponse(400, 'invalid_request', 'Provide a valid skincare library update.', false, PRIVATE_CACHE);
       }
@@ -115,6 +115,11 @@ export function createSkincareLibraryHandler({
   }
 }
 
+const OPTIONAL_STRING_FIELDS = [
+  'brand', 'category', 'status', 'purpose', 'cost',
+  'purchase_date', 'opened_date', 'finished_date', 'notes', 'hint'
+];
+
 async function parseRequest(request) {
   let body;
   try {
@@ -128,7 +133,13 @@ async function parseRequest(request) {
     return null;
   }
   if (body.id != null && (typeof body.id !== 'string' || !body.id.trim())) return null;
-  if (body.notes != null && typeof body.notes !== 'string') return null;
+  for (const key of OPTIONAL_STRING_FIELDS) {
+    if (body[key] != null && typeof body[key] !== 'string') return null;
+  }
+  if (body.active_ingredients != null) {
+    if (!Array.isArray(body.active_ingredients)) return null;
+    if (!body.active_ingredients.every(x => typeof x === 'string')) return null;
+  }
   return body;
 }
 

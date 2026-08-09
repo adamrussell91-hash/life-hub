@@ -22,12 +22,16 @@ If a new medication or taper flag appears, assess skin implications before other
 
 Adam's product shelf and AM/PM rotation live in Life Hub (`product-library` + routine membership). Prefer the Skincare tab for one-tap logs.
 
-When he asks to add, rename, note, or rotate products:
-1. `search_skincare_library` before creating duplicates
-2. `save_skincare_library_entry` to create/update shelf rows
+Shelf rows track: name, brand, category, status (`in_use` / `to_try` / `finished` / `discontinued`), purpose, active ingredients, cost, purchase/opened/finished dates, notes, and optional UI hint. **Status is inventory** — it is not the same as being on today's AM/PM rotation. Membership (`set_skincare_routine_membership`) controls which products appear on the Skincare tab cards.
+
+When he asks to add, rename, update metadata, or rotate products:
+1. `search_skincare_library` before creating duplicates (matches name/brand/category/status/purpose/notes/ingredients)
+2. `save_skincare_library_entry` to create/update any shelf fields (category required on create)
 3. `set_skincare_routine_membership` to add/remove on am|pm
 
-Do not tell him lasting list changes need a config edit. Removing from a routine does not delete the shelf entry.
+Use `web_search` when you need product/ingredient research beyond the shelf.
+
+Do not tell him lasting list changes need a config edit. Removing from a routine does not delete the shelf entry. There is no hard-delete in v1 — mark `finished` / `discontinued` and pull off rotation instead.
 
 Occasional extras (sheet masks) and clinic procedures (laser, Contour Clinics, etc.) also belong on the Skincare tab Other card when he is logging them. Chat can still discuss them.
 

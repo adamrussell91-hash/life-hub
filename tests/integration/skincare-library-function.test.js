@@ -149,7 +149,13 @@ test('POST save adds a product to the library', async () => {
 
   const response = await handler(fetchImpl)(request({
     method: 'POST',
-    body: { action: 'save', name: 'Test Serum', notes: 'AM' }
+    body: {
+      action: 'save',
+      name: 'Test Serum',
+      category: 'Serum',
+      brand: 'Test Brand',
+      notes: 'AM'
+    }
   }));
   const payload = await response.json();
   const put = calls.find(call => call.options.method === 'PUT');
@@ -158,7 +164,11 @@ test('POST save adds a product to the library', async () => {
   assert.equal(payload.ok, true);
   assert.equal(payload.data.sha, UPDATED_SHA);
   assert.equal(payload.data.library.products.length, 2);
-  assert.ok(payload.data.library.products.some(p => p.name === 'Test Serum' && p.notes === 'AM'));
+  const saved = payload.data.library.products.find(p => p.name === 'Test Serum');
+  assert.ok(saved);
+  assert.equal(saved.notes, 'AM');
+  assert.equal(saved.category, 'Serum');
+  assert.equal(saved.brand, 'Test Brand');
   assert.equal(put.url.includes(SKINCARE_PRODUCT_LIBRARY_PATH), true);
   const write = JSON.parse(put.options.body);
   assert.equal(write.sha, LIBRARY_SHA);
@@ -184,7 +194,7 @@ test('POST save on cold start seeds then updates with seed sha', async () => {
 
   const response = await handler(fetchImpl)(request({
     method: 'POST',
-    body: { action: 'save', name: 'Cold Start Serum' }
+    body: { action: 'save', name: 'Cold Start Serum', category: 'Serum' }
   }));
   const payload = await response.json();
   const puts = calls
