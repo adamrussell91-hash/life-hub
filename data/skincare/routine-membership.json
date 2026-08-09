@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "am": {
+    "product_ids": [
+      "rice-70-ceramide-glow-milky-toner",
+      "vegan-kombucha-tea-essence",
+      "green-plum-refreshing-toner-aha-bha",
+      "multi-peptide-ha-serum-buffet",
+      "niacinamide-10-zinc-1",
+      "hyaluronic-acid-2-b5",
+      "the-ordinary-hyaluronic-acid-2-b5-with-ceramides",
+      "azclear-action-medicated-lotion-azelaic-acid-20",
+      "greek-yoghurt-nourishing-probiotic-gel-cream",
+      "anthelios-invisible-fluid-spf-50",
+      "mecca-to-save-face-spf-50-superscreen-tinted",
+      "cicapair-soothing-color-correcting-treatment-spf-15",
+      "instant-anti-age-eraser-color-correcting-concealer-green",
+      "instant-anti-age-eraser-color-correcting-concealer-peach",
+      "serum-concealer",
+      "barepro-24-hr-wear-skin-perfecting-powder-foundation",
+      "cloud-set-translucent-loose-setting-blurring-powder",
+      "sensibio-ar-sos-spray"
+    ]
+  },
+  "pm": {
+    "product_ids": [
+      "green-deep-pore-cleansing-balm",
+      "greek-yoghurt-foaming-cream-cleanser",
+      "rice-70-ceramide-glow-milky-toner",
+      "vegan-kombucha-tea-essence",
+      "green-plum-refreshing-toner-aha-bha",
+      "hyaluronic-acid-2-b5",
+      "the-ordinary-hyaluronic-acid-2-b5-with-ceramides",
+      "retrieve-cream-tretinoin-0-05",
+      "cicaplast-baume-b5-soothing-repairing-balm",
+      "cicalfate-restorative-protective-cream",
+      "facial-moisturising-lotion-pm",
+      "dr-jart-dermask-brightening-solution",
+      "jmsolution-honey-luminous-royal-propolis-mask-plus-black",
+      "jmsolution-honey-luminous-royal-propolis-mask-plus-second-pack",
+      "2-anti-dandruff-treatment-shampoo-ketoconazole"
+    ]
+  }
+}
