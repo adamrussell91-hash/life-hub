@@ -208,33 +208,47 @@ test('renderSkincare marks the current routine card with skincare-card--current 
 
 test('renderSkincare renders routine products as selectable pills with add and remove controls', () => {
   const root = fakeSkincareRoot();
-  renderSkincare(root, baseModel());
+  const routines = {
+    ...SKINCARE_ROUTINES,
+    am: {
+      ...SKINCARE_ROUTINES.am,
+      products: ['Catalog serum'],
+      productEntries: [{ id: 'catalog-serum', name: 'Catalog serum' }]
+    },
+    pm: {
+      ...SKINCARE_ROUTINES.pm,
+      products: ['Fallback cleanser'],
+      productEntries: [{ id: null, name: 'Fallback cleanser' }]
+    }
+  };
+  renderSkincare(root, baseModel({ routines }));
 
   const routineCards = root._routineCards.children;
   const controls = routineCards.flatMap(descendants);
-  const productNames = new Set([
-    ...SKINCARE_ROUTINES.am.products,
-    ...SKINCARE_ROUTINES.pm.products
-  ]);
 
   assert.equal(
     controls.some(control => control.tagName === 'input' && control.type === 'checkbox'),
     false,
     'routine cards should not use checkbox controls'
   );
-  for (const product of productNames) {
-    const chip = controls.find(control =>
-      control.tagName === 'button'
-      && control.className === 'skincare-chip'
-      && control.textContent === product
-    );
-    assert.ok(chip, `${product} should render as a skincare chip`);
-  }
+  assert.ok(controls.some(control =>
+    control.tagName === 'button'
+    && control.className === 'skincare-chip'
+    && control.textContent === 'Catalog serum'
+  ));
   assert.ok(controls.some(control => control.tagName === 'button' && control.textContent === '+ Add'));
   assert.ok(controls.some(control =>
-    control.attributes['aria-label']?.includes('Remove')
-    && control.attributes['aria-label']?.includes('from routine')
+    control.className === 'skincare-product-pill__menu'
+    && control.attributes['aria-label']?.includes('Remove Catalog serum from routine')
   ));
+  assert.equal(
+    controls.some(control =>
+      control.className === 'skincare-product-pill__menu'
+      && control.attributes['aria-label']?.includes('Fallback cleanser')
+    ),
+    false,
+    '⋯ menu should be hidden for products without an id'
+  );
 });
 
 test('renderSkincare labels routine actions Log or Log again', () => {

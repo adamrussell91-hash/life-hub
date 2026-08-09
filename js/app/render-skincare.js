@@ -180,7 +180,7 @@ function renderRoutineCard(root, key, model, {
       });
       wrap.append(button);
 
-      if (!state.oneOffs.includes(product)) {
+      if (id && !state.oneOffs.includes(product)) {
         const menu = root.createElement('button');
         menu.type = 'button';
         menu.className = 'skincare-product-pill__menu';
@@ -188,7 +188,7 @@ function renderRoutineCard(root, key, model, {
         menu.textContent = '⋯';
         menu.addEventListener('click', event => {
           event.stopPropagation();
-          if (id) onRemoveFromRoutine?.({ routine: key, productId: id });
+          onRemoveFromRoutine?.({ routine: key, productId: id });
         });
         wrap.append(menu);
       }
