@@ -851,7 +851,7 @@ test('save_skincare_library_entry cold-start seeds defaults then writes library 
         const toolResult = await executeTools({
           id: 'call_1',
           name: 'save_skincare_library_entry',
-          input: { name: 'La Roche SPF 50', notes: 'AM' }
+          input: { name: 'La Roche SPF 50', category: 'Sunscreen', notes: 'AM' }
         });
         assert.ok(toolResult != null, 'executeTools must return a tool result so the round continues');
         assert.deepEqual(JSON.parse(toolResult), {
@@ -924,7 +924,7 @@ test('save_skincare_library_entry migrates legacy catalog before writing new pro
         const toolResult = await executeTools({
           id: 'call_1',
           name: 'save_skincare_library_entry',
-          input: { name: 'La Roche SPF 50', notes: 'AM' }
+          input: { name: 'La Roche SPF 50', category: 'Sunscreen', notes: 'AM' }
         });
         assert.ok(toolResult != null, 'executeTools must return a tool result so the round continues');
         assert.deepEqual(JSON.parse(toolResult), {
@@ -983,14 +983,14 @@ test('failed save_skincare_library_entry write leaves in-memory shelf unchanged 
         const failed = await executeTools({
           id: 'call_1',
           name: 'save_skincare_library_entry',
-          input: { name: 'Ghost Product That Should Not Stick' }
+          input: { name: 'Ghost Product That Should Not Stick', category: 'Other' }
         });
         assert.deepEqual(JSON.parse(failed), { ok: false, error: 'write_failed' });
 
         const ok = await executeTools({
           id: 'call_2',
           name: 'save_skincare_library_entry',
-          input: { name: 'Real Product Keep Me' }
+          input: { name: 'Real Product Keep Me', category: 'Other' }
         });
         assert.equal(JSON.parse(ok).ok, true);
         yield { type: 'done' };
