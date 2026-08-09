@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createChatController } from '../../js/app/chat-controller.js';
+import { agentColour } from '../../js/app/agent-colour.js';
 
 class FakeElement extends EventTarget {
   constructor(tag) {
@@ -715,6 +716,27 @@ test('applies the agent accent colour when the stream names the agent', async ()
   await controller.send('hey chadwick');
 
   assert.equal(root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'), '#D9683A');
+});
+
+test('selectAgent updates accent immediately from roster even without agentsConfig', () => {
+  const root = new FakeDocument();
+  const controller = createChatController({
+    root,
+    chatApi: { async *send() { yield { type: 'done' }; } },
+    agentColour,
+    getAgentsConfig: () => null
+  });
+
+  controller.selectAgent('hyaluronica');
+  assert.equal(
+    root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'),
+    '#C7AEEA'
+  );
+  controller.selectAgent('brisket');
+  assert.equal(
+    root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'),
+    '#EEB046'
+  );
 });
 
 function unreadCalls() {

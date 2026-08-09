@@ -236,6 +236,22 @@ test('renderSkincare marks the current routine card with skincare-card--current 
   assert.match(pmCard.textContent, /Now/);
 });
 
+test('renderSkincare groups products by category with Sunscreen separate from Other', () => {
+  const root = fakeSkincareRoot();
+  const routines = amRoutineWithEntries([
+    { id: 'gel', name: 'Korres Greek Yoghurt Probiotic Gel Cream', category: 'Moisturiser' },
+    { id: 'spf', name: 'La Roche Posay Anthelios SPF 50+', category: 'Sunscreen' },
+    { id: 'powder', name: 'Kosas Cloud Set', category: 'Makeup' }
+  ]);
+  renderSkincare(root, baseModel({ routines }));
+
+  const amCard = root._routineCards.children[0];
+  const labels = descendants(amCard)
+    .filter(node => node.className === 'metric-caption skincare-product-group__label')
+    .map(node => node.textContent);
+  assert.deepEqual(labels, ['Moisturiser', 'Sunscreen', 'Makeup']);
+});
+
 test('renderSkincare renders routine products as selectable pills with add and remove controls', () => {
   const root = fakeSkincareRoot();
   const routines = {

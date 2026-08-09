@@ -5,7 +5,8 @@ import {
 } from '../../../js/app/skincare-product-library.js';
 import {
   addToRoutine,
-  removeFromRoutine
+  removeFromRoutine,
+  resolveRoutineProducts
 } from '../../../js/app/skincare-routine-membership.js';
 
 const DEFAULT_PROMPT_LIMIT = 40;
@@ -84,6 +85,46 @@ export function setSkincareRoutineMembershipSchema() {
   };
 }
 
+export function listSkincareRoutinesSchema() {
+  return {
+    name: 'list_skincare_routines',
+    description:
+      "Return Adam's current AM and/or PM routine products (Skincare tab source of truth). Use this when he asks what is on a routine — do not infer from shelf status or notes.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        routine: {
+          type: 'string',
+          enum: ['am', 'pm'],
+          description: 'Optional. Omit to return both AM and PM.'
+        }
+      }
+    }
+  };
+}
+
+function formatRoutineProductLine(product) {
+  const bits = [product.name, `(${product.id})`];
+  if (product.category) bits.push(`[${product.category}]`);
+  return `- ${bits.join(' ')}`;
+}
+
+function formatRoutineSection(label, products) {
+  if (!products.length) return `${label}:\n(empty)`;
+  return `${label}:\n${products.map(formatRoutineProductLine).join('\n')}`;
+}
+
+export function formatSkincareRoutinesForPrompt(membership, library) {
+  if (!membership || !library) return '';
+  const am = resolveRoutineProducts('am', membership, library);
+  const pm = resolveRoutineProducts('pm', membership, library);
+  return [
+    'Current AM/PM rotation (Skincare tab source of truth; not the same as shelf status):',
+    formatRoutineSection('AM', am),
+    formatRoutineSection('PM', pm)
+  ].join('\n');
+}
+
 export function formatSkincareLibraryForPrompt(library, limit = DEFAULT_PROMPT_LIMIT) {
   const products = library?.products;
   if (!Array.isArray(products) || products.length === 0) return '';
@@ -97,12 +138,32 @@ export function formatSkincareLibraryForPrompt(library, limit = DEFAULT_PROMPT_L
   }).join('\n');
 }
 
+function serializeRoutineProducts(products) {
+  return products.map(p => ({
+    id: p.id,
+    name: p.name,
+    category: p.category || ''
+  }));
+}
+
 export function executeSearchSkincareLibrary(library, input = {}) {
   const query = typeof input.query === 'string' ? input.query : '';
   const matches = searchProductLibrary(library, query, {
     limit: input.limit
   });
   return JSON.stringify(matches);
+}
+
+export function executeListSkincareRoutines(membership, library, input = {}) {
+  const routine = input?.routine;
+  const out = {};
+  if (routine !== 'pm') {
+    out.am = serializeRoutineProducts(resolveRoutineProducts('am', membership, library));
+  }
+  if (routine !== 'am') {
+    out.pm = serializeRoutineProducts(resolveRoutineProducts('pm', membership, library));
+  }
+  return JSON.stringify(out);
 }
 
 export function applySaveSkincareLibraryEntry(library, input) {

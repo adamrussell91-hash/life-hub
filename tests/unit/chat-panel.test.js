@@ -52,7 +52,7 @@ test('opening the panel moves it into the given slot, unhides it, and sets the a
   assert.equal(controller.isOpen(), true);
 });
 
-test('closing the panel returns it to the home slot, hides it, and clears the accent colour', () => {
+test('closing the panel returns it to the home slot and hides it without clearing accent', () => {
   const root = new FakeDocument();
   const controller = createChatPanelController({ root });
   const nutritionSlot = new FakeElement('div');
@@ -64,7 +64,7 @@ test('closing the panel returns it to the home slot, hides it, and clears the ac
   const homeSlot = root.querySelector('#chat-view-home');
   assert.equal(panel.parent, homeSlot);
   assert.equal(panel.hidden, true);
-  assert.equal(panel.style.getPropertyValue('--agent-accent'), '');
+  assert.equal(panel.style.getPropertyValue('--agent-accent'), '#EEB046');
   assert.equal(panel.dataset.panelMode, undefined);
   assert.equal(controller.isOpen(), false);
 });

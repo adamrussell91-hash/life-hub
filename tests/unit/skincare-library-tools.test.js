@@ -4,8 +4,11 @@ import {
   searchSkincareLibrarySchema,
   saveSkincareLibraryEntrySchema,
   setSkincareRoutineMembershipSchema,
+  listSkincareRoutinesSchema,
   formatSkincareLibraryForPrompt,
+  formatSkincareRoutinesForPrompt,
   executeSearchSkincareLibrary,
+  executeListSkincareRoutines,
   applySaveSkincareLibraryEntry,
   applySetSkincareRoutineMembership
 } from '../../netlify/functions/_shared/skincare-library-tools.mjs';
@@ -24,6 +27,53 @@ test('schemas expose expected tool names and required fields', () => {
     setSkincareRoutineMembershipSchema().input_schema.required,
     ['routine', 'product_id', 'op']
   );
+
+  assert.equal(listSkincareRoutinesSchema().name, 'list_skincare_routines');
+  assert.equal(listSkincareRoutinesSchema().input_schema.properties.routine.enum.join(','), 'am,pm');
+});
+
+test('formatSkincareRoutinesForPrompt lists resolved AM/PM products', () => {
+  assert.equal(formatSkincareRoutinesForPrompt(null, null), '');
+  const library = {
+    schema_version: 1,
+    products: [
+      { id: 'spf-50', name: 'La Roche SPF', category: 'Sunscreen', notes: '' },
+      { id: 'cera-foam', name: 'CeraVe Foaming', category: 'Cleanser', notes: '' },
+      { id: 'shelf-only', name: 'Shelf Only Serum', category: 'Serum', notes: '' }
+    ]
+  };
+  const membership = {
+    schema_version: 1,
+    am: { product_ids: ['spf-50'] },
+    pm: { product_ids: ['cera-foam'] }
+  };
+  const text = formatSkincareRoutinesForPrompt(membership, library);
+  assert.match(text, /Current AM\/PM rotation/);
+  assert.match(text, /AM:\n- La Roche SPF \(spf-50\) \[Sunscreen\]/);
+  assert.match(text, /PM:\n- CeraVe Foaming \(cera-foam\) \[Cleanser\]/);
+  assert.doesNotMatch(text, /Shelf Only Serum/);
+});
+
+test('executeListSkincareRoutines returns resolved membership products', () => {
+  const library = {
+    schema_version: 1,
+    products: [
+      { id: 'spf-50', name: 'La Roche SPF', category: 'Sunscreen', notes: '' },
+      { id: 'cera-foam', name: 'CeraVe Foaming', category: 'Cleanser', notes: '' }
+    ]
+  };
+  const membership = {
+    schema_version: 1,
+    am: { product_ids: ['spf-50'] },
+    pm: { product_ids: ['cera-foam'] }
+  };
+  const both = JSON.parse(executeListSkincareRoutines(membership, library, {}));
+  assert.deepEqual(both.am, [{ id: 'spf-50', name: 'La Roche SPF', category: 'Sunscreen' }]);
+  assert.deepEqual(both.pm, [{ id: 'cera-foam', name: 'CeraVe Foaming', category: 'Cleanser' }]);
+
+  const amOnly = JSON.parse(executeListSkincareRoutines(membership, library, { routine: 'am' }));
+  assert.deepEqual(amOnly.am, [{ id: 'spf-50', name: 'La Roche SPF', category: 'Sunscreen' }]);
+  assert.equal(amOnly.pm, undefined);
 });
 
 test('formatSkincareLibraryForPrompt lists name and id, capped', () => {

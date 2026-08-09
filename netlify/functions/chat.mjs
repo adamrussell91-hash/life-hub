@@ -53,7 +53,10 @@ import {
 import {
   applySaveSkincareLibraryEntry,
   applySetSkincareRoutineMembership,
+  executeListSkincareRoutines,
   executeSearchSkincareLibrary,
+  formatSkincareRoutinesForPrompt,
+  listSkincareRoutinesSchema,
   saveSkincareLibraryEntrySchema,
   searchSkincareLibrarySchema,
   setSkincareRoutineMembershipSchema
@@ -77,7 +80,8 @@ import {
   emptyProductLibrary,
   migrateProductLibraryFromCatalog,
   parseProductLibrary,
-  seedProductLibraryFromDefaults
+  seedProductLibraryFromDefaults,
+  upgradeOtherProductCategories
 } from '../../js/app/skincare-product-library.js';
 import {
   SKINCARE_ROUTINE_MEMBERSHIP_PATH,
@@ -184,6 +188,7 @@ export function createChatHandler({
       ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : []),
       ...(needsSkincareLibrary
         ? [
+            listSkincareRoutinesSchema(),
             searchSkincareLibrarySchema(),
             saveSkincareLibraryEntrySchema(),
             setSkincareRoutineMembershipSchema()
@@ -342,7 +347,7 @@ export function createChatHandler({
           if (decodedSkincareLibrary !== null) {
             const parsed = parseProductLibrary(decodedSkincareLibrary);
             if (parsed) {
-              skincareLibrary = parsed;
+              skincareLibrary = upgradeOtherProductCategories(parsed).library;
               libraryLoaded = true;
             }
           }
@@ -408,6 +413,9 @@ export function createChatHandler({
         const brisketProtocol = slug === 'brisket' ? loadBrisketProtocol() : '';
         const saraProtocol = slug === 'sara' ? loadSaraProtocol() : '';
         const hammondProtocol = slug === 'hammond' ? loadHammondProtocol() : '';
+        const skincareRoutines = needsSkincareLibrary
+          ? formatSkincareRoutinesForPrompt(skincareMembership, skincareLibrary)
+          : '';
         const system = buildSystemPrompt({
           slug,
           digest,
@@ -425,7 +433,8 @@ export function createChatHandler({
           hammondProtocol,
           hammondAuditContract,
           workoutTemplates,
-          exerciseLibrary
+          exerciseLibrary,
+          skincareRoutines
         });
 
         try {
@@ -495,6 +504,13 @@ export function createChatHandler({
               }
               if (event.name === 'search_skincare_library') {
                 return executeSearchSkincareLibrary(skincareLibrary, event.input ?? {});
+              }
+              if (event.name === 'list_skincare_routines') {
+                return executeListSkincareRoutines(
+                  skincareMembership,
+                  skincareLibrary,
+                  event.input ?? {}
+                );
               }
               if (event.name === 'save_skincare_library_entry') {
                 const applied = applySaveSkincareLibraryEntry(skincareLibrary, event.input);

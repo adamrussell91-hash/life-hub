@@ -182,7 +182,7 @@ test('createProduct with keep saves to library then adds to routine', async () =
 
   assert.deepEqual(result, { library, membership });
   assert.deepEqual(apiCalls, [
-    ['saveLibraryEntry', { name: 'New Serum', category: 'Other', status: 'in_use' }],
+    ['saveLibraryEntry', { name: 'New Serum', category: 'Serum', status: 'in_use' }],
     ['addToRoutine', { routine: 'am', productId: 'new-serum' }]
   ]);
   assert.deepEqual(changes, [{ library, membership }]);

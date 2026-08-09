@@ -716,20 +716,41 @@ test('invalid auditSession is ignored for prompt injection', async () => {
 test('Hyaluronica registers skincare library and routine membership tools', async () => {
   let receivedArgs;
   const libraryPath = 'data/skincare/product-library.json';
+  const membershipPath = 'data/skincare/routine-membership.json';
   const librarySha = 'a'.repeat(40);
+  const membershipSha = 'b'.repeat(40);
   const libraryContent = JSON.stringify({
     schema_version: 1,
-    products: [{ id: 'cerave-foaming', name: 'CeraVe Foaming', notes: 'cleanser' }]
+    products: [
+      { id: 'cerave-foaming', name: 'CeraVe Foaming', category: 'Cleanser', notes: 'cleanser' },
+      { id: 'spf-50', name: 'La Roche SPF', category: 'Sunscreen', notes: '' }
+    ]
+  });
+  const membershipContent = JSON.stringify({
+    schema_version: 1,
+    am: { product_ids: ['spf-50'] },
+    pm: { product_ids: ['cerave-foaming'] }
   });
   const fetchImpl = async url => {
     if (url.includes('/commits/')) {
       return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
     }
     if (url.includes('/git/trees/')) {
-      return Response.json({ tree: [{ path: libraryPath, type: 'blob', sha: librarySha, size: 100 }] });
+      return Response.json({
+        tree: [
+          { path: libraryPath, type: 'blob', sha: librarySha, size: 100 },
+          { path: membershipPath, type: 'blob', sha: membershipSha, size: 100 }
+        ]
+      });
     }
     if (url.includes(`/git/blobs/${librarySha}`)) {
       return Response.json({ encoding: 'base64', content: Buffer.from(libraryContent, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${membershipSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(membershipContent, 'utf8').toString('base64')
+      });
     }
     return Response.json({ message: 'not found' }, { status: 404 });
   };
@@ -747,10 +768,15 @@ test('Hyaluronica registers skincare library and routine membership tools', asyn
 
   await readSse(await handler(request({ message: 'Hyaluronica, what is on my AM shelf?' })));
 
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'list_skincare_routines'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_skincare_library'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_skincare_library_entry'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'set_skincare_routine_membership'));
   assert.match(receivedArgs.system, /search_skincare_library/);
+  assert.match(receivedArgs.system, /list_skincare_routines/);
+  assert.match(receivedArgs.system, /Current AM\/PM rotation/);
+  assert.match(receivedArgs.system, /La Roche SPF/);
+  assert.match(receivedArgs.system, /Never invent a routine from shelf status/);
   const searchHits = JSON.parse(await receivedArgs.executeTools({
     name: 'search_skincare_library',
     id: 'call_1',
@@ -758,6 +784,71 @@ test('Hyaluronica registers skincare library and routine membership tools', asyn
   }));
   assert.equal(searchHits.length, 1);
   assert.equal(searchHits[0].id, 'cerave-foaming');
+});
+
+test('list_skincare_routines returns membership-resolved products', async () => {
+  let receivedArgs;
+  const libraryPath = 'data/skincare/product-library.json';
+  const membershipPath = 'data/skincare/routine-membership.json';
+  const librarySha = 'a'.repeat(40);
+  const membershipSha = 'b'.repeat(40);
+  const libraryContent = JSON.stringify({
+    schema_version: 1,
+    products: [
+      { id: 'spf-50', name: 'La Roche SPF', category: 'Sunscreen', notes: '' },
+      { id: 'cera-foam', name: 'CeraVe Foaming', category: 'Cleanser', notes: '' }
+    ]
+  });
+  const membershipContent = JSON.stringify({
+    schema_version: 1,
+    am: { product_ids: ['spf-50'] },
+    pm: { product_ids: ['cera-foam'] }
+  });
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: libraryPath, type: 'blob', sha: librarySha, size: 100 },
+          { path: membershipPath, type: 'blob', sha: membershipSha, size: 100 }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${librarySha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(libraryContent, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${membershipSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(membershipContent, 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Hyaluronica, list my AM routine' })));
+
+  const listed = JSON.parse(await receivedArgs.executeTools({
+    name: 'list_skincare_routines',
+    id: 'call_list',
+    input: { routine: 'am' }
+  }));
+  assert.deepEqual(listed.am, [{ id: 'spf-50', name: 'La Roche SPF', category: 'Sunscreen' }]);
+  assert.equal(listed.pm, undefined);
 });
 
 test('non-hyaluronica agents do not register skincare library tools', async () => {
@@ -776,10 +867,13 @@ test('non-hyaluronica agents do not register skincare library tools', async () =
 
   await readSse(await handler(request({ message: 'Chadwick, plan a chest session' })));
 
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'list_skincare_routines'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'search_skincare_library'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'save_skincare_library_entry'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'set_skincare_routine_membership'));
   assert.doesNotMatch(receivedArgs.system, /search_skincare_library/);
+  assert.doesNotMatch(receivedArgs.system, /list_skincare_routines/);
+  assert.doesNotMatch(receivedArgs.system, /Current AM\/PM rotation/);
 });
 
 test('search_skincare_library returns matches and continues the round', async () => {

@@ -17,7 +17,8 @@ export function buildSystemPrompt({
   hammondProtocol = '',
   hammondAuditContract = '',
   workoutTemplates = '',
-  exerciseLibrary = ''
+  exerciseLibrary = '',
+  skincareRoutines = ''
 }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
@@ -76,6 +77,9 @@ export function buildSystemPrompt({
     hyaluronicaProtocol
       ? `Hyaluronica operating manual (follow these Life Hub rules):\n${hyaluronicaProtocol}`
       : '',
+    skincareRoutines
+      ? `${skincareRoutines}\n\nWhen Adam asks what is on AM/PM, use this Current AM/PM rotation (or call list_skincare_routines). Never invent a routine from shelf status, in_use flags, or notes keyword search — those are inventory, not membership.`
+      : 'When Adam asks what is on AM/PM, call list_skincare_routines. Never invent a routine from shelf status, in_use flags, or notes keyword search.',
     'Prefer the Skincare tab for one-tap AM/PM logs. In chat, advise and adjust; only propose skincare log_entry when Adam clearly describes a completed routine or procedure here instead of using the tab.',
     'When you do propose skincare log_entry, put notes as "[routine] — [skin verdict]" when he gave a state so Central Node Flags stay useful after confirm.'
   ] : [];

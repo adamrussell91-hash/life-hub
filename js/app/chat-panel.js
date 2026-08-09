@@ -19,7 +19,8 @@ export function createChatPanelController({ root }) {
     homeSlot.append(panel);
     panel.hidden = true;
     delete panel.dataset.panelMode;
-    panel.style.removeProperty('--agent-accent');
+    // Keep --agent-accent so Chat section / next open still shows the last personality
+    // colour until open()/applyAgentAccent overwrites it. Clearing forced a blue fallback.
     openSlot = null;
   }
 

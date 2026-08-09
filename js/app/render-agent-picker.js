@@ -19,6 +19,7 @@ export function renderAgentPicker(root, {
         button.type = 'button';
         button.className = 'agent-picker__avatar';
         button.dataset.agentSlug = agent.slug;
+        if (agent.colour) button.style?.setProperty?.('--agent-colour', agent.colour);
         button.setAttribute?.('role', 'option');
         button.setAttribute?.('aria-label', agent.name);
         button.title = agent.name;
@@ -75,75 +76,18 @@ export function applyAgentAvatarToBubble(bubble, slug) {
 }
 
 export function renderAgentHero(root, slug, {
-  hostSelector = '#chat-agent-hero',
-  collapsed = false,
-  onToggle
+  hostSelector = '#chat-agent-hero'
 } = {}) {
+  // Full-body personality portraits are disabled for now (picker + bubble avatars only).
   const host = root.querySelector?.(hostSelector);
   if (!host) return;
-  const agent = slug ? avatarForSlug(slug) : null;
-  if (!agent?.fullSrc) {
-    host.setAttribute?.('hidden', '');
-    host.replaceChildren?.();
-    host.classList?.remove?.('is-collapsed');
-    if (!host.classList?.remove && typeof host.className === 'string') {
-      host.className = host.className.split(/\s+/).filter(c => c && c !== 'is-collapsed').join(' ');
-    }
-    return;
+  host.setAttribute?.('hidden', '');
+  host.replaceChildren?.();
+  host.classList?.remove?.('is-collapsed');
+  if (!host.classList?.remove && typeof host.className === 'string') {
+    host.className = host.className.split(/\s+/).filter(c => c && c !== 'is-collapsed').join(' ');
   }
-
-  host.removeAttribute?.('hidden');
-  let img = host.querySelector?.('.chat-agent-hero__img');
-  let name = host.querySelector?.('.chat-agent-hero__name');
-  if (!img || !name) {
-    host.replaceChildren?.();
-    img = root.createElement('img');
-    img.className = 'chat-agent-hero__img';
-    img.alt = '';
-    img.decoding = 'async';
-    name = root.createElement('p');
-    name.className = 'chat-agent-hero__name';
-    host.append(img, name);
-  }
-  img.src = agent.fullSrc;
-  img.alt = agent.name;
-  name.textContent = agent.name;
-  host.dataset.agent = agent.slug;
-
-  if (host.classList?.toggle) {
-    host.classList.toggle('is-collapsed', collapsed);
-  } else if (typeof host.className === 'string') {
-    const classes = host.className.split(/\s+/).filter(c => c && c !== 'is-collapsed');
-    if (collapsed) classes.push('is-collapsed');
-    host.className = classes.join(' ');
-  }
-
-  host.setAttribute?.('role', 'button');
-  host.setAttribute?.('tabindex', '0');
-  host.setAttribute?.('aria-expanded', collapsed ? 'false' : 'true');
-  host.setAttribute?.('aria-label', collapsed
-    ? `Expand ${agent.name} portrait`
-    : `Collapse ${agent.name} portrait`);
-
-  if (!host.dataset.toggleBound) {
-    host.dataset.toggleBound = '1';
-    const fireToggle = () => {
-      const currentlyCollapsed = host.classList?.contains?.('is-collapsed')
-        || (typeof host.className === 'string' && /\bis-collapsed\b/.test(host.className));
-      // currently collapsed → expand (pass collapsed=false); else collapse (true)
-      host._onToggle?.(currentlyCollapsed ? false : true);
-    };
-    host.addEventListener?.('click', event => {
-      event?.preventDefault?.();
-      fireToggle();
-    });
-    host.addEventListener?.('keydown', event => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault?.();
-      fireToggle();
-    });
-  }
-  host._onToggle = onToggle;
+  void slug;
 }
 
 export { AGENT_AVATARS, avatarForSlug };

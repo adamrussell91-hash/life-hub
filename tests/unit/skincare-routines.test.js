@@ -136,14 +136,18 @@ test('buildSkincareModel preserves default products without shelf data', () => {
     events: []
   });
   assert.deepEqual(model.routines.am.products, SKINCARE_ROUTINES.am.products);
-  assert.deepEqual(
-    model.routines.am.productEntries,
-    SKINCARE_ROUTINES.am.products.map(name => ({ id: null, name, category: '', hint: '' }))
+  assert.equal(
+    model.routines.am.productEntries.find(e => e.name.includes('Anthelios'))?.category,
+    'Sunscreen'
+  );
+  assert.equal(
+    model.routines.am.productEntries.find(e => e.name === 'Korres Greek Yoghurt Probiotic Gel Cream')?.category,
+    'Moisturiser'
   );
   assert.deepEqual(model.routines.pm.products, SKINCARE_ROUTINES.pm.products);
-  assert.deepEqual(
-    model.routines.pm.productEntries,
-    SKINCARE_ROUTINES.pm.products.map(name => ({ id: null, name, category: '', hint: '' }))
+  assert.equal(
+    model.routines.pm.productEntries.find(e => e.name.includes('Foaming Cream Cleanser'))?.category,
+    'Cleanser'
   );
 });
 
