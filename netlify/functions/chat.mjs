@@ -51,6 +51,24 @@ import {
   validateExerciseLibraryEntry
 } from './_shared/exercise-library.mjs';
 import {
+  applySaveSkincareLibraryEntry,
+  applySetSkincareRoutineMembership,
+  executeSearchSkincareLibrary,
+  saveSkincareLibraryEntrySchema,
+  searchSkincareLibrarySchema,
+  setSkincareRoutineMembershipSchema
+} from './_shared/skincare-library-tools.mjs';
+import {
+  SKINCARE_PRODUCT_LIBRARY_PATH,
+  emptyProductLibrary,
+  parseProductLibrary
+} from '../../js/app/skincare-product-library.js';
+import {
+  SKINCARE_ROUTINE_MEMBERSHIP_PATH,
+  emptyMembership,
+  parseMembership
+} from '../../js/app/skincare-routine-membership.js';
+import {
   formatTemplatesForPrompt,
   isTemplatePath,
   MAX_PROMPT_TEMPLATES,
@@ -128,6 +146,7 @@ export function createChatHandler({
     const needsFoodLibrary = Boolean(allowedTypes?.includes('meal'));
     const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
     const needsExerciseLibrary = slug === 'chadwick';
+    const needsSkincareLibrary = slug === 'hyaluronica';
 
     let anthropic;
     try {
@@ -141,7 +160,14 @@ export function createChatHandler({
       { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
       ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
       ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
-      ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : [])
+      ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : []),
+      ...(needsSkincareLibrary
+        ? [
+            searchSkincareLibrarySchema(),
+            saveSkincareLibraryEntrySchema(),
+            setSkincareRoutineMembershipSchema()
+          ]
+        : [])
     ];
 
     const stream = new ReadableStream({
@@ -167,6 +193,10 @@ export function createChatHandler({
         let exerciseLibraryEntries = [];
         let exerciseLibrary = '';
         let exerciseLibrarySha;
+        let skincareLibrary = emptyProductLibrary();
+        let skincareLibrarySha;
+        let skincareMembership = emptyMembership();
+        let skincareMembershipSha;
         let workoutTemplates = '';
         try {
           const current = await client.resolveTree();
@@ -181,15 +211,33 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === EXERCISE_LIBRARY_PATH && entry.type === 'blob')
             : null;
           exerciseLibrarySha = exerciseLibraryEntry?.sha;
+          const skincareLibraryEntry = needsSkincareLibrary
+            ? current.tree.find(entry => entry.path === SKINCARE_PRODUCT_LIBRARY_PATH && entry.type === 'blob')
+            : null;
+          skincareLibrarySha = skincareLibraryEntry?.sha;
+          const skincareMembershipEntry = needsSkincareLibrary
+            ? current.tree.find(entry => entry.path === SKINCARE_ROUTINE_MEMBERSHIP_PATH && entry.type === 'blob')
+            : null;
+          skincareMembershipSha = skincareMembershipEntry?.sha;
           const templateEntries = needsWorkoutTemplates
             ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
             : [];
 
-          const [dataBlobs, centralNodeBlob, foodLibraryBlob, exerciseLibraryBlob, templateBlobs] = await Promise.all([
+          const [
+            dataBlobs,
+            centralNodeBlob,
+            foodLibraryBlob,
+            exerciseLibraryBlob,
+            skincareLibraryBlob,
+            skincareMembershipBlob,
+            templateBlobs
+          ] = await Promise.all([
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
             foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
+            skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
+            skincareMembershipEntry ? client.readBlob(skincareMembershipEntry.sha) : null,
             Promise.all(templateEntries.map(entry => client.readBlob(entry.sha)))
           ]);
 
@@ -220,6 +268,16 @@ export function createChatHandler({
             exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries);
           }
 
+          const decodedSkincareLibrary = skincareLibraryBlob ? decodeBlob(skincareLibraryBlob) : null;
+          if (decodedSkincareLibrary !== null) {
+            skincareLibrary = parseProductLibrary(decodedSkincareLibrary) ?? emptyProductLibrary();
+          }
+
+          const decodedSkincareMembership = skincareMembershipBlob ? decodeBlob(skincareMembershipBlob) : null;
+          if (decodedSkincareMembership !== null) {
+            skincareMembership = parseMembership(decodedSkincareMembership) ?? emptyMembership();
+          }
+
           const templateContents = templateEntries
             .map((entry, index) => ({ path: entry.path, content: decodeBlob(templateBlobs[index]) }))
             .filter(file => file.content !== null);
@@ -234,6 +292,10 @@ export function createChatHandler({
           exerciseLibraryEntries = [];
           exerciseLibrary = '';
           exerciseLibrarySha = undefined;
+          skincareLibrary = emptyProductLibrary();
+          skincareLibrarySha = undefined;
+          skincareMembership = emptyMembership();
+          skincareMembershipSha = undefined;
           workoutTemplates = '';
         }
 
@@ -322,6 +384,55 @@ export function createChatHandler({
                     calories: entry.calories,
                     protein_g: entry.protein_g,
                     fat_g: entry.fat_g
+                  });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (event.name === 'search_skincare_library') {
+                return executeSearchSkincareLibrary(skincareLibrary, event.input ?? {});
+              }
+              if (event.name === 'save_skincare_library_entry') {
+                const applied = applySaveSkincareLibraryEntry(skincareLibrary, event.input);
+                if (!applied.ok) {
+                  return JSON.stringify({ ok: false, error: applied.error });
+                }
+                try {
+                  skincareLibrary = applied.library;
+                  const result = await client.writeFile({
+                    path: SKINCARE_PRODUCT_LIBRARY_PATH,
+                    content: JSON.stringify(skincareLibrary, null, 2),
+                    ...(skincareLibrarySha ? { sha: skincareLibrarySha } : {}),
+                    message: `chore(skincare): upsert ${applied.name}`
+                  });
+                  skincareLibrarySha = result.sha;
+                  return JSON.stringify({ ok: true, id: applied.id, name: applied.name });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (event.name === 'set_skincare_routine_membership') {
+                const applied = applySetSkincareRoutineMembership(
+                  skincareLibrary,
+                  skincareMembership,
+                  event.input
+                );
+                if (!applied.ok) {
+                  return JSON.stringify({ ok: false, error: applied.error });
+                }
+                try {
+                  skincareMembership = applied.membership;
+                  const result = await client.writeFile({
+                    path: SKINCARE_ROUTINE_MEMBERSHIP_PATH,
+                    content: JSON.stringify(skincareMembership, null, 2),
+                    ...(skincareMembershipSha ? { sha: skincareMembershipSha } : {}),
+                    message: `chore(skincare): ${event.input?.op} ${event.input?.product_id} on ${applied.routine}`
+                  });
+                  skincareMembershipSha = result.sha;
+                  return JSON.stringify({
+                    ok: true,
+                    routine: applied.routine,
+                    product_ids: applied.product_ids
                   });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });

@@ -18,9 +18,16 @@ Read Central Node context you are given before you coach or propose a skincare l
 
 If a new medication or taper flag appears, assess skin implications before other advice. Mention CN influence briefly when it changes what you recommend.
 
-## Routines
+## Routines and library
 
-Default AM and PM product stacks live in Life Hub config. When he asks to change a product, update guidance in chat; lasting list changes need a config edit later.
+Adam's product shelf and AM/PM rotation live in Life Hub (`product-library` + routine membership). Prefer the Skincare tab for one-tap logs.
+
+When he asks to add, rename, note, or rotate products:
+1. `search_skincare_library` before creating duplicates
+2. `save_skincare_library_entry` to create/update shelf rows
+3. `set_skincare_routine_membership` to add/remove on am|pm
+
+Do not tell him lasting list changes need a config edit. Removing from a routine does not delete the shelf entry.
 
 Occasional extras (sheet masks) and clinic procedures (laser, Contour Clinics, etc.) also belong on the Skincare tab Other card when he is logging them. Chat can still discuss them.
 

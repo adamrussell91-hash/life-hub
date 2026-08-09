@@ -712,3 +712,239 @@ test('invalid auditSession is ignored for prompt injection', async () => {
 
   assert.doesNotMatch(receivedArgs.system, /audit phase contract/i);
 });
+
+test('Hyaluronica registers skincare library and routine membership tools', async () => {
+  let receivedArgs;
+  const libraryPath = 'data/skincare/product-library.json';
+  const librarySha = 'a'.repeat(40);
+  const libraryContent = JSON.stringify({
+    schema_version: 1,
+    products: [{ id: 'cerave-foaming', name: 'CeraVe Foaming', notes: 'cleanser' }]
+  });
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: libraryPath, type: 'blob', sha: librarySha, size: 100 }] });
+    }
+    if (url.includes(`/git/blobs/${librarySha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(libraryContent, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Hyaluronica, what is on my AM shelf?' })));
+
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_skincare_library'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_skincare_library_entry'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'set_skincare_routine_membership'));
+  assert.match(receivedArgs.system, /search_skincare_library/);
+  const searchHits = JSON.parse(await receivedArgs.executeTools({
+    name: 'search_skincare_library',
+    id: 'call_1',
+    input: { query: 'cera cleanser' }
+  }));
+  assert.equal(searchHits.length, 1);
+  assert.equal(searchHits[0].id, 'cerave-foaming');
+});
+
+test('non-hyaluronica agents do not register skincare library tools', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Chadwick, plan a chest session' })));
+
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'search_skincare_library'));
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'save_skincare_library_entry'));
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'set_skincare_routine_membership'));
+  assert.doesNotMatch(receivedArgs.system, /search_skincare_library/);
+});
+
+test('search_skincare_library returns matches and continues the round', async () => {
+  const libraryPath = 'data/skincare/product-library.json';
+  const librarySha = 'a'.repeat(40);
+  const libraryContent = JSON.stringify({
+    schema_version: 1,
+    products: [{ id: 'korres-cleanser', name: 'Korres Cleanser', notes: '' }]
+  });
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: libraryPath, type: 'blob', sha: librarySha, size: 100 }] });
+    }
+    if (url.includes(`/git/blobs/${librarySha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(libraryContent, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        const toolResult = await executeTools({
+          id: 'call_1',
+          name: 'search_skincare_library',
+          input: { query: 'korres' }
+        });
+        assert.ok(toolResult != null, 'executeTools must return a tool result so the round continues');
+        const hits = JSON.parse(toolResult);
+        assert.equal(hits[0].name, 'Korres Cleanser');
+        yield { type: 'text', delta: 'Found Korres on your shelf.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Hyaluronica, search Korres' }))));
+  assert.deepEqual(events[0], { type: 'agent', slug: 'hyaluronica' });
+  assert.deepEqual(events[1], { type: 'text', delta: 'Found Korres on your shelf.' });
+  assert.deepEqual(events[2], { type: 'done' });
+});
+
+test('save_skincare_library_entry writes product-library.json and continues the round', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        const toolResult = await executeTools({
+          id: 'call_1',
+          name: 'save_skincare_library_entry',
+          input: { name: 'La Roche SPF 50', notes: 'AM' }
+        });
+        assert.ok(toolResult != null, 'executeTools must return a tool result so the round continues');
+        assert.deepEqual(JSON.parse(toolResult), {
+          ok: true,
+          id: 'la-roche-spf-50',
+          name: 'La Roche SPF 50'
+        });
+        yield { type: 'text', delta: 'Saved SPF to your shelf.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Hyaluronica, add La Roche SPF 50' }))));
+  assert.deepEqual(events[0], { type: 'agent', slug: 'hyaluronica' });
+  assert.deepEqual(events[1], { type: 'text', delta: 'Saved SPF to your shelf.' });
+  assert.deepEqual(events[2], { type: 'done' });
+
+  const putCall = calls.find(call => call.options?.method === 'PUT');
+  assert.ok(putCall, 'expected a PUT request to write the product library');
+  assert.ok(putCall.url.includes('data/skincare/product-library.json'));
+  const body = JSON.parse(putCall.options.body);
+  const written = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
+  assert.equal(written.schema_version, 1);
+  assert.equal(written.products.length, 1);
+  assert.equal(written.products[0].name, 'La Roche SPF 50');
+  assert.equal(written.products[0].id, 'la-roche-spf-50');
+});
+
+test('set_skincare_routine_membership writes routine-membership.json', async () => {
+  const calls = [];
+  const libraryPath = 'data/skincare/product-library.json';
+  const librarySha = 'a'.repeat(40);
+  const libraryContent = JSON.stringify({
+    schema_version: 1,
+    products: [{ id: 'cerave-foaming', name: 'CeraVe Foaming', notes: '' }]
+  });
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: libraryPath, type: 'blob', sha: librarySha, size: 100 }] });
+    }
+    if (url.includes(`/git/blobs/${librarySha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(libraryContent, 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'e'.repeat(40) }, commit: { sha: 'f'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        const unknown = await executeTools({
+          id: 'call_0',
+          name: 'set_skincare_routine_membership',
+          input: { routine: 'am', product_id: 'missing', op: 'add' }
+        });
+        assert.deepEqual(JSON.parse(unknown), { ok: false, error: 'unknown_product' });
+
+        const toolResult = await executeTools({
+          id: 'call_1',
+          name: 'set_skincare_routine_membership',
+          input: { routine: 'pm', product_id: 'cerave-foaming', op: 'add' }
+        });
+        assert.ok(toolResult != null);
+        assert.deepEqual(JSON.parse(toolResult), {
+          ok: true,
+          routine: 'pm',
+          product_ids: ['cerave-foaming']
+        });
+        yield { type: 'text', delta: 'Added CeraVe to PM.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Hyaluronica, put CeraVe on PM' }))));
+  assert.deepEqual(events[0], { type: 'agent', slug: 'hyaluronica' });
+  assert.deepEqual(events[1], { type: 'text', delta: 'Added CeraVe to PM.' });
+
+  const putCall = calls.find(call => call.options?.method === 'PUT');
+  assert.ok(putCall, 'expected a PUT request to write routine membership');
+  assert.ok(putCall.url.includes('data/skincare/routine-membership.json'));
+  const body = JSON.parse(putCall.options.body);
+  const written = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
+  assert.deepEqual(written.pm.product_ids, ['cerave-foaming']);
+  assert.deepEqual(written.am.product_ids, []);
+});
