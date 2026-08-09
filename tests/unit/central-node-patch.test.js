@@ -94,6 +94,28 @@ test('classify: purpose any op is confirm', () => {
   );
 });
 
+test('classify: recent_actions upsert_field is confirm', () => {
+  assert.equal(
+    classifyCentralNodePatchRisk({
+      section: 'recent_actions',
+      op: 'upsert_field',
+      payload: { field: 'x', text: 'y' }
+    }),
+    'confirm'
+  );
+});
+
+test('classify: recent_actions append_line is auto', () => {
+  assert.equal(
+    classifyCentralNodePatchRisk({
+      section: 'recent_actions',
+      op: 'append_line',
+      payload: { text: '- Hammond: note' }
+    }),
+    'auto'
+  );
+});
+
 test('apply upsert_field updates Flags', () => {
   const next = applyCentralNodePatch(FIXTURE, {
     section: 'todays_status',
@@ -176,4 +198,38 @@ test('apply condense replaces long_term_trends body', () => {
   });
   assert.match(next, /- Condensed trend/);
   assert.equal(next.includes('Sleep debt rising'), false);
+});
+
+const FIXTURE_WITH_HR = `# Purpose
+Purpose body.
+---
+## 🤝 Cross-Agent Coordination
+- Chadwick→Brisket: training day
+---
+## 📝 Recent Agent Actions
+- 1 Jan — Brisket: meal logged
+`;
+
+test('apply append_line lands before section-closing ---', () => {
+  const next = applyCentralNodePatch(FIXTURE_WITH_HR, {
+    section: 'cross_agent',
+    op: 'append_line',
+    payload: { text: '- Hammond→Brisket: hold surplus' }
+  });
+  assert.match(
+    next,
+    /## 🤝 Cross-Agent Coordination\n- Chadwick→Brisket: training day\n- Hammond→Brisket: hold surplus\n---\n## 📝 Recent Agent Actions/
+  );
+});
+
+test('apply replace_section preserves section-closing ---', () => {
+  const next = applyCentralNodePatch(FIXTURE_WITH_HR, {
+    section: 'cross_agent',
+    op: 'replace_section',
+    payload: { text: '- Only this' }
+  });
+  assert.match(
+    next,
+    /## 🤝 Cross-Agent Coordination\n- Only this\n---\n## 📝 Recent Agent Actions/
+  );
 });
