@@ -399,3 +399,165 @@ test('rejects an unauthenticated request', async () => {
   }));
   assert.equal(response.status, 401);
 });
+
+const CN_FIXTURE = `# Purpose
+Purpose body.
+
+## 🔴 Current Constraints & Priorities
+- Steroid taper active
+- Keep surplus
+
+## ⚡ Today's Status — Monday, 1 January 2026
+**Flags:** Quiet day.
+
+## 📝 Recent Agent Actions
+- 1 Jan — Brisket: meal logged
+`;
+
+const confirmPatch = {
+  section: 'constraints',
+  op: 'delete_lines',
+  payload: { match: 'Steroid taper', summary: 'Remove taper constraint' }
+};
+
+test('cn_patch confirm writes central-node.md for a confirm-class delete_lines patch', async () => {
+  const cnSha = 'f'.repeat(40);
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: 'central-node.md', type: 'blob', sha: cnSha }] });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(CN_FIXTURE, 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({
+    kind: 'cn_patch',
+    slug: 'hammond',
+    candidate: confirmPatch
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.data.path, 'central-node.md');
+  assert.equal(payload.data.summary, 'Remove taper constraint');
+
+  const putCall = calls.find(call => call.options?.method === 'PUT' && call.url.includes('central-node.md'));
+  assert.ok(putCall);
+  const written = Buffer.from(JSON.parse(putCall.options.body).content, 'base64').toString('utf8');
+  assert.doesNotMatch(written, /Steroid taper/);
+  assert.match(written, /Keep surplus/);
+  assert.match(JSON.parse(putCall.options.body).message, /chore\(cn\): Remove taper constraint/);
+});
+
+test('cn_patch confirm rejects auto-class patches with 400', async () => {
+  const { calls, fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({
+    kind: 'cn_patch',
+    slug: 'hammond',
+    candidate: {
+      section: 'constraints',
+      op: 'append_line',
+      payload: { text: '- New additive flag', summary: 'Add flag' }
+    }
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'auto_class_rejected');
+  assert.equal(calls.length, 0);
+});
+
+test('cn_patch confirm rejects invalid patch payloads without contacting GitHub', async () => {
+  const { calls, fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({
+    kind: 'cn_patch',
+    slug: 'hammond',
+    candidate: { section: 'constraints', op: 'delete_lines', payload: { match: 'x' } }
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'invalid_patch');
+  assert.equal(calls.length, 0);
+});
+
+test('cn_patch confirm returns 404 when central-node.md is missing', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({
+    kind: 'cn_patch',
+    slug: 'hammond',
+    candidate: confirmPatch
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 404);
+  assert.equal(payload.error.code, 'central_node_missing');
+  assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 0);
+});
+
+test('cn_patch confirm rejects non-hammond slug', async () => {
+  const { calls, fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({
+    kind: 'cn_patch',
+    slug: 'brisket',
+    candidate: confirmPatch
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'invalid_request');
+  assert.equal(calls.length, 0);
+});

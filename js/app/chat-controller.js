@@ -1,4 +1,11 @@
-import { appendMessage, appendRecordProposal, renderInlineMarkdown, setChatBusy, showChatError } from './render-chat.js';
+import {
+  appendMessage,
+  appendCnPatchProposal,
+  appendRecordProposal,
+  renderInlineMarkdown,
+  setChatBusy,
+  showChatError
+} from './render-chat.js';
 import { applyAgentAvatarToBubble, renderAgentHero, renderAgentPicker } from './render-agent-picker.js';
 import { isHammondAuditTrigger, nextAuditPhase } from './hammond-audit.js';
 
@@ -332,6 +339,21 @@ export function createChatController({
           endTextTurn();
           const proposal = appendRecordProposal(root, event);
           bindProposal(proposal, event);
+        } else if (event.type === 'cn_patch_proposal') {
+          turnSignaled = true;
+          gotUsefulOutput = true;
+          clearWorkingBubble();
+          endTextTurn();
+          const proposal = appendCnPatchProposal(root, { patch: event.patch });
+          bindCnPatchProposal(proposal, event.patch);
+        } else if (event.type === 'central_node_patched') {
+          turnSignaled = true;
+          gotUsefulOutput = true;
+          const summary = typeof event.summary === 'string' && event.summary.trim()
+            ? event.summary.trim()
+            : 'Central Node updated';
+          setWorkingStatus(summary);
+          showChatError(root, summary);
         } else if (event.type === 'record_rejected') {
           turnSignaled = true;
           clearWorkingBubble();
@@ -406,6 +428,37 @@ export function createChatController({
       void confirmProposal(proposal, event, overwrite);
     });
     proposal.discard.addEventListener('click', () => proposal.card.remove());
+  }
+
+  function bindCnPatchProposal(proposal, patch) {
+    if (!proposal) return;
+    proposal.confirm.addEventListener('click', () => {
+      void confirmCnPatch(proposal, patch);
+    });
+    proposal.discard.addEventListener('click', () => proposal.card.remove());
+  }
+
+  async function confirmCnPatch(proposal, patch) {
+    const previousLabel = proposal.confirm.textContent;
+    proposal.confirm.disabled = true;
+    proposal.confirm.textContent = 'Saving…';
+    try {
+      const result = await chatApi.confirm({
+        kind: 'cn_patch',
+        candidate: patch,
+        slug: stickyAgentSlug() === 'hammond' ? stickyAgentSlug() : 'hammond'
+      });
+      const saved = root.createElement('p');
+      saved.textContent = result?.summary
+        ? `Central Node updated: ${result.summary}`
+        : 'Central Node updated.';
+      proposal.card.replaceChildren(saved);
+      onRecordWritten?.(result);
+    } catch {
+      proposal.confirm.disabled = false;
+      proposal.confirm.textContent = previousLabel;
+      showChatError(root, 'Saving that Central Node change failed. You can try again.');
+    }
   }
 
   async function confirmProposal(proposal, event, overwrite) {

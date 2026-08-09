@@ -80,6 +80,34 @@ test('confirm posts the candidate and returns the written path', async () => {
   assert.equal(result.path, 'data/nutrition/x.md');
 });
 
+test('confirm passes kind through when provided', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (url, init) => {
+    sentBody = JSON.parse(init.body);
+    return Response.json({ ok: true, data: { path: 'central-node.md', summary: 'Remove taper' } });
+  });
+  const patch = {
+    section: 'constraints',
+    op: 'delete_lines',
+    payload: { match: 'Steroid taper', summary: 'Remove taper' }
+  };
+  const result = await chatApi.confirm({ kind: 'cn_patch', candidate: patch, slug: 'hammond' });
+  assert.equal(sentBody.kind, 'cn_patch');
+  assert.equal(sentBody.slug, 'hammond');
+  assert.deepEqual(sentBody.candidate, patch);
+  assert.equal(result.path, 'central-node.md');
+});
+
+test('confirm omits kind from the body when not provided', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return Response.json({ ok: true, data: { path: 'data/nutrition/x.md' } });
+  });
+  await chatApi.confirm({ candidate: { type: 'meal' }, slug: 'breakfast' });
+  assert.equal('kind' in sentBody, false);
+});
+
 test('confirm throws a structured error when the write fails', async () => {
   const chatApi = createChatApi(async () => Response.json({ ok: false, error: { code: 'write_conflict' } }, { status: 409 }));
   await assert.rejects(

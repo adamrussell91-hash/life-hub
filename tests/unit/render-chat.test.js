@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMessage, appendRecordProposal, renderInlineMarkdown } from '../../js/app/render-chat.js';
+import { appendMessage, appendRecordProposal, appendCnPatchProposal, renderInlineMarkdown } from '../../js/app/render-chat.js';
 
 class FakeElement {
   constructor(tag) {
@@ -208,6 +208,32 @@ test('appendRecordProposal always shows a sodium field for meal proposals', () =
   assert.ok(inputs.sodium_mg);
   assert.equal(inputs.sodium_mg.value, '');
   assert.equal(inputs.calories.value, '520');
+});
+
+test('appendCnPatchProposal renders summary, section/op, and Confirm/Discard buttons', () => {
+  const root = new FakeDocument();
+  const { card, confirm, discard } = appendCnPatchProposal(root, {
+    patch: {
+      section: 'constraints',
+      op: 'delete_lines',
+      payload: { match: 'Steroid taper', summary: 'Remove taper constraint' }
+    }
+  });
+
+  assert.ok(card);
+  assert.match(card.className, /record-proposal/);
+  assert.match(card.className, /cn-patch-proposal/);
+  assert.equal(
+    card.children.find(child => child.className === 'cn-patch-proposal__summary')?.textContent,
+    'Remove taper constraint'
+  );
+  assert.equal(
+    card.children.find(child => child.className === 'cn-patch-proposal__meta')?.textContent,
+    'constraints · delete_lines'
+  );
+  assert.equal(confirm.textContent, 'Confirm');
+  assert.equal(discard.textContent, 'Discard');
+  assert.equal(root.querySelector('#chat-messages').children.includes(card), true);
 });
 
 test('renderInlineMarkdown keeps bullet lines in one list even when a blank line separates them', () => {
