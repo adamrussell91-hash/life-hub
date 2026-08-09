@@ -14,8 +14,9 @@ function setText(root, selector, value) {
 export function renderSkincare(root, model, {
   onLogRoutine,
   onLogProcedure,
-  onAddProduct,
-  onRetireProduct
+  onRemoveFromRoutine,
+  onAddFromLibrary,
+  onCreateProduct
 } = {}) {
   const dashboard = root.querySelector('#skincare-dashboard');
   if (!dashboard) return;
@@ -41,7 +42,12 @@ export function renderSkincare(root, model, {
   if (host) {
     host.replaceChildren();
     for (const key of ['am', 'pm']) {
-      host.append(renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetireProduct));
+      host.append(renderRoutineCard(root, key, model, {
+        onLogRoutine,
+        onRemoveFromRoutine,
+        onAddFromLibrary,
+        onCreateProduct
+      }));
     }
   }
 
@@ -73,7 +79,12 @@ export function renderSkincare(root, model, {
   dashboard.removeAttribute('hidden');
 }
 
-function renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetireProduct) {
+function renderRoutineCard(root, key, model, {
+  onLogRoutine,
+  onRemoveFromRoutine,
+  onAddFromLibrary,
+  onCreateProduct
+} = {}) {
   const routine = model.routines[key];
   const isCurrent = model.currentRoutine === key;
   const card = root.createElement('article');
@@ -100,9 +111,13 @@ function renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetir
   status.textContent = already ? 'Logged today' : (model.currentRoutine === key ? 'Up next' : 'Waiting');
   card.append(status);
 
+  const productEntries = Array.isArray(routine.productEntries)
+    ? routine.productEntries
+    : (routine.products ?? []).map(name => ({ id: null, name }));
+
   const state = {
     choices: {},
-    enabled: new Set(routine.products),
+    enabled: new Set(productEntries.map(entry => entry.name)),
     oneOffs: [],
     extras: new Set(),
     notes: ''
@@ -142,8 +157,11 @@ function renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetir
   list.className = 'skincare-products skincare-products--pills';
   function renderProductChips() {
     list.replaceChildren();
-    const names = [...routine.products, ...state.oneOffs];
-    for (const product of names) {
+    const entries = [
+      ...productEntries,
+      ...state.oneOffs.map(name => ({ id: null, name }))
+    ];
+    for (const { id, name: product } of entries) {
       const wrap = root.createElement('div');
       wrap.className = 'skincare-product-pill';
       const button = root.createElement('button');
@@ -166,11 +184,11 @@ function renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetir
         const menu = root.createElement('button');
         menu.type = 'button';
         menu.className = 'skincare-product-pill__menu';
-        menu.setAttribute('aria-label', `Remove ${product} from rotation`);
+        menu.setAttribute('aria-label', `Remove ${product} from routine`);
         menu.textContent = '⋯';
         menu.addEventListener('click', event => {
           event.stopPropagation();
-          onRetireProduct?.({ routine: key, name: product });
+          if (id) onRemoveFromRoutine?.({ routine: key, productId: id });
         });
         wrap.append(menu);
       }
@@ -213,7 +231,7 @@ function renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetir
     confirm.addEventListener('click', () => {
       const product = name.value.trim();
       if (!product) return;
-      if (routine.products.includes(product)) {
+      if (productEntries.some(entry => entry.name === product) || routine.products?.includes(product)) {
         state.enabled.add(product);
         renderProductChips();
         return;
@@ -225,9 +243,7 @@ function renderRoutineCard(root, key, model, onLogRoutine, onAddProduct, onRetir
         state.enabled.add(product);
         renderProductChips();
       }
-      if (keepInRoutine) {
-        onAddProduct?.({ routine: key, name: product, keep: true });
-      }
+      onCreateProduct?.({ routine: key, name: product, keep: keepInRoutine });
     });
     add.replaceChildren(name, keep, confirm);
   });

@@ -95,8 +95,9 @@ export function createAppController(dependencies) {
   let calendarViewMonth = null;
   let bodyRange = 'monthly';
   let mindRange = 'monthly';
-  let latestCatalog = null;
-  let catalogRefreshToken = 0;
+  let latestLibrary = null;
+  let latestMembership = null;
+  let shelfRefreshToken = 0;
   let activeRefresh = null;
   let refreshAbortController = null;
   let lifecycleVersion = 0;
@@ -491,7 +492,7 @@ export function createAppController(dependencies) {
     if (name === 'fitness') renderFitnessSection();
     if (name === 'skincare') {
       renderSkincareSection();
-      void refreshSkincareCatalog();
+      void refreshSkincareShelf();
     }
     if (name === 'calendar') renderCalendarSection();
     if (name === 'body') renderBodySection();
@@ -563,7 +564,8 @@ export function createAppController(dependencies) {
     const model = buildSkincareModel({
       ...latestResult,
       routines: skincareRoutines,
-      catalog: latestCatalog,
+      library: latestLibrary,
+      membership: latestMembership,
       nowHourKey: typeof getCurrentRoutineKey === 'function'
         ? getCurrentRoutineKey(currentDate())
         : 'pm'
@@ -571,29 +573,38 @@ export function createAppController(dependencies) {
     renderSkincare(root, model, {
       onLogRoutine: skincareController?.onLogRoutine,
       onLogProcedure: skincareController?.onLogProcedure,
-      onAddProduct: skincareController?.onAddProduct,
-      onRetireProduct: skincareController?.onRetireProduct
+      onRemoveFromRoutine: skincareController?.onRemoveFromRoutine,
+      onAddFromLibrary: skincareController?.onAddFromLibrary,
+      onCreateProduct: skincareController?.onCreateProduct
     });
     const button = root.querySelector('#skincare-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, SKINCARE_AGENT_SLUG));
   }
 
-  async function refreshSkincareCatalog() {
-    if (typeof skincareApi?.getCatalog !== 'function') return;
-    const token = ++catalogRefreshToken;
+  async function refreshSkincareShelf() {
+    if (
+      typeof skincareApi?.getLibrary !== 'function'
+      || typeof skincareApi?.getRoutines !== 'function'
+    ) return;
+    const token = ++shelfRefreshToken;
     try {
-      const catalog = await skincareApi.getCatalog();
-      if (token !== catalogRefreshToken) return;
-      latestCatalog = catalog;
+      const [library, membership] = await Promise.all([
+        skincareApi.getLibrary(),
+        skincareApi.getRoutines()
+      ]);
+      if (token !== shelfRefreshToken) return;
+      latestLibrary = library;
+      latestMembership = membership;
       if (currentSection === 'skincare') renderSkincareSection();
     } catch {
-      // Retain the currently rendered catalog if it cannot be refreshed.
+      // Retain the currently rendered shelf if it cannot be refreshed.
     }
   }
 
-  function applySkincareCatalog(catalog) {
-    catalogRefreshToken += 1;
-    latestCatalog = catalog ?? null;
+  function applySkincareShelf({ library, membership } = {}) {
+    shelfRefreshToken += 1;
+    if (library !== undefined) latestLibrary = library ?? null;
+    if (membership !== undefined) latestMembership = membership ?? null;
     if (currentSection === 'skincare') renderSkincareSection();
   }
 
@@ -938,7 +949,7 @@ export function createAppController(dependencies) {
     getDisplayDate: () => latestResult?.date ?? null,
     getAgentsConfig: () => latestResult?.agentsConfig ?? null,
     getFitnessLibraryContext: () => fitnessLibraryContext(),
-    applySkincareCatalog
+    applySkincareShelf
   };
 }
 

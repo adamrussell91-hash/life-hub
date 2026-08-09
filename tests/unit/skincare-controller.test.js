@@ -22,98 +22,155 @@ function createRoot() {
   };
 }
 
-test('adding a kept product saves it, reports success, and publishes the catalog', async () => {
+test('removeFromRoutine calls API, reports success, and publishes membership', async () => {
   const root = createRoot();
   const calls = [];
   const changes = [];
-  const catalog = { am: { products: ['Cleanser', 'Serum'] } };
+  const membership = { schema_version: 1, am: { product_ids: [] }, pm: { product_ids: [] } };
   const controller = createSkincareController({
     root,
     chatApi: { confirm() {} },
     skincareApi: {
-      async appendProduct(args) {
+      async removeFromRoutine(args) {
         calls.push(args);
-        return catalog;
+        return membership;
       }
     },
-    onCatalogChanged: value => changes.push(value),
+    onShelfChanged: value => changes.push(value),
     isOnline: () => true
   });
 
-  const result = await controller.onAddProduct({ routine: 'am', name: 'Serum', keep: true });
+  const result = await controller.onRemoveFromRoutine({ routine: 'am', productId: 'serum' });
 
-  assert.equal(result, catalog);
-  assert.deepEqual(calls, [{ routine: 'am', name: 'Serum' }]);
-  assert.deepEqual(changes, [catalog]);
+  assert.equal(result, membership);
+  assert.deepEqual(calls, [{ routine: 'am', productId: 'serum' }]);
+  assert.deepEqual(changes, [{ membership }]);
+  assert.equal(root.status.textContent, 'Removed from routine');
+});
+
+test('addFromLibrary adds each product id and publishes the last membership', async () => {
+  const root = createRoot();
+  const calls = [];
+  const changes = [];
+  const memberships = [
+    { schema_version: 1, am: { product_ids: ['a'] }, pm: { product_ids: [] } },
+    { schema_version: 1, am: { product_ids: ['a', 'b'] }, pm: { product_ids: [] } }
+  ];
+  const controller = createSkincareController({
+    root,
+    chatApi: { confirm() {} },
+    skincareApi: {
+      async addToRoutine(args) {
+        calls.push(args);
+        return memberships[calls.length - 1];
+      }
+    },
+    onShelfChanged: value => changes.push(value),
+    isOnline: () => true
+  });
+
+  const result = await controller.onAddFromLibrary({
+    routine: 'am',
+    productIds: ['a', 'b']
+  });
+
+  assert.equal(result, memberships[1]);
+  assert.deepEqual(calls, [
+    { routine: 'am', productId: 'a' },
+    { routine: 'am', productId: 'b' }
+  ]);
+  assert.deepEqual(changes, [{ membership: memberships[1] }]);
   assert.equal(root.status.textContent, 'Added to routine');
 });
 
-test('retiring a product saves it, reports success, and publishes the catalog', async () => {
+test('createProduct with keep saves to library then adds to routine', async () => {
   const root = createRoot();
-  const calls = [];
+  const apiCalls = [];
   const changes = [];
-  const catalog = { pm: { products: ['Retinol'], retired: ['Moisturizer'] } };
+  const library = {
+    schema_version: 1,
+    products: [{ id: 'new-serum', name: 'New Serum', notes: '' }]
+  };
+  const membership = {
+    schema_version: 1,
+    am: { product_ids: ['new-serum'] },
+    pm: { product_ids: [] }
+  };
   const controller = createSkincareController({
     root,
     chatApi: { confirm() {} },
     skincareApi: {
-      async retireProduct(args) {
-        calls.push(args);
-        return catalog;
+      async saveLibraryEntry(args) {
+        apiCalls.push(['saveLibraryEntry', args]);
+        return library;
+      },
+      async addToRoutine(args) {
+        apiCalls.push(['addToRoutine', args]);
+        return membership;
       }
     },
-    onCatalogChanged: value => changes.push(value),
+    onShelfChanged: value => changes.push(value),
     isOnline: () => true
   });
 
-  const result = await controller.onRetireProduct({ routine: 'pm', name: 'Moisturizer' });
+  const result = await controller.onCreateProduct({
+    routine: 'am',
+    name: 'New Serum',
+    keep: true
+  });
 
-  assert.equal(result, catalog);
-  assert.deepEqual(calls, [{ routine: 'pm', name: 'Moisturizer' }]);
-  assert.deepEqual(changes, [catalog]);
-  assert.equal(root.status.textContent, 'Removed from rotation');
+  assert.deepEqual(result, { library, membership });
+  assert.deepEqual(apiCalls, [
+    ['saveLibraryEntry', { name: 'New Serum' }],
+    ['addToRoutine', { routine: 'am', productId: 'new-serum' }]
+  ]);
+  assert.deepEqual(changes, [{ library, membership }]);
+  assert.equal(root.status.textContent, 'Added to routine');
 });
 
-test('adding a retired product reports restore-unavailable status', async () => {
+test('createProduct without keep returns a one-off without API calls', async () => {
   const root = createRoot();
   let apiCalls = 0;
   const controller = createSkincareController({
     root,
     chatApi: { confirm() {} },
     skincareApi: {
-      async appendProduct() {
-        apiCalls += 1;
-        throw Object.assign(new Error('retired'), { code: 'retired_product', status: 400 });
-      }
+      async saveLibraryEntry() { apiCalls += 1; },
+      async addToRoutine() { apiCalls += 1; }
     },
-    onCatalogChanged: () => {
-      throw new Error('catalog should not change for retired append');
+    onShelfChanged: () => {
+      throw new Error('shelf should not change for one-off create');
     },
     isOnline: () => true
   });
 
-  const result = await controller.onAddProduct({ routine: 'am', name: 'Old Serum', keep: true });
+  const result = await controller.onCreateProduct({
+    routine: 'pm',
+    name: 'One Off Oil',
+    keep: false
+  });
 
-  assert.equal(result, undefined);
-  assert.equal(apiCalls, 1);
-  assert.equal(root.status.textContent, 'That product was retired — restore not available yet');
+  assert.deepEqual(result, { oneOff: true, name: 'One Off Oil' });
+  assert.equal(apiCalls, 0);
 });
 
-test('catalog updates report an offline status without making API requests', async () => {
+test('shelf updates report an offline status without making API requests', async () => {
   const root = createRoot();
   let apiCalls = 0;
   const controller = createSkincareController({
     root,
     chatApi: { confirm() {} },
     skincareApi: {
-      async appendProduct() { apiCalls += 1; },
-      async retireProduct() { apiCalls += 1; }
+      async removeFromRoutine() { apiCalls += 1; },
+      async addToRoutine() { apiCalls += 1; },
+      async saveLibraryEntry() { apiCalls += 1; }
     },
     isOnline: () => false
   });
 
-  await controller.onAddProduct({ routine: 'am', name: 'Serum', keep: true });
-  await controller.onRetireProduct({ routine: 'am', name: 'Cleanser' });
+  await controller.onRemoveFromRoutine({ routine: 'am', productId: 'serum' });
+  await controller.onAddFromLibrary({ routine: 'am', productIds: ['serum'] });
+  await controller.onCreateProduct({ routine: 'am', name: 'Serum', keep: true });
 
   assert.equal(apiCalls, 0);
   assert.equal(root.status.textContent, 'Connect to update routine.');
