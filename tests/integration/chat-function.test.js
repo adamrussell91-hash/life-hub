@@ -828,7 +828,7 @@ test('search_skincare_library returns matches and continues the round', async ()
   assert.deepEqual(events[2], { type: 'done' });
 });
 
-test('save_skincare_library_entry writes product-library.json and continues the round', async () => {
+test('save_skincare_library_entry cold-start seeds defaults then writes library with the new product', async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push({ url, options });
@@ -876,9 +876,63 @@ test('save_skincare_library_entry writes product-library.json and continues the 
   const body = JSON.parse(putCall.options.body);
   const written = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
   assert.equal(written.schema_version, 1);
-  assert.equal(written.products.length, 1);
-  assert.equal(written.products[0].name, 'La Roche SPF 50');
-  assert.equal(written.products[0].id, 'la-roche-spf-50');
+  const names = written.products.map(p => p.name);
+  assert.ok(names.includes('Azclear Azelaic Acid 20%'), 'cold-start write must include seeded defaults');
+  assert.ok(names.includes('La Roche SPF 50'), 'cold-start write must include the new product');
+  assert.ok(written.products.length > 1);
+  assert.ok(written.products.some(p => p.id === 'la-roche-spf-50'));
+});
+
+test('failed save_skincare_library_entry write leaves in-memory shelf unchanged for the next tool call', async () => {
+  let putAttempts = 0;
+  let successfulWrite;
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      putAttempts += 1;
+      if (putAttempts === 1) {
+        return Response.json({ message: 'conflict' }, { status: 409 });
+      }
+      const body = JSON.parse(options.body);
+      successfulWrite = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        const failed = await executeTools({
+          id: 'call_1',
+          name: 'save_skincare_library_entry',
+          input: { name: 'Ghost Product That Should Not Stick' }
+        });
+        assert.deepEqual(JSON.parse(failed), { ok: false, error: 'write_failed' });
+
+        const ok = await executeTools({
+          id: 'call_2',
+          name: 'save_skincare_library_entry',
+          input: { name: 'Real Product Keep Me' }
+        });
+        assert.equal(JSON.parse(ok).ok, true);
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Hyaluronica, try a save' })));
+  assert.equal(putAttempts, 2);
+  const names = successfulWrite.products.map(p => p.name);
+  assert.ok(!names.includes('Ghost Product That Should Not Stick'));
+  assert.ok(names.includes('Real Product Keep Me'));
+  assert.ok(names.includes('Azclear Azelaic Acid 20%'));
 });
 
 test('set_skincare_routine_membership writes routine-membership.json', async () => {
