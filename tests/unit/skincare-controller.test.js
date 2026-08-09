@@ -83,6 +83,67 @@ test('addFromLibrary adds each product id and publishes the last membership', as
   assert.equal(root.status.textContent, 'Added to routine');
 });
 
+test('addFromLibrary with empty productIds does not touch API or shelf', async () => {
+  const root = createRoot();
+  let apiCalls = 0;
+  const changes = [];
+  const controller = createSkincareController({
+    root,
+    chatApi: { confirm() {} },
+    skincareApi: {
+      async addToRoutine() { apiCalls += 1; }
+    },
+    onShelfChanged: value => changes.push(value),
+    isOnline: () => true
+  });
+
+  const emptyResult = await controller.onAddFromLibrary({ routine: 'am', productIds: [] });
+  const missingResult = await controller.onAddFromLibrary({ routine: 'am' });
+
+  assert.equal(emptyResult, undefined);
+  assert.equal(missingResult, undefined);
+  assert.equal(apiCalls, 0);
+  assert.deepEqual(changes, []);
+  assert.notEqual(root.status.textContent, 'Added to routine');
+});
+
+test('addFromLibrary publishes last successful membership when a later add fails', async () => {
+  const root = createRoot();
+  const calls = [];
+  const changes = [];
+  const firstMembership = {
+    schema_version: 1,
+    am: { product_ids: ['a'] },
+    pm: { product_ids: [] }
+  };
+  const controller = createSkincareController({
+    root,
+    chatApi: { confirm() {} },
+    skincareApi: {
+      async addToRoutine(args) {
+        calls.push(args);
+        if (args.productId === 'b') throw new Error('add failed');
+        return firstMembership;
+      }
+    },
+    onShelfChanged: value => changes.push(value),
+    isOnline: () => true
+  });
+
+  const result = await controller.onAddFromLibrary({
+    routine: 'am',
+    productIds: ['a', 'b']
+  });
+
+  assert.equal(result, undefined);
+  assert.deepEqual(calls, [
+    { routine: 'am', productId: 'a' },
+    { routine: 'am', productId: 'b' }
+  ]);
+  assert.deepEqual(changes, [{ membership: firstMembership }]);
+  assert.equal(root.status.textContent, 'Couldn’t update routine — try again.');
+});
+
 test('createProduct with keep saves to library then adds to routine', async () => {
   const root = createRoot();
   const apiCalls = [];
@@ -126,6 +187,39 @@ test('createProduct with keep saves to library then adds to routine', async () =
   ]);
   assert.deepEqual(changes, [{ library, membership }]);
   assert.equal(root.status.textContent, 'Added to routine');
+});
+
+test('createProduct keep publishes library when addToRoutine fails', async () => {
+  const root = createRoot();
+  const changes = [];
+  const library = {
+    schema_version: 1,
+    products: [{ id: 'new-serum', name: 'New Serum', notes: '' }]
+  };
+  const controller = createSkincareController({
+    root,
+    chatApi: { confirm() {} },
+    skincareApi: {
+      async saveLibraryEntry() {
+        return library;
+      },
+      async addToRoutine() {
+        throw new Error('add failed');
+      }
+    },
+    onShelfChanged: value => changes.push(value),
+    isOnline: () => true
+  });
+
+  const result = await controller.onCreateProduct({
+    routine: 'am',
+    name: 'New Serum',
+    keep: true
+  });
+
+  assert.equal(result, undefined);
+  assert.deepEqual(changes, [{ library }]);
+  assert.equal(root.status.textContent, 'Couldn’t update routine — try again.');
 });
 
 test('createProduct without keep returns a one-off without API calls', async () => {

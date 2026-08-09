@@ -66,16 +66,19 @@ export function createSkincareController({
       setStatus('Connect to update routine.');
       return;
     }
+    const ids = (productIds ?? []).filter(id => typeof id === 'string' && id.trim());
+    if (!ids.length) return;
     setStatus('Saving…');
+    let membership = null;
     try {
-      let membership = null;
-      for (const productId of productIds ?? []) {
+      for (const productId of ids) {
         membership = await skincareApi.addToRoutine({ routine, productId });
       }
       setStatus('Added to routine');
       onShelfChanged?.({ membership });
       return membership;
     } catch {
+      if (membership) onShelfChanged?.({ membership });
       setStatus('Couldn’t update routine — try again.');
     }
   }
@@ -87,20 +90,27 @@ export function createSkincareController({
       return;
     }
     setStatus('Saving…');
+    let library = null;
     try {
-      const library = await skincareApi.saveLibraryEntry({ name });
+      library = await skincareApi.saveLibraryEntry({ name });
       const product = findProductByName(library, name);
       if (!product?.id) {
+        if (library) onShelfChanged?.({ library });
         setStatus('Couldn’t update routine — try again.');
         return;
       }
-      const membership = await skincareApi.addToRoutine({
-        routine,
-        productId: product.id
-      });
-      setStatus('Added to routine');
-      onShelfChanged?.({ library, membership });
-      return { library, membership };
+      try {
+        const membership = await skincareApi.addToRoutine({
+          routine,
+          productId: product.id
+        });
+        setStatus('Added to routine');
+        onShelfChanged?.({ library, membership });
+        return { library, membership };
+      } catch {
+        onShelfChanged?.({ library });
+        setStatus('Couldn’t update routine — try again.');
+      }
     } catch {
       setStatus('Couldn’t update routine — try again.');
     }
