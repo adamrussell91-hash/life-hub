@@ -1220,6 +1220,7 @@ main { max-width: 76rem; margin: 0 auto; }
   gap: 0.45rem;
 }
 .skincare-product-pill {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.15rem;
@@ -1249,6 +1250,34 @@ main { max-width: 76rem; margin: 0 auto; }
   font: inherit;
   cursor: pointer;
 }
+.skincare-product-pill__menu-panel {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 2;
+  display: grid;
+  min-width: 10.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--warm-white);
+  box-shadow: 0 8px 20px rgba(26, 20, 36, 0.08);
+}
+.skincare-product-pill__menu-action {
+  border: 0;
+  border-radius: 0.55rem;
+  padding: 0.45rem 0.65rem;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+.skincare-product-pill__menu-action:hover,
+.skincare-product-pill__menu-action:focus-visible {
+  background: rgba(185, 158, 224, 0.18);
+}
 .skincare-add {
   display: flex;
   flex-wrap: wrap;
@@ -1256,9 +1285,43 @@ main { max-width: 76rem; margin: 0 auto; }
   gap: 0.45rem;
   margin: -0.35rem 0 0.75rem;
 }
+.skincare-add__panel {
+  display: grid;
+  gap: 0.45rem;
+  width: 100%;
+}
+.skincare-add__panel--library,
+.skincare-add__panel--new {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: rgba(255, 252, 248, 0.7);
+}
+.skincare-add__option {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+.skincare-add__empty {
+  margin: 0;
+}
+.skincare-add__matches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.skincare-add__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
 .skincare-add input {
   min-width: 12rem;
   flex: 1 1 12rem;
+  width: 100%;
   padding: 0.35rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: 999px;
