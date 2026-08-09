@@ -1,3 +1,6 @@
+const PURPOSE_HEADING = '# Purpose';
+const WRITING_RULES_HEADING = '## 📏 Writing Rules';
+const AGENT_DIRECTORY_HEADING = '## 🤖 Agent Directory';
 const CONSTRAINTS_HEADING = '## 🔴 Current Constraints & Priorities';
 const TODAYS_STATUS_HEADING = "## ⚡ Today's Status";
 const THIS_WEEK_HEADING = '## 📅 This Week';
@@ -48,7 +51,14 @@ export function extractRecentAgentActions(markdown) {
 }
 
 export {
-  RECENT_ACTIONS_HEADING,
+  PURPOSE_HEADING,
+  WRITING_RULES_HEADING,
+  AGENT_DIRECTORY_HEADING,
+  CONSTRAINTS_HEADING,
   TODAYS_STATUS_HEADING,
-  CROSS_AGENT_HEADING
+  THIS_WEEK_HEADING,
+  THIS_MONTH_HEADING,
+  LONG_TERM_TRENDS_HEADING,
+  CROSS_AGENT_HEADING,
+  RECENT_ACTIONS_HEADING
 };
