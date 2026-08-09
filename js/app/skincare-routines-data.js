@@ -4,17 +4,7 @@ export const SKINCARE_ROUTINES = {
   am: {
     label: 'Morning routine',
     duration_hint: '~20 min',
-    choices: {
-      toner: {
-        id: 'toner',
-        label: 'Toner',
-        options: [
-          'Anua Rice 70 + Ceramide Glow Milky Toner',
-          'Dr Ceuracle Vegan Kombucha Tea Essence'
-        ],
-        default: 'Anua Rice 70 + Ceramide Glow Milky Toner'
-      }
-    },
+    choices: {},
     products: [
       'Azclear Azelaic Acid 20%',
       'Korres Greek Yoghurt Probiotic Gel Cream',
@@ -27,22 +17,14 @@ export const SKINCARE_ROUTINES = {
   pm: {
     label: 'Evening routine',
     duration_hint: '~20 min',
-    choices: {
-      seal: {
-        id: 'seal',
-        label: 'Seal',
-        options: [
-          'La Roche Posay Cicaplast B5+',
-          'Avene Cicalfate+'
-        ],
-        default: 'La Roche Posay Cicaplast B5+'
-      }
-    },
+    choices: {},
     products: [
       'Dr.G Green Deep Pore Cleansing Balm',
       'Korres Greek Yoghurt Foaming Cream Cleanser',
       'Toner',
-      'Retrieve Tretinoin 0.05% (sandwich method)'
+      'Retrieve Tretinoin 0.05% (sandwich method)',
+      'La Roche Posay Cicaplast B5+',
+      'Avene Cicalfate+'
     ]
   },
   extras: ['Sheet mask'],
