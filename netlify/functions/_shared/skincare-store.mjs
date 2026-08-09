@@ -43,20 +43,10 @@ export async function loadOrSeedLibrary(github) {
   if (entry) {
     const parsed = parseProductLibrary(decodeBlob(await github.readBlob(entry.sha)));
     if (!parsed) throw corruptError('library_corrupt');
-    const { library, changed } = upgradeOtherProductCategories(parsed);
-    if (!changed) return { library, entry, created: false };
-    const result = await writeJson(
-      github,
-      SKINCARE_PRODUCT_LIBRARY_PATH,
-      library,
-      'chore(skincare): upgrade Other product categories',
-      entry.sha
-    );
-    return {
-      library,
-      entry: { path: SKINCARE_PRODUCT_LIBRARY_PATH, type: 'blob', sha: result.sha },
-      created: false
-    };
+    // Upgrade Other→inferred categories in memory for this request only.
+    // Do not auto-PUT on GET — that raced routine writes and broke unknown_product checks.
+    const { library } = upgradeOtherProductCategories(parsed);
+    return { library, entry, created: false };
   }
 
   const catalogEntry = findBlob(tree, SKINCARE_CATALOG_PATH);
