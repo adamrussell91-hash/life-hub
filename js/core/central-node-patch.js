@@ -45,11 +45,14 @@ export function classifyCentralNodePatchRisk(patch) {
   if (section === 'constraints' && op !== 'append_line') return 'confirm';
   if (section === 'todays_status' && (op === 'upsert_field' || op === 'append_line')) return 'auto';
   if (section === 'cross_agent' && op === 'append_line') return 'auto';
-  if (section === 'recent_actions' && (op === 'append_line' || op === 'upsert_field')) return 'auto';
+  if (section === 'recent_actions' && op === 'append_line') return 'auto';
   if (section === 'constraints' && op === 'append_line') return 'auto';
   if (section === 'this_week' && op === 'append_line') return 'auto';
   return 'confirm';
 }
+
+/** Trailing section HR (`---` before next ##), as used in live central-node.md. */
+const TRAILING_SECTION_HR_RE = /(?:\n|^)---\s*$/;
 
 function findSectionSpan(content, headingPrefix) {
   const escaped = headingPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -60,15 +63,19 @@ function findSectionSpan(content, headingPrefix) {
   const after = content.slice(headingEnd);
   const endRel = after.search(/\n## /);
   const bodyEnd = endRel === -1 ? content.length : headingEnd + endRel;
-  return { heading: match[0], headingStart, headingEnd, bodyEnd };
+  const rawBody = content.slice(headingEnd, bodyEnd);
+  const hrMatch = TRAILING_SECTION_HR_RE.exec(rawBody);
+  const contentEnd = hrMatch ? headingEnd + hrMatch.index : bodyEnd;
+  return { heading: match[0], headingStart, headingEnd, contentEnd, bodyEnd };
 }
 
 function replaceSectionBody(content, headingPrefix, newBody) {
   const span = findSectionSpan(content, headingPrefix);
   if (!span) return null;
   const body = String(newBody ?? '').replace(/^\n+/, '').replace(/\n+$/, '');
+  const separator = content.slice(span.contentEnd, span.bodyEnd);
   const after = content.slice(span.bodyEnd);
-  return `${content.slice(0, span.headingEnd)}\n${body}${after.startsWith('\n') ? '' : '\n'}${after}`;
+  return `${content.slice(0, span.headingEnd)}\n${body}${separator}${after.startsWith('\n') ? '' : '\n'}${after}`;
 }
 
 function appendLineToSection(content, headingPrefix, text) {
@@ -76,19 +83,21 @@ function appendLineToSection(content, headingPrefix, text) {
   const span = findSectionSpan(content, headingPrefix);
   if (!span) return null;
   const line = text.startsWith('\n') ? text.slice(1) : text;
-  const before = content.slice(0, span.bodyEnd).replace(/\s*$/, '');
+  const before = content.slice(0, span.contentEnd).replace(/\s*$/, '');
+  const separator = content.slice(span.contentEnd, span.bodyEnd);
   const after = content.slice(span.bodyEnd);
-  return `${before}\n${line}${after.startsWith('\n') ? '' : '\n'}${after}`;
+  return `${before}\n${line}${separator}${after.startsWith('\n') ? '' : '\n'}${after}`;
 }
 
 function deleteLinesInSection(content, headingPrefix, matchText) {
   if (typeof matchText !== 'string' || matchText === '') return null;
   const span = findSectionSpan(content, headingPrefix);
   if (!span) return null;
-  const rawBody = content.slice(span.headingEnd, span.bodyEnd);
+  const rawBody = content.slice(span.headingEnd, span.contentEnd);
   const lines = rawBody.split('\n');
   const filtered = lines.filter((line) => !line.includes(matchText));
-  return `${content.slice(0, span.headingEnd)}${filtered.join('\n')}${content.slice(span.bodyEnd)}`;
+  const separator = content.slice(span.contentEnd, span.bodyEnd);
+  return `${content.slice(0, span.headingEnd)}${filtered.join('\n')}${separator}${content.slice(span.bodyEnd)}`;
 }
 
 export function applyCentralNodePatch(content, patch) {
