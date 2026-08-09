@@ -727,8 +727,10 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 .nutrition--fat-over [data-nutrition="fat"],
-.nutrition--fat-over [data-split="fat"],
-.nutrition--fat-over [data-split="fat-pct"] {
+.nutrition--fat-over .metric-value [data-value="fat"],
+.nutrition--fat-over .metric-caption [data-percent="fat"],
+.nutrition--fat-over .macro-split__copy [data-split="fat"],
+.nutrition--fat-over .macro-split__copy [data-split="fat-pct"] {
   color: #b3261e;
 }
 .nutrition--fat-over .metric-ring--fat,
