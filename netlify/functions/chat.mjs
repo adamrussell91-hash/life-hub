@@ -61,15 +61,18 @@ import {
 import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   emptyProductLibrary,
+  migrateProductLibraryFromCatalog,
   parseProductLibrary,
   seedProductLibraryFromDefaults
 } from '../../js/app/skincare-product-library.js';
 import {
   SKINCARE_ROUTINE_MEMBERSHIP_PATH,
   emptyMembership,
+  migrateMembershipFromCatalog,
   parseMembership,
   seedMembershipFromDefaults
 } from '../../js/app/skincare-routine-membership.js';
+import { SKINCARE_CATALOG_PATH, parseCatalog } from '../../js/app/skincare-catalog.js';
 import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
 import {
   formatTemplatesForPrompt,
@@ -196,9 +199,9 @@ export function createChatHandler({
         let exerciseLibraryEntries = [];
         let exerciseLibrary = '';
         let exerciseLibrarySha;
-        // Cold-start: seed in memory from defaults so the first Hyaluronica write
-        // merges onto a full shelf instead of persisting a sparse 1-item library
-        // that would block HTTP seed-on-missing forever.
+        // Cold-start: seed in memory (defaults, or legacy catalog migrate below)
+        // so the first Hyaluronica write merges onto a full shelf instead of
+        // persisting a sparse 1-item library that would block HTTP seed-on-missing.
         let skincareLibrary = needsSkincareLibrary
           ? seedProductLibraryFromDefaults(SKINCARE_ROUTINES)
           : emptyProductLibrary();
@@ -229,6 +232,12 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === SKINCARE_ROUTINE_MEMBERSHIP_PATH && entry.type === 'blob')
             : null;
           skincareMembershipSha = skincareMembershipEntry?.sha;
+          // Mirror HTTP store: when shelf blobs are missing, fall back to legacy catalog.
+          const needsCatalogFallback = needsSkincareLibrary
+            && (!skincareLibraryEntry || !skincareMembershipEntry);
+          const skincareCatalogEntry = needsCatalogFallback
+            ? current.tree.find(entry => entry.path === SKINCARE_CATALOG_PATH && entry.type === 'blob')
+            : null;
           const templateEntries = needsWorkoutTemplates
             ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
             : [];
@@ -240,6 +249,7 @@ export function createChatHandler({
             exerciseLibraryBlob,
             skincareLibraryBlob,
             skincareMembershipBlob,
+            skincareCatalogBlob,
             templateBlobs
           ] = await Promise.all([
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
@@ -248,6 +258,7 @@ export function createChatHandler({
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
             skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
             skincareMembershipEntry ? client.readBlob(skincareMembershipEntry.sha) : null,
+            skincareCatalogEntry ? client.readBlob(skincareCatalogEntry.sha) : null,
             Promise.all(templateEntries.map(entry => client.readBlob(entry.sha)))
           ]);
 
@@ -278,10 +289,23 @@ export function createChatHandler({
             exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries);
           }
 
+          const decodedCatalog = skincareCatalogBlob ? decodeBlob(skincareCatalogBlob) : null;
+          const legacyCatalog = decodedCatalog !== null ? parseCatalog(decodedCatalog) : null;
+
+          let libraryLoaded = false;
           const decodedSkincareLibrary = skincareLibraryBlob ? decodeBlob(skincareLibraryBlob) : null;
           if (decodedSkincareLibrary !== null) {
             const parsed = parseProductLibrary(decodedSkincareLibrary);
-            if (parsed) skincareLibrary = parsed;
+            if (parsed) {
+              skincareLibrary = parsed;
+              libraryLoaded = true;
+            }
+          }
+          // Prefer legacy catalog migrate over defaults when the shelf blob is absent.
+          if (!libraryLoaded && needsSkincareLibrary) {
+            skincareLibrary = legacyCatalog
+              ? migrateProductLibraryFromCatalog(legacyCatalog)
+              : seedProductLibraryFromDefaults(SKINCARE_ROUTINES);
           }
 
           let membershipLoaded = false;
@@ -293,10 +317,12 @@ export function createChatHandler({
               membershipLoaded = true;
             }
           }
-          // Re-seed against the shelf we actually have when membership blob is absent/corrupt,
-          // so a sparse loaded library does not keep default ids from the cold-start seed.
+          // Mirror HTTP store: migrate membership from catalog when blob is absent/corrupt,
+          // else seed against the shelf we actually have.
           if (!membershipLoaded && needsSkincareLibrary) {
-            skincareMembership = seedMembershipFromDefaults(SKINCARE_ROUTINES, skincareLibrary);
+            skincareMembership = legacyCatalog
+              ? migrateMembershipFromCatalog(legacyCatalog, skincareLibrary)
+              : seedMembershipFromDefaults(SKINCARE_ROUTINES, skincareLibrary);
           }
 
           const templateContents = templateEntries
