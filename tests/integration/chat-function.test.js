@@ -883,6 +883,77 @@ test('save_skincare_library_entry cold-start seeds defaults then writes library 
   assert.ok(written.products.some(p => p.id === 'la-roche-spf-50'));
 });
 
+test('save_skincare_library_entry migrates legacy catalog before writing new product', async () => {
+  const catalogPath = 'data/skincare/routine-catalog.json';
+  const catalogSha = 'f'.repeat(40);
+  const customName = "Grandma's Secret Toner";
+  const catalogContent = JSON.stringify({
+    schema_version: 1,
+    am: { products: [customName], retired: [], extras: [] },
+    pm: { products: [], retired: [], extras: [] }
+  });
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: catalogPath, type: 'blob', sha: catalogSha, size: 100 }]
+      });
+    }
+    if (url.includes(`/git/blobs/${catalogSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(catalogContent, 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        const toolResult = await executeTools({
+          id: 'call_1',
+          name: 'save_skincare_library_entry',
+          input: { name: 'La Roche SPF 50', notes: 'AM' }
+        });
+        assert.ok(toolResult != null, 'executeTools must return a tool result so the round continues');
+        assert.deepEqual(JSON.parse(toolResult), {
+          ok: true,
+          id: 'la-roche-spf-50',
+          name: 'La Roche SPF 50'
+        });
+        yield { type: 'text', delta: 'Migrated shelf and saved SPF.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Hyaluronica, add La Roche SPF 50' }))));
+  assert.deepEqual(events[0], { type: 'agent', slug: 'hyaluronica' });
+  assert.deepEqual(events[1], { type: 'text', delta: 'Migrated shelf and saved SPF.' });
+  assert.deepEqual(events[2], { type: 'done' });
+
+  const putCall = calls.find(call => call.options?.method === 'PUT');
+  assert.ok(putCall, 'expected a PUT request to write the product library');
+  assert.ok(putCall.url.includes('data/skincare/product-library.json'));
+  const body = JSON.parse(putCall.options.body);
+  const written = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
+  const names = written.products.map(p => p.name);
+  assert.ok(names.includes(customName), 'first Hyaluronica save must include migrated catalog products');
+  assert.ok(names.includes('La Roche SPF 50'), 'first Hyaluronica save must include the new product');
+  assert.ok(!names.includes('Azclear Azelaic Acid 20%'), 'catalog migrate must not replace with defaults-only seed');
+});
+
 test('failed save_skincare_library_entry write leaves in-memory shelf unchanged for the next tool call', async () => {
   let putAttempts = 0;
   let successfulWrite;
