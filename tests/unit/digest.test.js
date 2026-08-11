@@ -30,6 +30,26 @@ fat_g: 12
 ---
 `;
 
+const fullMeal = `---
+schema_version: 1
+id: meal-2
+type: meal
+date: 2026-08-01
+time: "18:30"
+created_at: 2026-08-01T18:30:00+10:00
+updated_at: 2026-08-01T18:30:00+10:00
+source: test
+meal: dinner
+calories: 700
+protein_g: 45
+fat_g: 20
+sodium_mg: 900
+calcium_mg: 300
+polyphenol_score: 7
+omega3: high
+---
+`;
+
 test("summarizes today's totals, streak, and logging coverage", () => {
   const summary = summarizeRecentHistory(
     [{ path: 'data/nutrition/2026/08/2026-08-01-breakfast.md', content: meal }],
@@ -39,6 +59,37 @@ test("summarizes today's totals, streak, and logging coverage", () => {
   assert.match(summary, /520 of 1660 kcal/);
   assert.match(summary, /Logged today: nutrition/);
   assert.match(summary, /Nothing was logged yesterday/);
+});
+
+// Brisket is required to fill sodium, calcium, polyphenol_score and omega3 on every meal.
+// Before 2026-08-11 none of them came back to him, so protocol rules keyed off day totals
+// (the polyphenol bands, the omega-3 check) could only ever be answered by confabulation.
+test('surfaces the micronutrient day totals Brisket is required to log', () => {
+  const summary = summarizeRecentHistory(
+    [{ path: 'data/nutrition/2026/08/2026-08-01-dinner.md', content: fullMeal }],
+    targetsConfig,
+    '2026-08-01'
+  );
+  assert.match(summary, /900 of 2000 mg sodium ceiling/);
+  assert.match(summary, /300 of 1000 mg calcium target/);
+  assert.match(summary, /polyphenol score 7 against a daily aim of 10/);
+  assert.match(summary, /Omega-3 across today's meals: 1 high/);
+});
+
+test('reports protein by meal slot so empty slots are visible', () => {
+  const summary = summarizeRecentHistory(
+    [{ path: 'data/nutrition/2026/08/2026-08-01-breakfast.md', content: meal }],
+    targetsConfig,
+    '2026-08-01'
+  );
+  assert.match(summary, /breakfast 38 g/);
+  assert.match(summary, /lunch not logged \(guide 30 g\)/);
+  assert.match(summary, /dinner not logged \(guide 40 g\)/);
+});
+
+test('reports no omega-3 tally when nothing is logged yet', () => {
+  const summary = summarizeRecentHistory([], targetsConfig, '2026-08-01');
+  assert.match(summary, /Omega-3 across today's meals: no meals logged yet/);
 });
 
 test('skips a file that fails validation instead of throwing', () => {
