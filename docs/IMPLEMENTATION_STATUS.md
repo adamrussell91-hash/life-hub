@@ -360,4 +360,12 @@ Verified on 2026-08-11 (local only — do not push unless asked). Move 6. Shell 
 - **Deviation:** skipped shared-fixture browser assert for hammond-line (same risk as Phase 25 — shared mock tree); covered by unit tests instead.
 - `npm test`: 927 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
 
-## Next Phase: Hammond closed-loop Moves 7–8 / sleep·heart on Body
+## Phase 33: Hammond closed-loop 7/8 — CN audit UI + persisted phase — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked). Move 7. Shell cache bumped to `life-hub-shell-v66`.
+
+- "Run audit" button on the Central Node tab opens Hammond chat and sends the existing `central node audit` trigger (reuses `maybeStartAuditSession`).
+- Audit phase persists in `localStorage` (`life-hub:hammond-audit-session`) via injected storage; resumes on reload except `lock` phase (already ended).
+- `npm test`: 931 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
+## Next Phase: Hammond closed-loop Move 8 / sleep·heart on Body

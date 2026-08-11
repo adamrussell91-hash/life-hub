@@ -1922,6 +1922,24 @@ main { max-width: 76rem; margin: 0 auto; }
   cursor: pointer;
 }
 
+.cn-audit-button {
+  position: fixed;
+  right: 5.2rem;
+  bottom: 1.5rem;
+  z-index: 30;
+  min-height: 2.6rem;
+  padding: 0.55rem 0.95rem;
+  border: 1px solid rgba(20, 43, 81, 0.12);
+  border-radius: 999px;
+  color: var(--depth);
+  background: var(--glass);
+  font-size: 0.82rem;
+  font-weight: 650;
+  box-shadow: 0 0.5rem 1.4rem rgba(10,21,54,0.16);
+  backdrop-filter: blur(18px);
+  cursor: pointer;
+}
+
 /* Session-only unread indicator on every chat entry point: the floating FABs
    plus the Chat nav item in both the desktop rail and the mobile nav. */
 .nav-item, .mobile-nav button { position: relative; }
@@ -1967,6 +1985,7 @@ main { max-width: 76rem; margin: 0 auto; }
   .nutrition-grid { grid-template-columns: 1fr; }
   .chat-view[data-panel-mode="overlay"] { inset: auto 1rem 5.5rem auto; width: calc(100vw - 2rem); }
   .floating-chat-button { right: 1rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+  .cn-audit-button { right: 4.6rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
 }
 
 .prose-section { margin: 0.85rem 0 0; color: var(--ink); font-size: 0.82rem; line-height: 1.6; }

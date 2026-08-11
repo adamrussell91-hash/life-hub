@@ -66,6 +66,7 @@ export function createAppController(dependencies) {
     renderMind,
     chatSelectAgent,
     chatSyncAccent,
+    chatStartCentralNodeAudit,
     buildCentralNodeModel,
     renderCentralNode,
     renderGovernance,
@@ -172,6 +173,9 @@ export function createAppController(dependencies) {
   });
   bind(root.querySelector('#central-node-chat-button'), 'click', () => {
     toggleSectionChat('#central-node-dashboard', CENTRAL_NODE_AGENT_SLUG);
+  });
+  bind(root.querySelector('#central-node-audit-button'), 'click', () => {
+    openCentralNodeAudit();
   });
   bind(windowTarget, 'online', () => void handleOnline());
   bind(windowTarget, 'offline', () => handleOffline());
@@ -459,6 +463,17 @@ export function createAppController(dependencies) {
       chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, agentSlug));
       chatClearUnread?.();
     }
+  }
+
+  function openCentralNodeAudit() {
+    if (!chatPanel) return;
+    chatSelectAgent?.(CENTRAL_NODE_AGENT_SLUG);
+    const slot = root.querySelector('#central-node-dashboard');
+    if (slot && !chatPanel.isOpen()) {
+      chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
+      chatClearUnread?.();
+    }
+    void chatStartCentralNodeAudit?.();
   }
 
   function setSectionVisibility(name) {
