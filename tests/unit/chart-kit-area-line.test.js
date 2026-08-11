@@ -39,3 +39,37 @@ test('rollingAveragePoints uses trailing window mean when requested', () => {
   assert.equal(typeof chart.rollingLinePoints, 'string');
   assert.ok(chart.rollingLinePoints.length > 0);
 });
+
+test('buildAreaLine padded domain does not pin min to zero', () => {
+  const chart = buildAreaLine(
+    [
+      { date: '2026-01-01', value: 88 },
+      { date: '2026-02-01', value: 90 },
+      { date: '2026-03-01', value: 86 }
+    ],
+    { yDomain: 'padded', height: 160, width: 320 }
+  );
+  const ys = chart.points.map(p => p.y);
+  const spread = Math.max(...ys) - Math.min(...ys);
+  assert.ok(spread > 20, 'padded domain should use vertical range');
+});
+
+test('buildAreaLine default still zero-based', () => {
+  const zero = buildAreaLine(
+    [
+      { date: '2026-01-01', value: 88 },
+      { date: '2026-02-01', value: 90 }
+    ],
+    { height: 160, width: 320 }
+  );
+  const padded = buildAreaLine(
+    [
+      { date: '2026-01-01', value: 88 },
+      { date: '2026-02-01', value: 90 }
+    ],
+    { yDomain: 'padded', height: 160, width: 320 }
+  );
+  const zeroSpread = Math.max(...zero.points.map(p => p.y)) - Math.min(...zero.points.map(p => p.y));
+  const padSpread = Math.max(...padded.points.map(p => p.y)) - Math.min(...padded.points.map(p => p.y));
+  assert.ok(padSpread > zeroSpread, 'padded should spread more than zero-based for high values');
+});
