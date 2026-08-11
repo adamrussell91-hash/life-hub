@@ -310,4 +310,22 @@ Verified on 2026-08-11 (local only — do not push unless asked). Final phase of
 - **6b.** Two protocol corrections: focus-count math now actually fits the session window (2 focuses default on `workout_30` days, 3 focuses only on `workout_45_60` — 3×3-hits inside a 20-30 min window with a 5-min warmup never fit). `web_search` `max_uses` raised to 5 for Chadwick only (was 2 for everyone); every other agent keeps the default 2.
 - `npm test`: 876 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid. `npm run test:browser`: 19/21 passed (2 pre-existing unrelated offline failures, see Phase 24).
 
-## Next Phase: sleep·heart on Body / polish
+## Phase 27: Hammond closed-loop 1/8 — 90-day longitudinal digest — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked). First phase of `docs/superpowers/plans/2026-08-11-hammond-closed-loop.md` (Move 1).
+
+- New `netlify/functions/_shared/hammond-digest.mjs`: 90-day path-presence digest per domain (`nutrition|fitness|body|mind|skincare`) from the tree `chat.mjs` already fetches — no new GitHub call for the walk. Fitness alone gets a bounded blob read + `calculateWorkoutStreak` for completed/planned/skipped classification.
+- Wired only inside `needsHammondTools`: separate `hammondFrom` window; the existing thin today+yesterday digest for every other agent is untouched. `hammondDigest` degrades to `''` on failure.
+- Injected into `hammondBlocks` in `persona.mjs` (Hammond only).
+- `npm test`: 898 passed, 0 failed (at Move 1 land). `npm run validate:fixtures`: 4/4 valid.
+
+## Phase 28: Hammond closed-loop 2/8 — self-rolling This Week / This Month — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked). Move 2 of the Hammond closed-loop plan.
+
+- New `rollStaleSections(content, today)` in `js/core/central-node-write.js`: parses This Week range / This Month label (separate grammars from Today's Status), advances Mon–Sun week and calendar month when elapsed, and clears the stale body. Malformed/undated headings are a no-op.
+- Call sites: `applyLogToCentralNode` (alongside `trimCrossAgentSection`) and Hammond read-time in `chat.mjs` after CN decode — so both specialist writes and Hammond prompt/patch bases see a fresh heading. Bypasses `classifyCentralNodePatchRisk` (mechanical floor, not a Hammond-authored patch).
+- Read-time roll is in-memory unless something writes this turn; idempotent on the next turn.
+- `npm test`: 905 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
+## Next Phase: Hammond closed-loop Moves 4–8 (P2–P4) / sleep·heart on Body

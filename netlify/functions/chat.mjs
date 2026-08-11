@@ -76,6 +76,7 @@ import {
   emptyGovernanceLog,
   recentGovernanceTail
 } from '../../js/core/governance-log.js';
+import { rollStaleSections } from '../../js/core/central-node-write.js';
 import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   emptyProductLibrary,
@@ -343,15 +344,18 @@ export function createChatHandler({
 
           const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
           if (decodedCentralNode !== null) {
-            constraints = extractConstraints(decodedCentralNode);
+            const centralNodeForTurn = needsHammondTools
+              ? rollStaleSections(decodedCentralNode, today)
+              : decodedCentralNode;
+            constraints = extractConstraints(centralNodeForTurn);
             centralNodeLog = [
-              extractTodaysStatus(decodedCentralNode),
-              extractCrossAgentCoordination(decodedCentralNode),
-              extractRecentAgentActions(decodedCentralNode)
+              extractTodaysStatus(centralNodeForTurn),
+              extractCrossAgentCoordination(centralNodeForTurn),
+              extractRecentAgentActions(centralNodeForTurn)
             ].filter(Boolean).join('\n\n');
             if (needsHammondTools) {
-              centralNodeFull = decodedCentralNode;
-              centralNodeMarkdown = decodedCentralNode;
+              centralNodeFull = centralNodeForTurn;
+              centralNodeMarkdown = centralNodeForTurn;
             }
           }
 
