@@ -21,8 +21,17 @@ import { calculateWorkoutStreak } from '../../../js/core/aggregate.js';
 export const DOMAIN_PATH = /^data\/(?<domain>nutrition|fitness|body|mind|skincare)\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
 const DOMAINS = ['nutrition', 'fitness', 'body', 'mind', 'skincare'];
-const WINDOW_DAYS = 90;
+// Exported so chat.mjs's hammondFrom (the wider fitness blob-read window) is
+// derived from this constant rather than re-deriving its own literal -- a
+// change here must not be able to silently diverge the two windows.
+export const WINDOW_DAYS = 90;
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// The first date in the window: today minus (WINDOW_DAYS - 1), so the window is
+// WINDOW_DAYS calendar days inclusive of both windowStart and today.
+export function getWindowStart(today) {
+  return addCalendarDays(today, -(WINDOW_DAYS - 1));
+}
 
 // Fitness needs its own blob reads (for completed/planned/skipped classification),
 // unlike the other four domains which are presence-by-path only. Mirrors
@@ -43,7 +52,7 @@ export function selectHammondFitnessEntries(tree, { from, to } = {}) {
 }
 
 export function summarizeHammondDigest({ tree, fitnessRecords = [], today }) {
-  const windowStart = addCalendarDays(today, -(WINDOW_DAYS - 1));
+  const windowStart = getWindowStart(today);
   const datesByDomain = collectDatesByDomain(tree, windowStart, today);
 
   return DOMAINS
