@@ -100,6 +100,7 @@ import {
   summarizeTemplatesFromContents
 } from './_shared/workout-templates.mjs';
 import { selectLatestBodyEntries, formatBodyStateForPrompt } from './_shared/body-state.mjs';
+import { selectHammondFitnessEntries, summarizeHammondDigest } from './_shared/hammond-digest.mjs';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
@@ -179,6 +180,12 @@ export function createChatHandler({
     const needsSkincareLibrary = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
     const needsBodyState = slug === 'chadwick' || slug === 'brisket';
+    // Hammond alone gets a wider, path-only window for the 90-day longitudinal
+    // digest -- deliberately separate from `from`/`manifest`/`dataEntries` above,
+    // which stay a thin today+yesterday scan for every other agent. Widening
+    // those would blow the "no unbounded blob read" budget for everyone, not
+    // just Hammond.
+    const hammondFrom = needsHammondTools ? addCalendarDays(today, -89) : null;
 
     let anthropic;
     try {
@@ -232,6 +239,7 @@ export function createChatHandler({
         let governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
         let governanceLogSha;
         let governanceLogTail = '';
+        let hammondDigest = '';
         let foodLibraryEntries = [];
         let foodLibrary = '';
         let foodLibrarySha;
@@ -292,6 +300,11 @@ export function createChatHandler({
           const bodyEntries = needsBodyState
             ? selectLatestBodyEntries(current.tree, { limit: 2 })
             : { composition: [], measurements: [] };
+          // Hammond's 90-day fitness reads: bounded to the wider hammondFrom window,
+          // never a full-history scan -- see hammond-digest.mjs.
+          const hammondFitnessEntries = needsHammondTools
+            ? selectHammondFitnessEntries(current.tree, { from: hammondFrom, to: today })
+            : [];
 
           const [
             dataBlobs,
@@ -304,7 +317,8 @@ export function createChatHandler({
             skincareCatalogBlob,
             templateBlobs,
             compositionBlobs,
-            measurementBlobs
+            measurementBlobs,
+            hammondFitnessBlobs
           ] = await Promise.all([
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
@@ -316,7 +330,8 @@ export function createChatHandler({
             skincareCatalogEntry ? client.readBlob(skincareCatalogEntry.sha) : null,
             Promise.all(templateEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.composition.map(entry => client.readBlob(entry.sha))),
-            Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha)))
+            Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha))),
+            Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha)))
           ]);
 
           const files = dataEntries
@@ -408,6 +423,11 @@ export function createChatHandler({
             const targetRatio = loadPhysiqueTarget().shoulder_waist_ratio;
             bodyState = formatBodyStateForPrompt({ compositionRecords, measurementRecords, targetRatio });
           }
+
+          if (needsHammondTools) {
+            const fitnessRecords = parseHammondFitnessRecords(hammondFitnessEntries, hammondFitnessBlobs);
+            hammondDigest = summarizeHammondDigest({ tree: current.tree, fitnessRecords, today });
+          }
         } catch {
           digest = '';
           constraints = '';
@@ -418,6 +438,7 @@ export function createChatHandler({
           governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
           governanceLogSha = undefined;
           governanceLogTail = '';
+          hammondDigest = '';
           foodLibraryEntries = [];
           foodLibrary = '';
           foodLibrarySha = undefined;
@@ -454,6 +475,7 @@ export function createChatHandler({
           centralNodeLog,
           centralNodeFull,
           governanceLogTail,
+          hammondDigest,
           foodLibrary,
           chadwickProtocol,
           hyaluronicaProtocol,
@@ -831,6 +853,25 @@ function parseBodyRecords(entries, blobs) {
       if (record) records.push(record);
     } catch {
       // Skip an unreadable/invalid body record rather than breaking the chat turn.
+    }
+  }
+  return records;
+}
+
+// Mirrors parseBodyRecords: turns hammondFitnessEntries (bounded, see
+// hammond-digest.mjs) into records for the 90-day digest's streak/completed-count
+// classification. Skips anything unreadable or invalid rather than breaking the
+// chat turn.
+function parseHammondFitnessRecords(entries, blobs) {
+  const records = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    const content = decodeBlob(blobs[index]);
+    if (content === null) continue;
+    try {
+      const { record } = parseEventDocument(content, entries[index].path, loadYaml);
+      if (record) records.push(record);
+    } catch {
+      // Skip an unreadable/invalid fitness record rather than breaking the chat turn.
     }
   }
   return records;

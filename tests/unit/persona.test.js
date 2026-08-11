@@ -401,3 +401,21 @@ test('Hammond prompt includes governance log tail when provided', () => {
   assert.match(prompt, /Governance Log \(recent tail/);
   assert.match(prompt, /Hold the line/);
 });
+
+test('Hammond prompt includes the 90-day hammondDigest when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    hammondDigest: 'Logging last 90 days — nutrition: 41/90 days, current gap 2d, longest gap 9d (14–22 Jun).'
+  });
+  assert.match(prompt, /Logging history \(90-day path presence/);
+  assert.match(prompt, /nutrition: 41\/90 days/);
+});
+
+test('non-hammond prompts never include hammondDigest', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    hammondDigest: 'Logging last 90 days — nutrition: 41/90 days, current gap 2d, longest gap 9d (14–22 Jun).'
+  });
+  assert.equal(prompt.includes('41/90 days'), false);
+  assert.equal(prompt.includes('Logging history'), false);
+});
