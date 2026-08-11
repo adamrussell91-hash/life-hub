@@ -42,6 +42,7 @@ test('builds the approved Home fixture model through core modules', async () => 
     sodium_mg: 1100,
     calcium_mg: 590,
     polyphenol_score: 9,
+    omega3: { high: 0, medium: 1, low: 1, none: 0 },
     meals: {
       breakfast: { protein_g: 38 },
       lunch: { protein_g: 42 },

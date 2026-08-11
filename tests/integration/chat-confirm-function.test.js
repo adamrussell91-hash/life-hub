@@ -147,7 +147,7 @@ test('creates central-node.md from the app seed when the private repo is missing
 
   const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
   assert.match(writtenContent, /## ⚡ Today's Status/);
-  assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F, 420mg Na, 210mg Ca\./);
+  assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F, 420mg Na, 210mg Ca, polyphenol 4\./);
   assert.match(writtenContent, /\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast/);
 });
 
@@ -198,7 +198,7 @@ test('appends a one-line entry to the central node running log after a successfu
   assert.match(writtenContent, /\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast \(520 kcal, 38g protein, 12g fat\)\./);
   assert.match(writtenContent, /Chest and Curls session completed and logged/, 'must preserve the existing log rather than replacing it');
   assert.match(writtenContent, /## ⚡ Today's Status \([^)]*1 August 2026\)/);
-  assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F, 420mg Na, 210mg Ca\./);
+  assert.match(writtenContent, /\*\*Nutrition:\*\* 520 kcal, 38g P, 12g F, 420mg Na, 210mg Ca, polyphenol 4\./);
 });
 
 test('confirm still succeeds and reports centralNodeUpdated:false when the central node blob cannot be decoded', async () => {
@@ -287,7 +287,9 @@ test('appends Chadwick→Brisket Day Type on completed workout confirm', async (
   const centralNodePut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('central-node.md'));
   assert.ok(centralNodePut, 'expected a PUT to central-node.md');
   const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
-  assert.match(writtenContent, /Chadwick→Brisket: 1 Aug session completed, Chest and Curls\. Set Day Type to 30-min Workout\./);
+  // Day Type is derived from the workout record itself, so no directive is written.
+  assert.doesNotMatch(writtenContent, /Set Day Type to/);
+  assert.match(writtenContent, /\*\*Exercise:\*\* Chest and Curls · 26 min · completed\./);
   assert.match(writtenContent, /Keep prior directives/);
 });
 

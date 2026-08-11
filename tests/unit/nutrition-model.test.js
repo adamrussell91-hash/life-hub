@@ -39,6 +39,7 @@ test('builds today\'s macros, day type, and full target profile from the existin
     sodium_mg: 1100,
     calcium_mg: 590,
     polyphenol_score: 9,
+    omega3: { high: 0, medium: 0, low: 0, none: 0 },
     meals: {
       breakfast: { protein_g: 38 },
       lunch: { protein_g: 42 },

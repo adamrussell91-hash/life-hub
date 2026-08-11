@@ -31,7 +31,8 @@ export function buildNutritionStatusLine(totals) {
     totals.protein_g != null ? `${totals.protein_g}g P` : null,
     totals.fat_g != null ? `${totals.fat_g}g F` : null,
     totals.sodium_mg != null ? `${Number(totals.sodium_mg).toLocaleString('en-AU')}mg Na` : null,
-    totals.calcium_mg != null ? `${Number(totals.calcium_mg).toLocaleString('en-AU')}mg Ca` : null
+    totals.calcium_mg != null ? `${Number(totals.calcium_mg).toLocaleString('en-AU')}mg Ca` : null,
+    totals.polyphenol_score != null ? `polyphenol ${totals.polyphenol_score}` : null
   ].filter(Boolean);
   return `**Nutrition:** ${parts.length > 0 ? `${parts.join(', ')}.` : 'No meals logged.'}`;
 }
@@ -91,26 +92,31 @@ export function humanizeDayType(dayType) {
   }
 }
 
-export function buildCrossAgentDayTypeLine(record) {
-  const title = record.title?.trim() || 'session';
-  return `- Chadwick→Brisket: ${formatLogDate(record.date)} session completed, ${title}. Set Day Type to ${humanizeDayType(record.day_type)}.`;
-}
+// Cross-Agent Coordination is capped so the section cannot silently grow unbounded.
+// Its own header says "purge once actioned" and nothing ever did: by Aug 2026 it held
+// ~15 stale auto-generated Day Type directives, all injected into every specialist turn.
+// Hammond owns semantic purge (condense op); this is the mechanical floor underneath him.
+export const MAX_CROSS_AGENT_LINES = 12;
 
-export function appendCrossAgentDayType(content, record) {
-  if (record?.type !== 'workout' || record.status !== 'completed') return content;
-  const line = buildCrossAgentDayTypeLine(record);
+export function trimCrossAgentSection(content, { maxLines = MAX_CROSS_AGENT_LINES } = {}) {
   const headingIndex = content.indexOf(CROSS_AGENT_HEADING);
   if (headingIndex === -1) return content;
-  const dateToken = formatLogDate(record.date);
   const sectionStart = headingIndex + CROSS_AGENT_HEADING.length;
   const after = content.slice(sectionStart);
   const endRel = after.search(/\n## /);
   const section = endRel === -1 ? after : after.slice(0, endRel);
-  if (section.includes(dateToken) && section.includes('Set Day Type to') && section.includes('Chadwick→Brisket')) {
-    return content;
-  }
-  const insertAt = sectionStart;
-  return `${content.slice(0, insertAt)}\n${line}${content.slice(insertAt)}`;
+  const rest = endRel === -1 ? '' : after.slice(endRel);
+
+  const lines = section.split('\n');
+  const directiveIndexes = lines
+    .map((line, index) => (/^\s*[-*]\s+\S/.test(line) ? index : -1))
+    .filter(index => index !== -1);
+  if (directiveIndexes.length <= maxLines) return content;
+
+  // Newest directives are inserted at the top, so drop from the tail.
+  const dropFrom = new Set(directiveIndexes.slice(maxLines));
+  const kept = lines.filter((_, index) => !dropFrom.has(index));
+  return `${content.slice(0, sectionStart)}${kept.join('\n')}${rest}`;
 }
 
 export function extractTodaysStatusBlock(content) {
@@ -187,7 +193,12 @@ export function applyLogToCentralNode(content, {
   }
 
   next = replaceTodaysStatus(next, { dateKey: record.date, body });
-  next = appendCrossAgentDayType(next, record);
+  // Day Type used to be auto-written here as a "Chadwick→Brisket" directive. It was a
+  // Notion day-page property that outlived its database: resolveDayType() already derives
+  // it from the workout record and getDayTargets() has already applied it to the targets
+  // Brisket reads, so the line instructed him to set a value that was computed and used
+  // two steps earlier. Removed 2026-08-11; the honest signal is Today's Status Exercise.
+  next = trimCrossAgentSection(next);
   return next;
 }
 
