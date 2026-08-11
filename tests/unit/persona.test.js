@@ -126,6 +126,29 @@ test('chadwick prompt includes exercise library highlights when provided', () =>
   assert.match(prompt, /Bar Press/);
 });
 
+test('chadwick prompt includes the body state block when provided, and instructs him to use it honestly', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    bodyState: 'Shoulder:waist ratio: 1.43 (improving) — target 1.60, gap 0.17.'
+  });
+  assert.match(prompt, /Shoulder:waist ratio: 1\.43/);
+  assert.match(prompt, /reference body trend/i);
+  assert.match(prompt, /not (claim|say).{0,40}training alone/i);
+});
+
+test('chadwick prompt omits the body state block when empty', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick', bodyState: '' });
+  assert.doesNotMatch(prompt, /Body state/i);
+});
+
+test('non-chadwick agents never receive the chadwick body-state block', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    bodyState: 'Shoulder:waist ratio: 1.43 (improving).'
+  });
+  assert.doesNotMatch(prompt, /reference body trend/i);
+});
+
 test('chadwick prompt omits exercise library block when empty', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick', exerciseLibrary: '' });
   assert.doesNotMatch(prompt, /Exercise Library highlights/);

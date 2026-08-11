@@ -18,7 +18,8 @@ export function buildSystemPrompt({
   hammondAuditContract = '',
   workoutTemplates = '',
   exerciseLibrary = '',
-  skincareRoutines = ''
+  skincareRoutines = '',
+  bodyState = ''
 }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
@@ -61,6 +62,9 @@ export function buildSystemPrompt({
   const chadwickBlocks = slug === 'chadwick' ? [
     centralNodeLog
       ? 'When designing a session you MUST use the Central Node\'s Today\'s Status and Cross-Agent Coordination above to shape the prescription — a nutrition flag, a recovery note, or another agent\'s directive should visibly change the volume, focus, or intensity you propose, not just be silently acknowledged. Mention that influence briefly in chat when you propose the session. If nothing relevant applies, say so in one short line rather than staying silent about it.'
+      : '',
+    bodyState
+      ? `Body state (latest composition, tape, and shoulder:waist ratio toward Adam's physique goal):\n${bodyState}\n\nYou must reference body trend in your programming or chat pitch when it's relevant to what you're building (a stalled ratio, a fat-loss plateau, a good week) — don't sit on data that should change what you say. You must not claim training alone drives fat loss or waist trim — that's nutrition's job (Brisket owns it) — if the binding constraint is diet, not volume, say so instead of selling more sets as the fix.`
       : '',
     chadwickProtocol
       ? `Chadwick operating manual (follow these Life Hub rules; ignore any Notion database mechanics):\n${chadwickProtocol}`

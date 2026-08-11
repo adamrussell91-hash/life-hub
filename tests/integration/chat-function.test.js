@@ -634,6 +634,111 @@ test('loads exercise library highlights into Chadwick system prompt', async () =
   assert.equal(searchHits[0].name, 'Bar Press');
 });
 
+test('loads latest body composition/measurements into Chadwick\'s prompt via a bounded read (not a full history scan)', async () => {
+  const compositionPath = 'data/body/2026/07/2026-07-29-composition.md';
+  const compositionSha = 'a'.repeat(40);
+  const compositionContent = [
+    '---',
+    'schema_version: 1', 'id: "composition-1"', 'type: "composition"', 'date: "2026-07-29"', 'time: "08:00"',
+    'created_at: "2026-07-29T08:00:00+10:00"', 'updated_at: "2026-07-29T08:00:00+10:00"', 'source: "chat"',
+    'weight_kg: 85.5', 'body_fat_pct: 19.0', 'skeletal_muscle_kg: 40.1',
+    '---'
+  ].join('\n');
+  const measurementsPath = 'data/body/2026/07/2026-07-29-measurements.md';
+  const measurementsSha = 'b'.repeat(40);
+  const measurementsContent = [
+    '---',
+    'schema_version: 1', 'id: "measurements-1"', 'type: "measurements"', 'date: "2026-07-29"', 'time: "08:00"',
+    'created_at: "2026-07-29T08:00:00+10:00"', 'updated_at: "2026-07-29T08:00:00+10:00"', 'source: "chat"',
+    'shoulders: 114', 'waist: 80',
+    '---'
+  ].join('\n');
+  const blobCalls = [];
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: compositionPath, type: 'blob', sha: compositionSha, size: 200 },
+          { path: measurementsPath, type: 'blob', sha: measurementsSha, size: 200 }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${compositionSha}`)) {
+      blobCalls.push(compositionSha);
+      return Response.json({ encoding: 'base64', content: Buffer.from(compositionContent, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${measurementsSha}`)) {
+      blobCalls.push(measurementsSha);
+      return Response.json({ encoding: 'base64', content: Buffer.from(measurementsContent, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Chadwick, what should I do today?' })));
+
+  assert.match(receivedArgs.system, /Body composition/);
+  assert.match(receivedArgs.system, /85\.5kg/);
+  assert.match(receivedArgs.system, /Shoulder:waist ratio/);
+  assert.match(receivedArgs.system, /1\.43/);
+  assert.equal(blobCalls.length, 2, 'expected exactly one bounded read per body record type, not a history scan');
+});
+
+test('non-chadwick agents never receive body state in their prompt', async () => {
+  const compositionPath = 'data/body/2026/07/2026-07-29-composition.md';
+  const compositionSha = 'a'.repeat(40);
+  const compositionContent = [
+    '---',
+    'schema_version: 1', 'id: "composition-1"', 'type: "composition"', 'date: "2026-07-29"', 'time: "08:00"',
+    'created_at: "2026-07-29T08:00:00+10:00"', 'updated_at: "2026-07-29T08:00:00+10:00"', 'source: "chat"',
+    'weight_kg: 85.5',
+    '---'
+  ].join('\n');
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: compositionPath, type: 'blob', sha: compositionSha, size: 200 }] });
+    }
+    if (url.includes(`/git/blobs/${compositionSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(compositionContent, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Brisket, what did I eat today?' })));
+
+  assert.doesNotMatch(receivedArgs.system, /Shoulder:waist ratio/);
+  assert.doesNotMatch(receivedArgs.system, /85\.5kg/);
+});
+
 test('save_exercise_library_entry writes the cache to GitHub, emits exercise_library_saved, continues the round, and lets a follow-up log_entry produce a record_proposal', async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {

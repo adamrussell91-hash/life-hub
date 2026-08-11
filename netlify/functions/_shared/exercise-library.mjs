@@ -1,3 +1,5 @@
+import { formatLogDate } from '../../../js/core/central-node-write.js';
+
 export const EXERCISE_LIBRARY_PATH = 'data/exercise-library.json';
 
 const CABLE_TYPES = ['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing', 'none'];
@@ -174,7 +176,13 @@ export function formatExerciseLibraryForPrompt(entries) {
     const equipment = Array.isArray(entry.equipment) ? entry.equipment.join(', ') : '';
     const weight = typeof entry.working_weight_kg === 'number' ? `${entry.working_weight_kg} kg` : '';
     const rotation = entry.in_rotation ? 'in rotation' : '';
-    const bits = [entry.target_area, equipment, weight, rotation].filter(Boolean).join(' · ');
+    // Per-exercise progress so Chadwick programs from what actually happened last time,
+    // not a blank slate -- last actual weight, the PB it's chasing, and how often it's run.
+    const lastPerformed = typeof entry.last_performed === 'string' ? `last ${formatLogDate(entry.last_performed)}` : '';
+    const best = typeof entry.best_weight_kg === 'number' ? `PB ${entry.best_weight_kg} kg` : '';
+    const frequency = typeof entry.times_performed === 'number' ? `${entry.times_performed}x logged` : '';
+    const bits = [entry.target_area, equipment, weight, lastPerformed, best, frequency, rotation]
+      .filter(Boolean).join(' · ');
     return `- ${entry.name} — ${bits}`;
   }).join('\n');
 }

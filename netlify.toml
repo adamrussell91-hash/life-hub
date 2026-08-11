@@ -11,5 +11,6 @@ included_files = [
   "config/brisket-protocol.md",
   "config/sara-protocol.md",
   "config/hammond-protocol.md",
+  "config/physique-target.yml",
   "central-node.md"
 ]

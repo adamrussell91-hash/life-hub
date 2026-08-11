@@ -98,8 +98,12 @@ import {
   MAX_PROMPT_TEMPLATES,
   summarizeTemplatesFromContents
 } from './_shared/workout-templates.mjs';
+import { selectLatestBodyEntries, formatBodyStateForPrompt } from './_shared/body-state.mjs';
+import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
 import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays } from '../../js/core/time.js';
+import { parseEventDocument } from '../../js/core/records.js';
+import { load as loadYaml } from 'js-yaml';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 24 * 1024;
@@ -172,6 +176,7 @@ export function createChatHandler({
     const needsExerciseLibrary = slug === 'chadwick';
     const needsSkincareLibrary = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
+    const needsBodyState = slug === 'chadwick';
 
     let anthropic;
     try {
@@ -240,6 +245,7 @@ export function createChatHandler({
           : emptyMembership();
         let skincareMembershipSha;
         let workoutTemplates = '';
+        let bodyState = '';
         try {
           const current = await client.resolveTree();
           const manifest = selectManifestEntries(current.tree, { from, to: today });
@@ -275,6 +281,11 @@ export function createChatHandler({
           const templateEntries = needsWorkoutTemplates
             ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
             : [];
+          // Chadwick's eyes on Adam's body: a bounded read (latest 1-2 per type from the
+          // already-fetched tree, never a history scan) -- see body-state.mjs.
+          const bodyEntries = needsBodyState
+            ? selectLatestBodyEntries(current.tree, { limit: 2 })
+            : { composition: [], measurements: [] };
 
           const [
             dataBlobs,
@@ -285,7 +296,9 @@ export function createChatHandler({
             skincareLibraryBlob,
             skincareMembershipBlob,
             skincareCatalogBlob,
-            templateBlobs
+            templateBlobs,
+            compositionBlobs,
+            measurementBlobs
           ] = await Promise.all([
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
@@ -295,7 +308,9 @@ export function createChatHandler({
             skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
             skincareMembershipEntry ? client.readBlob(skincareMembershipEntry.sha) : null,
             skincareCatalogEntry ? client.readBlob(skincareCatalogEntry.sha) : null,
-            Promise.all(templateEntries.map(entry => client.readBlob(entry.sha)))
+            Promise.all(templateEntries.map(entry => client.readBlob(entry.sha))),
+            Promise.all(bodyEntries.composition.map(entry => client.readBlob(entry.sha))),
+            Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha)))
           ]);
 
           const files = dataEntries
@@ -379,6 +394,13 @@ export function createChatHandler({
             .map((entry, index) => ({ path: entry.path, content: decodeBlob(templateBlobs[index]) }))
             .filter(file => file.content !== null);
           workoutTemplates = formatTemplatesForPrompt(summarizeTemplatesFromContents(templateContents));
+
+          if (needsBodyState) {
+            const compositionRecords = parseBodyRecords(bodyEntries.composition, compositionBlobs);
+            const measurementRecords = parseBodyRecords(bodyEntries.measurements, measurementBlobs);
+            const targetRatio = loadPhysiqueTarget().shoulder_waist_ratio;
+            bodyState = formatBodyStateForPrompt({ compositionRecords, measurementRecords, targetRatio });
+          }
         } catch {
           digest = '';
           constraints = '';
@@ -404,6 +426,7 @@ export function createChatHandler({
             : emptyMembership();
           skincareMembershipSha = undefined;
           workoutTemplates = '';
+          bodyState = '';
         }
 
         const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
@@ -434,7 +457,8 @@ export function createChatHandler({
           hammondAuditContract,
           workoutTemplates,
           exerciseLibrary,
-          skincareRoutines
+          skincareRoutines,
+          bodyState
         });
 
         try {
@@ -777,6 +801,24 @@ async function readAtMost(stream, limit) {
     offset += chunk.byteLength;
   }
   return bytes;
+}
+
+// Decode+parse a bounded set of composition/measurements blobs (already selected by
+// selectLatestBodyEntries) into records, most-recent-first. Skips anything unreadable or
+// invalid rather than failing the whole chat turn over one bad body record.
+function parseBodyRecords(entries, blobs) {
+  const records = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    const content = decodeBlob(blobs[index]);
+    if (content === null) continue;
+    try {
+      const { record } = parseEventDocument(content, entries[index].path, loadYaml);
+      if (record) records.push(record);
+    } catch {
+      // Skip an unreadable/invalid body record rather than breaking the chat turn.
+    }
+  }
+  return records;
 }
 
 function repositoryError() {

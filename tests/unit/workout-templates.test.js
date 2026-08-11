@@ -101,6 +101,61 @@ test('formatTemplatesForPrompt returns an empty string for an empty or invalid l
   assert.equal(formatTemplatesForPrompt(undefined), '');
 });
 
+test('formatTemplatesForPrompt includes the exercise list and set actuals for the most recent templates', () => {
+  const text = formatTemplatesForPrompt([
+    {
+      title: 'Chest and Curls',
+      session_kind: 'strength',
+      source_session_date: '2026-07-30',
+      exercises: [
+        {
+          name: 'Chest Press',
+          intensification: 'drop_set',
+          sets: [
+            { reps: 10, weight_kg: 32, cable_type: 'concentric' },
+            { reps: 8, weight_kg: 30, cable_type: 'concentric' }
+          ]
+        },
+        { name: 'Bar Curl', sets: [{ reps: 12, weight_kg: 16, cable_type: 'constant_force' }] }
+      ]
+    }
+  ]);
+  assert.match(text, /Chest Press/);
+  assert.match(text, /drop_set/);
+  assert.match(text, /10x32kg/);
+  assert.match(text, /concentric/);
+  assert.match(text, /Bar Curl/);
+  assert.match(text, /12x16kg/);
+});
+
+test('formatTemplatesForPrompt only expands the most recent few templates in full; older ones stay one-line', () => {
+  const many = Array.from({ length: 7 }, (_, index) => ({
+    title: `Template ${index}`,
+    session_kind: 'strength',
+    source_session_date: `2026-07-${String(30 - index).padStart(2, '0')}`,
+    exercises: [{ name: `Move ${index}`, sets: [{ reps: 10, weight_kg: 20, cable_type: 'concentric' }] }]
+  }));
+  const text = formatTemplatesForPrompt(many);
+  assert.match(text, /Move 0/, 'the most recent template should be expanded');
+  assert.doesNotMatch(text, /Move 6/, 'older templates should stay one-line, not list exercises');
+  assert.match(text, /Template 6/, 'older templates still get a one-line summary');
+});
+
+test('formatTemplatesForPrompt sorts by most recent source_session_date first', () => {
+  const text = formatTemplatesForPrompt([
+    { title: 'Older', session_kind: 'strength', source_session_date: '2026-06-01', exercises: [] },
+    { title: 'Newer', session_kind: 'strength', source_session_date: '2026-07-30', exercises: [] }
+  ]);
+  assert.ok(text.indexOf('Newer') < text.indexOf('Older'), 'the more recent template should be listed first');
+});
+
+test('formatTemplatesForPrompt tolerates a template with no exercises recorded', () => {
+  const text = formatTemplatesForPrompt([
+    { title: 'Chest and Curls', session_kind: 'strength', source_session_date: '2026-07-30' }
+  ]);
+  assert.match(text, /Chest and Curls/);
+});
+
 test('summarizeTemplatesFromContents parses decoded tree entries into template records', () => {
   const template = buildTemplateRecord({
     title: 'Chest and Curls', session_kind: 'strength', exercises: []
