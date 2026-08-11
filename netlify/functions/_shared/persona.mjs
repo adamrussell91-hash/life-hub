@@ -7,6 +7,7 @@ export function buildSystemPrompt({
   centralNodeLog = '',
   centralNodeFull = '',
   governanceLogTail = '',
+  hammondDigest = '',
   foodLibrary = '',
   chadwickProtocol = '',
   hyaluronicaProtocol = '',
@@ -141,6 +142,9 @@ export function buildSystemPrompt({
       : '',
     centralNodeFull
       ? `Full Central Node (complete markdown — your primary coordination document this turn):\n${centralNodeFull}`
+      : '',
+    hammondDigest
+      ? `Logging history (90-day path presence per domain, plus a real fitness streak from completed/planned/skipped classification — you are the one place in the system that reads this full history):\n${hammondDigest}`
       : '',
     governanceLogTail
       ? `Governance Log (recent tail — durable protocol notes and Coach's Notes):\n${governanceLogTail}`
