@@ -27,6 +27,7 @@ test('matches the approved sample Home totals for parsed events', () => {
     sodium_mg: 1100,
     calcium_mg: 590,
     polyphenol_score: 9,
+    omega3: { high: 0, medium: 0, low: 0, none: 0 },
     meals: {
       breakfast: { protein_g: 38 },
       lunch: { protein_g: 42 },
@@ -49,6 +50,7 @@ test('empty and missing additive nutrition values contribute zero', () => {
     sodium_mg: 0,
     calcium_mg: 0,
     polyphenol_score: 0,
+    omega3: { high: 0, medium: 0, low: 0, none: 0 },
     meals: {
       breakfast: { protein_g: 0 },
       lunch: { protein_g: 0 },

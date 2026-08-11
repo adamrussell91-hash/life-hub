@@ -381,6 +381,7 @@ async function sumDayMealTotals(client, tree, record) {
   };
   if (record.sodium_mg != null) totals.sodium_mg = Number(record.sodium_mg) || 0;
   if (record.calcium_mg != null) totals.calcium_mg = Number(record.calcium_mg) || 0;
+  if (record.polyphenol_score != null) totals.polyphenol_score = Number(record.polyphenol_score) || 0;
 
   for (const path of mealPaths) {
     const blobEntry = tree.find(item => item.path === path);
@@ -404,6 +405,9 @@ async function sumDayMealTotals(client, tree, record) {
       }
       if (parsed.record.calcium_mg != null) {
         totals.calcium_mg = (totals.calcium_mg ?? 0) + (Number(parsed.record.calcium_mg) || 0);
+      }
+      if (parsed.record.polyphenol_score != null) {
+        totals.polyphenol_score = (totals.polyphenol_score ?? 0) + (Number(parsed.record.polyphenol_score) || 0);
       }
     } catch {
       // Ignore unreadable siblings; still publish totals from the confirmed record.

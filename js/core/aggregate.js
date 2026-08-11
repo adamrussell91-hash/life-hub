@@ -1,6 +1,7 @@
 import { addCalendarDays } from './time.js';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+const OMEGA3_LEVELS = ['high', 'medium', 'low', 'none'];
 const DAY_TYPE_RANK = { movement: 0, workout_30: 1, workout_45_60: 2 };
 const BODY_TYPES = new Set(['weight', 'composition']);
 
@@ -17,6 +18,13 @@ export function aggregateNutrition(items, date) {
     protein_g: sum(meals.filter(meal => meal.meal === mealType), 'protein_g')
   }]));
 
+  // omega3 is a categorical field, so it tallies by level rather than summing. It is
+  // mandatory on every meal but had no reader anywhere in the system until now.
+  const omega3 = Object.fromEntries(OMEGA3_LEVELS.map(level => [
+    level,
+    meals.filter(meal => meal.omega3 === level).length
+  ]));
+
   return {
     calories: sum(meals, 'calories'),
     protein_g: sum(meals, 'protein_g'),
@@ -25,6 +33,7 @@ export function aggregateNutrition(items, date) {
     sodium_mg: sum(meals, 'sodium_mg'),
     calcium_mg: sum(meals, 'calcium_mg'),
     polyphenol_score: sum(meals, 'polyphenol_score'),
+    omega3,
     meals: distribution
   };
 }

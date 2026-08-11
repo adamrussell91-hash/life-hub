@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  appendCrossAgentDayType,
   appendRecentAction,
   applyLogToCentralNode,
   buildMealFlagsLine,
@@ -9,6 +8,7 @@ import {
   formatStatusHeadingDate,
   humanizeDayType,
   replaceTodaysStatus,
+  trimCrossAgentSection,
   upsertStatusField
 } from '../../js/core/central-node-write.js';
 
@@ -112,27 +112,37 @@ test('humanizeDayType matches Home labels', () => {
   assert.equal(humanizeDayType('movement'), 'Movement day');
 });
 
-test('appendCrossAgentDayType inserts under Cross-Agent heading and is idempotent', () => {
+test('trimCrossAgentSection keeps the newest directives and drops the tail', () => {
+  const directives = Array.from({ length: 15 }, (_, index) => `- Directive ${index + 1}.`);
   const base = [
     '## 🤝 Cross-Agent Coordination',
-    '- Old directive.',
+    '*One-line directives only.*',
+    ...directives,
     '---',
     '## 📝 Recent Agent Actions'
   ].join('\n');
-  const record = {
-    type: 'workout',
-    date: '2026-07-30',
-    status: 'completed',
-    title: 'Chest and Curls',
-    day_type: 'workout_30'
-  };
-  const once = appendCrossAgentDayType(base, record);
-  assert.match(once, /Chadwick→Brisket: 30 Jul session completed, Chest and Curls\. Set Day Type to 30-min Workout\./);
-  const twice = appendCrossAgentDayType(once, record);
-  assert.equal(twice, once);
+
+  const next = trimCrossAgentSection(base, { maxLines: 12 });
+  assert.match(next, /- Directive 1\./);
+  assert.match(next, /- Directive 12\./);
+  assert.doesNotMatch(next, /- Directive 13\./);
+  assert.doesNotMatch(next, /- Directive 15\./);
+  // Non-directive content and later sections survive the trim.
+  assert.match(next, /\*One-line directives only\.\*/);
+  assert.match(next, /## 📝 Recent Agent Actions/);
 });
 
-test('applyLogToCentralNode adds Cross-Agent line for completed workouts', () => {
+test('trimCrossAgentSection leaves a short section untouched', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    '- Keep me.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+  assert.equal(trimCrossAgentSection(base), base);
+});
+
+test('applyLogToCentralNode no longer writes a Day Type directive for completed workouts', () => {
   const base = [
     '# Purpose',
     '---',
@@ -156,6 +166,10 @@ test('applyLogToCentralNode adds Cross-Agent line for completed workouts', () =>
     record,
     actionLine: '\n**30 Jul:** Chadwick Flexington: Logged a session.'
   });
-  assert.match(next, /Chadwick→Brisket: 30 Jul session completed/);
+  // Day Type reaches Brisket via resolveDayType/getDayTargets, not a directive he cannot action.
+  assert.doesNotMatch(next, /Set Day Type to/);
+  assert.match(next, /- Keep me\./);
+  // The honest signal -- what was actually done -- still lands in Status and Recent Actions.
+  assert.match(next, /\*\*Exercise:\*\* Chest and Curls · 26 min · completed\./);
   assert.match(next, /\*\*30 Jul:\*\* Chadwick Flexington/);
 });

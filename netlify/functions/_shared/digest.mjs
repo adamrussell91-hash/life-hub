@@ -25,8 +25,31 @@ export function summarizeRecentHistory(files, targetsConfig, today) {
 
   return [
     `Today (${today}) so far: ${nutrition.calories} of ${targets.calories} kcal, ${nutrition.protein_g} of ${targets.protein_g} g protein, ${nutrition.fat_g} of ${targets.fat_ceiling_g} g fat ceiling.`,
+    // Sodium, calcium, polyphenol and omega-3 are mandatory on every meal Brisket logs.
+    // They were aggregated for the Nutrition tab but never surfaced here, so the agent
+    // requiring them could never read a day total back -- see the 2026-08-11 Brisket audit.
+    `Micronutrients so far: ${nutrition.sodium_mg} of ${targets.sodium_ceiling_mg} mg sodium ceiling, ${nutrition.calcium_mg} of ${targets.calcium_target_mg} mg calcium target, polyphenol score ${nutrition.polyphenol_score} against a daily aim of ${targets.polyphenol_daily_aim}.`,
+    `Omega-3 across today's meals: ${formatOmega3Tally(nutrition.omega3)}.`,
+    `Protein by meal so far: ${formatMealSplit(nutrition.meals, targets.meal_protein_g)}.`,
     `Day type: ${dayType}. Workout streak: ${workoutStreak} day(s).`,
     `Logged today: ${loggedToday.length ? loggedToday.join(', ') : 'nothing yet'}.`,
     loggedYesterday ? 'Yesterday has at least one logged record.' : 'Nothing was logged yesterday.'
   ].join('\n');
+}
+
+function formatOmega3Tally(tally) {
+  const levels = ['high', 'medium', 'low', 'none'];
+  const present = levels.filter(level => (tally?.[level] ?? 0) > 0);
+  if (present.length === 0) return 'no meals logged yet';
+  return present.map(level => `${tally[level]} ${level}`).join(', ');
+}
+
+function formatMealSplit(meals, guides) {
+  return ['breakfast', 'lunch', 'dinner', 'snack']
+    .map(slot => {
+      const logged = meals?.[slot]?.protein_g ?? 0;
+      const guide = guides?.[slot] ?? 0;
+      return logged > 0 ? `${slot} ${logged} g` : `${slot} not logged (guide ${guide} g)`;
+    })
+    .join(', ');
 }
