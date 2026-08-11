@@ -100,7 +100,7 @@ import {
   summarizeTemplatesFromContents
 } from './_shared/workout-templates.mjs';
 import { selectLatestBodyEntries, formatBodyStateForPrompt } from './_shared/body-state.mjs';
-import { selectHammondFitnessEntries, summarizeHammondDigest } from './_shared/hammond-digest.mjs';
+import { selectHammondFitnessEntries, summarizeHammondDigest, getWindowStart } from './_shared/hammond-digest.mjs';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
@@ -184,8 +184,10 @@ export function createChatHandler({
     // digest -- deliberately separate from `from`/`manifest`/`dataEntries` above,
     // which stay a thin today+yesterday scan for every other agent. Widening
     // those would blow the "no unbounded blob read" budget for everyone, not
-    // just Hammond.
-    const hammondFrom = needsHammondTools ? addCalendarDays(today, -89) : null;
+    // just Hammond. Derived from hammond-digest.mjs's own WINDOW_DAYS (via
+    // getWindowStart) rather than a re-derived literal, so the two windows can't
+    // silently drift apart if that constant ever changes.
+    const hammondFrom = needsHammondTools ? getWindowStart(today) : null;
 
     let anthropic;
     try {

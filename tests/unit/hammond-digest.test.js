@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { addCalendarDays, enumerateDateKeys } from '../../js/core/time.js';
 import {
   DOMAIN_PATH,
+  WINDOW_DAYS,
+  getWindowStart,
   selectHammondFitnessEntries,
   summarizeHammondDigest
 } from '../../netlify/functions/_shared/hammond-digest.mjs';
@@ -17,6 +19,12 @@ function entryFor(domain, date, index) {
 function treeFor(domain, dates) {
   return dates.map((date, index) => entryFor(domain, date, index));
 }
+
+test('getWindowStart derives from WINDOW_DAYS -- chat.mjs\'s hammondFrom must use this, not a re-derived literal', () => {
+  assert.equal(WINDOW_DAYS, 90);
+  assert.equal(getWindowStart(TODAY), addCalendarDays(TODAY, -(WINDOW_DAYS - 1)));
+  assert.equal(getWindowStart(TODAY), '2026-05-14');
+});
 
 test('DOMAIN_PATH matches only the 5 recognised Life Hub domains', () => {
   assert.ok(DOMAIN_PATH.test('data/nutrition/2026/08/2026-08-01-breakfast.md'));
@@ -100,6 +108,37 @@ test('computes fitness streak and completed count from completed/planned/skipped
   assert.match(fitnessLine, /current streak 3d/);
   assert.match(fitnessLine, /3 completed/);
   assert.match(fitnessLine, /current gap 2d/);
+  // The only logged dates are 08-05..08-09, close to the end of the 90-day
+  // window -- the gap before the first of them (windowStart 05-14 through
+  // 08-04) is far bigger than the 2-day current gap, so it's the one that
+  // should win "longest gap", not the trailing/current one.
+  assert.match(fitnessLine, /longest gap 83d \(14 May – 4 Aug\)/);
+});
+
+test('longest gap picks the head gap (before the first logged date) when it is the biggest hole', () => {
+  // Only a short packed run right at the end of the window -- the empty stretch
+  // from windowStart to just before that run dwarfs anything else, and dwarfs
+  // the (small) trailing current gap too.
+  const tree = treeFor('nutrition', ['2026-08-05', '2026-08-06', '2026-08-07']);
+  const summary = summarizeHammondDigest({ tree, fitnessRecords: [], today: TODAY });
+  const nutritionLine = summary.split('\n').find(line => line.includes('— nutrition:'));
+  assert.match(nutritionLine, /3\/90 days/);
+  assert.match(nutritionLine, /current gap 4d/);
+  assert.match(nutritionLine, /longest gap 83d \(14 May – 4 Aug\)/);
+});
+
+test('longest gap picks the trailing/current gap when nothing has been logged since a packed early run', () => {
+  // A packed run right at the start of the window (no head gap, no internal
+  // gaps) followed by nothing for the rest of the 90 days -- the trailing gap
+  // to today is the only hole, and by far the biggest one.
+  const windowStart = addCalendarDays(TODAY, -89);
+  const earlyRun = enumerateDateKeys(windowStart, addCalendarDays(windowStart, 5));
+  const tree = treeFor('body', earlyRun);
+  const summary = summarizeHammondDigest({ tree, fitnessRecords: [], today: TODAY });
+  const bodyLine = summary.split('\n').find(line => line.includes('— body:'));
+  assert.match(bodyLine, /6\/90 days/);
+  assert.match(bodyLine, /current gap 84d/);
+  assert.match(bodyLine, /longest gap 84d \(20 May – 11 Aug\)/);
 });
 
 test('a planned/skipped-only fitness window reports a zero streak without crashing', () => {
