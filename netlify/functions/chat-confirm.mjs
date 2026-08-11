@@ -16,6 +16,11 @@ import { decodeBlob } from './_shared/decode-blob.mjs';
 import { buildCanonicalPath, validateLogEntry } from './_shared/chat-schema.mjs';
 import { buildTemplateRecord, renderTemplateMarkdown, templatePathForTitle } from './_shared/workout-templates.mjs';
 import { AGENTS } from './_shared/agent-directory.mjs';
+import {
+  applyCompletedWorkoutToLibrary,
+  EXERCISE_LIBRARY_PATH,
+  parseExerciseLibrary
+} from './_shared/exercise-library.mjs';
 import { load } from 'js-yaml';
 import { parseEventDocument, TYPE_DOMAINS } from '../../js/core/records.js';
 import {
@@ -119,12 +124,25 @@ export function createChatConfirmHandler({
         ...(existingSha ? { sha: existingSha } : {}),
         message: `feat(chat): log ${validation.record.type} for ${validation.record.date}`
       });
+      let exercisePersonalBests;
       if (validation.record.type === 'workout' && validation.record.status === 'completed') {
         try {
           await upsertWorkoutTemplate(client, validation.record);
         } catch {
           // Best-effort template upsert -- the session itself already saved successfully, so a
           // failure here (conflict, transient GitHub error) must never surface as a failed confirmation.
+        }
+        try {
+          exercisePersonalBests = await upsertExerciseLibraryProgress(
+            client,
+            validation.record,
+            getSydneyTimestamp(new Date(now()))
+          );
+        } catch {
+          // Best-effort library progress write -- same rationale as the template upsert above:
+          // the session record itself already saved, so a library read/write failure (conflict,
+          // missing file, transient GitHub error) must never surface as a failed confirmation.
+          exercisePersonalBests = [];
         }
       }
       let centralNodeUpdated = false;
@@ -177,6 +195,7 @@ export function createChatConfirmHandler({
           sha,
           commitSha,
           centralNodeUpdated,
+          ...(exercisePersonalBests !== undefined ? { personalBests: exercisePersonalBests } : {}),
           ...(dayoneSent != null ? { dayoneSent, ...(dayoneReason ? { dayoneReason } : {}) } : {})
         }
       }, PRIVATE_CACHE);
@@ -283,6 +302,27 @@ async function upsertWorkoutTemplate(client, record) {
     ...(existingSha ? { sha: existingSha } : {}),
     message: `chore(fitness-templates): upsert ${record.title}`
   });
+}
+
+async function upsertExerciseLibraryProgress(client, record, updatedAt) {
+  const current = await client.resolveTree();
+  const entry = current.tree.find(item => item.path === EXERCISE_LIBRARY_PATH && item.type === 'blob');
+  if (!entry) return [];
+
+  const content = decodeBlob(await client.readBlob(entry.sha));
+  if (content === null) return [];
+
+  const libraryEntries = parseExerciseLibrary(content);
+  const { entries: nextEntries, pbs } = applyCompletedWorkoutToLibrary(libraryEntries, record, updatedAt);
+  if (pbs.length === 0 && JSON.stringify(nextEntries) === JSON.stringify(libraryEntries)) return [];
+
+  await client.writeFile({
+    path: EXERCISE_LIBRARY_PATH,
+    content: JSON.stringify(nextEntries, null, 2),
+    sha: entry.sha,
+    message: `chore(exercise-library): progress from ${record.title ?? 'workout'} on ${record.date}`
+  });
+  return pbs;
 }
 
 async function syncCentralNodeAfterLog(client, record, notes) {

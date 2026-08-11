@@ -331,6 +331,137 @@ test('upserts a fitness template after a completed workout confirm', async () =>
   assert.match(writtenContent, /"concentric"/);
 });
 
+test('upserts exercise library progress and reports a PB after a completed workout confirm', async () => {
+  const workoutCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Chest and Curls',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'completed',
+      duration_min: 26,
+      focus: ['chest', 'arms'],
+      recovery_flag_next_day: false,
+      exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }],
+      pain_flags: []
+    }
+  };
+  const libraryContent = JSON.stringify([
+    { name: 'Chest Press', target_area: 'Chest', best_weight_kg: 30, times_performed: 2 }
+  ]);
+  const librarySha = 'ee'.repeat(20);
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: 'data/exercise-library.json', type: 'blob', sha: librarySha }] });
+    }
+    if (url.includes(`/git/blobs/${librarySha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(libraryContent, 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: workoutCandidate, slug: 'chest-curls' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.deepEqual(payload.data.personalBests, [
+    { name: 'Chest Press', best_weight_kg: 32, previous_best_weight_kg: 30 }
+  ]);
+
+  const libraryPuts = calls.filter(call => call.options?.method === 'PUT' && call.url.includes('data/exercise-library.json'));
+  assert.equal(libraryPuts.length, 1, 'expected exactly one write to the exercise library (single read + single write)');
+  const written = JSON.parse(Buffer.from(JSON.parse(libraryPuts[0].options.body).content, 'base64').toString('utf8'));
+  assert.equal(written[0].best_weight_kg, 32);
+  assert.equal(written[0].times_performed, 3);
+  assert.equal(written[0].last_performed, '2026-08-01');
+  assert.equal(JSON.parse(libraryPuts[0].options.body).sha, librarySha);
+});
+
+test('does not touch the exercise library for a planned (not completed) workout', async () => {
+  const plannedCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Chest and Curls',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'planned',
+      recovery_flag_next_day: false,
+      exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }],
+      pain_flags: []
+    }
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: plannedCandidate, slug: 'chest-curls' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.personalBests, undefined);
+  assert.ok(!calls.some(call => call.url.includes('data/exercise-library.json')), 'must not touch the exercise library for a planned workout');
+});
+
+test('a failing exercise library write never fails the confirm response', async () => {
+  const workoutCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Chest and Curls',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'completed',
+      duration_min: 26,
+      recovery_flag_next_day: false,
+      exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }],
+      pain_flags: []
+    }
+  };
+  const librarySha = 'ee'.repeat(20);
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: 'data/exercise-library.json', type: 'blob', sha: librarySha }] });
+    }
+    if (url.includes(`/git/blobs/${librarySha}`)) {
+      return Response.json({ message: 'server error' }, { status: 500 });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: workoutCandidate, slug: 'chest-curls' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200, 'a broken exercise library read/write must not fail the confirm response');
+  assert.deepEqual(payload.data.personalBests, []);
+});
+
 test('does not upsert a fitness template for a planned (not completed) workout', async () => {
   const plannedCandidate = {
     type: 'workout',

@@ -10,7 +10,8 @@ import {
   formatExerciseLibraryForPrompt,
   exerciseLibraryEntryFromCsvRow,
   searchExerciseLibrarySchema,
-  saveExerciseLibraryEntrySchema
+  saveExerciseLibraryEntrySchema,
+  applyCompletedWorkoutToLibrary
 } from '../../netlify/functions/_shared/exercise-library.mjs';
 
 test('EXERCISE_LIBRARY_PATH is the canonical chat-direct blob', () => {
@@ -119,4 +120,87 @@ test('exerciseLibraryEntryFromCsvRow maps Notion columns', () => {
 test('tool schemas expose the expected names', () => {
   assert.equal(searchExerciseLibrarySchema().name, 'search_exercise_library');
   assert.equal(saveExerciseLibraryEntrySchema().name, 'save_exercise_library_entry');
+});
+
+function workoutRecord(exercises, date = '2026-08-05') {
+  return { type: 'workout', status: 'completed', date, exercises };
+}
+
+test('applyCompletedWorkoutToLibrary records a new best and flags the PB', () => {
+  const library = [{ name: 'Bar Press', target_area: 'Chest', best_weight_kg: 40, times_performed: 3 }];
+  const record = workoutRecord([{ name: 'Bar Press', sets: [
+    { reps: 8, weight_kg: 38, cable_type: 'concentric' },
+    { reps: 6, weight_kg: 42, cable_type: 'concentric' }
+  ] }]);
+
+  const { entries, pbs } = applyCompletedWorkoutToLibrary(library, record, '2026-08-05T18:00:00+10:00');
+
+  assert.equal(entries[0].best_weight_kg, 42);
+  assert.equal(entries[0].working_weight_kg, 42);
+  assert.equal(entries[0].times_performed, 4);
+  assert.equal(entries[0].last_performed, '2026-08-05');
+  assert.equal(entries[0].updated_at, '2026-08-05T18:00:00+10:00');
+  assert.deepEqual(pbs, [{ name: 'Bar Press', best_weight_kg: 42, previous_best_weight_kg: 40 }]);
+});
+
+test('applyCompletedWorkoutToLibrary does not flag a tied best as a new PB', () => {
+  const library = [{ name: 'Bar Press', target_area: 'Chest', best_weight_kg: 40, times_performed: 1 }];
+  const record = workoutRecord([{ name: 'Bar Press', sets: [{ reps: 8, weight_kg: 40, cable_type: 'concentric' }] }]);
+
+  const { entries, pbs } = applyCompletedWorkoutToLibrary(library, record, '2026-08-05T18:00:00+10:00');
+
+  assert.equal(entries[0].best_weight_kg, 40);
+  assert.equal(entries[0].times_performed, 2);
+  assert.deepEqual(pbs, []);
+});
+
+test('applyCompletedWorkoutToLibrary sets an initial best on first-ever performance without flagging a PB', () => {
+  const library = [{ name: 'Bar Press', target_area: 'Chest' }];
+  const record = workoutRecord([{ name: 'Bar Press', sets: [{ reps: 8, weight_kg: 30, cable_type: 'concentric' }] }]);
+
+  const { entries, pbs } = applyCompletedWorkoutToLibrary(library, record, '2026-08-05T18:00:00+10:00');
+
+  assert.equal(entries[0].best_weight_kg, 30);
+  assert.equal(entries[0].times_performed, 1);
+  assert.deepEqual(pbs, []);
+});
+
+test('applyCompletedWorkoutToLibrary handles bodyweight-only sets (weight_kg 0) without crashing or false PBs', () => {
+  const library = [{ name: 'Pull Up', target_area: 'Back', best_weight_kg: 0, times_performed: 5 }];
+  const record = workoutRecord([{ name: 'Pull Up', sets: [{ reps: 10, weight_kg: 0, cable_type: 'none' }] }]);
+
+  const { entries, pbs } = applyCompletedWorkoutToLibrary(library, record, '2026-08-05T18:00:00+10:00');
+
+  assert.equal(entries[0].best_weight_kg, 0);
+  assert.equal(entries[0].working_weight_kg, 0);
+  assert.equal(entries[0].times_performed, 6);
+  assert.deepEqual(pbs, []);
+});
+
+test('applyCompletedWorkoutToLibrary matches case/whitespace variants without creating duplicate rows', () => {
+  const library = [{ name: 'Bar Press', target_area: 'Chest', best_weight_kg: 40 }];
+  const record = workoutRecord([{ name: ' bar press ', sets: [{ reps: 8, weight_kg: 41, cable_type: 'concentric' }] }]);
+
+  const { entries } = applyCompletedWorkoutToLibrary(library, record, '2026-08-05T18:00:00+10:00');
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].best_weight_kg, 41);
+});
+
+test('applyCompletedWorkoutToLibrary leaves an exercise with no library match untouched', () => {
+  const library = [{ name: 'Bar Press', target_area: 'Chest', best_weight_kg: 40 }];
+  const record = workoutRecord([{ name: 'Brand New Move', sets: [{ reps: 8, weight_kg: 20, cable_type: 'concentric' }] }]);
+
+  const { entries, pbs } = applyCompletedWorkoutToLibrary(library, record, '2026-08-05T18:00:00+10:00');
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].name, 'Bar Press');
+  assert.deepEqual(pbs, []);
+});
+
+test('applyCompletedWorkoutToLibrary tolerates a record with no exercises', () => {
+  const library = [{ name: 'Bar Press', target_area: 'Chest', best_weight_kg: 40 }];
+  const { entries, pbs } = applyCompletedWorkoutToLibrary(library, { type: 'workout', status: 'completed' }, 'x');
+  assert.deepEqual(entries, library);
+  assert.deepEqual(pbs, []);
 });
