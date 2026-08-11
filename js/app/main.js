@@ -144,6 +144,7 @@ controller = createAppController({
   renderMind,
   chatSelectAgent: slug => chatController?.selectAgent?.(slug),
   chatSyncAccent: () => chatController?.syncAccent?.(),
+  chatStartCentralNodeAudit: () => chatController?.startCentralNodeAudit?.(),
   buildCentralNodeModel,
   renderCentralNode,
   renderGovernance,

@@ -8,6 +8,11 @@ import {
 } from './render-chat.js';
 import { applyAgentAvatarToBubble, renderAgentHero, renderAgentPicker } from './render-agent-picker.js';
 import { isHammondAuditTrigger, nextAuditPhase } from './hammond-audit.js';
+import {
+  loadStoredAuditSession,
+  removeStoredAuditSession,
+  saveStoredAuditSession
+} from './hammond-audit-session-storage.js';
 
 const PARAGRAPH_BREAK = /\n{2,}/;
 const HISTORY_WINDOW_MS = 20 * 60 * 1000;
@@ -44,7 +49,8 @@ export function createChatController({
   agentColour,
   getAgentsConfig,
   isChatVisible,
-  onUnreadChange
+  onUnreadChange,
+  storage = globalThis.localStorage
 }) {
   if (!root || !chatApi) throw new TypeError('Chat controller dependencies are unavailable');
 
@@ -54,10 +60,16 @@ export function createChatController({
   let lastAgentAt = 0;
   let pinnedAgentSlug = null;
   let activeAbort = null;
-  let auditSession = null;
+  let auditSession = resumeAuditSession(storage);
 
   function clearAuditSession() {
     auditSession = null;
+    removeStoredAuditSession(storage);
+  }
+
+  function persistAuditSession() {
+    if (auditSession) saveStoredAuditSession(storage, auditSession);
+    else removeStoredAuditSession(storage);
   }
 
   function talkingToHammond(message) {
@@ -70,6 +82,7 @@ export function createChatController({
     if (!isHammondAuditTrigger(message)) return;
     if (!talkingToHammond(message)) return;
     auditSession = { kind: 'cn_audit', phase: 'triage', intakeCount: 0 };
+    persistAuditSession();
   }
 
   function advanceAuditSession(message, { governanceLogAppended = false } = {}) {
@@ -93,6 +106,8 @@ export function createChatController({
         }
       : {};
     auditSession = nextAuditPhase(auditSession, flags);
+    if (auditSession) persistAuditSession();
+    else removeStoredAuditSession(storage);
   }
 
   // Prunes anything outside the memory window as a side effect, then returns a
@@ -515,6 +530,11 @@ export function createChatController({
     }
   }
 
+  async function startCentralNodeAudit() {
+    selectAgent('hammond');
+    return send('central node audit');
+  }
+
   bindForm();
   bindNewChat();
   {
@@ -530,6 +550,7 @@ export function createChatController({
     send,
     selectAgent,
     startNewChat,
+    startCentralNodeAudit,
     syncAccent,
     getSelectedAgentSlug: () => stickyAgentSlug() ?? null,
     clearUnread
@@ -567,6 +588,17 @@ function personalBestHypeLine(pb) {
 
 function slugFromPath(path) {
   return path.split('/').at(-1).replace(/\.md$/, '').split('-').slice(3).join('-');
+}
+
+function resumeAuditSession(storage) {
+  const loaded = loadStoredAuditSession(storage);
+  if (!loaded) return null;
+  // A lock-phase session means the audit already reached its final turn — don't resume.
+  if (loaded.phase === 'lock') {
+    removeStoredAuditSession(storage);
+    return null;
+  }
+  return loaded;
 }
 
 function formatRejectionMessage(errors) {
