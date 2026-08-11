@@ -475,6 +475,15 @@ export function createChatController({
       if (result?.centralNodeUpdated === false) {
         showChatError(root, 'Logged, but Central Node didn\u2019t update — try Refresh.');
       }
+      // Earned hype: a genuine PB (Phase 1's library upsert) gets a specific, loud reaction
+      // right in the transcript -- confirm is a plain POST, not an LLM turn, so this is a
+      // templated in-voice line rather than a model-generated one. Workout-only: personalBests
+      // is only ever meaningful on a completed workout confirm.
+      if (event.record?.type === 'workout' && Array.isArray(result?.personalBests)) {
+        for (const pb of result.personalBests) {
+          appendMessage(root, { role: 'assistant', agentSlug: 'chadwick', text: personalBestHypeLine(pb) });
+        }
+      }
       if (result?.dayoneSent === false) {
         const reason = result.dayoneReason;
         const message = reason === 'not_configured'
@@ -537,6 +546,14 @@ function collectEdits(record, inputs) {
 function toCandidate(record) {
   const { schema_version, id, created_at, updated_at, source, type, date, time, notes, ...fields } = record;
   return { type, date, ...(time ? { time } : {}), ...(notes ? { notes } : {}), fields };
+}
+
+// Deterministic, not model-generated -- see the call site in confirmProposal for why.
+function personalBestHypeLine(pb) {
+  const hasDelta = typeof pb?.previous_best_weight_kg === 'number';
+  const delta = hasDelta ? Math.round((pb.best_weight_kg - pb.previous_best_weight_kg) * 10) / 10 : null;
+  const deltaText = hasDelta ? ` — that's +${delta}kg over your old best` : '';
+  return `NEW PB, bro. ${pb?.name ?? 'that move'} at ${pb?.best_weight_kg}kg${deltaText}. Absolute unit behavior — write that one down.`;
 }
 
 function slugFromPath(path) {

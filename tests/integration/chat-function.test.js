@@ -634,6 +634,46 @@ test('loads exercise library highlights into Chadwick system prompt', async () =
   assert.equal(searchHits[0].name, 'Bar Press');
 });
 
+test('reports days since last session from the exercise library\'s last_performed fields, at no extra read cost', async () => {
+  const libraryPath = 'data/exercise-library.json';
+  const librarySha = 'f'.repeat(40);
+  const libraryContent = JSON.stringify([
+    { name: 'Bar Press', target_area: 'Chest', last_performed: '2026-07-29' }
+  ]);
+  let receivedArgs;
+  const blobFetches = [];
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: libraryPath, type: 'blob', sha: librarySha, size: 100 }] });
+    }
+    if (url.includes(`/git/blobs/${librarySha}`)) {
+      blobFetches.push(url);
+      return Response.json({ encoding: 'base64', content: Buffer.from(libraryContent, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Chadwick, what should I do today?' })));
+
+  assert.match(receivedArgs.system, /3 days since/i);
+  assert.match(receivedArgs.system, /lower the bar/i);
+  assert.equal(blobFetches.length, 1, 'the library blob should only be fetched once -- no extra reads for adherence');
+});
+
 test('loads latest body composition/measurements into Chadwick\'s prompt via a bounded read (not a full history scan)', async () => {
   const compositionPath = 'data/body/2026/07/2026-07-29-composition.md';
   const compositionSha = 'a'.repeat(40);

@@ -19,7 +19,8 @@ export function buildSystemPrompt({
   workoutTemplates = '',
   exerciseLibrary = '',
   skincareRoutines = '',
-  bodyState = ''
+  bodyState = '',
+  daysSinceLastSession = null
 }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
@@ -65,6 +66,9 @@ export function buildSystemPrompt({
       : '',
     bodyState
       ? `Body state (latest composition, tape, and shoulder:waist ratio toward Adam's physique goal):\n${bodyState}\n\nYou must reference body trend in your programming or chat pitch when it's relevant to what you're building (a stalled ratio, a fat-loss plateau, a good week) — don't sit on data that should change what you say. You must not claim training alone drives fat loss or waist trim — that's nutrition's job (Brisket owns it) — name the binding constraint honestly: if diet, not training volume, is what's actually holding the ratio back, say so and defer to Brisket instead of selling more sets as the fix.`
+      : '',
+    typeof daysSinceLastSession === 'number'
+      ? `${daysSinceLastSession} days since Adam's last completed session.${daysSinceLastSession >= 2 ? ' At 2+ missed days, lead with this rather than burying it, and lower the bar hard: offer a 10-minute single-lift session or a walk, never the full programmed session, and never a guilt trip — getting him moving again beats getting him optimal.' : ''}`
       : '',
     chadwickProtocol
       ? `Chadwick operating manual (follow these Life Hub rules; ignore any Notion database mechanics):\n${chadwickProtocol}`

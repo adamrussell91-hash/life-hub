@@ -1,4 +1,5 @@
 import { formatLogDate } from '../../../js/core/central-node-write.js';
+import { daysBetween } from '../../../js/core/time.js';
 
 export const EXERCISE_LIBRARY_PATH = 'data/exercise-library.json';
 
@@ -122,6 +123,22 @@ export function applyCompletedWorkoutToLibrary(entries, record, updatedAt) {
   }
 
   return { entries: list, pbs };
+}
+
+/**
+ * Adherence signal for Phase 4b, at zero extra cost: every completed session's exercises
+ * get last_performed set to the session date (Phase 1), so the max across the whole
+ * library is exactly the date of the most recent completed session -- no extra blob
+ * reads needed beyond the exercise library Chadwick already loads every turn.
+ */
+export function daysSinceLastSession(entries, today) {
+  if (!Array.isArray(entries)) return null;
+  const lastPerformedDates = entries
+    .map(entry => entry?.last_performed)
+    .filter(value => typeof value === 'string' && value);
+  if (lastPerformedDates.length === 0) return null;
+  const mostRecent = lastPerformedDates.sort().at(-1);
+  return daysBetween(mostRecent, today);
 }
 
 export function selectExerciseHighlights(entries, limit = MAX_HIGHLIGHTS) {

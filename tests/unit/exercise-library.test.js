@@ -11,7 +11,8 @@ import {
   exerciseLibraryEntryFromCsvRow,
   searchExerciseLibrarySchema,
   saveExerciseLibraryEntrySchema,
-  applyCompletedWorkoutToLibrary
+  applyCompletedWorkoutToLibrary,
+  daysSinceLastSession
 } from '../../netlify/functions/_shared/exercise-library.mjs';
 
 test('EXERCISE_LIBRARY_PATH is the canonical chat-direct blob', () => {
@@ -222,6 +223,26 @@ test('applyCompletedWorkoutToLibrary leaves an exercise with no library match un
   assert.equal(entries.length, 1);
   assert.equal(entries[0].name, 'Bar Press');
   assert.deepEqual(pbs, []);
+});
+
+test('daysSinceLastSession returns the gap since the most recent last_performed across all entries', () => {
+  const library = [
+    { name: 'Bar Press', target_area: 'Chest', last_performed: '2026-07-29' },
+    { name: 'Bar Curl', target_area: 'Arms', last_performed: '2026-08-02' },
+    { name: 'Leg Press', target_area: 'Legs', last_performed: '2026-07-15' }
+  ];
+  assert.equal(daysSinceLastSession(library, '2026-08-05'), 3);
+});
+
+test('daysSinceLastSession returns 0 for a session performed today', () => {
+  const library = [{ name: 'Bar Press', target_area: 'Chest', last_performed: '2026-08-05' }];
+  assert.equal(daysSinceLastSession(library, '2026-08-05'), 0);
+});
+
+test('daysSinceLastSession returns null when no entry has ever been performed', () => {
+  assert.equal(daysSinceLastSession([], '2026-08-05'), null);
+  assert.equal(daysSinceLastSession([{ name: 'Bar Press', target_area: 'Chest' }], '2026-08-05'), null);
+  assert.equal(daysSinceLastSession(undefined, '2026-08-05'), null);
 });
 
 test('applyCompletedWorkoutToLibrary tolerates a record with no exercises', () => {
