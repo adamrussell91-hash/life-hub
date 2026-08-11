@@ -38,11 +38,16 @@ test('the tool schema restricts type to the allowed list when supplied', () => {
   assert.deepEqual(schema.input_schema.properties.type.enum, ['meal']);
 });
 
+const FULL_MEAL_FIELDS = {
+  meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420,
+  calcium_mg: 210, polyphenol_score: 4, omega3: 'low'
+};
+
 test('validates a well-formed meal log entry into a canonical record', () => {
   const result = validateLogEntry({
     type: 'meal',
     date: '2026-08-01',
-    fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420 }
+    fields: { ...FULL_MEAL_FIELDS }
   }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
 
   assert.equal(result.valid, true);
@@ -52,20 +57,35 @@ test('validates a well-formed meal log entry into a canonical record', () => {
 });
 
 test('rejects a meal log entry missing sodium_mg', () => {
+  const { sodium_mg, ...rest } = FULL_MEAL_FIELDS;
   const result = validateLogEntry({
     type: 'meal',
     date: '2026-08-01',
-    fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12 }
+    fields: rest
   }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
 
   assert.equal(result.valid, false);
   assert.ok(result.errors.some(error => error.includes('sodium_mg')));
 });
 
-test('meal tool schema requires sodium_mg among core macros', () => {
+test('rejects a meal log entry missing calcium_mg, polyphenol_score, or omega3', () => {
+  const { calcium_mg, polyphenol_score, omega3, ...rest } = FULL_MEAL_FIELDS;
+  const result = validateLogEntry({
+    type: 'meal',
+    date: '2026-08-01',
+    fields: rest
+  }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(error => error.includes('calcium_mg')));
+  assert.ok(result.errors.some(error => error.includes('polyphenol_score')));
+  assert.ok(result.errors.some(error => error.includes('omega3')));
+});
+
+test('meal tool schema requires the full macro/judgment set, not just core macros', () => {
   const schema = logEntryToolSchema(['meal']);
   assert.deepEqual(schema.input_schema.properties.fields.required, [
-    'meal', 'calories', 'protein_g', 'fat_g', 'sodium_mg'
+    'meal', 'calories', 'protein_g', 'fat_g', 'sodium_mg', 'calcium_mg', 'polyphenol_score', 'omega3'
   ]);
 });
 
@@ -73,7 +93,7 @@ test('rejects a log entry with semantically invalid fields', () => {
   const result = validateLogEntry({
     type: 'meal',
     date: '2026-08-01',
-    fields: { meal: 'brunch', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420 }
+    fields: { ...FULL_MEAL_FIELDS, meal: 'brunch' }
   }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
 
   assert.equal(result.valid, false);
@@ -116,7 +136,7 @@ test('spread order still protects protected keys if a field name were ever white
   const result = validateLogEntry({
     type: 'meal',
     date: '2026-08-01',
-    fields: { meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420 }
+    fields: { ...FULL_MEAL_FIELDS }
   }, { id: 'meal-1', now: '2026-08-01T07:45:00+10:00' });
 
   assert.equal(result.valid, true);

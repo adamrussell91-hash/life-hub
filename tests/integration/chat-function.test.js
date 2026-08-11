@@ -260,7 +260,10 @@ fat_g: 20
               calories: 650,
               protein_g: 42,
               fat_g: 28,
-              sodium_mg: 980
+              sodium_mg: 980,
+              calcium_mg: 180,
+              polyphenol_score: 3,
+              omega3: 'low'
             }
           }
         };
@@ -413,7 +416,10 @@ test('log_entry via executeTools returns real validation errors (not fake ok) an
               calories: 202,
               protein_g: 15,
               fat_g: 6,
-              sodium_mg: 150
+              sodium_mg: 150,
+              calcium_mg: 90,
+              polyphenol_score: 2,
+              omega3: 'none'
             },
             notes: 'Muscle Nation bar — emulsifier flag'
           }
@@ -456,7 +462,10 @@ test('log_entry via executeTools emits record_proposal and returns awaiting_conf
               calories: 202,
               protein_g: 15,
               fat_g: 6,
-              sodium_mg: 150
+              sodium_mg: 150,
+              calcium_mg: 90,
+              polyphenol_score: 2,
+              omega3: 'none'
             },
             notes: 'Muscle Nation bar — emulsifier flag'
           }

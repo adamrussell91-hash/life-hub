@@ -103,7 +103,7 @@ const DOMAIN_PROPERTIES = {
   }
 };
 
-const MEAL_REQUIRED_FIELDS = ['meal', 'calories', 'protein_g', 'fat_g', 'sodium_mg'];
+const MEAL_REQUIRED_FIELDS = ['meal', 'calories', 'protein_g', 'fat_g', 'sodium_mg', 'calcium_mg', 'polyphenol_score', 'omega3'];
 
 export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
   const fieldsSchema = allowedTypes.length === 1
