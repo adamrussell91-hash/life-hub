@@ -49,16 +49,29 @@ export function buildAreaLine(
     paddingBottom = padding,
     valueKey = 'value',
     rollingAverage = 0,
-    guideValue = null
+    guideValue = null,
+    yDomain = 'zero'
   } = {}
 ) {
   const values = series.map(day => Number(day[valueKey]) || 0);
   const means = rollingAverage > 0 ? rollingMeans(values, rollingAverage) : [];
   const guide = guideValue == null || !Number.isFinite(Number(guideValue)) ? null : Number(guideValue);
-  const max = Math.max(1, ...values, ...means, guide ?? 0);
   const stepX = series.length > 1 ? (width - padding * 2) / (series.length - 1) : 0;
   const plotBottom = height - paddingBottom;
-  const scaleY = value => plotBottom - (value / max) * (plotBottom - padding);
+
+  let scaleY;
+  if (yDomain === 'padded') {
+    const finite = values.filter(Number.isFinite);
+    const rawMin = Math.min(...finite);
+    const rawMax = Math.max(...finite);
+    const pad = Math.max((rawMax - rawMin) * 0.15, rawMax === rawMin ? 1 : 0);
+    const min = rawMin - pad;
+    const max = rawMax + pad;
+    scaleY = value => plotBottom - ((value - min) / (max - min)) * (plotBottom - padding);
+  } else {
+    const max = Math.max(1, ...values, ...means, guide ?? 0);
+    scaleY = value => plotBottom - (value / max) * (plotBottom - padding);
+  }
 
   const points = series.map((day, index) => ({
     x: padding + stepX * index,
