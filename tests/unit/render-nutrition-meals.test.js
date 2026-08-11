@@ -1,112 +1,59 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderMealBreakdown } from '../../js/app/render-nutrition.js';
+import { renderMealProteinPie } from '../../js/app/render-nutrition.js';
 
-class FakeElement {
-  constructor(tag) {
-    this.tagName = tag;
-    this.className = '';
-    this.dataset = {};
-    this._textContent = '';
-    this.children = [];
-    this.hidden = false;
-  }
-
-  set textContent(value) {
-    this._textContent = value;
-    this.children = [];
-  }
-
-  get textContent() {
-    if (this.children.length) return this.children.map(child => child.textContent).join('');
-    return this._textContent;
-  }
-
-  append(...nodes) {
-    this.children.push(...nodes);
-  }
-
-  replaceChildren(...nodes) {
-    this.children = [...nodes];
-  }
-
-  setAttribute(name, value) {
-    if (name === 'hidden') this.hidden = true;
-  }
-
-  removeAttribute(name) {
-    if (name === 'hidden') this.hidden = false;
-  }
-}
-
-function fakeMealBreakdownRoot() {
-  const dl = new FakeElement('dl');
-  const empty = new FakeElement('p');
-  empty.textContent = 'No meals logged yet.';
-  empty.hidden = true;
-  return {
-    createElement: tag => new FakeElement(tag),
-    querySelector(selector) {
-      if (selector === '.meal-breakdown') return dl;
-      if (selector === '[data-meal-breakdown-empty]') return empty;
+function makeRoot() {
+  const empty = { hidden: true, removeAttribute(name) { if (name === 'hidden') this.hidden = false; }, setAttribute(name) { if (name === 'hidden') this.hidden = true; } };
+  const slices = { replaceChildren(...nodes) { this.children = nodes; }, children: [] };
+  const legend = { replaceChildren(...nodes) { this.children = nodes; }, children: [] };
+  const svg = {
+    querySelector(sel) {
+      if (sel === '[data-role="slices"]') return slices;
       return null;
     },
-    _dl: dl,
-    _empty: empty
+    setAttribute() {},
+    removeAttribute() {}
+  };
+  const created = [];
+  return {
+    empty,
+    slices,
+    legend,
+    created,
+    querySelector(sel) {
+      if (sel === '#nutrition-meal-protein-pie') return svg;
+      if (sel === '[data-meal-protein-empty]') return empty;
+      if (sel === '[data-role="meal-protein-legend"]') return legend;
+      return null;
+    },
+    createElementNS(_ns, tag) {
+      const el = { tag, attrs: {}, textContent: '', setAttribute(k, v) { this.attrs[k] = v; } };
+      created.push(el);
+      return el;
+    },
+    createElement(tag) {
+      const el = { tag, textContent: '', children: [], className: '', style: {}, append(...nodes) { this.children.push(...nodes); } };
+      created.push(el);
+      return el;
+    }
   };
 }
 
-test('renderMealBreakdown lists only slots with protein_g > 0', () => {
-  const root = fakeMealBreakdownRoot();
-  renderMealBreakdown(root, {
-    breakfast: { protein_g: 38 },
-    lunch: { protein_g: 42 },
-    dinner: { protein_g: 0 },
-    snack: { protein_g: 0 }
+test('renderMealProteinPie shows empty state when no protein', () => {
+  const root = makeRoot();
+  renderMealProteinPie(root, {
+    breakfast: { protein_g: 0 }, lunch: { protein_g: 0 }, dinner: { protein_g: 0 }, snack: { protein_g: 0 }
   });
-
-  const text = root._dl.textContent;
-  assert.match(text, /Breakfast/);
-  assert.match(text, /38 g/);
-  assert.match(text, /Lunch/);
-  assert.match(text, /42 g/);
-  assert.equal(text.includes('Dinner'), false);
-  assert.equal(text.includes('Snack'), false);
-  assert.equal(text.includes('0 g'), false);
-  assert.equal(root._dl.hidden, false);
-  assert.equal(root._empty.hidden, true);
+  assert.equal(root.empty.hidden, false);
+  assert.equal(root.slices.children.length, 0);
 });
 
-test('renderMealBreakdown shows empty state and hides the list when no meals have protein', () => {
-  const root = fakeMealBreakdownRoot();
-  renderMealBreakdown(root, {
-    breakfast: { protein_g: 0 },
-    lunch: { protein_g: 0 },
-    dinner: { protein_g: 0 },
-    snack: { protein_g: 0 }
+test('renderMealProteinPie draws slices and legend for meals with protein', () => {
+  const root = makeRoot();
+  renderMealProteinPie(root, {
+    breakfast: { protein_g: 30 }, lunch: { protein_g: 40 }, dinner: { protein_g: 0 }, snack: { protein_g: 0 }
   });
-
-  assert.equal(root._dl.children.length, 0);
-  assert.equal(root._dl.hidden, true);
-  assert.equal(root._empty.hidden, false);
-  assert.match(root._empty.textContent, /No meals logged yet\./);
-});
-
-test('renderMealBreakdown treats a missing meals object as empty', () => {
-  const root = fakeMealBreakdownRoot();
-  renderMealBreakdown(root, undefined);
-
-  assert.equal(root._dl.children.length, 0);
-  assert.equal(root._empty.hidden, false);
-});
-
-test('renderMealBreakdown re-renders cleanly on repeated calls', () => {
-  const root = fakeMealBreakdownRoot();
-  renderMealBreakdown(root, { breakfast: { protein_g: 20 } });
-  renderMealBreakdown(root, { dinner: { protein_g: 55 } });
-
-  const text = root._dl.textContent;
-  assert.equal(text.includes('Breakfast'), false);
-  assert.match(text, /Dinner/);
-  assert.match(text, /55 g/);
+  assert.equal(root.empty.hidden, true);
+  assert.equal(root.slices.children.length, 2);
+  assert.equal(root.legend.children.length, 2);
 });
