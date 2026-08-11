@@ -145,9 +145,13 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
       guideLabels.append(text);
     }
     if (rollingLabel && chart.rollingLinePath && lastPoint) {
+      let rollingLabelY = Math.max(10, lastPoint.y - 12);
+      if (chart.guideY != null && Math.abs(rollingLabelY - chart.guideY) < 6) {
+        rollingLabelY = Math.max(10, chart.guideY - 8);
+      }
       const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
       text.setAttribute('x', String(lastPoint.x));
-      text.setAttribute('y', String(Math.max(9, lastPoint.y - 5)));
+      text.setAttribute('y', String(rollingLabelY));
       text.setAttribute('text-anchor', 'end');
       text.setAttribute('class', 'chart-guide-label chart-guide-label--avg');
       text.textContent = rollingLabel;
