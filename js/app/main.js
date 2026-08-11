@@ -27,6 +27,7 @@ import { buildMindModel } from './mind-model.js';
 import { buildNutritionModel } from './nutrition-model.js';
 import { renderBody } from './render-body.js';
 import { renderCentralNode } from './render-central-node.js';
+import { renderGovernance } from './render-governance.js';
 import { setChatUnread } from './render-chat.js';
 import { renderFitness } from './render-fitness.js';
 import { renderHome, renderUnavailable, renderWarnings } from './render-home.js';
@@ -145,6 +146,7 @@ controller = createAppController({
   chatSyncAccent: () => chatController?.syncAccent?.(),
   buildCentralNodeModel,
   renderCentralNode,
+  renderGovernance,
   agentColour,
   chatPanel,
   chatClearUnread: () => chatController?.clearUnread?.(),

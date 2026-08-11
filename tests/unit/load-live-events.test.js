@@ -273,4 +273,18 @@ test('agentsConfig and centralNodeMarkdown default to null when neither file is 
 
   assert.equal(result.agentsConfig, null);
   assert.equal(result.centralNodeMarkdown, null);
+  assert.equal(result.governanceLogMarkdown, null);
+});
+
+test('exposes raw governance-log.md content when present in the sync batch', async () => {
+  const governanceLogMarkdown = "# Governance Log\n\n## 2026-08-09 — Drift Detection\n**Status:** Still Active\n\nOpen loop.\n";
+  const files = [raw('data/governance/governance-log.md', governanceLogMarkdown)];
+  const sync = async () => ({
+    files, warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+    changed: true, freshness: 'confirmed'
+  });
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01' });
+
+  assert.equal(result.governanceLogMarkdown, governanceLogMarkdown);
 });

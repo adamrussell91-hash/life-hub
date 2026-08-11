@@ -7,6 +7,7 @@ export function buildSystemPrompt({
   centralNodeLog = '',
   centralNodeFull = '',
   governanceLogTail = '',
+  governanceLogIsEmpty = false,
   hammondDigest = '',
   foodLibrary = '',
   chadwickProtocol = '',
@@ -148,6 +149,9 @@ export function buildSystemPrompt({
       : '',
     governanceLogTail
       ? `Governance Log (recent tail — durable protocol notes and Coach's Notes):\n${governanceLogTail}`
+      : '',
+    governanceLogIsEmpty
+      ? 'Governance Log is empty. Once this turn, mention that Notion carried two open items forward — drift: "Build a life worth enjoying" (Still Active as of 9 Jul); escalation: August study load (past its 15 Aug checkpoint) — and ask Adam how to handle them (close / carry / drop). Do not invent more carried-over items. After the first append_governance_log succeeds this instruction stops firing.'
       : '',
     'You do not propose log_entry. Coach and triage; specialists own domain logs.',
     'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.'

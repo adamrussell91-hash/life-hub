@@ -72,13 +72,19 @@ export function createChatController({
     auditSession = { kind: 'cn_audit', phase: 'triage', intakeCount: 0 };
   }
 
-  function advanceAuditSession(message) {
+  function advanceAuditSession(message, { governanceLogAppended = false } = {}) {
     if (!auditSession) return;
     if (CANCEL_AUDIT_RE.test(message)) {
       clearAuditSession();
       return;
     }
     const phase = auditSession.phase;
+    if (phase === 'lock' && !governanceLogAppended) {
+      // First mechanical required-tool gate in this codebase: lock must call
+      // append_governance_log before the audit can end. Leave session on lock
+      // so the next turn re-sends the lock phase contract.
+      return;
+    }
     const flags = (phase === 'triage' || phase === 'intake')
       ? {
           askedIntakeQuestion: true,
@@ -219,6 +225,7 @@ export function createChatController({
     let gotUsefulOutput = false;
     let sawExerciseLibrarySaved = false;
     let sawRecordProposal = false;
+    let sawGovernanceLogAppended = false;
     const history = recentHistory();
     const priorAgentSlug = stickyAgentSlug();
     if (CANCEL_AUDIT_RE.test(message)) clearAuditSession();
@@ -381,6 +388,8 @@ export function createChatController({
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `Saved "${event.name}" to the Exercise Library.` });
           setWorkingStatus('Researching…');
+        } else if (event.type === 'governance_log_appended') {
+          sawGovernanceLogAppended = true;
         }
         // audit_phase SSE is informational only — client owns advancement
       }
@@ -400,7 +409,7 @@ export function createChatController({
           text: EMPTY_TURN_RECOVERY
         });
       } else if (gotUsefulOutput) {
-        advanceAuditSession(message);
+        advanceAuditSession(message, { governanceLogAppended: sawGovernanceLogAppended });
       }
     } catch (error) {
       turnSignaled = true;

@@ -1421,6 +1421,48 @@ test('empty-turn recovery does not advance the audit phase', async () => {
   });
 });
 
+test('lock phase does not end the audit until governance_log_appended fires', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  let turn = 0;
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      turn += 1;
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'text', delta: `phase turn ${turn}` };
+      // Walk triage → intake(skip) → stale_drift → open_loops → lock, then
+      // two lock turns: first without the tool SSE, second with it.
+      if (turn === 6) {
+        yield { type: 'governance_log_appended', entryType: 'Closed Loop Review' };
+      }
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hammond, Central Node audit'); // [0] triage → intake
+  await controller.send('skip intake'); // [1] intake → stale_drift
+  await controller.send('drift notes'); // [2] stale_drift → open_loops
+  await controller.send('open loops'); // [3] open_loops → lock
+  await controller.send('lock without tool'); // [4] lock, no SSE → stays lock
+  assert.deepEqual(sendCalls[4].auditSession, {
+    kind: 'cn_audit',
+    phase: 'lock',
+    intakeCount: 2
+  });
+
+  await controller.send('lock with tool'); // [5] still lock session on the wire
+  assert.deepEqual(sendCalls[5].auditSession, {
+    kind: 'cn_audit',
+    phase: 'lock',
+    intakeCount: 2
+  });
+
+  await controller.send('after lock'); // [6] previous turn appended → session cleared
+  assert.equal(sendCalls[6].auditSession, undefined);
+});
+
 test('cn_patch_proposal Confirm posts kind cn_patch with the patch candidate', async () => {
   const root = new FakeDocument();
   const patch = {

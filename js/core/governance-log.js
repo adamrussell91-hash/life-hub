@@ -96,3 +96,39 @@ function splitGovernanceEntries(content) {
   }
   return entries;
 }
+
+/**
+ * Parse governance-log markdown into structured entries.
+ * Splits on the same `## ` headings recentGovernanceTail uses.
+ */
+export function parseGovernanceEntries(content) {
+  if (typeof content !== 'string' || !content.trim()) return [];
+  return splitGovernanceEntries(content).map(parseGovernanceEntryBlock).filter(Boolean);
+}
+
+function parseGovernanceEntryBlock(block) {
+  const heading = /^##\s+(.+?)\s*$/m.exec(block);
+  if (!heading) return null;
+  const headingText = heading[1].trim();
+  const parts = headingText.split(/\s+—\s+/);
+  const dateKey = parts[0]?.trim() || null;
+  const entryType = parts.slice(1).join(' — ').trim() || null;
+
+  const titleMatch = /^\*\*Title:\*\*\s*(.+)$/m.exec(block);
+  const statusMatch = /^\*\*Status:\*\*\s*(.+)$/m.exec(block);
+
+  const withoutHeading = block.slice(heading.index + heading[0].length);
+  const body = withoutHeading
+    .replace(/^\*\*Title:\*\*.*$/m, '')
+    .replace(/^\*\*Status:\*\*.*$/m, '')
+    .replace(/^\n+/, '')
+    .replace(/\s+$/, '');
+
+  return {
+    dateKey: dateKey || null,
+    entryType: entryType || null,
+    title: titleMatch ? titleMatch[1].trim() : null,
+    status: statusMatch ? statusMatch[1].trim() : null,
+    body
+  };
+}

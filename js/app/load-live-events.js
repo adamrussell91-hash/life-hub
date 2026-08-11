@@ -1,5 +1,6 @@
 import { parseEventDocument } from '../core/records.js';
 import { addCalendarDays, daysBetween, isCalendarDate } from '../core/time.js';
+import { GOVERNANCE_LOG_PATH } from '../core/governance-log.js';
 
 const TARGETS_PATH = 'config/targets.yml';
 const AGENTS_PATH = 'config/agents.yml';
@@ -57,6 +58,7 @@ export async function loadLiveEvents({ sync, loadYaml, date }) {
     targetsConfig: parsed.targetsConfig,
     agentsConfig: parsed.agentsConfig,
     centralNodeMarkdown: parsed.centralNodeMarkdown,
+    governanceLogMarkdown: parsed.governanceLogMarkdown,
     warnings: [...warnings, ...parsed.warnings],
     commitSha,
     changed,
@@ -69,7 +71,7 @@ function createValidator(loadYaml) {
     try {
       if (file.path === TARGETS_PATH || file.path === AGENTS_PATH) {
         loadYaml(file.content);
-      } else if (file.path === CENTRAL_NODE_PATH) {
+      } else if (file.path === CENTRAL_NODE_PATH || file.path === GOVERNANCE_LOG_PATH) {
         // Freeform markdown, no schema to violate -- any string content is acceptable.
       } else if (EVENT_PATH.test(file.path)) {
         parseEventDocument(file.content, file.path, loadYaml);
@@ -94,6 +96,7 @@ function parseFiles(files, loadYaml) {
   let targetsConfig = null;
   let agentsConfig = null;
   let centralNodeMarkdown = null;
+  let governanceLogMarkdown = null;
 
   for (const file of files) {
     try {
@@ -103,6 +106,8 @@ function parseFiles(files, loadYaml) {
         agentsConfig = loadYaml(file.content);
       } else if (file.path === CENTRAL_NODE_PATH) {
         centralNodeMarkdown = file.content;
+      } else if (file.path === GOVERNANCE_LOG_PATH) {
+        governanceLogMarkdown = file.content;
       } else if (EVENT_PATH.test(file.path)) {
         events.push(parseEventDocument(file.content, file.path, loadYaml));
       }
@@ -119,7 +124,7 @@ function parseFiles(files, loadYaml) {
   if (!files.some(file => file.path === TARGETS_PATH)) {
     warnings.push({ path: TARGETS_PATH, code: 'missing_targets' });
   }
-  return { events, targetsConfig, agentsConfig, centralNodeMarkdown, warnings };
+  return { events, targetsConfig, agentsConfig, centralNodeMarkdown, governanceLogMarkdown, warnings };
 }
 
 function streakReaches(events, boundary) {

@@ -1976,7 +1976,8 @@ test('append_governance_log cold-starts empty log then writes governance-log.md'
 
   const events = contentEvents(await readSse(await handler(request({ message: 'Hammond, note the surplus hold' }))));
   assert.deepEqual(events[0], { type: 'agent', slug: 'hammond' });
-  assert.deepEqual(events[1], { type: 'text', delta: 'Logged the note.' });
+  assert.deepEqual(events[1], { type: 'governance_log_appended', entryType: "Coach's Notes" });
+  assert.deepEqual(events[2], { type: 'text', delta: 'Logged the note.' });
 
   const putCall = calls.find(call => call.options?.method === 'PUT');
   assert.ok(putCall, 'expected a PUT request to write governance log');
