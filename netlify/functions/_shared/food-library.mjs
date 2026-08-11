@@ -11,7 +11,7 @@ const MAX_PROMPT_ENTRIES = 200;
 export function foodLibraryEntrySchema() {
   return {
     name: 'save_food_library_entry',
-    description: 'Cache a food\'s researched nutrition figures so it never needs re-searching. Call this right after finding a food\'s figures (from web_search or a well-known source) whenever it was not already an exact, recently-verified match in the Food Library provided in your context.',
+    description: 'Cache a food\'s researched AU nutrition figures so it never needs re-searching. Call this right after finding verified figures (from web_search or a well-known AU source) whenever it was not already an exact, recently-verified match in the Food Library. Do not save estimated or guessed macros.',
     input_schema: {
       type: 'object',
       properties: {

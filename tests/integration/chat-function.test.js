@@ -393,6 +393,91 @@ test('emits record_rejected instead of a proposal for a semantically invalid too
   assert.deepEqual(events[2], { type: 'done' });
 });
 
+test('log_entry via executeTools returns real validation errors (not fake ok) and emits record_rejected', async () => {
+  let toolResult;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        toolResult = await executeTools({
+          id: 'call_1',
+          name: 'log_entry',
+          input: {
+            type: 'meal',
+            date: '2026-08-01',
+            time: '1:35pm',
+            fields: {
+              meal: 'snack',
+              calories: 202,
+              protein_g: 15,
+              fat_g: 6,
+              sodium_mg: 150
+            },
+            notes: 'Muscle Nation bar — emulsifier flag'
+          }
+        });
+        assert.ok(toolResult != null, 'log_entry must return a tool_result so the model can retry');
+        const parsed = JSON.parse(toolResult);
+        assert.equal(parsed.ok, false);
+        assert.ok(Array.isArray(parsed.errors) && parsed.errors.some(e => /time must be HH:MM/i.test(e)));
+        yield { type: 'text', delta: 'Time format was wrong — retrying.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Brisket, log the protein bar' }))));
+  assert.equal(events[0].type, 'agent');
+  assert.equal(events[1].type, 'record_rejected');
+  assert.ok(events[1].errors.some(e => /time must be HH:MM/i.test(e)));
+  assert.deepEqual(events[2], { type: 'text', delta: 'Time format was wrong — retrying.' });
+  assert.ok(!events.some(e => e.type === 'record_proposal'));
+});
+
+test('log_entry via executeTools emits record_proposal and returns awaiting_confirm', async () => {
+  let toolResult;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        toolResult = await executeTools({
+          id: 'call_1',
+          name: 'log_entry',
+          input: {
+            type: 'meal',
+            date: '2026-08-01',
+            time: '13:35',
+            fields: {
+              meal: 'snack',
+              calories: 202,
+              protein_g: 15,
+              fat_g: 6,
+              sodium_mg: 150
+            },
+            notes: 'Muscle Nation bar — emulsifier flag'
+          }
+        });
+        const parsed = JSON.parse(toolResult);
+        assert.equal(parsed.ok, true);
+        assert.equal(parsed.status, 'awaiting_confirm');
+        yield { type: 'text', delta: 'Hit Confirm when those macros look right.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Brisket, log the protein bar' }))));
+  assert.equal(events[1].type, 'record_proposal');
+  assert.equal(events[1].record.type, 'meal');
+  assert.equal(events[1].record.meal, 'snack');
+  assert.equal(events[1].record.time, '13:35');
+  assert.deepEqual(events[2], { type: 'text', delta: 'Hit Confirm when those macros look right.' });
+});
+
 test('save_food_library_entry writes the cache to GitHub, emits food_library_saved, and continues the round', async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {

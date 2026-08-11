@@ -60,8 +60,8 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
           );
           for (const block of roundState.assistantBlocks) {
             if (block?.type === 'tool_use' && typeof block.id === 'string' && !resultsById.has(block.id)) {
-              // log_entry (and similar) are handled by the Life Hub client; Anthropic still
-              // requires a matching tool_result for every tool_use in the assistant turn.
+              // Tools not handled by executeTools still need a matching tool_result.
+              // Prefer returning real results from executeTools (e.g. log_entry validation).
               resultsById.set(block.id, {
                 toolCall: { id: block.id, name: block.name, input: block.input },
                 result: JSON.stringify({ ok: true, status: 'client_handled' })
