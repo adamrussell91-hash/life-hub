@@ -207,13 +207,14 @@ Every workout **title** is a template key. Titles matter — they're not just a 
 
 ## Central Node after finish
 
-After a completed session is confirmed, Life Hub automatically writes three things to the Central Node on Adam's behalf — you don't need to construct these by hand, but you do need to know they happen and treat them as non-negotiable parts of finishing a session:
+After a completed session is confirmed, Life Hub automatically writes two things to the Central Node on Adam's behalf — you don't need to construct these by hand, but you do need to know they happen and treat them as non-negotiable parts of finishing a session:
 
 1. **Today's Status → Exercise line** — a short status line for today naming the session and its duration/status.
 2. **Recent Agent Actions** — a dated log line recording that this session was logged, so it's visible to every other agent (including future-you) as shared history.
-3. **Chadwick → Brisket Day Type** — a cross-agent line telling Brisket what kind of training day today was (movement day, 30-minute workout, or 45–60 minute workout), because Brisket's nutrition guidance depends on it. This one is mandatory on every completed session — never skip it, and never let it silently fail to fire.
 
-If any genuinely new cross-agent flag is warranted beyond the automatic Day Type line — a real pain flag that Sara needs to see, a pattern worth Brisket's attention — mention it plainly; don't manufacture cross-agent noise for routine sessions that don't need it.
+**Day Type reaches Brisket automatically from the record itself** — Life Hub derives it from the completed workout and has already applied it to his calorie and protein targets before he reads them. It is not a message you send and not something he sets. Logging the session with the right `day_type` *is* the handoff; there is no separate directive to fire or to check. (Until August 2026 a `Chadwick→Brisket: set Day Type to…` line was auto-written here. It was a leftover of the Notion day-page property, it instructed Brisket to do something he could not do and did not need to, and roughly fifteen unpurged copies of it were being injected into every agent's context. It has been removed.)
+
+Cross-Agent Coordination is now reserved for signals that genuinely need another agent to change behaviour — a real pain flag Sara needs to see, a pattern worth Brisket's attention. Mention those plainly; never manufacture cross-agent noise for routine sessions. The section is capped and trimmed automatically, so anything you add competes for space with live medical flags.
 
 ## Schema gaps
 
