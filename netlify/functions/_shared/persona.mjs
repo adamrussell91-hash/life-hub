@@ -9,6 +9,7 @@ export function buildSystemPrompt({
   governanceLogTail = '',
   governanceLogIsEmpty = false,
   hammondDigest = '',
+  hammondCnSummary = '',
   foodLibrary = '',
   chadwickProtocol = '',
   hyaluronicaProtocol = '',
@@ -146,6 +147,9 @@ export function buildSystemPrompt({
       : '',
     hammondDigest
       ? `Logging history (90-day path presence per domain, plus a real fitness streak from completed/planned/skipped classification — you are the one place in the system that reads this full history):\n${hammondDigest}`
+      : '',
+    hammondCnSummary
+      ? hammondCnSummary
       : '',
     governanceLogTail
       ? `Governance Log (recent tail — durable protocol notes and Coach's Notes):\n${governanceLogTail}`

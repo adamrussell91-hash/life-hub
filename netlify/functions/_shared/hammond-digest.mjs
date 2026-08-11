@@ -25,12 +25,22 @@ const DOMAINS = ['nutrition', 'fitness', 'body', 'mind', 'skincare'];
 // derived from this constant rather than re-deriving its own literal -- a
 // change here must not be able to silently diverge the two windows.
 export const WINDOW_DAYS = 90;
+// Separate 30-day window for reusing buildCentralNodeModel server-side (Move 5).
+// Bound deliberately tighter than WINDOW_DAYS — heatmaps need real record content
+// across all 5 domains, so every in-window blob is read (unlike the path-only
+// digest above). Keep this at 30 to stay the same order of magnitude as existing
+// body-state bounded reads.
+export const CN_MODEL_WINDOW_DAYS = 30;
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // The first date in the window: today minus (WINDOW_DAYS - 1), so the window is
 // WINDOW_DAYS calendar days inclusive of both windowStart and today.
 export function getWindowStart(today) {
   return addCalendarDays(today, -(WINDOW_DAYS - 1));
+}
+
+export function getCnModelWindowStart(today) {
+  return addCalendarDays(today, -(CN_MODEL_WINDOW_DAYS - 1));
 }
 
 // Fitness needs its own blob reads (for completed/planned/skipped classification),
@@ -49,6 +59,65 @@ export function selectHammondFitnessEntries(tree, { from, to } = {}) {
     entries.push(entry);
   }
   return entries.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** All five domains in a date window — used for the 30-day CN model blob read. */
+export function selectHammondEventEntries(tree, { from, to } = {}) {
+  if (!Array.isArray(tree)) return [];
+  const entries = [];
+  for (const entry of tree) {
+    if (!entry || entry.type !== 'blob' || typeof entry.path !== 'string') continue;
+    const match = DOMAIN_PATH.exec(entry.path);
+    if (!match) continue;
+    if (match.groups.date < from || match.groups.date > to) continue;
+    entries.push(entry);
+  }
+  return entries.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/**
+ * Compact text block from buildCentralNodeModel output for Hammond's prompt.
+ * Rates use the same 30-day series the CN tab heatmaps render.
+ */
+export function formatCentralNodeModelForPrompt(model) {
+  if (!model || !Array.isArray(model.week)) return '';
+
+  const logging = rateOf(model.loggingMonth, day => day.complete);
+  const exercise = rateOf(model.exerciseMonth, day => day.completed);
+  const eating = rateOf(model.eatingMonth, day => day.hitEatingTargets);
+
+  return [
+    'Central Node computed snapshot (same math as the CN tab — 7-day protein series + 30-day heatmaps):',
+    `Protein (7d): ${describeProteinTrend(model.week)}.`,
+    `Logging completeness (30d): ${logging.hit}/${logging.total} days (${logging.pct}%).`,
+    `Exercise completed (30d): ${exercise.hit}/${exercise.total} days (${exercise.pct}%).`,
+    `Eating targets met (30d): ${eating.hit}/${eating.total} days (${eating.pct}%).`
+  ].join('\n');
+}
+
+function rateOf(series, pred) {
+  const list = Array.isArray(series) ? series : [];
+  const total = list.length;
+  const hit = list.filter(pred).length;
+  const pct = total === 0 ? 0 : Math.round((hit / total) * 100);
+  return { hit, total, pct };
+}
+
+function describeProteinTrend(week) {
+  const values = week.map(day => Number(day?.protein_g) || 0);
+  if (values.length === 0) return 'no data';
+  const mid = Math.floor(values.length / 2);
+  const first = average(values.slice(0, mid || 1));
+  const second = average(values.slice(mid));
+  const delta = second - first;
+  if (Math.abs(delta) < 5) return `flat (~${Math.round(second)}g/day)`;
+  if (delta > 0) return `rising (${Math.round(first)}g → ${Math.round(second)}g/day)`;
+  return `falling (${Math.round(first)}g → ${Math.round(second)}g/day)`;
+}
+
+function average(values) {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 export function summarizeHammondDigest({ tree, fitnessRecords = [], today }) {
