@@ -698,7 +698,7 @@ test('loads latest body composition/measurements into Chadwick\'s prompt via a b
   assert.equal(blobCalls.length, 2, 'expected exactly one bounded read per body record type, not a history scan');
 });
 
-test('non-chadwick agents never receive body state in their prompt', async () => {
+test('loads body state into Brisket\'s prompt too (Phase 3 extends body state beyond Chadwick)', async () => {
   const compositionPath = 'data/body/2026/07/2026-07-29-composition.md';
   const compositionSha = 'a'.repeat(40);
   const compositionContent = [
@@ -734,6 +734,48 @@ test('non-chadwick agents never receive body state in their prompt', async () =>
   });
 
   await readSse(await handler(request({ message: 'Brisket, what did I eat today?' })));
+
+  assert.match(receivedArgs.system, /Body composition/);
+  assert.match(receivedArgs.system, /85\.5kg/);
+  assert.match(receivedArgs.system, /your lane/i);
+});
+
+test('non-chadwick, non-brisket agents never receive body state in their prompt', async () => {
+  const compositionPath = 'data/body/2026/07/2026-07-29-composition.md';
+  const compositionSha = 'a'.repeat(40);
+  const compositionContent = [
+    '---',
+    'schema_version: 1', 'id: "composition-1"', 'type: "composition"', 'date: "2026-07-29"', 'time: "08:00"',
+    'created_at: "2026-07-29T08:00:00+10:00"', 'updated_at: "2026-07-29T08:00:00+10:00"', 'source: "chat"',
+    'weight_kg: 85.5',
+    '---'
+  ].join('\n');
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: compositionPath, type: 'blob', sha: compositionSha, size: 200 }] });
+    }
+    if (url.includes(`/git/blobs/${compositionSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(compositionContent, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Sara, how is my body doing?' })));
 
   assert.doesNotMatch(receivedArgs.system, /Shoulder:waist ratio/);
   assert.doesNotMatch(receivedArgs.system, /85\.5kg/);
