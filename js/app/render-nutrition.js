@@ -1,7 +1,6 @@
-import { animateAreaReveal, animateColumnGrow, animateRingFill } from './chart-kit/animate.js';
+import { animateAreaReveal, animateRingFill } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
-import { buildColumns } from './chart-kit/columns.js';
 import { buildMealProteinPie } from './chart-kit/pie.js';
 import { buildRingTarget } from './chart-kit/ring.js';
 
@@ -36,7 +35,9 @@ export function renderNutrition(root, model) {
   renderNamedAreaChart(root, '#nutrition-protein-chart', model.week, 'protein_g', {
     rollingAverage: 3,
     guideValue: proteinGuide,
-    valueLabels: true
+    valueLabels: true,
+    guideLabel: 'goal',
+    rollingLabel: 'avg'
   });
   renderNamedAreaChart(root, '#nutrition-calories-chart', model.week, 'calories', {
     valueLabels: true
@@ -44,14 +45,15 @@ export function renderNutrition(root, model) {
   renderNamedAreaChart(root, '#nutrition-fat-chart', model.week, 'fat_g', {
     markOverage: true,
     guideValue: fatGuide,
-    valueLabels: true
+    valueLabels: true,
+    guideLabel: 'ceiling'
   });
   renderNamedAreaChart(root, '#nutrition-carbs-chart', model.week, 'carbs_g', {
     valueLabels: true
   });
   renderHeatmap(root, model.month);
   renderProteinTrend(root, model.proteinTrend);
-  renderWeekCompare(root, model.week, model.previousWeek);
+  renderWeekCompare(root, model.week, model.previousWeek, model.proteinTrend);
 
   const fatOver = Boolean(model.overFatCeiling);
   root.querySelector('#nutrition-dashboard')
@@ -71,7 +73,14 @@ function renderMacroRings(root, model) {
 }
 
 function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
-  const { rollingAverage = 0, markOverage = false, guideValue = null, valueLabels = false } = options;
+  const {
+    rollingAverage = 0,
+    markOverage = false,
+    guideValue = null,
+    valueLabels = false,
+    guideLabel = null,
+    rollingLabel = null
+  } = options;
   const svg = root.querySelector(selector);
   if (!svg) return;
   const normalized = series.map(day => ({ date: day.date, value: day[valueKey] }));
@@ -119,6 +128,30 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
       guide.removeAttribute('hidden');
     } else {
       guide.setAttribute('hidden', '');
+    }
+  }
+
+  const guideLabels = svg.querySelector('[data-role="guide-labels"]');
+  if (guideLabels) {
+    guideLabels.replaceChildren();
+    const lastPoint = chart.points.at(-1);
+    if (chart.guideY != null && guideLabel && lastPoint) {
+      const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', String(lastPoint.x));
+      text.setAttribute('y', String(Math.max(9, chart.guideY - 4)));
+      text.setAttribute('text-anchor', 'end');
+      text.setAttribute('class', 'chart-guide-label');
+      text.textContent = guideLabel;
+      guideLabels.append(text);
+    }
+    if (rollingLabel && chart.rollingLinePath && lastPoint) {
+      const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', String(lastPoint.x));
+      text.setAttribute('y', String(Math.max(9, lastPoint.y - 5)));
+      text.setAttribute('text-anchor', 'end');
+      text.setAttribute('class', 'chart-guide-label chart-guide-label--avg');
+      text.textContent = rollingLabel;
+      guideLabels.append(text);
     }
   }
 
@@ -333,36 +366,34 @@ function renderMacroSplit(root, model) {
   }
 }
 
-function renderWeekCompare(root, week, previousWeek = []) {
-  const host = root.querySelector('#nutrition-week-compare');
-  if (!host) return;
-  const thisAvg = week.length === 0
+function renderWeekCompare(root, week, previousWeek = [], proteinTrend = null) {
+  const avg = days => days.length === 0
     ? 0
-    : week.reduce((sum, day) => sum + day.protein_g, 0) / week.length;
-  const priorAvg = previousWeek.length === 0
-    ? 0
-    : previousWeek.reduce((sum, day) => sum + day.protein_g, 0) / previousWeek.length;
+    : days.reduce((sum, day) => sum + day.protein_g, 0) / days.length;
+
+  const thisAvg = avg(week);
+  const priorAvg = avg(previousWeek);
   setText(root, '[data-value="week-compare-this"]', thisAvg.toFixed(0));
   setText(root, '[data-value="week-compare-prior"]', priorAvg.toFixed(0));
 
-  // Task 5 replaces the legacy column chart with the SVG sparkline.
-  if (host.tagName?.toLowerCase() === 'svg') return;
-
-  const chart = buildColumns(week.map(day => ({
-    key: day.date,
-    label: weekdayLetter(day.date),
-    value: day.protein_g
-  })));
-  host.replaceChildren();
-  for (const bar of chart.bars) {
-    const col = root.createElement('div');
-    col.className = 'column-bar';
-    const fill = root.createElement('span');
-    col.append(fill);
-    const label = root.createElement('span');
-    label.textContent = bar.label;
-    col.append(label);
-    host.append(col);
-    animateColumnGrow(fill, bar.heightPct);
+  const badge = root.querySelector('[data-value="week-compare-delta"]');
+  if (badge) {
+    let label = proteinTrend?.label ?? '—';
+    let colour = proteinTrend?.colour ?? 'neutral';
+    if (priorAvg > 0) {
+      const pct = ((thisAvg - priorAvg) / priorAvg) * 100;
+      const sign = pct > 0 ? '+' : pct < 0 ? '−' : '';
+      label = `${sign}${Math.abs(pct).toFixed(0)}%`;
+      colour = pct === 0 ? 'neutral' : pct > 0 ? 'green' : 'red';
+    } else if (!previousWeek.length) {
+      label = 'no prior data';
+      colour = 'neutral';
+    }
+    badge.textContent = label;
+    if (badge.dataset) badge.dataset.colour = colour;
   }
+
+  renderNamedAreaChart(root, '#nutrition-week-compare', week, 'protein_g', {
+    valueLabels: true
+  });
 }

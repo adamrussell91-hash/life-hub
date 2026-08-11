@@ -727,6 +727,11 @@ main { max-width: 76rem; margin: 0 auto; }
   stroke-dasharray: 3 3;
   vector-effect: non-scaling-stroke;
 }
+.chart-guide-label {
+  fill: var(--muted);
+  font-size: 8px;
+  font-weight: 650;
+}
 
 .polyphenol-score {
   margin: 0.85rem 0 0.35rem;
@@ -789,6 +794,19 @@ main { max-width: 76rem; margin: 0 auto; }
   grid-template-columns: 1fr 1fr;
   gap: var(--space-grid);
   margin-bottom: 0;
+}
+.week-compare-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin: 0.5rem 0 0.75rem;
+}
+.week-compare-value {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--depth);
+  font-variant-numeric: tabular-nums;
 }
 @media (max-width: 720px) {
   .nutrition-week-charts { grid-template-columns: 1fr; }
