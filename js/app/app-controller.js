@@ -68,6 +68,7 @@ export function createAppController(dependencies) {
     chatSyncAccent,
     buildCentralNodeModel,
     renderCentralNode,
+    renderGovernance,
     agentColour,
     chatPanel,
     chatClearUnread,
@@ -697,6 +698,7 @@ export function createAppController(dependencies) {
   function renderCentralNodeSection() {
     if (!latestResult || !buildCentralNodeModel || !renderCentralNode) return;
     renderCentralNode(root, buildCentralNodeModel(latestResult));
+    renderGovernance?.(root, latestResult.governanceLogMarkdown);
     const button = root.querySelector('#central-node-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
   }

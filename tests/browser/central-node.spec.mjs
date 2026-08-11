@@ -64,6 +64,13 @@ test('the Central Node tab renders its markdown sections and logging-completion 
     assert.equal(await page.locator('#central-node-exercise-heatmap .heatmap-tile[data-hit="true"]').count(), 1);
     const eatingHeatmap = page.locator('#central-node-eating-heatmap .heatmap-tile');
     assert.equal(await eatingHeatmap.count(), 30);
+
+    // Absent governance-log.md in the shared fixture → empty-state card, not an error.
+    assert.equal(await page.locator('[data-central-node="governance-log"]').count(), 1);
+    assert.match(
+      await page.locator('[data-central-node="governance-log"]').textContent(),
+      /No governance entries yet/
+    );
   } finally {
     await context.close();
   }

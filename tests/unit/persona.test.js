@@ -402,6 +402,27 @@ test('Hammond prompt includes governance log tail when provided', () => {
   assert.match(prompt, /Hold the line/);
 });
 
+test('Hammond prompt includes the one-time carried-over Notion items when the governance log is empty', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    governanceLogIsEmpty: true
+  });
+  assert.match(prompt, /Notion carried two open items/);
+  assert.match(prompt, /Build a life worth enjoying/);
+  assert.match(prompt, /August study load/);
+});
+
+test('carried-over Notion items instruction is Hammond-only and absent when the log is not empty', () => {
+  assert.equal(
+    buildSystemPrompt({ slug: 'brisket', governanceLogIsEmpty: true }).includes('Notion carried two open items'),
+    false
+  );
+  assert.equal(
+    buildSystemPrompt({ slug: 'hammond', governanceLogIsEmpty: false }).includes('Notion carried two open items'),
+    false
+  );
+});
+
 test('Hammond prompt includes the 90-day hammondDigest when provided', () => {
   const prompt = buildSystemPrompt({
     slug: 'hammond',

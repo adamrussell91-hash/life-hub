@@ -481,6 +481,7 @@ export function createChatHandler({
           centralNodeLog,
           centralNodeFull,
           governanceLogTail,
+          governanceLogIsEmpty: needsHammondTools && governanceLog === emptyGovernanceLog(),
           hammondDigest,
           foodLibrary,
           chadwickProtocol,
@@ -659,6 +660,7 @@ export function createChatHandler({
                   });
                   governanceLog = next;
                   governanceLogSha = result.sha;
+                  send({ type: 'governance_log_appended', entryType: dated.entryType });
                   return JSON.stringify({ ok: true, path: GOVERNANCE_LOG_PATH });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });

@@ -6,7 +6,8 @@ import {
   emptyGovernanceLog,
   formatGovernanceEntry,
   appendGovernanceEntry,
-  recentGovernanceTail
+  recentGovernanceTail,
+  parseGovernanceEntries
 } from '../../js/core/governance-log.js';
 
 test('path is data/governance/governance-log.md', () => {
@@ -53,4 +54,40 @@ test('recentGovernanceTail respects entry and char caps', () => {
   }
   const tail = recentGovernanceTail(log, { maxEntries: 10, maxChars: 12000 });
   assert.equal((tail.match(/^## /gm) || []).length, 10);
+});
+
+test('parseGovernanceEntries extracts date, type, status, title, and body', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-08-09',
+    entryType: 'Drift Detection',
+    title: 'Life worth enjoying',
+    status: 'Still Active',
+    body: 'Stalled sleep goal.'
+  });
+  const entries = parseGovernanceEntries(log);
+  assert.equal(entries.length, 1);
+  assert.deepEqual(entries[0], {
+    dateKey: '2026-08-09',
+    entryType: 'Drift Detection',
+    title: 'Life worth enjoying',
+    status: 'Still Active',
+    body: 'Stalled sleep goal.'
+  });
+});
+
+test('parseGovernanceEntries returns [] for empty log', () => {
+  assert.deepEqual(parseGovernanceEntries(emptyGovernanceLog()), []);
+  assert.deepEqual(parseGovernanceEntries(''), []);
+});
+
+test('parseGovernanceEntries tolerates entries without title or status', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-08-01',
+    entryType: "Coach's Notes",
+    body: 'Hold surplus.'
+  });
+  const [entry] = parseGovernanceEntries(log);
+  assert.equal(entry.title, null);
+  assert.equal(entry.status, null);
+  assert.equal(entry.body, 'Hold surplus.');
 });

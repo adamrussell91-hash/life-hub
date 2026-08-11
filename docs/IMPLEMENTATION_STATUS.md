@@ -328,4 +328,14 @@ Verified on 2026-08-11 (local only — do not push unless asked). Move 2 of the 
 - Read-time roll is in-memory unless something writes this turn; idempotent on the next turn.
 - `npm test`: 905 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
 
-## Next Phase: Hammond closed-loop Moves 4–8 (P2–P4) / sleep·heart on Body
+## Phase 29: Hammond closed-loop 3/8 — Governance Log enforce + card — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked). Move 4 of the Hammond closed-loop plan. Shell cache bumped to `life-hub-shell-v64`.
+
+- **Write-side enforcement (first mechanical required-tool gate in this codebase):** `append_governance_log` now emits `governance_log_appended` SSE; `chat-controller.js` tracks it and refuses to advance past audit `lock` until the tool fires — leaving the session on `lock` so the phase contract re-sends. Prior art was prompt-only instruction, not code.
+- **One-time carried-over Notion items:** when `governanceLog === emptyGovernanceLog()`, persona injects a self-expiring instruction naming the two open Notion items (drift + August study escalation). First real `append_governance_log` clears it.
+- **Read-side:** `GOVERNANCE_LOG_PATH` added to `CONFIG_PATHS`; `load-live-events.js` special-cases it like Central Node; new Governance Log card on the CN tab via `render-governance.js` + `parseGovernanceEntries`. Absent file → empty-state, not an error.
+- Service worker precaches `render-governance.js` and `js/core/governance-log.js` (first client import of that module).
+- `npm test`: 914 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
+## Next Phase: Hammond closed-loop Moves 5, 3, 6, 7, 8 (P2–P4) / sleep·heart on Body
