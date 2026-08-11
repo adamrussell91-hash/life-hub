@@ -103,7 +103,7 @@ function appendInlineSegments(root, container, text) {
   }
 }
 
-export function appendRecordProposal(root, { path, record, notes }) {
+export function appendRecordProposal(root, { path, record, notes, warnings }) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
   const card = root.createElement('li');
@@ -167,6 +167,20 @@ export function appendRecordProposal(root, { path, record, notes }) {
       exercisesList.append(item);
     }
     card.append(exercisesList);
+  }
+
+  // Phase 6a: deterministic protocol lint -- a non-blocking heads-up, never a reason to
+  // disable Confirm. Adam can always override; this just makes a silent protocol drift
+  // visible instead of relying on Chadwick to remember every rule every time.
+  if (Array.isArray(warnings) && warnings.length > 0) {
+    const warningsList = root.createElement('ul');
+    warningsList.className = 'record-proposal__warnings';
+    for (const warning of warnings) {
+      const item = root.createElement('li');
+      item.textContent = `⚠ ${warning}`;
+      warningsList.append(item);
+    }
+    card.append(warningsList);
   }
 
   const confirm = root.createElement('button');

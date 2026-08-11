@@ -648,6 +648,18 @@ main { max-width: 76rem; margin: 0 auto; }
   gap: 0.55rem;
 }
 .record-proposal__exercises li { color: var(--depth); }
+.record-proposal__warnings {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.7rem;
+  list-style: none;
+  display: grid;
+  gap: 0.3rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(217, 104, 58, 0.35);
+  background: rgba(217, 104, 58, 0.08);
+  font-size: 0.82rem;
+  color: var(--depth);
+}
 .record-proposal__sets {
   margin-top: 0.25rem;
   font-size: 0.88rem;
