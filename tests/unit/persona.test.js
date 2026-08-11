@@ -136,17 +136,41 @@ test('chadwick prompt includes the body state block when provided, and instructs
   assert.match(prompt, /not (claim|say).{0,40}training alone/i);
 });
 
+test('chadwick prompt tells him to name the binding constraint and defer to Brisket rather than sell more sets', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    bodyState: 'Shoulder:waist ratio: 1.43 (improving) — target 1.60, gap 0.17.'
+  });
+  assert.match(prompt, /binding constraint/i);
+  assert.match(prompt, /defer to Brisket/i);
+});
+
 test('chadwick prompt omits the body state block when empty', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick', bodyState: '' });
   assert.doesNotMatch(prompt, /Body state/i);
 });
 
-test('non-chadwick agents never receive the chadwick body-state block', () => {
+test('non-chadwick, non-brisket agents never receive the body-state block', () => {
   const prompt = buildSystemPrompt({
-    slug: 'brisket',
+    slug: 'sara',
     bodyState: 'Shoulder:waist ratio: 1.43 (improving).'
   });
   assert.doesNotMatch(prompt, /reference body trend/i);
+  assert.doesNotMatch(prompt, /Shoulder:waist ratio: 1\.43/);
+});
+
+test('brisket prompt includes the body state block when provided, framed as his lane to address', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    bodyState: 'Shoulder:waist ratio: 1.43 (improving) — target 1.60, gap 0.17.'
+  });
+  assert.match(prompt, /Shoulder:waist ratio: 1\.43/);
+  assert.match(prompt, /your lane/i);
+});
+
+test('brisket prompt omits the body state block when empty', () => {
+  const prompt = buildSystemPrompt({ slug: 'brisket', bodyState: '' });
+  assert.doesNotMatch(prompt, /Shoulder:waist ratio/i);
 });
 
 test('chadwick prompt omits exercise library block when empty', () => {

@@ -64,7 +64,7 @@ export function buildSystemPrompt({
       ? 'When designing a session you MUST use the Central Node\'s Today\'s Status and Cross-Agent Coordination above to shape the prescription — a nutrition flag, a recovery note, or another agent\'s directive should visibly change the volume, focus, or intensity you propose, not just be silently acknowledged. Mention that influence briefly in chat when you propose the session. If nothing relevant applies, say so in one short line rather than staying silent about it.'
       : '',
     bodyState
-      ? `Body state (latest composition, tape, and shoulder:waist ratio toward Adam's physique goal):\n${bodyState}\n\nYou must reference body trend in your programming or chat pitch when it's relevant to what you're building (a stalled ratio, a fat-loss plateau, a good week) — don't sit on data that should change what you say. You must not claim training alone drives fat loss or waist trim — that's nutrition's job (Brisket owns it) — if the binding constraint is diet, not volume, say so instead of selling more sets as the fix.`
+      ? `Body state (latest composition, tape, and shoulder:waist ratio toward Adam's physique goal):\n${bodyState}\n\nYou must reference body trend in your programming or chat pitch when it's relevant to what you're building (a stalled ratio, a fat-loss plateau, a good week) — don't sit on data that should change what you say. You must not claim training alone drives fat loss or waist trim — that's nutrition's job (Brisket owns it) — name the binding constraint honestly: if diet, not training volume, is what's actually holding the ratio back, say so and defer to Brisket instead of selling more sets as the fix.`
       : '',
     chadwickProtocol
       ? `Chadwick operating manual (follow these Life Hub rules; ignore any Notion database mechanics):\n${chadwickProtocol}`
@@ -110,6 +110,9 @@ export function buildSystemPrompt({
   const brisketBlocks = slug === 'brisket' ? [
     brisketProtocol
       ? `Brisket operating manual (follow these Life Hub rules; ignore any Notion database mechanics):\n${brisketProtocol}`
+      : '',
+    bodyState
+      ? `Body state (latest composition, tape, and shoulder:waist ratio toward Adam's physique goal):\n${bodyState}\n\nIf this trend is stalled or moving the wrong way, that's your lane to actually address through nutrition coaching — Chadwick isn't qualified to fix a diet problem with more sets, so don't wait for him to raise it first.`
       : '',
     'Every meal log_entry MUST include notes in the form "[food] — [compact verdict]" (on track / protein short / fat risk / emulsifier flag, etc.). Life Hub copies that line into Central Node Flags and Recent Actions after confirm — a meal without a verdict leaves CN silent. Keep Cross-Agent directives rare; routine meal judgments stay in notes.',
     'One breakfast/lunch/dinner/snack file per day. If Adam corrects a meal already logged today, re-propose the same meal slot with updated macros/notes and say confirming will replace that slot (overwrite), not add another.',

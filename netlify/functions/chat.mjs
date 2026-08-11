@@ -176,7 +176,7 @@ export function createChatHandler({
     const needsExerciseLibrary = slug === 'chadwick';
     const needsSkincareLibrary = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
-    const needsBodyState = slug === 'chadwick';
+    const needsBodyState = slug === 'chadwick' || slug === 'brisket';
 
     let anthropic;
     try {
