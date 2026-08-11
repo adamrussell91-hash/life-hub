@@ -774,7 +774,8 @@ main { max-width: 76rem; margin: 0 auto; }
 @media (max-width: 720px) {
   .nutrition-week-charts { grid-template-columns: 1fr; }
 }
-.line-chart.body-chart { aspect-ratio: 320 / 168; }
+.line-chart.body-chart { aspect-ratio: 320 / 120; }
+#body-dashboard .line-chart.body-chart { aspect-ratio: 320 / 168; }
 .line-chart [data-role="area"] { fill: var(--area-fill); stroke: none; }
 .line-chart [data-role="line"] {
   fill: none;
