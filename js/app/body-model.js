@@ -1,13 +1,21 @@
-import { getTrend, downsampleWeekly } from '../core/trends.js';
+import { getTrend } from '../core/trends.js';
 import { addCalendarDays, isCalendarDate } from '../core/time.js';
 
-export const BODY_RANGES = ['weekly', 'monthly', 'six_month'];
-export const DEFAULT_BODY_RANGE = 'monthly';
+export const BODY_RANGES = ['monthly', 'six_month', 'year', 'five_year'];
+export const DEFAULT_BODY_RANGE = 'six_month';
 
 const RANGE_DAYS = {
-  weekly: 7,
   monthly: 30,
-  six_month: 182
+  six_month: 182,
+  year: 365,
+  five_year: 1826
+};
+
+const RANGE_LABELS = {
+  monthly: 'Month',
+  six_month: '6M',
+  year: 'Year',
+  five_year: '5Y'
 };
 
 export const TREND_CONFIG = {
@@ -61,14 +69,55 @@ export function observationsFor(events, type, field) {
     .sort((a, b) => a.date.localeCompare(b.date) || a.value - b.value);
 }
 
-export function seriesInRange(observations, { from, to, days }) {
-  const inRange = observations.filter(point => point.date >= from && point.date <= to);
-  if (days > 90 && inRange.length) {
-    return downsampleWeekly(inRange, 'value')
-      .filter(point => point.value != null)
-      .map(point => ({ date: point.date, value: point.value }));
+function lastDayOfMonth(date) {
+  const [year, month] = date.slice(0, 7).split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+}
+
+function aggregationBucket(date, mode) {
+  if (mode === 'monthly') return lastDayOfMonth(date);
+  if (mode === 'half_year') {
+    const [year, month] = date.slice(0, 7).split('-').map(Number);
+    return `${year}-${month <= 6 ? '06-30' : '12-31'}`;
   }
-  return inRange;
+  throw new TypeError(`Unknown body aggregation mode: ${mode}`);
+}
+
+export function aggregateSeries(points, mode) {
+  if (mode === 'raw') return points.map(point => ({ date: point.date, value: point.value }));
+  if (mode !== 'monthly' && mode !== 'half_year') {
+    throw new TypeError(`Unknown body aggregation mode: ${mode}`);
+  }
+
+  const buckets = new Map();
+  for (const point of points) {
+    const date = aggregationBucket(point.date, mode);
+    const bucket = buckets.get(date) ?? { total: 0, count: 0 };
+    bucket.total += point.value;
+    bucket.count += 1;
+    buckets.set(date, bucket);
+  }
+
+  return [...buckets.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, { total, count }]) => ({ date, value: total / count }));
+}
+
+export function seriesInRange(observations, { from, to, days }, rangeKey) {
+  const inRange = observations.filter(point => point.date >= from && point.date <= to);
+  const mode = rangeKey === 'monthly'
+    ? 'raw'
+    : rangeKey === 'six_month' || rangeKey === 'year'
+      ? 'monthly'
+      : rangeKey === 'five_year'
+        ? 'half_year'
+        : days > 900
+          ? 'half_year'
+          : days > 90
+            ? 'monthly'
+            : 'raw';
+  return aggregateSeries(inRange, mode);
 }
 
 export function rangeGrowthPercent(series) {
@@ -103,8 +152,8 @@ function latestPair(observations) {
   return { current, previous };
 }
 
-function metricModel(observations, rangeBounds, trendConfig, { label, key } = {}) {
-  const series = seriesInRange(observations, rangeBounds);
+function metricModel(observations, rangeBounds, selectedRange, trendConfig, { label, key } = {}) {
+  const series = seriesInRange(observations, rangeBounds, selectedRange);
   const { current, previous } = latestPair(observations);
   const primary = formatGrowthPercent(rangeGrowthPercent(series), trendConfig);
   const secondary = current
@@ -158,20 +207,20 @@ export function buildBodyModel({ events, date, range = DEFAULT_BODY_RANGE }) {
       field: 'value',
       good: measurementGood(site)
     };
-    tapeMetrics.push(metricModel(obs, bounds, config, {
+    tapeMetrics.push(metricModel(obs, bounds, selectedRange, config, {
       key: site,
       label: TAPE_LABELS[site] ?? site
     }));
   }
 
   const compositionMetrics = [
-    metricModel(fatObs, bounds, TREND_CONFIG.body_fat_pct, {
+    metricModel(fatObs, bounds, selectedRange, TREND_CONFIG.body_fat_pct, {
       key: 'body_fat_pct',
       label: 'Body fat'
     })
   ];
   if (muscleObs.length) {
-    compositionMetrics.push(metricModel(muscleObs, bounds, TREND_CONFIG.skeletal_muscle_kg, {
+    compositionMetrics.push(metricModel(muscleObs, bounds, selectedRange, TREND_CONFIG.skeletal_muscle_kg, {
       key: 'skeletal_muscle_kg',
       label: 'Skeletal muscle'
     }));
@@ -180,12 +229,12 @@ export function buildBodyModel({ events, date, range = DEFAULT_BODY_RANGE }) {
   return {
     date,
     range: selectedRange,
-    rangeLabel: selectedRange === 'weekly' ? 'Weekly' : selectedRange === 'monthly' ? 'Monthly' : '6M',
+    rangeLabel: RANGE_LABELS[selectedRange],
     scale: {
       id: 'scale',
       title: 'Scale',
       metrics: [
-        metricModel(mergedWeight, bounds, TREND_CONFIG.weight_kg, {
+        metricModel(mergedWeight, bounds, selectedRange, TREND_CONFIG.weight_kg, {
           key: 'weight_kg',
           label: 'Weight'
         })
