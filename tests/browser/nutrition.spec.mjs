@@ -71,6 +71,12 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     assert.equal(await page.locator('#nutrition-fat-chart [data-role="guide-labels"] .chart-guide-label').count(), 1);
     assert.deepEqual(await page.locator('#nutrition-protein-chart .chart-guide-label').allTextContents(), ['goal', 'avg']);
     assert.deepEqual(await page.locator('#nutrition-fat-chart .chart-guide-label').allTextContents(), ['ceiling']);
+    const avgLabelY = Number(await page.locator('#nutrition-protein-chart .chart-guide-label--avg').getAttribute('y'));
+    const finalValueLabelY = Number(await page.locator('#nutrition-protein-chart [data-role="value-labels"] text').last().getAttribute('y'));
+    assert.ok(avgLabelY < finalValueLabelY, 'average label sits above the final value label');
+    assert.match(await page.locator('[data-value="week-compare-this"]').textContent(), /^\d+$/);
+    assert.match(await page.locator('[data-value="week-compare-prior"]').textContent(), /^\d+$/);
+    assert.ok(await page.locator('#nutrition-week-compare [data-role="value-labels"] text').count() > 0);
     assert.equal(await page.locator('#nutrition-macro-split').count(), 1);
 
     const heatmapTiles = page.locator('#nutrition-heatmap .heatmap-tile');
