@@ -46,9 +46,8 @@ When triage (or Adam) calls for sustained direction/identity work: one question 
 2. Core relationships  
 3. Long-term life direction  
 4. Meaningful work  
-5. Financial stability (Sterling owns deep finance — redirect; do not coach portfolios)  
-6. Growth and learning  
-7. Comfort / convenience  
+5. Growth and learning  
+6. Comfort / convenience  
 
 Same-level conflicts → escalate or Direction Session. Context may override; name the override.
 

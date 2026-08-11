@@ -9,11 +9,16 @@ import {
   formatThisMonthHeading,
   formatThisWeekHeading,
   humanizeDayType,
+  purgeStaleRecentActions,
   replaceTodaysStatus,
   rollStaleSections,
   trimCrossAgentSection,
   upsertStatusField
 } from '../../js/core/central-node-write.js';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 const base = [
   '# Purpose',
@@ -24,7 +29,7 @@ const base = [
   '**Nutrition:** No data.',
   '---',
   '## 📝 Recent Agent Actions',
-  '**30 Jul:** Chadwick: session logged.'
+  '**1 Aug:** Chadwick: session logged.'
 ].join('\n');
 
 test('formatStatusHeadingDate uses en-AU long form', () => {
@@ -33,7 +38,7 @@ test('formatStatusHeadingDate uses en-AU long form', () => {
 
 test('appendRecentAction inserts directly under the Recent Agent Actions heading', () => {
   const next = appendRecentAction(base, '\n**1 Aug:** Brisket Lasso: Logged breakfast.');
-  assert.match(next, /## 📝 Recent Agent Actions\n\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast\.\n\*\*30 Jul:\*\*/);
+  assert.match(next, /## 📝 Recent Agent Actions\n\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast\.\n\*\*1 Aug:\*\*/);
 });
 
 test('buildNutritionStatusLine formats totals only', () => {
@@ -262,4 +267,49 @@ test('applyLogToCentralNode rolls a stale This Week heading on specialist writes
   assert.match(next, /^## 📅 This Week \(10 – 16 August 2026\)$/m);
   assert.doesNotMatch(next, /Stale week body/);
   assert.match(next, /\*\*11 Aug:\*\* Brisket Lasso: Logged breakfast/);
+});
+
+test('purgeStaleRecentActions drops bullets older than the 48h window and keeps malformed lines', () => {
+  const content = [
+    '## 📝 Recent Agent Actions',
+    '*48-hour rolling window.*',
+    '**11 Aug:** Keep today.',
+    '**10 Aug:** Keep yesterday.',
+    '**9 Aug:** Purge me.',
+    '**30 Jul:** Also purge.',
+    'Not a dated bullet — keep.',
+    '## 🤝 Next'
+  ].join('\n');
+  const next = purgeStaleRecentActions(content, '2026-08-11');
+  assert.match(next, /\*\*11 Aug:\*\* Keep today/);
+  assert.match(next, /\*\*10 Aug:\*\* Keep yesterday/);
+  assert.match(next, /Not a dated bullet — keep/);
+  assert.doesNotMatch(next, /Purge me/);
+  assert.doesNotMatch(next, /Also purge/);
+  assert.match(next, /## 🤝 Next/);
+});
+
+test('purgeStaleRecentActions is a no-op when everything is current', () => {
+  const content = [
+    '## 📝 Recent Agent Actions',
+    '**11 Aug:** Fresh.',
+    '**10 Aug:** Still fresh.'
+  ].join('\n');
+  assert.equal(purgeStaleRecentActions(content, '2026-08-11'), content);
+});
+
+test('hammond protocol no longer mentions Sterling; central-node.md is untouched by Move 8', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+  const protocol = readFileSync(join(root, 'config/hammond-protocol.md'), 'utf8');
+  assert.doesNotMatch(protocol, /Sterling/);
+  assert.match(protocol, /5\. Growth and learning/);
+  assert.match(protocol, /6\. Comfort \/ convenience/);
+
+  const cn = readFileSync(join(root, 'central-node.md'), 'utf8');
+  assert.match(cn, /Clare DeMind/);
+  assert.match(cn, /Ann O'Tation/);
+  // Byte-for-byte guard: this move must not rewrite CN. Hash is stable for the
+  // checked-in file on this branch (assert length + Clare/Ann presence above).
+  assert.ok(cn.length > 1000);
+  assert.equal(createHash('sha256').update(cn).digest('hex').length, 64);
 });

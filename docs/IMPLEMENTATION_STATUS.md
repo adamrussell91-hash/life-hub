@@ -368,4 +368,13 @@ Verified on 2026-08-11 (local only — do not push unless asked). Move 7. Shell 
 - Audit phase persists in `localStorage` (`life-hub:hammond-audit-session`) via injected storage; resumes on reload except `lock` phase (already ended).
 - `npm test`: 931 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
 
-## Next Phase: Hammond closed-loop Move 8 / sleep·heart on Body
+## Phase 34: Hammond closed-loop 8/8 — Recent Actions purge + Sterling cleanup — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked). Final move of `docs/superpowers/plans/2026-08-11-hammond-closed-loop.md`.
+
+- `purgeStaleRecentActions` drops dated Recent Agent Actions bullets outside the 48h window (day-month stamps; year inferred from today). Malformed lines kept. Wired at specialist confirm writes and Hammond read-time alongside `rollStaleSections`.
+- Removed Sterling from `config/hammond-protocol.md` Decision Priority Hierarchy (rule 5 dropped; Growth/Comfort renumbered). `central-node.md` untouched — Clare/Ann references preserved.
+- `npm test`: 934 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
+## Next Phase: sleep·heart on Body / polish
+
