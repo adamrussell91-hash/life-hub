@@ -269,3 +269,61 @@ test('shelf updates report an offline status without making API requests', async
   assert.equal(apiCalls, 0);
   assert.equal(root.status.textContent, 'Connect to update routine.');
 });
+
+test('onLogRoutine returns the save promise so callers can await settle', async () => {
+  const root = createRoot();
+  let resolveConfirm;
+  const confirmPromise = new Promise(resolve => { resolveConfirm = resolve; });
+  const written = [];
+  const controller = createSkincareController({
+    root,
+    chatApi: {
+      confirm() {
+        return confirmPromise;
+      }
+    },
+    skincareApi: {},
+    onRecordWritten: value => written.push(value),
+    isOnline: () => true
+  });
+
+  const pending = controller.onLogRoutine({
+    payload: {
+      candidate: { type: 'skincare', date: '2026-08-11', routine: 'am', products: ['Serum'] },
+      slug: 'am',
+      overwrite: true
+    }
+  });
+
+  assert.equal(typeof pending?.then, 'function', 'onLogRoutine must return a thenable');
+  assert.equal(root.status.textContent, 'Saving…');
+  assert.equal(written.length, 0);
+
+  resolveConfirm({ ok: true });
+  const result = await pending;
+  assert.equal(result.ok, true);
+  assert.equal(written.length, 1);
+  assert.equal(root.status.textContent, 'Logged ✨');
+});
+
+test('onLogProcedure returns the save promise', async () => {
+  const root = createRoot();
+  const controller = createSkincareController({
+    root,
+    chatApi: {
+      async confirm() {
+        return { ok: true };
+      }
+    },
+    skincareApi: {},
+    isOnline: () => true
+  });
+
+  const result = await controller.onLogProcedure({
+    payload: {
+      candidate: { type: 'skincare', date: '2026-08-11', routine: 'pm', products: ['Laser'] },
+      overwrite: true
+    }
+  });
+  assert.equal(result.ok, true);
+});
