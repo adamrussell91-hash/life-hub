@@ -17,6 +17,27 @@ test('loads the checked-in Brisket protocol markdown', () => {
   assert.match(text, /high.{0,10}1,500 mg\+/i);
 });
 
+test('protocol coaches eating psychology and environmental habit stacking, not just macros', () => {
+  const text = loadBrisketProtocol();
+  assert.match(text, /Psychology (&|and) behaviour/i);
+  assert.match(text, /habit stacking/i);
+  assert.match(text, /pre-made.{0,20}fridge|zero.effort|zero decision.making/i);
+  assert.match(text, /capable of more/i);
+});
+
+test('protocol anticipates the Vyvanse eating baseline rather than treating it as news', () => {
+  const text = loadBrisketProtocol();
+  assert.match(text, /Known baseline/i);
+  assert.match(text, /skipped breakfast\/lunch on a workday is the expected pattern/i);
+});
+
+test('protocol defers longitudinal patterns to Hammond via Cross-Agent rather than self-computing trends', () => {
+  const text = loadBrisketProtocol();
+  assert.match(text, /Patterns are Hammond's job/i);
+  assert.match(text, /Hammond→Brisket/);
+  assert.match(text, /do not (guess at trends|fabricate a pattern)/i);
+});
+
 test('returns an empty string when the seed file cannot be read', () => {
   const text = loadBrisketProtocol({
     readFileSyncImpl: () => {

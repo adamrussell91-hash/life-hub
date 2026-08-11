@@ -33,3 +33,12 @@ test('protocol points write-back at CN tools and Governance Log', () => {
   assert.doesNotMatch(text, /Life Hub persists CN from confirmed specialist logs/);
   assert.doesNotMatch(text, /No fake database write/);
 });
+
+test('protocol makes Hammond the relay for longitudinal patterns specialists cannot see themselves', () => {
+  const text = loadHammondProtocol();
+  assert.match(text, /Specialist pattern relay/i);
+  assert.match(text, /thin, short-range digest/i);
+  assert.match(text, /Hammond→\[Specialist\]/);
+  assert.match(text, /Hammond→Brisket|relaying to Brisket|worth relaying to Brisket/i);
+  assert.match(text, /Pattern confidence/);
+});
