@@ -95,7 +95,7 @@ export function createAppController(dependencies) {
   let currentSection = 'home';
   let calendarSelectedDate = null;
   let calendarViewMonth = null;
-  let bodyRange = 'monthly';
+  let bodyRange = 'six_month';
   let mindRange = 'monthly';
   let latestLibrary = null;
   let latestMembership = null;
