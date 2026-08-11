@@ -28,7 +28,7 @@ export function createSkincareController({
   async function save(payload) {
     if (!isOnline()) {
       setStatus('Connect to log skincare.');
-      return;
+      throw new Error('offline');
     }
     setStatus('Saving…');
     try {
@@ -40,8 +40,9 @@ export function createSkincareController({
       setStatus('Logged ✨');
       onRecordWritten?.(result);
       return result;
-    } catch {
+    } catch (error) {
       setStatus('Couldn’t save — try again.');
+      throw error;
     }
   }
 
