@@ -3,9 +3,10 @@ import { buildAreaLine } from './chart-kit/area-line.js';
 import { BODY_RANGES } from './body-model.js';
 
 const RANGE_LABELS = {
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-  six_month: '6M'
+  monthly: 'Month',
+  six_month: '6M',
+  year: 'Year',
+  five_year: '5Y'
 };
 
 export function renderBody(root, model, {
@@ -76,9 +77,16 @@ function sectionCard(root, section, hooks) {
     empty.className = 'metric-caption';
     empty.textContent = emptyCopy(section.id);
     article.append(empty);
+  } else if (section.id === 'tape') {
+    const grid = root.createElement('div');
+    grid.className = 'body-tape-grid';
+    for (const metric of section.metrics) {
+      if (metric.empty) continue;
+      grid.append(metricBlock(root, metric));
+    }
+    article.append(grid);
   } else {
     for (const metric of section.metrics) {
-      if (metric.empty && section.id !== 'tape') continue;
       if (metric.empty) continue;
       article.append(metricBlock(root, metric));
     }
@@ -128,7 +136,7 @@ function metricBlock(root, metric) {
   if (metric.series.length) {
     const chart = root.createElementNS('http://www.w3.org/2000/svg', 'svg');
     chart.setAttribute('class', 'line-chart body-chart');
-    chart.setAttribute('viewBox', '0 0 320 120');
+    chart.setAttribute('viewBox', '0 0 320 168');
     chart.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     chart.setAttribute('role', 'img');
     chart.setAttribute('aria-label', `${metric.label} trend`);
@@ -136,15 +144,39 @@ function metricBlock(root, metric) {
     area.setAttribute('data-role', 'area');
     const line = root.createElementNS('http://www.w3.org/2000/svg', 'path');
     line.setAttribute('data-role', 'line');
-    chart.append(area, line);
+    const points = root.createElementNS('http://www.w3.org/2000/svg', 'g');
+    points.setAttribute('data-role', 'points');
+    const valueLabels = root.createElementNS('http://www.w3.org/2000/svg', 'g');
+    valueLabels.setAttribute('data-role', 'value-labels');
+    chart.append(area, line, points, valueLabels);
     const built = buildAreaLine(metric.series.map(point => ({
       date: point.date,
       value: point.value
-    })));
+    })), { height: 168, yDomain: 'padded' });
     area.setAttribute('d', built.areaPath || built.areaPoints || '');
     line.setAttribute('d', built.linePath || '');
+    for (const point of built.points) {
+      const circle = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', String(point.x));
+      circle.setAttribute('cy', String(point.y));
+      circle.setAttribute('r', '2.5');
+      points.append(circle);
+
+      const label = root.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', String(point.x));
+      label.setAttribute('y', String(Math.max(9, point.y - 5)));
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('class', 'chart-value-label');
+      label.textContent = formatPointLabel(metric, point.value);
+      valueLabels.append(label);
+    }
     wrap.append(chart);
     queueMicrotask(() => animateAreaReveal(chart));
+  } else if (metric.latest) {
+    const caption = root.createElement('p');
+    caption.className = 'metric-caption';
+    caption.textContent = 'No readings in this range.';
+    wrap.append(caption);
   }
 
   return wrap;
@@ -157,6 +189,14 @@ function formatLatest(metric) {
   const n = metric.latest.value;
   const text = metric.key === 'body_fat_pct' ? n.toFixed(1) : Number.isInteger(n) ? String(n) : n.toFixed(1);
   return `${text}${unit}`;
+}
+
+function formatPointLabel(metric, value) {
+  return metric.key === 'body_fat_pct'
+    ? Number(value).toFixed(1)
+    : Number.isInteger(value)
+      ? String(value)
+      : Number(value).toFixed(1);
 }
 
 function trendArrow(trend) {
