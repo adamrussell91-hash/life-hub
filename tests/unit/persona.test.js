@@ -210,6 +210,15 @@ test('brisket prompt includes protocol when provided', () => {
   assert.match(prompt, /compact verdict/i);
 });
 
+test('shared logging prompt: proposals await Confirm; estimates are last resort; never fake a completed log', () => {
+  const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
+  assert.match(prompt, /awaiting confirm|Confirm card|before that record is saved/i);
+  assert.match(prompt, /do not (say|claim|tell).{0,60}(logged|saved to (Nutrition|today))/i);
+  assert.match(prompt, /Only fall back to a good-faith estimate when/i);
+  assert.match(prompt, /partial|incomplete|re-search|ask Adam for the AU label/i);
+  assert.match(prompt, /do not (call )?save_food_library_entry.{0,80}estimate/i);
+});
+
 test('checked-in Brisket protocol requires meal verdicts on Central Node', () => {
   const protocol = loadBrisketProtocol();
   const prompt = buildSystemPrompt({

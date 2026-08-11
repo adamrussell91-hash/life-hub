@@ -558,6 +558,27 @@ export function createChatHandler({
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
               }
+              if (event.name === 'log_entry') {
+                const validation = validateLogEntry(event.input, {
+                  id: `${event.input?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
+                  now: getSydneyTimestamp(nowInstant)
+                });
+                if (!validation.valid) {
+                  send({ type: 'record_rejected', errors: validation.errors });
+                  return JSON.stringify({ ok: false, errors: validation.errors });
+                }
+                send({
+                  type: 'record_proposal',
+                  record: validation.record,
+                  notes: validation.notes,
+                  path: buildCanonicalPath({
+                    type: validation.record.type,
+                    date: validation.record.date,
+                    slug: buildRecordSlug(validation.record)
+                  })
+                });
+                return JSON.stringify({ ok: true, status: 'awaiting_confirm' });
+              }
               if (event.name === 'append_governance_log') {
                 const entry = validateGovernanceLogAppendInput(event.input);
                 if (!entry) {
