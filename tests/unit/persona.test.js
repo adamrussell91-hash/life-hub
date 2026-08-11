@@ -219,6 +219,14 @@ test('shared logging prompt: proposals await Confirm; estimates are last resort;
   assert.match(prompt, /do not (call )?save_food_library_entry.{0,80}estimate/i);
 });
 
+test('shared logging prompt: calcium, polyphenol_score, and omega3 are mandatory with no "couldn\'t find data" excuse', () => {
+  const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
+  assert.match(prompt, /calcium_mg,? polyphenol_score,? and omega3/i);
+  assert.match(prompt, /category density estimate/i);
+  assert.match(prompt, /never leave it blank/i);
+  assert.match(prompt, /judgment calls?.{0,40}not lookups/i);
+});
+
 test('checked-in Brisket protocol requires meal verdicts on Central Node', () => {
   const protocol = loadBrisketProtocol();
   const prompt = buildSystemPrompt({

@@ -12,6 +12,9 @@ test('loads the checked-in Brisket protocol markdown', () => {
   assert.match(text, /do not (say|claim).{0,40}logged/i);
   assert.match(text, /partial (panel|NIP|nutrition)|re-search|ask.{0,20}(label|wrapper)/i);
   assert.match(text, /do not (save|cache).{0,40}estimate/i);
+  assert.match(text, /calcium_mg,? polyphenol_score,? and omega3 are all mandatory/i);
+  assert.match(text, /category density estimate/i);
+  assert.match(text, /high.{0,10}1,500 mg\+/i);
 });
 
 test('returns an empty string when the seed file cannot be read', () => {
