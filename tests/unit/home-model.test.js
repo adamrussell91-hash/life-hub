@@ -38,6 +38,7 @@ test('builds the approved Home fixture model through core modules', async () => 
     calories: 1130,
     protein_g: 80,
     fat_g: 27,
+    carbs_g: 100,
     sodium_mg: 1100,
     calcium_mg: 590,
     polyphenol_score: 9,
