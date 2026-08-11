@@ -307,3 +307,55 @@ test('validates nested workout exercises, sets, reps, and weights', () => {
     assert.notDeepEqual(validateRecord({ ...workout, exercises }), []);
   }
 });
+
+test('accepts optional per-exercise coach_cues (start/rest/final_set) on a planned session', () => {
+  const planned = {
+    ...common,
+    type: 'workout',
+    title: 'Chest and Curls',
+    session_kind: 'strength',
+    day_type: 'workout_30',
+    status: 'planned',
+    recovery_flag_next_day: false,
+    exercises: [{
+      name: 'Chest Press',
+      coach_cues: {
+        start: "Let's get that chest pumped, big guy.",
+        rest: 'Shake it out, breathe, next set is coming.',
+        final_set: '1-2 reps in the tank, this is the one that counts.'
+      },
+      sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }]
+    }]
+  };
+  assert.deepEqual(validateRecord(planned), []);
+});
+
+test('a planned exercise with no coach_cues is still valid (the field is optional)', () => {
+  const planned = {
+    ...common,
+    type: 'workout',
+    title: 'Chest and Curls',
+    session_kind: 'strength',
+    day_type: 'workout_30',
+    status: 'planned',
+    recovery_flag_next_day: false,
+    exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }]
+  };
+  assert.deepEqual(validateRecord(planned), []);
+});
+
+test('rejects coach_cues that is not an object, or whose sub-fields are not strings', () => {
+  const base = {
+    ...common,
+    type: 'workout',
+    title: 'Chest and Curls',
+    session_kind: 'strength',
+    day_type: 'workout_30',
+    status: 'planned',
+    recovery_flag_next_day: false
+  };
+  for (const coach_cues of ['not-an-object', 42, ['array'], { start: 42 }, { final_set: false }]) {
+    const exercises = [{ name: 'Chest Press', coach_cues, sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }];
+    assert.notEqual(validateRecord({ ...base, exercises }).length, 0, JSON.stringify(coach_cues));
+  }
+});

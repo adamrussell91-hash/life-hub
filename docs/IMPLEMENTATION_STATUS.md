@@ -253,4 +253,53 @@ Verified on 2026-08-07 (local only — do not push unless asked):
 
 Full design: `docs/superpowers/specs/2026-08-07-fitness-muscle-maps-templates-design.md`.
 
+## Phase 21: Chadwick closed-loop 1/6 — progression tracking — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked). First phase of `docs/superpowers/plans/2026-08-11-chadwick-closed-loop.md`.
+
+- Completed workout confirms now upsert `last_performed` / `times_performed` / `working_weight_kg` / `best_weight_kg` back into `data/exercise-library.json` — a genuine gap where these fields existed in the schema but were never written.
+- Single read + single write of the library JSON per confirm; best-effort (try/catch) so a library write failure never fails the confirm itself, matching the existing Central Node pattern in `chat-confirm.mjs`.
+- PB detection: a session strictly beating the prior `best_weight_kg` is flagged and returned as `personalBests` in the confirm response; a first-ever performance or a tied best is not flagged (nothing to genuinely beat).
+- `npm test`: 802 passed, 0 failed (+10 new tests). `npm run validate:fixtures`: 4/4 valid.
+
+## Phase 22: Chadwick closed-loop 2/6 — body state, exercise history, real templates — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked).
+
+- Body state block injected into Chadwick's prompt: latest composition + measurements with deltas vs. the previous reading, plus the shoulder:waist ratio, trend, and gap to target. Sourced via a bounded read (latest 1-2 records per type from the already-fetched repo tree, never a history scan) — `netlify/functions/_shared/body-state.mjs`.
+- New `config/physique-target.yml` (target ratio 1.6, target body fat 8%), loaded via `load-physique-target.mjs`, registered in `netlify.toml` `included_files`.
+- Exercise library prompt block now shows `last_performed`, `best_weight_kg` (PB), and `times_performed` alongside working weight — derived entirely from Phase 21's fields, zero extra reads.
+- The most recently-used workout templates now inject their full exercise/set list (top 5, sorted by recency), not just a title line — closes the "let's do X again" confabulation gap. Older templates still fall back to a one-line summary.
+- Protocol updated: body trend must be referenced when relevant; training alone must not be credited for fat loss; Templates section updated to match the new detail available.
+- `npm test`: 827 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
+## Phase 23: Chadwick closed-loop 3/6 — physique objective surfaced to Brisket — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked).
+
+- Body state (composition, tape, shoulder:waist ratio) now also injects into Brisket's prompt, framed as nutrition's lane to address when the ratio stalls.
+- Chadwick's protocol instructs him to name the binding constraint (diet vs. training volume) honestly and defer to Brisket when diet is the actual limiter, rather than selling more sets as the fix.
+- **Deviation:** skipped the plan's optional Body-tab UI display for the ratio — explicitly marked optional in the plan, and not worth a client JS + service-worker cache bump for a presentational-only addition. The ratio math and target config are already in place if wanted later.
+- `npm test`: 831 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
+## Phase 24: Chadwick closed-loop 4/6 — earned hype + adherence — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked).
+
+- Confirming a completed workout with a reported PB (Phase 21) now appends a specific, loud, in-voice hype line straight into the chat transcript. Confirm is a plain POST, not an LLM turn, so this is a deterministic templated line (naming the exercise and the exact kg beaten) rather than a model-generated one — `personalBestHypeLine` in `chat-controller.js`.
+- Chadwick's prompt now reports days since Adam's last completed session, computed at zero extra read cost from the exercise library's `last_performed` fields already loaded every turn (`daysSinceLastSession` in `exercise-library.mjs`). At 2+ missed days, protocol has him lead with it and lower the bar hard (10-minute single-lift or a walk, never the full session, never a guilt trip).
+- Verified the two known browser-suite offline/service-worker failures reproduce identically on the untouched pre-plan baseline (16b8ff3) — confirmed pre-existing and unrelated to this work.
+- `npm test`: 842 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
+## Phase 25: Chadwick closed-loop 5/6 — mid-session presence (coach_cues) — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked). Shell cache bumped to `life-hub-shell-v62` (client JS + CSS changed: `chat-controller.js`, `fitness-logger-draft.js`, `render-fitness-logger.js`, `css/app.css`).
+
+- New schema field `coach_cues` (optional `start` / `rest` / `final_set` strings) on a workout exercise — `js/core/validate.js`, and advertised in the `log_entry` tool schema so Chadwick actually populates it.
+- The no-mid-session-*writes* rule stays intact — cues are generated once, up front, in the same turn as the planned session proposal, at zero extra API cost. `coach_cues` is a deliberate, narrow exception to the protocol's "never invent fields" rule; the protocol now says so explicitly (`## Mid-session presence`) instead of silently contradicting itself.
+- Fitness logger displays cues at three concrete, testable spots rather than requiring a live active-set tracker: `start` at the top of the exercise card, `rest` between set rows, `final_set` attached to the last set row (never both final_set and rest on the same row).
+- `coach_cues` preserved end-to-end: tool schema → record validation → `fitness-logger-draft.js`'s `cloneLoggerDraft` (previously would have silently stripped it) → rendered DOM.
+- **Deviation:** the plan asked for "a browser test that a planned session with cues renders them." The Playwright suite's mock GitHub API serves a small, shared, hand-maintained fixture tree (`scripts/mock-api.mjs` `FIXTURE_FILES`) reused across every browser spec (home/nutrition/central-node/chat/fitness); the mocked `/api/chat/confirm` doesn't persist into that tree, so there's no low-risk way to drive a live "planned session with cues" through the real app without either editing the shared fixture set (real risk of breaking unrelated assertions in other specs — streak counts, record counts, etc.) or bypassing the app wiring entirely (which would just re-test what's already covered). Relied instead on 5 direct unit tests against `renderFitnessLogger`'s real DOM output (`tests/unit/render-fitness-logger.test.js`) covering all three cue placements plus the no-cues and single-set edge cases, and ran the full existing browser suite to confirm zero regressions.
+- `npm test`: 855 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid. `npm run test:browser`: 19/21 passed (2 pre-existing unrelated offline failures, see Phase 24).
+
 ## Next Phase: sleep·heart on Body / polish
