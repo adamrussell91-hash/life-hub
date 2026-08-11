@@ -1109,6 +1109,21 @@ main { max-width: 76rem; margin: 0 auto; }
   font-size: 0.95rem;
   color: var(--depth);
 }
+.fitness-logger__cue {
+  margin: 0 0 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.6rem;
+  border-left: 3px solid var(--fitness-accent);
+  background: rgba(20, 43, 81, 0.05);
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--depth);
+}
+.fitness-logger__cue--final-set {
+  border-left-color: var(--fitness-accent);
+  font-weight: 600;
+  font-style: normal;
+}
 .fitness-logger__bench {
   display: flex;
   align-items: center;

@@ -56,6 +56,7 @@ export function cloneLoggerDraft(session) {
       ...(exercise.equipment != null ? { equipment: exercise.equipment } : {}),
       ...(exercise.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
       ...(exercise.intensification != null ? { intensification: exercise.intensification } : {}),
+      ...(exercise.coach_cues != null ? { coach_cues: { ...exercise.coach_cues } } : {}),
       sets: (exercise.sets ?? []).map(set => ({
         reps: Number(set.reps) || 0,
         weight_kg: Number(set.weight_kg) || 0,

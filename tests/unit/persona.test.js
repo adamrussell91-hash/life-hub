@@ -196,6 +196,13 @@ test('non-chadwick agents never receive the days-since-last-session line', () =>
   assert.doesNotMatch(prompt, /days since/i);
 });
 
+test('chadwick prompt always instructs him to generate coach_cues on a planned session, up front, not per set', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick' });
+  assert.match(prompt, /coach_cues/);
+  assert.match(prompt, /start.{0,20}rest.{0,20}final_set|final_set.{0,80}start.{0,80}rest/is);
+  assert.match(prompt, /up front|in that same turn|alongside the plan/i);
+});
+
 test('chadwick prompt omits exercise library block when empty', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick', exerciseLibrary: '' });
   assert.doesNotMatch(prompt, /Exercise Library highlights/);
@@ -260,6 +267,13 @@ test('the checked-in Chadwick protocol resolves the Job/stay-in-chat conflict', 
   assert.match(protocol, /Confirm card/i);
   assert.doesNotMatch(protocol, /stay in chat until he asks to commit/i);
   assert.doesNotMatch(protocol, /When he asks you to lock today's session onto Fitness/);
+});
+
+test('the checked-in Chadwick protocol carves out coach_cues from the never-invent-fields rule instead of contradicting itself', () => {
+  const protocol = loadChadwickProtocol();
+  assert.match(protocol, /never as invented fields/i);
+  assert.match(protocol, /coach_cues.{0,60}is the (one )?exception/is);
+  assert.match(protocol, /Mid-session presence/);
 });
 
 test('other agents never receive hyaluronica protocol instructions', () => {

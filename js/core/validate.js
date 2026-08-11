@@ -159,6 +159,15 @@ function validateWorkout(record, errors) {
       if (exercise.intensification != null) {
         enumeration(exercise, 'intensification', INTENSIFICATIONS, errors);
       }
+      if (exercise.coach_cues != null) {
+        if (!isObject(exercise.coach_cues)) {
+          errors.push(`${prefix}.coach_cues must be an object`);
+        } else {
+          for (const field of ['start', 'rest', 'final_set']) {
+            optionalString(exercise.coach_cues, field, errors);
+          }
+        }
+      }
       if (exercise.sets == null) {
         if (strengthLike && record.status === 'completed') {
           errors.push(`${prefix}.sets must be an array`);

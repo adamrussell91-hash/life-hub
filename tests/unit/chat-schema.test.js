@@ -188,6 +188,11 @@ test('the workout whitelist accepts every field validateWorkout actually recogni
         name: 'Bench press',
         bench_angle_deg: 30,
         intensification: 'drop_set',
+        coach_cues: {
+          start: "Let's get that chest pumped, big guy.",
+          rest: 'Shake it out, next set is coming.',
+          final_set: '1-2 reps in the tank, this is the one that counts.'
+        },
         sets: [{ reps: 8, weight_kg: 60, cable_type: 'concentric' }]
       }],
       pain_flags: [{ site: 'left shoulder', note: 'mild twinge' }]
@@ -195,6 +200,16 @@ test('the workout whitelist accepts every field validateWorkout actually recogni
   }, { id: 'workout-1', now: '2026-08-01T07:45:00+10:00' });
 
   assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+
+test('the workout tool schema advertises coach_cues on each exercise so Chadwick knows to populate it', () => {
+  const schema = logEntryToolSchema(['workout']);
+  const exerciseProps = schema.input_schema.properties.fields.properties.exercises.items.properties;
+  assert.ok(exerciseProps.coach_cues, 'coach_cues should be a declared exercise property');
+  assert.deepEqual(
+    Object.keys(exerciseProps.coach_cues.properties).sort(),
+    ['final_set', 'rest', 'start']
+  );
 });
 
 test('the diary whitelist accepts every field validateDiary actually recognizes', () => {

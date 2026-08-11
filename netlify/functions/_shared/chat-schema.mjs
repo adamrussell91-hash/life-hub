@@ -44,6 +44,15 @@ const DOMAIN_PROPERTIES = {
             enum: ['drop_set', 'rest_pause', 'eccentric_overload', 'elastic_finisher', 'superset', 'other']
           },
           equipment: { type: 'string' },
+          coach_cues: {
+            type: 'object',
+            description: 'Optional presence during the session (planned exercises only): a short line to show on starting this exercise, during rest between sets, and on the final set. Zero extra API calls -- generated once, up front, alongside the plan.',
+            properties: {
+              start: { type: 'string', description: 'Shown when Adam opens this exercise.' },
+              rest: { type: 'string', description: 'Shown between sets while he rests.' },
+              final_set: { type: 'string', description: 'Shown on the last set, e.g. "1-2 reps in the tank, this is the one that counts."' }
+            }
+          },
           sets: {
             type: 'array',
             items: {

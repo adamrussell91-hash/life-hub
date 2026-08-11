@@ -58,6 +58,25 @@ test('toConfirmPayload builds overwrite candidate with exercises and notes', () 
   assert.equal(candidate.fields.exercises[0].sets[0].cable_type, 'constant_force');
 });
 
+test('cloneLoggerDraft preserves coach_cues so they survive to the confirm payload', () => {
+  const session = planned();
+  session.exercises[0].coach_cues = {
+    start: "Let's get that chest pumped, big guy.",
+    rest: 'Shake it out, next set is coming.',
+    final_set: '1-2 reps in the tank, this is the one that counts.'
+  };
+  const draft = cloneLoggerDraft(session);
+  assert.deepEqual(draft.exercises[0].coach_cues, session.exercises[0].coach_cues);
+
+  const { candidate } = toConfirmPayload(draft, { status: 'planned' });
+  assert.deepEqual(candidate.fields.exercises[0].coach_cues, session.exercises[0].coach_cues);
+});
+
+test('cloneLoggerDraft omits coach_cues entirely when the exercise has none', () => {
+  const draft = cloneLoggerDraft(planned());
+  assert.equal('coach_cues' in draft.exercises[0], false);
+});
+
 test('appendSet clones the last row defaults', () => {
   const next = appendSet(planned().exercises[0]);
   assert.equal(next.sets.length, 2);

@@ -90,6 +90,18 @@ export function renderFitnessLogger(root, draft, {
     name.textContent = exercise.name ?? 'Exercise';
     card.append(name);
 
+    // Mid-session presence (Phase 5): Chadwick's per-exercise cues, generated once up front
+    // alongside the plan -- no extra API calls during the workout. The start cue greets the
+    // exercise; rest/final-set cues are placed inline in the sets table below, at the moment
+    // they're actually relevant (see the sets loop).
+    if (exercise.coach_cues?.start) {
+      const startCue = root.createElement('p');
+      startCue.className = 'fitness-logger__cue fitness-logger__cue--start';
+      startCue.dataset.fitnessLogger = 'cue-start';
+      startCue.textContent = exercise.coach_cues.start;
+      card.append(startCue);
+    }
+
     if (exercise.bench_angle_deg != null || /bench/i.test(exercise.name ?? '')) {
       const benchRow = root.createElement('label');
       benchRow.className = 'fitness-logger__bench';
@@ -119,7 +131,8 @@ export function renderFitnessLogger(root, draft, {
     }
     table.append(head);
 
-    (exercise.sets ?? []).forEach((set, setIndex) => {
+    const exerciseSets = exercise.sets ?? [];
+    exerciseSets.forEach((set, setIndex) => {
       const row = root.createElement('div');
       row.className = 'fitness-logger__set';
       const index = root.createElement('span');
@@ -157,6 +170,23 @@ export function renderFitnessLogger(root, draft, {
 
       row.append(index, weight, reps, cable);
       table.append(row);
+
+      const isFinalSet = setIndex === exerciseSets.length - 1;
+      if (isFinalSet) {
+        if (exercise.coach_cues?.final_set) {
+          const finalCue = root.createElement('p');
+          finalCue.className = 'fitness-logger__cue fitness-logger__cue--final-set';
+          finalCue.dataset.fitnessLogger = 'cue-final-set';
+          finalCue.textContent = exercise.coach_cues.final_set;
+          table.append(finalCue);
+        }
+      } else if (exercise.coach_cues?.rest) {
+        const restCue = root.createElement('p');
+        restCue.className = 'fitness-logger__cue fitness-logger__cue--rest';
+        restCue.dataset.fitnessLogger = 'cue-rest';
+        restCue.textContent = exercise.coach_cues.rest;
+        table.append(restCue);
+      }
     });
 
     card.append(table);
