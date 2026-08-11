@@ -682,10 +682,29 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 600;
 }
 
-.nutrition-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-grid); }
-.meal-breakdown { display: grid; grid-template-columns: auto 1fr; gap: 0.4rem 1rem; margin: 0.75rem 0 0; }
-.meal-breakdown dt { color: var(--muted); font-size: 0.78rem; text-transform: capitalize; }
-.meal-breakdown dd { margin: 0; color: var(--depth); font-weight: 700; font-variant-numeric: tabular-nums; }
+.nutrition-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-grid); }
+@media (max-width: 1869px) {
+  .nutrition-grid { grid-template-columns: 1fr 1fr; }
+}
+.meal-protein-pie-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.meal-protein-pie { width: 4.5rem; height: 4.5rem; flex: 0 0 auto; }
+.meal-protein-pie path { stroke: var(--warm-white); stroke-width: 1; }
+.meal-protein-legend {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.meal-protein-legend li { display: flex; align-items: center; gap: 0.35rem; }
+.meal-protein-legend__swatch { width: 0.65rem; height: 0.65rem; border-radius: 50%; flex: 0 0 auto; }
 
 .trend-badge { padding: 0.3rem 0.6rem; border-radius: 999px; font-size: 0.7rem; font-weight: 750; background: rgba(20,43,81,0.06); color: var(--muted); }
 .trend-badge[data-colour="green"] { color: #1f7a52; background: rgba(31,122,82,0.1); }
@@ -707,6 +726,11 @@ main { max-width: 76rem; margin: 0 auto; }
   stroke-width: 1.25;
   stroke-dasharray: 3 3;
   vector-effect: non-scaling-stroke;
+}
+.chart-guide-label {
+  fill: var(--muted);
+  font-size: 8px;
+  font-weight: 650;
 }
 
 .polyphenol-score {
@@ -770,6 +794,19 @@ main { max-width: 76rem; margin: 0 auto; }
   grid-template-columns: 1fr 1fr;
   gap: var(--space-grid);
   margin-bottom: 0;
+}
+.week-compare-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin: 0.5rem 0 0.75rem;
+}
+.week-compare-value {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--depth);
+  font-variant-numeric: tabular-nums;
 }
 @media (max-width: 720px) {
   .nutrition-week-charts { grid-template-columns: 1fr; }
@@ -848,10 +885,6 @@ main { max-width: 76rem; margin: 0 auto; }
   .status-hybrid { grid-template-columns: 1fr; }
 }
 
-.hit-strip { display: flex; gap: 0.4rem; margin-top: 0.85rem; }
-.hit-bar { flex: 1; height: 0.6rem; border-radius: 999px; background: rgba(20,43,81,0.08); }
-.hit-bar[data-hit="true"] { background: var(--high-sea); }
-
 .heatmap-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: var(--space-tile); margin-top: 0.85rem; }
 .heatmap-tile { aspect-ratio: 1; border-radius: 0.4rem; background: rgba(20,43,81,0.08); }
 .heatmap-tile[data-hit="true"] { background: var(--wave); }
@@ -859,7 +892,7 @@ main { max-width: 76rem; margin: 0 auto; }
   display: grid;
   place-items: center;
   color: var(--depth);
-  font-size: 0.58rem;
+  font-size: 0.9rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   background: color-mix(in srgb, var(--wave) calc(var(--protein-pct, 0) * 1%), rgba(20, 43, 81, 0.08));
@@ -1879,7 +1912,7 @@ main { max-width: 76rem; margin: 0 auto; }
 .chat-view[data-panel-mode="overlay"] .chat-messages { max-height: 40vh; }
 
 @media (max-width: 48rem) {
-  .nutrition-grid { grid-template-columns: 1fr 1fr; }
+  .nutrition-grid { grid-template-columns: 1fr; }
   .chat-view[data-panel-mode="overlay"] { inset: auto 1rem 5.5rem auto; width: calc(100vw - 2rem); }
   .floating-chat-button { right: 1rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
 }

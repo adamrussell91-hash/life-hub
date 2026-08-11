@@ -320,13 +320,19 @@
               <p class="polyphenol-pill" data-nutrition="polyphenol-pill" data-colour="muted">—</p>
               <p class="metric-caption">Polyphenol score</p>
             </article>
+            <article class="metric-card" aria-labelledby="nutrition-meal-protein-label">
+              <div class="metric-heading">
+                <p class="metric-label" id="nutrition-meal-protein-label">Protein by meal</p>
+              </div>
+              <p data-meal-protein-empty class="metric-caption" hidden>No meals logged yet.</p>
+              <div class="meal-protein-pie-wrap">
+                <svg id="nutrition-meal-protein-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Today protein by meal">
+                  <g data-role="slices"></g>
+                </svg>
+                <ul class="meal-protein-legend" data-role="meal-protein-legend"></ul>
+              </div>
+            </article>
           </div>
-
-          <article class="metric-card meal-breakdown-card" aria-labelledby="meal-breakdown-label">
-            <p class="metric-label" id="meal-breakdown-label">Protein by meal</p>
-            <p data-meal-breakdown-empty class="metric-caption" hidden>No meals logged yet.</p>
-            <dl class="meal-breakdown"></dl>
-          </article>
 
           <article class="metric-card meal-log-card" aria-labelledby="meal-log-label">
             <p class="metric-label" id="meal-log-label">What you ate today</p>
@@ -334,7 +340,7 @@
             <ul id="nutrition-meal-log" class="meal-log"></ul>
           </article>
 
-          <div class="nutrition-week-charts">
+          <div class="nutrition-week-charts nutrition-week-charts--macros">
             <article class="metric-card chart-card" aria-labelledby="protein-trend-label">
               <div class="metric-heading">
                 <p class="metric-label" id="protein-trend-label">7-day protein</p>
@@ -345,11 +351,10 @@
                 <path data-role="line" d=""></path>
                 <path data-role="rolling" d="" hidden></path>
                 <line data-role="guide" class="chart-guide" hidden></line>
+                <g data-role="guide-labels"></g>
                 <g data-role="value-labels"></g>
                 <g data-role="day-labels"></g>
               </svg>
-              <p class="metric-caption" data-nutrition="rolling-caption">Dotted avg · dashed = protein goal</p>
-              <div id="nutrition-hit-strip" class="hit-strip" aria-label="Whether the protein target was met each day, last 7 days"></div>
             </article>
 
             <article class="metric-card chart-card" aria-labelledby="fat-trend-label">
@@ -358,30 +363,55 @@
                 <path data-role="area" d=""></path>
                 <path data-role="line" d=""></path>
                 <line data-role="guide" class="chart-guide" hidden></line>
+                <g data-role="guide-labels"></g>
                 <g data-role="value-labels"></g>
                 <g data-role="day-labels"></g>
                 <g data-role="overage-markers"></g>
               </svg>
-              <p class="metric-caption">Dashed = fat ceiling</p>
             </article>
           </div>
 
-          <article class="metric-card chart-card" aria-labelledby="calories-trend-label">
-            <p class="metric-label" id="calories-trend-label">7-day energy trend</p>
-            <svg id="nutrition-calories-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Calorie trend over the last 7 days">
+          <div class="nutrition-week-charts nutrition-week-charts--energy">
+            <article class="metric-card chart-card" aria-labelledby="calories-trend-label">
+              <p class="metric-label" id="calories-trend-label">7-day energy</p>
+              <svg id="nutrition-calories-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Calorie trend over the last 7 days">
+                <path data-role="area" d=""></path>
+                <path data-role="line" d=""></path>
+                <g data-role="value-labels"></g>
+                <g data-role="day-labels"></g>
+              </svg>
+            </article>
+
+            <article class="metric-card chart-card" aria-labelledby="carbs-trend-label">
+              <p class="metric-label" id="carbs-trend-label">7-day carbs</p>
+              <svg id="nutrition-carbs-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Carb trend over the last 7 days">
+                <path data-role="area" d=""></path>
+                <path data-role="line" d=""></path>
+                <g data-role="value-labels"></g>
+                <g data-role="day-labels"></g>
+              </svg>
+            </article>
+          </div>
+
+          <article class="metric-card chart-card" aria-labelledby="week-compare-label">
+            <p class="metric-label" id="week-compare-label">This week vs prior</p>
+            <div class="week-compare-summary">
+              <div>
+                <p class="metric-caption">This week avg</p>
+                <p class="week-compare-value"><strong data-value="week-compare-this">—</strong> g</p>
+              </div>
+              <div>
+                <p class="metric-caption">Prior week avg</p>
+                <p class="week-compare-value"><strong data-value="week-compare-prior">—</strong> g</p>
+              </div>
+              <span class="trend-badge" data-value="week-compare-delta">—</span>
+            </div>
+            <svg id="nutrition-week-compare" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="This week daily protein">
               <path data-role="area" d=""></path>
               <path data-role="line" d=""></path>
               <g data-role="value-labels"></g>
               <g data-role="day-labels"></g>
             </svg>
-          </article>
-
-          <article class="metric-card chart-card" aria-labelledby="week-compare-label">
-            <div class="metric-heading">
-              <p class="metric-label" id="week-compare-label">This week vs prior</p>
-              <span data-value="week-compare-prior">—</span>
-            </div>
-            <div id="nutrition-week-compare" class="column-chart" aria-label="Daily protein this week"></div>
           </article>
 
           <article class="metric-card chart-card" aria-labelledby="month-heatmap-label">

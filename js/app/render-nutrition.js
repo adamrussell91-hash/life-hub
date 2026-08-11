@@ -1,7 +1,7 @@
-import { animateAreaReveal, animateColumnGrow, animateRingFill } from './chart-kit/animate.js';
+import { animateAreaReveal, animateRingFill } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
-import { buildColumns } from './chart-kit/columns.js';
+import { buildMealProteinPie } from './chart-kit/pie.js';
 import { buildRingTarget } from './chart-kit/ring.js';
 
 const setText = (root, selector, value) => {
@@ -25,7 +25,7 @@ export function renderNutrition(root, model) {
     if (pill.dataset) pill.dataset.colour = model.polyphenolVsAim.colour;
   }
 
-  renderMealBreakdown(root, model.nutrition.meals);
+  renderMealProteinPie(root, model.nutrition.meals);
 
   renderMacroSplit(root, model);
   renderMealsToday(root, model.mealsToday);
@@ -35,7 +35,9 @@ export function renderNutrition(root, model) {
   renderNamedAreaChart(root, '#nutrition-protein-chart', model.week, 'protein_g', {
     rollingAverage: 3,
     guideValue: proteinGuide,
-    valueLabels: true
+    valueLabels: true,
+    guideLabel: 'goal',
+    rollingLabel: 'avg'
   });
   renderNamedAreaChart(root, '#nutrition-calories-chart', model.week, 'calories', {
     valueLabels: true
@@ -43,12 +45,15 @@ export function renderNutrition(root, model) {
   renderNamedAreaChart(root, '#nutrition-fat-chart', model.week, 'fat_g', {
     markOverage: true,
     guideValue: fatGuide,
+    valueLabels: true,
+    guideLabel: 'ceiling'
+  });
+  renderNamedAreaChart(root, '#nutrition-carbs-chart', model.week, 'carbs_g', {
     valueLabels: true
   });
-  renderHitStrip(root, model.week);
   renderHeatmap(root, model.month);
   renderProteinTrend(root, model.proteinTrend);
-  renderWeekCompare(root, model.week, model.previousWeek);
+  renderWeekCompare(root, model.week, model.previousWeek, model.proteinTrend);
 
   const fatOver = Boolean(model.overFatCeiling);
   root.querySelector('#nutrition-dashboard')
@@ -68,7 +73,14 @@ function renderMacroRings(root, model) {
 }
 
 function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
-  const { rollingAverage = 0, markOverage = false, guideValue = null, valueLabels = false } = options;
+  const {
+    rollingAverage = 0,
+    markOverage = false,
+    guideValue = null,
+    valueLabels = false,
+    guideLabel = null,
+    rollingLabel = null
+  } = options;
   const svg = root.querySelector(selector);
   if (!svg) return;
   const normalized = series.map(day => ({ date: day.date, value: day[valueKey] }));
@@ -116,6 +128,34 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
       guide.removeAttribute('hidden');
     } else {
       guide.setAttribute('hidden', '');
+    }
+  }
+
+  const guideLabels = svg.querySelector('[data-role="guide-labels"]');
+  if (guideLabels) {
+    guideLabels.replaceChildren();
+    const lastPoint = chart.points.at(-1);
+    if (chart.guideY != null && guideLabel && lastPoint) {
+      const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', String(lastPoint.x));
+      text.setAttribute('y', String(Math.max(9, chart.guideY - 4)));
+      text.setAttribute('text-anchor', 'end');
+      text.setAttribute('class', 'chart-guide-label');
+      text.textContent = guideLabel;
+      guideLabels.append(text);
+    }
+    if (rollingLabel && chart.rollingLinePath && lastPoint) {
+      let rollingLabelY = Math.max(10, lastPoint.y - 12);
+      if (chart.guideY != null && Math.abs(rollingLabelY - chart.guideY) < 6) {
+        rollingLabelY = Math.max(10, chart.guideY - 8);
+      }
+      const text = root.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', String(lastPoint.x));
+      text.setAttribute('y', String(rollingLabelY));
+      text.setAttribute('text-anchor', 'end');
+      text.setAttribute('class', 'chart-guide-label chart-guide-label--avg');
+      text.textContent = rollingLabel;
+      guideLabels.append(text);
     }
   }
 
@@ -171,31 +211,43 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
   animateAreaReveal(svg);
 }
 
-const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
+export function renderMealProteinPie(root, meals) {
+  const svg = root.querySelector('#nutrition-meal-protein-pie');
+  const slices = svg?.querySelector('[data-role="slices"]');
+  const empty = root.querySelector('[data-meal-protein-empty]');
+  const legend = root.querySelector('[data-role="meal-protein-legend"]');
+  const pie = buildMealProteinPie(meals);
 
-export function renderMealBreakdown(root, meals) {
-  const dl = root.querySelector('.meal-breakdown');
-  const empty = root.querySelector('[data-meal-breakdown-empty]');
-  if (!dl) return;
-  const entries = Object.entries(meals ?? {}).filter(([, values]) => Number(values?.protein_g) > 0);
-
-  dl.replaceChildren();
-  if (entries.length === 0) {
-    dl.setAttribute('hidden', '');
+  slices?.replaceChildren();
+  legend?.replaceChildren();
+  if (pie.empty) {
+    svg?.setAttribute('hidden', '');
     empty?.removeAttribute('hidden');
     return;
   }
 
-  dl.removeAttribute('hidden');
+  svg?.removeAttribute('hidden');
   empty?.setAttribute('hidden', '');
-  for (const [meal, values] of entries) {
-    const dt = root.createElement('dt');
-    dt.textContent = MEAL_LABELS[meal] ?? meal;
-    const dd = root.createElement('dd');
-    dd.dataset.mealProtein = meal;
-    dd.textContent = `${values.protein_g} g`;
-    dl.append(dt, dd);
-  }
+  const sliceNodes = pie.slices.map(slice => {
+    const path = root.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', slice.path);
+    path.setAttribute('fill', slice.colour);
+    path.setAttribute('data-meal', slice.meal);
+    return path;
+  });
+  slices?.replaceChildren(...sliceNodes);
+
+  const legendItems = pie.slices.map(slice => {
+    const item = root.createElement('li');
+    const swatch = root.createElement('span');
+    swatch.className = 'meal-protein-legend__swatch';
+    swatch.style.background = slice.colour;
+    const label = root.createElement('span');
+    label.textContent = `${slice.label} · ${slice.value} g`;
+    item.append(swatch, label);
+    return item;
+  });
+  legend?.replaceChildren(...legendItems);
 }
 
 function renderMealsToday(root, mealsToday) {
@@ -221,19 +273,6 @@ function renderMealsToday(root, mealsToday) {
     macros.textContent = `${meal.calories} kcal · ${meal.protein_g} g protein · ${meal.fat_g} g fat`;
     item.append(title, detail, macros);
     list.append(item);
-  }
-}
-
-function renderHitStrip(root, week) {
-  const strip = root.querySelector('#nutrition-hit-strip');
-  if (!strip) return;
-  strip.replaceChildren();
-  for (const day of week) {
-    const bar = root.createElement('span');
-    bar.className = 'hit-bar';
-    bar.dataset.hit = String(day.hitProtein);
-    bar.title = day.date;
-    strip.append(bar);
   }
 }
 
@@ -331,28 +370,34 @@ function renderMacroSplit(root, model) {
   }
 }
 
-function renderWeekCompare(root, week, previousWeek = []) {
-  const host = root.querySelector('#nutrition-week-compare');
-  if (!host) return;
-  const chart = buildColumns(week.map(day => ({
-    key: day.date,
-    label: weekdayLetter(day.date),
-    value: day.protein_g
-  })));
-  host.replaceChildren();
-  for (const bar of chart.bars) {
-    const col = root.createElement('div');
-    col.className = 'column-bar';
-    const fill = root.createElement('span');
-    col.append(fill);
-    const label = root.createElement('span');
-    label.textContent = bar.label;
-    col.append(label);
-    host.append(col);
-    animateColumnGrow(fill, bar.heightPct);
-  }
-  const priorAvg = previousWeek.length === 0
+function renderWeekCompare(root, week, previousWeek = [], proteinTrend = null) {
+  const avg = days => days.length === 0
     ? 0
-    : previousWeek.reduce((sum, day) => sum + day.protein_g, 0) / previousWeek.length;
-  setText(root, '[data-value="week-compare-prior"]', `Prior week avg ${priorAvg.toFixed(0)} g`);
+    : days.reduce((sum, day) => sum + day.protein_g, 0) / days.length;
+
+  const thisAvg = avg(week);
+  const priorAvg = avg(previousWeek);
+  setText(root, '[data-value="week-compare-this"]', thisAvg.toFixed(0));
+  setText(root, '[data-value="week-compare-prior"]', priorAvg.toFixed(0));
+
+  const badge = root.querySelector('[data-value="week-compare-delta"]');
+  if (badge) {
+    let label = proteinTrend?.label ?? '—';
+    let colour = proteinTrend?.colour ?? 'neutral';
+    if (priorAvg > 0) {
+      const pct = ((thisAvg - priorAvg) / priorAvg) * 100;
+      const sign = pct > 0 ? '+' : pct < 0 ? '−' : '';
+      label = `${sign}${Math.abs(pct).toFixed(0)}%`;
+      colour = pct === 0 ? 'neutral' : pct > 0 ? 'green' : 'red';
+    } else if (!previousWeek.length) {
+      label = 'no prior data';
+      colour = 'neutral';
+    }
+    badge.textContent = label;
+    if (badge.dataset) badge.dataset.colour = colour;
+  }
+
+  renderNamedAreaChart(root, '#nutrition-week-compare', week, 'protein_g', {
+    valueLabels: true
+  });
 }

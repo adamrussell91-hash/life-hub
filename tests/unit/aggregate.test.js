@@ -10,8 +10,8 @@ import {
 } from '../../js/core/aggregate.js';
 
 const records = [
-  { type: 'meal', date: '2026-07-30', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420, calcium_mg: 380, polyphenol_score: 6 },
-  { type: 'meal', date: '2026-07-30', meal: 'lunch', calories: 610, protein_g: 42, fat_g: 15, sodium_mg: 680, calcium_mg: 210, polyphenol_score: 3 },
+  { type: 'meal', date: '2026-07-30', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, carbs_g: 48, sodium_mg: 420, calcium_mg: 380, polyphenol_score: 6 },
+  { type: 'meal', date: '2026-07-30', meal: 'lunch', calories: 610, protein_g: 42, fat_g: 15, carbs_g: 52, sodium_mg: 680, calcium_mg: 210, polyphenol_score: 3 },
   { type: 'workout', date: '2026-07-30', status: 'completed', day_type: 'workout_30', recovery_flag_next_day: false, exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32 }, { reps: 8, weight_kg: 34 }] }] },
   { type: 'diary', date: '2026-07-30' }
 ];
@@ -23,6 +23,7 @@ test('matches the approved sample Home totals for parsed events', () => {
     calories: 1130,
     protein_g: 80,
     fat_g: 27,
+    carbs_g: 100,
     sodium_mg: 1100,
     calcium_mg: 590,
     polyphenol_score: 9,
@@ -44,6 +45,7 @@ test('empty and missing additive nutrition values contribute zero', () => {
     calories: 0,
     protein_g: 0,
     fat_g: 0,
+    carbs_g: 0,
     sodium_mg: 0,
     calcium_mg: 0,
     polyphenol_score: 0,
