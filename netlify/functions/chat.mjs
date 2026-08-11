@@ -100,6 +100,7 @@ import {
   summarizeTemplatesFromContents
 } from './_shared/workout-templates.mjs';
 import { selectLatestBodyEntries, formatBodyStateForPrompt } from './_shared/body-state.mjs';
+import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
 import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays } from '../../js/core/time.js';
@@ -188,7 +189,10 @@ export function createChatHandler({
 
     const nowInstant = new Date(now());
     const tools = [
-      { type: 'web_search_20250305', name: 'web_search', max_uses: 2 },
+      // Chadwick's protocol asks him to research evidence-based physique programming
+      // (see "Using evidence and external sources"); the default budget of 2 is one
+      // lookup, not a research pass, so he alone gets a raised cap.
+      { type: 'web_search_20250305', name: 'web_search', max_uses: slug === 'chadwick' ? 5 : 2 },
       ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
       ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
       ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : []),
@@ -604,7 +608,10 @@ export function createChatHandler({
                     type: validation.record.type,
                     date: validation.record.date,
                     slug: buildRecordSlug(validation.record)
-                  })
+                  }),
+                  // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
+                  // Confirm anyway. No-op (empty array) for anything but a workout proposal.
+                  warnings: lintWorkoutProposal(validation.record)
                 });
                 return JSON.stringify({ ok: true, status: 'awaiting_confirm' });
               }
@@ -692,7 +699,10 @@ export function createChatHandler({
                     type: validation.record.type,
                     date: validation.record.date,
                     slug: buildRecordSlug(validation.record)
-                  })
+                  }),
+                  // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
+                  // Confirm anyway. No-op (empty array) for anything but a workout proposal.
+                  warnings: lintWorkoutProposal(validation.record)
                 });
               } else {
                 send({ type: 'record_rejected', errors: validation.errors });

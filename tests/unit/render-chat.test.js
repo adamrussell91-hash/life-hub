@@ -190,6 +190,53 @@ test('appendRecordProposal adds a read-only exercises summary with cable types',
   assert.match(summary.children[1].children[1].textContent, /cable: constant force/);
 });
 
+test('appendRecordProposal renders protocol lint warnings without disabling Confirm', () => {
+  const root = new FakeDocument();
+  const { card, confirm } = appendRecordProposal(root, {
+    path: 'data/fitness/2026/07/2026-07-30-test.md',
+    record: {
+      type: 'workout',
+      date: '2026-07-30',
+      title: 'Quick Session',
+      session_kind: 'strength',
+      status: 'planned',
+      exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }]
+    },
+    notes: '',
+    warnings: ['3 exercises — the protocol default is 5-9 per session.', 'No exercise looks like a warmup by name.']
+  });
+
+  const warningsList = card.children.find(child => child.className === 'record-proposal__warnings');
+  assert.ok(warningsList, 'expected a warnings element on the card');
+  assert.equal(warningsList.children.length, 2);
+  assert.match(warningsList.children[0].textContent, /5-9/);
+  assert.match(warningsList.children[1].textContent, /warmup/i);
+  assert.notEqual(confirm.disabled, true, 'lint warnings must never disable Confirm -- Adam can always override');
+});
+
+test('appendRecordProposal renders no warnings element when there are no lint warnings', () => {
+  const root = new FakeDocument();
+  const { card } = appendRecordProposal(root, {
+    path: 'data/nutrition/2026/08/2026-08-07-breakfast.md',
+    record: { type: 'meal', date: '2026-08-07', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12 },
+    notes: '',
+    warnings: []
+  });
+
+  assert.equal(card.children.find(child => child.className === 'record-proposal__warnings'), undefined);
+});
+
+test('appendRecordProposal tolerates a missing warnings field entirely (older event shape)', () => {
+  const root = new FakeDocument();
+  const { card } = appendRecordProposal(root, {
+    path: 'data/nutrition/2026/08/2026-08-07-breakfast.md',
+    record: { type: 'meal', date: '2026-08-07', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12 },
+    notes: ''
+  });
+
+  assert.equal(card.children.find(child => child.className === 'record-proposal__warnings'), undefined);
+});
+
 test('appendRecordProposal always shows a sodium field for meal proposals', () => {
   const root = new FakeDocument();
   const { inputs } = appendRecordProposal(root, {

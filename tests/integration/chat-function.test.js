@@ -82,6 +82,40 @@ test('streams an agent event, text, and a validated record proposal for a routed
   assert.deepEqual(events[3], { type: 'done' });
 });
 
+test('Chadwick gets a raised web_search max_uses; other agents keep the default budget cap', async () => {
+  let args;
+  const capture = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: a => {
+        args = a;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+  await readSse(await capture(request({ message: 'Chadwick, plan a session' })));
+  const chadwickSearch = args.tools.find(tool => tool.name === 'web_search');
+  assert.ok(chadwickSearch.max_uses >= 4 && chadwickSearch.max_uses <= 5, `expected 4-5, got ${chadwickSearch.max_uses}`);
+
+  let brisketArgs;
+  const captureBrisket = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: a => {
+        brisketArgs = a;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+  await readSse(await captureBrisket(request({ message: 'Brisket, what should I eat?' })));
+  const brisketSearch = brisketArgs.tools.find(tool => tool.name === 'web_search');
+  assert.equal(brisketSearch.max_uses, 2);
+});
+
 test('loads saved workout template summaries into Chadwick\'s system prompt', async () => {
   const templatePath = 'data/fitness/templates/chest-and-curls.md';
   const templateSha = 'e'.repeat(40);
@@ -485,6 +519,140 @@ test('log_entry via executeTools emits record_proposal and returns awaiting_conf
   assert.equal(events[1].record.meal, 'snack');
   assert.equal(events[1].record.time, '13:35');
   assert.deepEqual(events[2], { type: 'text', delta: 'Hit Confirm when those macros look right.' });
+});
+
+test('log_entry via executeTools attaches protocol lint warnings to a workout record_proposal', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        await executeTools({
+          id: 'call_1',
+          name: 'log_entry',
+          input: {
+            type: 'workout',
+            date: '2026-08-01',
+            fields: {
+              title: 'Chest and Curls',
+              session_kind: 'strength',
+              day_type: 'workout_30',
+              status: 'planned',
+              recovery_flag_next_day: false,
+              exercises: [
+                { name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] },
+                { name: 'Bar Curl', sets: [{ reps: 10, weight_kg: 16, cable_type: 'concentric' }] }
+              ]
+            }
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Chadwick, plan a quick session' }))));
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal);
+  assert.ok(Array.isArray(proposal.warnings) && proposal.warnings.length > 0, JSON.stringify(proposal.warnings));
+  assert.ok(proposal.warnings.some(w => /5-9/.test(w)));
+  assert.ok(proposal.warnings.some(w => /warmup/i.test(w)));
+});
+
+test('log_entry via the tool_call stream fallback also attaches lint warnings to a workout record_proposal', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => (async function* () {
+        yield {
+          type: 'tool_call', id: 'call_1', name: 'log_entry', input: {
+            type: 'workout', date: '2026-08-01', fields: {
+              title: 'Chest and Curls', session_kind: 'strength', day_type: 'workout_30',
+              status: 'planned', recovery_flag_next_day: false,
+              exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }]
+            }
+          }
+        };
+        yield { type: 'done' };
+      })()
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Chadwick, log a workout' }))));
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal);
+  assert.ok(Array.isArray(proposal.warnings) && proposal.warnings.length > 0, JSON.stringify(proposal.warnings));
+});
+
+test('a well-formed workout proposal (5-9 exercises, warmup, cable_type, ≤2 intensification tags) carries no lint warnings', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        await executeTools({
+          id: 'call_1',
+          name: 'log_entry',
+          input: {
+            type: 'workout',
+            date: '2026-08-01',
+            fields: {
+              title: 'Full Session',
+              session_kind: 'strength',
+              day_type: 'workout_45_60',
+              status: 'planned',
+              recovery_flag_next_day: false,
+              exercises: [
+                { name: 'Warmup: Light Cable Rows', sets: [{ reps: 15, weight_kg: 5, cable_type: 'concentric' }] },
+                { name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] },
+                { name: 'Bar Curl', sets: [{ reps: 10, weight_kg: 16, cable_type: 'concentric' }] },
+                { name: 'Lat Pulldown', sets: [{ reps: 10, weight_kg: 40, cable_type: 'rowing' }] },
+                { name: 'Shoulder Press', sets: [{ reps: 10, weight_kg: 20, cable_type: 'constant_force' }] }
+              ]
+            }
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Chadwick, plan a full session' }))));
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal);
+  assert.deepEqual(proposal.warnings, []);
+});
+
+test('a non-workout record_proposal carries no lint warnings', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        await executeTools({
+          id: 'call_1',
+          name: 'log_entry',
+          input: {
+            type: 'meal', date: '2026-08-01', fields: {
+              meal: 'snack', calories: 202, protein_g: 15, fat_g: 6, sodium_mg: 150,
+              calcium_mg: 90, polyphenol_score: 2, omega3: 'none'
+            }
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Brisket, log the protein bar' }))));
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal);
+  assert.deepEqual(proposal.warnings, []);
 });
 
 test('save_food_library_entry writes the cache to GitHub, emits food_library_saved, and continues the round', async () => {

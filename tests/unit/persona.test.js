@@ -269,6 +269,14 @@ test('the checked-in Chadwick protocol resolves the Job/stay-in-chat conflict', 
   assert.doesNotMatch(protocol, /When he asks you to lock today's session onto Fitness/);
 });
 
+test('the checked-in Chadwick protocol fixes the focus-count math so it fits inside the session window', () => {
+  const protocol = loadChadwickProtocol();
+  // 3 focuses x >=3 hits each = 9+ moves inside a 20-30 min window (5 of which is warmup)
+  // doesn't fit -- 3 focuses is workout_45_60-only; 2 is the default on 30-minute days.
+  assert.match(protocol, /workout_45_60/);
+  assert.match(protocol, /2 focuses.{0,80}default.{0,40}30.minute|default.{0,40}30.minute.{0,80}2 focuses/is);
+});
+
 test('the checked-in Chadwick protocol carves out coach_cues from the never-invent-fields rule instead of contradicting itself', () => {
   const protocol = loadChadwickProtocol();
   assert.match(protocol, /never as invented fields/i);
