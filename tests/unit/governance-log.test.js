@@ -7,7 +7,9 @@ import {
   formatGovernanceEntry,
   appendGovernanceEntry,
   recentGovernanceTail,
-  parseGovernanceEntries
+  parseGovernanceEntries,
+  openGovernanceEntries,
+  oldestOpenGovernanceEntry
 } from '../../js/core/governance-log.js';
 
 test('path is data/governance/governance-log.md', () => {
@@ -90,4 +92,60 @@ test('parseGovernanceEntries tolerates entries without title or status', () => {
   assert.equal(entry.title, null);
   assert.equal(entry.status, null);
   assert.equal(entry.body, 'Hold surplus.');
+});
+
+test('openGovernanceEntries annotates ageDays and skips Resolved entries', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-05-24',
+    entryType: 'Drift Detection',
+    title: 'MEd Sem 2',
+    status: 'Still Active',
+    body: 'Unactioned.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-01',
+    entryType: 'Closed Loop Review',
+    status: 'Resolved',
+    body: 'Done.'
+  });
+  const open = openGovernanceEntries(log, '2026-08-11');
+  assert.equal(open.length, 1);
+  assert.equal(open[0].ageDays, 79);
+  assert.equal(open[0].title, 'MEd Sem 2');
+});
+
+test('openGovernanceEntries includes malformed dateKey entries without ageDays', () => {
+  const log = `# Governance Log\n\n## not-a-date — Drift Detection\n**Status:** Still Active\n\nBroken heading.\n`;
+  const open = openGovernanceEntries(log, '2026-08-11');
+  assert.equal(open.length, 1);
+  assert.equal(open[0].ageDays, undefined);
+  assert.equal(open[0].entryType, 'Drift Detection');
+});
+
+test('oldestOpenGovernanceEntry picks the oldest unresolved entry', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-01',
+    entryType: 'Escalation',
+    title: 'Study load',
+    status: 'Still Active',
+    body: 'Recent.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-05-24',
+    entryType: 'Drift Detection',
+    title: 'MEd Sem 2',
+    status: 'Still Active',
+    body: 'Older.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-01-01',
+    entryType: 'Closed Loop Review',
+    status: 'Resolved',
+    body: 'Ignore me.'
+  });
+  const oldest = oldestOpenGovernanceEntry(log, '2026-08-11');
+  assert.equal(oldest.dateKey, '2026-05-24');
+  assert.equal(oldest.ageDays, 79);
 });
