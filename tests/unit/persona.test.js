@@ -432,6 +432,23 @@ test('Hammond prompt includes the 90-day hammondDigest when provided', () => {
   assert.match(prompt, /nutrition: 41\/90 days/);
 });
 
+test('Hammond prompt includes the CN computed snapshot when hammondCnSummary is provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    hammondCnSummary: 'Central Node computed snapshot\nProtein (7d): rising.'
+  });
+  assert.match(prompt, /Central Node computed snapshot/);
+  assert.match(prompt, /Protein \(7d\): rising/);
+});
+
+test('non-hammond prompts never include hammondCnSummary', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    hammondCnSummary: 'Central Node computed snapshot\nProtein (7d): rising.'
+  });
+  assert.equal(prompt.includes('Central Node computed snapshot'), false);
+});
+
 test('non-hammond prompts never include hammondDigest', () => {
   const prompt = buildSystemPrompt({
     slug: 'brisket',

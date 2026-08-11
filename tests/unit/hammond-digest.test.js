@@ -4,10 +4,15 @@ import { addCalendarDays, enumerateDateKeys } from '../../js/core/time.js';
 import {
   DOMAIN_PATH,
   WINDOW_DAYS,
+  CN_MODEL_WINDOW_DAYS,
   getWindowStart,
+  getCnModelWindowStart,
   selectHammondFitnessEntries,
-  summarizeHammondDigest
+  selectHammondEventEntries,
+  summarizeHammondDigest,
+  formatCentralNodeModelForPrompt
 } from '../../netlify/functions/_shared/hammond-digest.mjs';
+import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 
 const TODAY = '2026-08-11';
 
@@ -200,4 +205,91 @@ test('selectHammondFitnessEntries returns only in-range fitness entries, sorted 
 
 test('selectHammondFitnessEntries tolerates a non-array tree', () => {
   assert.deepEqual(selectHammondFitnessEntries(undefined, { from: '2026-08-01', to: '2026-08-11' }), []);
+});
+
+test('getCnModelWindowStart is a 30-day inclusive window', () => {
+  assert.equal(CN_MODEL_WINDOW_DAYS, 30);
+  assert.equal(getCnModelWindowStart(TODAY), addCalendarDays(TODAY, -29));
+});
+
+test('selectHammondEventEntries includes all five domains inside the window and excludes older paths', () => {
+  const inWindow = addCalendarDays(TODAY, -10);
+  const outWindow = addCalendarDays(TODAY, -40);
+  const tree = [
+    ...treeFor('nutrition', [inWindow, outWindow]),
+    ...treeFor('fitness', [inWindow]),
+    ...treeFor('body', [inWindow]),
+    ...treeFor('mind', [inWindow]),
+    ...treeFor('skincare', [inWindow]),
+    { path: 'central-node.md', type: 'blob', sha: 'cn' }
+  ];
+  const selected = selectHammondEventEntries(tree, { from: getCnModelWindowStart(TODAY), to: TODAY });
+  assert.equal(selected.length, 5);
+  assert.ok(selected.every(entry => entry.path.includes(inWindow)));
+  assert.ok(selected.every(entry => !entry.path.includes(outWindow)));
+});
+
+test('formatCentralNodeModelForPrompt reports rates and rising/falling/flat protein trends', () => {
+  const rising = formatCentralNodeModelForPrompt({
+    week: [
+      { date: '2026-08-05', protein_g: 40 },
+      { date: '2026-08-06', protein_g: 45 },
+      { date: '2026-08-07', protein_g: 50 },
+      { date: '2026-08-08', protein_g: 90 },
+      { date: '2026-08-09', protein_g: 95 },
+      { date: '2026-08-10', protein_g: 100 },
+      { date: '2026-08-11', protein_g: 105 }
+    ],
+    loggingMonth: Array.from({ length: 30 }, (_, i) => ({ date: `d${i}`, complete: i < 15 })),
+    exerciseMonth: Array.from({ length: 30 }, (_, i) => ({ date: `d${i}`, completed: i < 6 })),
+    eatingMonth: Array.from({ length: 30 }, (_, i) => ({ date: `d${i}`, hitEatingTargets: i < 10 }))
+  });
+  assert.match(rising, /Protein \(7d\): rising/);
+  assert.match(rising, /Logging completeness \(30d\): 15\/30 days \(50%\)/);
+  assert.match(rising, /Exercise completed \(30d\): 6\/30 days \(20%\)/);
+  assert.match(rising, /Eating targets met \(30d\): 10\/30 days \(33%\)/);
+
+  const flat = formatCentralNodeModelForPrompt({
+    week: Array.from({ length: 7 }, (_, i) => ({ date: `d${i}`, protein_g: 80 })),
+    loggingMonth: [],
+    exerciseMonth: [],
+    eatingMonth: []
+  });
+  assert.match(flat, /Protein \(7d\): flat/);
+
+  const falling = formatCentralNodeModelForPrompt({
+    week: [
+      { date: 'a', protein_g: 120 }, { date: 'b', protein_g: 110 }, { date: 'c', protein_g: 100 },
+      { date: 'd', protein_g: 40 }, { date: 'e', protein_g: 30 }, { date: 'f', protein_g: 20 }, { date: 'g', protein_g: 10 }
+    ],
+    loggingMonth: [],
+    exerciseMonth: [],
+    eatingMonth: []
+  });
+  assert.match(falling, /Protein \(7d\): falling/);
+});
+
+test('formatCentralNodeModelForPrompt works against real buildCentralNodeModel output', () => {
+  const events = [
+    { record: { type: 'meal', date: TODAY, meal: 'breakfast', calories: 500, protein_g: 40, fat_g: 12, sodium_mg: 400, calcium_mg: 200, polyphenol_score: 2 } }
+  ];
+  const model = buildCentralNodeModel({
+    events,
+    targetsConfig: {
+      target_sets: [{
+        valid_from: '2020-01-01',
+        calories: { movement: 1660, workout_30: 1900, workout_45_60: 2200, recovery_bonus: 200 },
+        protein: { daily: 120, recovery_daily: 140, breakfast: 30, lunch: 30, dinner: 40, snack: 20, min_per_meal: 25 },
+        fat_ceiling_g: 50,
+        sodium_ceiling_mg: 2000,
+        calcium_target_mg: 1000,
+        polyphenol_daily_aim: 10
+      }]
+    },
+    centralNodeMarkdown: '',
+    date: TODAY
+  });
+  const text = formatCentralNodeModelForPrompt(model);
+  assert.match(text, /Central Node computed snapshot/);
+  assert.match(text, /Logging completeness \(30d\):/);
 });

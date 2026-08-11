@@ -101,7 +101,8 @@ import {
   summarizeTemplatesFromContents
 } from './_shared/workout-templates.mjs';
 import { selectLatestBodyEntries, formatBodyStateForPrompt } from './_shared/body-state.mjs';
-import { selectHammondFitnessEntries, summarizeHammondDigest, getWindowStart } from './_shared/hammond-digest.mjs';
+import { selectHammondFitnessEntries, selectHammondEventEntries, summarizeHammondDigest, formatCentralNodeModelForPrompt, getWindowStart, getCnModelWindowStart } from './_shared/hammond-digest.mjs';
+import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
@@ -189,6 +190,7 @@ export function createChatHandler({
     // getWindowStart) rather than a re-derived literal, so the two windows can't
     // silently drift apart if that constant ever changes.
     const hammondFrom = needsHammondTools ? getWindowStart(today) : null;
+    const hammondCnFrom = needsHammondTools ? getCnModelWindowStart(today) : null;
 
     let anthropic;
     try {
@@ -243,6 +245,7 @@ export function createChatHandler({
         let governanceLogSha;
         let governanceLogTail = '';
         let hammondDigest = '';
+        let hammondCnSummary = '';
         let foodLibraryEntries = [];
         let foodLibrary = '';
         let foodLibrarySha;
@@ -308,6 +311,11 @@ export function createChatHandler({
           const hammondFitnessEntries = needsHammondTools
             ? selectHammondFitnessEntries(current.tree, { from: hammondFrom, to: today })
             : [];
+          // Hammond CN-model reuse: bounded 30-day read across all 5 domains so
+          // buildCentralNodeModel's heatmaps/series have real record content.
+          const hammondCnEntries = needsHammondTools
+            ? selectHammondEventEntries(current.tree, { from: hammondCnFrom, to: today })
+            : [];
 
           const [
             dataBlobs,
@@ -321,7 +329,8 @@ export function createChatHandler({
             templateBlobs,
             compositionBlobs,
             measurementBlobs,
-            hammondFitnessBlobs
+            hammondFitnessBlobs,
+            hammondCnBlobs
           ] = await Promise.all([
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
@@ -334,7 +343,8 @@ export function createChatHandler({
             Promise.all(templateEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.composition.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha))),
-            Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha)))
+            Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha))),
+            Promise.all(hammondCnEntries.map(entry => client.readBlob(entry.sha)))
           ]);
 
           const files = dataEntries
@@ -433,6 +443,13 @@ export function createChatHandler({
           if (needsHammondTools) {
             const fitnessRecords = parseHammondFitnessRecords(hammondFitnessEntries, hammondFitnessBlobs);
             hammondDigest = summarizeHammondDigest({ tree: current.tree, fitnessRecords, today });
+            const cnEvents = parseHammondEventDocuments(hammondCnEntries, hammondCnBlobs);
+            hammondCnSummary = formatCentralNodeModelForPrompt(buildCentralNodeModel({
+              events: cnEvents,
+              targetsConfig: TARGETS_CONFIG,
+              centralNodeMarkdown,
+              date: today
+            }));
           }
         } catch {
           digest = '';
@@ -445,6 +462,7 @@ export function createChatHandler({
           governanceLogSha = undefined;
           governanceLogTail = '';
           hammondDigest = '';
+          hammondCnSummary = '';
           foodLibraryEntries = [];
           foodLibrary = '';
           foodLibrarySha = undefined;
@@ -483,6 +501,7 @@ export function createChatHandler({
           governanceLogTail,
           governanceLogIsEmpty: needsHammondTools && governanceLog === emptyGovernanceLog(),
           hammondDigest,
+          hammondCnSummary,
           foodLibrary,
           chadwickProtocol,
           hyaluronicaProtocol,
@@ -883,6 +902,22 @@ function parseHammondFitnessRecords(entries, blobs) {
     }
   }
   return records;
+}
+
+// Same try/catch-skip shape as parseHammondFitnessRecords, but returns the
+// {record}-shaped events buildCentralNodeModel expects (digest.mjs loop shape).
+function parseHammondEventDocuments(entries, blobs) {
+  const events = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    const content = decodeBlob(blobs[index]);
+    if (content === null) continue;
+    try {
+      events.push(parseEventDocument(content, entries[index].path, loadYaml));
+    } catch {
+      // Skip an unreadable/invalid event rather than breaking the chat turn.
+    }
+  }
+  return events;
 }
 
 function repositoryError() {
