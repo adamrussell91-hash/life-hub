@@ -2,6 +2,7 @@ import { animateAreaReveal, animateColumnGrow, animateRingFill } from './chart-k
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { buildColumns } from './chart-kit/columns.js';
+import { buildMealProteinPie } from './chart-kit/pie.js';
 import { buildRingTarget } from './chart-kit/ring.js';
 
 const setText = (root, selector, value) => {
@@ -25,7 +26,7 @@ export function renderNutrition(root, model) {
     if (pill.dataset) pill.dataset.colour = model.polyphenolVsAim.colour;
   }
 
-  renderMealBreakdown(root, model.nutrition.meals);
+  renderMealProteinPie(root, model.nutrition.meals);
 
   renderMacroSplit(root, model);
   renderMealsToday(root, model.mealsToday);
@@ -45,7 +46,9 @@ export function renderNutrition(root, model) {
     guideValue: fatGuide,
     valueLabels: true
   });
-  renderHitStrip(root, model.week);
+  renderNamedAreaChart(root, '#nutrition-carbs-chart', model.week, 'carbs_g', {
+    valueLabels: true
+  });
   renderHeatmap(root, model.month);
   renderProteinTrend(root, model.proteinTrend);
   renderWeekCompare(root, model.week, model.previousWeek);
@@ -171,31 +174,41 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
   animateAreaReveal(svg);
 }
 
-const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
+export function renderMealProteinPie(root, meals) {
+  const svg = root.querySelector('#nutrition-meal-protein-pie');
+  const slices = svg?.querySelector('[data-role="slices"]');
+  const empty = root.querySelector('[data-meal-protein-empty]');
+  const legend = root.querySelector('[data-role="meal-protein-legend"]');
+  const pie = buildMealProteinPie(meals);
 
-export function renderMealBreakdown(root, meals) {
-  const dl = root.querySelector('.meal-breakdown');
-  const empty = root.querySelector('[data-meal-breakdown-empty]');
-  if (!dl) return;
-  const entries = Object.entries(meals ?? {}).filter(([, values]) => Number(values?.protein_g) > 0);
-
-  dl.replaceChildren();
-  if (entries.length === 0) {
-    dl.setAttribute('hidden', '');
+  slices?.replaceChildren();
+  legend?.replaceChildren();
+  if (pie.empty) {
     empty?.removeAttribute('hidden');
     return;
   }
 
-  dl.removeAttribute('hidden');
   empty?.setAttribute('hidden', '');
-  for (const [meal, values] of entries) {
-    const dt = root.createElement('dt');
-    dt.textContent = MEAL_LABELS[meal] ?? meal;
-    const dd = root.createElement('dd');
-    dd.dataset.mealProtein = meal;
-    dd.textContent = `${values.protein_g} g`;
-    dl.append(dt, dd);
-  }
+  const sliceNodes = pie.slices.map(slice => {
+    const path = root.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', slice.path);
+    path.setAttribute('fill', slice.colour);
+    path.setAttribute('data-meal', slice.meal);
+    return path;
+  });
+  slices?.replaceChildren(...sliceNodes);
+
+  const legendItems = pie.slices.map(slice => {
+    const item = root.createElement('li');
+    const swatch = root.createElement('span');
+    swatch.className = 'meal-protein-legend__swatch';
+    swatch.style.background = slice.colour;
+    const label = root.createElement('span');
+    label.textContent = `${slice.label} · ${slice.value} g`;
+    item.append(swatch, label);
+    return item;
+  });
+  legend?.replaceChildren(...legendItems);
 }
 
 function renderMealsToday(root, mealsToday) {
@@ -221,19 +234,6 @@ function renderMealsToday(root, mealsToday) {
     macros.textContent = `${meal.calories} kcal · ${meal.protein_g} g protein · ${meal.fat_g} g fat`;
     item.append(title, detail, macros);
     list.append(item);
-  }
-}
-
-function renderHitStrip(root, week) {
-  const strip = root.querySelector('#nutrition-hit-strip');
-  if (!strip) return;
-  strip.replaceChildren();
-  for (const day of week) {
-    const bar = root.createElement('span');
-    bar.className = 'hit-bar';
-    bar.dataset.hit = String(day.hitProtein);
-    bar.title = day.date;
-    strip.append(bar);
   }
 }
 
@@ -334,6 +334,14 @@ function renderMacroSplit(root, model) {
 function renderWeekCompare(root, week, previousWeek = []) {
   const host = root.querySelector('#nutrition-week-compare');
   if (!host) return;
+  const priorAvg = previousWeek.length === 0
+    ? 0
+    : previousWeek.reduce((sum, day) => sum + day.protein_g, 0) / previousWeek.length;
+  setText(root, '[data-value="week-compare-prior"]', `Prior week avg ${priorAvg.toFixed(0)} g`);
+
+  // Task 5 replaces the legacy column chart with the SVG sparkline.
+  if (host.tagName?.toLowerCase() === 'svg') return;
+
   const chart = buildColumns(week.map(day => ({
     key: day.date,
     label: weekdayLetter(day.date),
@@ -351,8 +359,4 @@ function renderWeekCompare(root, week, previousWeek = []) {
     host.append(col);
     animateColumnGrow(fill, bar.heightPct);
   }
-  const priorAvg = previousWeek.length === 0
-    ? 0
-    : previousWeek.reduce((sum, day) => sum + day.protein_g, 0) / previousWeek.length;
-  setText(root, '[data-value="week-compare-prior"]', `Prior week avg ${priorAvg.toFixed(0)} g`);
 }
