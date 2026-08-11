@@ -67,6 +67,61 @@ export function upsertExerciseLibraryEntry(entries, entry, updatedAt) {
   return list;
 }
 
+/**
+ * Close the progression loop: upsert per-exercise last_performed / times_performed /
+ * working_weight_kg / best_weight_kg from a confirmed completed workout.
+ *
+ * Only updates exercises that already have a matching Exercise Library row (matched
+ * case/whitespace-insensitively, same identity `upsertExerciseLibraryEntry` uses) --
+ * it never invents a new row, since a workout record carries no target_area.
+ *
+ * Returns { entries, pbs } where pbs lists exercises that set a genuine new best
+ * (strictly beat the prior best_weight_kg; a first-ever performance or a tied best
+ * is not a PB, just an initial/unchanged reading).
+ */
+export function applyCompletedWorkoutToLibrary(entries, record, updatedAt) {
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  const pbs = [];
+  if (!record || !Array.isArray(record.exercises)) return { entries: list, pbs };
+  const sessionDate = typeof record.date === 'string' ? record.date : undefined;
+
+  for (const exercise of record.exercises) {
+    const name = typeof exercise?.name === 'string' ? exercise.name.trim() : '';
+    if (!name) continue;
+    const weights = (Array.isArray(exercise.sets) ? exercise.sets : [])
+      .map(set => set?.weight_kg)
+      .filter(weight => typeof weight === 'number' && Number.isFinite(weight));
+    if (weights.length === 0) continue;
+    const sessionMax = Math.max(...weights);
+
+    const key = libraryKey({ name });
+    const index = list.findIndex(existing => libraryKey(existing) === key);
+    if (index === -1) continue;
+
+    const existing = list[index];
+    const hadBest = typeof existing.best_weight_kg === 'number';
+    const previousBest = hadBest ? existing.best_weight_kg : null;
+    const nextBest = hadBest ? Math.max(previousBest, sessionMax) : sessionMax;
+    const isNewBest = hadBest && sessionMax > previousBest;
+    const timesPerformed = (typeof existing.times_performed === 'number' ? existing.times_performed : 0) + 1;
+
+    list[index] = {
+      ...existing,
+      last_performed: sessionDate ?? existing.last_performed,
+      times_performed: timesPerformed,
+      working_weight_kg: sessionMax,
+      best_weight_kg: nextBest,
+      updated_at: updatedAt
+    };
+
+    if (isNewBest) {
+      pbs.push({ name: existing.name, best_weight_kg: nextBest, previous_best_weight_kg: previousBest });
+    }
+  }
+
+  return { entries: list, pbs };
+}
+
 export function selectExerciseHighlights(entries, limit = MAX_HIGHLIGHTS) {
   if (!Array.isArray(entries) || entries.length === 0) return [];
   const rotating = entries.filter(e => e.in_rotation === true);
