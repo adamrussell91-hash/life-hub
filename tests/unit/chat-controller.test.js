@@ -129,6 +129,23 @@ function skincareRecord() {
   };
 }
 
+function workoutRecord() {
+  return {
+    schema_version: 1,
+    id: 'workout-1',
+    type: 'workout',
+    date: '2026-08-05',
+    created_at: '2026-08-05T00:00:00.000Z',
+    updated_at: '2026-08-05T00:00:00.000Z',
+    source: 'chat',
+    title: 'Chest and Curls',
+    session_kind: 'strength',
+    day_type: 'workout_30',
+    status: 'completed',
+    exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] }]
+  };
+}
+
 test('confirm shows Saving… while the request is in flight then restores on failure', async () => {
   const root = new FakeDocument();
   let release;
@@ -270,6 +287,83 @@ test('a diary confirm that reports dayoneSent:false shows a Day One warning with
 
   assert.match(proposal.children[0]?.textContent ?? '', /Saved/);
   assert.match(root.querySelector('#chat-error').textContent, /Day One email didn.t send/i);
+});
+
+test('confirming a completed workout with a reported PB appends an in-voice Chadwick hype line', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: workoutRecord(),
+    path: 'data/fitness/2026/08/2026-08-05-workout-completed.md',
+    confirmImpl: async () => ({
+      ok: true,
+      centralNodeUpdated: true,
+      personalBests: [{ name: 'Chest Press', best_weight_kg: 32, previous_best_weight_kg: 30 }]
+    })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Chadwick, log today\'s session');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className === 'record-proposal');
+  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  confirmButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  const hype = list.children.find(child =>
+    child.className.includes('chat-message--assistant')
+    && (child.querySelector?.('.chat-message__body')?.textContent ?? '').includes('Chest Press')
+  );
+  assert.ok(hype, 'expected an appended hype line naming the exercise that hit a PB');
+  const body = hype.querySelector('.chat-message__body').textContent;
+  assert.match(body, /PB/i);
+  assert.match(body, /32/);
+  assert.match(body, /\+2/, 'should call out the specific kg beaten, not a generic line');
+});
+
+test('confirming a completed workout with no PB does not append a hype line', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: workoutRecord(),
+    path: 'data/fitness/2026/08/2026-08-05-workout-completed.md',
+    confirmImpl: async () => ({ ok: true, centralNodeUpdated: true, personalBests: [] })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Chadwick, log today\'s session');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className === 'record-proposal');
+  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const bubbleCountBefore = list.children.length;
+  confirmButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(list.children.length, bubbleCountBefore, 'no extra bubble should be appended when there is no PB');
+});
+
+test('a non-workout confirm never appends a PB hype line even if personalBests is somehow present', async () => {
+  const root = new FakeDocument();
+  const chatApi = fakeChatApi({
+    record: skincareRecord(),
+    path: '2026/2026-08-02-hyaluronica-skincare.md',
+    confirmImpl: async () => ({ ok: true, personalBests: [{ name: 'Chest Press', best_weight_kg: 32, previous_best_weight_kg: 30 }] })
+  });
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('Hyaluronica, log tonight\'s routine');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className === 'record-proposal');
+  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  confirmButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  const hype = list.children.find(child =>
+    child.className.includes('chat-message--assistant')
+    && (child.querySelector?.('.chat-message__body')?.textContent ?? '').includes('Chest Press')
+  );
+  assert.equal(hype, undefined);
 });
 
 test('a write_conflict on first confirm prompts a retry, and confirming again sends exactly one overwrite request', async () => {

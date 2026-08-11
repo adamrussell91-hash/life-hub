@@ -173,6 +173,29 @@ test('brisket prompt omits the body state block when empty', () => {
   assert.doesNotMatch(prompt, /Shoulder:waist ratio/i);
 });
 
+test('chadwick prompt reports days since last session and instructs him to lower the bar at 2+ missed days', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick', daysSinceLastSession: 3 });
+  assert.match(prompt, /3 days since/i);
+  assert.match(prompt, /lower the bar/i);
+  assert.match(prompt, /10-minute/i);
+  assert.match(prompt, /never a guilt trip/i);
+});
+
+test('chadwick prompt omits the adherence line when days-since-last-session is unknown (null)', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick', daysSinceLastSession: null });
+  assert.doesNotMatch(prompt, /days since/i);
+});
+
+test('chadwick prompt reports zero days since last session without triggering the lower-the-bar instruction text oddly', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick', daysSinceLastSession: 0 });
+  assert.match(prompt, /0 days since/i);
+});
+
+test('non-chadwick agents never receive the days-since-last-session line', () => {
+  const prompt = buildSystemPrompt({ slug: 'brisket', daysSinceLastSession: 5 });
+  assert.doesNotMatch(prompt, /days since/i);
+});
+
 test('chadwick prompt omits exercise library block when empty', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick', exerciseLibrary: '' });
   assert.doesNotMatch(prompt, /Exercise Library highlights/);

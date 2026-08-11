@@ -41,6 +41,7 @@ import {
   validateFoodLibraryEntry
 } from './_shared/food-library.mjs';
 import {
+  daysSinceLastSession,
   EXERCISE_LIBRARY_PATH,
   formatExerciseLibraryForPrompt,
   parseExerciseLibrary,
@@ -246,6 +247,7 @@ export function createChatHandler({
         let skincareMembershipSha;
         let workoutTemplates = '';
         let bodyState = '';
+        let sessionAdherenceDays = null;
         try {
           const current = await client.resolveTree();
           const manifest = selectManifestEntries(current.tree, { from, to: today });
@@ -352,6 +354,7 @@ export function createChatHandler({
           if (decodedExerciseLibrary !== null) {
             exerciseLibraryEntries = parseExerciseLibrary(decodedExerciseLibrary);
             exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries);
+            sessionAdherenceDays = daysSinceLastSession(exerciseLibraryEntries, today);
           }
 
           const decodedCatalog = skincareCatalogBlob ? decodeBlob(skincareCatalogBlob) : null;
@@ -427,6 +430,7 @@ export function createChatHandler({
           skincareMembershipSha = undefined;
           workoutTemplates = '';
           bodyState = '';
+          sessionAdherenceDays = null;
         }
 
         const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
@@ -458,7 +462,8 @@ export function createChatHandler({
           workoutTemplates,
           exerciseLibrary,
           skincareRoutines,
-          bodyState
+          bodyState,
+          daysSinceLastSession: sessionAdherenceDays
         });
 
         try {
