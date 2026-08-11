@@ -3,9 +3,16 @@ import {
   TODAYS_STATUS_HEADING,
   CROSS_AGENT_HEADING
 } from './constraints.js';
+import { addCalendarDays, getSydneyWeekStart, isCalendarDate } from './time.js';
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const LONG_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
 const STATUS_HEADING_RE = /^## ⚡ Today's Status.*$/m;
+const THIS_WEEK_HEADING_RE = /^## 📅 This Week \((.+?)\)\s*$/m;
+const THIS_MONTH_HEADING_RE = /^## 📊 This Month \((.+?)\)\s*$/m;
 const NEXT_SECTION_RE = /\n## /;
 
 export function formatStatusHeadingDate(dateKey) {
@@ -154,6 +161,99 @@ function parseStatusHeadingDateKey(heading) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+function toDateKey(year, month, day) {
+  if (!month || !Number.isFinite(day) || !Number.isFinite(year)) return null;
+  const key = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return isCalendarDate(key) ? key : null;
+}
+
+/** Parse the trailing end-date of a This Week range like `16 – 22 June 2026` or `27 Jul – 2 Aug 2026`. */
+export function parseThisWeekEndDateKey(rangeText) {
+  if (typeof rangeText !== 'string') return null;
+  const text = rangeText.trim();
+  const cross = /^(\d{1,2})\s+([A-Za-z]+)\s*[–-]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/.exec(text);
+  if (cross) {
+    return toDateKey(Number(cross[5]), MONTH_INDEX[cross[4].toLowerCase()], Number(cross[3]));
+  }
+  const same = /^(\d{1,2})\s*[–-]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/.exec(text);
+  if (same) {
+    return toDateKey(Number(same[4]), MONTH_INDEX[same[3].toLowerCase()], Number(same[2]));
+  }
+  return null;
+}
+
+/** Parse a This Month label like `April 2026`. */
+export function parseThisMonthLabel(label) {
+  if (typeof label !== 'string') return null;
+  const match = /^([A-Za-z]+)\s+(\d{4})$/.exec(label.trim());
+  if (!match) return null;
+  const month = MONTH_INDEX[match[1].toLowerCase()];
+  const year = Number(match[2]);
+  if (!month || !Number.isFinite(year)) return null;
+  return { year, month };
+}
+
+function formatDayMonthYear(dateKey, { shortMonth = false } = {}) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const monthName = shortMonth ? SHORT_MONTHS[month - 1] : LONG_MONTHS[month - 1];
+  return { year, month, day, monthName };
+}
+
+export function formatThisWeekHeading(mondayKey) {
+  const sundayKey = addCalendarDays(mondayKey, 6);
+  const start = formatDayMonthYear(mondayKey, { shortMonth: mondayKey.slice(0, 7) !== sundayKey.slice(0, 7) });
+  const end = formatDayMonthYear(sundayKey, { shortMonth: mondayKey.slice(0, 7) !== sundayKey.slice(0, 7) });
+  if (start.month === end.month && start.year === end.year) {
+    return `## 📅 This Week (${start.day} – ${end.day} ${end.monthName} ${end.year})`;
+  }
+  return `## 📅 This Week (${start.day} ${start.monthName} – ${end.day} ${end.monthName} ${end.year})`;
+}
+
+export function formatThisMonthHeading(dateKey) {
+  const { year, monthName } = formatDayMonthYear(dateKey);
+  return `## 📊 This Month (${monthName} ${year})`;
+}
+
+function replaceHeadingClearBody(content, headingRe, newHeading) {
+  const match = headingRe.exec(content);
+  if (!match) return content;
+  const start = match.index;
+  const afterHeading = content.slice(start + match[0].length);
+  const endRel = NEXT_SECTION_RE.exec(afterHeading);
+  const end = endRel ? start + match[0].length + endRel.index : content.length;
+  return `${content.slice(0, start)}${newHeading}\n${content.slice(end).replace(/^\n?/, '')}`;
+}
+
+/**
+ * Mechanically advance stale This Week / This Month headings and clear their bodies.
+ * Malformed or missing headings are left untouched. Not a Hammond-authored patch.
+ */
+export function rollStaleSections(content, today) {
+  if (typeof content !== 'string' || !isCalendarDate(today)) return content;
+  let next = content;
+
+  const weekMatch = THIS_WEEK_HEADING_RE.exec(next);
+  if (weekMatch) {
+    const endKey = parseThisWeekEndDateKey(weekMatch[1]);
+    if (endKey && today > endKey) {
+      next = replaceHeadingClearBody(next, THIS_WEEK_HEADING_RE, formatThisWeekHeading(getSydneyWeekStart(today)));
+    }
+  }
+
+  const monthMatch = THIS_MONTH_HEADING_RE.exec(next);
+  if (monthMatch) {
+    const parsed = parseThisMonthLabel(monthMatch[1]);
+    if (parsed) {
+      const [year, month] = today.split('-').map(Number);
+      if (year > parsed.year || (year === parsed.year && month > parsed.month)) {
+        next = replaceHeadingClearBody(next, THIS_MONTH_HEADING_RE, formatThisMonthHeading(today));
+      }
+    }
+  }
+
+  return next;
+}
+
 export function applyLogToCentralNode(content, {
   record,
   actionLine,
@@ -199,6 +299,7 @@ export function applyLogToCentralNode(content, {
   // Brisket reads, so the line instructed him to set a value that was computed and used
   // two steps earlier. Removed 2026-08-11; the honest signal is Today's Status Exercise.
   next = trimCrossAgentSection(next);
+  next = rollStaleSections(next, record.date);
   return next;
 }
 

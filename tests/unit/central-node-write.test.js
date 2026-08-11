@@ -6,8 +6,11 @@ import {
   buildMealFlagsLine,
   buildNutritionStatusLine,
   formatStatusHeadingDate,
+  formatThisMonthHeading,
+  formatThisWeekHeading,
   humanizeDayType,
   replaceTodaysStatus,
+  rollStaleSections,
   trimCrossAgentSection,
   upsertStatusField
 } from '../../js/core/central-node-write.js';
@@ -172,4 +175,91 @@ test('applyLogToCentralNode no longer writes a Day Type directive for completed 
   // The honest signal -- what was actually done -- still lands in Status and Recent Actions.
   assert.match(next, /\*\*Exercise:\*\* Chest and Curls · 26 min · completed\./);
   assert.match(next, /\*\*30 Jul:\*\* Chadwick Flexington/);
+});
+
+test('rollStaleSections advances an elapsed This Week range and clears the body', () => {
+  const content = [
+    '## 📅 This Week (16 – 22 June 2026)',
+    '**Key Events:**',
+    '- Stale event that must not survive.',
+    '---',
+    '## 📊 This Month (August 2026)',
+    '**Active Goals:**',
+    '- Keep me — month is current.'
+  ].join('\n');
+
+  const next = rollStaleSections(content, '2026-08-11');
+  assert.match(next, /^## 📅 This Week \(10 – 16 August 2026\)$/m);
+  assert.doesNotMatch(next, /Stale event/);
+  assert.match(next, /## 📊 This Month \(August 2026\)/);
+  assert.match(next, /Keep me — month is current/);
+});
+
+test('rollStaleSections leaves an already-current This Week heading untouched', () => {
+  const content = [
+    '## 📅 This Week (10 – 16 August 2026)',
+    '- Still this week.',
+    '## 📊 This Month (August 2026)',
+    '- Current month.'
+  ].join('\n');
+  assert.equal(rollStaleSections(content, '2026-08-11'), content);
+  assert.equal(rollStaleSections(content, '2026-08-16'), content);
+});
+
+test('rollStaleSections is a no-op for malformed or undated week/month headings', () => {
+  const content = [
+    '## 📅 This Week',
+    '- Lift Mon',
+    '## 📊 This Month',
+    '- Sleep by 11'
+  ].join('\n');
+  assert.equal(rollStaleSections(content, '2026-08-11'), content);
+});
+
+test('rollStaleSections rolls This Month across a year boundary and clears the body', () => {
+  const content = [
+    '## 📅 This Week (29 Dec 2025 – 4 Jan 2026)',
+    '- Cross-year week still current on New Year\'s Day.',
+    '## 📊 This Month (December 2025)',
+    '- Old December goals.'
+  ].join('\n');
+
+  const next = rollStaleSections(content, '2026-01-01');
+  assert.match(next, /## 📅 This Week \(29 Dec 2025 – 4 Jan 2026\)/);
+  assert.match(next, /Cross-year week still current/);
+  assert.equal(formatThisMonthHeading('2026-01-01'), '## 📊 This Month (January 2026)');
+  assert.match(next, /^## 📊 This Month \(January 2026\)$/m);
+  assert.doesNotMatch(next, /Old December goals/);
+});
+
+test('formatThisWeekHeading uses short months when the Mon–Sun range spans two months', () => {
+  assert.equal(
+    formatThisWeekHeading('2026-07-27'),
+    '## 📅 This Week (27 Jul – 2 Aug 2026)'
+  );
+});
+
+test('applyLogToCentralNode rolls a stale This Week heading on specialist writes', () => {
+  const stale = [
+    '# Purpose',
+    '---',
+    "## ⚡ Today's Status (Friday 19 June 2026)",
+    '**Health:** Stable.',
+    '---',
+    '## 📅 This Week (16 – 22 June 2026)',
+    '- Stale week body.',
+    '---',
+    '## 📝 Recent Agent Actions',
+    '**30 Jul:** Chadwick: session logged.'
+  ].join('\n');
+
+  const next = applyLogToCentralNode(stale, {
+    record: { type: 'meal', date: '2026-08-11', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12 },
+    actionLine: '\n**11 Aug:** Brisket Lasso: Logged breakfast.',
+    nutritionTotals: { calories: 520, protein_g: 38, fat_g: 12 }
+  });
+
+  assert.match(next, /^## 📅 This Week \(10 – 16 August 2026\)$/m);
+  assert.doesNotMatch(next, /Stale week body/);
+  assert.match(next, /\*\*11 Aug:\*\* Brisket Lasso: Logged breakfast/);
 });

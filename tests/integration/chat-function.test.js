@@ -1693,6 +1693,76 @@ test('Hammond registers CN patch and governance tools and gets full CN in system
   assert.match(receivedArgs.system, /Lift Mon/);
 });
 
+test('Hammond prompt-time Central Node rolls a stale This Week heading before buildSystemPrompt', async () => {
+  let receivedArgs;
+  const staleCn = `# Purpose
+Purpose body.
+
+## 📏 Writing Rules (All Agents Must Follow)
+Rule one.
+
+## 🤖 Agent Directory
+- Hammond
+
+## 🔴 Current Constraints & Priorities
+- Steroid taper active
+
+## ⚡ Today's Status — Saturday, 1 August 2026
+**Flags:** Quiet day.
+
+## 📅 This Week (16 – 22 June 2026)
+- Stale June body must not reach the prompt.
+
+## 📊 This Month (April 2026)
+- Stale April body must not reach the prompt.
+
+## 📈 Long-Term Trends & Patterns
+- Sleep debt rising
+
+## 🤝 Cross-Agent Coordination
+- Chadwick→Brisket: training day
+
+## 📝 Recent Agent Actions
+- 1 Aug — Brisket: meal logged
+`;
+  const cnSha = '5'.repeat(40);
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'central-node.md', type: 'blob', sha: cnSha, size: staleCn.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(staleCn, 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Hammond, what should I focus on?' })));
+
+  assert.match(receivedArgs.system, /This Week \(27 Jul – 2 Aug 2026\)/);
+  assert.match(receivedArgs.system, /This Month \(August 2026\)/);
+  assert.doesNotMatch(receivedArgs.system, /Stale June body/);
+  assert.doesNotMatch(receivedArgs.system, /Stale April body/);
+});
+
 test('non-hammond agents do not register Hammond CN or governance tools', async () => {
   let receivedArgs;
   const handler = createChatHandler({
