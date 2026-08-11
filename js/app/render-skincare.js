@@ -513,7 +513,11 @@ function renderRoutineCard(root, key, model, {
   done.type = 'button';
   done.className = 'skincare-done';
   done.textContent = already ? 'Log again' : 'Log';
-  done.addEventListener('click', () => {
+  done.addEventListener('click', async () => {
+    if (done.disabled) return;
+    const priorLabel = done.textContent;
+    done.disabled = true;
+    done.textContent = 'Logging…';
     const products = buildProductList(key, {
       choiceSelections: state.choices,
       enabledProducts: [...state.enabled],
@@ -521,18 +525,23 @@ function renderRoutineCard(root, key, model, {
       activeProducts: routine.products,
       oneOffs: state.oneOffs
     });
-    onLogRoutine?.({
-      routine: key,
-      products,
-      notes: state.notes,
-      payload: toSkincareConfirmPayload({
-        date: model.date,
+    try {
+      await onLogRoutine?.({
         routine: key,
         products,
         notes: state.notes,
-        slug: key
-      })
-    });
+        payload: toSkincareConfirmPayload({
+          date: model.date,
+          routine: key,
+          products,
+          notes: state.notes,
+          slug: key
+        })
+      });
+    } catch {
+      done.textContent = priorLabel;
+      done.disabled = false;
+    }
   });
   card.append(done);
   return card;
@@ -560,19 +569,28 @@ function renderProcedureCard(root, host, model, onLogProcedure) {
   button.type = 'button';
   button.className = 'skincare-done';
   button.textContent = 'Log procedure';
-  button.addEventListener('click', () => {
+  button.addEventListener('click', async () => {
+    if (button.disabled) return;
+    const priorLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Logging…';
     const procedureTitle = name.value.trim() || 'procedure';
     const routine = model.currentRoutine === 'am' ? 'am' : 'pm';
-    onLogProcedure?.({
-      payload: toSkincareConfirmPayload({
-        date: model.date,
-        routine,
-        products: [procedureTitle],
-        notes: notes.value.trim(),
-        procedureTitle,
-        slug: undefined
-      })
-    });
+    try {
+      await onLogProcedure?.({
+        payload: toSkincareConfirmPayload({
+          date: model.date,
+          routine,
+          products: [procedureTitle],
+          notes: notes.value.trim(),
+          procedureTitle,
+          slug: undefined
+        })
+      });
+    } catch {
+      button.textContent = priorLabel;
+      button.disabled = false;
+    }
   });
   host.append(button);
 }

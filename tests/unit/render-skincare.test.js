@@ -17,6 +17,7 @@ class FakeElement {
     this.value = '';
     this.type = '';
     this.checked = false;
+    this.disabled = false;
   }
 
   set textContent(value) {
@@ -43,9 +44,11 @@ class FakeElement {
   }
 
   click(event = {}) {
+    let last;
     for (const handler of this._listeners.click ?? []) {
-      handler({ stopPropagation: () => {}, ...event, target: this, currentTarget: this });
+      last = handler({ stopPropagation: () => {}, ...event, target: this, currentTarget: this });
     }
+    return last;
   }
 
   dispatch(type, event = {}) {
@@ -636,4 +639,65 @@ test('index.html leads Skincare with the consistency hero, heatmap, and legend; 
   }
 
   assert.doesNotMatch(html, /skincare-week-dots/);
+});
+
+test('Log button shows Logging… and disables until onLogRoutine settles', async () => {
+  const root = fakeSkincareRoot();
+  let resolveLog;
+  const logPromise = new Promise(resolve => { resolveLog = resolve; });
+  renderSkincare(root, baseModel({ amLogged: false }), {
+    onLogRoutine: () => logPromise
+  });
+
+  const amCard = root._routineCards.children[0];
+  const done = descendants(amCard).find(control => control.className === 'skincare-done');
+  assert.equal(done.textContent, 'Log');
+
+  const clickResult = done.click();
+  assert.equal(done.textContent, 'Logging…');
+  assert.equal(done.disabled, true);
+
+  resolveLog({ ok: true });
+  await clickResult;
+  // Button stays pending until a full re-render; do not assert Log again here.
+  assert.equal(done.textContent, 'Logging…');
+  assert.equal(done.disabled, true);
+});
+
+test('Log button restores prior label when onLogRoutine rejects', async () => {
+  const root = fakeSkincareRoot();
+  renderSkincare(root, baseModel({ pmLogged: true }), {
+    onLogRoutine: async () => {
+      throw new Error('offline');
+    }
+  });
+
+  const pmCard = root._routineCards.children[1];
+  const done = descendants(pmCard).find(control => control.className === 'skincare-done');
+  assert.equal(done.textContent, 'Log again');
+
+  await done.click();
+  assert.equal(done.textContent, 'Log again');
+  assert.equal(done.disabled, false);
+});
+
+test('procedure Log button shows Logging… until onLogProcedure settles', async () => {
+  const root = fakeSkincareRoot();
+  let resolveLog;
+  const logPromise = new Promise(resolve => { resolveLog = resolve; });
+  renderSkincare(root, baseModel(), {
+    onLogProcedure: () => logPromise
+  });
+
+  const button = descendants(root._procedureCard).find(control =>
+    control.className === 'skincare-done' && control.textContent === 'Log procedure'
+  );
+  assert.ok(button);
+
+  const clickResult = button.click();
+  assert.equal(button.textContent, 'Logging…');
+  assert.equal(button.disabled, true);
+
+  resolveLog({ ok: true });
+  await clickResult;
 });

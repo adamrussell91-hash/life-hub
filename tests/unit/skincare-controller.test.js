@@ -306,6 +306,30 @@ test('onLogRoutine returns the save promise so callers can await settle', async 
   assert.equal(root.status.textContent, 'Logged ✨');
 });
 
+test('save rejects after status error so UI can restore the Log button', async () => {
+  const root = createRoot();
+  const controller = createSkincareController({
+    root,
+    chatApi: {
+      async confirm() {
+        throw new Error('network');
+      }
+    },
+    skincareApi: {},
+    isOnline: () => true
+  });
+
+  await assert.rejects(
+    () => controller.save({
+      candidate: { type: 'skincare', date: '2026-08-11', routine: 'am', products: [] },
+      slug: 'am',
+      overwrite: true
+    }),
+    /network/
+  );
+  assert.equal(root.status.textContent, 'Couldn’t save — try again.');
+});
+
 test('onLogProcedure returns the save promise', async () => {
   const root = createRoot();
   const controller = createSkincareController({
