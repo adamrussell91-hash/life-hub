@@ -122,8 +122,8 @@ export function createSkincareController({
 
   return {
     setStatus,
-    onLogRoutine: ({ payload }) => void save(payload),
-    onLogProcedure: ({ payload }) => void save(payload),
+    onLogRoutine: ({ payload }) => save(payload),
+    onLogProcedure: ({ payload }) => save(payload),
     onRemoveFromRoutine: removeFromRoutine,
     onAddFromLibrary: addFromLibrary,
     onCreateProduct: createProduct,
