@@ -1151,11 +1151,17 @@ main { max-width: 76rem; margin: 0 auto; }
   margin-bottom: 0.5rem;
 }
 .skincare-streak-pair .metric-value { margin: 0.4rem 0 0; }
-.skincare-heatmap .heatmap-tile { background: rgba(185, 158, 224, 0.12); transition: background 220ms ease; }
-.skincare-heatmap .heatmap-tile[data-skincare-state="am"] { background: #E7CFEF; }
-.skincare-heatmap .heatmap-tile[data-skincare-state="pm"] { background: #8F6FB8; }
-.skincare-heatmap .heatmap-tile[data-skincare-state="both"] { background: #B99EE0; }
+.skincare-heatmap .heatmap-tile { background: rgba(185, 158, 224, 0.12); transition: background 220ms ease, box-shadow 220ms ease; }
+.skincare-heatmap .heatmap-tile[data-skincare-state="am"] { background: #F3E9F8; }
+.skincare-heatmap .heatmap-tile[data-skincare-state="pm"] { background: #4E3478; }
+.skincare-heatmap .heatmap-tile[data-skincare-state="both"] {
+  background: #4E3478;
+  box-shadow: inset 0 0 0 2px #C9A24A;
+}
 .skincare-heatmap .heatmap-tile[data-today="true"] { box-shadow: 0 0 0 2px rgba(185, 158, 224, 0.55); }
+.skincare-heatmap .heatmap-tile[data-skincare-state="both"][data-today="true"] {
+  box-shadow: inset 0 0 0 2px #C9A24A, 0 0 0 2px rgba(185, 158, 224, 0.55);
+}
 @media (prefers-reduced-motion: reduce) {
   .skincare-heatmap .heatmap-tile { transition: none; }
 }
@@ -1177,9 +1183,12 @@ main { max-width: 76rem; margin: 0 auto; }
   border-radius: 0.2rem;
   background: rgba(185, 158, 224, 0.12);
 }
-.skincare-heatmap-legend li[data-state="am"]::before { background: #E7CFEF; }
-.skincare-heatmap-legend li[data-state="pm"]::before { background: #8F6FB8; }
-.skincare-heatmap-legend li[data-state="both"]::before { background: #B99EE0; }
+.skincare-heatmap-legend li[data-state="am"]::before { background: #F3E9F8; }
+.skincare-heatmap-legend li[data-state="pm"]::before { background: #4E3478; }
+.skincare-heatmap-legend li[data-state="both"]::before {
+  background: #4E3478;
+  box-shadow: inset 0 0 0 2px #C9A24A;
+}
 
 .skincare-grid {
   display: grid;
@@ -1392,6 +1401,10 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 750;
   cursor: pointer;
   width: 100%;
+}
+.skincare-done:disabled {
+  opacity: 0.72;
+  cursor: wait;
 }
 .skincare-procedure-list {
   margin: 0;
