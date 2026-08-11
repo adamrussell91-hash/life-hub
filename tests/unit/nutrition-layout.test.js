@@ -2,40 +2,51 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-async function nutritionGridMarkup() {
+async function nutritionDashboardMarkup() {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
-  const gridStart = html.indexOf('<div class="nutrition-grid">');
-  assert.ok(gridStart >= 0, 'nutrition-grid should exist');
-  const gridEnd = html.indexOf('meal-breakdown-card', gridStart);
-  assert.ok(gridEnd > gridStart, 'meal-breakdown-card should follow nutrition-grid');
-  return { html, grid: html.slice(gridStart, gridEnd) };
+  const start = html.indexOf('id="nutrition-dashboard"');
+  assert.ok(start >= 0);
+  const end = html.indexOf('id="fitness-dashboard"', start);
+  assert.ok(end > start);
+  return html.slice(start, end);
 }
 
-test('nutrition-grid drops the Energy, Protein, and Fat tiles', async () => {
-  const { grid } = await nutritionGridMarkup();
-
-  for (const ring of ['calories', 'protein', 'fat']) {
-    assert.doesNotMatch(
-      grid,
-      new RegExp(`data-nutrition-ring="${ring}"`),
-      `nutrition-grid should not contain a ${ring} ring`
-    );
-  }
+test('nutrition-grid includes Sodium, Calcium, Polyphenols, and Protein by meal pie', async () => {
+  const dash = await nutritionDashboardMarkup();
+  assert.match(dash, /data-nutrition-ring="sodium"/);
+  assert.match(dash, /data-nutrition-ring="calcium"/);
+  assert.match(dash, /data-nutrition="polyphenol"/);
+  assert.match(dash, /id="nutrition-meal-protein-pie"/);
+  assert.match(dash, /Protein by meal/);
+  assert.doesNotMatch(dash, /class="meal-breakdown-card"/);
+  assert.doesNotMatch(dash, /class="meal-breakdown"/);
 });
 
-test('nutrition-grid keeps Sodium, Calcium, and Polyphenols tiles', async () => {
-  const { grid } = await nutritionGridMarkup();
+test('protein and fat week charts sit in a pair; energy and carbs sit in a pair', async () => {
+  const dash = await nutritionDashboardMarkup();
+  assert.match(dash, /id="nutrition-protein-chart"/);
+  assert.match(dash, /id="nutrition-fat-chart"/);
+  assert.match(dash, /id="nutrition-calories-chart"/);
+  assert.match(dash, /id="nutrition-carbs-chart"/);
+  assert.doesNotMatch(dash, /id="nutrition-hit-strip"/);
+  assert.match(dash, /nutrition-week-charts/);
+  assert.match(dash, /class="nutrition-week-charts nutrition-week-charts--macros"/);
+  assert.match(dash, /class="nutrition-week-charts nutrition-week-charts--energy"/);
+});
 
-  assert.match(grid, /data-nutrition-ring="sodium"/);
-  assert.match(grid, /data-nutrition-ring="calcium"/);
-  assert.match(grid, /data-nutrition="polyphenol"/);
+test('week compare exposes summary slots and sparkline host', async () => {
+  const dash = await nutritionDashboardMarkup();
+  assert.match(dash, /data-value="week-compare-this"/);
+  assert.match(dash, /data-value="week-compare-prior"/);
+  assert.match(dash, /data-value="week-compare-delta"/);
+  assert.match(dash, /id="nutrition-week-compare"/);
+  assert.match(dash, /data-role="value-labels"/);
 });
 
 test('the macro split hero remains intact', async () => {
-  const { html } = await nutritionGridMarkup();
-
-  assert.match(html, /id="nutrition-macro-split"/);
-  assert.match(html, /data-split="protein"/);
-  assert.match(html, /data-split="fat"/);
-  assert.match(html, /data-split="energy"/);
+  const dash = await nutritionDashboardMarkup();
+  assert.match(dash, /id="nutrition-macro-split"/);
+  assert.match(dash, /data-split="protein"/);
+  assert.match(dash, /data-split="fat"/);
+  assert.match(dash, /data-split="energy"/);
 });
