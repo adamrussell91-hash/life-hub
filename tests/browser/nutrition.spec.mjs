@@ -49,11 +49,10 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     assert.equal(await page.locator('[data-split="energy"]').textContent(), '1,130 / 1,900 kcal');
     assert.equal(await page.locator('[data-split="protein"]').textContent(), '80 g / 120 g');
     assert.equal(await page.locator('[data-split="fat"]').textContent(), '27 g / 50 g');
-    assert.equal(await page.locator('[data-meal-protein="breakfast"]').textContent(), '38 g');
-    assert.equal(await page.locator('[data-meal-protein="lunch"]').textContent(), '42 g');
-    assert.equal(await page.locator('[data-meal-protein="dinner"]').count(), 0);
-    assert.equal(await page.locator('[data-meal-protein="snack"]').count(), 0);
-    assert.equal(await page.locator('[data-meal-breakdown-empty]').isHidden(), true);
+    assert.equal(await page.locator('#nutrition-meal-protein-pie').count(), 1);
+    assert.equal(await page.getByText('Protein by meal', { exact: true }).count(), 1);
+    assert.equal(await page.locator('.meal-breakdown-card').count(), 0);
+    assert.equal(await page.locator('[data-meal-breakdown-empty]').count(), 0);
     assert.equal(await page.locator('[data-nutrition-ring="protein"]').count(), 0);
     assert.equal(await page.locator('[data-nutrition-ring="calories"]').count(), 0);
     assert.equal(await page.locator('[data-nutrition-ring="fat"]').count(), 0);
@@ -67,10 +66,17 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
       await page.locator('#nutrition-protein-chart').getAttribute('preserveAspectRatio'),
       'xMidYMid meet'
     );
-    assert.match(
-      await page.locator('[data-nutrition="rolling-caption"]').textContent(),
-      /3-day average/i
-    );
+    assert.equal(await page.locator('[data-nutrition="rolling-caption"]').count(), 0);
+    assert.equal(await page.locator('#nutrition-protein-chart [data-role="guide-labels"] .chart-guide-label').count(), 2);
+    assert.equal(await page.locator('#nutrition-fat-chart [data-role="guide-labels"] .chart-guide-label').count(), 1);
+    assert.deepEqual(await page.locator('#nutrition-protein-chart .chart-guide-label').allTextContents(), ['goal', 'avg']);
+    assert.deepEqual(await page.locator('#nutrition-fat-chart .chart-guide-label').allTextContents(), ['ceiling']);
+    const avgLabelY = Number(await page.locator('#nutrition-protein-chart .chart-guide-label--avg').getAttribute('y'));
+    const finalValueLabelY = Number(await page.locator('#nutrition-protein-chart [data-role="value-labels"] text').last().getAttribute('y'));
+    assert.ok(avgLabelY < finalValueLabelY, 'average label sits above the final value label');
+    assert.match(await page.locator('[data-value="week-compare-this"]').textContent(), /^\d+$/);
+    assert.match(await page.locator('[data-value="week-compare-prior"]').textContent(), /^\d+$/);
+    assert.ok(await page.locator('#nutrition-week-compare [data-role="value-labels"] text').count() > 0);
     assert.equal(await page.locator('#nutrition-macro-split').count(), 1);
 
     const heatmapTiles = page.locator('#nutrition-heatmap .heatmap-tile');

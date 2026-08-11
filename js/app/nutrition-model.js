@@ -40,6 +40,7 @@ function dailyNutrition(events, date, targetsConfig) {
     calories: nutrition.calories,
     protein_g: nutrition.protein_g,
     fat_g: nutrition.fat_g,
+    carbs_g: nutrition.carbs_g,
     proteinTarget,
     fatCeiling,
     hitProtein: proteinTarget > 0 && nutrition.protein_g >= proteinTarget,
