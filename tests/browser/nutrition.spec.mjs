@@ -49,11 +49,10 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     assert.equal(await page.locator('[data-split="energy"]').textContent(), '1,130 / 1,900 kcal');
     assert.equal(await page.locator('[data-split="protein"]').textContent(), '80 g / 120 g');
     assert.equal(await page.locator('[data-split="fat"]').textContent(), '27 g / 50 g');
-    assert.equal(await page.locator('[data-meal-protein="breakfast"]').textContent(), '38 g');
-    assert.equal(await page.locator('[data-meal-protein="lunch"]').textContent(), '42 g');
-    assert.equal(await page.locator('[data-meal-protein="dinner"]').count(), 0);
-    assert.equal(await page.locator('[data-meal-protein="snack"]').count(), 0);
-    assert.equal(await page.locator('[data-meal-breakdown-empty]').isHidden(), true);
+    assert.equal(await page.locator('#nutrition-meal-protein-pie').count(), 1);
+    assert.equal(await page.getByText('Protein by meal', { exact: true }).count(), 1);
+    assert.equal(await page.locator('.meal-breakdown-card').count(), 0);
+    assert.equal(await page.locator('[data-meal-breakdown-empty]').count(), 0);
     assert.equal(await page.locator('[data-nutrition-ring="protein"]').count(), 0);
     assert.equal(await page.locator('[data-nutrition-ring="calories"]').count(), 0);
     assert.equal(await page.locator('[data-nutrition-ring="fat"]').count(), 0);

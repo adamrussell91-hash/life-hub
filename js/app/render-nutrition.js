@@ -184,10 +184,12 @@ export function renderMealProteinPie(root, meals) {
   slices?.replaceChildren();
   legend?.replaceChildren();
   if (pie.empty) {
+    svg?.setAttribute('hidden', '');
     empty?.removeAttribute('hidden');
     return;
   }
 
+  svg?.removeAttribute('hidden');
   empty?.setAttribute('hidden', '');
   const sliceNodes = pie.slices.map(slice => {
     const path = root.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -334,10 +336,14 @@ function renderMacroSplit(root, model) {
 function renderWeekCompare(root, week, previousWeek = []) {
   const host = root.querySelector('#nutrition-week-compare');
   if (!host) return;
+  const thisAvg = week.length === 0
+    ? 0
+    : week.reduce((sum, day) => sum + day.protein_g, 0) / week.length;
   const priorAvg = previousWeek.length === 0
     ? 0
     : previousWeek.reduce((sum, day) => sum + day.protein_g, 0) / previousWeek.length;
-  setText(root, '[data-value="week-compare-prior"]', `Prior week avg ${priorAvg.toFixed(0)} g`);
+  setText(root, '[data-value="week-compare-this"]', thisAvg.toFixed(0));
+  setText(root, '[data-value="week-compare-prior"]', priorAvg.toFixed(0));
 
   // Task 5 replaces the legacy column chart with the SVG sparkline.
   if (host.tagName?.toLowerCase() === 'svg') return;
