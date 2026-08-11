@@ -76,7 +76,7 @@ import {
   emptyGovernanceLog,
   recentGovernanceTail
 } from '../../js/core/governance-log.js';
-import { rollStaleSections } from '../../js/core/central-node-write.js';
+import { rollStaleSections, purgeStaleRecentActions } from '../../js/core/central-node-write.js';
 import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   emptyProductLibrary,
@@ -355,7 +355,7 @@ export function createChatHandler({
           const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
           if (decodedCentralNode !== null) {
             const centralNodeForTurn = needsHammondTools
-              ? rollStaleSections(decodedCentralNode, today)
+              ? purgeStaleRecentActions(rollStaleSections(decodedCentralNode, today), today)
               : decodedCentralNode;
             constraints = extractConstraints(centralNodeForTurn);
             centralNodeLog = [

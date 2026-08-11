@@ -162,7 +162,7 @@ test('appends a one-line entry to the central node running log after a successfu
     '**Nutrition:** No data.',
     '---',
     '## 📝 Recent Agent Actions',
-    '**30 Jul:** Chadwick: Chest and Curls session completed and logged.'
+    '**1 Aug:** Chadwick: Chest and Curls session completed and logged.'
   ].join('\n');
   const calls = [];
   const fetchImpl = async (url, options) => {

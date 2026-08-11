@@ -300,7 +300,55 @@ export function applyLogToCentralNode(content, {
   // two steps earlier. Removed 2026-08-11; the honest signal is Today's Status Exercise.
   next = trimCrossAgentSection(next);
   next = rollStaleSections(next, record.date);
+  next = purgeStaleRecentActions(next, record.date);
   return next;
+}
+
+/**
+ * Purge Recent Agent Actions bullets older than the declared rolling window.
+ * Bullets are day-month only (`**30 Jul:** …`); year is inferred from `today`.
+ * Unparseable lines are kept (never silently dropped).
+ */
+export function purgeStaleRecentActions(content, today, { windowHours = 48 } = {}) {
+  if (typeof content !== 'string' || !isCalendarDate(today)) return content;
+  const headingIndex = content.indexOf(RECENT_ACTIONS_HEADING);
+  if (headingIndex === -1) return content;
+
+  const sectionStart = headingIndex + RECENT_ACTIONS_HEADING.length;
+  const after = content.slice(sectionStart);
+  const endRel = after.search(/\n## /);
+  const section = endRel === -1 ? after : after.slice(0, endRel);
+  const rest = endRel === -1 ? '' : after.slice(endRel);
+
+  const windowDays = Math.max(1, Math.ceil(windowHours / 24));
+  const cutoff = addCalendarDays(today, -(windowDays - 1));
+  const lines = section.split('\n');
+  const kept = lines.filter(line => {
+    const parsed = parseRecentActionDateKey(line, today);
+    if (!parsed) return true; // malformed / non-bullet — keep
+    return parsed >= cutoff;
+  });
+  if (kept.length === lines.length) return content;
+  return `${content.slice(0, sectionStart)}${kept.join('\n')}${rest}`;
+}
+
+/** Parse `**30 Jul:** …` style leading dates into a YYYY-MM-DD near `today`. */
+export function parseRecentActionDateKey(line, today) {
+  if (typeof line !== 'string' || !isCalendarDate(today)) return null;
+  const match = /^\s*\*\*(\d{1,2})\s+([A-Za-z]{3,9}):\*\*/.exec(line);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = MONTH_INDEX[match[2].toLowerCase()];
+  if (!month || !Number.isFinite(day)) return null;
+
+  const year = Number(today.slice(0, 4));
+  let key = toDateKey(year, month, day);
+  if (!key) return null;
+  // If the stamped day sits in the future relative to today, it was last year.
+  if (key > today) {
+    key = toDateKey(year - 1, month, day);
+  }
+  return key;
 }
 
 export { TODAYS_STATUS_HEADING, RECENT_ACTIONS_HEADING, CROSS_AGENT_HEADING };
