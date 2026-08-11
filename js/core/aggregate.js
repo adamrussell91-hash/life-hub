@@ -21,6 +21,7 @@ export function aggregateNutrition(items, date) {
     calories: sum(meals, 'calories'),
     protein_g: sum(meals, 'protein_g'),
     fat_g: sum(meals, 'fat_g'),
+    carbs_g: sum(meals, 'carbs_g'),
     sodium_mg: sum(meals, 'sodium_mg'),
     calcium_mg: sum(meals, 'calcium_mg'),
     polyphenol_score: sum(meals, 'polyphenol_score'),

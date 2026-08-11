@@ -35,6 +35,7 @@ test('builds today\'s macros, day type, and full target profile from the existin
     calories: 1130,
     protein_g: 80,
     fat_g: 27,
+    carbs_g: 0,
     sodium_mg: 1100,
     calcium_mg: 590,
     polyphenol_score: 9,
@@ -61,13 +62,13 @@ test('builds a 7-day series ending on the display date, with each day\'s own pro
   const model = buildNutritionModel({ events, targetsConfig, date: '2026-07-30' });
 
   assert.deepEqual(model.week, [
-    { date: '2026-07-24', calories: 300, protein_g: 140, fat_g: 10, proteinTarget: 120, fatCeiling: 50, hitProtein: true, overFatCeiling: false, proteinPct: 117 },
-    { date: '2026-07-25', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 0 },
-    { date: '2026-07-26', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 0 },
-    { date: '2026-07-27', calories: 400, protein_g: 60, fat_g: 12, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 50 },
-    { date: '2026-07-28', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 0 },
-    { date: '2026-07-29', calories: 0, protein_g: 0, fat_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 0 },
-    { date: '2026-07-30', calories: 1130, protein_g: 80, fat_g: 27, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 67 }
+    { date: '2026-07-24', calories: 300, protein_g: 140, fat_g: 10, carbs_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: true, overFatCeiling: false, proteinPct: 117 },
+    { date: '2026-07-25', calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 0 },
+    { date: '2026-07-26', calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 0 },
+    { date: '2026-07-27', calories: 400, protein_g: 60, fat_g: 12, carbs_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 50 },
+    { date: '2026-07-28', calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 0 },
+    { date: '2026-07-29', calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 0 },
+    { date: '2026-07-30', calories: 1130, protein_g: 80, fat_g: 27, carbs_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: false, overFatCeiling: false, proteinPct: 67 }
   ]);
 });
 
@@ -78,7 +79,7 @@ test('builds a 30-day series ending on the display date, within the same window 
   assert.equal(model.month[0].date, '2026-07-01');
   assert.equal(model.month.at(-1).date, '2026-07-30');
   assert.deepEqual(model.month.find(day => day.date === '2026-07-24'), {
-    date: '2026-07-24', calories: 300, protein_g: 140, fat_g: 10, proteinTarget: 120, fatCeiling: 50, hitProtein: true, overFatCeiling: false, proteinPct: 117
+    date: '2026-07-24', calories: 300, protein_g: 140, fat_g: 10, carbs_g: 0, proteinTarget: 120, fatCeiling: 50, hitProtein: true, overFatCeiling: false, proteinPct: 117
   });
 });
 
