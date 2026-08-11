@@ -338,4 +338,26 @@ Verified on 2026-08-11 (local only — do not push unless asked). Move 4 of the 
 - Service worker precaches `render-governance.js` and `js/core/governance-log.js` (first client import of that module).
 - `npm test`: 914 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
 
-## Next Phase: Hammond closed-loop Moves 5, 3, 6, 7, 8 (P2–P4) / sleep·heart on Body
+## Phase 30: Hammond closed-loop 4/8 — CN model reused in Hammond's prompt — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked). Move 5 of the Hammond closed-loop plan.
+
+- `buildCentralNodeModel` now runs server-side for Hammond (same math as the CN tab), fed by a bounded 30-day blob read across all 5 domains (`selectHammondEventEntries` + `formatCentralNodeModelForPrompt` in `hammond-digest.mjs`). Gated on `needsHammondTools` so other agents' blob budgets are unchanged.
+- Prompt block covers 7-day protein trend direction plus 30-day logging / exercise / eating-target rates.
+- `npm test`: 920 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
+## Phase 31: Hammond closed-loop 5/8 — computed open-loop ages — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked). Move 3.
+
+- `openGovernanceEntries` / `oldestOpenGovernanceEntry` compute ageDays from dated Governance Log entries (skip `Status: Resolved`; malformed dates kept without age). Governance Log card shows `{N}d open` on unresolved entries.
+
+## Phase 32: Hammond closed-loop 6/8 — Home hammondLine — Complete
+
+Verified on 2026-08-11 (local only — do not push unless asked). Move 6. Shell cache bumped to `life-hub-shell-v65`.
+
+- `buildHomeModel` surfaces `hammondLine` from the oldest open governance entry (`Hammond: {title} — {N}d open.`). Home hides the line cleanly when nothing is open.
+- **Deviation:** skipped shared-fixture browser assert for hammond-line (same risk as Phase 25 — shared mock tree); covered by unit tests instead.
+- `npm test`: 927 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
+## Next Phase: Hammond closed-loop Moves 7–8 / sleep·heart on Body

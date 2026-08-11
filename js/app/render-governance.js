@@ -1,6 +1,7 @@
 import { parseGovernanceEntries, recentGovernanceTail } from '../core/governance-log.js';
+import { daysBetween, getSydneyDateKey, isCalendarDate } from '../core/time.js';
 
-export function renderGovernance(root, governanceLogMarkdown) {
+export function renderGovernance(root, governanceLogMarkdown, { today = getSydneyDateKey() } = {}) {
   const container = root.querySelector?.('[data-central-node="governance-log"]');
   if (!container) return;
 
@@ -23,6 +24,10 @@ export function renderGovernance(root, governanceLogMarkdown) {
     const heading = root.createElement('p');
     heading.className = 'governance-entry-heading';
     const bits = [entry.dateKey, entry.entryType].filter(Boolean);
+    const resolved = typeof entry.status === 'string' && entry.status.trim().toLowerCase() === 'resolved';
+    if (!resolved && isCalendarDate(entry.dateKey) && isCalendarDate(today)) {
+      bits.push(`${daysBetween(entry.dateKey, today)}d open`);
+    }
     heading.textContent = bits.join(' — ');
     block.append(heading);
 

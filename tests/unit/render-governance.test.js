@@ -79,13 +79,14 @@ test('renderGovernance renders dated entry blocks with status badges', () => {
     body: 'Stalled sleep goal.'
   });
   const { root, container } = fakeRoot();
-  renderGovernance(root, log);
+  renderGovernance(root, log, { today: '2026-08-11' });
 
   assert.equal(container.children.length, 1);
   const entry = container.children[0];
   assert.equal(entry.className, 'governance-entry');
   assert.match(entry.textContent, /2026-08-09/);
   assert.match(entry.textContent, /Drift Detection/);
+  assert.match(entry.textContent, /2d open/);
   assert.match(entry.textContent, /Life worth enjoying/);
   assert.match(entry.textContent, /Still Active/);
   assert.match(entry.textContent, /Stalled sleep goal/);

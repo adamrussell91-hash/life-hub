@@ -43,6 +43,17 @@ export function renderHome(root, model) {
   setText(root, '#week-label', model.weekSummary.headline);
   setText(root, '[data-week-detail]', model.weekSummary.detail);
 
+  const hammondLine = root.querySelector('[data-value="hammond-line"]');
+  if (hammondLine) {
+    if (model.hammondLine) {
+      hammondLine.textContent = model.hammondLine;
+      hammondLine.removeAttribute('hidden');
+    } else {
+      hammondLine.textContent = '';
+      hammondLine.setAttribute('hidden', '');
+    }
+  }
+
   const weekStrip = root.querySelector('.week-strip');
   if (weekStrip && Array.isArray(model.weekDays)) {
     weekStrip.replaceChildren();

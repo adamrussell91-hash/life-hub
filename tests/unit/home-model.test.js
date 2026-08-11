@@ -113,3 +113,33 @@ test('overFatCeiling is false on Home when fat is within the ceiling', async () 
   assert.equal(model.nutrition.fat_g, 27);
   assert.equal(model.overFatCeiling, false);
 });
+
+test('hammondLine surfaces the oldest open governance entry with age', () => {
+  const log = [
+    '# Governance Log',
+    '',
+    '## 2026-05-24 — Drift Detection',
+    '**Title:** MEd Sem 2',
+    '**Status:** Still Active',
+    '',
+    'Unactioned.',
+    ''
+  ].join('\n');
+  const model = buildHomeModel({
+    events: [],
+    targetsConfig,
+    date: '2026-08-11',
+    governanceLogMarkdown: log
+  });
+  assert.equal(model.hammondLine, 'Hammond: MEd Sem 2 — 79d open.');
+});
+
+test('hammondLine is null when there is no open governance entry', () => {
+  const model = buildHomeModel({
+    events: [],
+    targetsConfig,
+    date: '2026-08-11',
+    governanceLogMarkdown: '# Governance Log\n'
+  });
+  assert.equal(model.hammondLine, null);
+});

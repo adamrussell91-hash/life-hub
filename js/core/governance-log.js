@@ -1,3 +1,5 @@
+import { daysBetween, isCalendarDate } from './time.js';
+
 export const GOVERNANCE_LOG_PATH = 'data/governance/governance-log.md';
 
 export const GOVERNANCE_ENTRY_TYPES = [
@@ -132,3 +134,38 @@ function parseGovernanceEntryBlock(block) {
     body
   };
 }
+
+function isResolvedStatus(status) {
+  return typeof status === 'string' && status.trim().toLowerCase() === 'resolved';
+}
+
+/**
+ * Unresolved governance entries annotated with ageDays when dateKey is valid.
+ * Malformed/missing dateKey → included without ageDays (never dropped).
+ */
+export function openGovernanceEntries(markdown, today) {
+  if (!isCalendarDate(today)) return [];
+  return parseGovernanceEntries(markdown)
+    .filter(entry => !isResolvedStatus(entry.status))
+    .map(entry => {
+      if (isCalendarDate(entry.dateKey)) {
+        return { ...entry, ageDays: daysBetween(entry.dateKey, today) };
+      }
+      return { ...entry };
+    });
+}
+
+/** Oldest unresolved entry (by dateKey), or null. Entries without a valid dateKey sort last. */
+export function oldestOpenGovernanceEntry(markdown, today) {
+  const open = openGovernanceEntries(markdown, today);
+  if (open.length === 0) return null;
+  return [...open].sort((a, b) => {
+    const aOk = isCalendarDate(a.dateKey);
+    const bOk = isCalendarDate(b.dateKey);
+    if (aOk && bOk) return a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0;
+    if (aOk) return -1;
+    if (bOk) return 1;
+    return 0;
+  })[0];
+}
+
