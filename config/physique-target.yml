@@ -1,0 +1,5 @@
+# Physique target — the tracked shoulder:waist ratio and body fat goal that Chadwick's
+# and Brisket's programming is measured against (Tom Holland-style taper).
+# Hand-edited by Adam, not written by any agent tool.
+shoulder_waist_ratio: 1.6
+body_fat_pct: 8

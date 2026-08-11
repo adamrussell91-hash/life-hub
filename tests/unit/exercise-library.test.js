@@ -94,6 +94,32 @@ test('formatExerciseLibraryForPrompt is compact and omits empty libraries', () =
   assert.doesNotMatch(text, /Flat zero/);
 });
 
+test('formatExerciseLibraryForPrompt surfaces last_performed and best_weight_kg so Chadwick knows last session\'s actuals', () => {
+  const text = formatExerciseLibraryForPrompt([
+    {
+      name: 'Bar Press',
+      target_area: 'Chest',
+      working_weight_kg: 42,
+      best_weight_kg: 44,
+      last_performed: '2026-07-29',
+      times_performed: 6,
+      in_rotation: true
+    }
+  ]);
+  assert.match(text, /last 29 Jul/);
+  assert.match(text, /PB 44/);
+  assert.match(text, /6x logged/);
+});
+
+test('formatExerciseLibraryForPrompt omits progress bits an entry has never had', () => {
+  const text = formatExerciseLibraryForPrompt([
+    { name: 'Brand New Move', target_area: 'Back' }
+  ]);
+  assert.doesNotMatch(text, /last /);
+  assert.doesNotMatch(text, /PB/);
+  assert.doesNotMatch(text, /logged/);
+});
+
 test('exerciseLibraryEntryFromCsvRow maps Notion columns', () => {
   const entry = exerciseLibraryEntryFromCsvRow({
     Exercise: 'Bar Press',

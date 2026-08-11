@@ -73,11 +73,47 @@ export function parseTemplateMarkdown(text) {
   return record;
 }
 
+// "Let's do X again" only works if the prompt carries the actual prescription, not just a
+// title -- so the most recently-used templates get their full exercise/set list; the rest
+// stay one line each to keep prompt size in check.
+const DETAILED_TEMPLATE_COUNT = 5;
+
+function templateSummaryLine(template) {
+  return `- ${template.title} (${template.session_kind ?? 'unknown'}, last actuals from ${template.source_session_date ?? 'n/a'})`;
+}
+
+function formatTemplateSet(set) {
+  const reps = set?.reps ?? '?';
+  const weight = set?.weight_kg ?? '?';
+  const cableType = set?.cable_type ?? 'n/a';
+  return `${reps}x${weight}kg (${cableType})`;
+}
+
+function templateDetailLines(template) {
+  const exercises = Array.isArray(template.exercises) ? template.exercises : [];
+  const exerciseLines = exercises.map(exercise => {
+    const sets = Array.isArray(exercise?.sets) ? exercise.sets : [];
+    const setSummary = sets.length ? sets.map(formatTemplateSet).join(', ') : 'no logged sets';
+    const intensification = exercise?.intensification ? ` [${exercise.intensification}]` : '';
+    return `    · ${exercise?.name ?? 'unnamed move'}${intensification}: ${setSummary}`;
+  });
+  return [`${templateSummaryLine(template)}:`, ...exerciseLines];
+}
+
 export function formatTemplatesForPrompt(templates) {
   if (!Array.isArray(templates) || templates.length === 0) return '';
-  return templates.slice(0, MAX_PROMPT_TEMPLATES).map(template => (
-    `- ${template.title} (${template.session_kind ?? 'unknown'}, last actuals from ${template.source_session_date ?? 'n/a'})`
-  )).join('\n');
+  const ordered = templates
+    .slice()
+    .sort((a, b) => String(b.source_session_date ?? '').localeCompare(String(a.source_session_date ?? '')))
+    .slice(0, MAX_PROMPT_TEMPLATES);
+
+  return ordered
+    .map((template, index) => (
+      index < DETAILED_TEMPLATE_COUNT
+        ? templateDetailLines(template).join('\n')
+        : templateSummaryLine(template)
+    ))
+    .join('\n');
 }
 
 export function summarizeTemplatesFromContents(entries) {
