@@ -50,7 +50,8 @@ test('the Fitness tab renders the fixture workout and consistency heatmap', asyn
     assert.equal(await page.locator('[data-fitness="hero-duration"]').textContent(), '26 min');
     assert.equal(await page.locator('[data-fitness="hero-status"]').textContent(), 'completed');
     assert.match(await page.locator('[data-fitness="streak"]').textContent(), /\d+/);
-    assert.equal(await page.locator('#fitness-week-volume .column-bar').count(), 7);
+    assert.equal(await page.locator('#fitness-region-grid .fitness-region-card').count(), 5);
+    assert.ok(await page.locator('#fitness-volume-sparkline').count() === 1);
     assert.equal(await page.locator('#fitness-heatmap .heatmap-tile').count(), 30);
     assert.ok(await page.locator('#fitness-exercise-list .fitness-exercise').count() >= 2);
     assert.match(await page.locator('#fitness-exercise-list').textContent(), /kg/i);
