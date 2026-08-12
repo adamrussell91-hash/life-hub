@@ -37,13 +37,14 @@ export async function loadLiveEvents({ sync, loadYaml, date }) {
     }
 
     const batch = parseFiles(result.files ?? [], loadYaml);
-    const parsed = parseFiles([...filesByPath.values()], loadYaml);
-    const returnedOlderEvent = priorBoundary === null || batch.events.some(
-      event => event.record.date < priorBoundary
-    );
+    // Start lookback whenever this window found any events (sparse history need not
+    // land on the exact `from` day). Keep extending only while later batches still
+    // return events older than the previous boundary.
+    const returnedOlderEvent = priorBoundary === null
+      ? batch.events.length > 0
+      : batch.events.some(event => event.record.date < priorBoundary);
     if (
       !returnedOlderEvent
-      || !historyReaches(parsed.events, from)
       || daysBetween(from, date) >= MAX_LOOKBACK_DAYS
     ) break;
 
@@ -130,8 +131,4 @@ function parseFiles(files, loadYaml) {
     warnings.push({ path: TARGETS_PATH, code: 'missing_targets' });
   }
   return { events, targetsConfig, agentsConfig, centralNodeMarkdown, governanceLogMarkdown, warnings };
-}
-
-function historyReaches(events, boundary) {
-  return (events ?? []).some(event => event?.record?.date === boundary);
 }
