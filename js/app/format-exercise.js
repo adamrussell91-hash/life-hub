@@ -32,7 +32,7 @@ export function formatExerciseSets(exercise) {
         : '';
       return `Set ${index + 1}: ${weight} × ${reps}${cable}`;
     })
-    .join('; ');
+    .join('\n');
 }
 
 export function humanizeFieldLabel(key) {
