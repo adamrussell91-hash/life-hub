@@ -206,12 +206,20 @@ function collapseLabel(el) {
   history?.setAttribute('aria-hidden', 'true');
 }
 
-function trendChip(root, delta, colour, title) {
+function trendChip(root, delta, colour, label) {
   const chip = root.createElement('span');
   chip.className = 'body-tape-chip';
   chip.dataset.colour = colour || 'neutral';
-  chip.title = title;
-  chip.textContent = formatDeltaChip(delta);
+
+  const kind = root.createElement('span');
+  kind.className = 'body-tape-chip__label';
+  kind.textContent = label;
+
+  const deltaEl = root.createElement('span');
+  deltaEl.className = 'body-tape-chip__delta';
+  deltaEl.textContent = formatDeltaChip(delta);
+
+  chip.append(kind, deltaEl);
   return chip;
 }
 

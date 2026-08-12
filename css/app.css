@@ -1781,7 +1781,9 @@ main { max-width: 76rem; margin: 0 auto; }
   justify-content: flex-end;
 }
 .body-tape-chip {
-  display: inline-block;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
   padding: 0.08rem 0.35rem;
   border-radius: 0.35rem;
   font-size: 0.68rem;
@@ -1789,6 +1791,10 @@ main { max-width: 76rem; margin: 0 auto; }
   line-height: 1.3;
   background: rgba(28, 42, 34, 0.06);
   color: var(--muted);
+}
+.body-tape-chip__label {
+  font-weight: 650;
+  opacity: 0.85;
 }
 .body-tape-chip[data-colour="green"] {
   color: #2a7a4b;
@@ -1815,7 +1821,7 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .body-tape-label__history > .body-tape-history {
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 .body-tape-label.is-open {
   z-index: 2;
