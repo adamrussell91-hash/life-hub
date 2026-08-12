@@ -302,6 +302,21 @@ test('segmented AM|PM control slides the beauty drawer track to the selected rou
   assert.equal(root._pmTab.attributes['aria-selected'], 'false');
 });
 
+test('beauty drawer preserves user AM/PM selection across re-renders', () => {
+  const root = fakeSkincareRoot();
+  renderSkincare(root, baseModel({ currentRoutine: 'am' }));
+  assert.equal(root._routineCards.dataset.active, 'am');
+
+  root._pmTab.click();
+  assert.equal(root._routineCards.dataset.active, 'pm');
+
+  renderSkincare(root, baseModel({ currentRoutine: 'am', amLogged: true }));
+  assert.equal(root._routineCards.dataset.active, 'pm');
+  assert.equal(root._pmTab.attributes['aria-selected'], 'true');
+  assert.equal(root._amTab.attributes['aria-selected'], 'false');
+  assert.equal(root._routineCards.children.length, 2);
+});
+
 test('beauty drawer keeps both routine cards in the track (one visible via data-active)', () => {
   const root = fakeSkincareRoot();
   renderSkincare(root, baseModel({ currentRoutine: 'pm' }));
