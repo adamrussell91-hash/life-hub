@@ -1785,17 +1785,45 @@ main { max-width: 76rem; margin: 0 auto; }
   from { opacity: 0; transform: translateY(0.45rem); }
   to { opacity: 1; transform: translateY(0); }
 }
+@media (prefers-reduced-motion: reduce) {
+  #calendar-day-detail[data-motion="in"],
+  .calendar-month-grid[data-motion="forward"],
+  .calendar-month-grid[data-motion="back"] {
+    animation: none;
+  }
+}
 .calendar-event {
   display: grid;
-  gap: 0.25rem;
-  padding: 0.75rem 0;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.65rem;
+  align-items: start;
+  padding: 0.65rem 0;
   border-top: 1px solid var(--line);
 }
 .calendar-event:first-of-type { border-top: 0; }
+.calendar-event__affordance {
+  display: grid;
+  place-items: center;
+  padding-top: 0.35rem;
+}
+.calendar-event__affordance .calendar-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+}
+.calendar-event__meta {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.calendar-event__title {
+  font-size: 0.92rem;
+}
+.calendar-event__brief,
 .calendar-event p {
   margin: 0;
   color: var(--muted);
   font-size: 0.85rem;
+  line-height: 1.35;
 }
 
 .body-range {

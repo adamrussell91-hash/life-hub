@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildCalendarModel,
+  eventBrief,
   eventDetailTitle,
   eventsForDate,
   monthGridRange,
+  resolveCalendarDayClick,
   shiftYearMonth,
   yearMonthFromDate
 } from '../../js/app/calendar-model.js';
@@ -53,4 +55,67 @@ test('eventDetailTitle covers core types', () => {
 
 test('eventsForDate returns empty for quiet days', () => {
   assert.deepEqual(eventsForDate([], '2026-08-05'), []);
+});
+
+test('eventBrief summarises each domain in one line', () => {
+  assert.equal(
+    eventBrief({ record: { type: 'meal', protein_g: 32, calories: 450 } }),
+    '32g protein · 450 kcal'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'workout', duration_min: 45, status: 'completed' } }),
+    '45 min · completed'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'skincare', routine: 'am' } }),
+    'AM routine'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'skincare', routine: 'pm' }, body: 'Procedure: Laser.' }),
+    'Procedure'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'weight', weight_kg: 82.4 } }),
+    '82.4 kg'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'composition', weight_kg: 82, body_fat_pct: 18.5 } }),
+    '82 kg · 18.5% BF'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'measurements', waist: 84, chest: 102 } }),
+    'waist 84 · chest 102'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'diary', mood: 'good', energy: 'medium', mood_score: 7 } }),
+    'good · medium energy · score 7'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'sleep', duration_h: 7.5 } }),
+    '7.5 h sleep'
+  );
+});
+
+test('eventsForDate includes brief and category affordance', () => {
+  const rows = eventsForDate([
+    { record: { type: 'meal', date: '2026-08-05', meal: 'lunch', protein_g: 40, calories: 520 }, body: '', path: 'a' }
+  ], '2026-08-05');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].brief, '40g protein · 520 kcal');
+  assert.deepEqual(rows[0].categories, ['nutrition']);
+});
+
+test('resolveCalendarDayClick toggles same day and expands other days', () => {
+  assert.deepEqual(resolveCalendarDayClick(null, '2026-08-05'), {
+    selectedDate: '2026-08-05',
+    expandedDate: '2026-08-05'
+  });
+  assert.deepEqual(resolveCalendarDayClick('2026-08-05', '2026-08-05'), {
+    selectedDate: '2026-08-05',
+    expandedDate: null
+  });
+  assert.deepEqual(resolveCalendarDayClick('2026-08-05', '2026-08-06'), {
+    selectedDate: '2026-08-06',
+    expandedDate: '2026-08-06'
+  });
 });
