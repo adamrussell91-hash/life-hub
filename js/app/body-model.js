@@ -31,21 +31,30 @@ export const TREND_CONFIG = {
 };
 
 /** Sites where growth “up” is good (building). Others default down (leaning out). */
-const MEASUREMENT_GOOD_UP = new Set(['chest', 'shoulders', 'right_arm', 'left_arm']);
+const MEASUREMENT_GOOD_UP = new Set([
+  'chest', 'shoulders',
+  'right_arm_flexed', 'left_arm_flexed',
+  'right_arm_relaxed', 'left_arm_relaxed',
+  'right_thigh', 'left_thigh', 'calves'
+]);
 
 export const TAPE_SITES = [
-  'waist', 'chest', 'hips', 'shoulders', 'neck',
-  'right_arm', 'left_arm', 'right_thigh', 'left_thigh', 'calves'
+  'neck', 'shoulders', 'chest', 'waist', 'hips',
+  'right_arm_flexed', 'left_arm_flexed',
+  'right_arm_relaxed', 'left_arm_relaxed',
+  'right_thigh', 'left_thigh', 'calves'
 ];
 
 const TAPE_LABELS = {
-  waist: 'Waist',
-  chest: 'Chest',
-  hips: 'Hips',
-  shoulders: 'Shoulders',
   neck: 'Neck',
-  right_arm: 'Right arm',
-  left_arm: 'Left arm',
+  shoulders: 'Shoulders',
+  chest: 'Chest',
+  waist: 'Waist',
+  hips: 'Hips',
+  right_arm_flexed: 'Right arm flexed',
+  left_arm_flexed: 'Left arm flexed',
+  right_arm_relaxed: 'Right arm relaxed',
+  left_arm_relaxed: 'Left arm relaxed',
   right_thigh: 'Right thigh',
   left_thigh: 'Left thigh',
   calves: 'Calves'
@@ -185,6 +194,54 @@ function measurementGood(site) {
   return MEASUREMENT_GOOD_UP.has(site) ? 'up' : 'down';
 }
 
+function physiqueColour(delta, good) {
+  if (delta == null || !Number.isFinite(delta) || delta === 0) return 'neutral';
+  const direction = delta > 0 ? 'up' : 'down';
+  return good === direction ? 'green' : 'red';
+}
+
+function tapeHistory(observations) {
+  return observations.map((point, index) => {
+    const previous = index > 0 ? observations[index - 1] : null;
+    const delta = previous ? point.value - previous.value : null;
+    const pct = previous && previous.value !== 0
+      ? ((point.value - previous.value) / Math.abs(previous.value)) * 100
+      : null;
+    return { date: point.date, value: point.value, delta, pct };
+  });
+}
+
+function tapeMetricModel(observations, rangeBounds, selectedRange, site) {
+  const good = measurementGood(site);
+  const config = {
+    ...TREND_CONFIG.measurement_cm,
+    field: 'value',
+    good
+  };
+  const base = metricModel(observations, rangeBounds, selectedRange, config, {
+    key: site,
+    label: TAPE_LABELS[site] ?? site
+  });
+  const current = observations.at(-1)?.value ?? null;
+  const previous = observations.length > 1 ? observations.at(-2).value : null;
+  const first = observations[0]?.value ?? null;
+  const lastDelta = current != null && previous != null ? current - previous : null;
+  const overallDelta = current != null && first != null && observations.length > 1
+    ? current - first
+    : null;
+
+  return {
+    ...base,
+    site,
+    current,
+    lastDelta,
+    overallDelta,
+    lastColour: physiqueColour(lastDelta, good),
+    overallColour: physiqueColour(overallDelta, good),
+    history: tapeHistory(observations)
+  };
+}
+
 export function buildBodyModel({ events, date, range = DEFAULT_BODY_RANGE }) {
   if (!date) throw new RangeError('Body display date is unavailable');
   const selectedRange = BODY_RANGES.includes(range) ? range : DEFAULT_BODY_RANGE;
@@ -202,15 +259,7 @@ export function buildBodyModel({ events, date, range = DEFAULT_BODY_RANGE }) {
   for (const site of TAPE_SITES) {
     const obs = observationsFor(events, 'measurements', site);
     if (!obs.length) continue;
-    const config = {
-      ...TREND_CONFIG.measurement_cm,
-      field: 'value',
-      good: measurementGood(site)
-    };
-    tapeMetrics.push(metricModel(obs, bounds, selectedRange, config, {
-      key: site,
-      label: TAPE_LABELS[site] ?? site
-    }));
+    tapeMetrics.push(tapeMetricModel(obs, bounds, selectedRange, site));
   }
 
   const compositionMetrics = [
