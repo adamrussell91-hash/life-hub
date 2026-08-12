@@ -1,5 +1,5 @@
-import { animateColumnGrow } from './chart-kit/animate.js';
-import { buildColumns } from './chart-kit/columns.js';
+import { animateAreaReveal } from './chart-kit/animate.js';
+import { buildAreaLine } from './chart-kit/area-line.js';
 import { formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
 import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
 
@@ -14,13 +14,25 @@ const setText = (root, selector, value) => {
   if (element) element.textContent = String(value);
 };
 
-const weekdayLetter = date => new Intl.DateTimeFormat('en-AU', {
-  weekday: 'narrow'
-}).format(new Date(`${date}T12:00:00+10:00`));
+const formatSignedPct = pct => {
+  if (pct == null || !Number.isFinite(pct)) return '—';
+  if (pct === 0) return '0%';
+  const sign = pct > 0 ? '+' : '−';
+  return `${sign}${Math.abs(pct).toFixed(1)}%`;
+};
 
-const formatLoad = set => {
-  if (!set) return '—';
-  return `${set.weight_kg} kg × ${set.reps}`;
+const formatSignedKg = kg => {
+  if (kg == null || !Number.isFinite(kg)) return '—';
+  if (kg === 0) return '0 kg';
+  const sign = kg > 0 ? '+' : '−';
+  const mag = Math.abs(kg);
+  const text = Number.isInteger(mag) ? String(mag) : mag.toFixed(1);
+  return `${sign}${text} kg`;
+};
+
+const formatWorkoutsPerWeek = value => {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 };
 
 export function renderFitness(root, model, { logger, templates, libraryByName, onSelectTemplate } = {}) {
@@ -39,6 +51,9 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
     }
   }
 
+  renderLongTerm(root, model.longTerm);
+  renderRegions(root, model.regions);
+
   const empty = root.querySelector('[data-fitness="hero-empty"]');
   const heroWrap = root.querySelector('[data-fitness-hero]');
   if (!model.heroSession) {
@@ -53,7 +68,6 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
   }
 
   renderTemplateRail(root, templates, { libraryByName, onSelectTemplate });
-  renderWeekVolume(root, model.weekVolume);
   renderFocusStrip(root, model.focusHits);
   renderComparisons(root, model.comparisons);
   renderHeatmap(root, model.month);
@@ -131,6 +145,87 @@ export function renderTemplateRail(root, templatesState, { libraryByName, onSele
   }
 }
 
+function renderLongTerm(root, longTerm) {
+  const data = longTerm ?? {};
+  setText(root, '[data-fitness="volume-delta"]', formatSignedPct(data.volumeDeltaPct));
+  setText(root, '[data-fitness="workouts-week"]', formatWorkoutsPerWeek(data.workoutsPerWeek));
+  setText(
+    root,
+    '[data-fitness="adherence"]',
+    data.adherencePct == null || !Number.isFinite(data.adherencePct)
+      ? '—'
+      : `${Math.round(data.adherencePct)}%`
+  );
+  setText(root, '[data-fitness="strength-delta"]', formatSignedPct(data.strengthDeltaPct));
+
+  const svg = root.querySelector('#fitness-volume-sparkline');
+  if (!svg) return;
+  const area = svg.querySelector('[data-role="area"]');
+  const line = svg.querySelector('[data-role="line"]');
+  const series = (data.weeklyVolume ?? []).map(week => ({
+    date: week.weekStart,
+    value: week.value
+  }));
+  if (!series.length) {
+    if (area) area.setAttribute('d', '');
+    if (line) line.setAttribute('d', '');
+    svg.classList?.remove?.('chart-animating', 'chart-static');
+    return;
+  }
+  const chart = buildAreaLine(series, { height: 72, padding: 8 });
+  if (area) area.setAttribute('d', chart.areaPath || '');
+  if (line) line.setAttribute('d', chart.linePath || '');
+  queueMicrotask(() => animateAreaReveal(svg));
+}
+
+function renderRegions(root, regions) {
+  const grid = root.querySelector('#fitness-region-grid');
+  if (!grid) return;
+  grid.replaceChildren();
+
+  for (const region of regions ?? []) {
+    const card = root.createElement('article');
+    card.className = 'metric-card fitness-region-card';
+    card.dataset.region = region.key;
+    card.dataset.colour = region.colour ?? 'neutral';
+
+    const media = root.createElement('div');
+    media.className = 'fitness-region-card__media';
+    const img = root.createElement('img');
+    img.className = 'fitness-region-card__img';
+    img.src = region.image;
+    img.alt = `${region.label} anatomy`;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.addEventListener?.('error', () => {
+      media.classList.add('fitness-region-card__media--missing');
+      img.remove?.();
+    });
+    media.append(img);
+
+    const copy = root.createElement('div');
+    copy.className = 'fitness-region-card__copy';
+
+    const label = root.createElement('p');
+    label.className = 'metric-label';
+    label.textContent = region.label;
+
+    const headline = root.createElement('p');
+    headline.className = 'fitness-region-card__headline';
+    headline.dataset.colour = region.colour ?? 'neutral';
+    headline.textContent = formatSignedKg(region.bestSetDeltaKg);
+
+    const secondary = root.createElement('p');
+    secondary.className = 'metric-caption';
+    const vol = formatSignedPct(region.volumeDeltaPct);
+    secondary.textContent = vol === '—' ? 'Volume —' : `${vol} volume`;
+
+    copy.append(label, headline, secondary);
+    card.append(media, copy);
+    grid.append(card);
+  }
+}
+
 function renderHero(root, session, { logger, libraryByName } = {}) {
   setText(root, '[data-fitness="hero-title"]', session.title ?? 'Session');
   setText(root, '[data-fitness="hero-duration"]', session.duration_min != null ? `${session.duration_min} min` : '—');
@@ -179,6 +274,7 @@ function renderHero(root, session, { logger, libraryByName } = {}) {
         title.textContent = formatExerciseTitle(exercise);
         row.append(title);
         const detail = root.createElement('p');
+        detail.className = 'fitness-exercise__sets';
         detail.textContent = formatExerciseSets(exercise) || (session.status === 'planned' ? 'Sets to be confirmed' : 'No sets logged');
         row.append(detail);
         list.append(row);
@@ -195,28 +291,6 @@ function renderHero(root, session, { logger, libraryByName } = {}) {
       pill.textContent = typeof flag === 'string' ? flag : (flag?.area ?? flag?.note ?? 'pain');
       pain.append(pill);
     }
-  }
-}
-
-function renderWeekVolume(root, weekVolume) {
-  const host = root.querySelector('#fitness-week-volume');
-  if (!host) return;
-  const chart = buildColumns(weekVolume.map(day => ({
-    key: day.date,
-    label: weekdayLetter(day.date),
-    value: day.volume
-  })));
-  host.replaceChildren();
-  for (const bar of chart.bars) {
-    const col = root.createElement('div');
-    col.className = 'column-bar';
-    const fill = root.createElement('span');
-    col.append(fill);
-    const label = root.createElement('span');
-    label.textContent = bar.label;
-    col.append(label);
-    host.append(col);
-    animateColumnGrow(fill, bar.heightPct);
   }
 }
 
@@ -279,6 +353,11 @@ function renderComparisons(root, comparisons) {
     }
     host.append(item);
   }
+}
+
+function formatLoad(set) {
+  if (!set) return '—';
+  return `${set.weight_kg} kg × ${set.reps}`;
 }
 
 function renderHeatmap(root, month) {

@@ -291,7 +291,7 @@
                 <span class="metric-icon" aria-hidden="true">Na</span>
               </div>
               <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-nutrition-ring="sodium" viewBox="0 0 72 72" role="img" aria-label="Sodium progress">
+                <svg class="metric-ring" data-nutrition-ring="sodium" viewBox="0 0 56 56" role="img" aria-label="Sodium progress">
                   <circle data-role="track" class="metric-ring-track" fill="none"></circle>
                   <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
                 </svg>
@@ -304,7 +304,7 @@
                 <span class="metric-icon" aria-hidden="true">Ca</span>
               </div>
               <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-nutrition-ring="calcium" viewBox="0 0 72 72" role="img" aria-label="Calcium progress">
+                <svg class="metric-ring" data-nutrition-ring="calcium" viewBox="0 0 56 56" role="img" aria-label="Calcium progress">
                   <circle data-role="track" class="metric-ring-track" fill="none"></circle>
                   <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
                 </svg>
@@ -408,12 +408,7 @@
               </div>
               <span class="trend-badge" data-value="week-compare-delta">—</span>
             </div>
-            <svg id="nutrition-week-compare" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="This week daily protein">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <g data-role="value-labels"></g>
-              <g data-role="day-labels"></g>
-            </svg>
+            <div id="nutrition-week-compare" class="column-chart week-compare-columns" role="img" aria-label="Prior week and this week daily protein"></div>
           </article>
 
           <article class="metric-card chart-card" aria-labelledby="month-heatmap-label">
@@ -432,11 +427,32 @@
             </div>
           </div>
 
-          <article class="metric-card fitness-streak-card">
+          <div class="fitness-long-term-trio" aria-label="Long-term training trends">
+            <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-volume-label">
+              <p class="metric-label" id="fitness-volume-label">Weekly volume</p>
+              <p class="metric-value"><strong data-fitness="volume-delta">—</strong><span> vs earlier half</span></p>
+              <svg id="fitness-volume-sparkline" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Weekly training volume over 26 weeks">
+                <path data-role="area" d=""></path>
+                <path data-role="line" d=""></path>
+              </svg>
+            </article>
+            <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-workouts-label">
+              <p class="metric-label" id="fitness-workouts-label">Workouts / week</p>
+              <p class="metric-value"><strong data-fitness="workouts-week">—</strong></p>
+              <p class="metric-caption">Adherence <strong data-fitness="adherence">—</strong></p>
+            </article>
+            <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-strength-label">
+              <p class="metric-label" id="fitness-strength-label">Strength Δ</p>
+              <p class="metric-value"><strong data-fitness="strength-delta">—</strong></p>
+              <p class="metric-caption">Best-set trend across regions</p>
+            </article>
+          </div>
+
+          <article class="metric-card fitness-streak-card fitness-streak-card--quiet">
             <div class="fitness-streak-strip">
               <div>
                 <p class="metric-label">Streak</p>
-                <p class="metric-value"><strong data-fitness="streak">—</strong><span> day streak</span></p>
+                <p class="metric-value metric-value--compact"><strong data-fitness="streak">—</strong><span> day streak</span></p>
               </div>
               <p class="fitness-day-type" data-fitness="day-type">—</p>
               <div id="fitness-week-dots" class="fitness-week-dots" aria-label="Last 7 days of sessions"></div>
@@ -483,10 +499,7 @@
             </form>
           </dialog>
 
-          <article class="metric-card chart-card">
-            <p class="metric-label">7-day volume</p>
-            <div id="fitness-week-volume" class="column-chart" aria-label="Training volume last 7 days"></div>
-          </article>
+          <div id="fitness-region-grid" class="fitness-region-grid" aria-label="Region strength"></div>
 
           <article class="metric-card">
             <p class="metric-label">Focus this week</p>
@@ -535,7 +548,15 @@
               <li data-state="miss">Miss</li>
             </ul>
           </article>
-          <div id="skincare-routine-cards" class="skincare-grid"></div>
+          <div class="skincare-beauty-drawer">
+            <div id="skincare-routine-segment" class="skincare-segment" role="tablist" aria-label="AM or PM routine">
+              <button type="button" class="skincare-segment__btn" role="tab" data-routine="am" aria-controls="skincare-routine-cards" aria-selected="true">AM</button>
+              <button type="button" class="skincare-segment__btn" role="tab" data-routine="pm" aria-controls="skincare-routine-cards" aria-selected="false">PM</button>
+            </div>
+            <div class="skincare-drawer-viewport">
+              <div id="skincare-routine-cards" class="skincare-drawer-track" data-active="am" role="tabpanel" aria-label="Skincare routine"></div>
+            </div>
+          </div>
           <article class="metric-card" id="skincare-procedure"></article>
           <article class="metric-card">
             <p class="metric-label">Today’s procedures</p>

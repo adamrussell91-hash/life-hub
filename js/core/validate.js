@@ -23,8 +23,10 @@ const COMPOSITION_NUMBERS = [
   'weight_kg', 'body_fat_pct', 'skeletal_muscle_kg', 'visceral_fat_level', 'body_age'
 ];
 const MEASUREMENT_NUMBERS = [
-  'chest', 'waist', 'hips', 'right_arm', 'left_arm', 'right_thigh', 'left_thigh',
-  'calves', 'neck', 'shoulders'
+  'chest', 'waist', 'hips', 'shoulders', 'neck',
+  'right_arm_flexed', 'left_arm_flexed',
+  'right_arm_relaxed', 'left_arm_relaxed',
+  'right_thigh', 'left_thigh', 'calves'
 ];
 
 function isObject(value) {

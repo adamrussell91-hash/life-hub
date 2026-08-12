@@ -9,11 +9,25 @@ const RANGE_LABELS = {
   five_year: '5Y'
 };
 
+const LABEL_ANCHORS = {
+  neck: { top: '8%', side: 'left' },
+  shoulders: { top: '14%', side: 'right' },
+  chest: { top: '22%', side: 'left' },
+  right_arm_flexed: { top: '26%', side: 'right' },
+  left_arm_flexed: { top: '32%', side: 'left' },
+  right_arm_relaxed: { top: '38%', side: 'right' },
+  left_arm_relaxed: { top: '44%', side: 'left' },
+  waist: { top: '48%', side: 'left' },
+  hips: { top: '54%', side: 'right' },
+  right_thigh: { top: '68%', side: 'right' },
+  left_thigh: { top: '68%', side: 'left' },
+  calves: { top: '84%', side: 'right' }
+};
+
 export function renderBody(root, model, {
   onRangeChange,
   onLogWeight,
-  onLogComposition,
-  onLogMeasurements
+  onLogComposition
 } = {}) {
   const dashboard = root.querySelector('#body-dashboard');
   if (!dashboard || !model) return;
@@ -51,7 +65,6 @@ export function renderBody(root, model, {
       kind: 'composition'
     }));
     host.append(sectionCard(root, model.tape, {
-      onLogMeasurements,
       kind: 'tape'
     }));
   }
@@ -78,13 +91,7 @@ function sectionCard(root, section, hooks) {
     empty.textContent = emptyCopy(section.id);
     article.append(empty);
   } else if (section.id === 'tape') {
-    const grid = root.createElement('div');
-    grid.className = 'body-tape-grid';
-    for (const metric of section.metrics) {
-      if (metric.empty) continue;
-      grid.append(metricBlock(root, metric));
-    }
-    article.append(grid);
+    article.append(tapeFigure(root, section.metrics));
   } else {
     for (const metric of section.metrics) {
       if (metric.empty) continue;
@@ -92,7 +99,9 @@ function sectionCard(root, section, hooks) {
     }
   }
 
-  article.append(quickLog(root, section.id, hooks));
+  if (section.id === 'scale' || section.id === 'composition') {
+    article.append(quickLog(root, section.id, hooks));
+  }
   return article;
 }
 
@@ -100,6 +109,172 @@ function emptyCopy(id) {
   if (id === 'scale') return 'No weight readings in this range yet.';
   if (id === 'composition') return 'No composition readings yet.';
   return 'No tape measurements yet.';
+}
+
+function tapeFigure(root, metrics) {
+  const wrap = root.createElement('div');
+  wrap.className = 'body-tape';
+  wrap.dataset.bodySection = 'tape';
+
+  const figure = root.createElement('div');
+  figure.className = 'body-figure';
+  figure.id = 'body-tape-figure';
+
+  const img = root.createElement('img');
+  img.src = 'assets/body/full-body-diagram.png';
+  img.alt = 'Full body anatomy diagram';
+  img.className = 'body-figure__img';
+
+  const labels = root.createElement('div');
+  labels.className = 'body-figure__labels';
+  labels.id = 'body-tape-labels';
+
+  for (const metric of metrics) {
+    if (metric.empty || metric.current == null) continue;
+    const anchor = LABEL_ANCHORS[metric.site ?? metric.key];
+    if (!anchor) continue;
+    labels.append(tapeLabel(root, metric, anchor, labels));
+  }
+
+  figure.append(img, labels);
+  wrap.append(figure);
+  return wrap;
+}
+
+function tapeLabel(root, metric, anchor, labelsHost) {
+  const site = metric.site ?? metric.key;
+  const el = root.createElement('div');
+  el.className = 'body-tape-label';
+  el.dataset.site = site;
+  el.dataset.side = anchor.side;
+  el.style.top = anchor.top;
+
+  const toggle = root.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'body-tape-label__toggle';
+  toggle.setAttribute('aria-expanded', 'false');
+
+  const name = root.createElement('span');
+  name.className = 'body-tape-label__name';
+  name.textContent = metric.label;
+
+  const value = root.createElement('span');
+  value.className = 'body-tape-label__value';
+  value.textContent = formatCm(metric.current);
+
+  const trends = root.createElement('span');
+  trends.className = 'body-tape-label__trends';
+  trends.append(
+    trendChip(root, metric.lastDelta, metric.lastColour, 'Last'),
+    trendChip(root, metric.overallDelta, metric.overallColour, 'Overall')
+  );
+
+  toggle.append(name, value, trends);
+
+  const history = root.createElement('div');
+  history.className = 'body-tape-label__history';
+  history.setAttribute('aria-hidden', 'true');
+  history.append(historyList(root, metric.history ?? []));
+
+  toggle.addEventListener('click', () => {
+    const opening = !el.classList.contains('is-open');
+    for (const other of labelsHost.querySelectorAll('.body-tape-label.is-open')) {
+      if (other === el) continue;
+      collapseLabel(other);
+    }
+    if (opening) expandLabel(el);
+    else collapseLabel(el);
+  });
+
+  el.append(toggle, history);
+  return el;
+}
+
+function expandLabel(el) {
+  el.classList.add('is-open');
+  const toggle = el.querySelector('.body-tape-label__toggle');
+  const history = el.querySelector('.body-tape-label__history');
+  toggle?.setAttribute('aria-expanded', 'true');
+  history?.setAttribute('aria-hidden', 'false');
+}
+
+function collapseLabel(el) {
+  el.classList.remove('is-open');
+  const toggle = el.querySelector('.body-tape-label__toggle');
+  const history = el.querySelector('.body-tape-label__history');
+  toggle?.setAttribute('aria-expanded', 'false');
+  history?.setAttribute('aria-hidden', 'true');
+}
+
+function trendChip(root, delta, colour, label) {
+  const chip = root.createElement('span');
+  chip.className = 'body-tape-chip';
+  chip.dataset.colour = colour || 'neutral';
+
+  const kind = root.createElement('span');
+  kind.className = 'body-tape-chip__label';
+  kind.textContent = label;
+
+  const deltaEl = root.createElement('span');
+  deltaEl.className = 'body-tape-chip__delta';
+  deltaEl.textContent = formatDeltaChip(delta);
+
+  chip.append(kind, deltaEl);
+  return chip;
+}
+
+function historyList(root, history) {
+  const list = root.createElement('ul');
+  list.className = 'body-tape-history';
+  for (const row of history) {
+    const item = root.createElement('li');
+    item.className = 'body-tape-history__row';
+
+    const date = root.createElement('span');
+    date.className = 'body-tape-history__date';
+    date.textContent = String(row.date ?? '');
+
+    const value = root.createElement('span');
+    value.className = 'body-tape-history__value';
+    value.textContent = formatCm(row.value);
+
+    const pct = root.createElement('span');
+    pct.className = 'body-tape-history__pct';
+    pct.textContent = formatPct(row.pct);
+
+    item.append(date, value, pct);
+    list.append(item);
+  }
+  if (!history.length) {
+    const empty = root.createElement('li');
+    empty.className = 'body-tape-history__row body-tape-history__row--empty';
+    empty.textContent = 'No history yet.';
+    list.append(empty);
+  }
+  return list;
+}
+
+function formatCm(value) {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  const n = Number(value);
+  const text = Number.isInteger(n) ? String(n) : n.toFixed(1);
+  return `${text} cm`;
+}
+
+function formatDeltaChip(delta) {
+  if (delta == null || !Number.isFinite(delta)) return '→ —';
+  if (delta === 0) return '→ 0';
+  const arrow = delta > 0 ? '↑' : '↓';
+  const mag = Math.abs(delta);
+  const text = Number.isInteger(mag) ? String(mag) : mag.toFixed(1);
+  return `${arrow} ${text}`;
+}
+
+function formatPct(pct) {
+  if (pct == null || !Number.isFinite(pct)) return '—';
+  if (pct === 0) return '0%';
+  const sign = pct > 0 ? '+' : '−';
+  return `${sign}${Math.abs(pct).toFixed(1)}%`;
 }
 
 function metricBlock(root, metric) {
@@ -222,40 +397,21 @@ function quickLog(root, sectionId, hooks) {
     return form;
   }
 
-  if (sectionId === 'composition') {
-    const fat = numberInput(root, 'Body fat %', 'body_fat_pct');
-    const muscle = numberInput(root, 'Muscle kg', 'skeletal_muscle_kg');
-    const button = logButton(root, 'Log composition');
-    button.addEventListener('click', () => {
-      const fields = {};
-      const fatValue = Number(fat.value);
-      const muscleValue = Number(muscle.value);
-      if (Number.isFinite(fatValue) && fatValue > 0) fields.body_fat_pct = fatValue;
-      if (Number.isFinite(muscleValue) && muscleValue > 0) fields.skeletal_muscle_kg = muscleValue;
-      if (!Object.keys(fields).length) return;
-      hooks.onLogComposition?.(fields);
-      fat.value = '';
-      muscle.value = '';
-    });
-    form.append(fat, muscle, button);
-    return form;
-  }
-
-  const waist = numberInput(root, 'Waist cm', 'waist');
-  const chest = numberInput(root, 'Chest cm', 'chest');
-  const button = logButton(root, 'Log tape');
+  const fat = numberInput(root, 'Body fat %', 'body_fat_pct');
+  const muscle = numberInput(root, 'Muscle kg', 'skeletal_muscle_kg');
+  const button = logButton(root, 'Log composition');
   button.addEventListener('click', () => {
     const fields = {};
-    const waistValue = Number(waist.value);
-    const chestValue = Number(chest.value);
-    if (Number.isFinite(waistValue) && waistValue > 0) fields.waist = waistValue;
-    if (Number.isFinite(chestValue) && chestValue > 0) fields.chest = chestValue;
+    const fatValue = Number(fat.value);
+    const muscleValue = Number(muscle.value);
+    if (Number.isFinite(fatValue) && fatValue > 0) fields.body_fat_pct = fatValue;
+    if (Number.isFinite(muscleValue) && muscleValue > 0) fields.skeletal_muscle_kg = muscleValue;
     if (!Object.keys(fields).length) return;
-    hooks.onLogMeasurements?.(fields);
-    waist.value = '';
-    chest.value = '';
+    hooks.onLogComposition?.(fields);
+    fat.value = '';
+    muscle.value = '';
   });
-  form.append(waist, chest, button);
+  form.append(fat, muscle, button);
   return form;
 }
 

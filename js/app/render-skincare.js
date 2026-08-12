@@ -12,6 +12,73 @@ function setText(root, selector, value) {
   if (el) el.textContent = String(value);
 }
 
+function prefersReducedMotion(root) {
+  return root.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+}
+
+/** Prior user pick on the persistent track; otherwise null → clock / model.currentRoutine. */
+function readDrawerSelection(track, segment) {
+  if (track?.dataset?.userPicked === 'true') {
+    const fromTrack = track.dataset.active;
+    if (fromTrack === 'am' || fromTrack === 'pm') return fromTrack;
+    const selectedTab = [...(segment?.querySelectorAll?.('[data-routine]') ?? [])]
+      .find(tab => tab.getAttribute?.('aria-selected') === 'true');
+    const fromTab = selectedTab?.dataset?.routine;
+    if (fromTab === 'am' || fromTab === 'pm') return fromTab;
+  }
+  return null;
+}
+
+function resolveDrawerRoutine(track, segment, modelCurrent) {
+  return readDrawerSelection(track, segment)
+    ?? (modelCurrent === 'am' ? 'am' : 'pm');
+}
+
+function setBeautyDrawerActive(segment, track, activeKey, {
+  reducedMotion = false,
+  userPicked = false
+} = {}) {
+  const active = activeKey === 'am' ? 'am' : 'pm';
+  if (track) {
+    track.dataset.active = active;
+    if (userPicked) track.dataset.userPicked = 'true';
+    if (reducedMotion) track.dataset.reducedMotion = 'true';
+    else delete track.dataset.reducedMotion;
+    if (!String(track.className || '').includes('skincare-drawer-track')) {
+      track.className = `${track.className || ''} skincare-drawer-track`.trim();
+    }
+  }
+  const tabs = segment?.querySelectorAll?.('[data-routine]') ?? [];
+  for (const tab of tabs) {
+    const selected = tab.dataset.routine === active;
+    tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    if (selected) tab.dataset.active = 'true';
+    else delete tab.dataset.active;
+  }
+}
+
+function wireBeautyDrawer(root, segment, track, modelCurrent) {
+  if (!track) return modelCurrent === 'am' ? 'am' : 'pm';
+  const reducedMotion = prefersReducedMotion(root);
+  const active = resolveDrawerRoutine(track, segment, modelCurrent);
+  setBeautyDrawerActive(segment, track, active, { reducedMotion });
+
+  if (!segment || segment.dataset.drawerWired === 'true') return active;
+  segment.dataset.drawerWired = 'true';
+
+  const tabs = segment.querySelectorAll?.('[data-routine]') ?? [];
+  for (const tab of tabs) {
+    tab.addEventListener('click', () => {
+      const next = tab.dataset.routine === 'am' ? 'am' : 'pm';
+      setBeautyDrawerActive(segment, track, next, {
+        reducedMotion: prefersReducedMotion(root),
+        userPicked: true
+      });
+    });
+  }
+  return active;
+}
+
 export function renderSkincare(root, model, {
   onLogRoutine,
   onLogProcedure,
@@ -41,6 +108,7 @@ export function renderSkincare(root, model, {
   }
 
   const host = root.querySelector('#skincare-routine-cards');
+  const segment = root.querySelector('#skincare-routine-segment');
   if (host) {
     host.replaceChildren();
     for (const key of ['am', 'pm']) {
@@ -52,6 +120,7 @@ export function renderSkincare(root, model, {
         library
       }));
     }
+    wireBeautyDrawer(root, segment, host, model.currentRoutine);
   }
 
   const procedureHost = root.querySelector('#skincare-procedure');

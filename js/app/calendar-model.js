@@ -61,6 +61,66 @@ export function eventDetailTitle(record, body = '') {
   }
 }
 
+export function eventBrief(event) {
+  const record = event?.record;
+  if (!record) return '';
+  switch (record.type) {
+    case 'meal': {
+      const parts = [];
+      if (record.protein_g != null) parts.push(`${record.protein_g}g protein`);
+      if (record.calories != null) parts.push(`${record.calories} kcal`);
+      return parts.join(' · ');
+    }
+    case 'workout': {
+      const parts = [];
+      if (record.duration_min != null) parts.push(`${record.duration_min} min`);
+      if (record.status) parts.push(String(record.status));
+      return parts.join(' · ');
+    }
+    case 'skincare': {
+      if (String(event.body ?? '').startsWith('Procedure:')) return 'Procedure';
+      if (record.routine === 'am') return 'AM routine';
+      if (record.routine === 'pm') return 'PM routine';
+      return '';
+    }
+    case 'weight':
+      return record.weight_kg != null ? `${record.weight_kg} kg` : '';
+    case 'composition': {
+      const parts = [];
+      if (record.weight_kg != null) parts.push(`${record.weight_kg} kg`);
+      if (record.body_fat_pct != null) parts.push(`${record.body_fat_pct}% BF`);
+      return parts.join(' · ');
+    }
+    case 'measurements': {
+      const parts = [];
+      if (record.waist != null) parts.push(`waist ${record.waist}`);
+      if (record.chest != null) parts.push(`chest ${record.chest}`);
+      if (!parts.length && record.hips != null) parts.push(`hips ${record.hips}`);
+      return parts.join(' · ');
+    }
+    case 'diary': {
+      const parts = [];
+      if (record.mood) parts.push(String(record.mood));
+      if (record.energy) parts.push(`${record.energy} energy`);
+      if (record.mood_score != null) parts.push(`score ${record.mood_score}`);
+      return parts.join(' · ');
+    }
+    case 'sleep':
+      return record.duration_h != null ? `${record.duration_h} h sleep` : '';
+    case 'heart':
+      return record.resting_hr != null ? `RHR ${record.resting_hr}` : '';
+    default:
+      return String(event.body ?? '').trim().slice(0, 80);
+  }
+}
+
+export function resolveCalendarDayClick(expandedDate, clickedDate) {
+  if (clickedDate === expandedDate) {
+    return { selectedDate: clickedDate, expandedDate: null };
+  }
+  return { selectedDate: clickedDate, expandedDate: clickedDate };
+}
+
 export function eventsForDate(events, date) {
   return (events ?? [])
     .filter(event => event?.record?.date === date)
@@ -68,6 +128,7 @@ export function eventsForDate(events, date) {
       path: event.path,
       type: event.record.type,
       title: eventDetailTitle(event.record, event.body),
+      brief: eventBrief(event),
       snippet: String(event.body ?? '').trim().slice(0, 160),
       categories: buildCalendarMarkers([event])[date] ?? []
     }))

@@ -1,6 +1,5 @@
 import {
   buildCompositionPayload,
-  buildMeasurementsPayload,
   buildWeightPayload
 } from './body-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -58,11 +57,6 @@ export function createBodyController({
       const date = getDate?.();
       if (!date) return;
       return void save(buildCompositionPayload(date, fields));
-    },
-    onLogMeasurements: fields => {
-      const date = getDate?.();
-      if (!date) return;
-      return void save(buildMeasurementsPayload(date, fields));
     }
   };
 }

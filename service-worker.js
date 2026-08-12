@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v66';
+const CACHE_NAME = 'life-hub-shell-v67';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -75,6 +75,7 @@ const SHELL_FILES = [
   'manifest.webmanifest',
   'assets/icons/life-hub-192.png',
   'assets/icons/life-hub-512.png',
+  'assets/body/full-body-diagram.png',
   'assets/agents/brisket.jpg',
   'assets/agents/chadwick.jpg',
   'assets/agents/hyaluronica.jpg',
@@ -108,7 +109,12 @@ const SHELL_FILES = [
   'assets/fitness/muscles/glutes.png',
   'assets/fitness/muscles/shoulders.png',
   'assets/fitness/muscles/thighs-back.png',
-  'assets/fitness/muscles/thighs-front.png'
+  'assets/fitness/muscles/thighs-front.png',
+  'assets/fitness/regions/abs.png',
+  'assets/fitness/regions/arms.png',
+  'assets/fitness/regions/back.png',
+  'assets/fitness/regions/chest.png',
+  'assets/fitness/regions/legs.png'
 ];
 const PRECACHE_URLS = SHELL_FILES.map(file => SCOPE_PATH + file);
 const SHELL_PATHS = new Set(PRECACHE_URLS);

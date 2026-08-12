@@ -21,7 +21,7 @@ test('formatExerciseSets labels weight, reps, and cable type per set', () => {
         { weight_kg: null, reps: 8, cable_type: 'constant_force' }
       ]
     }),
-    'Set 1: 32 kg × 10 reps · cable: concentric; Set 2: bodyweight × 8 reps · cable: constant force'
+    'Set 1: 32 kg × 10 reps · cable: concentric\nSet 2: bodyweight × 8 reps · cable: constant force'
   );
   assert.equal(
     formatExerciseSets({ sets: [{ weight_kg: 20, reps: 12, cable_type: 'none' }] }),

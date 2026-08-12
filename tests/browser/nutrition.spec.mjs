@@ -76,7 +76,9 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     assert.ok(avgLabelY < finalValueLabelY, 'average label sits above the final value label');
     assert.match(await page.locator('[data-value="week-compare-this"]').textContent(), /^\d+$/);
     assert.match(await page.locator('[data-value="week-compare-prior"]').textContent(), /^\d+$/);
-    assert.ok(await page.locator('#nutrition-week-compare [data-role="value-labels"] text').count() > 0);
+    assert.equal(await page.locator('#nutrition-week-compare .column-bar').count(), 14);
+    assert.equal(await page.locator('#nutrition-week-compare .column-bar[data-series="prior"]').count(), 7);
+    assert.equal(await page.locator('#nutrition-week-compare .column-bar[data-series="this"]').count(), 7);
     assert.equal(await page.locator('#nutrition-macro-split').count(), 1);
 
     const heatmapTiles = page.locator('#nutrition-heatmap .heatmap-tile');

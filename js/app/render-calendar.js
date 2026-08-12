@@ -11,7 +11,8 @@ export function renderCalendar(root, model, {
   onSelectDate,
   onShiftMonth,
   scrollToDetail = false,
-  monthDelta = 0
+  monthDelta = 0,
+  expanded = false
 } = {}) {
   const dashboard = root.querySelector('#calendar-dashboard');
   if (!dashboard || !model) return;
@@ -44,34 +45,33 @@ export function renderCalendar(root, model, {
 
   const detail = root.querySelector('#calendar-day-detail');
   if (detail) {
-    detail.replaceChildren();
-    const heading = root.createElement('p');
-    heading.className = 'metric-label';
-    heading.textContent = `Selected · ${model.selectedDate}`;
-    detail.append(heading);
-    if (!model.dayEvents.length) {
-      const empty = root.createElement('p');
-      empty.className = 'metric-caption';
-      empty.textContent = 'Nothing logged this day.';
-      detail.append(empty);
+    if (!expanded) {
+      detail.replaceChildren();
+      detail.setAttribute('hidden', '');
+      delete detail.dataset.motion;
     } else {
-      for (const event of model.dayEvents) {
-        const row = root.createElement('div');
-        row.className = 'calendar-event';
-        const title = root.createElement('strong');
-        title.textContent = event.title;
-        row.append(title);
-        if (event.snippet) {
-          const snippet = root.createElement('p');
-          snippet.textContent = event.snippet;
-          row.append(snippet);
+      detail.removeAttribute('hidden');
+      detail.replaceChildren();
+      const heading = root.createElement('p');
+      heading.className = 'metric-label';
+      heading.textContent = `Selected · ${model.selectedDate}`;
+      detail.append(heading);
+      if (!model.dayEvents.length) {
+        const empty = root.createElement('p');
+        empty.className = 'metric-caption';
+        empty.textContent = 'Nothing logged this day.';
+        detail.append(empty);
+      } else {
+        for (const event of model.dayEvents) {
+          detail.append(eventRow(root, event));
         }
-        detail.append(row);
       }
-    }
-    if (scrollToDetail) {
-      detail.dataset.motion = 'in';
-      scrollDetailIntoView(root, detail);
+      if (scrollToDetail) {
+        delete detail.dataset.motion;
+        void detail.offsetWidth;
+        detail.dataset.motion = 'in';
+        scrollDetailIntoView(root, detail);
+      }
     }
   }
 
@@ -87,6 +87,37 @@ export function renderCalendar(root, model, {
   }
 
   dashboard.removeAttribute('hidden');
+}
+
+function eventRow(root, event) {
+  const row = root.createElement('div');
+  row.className = 'calendar-event';
+
+  const affordance = root.createElement('span');
+  affordance.className = 'calendar-event__affordance';
+  const category = event.categories?.[0];
+  if (category) {
+    const dot = root.createElement('i');
+    dot.className = `calendar-dot ${CATEGORY_CLASS[category] ?? ''}`.trim();
+    dot.title = category;
+    affordance.append(dot);
+  }
+  row.append(affordance);
+
+  const meta = root.createElement('div');
+  meta.className = 'calendar-event__meta';
+  const title = root.createElement('strong');
+  title.className = 'calendar-event__title';
+  title.textContent = event.title;
+  meta.append(title);
+  if (event.brief) {
+    const brief = root.createElement('p');
+    brief.className = 'calendar-event__brief';
+    brief.textContent = event.brief;
+    meta.append(brief);
+  }
+  row.append(meta);
+  return row;
 }
 
 function applyMonthMotion(grid, monthDelta) {
