@@ -8,6 +8,7 @@ const CENTRAL_NODE_PATH = 'central-node.md';
 const EVENT_PATH = /^data\/.+\.md$/;
 const INITIAL_LOOKBACK_DAYS = 30;
 const EXTENSION_DAYS = 90;
+const MAX_LOOKBACK_DAYS = 1826;
 
 export async function loadLiveEvents({ sync, loadYaml, date }) {
   if (typeof sync !== 'function' || typeof loadYaml !== 'function') {
@@ -40,7 +41,11 @@ export async function loadLiveEvents({ sync, loadYaml, date }) {
     const returnedOlderEvent = priorBoundary === null || batch.events.some(
       event => event.record.date < priorBoundary
     );
-    if (!returnedOlderEvent || !streakReaches(parsed.events, from)) break;
+    if (
+      !returnedOlderEvent
+      || !historyReaches(parsed.events, from)
+      || daysBetween(from, date) >= MAX_LOOKBACK_DAYS
+    ) break;
 
     const nextFrom = addCalendarDays(from, -EXTENSION_DAYS);
     priorBoundary = from;
@@ -127,15 +132,6 @@ function parseFiles(files, loadYaml) {
   return { events, targetsConfig, agentsConfig, centralNodeMarkdown, governanceLogMarkdown, warnings };
 }
 
-function streakReaches(events, boundary) {
-  const completed = new Set(events
-    .map(item => item.record)
-    .filter(record => record.type === 'workout' && record.status === 'completed')
-    .map(record => record.date));
-  const mostRecent = [...completed].sort().at(-1);
-  if (!mostRecent) return false;
-
-  let cursor = mostRecent;
-  while (completed.has(cursor) && cursor > boundary) cursor = addCalendarDays(cursor, -1);
-  return completed.has(boundary) && cursor === boundary;
+function historyReaches(events, boundary) {
+  return (events ?? []).some(event => event?.record?.date === boundary);
 }

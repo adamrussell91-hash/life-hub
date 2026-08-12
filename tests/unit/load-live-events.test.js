@@ -25,6 +25,15 @@ exercises:
 Workout`);
 }
 
+function bodyWeight(date, kg = 80) {
+  return raw(`data/body/${date.slice(0, 4)}/${date.slice(5, 7)}/${date}-weight.md`, `---
+type: weight
+date: '${date}'
+weight_kg: ${kg}
+---
+Weight`);
+}
+
 test('loads the current Sydney date window through existing parsers and exact Home modules', async () => {
   const fixtureManifest = JSON.parse(await readFile(
     new URL('../../fixtures/manifest.json', import.meta.url),
@@ -104,7 +113,39 @@ test('returns stable warnings for invalid Markdown and target configuration', as
   ]);
 });
 
-test('widens a boundary-reaching workout streak by ninety days within the bounded range', async () => {
+test('widens lookback when a body event sits on the window edge without any workout streak', async () => {
+  const calls = [];
+  const date = '2026-08-01';
+  const initialFrom = '2026-07-02';
+  const initialFiles = [
+    bodyWeight(initialFrom, 82),
+    bodyWeight(date, 80)
+  ];
+  const olderFiles = [bodyWeight('2026-07-01', 83)];
+  const sync = async options => {
+    calls.push(options);
+    return {
+      files: calls.length === 1 ? initialFiles : olderFiles,
+      warnings: [],
+      commitSha: 'c'.repeat(40),
+      manifestId: `range-${calls.length}`,
+      changed: true,
+      freshness: 'confirmed'
+    };
+  };
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date });
+
+  assert.deepEqual(calls.map(({ from, to }) => ({ from, to })), [
+    { from: '2026-07-02', to: '2026-08-01' },
+    { from: '2026-04-03', to: '2026-08-01' }
+  ]);
+  assert.ok(calls.every(call => daysBetween(call.from, call.to) < 366));
+  assert.equal(result.events.length, 3);
+  assert.ok(result.events.every(event => event.record.type === 'weight'));
+});
+
+test('widens a boundary-reaching history edge by ninety days within the bounded range', async () => {
   const calls = [];
   const initialFrom = '2026-07-02';
   const date = '2026-08-01';
