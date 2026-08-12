@@ -6,6 +6,7 @@
  *   node scripts/import-notion-history.mjs \
  *     --workouts "/Users/.../Private & Shared 2/Untitled" \
  *     --body-csv "/Users/.../Private & Shared 3/..._all.csv" \
+ *     --body-history-csv "/Users/.../body-history.csv" \
  *     --body-dir "/Users/.../Private & Shared 4/.../Body Measurements" \
  *     --body-log "/Users/.../Body Data Record ....md" \
  *     --out "/Users/.../life-hub-data"
@@ -14,16 +15,18 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 
 import { basename, join, resolve } from 'node:path';
 import { sydneyLocalStamp } from '../js/core/time.js';
 import { parseBodyLogMarkdown } from './lib/body-log-import.mjs';
+import { parseBodyHistoryCsv } from './lib/body-history-csv-import.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const outRoot = resolve(args.out || '../life-hub-data');
 const workoutsDir = args.workouts ? resolve(args.workouts) : null;
 const bodyCsv = args.bodyCsv ? resolve(args.bodyCsv) : null;
+const bodyHistoryCsv = args.bodyHistoryCsv ? resolve(args.bodyHistoryCsv) : null;
 const bodyDir = args.bodyDir ? resolve(args.bodyDir) : null;
 const bodyLog = args.bodyLog ? resolve(args.bodyLog) : null;
 
-if (!workoutsDir && !bodyCsv && !bodyDir && !bodyLog) {
-  console.error('Provide --workouts <dir> and/or --body-csv <file> and/or --body-dir <dir> and/or --body-log <file> and --out <life-hub-data>');
+if (!workoutsDir && !bodyCsv && !bodyHistoryCsv && !bodyDir && !bodyLog) {
+  console.error('Provide --workouts <dir> and/or --body-csv <file> and/or --body-history-csv <file> and/or --body-dir <dir> and/or --body-log <file> and --out <life-hub-data>');
   process.exit(1);
 }
 
@@ -59,6 +62,15 @@ if (bodyCsv) {
       writeEvent(outRoot, path, event.record, event.notes);
       bodyCount += 1;
     }
+  }
+}
+
+if (bodyHistoryCsv) {
+  const events = parseBodyHistoryCsv(readFileSync(bodyHistoryCsv, 'utf8'));
+  for (const event of events) {
+    const path = eventPath('body', event.record.date, event.slug);
+    writeEvent(outRoot, path, event.record, event.notes);
+    bodyCount += 1;
   }
 }
 
@@ -104,6 +116,7 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === '--workouts') out.workouts = argv[++i];
     else if (arg === '--body-csv') out.bodyCsv = argv[++i];
+    else if (arg === '--body-history-csv') out.bodyHistoryCsv = argv[++i];
     else if (arg === '--body-dir') out.bodyDir = argv[++i];
     else if (arg === '--body-log') out.bodyLog = argv[++i];
     else if (arg === '--out') out.out = argv[++i];
@@ -415,17 +428,23 @@ function bodyEventsFromRow(row) {
     });
   }
 
+  const rightCalf = num(row['Right Calf (cm)']);
+  const leftCalf = num(row['Left Calf (cm)']);
   const measurements = {
     chest: num(row['Chest (cm)']),
     waist: num(row['Waist (cm)']),
     hips: num(row['Hips (cm)']),
-    right_arm: num(row['Right Arm Flexed (cm)'] || row['Right Arm Relaxed (cm)']),
-    left_arm: num(row['Left Arm Flexed (cm)'] || row['Left Arm Relaxed (cm)']),
+    shoulders: num(row['Shoulders (cm)']),
+    neck: num(row['Neck (cm)']),
+    right_arm_flexed: num(row['Right Arm Flexed (cm)']),
+    left_arm_flexed: num(row['Left Arm Flexed (cm)']),
+    right_arm_relaxed: num(row['Right Arm Relaxed (cm)']),
+    left_arm_relaxed: num(row['Left Arm Relaxed (cm)']),
     right_thigh: num(row['Right Thigh (cm)']),
     left_thigh: num(row['Left Thigh (cm)']),
-    calves: num(row['Right Calf (cm)'] || row['Left Calf (cm)']),
-    neck: num(row['Neck (cm)']),
-    shoulders: num(row['Shoulders (cm)'])
+    calves: rightCalf != null && leftCalf != null
+      ? (rightCalf + leftCalf) / 2
+      : (rightCalf ?? leftCalf)
   };
   if (Object.values(measurements).some(value => value != null)) {
     events.push({
