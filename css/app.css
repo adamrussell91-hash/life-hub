@@ -1209,7 +1209,7 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .fitness-logger__exercise h4 {
   margin: 0 0 0.5rem;
-  font-size: 0.95rem;
+  font-size: 1rem;
   color: var(--depth);
 }
 .fitness-logger__cue {
@@ -1247,10 +1247,11 @@ main { max-width: 76rem; margin: 0 auto; }
   grid-template-columns: 1.5rem minmax(3.5rem, 1fr) minmax(3.5rem, 1fr) minmax(6rem, 1.4fr);
   gap: 0.35rem;
   align-items: center;
+  font-size: 0.95rem;
 }
 .fitness-logger__set--head {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -1263,6 +1264,7 @@ main { max-width: 76rem; margin: 0 auto; }
   border-radius: 0.45rem;
   background: var(--warm-white);
   font: inherit;
+  font-size: 0.95rem;
 }
 .fitness-logger__add-set {
   margin-top: 0.45rem;

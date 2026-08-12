@@ -194,7 +194,7 @@ function renderRegions(root, regions) {
     const img = root.createElement('img');
     img.className = 'fitness-region-card__img';
     img.src = region.image;
-    img.alt = '';
+    img.alt = `${region.label} anatomy`;
     img.loading = 'lazy';
     img.decoding = 'async';
     img.addEventListener?.('error', () => {
