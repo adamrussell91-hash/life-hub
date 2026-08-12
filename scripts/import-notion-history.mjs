@@ -13,11 +13,16 @@
  */
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { sydneyLocalStamp } from '../js/core/time.js';
 import { parseBodyLogMarkdown } from './lib/body-log-import.mjs';
 import { parseBodyHistoryCsv } from './lib/body-history-csv-import.mjs';
 
-const args = parseArgs(process.argv.slice(2));
+const isMain = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+let args = {};
+
+if (isMain) {
+args = parseArgs(process.argv.slice(2));
 const outRoot = resolve(args.out || '../life-hub-data');
 const workoutsDir = args.workouts ? resolve(args.workouts) : null;
 const bodyCsv = args.bodyCsv ? resolve(args.bodyCsv) : null;
@@ -109,6 +114,7 @@ console.log(JSON.stringify({
   skipped: skipped.length,
   skippedSamples: skipped.slice(0, 10)
 }, null, 2));
+}
 
 function parseArgs(argv) {
   const out = {};
@@ -376,7 +382,7 @@ function bodyEventsFromMarkdown(text) {
   });
 }
 
-function bodyEventsFromRow(row) {
+export function bodyEventsFromRow(row) {
   const dateKey = parseNotionDate(row.Snapshot) || parseNotionDate(row.Date);
   if (!dateKey) return [];
   const events = [];
