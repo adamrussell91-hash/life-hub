@@ -151,6 +151,20 @@ test('buildSkincareModel preserves default products without shelf data', () => {
   );
 });
 
+test('amStreak counts consecutive days ending at most recent log when today is unlogged', () => {
+  const model = buildSkincareModel({
+    date: '2026-08-12',
+    routines: SKINCARE_ROUTINES,
+    nowHourKey: 'am',
+    events: [
+      { record: { type: 'skincare', date: '2026-08-10', routine: 'am', products: [] }, body: '', path: 'am-10' },
+      { record: { type: 'skincare', date: '2026-08-11', routine: 'am', products: [] }, body: '', path: 'am-11' }
+    ]
+  });
+  assert.equal(model.amStreak, 2);
+  assert.equal(model.pmStreak, 0);
+});
+
 test('amStreak and pmStreak count consecutive routine days independently', () => {
   const model = buildSkincareModel({
     date: '2026-08-05',

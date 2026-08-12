@@ -12,11 +12,17 @@ function isRoutineLog(entry, routine) {
 }
 
 function streakFor(entries, date, routine) {
+  const loggedDates = new Set(
+    entries
+      .filter(entry => isRoutineLog(entry, routine) && entry.record.date <= date)
+      .map(entry => entry.record.date)
+  );
+  const mostRecentDate = [...loggedDates].sort().at(-1);
+  if (!mostRecentDate) return 0;
+
   let streak = 0;
-  let cursor = date;
-  while (entries.some(entry => entry.record.date === cursor && isRoutineLog(entry, routine))) {
+  for (let cursor = mostRecentDate; loggedDates.has(cursor); cursor = addCalendarDays(cursor, -1)) {
     streak += 1;
-    cursor = addCalendarDays(cursor, -1);
   }
   return streak;
 }
