@@ -1695,25 +1695,6 @@ main { max-width: 76rem; margin: 0 auto; }
 .body-section[data-body-section="scale"] .body-chart [data-role="line"] {
   stroke: var(--wave);
 }
-.body-section[data-body-section="tape"] .body-chart [data-role="area"] {
-  fill: rgba(246, 134, 32, 0.18);
-}
-.body-section[data-body-section="tape"] .body-chart [data-role="line"] {
-  stroke: var(--high-sea);
-}
-.body-tape-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.85rem 1rem;
-}
-@media (max-width: 520px) {
-  .body-tape-grid { grid-template-columns: 1fr; }
-}
-.body-tape-grid .body-metric {
-  margin-bottom: 0;
-  padding-bottom: 0.5rem;
-  border-bottom: 0;
-}
 .body-chart [data-role="points"] circle {
   fill: var(--depth, #1c2a22);
   stroke: #fff;
@@ -1723,6 +1704,176 @@ main { max-width: 76rem; margin: 0 auto; }
   font-size: 8px;
   fill: var(--muted);
 }
+
+.body-tape {
+  margin: 0;
+}
+.body-figure {
+  position: relative;
+  max-width: 28rem;
+  margin: 0 auto;
+}
+.body-figure__img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.body-figure__labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.body-tape-label {
+  position: absolute;
+  z-index: 1;
+  max-width: min(11.5rem, 46%);
+  pointer-events: auto;
+}
+.body-tape-label[data-side="left"] {
+  left: 0;
+  right: auto;
+  transform: translateY(-50%);
+}
+.body-tape-label[data-side="right"] {
+  right: 0;
+  left: auto;
+  transform: translateY(-50%);
+  text-align: right;
+}
+.body-tape-label__toggle {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--warm-white) 92%, transparent);
+  color: var(--ink);
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  min-height: 44px;
+  box-shadow: 0 1px 2px rgba(28, 42, 34, 0.06);
+}
+.body-tape-label[data-side="right"] .body-tape-label__toggle {
+  justify-items: end;
+}
+.body-tape-label__name {
+  font-size: 0.72rem;
+  font-weight: 750;
+  color: var(--depth);
+  line-height: 1.2;
+}
+.body-tape-label__value {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--depth);
+  line-height: 1.2;
+}
+.body-tape-label__trends {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+.body-tape-label[data-side="right"] .body-tape-label__trends {
+  justify-content: flex-end;
+}
+.body-tape-chip {
+  display: inline-block;
+  padding: 0.08rem 0.35rem;
+  border-radius: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.3;
+  background: rgba(28, 42, 34, 0.06);
+  color: var(--muted);
+}
+.body-tape-chip[data-colour="green"] {
+  color: #2a7a4b;
+  background: rgba(42, 122, 75, 0.12);
+}
+.body-tape-chip[data-colour="red"] {
+  color: #b3261e;
+  background: rgba(179, 38, 30, 0.1);
+}
+.body-tape-chip[data-colour="neutral"] {
+  color: var(--muted);
+  background: rgba(28, 42, 34, 0.06);
+}
+.body-tape-label__history {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  overflow: hidden;
+  margin-top: 0;
+  transition:
+    grid-template-rows 280ms cubic-bezier(.2, .8, .2, 1),
+    opacity 280ms cubic-bezier(.2, .8, .2, 1),
+    margin-top 280ms cubic-bezier(.2, .8, .2, 1);
+}
+.body-tape-label__history > .body-tape-history {
+  min-height: 0;
+  overflow: hidden;
+}
+.body-tape-label.is-open {
+  z-index: 2;
+}
+.body-tape-label.is-open .body-tape-label__history {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 0.35rem;
+}
+.body-tape-label.is-open .body-tape-label__toggle {
+  border-color: color-mix(in srgb, var(--wave) 45%, var(--line));
+  background: var(--warm-white);
+}
+.body-tape-history {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--warm-white);
+  display: grid;
+  gap: 0.3rem;
+  max-height: 11rem;
+  overflow: auto;
+}
+.body-tape-history__row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.45rem;
+  align-items: baseline;
+  font-size: 0.7rem;
+  color: var(--ink);
+}
+.body-tape-history__row--empty {
+  display: block;
+  color: var(--muted);
+}
+.body-tape-history__date {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.body-tape-history__value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.body-tape-history__pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  min-width: 3.2rem;
+  text-align: right;
+}
+@media (prefers-reduced-motion: reduce) {
+  .body-tape-label__history {
+    transition: none;
+  }
+}
+
 .body-quick-log {
   display: flex;
   flex-wrap: wrap;
