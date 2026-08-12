@@ -226,6 +226,32 @@ test('the diary whitelist accepts every field validateDiary actually recognizes'
   assert.equal(result.valid, true, JSON.stringify(result.errors));
 });
 
+test('the measurements whitelist matches validate.js flexed/relaxed arm fields', () => {
+  const result = validateLogEntry({
+    type: 'measurements',
+    date: '2026-08-01',
+    fields: {
+      chest: 104, waist: 82, hips: 98, shoulders: 118, neck: 38,
+      right_arm_flexed: 40, left_arm_flexed: 39,
+      right_arm_relaxed: 36, left_arm_relaxed: 35,
+      right_thigh: 58, left_thigh: 57, calves: 38
+    }
+  }, { id: 'tape-1', now: '2026-08-01T07:45:00+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.right_arm_flexed, 40);
+  assert.equal(result.record.left_arm_relaxed, 35);
+
+  const legacy = validateLogEntry({
+    type: 'measurements',
+    date: '2026-08-01',
+    fields: { right_arm: 40, left_arm: 39 }
+  }, { id: 'tape-legacy', now: '2026-08-01T07:45:00+10:00' });
+  assert.equal(legacy.valid, false);
+  assert.ok(legacy.errors.some(error => error.includes('right_arm')));
+  assert.ok(legacy.errors.some(error => error.includes('left_arm')));
+});
+
 test('rejects rather than throws when now is missing or not a string', () => {
   const missing = validateLogEntry({ type: 'meal', date: '2026-08-01', fields: { meal: 'breakfast' } }, { id: 'x' });
   assert.equal(missing.valid, false);

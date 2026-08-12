@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   BODY_RANGES,
   DEFAULT_BODY_RANGE,
+  TAPE_SITES,
   aggregateSeries,
   buildBodyModel,
   formatGrowthPercent,
@@ -104,4 +105,47 @@ test('observations and series filter to range', () => {
   const series = seriesInRange(obs, rangeWindow('2026-08-05', 'monthly'), 'monthly');
   assert.equal(series.length, 2);
   assert.equal(series[0].date, '2026-08-01');
+});
+
+test('TAPE_SITES includes flexed and relaxed arms separately', () => {
+  assert.ok(TAPE_SITES.includes('right_arm_flexed'));
+  assert.ok(TAPE_SITES.includes('left_arm_relaxed'));
+  assert.ok(!TAPE_SITES.includes('right_arm'));
+  assert.ok(!TAPE_SITES.includes('left_arm'));
+});
+
+test('tape metric exposes lastDelta and overallDelta with physique colours', () => {
+  const events = [
+    { record: { type: 'measurements', date: '2026-01-01', waist: 90 }, body: '', path: 'a' },
+    { record: { type: 'measurements', date: '2026-02-01', waist: 88 }, body: '', path: 'b' },
+    { record: { type: 'measurements', date: '2026-03-01', waist: 84 }, body: '', path: 'c' }
+  ];
+  const model = buildBodyModel({ events, date: '2026-03-01', range: 'year' });
+  const waist = model.tape.metrics.find(t => t.site === 'waist');
+  assert.ok(waist);
+  assert.equal(waist.current, 84);
+  assert.equal(waist.lastDelta, -4);
+  assert.equal(waist.overallDelta, -6);
+  assert.equal(waist.lastColour, 'green');
+  assert.equal(waist.overallColour, 'green');
+  assert.equal(waist.history.length, 3);
+  assert.equal(waist.history[0].date, '2026-01-01');
+  assert.equal(waist.history[0].value, 90);
+  assert.equal(waist.history[0].delta, null);
+  assert.equal(waist.history[2].delta, -4);
+  assert.ok(Number.isFinite(waist.history[2].pct));
+});
+
+test('tape good-up sites colour growth green', () => {
+  const events = [
+    { record: { type: 'measurements', date: '2026-01-01', chest: 100, right_arm_flexed: 38 }, body: '', path: 'a' },
+    { record: { type: 'measurements', date: '2026-03-01', chest: 104, right_arm_flexed: 40 }, body: '', path: 'b' }
+  ];
+  const model = buildBodyModel({ events, date: '2026-03-01', range: 'year' });
+  const chest = model.tape.metrics.find(t => t.site === 'chest');
+  const arm = model.tape.metrics.find(t => t.site === 'right_arm_flexed');
+  assert.equal(chest.lastDelta, 4);
+  assert.equal(chest.lastColour, 'green');
+  assert.equal(arm.overallDelta, 2);
+  assert.equal(arm.overallColour, 'green');
 });

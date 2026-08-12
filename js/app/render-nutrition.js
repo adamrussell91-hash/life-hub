@@ -1,6 +1,7 @@
-import { animateAreaReveal, animateRingFill } from './chart-kit/animate.js';
+import { animateAreaReveal, animateColumnGrow, animateRingFill } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
+import { buildColumns } from './chart-kit/columns.js';
 import { buildMealProteinPie } from './chart-kit/pie.js';
 import { buildRingTarget } from './chart-kit/ring.js';
 
@@ -68,7 +69,7 @@ function renderMacroRings(root, model) {
     calcium: { value: model.nutrition.calcium_mg, target: model.targets.calcium_target_mg }
   };
   for (const [name, config] of Object.entries(rings)) {
-    applyRingTarget(root.querySelector(`[data-nutrition-ring="${name}"]`), config, { size: 72, strokeWidth: 7 });
+    applyRingTarget(root.querySelector(`[data-nutrition-ring="${name}"]`), config, { size: 56, strokeWidth: 6 });
   }
 }
 
@@ -370,6 +371,40 @@ function renderMacroSplit(root, model) {
   }
 }
 
+/** Build 14 day slots: prior week (7) then this week (7), tagged by series. */
+export function buildWeekCompareBars(week = [], previousWeek = []) {
+  const toSlot = (day, series) => ({
+    key: `${series}-${day.date}`,
+    date: day.date,
+    label: weekdayLetter(day.date),
+    value: Number(day.protein_g) || 0,
+    series
+  });
+  return [
+    ...previousWeek.slice(0, 7).map(day => toSlot(day, 'prior')),
+    ...week.slice(0, 7).map(day => toSlot(day, 'this'))
+  ];
+}
+
+function renderWeekCompareColumns(root, host, slots) {
+  if (!host?.replaceChildren || !root.createElement) return;
+  const chart = buildColumns(slots, { height: 96 });
+  host.replaceChildren();
+  for (const bar of chart.bars) {
+    const slot = slots.find(item => item.key === bar.key) ?? {};
+    const col = root.createElement('div');
+    col.className = 'column-bar';
+    col.setAttribute?.('data-series', slot.series ?? '');
+    if (col.dataset) col.dataset.series = slot.series ?? '';
+    const fill = root.createElement('span');
+    const label = root.createElement('span');
+    label.textContent = bar.label;
+    col.append(fill, label);
+    host.append(col);
+    animateColumnGrow(fill, Math.max(bar.heightPct, bar.value > 0 ? 8 : 0));
+  }
+}
+
 function renderWeekCompare(root, week, previousWeek = [], proteinTrend = null) {
   const avg = days => days.length === 0
     ? 0
@@ -397,7 +432,6 @@ function renderWeekCompare(root, week, previousWeek = [], proteinTrend = null) {
     if (badge.dataset) badge.dataset.colour = colour;
   }
 
-  renderNamedAreaChart(root, '#nutrition-week-compare', week, 'protein_g', {
-    valueLabels: true
-  });
+  const host = root.querySelector('#nutrition-week-compare');
+  renderWeekCompareColumns(root, host, buildWeekCompareBars(week, previousWeek));
 }

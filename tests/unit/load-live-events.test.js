@@ -25,6 +25,15 @@ exercises:
 Workout`);
 }
 
+function bodyWeight(date, kg = 80) {
+  return raw(`data/body/${date.slice(0, 4)}/${date.slice(5, 7)}/${date}-weight.md`, `---
+type: weight
+date: '${date}'
+weight_kg: ${kg}
+---
+Weight`);
+}
+
 test('loads the current Sydney date window through existing parsers and exact Home modules', async () => {
   const fixtureManifest = JSON.parse(await readFile(
     new URL('../../fixtures/manifest.json', import.meta.url),
@@ -55,9 +64,11 @@ test('loads the current Sydney date window through existing parsers and exact Ho
   const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-07-30' });
   const model = buildHomeModel({ ...result, date: '2026-07-30' });
 
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal(calls[0].from, '2026-06-30');
   assert.equal(calls[0].to, '2026-07-30');
+  assert.equal(calls[1].from, '2026-04-01');
+  assert.equal(calls[1].to, '2026-07-30');
   assert.equal(result.events.length, 4);
   assert.equal(result.commitSha, 'c'.repeat(40));
   assert.equal(result.changed, true);
@@ -104,7 +115,77 @@ test('returns stable warnings for invalid Markdown and target configuration', as
   ]);
 });
 
-test('widens a boundary-reaching workout streak by ninety days within the bounded range', async () => {
+test('widens lookback when a body event sits on the window edge without any workout streak', async () => {
+  const calls = [];
+  const date = '2026-08-01';
+  const initialFrom = '2026-07-02';
+  const initialFiles = [
+    bodyWeight(initialFrom, 82),
+    bodyWeight(date, 80)
+  ];
+  const olderFiles = [bodyWeight('2026-07-01', 83)];
+  const sync = async options => {
+    calls.push(options);
+    return {
+      files: calls.length === 1 ? initialFiles : olderFiles,
+      warnings: [],
+      commitSha: 'c'.repeat(40),
+      manifestId: `range-${calls.length}`,
+      changed: true,
+      freshness: 'confirmed'
+    };
+  };
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date });
+
+  assert.deepEqual(calls.map(({ from, to }) => ({ from, to })), [
+    { from: '2026-07-02', to: '2026-08-01' },
+    { from: '2026-04-03', to: '2026-08-01' },
+    { from: '2026-01-03', to: '2026-08-01' }
+  ]);
+  assert.ok(calls.every(call => daysBetween(call.from, call.to) < 366));
+  assert.equal(result.events.length, 3);
+  assert.ok(result.events.every(event => event.record.type === 'weight'));
+});
+
+test('widens lookback for sparse history when events sit inside the window but not on the edge day', async () => {
+  const calls = [];
+  const date = '2026-08-01';
+  // Initial window is 2026-07-02..2026-08-01 — events exist inside it, but none on 2026-07-02.
+  const initialFiles = [
+    bodyWeight('2026-07-15', 82),
+    bodyWeight(date, 80)
+  ];
+  const olderByRange = new Map([
+    ['2026-04-03\0' + date, [bodyWeight('2026-06-01', 83)]],
+    ['2026-01-03\0' + date, [bodyWeight('2026-03-01', 84)]]
+  ]);
+  const sync = async options => {
+    calls.push(options);
+    const key = `${options.from}\0${options.to}`;
+    const files = calls.length === 1 ? initialFiles : (olderByRange.get(key) ?? []);
+    return {
+      files,
+      warnings: [],
+      commitSha: 'c'.repeat(40),
+      manifestId: `range-${calls.length}`,
+      changed: true,
+      freshness: 'confirmed'
+    };
+  };
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date });
+
+  assert.ok(calls.length >= 2, 'lookback must widen without an exact edge-day event');
+  assert.deepEqual(calls.slice(0, 2).map(({ from, to }) => ({ from, to })), [
+    { from: '2026-07-02', to: '2026-08-01' },
+    { from: '2026-04-03', to: '2026-08-01' }
+  ]);
+  assert.ok(result.events.some(event => event.record.date === '2026-06-01'));
+  assert.ok(result.events.every(event => event.record.type === 'weight'));
+});
+
+test('widens a boundary-reaching history edge by ninety days within the bounded range', async () => {
   const calls = [];
   const initialFrom = '2026-07-02';
   const date = '2026-08-01';
@@ -129,7 +210,8 @@ test('widens a boundary-reaching workout streak by ninety days within the bounde
 
   assert.deepEqual(calls.map(({ from, to }) => ({ from, to })), [
     { from: '2026-07-02', to: '2026-08-01' },
-    { from: '2026-04-03', to: '2026-08-01' }
+    { from: '2026-04-03', to: '2026-08-01' },
+    { from: '2026-01-03', to: '2026-08-01' }
   ]);
   assert.ok(calls.every(call => daysBetween(call.from, call.to) < 366));
   assert.equal(result.events.length, 32);

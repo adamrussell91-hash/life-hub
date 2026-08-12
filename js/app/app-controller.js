@@ -1,5 +1,5 @@
 import { getSydneyDateKey } from '../core/time.js';
-import { shiftYearMonth } from './calendar-model.js';
+import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
 
@@ -97,6 +97,7 @@ export function createAppController(dependencies) {
   let currentSection = 'home';
   let calendarSelectedDate = null;
   let calendarViewMonth = null;
+  let calendarExpandedDate = null;
   let bodyRange = 'six_month';
   let mindRange = 'monthly';
   let latestLibrary = null;
@@ -650,18 +651,27 @@ export function createAppController(dependencies) {
     renderCalendar(root, model, {
       scrollToDetail,
       monthDelta,
+      expanded: Boolean(calendarExpandedDate),
       onSelectDate: next => {
-        const nextMonth = next.slice(0, 7);
+        const { selectedDate, expandedDate } = resolveCalendarDayClick(calendarExpandedDate, next);
+        const nextMonth = selectedDate.slice(0, 7);
         const monthChanged = nextMonth !== calendarViewMonth;
         const monthDelta = !monthChanged ? 0 : (nextMonth > calendarViewMonth ? 1 : -1);
-        calendarSelectedDate = next;
+        calendarSelectedDate = selectedDate;
+        calendarExpandedDate = expandedDate;
         calendarViewMonth = nextMonth;
-        renderCalendarSection({ scrollToDetail: true, monthDelta });
+        renderCalendarSection({
+          scrollToDetail: Boolean(expandedDate),
+          monthDelta
+        });
       },
       onShiftMonth: delta => {
         calendarViewMonth = shiftYearMonth(calendarViewMonth, delta);
         calendarSelectedDate = clampDateToYearMonth(calendarSelectedDate, calendarViewMonth);
-        renderCalendarSection({ monthDelta: delta });
+        if (calendarExpandedDate) {
+          calendarExpandedDate = calendarSelectedDate;
+        }
+        renderCalendarSection({ monthDelta: delta, scrollToDetail: Boolean(calendarExpandedDate) });
       }
     });
   }
@@ -679,8 +689,7 @@ export function createAppController(dependencies) {
         renderBodySection();
       },
       onLogWeight: bodyController?.onLogWeight,
-      onLogComposition: bodyController?.onLogComposition,
-      onLogMeasurements: bodyController?.onLogMeasurements
+      onLogComposition: bodyController?.onLogComposition
     });
     const button = root.querySelector('#body-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, BODY_AGENT_SLUG));

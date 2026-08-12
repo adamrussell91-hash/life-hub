@@ -80,7 +80,7 @@ export function createFitnessTemplateLibrary({
         const name = root.createElement('strong');
         name.textContent = formatExerciseTitle(exercise);
         const sets = root.createElement('p');
-        sets.className = 'metric-caption';
+        sets.className = 'fitness-exercise__sets';
         sets.textContent = formatExerciseSets(exercise) || 'No sets';
         row.append(name, sets);
         list.append(row);
