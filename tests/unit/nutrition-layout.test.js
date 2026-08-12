@@ -34,13 +34,23 @@ test('protein and fat week charts sit in a pair; energy and carbs sit in a pair'
   assert.match(dash, /class="nutrition-week-charts nutrition-week-charts--energy"/);
 });
 
-test('week compare exposes summary slots and sparkline host', async () => {
+test('week compare exposes summary slots and 14-slot column host', async () => {
   const dash = await nutritionDashboardMarkup();
   assert.match(dash, /data-value="week-compare-this"/);
   assert.match(dash, /data-value="week-compare-prior"/);
   assert.match(dash, /data-value="week-compare-delta"/);
   assert.match(dash, /id="nutrition-week-compare"/);
-  assert.match(dash, /data-role="value-labels"/);
+  assert.match(dash, /week-compare-columns/);
+  assert.doesNotMatch(dash, /id="nutrition-week-compare"[^>]*line-chart/);
+  assert.doesNotMatch(dash, /id="nutrition-week-compare"[\s\S]*?data-role="value-labels"/);
+});
+
+test('nutrition-grid stays dense: smaller rings and 2×2 on narrow, not full-bleed stack', async () => {
+  const css = await readFile(new URL('../../css/app.css', import.meta.url), 'utf8');
+  assert.match(css, /\.nutrition-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*1fr\)/);
+  assert.match(css, /\.nutrition-grid\s+\.metric-ring\s*\{[^}]*3\.5rem/);
+  assert.match(css, /\.nutrition-grid\s*\{\s*grid-template-columns:\s*1fr 1fr\s*;\s*\}/);
+  assert.equal((css.match(/\.nutrition-grid\s*\{\s*grid-template-columns:\s*1fr\s*;\s*\}/g) || []).length, 0);
 });
 
 test('the macro split hero remains intact', async () => {

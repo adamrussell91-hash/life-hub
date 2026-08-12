@@ -697,6 +697,36 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 .nutrition-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-grid); }
+.nutrition-grid > .metric-card {
+  padding: 0.85rem 0.95rem;
+}
+.nutrition-grid .metric-ring-wrap {
+  gap: 0.55rem;
+  margin-top: 0.15rem;
+}
+.nutrition-grid .metric-ring {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+.nutrition-grid .metric-value {
+  margin: 0.35rem 0 0;
+  flex-wrap: wrap;
+}
+.nutrition-grid .metric-value strong {
+  font-size: clamp(1.05rem, 1.8vw, 1.4rem);
+}
+.nutrition-grid .polyphenol-score {
+  margin: 0.4rem 0 0.25rem;
+  font-size: 1.65rem;
+}
+.nutrition-grid .meal-protein-pie-wrap {
+  gap: 0.55rem;
+  margin-top: 0.45rem;
+}
+.nutrition-grid .meal-protein-pie {
+  width: 3.5rem;
+  height: 3.5rem;
+}
 @media (max-width: 1869px) {
   .nutrition-grid { grid-template-columns: 1fr 1fr; }
 }
@@ -821,6 +851,31 @@ main { max-width: 76rem; margin: 0 auto; }
   font-size: 1.25rem;
   color: var(--depth);
   font-variant-numeric: tabular-nums;
+}
+.week-compare-columns {
+  gap: 0.22rem;
+  min-height: 5.5rem;
+  margin-top: 0.35rem;
+}
+.week-compare-columns .column-bar {
+  height: 5.5rem;
+  gap: 0.25rem;
+}
+.week-compare-columns .column-bar > span:first-child {
+  max-width: 0.95rem;
+  border-radius: 0.35rem 0.35rem 0.15rem 0.15rem;
+}
+.week-compare-columns .column-bar[data-series="prior"] > span:first-child {
+  background: rgba(61, 109, 242, 0.28);
+}
+.week-compare-columns .column-bar[data-series="this"] > span:first-child {
+  background: var(--ring-protein);
+}
+.week-compare-columns .column-bar[data-series="this"]:nth-child(8) {
+  margin-left: 0.55rem;
+}
+.week-compare-columns .column-bar > span:last-child {
+  font-size: 0.62rem;
 }
 @media (max-width: 720px) {
   .nutrition-week-charts { grid-template-columns: 1fr; }
@@ -2297,7 +2352,7 @@ main { max-width: 76rem; margin: 0 auto; }
 .chat-view[data-panel-mode="overlay"] .chat-messages { max-height: 40vh; }
 
 @media (max-width: 48rem) {
-  .nutrition-grid { grid-template-columns: 1fr; }
+  .nutrition-grid { grid-template-columns: 1fr 1fr; }
   .chat-view[data-panel-mode="overlay"] { inset: auto 1rem 5.5rem auto; width: calc(100vw - 2rem); }
   .floating-chat-button { right: 1rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
   .cn-audit-button { right: 4.6rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
