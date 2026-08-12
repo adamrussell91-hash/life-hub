@@ -28,7 +28,7 @@ const FOCUS_TO_REGION = {
 
 /** Name regex fallbacks — checked in REGION_KEYS order. */
 const REGION_NAME_PATTERNS = [
-  ['chest', /\b(bench|chest|press|fly|flies)\b/i],
+  ['chest', /bench|\bchest\b|chest press|pec/i],
   ['arms', /\b(curl|tricep|triceps|bicep|biceps)\b/i],
   ['abs', /\b(crunch|plank|ab|abs|core)\b/i],
   ['legs', /\b(squat|deadlift|leg|lunge|rdl|calf|calves)\b/i],

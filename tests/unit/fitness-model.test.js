@@ -159,7 +159,7 @@ test('resolveExerciseRegion prefers focus tags over exercise name', () => {
 test('resolveExerciseRegion falls back to name regexes', () => {
   assert.equal(resolveExerciseRegion({ name: 'Incline Bench' }), 'chest');
   assert.equal(resolveExerciseRegion({ name: 'Chest Fly' }), 'chest');
-  assert.equal(resolveExerciseRegion({ name: 'Shoulder Press' }), 'chest');
+  assert.equal(resolveExerciseRegion({ name: 'Chest Press' }), 'chest');
   assert.equal(resolveExerciseRegion({ name: 'Barbell Curl' }), 'arms');
   assert.equal(resolveExerciseRegion({ name: 'Tricep Extension' }), 'arms');
   assert.equal(resolveExerciseRegion({ name: 'Bicep Curl' }), 'arms');
@@ -171,10 +171,17 @@ test('resolveExerciseRegion falls back to name regexes', () => {
   assert.equal(resolveExerciseRegion({ name: 'Walking Lunge' }), 'legs');
   assert.equal(resolveExerciseRegion({ name: 'RDL' }), 'legs');
   assert.equal(resolveExerciseRegion({ name: 'Calf Raise' }), 'legs');
+  assert.equal(resolveExerciseRegion({ name: 'Leg Press' }), 'legs');
   assert.equal(resolveExerciseRegion({ name: 'Seated Row' }), 'back');
   assert.equal(resolveExerciseRegion({ name: 'Pull-Up' }), 'back');
   assert.equal(resolveExerciseRegion({ name: 'Lat Pulldown' }), 'back');
   assert.equal(resolveExerciseRegion({ name: 'Mystery Move' }, ['chest', 'arms']), null);
+});
+
+test('bare press names do not map to chest (Leg / Overhead / Shoulder Press)', () => {
+  assert.equal(resolveExerciseRegion({ name: 'Leg Press' }), 'legs');
+  assert.notEqual(resolveExerciseRegion({ name: 'Overhead Press' }), 'chest');
+  assert.notEqual(resolveExerciseRegion({ name: 'Shoulder Press' }), 'chest');
 });
 
 test('longTerm weeklyVolume spans ~26 weeks with volumeDeltaPct', () => {
