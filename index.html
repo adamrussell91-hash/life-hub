@@ -535,7 +535,15 @@
               <li data-state="miss">Miss</li>
             </ul>
           </article>
-          <div id="skincare-routine-cards" class="skincare-grid"></div>
+          <div class="skincare-beauty-drawer">
+            <div id="skincare-routine-segment" class="skincare-segment" role="tablist" aria-label="AM or PM routine">
+              <button type="button" class="skincare-segment__btn" role="tab" data-routine="am" aria-controls="skincare-routine-cards" aria-selected="true">AM</button>
+              <button type="button" class="skincare-segment__btn" role="tab" data-routine="pm" aria-controls="skincare-routine-cards" aria-selected="false">PM</button>
+            </div>
+            <div class="skincare-drawer-viewport">
+              <div id="skincare-routine-cards" class="skincare-drawer-track" data-active="am" role="tabpanel" aria-label="Skincare routine"></div>
+            </div>
+          </div>
           <article class="metric-card" id="skincare-procedure"></article>
           <article class="metric-card">
             <p class="metric-label">Today’s procedures</p>

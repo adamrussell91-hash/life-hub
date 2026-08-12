@@ -12,6 +12,50 @@ function setText(root, selector, value) {
   if (el) el.textContent = String(value);
 }
 
+function prefersReducedMotion(root) {
+  return root.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+}
+
+function setBeautyDrawerActive(segment, track, activeKey, { reducedMotion = false } = {}) {
+  const active = activeKey === 'am' ? 'am' : 'pm';
+  if (track) {
+    track.dataset.active = active;
+    if (reducedMotion) track.dataset.reducedMotion = 'true';
+    else delete track.dataset.reducedMotion;
+    if (!String(track.className || '').includes('skincare-drawer-track')) {
+      track.className = `${track.className || ''} skincare-drawer-track`.trim();
+    }
+  }
+  const tabs = segment?.querySelectorAll?.('[data-routine]') ?? [];
+  for (const tab of tabs) {
+    const selected = tab.dataset.routine === active;
+    tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    if (selected) tab.dataset.active = 'true';
+    else delete tab.dataset.active;
+  }
+}
+
+function wireBeautyDrawer(root, segment, track, activeKey) {
+  if (!track) return activeKey === 'am' ? 'am' : 'pm';
+  const reducedMotion = prefersReducedMotion(root);
+  const initial = activeKey === 'am' ? 'am' : 'pm';
+  setBeautyDrawerActive(segment, track, initial, { reducedMotion });
+
+  if (!segment || segment.dataset.drawerWired === 'true') return initial;
+  segment.dataset.drawerWired = 'true';
+
+  const tabs = segment.querySelectorAll?.('[data-routine]') ?? [];
+  for (const tab of tabs) {
+    tab.addEventListener('click', () => {
+      const next = tab.dataset.routine === 'am' ? 'am' : 'pm';
+      setBeautyDrawerActive(segment, track, next, {
+        reducedMotion: prefersReducedMotion(root)
+      });
+    });
+  }
+  return initial;
+}
+
 export function renderSkincare(root, model, {
   onLogRoutine,
   onLogProcedure,
@@ -41,6 +85,7 @@ export function renderSkincare(root, model, {
   }
 
   const host = root.querySelector('#skincare-routine-cards');
+  const segment = root.querySelector('#skincare-routine-segment');
   if (host) {
     host.replaceChildren();
     for (const key of ['am', 'pm']) {
@@ -52,6 +97,7 @@ export function renderSkincare(root, model, {
         library
       }));
     }
+    wireBeautyDrawer(root, segment, host, model.currentRoutine);
   }
 
   const procedureHost = root.querySelector('#skincare-procedure');

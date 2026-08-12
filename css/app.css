@@ -1252,16 +1252,67 @@ main { max-width: 76rem; margin: 0 auto; }
   box-shadow: inset 0 0 0 2px #C9A24A;
 }
 
-.skincare-grid {
+.skincare-beauty-drawer {
   display: grid;
-  gap: var(--space-grid);
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.85rem;
+}
+.skincare-segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 252, 248, 0.72);
+  max-width: 16rem;
+}
+.skincare-segment__btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.skincare-segment__btn[aria-selected="true"] {
+  background: rgba(185, 158, 224, 0.28);
+  color: var(--depth);
+  box-shadow: 0 1px 0 rgba(26, 20, 36, 0.04);
+}
+.skincare-drawer-viewport {
+  overflow: hidden;
+  width: 100%;
+}
+.skincare-drawer-track {
+  display: flex;
+  width: 200%;
+  will-change: transform;
+  transition: transform 320ms cubic-bezier(.2, .8, .2, 1);
+}
+.skincare-drawer-track[data-active="am"] { transform: translateX(0); }
+.skincare-drawer-track[data-active="pm"] { transform: translateX(-50%); }
+.skincare-drawer-track[data-reduced-motion="true"],
+.skincare-drawer-track[data-reduced-motion="true"][data-active="am"],
+.skincare-drawer-track[data-reduced-motion="true"][data-active="pm"] {
+  transition: none;
+}
+.skincare-drawer-track > .skincare-card {
+  flex: 0 0 50%;
+  width: 50%;
+  max-width: 50%;
+  min-width: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skincare-drawer-track { transition: none; }
 }
 .skincare-card--current {
   box-shadow: 0 0 0 2px rgba(185, 158, 224, 0.55);
   background: rgba(185, 158, 224, 0.08);
 }
-.skincare-card:not(.skincare-card--current) { opacity: 0.92; }
 .skincare-card__heading {
   display: flex;
   align-items: baseline;

@@ -163,10 +163,34 @@ function baseModel(overrides = {}) {
   };
 }
 
-function fakeSkincareRoot() {
+function fakeSkincareRoot({ reducedMotion = false } = {}) {
   const dashboard = new FakeElement('section');
   const dateLabel = new FakeElement('p');
   const routineCards = new FakeElement('div');
+  const segment = new FakeElement('div');
+  segment.className = 'skincare-segment';
+  segment.setAttribute('role', 'tablist');
+  const amTab = new FakeElement('button');
+  amTab.type = 'button';
+  amTab.className = 'skincare-segment__btn';
+  amTab.dataset.routine = 'am';
+  amTab.textContent = 'AM';
+  const pmTab = new FakeElement('button');
+  pmTab.type = 'button';
+  pmTab.className = 'skincare-segment__btn';
+  pmTab.dataset.routine = 'pm';
+  pmTab.textContent = 'PM';
+  segment.append(amTab, pmTab);
+  segment.querySelector = selector => {
+    if (selector === '[data-routine="am"]') return amTab;
+    if (selector === '[data-routine="pm"]') return pmTab;
+    if (selector === '[data-routine]') return amTab;
+    return null;
+  };
+  segment.querySelectorAll = selector => {
+    if (selector === '[data-routine]' || selector === '.skincare-segment__btn') return [amTab, pmTab];
+    return [];
+  };
   const procedureCard = new FakeElement('article');
   const procedureLog = new FakeElement('div');
   const amStreak = new FakeElement('strong');
@@ -175,6 +199,7 @@ function fakeSkincareRoot() {
   const nodes = {
     '#skincare-dashboard': dashboard,
     '[data-skincare="date"]': dateLabel,
+    '#skincare-routine-segment': segment,
     '#skincare-routine-cards': routineCards,
     '#skincare-procedure': procedureCard,
     '#skincare-procedure-log': procedureLog,
@@ -184,11 +209,19 @@ function fakeSkincareRoot() {
   };
   return {
     createElement: tag => new FakeElement(tag),
+    defaultView: {
+      matchMedia: query => ({
+        matches: reducedMotion && String(query).includes('prefers-reduced-motion')
+      })
+    },
     querySelector(selector) {
       return nodes[selector] ?? null;
     },
     _dashboard: dashboard,
     _dateLabel: dateLabel,
+    _segment: segment,
+    _amTab: amTab,
+    _pmTab: pmTab,
     _routineCards: routineCards,
     _procedureCard: procedureCard,
     _procedureLog: procedureLog,
@@ -237,6 +270,56 @@ test('renderSkincare marks the current routine card with skincare-card--current 
   assert.equal(amCard.textContent.includes('Now'), false);
   assert.equal(pmCard.className.includes('skincare-card--current'), true);
   assert.match(pmCard.textContent, /Now/);
+});
+
+test('beauty drawer defaults the sliding track to model.currentRoutine (clock / nowHourKey)', () => {
+  const amRoot = fakeSkincareRoot();
+  renderSkincare(amRoot, baseModel({ currentRoutine: 'am' }));
+  assert.equal(amRoot._routineCards.dataset.active, 'am');
+  assert.equal(amRoot._amTab.attributes['aria-selected'], 'true');
+  assert.equal(amRoot._pmTab.attributes['aria-selected'], 'false');
+
+  const pmRoot = fakeSkincareRoot();
+  renderSkincare(pmRoot, baseModel({ currentRoutine: 'pm' }));
+  assert.equal(pmRoot._routineCards.dataset.active, 'pm');
+  assert.equal(pmRoot._pmTab.attributes['aria-selected'], 'true');
+  assert.equal(pmRoot._amTab.attributes['aria-selected'], 'false');
+});
+
+test('segmented AM|PM control slides the beauty drawer track to the selected routine', () => {
+  const root = fakeSkincareRoot();
+  renderSkincare(root, baseModel({ currentRoutine: 'am' }));
+  assert.equal(root._routineCards.dataset.active, 'am');
+
+  root._pmTab.click();
+  assert.equal(root._routineCards.dataset.active, 'pm');
+  assert.equal(root._pmTab.attributes['aria-selected'], 'true');
+  assert.equal(root._amTab.attributes['aria-selected'], 'false');
+
+  root._amTab.click();
+  assert.equal(root._routineCards.dataset.active, 'am');
+  assert.equal(root._amTab.attributes['aria-selected'], 'true');
+  assert.equal(root._pmTab.attributes['aria-selected'], 'false');
+});
+
+test('beauty drawer keeps both routine cards in the track (one visible via data-active)', () => {
+  const root = fakeSkincareRoot();
+  renderSkincare(root, baseModel({ currentRoutine: 'pm' }));
+
+  assert.equal(root._routineCards.children.length, 2);
+  assert.equal(root._routineCards.children[0].dataset.routine, 'am');
+  assert.equal(root._routineCards.children[1].dataset.routine, 'pm');
+  assert.equal(root._routineCards.className.includes('skincare-drawer-track'), true);
+});
+
+test('prefers-reduced-motion marks the drawer for an instant swap', () => {
+  const root = fakeSkincareRoot({ reducedMotion: true });
+  renderSkincare(root, baseModel({ currentRoutine: 'am' }));
+  assert.equal(root._routineCards.dataset.reducedMotion, 'true');
+
+  root._pmTab.click();
+  assert.equal(root._routineCards.dataset.active, 'pm');
+  assert.equal(root._routineCards.dataset.reducedMotion, 'true');
 });
 
 test('renderSkincare groups products by category with Sunscreen separate from Other', () => {
@@ -639,6 +722,23 @@ test('index.html leads Skincare with the consistency hero, heatmap, and legend; 
   }
 
   assert.doesNotMatch(html, /skincare-week-dots/);
+});
+
+test('index.html uses an AM|PM beauty drawer (segment + sliding track) instead of a dual-card grid', async () => {
+  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../../css/app.css', import.meta.url), 'utf8');
+
+  assert.match(html, /class="skincare-beauty-drawer"/);
+  assert.match(html, /id="skincare-routine-segment"/);
+  assert.match(html, /class="skincare-segment"/);
+  assert.match(html, /data-routine="am"/);
+  assert.match(html, /data-routine="pm"/);
+  assert.match(html, /class="skincare-drawer-viewport"/);
+  assert.match(html, /id="skincare-routine-cards"[^>]*class="[^"]*skincare-drawer-track/);
+  assert.doesNotMatch(html, /id="skincare-routine-cards"[^>]*skincare-grid/);
+
+  assert.match(css, /skincare-drawer-track[\s\S]*320ms\s+cubic-bezier/);
+  assert.match(css, /prefers-reduced-motion:\s*reduce[\s\S]*skincare-drawer-track[\s\S]*transition:\s*none/);
 });
 
 test('Log button shows Logging… and disables until onLogRoutine settles', async () => {
