@@ -679,8 +679,7 @@ export function createAppController(dependencies) {
         renderBodySection();
       },
       onLogWeight: bodyController?.onLogWeight,
-      onLogComposition: bodyController?.onLogComposition,
-      onLogMeasurements: bodyController?.onLogMeasurements
+      onLogComposition: bodyController?.onLogComposition
     });
     const button = root.querySelector('#body-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, BODY_AGENT_SLUG));
