@@ -100,9 +100,11 @@ const DOMAIN_PROPERTIES = {
   },
   measurements: {
     chest: { type: 'number' }, waist: { type: 'number' }, hips: { type: 'number' },
-    right_arm: { type: 'number' }, left_arm: { type: 'number' },
+    shoulders: { type: 'number' }, neck: { type: 'number' },
+    right_arm_flexed: { type: 'number' }, left_arm_flexed: { type: 'number' },
+    right_arm_relaxed: { type: 'number' }, left_arm_relaxed: { type: 'number' },
     right_thigh: { type: 'number' }, left_thigh: { type: 'number' },
-    calves: { type: 'number' }, neck: { type: 'number' }, shoulders: { type: 'number' }
+    calves: { type: 'number' }
   },
   skincare: {
     routine: { type: 'string', enum: ['am', 'pm'] },
