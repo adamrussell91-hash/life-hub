@@ -639,6 +639,7 @@
             <button type="button" data-mind-range="monthly" class="is-active" aria-pressed="true">Monthly</button>
             <button type="button" data-mind-range="six_month" aria-pressed="false">6M</button>
           </div>
+          <div id="mind-silence" class="bloods-flags" hidden></div>
           <p id="mind-empty" class="metric-caption" hidden>No diary entries in this range yet — talk with Penelope to log one.</p>
 
           <article class="metric-card chart-card">
@@ -650,6 +651,11 @@
           </article>
 
           <article class="metric-card chart-card">
+            <p class="metric-label">Energy</p>
+            <div id="mind-energy-columns" class="column-chart" aria-label="Diary entries by energy"></div>
+          </article>
+
+          <article class="metric-card chart-card">
             <p class="metric-label">Entries by mood</p>
             <div id="mind-mood-columns" class="column-chart" aria-label="Diary entries by mood"></div>
           </article>
@@ -657,6 +663,21 @@
           <article class="metric-card chart-card">
             <p class="metric-label">Recurring themes</p>
             <div id="mind-theme-columns" class="column-chart" aria-label="Recurring diary tags"></div>
+          </article>
+
+          <article class="metric-card" aria-labelledby="mind-sessions-label">
+            <p class="metric-label" id="mind-sessions-label">Vera sessions</p>
+            <div id="mind-sessions"></div>
+          </article>
+
+          <article class="metric-card" aria-labelledby="mind-insights-label">
+            <p class="metric-label" id="mind-insights-label">Mind Insights</p>
+            <div id="mind-insights"></div>
+          </article>
+
+          <article class="metric-card" aria-labelledby="mind-cross-agent-label">
+            <p class="metric-label" id="mind-cross-agent-label">Cross-Agent signals</p>
+            <div id="mind-cross-agent"></div>
           </article>
 
           <div class="mind-agents">
