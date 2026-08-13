@@ -2,7 +2,7 @@ import { formatExerciseSets, formatExerciseTitle, humanizeFieldLabel } from './f
 import { applyAgentAvatarToBubble } from './render-agent-picker.js';
 import { showEphemeralMessage } from './ephemeral-message.js';
 
-const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'pain_flags', 'tags', 'highlights', 'challenges', 'products']);
+const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'pain_flags', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
 const UNREAD_SELECTOR = '.floating-chat-button, [data-section="chat"]';
 const UNREAD_CLASS = 'has-unread';
 
@@ -48,6 +48,14 @@ export function appendMessage(root, { role, agentSlug, text = '' }) {
   list.append(item);
   list.scrollTop = list.scrollHeight;
   return item;
+}
+
+export function appendRecordSaved(root, { summary, agentSlug }) {
+  return appendMessage(root, {
+    role: 'assistant',
+    agentSlug,
+    text: summary || 'Session logged.'
+  });
 }
 
 // Renders a safe subset of markdown as real DOM nodes -- never innerHTML, so model

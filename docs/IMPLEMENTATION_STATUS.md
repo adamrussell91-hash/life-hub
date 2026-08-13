@@ -378,13 +378,26 @@ Verified on 2026-08-11 (local only — do not push unless asked). Final move of 
 
 ## Phase 35: Mind dashboard — Complete
 
-Verified on 2026-08-13 (local only — do not push unless asked). Spec: `docs/superpowers/specs/2026-08-13-mind-dashboard-design.md`. Shell cache bumped to `life-hub-shell-v70`.
+Verified on 2026-08-13 (local only — do not push unless asked). Spec: `docs/superpowers/specs/2026-08-13-mind-dashboard-design.md`. Shell cache bumped to `life-hub-shell-v70` at land; session-memory merge below takes the shell to v71.
 
 - Mind tab adds an energy column chart, Vera session cards, Mind Insight feed (`parseGovernanceEntries` on the full log, not the prompt tail), and Vera/Penelope Cross-Agent lines.
 - Dual-gap silence chip (both diary and Vera session ≥ 7 days, all-time, `null` is not silence). Everyday gap copy stays on the session-memory ambient line.
 - Empty states for sessions / insights / cross-agent so the page holds before session-memory ships.
 - Read-only. No write path.
 - `npm test`: 1014 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
+## Phase 36: Mind session memory 8/8 — Complete
+
+Verified on 2026-08-13 (local only — do not push unless asked). Merged `feature/mind-session-memory` onto main (dashboard already landed as Phase 35). Spec: `docs/superpowers/specs/2026-08-13-mind-session-memory-design.md`. Shell cache bumped to `life-hub-shell-v71`.
+
+- Vera `mind_session` auto-writes at close (one file per Sydney day); diary / meals / workouts still Confirm.
+- Bounded 30-day mind digest for Vera/Penelope; Hammond silence from path dates only; on-this-day excerpt is Penelope-only.
+- Central Node: Energy on diary, Mind status on session, Cross-Agent lines, `Mind Insight` governance type.
+- Client: `record_saved` summary (no Confirm card); `system_note` hidden on diary Confirm.
+- Mind tab ambient line immediately after `.mind-agents`: mood-trend only with two+ points, plus days since last diary and last Vera session.
+- Fixture corpus is 5 files (`2026-07-30-session.md`).
+- **Deviations:** 5e/6b protocol-only (no extra Hammond diary-blob window); leave-flush / transcripts not built.
+- `npm test`: 1049 passed, 0 failed. `npm run validate:fixtures`: 5/5 valid.
 
 ## Next Phase: sleep·heart on Body / polish
 

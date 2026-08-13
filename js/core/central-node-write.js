@@ -66,6 +66,15 @@ export function appendRecentAction(content, line) {
   return `${content.slice(0, insertAt)}${normalized}${content.slice(insertAt)}`;
 }
 
+export function appendCrossAgentLine(content, line) {
+  const headingIndex = content.indexOf(CROSS_AGENT_HEADING);
+  if (headingIndex === -1) return content;
+  const insertAt = headingIndex + CROSS_AGENT_HEADING.length;
+  const normalized = line.startsWith('\n') ? line : `\n${line}`;
+  const bullet = /^\n?- /.test(normalized) ? normalized : `\n- ${line.replace(/^\n/, '')}`;
+  return `${content.slice(0, insertAt)}${bullet}${content.slice(insertAt)}`;
+}
+
 export function replaceTodaysStatus(content, { dateKey, body }) {
   const heading = `${TODAYS_STATUS_HEADING} (${formatStatusHeadingDate(dateKey)})`;
   const section = `${heading}\n${body.trim()}\n`;
@@ -275,6 +284,12 @@ export function applyLogToCentralNode(content, {
   } else if (record.type === 'diary') {
     const mood = record.mood_score != null ? `${record.mood_score}/10` : (record.mood ?? 'logged');
     body = upsertStatusField(body, 'Mood', `**Mood:** ${mood}.`);
+    if (record.energy) body = upsertStatusField(body, 'Energy', `**Energy:** ${record.energy}.`);
+  } else if (record.type === 'mind_session') {
+    const theme = typeof record.theme === 'string' && record.theme.trim()
+      ? record.theme.trim()
+      : 'session logged';
+    body = upsertStatusField(body, 'Mind', `**Mind:** ${theme}.`);
   } else if (record.type === 'weight' || record.type === 'composition') {
     const weight = record.weight_kg != null ? `${record.weight_kg} kg` : 'logged';
     body = upsertStatusField(body, 'Health', `**Health:** Weight ${weight}.`);
@@ -293,6 +308,9 @@ export function applyLogToCentralNode(content, {
   }
 
   next = replaceTodaysStatus(next, { dateKey: record.date, body });
+  if (typeof record.cross_agent_note === 'string' && record.cross_agent_note.trim()) {
+    next = appendCrossAgentLine(next, `- ${record.cross_agent_note.trim()}`);
+  }
   // Day Type used to be auto-written here as a "Chadwick→Brisket" directive. It was a
   // Notion day-page property that outlived its database: resolveDayType() already derives
   // it from the workout record and getDayTargets() has already applied it to the targets

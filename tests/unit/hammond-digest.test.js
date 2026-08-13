@@ -84,6 +84,16 @@ test('empty tree produces a valid empty-ish output for every domain, no crash', 
   assert.match(lines.find(line => line.includes('fitness')), /0\/90 days, no entries in this window, current streak 0d, 0 completed\./);
 });
 
+test('a mind_session file counts as mind-domain presence', () => {
+  const tree = [{
+    path: 'data/mind/2026/08/2026-08-01-session.md',
+    type: 'blob',
+    sha: 'sha-session'
+  }];
+  const summary = summarizeHammondDigest({ tree, fitnessRecords: [], today: TODAY });
+  assert.match(summary, /mind: 1\/90 days/);
+});
+
 test('boundary: an entry exactly 90 days back is included in the window', () => {
   const windowStart = addCalendarDays(TODAY, -89); // "90 days back" inclusive of today
   const tree = treeFor('mind', [windowStart]);

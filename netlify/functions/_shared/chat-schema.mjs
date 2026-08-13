@@ -2,7 +2,7 @@ import { TYPE_DOMAINS } from '../../../js/core/records.js';
 import { validateRecord } from '../../../js/core/validate.js';
 import { isCalendarDate } from '../../../js/core/time.js';
 
-const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare'];
+const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare', 'mind_session'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const DOMAIN_PROPERTIES = {
@@ -88,7 +88,10 @@ const DOMAIN_PROPERTIES = {
     tags: { type: 'array', items: { type: 'string' } },
     highlights: { type: 'string' },
     challenges: { type: 'string' },
-    dayone_sent: { type: 'boolean' }
+    dayone_sent: { type: 'boolean' },
+    moods: { type: 'array', items: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] } },
+    system_note: { type: 'string' },
+    cross_agent_note: { type: 'string' }
   },
   weight: { weight_kg: { type: 'number' } },
   composition: {
@@ -111,6 +114,14 @@ const DOMAIN_PROPERTIES = {
     completed: { type: 'boolean' },
     products: { type: 'array', items: { type: 'string' } },
     skin_note: { type: 'string' }
+  },
+  mind_session: {
+    theme: { type: 'string' },
+    closing_question: { type: 'string' },
+    insight: { type: 'string' },
+    mood_at_open: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] },
+    mood_at_close: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] },
+    cross_agent_note: { type: 'string' }
   }
 };
 
@@ -170,6 +181,7 @@ export function buildRecordSlug(record) {
     }
     return record.meal;
   }
+  if (record.type === 'mind_session') return 'session';
   const label = record.type === 'skincare' ? record.routine : record.type;
   if (typeof label !== 'string' || !SLUG.test(label)) {
     throw new TypeError(`Invalid slug label: ${label}`);

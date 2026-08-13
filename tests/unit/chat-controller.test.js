@@ -1530,6 +1530,42 @@ test('cn_patch_proposal Discard removes the card without confirming', async () =
   assert.equal(list.children.includes(proposal), false);
 });
 
+test('record_saved appends the summary without a Confirm card and notifies onRecordWritten', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'vera' };
+      yield {
+        type: 'record_saved',
+        summary: 'Logged a mind session (Weekend permission).',
+        record: { type: 'mind_session' }
+      };
+      yield { type: 'done' };
+    }
+  };
+  const written = [];
+  const controller = createChatController({
+    root, chatApi, onRecordWritten: event => written.push(event)
+  });
+  await controller.send('that is enough for today');
+
+  const list = root.querySelector('#chat-messages');
+  const summary = 'Logged a mind session (Weekend permission).';
+  const hasSummary = list.children.some(item =>
+    (item.querySelector?.('.chat-message__body')?.textContent ?? '') === summary
+  );
+  assert.ok(hasSummary, 'expected the record_saved summary in a message body');
+
+  const hasConfirm = list.children.some(item =>
+    item.className === 'record-proposal__confirm'
+    || item.children?.some(child => child.className === 'record-proposal__confirm')
+  );
+  assert.equal(hasConfirm, false, 'auto-saved sessions must not show a Confirm card');
+  assert.equal(written.length, 1);
+  assert.equal(written[0].type, 'record_saved');
+  assert.equal(written[0].summary, summary);
+});
+
 test('central_node_patched appends a success chat line without using the error banner', async () => {
   const root = new FakeDocument();
   const chatApi = {
