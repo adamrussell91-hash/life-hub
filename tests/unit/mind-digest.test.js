@@ -90,3 +90,48 @@ test('selectMindEntries filters data/mind in window', () => {
   assert.equal(selected.length, 1);
   assert.equal(selected[0].sha, '1');
 });
+
+function diaryEvent(date, body) {
+  return {
+    record: { type: 'diary', date, mood: 'ok' },
+    body,
+    path: `data/mind/2026/08/${date}-diary-2100.md`
+  };
+}
+
+test('equal-length diary set of 4 does not flag shorter than usual', () => {
+  const body = 'one two three four five six seven eight nine ten';
+  const events = ['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13'].map(d => diaryEvent(d, body));
+  const text = summarizeDiaryForPrompt(events, TODAY);
+  assert.doesNotMatch(text, /shorter than usual/);
+});
+
+test('very short latest diary among 4 entries flags shorter than usual', () => {
+  const long = Array.from({ length: 50 }, (_, i) => `word${i}`).join(' ');
+  const events = [
+    diaryEvent('2026-08-10', long),
+    diaryEvent('2026-08-11', long),
+    diaryEvent('2026-08-12', long),
+    diaryEvent('2026-08-13', 'tiny')
+  ];
+  const text = summarizeDiaryForPrompt(events, TODAY);
+  assert.match(text, /shorter than usual/);
+});
+
+test('divergenceLine is empty when diary and session moods overlap', () => {
+  const events = [
+    { record: { type: 'diary', date: '2026-08-12', mood: 'low' }, body: '', path: 'd' },
+    { record: { type: 'mind_session', date: '2026-08-13', mood_at_open: 'low', mood_at_close: 'ok' }, body: '', path: 's' }
+  ];
+  assert.equal(divergenceLine(events, TODAY), '');
+});
+
+test('divergenceLine hypothesizes when diary and session moods do not overlap', () => {
+  const events = [
+    { record: { type: 'diary', date: '2026-08-12', mood: 'low' }, body: '', path: 'd' },
+    { record: { type: 'mind_session', date: '2026-08-13', mood_at_open: 'energised', mood_at_close: 'ok' }, body: '', path: 's' }
+  ];
+  const text = divergenceLine(events, TODAY);
+  assert.match(text, /Hypothesis only/);
+  assert.match(text, /did not overlap/);
+});
