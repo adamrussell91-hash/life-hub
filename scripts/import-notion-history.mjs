@@ -7,6 +7,7 @@
  *     --workouts "/Users/.../Private & Shared 2/Untitled" \
  *     --body-csv "/Users/.../Private & Shared 3/..._all.csv" \
  *     --body-history-csv "/Users/.../body-history.csv" \
+ *     --bloods-csv "/Users/.../blood-test-tracker.csv" \
  *     --body-dir "/Users/.../Private & Shared 4/.../Body Measurements" \
  *     --body-log "/Users/.../Body Data Record ....md" \
  *     --out "/Users/.../life-hub-data"
@@ -17,6 +18,7 @@ import { pathToFileURL } from 'node:url';
 import { sydneyLocalStamp } from '../js/core/time.js';
 import { parseBodyLogMarkdown } from './lib/body-log-import.mjs';
 import { parseBodyHistoryCsv } from './lib/body-history-csv-import.mjs';
+import { parseBloodsCsv } from './lib/bloods-csv-import.mjs';
 
 const isMain = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 let args = {};
@@ -29,9 +31,10 @@ const bodyCsv = args.bodyCsv ? resolve(args.bodyCsv) : null;
 const bodyHistoryCsv = args.bodyHistoryCsv ? resolve(args.bodyHistoryCsv) : null;
 const bodyDir = args.bodyDir ? resolve(args.bodyDir) : null;
 const bodyLog = args.bodyLog ? resolve(args.bodyLog) : null;
+const bloodsCsv = args.bloodsCsv ? resolve(args.bloodsCsv) : null;
 
-if (!workoutsDir && !bodyCsv && !bodyHistoryCsv && !bodyDir && !bodyLog) {
-  console.error('Provide --workouts <dir> and/or --body-csv <file> and/or --body-history-csv <file> and/or --body-dir <dir> and/or --body-log <file> and --out <life-hub-data>');
+if (!workoutsDir && !bodyCsv && !bodyHistoryCsv && !bodyDir && !bodyLog && !bloodsCsv) {
+  console.error('Provide --workouts <dir> and/or --body-csv <file> and/or --body-history-csv <file> and/or --body-dir <dir> and/or --body-log <file> and/or --bloods-csv <file> and --out <life-hub-data>');
   process.exit(1);
 }
 
@@ -105,10 +108,20 @@ if (bodyLog) {
   }
 }
 
+if (bloodsCsv) {
+  const events = parseBloodsCsv(readFileSync(bloodsCsv, 'utf8'));
+  for (const event of events) {
+    const path = eventPath('body', event.record.date, event.slug);
+    writeEvent(outRoot, path, event.record, event.notes);
+    bodyCount += 1;
+  }
+}
+
 
 console.log(JSON.stringify({
   outRoot,
   bodyLog,
+  bloodsCsv,
   workoutCount,
   bodyCount,
   skipped: skipped.length,
@@ -116,7 +129,7 @@ console.log(JSON.stringify({
 }, null, 2));
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -125,6 +138,7 @@ function parseArgs(argv) {
     else if (arg === '--body-history-csv') out.bodyHistoryCsv = argv[++i];
     else if (arg === '--body-dir') out.bodyDir = argv[++i];
     else if (arg === '--body-log') out.bodyLog = argv[++i];
+    else if (arg === '--bloods-csv') out.bloodsCsv = argv[++i];
     else if (arg === '--out') out.out = argv[++i];
     else if (arg === '--force') out.force = true;
   }
