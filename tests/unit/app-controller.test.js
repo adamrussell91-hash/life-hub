@@ -821,6 +821,35 @@ test('logout hides immediately and clears again after invalidating an active ref
   assert.equal(state.privateCachePresent(), false);
 });
 
+test('logout after first paint still waits for backfill before the last cache clear', async () => {
+  let release;
+  const later = new Promise(resolve => { release = resolve; });
+  const week = liveData();
+  const state = harness({
+    sessionMarker: EXPIRY,
+    loadLiveImpl: async ({ onPartial, setPrivateCachePresent }) => {
+      await onPartial(week);
+      await later;
+      setPrivateCachePresent(true);
+      return liveData();
+    }
+  });
+
+  const started = state.controller.start();
+  await new Promise(resolve => setImmediate(resolve));
+  await started;
+
+  const logout = state.controller.signOut();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.calls.clears, 1);
+  assert.equal(state.calls.refreshSignals[0]?.aborted, true);
+
+  release();
+  await logout;
+  assert.equal(state.calls.clears, 2);
+  assert.equal(state.privateCachePresent(), false);
+});
+
 test('rapid re-authentication waits for all prior logout cache cleanup', async () => {
   let releaseOldRefresh;
   const oldRefreshResult = new Promise(resolve => { releaseOldRefresh = resolve; });
@@ -1071,6 +1100,8 @@ test('navigating to Chat clears the chat unread flag', async () => {
 test('Home becomes ready after the first live window while a later slice is still pending', async () => {
   let release;
   const later = new Promise(resolve => { release = resolve; });
+  let releaseReturn;
+  const afterPartial = new Promise(resolve => { releaseReturn = resolve; });
   const week = liveData({ events: [{ record: { date: '2026-08-01', type: 'weight' } }] });
   const full = liveData({
     events: [
@@ -1083,6 +1114,7 @@ test('Home becomes ready after the first live window while a later slice is stil
       await onPartial(week);
       await later;
       await onPartial(full);
+      await afterPartial;
       return full;
     }
   });
@@ -1101,6 +1133,9 @@ test('Home becomes ready after the first live window while a later slice is stil
   await new Promise(resolve => setImmediate(resolve));
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(state.calls.renders, 2);
+  assert.match(state.root.querySelector('#app-status').textContent, /earlier history/i);
+
+  releaseReturn();
 });
 
 test('a failed later slice does not show the unavailable panel after first paint', async () => {
