@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   isAllowedRepositoryPath,
+  isClientFileInRange,
   parseDateRange,
   selectManifestEntries
 } from '../../netlify/functions/_shared/repo-policy.mjs';
@@ -83,6 +84,17 @@ test('manifest policy accepts only canonical bounded blob metadata', () => {
   assert.deepEqual(selectManifestEntries([valid, ...invalid], { from: '2026-08-01', to: '2026-08-01' }), [
     { path: valid.path, sha: valid.sha, size: valid.size }
   ]);
+});
+
+test('client file range allows config and in-range events, not templates or out-of-range events', () => {
+  const range = { from: '2026-07-02', to: '2026-08-01' };
+  assert.equal(isClientFileInRange('config/targets.yml', range), true);
+  assert.equal(isClientFileInRange('config/agents.yml', range), true);
+  assert.equal(isClientFileInRange('central-node.md', range), true);
+  assert.equal(isClientFileInRange('data/nutrition/2026/08/2026-08-01-breakfast.md', range), true);
+  assert.equal(isClientFileInRange('data/nutrition/2026/07/2026-07-01-old.md', range), false);
+  assert.equal(isClientFileInRange('data/fitness/templates/chest-and-curls.md', range), false);
+  assert.equal(isClientFileInRange('private/secret.md', range), false);
 });
 
 test('date ranges require one canonical ordered date pair no longer than 366 days', () => {

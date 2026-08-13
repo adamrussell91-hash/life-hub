@@ -70,3 +70,8 @@ function isEventInRange(path, range) {
   const match = EVENT_PATH.exec(path);
   return match && match.groups.date >= range.from && match.groups.date <= range.to;
 }
+
+export function isClientFileInRange(path, range) {
+  if (CONFIG_PATHS.has(path)) return true;
+  return Boolean(isEventInRange(path, range));
+}
