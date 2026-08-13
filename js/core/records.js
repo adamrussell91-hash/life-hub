@@ -7,6 +7,7 @@ export const TYPE_DOMAINS = {
   meal: 'nutrition',
   workout: 'fitness',
   diary: 'mind',
+  mind_session: 'mind',
   weight: 'body',
   composition: 'body',
   measurements: 'body',
