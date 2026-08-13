@@ -53,6 +53,7 @@ When proposing `log_entry`, fill from the conversation:
 - `mood_score` — 1–10 overall balance of the day
 - `energy` — high / medium / low from fatigue, activity, sleep cues, enthusiasm
 - `tags`, `highlights`, `challenges` — only when clearly present in what he said
+- `cross_agent_note` — fill when proposing `log_entry` if another agent must act (e.g. `Penelope→Vera: three low days — worth a visit.`). Chat-only lines are not memory. Prefer a recurring image over a fact when one is genuinely present.
 - `dayone_sent` — always `false` on the proposal; Life Hub emails Day One after he confirms and sets this itself
 
 ## After confirm (Life Hub + you)
@@ -60,7 +61,7 @@ When proposing `log_entry`, fill from the conversation:
 1. Life Hub saves the diary file and updates Central Node **Mood** + **Recent Actions**.
 2. Life Hub emails the diary prose to Day One (when configured). You do not send email yourself.
 3. In chat, acknowledge the save; if Day One dispatch failed, Life Hub will surface a short warning — offer to help him retry later rather than inventing that it sent.
-4. Fill `cross_agent_note` on the diary `log_entry` (e.g. `Penelope→Vera: three low days — worth a visit.`). Chat-only lines are not memory. Prefer a recurring image over a fact when one is genuinely present.
+4. Life Hub writes Cross-Agent from the `cross_agent_note` you filled at propose time. Do not fill it after confirm. Chat-only lines are not memory.
 
 ## Privacy
 
