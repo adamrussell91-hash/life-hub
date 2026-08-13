@@ -521,6 +521,95 @@ test('log_entry via executeTools emits record_proposal and returns awaiting_conf
   assert.deepEqual(events[2], { type: 'text', delta: 'Hit Confirm when those macros look right.' });
 });
 
+test('Vera mind_session log_entry writes immediately and emits record_saved', async () => {
+  const puts = [];
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      puts.push(url);
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  let toolResult;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        toolResult = await executeTools({
+          id: 'call_1',
+          name: 'log_entry',
+          input: {
+            type: 'mind_session',
+            date: '2026-08-01',
+            fields: {
+              theme: 'Weekend permission',
+              closing_question: 'What is the weekend for?',
+              insight: 'Exhaustion looking like chaos',
+              mood_at_close: 'low'
+            }
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Vera, that is enough for today',
+    priorAgentSlug: 'vera'
+  }))));
+  const parsed = JSON.parse(toolResult);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.status, 'written');
+  const saved = events.find(e => e.type === 'record_saved');
+  assert.ok(saved, JSON.stringify(events.map(e => e.type)));
+  assert.equal(saved.record.type, 'mind_session');
+  assert.ok(puts.some(url => url.includes('2026-08-01-session.md')));
+  assert.ok(puts.some(url => url.includes('governance')), JSON.stringify(puts));
+  assert.equal(events.find(e => e.type === 'record_proposal'), undefined);
+});
+
+test('Penelope diary log_entry still awaits confirm', async () => {
+  let toolResult;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        toolResult = await executeTools({
+          id: 'call_1',
+          name: 'log_entry',
+          input: {
+            type: 'diary',
+            date: '2026-08-01',
+            fields: {
+              mood: 'good'
+            }
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Penelope, log today',
+    priorAgentSlug: 'penelope'
+  }))));
+  const parsed = JSON.parse(toolResult);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.status, 'awaiting_confirm');
+  const proposal = events.find(e => e.type === 'record_proposal');
+  assert.ok(proposal, JSON.stringify(events.map(e => e.type)));
+  assert.equal(proposal.record.type, 'diary');
+  assert.equal(events.find(e => e.type === 'record_saved'), undefined);
+});
+
 test('log_entry via executeTools attaches protocol lint warnings to a workout record_proposal', async () => {
   const handler = createChatHandler({
     env: validEnv,

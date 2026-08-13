@@ -32,6 +32,7 @@ import {
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
 import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug } from './_shared/chat-schema.mjs';
+import { persistLogEntry, describeRecordForLog } from './_shared/persist-log.mjs';
 import {
   FOOD_LIBRARY_PATH,
   foodLibraryEntrySchema,
@@ -734,19 +735,15 @@ export function createChatHandler({
                   send({ type: 'record_rejected', errors: validation.errors });
                   return JSON.stringify({ ok: false, errors: validation.errors });
                 }
-                send({
-                  type: 'record_proposal',
-                  record: validation.record,
-                  notes: validation.notes,
-                  path: buildCanonicalPath({
-                    type: validation.record.type,
-                    date: validation.record.date,
-                    slug: buildRecordSlug(validation.record)
-                  }),
-                  // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
-                  // Confirm anyway. No-op (empty array) for anything but a workout proposal.
-                  warnings: lintWorkoutProposal(validation.record)
+                const outcome = await persistOrProposeLogEntry({
+                  client, slug, today, validation, send
                 });
+                if (outcome.status === 'written') {
+                  return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
+                }
+                if (outcome.error === 'write_failed') {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
                 return JSON.stringify({ ok: true, status: 'awaiting_confirm' });
               }
               if (event.name === 'append_governance_log') {
@@ -826,19 +823,7 @@ export function createChatHandler({
                 now: getSydneyTimestamp(nowInstant)
               });
               if (validation.valid) {
-                send({
-                  type: 'record_proposal',
-                  record: validation.record,
-                  notes: validation.notes,
-                  path: buildCanonicalPath({
-                    type: validation.record.type,
-                    date: validation.record.date,
-                    slug: buildRecordSlug(validation.record)
-                  }),
-                  // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
-                  // Confirm anyway. No-op (empty array) for anything but a workout proposal.
-                  warnings: lintWorkoutProposal(validation.record)
-                });
+                await persistOrProposeLogEntry({ client, slug, today, validation, send });
               } else {
                 send({ type: 'record_rejected', errors: validation.errors });
               }
@@ -866,6 +851,57 @@ export function createChatHandler({
       headers: { 'content-type': 'text/event-stream', ...PRIVATE_CACHE, connection: 'keep-alive' }
     });
   };
+}
+
+async function persistOrProposeLogEntry({ client, slug, today, validation, send }) {
+  const path = buildCanonicalPath({
+    type: validation.record.type,
+    date: validation.record.date,
+    slug: buildRecordSlug(validation.record)
+  });
+  const autoWrite = slug === 'vera' && validation.record.type === 'mind_session';
+  if (autoWrite) {
+    try {
+      const current = await client.resolveTree();
+      const existingSha = current.tree.find(e => e.path === path && e.type === 'blob')?.sha;
+      const persisted = await persistLogEntry(client, {
+        record: validation.record,
+        notes: validation.notes,
+        path,
+        existingSha,
+        nowDateKey: today
+      });
+      send({
+        type: 'record_saved',
+        record: validation.record,
+        notes: validation.notes,
+        path,
+        summary: describeRecordForLog(validation.record, validation.notes),
+        centralNodeUpdated: persisted.centralNodeUpdated
+      });
+      return { ok: true, status: 'written', path };
+    } catch {
+      send({
+        type: 'record_proposal',
+        record: validation.record,
+        notes: validation.notes,
+        path,
+        warnings: [],
+        autoWriteFailed: true
+      });
+      return { ok: false, error: 'write_failed' };
+    }
+  }
+  send({
+    type: 'record_proposal',
+    record: validation.record,
+    notes: validation.notes,
+    path,
+    // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
+    // Confirm anyway. No-op (empty array) for anything but a workout proposal.
+    warnings: lintWorkoutProposal(validation.record)
+  });
+  return { ok: true, status: 'awaiting_confirm' };
 }
 
 async function parseRequest(request) {
