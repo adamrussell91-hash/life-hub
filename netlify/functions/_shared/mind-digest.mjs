@@ -152,3 +152,16 @@ export function excerptOnThisDay({ date, mood, moods, tags, highlights, challeng
     excerpt ? `Excerpt: ${excerpt}` : ''
   ].filter(Boolean).join(' ');
 }
+
+const HAMMOND_BRIEF_RE = /retrospective|look-?back|monthly brief|three[- ]way brief|pattern synthesis|\bquarterly\b|two[- ]voice|mind brief/i;
+
+export function isHammondMindBriefTurn(message) {
+  if (typeof message !== 'string' || !message.trim()) return false;
+  return HAMMOND_BRIEF_RE.test(message);
+}
+
+export function hammondDiaryDigestForTurn({ slug, message, events, today } = {}) {
+  if (slug !== 'hammond') return '';
+  if (!isHammondMindBriefTurn(message)) return '';
+  return summarizeDiaryForPrompt(events, today);
+}

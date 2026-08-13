@@ -2112,3 +2112,107 @@ test('propose_central_node_patch returns error JSON when central-node.md is miss
   assert.deepEqual(events[0], { type: 'agent', slug: 'hammond' });
   assert.deepEqual(events[1], { type: 'text', delta: 'CN missing.' });
 });
+
+const HAMMOND_DIARY_PATH = 'data/mind/2026/07/2026-07-30-diary.md';
+const HAMMOND_DIARY_SHA = 'a'.repeat(40);
+const HAMMOND_DIARY_CONTENT = [
+  '---',
+  'schema_version: 1',
+  'id: diary-brief-1',
+  'type: diary',
+  'date: 2026-07-30',
+  'time: "21:40"',
+  'created_at: 2026-07-30T21:40:00+10:00',
+  'updated_at: 2026-07-30T21:40:00+10:00',
+  'source: test_fixture',
+  'mood_score: 4',
+  'mood: low',
+  'energy: low',
+  'tags: [weekend]',
+  'system_note: Weekend collapse',
+  'dayone_sent: false',
+  '---',
+  'SECRET PROSE ADAM SHOULD NOT SEE'
+].join('\n');
+
+function hammondFetchWithDiary(cnSha = '5'.repeat(40)) {
+  const blobUrls = [];
+  const fetchImpl = async url => {
+    if (url.includes('/git/blobs/')) blobUrls.push(url);
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'central-node.md', type: 'blob', sha: cnSha, size: HAMMOND_CN_FIXTURE.length },
+          { path: HAMMOND_DIARY_PATH, type: 'blob', sha: HAMMOND_DIARY_SHA, size: HAMMOND_DIARY_CONTENT.length }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(HAMMOND_CN_FIXTURE, 'utf8').toString('base64')
+      });
+    }
+    if (url.includes(`/git/blobs/${HAMMOND_DIARY_SHA}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(HAMMOND_DIARY_CONTENT, 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  return { fetchImpl, blobUrls };
+}
+
+test('Hammond 5e/6b brief injects diary metadata from the CN window without quoting prose', async () => {
+  let receivedArgs;
+  const { fetchImpl, blobUrls } = hammondFetchWithDiary();
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'Hammond, monthly three-way brief',
+    priorAgentSlug: 'hammond'
+  })));
+
+  assert.match(receivedArgs.system, /Weekend collapse/);
+  assert.doesNotMatch(receivedArgs.system, /SECRET PROSE/);
+  assert.ok(blobUrls.some(url => url.includes(HAMMOND_DIARY_SHA)));
+});
+
+test('ordinary Hammond turns do not inject diary metadata and fetch the same CN blobs', async () => {
+  let receivedArgs;
+  const { fetchImpl, blobUrls } = hammondFetchWithDiary();
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'Hammond, what should I focus on?',
+    priorAgentSlug: 'hammond'
+  })));
+
+  assert.doesNotMatch(receivedArgs.system, /Diary \(metadata only/);
+  assert.doesNotMatch(receivedArgs.system, /Weekend collapse/);
+  assert.ok(blobUrls.some(url => url.includes(HAMMOND_DIARY_SHA)), 'CN window still reads the mind blob');
+});

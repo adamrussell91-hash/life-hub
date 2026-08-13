@@ -399,5 +399,14 @@ Verified on 2026-08-13 (local only — do not push unless asked). Merged `featur
 - **Deviations:** 5e/6b protocol-only (no extra Hammond diary-blob window); leave-flush / transcripts not built.
 - `npm test`: 1049 passed, 0 failed. `npm run validate:fixtures`: 5/5 valid.
 
+## Phase 37: Mind leave-flush and Hammond 5e/6b briefs — Complete
+
+Verified on 2026-08-13 (local only — do not push unless asked). Spec: `docs/superpowers/specs/2026-08-13-mind-leave-flush-and-briefs-design.md`. Shell cache bumped to `life-hub-shell-v72`.
+
+- Hammond 5e/6b turns inject diary metadata + `system_note` from the existing 30-day CN event window. No extra GitHub blob read. Ordinary Hammond turns stay path dates + silence + insights.
+- Vera leave-flush: hidden close turn on New Chat, switching away from Vera, overlay close, or leaving the Chat section. Skips if no Vera reply this thread or a `mind_session` already saved. Navigating overlay → Chat does not flush.
+- Thin data: digest is empty when there is nothing to summarise; protocol still refuses to invent a season.
+- `npm test`: 1064 passed, 0 failed. `npm run validate:fixtures`: 5/5 valid.
+
 ## Next Phase: sleep·heart on Body / polish
 

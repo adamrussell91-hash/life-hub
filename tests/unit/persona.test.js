@@ -520,6 +520,28 @@ test('hammond prompt includes silence flag and not diary excerpt', () => {
   assert.doesNotMatch(prompt, /SECRET/);
 });
 
+test('hammond prompt includes hammondDiaryDigest when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    hammondDiaryDigest: 'Diary (metadata only — do not quote prose):\n2026-08-10: mood low'
+  });
+  assert.match(prompt, /Diary \(metadata only/);
+  assert.match(prompt, /mood low/);
+});
+
+test('hammond prompt omits diary digest when hammondDiaryDigest is empty', () => {
+  const prompt = buildSystemPrompt({ slug: 'hammond', hammondDiaryDigest: '' });
+  assert.doesNotMatch(prompt, /Diary \(metadata only/);
+});
+
+test('non-hammond prompts never include hammondDiaryDigest', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    hammondDiaryDigest: 'Diary leak'
+  });
+  assert.doesNotMatch(prompt, /Diary leak/);
+});
+
 test('brisket prompt never receives mind diary digest', () => {
   const prompt = buildSystemPrompt({
     slug: 'brisket',

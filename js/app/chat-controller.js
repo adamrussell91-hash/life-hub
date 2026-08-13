@@ -24,6 +24,7 @@ const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it 
 const EMPTY_TURN_RECOVERY = 'That reply got cut off before it finished (usually a timeout while looking things up). Send the same message again and I’ll continue.';
 const CANCEL_AUDIT_RE = /cancel audit|stop audit/i;
 const SKIP_INTAKE_RE = /skip intake|continue audit|\bgo on\b/i;
+export const VERA_SESSION_FLUSH_MESSAGE = "That's enough for today — record the session if there is one.";
 
 // FakeElement (used in unit tests) only models `className` as a plain string, so
 // classList is used when real DOM elements provide it and this string fallback
@@ -62,6 +63,9 @@ export function createChatController({
   let pinnedAgentSlug = null;
   let activeAbort = null;
   let auditSession = resumeAuditSession(storage);
+  let savedMindSessionThisThread = false;
+  let flushAttempted = false;
+  let flushInFlight = null;
 
   function clearAuditSession() {
     auditSession = null;
@@ -131,8 +135,7 @@ export function createChatController({
     return getDefaultAgentSlug?.();
   }
 
-  function selectAgent(slug) {
-    if (!slug) return;
+  function applySelectAgent(slug) {
     if (slug !== 'hammond') clearAuditSession();
     pinnedAgentSlug = slug;
     lastAgentSlug = slug;
@@ -142,6 +145,16 @@ export function createChatController({
       selectedSlug: slug,
       onSelect: selectAgent
     });
+  }
+
+  function selectAgent(slug) {
+    if (!slug) return Promise.resolve();
+    const leavingVera = slug !== 'vera' && (pinnedAgentSlug === 'vera' || lastAgentSlug === 'vera');
+    if (leavingVera && shouldFlushVeraSession()) {
+      return flushVeraSession().then(() => applySelectAgent(slug));
+    }
+    applySelectAgent(slug);
+    return Promise.resolve();
   }
 
   // A stream "ending" (real text, a proposal, a rejection, or an error/abort) is
@@ -183,6 +196,55 @@ export function createChatController({
     });
   }
 
+  function talkingToVera() {
+    return (pinnedAgentSlug || lastAgentSlug) === 'vera';
+  }
+
+  function shouldFlushVeraSession() {
+    if (flushAttempted) return false;
+    if (!talkingToVera()) return false;
+    if (savedMindSessionThisThread) return false;
+    if (!transcript.some(entry => entry.role === 'assistant')) return false;
+    return true;
+  }
+
+  async function waitUntilIdle() {
+    while (sending) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+  }
+
+  async function flushVeraSession() {
+    if (flushInFlight) return flushInFlight;
+    if (!shouldFlushVeraSession()) return;
+    flushAttempted = true;
+    flushInFlight = send(VERA_SESSION_FLUSH_MESSAGE, { hiddenUser: true }).finally(() => {
+      flushInFlight = null;
+    });
+    return flushInFlight;
+  }
+
+  function resetThread() {
+    transcript = [];
+    savedMindSessionThisThread = false;
+    flushAttempted = false;
+    clearAuditSession();
+    lastAgentSlug = pinnedAgentSlug;
+    lastAgentAt = pinnedAgentSlug ? now() : 0;
+    sending = false;
+    setChatBusy(root, false);
+    showChatError(root, '');
+    const list = root.querySelector('#chat-messages');
+    list?.replaceChildren?.();
+    const slug = stickyAgentSlug();
+    if (slug) applyAgentAccent(slug);
+    renderAgentPicker(root, {
+      selectedSlug: slug ?? null,
+      onSelect: selectAgent
+    });
+    clearUnread();
+  }
+
   function bindForm() {
     const form = root.querySelector('#chat-form');
     if (!form || form.dataset.bound === '1') return;
@@ -201,39 +263,38 @@ export function createChatController({
     const button = root.querySelector('#chat-new');
     if (!button || button.dataset.bound === '1') return;
     button.dataset.bound = '1';
-    button.addEventListener('click', () => startNewChat());
+    button.addEventListener('click', () => {
+      void startNewChat();
+    });
   }
 
   // Hard-reset the visible thread and API memory, but keep whoever Adam pinned
   // so the next message still goes to the same agent with the same accent.
   function startNewChat() {
+    if (flushInFlight) {
+      return flushInFlight.finally(() => {
+        resetThread();
+      });
+    }
     if (activeAbort) {
       try {
         activeAbort.abort('new-chat');
       } catch {
         /* ignore */
       }
-      activeAbort = null;
     }
-    transcript = [];
-    clearAuditSession();
-    lastAgentSlug = pinnedAgentSlug;
-    lastAgentAt = pinnedAgentSlug ? now() : 0;
-    sending = false;
-    setChatBusy(root, false);
-    showChatError(root, '');
-    const list = root.querySelector('#chat-messages');
-    list?.replaceChildren?.();
-    const slug = stickyAgentSlug();
-    if (slug) applyAgentAccent(slug);
-    renderAgentPicker(root, {
-      selectedSlug: slug ?? null,
-      onSelect: selectAgent
-    });
-    clearUnread();
+    if (!shouldFlushVeraSession()) {
+      resetThread();
+      return Promise.resolve();
+    }
+    return waitUntilIdle()
+      .then(() => flushVeraSession())
+      .finally(() => {
+        resetThread();
+      });
   }
 
-  async function send(message) {
+  async function send(message, { hiddenUser = false } = {}) {
     sending = true;
     setChatBusy(root, true);
     showChatError(root, '');
@@ -244,11 +305,15 @@ export function createChatController({
     let sawGovernanceLogAppended = false;
     const history = recentHistory();
     const priorAgentSlug = stickyAgentSlug();
-    if (CANCEL_AUDIT_RE.test(message)) clearAuditSession();
-    maybeStartAuditSession(message);
-    const sessionForSend = auditSession && talkingToHammond(message) ? auditSession : undefined;
-    remember('user', message);
-    appendMessage(root, { role: 'user', text: message });
+    if (!hiddenUser) {
+      if (CANCEL_AUDIT_RE.test(message)) clearAuditSession();
+      maybeStartAuditSession(message);
+    }
+    const sessionForSend = !hiddenUser && auditSession && talkingToHammond(message) ? auditSession : undefined;
+    if (!hiddenUser) {
+      remember('user', message);
+      appendMessage(root, { role: 'user', text: message });
+    }
 
     let assistantSlug = stickyAgentSlug();
     let assistantBubble = null;
@@ -257,7 +322,7 @@ export function createChatController({
     let workingBubble = appendMessage(root, {
       role: 'assistant',
       agentSlug: assistantSlug,
-      text: 'On it…'
+      text: hiddenUser ? 'Wrapping up…' : 'On it…'
     });
     addStatusClass(workingBubble);
     const abort = new AbortController();
@@ -364,6 +429,7 @@ export function createChatController({
           gotUsefulOutput = true;
           clearWorkingBubble();
           endTextTurn();
+          if (event.record?.type === 'mind_session') savedMindSessionThisThread = true;
           appendRecordSaved(root, {
             summary: event.summary,
             agentSlug: assistantSlug
@@ -427,14 +493,18 @@ export function createChatController({
         appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text: LIBRARY_SAVE_NUDGE_TEXT });
       }
       if (!turnSignaled) {
-        turnSignaled = true;
-        clearWorkingBubble();
-        appendMessage(root, {
-          role: 'assistant',
-          agentSlug: assistantSlug,
-          text: EMPTY_TURN_RECOVERY
-        });
-      } else if (gotUsefulOutput) {
+        if (hiddenUser) {
+          clearWorkingBubble();
+        } else {
+          turnSignaled = true;
+          clearWorkingBubble();
+          appendMessage(root, {
+            role: 'assistant',
+            agentSlug: assistantSlug,
+            text: EMPTY_TURN_RECOVERY
+          });
+        }
+      } else if (gotUsefulOutput && !hiddenUser) {
         advanceAuditSession(message, { governanceLogAppended: sawGovernanceLogAppended });
       }
     } catch (error) {
@@ -454,7 +524,7 @@ export function createChatController({
       clearWorkingBubble();
       sending = false;
       setChatBusy(root, false);
-      if (turnSignaled) maybeMarkUnread();
+      if (turnSignaled && !hiddenUser) maybeMarkUnread();
     }
   }
 
@@ -561,6 +631,7 @@ export function createChatController({
     send,
     selectAgent,
     startNewChat,
+    flushVeraSession,
     startCentralNodeAudit,
     syncAccent,
     getSelectedAgentSlug: () => stickyAgentSlug() ?? null,

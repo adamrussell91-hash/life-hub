@@ -69,6 +69,7 @@ export function createAppController(dependencies) {
     chatSelectAgent,
     chatSyncAccent,
     chatStartCentralNodeAudit,
+    chatFlushVeraSession,
     buildCentralNodeModel,
     renderCentralNode,
     renderGovernance,
@@ -540,6 +541,7 @@ export function createAppController(dependencies) {
   function toggleSectionChat(slotSelector, agentSlug) {
     if (!chatPanel) return;
     if (chatPanel.isOpen()) {
+      void chatFlushVeraSession?.();
       chatPanel.close();
       return;
     }
@@ -587,6 +589,8 @@ export function createAppController(dependencies) {
 
   function showSection(name) {
     closeMoreSheet();
+    const leavingChatSurface = (chatPanel?.isOpen() || currentSection === 'chat') && name !== 'chat';
+    if (leavingChatSurface) void chatFlushVeraSession?.();
     // Overlay chat lives inside a section host — leave it cleanly on any nav change
     // so the next FAB open isn't stuck in a half-closed toggle state.
     if (chatPanel?.isOpen()) chatPanel.close();
