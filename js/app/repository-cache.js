@@ -8,16 +8,24 @@ export function createRepositoryCache(cacheStorage) {
     throw new TypeError('Cache Storage is unavailable');
   }
 
+  let legacyCleared = false;
+
   async function open() {
-    await cacheStorage.delete(LEGACY_CACHE_NAME);
+    if (!legacyCleared) {
+      await cacheStorage.delete(LEGACY_CACHE_NAME);
+      legacyCleared = true;
+    }
     return cacheStorage.open(CACHE_NAME);
   }
 
-  async function readBlob(sha) {
+  async function matchBlob(cache, sha) {
     if (!/^[0-9a-f]{40}$/.test(sha)) return null;
-    const cache = await open();
     const response = await cache.match(BLOB_PREFIX + sha);
     return response ? response.json() : null;
+  }
+
+  async function readBlob(sha) {
+    return matchBlob(await open(), sha);
   }
 
   return {
@@ -30,7 +38,7 @@ export function createRepositoryCache(cacheStorage) {
       const record = await response.json();
       const files = [];
       for (const entry of record.manifest.files) {
-        const blob = await readBlob(entry.sha);
+        const blob = await matchBlob(cache, entry.sha);
         if (!blob || typeof blob.content !== 'string') return null;
         files.push(blob);
       }
@@ -54,7 +62,10 @@ export function createRepositoryCache(cacheStorage) {
       return Promise.all([
         cacheStorage.delete(CACHE_NAME),
         cacheStorage.delete(LEGACY_CACHE_NAME)
-      ]).then(results => results.some(Boolean));
+      ]).then(results => {
+        legacyCleared = false;
+        return results.some(Boolean);
+      });
     }
   };
 }
