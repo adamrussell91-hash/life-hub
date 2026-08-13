@@ -86,6 +86,7 @@ class FakeDocument extends EventTarget {
       ['#fitness-chat-button', new FakeElement()],
       ['#central-node-dashboard', new FakeElement({ hidden: true })],
       ['#central-node-chat-button', new FakeElement()],
+      ['#body-bloods-dashboard', new FakeElement({ hidden: true })],
       ['#unavailable-panel', new FakeElement({ hidden: true })],
       ['#retry-button', new FakeElement()]
     ]);
