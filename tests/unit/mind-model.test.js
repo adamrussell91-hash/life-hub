@@ -72,3 +72,12 @@ test('buildMindModel includes an ambient observation', () => {
   assert.match(model.ambient, /diary/i);
   assert.match(model.ambient, /session/i);
 });
+
+test('ambient omits Mood scores held when there are fewer than two mood points', () => {
+  const model = buildMindModel({
+    events: [],
+    date: '2026-08-13',
+    range: 'monthly'
+  });
+  assert.doesNotMatch(model.ambient, /Mood scores held/);
+});
