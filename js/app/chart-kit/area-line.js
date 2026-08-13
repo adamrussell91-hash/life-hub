@@ -50,26 +50,28 @@ export function buildAreaLine(
     valueKey = 'value',
     rollingAverage = 0,
     guideValue = null,
-    yDomain = 'zero'
+    yDomain = 'zero',
+    includeValues = []
   } = {}
 ) {
   const values = series.map(day => Number(day[valueKey]) || 0);
   const means = rollingAverage > 0 ? rollingMeans(values, rollingAverage) : [];
   const guide = guideValue == null || !Number.isFinite(Number(guideValue)) ? null : Number(guideValue);
+  const extras = (includeValues ?? []).map(Number).filter(Number.isFinite);
   const stepX = series.length > 1 ? (width - padding * 2) / (series.length - 1) : 0;
   const plotBottom = height - paddingBottom;
 
   let scaleY;
   if (yDomain === 'padded') {
-    const finite = values.filter(Number.isFinite);
-    const rawMin = Math.min(...finite);
-    const rawMax = Math.max(...finite);
+    const finite = [...values.filter(Number.isFinite), ...extras];
+    const rawMin = finite.length ? Math.min(...finite) : 0;
+    const rawMax = finite.length ? Math.max(...finite) : 1;
     const pad = Math.max((rawMax - rawMin) * 0.15, rawMax === rawMin ? 1 : 0);
     const min = rawMin - pad;
     const max = rawMax + pad;
     scaleY = value => plotBottom - ((value - min) / (max - min)) * (plotBottom - padding);
   } else {
-    const max = Math.max(1, ...values, ...means, guide ?? 0);
+    const max = Math.max(1, ...values, ...means, guide ?? 0, ...extras);
     scaleY = value => plotBottom - (value / max) * (plotBottom - padding);
   }
 
@@ -96,6 +98,7 @@ export function buildAreaLine(
     areaPoints,
     linePath,
     areaPath,
+    scaleY,
     dayLabels: points.map(({ date, x }) => ({ date, x })),
     guideY: guide == null ? null : scaleY(guide)
   };
