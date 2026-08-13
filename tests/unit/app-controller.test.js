@@ -331,6 +331,9 @@ function harness(options = {}) {
     chatClearUnread: () => {
       calls.chatClearUnreads = (calls.chatClearUnreads ?? 0) + 1;
     },
+    chatFlushVeraSession: () => {
+      calls.chatFlushes = (calls.chatFlushes ?? 0) + 1;
+    },
     chatPanel: {
       opens: [],
       closes: 0,
@@ -936,6 +939,42 @@ test('clicking the floating chat button again closes an already-open panel', asy
 
   assert.equal(state.chatPanelCalls.opens.length, 1);
   assert.equal(state.chatPanelCalls.closes, 1);
+});
+
+test('closing an overlay chat panel flushes a Vera session', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+  const button = state.root.querySelector('#nutrition-chat-button');
+  button.dispatchEvent(new Event('click'));
+  assert.equal(state.calls.chatFlushes ?? 0, 0);
+
+  button.dispatchEvent(new Event('click'));
+
+  assert.equal(state.calls.chatFlushes, 1);
+});
+
+test('leaving the Chat section flushes a Vera session', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.chatNavigation.dispatchEvent(new Event('click'));
+  assert.equal(state.calls.chatFlushes ?? 0, 0);
+
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+
+  assert.equal(state.calls.chatFlushes, 1);
+});
+
+test('navigating from an overlay to the Chat section does not flush', async () => {
+  const state = harness();
+  await state.controller.start();
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+  state.root.querySelector('#nutrition-chat-button').dispatchEvent(new Event('click'));
+
+  state.root.chatNavigation.dispatchEvent(new Event('click'));
+
+  assert.equal(state.calls.chatFlushes ?? 0, 0);
+  assert.equal(state.controller.getCurrentSection(), 'chat');
 });
 
 test('navigating to Chat closes an open overlay panel and returns the chat view to its home slot', async () => {

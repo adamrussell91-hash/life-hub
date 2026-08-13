@@ -1591,3 +1591,117 @@ test('central_node_patched appends a success chat line without using the error b
   );
   assert.ok(success, 'expected an assistant success line for the auto CN patch');
 });
+
+const VERA_FLUSH = "That's enough for today — record the session if there is one.";
+
+function veraChatApi(sendCalls, { onSend } = {}) {
+  return {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      if (onSend) await onSend(message, options);
+      yield { type: 'agent', slug: 'vera' };
+      yield { type: 'text', delta: 'What came up today?' };
+      yield { type: 'done' };
+    }
+  };
+}
+
+test('New Chat after a Vera reply sends a hidden flush then clears the thread', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const controller = createChatController({
+    root,
+    chatApi: veraChatApi(sendCalls),
+    getDefaultAgentSlug: () => 'hammond'
+  });
+
+  controller.selectAgent('vera');
+  await controller.send('I am tired');
+  assert.equal(sendCalls.length, 1);
+
+  await controller.startNewChat();
+
+  assert.equal(sendCalls.length, 2);
+  assert.equal(sendCalls[1].message, VERA_FLUSH);
+  assert.deepEqual(sendCalls[1].history, [
+    { role: 'user', content: 'I am tired' },
+    { role: 'assistant', content: 'What came up today?' }
+  ]);
+  assert.equal(sendCalls[1].priorAgentSlug, 'vera');
+  assert.equal(messageBubbles(root).length, 0);
+  assert.equal(
+    messageBubbles(root).some(bubble => bubbleText(bubble).includes(VERA_FLUSH)),
+    false
+  );
+  assert.equal(controller.getSelectedAgentSlug(), 'vera');
+});
+
+test('New Chat does not flush Penelope threads', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'penelope' };
+      yield { type: 'text', delta: 'Tell me more.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  controller.selectAgent('penelope');
+  await controller.send('rough morning');
+  controller.startNewChat();
+  assert.equal(sendCalls.length, 1);
+  assert.equal(messageBubbles(root).length, 0);
+});
+
+test('New Chat skips flush after mind_session record_saved this thread', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'vera' };
+      yield {
+        type: 'record_saved',
+        summary: 'Logged a mind session.',
+        record: { type: 'mind_session' }
+      };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  controller.selectAgent('vera');
+  await controller.send('that is enough');
+  await controller.startNewChat();
+  assert.equal(sendCalls.length, 1);
+  assert.equal(sendCalls[0].message, 'that is enough');
+});
+
+test('New Chat skips flush when Vera was pinned but never replied', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const controller = createChatController({
+    root,
+    chatApi: veraChatApi(sendCalls)
+  });
+  controller.selectAgent('vera');
+  await controller.startNewChat();
+  assert.equal(sendCalls.length, 0);
+});
+
+test('switching from Vera to Penelope flushes then pins Penelope', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const controller = createChatController({
+    root,
+    chatApi: veraChatApi(sendCalls),
+    getDefaultAgentSlug: () => 'hammond'
+  });
+  controller.selectAgent('vera');
+  await controller.send('I am tired');
+  await controller.selectAgent('penelope');
+  assert.equal(sendCalls.length, 2);
+  assert.equal(sendCalls[1].message, VERA_FLUSH);
+  assert.equal(controller.getSelectedAgentSlug(), 'penelope');
+});

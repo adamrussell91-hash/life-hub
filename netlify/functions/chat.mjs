@@ -111,7 +111,8 @@ import {
   summarizeMindSessionsForPrompt,
   simultaneousSilenceFlag,
   divergenceLine,
-  excerptOnThisDay
+  excerptOnThisDay,
+  hammondDiaryDigestForTurn
 } from './_shared/mind-digest.mjs';
 import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
@@ -280,6 +281,7 @@ export function createChatHandler({
         let bodyState = '';
         let sessionAdherenceDays = null;
         let mindDiaryDigest = '';
+        let hammondDiaryDigest = '';
         let mindSessionDigest = '';
         let mindSilence = '';
         let mindDivergence = '';
@@ -483,6 +485,12 @@ export function createChatHandler({
               centralNodeMarkdown,
               date: today
             }));
+            hammondDiaryDigest = hammondDiaryDigestForTurn({
+              slug,
+              message: parsed.message,
+              events: cnEvents,
+              today
+            });
           }
 
           if (slug === 'vera' || slug === 'penelope' || slug === 'hammond') {
@@ -597,6 +605,7 @@ export function createChatHandler({
           bodyState,
           daysSinceLastSession: sessionAdherenceDays,
           mindDiaryDigest,
+          hammondDiaryDigest,
           mindSessionDigest,
           mindSilence,
           mindDivergence,

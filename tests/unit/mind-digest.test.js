@@ -9,7 +9,9 @@ import {
   simultaneousSilenceFlag,
   divergenceLine,
   excerptOnThisDay,
-  selectMindEntries
+  selectMindEntries,
+  isHammondMindBriefTurn,
+  hammondDiaryDigestForTurn
 } from '../../netlify/functions/_shared/mind-digest.mjs';
 
 const TODAY = '2026-08-13';
@@ -134,4 +136,35 @@ test('divergenceLine hypothesizes when diary and session moods do not overlap', 
   const text = divergenceLine(events, TODAY);
   assert.match(text, /Hypothesis only/);
   assert.match(text, /did not overlap/);
+});
+
+test('isHammondMindBriefTurn matches 5e/6b phrases and ignores audits', () => {
+  assert.equal(isHammondMindBriefTurn('Hammond, monthly three-way brief'), true);
+  assert.equal(isHammondMindBriefTurn('run a quarterly look-back'), true);
+  assert.equal(isHammondMindBriefTurn('pattern synthesis please'), true);
+  assert.equal(isHammondMindBriefTurn('two-voice retrospective'), true);
+  assert.equal(isHammondMindBriefTurn('Hammond, what should I focus on?'), false);
+  assert.equal(isHammondMindBriefTurn('monthly audit'), false);
+  assert.equal(isHammondMindBriefTurn(''), false);
+});
+
+test('hammondDiaryDigestForTurn is empty unless Hammond and a brief phrase', () => {
+  const events = [{
+    record: {
+      type: 'diary', date: '2026-08-10', mood: 'low',
+      system_note: 'Weekend collapse'
+    },
+    body: 'SECRET PROSE'
+  }];
+  assert.equal(hammondDiaryDigestForTurn({
+    slug: 'hammond', message: 'focus today', events, today: TODAY
+  }), '');
+  const brief = hammondDiaryDigestForTurn({
+    slug: 'hammond', message: 'monthly three-way brief', events, today: TODAY
+  });
+  assert.match(brief, /Weekend collapse/);
+  assert.doesNotMatch(brief, /SECRET PROSE/);
+  assert.equal(hammondDiaryDigestForTurn({
+    slug: 'vera', message: 'monthly three-way brief', events, today: TODAY
+  }), '');
 });
