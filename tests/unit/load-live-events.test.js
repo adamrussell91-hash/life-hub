@@ -48,11 +48,12 @@ test('loads the current Sydney date window through existing parsers and exact Ho
     await readFile(new URL('../../config/targets.yml', import.meta.url), 'utf8')
   ));
   const calls = [];
+  const date = '2026-07-30';
   const sync = async options => {
     calls.push(options);
     for (const candidate of files) assert.deepEqual(options.validateFile(candidate), { valid: true });
     return {
-      files,
+      files: options.to === date ? files : [],
       warnings: [],
       commitSha: 'c'.repeat(40),
       manifestId: 'range',
@@ -61,14 +62,14 @@ test('loads the current Sydney date window through existing parsers and exact Ho
     };
   };
 
-  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-07-30' });
+  const result = await loadLiveEvents({ sync, loadYaml: load, date });
   const model = buildHomeModel({ ...result, date: '2026-07-30' });
 
   assert.equal(calls.length, 2);
-  assert.equal(calls[0].from, '2026-06-30');
+  assert.equal(calls[0].from, '2026-07-24');
   assert.equal(calls[0].to, '2026-07-30');
-  assert.equal(calls[1].from, '2026-04-01');
-  assert.equal(calls[1].to, '2026-07-30');
+  assert.equal(calls[1].from, '2026-06-24');
+  assert.equal(calls[1].to, '2026-07-23');
   assert.equal(result.events.length, 4);
   assert.equal(result.commitSha, 'c'.repeat(40));
   assert.equal(result.changed, true);
@@ -88,7 +89,18 @@ test('returns stable warnings for invalid Markdown and target configuration', as
     raw('data/fitness/2026/07/2026-07-30-workout.md', 'not frontmatter'),
     raw('config/agents.yml', 'agents: [invalid')
   ];
+  let calls = 0;
   const sync = async ({ validateFile }) => {
+    calls += 1;
+    if (calls > 1) {
+      return {
+        files: [],
+        warnings: [],
+        commitSha: 'c'.repeat(40),
+        changed: false,
+        freshness: 'fallback'
+      };
+    }
     assert.equal(validateFile(files[0]).valid, false);
     assert.equal(validateFile(files[1]).valid, false);
     assert.deepEqual(validateFile(files[2]), { valid: false, code: 'invalid_agents' });
@@ -115,106 +127,75 @@ test('returns stable warnings for invalid Markdown and target configuration', as
   ]);
 });
 
-test('widens lookback when a body event sits on the window edge without any workout streak', async () => {
+test('first sync is seven inclusive days and the next slice does not overlap', async () => {
   const calls = [];
   const date = '2026-08-01';
-  const initialFrom = '2026-07-02';
-  const initialFiles = [
-    bodyWeight(initialFrom, 82),
-    bodyWeight(date, 80)
-  ];
+  const weekFiles = [bodyWeight('2026-07-28', 80), bodyWeight(date, 79)];
   const olderFiles = [bodyWeight('2026-07-01', 83)];
   const sync = async options => {
-    calls.push(options);
+    calls.push({ from: options.from, to: options.to });
+    const files = options.to === date ? weekFiles : olderFiles;
     return {
-      files: calls.length === 1 ? initialFiles : olderFiles,
-      warnings: [],
-      commitSha: 'c'.repeat(40),
-      manifestId: `range-${calls.length}`,
-      changed: true,
-      freshness: 'confirmed'
+      files, warnings: [], commitSha: 'c'.repeat(40),
+      manifestId: `range-${calls.length}`, changed: true, freshness: 'confirmed'
     };
   };
+  const partials = [];
+  const result = await loadLiveEvents({
+    sync, loadYaml: load, date, onPartial: snapshot => partials.push(snapshot)
+  });
 
-  const result = await loadLiveEvents({ sync, loadYaml: load, date });
-
-  assert.deepEqual(calls.map(({ from, to }) => ({ from, to })), [
-    { from: '2026-07-02', to: '2026-08-01' },
-    { from: '2026-04-03', to: '2026-08-01' },
-    { from: '2026-01-03', to: '2026-08-01' }
-  ]);
-  assert.ok(calls.every(call => daysBetween(call.from, call.to) < 366));
-  assert.equal(result.events.length, 3);
-  assert.ok(result.events.every(event => event.record.type === 'weight'));
+  assert.deepEqual(calls[0], { from: '2026-07-26', to: '2026-08-01' });
+  assert.deepEqual(calls[1], { from: '2026-06-26', to: '2026-07-25' });
+  assert.ok(calls.every(call => call.to < calls[0].from || call === calls[0] || call.to === date));
+  assert.equal(calls[1].to, '2026-07-25');
+  assert.ok(partials.length >= 1);
+  assert.equal(partials[0].events.every(event => event.record.date >= '2026-07-26'), true);
+  assert.ok(result.events.some(event => event.record.date === '2026-07-01'));
 });
 
-test('widens lookback for sparse history when events sit inside the window but not on the edge day', async () => {
-  const calls = [];
+test('onPartial fires after the first window before older files exist', async () => {
   const date = '2026-08-01';
-  // Initial window is 2026-07-02..2026-08-01 — events exist inside it, but none on 2026-07-02.
-  const initialFiles = [
-    bodyWeight('2026-07-15', 82),
-    bodyWeight(date, 80)
-  ];
-  const olderByRange = new Map([
-    ['2026-04-03\0' + date, [bodyWeight('2026-06-01', 83)]],
-    ['2026-01-03\0' + date, [bodyWeight('2026-03-01', 84)]]
-  ]);
-  const sync = async options => {
-    calls.push(options);
-    const key = `${options.from}\0${options.to}`;
-    const files = calls.length === 1 ? initialFiles : (olderByRange.get(key) ?? []);
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const sync = async ({ from, to }) => {
+    if (to !== date) await gate;
     return {
-      files,
-      warnings: [],
-      commitSha: 'c'.repeat(40),
-      manifestId: `range-${calls.length}`,
-      changed: true,
-      freshness: 'confirmed'
+      files: [bodyWeight(to === date ? date : '2026-07-01', 80)],
+      warnings: [], commitSha: 'c'.repeat(40), manifestId: `${from}`,
+      changed: true, freshness: 'confirmed'
     };
   };
-
-  const result = await loadLiveEvents({ sync, loadYaml: load, date });
-
-  assert.ok(calls.length >= 2, 'lookback must widen without an exact edge-day event');
-  assert.deepEqual(calls.slice(0, 2).map(({ from, to }) => ({ from, to })), [
-    { from: '2026-07-02', to: '2026-08-01' },
-    { from: '2026-04-03', to: '2026-08-01' }
-  ]);
-  assert.ok(result.events.some(event => event.record.date === '2026-06-01'));
-  assert.ok(result.events.every(event => event.record.type === 'weight'));
+  const partials = [];
+  const done = loadLiveEvents({
+    sync, loadYaml: load, date,
+    onPartial: snapshot => partials.push(snapshot.events.map(event => event.record.date))
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(partials[0], [date]);
+  release();
+  await done;
 });
 
-test('widens a boundary-reaching history edge by ninety days within the bounded range', async () => {
-  const calls = [];
-  const initialFrom = '2026-07-02';
+test('a config-only older slice stops extension', async () => {
   const date = '2026-08-01';
-  const initialFiles = [];
-  for (let key = initialFrom; key <= date; key = addCalendarDays(key, 1)) {
-    initialFiles.push(workout(key));
-  }
-  const olderFiles = [workout('2026-07-01')];
+  const calls = [];
   const sync = async options => {
     calls.push(options);
+    const files = options.to === date
+      ? [bodyWeight(date, 80)]
+      : [raw('config/targets.yml', 'target_sets: []\n')];
     return {
-      files: calls.length === 1 ? initialFiles : olderFiles,
-      warnings: [],
-      commitSha: 'c'.repeat(40),
-      manifestId: `range-${calls.length}`,
-      changed: true,
-      freshness: 'confirmed'
+      files, warnings: [], commitSha: 'c'.repeat(40),
+      manifestId: `r-${calls.length}`, changed: true, freshness: 'confirmed'
     };
   };
-
-  const result = await loadLiveEvents({ sync, loadYaml: load, date });
-
-  assert.deepEqual(calls.map(({ from, to }) => ({ from, to })), [
-    { from: '2026-07-02', to: '2026-08-01' },
-    { from: '2026-04-03', to: '2026-08-01' },
-    { from: '2026-01-03', to: '2026-08-01' }
-  ]);
-  assert.ok(calls.every(call => daysBetween(call.from, call.to) < 366));
-  assert.equal(result.events.length, 32);
+  await loadLiveEvents({ sync, loadYaml: load, date });
+  assert.equal(calls.length, 2);
+  assert.deepEqual(
+    { from: calls[1].from, to: calls[1].to },
+    { from: '2026-06-26', to: '2026-07-25' }
+  );
 });
 
 test('repeated boundary expansion never sends an individual range over 366 days', async () => {
@@ -243,9 +224,9 @@ test('repeated boundary expansion never sends an individual range over 366 days'
 
   assert.equal(calls.length, 6);
   assert.ok(calls.every(call => daysBetween(call.from, call.to) < 366));
-  assert.deepEqual(calls[1], { from: '2026-04-03', to: '2026-08-01' });
-  assert.deepEqual(calls[4], { from: '2025-07-07', to: '2025-10-04' });
-  assert.deepEqual(calls[5], { from: '2025-04-08', to: '2025-10-04' });
+  assert.deepEqual(calls[0], { from: '2026-07-26', to: '2026-08-01' });
+  assert.deepEqual(calls[1], { from: '2026-06-26', to: '2026-07-25' });
+  assert.deepEqual(calls[5], { from: '2026-02-26', to: '2026-03-27' });
 });
 
 test('exact range snapshots restore a long streak offline across the disjoint-range boundary', async () => {

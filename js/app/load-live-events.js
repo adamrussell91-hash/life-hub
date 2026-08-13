@@ -6,11 +6,11 @@ const TARGETS_PATH = 'config/targets.yml';
 const AGENTS_PATH = 'config/agents.yml';
 const CENTRAL_NODE_PATH = 'central-node.md';
 const EVENT_PATH = /^data\/.+\.md$/;
-const INITIAL_LOOKBACK_DAYS = 30;
-const EXTENSION_DAYS = 90;
+const INITIAL_LOOKBACK_DAYS = 6;
+const EXTENSION_DAYS = 30;
 const MAX_LOOKBACK_DAYS = 1826;
 
-export async function loadLiveEvents({ sync, loadYaml, date }) {
+export async function loadLiveEvents({ sync, loadYaml, date, onPartial }) {
   if (typeof sync !== 'function' || typeof loadYaml !== 'function') {
     throw new TypeError('Live event dependencies are unavailable');
   }
@@ -19,57 +19,52 @@ export async function loadLiveEvents({ sync, loadYaml, date }) {
   let from = addCalendarDays(date, -INITIAL_LOOKBACK_DAYS);
   let to = date;
   let commitSha = null;
-  let priorBoundary = null;
   let changed = false;
   let freshness = 'confirmed';
   const filesByPath = new Map();
   const warnings = [];
 
-  while (true) {
-    const result = await sync({ from, to, validateFile: createValidator(loadYaml) });
+  const ingest = result => {
     commitSha = result.commitSha ?? commitSha;
     changed ||= result.changed === true;
     if (result.freshness === 'fallback') freshness = 'fallback';
     warnings.push(...(result.warnings ?? []));
+    for (const file of result.files ?? []) filesByPath.set(file.path, file);
+  };
 
-    for (const file of result.files ?? []) {
-      filesByPath.set(file.path, file);
-    }
+  const snapshot = () => {
+    const parsed = parseFiles([...filesByPath.values()], loadYaml);
+    return {
+      events: parsed.events,
+      targetsConfig: parsed.targetsConfig,
+      agentsConfig: parsed.agentsConfig,
+      centralNodeMarkdown: parsed.centralNodeMarkdown,
+      governanceLogMarkdown: parsed.governanceLogMarkdown,
+      warnings: [...warnings, ...parsed.warnings],
+      commitSha,
+      changed,
+      freshness
+    };
+  };
 
-    const batch = parseFiles(result.files ?? [], loadYaml);
-    // Start lookback whenever this window found any events (sparse history need not
-    // land on the exact `from` day). Keep extending only while later batches still
-    // return events older than the previous boundary.
-    const returnedOlderEvent = priorBoundary === null
-      ? batch.events.length > 0
-      : batch.events.some(event => event.record.date < priorBoundary);
-    if (
-      !returnedOlderEvent
-      || daysBetween(from, date) >= MAX_LOOKBACK_DAYS
-    ) break;
+  const first = await sync({ from, to, validateFile: createValidator(loadYaml) });
+  ingest(first);
+  await onPartial?.(snapshot());
 
+  while (true) {
+    const nextTo = addCalendarDays(from, -1);
     const nextFrom = addCalendarDays(from, -EXTENSION_DAYS);
-    priorBoundary = from;
-    if (daysBetween(nextFrom, to) < 366) {
-      from = nextFrom;
-    } else {
-      to = addCalendarDays(from, -1);
-      from = nextFrom;
-    }
+    if (daysBetween(nextFrom, date) >= MAX_LOOKBACK_DAYS) break;
+    from = nextFrom;
+    to = nextTo;
+    const result = await sync({ from, to, validateFile: createValidator(loadYaml) });
+    const batch = parseFiles(result.files ?? [], loadYaml);
+    ingest(result);
+    if (batch.events.length === 0) break;
+    await onPartial?.(snapshot());
   }
 
-  const parsed = parseFiles([...filesByPath.values()], loadYaml);
-  return {
-    events: parsed.events,
-    targetsConfig: parsed.targetsConfig,
-    agentsConfig: parsed.agentsConfig,
-    centralNodeMarkdown: parsed.centralNodeMarkdown,
-    governanceLogMarkdown: parsed.governanceLogMarkdown,
-    warnings: [...warnings, ...parsed.warnings],
-    commitSha,
-    changed,
-    freshness
-  };
+  return snapshot();
 }
 
 function createValidator(loadYaml) {
