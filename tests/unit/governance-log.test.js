@@ -149,3 +149,14 @@ test('oldestOpenGovernanceEntry picks the oldest unresolved entry', () => {
   assert.equal(oldest.dateKey, '2026-05-24');
   assert.equal(oldest.ageDays, 79);
 });
+
+test('Mind Insight is a valid governance entry type', () => {
+  const next = appendGovernanceEntry('', {
+    dateKey: '2026-08-13',
+    entryType: 'Mind Insight',
+    title: 'Weekend permission',
+    body: 'Exhaustion looking like chaos'
+  });
+  assert.match(next, /Mind Insight/);
+  assert.match(next, /Weekend permission/);
+});
