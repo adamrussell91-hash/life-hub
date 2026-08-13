@@ -608,6 +608,24 @@
           <button id="body-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Dr Sara Tonin">💬</button>
         </section>
 
+        <section id="body-bloods-dashboard" class="dashboard" aria-labelledby="bloods-heading" hidden>
+          <button type="button" id="bloods-back" class="bloods-back">← Body</button>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Body</p>
+              <h2 id="bloods-heading">Bloods</h2>
+            </div>
+          </div>
+          <div id="bloods-range-control" class="body-range" role="group" aria-label="Bloods time range">
+            <button type="button" data-bloods-range="monthly" aria-pressed="false">Month</button>
+            <button type="button" data-bloods-range="six_month" class="is-active" aria-pressed="true">6M</button>
+            <button type="button" data-bloods-range="year" aria-pressed="false">Year</button>
+            <button type="button" data-bloods-range="five_year" aria-pressed="false">5Y</button>
+          </div>
+          <div id="bloods-flags" class="bloods-flags" aria-live="polite"></div>
+          <div id="bloods-sections" class="bloods-sections"></div>
+        </section>
+
         <section id="mind-dashboard" class="dashboard" aria-labelledby="mind-heading" hidden>
           <div class="section-heading">
             <div>

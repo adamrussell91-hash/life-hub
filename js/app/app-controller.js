@@ -62,6 +62,8 @@ export function createAppController(dependencies) {
     buildBodyModel,
     renderBody,
     bodyController,
+    buildBloodsModel,
+    renderBloods,
     buildMindModel,
     renderMind,
     chatSelectAgent,
@@ -175,6 +177,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#body-chat-button'), 'click', () => {
     toggleSectionChat('#body-dashboard', BODY_AGENT_SLUG);
   });
+  bind(root.querySelector('#bloods-back'), 'click', () => showSection('body'));
   bind(root.querySelector('#central-node-chat-button'), 'click', () => {
     toggleSectionChat('#central-node-dashboard', CENTRAL_NODE_AGENT_SLUG);
   });
@@ -346,6 +349,7 @@ export function createAppController(dependencies) {
         if (currentSection === 'skincare') renderSkincareSection();
         if (currentSection === 'calendar') renderCalendarSection();
         if (currentSection === 'body') renderBodySection();
+        if (currentSection === 'body-bloods') renderBloodsSection();
         if (currentSection === 'mind') renderMindSection();
         if (currentSection === 'central-node') renderCentralNodeSection();
         // Renderers historically force-unhide their dashboards; refresh must not
@@ -513,6 +517,7 @@ export function createAppController(dependencies) {
     skincare: { eyebrow: 'Skincare', title: 'Skincare' },
     calendar: { eyebrow: 'Calendar', title: 'Calendar' },
     body: { eyebrow: 'Body', title: 'Body' },
+    'body-bloods': { eyebrow: 'Body', title: 'Bloods' },
     mind: { eyebrow: 'Mind', title: 'Mind' },
     'central-node': { eyebrow: 'Central Node', title: 'Central Node' }
   };
@@ -565,6 +570,7 @@ export function createAppController(dependencies) {
     const skincare = root.querySelector('#skincare-dashboard');
     const calendar = root.querySelector('#calendar-dashboard');
     const body = root.querySelector('#body-dashboard');
+    const bloods = root.querySelector('#body-bloods-dashboard');
     const mind = root.querySelector('#mind-dashboard');
     const centralNode = root.querySelector('#central-node-dashboard');
     if (home) home.hidden = name !== 'home';
@@ -573,6 +579,7 @@ export function createAppController(dependencies) {
     if (skincare) skincare.hidden = name !== 'skincare';
     if (calendar) calendar.hidden = name !== 'calendar';
     if (body) body.hidden = name !== 'body';
+    if (bloods) bloods.hidden = name !== 'body-bloods';
     if (mind) mind.hidden = name !== 'mind';
     if (centralNode) centralNode.hidden = name !== 'central-node';
     if (chat) chat.hidden = name !== 'chat';
@@ -598,12 +605,14 @@ export function createAppController(dependencies) {
     }
     if (name === 'calendar') renderCalendarSection();
     if (name === 'body') renderBodySection();
+    if (name === 'body-bloods') renderBloodsSection();
     if (name === 'mind') renderMindSection();
     if (name === 'central-node') renderCentralNodeSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const section = button.dataset.section;
       const active = section === name
-        || (section === 'more' && MORE_SECTIONS.has(name));
+        || (section === 'more' && MORE_SECTIONS.has(name))
+        || (section === 'body' && name === 'body-bloods');
       button.classList.toggle('is-active', active);
       if (active && section !== 'more') button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
@@ -769,10 +778,26 @@ export function createAppController(dependencies) {
         renderBodySection();
       },
       onLogWeight: bodyController?.onLogWeight,
-      onLogComposition: bodyController?.onLogComposition
+      onLogComposition: bodyController?.onLogComposition,
+      onViewBloods: () => showSection('body-bloods')
     });
     const button = root.querySelector('#body-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, BODY_AGENT_SLUG));
+  }
+
+  function renderBloodsSection() {
+    if (!latestResult || !buildBloodsModel || !renderBloods) return;
+    const model = buildBloodsModel({
+      events: latestResult.events,
+      date: latestResult.date,
+      range: bodyRange
+    });
+    renderBloods(root, model, {
+      onRangeChange: next => {
+        bodyRange = next;
+        renderBloodsSection();
+      }
+    });
   }
 
   function renderMindSection() {

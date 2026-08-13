@@ -2038,6 +2038,18 @@ main { max-width: 76rem; margin: 0 auto; }
   color: var(--high-sea);
   background: rgba(246, 134, 32, 0.14);
 }
+.bloods-entry {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  color: var(--wave);
+}
 .bloods-flags {
   display: flex;
   flex-wrap: wrap;

@@ -27,7 +27,8 @@ const LABEL_ANCHORS = {
 export function renderBody(root, model, {
   onRangeChange,
   onLogWeight,
-  onLogComposition
+  onLogComposition,
+  onViewBloods
 } = {}) {
   const dashboard = root.querySelector('#body-dashboard');
   if (!dashboard || !model) return;
@@ -67,6 +68,7 @@ export function renderBody(root, model, {
     host.append(sectionCard(root, model.tape, {
       kind: 'tape'
     }));
+    host.append(bloodsTile(root, onViewBloods));
   }
 
   dashboard.removeAttribute('hidden');
@@ -103,6 +105,15 @@ function sectionCard(root, section, hooks) {
     article.append(quickLog(root, section.id, hooks));
   }
   return article;
+}
+
+function bloodsTile(root, onViewBloods) {
+  const button = root.createElement('button');
+  button.type = 'button';
+  button.className = 'metric-card body-section bloods-entry';
+  button.textContent = 'View bloods →';
+  button.addEventListener('click', () => onViewBloods?.());
+  return button;
 }
 
 function emptyCopy(id) {

@@ -12,6 +12,7 @@ import {
 } from './app-controller.js';
 import { createBodyController } from './body-controller.js';
 import { buildBodyModel } from './body-model.js';
+import { buildBloodsModel } from './bloods-model.js';
 import { buildCentralNodeModel } from './central-node-model.js';
 import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
@@ -26,6 +27,7 @@ import { loadLiveEvents } from './load-live-events.js';
 import { buildMindModel } from './mind-model.js';
 import { buildNutritionModel } from './nutrition-model.js';
 import { renderBody } from './render-body.js';
+import { renderBloods } from './render-bloods.js';
 import { renderCentralNode } from './render-central-node.js';
 import { renderGovernance } from './render-governance.js';
 import { setChatUnread } from './render-chat.js';
@@ -140,6 +142,8 @@ controller = createAppController({
   buildBodyModel,
   renderBody,
   bodyController,
+  buildBloodsModel,
+  renderBloods,
   buildMindModel,
   renderMind,
   chatSelectAgent: slug => chatController?.selectAgent?.(slug),
