@@ -95,6 +95,7 @@ export function createAppController(dependencies) {
   let rendered = false;
   let latestResult = null;
   let lastPaintedKey = null;
+  let lastPaintedEventCount = null;
   let currentSection = 'home';
   let calendarSelectedDate = null;
   let calendarViewMonth = null;
@@ -310,6 +311,31 @@ export function createAppController(dependencies) {
       if (!isCurrentRefresh(version, signal) || !requireUnexpiredSession()) return;
       if (result === lastApplied) return;
       lastApplied = result;
+      const eventCount = result.events?.length ?? 0;
+      const lastCount = lastPaintedEventCount;
+      const shrinkUnchanged = rendered
+        && !force
+        && !manual
+        && result.changed !== true
+        && lastCount != null
+        && eventCount < lastCount;
+      if (shrinkUnchanged) {
+        if (!painted && result.freshness === 'confirmed') recordSuccess();
+        if (!painted) {
+          if (result.freshness === 'confirmed') {
+            confirmedPaint = true;
+            setStatus('Loading earlier history…');
+            hideProvider();
+            setAppState('ready');
+          } else {
+            restoreLastSuccess();
+            setAppState('stale');
+            if (manual) setStatus('Showing your last saved view.');
+          }
+          painted = true;
+        }
+        return;
+      }
       latestResult = { ...result, date };
       const viewKey = paintedViewKey(result);
       if (!rendered || force === true || result.changed === true || viewKey !== lastPaintedKey) {
@@ -329,6 +355,7 @@ export function createAppController(dependencies) {
           setStatus('Loading earlier history…');
         }
         lastPaintedKey = viewKey;
+        lastPaintedEventCount = eventCount;
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
       rendered = true;

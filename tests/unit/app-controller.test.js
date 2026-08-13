@@ -1138,6 +1138,50 @@ test('Home becomes ready after the first live window while a later slice is stil
   releaseReturn();
 });
 
+test('a later background refresh does not replace Home with a smaller week snapshot', async () => {
+  let releaseWeek;
+  const weekHeld = new Promise(resolve => { releaseWeek = resolve; });
+  const week = liveData({
+    changed: false,
+    events: [{ record: { date: '2026-08-01', type: 'weight' } }]
+  });
+  const full = liveData({
+    changed: false,
+    events: [
+      { record: { date: '2026-08-01', type: 'weight' } },
+      { record: { date: '2026-07-01', type: 'weight' } }
+    ]
+  });
+  const state = harness({
+    loadLiveImpl: async ({ call, onPartial }) => {
+      if (call === 1) {
+        await onPartial(week);
+        await onPartial(full);
+        return full;
+      }
+      await onPartial(week);
+      await weekHeld;
+      await onPartial(full);
+      return full;
+    }
+  });
+
+  await state.controller.start();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.calls.renders, 2);
+
+  state.root.dispatchEvent(new Event('visibilitychange'));
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.calls.syncs, 2);
+  assert.equal(state.calls.renders, 2);
+
+  releaseWeek();
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.calls.renders, 2);
+});
+
 test('later slices re-render Home even when every window reports unchanged', async () => {
   let release;
   const later = new Promise(resolve => { release = resolve; });
