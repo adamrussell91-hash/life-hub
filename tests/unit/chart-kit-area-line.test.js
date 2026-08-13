@@ -73,3 +73,41 @@ test('buildAreaLine default still zero-based', () => {
   const padSpread = Math.max(...padded.points.map(p => p.y)) - Math.min(...padded.points.map(p => p.y));
   assert.ok(padSpread > zeroSpread, 'padded should spread more than zero-based for high values');
 });
+
+test('buildAreaLine padded domain folds includeValues into min/max', () => {
+  const chart = buildAreaLine(
+    [
+      { date: '2026-01-01', value: 42 },
+      { date: '2026-02-01', value: 44 }
+    ],
+    { yDomain: 'padded', height: 168, width: 320, includeValues: [5, 40] }
+  );
+  assert.equal(typeof chart.scaleY, 'function');
+  const yLow = chart.scaleY(5);
+  const yHigh = chart.scaleY(40);
+  const yPoint = chart.points[0].y;
+  assert.ok(yLow > yPoint, 'ref_low below the series should sit lower on screen (higher y)');
+  assert.ok(Math.abs(yHigh - chart.scaleY(40)) < 0.01);
+  const without = buildAreaLine(
+    [
+      { date: '2026-01-01', value: 42 },
+      { date: '2026-02-01', value: 44 }
+    ],
+    { yDomain: 'padded', height: 168, width: 320 }
+  );
+  const seriesSpreadWith = Math.abs(chart.points[0].y - chart.points[1].y);
+  const seriesSpreadWithout = Math.abs(without.points[0].y - without.points[1].y);
+  assert.ok(seriesSpreadWith < seriesSpreadWithout, 'including the reference floor should compress the series vertically');
+});
+
+test('buildAreaLine returns scaleY for the default domain too', () => {
+  const chart = buildAreaLine(
+    [
+      { date: '2026-01-01', value: 0 },
+      { date: '2026-01-02', value: 100 }
+    ],
+    { height: 120, width: 320, padding: 12 }
+  );
+  assert.equal(chart.scaleY(100), 12);
+  assert.equal(chart.scaleY(0), 108);
+});
