@@ -53,6 +53,7 @@ export function eventDetailTitle(record, body = '') {
     case 'weight':
     case 'composition':
     case 'measurements':
+    case 'bloods':
       return 'Body';
     case 'sleep':
       return 'Sleep';
@@ -97,6 +98,10 @@ export function eventBrief(event) {
       if (record.chest != null) parts.push(`chest ${record.chest}`);
       if (!parts.length && record.hips != null) parts.push(`hips ${record.hips}`);
       return parts.join(' · ');
+    }
+    case 'bloods': {
+      const n = Array.isArray(record.markers) ? record.markers.length : 0;
+      return n ? `${n} marker${n === 1 ? '' : 's'}` : '';
     }
     case 'diary': {
       const parts = [];
