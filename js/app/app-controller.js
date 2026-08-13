@@ -104,6 +104,7 @@ export function createAppController(dependencies) {
   let latestMembership = null;
   let shelfRefreshToken = 0;
   let activeRefresh = null;
+  let inFlightLive = null;
   let refreshAbortController = null;
   let lifecycleVersion = 0;
   let intervalId = null;
@@ -299,6 +300,8 @@ export function createAppController(dependencies) {
   async function performRefresh({ signal, version, manual = false, force = false }) {
     const date = getSydneyDateKey(currentDate());
     let painted = false;
+    let confirmedPaint = false;
+    let historyComplete = false;
     let lastApplied = null;
 
     const apply = result => {
@@ -319,12 +322,16 @@ export function createAppController(dependencies) {
         // Renderers historically force-unhide their dashboards; refresh must not
         // resurface Home (or any other section) while Adam is elsewhere.
         setSectionVisibility(currentSection);
+        if (painted && !historyComplete && confirmedPaint) {
+          setStatus('Loading earlier history…');
+        }
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
       rendered = true;
       if (!painted && result.freshness === 'confirmed') recordSuccess();
       if (!painted) {
         if (result.freshness === 'confirmed') {
+          confirmedPaint = true;
           setStatus('Loading earlier history…');
           hideProvider();
           setAppState('ready');
@@ -347,12 +354,15 @@ export function createAppController(dependencies) {
         firstPaintDone();
       }
     });
+    inFlightLive = backfill;
     const backfillOutcome = backfill.then(
       result => ({ ok: true, result }),
       error => ({ ok: false, error })
     );
 
     void backfillOutcome.then(outcome => {
+      historyComplete = true;
+      if (inFlightLive === backfill) inFlightLive = null;
       if (refreshAbortController?.signal === signal) refreshAbortController = null;
       if (outcome.ok) {
         if (!isCurrentRefresh(version, signal)) return;
@@ -409,7 +419,7 @@ export function createAppController(dependencies) {
   }
 
   async function signOut() {
-    const refreshToSettle = activeRefresh;
+    const refreshToSettle = inFlightLive;
     lifecycleVersion += 1;
     authenticated = false;
     clearRefreshTimer();
