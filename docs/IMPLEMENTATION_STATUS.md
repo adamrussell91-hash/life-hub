@@ -376,5 +376,17 @@ Verified on 2026-08-11 (local only — do not push unless asked). Final move of 
 - Removed Sterling from `config/hammond-protocol.md` Decision Priority Hierarchy (rule 5 dropped; Growth/Comfort renumbered). `central-node.md` untouched — Clare/Ann references preserved.
 - `npm test`: 934 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
 
+## Phase 35: Mind session memory 8/8 — ambient line + Hammond cadence — Complete
+
+Verified on 2026-08-13 (local only — do not push unless asked). Final task of `docs/superpowers/plans/2026-08-13-mind-session-memory.md` — the plan is now fully implemented. Shell cache remains `life-hub-shell-v70` (Task 7; no new precache file).
+
+- Mind tab shows one ambient observation near Vera: mood-trend direction plus days since last diary and last Vera `mind_session`. Computed in `buildMindModel` from events already loaded; `renderMind` copies it into `[data-mind="ambient"]`. Zero extra API calls.
+- Hammond 90-day cadence treats `data/mind/.../YYYY-MM-DD-session.md` as mind-domain presence (`session` already matched `DOMAIN_PATH`; characterization test added, already green).
+- **Deviations from spec:**
+  - Auto-write exception: Vera `mind_session` writes immediately with no Confirm card; diary / meals / workouts still go through Confirm.
+  - 5e/6b is protocol-only: Hammond can suggest Long-Term Trends via existing `propose_central_node_patch` Confirm. No extra Hammond diary-blob window on ordinary turns.
+  - Leave-flush / transcripts not built (follow-up, not tasked).
+- `npm test`: 1014 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
 ## Next Phase: sleep·heart on Body / polish
 

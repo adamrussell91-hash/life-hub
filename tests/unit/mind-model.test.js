@@ -59,3 +59,16 @@ test('entriesByMood increments both bars for mixed moods', () => {
   assert.equal(model.byMood.find(item => item.key === 'low').value, 1);
   assert.equal(model.byMood.find(item => item.key === 'good').value, 1);
 });
+
+test('buildMindModel includes an ambient observation', () => {
+  const model = buildMindModel({
+    events: [
+      { record: { type: 'diary', date: '2026-08-01', mood_score: 4, mood: 'low', tags: [] }, body: '', path: 'd' },
+      { record: { type: 'mind_session', date: '2026-08-10', theme: 'Weekend' }, body: '', path: 's' }
+    ],
+    date: '2026-08-13',
+    range: 'monthly'
+  });
+  assert.match(model.ambient, /diary/i);
+  assert.match(model.ambient, /session/i);
+});
