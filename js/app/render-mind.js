@@ -30,6 +30,12 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent } = {}) {
       : 'No diary entries in this range';
   }
 
+  const ambient = root.querySelector('[data-mind="ambient"]');
+  if (ambient) {
+    ambient.hidden = !model.ambient;
+    ambient.textContent = model.ambient ?? '';
+  }
+
   renderMoodChart(root, model.moodSeries);
   renderBarHost(root, '#mind-mood-columns', model.byMood);
   renderBarHost(root, '#mind-theme-columns', model.themes);

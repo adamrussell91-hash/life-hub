@@ -15,20 +15,13 @@ import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from 
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { buildCanonicalPath, validateLogEntry } from './_shared/chat-schema.mjs';
 import { buildTemplateRecord, renderTemplateMarkdown, templatePathForTitle } from './_shared/workout-templates.mjs';
-import { AGENTS } from './_shared/agent-directory.mjs';
 import {
   applyCompletedWorkoutToLibrary,
   EXERCISE_LIBRARY_PATH,
   parseExerciseLibrary
 } from './_shared/exercise-library.mjs';
-import { load } from 'js-yaml';
-import { parseEventDocument, TYPE_DOMAINS } from '../../js/core/records.js';
-import {
-  applyLogToCentralNode,
-  formatLogDate
-} from '../../js/core/central-node-write.js';
-import { getSydneyTimestamp } from '../../js/core/time.js';
-import { loadCentralNodeSeed } from './_shared/load-central-node-seed.mjs';
+import { persistLogEntry, renderMarkdown } from './_shared/persist-log.mjs';
+import { getSydneyDateKey, getSydneyTimestamp } from '../../js/core/time.js';
 import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
 import {
   validateCentralNodePatchInput,
@@ -118,11 +111,12 @@ export function createChatConfirmHandler({
     }
 
     try {
-      const result = await client.writeFile({
+      const persisted = await persistLogEntry(client, {
+        record: validation.record,
+        notes: validation.notes,
         path,
-        content: renderMarkdown(validation.record, validation.notes),
-        ...(existingSha ? { sha: existingSha } : {}),
-        message: `feat(chat): log ${validation.record.type} for ${validation.record.date}`
+        existingSha,
+        nowDateKey: getSydneyDateKey(new Date(now()))
       });
       let exercisePersonalBests;
       if (validation.record.type === 'workout' && validation.record.status === 'completed') {
@@ -145,21 +139,12 @@ export function createChatConfirmHandler({
           exercisePersonalBests = [];
         }
       }
-      let centralNodeUpdated = false;
-      try {
-        const cn = await syncCentralNodeAfterLog(client, validation.record, validation.notes);
-        centralNodeUpdated = cn?.updated === true;
-      } catch {
-        // Best-effort running log -- the record itself already saved successfully, so a
-        // failure here (conflict, missing file, transient GitHub error) must never surface
-        // as a failed confirmation. The client is told via centralNodeUpdated instead.
-        centralNodeUpdated = false;
-      }
+      const centralNodeUpdated = persisted.centralNodeUpdated === true;
 
       let dayoneSent = null;
       let dayoneReason = null;
-      let sha = result.sha;
-      let commitSha = result.commitSha;
+      let sha = persisted.sha;
+      let commitSha = persisted.commitSha;
       if (validation.record.type === 'diary') {
         const dispatch = await sendDiaryToDayOne({
           notes: validation.notes,
@@ -281,15 +266,6 @@ export function createChatConfirmHandler({
   }
 }
 
-function renderMarkdown(record, notes) {
-  const frontmatter = Object.entries(record)
-    .filter(([, value]) => value !== undefined)
-    .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
-    .join('\n');
-  const body = typeof notes === 'string' && notes.trim() !== '' ? `${notes.trim()}\n` : '';
-  return `---\n${frontmatter}\n---\n${body}`;
-}
-
 async function upsertWorkoutTemplate(client, record) {
   const path = templatePathForTitle(record.title);
   const template = buildTemplateRecord(record, record.date);
@@ -325,133 +301,6 @@ async function upsertExerciseLibraryProgress(client, record, updatedAt) {
   return pbs;
 }
 
-async function syncCentralNodeAfterLog(client, record, notes) {
-  const current = await client.resolveTree();
-  const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
-
-  let content;
-  let existingSha;
-  if (entry) {
-    content = decodeBlob(await client.readBlob(entry.sha));
-    if (content === null) return { updated: false, reason: 'decode_failed' };
-    existingSha = entry.sha;
-  } else {
-    content = loadCentralNodeSeed();
-    if (!content) return { updated: false, reason: 'missing_seed' };
-    existingSha = undefined;
-  }
-
-  const actionLine = `\n**${formatLogDate(record.date)}:** ${agentNameForType(record.type)}: ${describeRecordForLog(record, notes)}`;
-  let nutritionTotals = null;
-  if (record.type === 'meal') {
-    nutritionTotals = await sumDayMealTotals(client, current.tree, record);
-  }
-
-  const updated = applyLogToCentralNode(content, {
-    record,
-    actionLine,
-    nutritionTotals,
-    flagNotes: ['meal', 'skincare', 'weight', 'composition', 'measurements'].includes(record.type)
-      ? notes
-      : null
-  });
-  if (updated === content) return { updated: false, reason: 'unchanged' };
-
-  await client.writeFile({
-    path: CENTRAL_NODE_PATH,
-    content: updated,
-    ...(existingSha ? { sha: existingSha } : {}),
-    message: `chore(central-node): sync ${record.type} log into Status`
-  });
-  return { updated: true };
-}
-
-async function sumDayMealTotals(client, tree, record) {
-  const domain = TYPE_DOMAINS.meal;
-  const [year, month] = record.date.split('-');
-  const prefix = `data/${domain}/${year}/${month}/${record.date}-`;
-  const mealPaths = tree
-    .filter(item => item.type === 'blob' && item.path.startsWith(prefix) && item.path.endsWith('.md'))
-    .map(item => item.path);
-
-  const totals = {
-    calories: Number(record.calories) || 0,
-    protein_g: Number(record.protein_g) || 0,
-    fat_g: Number(record.fat_g) || 0
-  };
-  if (record.sodium_mg != null) totals.sodium_mg = Number(record.sodium_mg) || 0;
-  if (record.calcium_mg != null) totals.calcium_mg = Number(record.calcium_mg) || 0;
-  if (record.polyphenol_score != null) totals.polyphenol_score = Number(record.polyphenol_score) || 0;
-
-  for (const path of mealPaths) {
-    const blobEntry = tree.find(item => item.path === path);
-    if (!blobEntry) continue;
-    let text;
-    try {
-      text = decodeBlob(await client.readBlob(blobEntry.sha));
-    } catch {
-      continue;
-    }
-    if (text === null) continue;
-    try {
-      const parsed = parseEventDocument(text, path, load);
-      if (parsed.record?.type !== 'meal') continue;
-      if (parsed.record.meal === record.meal) continue;
-      totals.calories += Number(parsed.record.calories) || 0;
-      totals.protein_g += Number(parsed.record.protein_g) || 0;
-      totals.fat_g += Number(parsed.record.fat_g) || 0;
-      if (parsed.record.sodium_mg != null) {
-        totals.sodium_mg = (totals.sodium_mg ?? 0) + (Number(parsed.record.sodium_mg) || 0);
-      }
-      if (parsed.record.calcium_mg != null) {
-        totals.calcium_mg = (totals.calcium_mg ?? 0) + (Number(parsed.record.calcium_mg) || 0);
-      }
-      if (parsed.record.polyphenol_score != null) {
-        totals.polyphenol_score = (totals.polyphenol_score ?? 0) + (Number(parsed.record.polyphenol_score) || 0);
-      }
-    } catch {
-      // Ignore unreadable siblings; still publish totals from the confirmed record.
-    }
-  }
-
-  return totals;
-}
-
-function agentNameForType(type) {
-  return AGENTS.find(agent => agent.recordTypes.includes(type))?.name ?? 'Life Hub';
-}
-
-function describeRecordForLog(record, notes) {
-  const label = typeof notes === 'string' && notes.trim() !== '' ? notes.trim() : null;
-  switch (record.type) {
-    case 'meal': {
-      const macros = [
-        record.calories != null ? `${record.calories} kcal` : null,
-        record.protein_g != null ? `${record.protein_g}g protein` : null,
-        record.fat_g != null ? `${record.fat_g}g fat` : null
-      ].filter(Boolean).join(', ');
-      const what = label ? `${label} for ${record.meal}` : record.meal;
-      return `Logged ${what}${macros ? ` (${macros})` : ''}.`;
-    }
-    case 'workout': {
-      const duration = record.duration_min != null ? `${record.duration_min}-min ` : '';
-      const title = record.title ? ` (${record.title})` : '';
-      return `Logged a ${duration}${record.day_type ?? 'workout'} session${title}.`;
-    }
-    case 'skincare':
-      return `Logged ${record.routine ?? ''} skincare${record.completed === false ? ' (incomplete)' : ''}.`.replace(/\s+/g, ' ');
-    case 'diary':
-      return `Logged a diary entry${record.mood ? ` (mood: ${record.mood})` : ''}.`;
-    case 'weight':
-      return `Logged weight${record.weight_kg != null ? `: ${record.weight_kg}kg` : ''}.`;
-    case 'composition':
-      return `Logged body composition${record.weight_kg != null ? ` (${record.weight_kg}kg${record.body_fat_pct != null ? `, ${record.body_fat_pct}% body fat` : ''})` : ''}.`;
-    case 'measurements':
-      return 'Logged body measurements.';
-    default:
-      return `Logged a ${record.type} record.`;
-  }
-}
 async function parseRequest(request) {
   const contentLength = Number(request.headers.get('content-length'));
   if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {

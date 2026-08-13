@@ -198,3 +198,38 @@ test('buildMindModel clips sessions and insights to the range window, not cross-
   assert.equal(model.daysSinceLastMindSession, 3);
   assert.equal(model.silence, false);
 });
+
+test('entriesByMood increments both bars for mixed moods', () => {
+  const events = [{
+    record: {
+      type: 'diary', date: '2026-08-05', mood: 'low', moods: ['low', 'good'], tags: []
+    },
+    body: '',
+    path: 'mixed'
+  }];
+  const model = buildMindModel({ events, date: '2026-08-05', range: 'weekly' });
+  assert.equal(model.byMood.find(item => item.key === 'low').value, 1);
+  assert.equal(model.byMood.find(item => item.key === 'good').value, 1);
+});
+
+test('buildMindModel includes an ambient observation', () => {
+  const model = buildMindModel({
+    events: [
+      { record: { type: 'diary', date: '2026-08-01', mood_score: 4, mood: 'low', tags: [] }, body: '', path: 'd' },
+      { record: { type: 'mind_session', date: '2026-08-10', theme: 'Weekend' }, body: '', path: 's' }
+    ],
+    date: '2026-08-13',
+    range: 'monthly'
+  });
+  assert.match(model.ambient, /diary/i);
+  assert.match(model.ambient, /session/i);
+});
+
+test('ambient omits Mood scores held when there are fewer than two mood points', () => {
+  const model = buildMindModel({
+    events: [],
+    date: '2026-08-13',
+    range: 'monthly'
+  });
+  assert.doesNotMatch(model.ambient, /Mood scores held/);
+});

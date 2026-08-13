@@ -219,7 +219,33 @@ function validateDiary(record, errors) {
   stringArray(record, 'tags', errors);
   optionalString(record, 'highlights', errors);
   optionalString(record, 'challenges', errors);
+  optionalString(record, 'system_note', errors);
+  optionalString(record, 'cross_agent_note', errors);
   booleanField(record, 'dayone_sent', errors);
+  if (record.moods != null) {
+    if (!Array.isArray(record.moods) || record.moods.length < 1 || record.moods.length > 3) {
+      errors.push('moods must be an array of 1–3 items');
+    } else {
+      for (const item of record.moods) {
+        if (!MOODS.includes(item)) errors.push(`moods items must be one of: ${MOODS.join(', ')}`);
+      }
+      if (record.mood != null && !record.moods.includes(record.mood)) {
+        errors.push('mood must be one of moods when moods is present');
+      }
+    }
+  }
+}
+
+function validateMindSession(record, errors) {
+  optionalString(record, 'theme', errors);
+  optionalString(record, 'closing_question', errors);
+  optionalString(record, 'insight', errors);
+  optionalString(record, 'cross_agent_note', errors);
+  enumeration(record, 'mood_at_open', MOODS, errors);
+  enumeration(record, 'mood_at_close', MOODS, errors);
+  const hasCore = [record.theme, record.closing_question, record.insight]
+    .some(v => typeof v === 'string' && v.trim() !== '');
+  if (!hasCore) errors.push('mind_session requires theme, insight, or closing_question');
 }
 
 function validateWeight(record, errors) {
@@ -288,6 +314,7 @@ const VALIDATORS = {
   meal: validateMeal,
   workout: validateWorkout,
   diary: validateDiary,
+  mind_session: validateMindSession,
   weight: validateWeight,
   composition: validateComposition,
   measurements: validateMeasurements,

@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { buildSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
 import { loadChadwickProtocol } from '../../netlify/functions/_shared/load-chadwick-protocol.mjs';
 import { loadBrisketProtocol } from '../../netlify/functions/_shared/load-brisket-protocol.mjs';
+import { loadVeraProtocol } from '../../netlify/functions/_shared/load-vera-protocol.mjs';
+import { loadPenelopeProtocol } from '../../netlify/functions/_shared/load-penelope-protocol.mjs';
+import { loadHammondProtocol } from '../../netlify/functions/_shared/load-hammond-protocol.mjs';
 
 test('builds a named agent prompt naming its writable record types', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick', digest: 'Streak: 2', constraints: 'Fat < 50g' });
@@ -456,4 +459,71 @@ test('non-hammond prompts never include hammondDigest', () => {
   });
   assert.equal(prompt.includes('41/90 days'), false);
   assert.equal(prompt.includes('Logging history'), false);
+});
+
+test('vera protocol restore includes diagnostic, ACE, and mind_session logging', () => {
+  const text = loadVeraProtocol();
+  assert.match(text, /Framework Selection/);
+  assert.match(text, /Dropping Anchor/);
+  assert.match(text, /mind_session/);
+  assert.doesNotMatch(text, /You do not propose `log_entry`/);
+});
+
+test('penelope protocol restore includes gather-context, moods, and cross_agent_note', () => {
+  const text = loadPenelopeProtocol();
+  assert.match(text, /Relationships and social context|relationship dynamic/i);
+  assert.match(text, /moods/);
+  assert.match(text, /cross_agent_note/);
+  assert.match(text, /On this day/);
+});
+
+test('hammond protocol includes Mind domain brief and retrospective', () => {
+  const text = loadHammondProtocol();
+  assert.match(text, /Mind Insight/);
+  assert.match(text, /three-way brief/i);
+  assert.match(text, /two-voice/i);
+});
+
+test('vera prompt includes mind diary and session digest and lists mind_session', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'vera',
+    mindDiaryDigest: 'Diary (metadata only): 2026-08-10 mood low',
+    mindSessionDigest: 'thread: What is the weekend actually for?',
+    mindSilence: 'Mind silence: both quiet 8d'
+  });
+  assert.match(prompt, /mind_session/);
+  assert.doesNotMatch(prompt, /You do not propose log_entry/);
+  assert.match(prompt, /Diary \(metadata only\)/);
+  assert.match(prompt, /What is the weekend actually for/);
+  assert.match(prompt, /Mind silence/);
+});
+
+test('penelope prompt includes mind diary digest and keeps nutrition digest', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'penelope',
+    digest: 'Today: 1800 kcal',
+    mindDiaryDigest: 'Days since last entry: 2',
+    onThisDay: 'On this day 2025-08-13: Excerpt: We went to the shops.'
+  });
+  assert.match(prompt, /1800 kcal/);
+  assert.match(prompt, /Days since last entry/);
+  assert.match(prompt, /We went to the shops/);
+});
+
+test('hammond prompt includes silence flag and not diary excerpt', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    mindSilence: 'Mind silence: both quiet 8d',
+    onThisDay: 'On this day 2025-08-13: Excerpt: SECRET'
+  });
+  assert.match(prompt, /Mind silence/);
+  assert.doesNotMatch(prompt, /SECRET/);
+});
+
+test('brisket prompt never receives mind diary digest', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    mindDiaryDigest: 'Diary leak'
+  });
+  assert.doesNotMatch(prompt, /Diary leak/);
 });

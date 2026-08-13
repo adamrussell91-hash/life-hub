@@ -32,6 +32,7 @@ import {
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
 import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug } from './_shared/chat-schema.mjs';
+import { persistLogEntry, describeRecordForLog } from './_shared/persist-log.mjs';
 import {
   FOOD_LIBRARY_PATH,
   foodLibraryEntrySchema,
@@ -102,11 +103,21 @@ import {
 } from './_shared/workout-templates.mjs';
 import { selectLatestBodyEntries, formatBodyStateForPrompt } from './_shared/body-state.mjs';
 import { selectHammondFitnessEntries, selectHammondEventEntries, summarizeHammondDigest, formatCentralNodeModelForPrompt, getWindowStart, getCnModelWindowStart } from './_shared/hammond-digest.mjs';
+import {
+  getMindDigestWindowStart,
+  selectMindEntries,
+  selectOnThisDayEntries,
+  summarizeDiaryForPrompt,
+  summarizeMindSessionsForPrompt,
+  simultaneousSilenceFlag,
+  divergenceLine,
+  excerptOnThisDay
+} from './_shared/mind-digest.mjs';
 import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
-import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays } from '../../js/core/time.js';
+import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } from '../../js/core/time.js';
 import { parseEventDocument } from '../../js/core/records.js';
 import { load as loadYaml } from 'js-yaml';
 
@@ -182,6 +193,8 @@ export function createChatHandler({
     const needsSkincareLibrary = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
     const needsBodyState = slug === 'chadwick' || slug === 'brisket';
+    const needsMindDigest = slug === 'vera' || slug === 'penelope';
+    const mindFrom = needsMindDigest ? getMindDigestWindowStart(today) : null;
     // Hammond alone gets a wider, path-only window for the 90-day longitudinal
     // digest -- deliberately separate from `from`/`manifest`/`dataEntries` above,
     // which stay a thin today+yesterday scan for every other agent. Widening
@@ -266,6 +279,13 @@ export function createChatHandler({
         let workoutTemplates = '';
         let bodyState = '';
         let sessionAdherenceDays = null;
+        let mindDiaryDigest = '';
+        let mindSessionDigest = '';
+        let mindSilence = '';
+        let mindDivergence = '';
+        let onThisDay = '';
+        let daysSinceLastEntry = null;
+        let daysSinceLastMindSession = null;
         try {
           const current = await client.resolveTree();
           const manifest = selectManifestEntries(current.tree, { from, to: today });
@@ -316,6 +336,15 @@ export function createChatHandler({
           const hammondCnEntries = needsHammondTools
             ? selectHammondEventEntries(current.tree, { from: hammondCnFrom, to: today })
             : [];
+          // Vera/Penelope get a gated 30-day mind window from the already-fetched
+          // tree — do not widen the shared today+yesterday `from` used for dataEntries.
+          // Hammond silence is path-dates only (no extra diary-body fetch).
+          const mindEntries = needsMindDigest
+            ? selectMindEntries(current.tree, { from: mindFrom, to: today })
+            : [];
+          const onThisDayEntries = slug === 'penelope'
+            ? selectOnThisDayEntries(current.tree, today)
+            : [];
 
           const [
             dataBlobs,
@@ -330,7 +359,9 @@ export function createChatHandler({
             compositionBlobs,
             measurementBlobs,
             hammondFitnessBlobs,
-            hammondCnBlobs
+            hammondCnBlobs,
+            mindBlobs,
+            onThisDayBlobs
           ] = await Promise.all([
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
@@ -344,7 +375,9 @@ export function createChatHandler({
             Promise.all(bodyEntries.composition.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha))),
-            Promise.all(hammondCnEntries.map(entry => client.readBlob(entry.sha)))
+            Promise.all(hammondCnEntries.map(entry => client.readBlob(entry.sha))),
+            Promise.all(mindEntries.map(entry => client.readBlob(entry.sha))),
+            Promise.all(onThisDayEntries.map(entry => client.readBlob(entry.sha)))
           ]);
 
           const files = dataEntries
@@ -451,6 +484,46 @@ export function createChatHandler({
               date: today
             }));
           }
+
+          if (slug === 'vera' || slug === 'penelope' || slug === 'hammond') {
+            mindSilence = simultaneousSilenceFlag({ tree: current.tree, today });
+          }
+          if (needsMindDigest) {
+            const mindFiles = mindEntries
+              .map((entry, index) => ({ path: entry.path, content: decodeBlob(mindBlobs[index]) }))
+              .filter(file => file.content !== null);
+            const mindEvents = [];
+            for (const file of mindFiles) {
+              try { mindEvents.push(parseEventDocument(file.content, file.path, loadYaml)); }
+              catch { /* skip */ }
+            }
+            mindDiaryDigest = summarizeDiaryForPrompt(mindEvents, today);
+            mindSessionDigest = summarizeMindSessionsForPrompt(mindEvents, today);
+            mindDivergence = slug === 'vera' ? divergenceLine(mindEvents, today) : '';
+            const lastDiary = mindEvents.filter(e => e.record.type === 'diary').map(e => e.record.date).sort().at(-1);
+            const lastSession = mindEvents.filter(e => e.record.type === 'mind_session').map(e => e.record.date).sort().at(-1);
+            if (lastDiary) daysSinceLastEntry = daysBetween(lastDiary, today);
+            if (lastSession) daysSinceLastMindSession = daysBetween(lastSession, today);
+          }
+          if (slug === 'penelope' && onThisDayBlobs?.length) {
+            const file = onThisDayEntries
+              .map((entry, i) => ({ path: entry.path, content: decodeBlob(onThisDayBlobs[i]) }))
+              .find(f => f.content);
+            if (file) {
+              try {
+                const parsed = parseEventDocument(file.content, file.path, loadYaml);
+                onThisDay = excerptOnThisDay({
+                  date: parsed.record.date,
+                  mood: parsed.record.mood,
+                  moods: parsed.record.moods,
+                  tags: parsed.record.tags,
+                  highlights: parsed.record.highlights,
+                  challenges: parsed.record.challenges,
+                  notes: parsed.body
+                });
+              } catch { /* skip */ }
+            }
+          }
         } catch {
           digest = '';
           constraints = '';
@@ -480,6 +553,13 @@ export function createChatHandler({
           workoutTemplates = '';
           bodyState = '';
           sessionAdherenceDays = null;
+          mindDiaryDigest = '';
+          mindSessionDigest = '';
+          mindSilence = '';
+          mindDivergence = '';
+          onThisDay = '';
+          daysSinceLastEntry = null;
+          daysSinceLastMindSession = null;
         }
 
         const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
@@ -515,7 +595,14 @@ export function createChatHandler({
           exerciseLibrary,
           skincareRoutines,
           bodyState,
-          daysSinceLastSession: sessionAdherenceDays
+          daysSinceLastSession: sessionAdherenceDays,
+          mindDiaryDigest,
+          mindSessionDigest,
+          mindSilence,
+          mindDivergence,
+          onThisDay,
+          daysSinceLastEntry,
+          daysSinceLastMindSession
         });
 
         try {
@@ -648,19 +735,15 @@ export function createChatHandler({
                   send({ type: 'record_rejected', errors: validation.errors });
                   return JSON.stringify({ ok: false, errors: validation.errors });
                 }
-                send({
-                  type: 'record_proposal',
-                  record: validation.record,
-                  notes: validation.notes,
-                  path: buildCanonicalPath({
-                    type: validation.record.type,
-                    date: validation.record.date,
-                    slug: buildRecordSlug(validation.record)
-                  }),
-                  // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
-                  // Confirm anyway. No-op (empty array) for anything but a workout proposal.
-                  warnings: lintWorkoutProposal(validation.record)
+                const outcome = await persistOrProposeLogEntry({
+                  client, slug, today, validation, send
                 });
+                if (outcome.status === 'written') {
+                  return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
+                }
+                if (outcome.error === 'write_failed') {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
                 return JSON.stringify({ ok: true, status: 'awaiting_confirm' });
               }
               if (event.name === 'append_governance_log') {
@@ -740,19 +823,7 @@ export function createChatHandler({
                 now: getSydneyTimestamp(nowInstant)
               });
               if (validation.valid) {
-                send({
-                  type: 'record_proposal',
-                  record: validation.record,
-                  notes: validation.notes,
-                  path: buildCanonicalPath({
-                    type: validation.record.type,
-                    date: validation.record.date,
-                    slug: buildRecordSlug(validation.record)
-                  }),
-                  // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
-                  // Confirm anyway. No-op (empty array) for anything but a workout proposal.
-                  warnings: lintWorkoutProposal(validation.record)
-                });
+                await persistOrProposeLogEntry({ client, slug, today, validation, send });
               } else {
                 send({ type: 'record_rejected', errors: validation.errors });
               }
@@ -780,6 +851,57 @@ export function createChatHandler({
       headers: { 'content-type': 'text/event-stream', ...PRIVATE_CACHE, connection: 'keep-alive' }
     });
   };
+}
+
+async function persistOrProposeLogEntry({ client, slug, today, validation, send }) {
+  const path = buildCanonicalPath({
+    type: validation.record.type,
+    date: validation.record.date,
+    slug: buildRecordSlug(validation.record)
+  });
+  const autoWrite = slug === 'vera' && validation.record.type === 'mind_session';
+  if (autoWrite) {
+    try {
+      const current = await client.resolveTree();
+      const existingSha = current.tree.find(e => e.path === path && e.type === 'blob')?.sha;
+      const persisted = await persistLogEntry(client, {
+        record: validation.record,
+        notes: validation.notes,
+        path,
+        existingSha,
+        nowDateKey: today
+      });
+      send({
+        type: 'record_saved',
+        record: validation.record,
+        notes: validation.notes,
+        path,
+        summary: describeRecordForLog(validation.record, validation.notes),
+        centralNodeUpdated: persisted.centralNodeUpdated
+      });
+      return { ok: true, status: 'written', path };
+    } catch {
+      send({
+        type: 'record_proposal',
+        record: validation.record,
+        notes: validation.notes,
+        path,
+        warnings: [],
+        autoWriteFailed: true
+      });
+      return { ok: false, error: 'write_failed' };
+    }
+  }
+  send({
+    type: 'record_proposal',
+    record: validation.record,
+    notes: validation.notes,
+    path,
+    // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
+    // Confirm anyway. No-op (empty array) for anything but a workout proposal.
+    warnings: lintWorkoutProposal(validation.record)
+  });
+  return { ok: true, status: 'awaiting_confirm' };
 }
 
 async function parseRequest(request) {

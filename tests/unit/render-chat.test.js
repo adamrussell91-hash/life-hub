@@ -310,6 +310,36 @@ test('appendCnPatchProposal includes truncated payload.text in the detail line',
   assert.doesNotMatch(detail, /tail/);
 });
 
+function collectCardText(node) {
+  const parts = [];
+  function walk(el) {
+    if (el.textContent) parts.push(el.textContent);
+    if (el.value != null && el.value !== '') parts.push(String(el.value));
+    for (const child of el.children ?? []) walk(child);
+  }
+  walk(node);
+  return parts.join(' ');
+}
+
+test('appendRecordProposal hides system_note on diary cards but shows cross_agent_note', () => {
+  const root = new FakeDocument();
+  const { card } = appendRecordProposal(root, {
+    path: 'data/mind/2026/08/2026-08-13-diary.md',
+    record: {
+      type: 'diary',
+      date: '2026-08-13',
+      system_note: 'hidden',
+      cross_agent_note: 'Penelope→Vera: hi'
+    },
+    notes: ''
+  });
+
+  const cardText = collectCardText(card);
+  assert.doesNotMatch(cardText, /hidden/);
+  assert.doesNotMatch(cardText, /system_note/i);
+  assert.match(cardText, /Penelope→Vera/);
+});
+
 test('renderInlineMarkdown keeps bullet lines in one list even when a blank line separates them', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');

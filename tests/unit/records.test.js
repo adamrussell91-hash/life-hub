@@ -415,3 +415,29 @@ test('rejects coach_cues that is not an object, or whose sub-fields are not stri
     assert.notEqual(validateRecord({ ...base, exercises }).length, 0, JSON.stringify(coach_cues));
   }
 });
+
+test('validateMindSession requires at least one of theme, insight, closing_question', () => {
+  const base = {
+    schema_version: 1, id: 'ms-1', type: 'mind_session', date: '2026-08-13',
+    time: '17:00',
+    created_at: '2026-08-13T17:00:00+10:00', updated_at: '2026-08-13T17:00:00+10:00',
+    source: 'chat'
+  };
+  assert.ok(validateRecord({ ...base, theme: 'Weekend permission' }).length === 0);
+  assert.ok(validateRecord({ ...base }).some(e => /theme|insight|closing_question/.test(e)));
+  assert.ok(validateRecord({ ...base, theme: 'x', mood_at_open: 'wired' }).some(e => /mood_at_open/.test(e)));
+});
+
+test('diary moods is 1–3 MOODS and must include primary mood', () => {
+  const diary = {
+    schema_version: 1, id: 'd-1', type: 'diary', date: '2026-08-13',
+    time: '21:00',
+    created_at: '2026-08-13T21:00:00+10:00', updated_at: '2026-08-13T21:00:00+10:00',
+    source: 'chat', mood_score: 6, mood: 'low', energy: 'medium', tags: [], dayone_sent: false
+  };
+  assert.equal(validateRecord(diary).length, 0);
+  assert.equal(validateRecord({ ...diary, moods: ['low', 'good'] }).length, 0);
+  assert.ok(validateRecord({ ...diary, moods: [] }).some(e => /moods/.test(e)));
+  assert.ok(validateRecord({ ...diary, moods: ['low', 'good', 'neutral', 'bad'] }).some(e => /moods/.test(e)));
+  assert.ok(validateRecord({ ...diary, mood: 'low', moods: ['good'] }).some(e => /mood/.test(e)));
+});
