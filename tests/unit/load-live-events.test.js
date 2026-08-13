@@ -134,7 +134,9 @@ test('first sync is seven inclusive days and the next slice does not overlap', a
   const olderFiles = [bodyWeight('2026-07-01', 83)];
   const sync = async options => {
     calls.push({ from: options.from, to: options.to });
-    const files = options.to === date ? weekFiles : olderFiles;
+    const files = options.to === date ? weekFiles
+      : calls.length === 2 ? olderFiles
+      : [];
     return {
       files, warnings: [], commitSha: 'c'.repeat(40),
       manifestId: `range-${calls.length}`, changed: true, freshness: 'confirmed'
@@ -145,6 +147,7 @@ test('first sync is seven inclusive days and the next slice does not overlap', a
     sync, loadYaml: load, date, onPartial: snapshot => partials.push(snapshot)
   });
 
+  assert.equal(calls.length, 3);
   assert.deepEqual(calls[0], { from: '2026-07-26', to: '2026-08-01' });
   assert.deepEqual(calls[1], { from: '2026-06-26', to: '2026-07-25' });
   assert.ok(calls.every(call => call.to < calls[0].from || call === calls[0] || call.to === date));
@@ -158,8 +161,18 @@ test('onPartial fires after the first window before older files exist', async ()
   const date = '2026-08-01';
   let release;
   const gate = new Promise(resolve => { release = resolve; });
+  let olderCalls = 0;
   const sync = async ({ from, to }) => {
-    if (to !== date) await gate;
+    if (to !== date) {
+      olderCalls += 1;
+      if (olderCalls === 1) await gate;
+      if (olderCalls > 1) {
+        return {
+          files: [], warnings: [], commitSha: 'c'.repeat(40), manifestId: `${from}`,
+          changed: true, freshness: 'confirmed'
+        };
+      }
+    }
     return {
       files: [bodyWeight(to === date ? date : '2026-07-01', 80)],
       warnings: [], commitSha: 'c'.repeat(40), manifestId: `${from}`,
@@ -175,6 +188,7 @@ test('onPartial fires after the first window before older files exist', async ()
   assert.deepEqual(partials[0], [date]);
   release();
   await done;
+  assert.equal(olderCalls, 2);
 });
 
 test('a config-only older slice stops extension', async () => {
