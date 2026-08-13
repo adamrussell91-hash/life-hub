@@ -217,7 +217,7 @@ test('sign-out clears the session marker, cookie, and private repository cache',
   const page = await context.newPage();
   const assertNoSecretResponses = await monitorApiResponses(page);
   await signIn(page);
-  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v1')), true);
+  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v2')), true);
 
   const logout = page.waitForResponse(response => new URL(response.url()).pathname === '/api/logout');
   await page.locator('#sign-out-button').click();
@@ -226,7 +226,7 @@ test('sign-out clears the session marker, cookie, and private repository cache',
 
   assert.equal(await page.locator('#sign-in-view').isVisible(), true);
   assert.equal(await page.evaluate(() => sessionStorage.getItem('life-hub:session-expiry')), null);
-  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v1')), false);
+  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v2')), false);
   assert.equal((await context.cookies()).some(cookie => cookie.name === 'life_hub_mock'), false);
   await assertNoSecretResponses();
   await context.close();
@@ -248,7 +248,7 @@ test('session expiry is not masked by the public service-worker cache', async ()
   await page.locator('#sign-in-view').waitFor();
   assert.equal(await page.locator('#sign-in-error').textContent(), 'Your session expired. Please sign in again.');
   assert.equal(await page.evaluate(() => sessionStorage.getItem('life-hub:session-expiry')), null);
-  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v1')), true);
+  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v2')), true);
 
   const publicCacheUrls = await page.evaluate(async () => {
     const names = (await caches.keys()).filter(name => name.startsWith('life-hub-shell-'));
@@ -336,7 +336,7 @@ test('offline logout survives reload and clears the server cookie on reconnect',
   await page.waitForFunction(() => localStorage.getItem('life-hub:logout-pending') === null);
 
   assert.equal((await context.cookies()).some(cookie => cookie.name === 'life_hub_mock'), false);
-  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v1')), false);
+  assert.equal(await page.evaluate(() => caches.has('life-hub-private-v2')), false);
   await context.close();
 });
 
