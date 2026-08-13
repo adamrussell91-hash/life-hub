@@ -324,6 +324,19 @@ test('diary confirm upserts Energy as well as Mood', () => {
   assert.match(next, /\*\*Energy:\*\* low/);
 });
 
+test('mind_session with whitespace-only theme falls back to session logged', () => {
+  const next = applyLogToCentralNode(base, {
+    record: {
+      type: 'mind_session',
+      date: '2026-06-19',
+      theme: '   ',
+      insight: 'Exhaustion looking like chaos'
+    },
+    actionLine: '\n**19 Jun:** Dr Vera Lenz: Logged a mind session.'
+  });
+  assert.match(next, /\*\*Mind:\*\* session logged/);
+});
+
 test('mind_session upserts Mind status and Cross-Agent line', () => {
   const withXa = `${base}\n## 🤝 Cross-Agent Coordination\n- Old line.\n`;
   const next = applyLogToCentralNode(withXa, {
@@ -335,7 +348,8 @@ test('mind_session upserts Mind status and Cross-Agent line', () => {
     actionLine: '\n**19 Jun:** Dr Vera Lenz: Logged a mind session (Weekend permission).'
   });
   assert.match(next, /\*\*Mind:\*\* Weekend permission/);
-  assert.match(next, /Vera→Penelope: ask what the weekend is for/);
+  assert.match(next, /## 🤝 Cross-Agent Coordination\n- Vera→Penelope: ask what the weekend is for/);
+  assert.match(next, /Vera→Penelope: ask what the weekend is for\.\n- Old line\./);
 });
 
 test('appendCrossAgentLine inserts newest-first and trim still caps at 12', () => {
@@ -346,7 +360,11 @@ test('appendCrossAgentLine inserts newest-first and trim still caps at 12', () =
     record: { type: 'diary', date: '2026-06-19', mood: 'good', energy: 'high' },
     actionLine: '\n**19 Jun:** Penelope: Logged a diary entry.'
   });
-  assert.match(trimmed, /New line/);
-  const bullets = trimmed.split('\n').filter(l => l.startsWith('- '));
-  assert.ok(bullets.length <= 12);
+  assert.match(trimmed, /## 🤝 Cross-Agent Coordination\n- New line\./);
+  const xaStart = trimmed.indexOf('## 🤝 Cross-Agent Coordination');
+  const xaRest = trimmed.slice(xaStart);
+  const xaEndRel = xaRest.search(/\n## /);
+  const xaSection = xaEndRel === -1 ? xaRest : xaRest.slice(0, xaEndRel);
+  const bullets = xaSection.split('\n').filter(l => l.startsWith('- '));
+  assert.equal(bullets.length, 12);
 });

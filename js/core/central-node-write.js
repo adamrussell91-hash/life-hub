@@ -71,7 +71,7 @@ export function appendCrossAgentLine(content, line) {
   if (headingIndex === -1) return content;
   const insertAt = headingIndex + CROSS_AGENT_HEADING.length;
   const normalized = line.startsWith('\n') ? line : `\n${line}`;
-  const bullet = normalized.includes('- ') ? normalized : `\n- ${line.replace(/^\n/, '')}`;
+  const bullet = /^\n?- /.test(normalized) ? normalized : `\n- ${line.replace(/^\n/, '')}`;
   return `${content.slice(0, insertAt)}${bullet}${content.slice(insertAt)}`;
 }
 
@@ -286,7 +286,9 @@ export function applyLogToCentralNode(content, {
     body = upsertStatusField(body, 'Mood', `**Mood:** ${mood}.`);
     if (record.energy) body = upsertStatusField(body, 'Energy', `**Energy:** ${record.energy}.`);
   } else if (record.type === 'mind_session') {
-    const theme = record.theme ? String(record.theme).trim() : 'session logged';
+    const theme = typeof record.theme === 'string' && record.theme.trim()
+      ? record.theme.trim()
+      : 'session logged';
     body = upsertStatusField(body, 'Mind', `**Mind:** ${theme}.`);
   } else if (record.type === 'weight' || record.type === 'composition') {
     const weight = record.weight_kg != null ? `${record.weight_kg} kg` : 'logged';
