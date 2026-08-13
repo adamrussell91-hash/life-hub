@@ -42,19 +42,26 @@ function lastDate(events, type) {
   return dates.at(-1) ?? null;
 }
 
+function diaryWordCount(entry) {
+  return (entry.body ?? '').trim().split(/\s+/).filter(Boolean).length;
+}
+
 export function summarizeDiaryForPrompt(events, today) {
   const entries = (events ?? []).filter(e => e?.record?.type === 'diary');
   if (!entries.length) return '';
   const last = lastDate(events, 'diary');
   const gap = last ? daysBetween(last, today) : null;
-  const lengths = entries.map(e => (e.body ?? '').trim().split(/\s+/).filter(Boolean).length);
-  const sorted = [...lengths].sort((a, b) => a - b);
-  const q1 = sorted[Math.floor(sorted.length / 4)] ?? 0;
-  const shortFlag = lengths.length >= 4 && lengths.filter(n => n <= q1).length
-    ? 'Recent entries include some shorter than usual — a hypothesis, not a claim.'
-    : '';
-  const lines = entries
-    .sort((a, b) => a.record.date.localeCompare(b.record.date))
+  const byDate = [...entries].sort((a, b) => a.record.date.localeCompare(b.record.date));
+  let shortFlag = '';
+  if (byDate.length >= 4) {
+    const latestCount = diaryWordCount(byDate.at(-1));
+    const others = byDate.slice(0, -1);
+    const meanOthers = others.reduce((sum, e) => sum + diaryWordCount(e), 0) / others.length;
+    if (latestCount < 0.7 * meanOthers) {
+      shortFlag = 'Recent entries include some shorter than usual — a hypothesis, not a claim.';
+    }
+  }
+  const lines = byDate
     .slice(-8)
     .map(e => {
       const r = e.record;
