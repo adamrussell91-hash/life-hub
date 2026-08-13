@@ -94,10 +94,13 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile },
 
   const diff = diffManifest(previous?.manifest, manifest);
   const previousFiles = new Map((previous?.files ?? []).map(entry => [entry.path, entry]));
-  const downloads = diff.changed.filter(entry => {
-    const prior = previousFiles.get(entry.path);
-    return prior?.sha !== entry.sha;
-  });
+  const cachedBlobs = new Map();
+  const downloads = [];
+  for (const entry of manifest.files) {
+    const cached = await readCachedBlob(cache, entry.sha, previous?.files);
+    if (cached && typeof cached.content === 'string') cachedBlobs.set(entry.sha, cached);
+    else downloads.push(entry);
+  }
   const received = new Map();
   const warnings = [];
 
@@ -110,6 +113,7 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile },
         body: JSON.stringify({
           from,
           to,
+          commitSha: manifest.commitSha,
           files: batch.map(({ path, sha }) => ({ path, sha }))
         }),
         signal
@@ -173,7 +177,9 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile },
 
   const files = [];
   for (const entry of manifest.files) {
-    const candidate = received.get(entry.path) ?? previousFiles.get(entry.path);
+    const cached = cachedBlobs.get(entry.sha);
+    const fromCache = cached ? { ...cached, path: entry.path, sha: entry.sha } : null;
+    const candidate = received.get(entry.path) ?? fromCache ?? previousFiles.get(entry.path);
     if (candidate && candidate.sha === entry.sha && typeof candidate.content === 'string') {
       files.push({
         path: entry.path,
@@ -200,6 +206,11 @@ async function performSync({ fetchImpl, cache, from, to, signal, validateFile },
   }
   const changed = !previousMatchesRange || diff.changed.length > 0 || diff.removed.length > 0;
   return resultFrom(record, [], changed);
+}
+
+async function readCachedBlob(cache, sha, previousFiles) {
+  if (typeof cache.readBlob === 'function') return cache.readBlob(sha);
+  return previousFiles?.find(file => file.sha === sha) ?? null;
 }
 
 function createBatches(files) {

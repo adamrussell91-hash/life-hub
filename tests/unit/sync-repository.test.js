@@ -20,17 +20,37 @@ const manifest = (manifestId, files, commitSha = SHA.c, range = {
 const json = (data, status = 200) => Response.json({ ok: status < 400, data }, { status });
 
 function memoryCache(previous = null) {
-  let value = previous;
+  const blobs = new Map();
+  const memos = new Map();
+  if (previous) {
+    memos.set(`${previous.manifest.from}\0${previous.manifest.to}`, previous);
+    for (const file of previous.files ?? []) blobs.set(file.sha, file);
+  }
   const writes = [];
-  return {
-    read: async () => value,
-    write: async next => {
-      value = structuredClone(next);
-      writes.push(structuredClone(next));
+  const cache = {
+    async readBlob(sha) { return blobs.get(sha) ?? null; },
+    async read(range) {
+      const key = `${range.from}\0${range.to}`;
+      const memo = memos.get(key);
+      if (!memo) return null;
+      const files = [];
+      for (const entry of memo.manifest.files) {
+        const blob = blobs.get(entry.sha);
+        if (!blob) return null;
+        files.push(blob);
+      }
+      return { ...memo, files };
     },
-    get value() { return value; },
+    async write(next) {
+      const copy = structuredClone(next);
+      memos.set(`${copy.manifest.from}\0${copy.manifest.to}`, copy);
+      for (const file of copy.files ?? []) blobs.set(file.sha, file);
+      writes.push(copy);
+    },
+    get value() { return [...memos.values()].at(-1) ?? null; },
     writes
   };
+  return cache;
 }
 
 test('manifest diff downloads only new or changed blobs and drops removed paths', () => {
@@ -107,6 +127,46 @@ test('a cached manifest from another range is never sent as a conditional', asyn
   assert.deepEqual(cache.value.manifest, nextManifest);
 });
 
+test('a second range does not POST files whose sha is already cached', async () => {
+  const cachedFile = { path: 'config/targets.yml', sha: SHA.a, content: 'cached' };
+  const cache = memoryCache({
+    manifest: manifest('july', [file('config/targets.yml', SHA.a)], SHA.c, {
+      from: '2026-07-01', to: '2026-07-31'
+    }),
+    files: [cachedFile]
+  });
+  const julyManifest = manifest('july', [file('config/targets.yml', SHA.a)]);
+  const weekManifest = manifest('week', [
+    file('config/targets.yml', SHA.a),
+    file('data/nutrition/2026/08/2026-08-01-breakfast.md', SHA.b)
+  ], SHA.c, { from: '2026-07-26', to: '2026-08-01' });
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url, init });
+    if (String(url).includes('/api/repo/manifest')) {
+      const to = new URL(url, 'https://life.example').searchParams.get('to');
+      return json(to === '2026-08-01' ? weekManifest : julyManifest);
+    }
+    return json({
+      commitSha: SHA.c,
+      files: [{ path: 'data/nutrition/2026/08/2026-08-01-breakfast.md', sha: SHA.b, content: 'meal' }]
+    });
+  };
+
+  await syncRepository({
+    fetchImpl, cache, from: '2026-07-26', to: '2026-08-01',
+    validateFile: () => ({ valid: true })
+  });
+
+  const filePosts = calls.filter(call => call.url === '/api/repo/files');
+  assert.equal(filePosts.length, 1);
+  const body = JSON.parse(filePosts[0].init.body);
+  assert.equal(body.commitSha, SHA.c);
+  assert.deepEqual(body.files, [
+    { path: 'data/nutrition/2026/08/2026-08-01-breakfast.md', sha: SHA.b }
+  ]);
+});
+
 test('changed manifest requests one exact pair and atomically replaces the cache', async () => {
   const oldManifest = manifest('old-range', [file('a.md', SHA.a), file('gone.md', SHA.d)]);
   const nextManifest = manifest('new-range', [file('a.md', SHA.a), file('b.md', SHA.b)]);
@@ -137,6 +197,7 @@ test('changed manifest requests one exact pair and atomically replaces the cache
   assert.deepEqual(JSON.parse(requests[1].init.body), {
     from: '2026-07-01',
     to: '2026-07-31',
+    commitSha: SHA.c,
     files: [{ path: 'b.md', sha: SHA.b }]
   });
   assert.deepEqual(result.files, [
