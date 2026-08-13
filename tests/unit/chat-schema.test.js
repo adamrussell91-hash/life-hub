@@ -259,3 +259,30 @@ test('rejects rather than throws when now is missing or not a string', () => {
   const nonString = validateLogEntry({ type: 'meal', date: '2026-08-01', fields: { meal: 'breakfast' } }, { id: 'x', now: 12345 });
   assert.equal(nonString.valid, false);
 });
+
+test('mind_session whitelist and session slug', () => {
+  const result = validateLogEntry({
+    type: 'mind_session',
+    date: '2026-08-13',
+    fields: { theme: 'Weekend permission', closing_question: 'What is the weekend for?', mood_at_close: 'low' }
+  }, { id: 'ms-1', now: '2026-08-13T17:00:00+10:00' });
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(buildRecordSlug(result.record), 'session');
+  assert.equal(
+    buildCanonicalPath({ type: 'mind_session', date: '2026-08-13', slug: 'session' }),
+    'data/mind/2026/08/2026-08-13-session.md'
+  );
+});
+
+test('diary whitelist accepts moods, system_note, cross_agent_note', () => {
+  const result = validateLogEntry({
+    type: 'diary',
+    date: '2026-08-13',
+    fields: {
+      mood_score: 6, mood: 'low', moods: ['low', 'good'], energy: 'medium',
+      tags: [], dayone_sent: false, system_note: 'Weekend collapse',
+      cross_agent_note: 'Penelope→Vera: worth a visit.'
+    }
+  }, { id: 'd-1', now: '2026-08-13T21:00:00+10:00' });
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
