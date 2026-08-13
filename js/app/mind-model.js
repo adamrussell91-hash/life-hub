@@ -150,7 +150,7 @@ export function recurringThemes(entries, bounds, { limit = 8 } = {}) {
     }));
 }
 
-export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE }) {
+export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE, governanceLogMarkdown, centralNodeMarkdown }) {
   if (!date) throw new RangeError('Mind display date is unavailable');
   const selectedRange = MIND_RANGES.includes(range) ? range : DEFAULT_MIND_RANGE;
   const bounds = rangeWindow(date, selectedRange);
@@ -158,6 +158,16 @@ export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE }) {
   const moodSeries = moodScoreSeries(entries, bounds);
   const byMood = entriesByMood(entries, bounds);
   const themes = recurringThemes(entries, bounds);
+  const allSessions = sessionEntries(events);
+  const sessions = allSessions
+    .filter(session => session.date >= bounds.from && session.date <= bounds.to)
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date) || String(a.path).localeCompare(String(b.path)));
+  const energyByLevel = entriesByEnergy(entries, bounds);
+  const insights = mindInsights(governanceLogMarkdown, bounds);
+  const crossAgentLines = mindCrossAgentLines(centralNodeMarkdown);
+  const diaryGap = daysSinceLastDiary(entries, date);
+  const sessionGap = daysSinceLastMindSession(allSessions, date);
 
   return {
     date,
@@ -167,6 +177,13 @@ export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE }) {
     moodSeries,
     byMood,
     themes,
+    sessions,
+    energyByLevel,
+    insights,
+    crossAgentLines,
+    daysSinceLastDiary: diaryGap,
+    daysSinceLastMindSession: sessionGap,
+    silence: silenceFlag(diaryGap, sessionGap),
     empty: moodSeries.length === 0 && byMood.every(item => item.value === 0) && themes.length === 0
   };
 }
