@@ -2034,6 +2034,57 @@ main { max-width: 76rem; margin: 0 auto; }
   color: var(--muted);
   background: rgba(28, 42, 34, 0.06);
 }
+.body-tape-chip[data-colour="low"] {
+  color: var(--high-sea);
+  background: rgba(246, 134, 32, 0.14);
+}
+.bloods-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+}
+.bloods-flag {
+  cursor: default;
+}
+.bloods-sections {
+  display: grid;
+  gap: var(--space-stack);
+}
+.bloods-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.85rem;
+  padding: 0.35rem 0;
+  border: 0;
+  background: none;
+  color: var(--wave);
+  font: inherit;
+  font-weight: 700;
+  min-height: 44px;
+  cursor: pointer;
+}
+.bloods-category__toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: 44px;
+}
+.bloods-category.is-collapsed .bloods-category__body {
+  display: none;
+}
+.body-chart [data-role="ref-band"] {
+  fill: rgba(55, 111, 183, 0.12);
+}
 .body-tape-label__history {
   display: grid;
   grid-template-rows: 0fr;
