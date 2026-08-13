@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  appendCrossAgentLine,
   appendRecentAction,
   applyLogToCentralNode,
   buildMealFlagsLine,
@@ -312,4 +313,40 @@ test('hammond protocol no longer mentions Sterling; central-node.md is untouched
   // checked-in file on this branch (assert length + Clare/Ann presence above).
   assert.ok(cn.length > 1000);
   assert.equal(createHash('sha256').update(cn).digest('hex').length, 64);
+});
+
+test('diary confirm upserts Energy as well as Mood', () => {
+  const next = applyLogToCentralNode(base, {
+    record: { type: 'diary', date: '2026-06-19', mood: 'low', mood_score: 4, energy: 'low' },
+    actionLine: '\n**19 Jun:** Penelope: Logged a diary entry.'
+  });
+  assert.match(next, /\*\*Mood:\*\*/);
+  assert.match(next, /\*\*Energy:\*\* low/);
+});
+
+test('mind_session upserts Mind status and Cross-Agent line', () => {
+  const withXa = `${base}\n## 🤝 Cross-Agent Coordination\n- Old line.\n`;
+  const next = applyLogToCentralNode(withXa, {
+    record: {
+      type: 'mind_session', date: '2026-06-19',
+      theme: 'Weekend permission',
+      cross_agent_note: 'Vera→Penelope: ask what the weekend is for.'
+    },
+    actionLine: '\n**19 Jun:** Dr Vera Lenz: Logged a mind session (Weekend permission).'
+  });
+  assert.match(next, /\*\*Mind:\*\* Weekend permission/);
+  assert.match(next, /Vera→Penelope: ask what the weekend is for/);
+});
+
+test('appendCrossAgentLine inserts newest-first and trim still caps at 12', () => {
+  let content = `${base}\n## 🤝 Cross-Agent Coordination\n`;
+  for (let i = 0; i < 12; i += 1) content = appendCrossAgentLine(content, `- Old ${i}.`);
+  const next = appendCrossAgentLine(content, '- New line.');
+  const trimmed = applyLogToCentralNode(next, {
+    record: { type: 'diary', date: '2026-06-19', mood: 'good', energy: 'high' },
+    actionLine: '\n**19 Jun:** Penelope: Logged a diary entry.'
+  });
+  assert.match(trimmed, /New line/);
+  const bullets = trimmed.split('\n').filter(l => l.startsWith('- '));
+  assert.ok(bullets.length <= 12);
 });

@@ -13,7 +13,8 @@ export const GOVERNANCE_ENTRY_TYPES = [
   'Weekly Review',
   'Goal Audit',
   'Direction Session',
-  'Principle Update'
+  'Principle Update',
+  'Mind Insight'
 ];
 
 const TITLE_LINE = '# Governance Log\n';
