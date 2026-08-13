@@ -805,7 +805,9 @@ export function createAppController(dependencies) {
     const model = buildMindModel({
       events: latestResult.events,
       date: latestResult.date,
-      range: mindRange
+      range: mindRange,
+      governanceLogMarkdown: latestResult.governanceLogMarkdown,
+      centralNodeMarkdown: latestResult.centralNodeMarkdown
     });
     renderMind(root, model, {
       onRangeChange: next => {

@@ -2285,9 +2285,89 @@ main { max-width: 76rem; margin: 0 auto; }
 #mind-mood-chart [data-role="area"] { fill: rgba(200, 90, 100, 0.18); }
 #mind-mood-chart [data-role="line"] { fill: none; stroke: #C85A64; stroke-width: 2; }
 #mind-mood-columns .column-bar > span:first-child,
-#mind-theme-columns .column-bar > span:first-child {
+#mind-theme-columns .column-bar > span:first-child,
+#mind-energy-columns .column-bar > span:first-child {
   background: #C85A64;
 }
+#mind-silence {
+  margin: 0 0 1rem;
+}
+.mind-session-card {
+  background: var(--glass);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1rem;
+  margin: 0 0 0.65rem;
+  border-left: 0.28rem solid #263450;
+}
+.mind-session-card__date {
+  margin: 0 0 0.2rem;
+  color: var(--wave);
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.mind-session-card__theme {
+  margin: 0;
+  color: var(--marine);
+  font-size: 1.05rem;
+}
+.mind-session-card__question {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-style: italic;
+}
+.mind-session-card__insight {
+  margin: 0.45rem 0 0;
+  color: var(--high-sea);
+  font-weight: 650;
+}
+.governance-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.governance-entry {
+  margin: 0 0 0.85rem;
+}
+.governance-entry-heading {
+  margin: 0;
+  color: var(--wave);
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.governance-entry-title {
+  margin: 0.25rem 0 0;
+  color: var(--marine);
+  font-weight: 700;
+}
+.governance-entry-status,
+.governance-entry-body {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.mind-cross-agent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.mind-cross-agent__line {
+  margin: 0;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.55rem;
+  border-left: 0.28rem solid var(--wave);
+  background: var(--glass);
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+.mind-cross-agent__line[data-agent="vera"] { border-left-color: #263450; }
+.mind-cross-agent__line[data-agent="penelope"] { border-left-color: #8F373E; }
 
 .fitness-exercise strong {
   display: block;
