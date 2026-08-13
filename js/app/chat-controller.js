@@ -2,6 +2,7 @@ import {
   appendMessage,
   appendCnPatchProposal,
   appendRecordProposal,
+  appendRecordSaved,
   renderInlineMarkdown,
   setChatBusy,
   showChatError
@@ -358,6 +359,16 @@ export function createChatController({
           endTextTurn();
           const proposal = appendRecordProposal(root, event);
           bindProposal(proposal, event);
+        } else if (event.type === 'record_saved') {
+          turnSignaled = true;
+          gotUsefulOutput = true;
+          clearWorkingBubble();
+          endTextTurn();
+          appendRecordSaved(root, {
+            summary: event.summary,
+            agentSlug: assistantSlug
+          });
+          onRecordWritten?.(event);
         } else if (event.type === 'cn_patch_proposal') {
           turnSignaled = true;
           gotUsefulOutput = true;
