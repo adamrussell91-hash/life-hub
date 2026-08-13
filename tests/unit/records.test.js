@@ -180,12 +180,68 @@ test('accepts every canonical domain record and nullable observations', () => {
       ...common, type: 'skincare', routine: 'pm', completed: true,
       products: ['cleanser'], skin_note: null
     },
-    { ...common, type: 'fragrance', fragrance: 'Aether', occasion: null }
+    { ...common, type: 'fragrance', fragrance: 'Aether', occasion: null },
+    { ...common, type: 'bloods', markers: [] }
   ];
 
   for (const record of records) {
     assert.deepEqual(validateRecord(record), [], `${record.type} should be valid`);
   }
+});
+
+test('accepts bloods records with a markers array', () => {
+  const record = {
+    ...common,
+    type: 'bloods',
+    markers: [
+      {
+        key: 'alt',
+        label: 'ALT',
+        category: 'Liver Function',
+        value: 42,
+        unit: 'U/L',
+        ref_low: null,
+        ref_high: 40,
+        status: 'High'
+      },
+      {
+        key: 'hepb_sag',
+        label: 'HepB sAg',
+        category: 'Liver Function',
+        value: null,
+        unit: 'Qualitative',
+        ref_low: null,
+        ref_high: null,
+        status: null
+      }
+    ]
+  };
+  assert.deepEqual(validateRecord(record), []);
+});
+
+test('rejects bloods records with a non-array markers field', () => {
+  assert.match(
+    validateRecord({ ...common, type: 'bloods', markers: 'nope' }).join('; '),
+    /markers/
+  );
+});
+
+test('parses a canonical bloods event path', () => {
+  const text = `---
+schema_version: 1
+id: "notion-bloods-2026-05-19"
+type: "bloods"
+date: "2026-05-19"
+time: "12:00"
+created_at: "2026-05-19T12:00:00+10:00"
+updated_at: "2026-05-19T12:00:00+10:00"
+source: "notion_import"
+markers: [{"key":"alt","label":"ALT","category":"Liver Function","value":42,"unit":"U/L","ref_low":null,"ref_high":40,"status":"High"}]
+---
+`;
+  const event = parseEventDocument(text, 'data/body/2026/05/2026-05-19-bloods.md', load);
+  assert.equal(event.record.type, 'bloods');
+  assert.equal(event.record.markers[0].key, 'alt');
 });
 
 test('rejects unknown types and invalid enumerations', () => {

@@ -259,6 +259,31 @@ function validateFragrance(record, errors) {
   optionalString(record, 'occasion', errors);
 }
 
+function validateBloods(record, errors) {
+  const markers = record.markers;
+  if (!Array.isArray(markers)) {
+    errors.push('markers must be an array');
+    return;
+  }
+  for (const marker of markers) {
+    if (!isObject(marker)) {
+      errors.push('markers entries must be objects');
+      continue;
+    }
+    if (typeof marker.key !== 'string' || marker.key.trim() === '') {
+      errors.push('marker key must be a non-empty string');
+    }
+    if (marker.value != null && (typeof marker.value !== 'number' || !Number.isFinite(marker.value))) {
+      errors.push('marker value must be a finite number or null');
+    }
+    for (const bound of ['ref_low', 'ref_high']) {
+      if (marker[bound] != null && (typeof marker[bound] !== 'number' || !Number.isFinite(marker[bound]))) {
+        errors.push(`marker ${bound} must be a finite number or null`);
+      }
+    }
+  }
+}
+
 const VALIDATORS = {
   meal: validateMeal,
   workout: validateWorkout,
@@ -269,7 +294,8 @@ const VALIDATORS = {
   sleep: validateSleep,
   heart: validateHeart,
   skincare: validateSkincare,
-  fragrance: validateFragrance
+  fragrance: validateFragrance,
+  bloods: validateBloods
 };
 
 export function validateUniqueIds(eventsOrRecords) {
