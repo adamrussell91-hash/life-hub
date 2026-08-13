@@ -376,5 +376,15 @@ Verified on 2026-08-11 (local only — do not push unless asked). Final move of 
 - Removed Sterling from `config/hammond-protocol.md` Decision Priority Hierarchy (rule 5 dropped; Growth/Comfort renumbered). `central-node.md` untouched — Clare/Ann references preserved.
 - `npm test`: 934 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
 
+## Phase 35: Mind dashboard — Complete
+
+Verified on 2026-08-13 (local only — do not push unless asked). Spec: `docs/superpowers/specs/2026-08-13-mind-dashboard-design.md`. Shell cache bumped to `life-hub-shell-v70`.
+
+- Mind tab adds an energy column chart, Vera session cards, Mind Insight feed (`parseGovernanceEntries` on the full log, not the prompt tail), and Vera/Penelope Cross-Agent lines.
+- Dual-gap silence chip (both diary and Vera session ≥ 7 days, all-time, `null` is not silence). Everyday gap copy stays on the session-memory ambient line.
+- Empty states for sessions / insights / cross-agent so the page holds before session-memory ships.
+- Read-only. No write path.
+- `npm test`: 1014 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+
 ## Next Phase: sleep·heart on Body / polish
 
