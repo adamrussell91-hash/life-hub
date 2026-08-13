@@ -87,11 +87,14 @@ test('private cache whitelists nested repository fields at the private cache key
     }],
     warnings: [{ path: 'config/targets.yml', code: 'invalid_targets' }]
   });
-  assert.deepEqual([...storage.caches.keys()], ['life-hub-private-v1']);
-  const stored = storage.caches.get('life-hub-private-v1');
-  assert.deepEqual([...stored.keys()], [
-    '/__life-hub-private-cache__/repository?from=2026-07-01&to=2026-07-31'
-  ]);
+  assert.deepEqual([...storage.caches.keys()], ['life-hub-private-v2']);
+  const stored = storage.caches.get('life-hub-private-v2');
+  const blobKey = `/__life-hub-private-cache__/blob/${'a'.repeat(40)}`;
+  const rangeKey = '/__life-hub-private-cache__/repository?from=2026-07-01&to=2026-07-31';
+  assert.deepEqual([...stored.keys()], [blobKey, rangeKey]);
+  const memo = await stored.get(rangeKey).clone().json();
+  assert.equal(Object.hasOwn(memo, 'files'), false);
+  assert.equal(JSON.stringify(memo).includes('target_sets'), false);
   const cached = await cache.read({ from: '2026-07-01', to: '2026-07-31' });
   assert.equal(JSON.stringify(cached).includes('life_hub_session'), false);
   assert.equal(JSON.stringify(cached).includes('Bearer'), false);
@@ -120,4 +123,45 @@ test('private cache keeps disjoint exact ranges and clear deletes only its named
   assert.equal(await cache.read({ from: july.from, to: july.to }), null);
   assert.equal(await cache.read({ from: august.from, to: august.to }), null);
   assert.equal(storage.caches.has('other-cache'), true);
+});
+
+test('readBlob returns a file by sha across ranges and write stores blobs plus a range memo', async () => {
+  const storage = new MemoryCacheStorage();
+  const cache = createRepositoryCache(storage);
+  const sha = 'a'.repeat(40);
+  const file = { path: 'config/targets.yml', sha, content: 'target_sets: []\n' };
+
+  await cache.write({
+    manifest: manifest('july-range', [{ path: file.path, sha, size: 16 }]),
+    files: [file],
+    warnings: []
+  });
+
+  assert.deepEqual(await cache.readBlob(sha), {
+    path: 'config/targets.yml',
+    sha,
+    content: 'target_sets: []\n'
+  });
+  assert.equal((await cache.read({ from: '2026-07-01', to: '2026-07-31' })).files[0].content, file.content);
+
+  await cache.write({
+    manifest: {
+      ...manifest('august-range', [{ path: file.path, sha, size: 16 }]),
+      from: '2026-08-01',
+      to: '2026-08-07'
+    },
+    files: [file],
+    warnings: []
+  });
+
+  assert.equal(await cache.readBlob(sha).then(value => value.content), file.content);
+});
+
+test('opening v2 deletes leftover v1 range records', async () => {
+  const storage = new MemoryCacheStorage();
+  storage.caches.set('life-hub-private-v1', new Map([['old', true]]));
+  const cache = createRepositoryCache(storage);
+  await cache.read({ from: '2026-07-01', to: '2026-07-31' });
+  assert.equal(storage.caches.has('life-hub-private-v1'), false);
+  assert.equal(storage.caches.has('life-hub-private-v2'), true);
 });
