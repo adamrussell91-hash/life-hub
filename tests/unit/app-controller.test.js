@@ -268,13 +268,14 @@ function harness(options = {}) {
       },
       async read() { return options.cachedRecord ?? null; }
     },
-    async loadLive({ signal } = {}) {
+    async loadLive({ signal, onPartial } = {}) {
       calls.syncs += 1;
       calls.refreshSignals.push(signal);
       if (typeof options.loadLiveImpl === 'function') {
         return options.loadLiveImpl({
           call: calls.syncs,
           signal,
+          onPartial,
           setPrivateCachePresent(value = true) {
             privateCachePresent = value;
           }
@@ -283,10 +284,13 @@ function harness(options = {}) {
       if (heldSync) {
         const result = await heldSync;
         if (options.repopulateOnSync) privateCachePresent = true;
+        await onPartial?.(result);
         return result;
       }
       if (options.liveError) throw options.liveError;
-      return options.liveResults?.shift() ?? options.liveResult ?? liveData();
+      const result = options.liveResults?.shift() ?? options.liveResult ?? liveData();
+      await onPartial?.(result);
+      return result;
     },
     async loadCached() {
       calls.cached += 1;
@@ -1062,6 +1066,59 @@ test('navigating to Chat clears the chat unread flag', async () => {
 
   assert.equal(state.calls.chatClearUnreads, 1);
   assert.equal(state.controller.getCurrentSection(), 'chat');
+});
+
+test('Home becomes ready after the first live window while a later slice is still pending', async () => {
+  let release;
+  const later = new Promise(resolve => { release = resolve; });
+  const week = liveData({ events: [{ record: { date: '2026-08-01', type: 'weight' } }] });
+  const full = liveData({
+    events: [
+      { record: { date: '2026-08-01', type: 'weight' } },
+      { record: { date: '2026-07-01', type: 'weight' } }
+    ]
+  });
+  const state = harness({
+    loadLiveImpl: async ({ onPartial }) => {
+      await onPartial(week);
+      await later;
+      await onPartial(full);
+      return full;
+    }
+  });
+
+  const started = state.controller.start();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.root.querySelector('#app-shell').hidden, false);
+  assert.equal(state.calls.renders, 1);
+  assert.equal(state.root.querySelector('#app').dataset.state, 'ready');
+  assert.match(state.root.querySelector('#app-status').textContent, /earlier history/i);
+
+  await started;
+  assert.equal(state.calls.renders, 1);
+
+  release();
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.calls.renders, 2);
+});
+
+test('a failed later slice does not show the unavailable panel after first paint', async () => {
+  const week = liveData();
+  const state = harness({
+    loadLiveImpl: async ({ onPartial }) => {
+      await onPartial(week);
+      throw Object.assign(new Error('github_unavailable'), { code: 'github_unavailable' });
+    }
+  });
+
+  await state.controller.start();
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(state.root.querySelector('#unavailable-panel').hidden, true);
+  assert.equal(state.root.querySelector('#app-shell').hidden, false);
+  assert.equal(state.root.querySelector('#app').dataset.state, 'ready');
 });
 
 test('a completed refresh while viewing Central Node re-renders the dashboard and re-themes the chat button', async () => {

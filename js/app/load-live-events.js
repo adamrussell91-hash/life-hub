@@ -10,7 +10,7 @@ const INITIAL_LOOKBACK_DAYS = 6;
 const EXTENSION_DAYS = 30;
 const MAX_LOOKBACK_DAYS = 1826;
 
-export async function loadLiveEvents({ sync, loadYaml, date, onPartial }) {
+export async function loadLiveEvents({ sync, loadYaml, date, onPartial, backfill }) {
   if (typeof sync !== 'function' || typeof loadYaml !== 'function') {
     throw new TypeError('Live event dependencies are unavailable');
   }
@@ -51,17 +51,19 @@ export async function loadLiveEvents({ sync, loadYaml, date, onPartial }) {
   ingest(first);
   await onPartial?.(snapshot());
 
-  while (true) {
-    const nextTo = addCalendarDays(from, -1);
-    const nextFrom = addCalendarDays(from, -EXTENSION_DAYS);
-    if (daysBetween(nextFrom, date) >= MAX_LOOKBACK_DAYS) break;
-    from = nextFrom;
-    to = nextTo;
-    const result = await sync({ from, to, validateFile: createValidator(loadYaml) });
-    const batch = parseFiles(result.files ?? [], loadYaml);
-    ingest(result);
-    if (batch.events.length === 0) break;
-    await onPartial?.(snapshot());
+  if (backfill !== false) {
+    while (true) {
+      const nextTo = addCalendarDays(from, -1);
+      const nextFrom = addCalendarDays(from, -EXTENSION_DAYS);
+      if (daysBetween(nextFrom, date) >= MAX_LOOKBACK_DAYS) break;
+      from = nextFrom;
+      to = nextTo;
+      const result = await sync({ from, to, validateFile: createValidator(loadYaml) });
+      const batch = parseFiles(result.files ?? [], loadYaml);
+      ingest(result);
+      if (batch.events.length === 0) break;
+      await onPartial?.(snapshot());
+    }
   }
 
   return snapshot();
