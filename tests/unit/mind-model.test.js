@@ -46,3 +46,16 @@ test('range helpers and empty themes', () => {
   assert.equal(moodScoreSeries([], rangeWindow('2026-08-05', 'weekly')).length, 0);
   assert.equal(entriesByMood([], rangeWindow('2026-08-05', 'weekly')).every(item => item.value === 0), true);
 });
+
+test('entriesByMood increments both bars for mixed moods', () => {
+  const events = [{
+    record: {
+      type: 'diary', date: '2026-08-05', mood: 'low', moods: ['low', 'good'], tags: []
+    },
+    body: '',
+    path: 'mixed'
+  }];
+  const model = buildMindModel({ events, date: '2026-08-05', range: 'weekly' });
+  assert.equal(model.byMood.find(item => item.key === 'low').value, 1);
+  assert.equal(model.byMood.find(item => item.key === 'good').value, 1);
+});
