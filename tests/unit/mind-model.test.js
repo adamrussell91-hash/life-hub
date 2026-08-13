@@ -11,7 +11,9 @@ import {
   sessionEntries,
   daysSinceLastDiary,
   daysSinceLastMindSession,
-  silenceFlag
+  silenceFlag,
+  mindInsights,
+  mindCrossAgentLines
 } from '../../js/app/mind-model.js';
 
 test('buildMindModel builds mood series, by-mood counts, and themes', () => {
@@ -119,4 +121,39 @@ test('silenceFlag is true only when both gaps are numbers >= 7', () => {
   assert.equal(silenceFlag(null, null), false);
   assert.equal(silenceFlag(12, null), false);
   assert.equal(silenceFlag(null, 9), false);
+});
+
+test('mindInsights filters Mind Insight entries in range and ignores the 10-entry tail cap', () => {
+  const blocks = [];
+  for (let i = 0; i < 11; i += 1) {
+    const day = String(i + 1).padStart(2, '0');
+    blocks.push(`## 2026-07-${day} — Coach's Notes\n\nOld note ${i}.\n`);
+  }
+  blocks.push(`## 2026-08-02 — Mind Insight\n**Title:** Weekend\n**Status:** Still Active\n\nRest is not a prize.\n`);
+  blocks.push(`## 2026-06-01 — Mind Insight\n**Title:** Too old\n\nOutside monthly window.\n`);
+  const markdown = `# Governance Log\n\n${blocks.join('\n')}`;
+  const insights = mindInsights(markdown, rangeWindow('2026-08-13', 'monthly'));
+  assert.equal(insights.length, 1);
+  assert.equal(insights[0].entryType, 'Mind Insight');
+  assert.equal(insights[0].title, 'Weekend');
+  assert.equal(insights[0].body, 'Rest is not a prize.');
+  assert.equal(insights[0].status, 'Still Active');
+});
+
+test('mindCrossAgentLines keeps Vera/Penelope prefixes and drops others', () => {
+  const markdown = `# Purpose
+## 🤝 Cross-Agent Coordination
+*One-line directives only.*
+- Chadwick→Sara: AC flag.
+- **Vera→Penelope:** ask what the weekend is actually for.
+- Penelope→Vera: the wedding scent came up.
+- Hammond→Ann: teaching handoff.
+- Brisket→Penelope: skip dessert logging.
+`;
+  const lines = mindCrossAgentLines(markdown);
+  assert.deepEqual(lines, [
+    'Vera→Penelope: ask what the weekend is actually for.',
+    'Penelope→Vera: the wedding scent came up.',
+    'Brisket→Penelope: skip dessert logging.'
+  ]);
 });
