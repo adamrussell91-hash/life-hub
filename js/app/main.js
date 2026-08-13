@@ -54,30 +54,30 @@ const fetchImpl = (input, init = {}) => {
 const cache = createRepositoryCache(caches);
 const sessionApi = createSessionApi(fetchImpl);
 
-const loadLive = ({ date, signal }) => loadLiveEvents({
+const loadLive = ({ date, signal, onPartial }) => loadLiveEvents({
   date,
   loadYaml: load,
+  onPartial,
   sync: options => syncRepository({ ...options, fetchImpl, cache, signal })
 });
 
-const loadCached = async ({ date }) => {
-  return loadLiveEvents({
-    date,
-    loadYaml: load,
-    sync: async ({ from, to }) => {
-      const snapshot = await cache.read({ from, to });
-      if (!snapshot) throw new Error('Private cache is unavailable');
-      return {
-        files: snapshot.files,
-        warnings: snapshot.warnings ?? [],
-        commitSha: snapshot.manifest.commitSha,
-        manifestId: snapshot.manifest.manifestId,
-        changed: false,
-        freshness: 'fallback'
-      };
-    }
-  });
-};
+const loadCached = async ({ date }) => loadLiveEvents({
+  date,
+  loadYaml: load,
+  backfill: false,
+  sync: async ({ from, to }) => {
+    const snapshot = await cache.read({ from, to });
+    if (!snapshot) throw new Error('Private cache is unavailable');
+    return {
+      files: snapshot.files,
+      warnings: snapshot.warnings ?? [],
+      commitSha: snapshot.manifest.commitSha,
+      manifestId: snapshot.manifest.manifestId,
+      changed: false,
+      freshness: 'fallback'
+    };
+  }
+});
 
 const chatPanel = createChatPanelController({ root: document });
 const chatApi = createChatApi(fetchImpl);

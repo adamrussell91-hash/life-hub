@@ -289,6 +289,27 @@ test('exact range snapshots restore a long streak offline across the disjoint-ra
   assert.equal(cached.changed, false);
 });
 
+test('backfill: false syncs only the first seven-day window', async () => {
+  const calls = [];
+  const date = '2026-08-01';
+  const sync = async options => {
+    calls.push({ from: options.from, to: options.to });
+    return {
+      files: [bodyWeight(date, 80)],
+      warnings: [],
+      commitSha: 'c'.repeat(40),
+      manifestId: `range-${calls.length}`,
+      changed: true,
+      freshness: 'confirmed'
+    };
+  };
+
+  await loadLiveEvents({ sync, loadYaml: load, date, backfill: false });
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], { from: '2026-07-26', to: '2026-08-01' });
+});
+
 test('rejects invalid dates before starting repository sync', async () => {
   let called = false;
   await assert.rejects(

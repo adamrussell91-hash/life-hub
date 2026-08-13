@@ -265,8 +265,11 @@ export function createAppController(dependencies) {
     if (destroyed) return Promise.resolve();
     const force = options.force === true;
     if (activeRefresh && !force) return activeRefresh;
-    if (force && activeRefresh) {
-      abortActiveRefresh(new DOMException('Superseded by post-write refresh', 'AbortError'));
+    if (refreshAbortController) {
+      abortActiveRefresh(new DOMException(
+        force ? 'Superseded by post-write refresh' : 'Superseded by new refresh',
+        'AbortError'
+      ));
     }
     if (!requireUnexpiredSession()) return Promise.resolve();
     if (!navigatorTarget.onLine && rendered) {
@@ -287,7 +290,6 @@ export function createAppController(dependencies) {
       .finally(() => {
         if (activeRefresh !== refreshPromise) return;
         if (button) button.disabled = !navigatorTarget.onLine;
-        if (refreshAbortController === abortController) refreshAbortController = null;
         activeRefresh = null;
       });
     activeRefresh = refreshPromise;
@@ -295,10 +297,14 @@ export function createAppController(dependencies) {
   }
 
   async function performRefresh({ signal, version, manual = false, force = false }) {
-    try {
-      const date = getSydneyDateKey(currentDate());
-      const result = await loadLive({ date, signal });
+    const date = getSydneyDateKey(currentDate());
+    let painted = false;
+    let lastApplied = null;
+
+    const apply = result => {
       if (!isCurrentRefresh(version, signal) || !requireUnexpiredSession()) return;
+      if (result === lastApplied) return;
+      lastApplied = result;
       latestResult = { ...result, date };
       if (!rendered || result.changed === true || force === true) {
         const model = buildHomeModel({ ...result, date });
@@ -316,26 +322,57 @@ export function createAppController(dependencies) {
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
       rendered = true;
-      if (result.freshness === 'confirmed') {
-        recordSuccess();
-        if (manual) {
-          setStatus(result.changed === true ? 'Synced — updates applied.' : 'Synced — already up to date.');
+      if (!painted && result.freshness === 'confirmed') recordSuccess();
+      if (!painted) {
+        if (result.freshness === 'confirmed') {
+          setStatus('Loading earlier history…');
+          hideProvider();
+          setAppState('ready');
+        } else {
+          restoreLastSuccess();
+          setAppState('stale');
+          if (manual) setStatus('Showing your last saved view.');
         }
-      } else {
-        restoreLastSuccess();
-        if (manual) setStatus('Showing your last saved view.');
+        painted = true;
       }
+    };
 
-      if (result.freshness === 'fallback') {
-        setAppState('stale');
-      } else {
-        hideProvider();
-        setAppState('ready');
+    let firstPaintDone;
+    const firstPaint = new Promise(resolve => { firstPaintDone = resolve; });
+    const backfill = loadLive({
+      date,
+      signal,
+      onPartial: result => {
+        apply(result);
+        firstPaintDone();
       }
-    } catch (error) {
+    });
+    const backfillOutcome = backfill.then(
+      result => ({ ok: true, result }),
+      error => ({ ok: false, error })
+    );
+
+    void backfillOutcome.then(outcome => {
+      if (refreshAbortController?.signal === signal) refreshAbortController = null;
+      if (outcome.ok) {
+        if (!isCurrentRefresh(version, signal)) return;
+        apply(outcome.result);
+        if (!manual) setStatus('');
+        else {
+          setStatus(outcome.result.changed === true
+            ? 'Synced — updates applied.'
+            : 'Synced — already up to date.');
+        }
+        return;
+      }
+      const error = outcome.error;
       if (!isCurrentRefresh(version, signal)) return;
       if (isSessionExpired(error)) {
         invalidateSession('Your session expired. Please sign in again.');
+        return;
+      }
+      if (painted) {
+        setStatus('Earlier history unavailable');
         return;
       }
       if (rendered) {
@@ -344,7 +381,9 @@ export function createAppController(dependencies) {
         return;
       }
       renderUnavailable?.(root, GENERIC_LOAD_ERROR);
-    }
+    });
+
+    await Promise.race([firstPaint, backfillOutcome]);
   }
 
   async function showOfflineCache(version) {
