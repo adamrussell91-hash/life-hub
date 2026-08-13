@@ -1138,6 +1138,71 @@ test('Home becomes ready after the first live window while a later slice is stil
   releaseReturn();
 });
 
+test('later slices re-render Home even when every window reports unchanged', async () => {
+  let release;
+  const later = new Promise(resolve => { release = resolve; });
+  const week = liveData({
+    changed: false,
+    events: [{ record: { date: '2026-08-01', type: 'weight' } }]
+  });
+  const full = liveData({
+    changed: false,
+    events: [
+      { record: { date: '2026-08-01', type: 'weight' } },
+      { record: { date: '2026-07-01', type: 'weight' } }
+    ]
+  });
+  const state = harness({
+    loadLiveImpl: async ({ onPartial }) => {
+      await onPartial(week);
+      await later;
+      await onPartial(full);
+      return full;
+    }
+  });
+
+  const started = state.controller.start();
+  await new Promise(resolve => setImmediate(resolve));
+  await started;
+  assert.equal(state.calls.renders, 1);
+
+  release();
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.calls.renders, 2);
+});
+
+test('visibility and interval refresh do not abort an in-flight backfill', async () => {
+  let release;
+  const later = new Promise(resolve => { release = resolve; });
+  const week = liveData();
+  const state = harness({
+    loadLiveImpl: async ({ onPartial }) => {
+      await onPartial(week);
+      await later;
+      return week;
+    }
+  });
+
+  const started = state.controller.start();
+  await new Promise(resolve => setImmediate(resolve));
+  await started;
+  assert.equal(state.calls.syncs, 1);
+  assert.equal(state.calls.refreshSignals[0]?.aborted, false);
+
+  state.root.dispatchEvent(new Event('visibilitychange'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.calls.refreshSignals[0]?.aborted, false);
+  assert.equal(state.calls.syncs, 1);
+
+  state.clock.tick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.calls.refreshSignals[0]?.aborted, false);
+  assert.equal(state.calls.syncs, 1);
+
+  release();
+});
+
 test('a failed later slice does not show the unavailable panel after first paint', async () => {
   const week = liveData();
   const state = harness({

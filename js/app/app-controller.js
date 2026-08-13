@@ -94,6 +94,7 @@ export function createAppController(dependencies) {
   let authenticated = false;
   let rendered = false;
   let latestResult = null;
+  let lastPaintedKey = null;
   let currentSection = 'home';
   let calendarSelectedDate = null;
   let calendarViewMonth = null;
@@ -265,7 +266,9 @@ export function createAppController(dependencies) {
   function refresh(options = {}) {
     if (destroyed) return Promise.resolve();
     const force = options.force === true;
+    const manual = options.manual === true;
     if (activeRefresh && !force) return activeRefresh;
+    if (inFlightLive && !force && !manual) return Promise.resolve();
     if (refreshAbortController) {
       abortActiveRefresh(new DOMException(
         force ? 'Superseded by post-write refresh' : 'Superseded by new refresh',
@@ -278,7 +281,6 @@ export function createAppController(dependencies) {
       return Promise.resolve();
     }
 
-    const manual = options.manual === true;
     const button = root.querySelector('#refresh-button');
     if (button) button.disabled = true;
     if (manual) setStatus('Refreshing your Life Hub…');
@@ -309,7 +311,8 @@ export function createAppController(dependencies) {
       if (result === lastApplied) return;
       lastApplied = result;
       latestResult = { ...result, date };
-      if (!rendered || result.changed === true || force === true) {
+      const viewKey = paintedViewKey(result);
+      if (!rendered || force === true || result.changed === true || viewKey !== lastPaintedKey) {
         const model = buildHomeModel({ ...result, date });
         renderHome(root, model);
         if (currentSection === 'nutrition') renderNutritionSection();
@@ -325,6 +328,7 @@ export function createAppController(dependencies) {
         if (painted && !historyComplete && confirmedPaint) {
           setStatus('Loading earlier history…');
         }
+        lastPaintedKey = viewKey;
       }
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
       rendered = true;
@@ -1046,4 +1050,13 @@ function isSessionExpired(error) {
 
 function isNetworkFailure(error) {
   return error?.code === 'network_error' || (error instanceof TypeError && error?.status == null);
+}
+
+function paintedViewKey(result) {
+  return [
+    result.events?.length ?? 0,
+    result.commitSha ?? '',
+    result.freshness ?? '',
+    result.warnings?.length ?? 0
+  ].join('\0');
 }
