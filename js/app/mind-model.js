@@ -1,5 +1,5 @@
 import { downsampleWeekly } from '../core/trends.js';
-import { addCalendarDays, isCalendarDate } from '../core/time.js';
+import { addCalendarDays, daysBetween, isCalendarDate } from '../core/time.js';
 
 export const MIND_RANGES = ['weekly', 'monthly', 'six_month'];
 export const DEFAULT_MIND_RANGE = 'monthly';
@@ -11,6 +11,7 @@ const RANGE_DAYS = {
 };
 
 export const MOOD_ORDER = ['great', 'good', 'neutral', 'low', 'bad'];
+export const ENERGY_ORDER = ['high', 'medium', 'low'];
 
 export function rangeWindow(date, range) {
   if (!isCalendarDate(date)) throw new TypeError(`Invalid calendar date: ${date}`);
@@ -31,6 +32,55 @@ export function diaryEntries(events) {
       path: event.path
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function sessionEntries(events) {
+  return (events ?? [])
+    .filter(event => event?.record?.type === 'mind_session' && isCalendarDate(event.record.date))
+    .map(event => ({
+      date: event.record.date,
+      theme: event.record.theme ?? null,
+      closingQuestion: event.record.closing_question ?? null,
+      insight: event.record.insight ?? null,
+      moodAtOpen: event.record.mood_at_open ?? null,
+      moodAtClose: event.record.mood_at_close ?? null,
+      crossAgentNote: event.record.cross_agent_note ?? null,
+      path: event.path
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function entriesByEnergy(entries, bounds) {
+  const counts = Object.fromEntries(ENERGY_ORDER.map(level => [level, 0]));
+  for (const entry of entries) {
+    if (entry.date < bounds.from || entry.date > bounds.to) continue;
+    if (entry.energy && Object.hasOwn(counts, entry.energy)) counts[entry.energy] += 1;
+  }
+  return ENERGY_ORDER.map(level => ({
+    key: level,
+    label: level[0].toUpperCase() + level.slice(1),
+    value: counts[level]
+  }));
+}
+
+function daysSinceLast(dates, date) {
+  if (!isCalendarDate(date)) return null;
+  const last = (dates ?? []).filter(isCalendarDate).sort().at(-1);
+  if (!last) return null;
+  return daysBetween(last, date);
+}
+
+export function daysSinceLastDiary(entries, date) {
+  return daysSinceLast((entries ?? []).map(entry => entry.date), date);
+}
+
+export function daysSinceLastMindSession(sessions, date) {
+  return daysSinceLast((sessions ?? []).map(session => session.date), date);
+}
+
+export function silenceFlag(diaryGap, sessionGap) {
+  return typeof diaryGap === 'number' && typeof sessionGap === 'number'
+    && diaryGap >= 7 && sessionGap >= 7;
 }
 
 export function moodScoreSeries(entries, bounds) {
