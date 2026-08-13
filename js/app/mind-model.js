@@ -1,4 +1,6 @@
 import { downsampleWeekly } from '../core/trends.js';
+import { extractCrossAgentCoordination } from '../core/constraints.js';
+import { parseGovernanceEntries } from '../core/governance-log.js';
 import { addCalendarDays, daysBetween, isCalendarDate } from '../core/time.js';
 
 export const MIND_RANGES = ['weekly', 'monthly', 'six_month'];
@@ -81,6 +83,23 @@ export function daysSinceLastMindSession(sessions, date) {
 export function silenceFlag(diaryGap, sessionGap) {
   return typeof diaryGap === 'number' && typeof sessionGap === 'number'
     && diaryGap >= 7 && sessionGap >= 7;
+}
+
+const CROSS_AGENT_MARKERS = ['Vera→', 'Penelope→', '→Vera', '→Penelope'];
+
+export function mindInsights(governanceLogMarkdown, bounds) {
+  return parseGovernanceEntries(governanceLogMarkdown ?? '')
+    .filter(entry => entry.entryType === 'Mind Insight')
+    .filter(entry => entry.dateKey && entry.dateKey >= bounds.from && entry.dateKey <= bounds.to);
+}
+
+export function mindCrossAgentLines(centralNodeMarkdown) {
+  const section = extractCrossAgentCoordination(centralNodeMarkdown ?? '');
+  if (!section) return [];
+  return section
+    .split('\n')
+    .map(line => line.replace(/^\s*[-*]\s+/, '').replace(/^\*\*/, '').replace(/\*\*/g, '').trim())
+    .filter(line => line && CROSS_AGENT_MARKERS.some(marker => line.includes(marker)));
 }
 
 export function moodScoreSeries(entries, bounds) {
