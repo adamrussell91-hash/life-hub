@@ -88,6 +88,13 @@ test('calendar markers deduplicate categories and omit unsupported types', () =>
   });
 });
 
+test('calendar markers map bloods onto the body category', () => {
+  const markers = buildCalendarMarkers([
+    { record: { id: 'bloods', type: 'bloods', date: '2026-05-19' } }
+  ]);
+  assert.deepEqual(markers, { '2026-05-19': ['body'] });
+});
+
 test('search extension moves exactly three calendar months backward', () => {
   assert.equal(getSearchExtension('2026-07-01'), '2026-04-01');
 });

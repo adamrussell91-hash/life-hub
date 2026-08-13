@@ -96,6 +96,12 @@ test('eventBrief summarises each domain in one line', () => {
   );
 });
 
+test('bloods events title as Body with a marker count brief', () => {
+  const record = { type: 'bloods', markers: [{ key: 'alt' }, { key: 'crp' }] };
+  assert.equal(eventDetailTitle(record), 'Body');
+  assert.equal(eventBrief({ record }), '2 markers');
+});
+
 test('eventsForDate includes brief and category affordance', () => {
   const rows = eventsForDate([
     { record: { type: 'meal', date: '2026-08-05', meal: 'lunch', protein_g: 40, calories: 520 }, body: '', path: 'a' }
