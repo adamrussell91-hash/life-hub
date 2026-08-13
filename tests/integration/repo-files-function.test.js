@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
+import { GitHubClientError } from '../../netlify/functions/_shared/github-client.mjs';
 import { createRepoFilesHandler } from '../../netlify/functions/repo-files.mjs';
 
 const SECRET = 's'.repeat(32);
@@ -32,7 +33,7 @@ function jsonRequest(body, cookie = validCookie, method = 'POST') {
 }
 
 function requestBody(files) {
-  return { from: '2026-07-02', to: '2026-08-01', files };
+  return { commitSha: COMMIT_SHA, from: '2026-07-02', to: '2026-08-01', files };
 }
 
 function entry(path, sha = TARGET_SHA, size = 20) {
@@ -86,19 +87,20 @@ test('files endpoint returns only exact current manifest pairs and decodes folde
       files: [{ path: 'config/targets.yml', sha: TARGET_SHA, content: 'target_sets: []\n' }]
     }
   });
-  assert.deepEqual(github.calls, { resolve: 1, blobs: [TARGET_SHA] });
+  assert.deepEqual(github.calls, { resolve: 0, blobs: [TARGET_SHA] });
 });
 
-test('files endpoint rejects stale pairs before blob reads', async () => {
-  const github = createClientDouble();
+test('files endpoint maps a missing blob to stale_manifest without a tree walk', async () => {
+  const github = createClientDouble({
+    blobError: new GitHubClientError('repository_not_found', false)
+  });
   const response = await handlerFor(github)(jsonRequest(requestBody([
-    { path: 'config/targets.yml', sha: WRONG_SHA }
+    { path: 'config/targets.yml', sha: TARGET_SHA }
   ])));
 
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error.code, 'stale_manifest');
-  assert.equal(github.calls.resolve, 1);
-  assert.equal(github.calls.blobs.length, 0);
+  assert.deepEqual(github.calls, { resolve: 0, blobs: [TARGET_SHA] });
 });
 
 test('files endpoint rejects excessive, duplicate, malformed, and unknown requests before provider reads', async () => {
@@ -121,9 +123,9 @@ test('files endpoint rejects excessive, duplicate, malformed, and unknown reques
 
 test('files endpoint applies the manifest date-window boundary before provider reads', async () => {
   for (const body of [
-    { from: '2025-01-01', to: '2026-08-01', files: [] },
-    { from: '2026-08-02', to: '2026-08-01', files: [] },
-    { from: '2026-02-30', to: '2026-08-01', files: [] }
+    { commitSha: COMMIT_SHA, from: '2025-01-01', to: '2026-08-01', files: [] },
+    { commitSha: COMMIT_SHA, from: '2026-08-02', to: '2026-08-01', files: [] },
+    { commitSha: COMMIT_SHA, from: '2026-02-30', to: '2026-08-01', files: [] }
   ]) {
     const github = createClientDouble();
     const response = await handlerFor(github)(jsonRequest(body));
@@ -133,23 +135,15 @@ test('files endpoint applies the manifest date-window boundary before provider r
   }
 });
 
-test('files endpoint rejects a declared aggregate over 1 MiB before blob reads', async () => {
-  const files = [
-    ['config/targets.yml', 'a'],
-    ['config/agents.yml', 'b'],
-    ['data/nutrition/2026/08/2026-08-01-breakfast.md', 'c'],
-    ['data/fitness/2026/08/2026-08-01-workout.md', 'd'],
-    ['data/mind/2026/08/2026-08-01-diary.md', 'e']
-  ];
-  const tree = files.map(([path, character]) => entry(path, character.repeat(40), 220 * 1024));
-  const github = createClientDouble({ tree });
-  const response = await handlerFor(github)(jsonRequest(requestBody(
-    files.map(([path, character]) => ({ path, sha: character.repeat(40) }))
-  )));
+test('files endpoint rejects event paths outside the requested date window before blob reads', async () => {
+  const github = createClientDouble();
+  const response = await handlerFor(github)(jsonRequest(requestBody([
+    { path: 'data/nutrition/2026/06/2026-06-01-breakfast.md', sha: TARGET_SHA }
+  ])));
 
-  assert.equal(response.status, 413);
-  assert.equal((await response.json()).error.code, 'batch_too_large');
-  assert.equal(github.calls.resolve, 1);
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'invalid_request');
+  assert.equal(github.calls.resolve, 0);
   assert.equal(github.calls.blobs.length, 0);
 });
 

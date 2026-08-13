@@ -15,7 +15,7 @@ import {
   GitHubClientError,
   GitHubConfigurationError
 } from './_shared/github-client.mjs';
-import { isAllowedRepositoryPath, parseDateRange, selectManifestEntries } from './_shared/repo-policy.mjs';
+import { isAllowedRepositoryPath, isClientFileInRange, parseDateRange } from './_shared/repo-policy.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
@@ -67,6 +67,10 @@ export function createRepoFilesHandler({
     const parsed = await parseRequest(request);
     if (parsed.error) return parsed.error;
 
+    if (parsed.files.some(file => !isClientFileInRange(file.path, parsed.range))) {
+      return invalidRequest();
+    }
+
     let client;
     try {
       client = createClient({ env, fetchImpl });
@@ -77,23 +81,6 @@ export function createRepoFilesHandler({
       return repositoryError('github_unavailable', true);
     }
 
-    let current;
-    try {
-      current = await client.resolveTree();
-    } catch (error) {
-      return mapRepositoryError(error);
-    }
-
-    const manifest = selectManifestEntries(current.tree, parsed.range);
-    const allowedPairs = new Map(manifest.map(file => [`${file.path}\0${file.sha}`, file]));
-    const requestedEntries = parsed.files.map(file => allowedPairs.get(`${file.path}\0${file.sha}`));
-    if (requestedEntries.some(file => !file)) {
-      return errorResponse(409, 'stale_manifest', 'Refresh the repository manifest and try again.', true, PRIVATE_CACHE);
-    }
-
-    const declaredBytes = requestedEntries.reduce((total, file) => total + file.size, 0);
-    if (declaredBytes > MAX_BATCH_BYTES) return batchTooLarge();
-
     const files = [];
     let actualBytes = 0;
     for (const requestFile of parsed.files) {
@@ -101,6 +88,9 @@ export function createRepoFilesHandler({
       try {
         blob = await client.readBlob(requestFile.sha);
       } catch (error) {
+        if (error instanceof GitHubClientError && error.code === 'repository_not_found') {
+          return errorResponse(409, 'stale_manifest', 'Refresh the repository manifest and try again.', true, PRIVATE_CACHE);
+        }
         return mapRepositoryError(error);
       }
 
@@ -123,7 +113,7 @@ export function createRepoFilesHandler({
 
     return jsonResponse(200, {
       ok: true,
-      data: { commitSha: current.commitSha, files }
+      data: { commitSha: parsed.commitSha, files }
     }, PRIVATE_CACHE);
   };
 }
@@ -163,7 +153,7 @@ async function parseRequest(request) {
     seen.add(`${file.path}\0${file.sha}`);
   }
 
-  return { range: { from: body.from, to: body.to }, files: body.files };
+  return { commitSha: body.commitSha, range: { from: body.from, to: body.to }, files: body.files };
 }
 
 async function readAtMost(stream, limit) {
@@ -198,7 +188,8 @@ async function readAtMost(stream, limit) {
 
 function isRequestBody(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body) ||
-      !sameKeys(body, ['files', 'from', 'to']) || !Array.isArray(body.files) ||
+      !sameKeys(body, ['commitSha', 'files', 'from', 'to']) || !Array.isArray(body.files) ||
+      typeof body.commitSha !== 'string' || !BLOB_SHA.test(body.commitSha) ||
       typeof body.from !== 'string' || typeof body.to !== 'string') {
     return false;
   }
