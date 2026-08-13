@@ -23,7 +23,14 @@ export function buildSystemPrompt({
   exerciseLibrary = '',
   skincareRoutines = '',
   bodyState = '',
-  daysSinceLastSession = null
+  daysSinceLastSession = null,
+  mindDiaryDigest = '',
+  mindSessionDigest = '',
+  mindSilence = '',
+  mindDivergence = '',
+  onThisDay = '',
+  daysSinceLastEntry = null,
+  daysSinceLastMindSession = null
 }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
@@ -44,7 +51,7 @@ export function buildSystemPrompt({
     'A meal log_entry also always requires calcium_mg, polyphenol_score, and omega3 — none of these are an excuse to skip logging. calcium_mg: search first, and if the AU label doesn\'t list it (common — it\'s not one of the mandatory panel nutrients), use a category density estimate (dairy/fortified plant milk ~120mg/100ml, hard cheese ~700–900mg/100g, leafy greens ~100–160mg/100g, legumes ~50–80mg/100g, meat/fish ~10–20mg/100g) and label it as an estimate in notes — never leave it blank. polyphenol_score (0–10) and omega3 (high/medium/low/none) are your own judgment calls from what was eaten, not lookups — there is no "couldn\'t find data" excuse for a rating you make yourself; assign them every time.',
     'Do not call save_food_library_entry with estimated fat/sodium (or any macros you invented). Cache only figures from the Food Library match, an AU label/NIP, or a named AU retailer/brand source. If you must estimate to propose a Confirm card, say so in chat and skip the library save until real numbers exist.',
     'If you want to note what the record was in Adam’s own words (e.g. the specific food, or how a workout felt), use the top-level `notes` parameter on log_entry — never invent a field for this inside `fields`, since only the schema’s exact domain fields belong there and anything else is rejected.',
-    'Every proposed log_entry is shown to Adam as a Confirm card before that record is saved — specialists never silently auto-save structured records. A successful log_entry tool result means awaiting confirm, not written. Do not say or claim the meal is logged, "in the books," or saved to Nutrition/today’s eating record until Adam hits Confirm. Saving to the Food Library is not the same as logging today’s meal. If log_entry returns errors, fix the fields (time must be HH:MM or omit time) and call log_entry again — never narrate a completed day log after a rejection. Confirmed logs do write; applicable agent tools may also write when they succeed or when Adam confirms a high-risk action (for example Hammond Central Node patches and Governance Log entries).',
+    'Every proposed log_entry is shown to Adam as a Confirm card before that record is saved — specialists never silently auto-save structured records. Exception: Vera mind_session writes immediately (no Confirm card). Every other type still awaits Confirm. A successful log_entry tool result means awaiting confirm, not written. Do not say or claim the meal is logged, "in the books," or saved to Nutrition/today’s eating record until Adam hits Confirm. Saving to the Food Library is not the same as logging today’s meal. If log_entry returns errors, fix the fields (time must be HH:MM or omit time) and call log_entry again — never narrate a completed day log after a rejection. Confirmed logs do write; applicable agent tools may also write when they succeed or when Adam confirms a high-risk action (for example Hammond Central Node patches and Governance Log entries).',
     digest ? `Recent context:\n${digest}` : '',
     constraints ? `Standing medical and dietary constraints:\n${constraints}` : ''
   ].filter(Boolean).join('\n\n');
@@ -104,15 +111,24 @@ export function buildSystemPrompt({
       : '',
     'Interview one question at a time about his day — what happened and how it felt. Never ask him to rate energy, mood score, or pick schema labels; infer mood, mood_score, and energy when you propose diary log_entry.',
     'Diary notes must be Adam\'s first-person voice, never theatrical Moira phrasing. Propose dayone_sent:false; Life Hub emails Day One after he confirms.',
-    'Read Central Node before deepening the interview. After diary confirm, Mood + Recent Actions update automatically — add a one-line Cross-Agent handoff in chat only when another agent must act.'
+    'Read Central Node before deepening the interview. After diary confirm, Mood + Recent Actions update automatically — fill `cross_agent_note` on diary log_entry when another agent must act. Chat-only lines are not memory.',
+    mindDiaryDigest ? `Mind diary digest:\n${mindDiaryDigest}` : '',
+    mindSilence,
+    onThisDay ? `On this day (his own past writing — you may open with it):\n${onThisDay}` : '',
+    daysSinceLastEntry != null ? `Days since last diary entry: ${daysSinceLastEntry}.` : ''
   ] : [];
 
   const veraBlocks = slug === 'vera' ? [
     veraProtocol
       ? `Vera operating manual (follow these Life Hub rules):\n${veraProtocol}`
       : '',
-    'You do not propose log_entry. Reflect and ask; send diary logging to Penelope.',
-    'Read Central Node before your opening question. When another agent must act, state one Vera→[Agent] line in chat — you cannot silently edit Central Node yourself.'
+    'You MAY propose log_entry for mind_session at a natural close or when Adam asks to record. Diary stays Penelope. Life Hub writes mind_session immediately — a successful tool result means written, not awaiting confirm. Do not claim it was logged if the tool returns an error.',
+    'Read Central Node before your opening question. When another agent must act, fill `cross_agent_note` on mind_session — chat-only lines are not memory.',
+    mindDiaryDigest ? `Mind diary digest:\n${mindDiaryDigest}` : '',
+    mindSessionDigest ? `Mind session digest:\n${mindSessionDigest}` : '',
+    mindSilence,
+    mindDivergence,
+    daysSinceLastMindSession != null ? `Days since last Vera session: ${daysSinceLastMindSession}.` : ''
   ] : [];
 
   const brisketBlocks = slug === 'brisket' ? [
@@ -157,6 +173,7 @@ export function buildSystemPrompt({
     governanceLogIsEmpty
       ? 'Governance Log is empty. Once this turn, mention that Notion carried two open items forward — drift: "Build a life worth enjoying" (Still Active as of 9 Jul); escalation: August study load (past its 15 Aug checkpoint) — and ask Adam how to handle them (close / carry / drop). Do not invent more carried-over items. After the first append_governance_log succeeds this instruction stops firing.'
       : '',
+    mindSilence,
     'You do not propose log_entry. Coach and triage; specialists own domain logs.',
     'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.'
   ] : [];

@@ -483,3 +483,47 @@ test('hammond protocol includes Mind domain brief and retrospective', () => {
   assert.match(text, /three-way brief/i);
   assert.match(text, /two-voice/i);
 });
+
+test('vera prompt includes mind diary and session digest and lists mind_session', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'vera',
+    mindDiaryDigest: 'Diary (metadata only): 2026-08-10 mood low',
+    mindSessionDigest: 'thread: What is the weekend actually for?',
+    mindSilence: 'Mind silence: both quiet 8d'
+  });
+  assert.match(prompt, /mind_session/);
+  assert.doesNotMatch(prompt, /You do not propose log_entry/);
+  assert.match(prompt, /Diary \(metadata only\)/);
+  assert.match(prompt, /What is the weekend actually for/);
+  assert.match(prompt, /Mind silence/);
+});
+
+test('penelope prompt includes mind diary digest and keeps nutrition digest', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'penelope',
+    digest: 'Today: 1800 kcal',
+    mindDiaryDigest: 'Days since last entry: 2',
+    onThisDay: 'On this day 2025-08-13: Excerpt: We went to the shops.'
+  });
+  assert.match(prompt, /1800 kcal/);
+  assert.match(prompt, /Days since last entry/);
+  assert.match(prompt, /We went to the shops/);
+});
+
+test('hammond prompt includes silence flag and not diary excerpt', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    mindSilence: 'Mind silence: both quiet 8d',
+    onThisDay: 'On this day 2025-08-13: Excerpt: SECRET'
+  });
+  assert.match(prompt, /Mind silence/);
+  assert.doesNotMatch(prompt, /SECRET/);
+});
+
+test('brisket prompt never receives mind diary digest', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    mindDiaryDigest: 'Diary leak'
+  });
+  assert.doesNotMatch(prompt, /Diary leak/);
+});
