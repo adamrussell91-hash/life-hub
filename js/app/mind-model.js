@@ -1,5 +1,5 @@
 import { downsampleWeekly } from '../core/trends.js';
-import { addCalendarDays, isCalendarDate } from '../core/time.js';
+import { addCalendarDays, daysBetween, isCalendarDate } from '../core/time.js';
 
 export const MIND_RANGES = ['weekly', 'monthly', 'six_month'];
 export const DEFAULT_MIND_RANGE = 'monthly';
@@ -92,6 +92,23 @@ export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE }) {
   const bounds = rangeWindow(date, selectedRange);
   const entries = diaryEntries(events);
   const moodSeries = moodScoreSeries(entries, bounds);
+  const lastDiary = entries.map(e => e.date).sort().at(-1);
+  const sessionDates = (events ?? [])
+    .filter(e => e?.record?.type === 'mind_session')
+    .map(e => e.record.date)
+    .sort();
+  const lastSession = sessionDates.at(-1);
+  const diaryGap = lastDiary ? daysBetween(lastDiary, date) : null;
+  const sessionGap = lastSession ? daysBetween(lastSession, date) : null;
+  const trend = moodSeries.length >= 2
+    ? (moodSeries.at(-1).value - moodSeries[0].value)
+    : 0;
+  const trendWord = trend > 0.5 ? 'Mood scores ticked up' : trend < -0.5 ? 'Mood scores eased down' : 'Mood scores held';
+  const ambient = [
+    trendWord,
+    diaryGap == null ? 'no diary in range yet' : `last diary ${diaryGap}d ago`,
+    sessionGap == null ? 'no Vera session yet' : `last Vera session ${sessionGap}d ago`
+  ].join(' · ') + '.';
   const byMood = entriesByMood(entries, bounds);
   const themes = recurringThemes(entries, bounds);
 
@@ -103,6 +120,7 @@ export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE }) {
     moodSeries,
     byMood,
     themes,
+    ambient,
     empty: moodSeries.length === 0 && byMood.every(item => item.value === 0) && themes.length === 0
   };
 }
