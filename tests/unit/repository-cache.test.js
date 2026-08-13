@@ -165,3 +165,20 @@ test('opening v2 deletes leftover v1 range records', async () => {
   assert.equal(storage.caches.has('life-hub-private-v1'), false);
   assert.equal(storage.caches.has('life-hub-private-v2'), true);
 });
+
+test('read returns null when a range memo is missing a blob', async () => {
+  const storage = new MemoryCacheStorage();
+  const cache = createRepositoryCache(storage);
+  const sha = 'a'.repeat(40);
+  const file = { path: 'config/targets.yml', sha, content: 'target_sets: []\n' };
+  const range = { from: '2026-07-01', to: '2026-07-31' };
+
+  await cache.write({
+    manifest: manifest('july-range', [{ path: file.path, sha, size: 16 }]),
+    files: [file],
+    warnings: []
+  });
+
+  storage.caches.get('life-hub-private-v2').delete(`/__life-hub-private-cache__/blob/${sha}`);
+  assert.equal(await cache.read(range), null);
+});
