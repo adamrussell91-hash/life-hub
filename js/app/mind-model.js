@@ -25,6 +25,8 @@ export function diaryEntries(events) {
     .map(event => ({
       date: event.record.date,
       mood: event.record.mood ?? null,
+      moods: Array.isArray(event.record.moods) ? event.record.moods : null,
+      system_note: event.record.system_note ?? null,
       mood_score: Number.isFinite(event.record.mood_score) ? event.record.mood_score : null,
       energy: event.record.energy ?? null,
       tags: Array.isArray(event.record.tags) ? event.record.tags.map(String) : [],
@@ -52,7 +54,10 @@ export function entriesByMood(entries, bounds) {
   const counts = Object.fromEntries(MOOD_ORDER.map(mood => [mood, 0]));
   for (const entry of entries) {
     if (entry.date < bounds.from || entry.date > bounds.to) continue;
-    if (entry.mood && Object.hasOwn(counts, entry.mood)) counts[entry.mood] += 1;
+    const keys = Array.isArray(entry.moods) && entry.moods.length ? entry.moods : [entry.mood];
+    for (const key of keys) {
+      if (key && Object.hasOwn(counts, key)) counts[key] += 1;
+    }
   }
   return MOOD_ORDER.map(mood => ({
     key: mood,
