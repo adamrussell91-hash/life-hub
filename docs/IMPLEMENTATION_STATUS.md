@@ -378,15 +378,16 @@ Verified on 2026-08-11 (local only — do not push unless asked). Final move of 
 
 ## Phase 35: Mind session memory 8/8 — ambient line + Hammond cadence — Complete
 
-Verified on 2026-08-13 (local only — do not push unless asked). Final task of `docs/superpowers/plans/2026-08-13-mind-session-memory.md` — the plan is now fully implemented. Shell cache remains `life-hub-shell-v70` (Task 7; no new precache file).
+Verified on 2026-08-13 (local only — do not push unless asked). Final task of `docs/superpowers/plans/2026-08-13-mind-session-memory.md` — the plan is now fully implemented. Shell cache bumped to `life-hub-shell-v71` (Task 7 was v70; main is also v70, so this branch must bump or merge would not invalidate caches).
 
-- Mind tab shows one ambient observation near Vera: mood-trend direction plus days since last diary and last Vera `mind_session`. Computed in `buildMindModel` from events already loaded; `renderMind` copies it into `[data-mind="ambient"]`. Zero extra API calls.
+- Mind tab shows one ambient observation immediately after `.mind-agents` (not inside the button grid): mood-trend direction only when there are at least two mood points, plus days since last diary and last Vera `mind_session`. Empty-tab copy is `no diary yet` / `no Vera session yet` — last diary is not range-filtered. Computed in `buildMindModel` from events already loaded; `renderMind` copies it into `[data-mind="ambient"]`. Zero extra API calls.
 - Hammond 90-day cadence treats `data/mind/.../YYYY-MM-DD-session.md` as mind-domain presence (`session` already matched `DOMAIN_PATH`; characterization test added, already green).
+- Valid fixture corpus is 5 files (Task 2 added `2026-07-30-session.md`); `tests/unit/fixtures.test.js` expected count updated to match.
 - **Deviations from spec:**
   - Auto-write exception: Vera `mind_session` writes immediately with no Confirm card; diary / meals / workouts still go through Confirm.
   - 5e/6b is protocol-only: Hammond can suggest Long-Term Trends via existing `propose_central_node_patch` Confirm. No extra Hammond diary-blob window on ordinary turns.
   - Leave-flush / transcripts not built (follow-up, not tasked).
-- `npm test`: 1014 passed, 0 failed. `npm run validate:fixtures`: 4/4 valid.
+- `npm test`: 1039 passed, 0 failed. `npm run validate:fixtures`: 5/5 valid.
 
 ## Next Phase: sleep·heart on Body / polish
 

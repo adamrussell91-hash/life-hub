@@ -102,13 +102,15 @@ export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE }) {
   const sessionGap = lastSession ? daysBetween(lastSession, date) : null;
   const trend = moodSeries.length >= 2
     ? (moodSeries.at(-1).value - moodSeries[0].value)
-    : 0;
-  const trendWord = trend > 0.5 ? 'Mood scores ticked up' : trend < -0.5 ? 'Mood scores eased down' : 'Mood scores held';
+    : null;
+  const trendWord = trend == null
+    ? null
+    : trend > 0.5 ? 'Mood scores ticked up' : trend < -0.5 ? 'Mood scores eased down' : 'Mood scores held';
   const ambient = [
     trendWord,
-    diaryGap == null ? 'no diary in range yet' : `last diary ${diaryGap}d ago`,
+    diaryGap == null ? 'no diary yet' : `last diary ${diaryGap}d ago`,
     sessionGap == null ? 'no Vera session yet' : `last Vera session ${sessionGap}d ago`
-  ].join(' · ') + '.';
+  ].filter(Boolean).join(' · ') + '.';
   const byMood = entriesByMood(entries, bounds);
   const themes = recurringThemes(entries, bounds);
 
