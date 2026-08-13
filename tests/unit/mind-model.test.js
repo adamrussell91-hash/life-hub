@@ -157,3 +157,44 @@ test('mindCrossAgentLines keeps Vera/Penelope prefixes and drops others', () => 
     'Brisket→Penelope: skip dessert logging.'
   ]);
 });
+
+test('buildMindModel returns sessions, energy, insights, cross-agent lines, and silence', () => {
+  const events = [
+    { record: { type: 'diary', date: '2026-08-01', mood_score: 4, mood: 'low', energy: 'low', tags: [] }, path: 'd' },
+    { record: { type: 'mind_session', date: '2026-08-04', theme: 'Weekend', closing_question: 'What for?' }, path: 's' }
+  ];
+  const model = buildMindModel({
+    events,
+    date: '2026-08-13',
+    range: 'monthly',
+    governanceLogMarkdown: `# Governance Log\n\n## 2026-08-04 — Mind Insight\n**Title:** Weekend\n\nRest is not a prize.\n`,
+    centralNodeMarkdown: `## 🤝 Cross-Agent Coordination\n- Vera→Penelope: ask what the weekend is actually for.\n- Chadwick→Sara: AC flag.\n`
+  });
+  assert.equal(model.sessions.length, 1);
+  assert.equal(model.sessions[0].theme, 'Weekend');
+  assert.equal(model.energyByLevel.find(item => item.key === 'low').value, 1);
+  assert.equal(model.insights.length, 1);
+  assert.equal(model.insights[0].title, 'Weekend');
+  assert.deepEqual(model.crossAgentLines, ['Vera→Penelope: ask what the weekend is actually for.']);
+  assert.equal(model.daysSinceLastDiary, 12);
+  assert.equal(model.daysSinceLastMindSession, 9);
+  assert.equal(model.silence, true);
+});
+
+test('buildMindModel clips sessions and insights to the range window, not cross-agent or silence', () => {
+  const model = buildMindModel({
+    events: [
+      { record: { type: 'mind_session', date: '2026-06-01', theme: 'Old' }, path: 'old' },
+      { record: { type: 'mind_session', date: '2026-08-10', theme: 'New' }, path: 'new' }
+    ],
+    date: '2026-08-13',
+    range: 'weekly',
+    governanceLogMarkdown: `# Governance Log\n\n## 2026-06-01 — Mind Insight\n**Title:** Old\n\nGone.\n\n## 2026-08-10 — Mind Insight\n**Title:** New\n\nHere.\n`,
+    centralNodeMarkdown: `## 🤝 Cross-Agent Coordination\n- Vera→Penelope: still on the board.\n`
+  });
+  assert.deepEqual(model.sessions.map(s => s.theme), ['New']);
+  assert.deepEqual(model.insights.map(i => i.title), ['New']);
+  assert.deepEqual(model.crossAgentLines, ['Vera→Penelope: still on the board.']);
+  assert.equal(model.daysSinceLastMindSession, 3);
+  assert.equal(model.silence, false);
+});
