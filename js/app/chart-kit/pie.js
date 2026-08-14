@@ -32,16 +32,16 @@ function slicePath(cx, cy, r, startAngle, endAngle) {
 }
 
 /**
- * @param {Record<string, { protein_g?: number }>} meals
+ * @param {Array<{ key?: string, label?: string, value?: number, colour?: string }>} items
  * @param {{ size?: number }} [options]
  */
-export function buildMealProteinPie(meals, { size = 72 } = {}) {
-  const entries = MEAL_ORDER
-    .map(meal => ({
-      meal,
-      label: MEAL_LABELS[meal],
-      value: Number(meals?.[meal]?.protein_g) || 0,
-      colour: MEAL_COLOURS[meal]
+export function buildDistributionPie(items, { size = 72 } = {}) {
+  const entries = (items ?? [])
+    .map(item => ({
+      ...item,
+      key: item.key,
+      label: item.label ?? item.key,
+      value: Number(item.value) || 0
     }))
     .filter(entry => entry.value > 0);
 
@@ -52,7 +52,6 @@ export function buildMealProteinPie(meals, { size = 72 } = {}) {
 
   const center = size / 2;
   const radius = size / 2 - 4;
-  // Start at 12 o'clock
   let angle = -Math.PI / 2;
   const slices = entries.map(entry => {
     const sweep = (entry.value / total) * 2 * Math.PI;
@@ -61,9 +60,28 @@ export function buildMealProteinPie(meals, { size = 72 } = {}) {
     angle = endAngle;
     return {
       ...entry,
+      startAngle,
+      endAngle,
       path: slicePath(center, center, radius, startAngle, endAngle)
     };
   });
 
   return { empty: false, total, size, center, radius, slices };
+}
+
+/**
+ * @param {Record<string, { protein_g?: number }>} meals
+ * @param {{ size?: number }} [options]
+ */
+export function buildMealProteinPie(meals, { size = 72 } = {}) {
+  return buildDistributionPie(
+    MEAL_ORDER.map(meal => ({
+      meal,
+      key: meal,
+      label: MEAL_LABELS[meal],
+      value: Number(meals?.[meal]?.protein_g) || 0,
+      colour: MEAL_COLOURS[meal]
+    })),
+    { size }
+  );
 }

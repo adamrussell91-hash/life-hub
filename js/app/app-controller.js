@@ -818,6 +818,7 @@ export function createAppController(dependencies) {
         mindRange = next;
         renderMindSection();
       },
+      agentsConfig: latestResult.agentsConfig,
       onOpenAgent: slug => {
         chatSelectAgent?.(slug);
         if (!chatPanel) return;

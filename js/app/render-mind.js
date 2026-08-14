@@ -1,8 +1,39 @@
-import { animateAreaReveal, animateColumnGrow } from './chart-kit/animate.js';
+import { agentColour } from './agent-colour.js';
+import { animateAreaReveal } from './chart-kit/animate.js';
+import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
-import { buildColumns } from './chart-kit/columns.js';
+import { buildHeatmapRow } from './chart-kit/heatmap.js';
+import { buildDistributionPie } from './chart-kit/pie.js';
+import { MOOD_ORDER, rangeWindow } from './mind-model.js';
 
-export function renderMind(root, model, { onRangeChange, onOpenAgent } = {}) {
+const MOOD_TOKEN = {
+  great: 'var(--mood-great)',
+  good: 'var(--mood-good)',
+  neutral: 'var(--mood-neutral)',
+  low: 'var(--mood-low)',
+  bad: 'var(--mood-bad)'
+};
+
+const SHIFT_COPY = {
+  improved: 'mood lifted',
+  declined: 'mood eased',
+  flat: 'mood held'
+};
+
+export function moodShiftRank(mood) {
+  return MOOD_ORDER.indexOf(mood);
+}
+
+export function moodShiftDirection(moodAtOpen, moodAtClose) {
+  const open = moodShiftRank(moodAtOpen);
+  const close = moodShiftRank(moodAtClose);
+  if (open < 0 || close < 0) return 'flat';
+  if (close < open) return 'improved';
+  if (close > open) return 'declined';
+  return 'flat';
+}
+
+export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConfig } = {}) {
   const dashboard = root.querySelector('#mind-dashboard');
   if (!dashboard || !model) return;
 
@@ -36,17 +67,30 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent } = {}) {
     ambient.textContent = model.ambient ?? '';
   }
 
-  renderMoodChart(root, model.moodSeries);
-  renderBarHost(root, '#mind-mood-columns', model.byMood);
-  renderBarHost(root, '#mind-theme-columns', model.themes);
-  renderBarHost(root, '#mind-energy-columns', model.energyByLevel);
-  renderSilenceBanner(root, model);
-  renderSessionList(root, model.sessions);
-  renderInsightList(root, model.insights);
-  renderCrossAgentStrip(root, model.crossAgentLines);
+  const veraColour = agentColour(agentsConfig, 'vera');
+  const penelopeColour = agentColour(agentsConfig, 'penelope');
+  dashboard.style?.setProperty?.('--vera-accent', veraColour);
+  dashboard.style?.setProperty?.('--heatmap-vera-hit', veraColour);
+  dashboard.style?.setProperty?.('--penelope-accent', penelopeColour);
 
   const empty = root.querySelector('#mind-empty');
   if (empty) empty.hidden = !model.empty;
+  for (const selector of ['#mind-hero', '#mind-cadence']) {
+    const row = root.querySelector(selector);
+    if (row) row.hidden = Boolean(model.empty);
+  }
+
+  if (!model.empty) {
+    renderMoodChart(root, model.moodSeries);
+    renderMoodMix(root, model.byMood);
+    renderEnergyRings(root, model);
+    renderCadenceHeatmap(root, model);
+    renderThemeChips(root, model.themes);
+  }
+  renderSilenceBanner(root, model);
+  renderSessionList(root, model.sessions);
+  renderInsightList(root, model.insights);
+  renderCrossAgentStrip(root, model.crossAgentLines, { veraColour, penelopeColour });
 
   for (const button of root.querySelectorAll?.('[data-mind-agent]') ?? []) {
     if (button.dataset.bound) continue;
@@ -57,11 +101,17 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent } = {}) {
   dashboard.removeAttribute('hidden');
 }
 
+function createSvg(root, tag) {
+  return root.createElementNS?.('http://www.w3.org/2000/svg', tag) ?? root.createElement(tag);
+}
+
 function renderMoodChart(root, series) {
   const svg = root.querySelector('#mind-mood-chart');
   if (!svg) return;
   const area = svg.querySelector('[data-role="area"]');
   const line = svg.querySelector('[data-role="line"]');
+  const dots = svg.querySelector('[data-role="dots"]');
+  dots?.replaceChildren?.();
   if (!series.length) {
     if (area) area.setAttribute('d', '');
     if (line) line.setAttribute('d', '');
@@ -71,35 +121,133 @@ function renderMoodChart(root, series) {
   const chart = buildAreaLine(series.map(point => ({ date: point.date, value: point.value })));
   if (area) area.setAttribute('d', chart.areaPath || '');
   if (line) line.setAttribute('d', chart.linePath || '');
+  if (dots) {
+    chart.points.forEach((point, index) => {
+      const source = series[index] ?? {};
+      const mood = source.mood && MOOD_TOKEN[source.mood] ? source.mood : null;
+      const dot = createSvg(root, 'circle');
+      dot.setAttribute('cx', String(point.x));
+      dot.setAttribute('cy', String(point.y));
+      dot.setAttribute('r', '3.5');
+      dot.setAttribute('class', 'mind-mood-dot');
+      if (mood) {
+        dot.setAttribute('data-mood', mood);
+        dot.setAttribute('fill', MOOD_TOKEN[mood]);
+      } else {
+        dot.setAttribute('fill', 'var(--mood-neutral)');
+      }
+      dot.style.animationDelay = `${Math.min(index * 25, 400)}ms`;
+      dots.append(dot);
+    });
+  }
   animateAreaReveal(svg);
 }
 
-function renderBarHost(root, selector, items) {
-  const host = root.querySelector(selector);
+function renderMoodMix(root, byMood) {
+  const host = root.querySelector('#mind-mood-mix');
+  const slicesHost = root.querySelector('#mind-mood-pie [data-role="slices"]')
+    ?? root.querySelector('#mind-mood-pie')?.querySelector?.('[data-role="slices"]');
+  const label = root.querySelector('[data-mind="mood-mix-label"]');
+  if (!host && !slicesHost) return;
+  slicesHost?.replaceChildren?.();
+  const items = (byMood ?? []).map(item => ({
+    ...item,
+    colour: MOOD_TOKEN[item.key] ?? 'var(--mood-neutral)'
+  }));
+  const pie = buildDistributionPie(items);
+  if (pie.empty) {
+    if (label) label.textContent = 'No mood entries yet';
+    return;
+  }
+  pie.slices.forEach((slice, index) => {
+    const path = createSvg(root, 'path');
+    path.setAttribute('d', slice.path);
+    path.setAttribute('fill', slice.colour);
+    path.setAttribute('class', 'mind-pie-slice');
+    path.setAttribute('data-mood', slice.key);
+    path.style.animationDelay = `${index * 40}ms`;
+    slicesHost?.append(path);
+  });
+  const dominant = pie.slices.reduce((best, slice) => slice.value > best.value ? slice : best);
+  if (label) label.textContent = `${dominant.label} · ${pie.total}`;
+}
+
+function renderEnergyRings(root, model) {
+  const host = root.querySelector('#mind-energy-rings');
+  if (!host) return;
+  const target = model.entryCount || 0;
+  const levels = model.energyByLevel ?? [];
+  const hasValues = levels.some(item => item.value > 0);
+  const empty = root.querySelector('[data-mind="energy-empty"]');
+  if (empty) empty.hidden = hasValues;
+  for (const item of levels) {
+    const svg = root.querySelector(`[data-mind-energy-ring="${item.key}"]`);
+    applyRingTarget(svg, { value: item.value, target }, { size: 56, strokeWidth: 6 });
+    const count = svg?.parentNode?.querySelector?.('[data-mind-energy-count]');
+    if (count) count.textContent = String(item.value);
+  }
+}
+
+function renderCadenceHeatmap(root, model) {
+  let bounds;
+  try {
+    bounds = rangeWindow(model.date, model.range);
+  } catch {
+    return;
+  }
+  const diaryHits = [...new Set((model.moodSeries ?? []).map(point => point.date))];
+  const sessionHits = [...new Set((model.sessions ?? []).map(session => session.date))];
+  paintHeatmapRow(root, '#mind-heatmap-diary', buildHeatmapRow({
+    from: bounds.from,
+    to: bounds.to,
+    today: model.date,
+    hitDates: diaryHits
+  }), 'diary');
+  paintHeatmapRow(root, '#mind-heatmap-vera', buildHeatmapRow({
+    from: bounds.from,
+    to: bounds.to,
+    today: model.date,
+    hitDates: sessionHits
+  }), 'vera');
+}
+
+function paintHeatmapRow(root, selector, tiles, kind) {
+  const grid = root.querySelector(selector);
+  if (!grid) return;
+  grid.replaceChildren();
+  for (const tile of tiles) {
+    const node = root.createElement('span');
+    node.className = `heatmap-tile heatmap-tile--${kind}`;
+    node.dataset.hit = String(tile.hit);
+    if (tile.today) node.dataset.today = 'true';
+    node.title = tile.date;
+    grid.append(node);
+  }
+}
+
+function renderThemeChips(root, themes) {
+  const host = root.querySelector('#mind-themes');
   if (!host) return;
   host.replaceChildren();
-  if (!items?.length) {
+  if (!themes?.length) {
     const caption = root.createElement('p');
     caption.className = 'metric-caption';
-    caption.textContent = selector.includes('theme')
-      ? 'No recurring themes in this range yet.'
-      : selector.includes('energy')
-        ? 'No energy entries in this range yet.'
-        : 'No mood entries in this range yet.';
+    caption.textContent = 'No recurring themes in this range yet.';
     host.append(caption);
     return;
   }
-  const built = buildColumns(items, { height: 96 });
-  for (const bar of built.bars) {
-    const col = root.createElement('div');
-    col.className = 'column-bar';
-    const fill = root.createElement('span');
-    const label = root.createElement('span');
-    label.textContent = bar.label;
-    col.append(fill, label);
-    host.append(col);
-    animateColumnGrow(fill, Math.max(bar.heightPct, bar.value > 0 ? 8 : 0));
-  }
+  const max = Math.max(...themes.map(theme => theme.value));
+  themes.forEach((theme, index) => {
+    const chip = root.createElement('span');
+    chip.className = 'mind-theme-chip';
+    const weight = max > 0 ? theme.value / max : 0;
+    chip.style.fontSize = weight > 0.66 ? 'var(--text-md)' : weight > 0.33 ? 'var(--text-base)' : 'var(--text-sm)';
+    chip.style.background = `color-mix(in srgb, var(--glass) ${Math.round(70 + weight * 30)}%, var(--wave))`;
+    chip.style.animationDelay = `${Math.min(index, 5) * 40}ms`;
+    if (index >= 6) chip.classList.add('mind-theme-chip--group');
+    chip.textContent = `${theme.label} · ${theme.value}`;
+    host.append(chip);
+  });
 }
 
 function renderSilenceBanner(root, model) {
@@ -151,8 +299,42 @@ function renderSessionList(root, sessions) {
       insight.textContent = session.insight;
       card.append(insight);
     }
+    const shift = renderMoodShift(root, session);
+    if (shift) card.append(shift);
     host.append(card);
   }
+}
+
+function renderMoodShift(root, session) {
+  const direction = moodShiftDirection(session.moodAtOpen, session.moodAtClose);
+  const openRank = moodShiftRank(session.moodAtOpen);
+  const closeRank = moodShiftRank(session.moodAtClose);
+  if (openRank < 0 && closeRank < 0) return null;
+  const wrap = root.createElement('div');
+  wrap.className = 'mind-session-shift';
+  wrap.dataset.shift = direction;
+  const svg = createSvg(root, 'svg');
+  svg.setAttribute('class', 'line-chart mind-shift-chart');
+  svg.setAttribute('viewBox', '0 0 120 36');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `${SHIFT_COPY[direction]} from ${session.moodAtOpen ?? 'unknown'} to ${session.moodAtClose ?? 'unknown'}`);
+  const line = createSvg(root, 'path');
+  line.setAttribute('data-role', 'line');
+  const series = [
+    { date: 'open', value: openRank < 0 ? 2 : (MOOD_ORDER.length - 1 - openRank) },
+    { date: 'close', value: closeRank < 0 ? 2 : (MOOD_ORDER.length - 1 - closeRank) }
+  ];
+  const chart = buildAreaLine(series, { width: 120, height: 36, padding: 6 });
+  line.setAttribute('d', chart.linePath || '');
+  svg.append(line);
+  const caption = root.createElement('p');
+  caption.className = 'metric-caption';
+  const openLabel = session.moodAtOpen ?? '—';
+  const closeLabel = session.moodAtClose ?? '—';
+  caption.textContent = `${SHIFT_COPY[direction]} · ${openLabel} → ${closeLabel}`;
+  wrap.append(svg, caption);
+  animateAreaReveal(svg);
+  return wrap;
 }
 
 function renderInsightList(root, insights) {
@@ -166,9 +348,11 @@ function renderInsightList(root, insights) {
     host.append(empty);
     return;
   }
-  for (const entry of insights) {
+  insights.forEach((entry, index) => {
     const block = root.createElement('article');
-    block.className = 'governance-entry';
+    block.className = 'governance-entry mind-insight';
+    if (index === 0) block.dataset.current = 'true';
+    block.style.animationDelay = `${index * 40}ms`;
     const heading = root.createElement('p');
     heading.className = 'governance-entry-heading';
     heading.textContent = [entry.dateKey, entry.entryType].filter(Boolean).join(' — ');
@@ -192,10 +376,10 @@ function renderInsightList(root, insights) {
       block.append(body);
     }
     host.append(block);
-  }
+  });
 }
 
-function renderCrossAgentStrip(root, lines) {
+function renderCrossAgentStrip(root, lines, { veraColour, penelopeColour } = {}) {
   const host = root.querySelector('#mind-cross-agent');
   if (!host) return;
   host.replaceChildren();
@@ -211,8 +395,13 @@ function renderCrossAgentStrip(root, lines) {
   for (const line of lines) {
     const item = root.createElement('li');
     item.className = 'mind-cross-agent__line';
-    if (line.includes('Vera')) item.dataset.agent = 'vera';
-    else if (line.includes('Penelope')) item.dataset.agent = 'penelope';
+    if (line.includes('Vera')) {
+      item.dataset.agent = 'vera';
+      item.style.borderLeftColor = veraColour;
+    } else if (line.includes('Penelope')) {
+      item.dataset.agent = 'penelope';
+      item.style.borderLeftColor = penelopeColour;
+    }
     item.textContent = line;
     list.append(item);
   }

@@ -152,6 +152,29 @@ test('renderBloods paints flags, category cards, and a ref-band chart', () => {
   assert.ok(band);
 });
 
+test('numeric markers in a category sit side by side', () => {
+  const root = fakeRoot();
+  const alt = model.categories[0].markers[0];
+  renderBloods(root, {
+    ...model,
+    categories: [{
+      id: 'Liver Function',
+      title: 'Liver Function',
+      hasFlags: true,
+      markers: [
+        alt,
+        { ...alt, key: 'ggt', label: 'GGT', latest: { ...alt.latest, value: 120 } }
+      ]
+    }]
+  });
+  const pair = root._host.querySelector('.body-metrics--pair');
+  assert.ok(pair, 'expected a side-by-side marker row');
+  const blocks = pair.children.filter(child => String(child.className).split(/\s+/).includes('body-metric'));
+  assert.equal(blocks.length, 2);
+  assert.match(String(blocks[0].textContent), /ALT/);
+  assert.match(String(blocks[1].textContent), /GGT/);
+});
+
 test('renderBloods empty flags copy and skips charts for qualitative markers', () => {
   const root = fakeRoot();
   renderBloods(root, {

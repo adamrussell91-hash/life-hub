@@ -94,8 +94,14 @@ function categoryCard(root, category) {
     empty.textContent = 'No markers in this category.';
     body.append(empty);
   } else {
-    for (const marker of category.markers) {
-      body.append(markerBlock(root, marker));
+    const blocks = category.markers.map(marker => markerBlock(root, marker));
+    if (blocks.length > 1) {
+      const row = root.createElement('div');
+      row.className = 'body-metrics body-metrics--pair';
+      row.append(...blocks);
+      body.append(row);
+    } else {
+      body.append(blocks[0]);
     }
   }
   article.append(body);
