@@ -30,6 +30,12 @@ const formatSignedKg = kg => {
   return `${sign}${text} kg`;
 };
 
+const formatKg = kg => {
+  if (kg == null || !Number.isFinite(kg) || kg <= 0) return '—';
+  const text = Number.isInteger(kg) ? kg.toLocaleString('en-AU') : kg.toFixed(1);
+  return `${text} kg`;
+};
+
 const formatWorkoutsPerWeek = value => {
   if (value == null || !Number.isFinite(value)) return '—';
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -213,12 +219,17 @@ function renderRegions(root, regions) {
     const headline = root.createElement('p');
     headline.className = 'fitness-region-card__headline';
     headline.dataset.colour = region.colour ?? 'neutral';
-    headline.textContent = formatSignedKg(region.bestSetDeltaKg);
+    headline.textContent = region.bestSetDeltaKg != null
+      ? formatSignedKg(region.bestSetDeltaKg)
+      : formatKg(region.currentBestKg);
 
     const secondary = root.createElement('p');
     secondary.className = 'metric-caption';
-    const vol = formatSignedPct(region.volumeDeltaPct);
-    secondary.textContent = vol === '—' ? 'Volume —' : `${vol} volume`;
+    const volDelta = formatSignedPct(region.volumeDeltaPct);
+    const volNow = formatKg(region.currentVolume);
+    secondary.textContent = volDelta !== '—'
+      ? `${volDelta} volume`
+      : volNow === '—' ? 'Volume —' : `${volNow} volume`;
 
     copy.append(label, headline, secondary);
     card.append(media, copy);

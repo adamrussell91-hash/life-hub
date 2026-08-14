@@ -260,16 +260,22 @@ test('regions expose best-set kg delta, volume delta, colour, and image path', (
   assert.equal(chest.label, 'Chest');
   assert.equal(chest.image, 'assets/fitness/regions/chest.png');
   assert.equal(chest.bestSetDeltaKg, 10);
+  assert.equal(chest.currentBestKg, 50);
+  assert.equal(chest.currentVolume, 500);
   assert.ok(Math.abs(chest.volumeDeltaPct - 25) < 1e-9);
   assert.equal(chest.colour, 'green');
 
   const arms = model.regions.find(r => r.key === 'arms');
   assert.equal(arms.bestSetDeltaKg, null);
+  assert.equal(arms.currentBestKg, 14);
+  assert.equal(arms.currentVolume, 168);
   assert.equal(arms.colour, 'neutral');
 
   const legs = model.regions.find(r => r.key === 'legs');
   assert.equal(legs.image, 'assets/fitness/regions/legs.png');
   assert.equal(legs.bestSetDeltaKg, null);
+  assert.equal(legs.currentBestKg, null);
+  assert.equal(legs.currentVolume, 0);
   assert.equal(legs.volumeDeltaPct, null);
 });
 

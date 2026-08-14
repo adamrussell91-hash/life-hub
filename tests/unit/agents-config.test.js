@@ -18,7 +18,7 @@ test('agent registry preserves the approved roster and confirmed colours', () =>
     hyaluronica: { colour: '#C7AEEA', colour_source: 'confirmed' },
     penelope: { colour: '#8F373E', colour_source: 'confirmed' },
     sara: { colour: '#BED3BC', colour_source: 'confirmed' },
-    vera: { colour: '#263450', colour_source: 'confirmed' },
+    vera: { colour: '#37598A', colour_source: 'confirmed' },
     brisket: { colour: '#EEB046', colour_source: 'confirmed' },
     hammond: { colour: '#2D2D2D', colour_source: 'confirmed' }
   });

@@ -281,6 +281,8 @@ function buildRegions(events, date) {
       label: REGION_LABELS[key],
       image: `assets/fitness/regions/${key}.png`,
       bestSetDeltaKg,
+      currentBestKg: currentBest,
+      currentVolume: currentVol,
       volumeDeltaPct,
       colour: strengthColour(bestSetDeltaKg)
     };

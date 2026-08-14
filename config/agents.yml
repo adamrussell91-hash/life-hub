@@ -38,7 +38,7 @@ agents:
     slug: vera
     domain: psychology
     tab: Mind
-    colour: '#263450'
+    colour: '#37598A'
     colour_source: confirmed
     name_triggers: [dr vera lenz, vera lenz, vera]
   - name: General Hammond

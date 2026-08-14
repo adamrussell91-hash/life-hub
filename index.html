@@ -499,7 +499,13 @@
             </form>
           </dialog>
 
-          <div id="fitness-region-grid" class="fitness-region-grid" aria-label="Region strength"></div>
+          <div class="fitness-region-block">
+            <div class="body-section__head">
+              <h3 class="metric-label" id="fitness-region-heading">Region strength</h3>
+              <p class="metric-caption">Vs the previous 30 days. A plain kg figure is this month’s best, with nothing to compare yet.</p>
+            </div>
+            <div id="fitness-region-grid" class="fitness-region-grid" aria-labelledby="fitness-region-heading"></div>
+          </div>
 
           <article class="metric-card">
             <p class="metric-label">Focus this week</p>
@@ -639,43 +645,101 @@
             <button type="button" data-mind-range="monthly" class="is-active" aria-pressed="true">Monthly</button>
             <button type="button" data-mind-range="six_month" aria-pressed="false">6M</button>
           </div>
-          <div id="mind-silence" class="bloods-flags" hidden aria-live="polite"></div>
+          <p class="metric-caption" data-mind="ambient" hidden></p>
           <p id="mind-empty" class="metric-caption" hidden>No diary entries in this range yet — talk with Penelope to log one.</p>
 
-          <article class="metric-card chart-card">
-            <p class="metric-label">Mood score</p>
-            <svg id="mind-mood-chart" class="line-chart body-chart" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mood score over time">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-            </svg>
-          </article>
+          <div id="mind-hero" class="hero-grid">
+            <article class="metric-card chart-card" aria-labelledby="mind-mood-arc-label">
+              <p class="metric-label" id="mind-mood-arc-label">Mood arc</p>
+              <svg id="mind-mood-chart" class="line-chart body-chart" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mood score over time">
+                <defs>
+                  <linearGradient id="mind-mood-stroke" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--wave)"></stop>
+                    <stop offset="55%" stop-color="var(--mood-neutral)"></stop>
+                    <stop offset="100%" stop-color="var(--mood-bad)"></stop>
+                  </linearGradient>
+                </defs>
+                <path data-role="area" d=""></path>
+                <path data-role="line" d=""></path>
+                <g data-role="dots"></g>
+              </svg>
+            </article>
 
-          <article class="metric-card chart-card">
-            <p class="metric-label">Energy</p>
-            <div id="mind-energy-columns" class="column-chart" aria-label="Diary entries by energy"></div>
-          </article>
+            <article class="metric-card" aria-labelledby="mind-mood-mix-label">
+              <p class="metric-label" id="mind-mood-mix-label">Mood mix</p>
+              <div id="mind-mood-mix" class="mind-mood-mix">
+                <svg id="mind-mood-pie" class="mind-mood-pie" viewBox="0 0 72 72" role="img" aria-label="Diary entries by mood">
+                  <g data-role="slices"></g>
+                </svg>
+                <p class="metric-value" data-mind="mood-mix-label">—</p>
+              </div>
+            </article>
 
-          <article class="metric-card chart-card">
-            <p class="metric-label">Entries by mood</p>
-            <div id="mind-mood-columns" class="column-chart" aria-label="Diary entries by mood"></div>
-          </article>
+            <article class="metric-card" aria-labelledby="mind-energy-label">
+              <p class="metric-label" id="mind-energy-label">Energy</p>
+              <p data-mind="energy-empty" class="metric-caption" hidden>No energy entries in this range yet.</p>
+              <div id="mind-energy-rings" class="mind-energy-rings" aria-label="Diary entries by energy">
+                <div class="mind-energy-ring">
+                  <svg class="metric-ring metric-ring--mind-high" data-mind-energy-ring="high" viewBox="0 0 56 56" role="img" aria-label="High energy share">
+                    <circle data-role="track" class="metric-ring-track" fill="none"></circle>
+                    <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
+                  </svg>
+                  <p class="metric-caption">High <span data-mind-energy-count>0</span></p>
+                </div>
+                <div class="mind-energy-ring">
+                  <svg class="metric-ring metric-ring--mind-medium" data-mind-energy-ring="medium" viewBox="0 0 56 56" role="img" aria-label="Medium energy share">
+                    <circle data-role="track" class="metric-ring-track" fill="none"></circle>
+                    <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
+                  </svg>
+                  <p class="metric-caption">Medium <span data-mind-energy-count>0</span></p>
+                </div>
+                <div class="mind-energy-ring">
+                  <svg class="metric-ring metric-ring--mind-low" data-mind-energy-ring="low" viewBox="0 0 56 56" role="img" aria-label="Low energy share">
+                    <circle data-role="track" class="metric-ring-track" fill="none"></circle>
+                    <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
+                  </svg>
+                  <p class="metric-caption">Low <span data-mind-energy-count>0</span></p>
+                </div>
+              </div>
+            </article>
+          </div>
 
-          <article class="metric-card chart-card">
-            <p class="metric-label">Recurring themes</p>
-            <div id="mind-theme-columns" class="column-chart" aria-label="Recurring diary tags"></div>
-          </article>
+          <div id="mind-cadence" class="support-grid">
+            <article class="metric-card" aria-labelledby="mind-heatmap-label">
+              <p class="metric-label" id="mind-heatmap-label">Diary and Vera cadence</p>
+              <div class="mind-heatmap">
+                <div class="mind-heatmap-row">
+                  <p class="metric-caption">Diary</p>
+                  <div id="mind-heatmap-diary" class="heatmap-grid mind-heatmap-grid" aria-label="Diary days in range"></div>
+                </div>
+                <div class="mind-heatmap-row">
+                  <p class="metric-caption">Vera</p>
+                  <div id="mind-heatmap-vera" class="heatmap-grid mind-heatmap-grid" aria-label="Vera session days in range"></div>
+                </div>
+              </div>
+            </article>
 
-          <article class="metric-card" aria-labelledby="mind-sessions-label">
-            <p class="metric-label" id="mind-sessions-label">Vera sessions</p>
-            <div id="mind-sessions"></div>
-          </article>
+            <article class="metric-card" aria-labelledby="mind-themes-label">
+              <p class="metric-label" id="mind-themes-label">Recurring themes</p>
+              <div id="mind-themes" class="mind-theme-chips" aria-label="Recurring diary tags"></div>
+            </article>
+          </div>
 
-          <article class="metric-card" aria-labelledby="mind-insights-label">
-            <p class="metric-label" id="mind-insights-label">Mind Insights</p>
-            <div id="mind-insights"></div>
-          </article>
+          <div id="mind-silence" class="mind-silence" hidden aria-live="polite"></div>
 
-          <article class="metric-card" aria-labelledby="mind-cross-agent-label">
+          <div class="support-grid">
+            <article class="metric-card" aria-labelledby="mind-sessions-label">
+              <p class="metric-label" id="mind-sessions-label">Vera sessions</p>
+              <div id="mind-sessions"></div>
+            </article>
+
+            <article class="metric-card" aria-labelledby="mind-insights-label">
+              <p class="metric-label" id="mind-insights-label">Mind Insights</p>
+              <div id="mind-insights" class="mind-insight-timeline"></div>
+            </article>
+          </div>
+
+          <article class="metric-card mind-cross-agent-card" aria-labelledby="mind-cross-agent-label">
             <p class="metric-label" id="mind-cross-agent-label">Cross-Agent signals</p>
             <div id="mind-cross-agent"></div>
           </article>
@@ -684,7 +748,6 @@
             <button type="button" class="mind-agent-button" data-mind-agent="penelope">Talk with Penelope</button>
             <button type="button" class="mind-agent-button mind-agent-button--vera" data-mind-agent="vera">Talk with Vera</button>
           </div>
-          <p class="metric-caption" data-mind="ambient" hidden></p>
         </section>
 
         <section id="central-node-dashboard" class="dashboard" aria-labelledby="central-node-heading" hidden>

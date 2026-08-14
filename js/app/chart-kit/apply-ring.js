@@ -4,6 +4,10 @@ import { animateRingFill } from './animate.js';
 export function applyRingTarget(svg, { value, target }, options = {}) {
   if (!svg) return null;
   const ring = buildRingTarget({ value, target }, options);
+  const key = `${value}\0${target}\0${ring.size}\0${ring.strokeWidth}`;
+  const unchanged = svg.dataset?.ringKey === key;
+  if (svg.dataset) svg.dataset.ringKey = key;
+  const motion = unchanged ? { ...options, reducedMotion: true } : options;
   for (const role of ['track', 'fill']) {
     const circle = svg.querySelector(`[data-role="${role}"]`);
     if (!circle) continue;
@@ -11,7 +15,7 @@ export function applyRingTarget(svg, { value, target }, options = {}) {
     circle.setAttribute('cy', ring.center);
     circle.setAttribute('r', ring.radius);
     circle.setAttribute('stroke-width', ring.strokeWidth);
-    if (role === 'fill') animateRingFill(circle, ring, options);
+    if (role === 'fill') animateRingFill(circle, ring, motion);
   }
   return ring;
 }

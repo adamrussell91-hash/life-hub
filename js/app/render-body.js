@@ -95,9 +95,14 @@ function sectionCard(root, section, hooks) {
   } else if (section.id === 'tape') {
     article.append(tapeFigure(root, section.metrics));
   } else {
-    for (const metric of section.metrics) {
-      if (metric.empty) continue;
-      article.append(metricBlock(root, metric));
+    const blocks = section.metrics.filter(metric => !metric.empty).map(metric => metricBlock(root, metric));
+    if (section.id === 'composition' && blocks.length > 1) {
+      const row = root.createElement('div');
+      row.className = 'body-metrics body-metrics--pair';
+      row.append(...blocks);
+      article.append(row);
+    } else {
+      for (const block of blocks) article.append(block);
     }
   }
 
@@ -135,20 +140,28 @@ function tapeFigure(root, metrics) {
   img.src = 'assets/body/full-body-diagram.png';
   img.alt = 'Full body anatomy diagram';
   img.className = 'body-figure__img';
+  figure.append(img);
 
-  const labels = root.createElement('div');
-  labels.className = 'body-figure__labels';
-  labels.id = 'body-tape-labels';
+  const left = root.createElement('div');
+  left.className = 'body-figure__rail body-figure__rail--left';
+  const right = root.createElement('div');
+  right.className = 'body-figure__rail body-figure__rail--right';
+  wrap.append(left, figure, right);
 
+  const placed = [];
   for (const metric of metrics) {
     if (metric.empty || metric.current == null) continue;
     const anchor = LABEL_ANCHORS[metric.site ?? metric.key];
     if (!anchor) continue;
-    labels.append(tapeLabel(root, metric, anchor, labels));
+    placed.push({ metric, anchor });
+  }
+  placed.sort((a, b) => parseFloat(a.anchor.top) - parseFloat(b.anchor.top));
+
+  for (const { metric, anchor } of placed) {
+    const rail = anchor.side === 'right' ? right : left;
+    rail.append(tapeLabel(root, metric, anchor, wrap));
   }
 
-  figure.append(img, labels);
-  wrap.append(figure);
   return wrap;
 }
 
@@ -158,7 +171,6 @@ function tapeLabel(root, metric, anchor, labelsHost) {
   el.className = 'body-tape-label';
   el.dataset.site = site;
   el.dataset.side = anchor.side;
-  el.style.top = anchor.top;
 
   const toggle = root.createElement('button');
   toggle.type = 'button';

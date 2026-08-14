@@ -13,10 +13,22 @@ function el(tag = 'div') {
     children: [],
     attributes: {},
     listeners: [],
-    style: {},
-    classList: { remove() {}, add() {}, toggle() {} },
+    style: { setProperty() {} },
+    classList: {
+      remove() {},
+      add() {},
+      toggle(name, force) {
+        const parts = String(this.className || '').split(/\s+/).filter(Boolean);
+        const has = parts.includes(name);
+        const on = force == null ? !has : Boolean(force);
+        this.className = on
+          ? (has ? parts.join(' ') : [...parts, name].join(' '))
+          : parts.filter(part => part !== name).join(' ');
+      }
+    },
     getBoundingClientRect() { return { width: 0, height: 0, top: 0, left: 0 }; },
     append(...nodes) {
+      for (const node of nodes) node.parentNode = this;
       this.children.push(...nodes);
       const bits = this.children.map(n => n.textContent).filter(Boolean);
       if (bits.length) this.textContent = bits.join('');
@@ -30,7 +42,10 @@ function el(tag = 'div') {
       this.attributes[name] = String(value);
       if (name === 'class') this.className = String(value);
       if (name === 'id') this.id = String(value);
-      if (name === 'data-role') this.dataset.role = String(value);
+      if (name.startsWith('data-')) {
+        const key = name.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        this.dataset[key] = String(value);
+      }
       if (name === 'hidden') this.hidden = true;
     },
     getAttribute(name) { return this.attributes[name]; },
@@ -75,28 +90,67 @@ function matches(node, selector) {
   return false;
 }
 
+function ringSvg(level) {
+  const svg = el('svg');
+  svg.dataset.mindEnergyRing = level;
+  const track = el('circle');
+  track.dataset.role = 'track';
+  const fill = el('circle');
+  fill.dataset.role = 'fill';
+  svg.append(track, fill);
+  return svg;
+}
+
 function fakeRoot() {
   const dashboard = el('section');
   dashboard.id = 'mind-dashboard';
   dashboard.hidden = true;
+  dashboard.style = { setProperty() {} };
   const ranges = el('div');
   ranges.id = 'mind-range-control';
   ranges.querySelectorAll = () => [];
   const caption = el('p');
   caption.dataset.mind = 'entry-count';
+  const ambient = el('p');
+  ambient.dataset.mind = 'ambient';
   const moodChart = el('svg');
   moodChart.id = 'mind-mood-chart';
   const area = el('path');
   area.dataset.role = 'area';
   const line = el('path');
   line.dataset.role = 'line';
-  moodChart.append(area, line);
-  const moodColumns = el('div');
-  moodColumns.id = 'mind-mood-columns';
-  const themeColumns = el('div');
-  themeColumns.id = 'mind-theme-columns';
+  const dots = el('g');
+  dots.dataset.role = 'dots';
+  moodChart.append(area, line, dots);
+  const slices = el('g');
+  slices.dataset.role = 'slices';
+  const pie = el('svg');
+  pie.id = 'mind-mood-pie';
+  pie.append(slices);
+  const mix = el('div');
+  mix.id = 'mind-mood-mix';
+  mix.append(pie);
+  const mixLabel = el('p');
+  mixLabel.dataset.mind = 'mood-mix-label';
   const energy = el('div');
-  energy.id = 'mind-energy-columns';
+  energy.id = 'mind-energy-rings';
+  const high = ringSvg('high');
+  const medium = ringSvg('medium');
+  const low = ringSvg('low');
+  energy.append(high, medium, low);
+  const energyEmpty = el('p');
+  energyEmpty.dataset.mind = 'energy-empty';
+  energyEmpty.hidden = true;
+  const hero = el('div');
+  hero.id = 'mind-hero';
+  const cadence = el('div');
+  cadence.id = 'mind-cadence';
+  const diaryHeat = el('div');
+  diaryHeat.id = 'mind-heatmap-diary';
+  const veraHeat = el('div');
+  veraHeat.id = 'mind-heatmap-vera';
+  const themes = el('div');
+  themes.id = 'mind-themes';
   const empty = el('p');
   empty.id = 'mind-empty';
   const silence = el('div');
@@ -112,10 +166,22 @@ function fakeRoot() {
     '#mind-dashboard': dashboard,
     '#mind-range-control': ranges,
     '[data-mind="entry-count"]': caption,
+    '[data-mind="ambient"]': ambient,
     '#mind-mood-chart': moodChart,
-    '#mind-mood-columns': moodColumns,
-    '#mind-theme-columns': themeColumns,
-    '#mind-energy-columns': energy,
+    '#mind-mood-mix': mix,
+    '#mind-mood-pie': pie,
+    '#mind-mood-pie [data-role="slices"]': slices,
+    '[data-mind="mood-mix-label"]': mixLabel,
+    '#mind-energy-rings': energy,
+    '[data-mind="energy-empty"]': energyEmpty,
+    '[data-mind-energy-ring="high"]': high,
+    '[data-mind-energy-ring="medium"]': medium,
+    '[data-mind-energy-ring="low"]': low,
+    '#mind-hero': hero,
+    '#mind-cadence': cadence,
+    '#mind-heatmap-diary': diaryHeat,
+    '#mind-heatmap-vera': veraHeat,
+    '#mind-themes': themes,
     '#mind-empty': empty,
     '#mind-silence': silence,
     '#mind-sessions': sessions,
@@ -124,13 +190,21 @@ function fakeRoot() {
   };
   return {
     createElement: tag => el(tag),
+    createElementNS: (_ns, tag) => el(tag),
     querySelector(selector) { return hosts[selector] ?? null; },
     querySelectorAll() { return []; },
     _energy: energy,
+    _high: high,
     _silence: silence,
     _sessions: sessions,
     _insights: insights,
-    _cross: cross
+    _cross: cross,
+    _diaryHeat: diaryHeat,
+    _veraHeat: veraHeat,
+    _themes: themes,
+    _hero: hero,
+    _dots: dots,
+    _mixLabel: mixLabel
   };
 }
 
@@ -165,11 +239,23 @@ test('renderMind shows empty states for sessions, insights, and cross-agent', ()
   assert.equal(root._silence.children.length, 0);
 });
 
-test('renderMind renders energy columns, session cards, insights, cross-agent, and silence', () => {
+test('renderMind renders energy rings, session mood-shift, insights, heatmap, and silence', () => {
   const root = fakeRoot();
   renderMind(root, emptyModel({
     empty: false,
-    entryCount: 1,
+    entryCount: 3,
+    moodSeries: [
+      { date: '2026-08-10', value: 4, mood: 'low' },
+      { date: '2026-08-12', value: 7, mood: 'good' }
+    ],
+    byMood: [
+      { key: 'great', label: 'Great', value: 0 },
+      { key: 'good', label: 'Good', value: 1 },
+      { key: 'neutral', label: 'Neutral', value: 0 },
+      { key: 'low', label: 'Low', value: 1 },
+      { key: 'bad', label: 'Bad', value: 0 }
+    ],
+    themes: [{ key: 'school', label: 'school', value: 2 }],
     energyByLevel: [
       { key: 'high', label: 'High', value: 1 },
       { key: 'medium', label: 'Medium', value: 0 },
@@ -198,17 +284,32 @@ test('renderMind renders energy columns, session cards, insights, cross-agent, a
     daysSinceLastMindSession: 9
   }));
 
-  assert.equal(root._energy.children.length, 3);
+  assert.equal(root._high.querySelector('[data-role="fill"]').getAttribute('stroke-dasharray'), String(2 * Math.PI * 25));
   const card = root._sessions.querySelector('.mind-session-card');
   assert.ok(card);
   assert.match(card.textContent, /Weekend/);
-  assert.match(card.textContent, /What is the weekend for/);
-  assert.match(card.textContent, /Rest is not a prize/);
+  assert.match(card.textContent, /mood lifted/);
+  assert.equal(card.querySelector('.mind-session-shift')?.dataset.shift, 'improved');
   const insight = root._insights.querySelector('.governance-entry');
   assert.ok(insight);
+  assert.equal(insight.dataset.current, 'true');
   assert.match(insight.textContent, /Mind Insight/);
   assert.match(root._cross.textContent, /Vera→Penelope/);
+  assert.equal(root._cross.querySelector('[data-agent="vera"]')?.style.borderLeftColor, '#37598A');
   assert.equal(root._silence.hidden, false);
   assert.match(root._silence.textContent, /12 days since diary/);
   assert.match(root._silence.textContent, /9 days since a Vera session/);
+  assert.equal(root._diaryHeat.children.length, 30);
+  assert.equal(root._diaryHeat.children.filter(tile => tile.dataset.hit === 'true').length, 2);
+  assert.equal(root._veraHeat.children.filter(tile => tile.dataset.hit === 'true').length, 1);
+  assert.match(root._themes.textContent, /school/);
+  assert.match(root._mixLabel.textContent, /Good/);
+  assert.equal(root._dots.children.length, 2);
+  assert.equal(root._dots.children[0].dataset.mood, 'low');
+});
+
+test('renderMind hides hero and cadence rows in the empty state', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({ empty: true }));
+  assert.equal(root._hero.hidden, true);
 });
