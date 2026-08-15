@@ -76,6 +76,31 @@ export function sessionThemes(session) {
   return session?.theme ? [session.theme] : [];
 }
 
+export function entriesForTheme(entries, sessions, theme) {
+  const key = normalizeThemeKey(theme ?? '');
+  if (!key) return [];
+  const rows = [];
+  for (const entry of entries ?? []) {
+    const tags = uniqueThemeKeys(entry.tags);
+    if (!tags.includes(key)) continue;
+    rows.push({
+      date: entry.date,
+      title: entry.title ?? null,
+      excerpt: String(entry.body || entry.insight || entry.observation || '').slice(0, 140)
+    });
+  }
+  for (const session of sessions ?? []) {
+    const themes = uniqueThemeKeys(sessionThemes(session));
+    if (!themes.includes(key)) continue;
+    rows.push({
+      date: session.date,
+      title: session.title ?? null,
+      excerpt: String(session.body || session.insight || session.observation || '').slice(0, 140)
+    });
+  }
+  return rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
 function normalizeThemeKey(value) {
   return String(value).trim().toLowerCase();
 }
@@ -660,6 +685,7 @@ export function buildMindModel({
     resurfacing: resurfacing(entries, allSessions, date),
     waffle: waffleEntries(entries, allSessions, bounds),
     cadence: cadenceHits(entries, allSessions),
-    tensions
+    tensions,
+    diary: entries
   };
 }

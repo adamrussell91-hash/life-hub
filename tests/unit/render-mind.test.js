@@ -98,6 +98,9 @@ function matches(node, selector) {
     if (data[2]) return node.dataset?.[key] === data[2] || node.attributes?.[`data-${data[1]}`] === data[2];
     return node.dataset?.[key] !== undefined;
   }
+  if (/^[a-z][\w-]*$/i.test(selector)) {
+    return String(node.tagName).toLowerCase() === selector.toLowerCase();
+  }
   return false;
 }
 
@@ -211,6 +214,11 @@ function fakeRoot() {
   tileStreak.append(streakRing);
   const penelopeHeat = el('div');
   penelopeHeat.id = 'mind-heatmap-penelope';
+  const constellation = el('svg');
+  constellation.id = 'mind-constellation';
+  const tension = el('article');
+  tension.id = 'mind-tension';
+  tension.hidden = false;
   const agentButtons = [veraBtn, penelopeBtn];
   const hosts = {
     '#mind-dashboard': dashboard,
@@ -247,7 +255,9 @@ function fakeRoot() {
     '#mind-tile-insights': tileInsights,
     '#mind-tile-factors': tileFactors,
     '#mind-tile-streak': tileStreak,
-    '#mind-streak-ring': streakRing
+    '#mind-streak-ring': streakRing,
+    '#mind-constellation': constellation,
+    '#mind-tension': tension
   };
   return {
     createElement: tag => el(tag),
@@ -417,4 +427,29 @@ test('renderMind paints factor bars and streak label', () => {
   });
   assert.match(root.querySelector('#mind-tile-factors').textContent, /walk/);
   assert.match(root.querySelector('#mind-tile-streak').textContent, /3/);
+});
+
+test('renderMind draws constellation nodes and hides empty tension', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({
+    empty: false,
+    themeNodes: [{ key: 'work', count: 4, meanMood: 7 }],
+    themeCooccurrence: [{ themeA: 'work', themeB: 'shame', count: 2 }],
+    tensions: []
+  }));
+  const node = root.querySelector('#mind-constellation').querySelector('[data-theme="work"]');
+  assert.ok(node);
+  assert.equal(root.querySelector('#mind-tension').hidden, true);
+});
+
+test('renderMind paints tension poles and keeps the tile visible', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({
+    empty: false,
+    tensions: [{ body: 'The filter vs the need.', tension: { poleA: 'filter', poleB: 'need' }, stated: 0.2, revealed: 0.8 }]
+  }));
+  const tile = root.querySelector('#mind-tension');
+  assert.equal(tile.hidden, false);
+  const circles = [...(tile.querySelectorAll?.('circle') ?? tile.children)].filter(n => String(n.tagName).toLowerCase() === 'circle');
+  assert.ok(circles.length >= 2 || tile.querySelector('svg'));
 });
