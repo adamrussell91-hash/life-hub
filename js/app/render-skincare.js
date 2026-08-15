@@ -6,6 +6,7 @@ import {
   toSkincareConfirmPayload
 } from './skincare-routines-data.js';
 import { groupProductsByCategory, searchProductLibrary } from './skincare-product-library.js';
+import { formatDisplayDate } from '../core/time.js';
 
 function setText(root, selector, value) {
   const el = root.querySelector(selector);
@@ -90,7 +91,7 @@ export function renderSkincare(root, model, {
   const dashboard = root.querySelector('#skincare-dashboard');
   if (!dashboard) return;
 
-  setText(root, '[data-skincare="date"]', model.date);
+  setText(root, '[data-skincare="date"]', formatDisplayDate(model.date));
   setText(root, '[data-skincare="am-streak"]', model.amStreak);
   setText(root, '[data-skincare="pm-streak"]', model.pmStreak);
 
@@ -102,7 +103,7 @@ export function renderSkincare(root, model, {
       tile.className = 'heatmap-tile';
       tile.dataset.skincareState = day.state;
       if (day.isToday) tile.dataset.today = 'true';
-      tile.title = day.date;
+      tile.title = formatDisplayDate(day.date);
       heatmap.append(tile);
     }
   }

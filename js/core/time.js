@@ -25,6 +25,13 @@ function parseKey(key) {
   return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
 }
 
+export function formatDisplayDate(value) {
+  if (value == null || value === '') return '';
+  if (!isCalendarDate(value)) return String(value);
+  const { year, month, day } = parseKey(value);
+  return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
+}
+
 function utcDate(key) {
   const { year, month, day } = parseKey(key);
   const date = new Date(0);

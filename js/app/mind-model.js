@@ -105,6 +105,20 @@ function normalizeThemeKey(value) {
   return String(value).trim().toLowerCase();
 }
 
+export function displayThemeLabel(value) {
+  const words = String(value ?? '')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return '';
+  return words.map((word, index) => {
+    const lower = word.toLowerCase();
+    if (index === 0) return lower.charAt(0).toUpperCase() + lower.slice(1);
+    return lower;
+  }).join(' ');
+}
+
 function uniqueThemeKeys(values) {
   const keys = [];
   const seen = new Set();
@@ -351,7 +365,7 @@ export function recurringThemes(entries, bounds, { limit = 8 } = {}) {
     .slice(0, limit)
     .map(([key, value]) => ({
       key,
-      label: key,
+      label: displayThemeLabel(key),
       value
     }));
 }

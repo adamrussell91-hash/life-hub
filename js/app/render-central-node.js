@@ -2,6 +2,7 @@ import { animateAreaReveal, animateRingFill } from './chart-kit/animate.js';
 import { buildCompletionRing } from './central-node-charts.js';
 import { buildProteinLineChart } from './nutrition-charts.js';
 import { renderInlineMarkdown } from './render-chat.js';
+import { formatDisplayDate } from '../core/time.js';
 
 const SECTION_SELECTORS = {
   todaysStatus: '[data-central-node="todays-status"]',
@@ -143,7 +144,7 @@ function renderHeatmap(root, selector, series, hit) {
     const tile = root.createElement('span');
     tile.className = 'heatmap-tile';
     tile.dataset.hit = String(hit(day));
-    tile.title = day.date;
+    tile.title = formatDisplayDate(day.date);
     grid.append(tile);
   }
 }

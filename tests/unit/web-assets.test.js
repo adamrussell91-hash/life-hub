@@ -42,6 +42,7 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
   for (const fragment of [
     'id="sign-in-view"',
     'id="sign-in-form"',
+    'onsubmit="return false"',
     '<label for="passphrase-input"',
     'id="passphrase-input"',
     'type="password"',

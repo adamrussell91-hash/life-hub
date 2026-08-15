@@ -33,16 +33,17 @@ export function createStaticServer({ root, apiRoot = new URL('../', import.meta.
   return createServer(async (request, response) => {
     if (await handleMockApi(request, response)) return;
 
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      send(response, 405, 'Method not allowed');
-      return;
-    }
-
     let decodedPath;
     try {
       decodedPath = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
     } catch {
       send(response, 400, 'Invalid path');
+      return;
+    }
+
+    const indexPost = request.method === 'POST' && (decodedPath === '/' || decodedPath === '/index.html');
+    if (request.method !== 'GET' && request.method !== 'HEAD' && !indexPost) {
+      send(response, 405, 'Method not allowed');
       return;
     }
 

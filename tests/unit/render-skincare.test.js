@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { renderSkincare } from '../../js/app/render-skincare.js';
 import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+import { formatDisplayDate } from '../../js/core/time.js';
 
 class FakeElement {
   constructor(tag) {
@@ -248,7 +249,7 @@ test('renderSkincare fills the consistency heatmap with 30 dated tiles carrying 
   assert.equal(tiles.length, 30);
   for (const [index, tile] of tiles.entries()) {
     assert.equal(tile.dataset.skincareState, monthHeatmap[index].state);
-    assert.equal(tile.title, monthHeatmap[index].date);
+    assert.equal(tile.title, formatDisplayDate(monthHeatmap[index].date));
   }
   assert.equal(tiles[29].dataset.today, 'true');
   assert.equal(tiles[0].dataset.today, undefined);

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addCalendarDays, daysBetween, enumerateDateKeys,
+  formatDisplayDate,
   getSydneyDateKey, getSydneyTimestamp, getSydneyWeekStart, isCalendarDate,
   sydneyLocalStamp
 } from '../../js/core/time.js';
@@ -55,6 +56,14 @@ test('calendar helpers reject impossible dates and preserve leap-day arithmetic'
     assert.throws(() => enumerateDateKeys(impossible, '2026-03-01'), TypeError);
     assert.throws(() => enumerateDateKeys('2026-02-01', impossible), TypeError);
   }
+});
+
+test('formatDisplayDate is always DD/MM/YY', () => {
+  assert.equal(formatDisplayDate('2026-08-15'), '15/08/26');
+  assert.equal(formatDisplayDate('2026-01-05'), '05/01/26');
+  assert.equal(formatDisplayDate('2015-12-31'), '31/12/15');
+  assert.equal(formatDisplayDate('not-a-date'), 'not-a-date');
+  assert.equal(formatDisplayDate(''), '');
 });
 
 test('sydneyLocalStamp picks AEDT (+11) in late March', () => {

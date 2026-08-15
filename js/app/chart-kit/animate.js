@@ -2,9 +2,19 @@ export function prefersReducedMotion(media = globalThis.matchMedia) {
   return typeof media === 'function' && Boolean(media('(prefers-reduced-motion: reduce)')?.matches);
 }
 
+function motionIsQuiet(node, options = {}) {
+  if (options.quiet === true) return true;
+  let el = node;
+  while (el) {
+    if (el.dataset?.syncQuiet != null && String(el.dataset.syncQuiet) !== 'false') return true;
+    el = el.parentElement || el.parentNode;
+  }
+  return options.reducedMotion ?? prefersReducedMotion();
+}
+
 export function animateRingFill(circle, { circumference, dashoffset }, options = {}) {
   if (!circle) return;
-  const reduced = options.reducedMotion ?? prefersReducedMotion();
+  const reduced = motionIsQuiet(circle, options);
   circle.setAttribute('stroke-dasharray', String(circumference));
   if (reduced) {
     circle.style.transition = 'none';
@@ -20,7 +30,7 @@ export function animateRingFill(circle, { circumference, dashoffset }, options =
 
 export function animateAreaReveal(svg, options = {}) {
   if (!svg) return;
-  const reduced = options.reducedMotion ?? prefersReducedMotion();
+  const reduced = motionIsQuiet(svg, options);
   svg.classList.remove('chart-animating', 'chart-static');
 
   const line = svg.querySelector('[data-role="line"]');
@@ -53,7 +63,7 @@ export function animateAreaReveal(svg, options = {}) {
 
 export function animateColumnGrow(element, heightPct, options = {}) {
   if (!element) return;
-  const reduced = options.reducedMotion ?? prefersReducedMotion();
+  const reduced = motionIsQuiet(element, options);
   if (reduced) {
     element.style.transition = 'none';
     element.style.height = `${heightPct}%`;

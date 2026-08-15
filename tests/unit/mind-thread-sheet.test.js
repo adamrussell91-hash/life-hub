@@ -139,3 +139,27 @@ test('closeMindThreadSheet hides the overlay', () => {
   closeMindThreadSheet(root);
   assert.equal(root.querySelector('#mind-thread-sheet').hidden, true);
 });
+
+test('openMindThreadSheet parks the panel inside the clicked tile', () => {
+  const root = makeRootWithSheet();
+  const tile = el('article');
+  tile.className = 'mind-tile';
+  tile.closest = selector => (selector === '.mind-tile' || selector === '.metric-card' ? tile : null);
+  const mark = el('path');
+  mark.closest = selector => tile.closest(selector);
+  tile.append(mark);
+  root.append(tile);
+
+  openMindThreadSheet(root, {
+    title: 'fatigue',
+    rows: [{ date: '2026-08-12', excerpt: 'School drained me.' }],
+    anchor: mark
+  });
+
+  const sheet = root.querySelector('#mind-thread-sheet');
+  assert.equal(sheet.hidden, false);
+  assert.equal(sheet.parentNode, tile);
+  closeMindThreadSheet(root);
+  assert.equal(sheet.hidden, true);
+  assert.equal(sheet.parentNode, root);
+});

@@ -54,6 +54,19 @@ test('serves the Home shell with the correct content type', async t => {
   assert.match(await response.text(), /Life Hub/);
 });
 
+test('native sign-in POST to / serves the shell instead of 405', async t => {
+  const baseUrl = await startServer(t);
+  const response = await fetch(`${baseUrl}/`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: 'passphrase=life-hub-local'
+  });
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /^text\/html/);
+  assert.match(await response.text(), /Life Hub/);
+});
+
 function readConfigurationValue(configuration, section, key) {
   let inSection = false;
   for (const line of configuration.split(/\r?\n/)) {

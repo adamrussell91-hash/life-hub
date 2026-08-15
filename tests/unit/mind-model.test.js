@@ -28,6 +28,7 @@ import {
   resurfacing,
   waffleEntries,
   parseInsightExtras,
+  displayThemeLabel,
   entriesForTheme
 } from '../../js/app/mind-model.js';
 
@@ -61,6 +62,22 @@ test('buildMindModel builds mood series, by-mood counts, and themes', () => {
   assert.equal(model.byMood.find(item => item.key === 'great').value, 1);
   assert.equal(model.themes[0].key, 'fatigue');
   assert.equal(model.themes[0].value, 2);
+});
+
+test('displayThemeLabel turns snake_case keys into readable words', () => {
+  assert.equal(displayThemeLabel('free_will'), 'Free will');
+  assert.equal(displayThemeLabel('turkish_food'), 'Turkish food');
+  assert.equal(displayThemeLabel('vibe-coding'), 'Vibe coding');
+  assert.equal(displayThemeLabel('lecture'), 'Lecture');
+});
+
+test('recurringThemes exposes a human label beside the raw key', () => {
+  const themes = recurringThemes(
+    [{ date: '2026-08-05', tags: ['free_will'] }],
+    rangeWindow('2026-08-05', 'weekly')
+  );
+  assert.equal(themes[0].key, 'free_will');
+  assert.equal(themes[0].label, 'Free will');
 });
 
 test('range helpers and empty themes', () => {

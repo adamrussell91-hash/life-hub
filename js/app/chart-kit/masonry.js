@@ -1,4 +1,4 @@
-export function packMasonry(items, { columns, gap, columnWidth }) {
+export function packMasonry(items, { columns, gap, columnWidth, flowOffset = 0 }) {
   const colHeights = Array(columns).fill(0);
   const packed = [];
 
@@ -19,7 +19,7 @@ export function packMasonry(items, { columns, gap, columnWidth }) {
     packed.push({
       id: item.id,
       x: columnIndex * (columnWidth + gap),
-      y,
+      y: y + flowOffset,
       width,
       height: item.height,
       span

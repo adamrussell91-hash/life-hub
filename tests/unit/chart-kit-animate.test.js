@@ -28,6 +28,28 @@ test('animateAreaReveal clears stroke dash after animationend so the solid line 
   assert.equal(line.style.strokeDashoffset, '');
 });
 
+test('animateAreaReveal skips the draw-in when quiet is set', () => {
+  const line = {
+    style: { strokeDasharray: '', strokeDashoffset: '' },
+    getTotalLength: () => 80,
+    addEventListener() {}
+  };
+  const svg = {
+    classList: {
+      items: new Set(),
+      remove(...names) { for (const n of names) this.items.delete(n); },
+      add(name) { this.items.add(name); }
+    },
+    getBoundingClientRect() { return {}; },
+    querySelector(sel) { return sel.includes('line') ? line : null; }
+  };
+  animateAreaReveal(svg, { quiet: true });
+  assert.equal(line.style.strokeDasharray, '');
+  assert.equal(line.style.strokeDashoffset, '');
+  assert.equal(svg.classList.items.has('chart-static'), true);
+  assert.equal(svg.classList.items.has('chart-animating'), false);
+});
+
 test('animateAreaReveal jumps to the final line when reduced motion is set', () => {
   const line = {
     style: { strokeDasharray: '', strokeDashoffset: '' },

@@ -214,8 +214,11 @@ function fakeRoot() {
   tileStreak.append(streakRing);
   const penelopeHeat = el('div');
   penelopeHeat.id = 'mind-heatmap-penelope';
+  const tileConstellation = el('article');
+  tileConstellation.id = 'mind-tile-constellation';
   const constellation = el('svg');
   constellation.id = 'mind-constellation';
+  tileConstellation.append(constellation);
   const tension = el('article');
   tension.id = 'mind-tension';
   tension.hidden = false;
@@ -301,6 +304,7 @@ function fakeRoot() {
     '#mind-tile-factors': tileFactors,
     '#mind-tile-streak': tileStreak,
     '#mind-streak-ring': streakRing,
+    '#mind-tile-constellation': tileConstellation,
     '#mind-constellation': constellation,
     '#mind-tension': tension,
     '#mind-tile-stream': tileStream,
@@ -435,6 +439,8 @@ test('renderMind renders energy rings, session mood-shift, insights, heatmap, an
   const card = root._sessions.querySelector('.mind-session-card');
   assert.ok(card);
   assert.match(card.textContent, /Weekend/);
+  assert.match(card.textContent, /10\/08\/26/);
+  assert.doesNotMatch(card.textContent, /2026-08-10/);
   assert.match(card.textContent, /mood lifted/);
   assert.equal(card.querySelector('.mind-session-shift')?.dataset.shift, 'improved');
   const insight = root._insights.querySelector('.governance-entry');
@@ -557,4 +563,20 @@ test('resurfacing card dismisses and stays gone', () => {
     resurfacing: { id: 'shame-loop-2026-08-10', theme: 'shame-loop', priorDate: '2026-07-01', excerpt: 'Old mention.' }
   });
   assert.doesNotMatch(root.querySelector('#mind-tile-insights').textContent, /came up again/i);
+});
+
+test('renderMind shows human theme labels instead of snake_case keys', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({
+    empty: false,
+    themes: [{ key: 'free_will', label: 'Free will', value: 1 }],
+    themeNodes: [{ key: 'free_will', count: 3, meanMood: 6 }],
+    butterfly: [{ theme: 'free_will', veraCount: 1, penelopeCount: 2 }]
+  }));
+  assert.match(root.querySelector('#mind-themes').textContent, /Free will/);
+  assert.doesNotMatch(root.querySelector('#mind-themes').textContent, /free_will/);
+  assert.match(root.querySelector('#mind-tile-constellation').textContent, /Free will/);
+  assert.match(root.querySelector('#mind-butterfly').textContent, /Free will/);
+  const mark = root.querySelector('#mind-constellation').querySelector('[data-theme="free_will"]');
+  assert.ok(mark?.listeners?.some(([type]) => type === 'click'));
 });

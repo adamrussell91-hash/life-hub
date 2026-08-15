@@ -1,6 +1,7 @@
 import { animateAreaReveal } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { BODY_RANGES } from './body-model.js';
+import { formatDisplayDate } from '../core/time.js';
 
 const RANGE_LABELS = {
   monthly: 'Month',
@@ -28,7 +29,8 @@ export function renderBody(root, model, {
   onRangeChange,
   onLogWeight,
   onLogComposition,
-  onViewBloods
+  onViewBloods,
+  quiet = false
 } = {}) {
   const dashboard = root.querySelector('#body-dashboard');
   if (!dashboard || !model) return;
@@ -53,17 +55,21 @@ export function renderBody(root, model, {
 
   const host = root.querySelector('#body-sections');
   if (host) {
+    const reuseImg = quiet ? host.querySelector('.body-figure__img') : null;
     host.replaceChildren(
       sectionCard(root, model.scale, {
         onLogWeight,
-        kind: 'scale'
+        kind: 'scale',
+        quiet
       }),
-      sectionCard(root, model.composition, {
+      ...compositionSection(root, model.composition, {
         onLogComposition,
-        kind: 'composition'
+        quiet
       }),
       sectionCard(root, model.tape, {
-        kind: 'tape'
+        kind: 'tape',
+        quiet,
+        reuseImg
       }),
       bloodsTile(root, onViewBloods)
     );
@@ -91,22 +97,48 @@ function sectionCard(root, section, hooks) {
     empty.textContent = emptyCopy(section.id);
     article.append(empty);
   } else if (section.id === 'tape') {
-    article.append(tapeFigure(root, section.metrics));
+    article.append(tapeFigure(root, section.metrics, hooks.reuseImg));
   } else {
-    const blocks = section.metrics.filter(metric => !metric.empty).map(metric => metricBlock(root, metric));
-    if (section.id === 'composition' && blocks.length > 1) {
-      const row = root.createElement('div');
-      row.className = 'body-metrics body-metrics--pair';
-      row.append(...blocks);
-      article.append(row);
-    } else {
-      for (const block of blocks) article.append(block);
-    }
+    const blocks = section.metrics.filter(metric => !metric.empty).map(metric => metricBlock(root, metric, hooks.quiet));
+    for (const block of blocks) article.append(block);
   }
 
   if (section.id === 'scale' || section.id === 'composition') {
     article.append(quickLog(root, section.id, hooks));
   }
+  return article;
+}
+
+function compositionSection(root, section, hooks) {
+  const metrics = (section.metrics ?? []).filter(metric => !metric.empty);
+  if (!metrics.length) {
+    return [sectionCard(root, { ...section, id: 'composition' }, { ...hooks, kind: 'composition' })];
+  }
+
+  const pair = root.createElement('div');
+  pair.className = 'body-composition-pair';
+  for (const metric of metrics) {
+    pair.append(compositionCard(root, metric, hooks.quiet));
+  }
+
+  const wrap = root.createElement('div');
+  wrap.className = 'body-composition';
+  wrap.append(pair, quickLog(root, 'composition', hooks));
+  return [wrap];
+}
+
+function compositionCard(root, metric, quiet) {
+  const article = root.createElement('article');
+  article.className = 'metric-card body-section';
+  article.dataset.bodySection = metric.key;
+
+  const heading = root.createElement('div');
+  heading.className = 'body-section__head';
+  const title = root.createElement('h3');
+  title.className = 'metric-label';
+  title.textContent = metric.label;
+  heading.append(title);
+  article.append(heading, metricBlock(root, metric, quiet, { hideLabel: true }));
   return article;
 }
 
@@ -125,7 +157,7 @@ function emptyCopy(id) {
   return 'No tape measurements yet.';
 }
 
-function tapeFigure(root, metrics) {
+function tapeFigure(root, metrics, reuseImg) {
   const wrap = root.createElement('div');
   wrap.className = 'body-tape';
   wrap.dataset.bodySection = 'tape';
@@ -134,10 +166,12 @@ function tapeFigure(root, metrics) {
   figure.className = 'body-figure';
   figure.id = 'body-tape-figure';
 
-  const img = root.createElement('img');
-  img.src = 'assets/body/full-body-diagram.png';
-  img.alt = 'Full body anatomy diagram';
-  img.className = 'body-figure__img';
+  const img = reuseImg ?? root.createElement('img');
+  if (!reuseImg) {
+    img.src = 'assets/body/full-body-diagram.png';
+    img.alt = 'Full body anatomy diagram';
+    img.className = 'body-figure__img';
+  }
   figure.append(img);
 
   const left = root.createElement('div');
@@ -253,7 +287,7 @@ function historyList(root, history) {
 
     const date = root.createElement('span');
     date.className = 'body-tape-history__date';
-    date.textContent = String(row.date ?? '');
+    date.textContent = formatDisplayDate(row.date);
 
     const value = root.createElement('span');
     value.className = 'body-tape-history__value';
@@ -298,15 +332,17 @@ function formatPct(pct) {
   return `${sign}${Math.abs(pct).toFixed(1)}%`;
 }
 
-function metricBlock(root, metric) {
+function metricBlock(root, metric, quiet = false, { hideLabel = false } = {}) {
   const wrap = root.createElement('div');
   wrap.className = 'body-metric';
 
   const head = root.createElement('div');
   head.className = 'body-metric__head';
-  const name = root.createElement('strong');
-  name.textContent = metric.label;
-  head.append(name);
+  if (!hideLabel) {
+    const name = root.createElement('strong');
+    name.textContent = metric.label;
+    head.append(name);
+  }
 
   const growth = root.createElement('div');
   growth.className = 'body-metric__growth';
@@ -367,7 +403,7 @@ function metricBlock(root, metric) {
       valueLabels.append(label);
     }
     wrap.append(chart);
-    queueMicrotask(() => animateAreaReveal(chart));
+    queueMicrotask(() => animateAreaReveal(chart, { quiet }));
   } else if (metric.latest) {
     const caption = root.createElement('p');
     caption.className = 'metric-caption';
