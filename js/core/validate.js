@@ -14,6 +14,9 @@ const CABLE_TYPES = ['constant_force', 'concentric', 'eccentric', 'elastic', 'ro
 const INTENSIFICATIONS = ['drop_set', 'rest_pause', 'eccentric_overload', 'elastic_finisher', 'superset', 'other'];
 const ROUTINES = ['am', 'pm'];
 const OMEGA3_LEVELS = ['high', 'medium', 'low', 'none'];
+const SESSION_TYPES = ['check-in', 'deep-dive', 'pattern-review', 'historical'];
+const DIARY_SOURCE_AGENTS = ['penelope', 'import'];
+const SESSION_SOURCE_AGENTS = ['vera', 'import'];
 
 const MEAL_NUMBERS = [
   'calories', 'protein_g', 'fat_g', 'saturated_fat_g', 'unsaturated_fat_g',
@@ -234,18 +237,27 @@ function validateDiary(record, errors) {
       }
     }
   }
+  enumeration(record, 'source_agent', DIARY_SOURCE_AGENTS, errors);
 }
 
 function validateMindSession(record, errors) {
+  optionalString(record, 'title', errors);
   optionalString(record, 'theme', errors);
   optionalString(record, 'closing_question', errors);
   optionalString(record, 'insight', errors);
+  optionalString(record, 'framework', errors);
+  optionalString(record, 'observation', errors);
   optionalString(record, 'cross_agent_note', errors);
+  stringArray(record, 'themes', errors);
+  stringArray(record, 'pattern_tags', errors);
+  enumeration(record, 'session_type', SESSION_TYPES, errors);
+  enumeration(record, 'source_agent', SESSION_SOURCE_AGENTS, errors);
   enumeration(record, 'mood_at_open', MOODS, errors);
   enumeration(record, 'mood_at_close', MOODS, errors);
-  const hasCore = [record.theme, record.closing_question, record.insight]
-    .some(v => typeof v === 'string' && v.trim() !== '');
-  if (!hasCore) errors.push('mind_session requires theme, insight, or closing_question');
+  const hasCore = [record.title, record.theme, record.closing_question, record.insight]
+    .some(v => typeof v === 'string' && v.trim() !== '')
+    || (Array.isArray(record.themes) && record.themes.some(t => String(t).trim()));
+  if (!hasCore) errors.push('mind_session requires title, theme, themes, insight, or closing_question');
 }
 
 function validateWeight(record, errors) {

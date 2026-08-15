@@ -9,11 +9,26 @@ import {
   recurringThemes,
   rangeWindow,
   sessionEntries,
+  sessionThemes,
+  themeCooccurrence,
+  themeNodes,
+  factorEffects,
+  consistencyRing,
+  cadenceHits,
   daysSinceLastDiary,
   daysSinceLastMindSession,
   silenceFlag,
   mindInsights,
-  mindCrossAgentLines
+  mindCrossAgentLines,
+  moodTransitions,
+  themeWeekly,
+  themeRanks,
+  lexicalSeries,
+  butterfly,
+  resurfacing,
+  waffleEntries,
+  parseInsightExtras,
+  entriesForTheme
 } from '../../js/app/mind-model.js';
 
 test('buildMindModel builds mood series, by-mood counts, and themes', () => {
@@ -82,8 +97,124 @@ test('sessionEntries maps mind_session records and ignores diary', () => {
     moodAtOpen: 'low',
     moodAtClose: 'good',
     crossAgentNote: 'Vera→Penelope: ask what the weekend is actually for.',
-    path: 'data/mind/2026/08/2026-08-10-session.md'
+    path: 'data/mind/2026/08/2026-08-10-session.md',
+    title: null,
+    themes: [],
+    patternTags: [],
+    sessionType: null,
+    framework: null,
+    observation: null,
+    sourceAgent: null
   });
+});
+
+test('sessionEntries maps themes, pattern tags, and title', () => {
+  const sessions = sessionEntries([{
+    record: {
+      type: 'mind_session',
+      date: '2026-04-07',
+      title: 'The Filter',
+      theme: 'ADHD Reality',
+      themes: ['ADHD Reality', 'Self-Compassion'],
+      pattern_tags: ['shame-loop'],
+      session_type: 'deep-dive',
+      framework: 'Compassion-Focused',
+      observation: 'The filter activated.',
+      source_agent: 'import'
+    },
+    path: 'data/mind/2026/04/2026-04-07-the-filter.md'
+  }]);
+  assert.equal(sessions[0].title, 'The Filter');
+  assert.deepEqual(sessions[0].themes, ['ADHD Reality', 'Self-Compassion']);
+  assert.deepEqual(sessions[0].patternTags, ['shame-loop']);
+  assert.equal(sessions[0].sessionType, 'deep-dive');
+  assert.equal(sessions[0].observation, 'The filter activated.');
+  assert.equal(sessions[0].sourceAgent, 'import');
+});
+
+test('sessionThemes falls back to singular theme', () => {
+  const sessions = sessionEntries([{
+    record: { type: 'mind_session', date: '2026-08-10', theme: 'Weekend' },
+    path: 's'
+  }]);
+  assert.deepEqual(sessionThemes(sessions[0]), ['Weekend']);
+});
+
+test('themeCooccurrence counts unordered pairs and nodes keep mean mood', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-01', mood_score: 4, tags: ['work', 'sleep'] }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-02', mood_score: 8, tags: ['work', 'sleep'] }, path: 'b' },
+    { record: { type: 'diary', date: '2026-08-03', mood_score: 6, tags: ['work'] }, path: 'c' }
+  ]);
+  const sessions = sessionEntries([
+    { record: { type: 'mind_session', date: '2026-08-04', themes: ['work', 'shame-loop'] }, path: 's' }
+  ]);
+  const pairs = themeCooccurrence(entries, sessions, bounds);
+  const workSleep = pairs.find(p => p.themeA === 'sleep' && p.themeB === 'work');
+  assert.equal(workSleep.count, 2);
+  const nodes = themeNodes(entries, sessions, bounds);
+  const work = nodes.find(n => n.key === 'work');
+  assert.equal(work.count, 4);
+  assert.equal(work.meanMood, 6);
+});
+
+test('factorEffects requires three with and three without', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const scored = [];
+  for (let i = 1; i <= 6; i += 1) {
+    scored.push({
+      record: {
+        type: 'diary',
+        date: `2026-08-0${i}`,
+        mood_score: i <= 3 ? 8 : 4,
+        tags: i <= 3 ? ['walk'] : []
+      },
+      path: String(i)
+    });
+  }
+  const effects = factorEffects(diaryEntries(scored), sessionEntries([]), bounds);
+  const walk = effects.find(e => e.key === 'walk');
+  assert.equal(walk.effect, 4);
+  assert.equal(walk.direction, 'positive');
+});
+
+test('consistencyRing counts unique mind dates in last 30 days and streak', () => {
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-09' }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-10' }, path: 'b' }
+  ]);
+  const sessions = sessionEntries([
+    { record: { type: 'mind_session', date: '2026-08-10', theme: 'x' }, path: 's' }
+  ]);
+  const ring = consistencyRing(entries, sessions, '2026-08-10');
+  assert.equal(ring.daysWithEntry, 2);
+  assert.equal(ring.windowDays, 30);
+  assert.equal(ring.streak, 2);
+});
+
+test('cadenceHits lists diary, Vera, and Penelope dates', () => {
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-09' }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-10', source_agent: 'import' }, path: 'b' }
+  ]);
+  const sessions = sessionEntries([
+    { record: { type: 'mind_session', date: '2026-08-10', theme: 'x' }, path: 's' }
+  ]);
+  const hits = cadenceHits(entries, sessions);
+  assert.deepEqual(hits.diary, ['2026-08-09', '2026-08-10']);
+  assert.deepEqual(hits.vera, ['2026-08-10']);
+  assert.deepEqual(hits.penelope, ['2026-08-09', '2026-08-10']);
+});
+
+test('diaryEntries includes body and sourceAgent', () => {
+  const entries = diaryEntries([{
+    record: { type: 'diary', date: '2026-03-03', mood: 'low', source_agent: 'import' },
+    body: 'Flat, fatigued day.',
+    path: 'd'
+  }]);
+  assert.equal(entries[0].body, 'Flat, fatigued day.');
+  assert.equal(entries[0].sourceAgent, 'import');
 });
 
 test('entriesByEnergy counts diary energy in range', () => {
@@ -232,4 +363,132 @@ test('ambient omits Mood scores held when there are fewer than two mood points',
     range: 'monthly'
   });
   assert.doesNotMatch(model.ambient, /Mood scores held/);
+});
+
+test('moodTransitions counts consecutive primary moods', () => {
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-01', mood: 'low' }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-02', mood: 'good' }, path: 'b' },
+    { record: { type: 'diary', date: '2026-08-03', mood: 'good' }, path: 'c' }
+  ]);
+  const flows = moodTransitions(entries, rangeWindow('2026-08-10', 'monthly'));
+  assert.equal(flows.find(f => f.from === 'low' && f.to === 'good').count, 1);
+  assert.equal(flows.find(f => f.from === 'good' && f.to === 'good').count, 1);
+});
+
+test('themeWeekly and themeRanks bucket by Sydney week start', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-03', tags: ['work', 'sleep'] }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-10', tags: ['work'] }, path: 'b' }
+  ]);
+  const weekly = themeWeekly(entries, sessionEntries([]), bounds, { limit: 8 });
+  assert.ok(weekly.themes.includes('work'));
+  const ranks = themeRanks(weekly);
+  assert.equal(ranks[0].rankByTheme.work, 1);
+});
+
+test('lexicalSeries counts watchlist terms per week', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const entries = diaryEntries([{
+    record: { type: 'diary', date: '2026-08-03' },
+    body: 'I should be fine. I should rest.',
+    path: 'a'
+  }]);
+  const series = lexicalSeries(entries, sessionEntries([]), bounds, ['should', 'flake']);
+  const should = series.find(s => s.term === 'should');
+  assert.equal(should.points.reduce((n, p) => n + p.count, 0), 2);
+  assert.equal(series.find(s => s.term === 'flake').points.reduce((n, p) => n + p.count, 0), 0);
+});
+
+test('butterfly compares vera session themes to diary tags', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const rows = butterfly(
+    diaryEntries([{ record: { type: 'diary', date: '2026-08-01', tags: ['work'], mood_score: 6 }, path: 'd' }]),
+    sessionEntries([{ record: { type: 'mind_session', date: '2026-08-02', themes: ['work'], source_agent: 'vera', mood_at_open: 'low', mood_at_close: 'good' }, path: 's' }]),
+    bounds
+  );
+  const work = rows.find(r => r.theme === 'work');
+  assert.equal(work.veraCount, 1);
+  assert.equal(work.penelopeCount, 1);
+  assert.equal(work.veraDelta, 2);
+});
+
+test('resurfacing finds a theme older than seven days', () => {
+  const card = resurfacing(
+    diaryEntries([
+      { record: { type: 'diary', date: '2026-07-01', tags: ['shame-loop'] }, body: 'Old mention.', path: 'old' },
+      { record: { type: 'diary', date: '2026-08-10', tags: ['shame-loop'] }, body: 'Again today.', path: 'new' }
+    ]),
+    sessionEntries([]),
+    '2026-08-10'
+  );
+  assert.equal(card.theme, 'shame-loop');
+  assert.equal(card.priorDate, '2026-07-01');
+  assert.match(card.excerpt, /Old mention/);
+});
+
+test('waffleEntries one cell per diary or session in range', () => {
+  const bounds = rangeWindow('2026-08-10', 'weekly');
+  const cells = waffleEntries(
+    diaryEntries([{ record: { type: 'diary', date: '2026-08-09', mood: 'low' }, path: 'd' }]),
+    sessionEntries([{ record: { type: 'mind_session', date: '2026-08-10', theme: 'x', mood_at_close: 'good' }, path: 's' }]),
+    bounds
+  );
+  assert.equal(cells.length, 2);
+});
+
+test('parseInsightExtras reads tension and source session from body', () => {
+  const extras = parseInsightExtras(`**Source session:** data/mind/2026/04/2026-04-07-the-filter.md
+**Tension:** stated rule — actual behaviour
+**Stated:** 0.2
+**Revealed:** 0.75
+The rest of the insight.`);
+  assert.equal(extras.sourceSession, 'data/mind/2026/04/2026-04-07-the-filter.md');
+  assert.equal(extras.tension.poleA, 'stated rule');
+  assert.equal(extras.tension.poleB, 'actual behaviour');
+  assert.equal(extras.tension.stated, 0.2);
+  assert.equal(extras.tension.revealed, 0.75);
+});
+
+test('buildMindModel exposes launchers and analysis series', () => {
+  const events = [
+    { record: { type: 'diary', date: '2026-08-09', mood_score: 6, mood: 'good', tags: ['work'], source_agent: 'penelope' }, body: 'I should rest.', path: 'd' },
+    { record: { type: 'mind_session', date: '2026-08-10', title: 'Filter', themes: ['work'], mood_at_open: 'low', mood_at_close: 'good', source_agent: 'vera' }, path: 's' }
+  ];
+  const model = buildMindModel({
+    events,
+    date: '2026-08-10',
+    range: 'monthly',
+    governanceLogMarkdown: `## 2026-08-10 — Mind Insight
+**Title:** Gap
+**Tension:** stated — revealed
+**Stated:** 0.2
+**Revealed:** 0.8
+
+Body here.
+`,
+    centralNodeMarkdown: ''
+  });
+  assert.equal(model.launchers.vera.title, 'Filter');
+  assert.equal(model.launchers.penelope.daysAgo, 1);
+  assert.ok(Array.isArray(model.factorEffects));
+  assert.equal(model.consistency.windowDays, 30);
+  assert.ok(model.themeNodes.length);
+  assert.equal(model.tensions.length, 1);
+  assert.equal(model.tensions[0].stated, 0.2);
+  assert.ok(Array.isArray(model.waffle));
+  assert.ok(Array.isArray(model.lexical));
+  assert.equal(model.empty, false);
+});
+
+test('entriesForTheme lists diary and sessions newest last', () => {
+  const rows = entriesForTheme(
+    diaryEntries([{ record: { type: 'diary', date: '2026-08-01', tags: ['work'] }, body: 'School day.', path: 'd' }]),
+    sessionEntries([{ record: { type: 'mind_session', date: '2026-08-10', themes: ['work'], title: 'Filter', insight: 'A filter.', theme: 'work' }, path: 's' }]),
+    'work'
+  );
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].date, '2026-08-01');
+  assert.match(rows[1].excerpt, /filter/i);
 });

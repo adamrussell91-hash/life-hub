@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCanonicalPath, logEntryToolSchema, validateLogEntry, buildRecordSlug } from '../../netlify/functions/_shared/chat-schema.mjs';
+import { buildCanonicalPath, logEntryToolSchema, validateLogEntry, buildRecordSlug, DOMAIN_PROPERTIES } from '../../netlify/functions/_shared/chat-schema.mjs';
 
 test('builds the canonical path for each writable record type', () => {
   assert.equal(buildCanonicalPath({ type: 'meal', date: '2026-08-01', slug: 'breakfast' }), 'data/nutrition/2026/08/2026-08-01-breakfast.md');
@@ -285,4 +285,15 @@ test('diary whitelist accepts moods, system_note, cross_agent_note', () => {
     }
   }, { id: 'd-1', now: '2026-08-13T21:00:00+10:00' });
   assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+
+test('mind_session schema includes themes, session_type, and observation', () => {
+  const keys = Object.keys(DOMAIN_PROPERTIES.mind_session);
+  for (const key of ['themes', 'pattern_tags', 'session_type', 'framework', 'observation', 'title', 'source_agent']) {
+    assert.ok(keys.includes(key), key);
+  }
+});
+
+test('diary schema includes source_agent', () => {
+  assert.ok(Object.hasOwn(DOMAIN_PROPERTIES.diary, 'source_agent'));
 });

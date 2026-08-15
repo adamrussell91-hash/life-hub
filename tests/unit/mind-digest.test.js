@@ -57,6 +57,14 @@ test('session summary surfaces closing_question as a thread', () => {
   assert.match(text, /What is the weekend actually for/);
 });
 
+test('summarizeMindSessionsForPrompt includes themes and session_type', () => {
+  const text = summarizeMindSessionsForPrompt([
+    { record: { type: 'mind_session', date: '2026-08-10', themes: ['work'], session_type: 'deep-dive', title: 'Filter' } }
+  ], '2026-08-10');
+  assert.match(text, /work/);
+  assert.match(text, /deep-dive|Filter/);
+});
+
 test('silence flag only when both gaps >= 7', () => {
   const treeBoth = [];
   assert.match(simultaneousSilenceFlag({ tree: treeBoth, today: TODAY }), /quiet/i);
