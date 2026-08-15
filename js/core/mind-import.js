@@ -248,3 +248,94 @@ function headingDate(title) {
   const match = /(\d{1,2}\s+[A-Za-z]+\s+\d{4}|\d{4}-\d{2}-\d{2})/.exec(String(title ?? ''));
   return match ? match[1] : '';
 }
+
+function hasSessionFields(text) {
+  return /Session Type\s*:|Mood at Opening\s*:|Key Insight\s*:|Primary Theme\s*:|Vera's Observation\s*:/i.test(String(text ?? ''));
+}
+
+export function classifyMindFile(name, text) {
+  const base = String(name ?? '').split(/[/\\]/).pop();
+  const sample = String(text ?? '').slice(0, 2000);
+  if (/Psychological Baseline|Vera Intake/i.test(base) || /Psychological Baseline|Vera Intake/i.test(sample)) {
+    return 'skip';
+  }
+  if (/\.csv$/i.test(base) && /Session Database/i.test(base)) return 'session-csv';
+  if (/Daily Diary/i.test(base)) return 'diary';
+  if (/^Type:\s*Note\b/m.test(text) && /Mood Score\s*:/i.test(text)) return 'diary';
+  if (/^@/.test(base) && hasSessionFields(text)) return 'session-md';
+  if (/^Historical/i.test(base) || /Pattern Review/i.test(base)) return 'historical';
+  if (/\.md$/i.test(base) && !/Daily Diary/i.test(base) && !/Session Database/i.test(base)) {
+    if (hasSessionFields(text)) return 'session-md';
+    if (/^#\s+/m.test(text) && !/Mood Score\s*:/i.test(text)) return 'historical';
+  }
+  return 'skip';
+}
+
+export function recordFromSessionMarkdown(text, name = '') {
+  const props = extractProps(text);
+  const heading = firstHeading(text);
+  const fromName = String(name).split(/[/\\]/).pop().replace(/^@/, '').replace(/\.md$/i, '');
+  return recordFromSessionRow({
+    'Session Title': props['Session Title'] || heading.replace(/^@/, ''),
+    Date: props.Date || heading.replace(/^@/, '') || fromName,
+    'Session Type': props['Session Type'],
+    'Primary Theme': props['Primary Theme'] || props.Theme,
+    'Follow-up Themes': props['Follow-up Themes'],
+    'Framework Used': props['Framework Used'] || props.Framework,
+    'Mood at Opening': props['Mood at Opening'],
+    'Mood at Close': props['Mood at Close'],
+    'Key Insight': props['Key Insight'] || props.Insight,
+    "Vera's Observation": props["Vera's Observation"] || props.Observation,
+    'Closing Question': props['Closing Question'],
+    'Pattern Tags': props['Pattern Tags']
+  });
+}
+
+export function planImport(files, { existingIds = new Set() } = {}) {
+  const planned = [];
+  const insights = [];
+  const seen = new Set(existingIds);
+
+  for (const file of files ?? []) {
+    const name = file?.name ?? '';
+    const text = file?.text ?? '';
+    const kind = classifyMindFile(name, text);
+    if (kind === 'skip') continue;
+
+    if (kind === 'session-csv') {
+      for (const row of parseCsv(text)) {
+        const record = recordFromSessionRow(row);
+        if (!record.date || seen.has(record.id)) continue;
+        seen.add(record.id);
+        planned.push({ record, body: record.insight || '', name, kind });
+      }
+      continue;
+    }
+
+    const record = kind === 'diary'
+      ? recordFromDiaryMarkdown(text)
+      : kind === 'session-md'
+        ? recordFromSessionMarkdown(text, name)
+        : recordFromHistoricalMarkdown(text);
+    if (!record?.date || seen.has(record.id)) continue;
+    seen.add(record.id);
+    const body = markdownBody(text);
+    planned.push({ record, body, name, kind });
+
+    const base = name.split(/[/\\]/).pop();
+    if (kind === 'historical' && text.length > 400 && (/^Historical/i.test(base) || /Pattern Review/i.test(base))) {
+      insights.push({
+        dateKey: record.date,
+        title: record.title,
+        body,
+        entryType: 'Mind Insight'
+      });
+    }
+  }
+
+  return {
+    records: planned.map(item => item.record),
+    planned,
+    insights
+  };
+}
