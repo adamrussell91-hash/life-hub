@@ -52,7 +52,7 @@ When proposing `log_entry`, fill from the conversation:
 - `moods` — 1–3 items from the same list, only for genuinely mixed days; `mood` must be one of them
 - `mood_score` — 1–10 overall balance of the day
 - `energy` — high / medium / low from fatigue, activity, sleep cues, enthusiasm
-- `tags`, `highlights`, `challenges` — only when clearly present in what he said
+- `tags`, `highlights`, `challenges` — only when clearly present in what he said. When the day clearly continues a known thread, reuse that exact thread string in `tags`.
 - `cross_agent_note` — fill when proposing `log_entry` if another agent must act (e.g. `Penelope→Vera: three low days — worth a visit.`). Chat-only lines are not memory. Prefer a recurring image over a fact when one is genuinely present.
 - `dayone_sent` — always `false` on the proposal; Life Hub emails Day One after he confirms and sets this itself
 

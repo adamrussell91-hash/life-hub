@@ -1,6 +1,7 @@
 import { getSydneyDateKey } from '../core/time.js';
 import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
+import { DEFAULT_MIND_WATCHLIST } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
@@ -806,16 +807,31 @@ export function createAppController(dependencies) {
 
   function renderMindSection() {
     if (!latestResult || !buildMindModel || !renderMind) return;
+    let watchlist = DEFAULT_MIND_WATCHLIST;
+    try {
+      watchlist = JSON.parse(localStorage.getItem('life-hub-mind-watchlist') || 'null') ?? DEFAULT_MIND_WATCHLIST;
+    } catch {
+      watchlist = DEFAULT_MIND_WATCHLIST;
+    }
     const model = buildMindModel({
       events: latestResult.events,
       date: latestResult.date,
       range: mindRange,
       governanceLogMarkdown: latestResult.governanceLogMarkdown,
-      centralNodeMarkdown: latestResult.centralNodeMarkdown
+      centralNodeMarkdown: latestResult.centralNodeMarkdown,
+      watchlist
     });
     renderMind(root, model, {
       onRangeChange: next => {
         mindRange = next;
+        renderMindSection();
+      },
+      onWatchlistChange: next => {
+        try {
+          localStorage.setItem('life-hub-mind-watchlist', JSON.stringify(next));
+        } catch {
+          // Ignore quota / private-mode write failures.
+        }
         renderMindSection();
       },
       agentsConfig: latestResult.agentsConfig,

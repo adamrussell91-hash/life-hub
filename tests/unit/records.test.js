@@ -416,7 +416,7 @@ test('rejects coach_cues that is not an object, or whose sub-fields are not stri
   }
 });
 
-test('validateMindSession requires at least one of theme, insight, closing_question', () => {
+test('validateMindSession requires at least one of title, theme, themes, insight, closing_question', () => {
   const base = {
     schema_version: 1, id: 'ms-1', type: 'mind_session', date: '2026-08-13',
     time: '17:00',
@@ -424,8 +424,44 @@ test('validateMindSession requires at least one of theme, insight, closing_quest
     source: 'chat'
   };
   assert.ok(validateRecord({ ...base, theme: 'Weekend permission' }).length === 0);
-  assert.ok(validateRecord({ ...base }).some(e => /theme|insight|closing_question/.test(e)));
+  assert.ok(validateRecord({ ...base, themes: ['x'] }).length === 0);
+  assert.ok(validateRecord({ ...base }).some(e => /title|theme|themes|insight|closing_question/.test(e)));
   assert.ok(validateRecord({ ...base, theme: 'x', mood_at_open: 'wired' }).some(e => /mood_at_open/.test(e)));
+});
+
+test('diary source_agent is penelope, import, or omitted', () => {
+  const diary = {
+    schema_version: 1, id: 'd-1', type: 'diary', date: '2026-08-13',
+    time: '21:00',
+    created_at: '2026-08-13T21:00:00+10:00', updated_at: '2026-08-13T21:00:00+10:00',
+    source: 'chat', mood_score: 6, mood: 'low', energy: 'medium', tags: [], dayone_sent: false
+  };
+  assert.equal(validateRecord(diary).length, 0);
+  assert.equal(validateRecord({ ...diary, source_agent: 'penelope' }).length, 0);
+  assert.equal(validateRecord({ ...diary, source_agent: 'import' }).length, 0);
+  assert.ok(validateRecord({ ...diary, source_agent: 'vera' }).some(e => /source_agent/.test(e)));
+});
+
+test('mind_session accepts title, themes, pattern_tags, session_type, and title-only core', () => {
+  const base = {
+    schema_version: 1, id: 'ms-1', type: 'mind_session', date: '2026-08-13',
+    time: '17:00',
+    created_at: '2026-08-13T17:00:00+10:00', updated_at: '2026-08-13T17:00:00+10:00',
+    source: 'chat'
+  };
+  assert.equal(validateRecord({ ...base, title: 'The Filter' }).length, 0);
+  assert.equal(validateRecord({
+    ...base,
+    themes: ['ADHD Reality', 'Self-Compassion'],
+    pattern_tags: ['shame-loop'],
+    session_type: 'deep-dive',
+    framework: 'Compassion-Focused',
+    observation: 'The filter activated.',
+    source_agent: 'vera'
+  }).length, 0);
+  assert.ok(validateRecord({ ...base, session_type: 'workshop' }).some(e => /session_type/.test(e)));
+  assert.ok(validateRecord({ ...base, source_agent: 'penelope' }).some(e => /source_agent/.test(e)));
+  assert.ok(validateRecord({ ...base, themes: 'ADHD' }).some(e => /themes/.test(e)));
 });
 
 test('diary moods is 1–3 MOODS and must include primary mood', () => {

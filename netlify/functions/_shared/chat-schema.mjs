@@ -91,7 +91,8 @@ const DOMAIN_PROPERTIES = {
     dayone_sent: { type: 'boolean' },
     moods: { type: 'array', items: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] } },
     system_note: { type: 'string' },
-    cross_agent_note: { type: 'string' }
+    cross_agent_note: { type: 'string' },
+    source_agent: { type: 'string', enum: ['penelope', 'import'] }
   },
   weight: { weight_kg: { type: 'number' } },
   composition: {
@@ -117,11 +118,18 @@ const DOMAIN_PROPERTIES = {
   },
   mind_session: {
     theme: { type: 'string' },
+    title: { type: 'string' },
+    themes: { type: 'array', items: { type: 'string' } },
+    pattern_tags: { type: 'array', items: { type: 'string' } },
+    session_type: { type: 'string', enum: ['check-in', 'deep-dive', 'pattern-review', 'historical'] },
+    framework: { type: 'string' },
+    observation: { type: 'string' },
     closing_question: { type: 'string' },
     insight: { type: 'string' },
     mood_at_open: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] },
     mood_at_close: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] },
-    cross_agent_note: { type: 'string' }
+    cross_agent_note: { type: 'string' },
+    source_agent: { type: 'string', enum: ['vera', 'import'] }
   }
 };
 
