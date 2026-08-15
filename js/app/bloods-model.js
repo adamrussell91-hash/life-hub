@@ -123,7 +123,10 @@ function markerModel(observations, bounds, selectedRange) {
     : null;
 
   const good = latest.status === 'High' ? 'down' : latest.status === 'Low' ? 'up' : null;
-  const series = qualitative ? [] : seriesInRange(numeric, bounds, selectedRange);
+  let series = qualitative ? [] : seriesInRange(numeric, bounds, selectedRange);
+  if (!qualitative && series.length === 0 && numeric.length) {
+    series = [{ date: numeric.at(-1).date, value: numeric.at(-1).value }];
+  }
 
   return {
     key: latest.key,

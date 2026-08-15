@@ -221,12 +221,8 @@
         </section>
 
         <div id="chat-view-home">
-          <section id="chat-view" class="chat-view" aria-labelledby="chat-heading" hidden>
+          <section id="chat-view" class="chat-view" aria-labelledby="page-title" hidden>
             <div class="section-heading">
-              <div>
-                <p class="section-kicker">Talk to your agents</p>
-                <h2 id="chat-heading">Chat</h2>
-              </div>
               <button type="button" id="chat-new" class="chat-new-button">New chat</button>
             </div>
             <div id="agent-picker" class="agent-picker" aria-label="Choose who to talk to"></div>
@@ -241,14 +237,7 @@
           </section>
         </div>
 
-        <section id="nutrition-dashboard" class="dashboard" aria-labelledby="nutrition-heading" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Nutrition</p>
-              <h2 id="nutrition-heading">Today's macros</h2>
-            </div>
-          </div>
-
+        <section id="nutrition-dashboard" class="dashboard" aria-label="Nutrition" hidden>
           <article class="metric-card chart-card macro-split-card" aria-labelledby="macro-split-label">
             <div class="metric-heading">
               <p class="metric-label" id="macro-split-label">Macro split</p>
@@ -395,22 +384,6 @@
             </article>
           </div>
 
-          <article class="metric-card chart-card" aria-labelledby="week-compare-label">
-            <p class="metric-label" id="week-compare-label">This week vs prior</p>
-            <div class="week-compare-summary">
-              <div>
-                <p class="metric-caption">This week avg</p>
-                <p class="week-compare-value"><strong data-value="week-compare-this">—</strong> g</p>
-              </div>
-              <div>
-                <p class="metric-caption">Prior week avg</p>
-                <p class="week-compare-value"><strong data-value="week-compare-prior">—</strong> g</p>
-              </div>
-              <span class="trend-badge" data-value="week-compare-delta">—</span>
-            </div>
-            <div id="nutrition-week-compare" class="column-chart week-compare-columns" role="img" aria-label="Prior week and this week daily protein"></div>
-          </article>
-
           <article class="metric-card chart-card" aria-labelledby="month-heatmap-label">
             <p class="metric-label" id="month-heatmap-label">30-day protein target consistency</p>
             <div id="nutrition-heatmap" class="heatmap-grid" aria-label="Whether the protein target was met each day, last 30 days"></div>
@@ -419,14 +392,7 @@
           <button id="nutrition-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Brisket">💬</button>
         </section>
 
-        <section id="fitness-dashboard" class="dashboard" aria-labelledby="fitness-heading" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Fitness</p>
-              <h2 id="fitness-heading">Training</h2>
-            </div>
-          </div>
-
+        <section id="fitness-dashboard" class="dashboard" aria-label="Fitness" hidden>
           <div class="fitness-long-term-trio" aria-label="Long-term training trends">
             <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-volume-label">
               <p class="metric-label" id="fitness-volume-label">Weekly volume</p>
@@ -525,14 +491,8 @@
           <button id="fitness-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Chadwick">💬</button>
         </section>
 
-        <section id="skincare-dashboard" class="dashboard" aria-labelledby="skincare-heading" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Skincare</p>
-              <h2 id="skincare-heading">Consistency first</h2>
-            </div>
-            <p class="metric-caption" data-skincare="date">—</p>
-          </div>
+        <section id="skincare-dashboard" class="dashboard" aria-label="Skincare" hidden>
+          <p class="metric-caption" data-skincare="date">—</p>
           <p id="skincare-status" class="metric-caption" aria-live="polite"></p>
           <article class="metric-card skincare-consistency-card">
             <div class="skincare-streak-pair">
@@ -571,14 +531,7 @@
           <button id="skincare-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Hyaluronica">💬</button>
         </section>
 
-        <section id="calendar-dashboard" class="dashboard" aria-labelledby="calendar-heading" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Calendar</p>
-              <h2 id="calendar-heading">Your logged days</h2>
-            </div>
-          </div>
-
+        <section id="calendar-dashboard" class="dashboard" aria-label="Calendar" hidden>
           <article class="metric-card">
             <p class="metric-label">This week</p>
             <div id="calendar-week-strip" class="calendar-week-strip" aria-label="Current week"></div>
@@ -596,13 +549,7 @@
           <article class="metric-card" id="calendar-day-detail" aria-live="polite"></article>
         </section>
 
-        <section id="body-dashboard" class="dashboard" aria-labelledby="body-heading" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Body</p>
-              <h2 id="body-heading">Scale, composition, tape</h2>
-            </div>
-          </div>
+        <section id="body-dashboard" class="dashboard" aria-label="Body" hidden>
           <div id="body-range-control" class="body-range" role="group" aria-label="Body time range">
             <button type="button" data-body-range="monthly" aria-pressed="false">Month</button>
             <button type="button" data-body-range="six_month" class="is-active" aria-pressed="true">6M</button>
@@ -614,19 +561,13 @@
           <button id="body-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Dr Sara Tonin">💬</button>
         </section>
 
-        <section id="body-bloods-dashboard" class="dashboard" aria-labelledby="bloods-heading" hidden>
+        <section id="body-bloods-dashboard" class="dashboard" aria-label="Bloods" hidden>
           <button type="button" id="bloods-back" class="bloods-back">← Body</button>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Body</p>
-              <h2 id="bloods-heading">Bloods</h2>
-            </div>
-          </div>
           <div id="bloods-range-control" class="body-range" role="group" aria-label="Bloods time range">
             <button type="button" data-bloods-range="monthly" aria-pressed="false">Month</button>
-            <button type="button" data-bloods-range="six_month" class="is-active" aria-pressed="true">6M</button>
+            <button type="button" data-bloods-range="six_month" aria-pressed="false">6M</button>
             <button type="button" data-bloods-range="year" aria-pressed="false">Year</button>
-            <button type="button" data-bloods-range="five_year" aria-pressed="false">5Y</button>
+            <button type="button" data-bloods-range="five_year" class="is-active" aria-pressed="true">5Y</button>
           </div>
           <div id="bloods-flags" class="bloods-flags" aria-live="polite"></div>
           <div id="bloods-sections" class="bloods-sections"></div>
@@ -828,14 +769,7 @@
           </div>
         </section>
 
-        <section id="central-node-dashboard" class="dashboard" aria-labelledby="central-node-heading" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Central Node</p>
-              <h2 id="central-node-heading">Coordination hub</h2>
-            </div>
-          </div>
-
+        <section id="central-node-dashboard" class="dashboard" aria-label="Central Node" hidden>
           <article class="metric-card status-card" aria-labelledby="todays-status-label">
             <p class="metric-label" id="todays-status-label">Today's Status</p>
             <div class="status-hybrid">

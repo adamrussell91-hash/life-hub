@@ -14,7 +14,30 @@ function el(tag = 'div') {
     attributes: {},
     listeners: [],
     style: {},
-    classList: { remove() {}, add() {}, toggle() {} },
+    classList: {
+      remove(name) {
+        this.owner.className = String(this.owner.className || '')
+          .split(/\s+/)
+          .filter(token => token && token !== name)
+          .join(' ');
+      },
+      add(name) {
+        const tokens = String(this.owner.className || '').split(/\s+/).filter(Boolean);
+        if (!tokens.includes(name)) this.owner.className = [...tokens, name].join(' ');
+      },
+      toggle(name) {
+        const tokens = String(this.owner.className || '').split(/\s+/).filter(Boolean);
+        const has = tokens.includes(name);
+        this.owner.className = has
+          ? tokens.filter(token => token !== name).join(' ')
+          : [...tokens, name].join(' ');
+        return !has;
+      },
+      contains(name) {
+        return String(this.owner.className || '').split(/\s+/).includes(name);
+      },
+      owner: null
+    },
     getBoundingClientRect() { return { width: 0, height: 0, top: 0, left: 0 }; },
     append(...nodes) {
       this.children.push(...nodes);
@@ -42,6 +65,7 @@ function el(tag = 'div') {
       return collect(this, selector);
     }
   };
+  node.classList.owner = node;
   return node;
 }
 
@@ -189,4 +213,30 @@ test('renderBloods empty flags copy and skips charts for qualitative markers', (
   });
   assert.match(String(root._flags.textContent), /Everything in range/);
   assert.equal(root._host.querySelector('.body-chart'), null);
+});
+
+test('renderBloods leaves categories expanded so markers stay visible', () => {
+  const root = fakeRoot();
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: [{
+      ...model.categories[0],
+      hasFlags: false
+    }]
+  });
+  const section = root._host.children[0];
+  assert.equal(section.classList.contains('is-collapsed'), false);
+  assert.match(String(section.textContent), /ALT|HepB/);
+});
+
+test('renderBloods empty copy when there are no blood events', () => {
+  const root = fakeRoot();
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: []
+  });
+  assert.match(String(root._flags.textContent), /No blood/i);
+  assert.equal(root._host.children.length, 0);
 });

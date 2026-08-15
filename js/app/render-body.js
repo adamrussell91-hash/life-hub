@@ -53,22 +53,20 @@ export function renderBody(root, model, {
 
   const host = root.querySelector('#body-sections');
   if (host) {
-    host.replaceChildren();
-    host.dataset.motion = 'in';
-    void host.offsetWidth;
-    host.dataset.motion = 'in';
-    host.append(sectionCard(root, model.scale, {
-      onLogWeight,
-      kind: 'scale'
-    }));
-    host.append(sectionCard(root, model.composition, {
-      onLogComposition,
-      kind: 'composition'
-    }));
-    host.append(sectionCard(root, model.tape, {
-      kind: 'tape'
-    }));
-    host.append(bloodsTile(root, onViewBloods));
+    host.replaceChildren(
+      sectionCard(root, model.scale, {
+        onLogWeight,
+        kind: 'scale'
+      }),
+      sectionCard(root, model.composition, {
+        onLogComposition,
+        kind: 'composition'
+      }),
+      sectionCard(root, model.tape, {
+        kind: 'tape'
+      }),
+      bloodsTile(root, onViewBloods)
+    );
   }
 
   dashboard.removeAttribute('hidden');
