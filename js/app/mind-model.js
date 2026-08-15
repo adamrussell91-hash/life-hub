@@ -5,6 +5,7 @@ import { addCalendarDays, daysBetween, getSydneyWeekStart, isCalendarDate } from
 
 export const MIND_RANGES = ['weekly', 'monthly', 'six_month'];
 export const DEFAULT_MIND_RANGE = 'monthly';
+export const DEFAULT_MIND_WATCHLIST = ['should', 'just', 'fine', 'unfulfilled', 'flake'];
 
 const RANGE_DAYS = {
   weekly: 7,
@@ -559,11 +560,27 @@ export function waffleEntries(entries, sessions, bounds) {
   return cells.sort((a, b) => a.date.localeCompare(b.date) || a.kind.localeCompare(b.kind));
 }
 
-export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE, governanceLogMarkdown, centralNodeMarkdown }) {
+function sessionOutcome(session) {
+  const delta = moodDelta(session.moodAtOpen, session.moodAtClose);
+  if (delta != null) {
+    return delta > 0 ? 'mood lifted' : delta < 0 ? 'mood eased' : 'mood held';
+  }
+  return session.title || 'logged';
+}
+
+export function buildMindModel({
+  events,
+  date,
+  range = DEFAULT_MIND_RANGE,
+  governanceLogMarkdown,
+  centralNodeMarkdown,
+  watchlist = DEFAULT_MIND_WATCHLIST
+}) {
   if (!date) throw new RangeError('Mind display date is unavailable');
   const selectedRange = MIND_RANGES.includes(range) ? range : DEFAULT_MIND_RANGE;
   const bounds = rangeWindow(date, selectedRange);
   const entries = diaryEntries(events);
+  const inRangeEntries = entries.filter(entry => entry.date >= bounds.from && entry.date <= bounds.to);
   const moodSeries = moodScoreSeries(entries, bounds);
   const byMood = entriesByMood(entries, bounds);
   const themes = recurringThemes(entries, bounds);
@@ -573,7 +590,31 @@ export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE, gover
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date) || String(a.path).localeCompare(String(b.path)));
   const energyByLevel = entriesByEnergy(entries, bounds);
-  const insights = mindInsights(governanceLogMarkdown, bounds);
+  const insights = mindInsights(governanceLogMarkdown, bounds).map(entry => {
+    const extras = parseInsightExtras(entry.body);
+    return { ...entry, ...extras };
+  });
+  const tensions = insights
+    .filter(entry => entry.tension)
+    .map(entry => (entry.tension.stated != null ? { ...entry, ...entry.tension } : entry));
+  const newestSession = allSessions.at(-1) ?? null;
+  const newestDiary = entries.at(-1) ?? null;
+  const launchers = {
+    vera: newestSession
+      ? {
+        title: newestSession.title,
+        daysAgo: daysBetween(newestSession.date, date),
+        outcome: sessionOutcome(newestSession)
+      }
+      : null,
+    penelope: newestDiary
+      ? {
+        daysAgo: daysBetween(newestDiary.date, date),
+        outcome: 'logged'
+      }
+      : null
+  };
+  const weekly = themeWeekly(entries, allSessions, bounds);
   const crossAgentLines = mindCrossAgentLines(centralNodeMarkdown);
   const diaryGap = daysSinceLastDiary(entries, date);
   const sessionGap = daysSinceLastMindSession(allSessions, date);
@@ -593,7 +634,7 @@ export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE, gover
     date,
     range: selectedRange,
     rangeLabel: selectedRange === 'weekly' ? 'Weekly' : selectedRange === 'monthly' ? 'Monthly' : '6M',
-    entryCount: entries.filter(entry => entry.date >= bounds.from && entry.date <= bounds.to).length,
+    entryCount: inRangeEntries.length,
     moodSeries,
     byMood,
     themes,
@@ -605,6 +646,20 @@ export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE, gover
     daysSinceLastMindSession: sessionGap,
     silence: silenceFlag(diaryGap, sessionGap),
     ambient,
-    empty: moodSeries.length === 0 && byMood.every(item => item.value === 0) && themes.length === 0
+    empty: inRangeEntries.length === 0 && sessions.length === 0,
+    launchers,
+    factorEffects: factorEffects(entries, allSessions, bounds),
+    consistency: consistencyRing(entries, allSessions, date),
+    themeNodes: themeNodes(entries, allSessions, bounds),
+    themeCooccurrence: themeCooccurrence(entries, allSessions, bounds),
+    themeWeekly: weekly,
+    themeRanks: themeRanks(weekly),
+    moodTransitions: moodTransitions(entries, bounds),
+    lexical: lexicalSeries(entries, allSessions, bounds, watchlist),
+    butterfly: butterfly(entries, allSessions, bounds),
+    resurfacing: resurfacing(entries, allSessions, date),
+    waffle: waffleEntries(entries, allSessions, bounds),
+    cadence: cadenceHits(entries, allSessions),
+    tensions
   };
 }
