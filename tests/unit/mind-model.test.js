@@ -12,6 +12,9 @@ import {
   sessionThemes,
   themeCooccurrence,
   themeNodes,
+  factorEffects,
+  consistencyRing,
+  cadenceHits,
   daysSinceLastDiary,
   daysSinceLastMindSession,
   silenceFlag,
@@ -145,6 +148,54 @@ test('themeCooccurrence counts unordered pairs and nodes keep mean mood', () => 
   const work = nodes.find(n => n.key === 'work');
   assert.equal(work.count, 4);
   assert.equal(work.meanMood, 6);
+});
+
+test('factorEffects requires three with and three without', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const scored = [];
+  for (let i = 1; i <= 6; i += 1) {
+    scored.push({
+      record: {
+        type: 'diary',
+        date: `2026-08-0${i}`,
+        mood_score: i <= 3 ? 8 : 4,
+        tags: i <= 3 ? ['walk'] : []
+      },
+      path: String(i)
+    });
+  }
+  const effects = factorEffects(diaryEntries(scored), sessionEntries([]), bounds);
+  const walk = effects.find(e => e.key === 'walk');
+  assert.equal(walk.effect, 4);
+  assert.equal(walk.direction, 'positive');
+});
+
+test('consistencyRing counts unique mind dates in last 30 days and streak', () => {
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-09' }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-10' }, path: 'b' }
+  ]);
+  const sessions = sessionEntries([
+    { record: { type: 'mind_session', date: '2026-08-10', theme: 'x' }, path: 's' }
+  ]);
+  const ring = consistencyRing(entries, sessions, '2026-08-10');
+  assert.equal(ring.daysWithEntry, 2);
+  assert.equal(ring.windowDays, 30);
+  assert.equal(ring.streak, 2);
+});
+
+test('cadenceHits lists diary, Vera, and Penelope dates', () => {
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-09' }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-10', source_agent: 'import' }, path: 'b' }
+  ]);
+  const sessions = sessionEntries([
+    { record: { type: 'mind_session', date: '2026-08-10', theme: 'x' }, path: 's' }
+  ]);
+  const hits = cadenceHits(entries, sessions);
+  assert.deepEqual(hits.diary, ['2026-08-09', '2026-08-10']);
+  assert.deepEqual(hits.vera, ['2026-08-10']);
+  assert.deepEqual(hits.penelope, ['2026-08-09', '2026-08-10']);
 });
 
 test('diaryEntries includes body and sourceAgent', () => {
