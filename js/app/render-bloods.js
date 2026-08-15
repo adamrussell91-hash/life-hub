@@ -1,10 +1,23 @@
-import { animateAreaReveal } from './chart-kit/animate.js';
-import { buildAreaLine } from './chart-kit/area-line.js';
+import { applyRingTarget } from './chart-kit/apply-ring.js';
+import { categoryNote, explainerFor } from './bloods-explainers.js';
+import { combinedChartSvg, markerVisual } from './bloods-charts.js';
 
 export function renderBloods(root, model, { onRangeChange } = {}) {
   const dashboard = root.querySelector('#body-bloods-dashboard');
   if (!dashboard || !model) return;
 
+  bindRange(root, model, onRangeChange);
+  renderInRange(root, model);
+  renderFlags(root, model);
+  renderLastCollected(root, model);
+  bindToolbar(root, dashboard);
+  bindAppointment(root, model);
+  bindExplainer(root);
+  renderSections(root, model, dashboard);
+  dashboard.removeAttribute('hidden');
+}
+
+function bindRange(root, model, onRangeChange) {
   const ranges = root.querySelector('#bloods-range-control');
   if (ranges && !ranges.dataset.bound) {
     ranges.dataset.bound = '1';
@@ -14,71 +27,176 @@ export function renderBloods(root, model, { onRangeChange } = {}) {
       onRangeChange?.(button.dataset.bloodsRange);
     });
   }
-  if (ranges) {
-    for (const button of ranges.querySelectorAll?.('[data-bloods-range]') ?? []) {
-      const active = button.dataset.bloodsRange === model.range;
-      button.classList.toggle('is-active', active);
-      if (active) button.setAttribute('aria-pressed', 'true');
-      else button.setAttribute('aria-pressed', 'false');
-    }
+  if (!ranges) return;
+  for (const button of ranges.querySelectorAll?.('[data-bloods-range]') ?? []) {
+    const active = button.dataset.bloodsRange === model.range;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
   }
+}
 
+function renderInRange(root, model) {
+  const host = root.querySelector('#bloods-in-range');
+  if (!host) return;
+  host.replaceChildren();
+  const svg = root.querySelector('#bloods-in-range-ring') || (() => {
+    const node = root.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    node.id = 'bloods-in-range-ring';
+    node.setAttribute('class', 'metric-ring metric-ring--bloods-in-range');
+    node.setAttribute('viewBox', '0 0 56 56');
+    const track = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    track.setAttribute('data-role', 'track');
+    const fill = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    fill.setAttribute('data-role', 'fill');
+    node.append(track, fill);
+    return node;
+  })();
+  if (!svg.id) svg.id = 'bloods-in-range-ring';
+  applyRingTarget(svg, { value: model.inRangeCount ?? 0, target: model.markerCount || 1 });
+  const caption = root.createElement('p');
+  caption.className = 'metric-caption';
+  caption.textContent = model.markerCount
+    ? `${model.inRangeCount} of ${model.markerCount} in range`
+    : 'No numeric markers yet.';
+  host.append(svg, caption);
+}
+
+function renderFlags(root, model) {
   const flags = root.querySelector('#bloods-flags');
-  if (flags) {
-    flags.replaceChildren();
-    if (!model.flagged.length) {
-      const empty = root.createElement('p');
-      empty.className = 'metric-caption';
-      empty.textContent = 'Everything in range.';
-      flags.append(empty);
+  if (!flags) return;
+  flags.replaceChildren();
+  if (!model.categories.length) {
+    flags.append(caption(root, 'No blood results in your synced history yet.'));
+    return;
+  }
+  if (!model.flagged.length) {
+    flags.append(caption(root, 'Everything in range.'));
+    return;
+  }
+  for (const flag of model.flagged) {
+    const chip = root.createElement('button');
+    chip.type = 'button';
+    chip.className = 'body-tape-chip bloods-flag';
+    chip.dataset.colour = flag.status === 'Low' ? 'low' : flag.status === 'High' ? 'red' : 'neutral';
+    chip.dataset.bloodsMarker = flag.key;
+    const label = root.createElement('span');
+    label.className = 'body-tape-chip__label';
+    label.textContent = flag.label;
+    const value = root.createElement('span');
+    value.className = 'body-tape-chip__delta';
+    value.textContent = [formatLatestValue(flag.value, flag.unit), flag.status].filter(Boolean).join(' ');
+    chip.append(label, value);
+    chip.addEventListener('click', () => jumpToMarker(root, flag.key));
+    flags.append(chip);
+  }
+}
+
+function renderLastCollected(root, model) {
+  const host = root.querySelector('#bloods-last-collected');
+  if (!host) return;
+  host.replaceChildren();
+  if (!model.lastCollected) {
+    host.append(caption(root, 'No collection date yet.'));
+    return;
+  }
+  const line = root.createElement('p');
+  line.className = 'metric-value';
+  line.textContent = model.lastCollected.date;
+  host.append(line);
+  if (model.lastCollected.lab) {
+    host.append(caption(root, model.lastCollected.lab));
+  }
+  if (model.lastCollected.stale) {
+    const stale = caption(root, 'Last panel is more than 90 days ago.');
+    stale.dataset.stale = '1';
+    host.append(stale);
+  }
+}
+
+function bindToolbar(root, dashboard) {
+  const expand = root.querySelector('#bloods-expand-all');
+  const collapse = root.querySelector('#bloods-collapse-all');
+  const search = root.querySelector('#bloods-search');
+  if (expand && !expand.dataset.bound) {
+    expand.dataset.bound = '1';
+    expand.addEventListener('click', () => setAllCollapsed(dashboard, false));
+  }
+  if (collapse && !collapse.dataset.bound) {
+    collapse.dataset.bound = '1';
+    collapse.addEventListener('click', () => setAllCollapsed(dashboard, true));
+  }
+  if (search && !search.dataset.bound) {
+    search.dataset.bound = '1';
+    search.addEventListener('input', () => filterMarkers(dashboard, search.value));
+  }
+}
+
+function bindAppointment(root, model) {
+  const open = root.querySelector('#bloods-appointment-open');
+  const sheet = root.querySelector('#bloods-appointment-sheet');
+  const body = root.querySelector('#bloods-appointment-body');
+  if (body) {
+    body.replaceChildren();
+    if (!model.appointmentLines?.length) {
+      body.append(caption(root, 'Nothing flagged or moving unfavourably.'));
     } else {
-      for (const flag of model.flagged) {
-        flags.append(flagChip(root, flag));
+      for (const line of model.appointmentLines) {
+        const p = root.createElement('p');
+        p.className = 'bloods-appointment-line';
+        p.textContent = line;
+        body.append(p);
       }
     }
   }
-
-  const host = root.querySelector('#bloods-sections');
-  if (host) {
-    host.replaceChildren();
-    for (const category of model.categories) {
-      host.append(categoryCard(root, category));
-    }
+  if (open && sheet && !open.dataset.bound) {
+    open.dataset.bound = '1';
+    open.addEventListener('click', () => {
+      if (typeof sheet.showModal === 'function') sheet.showModal();
+      else sheet.removeAttribute('hidden');
+    });
   }
-
-  dashboard.removeAttribute('hidden');
 }
 
-function flagChip(root, flag) {
-  const chip = root.createElement('span');
-  chip.className = 'body-tape-chip bloods-flag';
-  chip.dataset.colour = flag.status === 'Low' ? 'low' : flag.status === 'High' ? 'red' : 'neutral';
-  const label = root.createElement('span');
-  label.className = 'body-tape-chip__label';
-  label.textContent = flag.label;
-  const value = root.createElement('span');
-  value.className = 'body-tape-chip__delta';
-  value.textContent = [formatLatestValue(flag.value, flag.unit), flag.status].filter(Boolean).join(' ');
-  chip.append(label, value);
-  return chip;
+function bindExplainer(root) {
+  const drawer = root.querySelector('#bloods-explainer');
+  if (!drawer || drawer.dataset.bound) return;
+  drawer.dataset.bound = '1';
+  drawer.addEventListener('click', event => {
+    if (event.target === drawer || event.target?.closest?.('[data-bloods-explainer-close]')) {
+      drawer.setAttribute('hidden', '');
+    }
+  });
 }
 
-function categoryCard(root, category) {
+function renderSections(root, model, dashboard) {
+  const host = root.querySelector('#bloods-sections');
+  if (!host) return;
+  host.replaceChildren();
+  const flareOn = dashboard.querySelector?.('[data-bloods-flare]')?.checked === true;
+  for (const category of model.categories) {
+    host.append(categoryCard(root, category, model, flareOn));
+  }
+}
+
+function categoryCard(root, category, model, flareOn) {
   const article = root.createElement('article');
   article.className = 'metric-card body-section bloods-category';
   article.dataset.bodySection = category.id;
-  if (!category.hasFlags) article.classList.add('is-collapsed');
+  if (category.collapsed) article.classList.add('is-collapsed');
 
   const heading = root.createElement('div');
   heading.className = 'body-section__head';
   const toggle = root.createElement('button');
   toggle.type = 'button';
   toggle.className = 'bloods-category__toggle';
-  toggle.setAttribute('aria-expanded', category.hasFlags ? 'true' : 'false');
+  toggle.setAttribute('aria-expanded', category.collapsed ? 'false' : 'true');
   const title = root.createElement('h3');
   title.className = 'metric-label';
   title.textContent = category.title;
-  toggle.append(title);
+  const summary = root.createElement('span');
+  summary.className = 'metric-caption';
+  summary.textContent = category.summary || '';
+  toggle.append(title, summary);
   toggle.addEventListener('click', () => {
     const collapsed = article.classList.toggle('is-collapsed');
     toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
@@ -86,49 +204,95 @@ function categoryCard(root, category) {
   heading.append(toggle);
   article.append(heading);
 
+  const noteText = categoryNote(category.id);
+  if (noteText) {
+    const note = root.createElement('p');
+    note.className = 'bloods-category__note metric-caption';
+    note.textContent = noteText;
+    article.append(note);
+  }
+
   const body = root.createElement('div');
   body.className = 'bloods-category__body';
-  if (!category.markers.length) {
-    const empty = root.createElement('p');
-    empty.className = 'metric-caption';
-    empty.textContent = 'No markers in this category.';
-    body.append(empty);
-  } else {
-    const blocks = category.markers.map(marker => markerBlock(root, marker));
-    if (blocks.length > 1) {
-      const row = root.createElement('div');
-      row.className = 'body-metrics body-metrics--pair';
-      row.append(...blocks);
-      body.append(row);
-    } else {
-      body.append(blocks[0]);
+
+  const strip = root.createElement('div');
+  strip.className = 'bloods-summary-strip';
+  for (const marker of category.markers.filter(m => !m.qualitative)) {
+    const mini = root.createElement('button');
+    mini.type = 'button';
+    mini.className = 'bloods-summary-strip__item';
+    mini.dataset.bloodsMarker = marker.key;
+    mini.textContent = marker.label;
+    mini.addEventListener('click', () => jumpToMarker(root, marker.key));
+    strip.append(mini);
+  }
+  if (strip.children.length) body.append(strip);
+
+  if (['Inflammation Markers', 'Iron Studies'].includes(category.id) && model.flareMarks?.length) {
+    const flare = root.createElement('label');
+    flare.className = 'bloods-flare-toggle';
+    const box = root.createElement('input');
+    box.type = 'checkbox';
+    box.dataset.bloodsFlare = '1';
+    box.checked = flareOn;
+    flare.append(box, documentText(root, ' Show flare diary ticks'));
+    body.append(flare);
+  }
+
+  if (category.combined) {
+    const combined = combinedChartSvg(root, category.combined);
+    if (combined) {
+      combined.className = `${combined.className || ''} bloods-combined`.trim();
+      body.append(combined);
     }
+  }
+
+  const grid = root.createElement('div');
+  grid.className = 'bloods-metric-grid body-metrics body-metrics--pair';
+  if (!category.markers.length) {
+    body.append(caption(root, 'Not yet tested'));
+  } else {
+    for (const marker of category.markers) {
+      grid.append(markerBlock(root, marker, model, flareOn));
+    }
+    body.append(grid);
   }
   article.append(body);
   return article;
 }
 
-function markerBlock(root, marker) {
+function markerBlock(root, marker, model, flareOn) {
   const wrap = root.createElement('div');
-  wrap.className = 'body-metric';
+  wrap.className = `body-metric bloods-metric${marker.span === 'wide' ? ' bloods-metric--wide' : ''}`;
+  wrap.id = `bloods-marker-${marker.key}`;
+  wrap.dataset.bloodsMarker = marker.key;
 
   const head = root.createElement('div');
   head.className = 'body-metric__head';
   const name = root.createElement('strong');
   name.textContent = marker.label;
-  head.append(name);
+  const info = root.createElement('button');
+  info.type = 'button';
+  info.className = 'bloods-info';
+  info.setAttribute('aria-label', `About ${marker.label}`);
+  info.textContent = 'i';
+  info.addEventListener('click', () => openExplainer(root, marker));
+  head.append(name, info);
 
-  const trends = root.createElement('div');
-  trends.className = 'body-metric__growth';
-  trends.append(
-    trendChip(root, marker.lastDelta, marker.lastColour, 'Last'),
-    trendChip(root, marker.overallDelta, marker.overallColour, 'Overall')
-  );
-  head.append(trends);
+  if (marker.lastDelta != null) {
+    const trends = root.createElement('div');
+    trends.className = 'body-metric__growth';
+    trends.append(
+      trendChip(root, marker.lastDelta, marker.lastColour, marker.lastDeltaLabel ? marker.lastDeltaLabel : 'Last'),
+      trendChip(root, marker.overallDelta, marker.overallColour, 'Overall')
+    );
+    head.append(trends);
+  }
   wrap.append(head);
 
   const value = root.createElement('p');
   value.className = 'body-metric__value';
+  value.style.fontVariantNumeric = 'tabular-nums';
   if (marker.qualitative) {
     value.textContent = marker.latest?.status || marker.latest?.unit || 'Qualitative';
     wrap.append(value);
@@ -137,67 +301,85 @@ function markerBlock(root, marker) {
   value.textContent = formatLatestValue(marker.latest?.value, marker.latest?.unit);
   wrap.append(value);
 
-  if (marker.series?.length) {
-    wrap.append(markerChart(root, marker));
+  const pill = root.createElement('span');
+  pill.className = 'bloods-status';
+  pill.dataset.status = marker.statusTone || 'first';
+  pill.textContent = marker.latest?.status || 'First reading';
+  wrap.append(pill);
+
+  const visual = markerVisual(root, marker, { flareMarks: model.flareMarks, flareOn });
+  if (visual) {
+    visual.dataset.status = marker.statusTone || 'first';
+    wrap.append(visual);
   } else if (marker.latest) {
-    const caption = root.createElement('p');
-    caption.className = 'metric-caption';
-    caption.textContent = 'No readings in this range.';
-    wrap.append(caption);
+    wrap.append(caption(root, marker.series?.length ? '' : 'Not yet tested'));
   }
+
+  const tested = root.createElement('p');
+  tested.className = 'metric-caption bloods-tested';
+  tested.textContent = marker.latest?.date || '';
+  wrap.append(tested);
   return wrap;
 }
 
-function markerChart(root, marker) {
-  const chart = root.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  chart.setAttribute('class', 'line-chart body-chart');
-  chart.setAttribute('viewBox', '0 0 320 168');
-  chart.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  chart.setAttribute('role', 'img');
-  chart.setAttribute('aria-label', `${marker.label} trend`);
-
-  const band = root.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  band.setAttribute('data-role', 'ref-band');
-  const area = root.createElementNS('http://www.w3.org/2000/svg', 'path');
-  area.setAttribute('data-role', 'area');
-  const line = root.createElementNS('http://www.w3.org/2000/svg', 'path');
-  line.setAttribute('data-role', 'line');
-  const points = root.createElementNS('http://www.w3.org/2000/svg', 'g');
-  points.setAttribute('data-role', 'points');
-  chart.append(band, area, line, points);
-
-  const refLow = marker.latest?.ref_low;
-  const refHigh = marker.latest?.ref_high;
-  const includeValues = [refLow, refHigh].filter(value => value != null && Number.isFinite(Number(value)));
-  const built = buildAreaLine(marker.series.map(point => ({
-    date: point.date,
-    value: point.value
-  })), { height: 168, yDomain: 'padded', includeValues });
-
-  if (Number.isFinite(Number(refLow)) && Number.isFinite(Number(refHigh))) {
-    const yHigh = built.scaleY(Number(refHigh));
-    const yLow = built.scaleY(Number(refLow));
-    const y = Math.min(yHigh, yLow);
-    const height = Math.abs(yLow - yHigh);
-    band.setAttribute('x', String(built.points[0]?.x ?? 12));
-    band.setAttribute('width', String(Math.max(0, 320 - 24)));
-    band.setAttribute('y', String(y));
-    band.setAttribute('height', String(height));
-  } else {
-    band.setAttribute('height', '0');
+function openExplainer(root, marker) {
+  const drawer = root.querySelector('#bloods-explainer');
+  const body = root.querySelector('#bloods-explainer-body');
+  if (!drawer || !body) return;
+  const copy = explainerFor(marker.key);
+  body.replaceChildren();
+  const title = root.createElement('h3');
+  title.textContent = marker.label;
+  body.append(title);
+  for (const [label, text] of [
+    ['What it measures', copy.what],
+    ['Why it’s tracked here', copy.why],
+    ['If it’s high', copy.high],
+    ['If it’s low', copy.low]
+  ]) {
+    const h = root.createElement('p');
+    h.className = 'metric-label';
+    h.textContent = label;
+    const p = root.createElement('p');
+    p.textContent = text;
+    body.append(h, p);
   }
-
-  area.setAttribute('d', built.areaPath || built.areaPoints || '');
-  line.setAttribute('d', built.linePath || '');
-  for (const point of built.points) {
-    const circle = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', String(point.x));
-    circle.setAttribute('cy', String(point.y));
-    circle.setAttribute('r', '2.5');
-    points.append(circle);
+  if (copy.related?.length) {
+    const rel = root.createElement('p');
+    rel.className = 'metric-caption';
+    rel.textContent = `Commonly read alongside ${copy.related.join(', ')}`;
+    body.append(rel);
   }
-  queueMicrotask(() => animateAreaReveal(chart));
-  return chart;
+  const disc = root.createElement('p');
+  disc.className = 'metric-caption';
+  disc.textContent = copy.disclaimer;
+  body.append(disc);
+  drawer.removeAttribute('hidden');
+}
+
+function jumpToMarker(root, key) {
+  const node = root.querySelector?.(`#bloods-marker-${key}`);
+  node?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  if (node?.classList) {
+    node.classList.add('is-highlight');
+    setTimeout(() => node.classList.remove('is-highlight'), 1200);
+  }
+}
+
+function setAllCollapsed(dashboard, collapsed) {
+  for (const article of dashboard.querySelectorAll?.('.bloods-category') ?? []) {
+    article.classList.toggle('is-collapsed', collapsed);
+    const toggle = article.querySelector?.('.bloods-category__toggle');
+    toggle?.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+}
+
+function filterMarkers(dashboard, query) {
+  const q = String(query || '').trim().toLowerCase();
+  for (const card of dashboard.querySelectorAll?.('.bloods-metric') ?? []) {
+    const hay = String(card.textContent || '').toLowerCase();
+    card.hidden = q ? !hay.includes(q) : false;
+  }
 }
 
 function trendChip(root, delta, colour, label) {
@@ -209,9 +391,22 @@ function trendChip(root, delta, colour, label) {
   kind.textContent = label;
   const deltaEl = root.createElement('span');
   deltaEl.className = 'body-tape-chip__delta';
-  deltaEl.textContent = formatDeltaChip(delta);
+  deltaEl.textContent = /[↑↓→]/.test(String(label)) ? '' : formatDeltaChip(delta);
   chip.append(kind, deltaEl);
   return chip;
+}
+
+function caption(root, text) {
+  const node = root.createElement('p');
+  node.className = 'metric-caption';
+  node.textContent = text;
+  return node;
+}
+
+function documentText(root, text) {
+  const span = root.createElement('span');
+  span.textContent = text;
+  return span;
 }
 
 function formatLatestValue(value, unit) {

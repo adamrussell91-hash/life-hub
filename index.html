@@ -614,22 +614,51 @@
           <button id="body-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Dr Sara Tonin">💬</button>
         </section>
 
-        <section id="body-bloods-dashboard" class="dashboard" aria-labelledby="bloods-heading" hidden>
-          <button type="button" id="bloods-back" class="bloods-back">← Body</button>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Body</p>
-              <h2 id="bloods-heading">Bloods</h2>
-            </div>
+        <section id="body-bloods-dashboard" class="dashboard" aria-label="Bloods" hidden>
+          <div class="bloods-top">
+            <button type="button" id="bloods-back" class="bloods-back">← Body</button>
+            <button type="button" id="bloods-appointment-open" class="bloods-appointment-open">Summary for appointment</button>
           </div>
           <div id="bloods-range-control" class="body-range" role="group" aria-label="Bloods time range">
             <button type="button" data-bloods-range="monthly" aria-pressed="false">Month</button>
-            <button type="button" data-bloods-range="six_month" class="is-active" aria-pressed="true">6M</button>
+            <button type="button" data-bloods-range="six_month" aria-pressed="false">6M</button>
             <button type="button" data-bloods-range="year" aria-pressed="false">Year</button>
-            <button type="button" data-bloods-range="five_year" aria-pressed="false">5Y</button>
+            <button type="button" data-bloods-range="five_year" class="is-active" aria-pressed="true">5Y</button>
           </div>
-          <div id="bloods-flags" class="bloods-flags" aria-live="polite"></div>
+          <div id="bloods-signal" class="bloods-signal">
+            <article class="metric-card bloods-signal__card" aria-label="Markers in range">
+              <p class="metric-label">Markers in range</p>
+              <div id="bloods-in-range" class="bloods-in-range"></div>
+            </article>
+            <article class="metric-card bloods-signal__card" aria-label="Flags this test">
+              <p class="metric-label">Flags this test</p>
+              <div id="bloods-flags" class="bloods-flags" aria-live="polite"></div>
+            </article>
+            <article class="metric-card bloods-signal__card" aria-label="Last collected">
+              <p class="metric-label">Last collected</p>
+              <div id="bloods-last-collected"></div>
+            </article>
+          </div>
+          <div id="bloods-toolbar" class="bloods-toolbar">
+            <button type="button" id="bloods-expand-all">Expand all</button>
+            <button type="button" id="bloods-collapse-all">Collapse all</button>
+            <label class="bloods-search-label">
+              <span class="visually-hidden">Search markers</span>
+              <input id="bloods-search" type="search" placeholder="Filter markers" autocomplete="off">
+            </label>
+          </div>
           <div id="bloods-sections" class="bloods-sections"></div>
+          <dialog id="bloods-appointment-sheet" class="bloods-sheet" aria-label="Summary for appointment">
+            <form method="dialog">
+              <button type="submit" value="close">Close</button>
+            </form>
+            <h2>Summary for appointment</h2>
+            <div id="bloods-appointment-body"></div>
+          </dialog>
+          <div id="bloods-explainer" class="bloods-explainer" hidden>
+            <button type="button" data-bloods-explainer-close class="bloods-explainer__close">Close</button>
+            <div id="bloods-explainer-body"></div>
+          </div>
         </section>
 
         <section id="mind-dashboard" class="dashboard" aria-labelledby="mind-heading" hidden>
