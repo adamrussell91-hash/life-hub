@@ -4,6 +4,7 @@ import {
   rangeWindow,
   seriesInRange
 } from './body-model.js';
+import { ratioTone } from './bloods-charts-layout.js';
 
 export const BLOODS_CATEGORY_ORDER = [
   'Inflammation Markers',
@@ -163,7 +164,8 @@ function decorateCategory(category) {
     ...category,
     collapsed: !category.hasFlags,
     summary,
-    combined: combinedChart(category)
+    combined: combinedChart(category),
+    lipidRatio: lipidRatio(category)
   };
 }
 
@@ -183,6 +185,24 @@ function combinedChart(category) {
     return series.length === 3 ? { kind: 'liver', series } : null;
   }
   return null;
+}
+
+const TOTAL_KEYS = new Set(['cholesterol', 'total_cholesterol']);
+const HDL_KEYS = new Set(['hdl', 'hdl_cholesterol']);
+
+function lipidRatio(category) {
+  if (category.id !== 'Lipid Studies') return null;
+  const lab = category.markers.find(m => m.key === 'tc_hdl_ratio' && m.latest?.value != null);
+  if (lab) {
+    const value = Number(lab.latest.value);
+    return { value, source: 'lab', date: lab.latest.date, tone: ratioTone(value) };
+  }
+  const total = category.markers.find(m => TOTAL_KEYS.has(m.key) && m.latest?.value != null);
+  const hdl = category.markers.find(m => HDL_KEYS.has(m.key) && m.latest?.value);
+  if (!total || !hdl || !Number(hdl.latest.value)) return null;
+  const value = Number(total.latest.value) / Number(hdl.latest.value);
+  if (!Number.isFinite(value)) return null;
+  return { value, source: 'computed', date: total.latest.date, tone: ratioTone(value) };
 }
 
 function normalisedSeries(marker) {

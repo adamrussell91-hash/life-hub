@@ -239,6 +239,16 @@ function categoryCard(root, category, model, flareOn) {
     body.append(flare);
   }
 
+  if (category.lipidRatio) {
+    const ratio = root.createElement('p');
+    ratio.className = 'bloods-lipid-ratio';
+    ratio.dataset.status = category.lipidRatio.tone;
+    const n = category.lipidRatio.value;
+    const text = Number.isInteger(n) ? String(n) : n.toFixed(1);
+    ratio.textContent = `Total : HDL ${text}`;
+    body.append(ratio);
+  }
+
   if (category.combined) {
     const combined = combinedChartSvg(root, category.combined);
     if (combined) {
@@ -309,7 +319,10 @@ function markerBlock(root, marker, model, flareOn) {
 
   const visual = markerVisual(root, marker, { flareMarks: model.flareMarks, flareOn });
   if (visual) {
-    visual.dataset.status = marker.statusTone || 'first';
+    const chart = String(visual.className || '').includes('body-chart')
+      ? visual
+      : visual.querySelector?.('.body-chart') || visual;
+    if (chart?.dataset) chart.dataset.status = marker.statusTone || 'first';
     wrap.append(visual);
   } else if (marker.latest) {
     wrap.append(caption(root, marker.series?.length ? '' : 'Not yet tested'));

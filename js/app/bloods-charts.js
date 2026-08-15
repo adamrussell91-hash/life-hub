@@ -1,8 +1,8 @@
 import { animateAreaReveal } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
-import { glucoseZones, rangeBarLayout } from './bloods-charts-layout.js';
+import { compareChartPoints, glucoseZones, nextComparePins, rangeBarLayout } from './bloods-charts-layout.js';
 
-export { glucoseZones, rangeBarLayout };
+export { compareChartPoints, glucoseZones, nextComparePins, rangeBarLayout };
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -61,6 +61,8 @@ function rangeBarSvg(root, marker) {
 }
 
 function zonedChartSvg(root, marker) {
+  const wrap = root.createElement('div');
+  wrap.className = 'bloods-line-wrap';
   const chart = svgRoot(root, `${marker.label} zones`);
   const unit = marker.latest?.unit || 'mmol/mol';
   const zones = glucoseZones(unit);
@@ -94,11 +96,16 @@ function zonedChartSvg(root, marker) {
     line.setAttribute('data-role', 'line');
     line.setAttribute('d', built.linePath || '');
     chart.append(line);
+    bindScrub(chart, built.points);
+    bindCompare(root, wrap, chart, built.points);
   }
-  return chart;
+  wrap.append(chart);
+  return wrap;
 }
 
 function lineChartSvg(root, marker, { flareMarks, flareOn }) {
+  const wrap = root.createElement('div');
+  wrap.className = 'bloods-line-wrap';
   const chart = svgRoot(root, `${marker.label} trend`);
   const band = el(root, 'rect');
   band.setAttribute('data-role', 'ref-band');
@@ -145,8 +152,7 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
 
   if (flareOn) {
     for (const mark of flareMarks) {
-      const match = built.points.find(point => point.date === mark.date)
-        || nearestByDate(built.points, mark.date);
+      const match = built.points.find(point => point.date === mark.date);
       if (!match) continue;
       const tick = el(root, 'line');
       tick.setAttribute('x1', String(match.x));
@@ -159,8 +165,10 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
   }
 
   bindScrub(chart, built.points);
+  bindCompare(root, wrap, chart, built.points);
   queueMicrotask(() => animateAreaReveal(chart));
-  return chart;
+  wrap.append(chart);
+  return wrap;
 }
 
 function bindScrub(chart, points) {
@@ -182,8 +190,50 @@ function bindScrub(chart, points) {
   });
 }
 
-function nearestByDate(points, date) {
-  return points.find(point => point.date === date) ?? null;
+function bindCompare(root, host, chart, points) {
+  if (!points?.length) return;
+  let pins = [];
+  let callout = null;
+  const ensureCallout = () => {
+    if (callout) return callout;
+    callout = root.createElement('p');
+    callout.className = 'bloods-compare metric-caption';
+    callout.hidden = true;
+    host.append(callout);
+    return callout;
+  };
+  chart.addEventListener?.('pointerdown', event => {
+    const nearest = nearestPoint(chart, points, event);
+    if (!nearest) return;
+    pins = nextComparePins(pins, nearest);
+    const note = ensureCallout();
+    if (pins.length < 2) {
+      note.hidden = true;
+      note.textContent = '';
+      chart.dataset.compareLabel = '';
+      return;
+    }
+    const cmp = compareChartPoints(pins[0], pins[1]);
+    if (!cmp) return;
+    note.hidden = false;
+    note.textContent = cmp.label;
+    chart.dataset.compareLabel = cmp.label;
+  });
+}
+
+function nearestPoint(chart, points, event) {
+  const rect = chart.getBoundingClientRect?.() || { width: 320, left: 0 };
+  const x = ((event.clientX - (rect.left || 0)) / (rect.width || 1)) * 320;
+  let nearest = points[0];
+  let best = Infinity;
+  for (const point of points) {
+    const d = Math.abs(point.x - x);
+    if (d < best) {
+      best = d;
+      nearest = point;
+    }
+  }
+  return nearest;
 }
 
 function svgRoot(root, label, extraClass = '') {

@@ -248,3 +248,37 @@ test('appointmentLines include flags, notes, and unfavourable moves', () => {
   assert.ok(model.appointmentLines.some(line => /Fasted/.test(line)));
   assert.ok(!model.appointmentLines.some(line => /CRP/.test(line)));
 });
+
+test('Lipid Studies expose a Total:HDL ratio from matching latest values', () => {
+  const model = buildBloodsModel({
+    date: '2026-08-13',
+    events: [
+      bloodsEvent('2026-05-19', [
+        { key: 'cholesterol', label: 'Total Cholesterol', category: 'Lipid Studies', value: 5.2, unit: 'mmol/L', status: 'Normal' },
+        { key: 'hdl', label: 'HDL', category: 'Lipid Studies', value: 1.3, unit: 'mmol/L', status: 'Normal' }
+      ])
+    ]
+  });
+  const lipids = model.categories.find(c => c.id === 'Lipid Studies');
+  assert.ok(lipids.lipidRatio);
+  assert.equal(lipids.lipidRatio.source, 'computed');
+  assert.equal(Number(lipids.lipidRatio.value.toFixed(2)), 4);
+  assert.equal(lipids.lipidRatio.tone, 'low');
+});
+
+test('Lipid Studies prefer a lab tc_hdl_ratio marker when present', () => {
+  const model = buildBloodsModel({
+    date: '2026-08-13',
+    events: [
+      bloodsEvent('2026-05-19', [
+        { key: 'cholesterol', label: 'Total Cholesterol', category: 'Lipid Studies', value: 6, unit: 'mmol/L', status: 'High' },
+        { key: 'hdl', label: 'HDL', category: 'Lipid Studies', value: 1, unit: 'mmol/L', status: 'Low' },
+        { key: 'tc_hdl_ratio', label: 'TC/HDL', category: 'Lipid Studies', value: 5.4, unit: '', status: 'High' }
+      ])
+    ]
+  });
+  const lipids = model.categories.find(c => c.id === 'Lipid Studies');
+  assert.equal(lipids.lipidRatio.source, 'lab');
+  assert.equal(lipids.lipidRatio.value, 5.4);
+  assert.equal(lipids.lipidRatio.tone, 'high');
+});

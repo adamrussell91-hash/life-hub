@@ -247,6 +247,33 @@ test('renderBloods empty flags copy and skips charts for qualitative markers', (
   assert.equal(root._host.querySelector('.body-chart'), null);
 });
 
+test('Lipid Studies render a Total:HDL ratio chip', () => {
+  const root = fakeRoot();
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: [{
+      id: 'Lipid Studies',
+      title: 'Lipid Studies',
+      hasFlags: false,
+      collapsed: true,
+      lipidRatio: { value: 4, source: 'computed', date: '2026-05-19', tone: 'low' },
+      markers: [{
+        ...alt,
+        key: 'hdl',
+        label: 'HDL',
+        chartKind: 'range-bar',
+        statusTone: 'normal',
+        latest: { date: '2026-05-19', value: 1.3, unit: 'mmol/L', status: 'Normal' }
+      }]
+    }]
+  });
+  const chip = root._host.querySelector('.bloods-lipid-ratio');
+  assert.ok(chip);
+  assert.match(String(chip.textContent), /Total : HDL 4/);
+  assert.equal(chip.dataset.status, 'low');
+});
+
 test('normal categories start collapsed and the appointment control stays quiet', () => {
   const root = fakeRoot();
   renderBloods(root, {

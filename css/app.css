@@ -2914,6 +2914,21 @@ main { max-width: 76rem; margin: 0 auto; }
   margin: 0 0 0.65rem;
 }
 
+.bloods-lipid-ratio {
+  margin: 0 0 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.bloods-lipid-ratio[data-status="normal"] { color: var(--bloods-normal); }
+.bloods-lipid-ratio[data-status="low"] { color: var(--bloods-low); }
+.bloods-lipid-ratio[data-status="high"] { color: var(--bloods-high); }
+
+.bloods-compare {
+  margin: 0.35rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (min-width: 721px) {
   .bloods-explainer {
     inset: 12vh 1.5rem auto auto;
