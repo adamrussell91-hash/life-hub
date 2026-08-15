@@ -9,6 +9,7 @@ import {
   recurringThemes,
   rangeWindow,
   sessionEntries,
+  sessionThemes,
   daysSinceLastDiary,
   daysSinceLastMindSession,
   silenceFlag,
@@ -82,8 +83,57 @@ test('sessionEntries maps mind_session records and ignores diary', () => {
     moodAtOpen: 'low',
     moodAtClose: 'good',
     crossAgentNote: 'Vera→Penelope: ask what the weekend is actually for.',
-    path: 'data/mind/2026/08/2026-08-10-session.md'
+    path: 'data/mind/2026/08/2026-08-10-session.md',
+    title: null,
+    themes: [],
+    patternTags: [],
+    sessionType: null,
+    framework: null,
+    observation: null,
+    sourceAgent: null
   });
+});
+
+test('sessionEntries maps themes, pattern tags, and title', () => {
+  const sessions = sessionEntries([{
+    record: {
+      type: 'mind_session',
+      date: '2026-04-07',
+      title: 'The Filter',
+      theme: 'ADHD Reality',
+      themes: ['ADHD Reality', 'Self-Compassion'],
+      pattern_tags: ['shame-loop'],
+      session_type: 'deep-dive',
+      framework: 'Compassion-Focused',
+      observation: 'The filter activated.',
+      source_agent: 'import'
+    },
+    path: 'data/mind/2026/04/2026-04-07-the-filter.md'
+  }]);
+  assert.equal(sessions[0].title, 'The Filter');
+  assert.deepEqual(sessions[0].themes, ['ADHD Reality', 'Self-Compassion']);
+  assert.deepEqual(sessions[0].patternTags, ['shame-loop']);
+  assert.equal(sessions[0].sessionType, 'deep-dive');
+  assert.equal(sessions[0].observation, 'The filter activated.');
+  assert.equal(sessions[0].sourceAgent, 'import');
+});
+
+test('sessionThemes falls back to singular theme', () => {
+  const sessions = sessionEntries([{
+    record: { type: 'mind_session', date: '2026-08-10', theme: 'Weekend' },
+    path: 's'
+  }]);
+  assert.deepEqual(sessionThemes(sessions[0]), ['Weekend']);
+});
+
+test('diaryEntries includes body and sourceAgent', () => {
+  const entries = diaryEntries([{
+    record: { type: 'diary', date: '2026-03-03', mood: 'low', source_agent: 'import' },
+    body: 'Flat, fatigued day.',
+    path: 'd'
+  }]);
+  assert.equal(entries[0].body, 'Flat, fatigued day.');
+  assert.equal(entries[0].sourceAgent, 'import');
 });
 
 test('entriesByEnergy counts diary energy in range', () => {
