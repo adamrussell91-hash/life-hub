@@ -449,3 +449,34 @@ The rest of the insight.`);
   assert.equal(extras.tension.stated, 0.2);
   assert.equal(extras.tension.revealed, 0.75);
 });
+
+test('buildMindModel exposes launchers and analysis series', () => {
+  const events = [
+    { record: { type: 'diary', date: '2026-08-09', mood_score: 6, mood: 'good', tags: ['work'], source_agent: 'penelope' }, body: 'I should rest.', path: 'd' },
+    { record: { type: 'mind_session', date: '2026-08-10', title: 'Filter', themes: ['work'], mood_at_open: 'low', mood_at_close: 'good', source_agent: 'vera' }, path: 's' }
+  ];
+  const model = buildMindModel({
+    events,
+    date: '2026-08-10',
+    range: 'monthly',
+    governanceLogMarkdown: `## 2026-08-10 — Mind Insight
+**Title:** Gap
+**Tension:** stated — revealed
+**Stated:** 0.2
+**Revealed:** 0.8
+
+Body here.
+`,
+    centralNodeMarkdown: ''
+  });
+  assert.equal(model.launchers.vera.title, 'Filter');
+  assert.equal(model.launchers.penelope.daysAgo, 1);
+  assert.ok(Array.isArray(model.factorEffects));
+  assert.equal(model.consistency.windowDays, 30);
+  assert.ok(model.themeNodes.length);
+  assert.equal(model.tensions.length, 1);
+  assert.equal(model.tensions[0].stated, 0.2);
+  assert.ok(Array.isArray(model.waffle));
+  assert.ok(Array.isArray(model.lexical));
+  assert.equal(model.empty, false);
+});
