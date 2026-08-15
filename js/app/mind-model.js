@@ -33,7 +33,9 @@ export function diaryEntries(events) {
       mood_score: Number.isFinite(event.record.mood_score) ? event.record.mood_score : null,
       energy: event.record.energy ?? null,
       tags: Array.isArray(event.record.tags) ? event.record.tags.map(String) : [],
-      path: event.path
+      path: event.path,
+      sourceAgent: event.record.source_agent ?? null,
+      body: event.body ?? ''
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -49,9 +51,21 @@ export function sessionEntries(events) {
       moodAtOpen: event.record.mood_at_open ?? null,
       moodAtClose: event.record.mood_at_close ?? null,
       crossAgentNote: event.record.cross_agent_note ?? null,
-      path: event.path
+      path: event.path,
+      title: event.record.title ?? null,
+      themes: Array.isArray(event.record.themes) ? event.record.themes : [],
+      patternTags: Array.isArray(event.record.pattern_tags) ? event.record.pattern_tags : [],
+      sessionType: event.record.session_type ?? null,
+      framework: event.record.framework ?? null,
+      observation: event.record.observation ?? null,
+      sourceAgent: event.record.source_agent ?? null
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function sessionThemes(session) {
+  if (Array.isArray(session?.themes) && session.themes.length) return session.themes;
+  return session?.theme ? [session.theme] : [];
 }
 
 export function entriesByEnergy(entries, bounds) {
