@@ -34,15 +34,10 @@ test('protein and fat week charts sit in a pair; energy and carbs sit in a pair'
   assert.match(dash, /class="nutrition-week-charts nutrition-week-charts--energy"/);
 });
 
-test('week compare exposes summary slots and 14-slot column host', async () => {
+test('nutrition page does not include this-week vs prior protein compare', async () => {
   const dash = await nutritionDashboardMarkup();
-  assert.match(dash, /data-value="week-compare-this"/);
-  assert.match(dash, /data-value="week-compare-prior"/);
-  assert.match(dash, /data-value="week-compare-delta"/);
-  assert.match(dash, /id="nutrition-week-compare"/);
-  assert.match(dash, /week-compare-columns/);
-  assert.doesNotMatch(dash, /id="nutrition-week-compare"[^>]*line-chart/);
-  assert.doesNotMatch(dash, /id="nutrition-week-compare"[\s\S]*?data-role="value-labels"/);
+  assert.doesNotMatch(dash, /week-compare/);
+  assert.doesNotMatch(dash, /This week vs prior/);
 });
 
 test('nutrition-grid stays dense: smaller rings and 2×2 on narrow, not full-bleed stack', async () => {

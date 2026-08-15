@@ -79,3 +79,29 @@ test('buildBloodsModel ignores non-bloods events and requires a date', () => {
   });
   assert.equal(model.categories.length, 0);
 });
+
+test('buildBloodsModel still charts the latest reading when it sits outside the selected range', () => {
+  const model = buildBloodsModel({
+    date: '2026-08-13',
+    range: 'monthly',
+    events: [
+      bloodsEvent('2026-01-01', [
+        {
+          key: 'alt',
+          label: 'ALT',
+          category: 'Liver Function',
+          value: 42,
+          unit: 'U/L',
+          status: 'High',
+          ref_low: 5,
+          ref_high: 40
+        }
+      ])
+    ]
+  });
+  const alt = model.categories.find(c => c.id === 'Liver Function')?.markers.find(m => m.key === 'alt');
+  assert.ok(alt);
+  assert.equal(alt.latest.value, 42);
+  assert.ok(alt.series.length >= 1);
+  assert.equal(alt.series.at(-1).value, 42);
+});

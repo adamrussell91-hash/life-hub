@@ -22,8 +22,6 @@ export function animateAreaReveal(svg, options = {}) {
   if (!svg) return;
   const reduced = options.reducedMotion ?? prefersReducedMotion();
   svg.classList.remove('chart-animating', 'chart-static');
-  // Force a style recalc so re-entering a tab replays the reveal.
-  void svg.getBoundingClientRect();
 
   const line = svg.querySelector('[data-role="line"]');
   if (line) {

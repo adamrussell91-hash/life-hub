@@ -26,7 +26,12 @@ export function renderBloods(root, model, { onRangeChange } = {}) {
   const flags = root.querySelector('#bloods-flags');
   if (flags) {
     flags.replaceChildren();
-    if (!model.flagged.length) {
+    if (!model.categories.length) {
+      const empty = root.createElement('p');
+      empty.className = 'metric-caption';
+      empty.textContent = 'No blood results in your synced history yet.';
+      flags.append(empty);
+    } else if (!model.flagged.length) {
       const empty = root.createElement('p');
       empty.className = 'metric-caption';
       empty.textContent = 'Everything in range.';
@@ -67,14 +72,13 @@ function categoryCard(root, category) {
   const article = root.createElement('article');
   article.className = 'metric-card body-section bloods-category';
   article.dataset.bodySection = category.id;
-  if (!category.hasFlags) article.classList.add('is-collapsed');
 
   const heading = root.createElement('div');
   heading.className = 'body-section__head';
   const toggle = root.createElement('button');
   toggle.type = 'button';
   toggle.className = 'bloods-category__toggle';
-  toggle.setAttribute('aria-expanded', category.hasFlags ? 'true' : 'false');
+  toggle.setAttribute('aria-expanded', 'true');
   const title = root.createElement('h3');
   title.className = 'metric-label';
   title.textContent = category.title;

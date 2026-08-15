@@ -105,6 +105,7 @@ export function createAppController(dependencies) {
   let calendarViewMonth = null;
   let calendarExpandedDate = null;
   let bodyRange = 'six_month';
+  let bloodsRange = 'five_year';
   let mindRange = 'monthly';
   let latestLibrary = null;
   let latestMembership = null;
@@ -513,15 +514,15 @@ export function createAppController(dependencies) {
 
   const SECTION_TITLES = {
     home: { eyebrow: 'Your day at a glance', title: 'Home' },
-    chat: { eyebrow: 'Life Hub', title: 'Chat' },
-    nutrition: { eyebrow: 'Nutrition', title: 'Nutrition' },
-    fitness: { eyebrow: 'Fitness', title: 'Fitness' },
-    skincare: { eyebrow: 'Skincare', title: 'Skincare' },
-    calendar: { eyebrow: 'Calendar', title: 'Calendar' },
-    body: { eyebrow: 'Body', title: 'Body' },
-    'body-bloods': { eyebrow: 'Body', title: 'Bloods' },
-    mind: { eyebrow: 'Mind', title: 'Mind' },
-    'central-node': { eyebrow: 'Central Node', title: 'Central Node' }
+    chat: { eyebrow: 'Talk to your agents', title: 'Chat' },
+    nutrition: { eyebrow: "Today's macros", title: 'Nutrition' },
+    fitness: { eyebrow: 'Training', title: 'Fitness' },
+    skincare: { eyebrow: 'Consistency first', title: 'Skincare' },
+    calendar: { eyebrow: 'Your logged days', title: 'Calendar' },
+    body: { eyebrow: 'Scale, composition, tape', title: 'Body' },
+    'body-bloods': { eyebrow: 'Labs', title: 'Bloods' },
+    mind: { eyebrow: 'Mood and themes', title: 'Mind' },
+    'central-node': { eyebrow: 'Coordination hub', title: 'Central Node' }
   };
 
   function closeMoreSheet() {
@@ -795,11 +796,11 @@ export function createAppController(dependencies) {
     const model = buildBloodsModel({
       events: latestResult.events,
       date: latestResult.date,
-      range: bodyRange
+      range: bloodsRange
     });
     renderBloods(root, model, {
       onRangeChange: next => {
-        bodyRange = next;
+        bloodsRange = next;
         renderBloodsSection();
       }
     });

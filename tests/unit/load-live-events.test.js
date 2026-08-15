@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { load } from 'js-yaml';
 import { buildHomeModel } from '../../js/app/home-model.js';
-import { loadLiveEvents } from '../../js/app/load-live-events.js';
+import { loadLiveEvents as loadLiveEventsRaw } from '../../js/app/load-live-events.js';
+
+function loadLiveEvents(opts) {
+  return loadLiveEventsRaw({ maxLookbackDays: 40, ...opts });
+}
 import { addCalendarDays, daysBetween } from '../../js/core/time.js';
 
 const SHA = 'a'.repeat(40);
@@ -144,7 +148,7 @@ test('first sync is seven inclusive days and the next slice does not overlap', a
   };
   const partials = [];
   const result = await loadLiveEvents({
-    sync, loadYaml: load, date, onPartial: snapshot => partials.push(snapshot)
+    sync, loadYaml: load, date, maxLookbackDays: 70, onPartial: snapshot => partials.push(snapshot)
   });
 
   assert.equal(calls.length, 3);
@@ -181,7 +185,7 @@ test('onPartial fires after the first window before older files exist', async ()
   };
   const partials = [];
   const done = loadLiveEvents({
-    sync, loadYaml: load, date,
+    sync, loadYaml: load, date, maxLookbackDays: 70,
     onPartial: snapshot => partials.push(snapshot.events.map(event => event.record.date))
   });
   await new Promise(resolve => setImmediate(resolve));
@@ -191,7 +195,7 @@ test('onPartial fires after the first window before older files exist', async ()
   assert.equal(olderCalls, 2);
 });
 
-test('a config-only older slice stops extension', async () => {
+test('a config-only older slice still extends until the lookback cap', async () => {
   const date = '2026-08-01';
   const calls = [];
   const sync = async options => {
@@ -216,12 +220,6 @@ test('repeated boundary expansion never sends an individual range over 366 days'
   const calls = [];
   const sync = async ({ from, to }) => {
     calls.push({ from, to });
-    if (calls.length === 6) {
-      return {
-        files: [], warnings: [], commitSha: 'c'.repeat(40), manifestId: 'empty',
-        changed: true, freshness: 'confirmed'
-      };
-    }
     const files = [];
     for (let key = from; key <= to; key = addCalendarDays(key, 1)) files.push(workout(key));
     return {
@@ -234,7 +232,7 @@ test('repeated boundary expansion never sends an individual range over 366 days'
     };
   };
 
-  await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01' });
+  await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', maxLookbackDays: 160 });
 
   assert.equal(calls.length, 6);
   assert.ok(calls.every(call => daysBetween(call.from, call.to) < 366));
@@ -276,10 +274,10 @@ test('exact range snapshots restore a long streak offline across the disjoint-ra
     return result;
   };
 
-  const live = await loadLiveEvents({ sync, loadYaml: load, date });
+  const live = await loadLiveEvents({ sync, loadYaml: load, date, maxLookbackDays: 500 });
   const callsAfterOnline = remoteCalls;
   online = false;
-  const cached = await loadLiveEvents({ sync, loadYaml: load, date });
+  const cached = await loadLiveEvents({ sync, loadYaml: load, date, maxLookbackDays: 500 });
 
   assert.ok(callsAfterOnline >= 5, 'streak must cross into a disjoint range request');
   assert.equal(remoteCalls, callsAfterOnline);
@@ -385,4 +383,36 @@ test('exposes raw governance-log.md content when present in the sync batch', asy
   const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01' });
 
   assert.equal(result.governanceLogMarkdown, governanceLogMarkdown);
+});
+
+test('backfill walks through empty months so older bloods still load', async () => {
+  const date = '2026-08-15';
+  const bloods = raw('data/body/2023/03/2023-03-21-bloods.md', `---
+schema_version: 1
+id: notion-bloods-2023-03-21
+type: bloods
+date: '2023-03-21'
+time: '12:00'
+created_at: '2023-03-21T12:00:00+11:00'
+updated_at: '2023-03-21T12:00:00+11:00'
+source: notion_import
+markers:
+  - { key: alt, label: ALT, category: Liver Function, value: 40, unit: U/L }
+---
+Labs`);
+  const sync = async ({ from, to }) => {
+    const files = [];
+    if (from <= date && to >= date) files.push(bodyWeight(date, 80));
+    if (from <= '2023-03-21' && to >= '2023-03-21') files.push(bloods);
+    return {
+      files, warnings: [], commitSha: 'c'.repeat(40),
+      manifestId: `${from}`, changed: true, freshness: 'confirmed'
+    };
+  };
+  const result = await loadLiveEvents({
+    sync, loadYaml: load, date, maxLookbackDays: 1300
+  });
+  assert.ok(result.events.some(event => (
+    event.record.type === 'bloods' && event.record.date === '2023-03-21'
+  )));
 });
