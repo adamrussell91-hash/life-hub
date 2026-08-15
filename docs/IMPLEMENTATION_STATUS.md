@@ -408,5 +408,15 @@ Verified on 2026-08-13 (local only — do not push unless asked). Spec: `docs/su
 - Thin data: digest is empty when there is nothing to summarise; protocol still refuses to invent a season.
 - `npm test`: 1064 passed, 0 failed. `npm run validate:fixtures`: 5/5 valid.
 
+## Phase 38: Mind dashboard v2 — Complete
+
+Verified on 2026-08-15 (local only — do not push unless asked). Spec: `docs/superpowers/specs/2026-08-15-mind-dashboard-v2-design.md`. Shell cache bumped to `life-hub-shell-v80`.
+
+- Mind tab is a Clinical Glass analysis board: Vera/Penelope launchers at the top, JS masonry tiles, overlay thread sheet (Esc / scrim / continue).
+- Derived series (co-occurrence, factors, streak, transitions, lexical, butterfly, waffle, tension) plus stream / Sankey / bump / chord / radial year / horizon charts. Vendored d3 layouts stay offline; no runtime CDN.
+- Vera/Penelope protocols persist richer `mind_session` / diary fields; digest stays metadata-only (no diary prose).
+- Notion export mapper + `npm run import:mind` wrote 114 diary/session records into `data/mind` (intake skipped) and one historical Mind Insight into `data/governance/governance-log.md`. All 114 parse as valid event documents.
+- `node --test tests/unit/*.test.js`: 992 passed, 0 failed. `npm run validate:fixtures`: 5/5 valid. Full `npm test` still reaches integration `static-server.test.js` (pre-existing hang under this environment; not introduced here).
+
 ## Next Phase: sleep·heart on Body / polish
 
