@@ -6,6 +6,7 @@ import { buildHeatmapRow } from './chart-kit/heatmap.js';
 import { packMasonry } from './chart-kit/masonry.js';
 import { buildDistributionPie } from './chart-kit/pie.js';
 import { MOOD_ORDER, rangeWindow } from './mind-model.js';
+import { openMindThreadSheet } from './mind-thread-sheet.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
 
@@ -84,6 +85,8 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConf
   }
 
   renderLaunchers(root, model);
+  renderFactorPanel(root, model);
+  renderStreak(root, model);
 
   if (!model.empty) {
     renderMoodChart(root, model.moodSeries);
@@ -127,6 +130,58 @@ function renderLaunchers(root, model) {
     const meta = button?.querySelector?.('.mind-launcher__meta');
     if (meta) meta.textContent = launcherMeta(launcher);
   }
+}
+
+function renderFactorPanel(root, model) {
+  const host = root.querySelector('[data-role="factor-bars"]')
+    ?? root.querySelector('#mind-tile-factors');
+  if (!host) return;
+  host.replaceChildren();
+  const factors = model.factorEffects ?? [];
+  const max = Math.max(0, ...factors.map(factor => Math.abs(Number(factor.effect) || 0)));
+  for (const factor of factors) {
+    const label = factor.label || factor.key;
+    const button = root.createElement('button');
+    button.type = 'button';
+    const name = root.createElement('span');
+    name.textContent = label;
+    const bar = root.createElement('span');
+    const fill = root.createElement('span');
+    fill.className = 'mind-factor-fill';
+    const pct = max > 0 ? (Math.abs(Number(factor.effect) || 0) / max) * 100 : 0;
+    fill.style.width = `${pct}%`;
+    fill.style.transform = 'scaleX(0)';
+    bar.append(fill);
+    button.append(name, bar);
+    button.addEventListener('click', () => {
+      openMindThreadSheet(root, { title: label, rows: [], continueAgent: null });
+    });
+    host.append(button);
+    void fill.getBoundingClientRect?.();
+    fill.style.transform = 'scaleX(1)';
+  }
+}
+
+function renderStreak(root, model) {
+  const consistency = model.consistency ?? {};
+  const daysWithEntry = Number(consistency.daysWithEntry) || 0;
+  const windowDays = Number(consistency.windowDays) || 30;
+  const streak = consistency.streak ?? 0;
+  applyRingTarget(root.querySelector('#mind-streak-ring'), {
+    value: daysWithEntry,
+    target: windowDays
+  }, { size: 56, strokeWidth: 6 });
+  const caption = root.querySelector('[data-mind="streak"]');
+  if (caption) {
+    caption.textContent = String(streak);
+    return;
+  }
+  const tile = root.querySelector('#mind-tile-streak');
+  if (!tile) return;
+  const label = root.createElement('p');
+  label.dataset.mind = 'streak';
+  label.textContent = String(streak);
+  tile.append(label);
 }
 
 function packMindBoard(root) {
@@ -263,6 +318,12 @@ function renderCadenceHeatmap(root, model) {
     today: model.date,
     hitDates: sessionHits
   }), 'vera');
+  paintHeatmapRow(root, '#mind-heatmap-penelope', buildHeatmapRow({
+    from: bounds.from,
+    to: bounds.to,
+    today: model.date,
+    hitDates: model.cadence?.penelope ?? diaryHits
+  }), 'penelope');
 }
 
 function paintHeatmapRow(root, selector, tiles, kind) {
