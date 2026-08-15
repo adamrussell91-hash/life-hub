@@ -2331,6 +2331,36 @@ main { max-width: 76rem; margin: 0 auto; }
 .mind-agent-button--vera {
   background: var(--vera-accent, #37598A);
 }
+.mind-launcher__meta {
+  display: block;
+  margin-top: 0.25rem;
+  font-weight: 500;
+  font-size: var(--text-xs, 0.7rem);
+  color: var(--muted);
+  opacity: 0.85;
+}
+.mind-board { position: relative; }
+.mind-tile {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 12px);
+  padding: var(--space-md, 16px);
+}
+.mind-tile__question {
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--text-xs, 0.7rem);
+  color: var(--wave);
+}
+.mind-tile__legend { color: var(--muted); margin: 0 0 12px; }
+.mind-thread-sheet[hidden] { display: none; }
+.mind-thread-sheet:not([hidden]) {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
 #mind-mood-chart [data-role="area"] { fill: color-mix(in srgb, var(--mood-bad) 18%, transparent); }
 #mind-mood-chart [data-role="line"] { fill: none; stroke: url(#mind-mood-stroke); stroke-width: 2; }
 .mind-mood-dot {

@@ -3,8 +3,11 @@ import { animateAreaReveal } from './chart-kit/animate.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { buildHeatmapRow } from './chart-kit/heatmap.js';
+import { packMasonry } from './chart-kit/masonry.js';
 import { buildDistributionPie } from './chart-kit/pie.js';
 import { MOOD_ORDER, rangeWindow } from './mind-model.js';
+
+const TILE_FALLBACK_HEIGHT = 160;
 
 const MOOD_TOKEN = {
   great: 'var(--mood-great)',
@@ -80,6 +83,8 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConf
     if (row) row.hidden = Boolean(model.empty);
   }
 
+  renderLaunchers(root, model);
+
   if (!model.empty) {
     renderMoodChart(root, model.moodSeries);
     renderMoodMix(root, model.byMood);
@@ -98,7 +103,56 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConf
     button.addEventListener('click', () => onOpenAgent?.(button.dataset.mindAgent));
   }
 
+  packMindBoard(root);
   dashboard.removeAttribute('hidden');
+}
+
+function formatDaysAgo(daysAgo) {
+  if (daysAgo == null || Number.isNaN(Number(daysAgo))) return '';
+  const days = Number(daysAgo);
+  if (days === 0) return 'today';
+  if (days === 1) return '1 day ago';
+  return `${days} days ago`;
+}
+
+function launcherMeta(launcher) {
+  if (!launcher) return '';
+  return [launcher.title, formatDaysAgo(launcher.daysAgo), launcher.outcome].filter(Boolean).join(' · ');
+}
+
+function renderLaunchers(root, model) {
+  const launchers = model.launchers ?? {};
+  for (const [id, launcher] of [['#mind-launcher-vera', launchers.vera], ['#mind-launcher-penelope', launchers.penelope]]) {
+    const button = root.querySelector(id);
+    const meta = button?.querySelector?.('.mind-launcher__meta');
+    if (meta) meta.textContent = launcherMeta(launcher);
+  }
+}
+
+function packMindBoard(root) {
+  const board = root.querySelector('#mind-board');
+  if (!board) return;
+  const width = board.getBoundingClientRect?.()?.width ?? 0;
+  if (width <= 0) return;
+  const tiles = [...(board.querySelectorAll?.('.mind-tile') ?? [])];
+  if (!tiles.length) return;
+  const gap = 16;
+  const columns = width >= 900 ? 3 : width >= 560 ? 2 : 1;
+  const columnWidth = (width - gap * (columns - 1)) / columns;
+  const items = tiles.map(tile => ({
+    id: tile.id,
+    span: Number(tile.dataset?.mindSpan) || 1,
+    height: tile.offsetHeight || ((Number(tile.dataset?.mindSpan) || 1) * TILE_FALLBACK_HEIGHT)
+  }));
+  const packed = packMasonry(items, { columns, gap, columnWidth });
+  for (const item of packed) {
+    const tile = tiles.find(node => node.id === item.id);
+    if (!tile?.style) continue;
+    tile.style.position = 'absolute';
+    tile.style.left = `${item.x}px`;
+    tile.style.top = `${item.y}px`;
+    tile.style.width = `${item.width}px`;
+  }
 }
 
 function createSvg(root, tag) {

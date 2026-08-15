@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { renderMind } from '../../js/app/render-mind.js';
 
 function el(tag = 'div') {
+  let text = '';
   const node = {
     tagName: String(tag).toUpperCase(),
     className: '',
-    textContent: '',
     hidden: false,
     id: '',
     dataset: {},
@@ -28,7 +28,7 @@ function el(tag = 'div') {
     },
     getBoundingClientRect() { return { width: 0, height: 0, top: 0, left: 0 }; },
     append(...nodes) {
-      for (const node of nodes) node.parentNode = this;
+      for (const child of nodes) child.parentNode = this;
       this.children.push(...nodes);
       const bits = this.children.map(n => n.textContent).filter(Boolean);
       if (bits.length) this.textContent = bits.join('');
@@ -60,6 +60,17 @@ function el(tag = 'div') {
       return collect(this, selector);
     }
   };
+  Object.defineProperty(node, 'textContent', {
+    get() {
+      if (this.children.length) {
+        return this.children.map(child => child.textContent).filter(Boolean).join('');
+      }
+      return text;
+    },
+    set(value) {
+      text = String(value ?? '');
+    }
+  });
   return node;
 }
 
@@ -162,6 +173,37 @@ function fakeRoot() {
   insights.id = 'mind-insights';
   const cross = el('div');
   cross.id = 'mind-cross-agent';
+  const board = el('div');
+  board.id = 'mind-board';
+  const veraMeta = el('span');
+  veraMeta.className = 'mind-launcher__meta';
+  const veraBtn = el('button');
+  veraBtn.id = 'mind-launcher-vera';
+  veraBtn.dataset.mindAgent = 'vera';
+  veraBtn.append(veraMeta);
+  const penelopeMeta = el('span');
+  penelopeMeta.className = 'mind-launcher__meta';
+  const penelopeBtn = el('button');
+  penelopeBtn.id = 'mind-launcher-penelope';
+  penelopeBtn.dataset.mindAgent = 'penelope';
+  penelopeBtn.append(penelopeMeta);
+  const threadSheet = el('div');
+  threadSheet.id = 'mind-thread-sheet';
+  threadSheet.hidden = true;
+  for (const role of ['title', 'rows', 'continue', 'close', 'scrim']) {
+    const part = el(role === 'continue' || role === 'close' ? 'button' : 'div');
+    part.dataset.role = role;
+    threadSheet.append(part);
+  }
+  const tileInsights = el('article');
+  tileInsights.id = 'mind-tile-insights';
+  const tileFactors = el('article');
+  tileFactors.id = 'mind-tile-factors';
+  const tileStreak = el('article');
+  tileStreak.id = 'mind-tile-streak';
+  const penelopeHeat = el('div');
+  penelopeHeat.id = 'mind-heatmap-penelope';
+  const agentButtons = [veraBtn, penelopeBtn];
   const hosts = {
     '#mind-dashboard': dashboard,
     '#mind-range-control': ranges,
@@ -181,18 +223,31 @@ function fakeRoot() {
     '#mind-cadence': cadence,
     '#mind-heatmap-diary': diaryHeat,
     '#mind-heatmap-vera': veraHeat,
+    '#mind-heatmap-penelope': penelopeHeat,
     '#mind-themes': themes,
     '#mind-empty': empty,
     '#mind-silence': silence,
     '#mind-sessions': sessions,
     '#mind-insights': insights,
-    '#mind-cross-agent': cross
+    '#mind-cross-agent': cross,
+    '#mind-board': board,
+    '#mind-launcher-vera': veraBtn,
+    '#mind-launcher-penelope': penelopeBtn,
+    '[data-mind-agent="vera"]': veraBtn,
+    '[data-mind-agent="penelope"]': penelopeBtn,
+    '#mind-thread-sheet': threadSheet,
+    '#mind-tile-insights': tileInsights,
+    '#mind-tile-factors': tileFactors,
+    '#mind-tile-streak': tileStreak
   };
   return {
     createElement: tag => el(tag),
     createElementNS: (_ns, tag) => el(tag),
     querySelector(selector) { return hosts[selector] ?? null; },
-    querySelectorAll() { return []; },
+    querySelectorAll(selector) {
+      if (selector === '[data-mind-agent]') return agentButtons;
+      return [];
+    },
     _energy: energy,
     _high: high,
     _silence: silence,
@@ -203,8 +258,11 @@ function fakeRoot() {
     _veraHeat: veraHeat,
     _themes: themes,
     _hero: hero,
+    _cadence: cadence,
     _dots: dots,
-    _mixLabel: mixLabel
+    _mixLabel: mixLabel,
+    _veraBtn: veraBtn,
+    _penelopeBtn: penelopeBtn
   };
 }
 
@@ -312,4 +370,30 @@ test('renderMind hides hero and cadence rows in the empty state', () => {
   const root = fakeRoot();
   renderMind(root, emptyModel({ empty: true }));
   assert.equal(root._hero.hidden, true);
+  assert.equal(root._cadence.hidden, true);
+  assert.equal(root._veraBtn.hidden, false);
+  assert.equal(root._penelopeBtn.hidden, false);
+});
+
+function modelWithLaunchers() {
+  return emptyModel({
+    empty: false,
+    launchers: {
+      vera: { title: 'The Filter', daysAgo: 2, outcome: 'mood lifted' },
+      penelope: { daysAgo: 0, outcome: 'logged' }
+    }
+  });
+}
+
+test('renderMind writes launcher context and keeps agent clicks', () => {
+  const root = fakeRoot();
+  const opens = [];
+  renderMind(root, modelWithLaunchers(), {
+    onOpenAgent: slug => opens.push(slug),
+    agentsConfig: {}
+  });
+  assert.match(root.querySelector('#mind-launcher-vera').textContent, /Filter|mood lifted|Vera/i);
+  const vera = root.querySelector('[data-mind-agent="vera"]');
+  vera.listeners.find(([type]) => type === 'click')[1]();
+  assert.deepEqual(opens, ['vera']);
 });

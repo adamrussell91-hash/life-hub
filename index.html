@@ -632,14 +632,8 @@
           <div id="bloods-sections" class="bloods-sections"></div>
         </section>
 
-        <section id="mind-dashboard" class="dashboard" aria-labelledby="mind-heading" hidden>
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Mind</p>
-              <h2 id="mind-heading">Mood and themes</h2>
-            </div>
-            <p class="metric-caption" data-mind="entry-count">—</p>
-          </div>
+        <section id="mind-dashboard" class="dashboard" aria-label="Mind" hidden>
+          <p class="metric-caption" data-mind="entry-count">—</p>
           <div id="mind-range-control" class="body-range" role="group" aria-label="Mind time range">
             <button type="button" data-mind-range="weekly" aria-pressed="false">Weekly</button>
             <button type="button" data-mind-range="monthly" class="is-active" aria-pressed="true">Monthly</button>
@@ -648,6 +642,12 @@
           <p class="metric-caption" data-mind="ambient" hidden></p>
           <p id="mind-empty" class="metric-caption" hidden>No diary entries in this range yet — talk with Penelope to log one.</p>
 
+          <div class="mind-agents">
+            <button type="button" id="mind-launcher-vera" class="mind-agent-button mind-agent-button--vera" data-mind-agent="vera">Talk with Vera<span class="mind-launcher__meta"></span></button>
+            <button type="button" id="mind-launcher-penelope" class="mind-agent-button" data-mind-agent="penelope">Talk with Penelope<span class="mind-launcher__meta"></span></button>
+          </div>
+
+          <div id="mind-board" class="mind-board">
           <div id="mind-hero" class="hero-grid">
             <article class="metric-card chart-card" aria-labelledby="mind-mood-arc-label">
               <p class="metric-label" id="mind-mood-arc-label">Mood arc</p>
@@ -716,6 +716,10 @@
                   <p class="metric-caption">Vera</p>
                   <div id="mind-heatmap-vera" class="heatmap-grid mind-heatmap-grid" aria-label="Vera session days in range"></div>
                 </div>
+                <div class="mind-heatmap-row">
+                  <p class="metric-caption">Penelope</p>
+                  <div id="mind-heatmap-penelope" class="heatmap-grid mind-heatmap-grid" aria-label="Penelope diary days in range"></div>
+                </div>
               </div>
             </article>
 
@@ -733,20 +737,27 @@
               <div id="mind-sessions"></div>
             </article>
 
-            <article class="metric-card" aria-labelledby="mind-insights-label">
+            <article id="mind-tile-insights" class="metric-card mind-tile" aria-labelledby="mind-insights-label">
               <p class="metric-label" id="mind-insights-label">Mind Insights</p>
               <div id="mind-insights" class="mind-insight-timeline"></div>
             </article>
           </div>
 
+          <article id="mind-tile-factors" class="metric-card mind-tile"></article>
+          <article id="mind-tile-streak" class="metric-card mind-tile"></article>
+
           <article class="metric-card mind-cross-agent-card" aria-labelledby="mind-cross-agent-label">
             <p class="metric-label" id="mind-cross-agent-label">Cross-Agent signals</p>
             <div id="mind-cross-agent"></div>
           </article>
+          </div>
 
-          <div class="mind-agents">
-            <button type="button" class="mind-agent-button" data-mind-agent="penelope">Talk with Penelope</button>
-            <button type="button" class="mind-agent-button mind-agent-button--vera" data-mind-agent="vera">Talk with Vera</button>
+          <div id="mind-thread-sheet" class="mind-thread-sheet" hidden>
+            <div data-role="scrim"></div>
+            <h2 data-role="title"></h2>
+            <div data-role="rows"></div>
+            <button type="button" data-role="continue" hidden></button>
+            <button type="button" data-role="close">Close</button>
           </div>
         </section>
 
