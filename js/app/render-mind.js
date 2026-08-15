@@ -906,18 +906,55 @@ function renderWaffleTile(root, model) {
   sparseCaption(root, host, cells.length, 'entries');
 }
 
+const RESURFACING_DISMISS_KEY = 'life-hub-mind-resurfacing-dismissed';
+
+function resurfacingId(resurfacing) {
+  return resurfacing.id || `${resurfacing.theme}-${resurfacing.priorDate}`;
+}
+
+function dismissedResurfacingIds() {
+  try {
+    const parsed = JSON.parse(globalThis.localStorage?.getItem(RESURFACING_DISMISS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function isResurfacingDismissed(resurfacing) {
+  if (!resurfacing) return true;
+  return dismissedResurfacingIds().includes(resurfacingId(resurfacing));
+}
+
+function dismissResurfacing(resurfacing) {
+  const next = [...new Set([...dismissedResurfacingIds(), resurfacingId(resurfacing)])];
+  try {
+    globalThis.localStorage?.setItem(RESURFACING_DISMISS_KEY, JSON.stringify(next));
+  } catch {
+    // Ignore quota / private-mode write failures.
+  }
+}
+
 function renderInsightList(root, insights, resurfacing) {
   const host = root.querySelector('#mind-insights');
   if (!host) return;
   host.replaceChildren();
-  if (resurfacing) {
+  const showResurfacing = Boolean(resurfacing) && !isResurfacingDismissed(resurfacing);
+  if (showResurfacing) {
     const card = root.createElement('article');
     card.className = 'mind-resurfacing';
-    card.textContent = `${resurfacing.theme} came up again. Last time was ${resurfacing.priorDate}: ${resurfacing.excerpt ?? ''}`;
+    const copy = root.createElement('p');
+    copy.textContent = `${resurfacing.theme} came up again. Last time was ${resurfacing.priorDate}: ${resurfacing.excerpt ?? ''}`;
+    const dismiss = root.createElement('button');
+    dismiss.type = 'button';
+    dismiss.setAttribute('data-mind-resurfacing-dismiss', '');
+    dismiss.textContent = 'Dismiss';
+    dismiss.addEventListener('click', () => dismissResurfacing(resurfacing));
+    card.append(copy, dismiss);
     host.append(card);
   }
   if (!insights?.length) {
-    if (resurfacing) return;
+    if (showResurfacing) return;
     const empty = root.createElement('p');
     empty.className = 'governance-empty';
     empty.textContent = 'No governance entries yet.';

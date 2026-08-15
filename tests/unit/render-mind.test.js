@@ -290,6 +290,7 @@ function fakeRoot() {
     '#mind-silence': silence,
     '#mind-sessions': sessions,
     '#mind-insights': insights,
+    '#mind-tile-insights': insights,
     '#mind-cross-agent': cross,
     '#mind-board': board,
     '#mind-launcher-vera': veraBtn,
@@ -297,7 +298,6 @@ function fakeRoot() {
     '[data-mind-agent="vera"]': veraBtn,
     '[data-mind-agent="penelope"]': penelopeBtn,
     '#mind-thread-sheet': threadSheet,
-    '#mind-tile-insights': tileInsights,
     '#mind-tile-factors': tileFactors,
     '#mind-tile-streak': tileStreak,
     '#mind-streak-ring': streakRing,
@@ -325,7 +325,14 @@ function fakeRoot() {
   return {
     createElement: tag => el(tag),
     createElementNS: (_ns, tag) => el(tag),
-    querySelector(selector) { return hosts[selector] ?? null; },
+    querySelector(selector) {
+      if (hosts[selector]) return hosts[selector];
+      for (const tree of [dashboard, insights, tileInsights, threadSheet]) {
+        const found = tree.querySelector?.(selector);
+        if (found) return found;
+      }
+      return null;
+    },
     querySelectorAll(selector) {
       if (selector === '[data-mind-agent]') return agentButtons;
       return [];
@@ -530,4 +537,24 @@ test('renderMind paints tension poles and keeps the tile visible', () => {
   assert.equal(tile.hidden, false);
   const circles = [...(tile.querySelectorAll?.('circle') ?? tile.children)].filter(n => String(n.tagName).toLowerCase() === 'circle');
   assert.ok(circles.length >= 2 || tile.querySelector('svg'));
+});
+
+test('resurfacing card dismisses and stays gone', () => {
+  const store = {};
+  globalThis.localStorage = {
+    getItem: k => store[k] ?? null,
+    setItem: (k, v) => { store[k] = String(v); }
+  };
+  const root = fakeRoot();
+  renderMind(root, {
+    ...emptyModel(),
+    resurfacing: { id: 'shame-loop-2026-08-10', theme: 'shame-loop', priorDate: '2026-07-01', excerpt: 'Old mention.' }
+  });
+  assert.match(root.querySelector('#mind-tile-insights').textContent, /came up again/i);
+  root.querySelector('[data-mind-resurfacing-dismiss]').listeners.find(([t]) => t === 'click')[1]();
+  renderMind(root, {
+    ...emptyModel(),
+    resurfacing: { id: 'shame-loop-2026-08-10', theme: 'shame-loop', priorDate: '2026-07-01', excerpt: 'Old mention.' }
+  });
+  assert.doesNotMatch(root.querySelector('#mind-tile-insights').textContent, /came up again/i);
 });

@@ -2821,3 +2821,7 @@ main { max-width: 76rem; margin: 0 auto; }
   background: var(--glass);
   color: var(--ink);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .mind-tile { animation: none; }
+}
