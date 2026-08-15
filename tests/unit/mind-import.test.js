@@ -5,7 +5,8 @@ import {
   sessionTypeFromNotion,
   recordFromSessionRow,
   recordFromDiaryMarkdown,
-  recordFromHistoricalMarkdown
+  recordFromHistoricalMarkdown,
+  planImport
 } from '../../js/core/mind-import.js';
 
 test('parseCsv respects quoted commas', () => {
@@ -62,4 +63,17 @@ test('recordFromHistoricalMarkdown sets session_type historical', () => {
 test('sessionTypeFromNotion maps labels', () => {
   assert.equal(sessionTypeFromNotion('Check-in'), 'check-in');
   assert.equal(sessionTypeFromNotion('Pattern Review'), 'pattern-review');
+});
+
+test('planImport skips existing ids and ignores intake filenames', () => {
+  const files = [
+    { name: 'Vera — Session Database.csv', text: 'Session Title,Date,Session Type,Primary Theme,Follow-up Themes,Framework Used,Mood at Opening,Mood at Close,Key Insight,Vera\'s Observation,Closing Question,Pattern Tags\nFilter,7 April 2026,Deep Dive,ADHD Reality,,ACT,Low,Good,Insight,Obs,Q,tag\n' },
+    { name: 'Adam — Psychological Baseline.md', text: '# Intake\nNot a record.\n' }
+  ];
+  const plan = planImport(files, { existingIds: new Set() });
+  assert.equal(plan.records.length, 1);
+  assert.equal(plan.records[0].type, 'mind_session');
+
+  const skipped = planImport(files, { existingIds: new Set([plan.records[0].id]) });
+  assert.equal(skipped.records.length, 0);
 });
