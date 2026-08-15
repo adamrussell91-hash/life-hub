@@ -149,6 +149,79 @@ export function themeNodes(entries, sessions, bounds) {
   });
 }
 
+function meanScores(scores) {
+  return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+}
+
+export function factorEffects(entries, sessions, bounds) {
+  const byDate = new Map();
+
+  for (const entry of entries ?? []) {
+    if (entry.date < bounds.from || entry.date > bounds.to) continue;
+    if (entry.mood_score == null) continue;
+    const day = byDate.get(entry.date) ?? { score: entry.mood_score, factors: new Set() };
+    day.score = entry.mood_score;
+    for (const key of uniqueThemeKeys(entry.tags)) day.factors.add(key);
+    byDate.set(entry.date, day);
+  }
+
+  for (const session of sessions ?? []) {
+    if (session.date < bounds.from || session.date > bounds.to) continue;
+    const day = byDate.get(session.date);
+    if (!day) continue;
+    for (const key of uniqueThemeKeys(sessionThemes(session))) day.factors.add(key);
+  }
+
+  const keys = new Set();
+  for (const day of byDate.values()) {
+    for (const key of day.factors) keys.add(key);
+  }
+
+  const effects = [];
+  for (const key of keys) {
+    const present = [];
+    const absent = [];
+    for (const day of byDate.values()) {
+      if (day.factors.has(key)) present.push(day.score);
+      else absent.push(day.score);
+    }
+    if (present.length < 3 || absent.length < 3) continue;
+    const effect = meanScores(present) - meanScores(absent);
+    effects.push({
+      key,
+      effect,
+      direction: effect > 0 ? 'positive' : 'negative'
+    });
+  }
+  return effects;
+}
+
+export function consistencyRing(entries, sessions, date) {
+  const from = addCalendarDays(date, -29);
+  const dates = new Set();
+  for (const entry of entries ?? []) {
+    if (entry.date < from || entry.date > date) continue;
+    dates.add(entry.date);
+  }
+  for (const session of sessions ?? []) {
+    if (session.date < from || session.date > date) continue;
+    dates.add(session.date);
+  }
+  let streak = 0;
+  let cursor = date;
+  while (dates.has(cursor)) {
+    streak += 1;
+    cursor = addCalendarDays(cursor, -1);
+  }
+  return { daysWithEntry: dates.size, windowDays: 30, streak };
+}
+
+export function cadenceHits(entries, sessions) {
+  const diary = [...new Set((entries ?? []).map(entry => entry.date).filter(isCalendarDate))].sort();
+  const vera = [...new Set((sessions ?? []).map(session => session.date).filter(isCalendarDate))].sort();
+  return { diary, vera, penelope: [...diary] };
+}
+
 export function entriesByEnergy(entries, bounds) {
   const counts = Object.fromEntries(ENERGY_ORDER.map(level => [level, 0]));
   for (const entry of entries) {
