@@ -68,6 +68,87 @@ export function sessionThemes(session) {
   return session?.theme ? [session.theme] : [];
 }
 
+function normalizeThemeKey(value) {
+  return String(value).trim().toLowerCase();
+}
+
+function uniqueThemeKeys(values) {
+  const keys = [];
+  const seen = new Set();
+  for (const value of values ?? []) {
+    const key = normalizeThemeKey(value);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    keys.push(key);
+  }
+  return keys;
+}
+
+export function themeCooccurrence(entries, sessions, bounds) {
+  const counts = new Map();
+
+  function addPairs(themes) {
+    const keys = uniqueThemeKeys(themes);
+    for (let i = 0; i < keys.length; i += 1) {
+      for (let j = i + 1; j < keys.length; j += 1) {
+        const themeA = keys[i] < keys[j] ? keys[i] : keys[j];
+        const themeB = keys[i] < keys[j] ? keys[j] : keys[i];
+        const pairKey = `${themeA}\0${themeB}`;
+        const pair = counts.get(pairKey) ?? { themeA, themeB, count: 0 };
+        pair.count += 1;
+        counts.set(pairKey, pair);
+      }
+    }
+  }
+
+  for (const entry of entries ?? []) {
+    if (entry.date < bounds.from || entry.date > bounds.to) continue;
+    addPairs(entry.tags);
+  }
+  for (const session of sessions ?? []) {
+    if (session.date < bounds.from || session.date > bounds.to) continue;
+    addPairs(sessionThemes(session));
+  }
+
+  return [...counts.values()];
+}
+
+export function themeNodes(entries, sessions, bounds) {
+  const counts = new Map();
+  const themeDates = new Map();
+  const moodByDate = new Map();
+
+  function addThemes(themes, date) {
+    for (const key of uniqueThemeKeys(themes)) {
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      const dates = themeDates.get(key) ?? new Set();
+      dates.add(date);
+      themeDates.set(key, dates);
+    }
+  }
+
+  for (const entry of entries ?? []) {
+    if (entry.date < bounds.from || entry.date > bounds.to) continue;
+    if (entry.mood_score != null) moodByDate.set(entry.date, entry.mood_score);
+    addThemes(entry.tags, entry.date);
+  }
+  for (const session of sessions ?? []) {
+    if (session.date < bounds.from || session.date > bounds.to) continue;
+    addThemes(sessionThemes(session), session.date);
+  }
+
+  return [...counts.entries()].map(([key, count]) => {
+    const scores = [...(themeDates.get(key) ?? [])]
+      .map(date => moodByDate.get(date))
+      .filter(score => score != null);
+    return {
+      key,
+      count,
+      meanMood: scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null
+    };
+  });
+}
+
 export function entriesByEnergy(entries, bounds) {
   const counts = Object.fromEntries(ENERGY_ORDER.map(level => [level, 0]));
   for (const entry of entries) {
