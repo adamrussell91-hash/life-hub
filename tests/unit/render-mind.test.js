@@ -201,6 +201,14 @@ function fakeRoot() {
   tileFactors.id = 'mind-tile-factors';
   const tileStreak = el('article');
   tileStreak.id = 'mind-tile-streak';
+  const streakRing = el('svg');
+  streakRing.id = 'mind-streak-ring';
+  const streakTrack = el('circle');
+  streakTrack.dataset.role = 'track';
+  const streakFill = el('circle');
+  streakFill.dataset.role = 'fill';
+  streakRing.append(streakTrack, streakFill);
+  tileStreak.append(streakRing);
   const penelopeHeat = el('div');
   penelopeHeat.id = 'mind-heatmap-penelope';
   const agentButtons = [veraBtn, penelopeBtn];
@@ -238,7 +246,8 @@ function fakeRoot() {
     '#mind-thread-sheet': threadSheet,
     '#mind-tile-insights': tileInsights,
     '#mind-tile-factors': tileFactors,
-    '#mind-tile-streak': tileStreak
+    '#mind-tile-streak': tileStreak,
+    '#mind-streak-ring': streakRing
   };
   return {
     createElement: tag => el(tag),
@@ -396,4 +405,16 @@ test('renderMind writes launcher context and keeps agent clicks', () => {
   const vera = root.querySelector('[data-mind-agent="vera"]');
   vera.listeners.find(([type]) => type === 'click')[1]();
   assert.deepEqual(opens, ['vera']);
+});
+
+test('renderMind paints factor bars and streak label', () => {
+  const root = fakeRoot();
+  renderMind(root, {
+    ...emptyModel(),
+    empty: false,
+    factorEffects: [{ key: 'walk', label: 'walk', effect: 1.5, direction: 'positive' }],
+    consistency: { daysWithEntry: 10, windowDays: 30, streak: 3 }
+  });
+  assert.match(root.querySelector('#mind-tile-factors').textContent, /walk/);
+  assert.match(root.querySelector('#mind-tile-streak').textContent, /3/);
 });

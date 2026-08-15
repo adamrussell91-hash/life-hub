@@ -743,8 +743,20 @@
             </article>
           </div>
 
-          <article id="mind-tile-factors" class="metric-card mind-tile"></article>
-          <article id="mind-tile-streak" class="metric-card mind-tile"></article>
+          <article id="mind-tile-factors" class="metric-card mind-tile">
+            <p class="mind-tile__question">What’s moving my mood?</p>
+            <p class="mind-tile__legend">Bar = mean mood with this minus without. Need 3 days each side.</p>
+            <div data-role="factor-bars"></div>
+          </article>
+          <article id="mind-tile-streak" class="metric-card mind-tile">
+            <p class="mind-tile__question">Am I showing up?</p>
+            <p class="mind-tile__legend">Ring = days with a diary or session in the last 30.</p>
+            <svg id="mind-streak-ring" class="metric-ring" viewBox="0 0 56 56" role="img" aria-label="Days with a diary or session in the last 30">
+              <circle data-role="track" class="metric-ring-track" fill="none"></circle>
+              <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
+            </svg>
+            <p class="metric-caption" data-mind="streak">—</p>
+          </article>
 
           <article class="metric-card mind-cross-agent-card" aria-labelledby="mind-cross-agent-label">
             <p class="metric-label" id="mind-cross-agent-label">Cross-Agent signals</p>

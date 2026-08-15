@@ -2354,6 +2354,11 @@ main { max-width: 76rem; margin: 0 auto; }
   color: var(--wave);
 }
 .mind-tile__legend { color: var(--muted); margin: 0 0 12px; }
+.mind-factor-fill {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 700ms cubic-bezier(.2,.8,.2,1);
+}
 .mind-thread-sheet[hidden] { display: none; }
 .mind-thread-sheet:not([hidden]) {
   position: fixed;
