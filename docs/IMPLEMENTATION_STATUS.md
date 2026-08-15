@@ -415,8 +415,8 @@ Verified on 2026-08-15 (local only — do not push unless asked). Spec: `docs/su
 - Mind tab is a Clinical Glass analysis board: Vera/Penelope launchers at the top, JS masonry tiles, overlay thread sheet (Esc / scrim / continue).
 - Derived series (co-occurrence, factors, streak, transitions, lexical, butterfly, waffle, tension) plus stream / Sankey / bump / chord / radial year / horizon charts. Vendored d3 layouts stay offline; no runtime CDN.
 - Vera/Penelope protocols persist richer `mind_session` / diary fields; digest stays metadata-only (no diary prose).
-- Notion export mapper + `npm run import:mind` wrote 114 diary/session records into `data/mind` (intake skipped) and one historical Mind Insight into `data/governance/governance-log.md`. All 114 parse as valid event documents.
-- `node --test tests/unit/*.test.js`: 992 passed, 0 failed. `npm run validate:fixtures`: 5/5 valid. Full `npm test` still reaches integration `static-server.test.js` (pre-existing hang under this environment; not introduced here).
+- Notion mapper + `npm run import:mind`. This job imported only to `/tmp/life-hub-mind-import-preview`: 119 scanned, 114 written (88 diary, 26 mind_session), 1 Mind Insight, intake skipped. Do not push. Imported diary/session files were not added by this job.
+- This run: Mind-related unit tests 181 passed, 0 failed. `node --test tests/unit/*.test.js`: 992 passed, 0 failed. Integration except `static-server.test.js`: 125 passed, 0 failed. Full `npm test` hung on `tests/integration/static-server.test.js` (port contention from concurrent test processes; not a Mind regression). `npm run validate:fixtures`: 5/5 valid. Unrelated dirty WIP (nutrition/bloods/headings) was not rewritten; those unit files passed 30/30 when run alone.
 
 ## Next Phase: sleep·heart on Body / polish
 
