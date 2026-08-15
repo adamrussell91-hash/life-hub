@@ -19,7 +19,15 @@ import {
   daysSinceLastMindSession,
   silenceFlag,
   mindInsights,
-  mindCrossAgentLines
+  mindCrossAgentLines,
+  moodTransitions,
+  themeWeekly,
+  themeRanks,
+  lexicalSeries,
+  butterfly,
+  resurfacing,
+  waffleEntries,
+  parseInsightExtras
 } from '../../js/app/mind-model.js';
 
 test('buildMindModel builds mood series, by-mood counts, and themes', () => {
@@ -354,4 +362,90 @@ test('ambient omits Mood scores held when there are fewer than two mood points',
     range: 'monthly'
   });
   assert.doesNotMatch(model.ambient, /Mood scores held/);
+});
+
+test('moodTransitions counts consecutive primary moods', () => {
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-01', mood: 'low' }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-02', mood: 'good' }, path: 'b' },
+    { record: { type: 'diary', date: '2026-08-03', mood: 'good' }, path: 'c' }
+  ]);
+  const flows = moodTransitions(entries, rangeWindow('2026-08-10', 'monthly'));
+  assert.equal(flows.find(f => f.from === 'low' && f.to === 'good').count, 1);
+  assert.equal(flows.find(f => f.from === 'good' && f.to === 'good').count, 1);
+});
+
+test('themeWeekly and themeRanks bucket by Sydney week start', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-03', tags: ['work', 'sleep'] }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-10', tags: ['work'] }, path: 'b' }
+  ]);
+  const weekly = themeWeekly(entries, sessionEntries([]), bounds, { limit: 8 });
+  assert.ok(weekly.themes.includes('work'));
+  const ranks = themeRanks(weekly);
+  assert.equal(ranks[0].rankByTheme.work, 1);
+});
+
+test('lexicalSeries counts watchlist terms per week', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const entries = diaryEntries([{
+    record: { type: 'diary', date: '2026-08-03' },
+    body: 'I should be fine. I should rest.',
+    path: 'a'
+  }]);
+  const series = lexicalSeries(entries, sessionEntries([]), bounds, ['should', 'flake']);
+  const should = series.find(s => s.term === 'should');
+  assert.equal(should.points.reduce((n, p) => n + p.count, 0), 2);
+  assert.equal(series.find(s => s.term === 'flake').points.reduce((n, p) => n + p.count, 0), 0);
+});
+
+test('butterfly compares vera session themes to diary tags', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const rows = butterfly(
+    diaryEntries([{ record: { type: 'diary', date: '2026-08-01', tags: ['work'], mood_score: 6 }, path: 'd' }]),
+    sessionEntries([{ record: { type: 'mind_session', date: '2026-08-02', themes: ['work'], source_agent: 'vera', mood_at_open: 'low', mood_at_close: 'good' }, path: 's' }]),
+    bounds
+  );
+  const work = rows.find(r => r.theme === 'work');
+  assert.equal(work.veraCount, 1);
+  assert.equal(work.penelopeCount, 1);
+  assert.equal(work.veraDelta, 2);
+});
+
+test('resurfacing finds a theme older than seven days', () => {
+  const card = resurfacing(
+    diaryEntries([
+      { record: { type: 'diary', date: '2026-07-01', tags: ['shame-loop'] }, body: 'Old mention.', path: 'old' },
+      { record: { type: 'diary', date: '2026-08-10', tags: ['shame-loop'] }, body: 'Again today.', path: 'new' }
+    ]),
+    sessionEntries([]),
+    '2026-08-10'
+  );
+  assert.equal(card.theme, 'shame-loop');
+  assert.equal(card.priorDate, '2026-07-01');
+  assert.match(card.excerpt, /Old mention/);
+});
+
+test('waffleEntries one cell per diary or session in range', () => {
+  const bounds = rangeWindow('2026-08-10', 'weekly');
+  const cells = waffleEntries(
+    diaryEntries([{ record: { type: 'diary', date: '2026-08-09', mood: 'low' }, path: 'd' }]),
+    sessionEntries([{ record: { type: 'mind_session', date: '2026-08-10', theme: 'x', mood_at_close: 'good' }, path: 's' }]),
+    bounds
+  );
+  assert.equal(cells.length, 2);
+});
+
+test('parseInsightExtras reads tension and source session from body', () => {
+  const extras = parseInsightExtras(`**Source session:** data/mind/2026/04/2026-04-07-the-filter.md
+**Tension:** stated rule — actual behaviour
+**Stated:** 0.2
+**Revealed:** 0.75
+The rest of the insight.`);
+  assert.equal(extras.sourceSession, 'data/mind/2026/04/2026-04-07-the-filter.md');
+  assert.equal(extras.tension.poleA, 'stated rule');
+  assert.equal(extras.tension.poleB, 'actual behaviour');
+  assert.equal(extras.tension.stated, 0.2);
+  assert.equal(extras.tension.revealed, 0.75);
 });

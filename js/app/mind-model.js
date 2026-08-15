@@ -1,7 +1,7 @@
 import { downsampleWeekly } from '../core/trends.js';
 import { extractCrossAgentCoordination } from '../core/constraints.js';
 import { parseGovernanceEntries } from '../core/governance-log.js';
-import { addCalendarDays, daysBetween, isCalendarDate } from '../core/time.js';
+import { addCalendarDays, daysBetween, getSydneyWeekStart, isCalendarDate } from '../core/time.js';
 
 export const MIND_RANGES = ['weekly', 'monthly', 'six_month'];
 export const DEFAULT_MIND_RANGE = 'monthly';
@@ -14,6 +14,13 @@ const RANGE_DAYS = {
 
 export const MOOD_ORDER = ['great', 'good', 'neutral', 'low', 'bad'];
 export const ENERGY_ORDER = ['high', 'medium', 'low'];
+
+export function moodDelta(open, close) {
+  const openIndex = MOOD_ORDER.indexOf(open);
+  const closeIndex = MOOD_ORDER.indexOf(close);
+  if (openIndex < 0 || closeIndex < 0) return null;
+  return openIndex - closeIndex;
+}
 
 export function rangeWindow(date, range) {
   if (!isCalendarDate(date)) throw new TypeError(`Invalid calendar date: ${date}`);
@@ -321,6 +328,235 @@ export function recurringThemes(entries, bounds, { limit = 8 } = {}) {
       label: key,
       value
     }));
+}
+
+function inBounds(item, bounds) {
+  return item.date >= bounds.from && item.date <= bounds.to;
+}
+
+function weeksInBounds(bounds) {
+  const start = getSydneyWeekStart(bounds.from);
+  const end = getSydneyWeekStart(bounds.to);
+  const weeks = [];
+  for (let week = start; week <= end; week = addCalendarDays(week, 7)) weeks.push(week);
+  return weeks;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function parseInsightExtras(body) {
+  const text = String(body ?? '');
+  const extras = {};
+  const source = /^\*\*Source session:\*\*\s*(.+)$/m.exec(text);
+  if (source) extras.sourceSession = source[1].trim();
+
+  const tensionLine = /^\*\*Tension:\*\*\s*(.+?)\s+[—–-]\s+(.+)$/m.exec(text);
+  const statedLine = /^\*\*Stated:\*\*\s*([+-]?(?:\d+\.?\d*|\.\d+))\s*$/m.exec(text);
+  const revealedLine = /^\*\*Revealed:\*\*\s*([+-]?(?:\d+\.?\d*|\.\d+))\s*$/m.exec(text);
+  const stated = statedLine ? Number(statedLine[1]) : NaN;
+  const revealed = revealedLine ? Number(revealedLine[1]) : NaN;
+  if (tensionLine && Number.isFinite(stated) && Number.isFinite(revealed)) {
+    extras.tension = {
+      poleA: tensionLine[1].trim(),
+      poleB: tensionLine[2].trim(),
+      stated,
+      revealed
+    };
+  }
+  return extras;
+}
+
+export function moodTransitions(entries, bounds) {
+  const moods = (entries ?? [])
+    .filter(entry => inBounds(entry, bounds) && entry.mood)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const counts = new Map();
+  for (let i = 1; i < moods.length; i += 1) {
+    const from = moods[i - 1].mood;
+    const to = moods[i].mood;
+    const key = `${from}\0${to}`;
+    const flow = counts.get(key) ?? { from, to, count: 0 };
+    flow.count += 1;
+    counts.set(key, flow);
+  }
+  return [...counts.values()];
+}
+
+export function themeWeekly(entries, sessions, bounds, { limit = 8 } = {}) {
+  const weeks = weeksInBounds(bounds);
+  const weekIndex = new Map(weeks.map((week, index) => [week, index]));
+  const totals = new Map();
+  const byThemeWeek = new Map();
+
+  function addTheme(theme, date) {
+    const key = normalizeThemeKey(theme);
+    if (!key) return;
+    const index = weekIndex.get(getSydneyWeekStart(date));
+    if (index == null) return;
+    totals.set(key, (totals.get(key) ?? 0) + 1);
+    let values = byThemeWeek.get(key);
+    if (!values) {
+      values = weeks.map(() => 0);
+      byThemeWeek.set(key, values);
+    }
+    values[index] += 1;
+  }
+
+  for (const entry of entries ?? []) {
+    if (!inBounds(entry, bounds)) continue;
+    for (const tag of entry.tags ?? []) addTheme(tag, entry.date);
+  }
+  for (const session of sessions ?? []) {
+    if (!inBounds(session, bounds)) continue;
+    for (const theme of sessionThemes(session)) addTheme(theme, session.date);
+  }
+
+  const ranked = [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const top = ranked.slice(0, limit).map(([key]) => key);
+  const rest = ranked.slice(limit);
+  const themes = [...top];
+  const series = top.map(key => ({ key, values: byThemeWeek.get(key) }));
+  if (rest.length) {
+    themes.push('other');
+    series.push({
+      key: 'other',
+      values: weeks.map((_, index) => rest.reduce((sum, [key]) => sum + (byThemeWeek.get(key)?.[index] ?? 0), 0))
+    });
+  }
+  return { weeks, themes, series };
+}
+
+export function themeRanks(weekly) {
+  const weeks = weekly?.weeks ?? [];
+  const themes = weekly?.themes ?? [];
+  const valuesByTheme = new Map((weekly?.series ?? []).map(item => [item.key, item.values]));
+  return weeks.map((week, index) => {
+    const ordered = themes
+      .map(theme => ({ theme, count: valuesByTheme.get(theme)?.[index] ?? 0 }))
+      .sort((a, b) => b.count - a.count || a.theme.localeCompare(b.theme));
+    const rankByTheme = {};
+    let rank = 1;
+    for (let i = 0; i < ordered.length; i += 1) {
+      if (i > 0 && ordered[i].count < ordered[i - 1].count) rank = i + 1;
+      rankByTheme[ordered[i].theme] = rank;
+    }
+    return { week, rankByTheme };
+  });
+}
+
+export function lexicalSeries(entries, sessions, bounds, watchlist) {
+  const weeks = weeksInBounds(bounds);
+  const weekIndex = new Map(weeks.map((week, index) => [week, index]));
+
+  function countTerm(text, term) {
+    if (!text) return 0;
+    const matches = String(text).match(new RegExp(`\\b${escapeRegExp(term)}\\b`, 'gi'));
+    return matches?.length ?? 0;
+  }
+
+  return (watchlist ?? []).map(term => {
+    const points = weeks.map(date => ({ date, count: 0 }));
+    function addText(text, date) {
+      if (date < bounds.from || date > bounds.to) return;
+      const index = weekIndex.get(getSydneyWeekStart(date));
+      if (index == null) return;
+      points[index].count += countTerm(text, term);
+    }
+    for (const entry of entries ?? []) addText(entry.body, entry.date);
+    for (const session of sessions ?? []) {
+      addText(
+        [session.insight, session.observation, session.closingQuestion, session.title].filter(Boolean).join('\n'),
+        session.date
+      );
+    }
+    return { term, points };
+  });
+}
+
+export function butterfly(entries, sessions, bounds) {
+  const byTheme = new Map();
+
+  function rowFor(theme) {
+    const key = normalizeThemeKey(theme);
+    if (!key) return null;
+    let row = byTheme.get(key);
+    if (!row) {
+      row = { theme: key, veraCount: 0, penelopeCount: 0, deltas: [] };
+      byTheme.set(key, row);
+    }
+    return row;
+  }
+
+  for (const entry of entries ?? []) {
+    if (!inBounds(entry, bounds)) continue;
+    for (const tag of uniqueThemeKeys(entry.tags)) {
+      const row = rowFor(tag);
+      if (row) row.penelopeCount += 1;
+    }
+  }
+  for (const session of sessions ?? []) {
+    if (!inBounds(session, bounds)) continue;
+    const delta = moodDelta(session.moodAtOpen, session.moodAtClose);
+    for (const theme of uniqueThemeKeys(sessionThemes(session))) {
+      const row = rowFor(theme);
+      if (!row) continue;
+      row.veraCount += 1;
+      if (delta != null) row.deltas.push(delta);
+    }
+  }
+
+  return [...byTheme.values()].map(({ theme, veraCount, penelopeCount, deltas }) => ({
+    theme,
+    veraCount,
+    penelopeCount,
+    veraDelta: deltas.length ? deltas.reduce((sum, value) => sum + value, 0) / deltas.length : null
+  }));
+}
+
+export function resurfacing(entries, sessions, date) {
+  const items = [];
+  for (const entry of entries ?? []) {
+    if (entry.date > date) continue;
+    items.push({ date: entry.date, themes: uniqueThemeKeys(entry.tags), excerpt: entry.body ?? '' });
+  }
+  for (const session of sessions ?? []) {
+    if (session.date > date) continue;
+    items.push({
+      date: session.date,
+      themes: uniqueThemeKeys(sessionThemes(session)),
+      excerpt: session.insight || session.observation || ''
+    });
+  }
+  if (!items.length) return null;
+  items.sort((a, b) => a.date.localeCompare(b.date));
+  const latestDate = items.at(-1).date;
+  const latestThemes = uniqueThemeKeys(items.filter(item => item.date === latestDate).flatMap(item => item.themes));
+
+  let card = null;
+  for (const theme of latestThemes) {
+    const priors = items.filter(item => item.themes.includes(theme) && daysBetween(item.date, latestDate) > 7);
+    if (!priors.length) continue;
+    const prior = priors.at(-1);
+    if (!card || prior.date > card.priorDate) {
+      card = { theme, priorDate: prior.date, excerpt: prior.excerpt };
+    }
+  }
+  return card;
+}
+
+export function waffleEntries(entries, sessions, bounds) {
+  const cells = [];
+  for (const entry of entries ?? []) {
+    if (!inBounds(entry, bounds)) continue;
+    cells.push({ date: entry.date, mood: entry.mood, kind: 'diary' });
+  }
+  for (const session of sessions ?? []) {
+    if (!inBounds(session, bounds)) continue;
+    cells.push({ date: session.date, mood: session.moodAtClose ?? session.moodAtOpen ?? null, kind: 'session' });
+  }
+  return cells.sort((a, b) => a.date.localeCompare(b.date) || a.kind.localeCompare(b.kind));
 }
 
 export function buildMindModel({ events, date, range = DEFAULT_MIND_RANGE, governanceLogMarkdown, centralNodeMarkdown }) {
