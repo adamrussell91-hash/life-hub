@@ -10,6 +10,8 @@ import {
   rangeWindow,
   sessionEntries,
   sessionThemes,
+  themeCooccurrence,
+  themeNodes,
   daysSinceLastDiary,
   daysSinceLastMindSession,
   silenceFlag,
@@ -124,6 +126,25 @@ test('sessionThemes falls back to singular theme', () => {
     path: 's'
   }]);
   assert.deepEqual(sessionThemes(sessions[0]), ['Weekend']);
+});
+
+test('themeCooccurrence counts unordered pairs and nodes keep mean mood', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-01', mood_score: 4, tags: ['work', 'sleep'] }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-02', mood_score: 8, tags: ['work', 'sleep'] }, path: 'b' },
+    { record: { type: 'diary', date: '2026-08-03', mood_score: 6, tags: ['work'] }, path: 'c' }
+  ]);
+  const sessions = sessionEntries([
+    { record: { type: 'mind_session', date: '2026-08-04', themes: ['work', 'shame-loop'] }, path: 's' }
+  ]);
+  const pairs = themeCooccurrence(entries, sessions, bounds);
+  const workSleep = pairs.find(p => p.themeA === 'sleep' && p.themeB === 'work');
+  assert.equal(workSleep.count, 2);
+  const nodes = themeNodes(entries, sessions, bounds);
+  const work = nodes.find(n => n.key === 'work');
+  assert.equal(work.count, 4);
+  assert.equal(work.meanMood, 6);
 });
 
 test('diaryEntries includes body and sourceAgent', () => {
