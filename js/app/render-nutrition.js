@@ -3,6 +3,7 @@ import { buildAreaLine } from './chart-kit/area-line.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { buildMealProteinPie } from './chart-kit/pie.js';
 import { buildRingTarget } from './chart-kit/ring.js';
+import { formatDisplayDate } from '../core/time.js';
 
 const setText = (root, selector, value) => {
   const element = root.querySelector(selector);
@@ -286,7 +287,7 @@ function renderHeatmap(root, month) {
     tile.dataset.pct = String(pct);
     tile.dataset.hit = String(day.hitProtein);
     tile.style?.setProperty?.('--protein-pct', String(pct));
-    tile.title = `${day.date}: ${day.protein_g}g / ${day.proteinTarget}g`;
+    tile.title = `${formatDisplayDate(day.date)}: ${day.protein_g}g / ${day.proteinTarget}g`;
     tile.textContent = day.protein_g > 0 ? String(Math.round(day.protein_g)) : '';
     grid.append(tile);
   }

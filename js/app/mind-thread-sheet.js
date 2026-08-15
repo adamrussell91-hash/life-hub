@@ -1,3 +1,5 @@
+import { formatDisplayDate } from '../core/time.js';
+
 const AGENT_LABEL = {
   vera: 'Vera',
   penelope: 'Penelope'
@@ -5,6 +7,25 @@ const AGENT_LABEL = {
 
 function sheetOf(root) {
   return root?.querySelector?.('#mind-thread-sheet') ?? null;
+}
+
+function hostTile(anchor) {
+  if (!anchor) return null;
+  if (typeof anchor.closest === 'function') {
+    return anchor.closest('.mind-tile') || anchor.closest('.metric-card') || null;
+  }
+  let node = anchor;
+  while (node) {
+    const classes = String(node.className || '').split(/\s+/);
+    if (classes.includes('mind-tile') || classes.includes('metric-card')) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+
+function releaseTile(sheet) {
+  sheet._tile?.classList?.remove?.('mind-tile--thread-open');
+  sheet._tile = null;
 }
 
 function bindOnce(root, sheet) {
@@ -23,13 +44,24 @@ function bindOnce(root, sheet) {
   });
 }
 
-export function openMindThreadSheet(root, { title, rows, continueAgent, onContinue, onClose } = {}) {
+export function openMindThreadSheet(root, { title, rows, continueAgent, onContinue, onClose, anchor } = {}) {
   const sheet = sheetOf(root);
   if (!sheet) return;
+  if (!sheet._home) sheet._home = sheet.parentNode ?? root;
   sheet.hidden = false;
   sheet._onContinue = onContinue;
   sheet._onClose = onClose;
   sheet._continueAgent = continueAgent ?? null;
+
+  releaseTile(sheet);
+  const tile = hostTile(anchor);
+  if (tile) {
+    tile.classList?.add?.('mind-tile--thread-open');
+    sheet._tile = tile;
+    tile.append(sheet);
+  } else {
+    sheet._home?.append?.(sheet);
+  }
 
   const titleEl = sheet.querySelector('[data-role="title"]');
   if (titleEl) titleEl.textContent = title ?? '';
@@ -38,7 +70,7 @@ export function openMindThreadSheet(root, { title, rows, continueAgent, onContin
   if (host) {
     const nodes = (rows ?? []).map(row => {
       const item = root.createElement('article');
-      item.textContent = [row.date, row.title, row.excerpt].filter(Boolean).join(' ');
+      item.textContent = [formatDisplayDate(row.date), row.title, row.excerpt].filter(Boolean).join(' ');
       return item;
     });
     host.replaceChildren(...nodes);
@@ -60,6 +92,8 @@ export function openMindThreadSheet(root, { title, rows, continueAgent, onContin
 export function closeMindThreadSheet(root) {
   const sheet = sheetOf(root);
   if (!sheet) return;
+  releaseTile(sheet);
+  sheet._home?.append?.(sheet);
   sheet.hidden = true;
   sheet._onClose?.();
 }

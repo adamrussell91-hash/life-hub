@@ -135,4 +135,40 @@ test('tape labels live in side rails beside the diagram, not over the image', ()
   assert.ok(left.children.some(child => child.dataset.site === 'neck'));
   assert.ok(left.children.some(child => child.dataset.site === 'chest'));
   assert.ok(right.children.some(child => child.dataset.site === 'shoulders'));
+  const historyDate = findByClass(tape, 'body-tape-history__date');
+  assert.equal(historyDate?.textContent, '01/08/26');
+});
+
+test('a quiet body rerender reuses the tape diagram image node', () => {
+  const dashboard = el();
+  const host = el();
+  const ranges = el();
+  ranges.querySelectorAll = () => [];
+  const root = {
+    createElement: () => el(),
+    querySelector(selector) {
+      if (selector === '#body-dashboard') return dashboard;
+      if (selector === '#body-sections') return host;
+      if (selector === '#body-range-control') return ranges;
+      return null;
+    }
+  };
+  const model = {
+    range: 'six_month',
+    scale: emptySection('scale', 'Scale'),
+    composition: emptySection('composition', 'Composition'),
+    tape: {
+      id: 'tape',
+      title: 'Tape',
+      metrics: [tapeMetric('neck', 'Neck')]
+    }
+  };
+
+  renderBody(root, model);
+  const firstImg = findByClass(host, 'body-figure__img');
+  assert.ok(firstImg);
+
+  renderBody(root, model, { quiet: true });
+  const secondImg = findByClass(host, 'body-figure__img');
+  assert.equal(secondImg, firstImg);
 });

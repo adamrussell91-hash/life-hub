@@ -1,6 +1,7 @@
 import { formatExerciseSets, formatExerciseTitle, humanizeFieldLabel } from './format-exercise.js';
 import { applyAgentAvatarToBubble } from './render-agent-picker.js';
 import { showEphemeralMessage } from './ephemeral-message.js';
+import { formatDisplayDate } from '../core/time.js';
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'pain_flags', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
 const UNREAD_SELECTOR = '.floating-chat-button, [data-section="chat"]';
@@ -119,7 +120,7 @@ export function appendRecordProposal(root, { path, record, notes, warnings }) {
   card.dataset.path = path;
 
   const summary = root.createElement('p');
-  summary.textContent = `Proposed ${record.type} record for ${record.date}`;
+  summary.textContent = `Proposed ${record.type} record for ${formatDisplayDate(record.date)}`;
   card.append(summary);
 
   const fields = root.createElement('dl');

@@ -1222,6 +1222,45 @@ test('a later background refresh does not replace Home with a smaller week snaps
   assert.equal(state.calls.renders, 2);
 });
 
+test('a later history slice does not hide an open overlay chat panel', async () => {
+  let release;
+  const later = new Promise(resolve => { release = resolve; });
+  const week = liveData({
+    changed: true,
+    events: [{ record: { date: '2026-08-01', type: 'meal' } }]
+  });
+  const full = liveData({
+    changed: true,
+    events: [
+      { record: { date: '2026-08-01', type: 'meal' } },
+      { record: { date: '2026-07-01', type: 'meal' } }
+    ]
+  });
+  const state = harness({
+    loadLiveImpl: async ({ onPartial }) => {
+      await onPartial(week);
+      await later;
+      await onPartial(full);
+      return full;
+    }
+  });
+
+  const started = state.controller.start();
+  await new Promise(resolve => setImmediate(resolve));
+  state.root.nutritionNavigation.dispatchEvent(new Event('click'));
+  state.root.querySelector('#nutrition-chat-button').dispatchEvent(new Event('click'));
+  const chat = state.root.querySelector('#chat-view');
+  chat.hidden = false;
+
+  release();
+  await started;
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(state.chatPanelCalls.opens.length, 1);
+  assert.equal(chat.hidden, false);
+});
+
 test('later slices re-render Home even when every window reports unchanged', async () => {
   let release;
   const later = new Promise(resolve => { release = resolve; });

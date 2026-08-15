@@ -1,4 +1,4 @@
-import { addCalendarDays, daysBetween, getSydneyWeekStart, isCalendarDate } from './time.js';
+import { addCalendarDays, daysBetween, formatDisplayDate, getSydneyWeekStart, isCalendarDate } from './time.js';
 
 const MAX_WEEKLY_POINTS = 120;
 function assertSemanticDateKey(key) {
@@ -48,10 +48,7 @@ export function getTrend(current, previous, config) {
 
   const previousValue = assertFiniteNumber(previous[config.field], `previous ${config.field}`);
   const old = daysBetween(previous.date, current.date) > 60;
-  const dateLabel = new Intl.DateTimeFormat('en-AU', {
-    day: 'numeric', month: 'short', timeZone: 'UTC'
-  }).format(new Date(`${previous.date}T00:00:00Z`));
-  const suffix = old ? ` since ${dateLabel}` : '';
+  const suffix = old ? ` since ${formatDisplayDate(previous.date)}` : '';
 
   return resultFor(currentValue - previousValue, config, suffix);
 }

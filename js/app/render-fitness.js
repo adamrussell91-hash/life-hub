@@ -2,6 +2,7 @@ import { animateAreaReveal } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
 import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
+import { formatDisplayDate } from '../core/time.js';
 
 const DAY_TYPE_LABELS = {
   movement: 'Movement day',
@@ -52,7 +53,7 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
       const el = root.createElement('span');
       el.dataset.hit = String(day.completed);
       if (day.isToday) el.dataset.today = 'true';
-      el.title = day.date;
+      el.title = formatDisplayDate(day.date);
       dots.append(el);
     }
   }
@@ -143,7 +144,7 @@ export function renderTemplateRail(root, templatesState, { libraryByName, onSele
 
     const meta = root.createElement('span');
     meta.className = 'fitness-template-card__meta';
-    meta.textContent = template.source_session_date ? `Last ${template.source_session_date}` : 'No actuals yet';
+    meta.textContent = template.source_session_date ? `Last ${formatDisplayDate(template.source_session_date)}` : 'No actuals yet';
     card.append(meta);
 
     card.addEventListener('click', () => onSelectTemplate?.(template));
@@ -379,7 +380,7 @@ function renderHeatmap(root, month) {
     const tile = root.createElement('span');
     tile.className = 'heatmap-tile';
     tile.dataset.hit = String(day.completed);
-    tile.title = day.date;
+    tile.title = formatDisplayDate(day.date);
     grid.append(tile);
   }
 }

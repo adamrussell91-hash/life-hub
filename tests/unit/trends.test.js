@@ -19,7 +19,7 @@ test('old comparison includes its date and correct good direction', () => {
   assert.equal(trend.direction, 'down');
   assert.equal(trend.colour, 'green');
   assert.equal(trend.intensity, 'strong');
-  assert.match(trend.label, /−1.2 kg since 21 May/);
+  assert.match(trend.label, /−1.2 kg since 21\/05\/26/);
   assert.ok(Math.abs(trend.delta - (-1.2)) < 1e-12);
 });
 

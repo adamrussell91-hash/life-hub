@@ -19,6 +19,15 @@ test('packMasonry fills short columns and never leaves a hole', () => {
   assert.equal(packed.find(p => p.id === 'a').x, 0);
 });
 
+test('packMasonry can offset packed tiles below in-flow content', () => {
+  const packed = packMasonry(
+    [{ id: 'tile', height: 80, span: 1 }],
+    { columns: 2, gap: 12, columnWidth: 100, flowOffset: 240 }
+  );
+  assert.equal(packed[0].y, 240);
+  assert.equal(packed[0].x, 0);
+});
+
 test('span 2 occupies two columns when it fits', () => {
   const packed = packMasonry(
     [{ id: 'wide', height: 60, span: 2 }],

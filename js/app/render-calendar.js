@@ -1,3 +1,5 @@
+import { formatDisplayDate } from '../core/time.js';
+
 const CATEGORY_CLASS = {
   nutrition: 'nutrition',
   fitness: 'fitness',
@@ -54,7 +56,7 @@ export function renderCalendar(root, model, {
       detail.replaceChildren();
       const heading = root.createElement('p');
       heading.className = 'metric-label';
-      heading.textContent = `Selected · ${model.selectedDate}`;
+      heading.textContent = `Selected · ${formatDisplayDate(model.selectedDate)}`;
       detail.append(heading);
       if (!model.dayEvents.length) {
         const empty = root.createElement('p');
@@ -140,6 +142,7 @@ function dayButton(root, day, onSelectDate) {
   if (day.isToday) button.dataset.today = 'true';
   if (day.isSelected) button.dataset.selected = 'true';
   button.addEventListener('click', () => onSelectDate?.(day.date));
+  button.title = formatDisplayDate(day.date);
 
   const letter = root.createElement('span');
   letter.textContent = day.letter;
@@ -156,6 +159,7 @@ function monthCell(root, day, onSelectDate) {
   if (day.isToday) button.dataset.today = 'true';
   if (day.isSelected) button.dataset.selected = 'true';
   button.addEventListener('click', () => onSelectDate?.(day.date));
+  button.title = formatDisplayDate(day.date);
 
   const num = root.createElement('span');
   num.className = 'calendar-day__num';

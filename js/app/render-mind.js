@@ -11,7 +11,8 @@ import { buildDistributionPie } from './chart-kit/pie.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
 import { buildSankeyFlow } from './chart-kit/sankey-flow.js';
 import { buildStreamPaths } from './chart-kit/stream.js';
-import { entriesForTheme, MOOD_ORDER, rangeWindow } from './mind-model.js';
+import { entriesForTheme, MOOD_ORDER, rangeWindow, displayThemeLabel } from './mind-model.js';
+import { formatDisplayDate, isCalendarDate } from '../core/time.js';
 import { openMindThreadSheet } from './mind-thread-sheet.js';
 
 const STREAM_FILLS = [
@@ -52,9 +53,11 @@ export function moodShiftDirection(moodAtOpen, moodAtClose) {
   return 'flat';
 }
 
-export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConfig, onWatchlistChange } = {}) {
+export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConfig, onWatchlistChange, quiet = false } = {}) {
   const dashboard = root.querySelector('#mind-dashboard');
   if (!dashboard || !model) return;
+  dashboard._onOpenAgent = onOpenAgent;
+  dashboard._quiet = quiet;
 
   const ranges = root.querySelector('#mind-range-control');
   if (ranges && !ranges.dataset.bound) {
@@ -166,7 +169,7 @@ function renderFactorPanel(root, model) {
   const factors = model.factorEffects ?? [];
   const max = Math.max(0, ...factors.map(factor => Math.abs(Number(factor.effect) || 0)));
   for (const factor of factors) {
-    const label = factor.label || factor.key;
+    const label = factor.label || displayThemeLabel(factor.key);
     const button = root.createElement('button');
     button.type = 'button';
     const name = root.createElement('span');
@@ -176,19 +179,27 @@ function renderFactorPanel(root, model) {
     fill.className = 'mind-factor-fill';
     const pct = max > 0 ? (Math.abs(Number(factor.effect) || 0) / max) * 100 : 0;
     fill.style.width = `${pct}%`;
-    fill.style.transform = 'scaleX(0)';
+    if (root.querySelector('#mind-dashboard')?._quiet) {
+      fill.style.transform = 'scaleX(1)';
+    } else {
+      fill.style.transform = 'scaleX(0)';
+    }
     bar.append(fill);
     button.append(name, bar);
     button.addEventListener('click', () => {
       openMindThreadSheet(root, {
         title: label,
         rows: entriesForTheme(model.diary ?? [], model.sessions ?? [], factor.key),
-        continueAgent: null
+        continueAgent: 'vera',
+        onContinue: slug => root.querySelector('#mind-dashboard')?._onOpenAgent?.(slug),
+        anchor: button
       });
     });
     host.append(button);
-    void fill.getBoundingClientRect?.();
-    fill.style.transform = 'scaleX(1)';
+    if (!root.querySelector('#mind-dashboard')?._quiet) {
+      void fill.getBoundingClientRect?.();
+      fill.style.transform = 'scaleX(1)';
+    }
   }
 }
 
@@ -234,13 +245,16 @@ function renderConstellation(root, model) {
   if (!svg) return;
   svg.replaceChildren();
   const nodes = model.themeNodes ?? [];
-  if (!nodes.length) return;
+  if (!nodes.length) {
+    paintLegend(root, svg.parentNode, []);
+    return;
+  }
 
-  const width = 200;
-  const height = 200;
+  const width = 240;
+  const height = 240;
   const cx = width / 2;
   const cy = height / 2;
-  const orbit = 70;
+  const orbit = 78;
   const maxCount = Math.max(...nodes.map(node => Number(node.count) || 0), 1);
   const placed = nodes.map((node, index) => {
     const angle = (2 * Math.PI * index) / nodes.length - Math.PI / 2;
@@ -274,20 +288,23 @@ function renderConstellation(root, model) {
     circle.setAttribute('r', String(node.r));
     circle.setAttribute('fill', moodTokenFromScore(node.meanMood));
     circle.setAttribute('data-theme', node.key);
+    circle.setAttribute('title', displayThemeLabel(node.key));
+    circle.style.cursor = 'pointer';
     circle.addEventListener('click', () => {
       openMindThreadSheet(root, {
-        title: node.key,
+        title: displayThemeLabel(node.key),
         rows: entriesForTheme(model.diary ?? [], model.sessions ?? [], node.key),
-        continueAgent: 'vera'
+        continueAgent: 'vera',
+        onContinue: slug => root.querySelector('#mind-dashboard')?._onOpenAgent?.(slug),
+        anchor: circle
       });
     });
     svg.append(circle);
-    const label = createSvg(root, 'text');
-    label.setAttribute('x', String(node.x));
-    label.setAttribute('y', String(node.y + node.r + 10));
-    label.textContent = node.key;
-    svg.append(label);
   }
+  paintLegend(root, root.querySelector('#mind-tile-constellation') ?? svg.parentNode, placed.map(node => ({
+    label: displayThemeLabel(node.key),
+    swatch: moodTokenFromScore(node.meanMood)
+  })));
 }
 
 function renderTension(root, model) {
@@ -304,14 +321,21 @@ function renderTension(root, model) {
   if (!svg) {
     svg = createSvg(root, 'svg');
     svg.id = 'mind-tension-chart';
-    svg.setAttribute('viewBox', '0 0 160 80');
+    svg.setAttribute('viewBox', '0 0 240 120');
     tile.append(svg);
   }
   svg.replaceChildren();
   const poles = [
-    { x: 40, y: 40 },
-    { x: 120, y: 40 }
+    { x: 56, y: 56, label: 'Stated' },
+    { x: 184, y: 56, label: 'Revealed' }
   ];
+  const axis = createSvg(root, 'line');
+  axis.setAttribute('x1', '56');
+  axis.setAttribute('y1', '56');
+  axis.setAttribute('x2', '184');
+  axis.setAttribute('y2', '56');
+  axis.setAttribute('stroke', 'var(--line)');
+  svg.append(axis);
   for (const pole of poles) {
     const circle = createSvg(root, 'circle');
     circle.setAttribute('cx', String(pole.x));
@@ -325,10 +349,18 @@ function renderTension(root, model) {
           title: tension.title || '',
           excerpt: tension.body
         }],
-        continueAgent: 'vera'
+        continueAgent: 'vera',
+        anchor: circle
       });
     });
     svg.append(circle);
+    const label = createSvg(root, 'text');
+    label.setAttribute('x', String(pole.x));
+    label.setAttribute('y', '92');
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('class', 'mind-chart-label');
+    label.textContent = pole.label;
+    svg.append(label);
   }
 }
 
@@ -337,29 +369,76 @@ function packMindBoard(root) {
   if (!board) return;
   const width = board.getBoundingClientRect?.()?.width ?? 0;
   if (width <= 0) return;
-  const tiles = [...(board.querySelectorAll?.('.mind-tile') ?? [])];
+  const tiles = [...(board.children ?? [])].filter(node =>
+    String(node.className || '').split(/\s+/).includes('mind-tile')
+  );
   if (!tiles.length) return;
   const gap = 16;
   const columns = width >= 900 ? 3 : width >= 560 ? 2 : 1;
   const columnWidth = (width - gap * (columns - 1)) / columns;
+  for (const tile of tiles) {
+    if (!tile.style) continue;
+    const span = Math.min(Math.max(1, Number(tile.dataset?.mindSpan) || 1), columns);
+    tile.style.position = 'absolute';
+    tile.style.width = `${columnWidth * span + gap * (span - 1)}px`;
+  }
+  let flowBottom = 0;
+  for (const child of board.children ?? []) {
+    if (tiles.includes(child)) continue;
+    const top = Number(child.offsetTop) || 0;
+    const height = Number(child.offsetHeight) || 0;
+    flowBottom = Math.max(flowBottom, top + height);
+  }
+  if (flowBottom > 0) flowBottom += gap;
   const items = tiles.map(tile => ({
     id: tile.id,
     span: Number(tile.dataset?.mindSpan) || 1,
-    height: tile.offsetHeight || ((Number(tile.dataset?.mindSpan) || 1) * TILE_FALLBACK_HEIGHT)
+    height: tile.offsetHeight || TILE_FALLBACK_HEIGHT
   }));
-  const packed = packMasonry(items, { columns, gap, columnWidth });
+  const packed = packMasonry(items, { columns, gap, columnWidth, flowOffset: flowBottom });
+  let bottom = flowBottom;
   for (const item of packed) {
     const tile = tiles.find(node => node.id === item.id);
     if (!tile?.style) continue;
-    tile.style.position = 'absolute';
     tile.style.left = `${item.x}px`;
     tile.style.top = `${item.y}px`;
     tile.style.width = `${item.width}px`;
+    bottom = Math.max(bottom, item.y + item.height);
   }
+  if (board.style) board.style.minHeight = `${bottom}px`;
 }
 
 function createSvg(root, tag) {
   return root.createElementNS?.('http://www.w3.org/2000/svg', tag) ?? root.createElement(tag);
+}
+
+function paintLegend(root, host, items) {
+  if (!host) return;
+  const children = host.children ?? [];
+  let legend = [...children].find(node => String(node.className || '').split(/\s+/).includes('mind-chart-legend'));
+  if (!items?.length) {
+    legend?.replaceChildren?.();
+    return;
+  }
+  if (!legend) {
+    legend = root.createElement('ul');
+    legend.className = 'mind-chart-legend';
+    host.append(legend);
+  }
+  legend.replaceChildren();
+  for (const item of items) {
+    const row = root.createElement('li');
+    if (item.swatch) {
+      const swatch = root.createElement('i');
+      swatch.setAttribute('aria-hidden', 'true');
+      swatch.style?.setProperty?.('--swatch', item.swatch);
+      row.append(swatch);
+    }
+    const label = root.createElement('span');
+    label.textContent = item.label;
+    row.append(label);
+    legend.append(row);
+  }
 }
 
 function renderMoodChart(root, series) {
@@ -397,7 +476,7 @@ function renderMoodChart(root, series) {
       dots.append(dot);
     });
   }
-  animateAreaReveal(svg);
+  animateAreaReveal(svg, quietMotion(root));
 }
 
 function renderMoodMix(root, byMood) {
@@ -483,7 +562,7 @@ function paintHeatmapRow(root, selector, tiles, kind) {
     node.className = `heatmap-tile heatmap-tile--${kind}`;
     node.dataset.hit = String(tile.hit);
     if (tile.today) node.dataset.today = 'true';
-    node.title = tile.date;
+    node.title = formatDisplayDate(tile.date);
     grid.append(node);
   }
 }
@@ -506,7 +585,9 @@ function renderThemeChips(root, themes) {
     const weight = max > 0 ? theme.value / max : 0;
     chip.style.fontSize = weight > 0.66 ? 'var(--text-md)' : weight > 0.33 ? 'var(--text-base)' : 'var(--text-sm)';
     chip.style.background = `color-mix(in srgb, var(--glass) ${Math.round(70 + weight * 30)}%, var(--wave))`;
-    chip.style.animationDelay = `${Math.min(index, 5) * 40}ms`;
+    chip.style.animationDelay = root.querySelector('#mind-dashboard')?._quiet
+      ? '0ms'
+      : `${Math.min(index, 5) * 40}ms`;
     if (index >= 6) chip.classList.add('mind-theme-chip--group');
     chip.textContent = `${theme.label} · ${theme.value}`;
     host.append(chip);
@@ -545,7 +626,7 @@ function renderSessionList(root, sessions) {
     card.className = 'mind-session-card';
     const date = root.createElement('p');
     date.className = 'mind-session-card__date';
-    date.textContent = session.date;
+    date.textContent = formatDisplayDate(session.date);
     const title = root.createElement('h3');
     title.className = 'mind-session-card__theme';
     title.textContent = session.theme || 'Vera session';
@@ -596,18 +677,38 @@ function renderMoodShift(root, session) {
   const closeLabel = session.moodAtClose ?? '—';
   caption.textContent = `${SHIFT_COPY[direction]} · ${openLabel} → ${closeLabel}`;
   wrap.append(svg, caption);
-  animateAreaReveal(svg);
+  animateAreaReveal(svg, quietMotion(root));
   return wrap;
 }
 
+function displayMarkTitle(value) {
+  if (value == null || value === '') return value;
+  const text = String(value);
+  if (isCalendarDate(text)) return formatDisplayDate(text);
+  return text.replace(/\d{4}-\d{2}-\d{2}/g, match => (
+    isCalendarDate(match) ? formatDisplayDate(match) : match
+  ));
+}
+
 function bindMark(node, root, payload) {
-  if (payload.title != null) node.setAttribute('title', payload.title);
+  const title = payload.title != null ? displayMarkTitle(payload.title) : payload.title;
+  if (title != null) node.setAttribute('title', title);
   node.setAttribute('tabindex', '0');
-  const open = () => openMindThreadSheet(root, payload);
+  node.style.cursor = 'pointer';
+  const open = () => openMindThreadSheet(root, {
+    ...payload,
+    title,
+    anchor: node,
+    onContinue: payload.onContinue ?? (slug => root.querySelector('#mind-dashboard')?._onOpenAgent?.(slug))
+  });
   node.addEventListener('click', open);
   node.addEventListener('keydown', event => {
     if (event.key === 'Enter') open();
   });
+}
+
+function quietMotion(root) {
+  return { quiet: Boolean(root.querySelector('#mind-dashboard')?._quiet) };
 }
 
 function sparseCaption(root, host, count, noun) {
@@ -648,12 +749,11 @@ function renderStreamTile(root, model) {
   if (!svg) return;
   svg.replaceChildren();
   const weekly = model.themeWeekly ?? { weeks: [], series: [] };
-  const paths = buildStreamPaths(weekly, { width: 320, height: 80 });
+  const paths = buildStreamPaths(weekly, { width: 320, height: 168 });
   paths.forEach((band, index) => {
     const path = createSvg(root, 'path');
     path.setAttribute('d', band.d);
     path.setAttribute('fill', STREAM_FILLS[index % STREAM_FILLS.length]);
-    if (index === 0) path.setAttribute('data-role', 'line');
     bindMark(path, root, {
       title: band.key,
       rows: themeRows(model, band.key),
@@ -661,15 +761,19 @@ function renderStreamTile(root, model) {
     });
     svg.append(path);
   });
+  paintLegend(root, root.querySelector('#mind-tile-stream') ?? svg.parentNode, paths.map((band, index) => ({
+    label: displayThemeLabel(band.key),
+    swatch: STREAM_FILLS[index % STREAM_FILLS.length]
+  })));
   sparseCaption(root, svg.parentNode ?? svg, paths.length, 'themes');
-  animateAreaReveal(svg);
+  animateAreaReveal(svg, quietMotion(root));
 }
 
 function renderSankeyTile(root, model) {
   const svg = root.querySelector('#mind-sankey');
   if (!svg) return;
   svg.replaceChildren();
-  const chart = buildSankeyFlow(model.moodTransitions ?? [], { width: 320, height: 80 });
+  const chart = buildSankeyFlow(model.moodTransitions ?? [], { width: 320, height: 200 });
   for (const link of chart.links) {
     const mark = createSvg(root, 'path');
     const x0 = link.x0 ?? 20;
@@ -686,6 +790,17 @@ function renderSankeyTile(root, model) {
     });
     svg.append(mark);
   }
+  for (const node of chart.nodes ?? []) {
+    const label = createSvg(root, 'text');
+    const left = (node.x0 ?? 0) < 80;
+    label.setAttribute('x', String(left ? (node.x1 ?? 12) + 4 : (node.x0 ?? 308) - 4));
+    label.setAttribute('y', String(((node.y0 ?? 0) + (node.y1 ?? 0)) / 2 + 3));
+    label.setAttribute('text-anchor', left ? 'start' : 'end');
+    label.setAttribute('class', 'mind-chart-label');
+    label.setAttribute('pointer-events', 'none');
+    label.textContent = displayThemeLabel(node.id);
+    svg.append(label);
+  }
   sparseCaption(root, svg.parentNode ?? svg, chart.links.length, 'transitions');
 }
 
@@ -695,14 +810,13 @@ function renderBumpTile(root, model) {
   svg.replaceChildren();
   const ranks = model.themeRanks ?? [];
   const themes = model.themeWeekly?.themes ?? Object.keys(ranks[0]?.rankByTheme ?? {});
-  const lines = buildBumpLines(ranks, themes, { width: 320, height: 80 });
+  const lines = buildBumpLines(ranks, themes, { width: 320, height: 168 });
   lines.forEach((line, index) => {
     const path = createSvg(root, 'path');
     path.setAttribute('d', line.linePath || '');
     path.setAttribute('fill', 'none');
     path.setAttribute('stroke', STREAM_FILLS[index % STREAM_FILLS.length]);
-    path.setAttribute('stroke-width', '2');
-    if (index === 0) path.setAttribute('data-role', 'line');
+    path.setAttribute('stroke-width', '2.5');
     bindMark(path, root, {
       title: line.key,
       rows: themeRows(model, line.key),
@@ -710,8 +824,12 @@ function renderBumpTile(root, model) {
     });
     svg.append(path);
   });
+  paintLegend(root, root.querySelector('#mind-tile-bump') ?? svg.parentNode, lines.map((line, index) => ({
+    label: displayThemeLabel(line.key),
+    swatch: STREAM_FILLS[index % STREAM_FILLS.length]
+  })));
   sparseCaption(root, svg.parentNode ?? svg, lines.length, 'rank lines');
-  animateAreaReveal(svg);
+  animateAreaReveal(svg, quietMotion(root));
 }
 
 function renderChordTile(root, model) {
@@ -719,9 +837,9 @@ function renderChordTile(root, model) {
   if (!svg) return;
   svg.replaceChildren();
   const layout = buildChordLayout(model.themeCooccurrence ?? []);
-  const cx = 80;
-  const cy = 80;
-  const radius = 60;
+  const cx = 120;
+  const cy = 120;
+  const radius = 78;
   for (const arc of layout.arcs) {
     const path = createSvg(root, 'path');
     const x0 = cx + radius * Math.cos(arc.startAngle - Math.PI / 2);
@@ -732,7 +850,8 @@ function renderChordTile(root, model) {
     path.setAttribute('d', `M${x0},${y0} A${radius},${radius},0,${large},1,${x1},${y1}`);
     path.setAttribute('fill', 'none');
     path.setAttribute('stroke', 'var(--wave)');
-    path.setAttribute('stroke-width', '8');
+    path.setAttribute('stroke-width', '10');
+    path.setAttribute('title', displayThemeLabel(arc.key));
     bindMark(path, root, {
       title: arc.key,
       rows: themeRows(model, arc.key),
@@ -740,6 +859,10 @@ function renderChordTile(root, model) {
     });
     svg.append(path);
   }
+  paintLegend(root, root.querySelector('#mind-tile-chord') ?? svg.parentNode, (layout.arcs ?? []).map(arc => ({
+    label: displayThemeLabel(arc.key),
+    swatch: 'var(--wave)'
+  })));
   sparseCaption(root, svg.parentNode ?? svg, layout.arcs.length, 'themes');
 }
 
@@ -753,24 +876,37 @@ function renderRadialTile(root, model) {
     if (point.date) byDate[point.date] = point.mood ?? null;
   }
   const ticks = buildRadialYear({ year, byDate });
-  const cx = 80;
-  const cy = 80;
-  const inner = 28;
-  const outer = 70;
+  const cx = 120;
+  const cy = 120;
+  const inner = 42;
+  const outer = 96;
   for (const tick of ticks) {
+    if (!tick.mood) continue;
     const line = createSvg(root, 'line');
     line.setAttribute('x1', String(cx + inner * Math.cos(tick.angle)));
     line.setAttribute('y1', String(cy + inner * Math.sin(tick.angle)));
     line.setAttribute('x2', String(cx + outer * Math.cos(tick.angle)));
     line.setAttribute('y2', String(cy + outer * Math.sin(tick.angle)));
-    line.setAttribute('stroke', tick.mood && MOOD_TOKEN[tick.mood] ? MOOD_TOKEN[tick.mood] : 'var(--line)');
-    line.setAttribute('stroke-width', tick.mood ? '1.4' : '0.6');
+    line.setAttribute('stroke', MOOD_TOKEN[tick.mood] ?? 'var(--line)');
+    line.setAttribute('stroke-width', '2.4');
+    line.setAttribute('stroke-linecap', 'round');
     bindMark(line, root, {
       title: tick.date,
       rows: dateRows(model, tick.date)
     });
     svg.append(line);
   }
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  months.forEach((month, index) => {
+    const angle = (index / 12) * Math.PI * 2 - Math.PI / 2;
+    const label = createSvg(root, 'text');
+    label.setAttribute('x', String(cx + 110 * Math.cos(angle)));
+    label.setAttribute('y', String(cy + 110 * Math.sin(angle) + 3));
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('class', 'mind-chart-label');
+    label.textContent = month;
+    svg.append(label);
+  });
 }
 
 function renderHorizonTile(root, model) {
@@ -785,17 +921,22 @@ function renderHorizonTile(root, model) {
     .filter(entry => entry.energy)
     .map(entry => ({ date: entry.date, value: energyMap[entry.energy] ?? 0 }));
   if (energyPoints.length) metrics.push({ key: 'energy', points: energyPoints });
-  const bands = buildHorizonBands(metrics, { width: 320, height: 12 });
+  const bands = buildHorizonBands(metrics, { width: 320, height: 18 });
   for (const band of bands) {
+    const row = root.createElement('div');
+    row.className = 'mind-horizon-row';
+    const caption = root.createElement('p');
+    caption.className = 'metric-caption';
+    caption.textContent = band.key;
     const svg = createSvg(root, 'svg');
-    svg.setAttribute('viewBox', '0 0 320 12');
+    svg.setAttribute('viewBox', '0 0 320 18');
     svg.setAttribute('class', 'mind-horizon-band');
     for (const rect of band.rects) {
       const node = createSvg(root, 'rect');
       node.setAttribute('x', String(rect.x));
       node.setAttribute('y', String(rect.y));
       node.setAttribute('width', String(rect.width));
-      node.setAttribute('height', String(rect.height));
+      node.setAttribute('height', String(Math.max(rect.height, 14)));
       node.setAttribute('fill', 'var(--wave)');
       node.setAttribute('opacity', String(rect.opacity));
       bindMark(node, root, {
@@ -808,7 +949,8 @@ function renderHorizonTile(root, model) {
       title: band.key,
       rows: (band.rects ?? []).map(rect => ({ date: rect.date, title: band.key, excerpt: String(rect.value) }))
     });
-    host.append(svg);
+    row.append(caption, svg);
+    host.append(row);
   }
   sparseCaption(root, host, bands.length, 'metrics');
 }
@@ -825,13 +967,13 @@ function renderButterflyTile(root, model) {
     const vera = root.createElement('div');
     vera.className = 'mind-butterfly-bar mind-butterfly-bar--vera';
     vera.style.width = `${((Number(row.veraCount) || 0) / max) * 100}%`;
-    vera.setAttribute('title', `Vera ${row.theme}`);
+    vera.setAttribute('title', `Vera ${displayThemeLabel(row.theme)}`);
     const label = root.createElement('span');
-    label.textContent = row.theme;
+    label.textContent = displayThemeLabel(row.theme);
     const penelope = root.createElement('div');
     penelope.className = 'mind-butterfly-bar mind-butterfly-bar--penelope';
     penelope.style.width = `${((Number(row.penelopeCount) || 0) / max) * 100}%`;
-    penelope.setAttribute('title', `Penelope ${row.theme}`);
+    penelope.setAttribute('title', `Penelope ${displayThemeLabel(row.theme)}`);
     bindMark(wrap, root, {
       title: row.theme,
       rows: themeRows(model, row.theme)
@@ -848,19 +990,18 @@ function renderLexicalTile(root, model, onWatchlistChange) {
   host.replaceChildren();
   const series = model.lexical ?? [];
   const svg = createSvg(root, 'svg');
-  svg.setAttribute('viewBox', '0 0 320 80');
-  svg.setAttribute('class', 'line-chart');
+  svg.setAttribute('viewBox', '0 0 320 160');
+  svg.setAttribute('class', 'mind-chart mind-chart--lexical');
   series.forEach((item, index) => {
     const chart = buildAreaLine(
       (item.points ?? []).map(point => ({ date: point.date, value: point.count })),
-      { width: 320, height: 80, padding: 8 }
+      { width: 320, height: 160, padding: 16 }
     );
     const path = createSvg(root, 'path');
     path.setAttribute('d', chart.linePath || '');
     path.setAttribute('fill', 'none');
     path.setAttribute('stroke', STREAM_FILLS[index % STREAM_FILLS.length]);
-    path.setAttribute('stroke-width', '2');
-    if (index === 0) path.setAttribute('data-role', 'line');
+    path.setAttribute('stroke-width', '2.5');
     bindMark(path, root, {
       title: item.term,
       rows: [{ date: '', title: item.term, excerpt: 'Language watchlist' }]
@@ -868,7 +1009,11 @@ function renderLexicalTile(root, model, onWatchlistChange) {
     svg.append(path);
   });
   host.append(svg);
-  animateAreaReveal(svg);
+  paintLegend(root, host, series.map((item, index) => ({
+    label: item.term,
+    swatch: STREAM_FILLS[index % STREAM_FILLS.length]
+  })));
+  animateAreaReveal(svg, quietMotion(root));
   const form = root.createElement('div');
   form.className = 'mind-lexical-form';
   const input = root.createElement('input');
@@ -896,7 +1041,7 @@ function renderWaffleTile(root, model) {
     const button = root.createElement('button');
     button.type = 'button';
     if (cell.mood) button.setAttribute('data-mood', cell.mood);
-    button.setAttribute('title', `${cell.date} ${cell.mood ?? ''}`.trim());
+    button.setAttribute('title', `${formatDisplayDate(cell.date)} ${cell.mood ?? ''}`.trim());
     bindMark(button, root, {
       title: cell.date,
       rows: dateRows(model, cell.date)
@@ -944,7 +1089,7 @@ function renderInsightList(root, insights, resurfacing) {
     const card = root.createElement('article');
     card.className = 'mind-resurfacing';
     const copy = root.createElement('p');
-    copy.textContent = `${resurfacing.theme} came up again. Last time was ${resurfacing.priorDate}: ${resurfacing.excerpt ?? ''}`;
+    copy.textContent = `${displayThemeLabel(resurfacing.theme)} came up again. Last time was ${formatDisplayDate(resurfacing.priorDate)}: ${resurfacing.excerpt ?? ''}`;
     const dismiss = root.createElement('button');
     dismiss.type = 'button';
     dismiss.setAttribute('data-mind-resurfacing-dismiss', '');
@@ -968,7 +1113,7 @@ function renderInsightList(root, insights, resurfacing) {
     block.style.animationDelay = `${index * 40}ms`;
     const heading = root.createElement('p');
     heading.className = 'governance-entry-heading';
-    heading.textContent = [entry.dateKey, entry.entryType].filter(Boolean).join(' — ');
+    heading.textContent = [formatDisplayDate(entry.dateKey), entry.entryType].filter(Boolean).join(' — ');
     block.append(heading);
     if (entry.title) {
       const title = root.createElement('p');

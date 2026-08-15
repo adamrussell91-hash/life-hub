@@ -1,4 +1,5 @@
 import { applyRingTarget } from './chart-kit/apply-ring.js';
+import { formatDisplayDate } from '../core/time.js';
 
 const DAY_TYPE_LABELS = {
   movement: 'Movement day',
@@ -11,11 +12,7 @@ const setText = (root, selector, value) => {
   if (element) element.textContent = String(value);
 };
 
-const formatDate = date => new Intl.DateTimeFormat('en-AU', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long'
-}).format(new Date(`${date}T12:00:00+10:00`));
+const formatDate = date => formatDisplayDate(date);
 
 const setProgress = (root, name, value) => {
   const element = root.querySelector(`[data-progress="${name}"]`);

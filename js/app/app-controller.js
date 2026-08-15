@@ -119,12 +119,18 @@ export function createAppController(dependencies) {
   let pendingLogoutPromise = null;
   let pendingLogoutCleanupPromise = null;
   let destroyed = false;
+  let syncQuiet = false;
   const listeners = [];
 
   bind(root.querySelector('#sign-in-form'), 'submit', event => {
     event.preventDefault?.();
     void signIn(root.querySelector('#passphrase-input')?.value ?? '');
   });
+  const localHost = windowTarget?.location?.hostname ?? '';
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(localHost)) {
+    const copy = root.querySelector('.sign-in-copy');
+    if (copy) copy.textContent = 'Local preview. Use passphrase life-hub-local — not your live password.';
+  }
   bind(root.querySelector('#refresh-button'), 'click', () => void refresh({ manual: true }));
   bind(root.querySelector('#retry-button'), 'click', () => void refresh({ manual: true }));
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
@@ -345,6 +351,12 @@ export function createAppController(dependencies) {
       latestResult = { ...result, date };
       const viewKey = paintedViewKey(result);
       if (!rendered || force === true || result.changed === true || viewKey !== lastPaintedKey) {
+        syncQuiet = painted === true;
+        const app = root.querySelector('#app');
+        if (app?.dataset) {
+          if (syncQuiet) app.dataset.syncQuiet = 'true';
+          else delete app.dataset.syncQuiet;
+        }
         const model = buildHomeModel({ ...result, date });
         renderHome(root, model);
         if (currentSection === 'nutrition') renderNutritionSection();
@@ -355,6 +367,7 @@ export function createAppController(dependencies) {
         if (currentSection === 'body-bloods') renderBloodsSection();
         if (currentSection === 'mind') renderMindSection();
         if (currentSection === 'central-node') renderCentralNodeSection();
+        syncQuiet = false;
         // Renderers historically force-unhide their dashboards; refresh must not
         // resurface Home (or any other section) while Adam is elsewhere.
         setSectionVisibility(currentSection);
@@ -405,6 +418,8 @@ export function createAppController(dependencies) {
       if (outcome.ok) {
         if (!isCurrentRefresh(version, signal)) return;
         apply(outcome.result);
+        const app = root.querySelector('#app');
+        if (app?.dataset) delete app.dataset.syncQuiet;
         if (!manual) setStatus('');
         else {
           setStatus(outcome.result.changed === true
@@ -586,7 +601,7 @@ export function createAppController(dependencies) {
     if (bloods) bloods.hidden = name !== 'body-bloods';
     if (mind) mind.hidden = name !== 'mind';
     if (centralNode) centralNode.hidden = name !== 'central-node';
-    if (chat) chat.hidden = name !== 'chat';
+    if (chat) chat.hidden = name !== 'chat' && !chatPanel?.isOpen?.();
   }
 
   function showSection(name) {
@@ -634,7 +649,7 @@ export function createAppController(dependencies) {
 
   function renderNutritionSection() {
     if (!latestResult || !buildNutritionModel || !renderNutrition) return;
-    renderNutrition(root, buildNutritionModel(latestResult));
+    renderNutrition(root, buildNutritionModel(latestResult), { quiet: syncQuiet });
     const button = root.querySelector('#nutrition-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, NUTRITION_AGENT_SLUG));
   }
@@ -648,7 +663,8 @@ export function createAppController(dependencies) {
       logger: fitnessLogger,
       templates,
       libraryByName,
-      onSelectTemplate: template => fitnessTemplateLibrary?.openTemplate?.(template)
+      onSelectTemplate: template => fitnessTemplateLibrary?.openTemplate?.(template),
+      quiet: syncQuiet
     });
     const button = root.querySelector('#fitness-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, FITNESS_AGENT_SLUG));
@@ -660,7 +676,8 @@ export function createAppController(dependencies) {
         logger: fitnessLogger,
         templates: fitnessTemplateLibrary.getState(),
         libraryByName: nextLibrary,
-        onSelectTemplate: template => fitnessTemplateLibrary.openTemplate(template)
+        onSelectTemplate: template => fitnessTemplateLibrary.openTemplate(template),
+        quiet: syncQuiet
       });
     });
   }
@@ -785,7 +802,8 @@ export function createAppController(dependencies) {
       },
       onLogWeight: bodyController?.onLogWeight,
       onLogComposition: bodyController?.onLogComposition,
-      onViewBloods: () => showSection('body-bloods')
+      onViewBloods: () => showSection('body-bloods'),
+      quiet: syncQuiet
     });
     const button = root.querySelector('#body-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, BODY_AGENT_SLUG));
@@ -802,7 +820,8 @@ export function createAppController(dependencies) {
       onRangeChange: next => {
         bloodsRange = next;
         renderBloodsSection();
-      }
+      },
+      quiet: syncQuiet
     });
   }
 
@@ -836,21 +855,16 @@ export function createAppController(dependencies) {
         renderMindSection();
       },
       agentsConfig: latestResult.agentsConfig,
+      quiet: syncQuiet,
       onOpenAgent: slug => {
-        chatSelectAgent?.(slug);
-        if (!chatPanel) return;
-        const slot = root.querySelector('#mind-dashboard');
-        if (slot) {
-          chatPanel.open(slot, agentColour?.(latestResult.agentsConfig, slug));
-          chatClearUnread?.();
-        }
+        toggleSectionChat('#mind-dashboard', slug);
       }
     });
   }
 
   function renderCentralNodeSection() {
     if (!latestResult || !buildCentralNodeModel || !renderCentralNode) return;
-    renderCentralNode(root, buildCentralNodeModel(latestResult));
+    renderCentralNode(root, buildCentralNodeModel(latestResult), { quiet: syncQuiet });
     renderGovernance?.(root, latestResult.governanceLogMarkdown);
     const button = root.querySelector('#central-node-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
