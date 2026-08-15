@@ -219,6 +219,51 @@ function fakeRoot() {
   const tension = el('article');
   tension.id = 'mind-tension';
   tension.hidden = false;
+  const tileStream = el('article');
+  tileStream.id = 'mind-tile-stream';
+  const streamSvg = el('svg');
+  streamSvg.id = 'mind-stream';
+  tileStream.append(streamSvg);
+  const tileTransitions = el('article');
+  tileTransitions.id = 'mind-tile-transitions';
+  const sankeySvg = el('svg');
+  sankeySvg.id = 'mind-sankey';
+  tileTransitions.append(sankeySvg);
+  const tileBump = el('article');
+  tileBump.id = 'mind-tile-bump';
+  const bumpSvg = el('svg');
+  bumpSvg.id = 'mind-bump';
+  tileBump.append(bumpSvg);
+  const tileChord = el('article');
+  tileChord.id = 'mind-tile-chord';
+  const chordSvg = el('svg');
+  chordSvg.id = 'mind-chord';
+  tileChord.append(chordSvg);
+  const tileRadial = el('article');
+  tileRadial.id = 'mind-tile-radial';
+  const radialSvg = el('svg');
+  radialSvg.id = 'mind-radial-year';
+  tileRadial.append(radialSvg);
+  const tileHorizon = el('article');
+  tileHorizon.id = 'mind-tile-horizon';
+  const horizonHost = el('div');
+  horizonHost.id = 'mind-horizon';
+  tileHorizon.append(horizonHost);
+  const tileButterfly = el('article');
+  tileButterfly.id = 'mind-tile-butterfly';
+  const butterflyHost = el('div');
+  butterflyHost.id = 'mind-butterfly';
+  tileButterfly.append(butterflyHost);
+  const tileLexical = el('article');
+  tileLexical.id = 'mind-tile-lexical';
+  const lexicalHost = el('div');
+  lexicalHost.id = 'mind-lexical';
+  tileLexical.append(lexicalHost);
+  const tileWaffle = el('article');
+  tileWaffle.id = 'mind-tile-waffle';
+  const waffleHost = el('div');
+  waffleHost.id = 'mind-waffle';
+  tileWaffle.append(waffleHost);
   const agentButtons = [veraBtn, penelopeBtn];
   const hosts = {
     '#mind-dashboard': dashboard,
@@ -257,7 +302,25 @@ function fakeRoot() {
     '#mind-tile-streak': tileStreak,
     '#mind-streak-ring': streakRing,
     '#mind-constellation': constellation,
-    '#mind-tension': tension
+    '#mind-tension': tension,
+    '#mind-tile-stream': tileStream,
+    '#mind-stream': streamSvg,
+    '#mind-tile-transitions': tileTransitions,
+    '#mind-sankey': sankeySvg,
+    '#mind-tile-bump': tileBump,
+    '#mind-bump': bumpSvg,
+    '#mind-tile-chord': tileChord,
+    '#mind-chord': chordSvg,
+    '#mind-tile-radial': tileRadial,
+    '#mind-radial-year': radialSvg,
+    '#mind-tile-horizon': tileHorizon,
+    '#mind-horizon': horizonHost,
+    '#mind-tile-butterfly': tileButterfly,
+    '#mind-butterfly': butterflyHost,
+    '#mind-tile-lexical': tileLexical,
+    '#mind-lexical': lexicalHost,
+    '#mind-tile-waffle': tileWaffle,
+    '#mind-waffle': waffleHost
   };
   return {
     createElement: tag => el(tag),
@@ -440,6 +503,21 @@ test('renderMind draws constellation nodes and hides empty tension', () => {
   const node = root.querySelector('#mind-constellation').querySelector('[data-theme="work"]');
   assert.ok(node);
   assert.equal(root.querySelector('#mind-tension').hidden, true);
+});
+
+test('renderMind paints waffle and stream marks', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({
+    empty: false,
+    waffle: [{ date: '2026-08-01', mood: 'good', kind: 'diary' }],
+    themeWeekly: {
+      weeks: ['2026-08-03'],
+      themes: ['work'],
+      series: [{ key: 'work', values: [2] }]
+    }
+  }));
+  assert.ok(root.querySelector('#mind-waffle').querySelector('[data-mood]'));
+  assert.ok(root.querySelector('#mind-stream').querySelector('path'));
 });
 
 test('renderMind paints tension poles and keeps the tile visible', () => {
