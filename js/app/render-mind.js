@@ -5,7 +5,7 @@ import { buildAreaLine } from './chart-kit/area-line.js';
 import { buildHeatmapRow } from './chart-kit/heatmap.js';
 import { packMasonry } from './chart-kit/masonry.js';
 import { buildDistributionPie } from './chart-kit/pie.js';
-import { MOOD_ORDER, rangeWindow } from './mind-model.js';
+import { entriesForTheme, MOOD_ORDER, rangeWindow } from './mind-model.js';
 import { openMindThreadSheet } from './mind-thread-sheet.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
@@ -87,6 +87,8 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConf
   renderLaunchers(root, model);
   renderFactorPanel(root, model);
   renderStreak(root, model);
+  renderConstellation(root, model);
+  renderTension(root, model);
 
   if (!model.empty) {
     renderMoodChart(root, model.moodSeries);
@@ -154,7 +156,11 @@ function renderFactorPanel(root, model) {
     bar.append(fill);
     button.append(name, bar);
     button.addEventListener('click', () => {
-      openMindThreadSheet(root, { title: label, rows: [], continueAgent: null });
+      openMindThreadSheet(root, {
+        title: label,
+        rows: entriesForTheme(model.diary ?? [], model.sessions ?? [], factor.key),
+        continueAgent: null
+      });
     });
     host.append(button);
     void fill.getBoundingClientRect?.();
@@ -182,6 +188,124 @@ function renderStreak(root, model) {
   label.dataset.mind = 'streak';
   label.textContent = String(streak);
   tile.append(label);
+}
+
+function moodTokenFromScore(score) {
+  const value = Number(score);
+  if (!Number.isFinite(value)) return 'var(--mood-neutral)';
+  if (value <= 3) return 'var(--mood-bad)';
+  if (value <= 5) return 'var(--mood-low)';
+  if (value <= 6) return 'var(--mood-neutral)';
+  if (value <= 8) return 'var(--mood-good)';
+  return 'var(--mood-great)';
+}
+
+function themeNodeRadius(count, maxCount) {
+  if (!(maxCount > 0)) return 6;
+  return 6 + ((Number(count) || 0) / maxCount) * 10;
+}
+
+function renderConstellation(root, model) {
+  const svg = root.querySelector('#mind-constellation');
+  if (!svg) return;
+  svg.replaceChildren();
+  const nodes = model.themeNodes ?? [];
+  if (!nodes.length) return;
+
+  const width = 200;
+  const height = 200;
+  const cx = width / 2;
+  const cy = height / 2;
+  const orbit = 70;
+  const maxCount = Math.max(...nodes.map(node => Number(node.count) || 0), 1);
+  const placed = nodes.map((node, index) => {
+    const angle = (2 * Math.PI * index) / nodes.length - Math.PI / 2;
+    return {
+      ...node,
+      x: cx + orbit * Math.cos(angle),
+      y: cy + orbit * Math.sin(angle),
+      r: themeNodeRadius(node.count, maxCount)
+    };
+  });
+  const byKey = new Map(placed.map(node => [node.key, node]));
+
+  for (const edge of model.themeCooccurrence ?? []) {
+    if ((edge.count ?? 0) < 2) continue;
+    const a = byKey.get(edge.themeA);
+    const b = byKey.get(edge.themeB);
+    if (!a || !b) continue;
+    const line = createSvg(root, 'line');
+    line.setAttribute('x1', String(a.x));
+    line.setAttribute('y1', String(a.y));
+    line.setAttribute('x2', String(b.x));
+    line.setAttribute('y2', String(b.y));
+    line.setAttribute('stroke', 'var(--line)');
+    svg.append(line);
+  }
+
+  for (const node of placed) {
+    const circle = createSvg(root, 'circle');
+    circle.setAttribute('cx', String(node.x));
+    circle.setAttribute('cy', String(node.y));
+    circle.setAttribute('r', String(node.r));
+    circle.setAttribute('fill', moodTokenFromScore(node.meanMood));
+    circle.setAttribute('data-theme', node.key);
+    circle.addEventListener('click', () => {
+      openMindThreadSheet(root, {
+        title: node.key,
+        rows: entriesForTheme(model.diary ?? [], model.sessions ?? [], node.key),
+        continueAgent: 'vera'
+      });
+    });
+    svg.append(circle);
+    const label = createSvg(root, 'text');
+    label.setAttribute('x', String(node.x));
+    label.setAttribute('y', String(node.y + node.r + 10));
+    label.textContent = node.key;
+    svg.append(label);
+  }
+}
+
+function renderTension(root, model) {
+  const tile = root.querySelector('#mind-tension');
+  if (!tile) return;
+  const tensions = model.tensions ?? [];
+  if (!tensions.length) {
+    tile.hidden = true;
+    return;
+  }
+  tile.hidden = false;
+  const tension = tensions[0];
+  let svg = tile.querySelector('#mind-tension-chart') ?? tile.querySelector('svg');
+  if (!svg) {
+    svg = createSvg(root, 'svg');
+    svg.id = 'mind-tension-chart';
+    svg.setAttribute('viewBox', '0 0 160 80');
+    tile.append(svg);
+  }
+  svg.replaceChildren();
+  const poles = [
+    { x: 40, y: 40 },
+    { x: 120, y: 40 }
+  ];
+  for (const pole of poles) {
+    const circle = createSvg(root, 'circle');
+    circle.setAttribute('cx', String(pole.x));
+    circle.setAttribute('cy', String(pole.y));
+    circle.setAttribute('r', '10');
+    circle.addEventListener('click', () => {
+      openMindThreadSheet(root, {
+        title: tension.title || '',
+        rows: [{
+          date: tension.dateKey || '',
+          title: tension.title || '',
+          excerpt: tension.body
+        }],
+        continueAgent: 'vera'
+      });
+    });
+    svg.append(circle);
+  }
 }
 
 function packMindBoard(root) {

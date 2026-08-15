@@ -27,7 +27,8 @@ import {
   butterfly,
   resurfacing,
   waffleEntries,
-  parseInsightExtras
+  parseInsightExtras,
+  entriesForTheme
 } from '../../js/app/mind-model.js';
 
 test('buildMindModel builds mood series, by-mood counts, and themes', () => {
@@ -479,4 +480,15 @@ Body here.
   assert.ok(Array.isArray(model.waffle));
   assert.ok(Array.isArray(model.lexical));
   assert.equal(model.empty, false);
+});
+
+test('entriesForTheme lists diary and sessions newest last', () => {
+  const rows = entriesForTheme(
+    diaryEntries([{ record: { type: 'diary', date: '2026-08-01', tags: ['work'] }, body: 'School day.', path: 'd' }]),
+    sessionEntries([{ record: { type: 'mind_session', date: '2026-08-10', themes: ['work'], title: 'Filter', insight: 'A filter.', theme: 'work' }, path: 's' }]),
+    'work'
+  );
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].date, '2026-08-01');
+  assert.match(rows[1].excerpt, /filter/i);
 });
