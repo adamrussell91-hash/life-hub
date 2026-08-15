@@ -88,8 +88,14 @@ export function summarizeMindSessionsForPrompt(events, today) {
     .slice(-6)
     .map(e => {
       const r = e.record;
+      const title = r.title ? ` ${r.title}` : '';
+      const themes = Array.isArray(r.themes) && r.themes.length ? ` themes ${r.themes.join(', ')}` : '';
+      const sessionType = r.session_type ? ` ${r.session_type}` : '';
+      const mood = (r.mood_at_open || r.mood_at_close)
+        ? ` mood ${r.mood_at_open ?? '—'}→${r.mood_at_close ?? '—'}`
+        : '';
       const thread = r.closing_question ? ` thread: ${r.closing_question}` : '';
-      return `${r.date}: ${r.theme ?? 'session'}${thread}`;
+      return `${r.date}: ${r.theme ?? 'session'}${title}${themes}${sessionType}${mood}${thread}`;
     });
   return [
     'Vera sessions (do not quote session prose):',
