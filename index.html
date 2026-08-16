@@ -624,16 +624,12 @@
             <button type="button" data-mind-range="six_month" aria-pressed="false">6M</button>
           </div>
           <p class="metric-caption" data-mind="ambient" hidden></p>
-          <p id="mind-empty" class="metric-caption" hidden>No diary entries in this range yet — talk with Penelope to log one.</p>
-
-          <div class="mind-agents">
-            <button type="button" id="mind-launcher-vera" class="mind-agent-button mind-agent-button--vera" data-mind-agent="vera">Talk with Vera<span class="mind-launcher__meta"></span></button>
-            <button type="button" id="mind-launcher-penelope" class="mind-agent-button" data-mind-agent="penelope">Talk with Penelope<span class="mind-launcher__meta"></span></button>
-          </div>
+          <p id="mind-empty" class="metric-caption" hidden>No diary entries in this range yet — open Chat to log one with Penelope.</p>
 
           <div id="mind-board" class="mind-board">
           <div id="mind-hero" class="hero-grid">
             <article class="metric-card chart-card" aria-labelledby="mind-mood-arc-label">
+              <p class="mind-tile__question">How has mood moved?</p>
               <p class="metric-label" id="mind-mood-arc-label">Mood arc</p>
               <svg id="mind-mood-chart" class="line-chart body-chart" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mood score over time">
                 <defs>
@@ -650,6 +646,7 @@
             </article>
 
             <article class="metric-card" aria-labelledby="mind-mood-mix-label">
+              <p class="mind-tile__question">What’s the mix?</p>
               <p class="metric-label" id="mind-mood-mix-label">Mood mix</p>
               <div id="mind-mood-mix" class="mind-mood-mix">
                 <svg id="mind-mood-pie" class="mind-mood-pie" viewBox="0 0 72 72" role="img" aria-label="Diary entries by mood">
@@ -660,6 +657,7 @@
             </article>
 
             <article class="metric-card" aria-labelledby="mind-energy-label">
+              <p class="mind-tile__question">Where is energy sitting?</p>
               <p class="metric-label" id="mind-energy-label">Energy</p>
               <p data-mind="energy-empty" class="metric-caption" hidden>No energy entries in this range yet.</p>
               <div id="mind-energy-rings" class="mind-energy-rings" aria-label="Diary entries by energy">
@@ -688,44 +686,25 @@
             </article>
           </div>
 
-          <div id="mind-cadence" class="support-grid">
-            <article class="metric-card" aria-labelledby="mind-heatmap-label">
-              <p class="metric-label" id="mind-heatmap-label">Diary and Vera cadence</p>
-              <div class="mind-heatmap">
-                <div class="mind-heatmap-row">
-                  <p class="metric-caption">Diary</p>
-                  <div id="mind-heatmap-diary" class="heatmap-grid mind-heatmap-grid" aria-label="Diary days in range"></div>
-                </div>
-                <div class="mind-heatmap-row">
-                  <p class="metric-caption">Vera</p>
-                  <div id="mind-heatmap-vera" class="heatmap-grid mind-heatmap-grid" aria-label="Vera session days in range"></div>
-                </div>
-                <div class="mind-heatmap-row">
-                  <p class="metric-caption">Penelope</p>
-                  <div id="mind-heatmap-penelope" class="heatmap-grid mind-heatmap-grid" aria-label="Penelope diary days in range"></div>
-                </div>
-              </div>
-            </article>
-
-            <article class="metric-card" aria-labelledby="mind-themes-label">
-              <p class="metric-label" id="mind-themes-label">Recurring themes</p>
-              <div id="mind-themes" class="mind-theme-chips" aria-label="Recurring diary tags"></div>
-            </article>
-          </div>
+          <article id="mind-tile-themes" class="metric-card mind-tile" aria-labelledby="mind-themes-label">
+            <p class="mind-tile__question">What keeps coming back?</p>
+            <p class="metric-label" id="mind-themes-label">Recurring themes</p>
+            <div id="mind-themes" class="mind-theme-chips" aria-label="Recurring diary tags"></div>
+          </article>
 
           <div id="mind-silence" class="mind-silence" hidden aria-live="polite"></div>
 
-          <div class="support-grid">
-            <article class="metric-card" aria-labelledby="mind-sessions-label">
-              <p class="metric-label" id="mind-sessions-label">Vera sessions</p>
-              <div id="mind-sessions"></div>
-            </article>
+          <article id="mind-tile-sessions" class="metric-card mind-tile" aria-labelledby="mind-sessions-label">
+            <p class="mind-tile__question">Latest Vera session</p>
+            <p class="metric-label" id="mind-sessions-label">Vera sessions</p>
+            <div id="mind-sessions"></div>
+          </article>
 
-            <article id="mind-tile-insights" class="metric-card mind-tile" aria-labelledby="mind-insights-label">
-              <p class="metric-label" id="mind-insights-label">Mind Insights</p>
-              <div id="mind-insights" class="mind-insight-timeline"></div>
-            </article>
-          </div>
+          <article id="mind-tile-insights" class="metric-card mind-tile" aria-labelledby="mind-insights-label">
+            <p class="mind-tile__question">What still holds?</p>
+            <p class="metric-label" id="mind-insights-label">Mind Insights</p>
+            <div id="mind-insights" class="mind-insight-timeline"></div>
+          </article>
 
           <article id="mind-tile-factors" class="metric-card mind-tile">
             <p class="mind-tile__question">What’s moving my mood?</p>

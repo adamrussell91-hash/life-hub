@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderMind } from '../../js/app/render-mind.js';
+import { readFile } from 'node:fs/promises';
+import { firstSentence, renderMind } from '../../js/app/render-mind.js';
 
 function el(tag = 'div') {
   let text = '';
@@ -157,12 +158,6 @@ function fakeRoot() {
   energyEmpty.hidden = true;
   const hero = el('div');
   hero.id = 'mind-hero';
-  const cadence = el('div');
-  cadence.id = 'mind-cadence';
-  const diaryHeat = el('div');
-  diaryHeat.id = 'mind-heatmap-diary';
-  const veraHeat = el('div');
-  veraHeat.id = 'mind-heatmap-vera';
   const themes = el('div');
   themes.id = 'mind-themes';
   const empty = el('p');
@@ -178,18 +173,6 @@ function fakeRoot() {
   cross.id = 'mind-cross-agent';
   const board = el('div');
   board.id = 'mind-board';
-  const veraMeta = el('span');
-  veraMeta.className = 'mind-launcher__meta';
-  const veraBtn = el('button');
-  veraBtn.id = 'mind-launcher-vera';
-  veraBtn.dataset.mindAgent = 'vera';
-  veraBtn.append(veraMeta);
-  const penelopeMeta = el('span');
-  penelopeMeta.className = 'mind-launcher__meta';
-  const penelopeBtn = el('button');
-  penelopeBtn.id = 'mind-launcher-penelope';
-  penelopeBtn.dataset.mindAgent = 'penelope';
-  penelopeBtn.append(penelopeMeta);
   const threadSheet = el('div');
   threadSheet.id = 'mind-thread-sheet';
   threadSheet.hidden = true;
@@ -212,8 +195,6 @@ function fakeRoot() {
   streakFill.dataset.role = 'fill';
   streakRing.append(streakTrack, streakFill);
   tileStreak.append(streakRing);
-  const penelopeHeat = el('div');
-  penelopeHeat.id = 'mind-heatmap-penelope';
   const tileConstellation = el('article');
   tileConstellation.id = 'mind-tile-constellation';
   const constellation = el('svg');
@@ -267,7 +248,6 @@ function fakeRoot() {
   const waffleHost = el('div');
   waffleHost.id = 'mind-waffle';
   tileWaffle.append(waffleHost);
-  const agentButtons = [veraBtn, penelopeBtn];
   const hosts = {
     '#mind-dashboard': dashboard,
     '#mind-range-control': ranges,
@@ -284,10 +264,6 @@ function fakeRoot() {
     '[data-mind-energy-ring="medium"]': medium,
     '[data-mind-energy-ring="low"]': low,
     '#mind-hero': hero,
-    '#mind-cadence': cadence,
-    '#mind-heatmap-diary': diaryHeat,
-    '#mind-heatmap-vera': veraHeat,
-    '#mind-heatmap-penelope': penelopeHeat,
     '#mind-themes': themes,
     '#mind-empty': empty,
     '#mind-silence': silence,
@@ -296,10 +272,6 @@ function fakeRoot() {
     '#mind-tile-insights': insights,
     '#mind-cross-agent': cross,
     '#mind-board': board,
-    '#mind-launcher-vera': veraBtn,
-    '#mind-launcher-penelope': penelopeBtn,
-    '[data-mind-agent="vera"]': veraBtn,
-    '[data-mind-agent="penelope"]': penelopeBtn,
     '#mind-thread-sheet': threadSheet,
     '#mind-tile-factors': tileFactors,
     '#mind-tile-streak': tileStreak,
@@ -338,7 +310,7 @@ function fakeRoot() {
       return null;
     },
     querySelectorAll(selector) {
-      if (selector === '[data-mind-agent]') return agentButtons;
+      if (selector === '[data-mind-agent]') return [];
       return [];
     },
     _energy: energy,
@@ -347,15 +319,10 @@ function fakeRoot() {
     _sessions: sessions,
     _insights: insights,
     _cross: cross,
-    _diaryHeat: diaryHeat,
-    _veraHeat: veraHeat,
     _themes: themes,
     _hero: hero,
-    _cadence: cadence,
     _dots: dots,
-    _mixLabel: mixLabel,
-    _veraBtn: veraBtn,
-    _penelopeBtn: penelopeBtn
+    _mixLabel: mixLabel
   };
 }
 
@@ -390,7 +357,7 @@ test('renderMind shows empty states for sessions, insights, and cross-agent', ()
   assert.equal(root._silence.children.length, 0);
 });
 
-test('renderMind renders energy rings, session mood-shift, insights, heatmap, and silence', () => {
+test('renderMind renders energy rings, session mood-shift, insights, and silence', () => {
   const root = fakeRoot();
   renderMind(root, emptyModel({
     empty: false,
@@ -416,7 +383,8 @@ test('renderMind renders energy rings, session mood-shift, insights, heatmap, an
       date: '2026-08-10',
       theme: 'Weekend',
       closingQuestion: 'What is the weekend for?',
-      insight: 'Rest is not a prize.',
+      insight: 'Rest is not a prize. Keep the rest of this off the board.',
+      observation: 'Long observation that must not dump onto the board.',
       moodAtOpen: 'low',
       moodAtClose: 'good',
       crossAgentNote: null,
@@ -427,7 +395,7 @@ test('renderMind renders energy rings, session mood-shift, insights, heatmap, an
       entryType: 'Mind Insight',
       title: 'Weekend',
       status: 'Still Active',
-      body: 'Rest is not a prize.'
+      body: 'Rest is not a prize. A second sentence stays in the sheet.'
     }],
     crossAgentLines: ['Vera→Penelope: ask what the weekend is actually for.'],
     silence: true,
@@ -442,55 +410,72 @@ test('renderMind renders energy rings, session mood-shift, insights, heatmap, an
   assert.match(card.textContent, /10\/08\/26/);
   assert.doesNotMatch(card.textContent, /2026-08-10/);
   assert.match(card.textContent, /mood lifted/);
+  assert.doesNotMatch(card.textContent, /What is the weekend for/);
+  assert.doesNotMatch(card.textContent, /Keep the rest of this off the board/);
   assert.equal(card.querySelector('.mind-session-shift')?.dataset.shift, 'improved');
   const insight = root._insights.querySelector('.governance-entry');
   assert.ok(insight);
   assert.equal(insight.dataset.current, 'true');
   assert.match(insight.textContent, /Mind Insight/);
+  assert.doesNotMatch(insight.textContent, /second sentence stays in the sheet/);
   assert.match(root._cross.textContent, /Vera→Penelope/);
   assert.equal(root._cross.querySelector('[data-agent="vera"]')?.style.borderLeftColor, '#37598A');
   assert.equal(root._silence.hidden, false);
   assert.match(root._silence.textContent, /12 days since diary/);
   assert.match(root._silence.textContent, /9 days since a Vera session/);
-  assert.equal(root._diaryHeat.children.length, 30);
-  assert.equal(root._diaryHeat.children.filter(tile => tile.dataset.hit === 'true').length, 2);
-  assert.equal(root._veraHeat.children.filter(tile => tile.dataset.hit === 'true').length, 1);
   assert.match(root._themes.textContent, /school/);
+  assert.doesNotMatch(root._themes.textContent, /school · 2/);
   assert.match(root._mixLabel.textContent, /Good/);
   assert.equal(root._dots.children.length, 2);
   assert.equal(root._dots.children[0].dataset.mood, 'low');
 });
 
-test('renderMind hides hero and cadence rows in the empty state', () => {
+test('renderMind hides hero in the empty state and does not require launchers', () => {
   const root = fakeRoot();
   renderMind(root, emptyModel({ empty: true }));
   assert.equal(root._hero.hidden, true);
-  assert.equal(root._cadence.hidden, true);
-  assert.equal(root._veraBtn.hidden, false);
-  assert.equal(root._penelopeBtn.hidden, false);
+  assert.equal(root.querySelector('#mind-launcher-vera'), null);
+  assert.equal(root.querySelector('#mind-cadence'), null);
 });
 
-function modelWithLaunchers() {
-  return emptyModel({
-    empty: false,
-    launchers: {
-      vera: { title: 'The Filter', daysAgo: 2, outcome: 'mood lifted' },
-      penelope: { daysAgo: 0, outcome: 'logged' }
-    }
-  });
-}
+test('firstSentence keeps one clause', () => {
+  assert.equal(firstSentence('Rest is not a prize. Keep going.'), 'Rest is not a prize.');
+  assert.equal(firstSentence(''), '');
+});
 
-test('renderMind writes launcher context and keeps agent clicks', () => {
+test('renderMind caps insights to three scan rows', () => {
   const root = fakeRoot();
-  const opens = [];
-  renderMind(root, modelWithLaunchers(), {
-    onOpenAgent: slug => opens.push(slug),
-    agentsConfig: {}
-  });
-  assert.match(root.querySelector('#mind-launcher-vera').textContent, /Filter|mood lifted|Vera/i);
-  const vera = root.querySelector('[data-mind-agent="vera"]');
-  vera.listeners.find(([type]) => type === 'click')[1]();
-  assert.deepEqual(opens, ['vera']);
+  renderMind(root, emptyModel({
+    empty: false,
+    insights: [
+      { dateKey: '2026-08-10', title: 'One', body: 'First.' },
+      { dateKey: '2026-08-09', title: 'Two', body: 'Second.' },
+      { dateKey: '2026-08-08', title: 'Three', body: 'Third.' },
+      { dateKey: '2026-08-07', title: 'Four', body: 'Hidden.' }
+    ]
+  }));
+  assert.doesNotMatch(root._insights.textContent, /Hidden/);
+  assert.match(root._insights.textContent, /more in sheet/i);
+});
+
+test('renderMind paints honest empty instead of sparse chord, sankey, radial, and tension', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({
+    empty: false,
+    themeCooccurrence: [{ themeA: 'work', themeB: 'shame', count: 1 }],
+    moodTransitions: [{ from: 'low', to: 'good', count: 1 }],
+    moodSeries: [],
+    tensions: []
+  }));
+  assert.match(root.querySelector('#mind-tile-chord').textContent, /Need 3 paired themes/);
+  assert.equal(root.querySelector('#mind-chord').children.length, 0);
+  assert.match(root.querySelector('#mind-tile-transitions').textContent, /Need 3 transitions/);
+  assert.equal(root.querySelector('#mind-sankey').children.length, 0);
+  assert.match(root.querySelector('#mind-tile-radial').textContent, /Need /);
+  assert.equal(root.querySelector('#mind-radial-year').children.length, 0);
+  const tension = root.querySelector('#mind-tension');
+  assert.equal(tension.hidden, false);
+  assert.match(tension.textContent, /Need /);
 });
 
 test('renderMind paints factor bars and streak label', () => {
@@ -505,7 +490,7 @@ test('renderMind paints factor bars and streak label', () => {
   assert.match(root.querySelector('#mind-tile-streak').textContent, /3/);
 });
 
-test('renderMind draws constellation nodes and hides empty tension', () => {
+test('renderMind draws constellation nodes and keeps empty tension as honest empty', () => {
   const root = fakeRoot();
   renderMind(root, emptyModel({
     empty: false,
@@ -515,7 +500,8 @@ test('renderMind draws constellation nodes and hides empty tension', () => {
   }));
   const node = root.querySelector('#mind-constellation').querySelector('[data-theme="work"]');
   assert.ok(node);
-  assert.equal(root.querySelector('#mind-tension').hidden, true);
+  assert.equal(root.querySelector('#mind-tension').hidden, false);
+  assert.match(root.querySelector('#mind-tension').textContent, /Need /);
 });
 
 test('renderMind paints waffle and stream marks', () => {
@@ -575,8 +561,24 @@ test('renderMind shows human theme labels instead of snake_case keys', () => {
   }));
   assert.match(root.querySelector('#mind-themes').textContent, /Free will/);
   assert.doesNotMatch(root.querySelector('#mind-themes').textContent, /free_will/);
+  assert.doesNotMatch(root.querySelector('#mind-themes').textContent, /Free will · 1/);
   assert.match(root.querySelector('#mind-tile-constellation').textContent, /Free will/);
   assert.match(root.querySelector('#mind-butterfly').textContent, /Free will/);
   const mark = root.querySelector('#mind-constellation').querySelector('[data-theme="free_will"]');
   assert.ok(mark?.listeners?.some(([type]) => type === 'click'));
+});
+
+test('index.html Mind board has no Talk launchers or cadence heatmap', async () => {
+  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const start = html.indexOf('id="mind-dashboard"');
+  const end = html.indexOf('id="central-node-dashboard"');
+  const mind = html.slice(start, end);
+  assert.doesNotMatch(mind, /id="mind-launcher-vera"/);
+  assert.doesNotMatch(mind, /id="mind-launcher-penelope"/);
+  assert.doesNotMatch(mind, /Talk with Vera/);
+  assert.doesNotMatch(mind, /Talk with Penelope/);
+  assert.doesNotMatch(mind, /id="mind-cadence"/);
+  assert.doesNotMatch(mind, /id="mind-heatmap-diary"/);
+  assert.match(mind, /id="mind-themes"/);
+  assert.match(mind, /id="mind-tile-streak"/);
 });

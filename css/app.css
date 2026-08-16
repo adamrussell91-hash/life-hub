@@ -2499,14 +2499,6 @@ main { max-width: 76rem; margin: 0 auto; }
   50% { opacity: 1; }
 }
 
-.mind-agents {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  gap: 0.65rem;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  margin-top: 0.5rem;
-}
 [data-sync-quiet] .chart-animating [data-role="line"],
 [data-sync-quiet] .chart-animating [data-role="area"],
 [data-sync-quiet] .mind-mood-dot,
@@ -2517,28 +2509,6 @@ main { max-width: 76rem; margin: 0 auto; }
 [data-sync-quiet] .metric-ring-fill {
   animation: none !important;
   transition: none !important;
-}
-.mind-agent-button {
-  border: 0;
-  border-radius: 0.85rem;
-  padding: 0.9rem 1rem;
-  background: var(--penelope-accent, #8F373E);
-  color: #fff;
-  font: inherit;
-  font-weight: var(--weight-bold);
-  cursor: pointer;
-  min-height: 44px;
-}
-.mind-agent-button--vera {
-  background: var(--vera-accent, #37598A);
-}
-.mind-launcher__meta {
-  display: block;
-  margin-top: 0.25rem;
-  font-weight: 500;
-  font-size: var(--text-xs, 0.7rem);
-  color: var(--muted);
-  opacity: 0.85;
 }
 .mind-board { position: relative; min-height: 12rem; }
 .mind-tile {
@@ -2561,8 +2531,7 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 600;
 }
 .mind-tile [tabindex],
-.mind-theme-chip,
-.mind-agent-button {
+.mind-theme-chip {
   cursor: pointer;
 }
 .mind-tile [tabindex]:hover,
@@ -2578,6 +2547,11 @@ main { max-width: 76rem; margin: 0 auto; }
   color: var(--wave);
 }
 .mind-tile__legend { color: var(--muted); margin: 0 0 12px; }
+.mind-honest-empty {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: var(--text-base);
+}
 .mind-factor-fill {
   transform: scaleX(0);
   transform-origin: left center;
@@ -2665,16 +2639,6 @@ main { max-width: 76rem; margin: 0 auto; }
 .metric-ring--mind-high .metric-ring-fill { stroke: var(--ring-mind-high); }
 .metric-ring--mind-medium .metric-ring-fill { stroke: var(--ring-mind-medium); }
 .metric-ring--mind-low .metric-ring-fill { stroke: var(--ring-mind-low); }
-.mind-heatmap-grid {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 3px;
-  margin-top: 0;
-}
-.mind-heatmap-grid .heatmap-tile {
-  aspect-ratio: 1;
-  min-height: 0;
-  border-radius: 2px;
-}
 .mind-chart {
   width: 100%;
   height: auto;
@@ -2721,9 +2685,6 @@ main { max-width: 76rem; margin: 0 auto; }
 .mind-chart--bump path {
   fill: none;
 }
-.mind-heatmap-grid .heatmap-tile[data-hit="true"] { background: var(--heatmap-diary-hit); }
-#mind-heatmap-vera .heatmap-tile[data-hit="true"] { background: var(--heatmap-vera-hit); }
-.mind-heatmap-grid .heatmap-tile[data-today="true"] { box-shadow: 0 0 0 2px color-mix(in srgb, var(--wave) 55%, transparent); }
 .mind-theme-chips {
   display: flex;
   flex-wrap: wrap;
@@ -2822,8 +2783,8 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .mind-session-card__insight {
   margin: 0.45rem 0 0;
-  color: var(--high-sea);
-  font-weight: 600;
+  color: var(--marine);
+  font-weight: 500;
 }
 .governance-empty {
   margin: 0;
@@ -2967,7 +2928,6 @@ main { max-width: 76rem; margin: 0 auto; }
   .mind-insight {
     animation: none;
   }
-  .mind-heatmap-grid .heatmap-tile { transition: none; }
 }
 
 .floating-chat-button {

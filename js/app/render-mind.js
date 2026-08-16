@@ -4,14 +4,13 @@ import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { buildBumpLines } from './chart-kit/bump.js';
 import { buildChordLayout } from './chart-kit/chord-layout.js';
-import { buildHeatmapRow } from './chart-kit/heatmap.js';
 import { buildHorizonBands } from './chart-kit/horizon.js';
 import { packMasonry } from './chart-kit/masonry.js';
 import { buildDistributionPie } from './chart-kit/pie.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
 import { buildSankeyFlow } from './chart-kit/sankey-flow.js';
 import { buildStreamPaths } from './chart-kit/stream.js';
-import { entriesForTheme, MOOD_ORDER, rangeWindow, displayThemeLabel } from './mind-model.js';
+import { entriesForTheme, MOOD_ORDER, displayThemeLabel } from './mind-model.js';
 import { formatDisplayDate, isCalendarDate } from '../core/time.js';
 import { openMindThreadSheet } from './mind-thread-sheet.js';
 
@@ -53,6 +52,15 @@ export function moodShiftDirection(moodAtOpen, moodAtClose) {
   return 'flat';
 }
 
+export function firstSentence(text, max = 140) {
+  const raw = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  const match = raw.match(/^.+?[.!?](?=\s|$)/);
+  let sentence = (match ? match[0] : raw).trim();
+  if (sentence.length > max) sentence = `${sentence.slice(0, max - 1).trimEnd()}…`;
+  return sentence;
+}
+
 export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConfig, onWatchlistChange, quiet = false } = {}) {
   const dashboard = root.querySelector('#mind-dashboard');
   if (!dashboard || !model) return;
@@ -92,17 +100,13 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConf
   const veraColour = agentColour(agentsConfig, 'vera');
   const penelopeColour = agentColour(agentsConfig, 'penelope');
   dashboard.style?.setProperty?.('--vera-accent', veraColour);
-  dashboard.style?.setProperty?.('--heatmap-vera-hit', veraColour);
   dashboard.style?.setProperty?.('--penelope-accent', penelopeColour);
 
   const empty = root.querySelector('#mind-empty');
   if (empty) empty.hidden = !model.empty;
-  for (const selector of ['#mind-hero', '#mind-cadence']) {
-    const row = root.querySelector(selector);
-    if (row) row.hidden = Boolean(model.empty);
-  }
+  const hero = root.querySelector('#mind-hero');
+  if (hero) hero.hidden = Boolean(model.empty);
 
-  renderLaunchers(root, model);
   renderFactorPanel(root, model);
   renderStreak(root, model);
   renderConstellation(root, model);
@@ -112,7 +116,6 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConf
     renderMoodChart(root, model.moodSeries);
     renderMoodMix(root, model.byMood);
     renderEnergyRings(root, model);
-    renderCadenceHeatmap(root, model);
     renderThemeChips(root, model.themes);
   }
   renderSilenceBanner(root, model);
@@ -137,28 +140,6 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConf
 
   packMindBoard(root);
   dashboard.removeAttribute('hidden');
-}
-
-function formatDaysAgo(daysAgo) {
-  if (daysAgo == null || Number.isNaN(Number(daysAgo))) return '';
-  const days = Number(daysAgo);
-  if (days === 0) return 'today';
-  if (days === 1) return '1 day ago';
-  return `${days} days ago`;
-}
-
-function launcherMeta(launcher) {
-  if (!launcher) return '';
-  return [launcher.title, formatDaysAgo(launcher.daysAgo), launcher.outcome].filter(Boolean).join(' · ');
-}
-
-function renderLaunchers(root, model) {
-  const launchers = model.launchers ?? {};
-  for (const [id, launcher] of [['#mind-launcher-vera', launchers.vera], ['#mind-launcher-penelope', launchers.penelope]]) {
-    const button = root.querySelector(id);
-    const meta = button?.querySelector?.('.mind-launcher__meta');
-    if (meta) meta.textContent = launcherMeta(launcher);
-  }
 }
 
 function renderFactorPanel(root, model) {
@@ -311,10 +292,6 @@ function renderTension(root, model) {
   const tile = root.querySelector('#mind-tension');
   if (!tile) return;
   const tensions = model.tensions ?? [];
-  if (!tensions.length) {
-    tile.hidden = true;
-    return;
-  }
   tile.hidden = false;
   const tension = tensions[0];
   let svg = tile.querySelector('#mind-tension-chart') ?? tile.querySelector('svg');
@@ -324,6 +301,11 @@ function renderTension(root, model) {
     svg.setAttribute('viewBox', '0 0 240 120');
     tile.append(svg);
   }
+  if (!paintChartOrEmpty(root, tile, svg, {
+    need: 1,
+    have: tensions.length,
+    unit: 'stated/revealed split'
+  })) return;
   svg.replaceChildren();
   const poles = [
     { x: 56, y: 56, label: 'Stated' },
@@ -524,47 +506,32 @@ function renderEnergyRings(root, model) {
   }
 }
 
-function renderCadenceHeatmap(root, model) {
-  let bounds;
-  try {
-    bounds = rangeWindow(model.date, model.range);
-  } catch {
-    return;
+function paintChartOrEmpty(root, host, svg, { need, have, unit }) {
+  const count = Number(have) || 0;
+  const threshold = Number(need) || 0;
+  const qualifies = count >= threshold;
+  const children = [...(host?.children ?? [])];
+  let empty = children.find(node => String(node.className || '').split(/\s+/).includes('mind-honest-empty'));
+  if (svg) {
+    svg.hidden = !qualifies;
+    if (!qualifies) svg.replaceChildren?.();
+    else svg.removeAttribute?.('hidden');
   }
-  const diaryHits = [...new Set((model.moodSeries ?? []).map(point => point.date))];
-  const sessionHits = [...new Set((model.sessions ?? []).map(session => session.date))];
-  paintHeatmapRow(root, '#mind-heatmap-diary', buildHeatmapRow({
-    from: bounds.from,
-    to: bounds.to,
-    today: model.date,
-    hitDates: diaryHits
-  }), 'diary');
-  paintHeatmapRow(root, '#mind-heatmap-vera', buildHeatmapRow({
-    from: bounds.from,
-    to: bounds.to,
-    today: model.date,
-    hitDates: sessionHits
-  }), 'vera');
-  paintHeatmapRow(root, '#mind-heatmap-penelope', buildHeatmapRow({
-    from: bounds.from,
-    to: bounds.to,
-    today: model.date,
-    hitDates: model.cadence?.penelope ?? diaryHits
-  }), 'penelope');
-}
-
-function paintHeatmapRow(root, selector, tiles, kind) {
-  const grid = root.querySelector(selector);
-  if (!grid) return;
-  grid.replaceChildren();
-  for (const tile of tiles) {
-    const node = root.createElement('span');
-    node.className = `heatmap-tile heatmap-tile--${kind}`;
-    node.dataset.hit = String(tile.hit);
-    if (tile.today) node.dataset.today = 'true';
-    node.title = formatDisplayDate(tile.date);
-    grid.append(node);
+  if (qualifies) {
+    if (empty) {
+      empty.hidden = true;
+      empty.textContent = '';
+    }
+    return true;
   }
+  if (!empty) {
+    empty = root.createElement('p');
+    empty.className = 'mind-honest-empty metric-caption';
+    host.append(empty);
+  }
+  empty.hidden = false;
+  empty.textContent = `Need ${threshold} ${unit}. ${count} so far.`;
+  return false;
 }
 
 function renderThemeChips(root, themes) {
@@ -578,18 +545,18 @@ function renderThemeChips(root, themes) {
     host.append(caption);
     return;
   }
-  const max = Math.max(...themes.map(theme => theme.value));
+  const caption = root.createElement('p');
+  caption.className = 'metric-caption';
+  caption.textContent = `${themes.length} in this range`;
+  host.append(caption);
   themes.forEach((theme, index) => {
     const chip = root.createElement('span');
     chip.className = 'mind-theme-chip';
-    const weight = max > 0 ? theme.value / max : 0;
-    chip.style.fontSize = weight > 0.66 ? 'var(--text-md)' : weight > 0.33 ? 'var(--text-base)' : 'var(--text-sm)';
-    chip.style.background = `color-mix(in srgb, var(--glass) ${Math.round(70 + weight * 30)}%, var(--wave))`;
     chip.style.animationDelay = root.querySelector('#mind-dashboard')?._quiet
       ? '0ms'
       : `${Math.min(index, 5) * 40}ms`;
     if (index >= 6) chip.classList.add('mind-theme-chip--group');
-    chip.textContent = `${theme.label} · ${theme.value}`;
+    chip.textContent = theme.label;
     host.append(chip);
   });
 }
@@ -621,32 +588,35 @@ function renderSessionList(root, sessions) {
     host.append(empty);
     return;
   }
-  for (const session of sessions) {
-    const card = root.createElement('article');
-    card.className = 'mind-session-card';
-    const date = root.createElement('p');
-    date.className = 'mind-session-card__date';
-    date.textContent = formatDisplayDate(session.date);
-    const title = root.createElement('h3');
-    title.className = 'mind-session-card__theme';
-    title.textContent = session.theme || 'Vera session';
-    card.append(date, title);
-    if (session.closingQuestion) {
-      const question = root.createElement('p');
-      question.className = 'mind-session-card__question';
-      question.textContent = session.closingQuestion;
-      card.append(question);
-    }
-    if (session.insight) {
-      const insight = root.createElement('p');
-      insight.className = 'mind-session-card__insight';
-      insight.textContent = session.insight;
-      card.append(insight);
-    }
-    const shift = renderMoodShift(root, session);
-    if (shift) card.append(shift);
-    host.append(card);
+  const latest = [...sessions].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+  const card = root.createElement('article');
+  card.className = 'mind-session-card';
+  const date = root.createElement('p');
+  date.className = 'mind-session-card__date';
+  date.textContent = formatDisplayDate(latest.date);
+  const title = root.createElement('h3');
+  title.className = 'mind-session-card__theme';
+  title.textContent = latest.theme || 'Vera session';
+  card.append(date, title);
+  const line = firstSentence(latest.insight || latest.observation);
+  if (line) {
+    const insight = root.createElement('p');
+    insight.className = 'mind-session-card__insight';
+    insight.textContent = line;
+    card.append(insight);
   }
+  const shift = renderMoodShift(root, latest);
+  if (shift) card.append(shift);
+  bindMark(card, root, {
+    title: latest.theme || 'Vera session',
+    rows: [{
+      date: latest.date,
+      title: latest.theme || 'Vera session',
+      excerpt: [latest.insight, latest.observation, latest.closingQuestion].filter(Boolean).join('\n\n')
+    }],
+    continueAgent: 'vera'
+  });
+  host.append(card);
 }
 
 function renderMoodShift(root, session) {
@@ -711,14 +681,6 @@ function quietMotion(root) {
   return { quiet: Boolean(root.querySelector('#mind-dashboard')?._quiet) };
 }
 
-function sparseCaption(root, host, count, noun) {
-  if (count) return;
-  const caption = root.createElement('p');
-  caption.className = 'metric-caption';
-  caption.textContent = `${count} ${noun} in this range`;
-  host.append(caption);
-}
-
 function themeRows(model, theme) {
   return entriesForTheme(model.diary ?? [], model.sessions ?? [], theme);
 }
@@ -747,9 +709,14 @@ function dateRows(model, date) {
 function renderStreamTile(root, model) {
   const svg = root.querySelector('#mind-stream');
   if (!svg) return;
-  svg.replaceChildren();
+  const tile = root.querySelector('#mind-tile-stream') ?? svg.parentNode;
   const weekly = model.themeWeekly ?? { weeks: [], series: [] };
   const paths = buildStreamPaths(weekly, { width: 320, height: 168 });
+  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: paths.length, unit: 'weekly theme bands' })) {
+    paintLegend(root, tile, []);
+    return;
+  }
+  svg.replaceChildren();
   paths.forEach((band, index) => {
     const path = createSvg(root, 'path');
     path.setAttribute('d', band.d);
@@ -765,15 +732,17 @@ function renderStreamTile(root, model) {
     label: displayThemeLabel(band.key),
     swatch: STREAM_FILLS[index % STREAM_FILLS.length]
   })));
-  sparseCaption(root, svg.parentNode ?? svg, paths.length, 'themes');
   animateAreaReveal(svg, quietMotion(root));
 }
 
 function renderSankeyTile(root, model) {
   const svg = root.querySelector('#mind-sankey');
   if (!svg) return;
+  const tile = root.querySelector('#mind-tile-transitions') ?? svg.parentNode;
+  const transitions = model.moodTransitions ?? [];
+  if (!paintChartOrEmpty(root, tile, svg, { need: 3, have: transitions.length, unit: 'transitions' })) return;
   svg.replaceChildren();
-  const chart = buildSankeyFlow(model.moodTransitions ?? [], { width: 320, height: 200 });
+  const chart = buildSankeyFlow(transitions, { width: 320, height: 200 });
   for (const link of chart.links) {
     const mark = createSvg(root, 'path');
     const x0 = link.x0 ?? 20;
@@ -801,16 +770,20 @@ function renderSankeyTile(root, model) {
     label.textContent = displayThemeLabel(node.id);
     svg.append(label);
   }
-  sparseCaption(root, svg.parentNode ?? svg, chart.links.length, 'transitions');
 }
 
 function renderBumpTile(root, model) {
   const svg = root.querySelector('#mind-bump');
   if (!svg) return;
-  svg.replaceChildren();
+  const tile = root.querySelector('#mind-tile-bump') ?? svg.parentNode;
   const ranks = model.themeRanks ?? [];
   const themes = model.themeWeekly?.themes ?? Object.keys(ranks[0]?.rankByTheme ?? {});
   const lines = buildBumpLines(ranks, themes, { width: 320, height: 168 });
+  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: lines.length, unit: 'rank lines' })) {
+    paintLegend(root, tile, []);
+    return;
+  }
+  svg.replaceChildren();
   lines.forEach((line, index) => {
     const path = createSvg(root, 'path');
     path.setAttribute('d', line.linePath || '');
@@ -828,15 +801,20 @@ function renderBumpTile(root, model) {
     label: displayThemeLabel(line.key),
     swatch: STREAM_FILLS[index % STREAM_FILLS.length]
   })));
-  sparseCaption(root, svg.parentNode ?? svg, lines.length, 'rank lines');
   animateAreaReveal(svg, quietMotion(root));
 }
 
 function renderChordTile(root, model) {
   const svg = root.querySelector('#mind-chord');
   if (!svg) return;
+  const tile = root.querySelector('#mind-tile-chord') ?? svg.parentNode;
+  const pairs = model.themeCooccurrence ?? [];
+  if (!paintChartOrEmpty(root, tile, svg, { need: 3, have: pairs.length, unit: 'paired themes' })) {
+    paintLegend(root, tile, []);
+    return;
+  }
   svg.replaceChildren();
-  const layout = buildChordLayout(model.themeCooccurrence ?? []);
+  const layout = buildChordLayout(pairs);
   const cx = 120;
   const cy = 120;
   const radius = 78;
@@ -863,12 +841,14 @@ function renderChordTile(root, model) {
     label: displayThemeLabel(arc.key),
     swatch: 'var(--wave)'
   })));
-  sparseCaption(root, svg.parentNode ?? svg, layout.arcs.length, 'themes');
 }
 
 function renderRadialTile(root, model) {
   const svg = root.querySelector('#mind-radial-year');
   if (!svg) return;
+  const tile = root.querySelector('#mind-tile-radial') ?? svg.parentNode;
+  const moodDays = (model.moodSeries ?? []).filter(point => point.mood || Number.isFinite(Number(point.value))).length;
+  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: moodDays, unit: 'mood days this year' })) return;
   svg.replaceChildren();
   const year = Number(String(model.date ?? '').slice(0, 4)) || 2026;
   const byDate = {};
@@ -912,7 +892,7 @@ function renderRadialTile(root, model) {
 function renderHorizonTile(root, model) {
   const host = root.querySelector('#mind-horizon');
   if (!host) return;
-  host.replaceChildren();
+  const tile = root.querySelector('#mind-tile-horizon') ?? host;
   const energyMap = { high: 3, medium: 2, low: 1 };
   const metrics = [
     { key: 'mood', points: (model.moodSeries ?? []).map(point => ({ date: point.date, value: point.value })) }
@@ -922,6 +902,11 @@ function renderHorizonTile(root, model) {
     .map(entry => ({ date: entry.date, value: energyMap[entry.energy] ?? 0 }));
   if (energyPoints.length) metrics.push({ key: 'energy', points: energyPoints });
   const bands = buildHorizonBands(metrics, { width: 320, height: 18 });
+  if (!paintChartOrEmpty(root, tile, null, { need: 1, have: bands.length, unit: 'metrics' })) {
+    host.replaceChildren();
+    return;
+  }
+  host.replaceChildren();
   for (const band of bands) {
     const row = root.createElement('div');
     row.className = 'mind-horizon-row';
@@ -952,14 +937,18 @@ function renderHorizonTile(root, model) {
     row.append(caption, svg);
     host.append(row);
   }
-  sparseCaption(root, host, bands.length, 'metrics');
 }
 
 function renderButterflyTile(root, model) {
   const host = root.querySelector('#mind-butterfly');
   if (!host) return;
-  host.replaceChildren();
+  const tile = root.querySelector('#mind-tile-butterfly') ?? host;
   const rows = model.butterfly ?? [];
+  if (!paintChartOrEmpty(root, tile, null, { need: 1, have: rows.length, unit: 'themes' })) {
+    host.replaceChildren();
+    return;
+  }
+  host.replaceChildren();
   const max = Math.max(1, ...rows.flatMap(row => [row.veraCount, row.penelopeCount]));
   for (const row of rows) {
     const wrap = root.createElement('div');
@@ -981,7 +970,6 @@ function renderButterflyTile(root, model) {
     wrap.append(vera, label, penelope);
     host.append(wrap);
   }
-  sparseCaption(root, host, rows.length, 'themes');
 }
 
 function renderLexicalTile(root, model, onWatchlistChange) {
@@ -989,31 +977,34 @@ function renderLexicalTile(root, model, onWatchlistChange) {
   if (!host) return;
   host.replaceChildren();
   const series = model.lexical ?? [];
+  const tile = root.querySelector('#mind-tile-lexical') ?? host;
   const svg = createSvg(root, 'svg');
   svg.setAttribute('viewBox', '0 0 320 160');
   svg.setAttribute('class', 'mind-chart mind-chart--lexical');
-  series.forEach((item, index) => {
-    const chart = buildAreaLine(
-      (item.points ?? []).map(point => ({ date: point.date, value: point.count })),
-      { width: 320, height: 160, padding: 16 }
-    );
-    const path = createSvg(root, 'path');
-    path.setAttribute('d', chart.linePath || '');
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', STREAM_FILLS[index % STREAM_FILLS.length]);
-    path.setAttribute('stroke-width', '2.5');
-    bindMark(path, root, {
-      title: item.term,
-      rows: [{ date: '', title: item.term, excerpt: 'Language watchlist' }]
+  if (paintChartOrEmpty(root, tile, svg, { need: 1, have: series.length, unit: 'watchlist terms' })) {
+    series.forEach((item, index) => {
+      const chart = buildAreaLine(
+        (item.points ?? []).map(point => ({ date: point.date, value: point.count })),
+        { width: 320, height: 160, padding: 16 }
+      );
+      const path = createSvg(root, 'path');
+      path.setAttribute('d', chart.linePath || '');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', STREAM_FILLS[index % STREAM_FILLS.length]);
+      path.setAttribute('stroke-width', '2.5');
+      bindMark(path, root, {
+        title: item.term,
+        rows: [{ date: '', title: item.term, excerpt: 'Language watchlist' }]
+      });
+      svg.append(path);
     });
-    svg.append(path);
-  });
+    paintLegend(root, host, series.map((item, index) => ({
+      label: item.term,
+      swatch: STREAM_FILLS[index % STREAM_FILLS.length]
+    })));
+    animateAreaReveal(svg, quietMotion(root));
+  }
   host.append(svg);
-  paintLegend(root, host, series.map((item, index) => ({
-    label: item.term,
-    swatch: STREAM_FILLS[index % STREAM_FILLS.length]
-  })));
-  animateAreaReveal(svg, quietMotion(root));
   const form = root.createElement('div');
   form.className = 'mind-lexical-form';
   const input = root.createElement('input');
@@ -1029,14 +1020,18 @@ function renderLexicalTile(root, model, onWatchlistChange) {
   });
   form.append(input, button);
   host.append(form);
-  sparseCaption(root, host, series.length, 'terms');
 }
 
 function renderWaffleTile(root, model) {
   const host = root.querySelector('#mind-waffle');
   if (!host) return;
-  host.replaceChildren();
+  const tile = root.querySelector('#mind-tile-waffle') ?? host;
   const cells = model.waffle ?? [];
+  if (!paintChartOrEmpty(root, tile, null, { need: 1, have: cells.length, unit: 'entries' })) {
+    host.replaceChildren();
+    return;
+  }
+  host.replaceChildren();
   for (const cell of cells) {
     const button = root.createElement('button');
     button.type = 'button';
@@ -1048,7 +1043,6 @@ function renderWaffleTile(root, model) {
     });
     host.append(button);
   }
-  sparseCaption(root, host, cells.length, 'entries');
 }
 
 const RESURFACING_DISMISS_KEY = 'life-hub-mind-resurfacing-dismissed';
@@ -1106,7 +1100,8 @@ function renderInsightList(root, insights, resurfacing) {
     host.append(empty);
     return;
   }
-  insights.forEach((entry, index) => {
+  const visible = insights.slice(0, 3);
+  visible.forEach((entry, index) => {
     const block = root.createElement('article');
     block.className = 'governance-entry mind-insight';
     if (index === 0) block.dataset.current = 'true';
@@ -1121,20 +1116,29 @@ function renderInsightList(root, insights, resurfacing) {
       title.textContent = entry.title;
       block.append(title);
     }
-    if (entry.status) {
-      const status = root.createElement('p');
-      status.className = 'governance-entry-status';
-      status.textContent = entry.status;
-      block.append(status);
-    }
-    if (entry.body) {
+    const line = firstSentence(entry.body);
+    if (line) {
       const body = root.createElement('p');
       body.className = 'governance-entry-body';
-      body.textContent = entry.body;
+      body.textContent = line;
       block.append(body);
     }
+    bindMark(block, root, {
+      title: entry.title || 'Mind Insight',
+      rows: [{
+        date: entry.dateKey,
+        title: entry.title || entry.entryType || 'Mind Insight',
+        excerpt: entry.body || ''
+      }]
+    });
     host.append(block);
   });
+  if (insights.length > 3) {
+    const more = root.createElement('p');
+    more.className = 'metric-caption';
+    more.textContent = 'more in sheet';
+    host.append(more);
+  }
 }
 
 function renderCrossAgentStrip(root, lines, { veraColour, penelopeColour } = {}) {
