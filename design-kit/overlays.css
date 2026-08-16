@@ -1,7 +1,7 @@
 /* Hub overlays — the only allowed visual divergence.
  *
  * Set data-hub on <html>. Do not fork the palette, type scale, or spacing.
- * Teaching: more glass, more tiles. Life: tiles, flatter. Knowledge: less glass.
+ * Teaching / Tasks: more glass, more tiles. Life: tiles, flatter. Knowledge: less glass.
  */
 
 :root {
@@ -12,7 +12,8 @@
   --hub-elev-card: var(--elev-3);
 }
 
-html[data-hub="teaching"] {
+html[data-hub="teaching"],
+html[data-hub="tasks"] {
   --hub-glass-fill: rgba(255, 255, 255, 0.62);
   --hub-glass-blur: 22px;
   --hub-tile-gap: var(--space-4);

@@ -1,13 +1,17 @@
 # Hub design kit — agent instructions
 
-This folder is the design source of truth for Adam’s hub sites (Teaching, Life, Knowledge, and any new hub). Read it **before** writing or restyling UI.
+This folder is the design source of truth for Adam’s hub sites (Teaching, Life, Knowledge, Tasks, and any new hub). Read it **before** writing or restyling UI.
+
+Tasks Hub agents: also read `TASKS.md` (Teaching chrome, board home, graph/charts borrowed from Knowledge and Life).
 
 ## Grab these files
 
 1. `css/tokens.css` — closed palette, type, space, radius, elevation
 2. `css/overlays.css` — the only per-hub differences (glass / tile density)
-3. `css/chrome.css` — rail, page header, buttons, confirm cards (new hubs)
-4. `snippets/` — copy the HTML, then wire behaviour
+3. `css/actions.css` — `.btn`, Wave `:focus-visible`, `.confirm-card` (import in existing hubs)
+4. `css/sign-in.css` — passphrase gate (brand, Sign in, labelled field)
+5. `css/chrome.css` — rail, page header, buttons, confirm cards (new hubs)
+6. `snippets/` — copy the HTML, then wire behaviour
 
 Canonical repo: `/Users/adamrussell/Projects/hub-design-kit`  
 GitHub: https://github.com/adamrussell91-hash/hub-design-kit  
@@ -27,6 +31,7 @@ Each hub also has a copy at `design-kit/` so this workspace can see it.
 | Hub | Overlay |
 |-----|---------|
 | `teaching` | More glass, more tiles |
+| `tasks` | Clone of Teaching. Product brief: `TASKS.md` |
 | `life` | Tiles, flatter (less blur, tighter gap) |
 | `knowledge` | Less glass, fewer tiles, icon rail (`--rail-width: 5.75rem`) |
 
