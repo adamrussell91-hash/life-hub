@@ -70,7 +70,7 @@ class FakeDocument extends EventTarget {
       ['#app', new FakeElement()],
       ['#sign-in-form', new FakeElement()],
       ['.sign-in__supporting', new FakeElement()],
-      ['#passphrase-input', new FakeElement()],
+      ['#sign-in-passphrase', new FakeElement()],
       ['#sign-in-button', new FakeElement()],
       ['#sign-in-error', new FakeElement({ hidden: true })],
       ['#refresh-button', new FakeElement()],
@@ -415,7 +415,7 @@ test('signed-out startup reveals only the sign-in view and focuses the passphras
 
   assert.equal(state.root.querySelector('#sign-in-view').hidden, false);
   assert.equal(state.root.querySelector('#app-shell').hidden, true);
-  assert.equal(state.root.querySelector('#passphrase-input').focused, true);
+  assert.equal(state.root.querySelector('#sign-in-passphrase').focused, true);
   assert.equal(state.calls.syncs, 0);
 });
 
@@ -441,7 +441,7 @@ test('successful sign-in loads live Home and stores only a tab expiry marker', a
 
   assert.equal(state.root.querySelector('#app-shell').hidden, false);
   assert.equal(state.root.querySelector('#sign-in-view').hidden, true);
-  assert.equal(state.root.querySelector('#passphrase-input').value, '');
+  assert.equal(state.root.querySelector('#sign-in-passphrase').value, '');
   assert.equal(state.sessionStorage.getItem('life-hub:session-expiry'), EXPIRY);
   assert.equal(state.localStorage.getItem('passphrase'), null);
   assert.deepEqual(state.sessionStorage.snapshot(), { 'life-hub:session-expiry': EXPIRY });
@@ -450,7 +450,7 @@ test('successful sign-in loads live Home and stores only a tab expiry marker', a
 
 test('invalid credentials re-enable the passphrase before restoring focus', async () => {
   const state = harness({ acceptedPassphrase: 'secret' });
-  const input = state.root.querySelector('#passphrase-input');
+  const input = state.root.querySelector('#sign-in-passphrase');
   input.value = 'wrong';
 
   await state.controller.signIn('wrong');
@@ -458,7 +458,7 @@ test('invalid credentials re-enable the passphrase before restoring focus', asyn
   assert.equal(state.root.querySelector('#app-shell').hidden, true);
   assert.equal(state.root.querySelector('#sign-in-view').hidden, false);
   assert.equal(state.root.querySelector('#sign-in-error').hidden, false);
-  assert.equal(state.root.querySelector('#sign-in-error').textContent, 'That passphrase was not accepted.');
+  assert.equal(state.root.querySelector('#sign-in-error').textContent, 'Invalid passphrase');
   assert.equal(input.value, '');
   assert.equal(input.disabled, false);
   assert.equal(input.focused, true);
@@ -466,7 +466,7 @@ test('invalid credentials re-enable the passphrase before restoring focus', asyn
 
 test('malformed sign-in session fails closed and clears the submitted passphrase', async () => {
   const state = harness({ signInSession: { authenticated: true, expiresAt: 'not-a-date' } });
-  const input = state.root.querySelector('#passphrase-input');
+  const input = state.root.querySelector('#sign-in-passphrase');
   input.value = 'secret';
 
   await state.controller.signIn('secret');

@@ -124,7 +124,7 @@ export function createAppController(dependencies) {
 
   bind(root.querySelector('#sign-in-form'), 'submit', event => {
     event.preventDefault?.();
-    void signIn(root.querySelector('#passphrase-input')?.value ?? '');
+    void signIn(root.querySelector('#sign-in-passphrase')?.value ?? '');
   });
   const localHost = windowTarget?.location?.hostname ?? '';
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(localHost)) {
@@ -266,8 +266,8 @@ export function createAppController(dependencies) {
       setSignInBusy(false);
       clearPassphrase();
       showSignedOut(error?.status === 401
-        ? 'That passphrase was not accepted.'
-        : 'Sign-in is unavailable right now. Please try again.');
+        ? 'Invalid passphrase'
+        : 'Unable to sign in. Please try again.');
     } finally {
       if (isCurrentLifecycle(version)) {
         clearPassphrase();
@@ -882,7 +882,7 @@ export function createAppController(dependencies) {
     setAppState('signed-out');
     if (message) showSignInError(message);
     else clearSignInError();
-    root.querySelector('#passphrase-input')?.focus();
+    root.querySelector('#sign-in-passphrase')?.focus();
   }
 
   function showSignInError(message) {
@@ -900,14 +900,14 @@ export function createAppController(dependencies) {
   }
 
   function clearPassphrase() {
-    const input = root.querySelector('#passphrase-input');
+    const input = root.querySelector('#sign-in-passphrase');
     if (!input) return;
     input.value = '';
     if (!authenticated) input.focus();
   }
 
   function setSignInBusy(busy) {
-    const input = root.querySelector('#passphrase-input');
+    const input = root.querySelector('#sign-in-passphrase');
     const button = root.querySelector('#sign-in-button');
     if (input) input.disabled = busy;
     if (button) {

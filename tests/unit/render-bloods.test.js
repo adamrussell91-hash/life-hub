@@ -100,6 +100,8 @@ function fakeRoot() {
   dashboard.hidden = true;
   const flags = el('div');
   flags.id = 'bloods-flags';
+  const flagSummary = el('div');
+  flagSummary.id = 'bloods-flag-summary';
   const host = el('div');
   host.id = 'bloods-sections';
   const ranges = el('div');
@@ -115,6 +117,7 @@ function fakeRoot() {
   const map = {
     '#body-bloods-dashboard': dashboard,
     '#bloods-flags': flags,
+    '#bloods-flag-summary': flagSummary,
     '#bloods-sections': host,
     '#bloods-range-control': ranges,
     '#bloods-appointment-open': open,
@@ -130,6 +133,7 @@ function fakeRoot() {
     },
     _dashboard: dashboard,
     _flags: flags,
+    _flagSummary: flagSummary,
     _host: host,
     _open: open
   };
@@ -339,6 +343,29 @@ test('numeric tiles show a what-line, In range label, refs, and previous value',
   });
   assert.match(String(crpRoot._host.querySelector('.bloods-metric').textContent), /In range/);
   assert.doesNotMatch(String(crpRoot._host.querySelector('.bloods-status').textContent), /^Normal$/);
+});
+
+test('the flags tile carries a count, and the chips live in a strip outside the summary row', async () => {
+  const root = fakeRoot();
+  renderBloods(root, model);
+  assert.match(String(root._flagSummary.textContent), /1/);
+  assert.match(String(root._flagSummary.textContent), /marker flagged/);
+  assert.match(String(root._flagSummary.textContent), /1 high/);
+  assert.equal(root._flagSummary.querySelector('.bloods-flag'), null);
+
+  const { readFileSync } = await import('node:fs');
+  const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+  const signal = html.match(/<div id="bloods-signal"[\s\S]*?\n {10}<\/div>/);
+  assert.ok(signal, 'expected a #bloods-signal block');
+  assert.doesNotMatch(signal[0], /id="bloods-flags"/);
+  assert.match(html, /id="bloods-flags"/);
+});
+
+test('the in-range ring is drawn unfilled at the ring geometry size', async () => {
+  const { readFileSync } = await import('node:fs');
+  const js = readFileSync(new URL('../../js/app/render-bloods.js', import.meta.url), 'utf8');
+  assert.match(js, /viewBox', '0 0 64 64'/);
+  assert.equal((js.match(/setAttribute\('fill', 'none'\)/g) || []).length >= 2, true);
 });
 
 test('bloods flag chips are centred in CSS, not baseline-aligned tape chips', async () => {

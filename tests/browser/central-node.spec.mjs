@@ -31,7 +31,7 @@ async function signIn(page) {
   await page.clock.setFixedTime(new Date('2026-07-30T12:00:00+10:00'));
   await page.goto(baseUrl);
   await page.locator('#sign-in-view').waitFor();
-  await page.locator('#passphrase-input').fill(LOCAL_PASSPHRASE);
+  await page.locator('#sign-in-passphrase').fill(LOCAL_PASSPHRASE);
   await page.locator('#sign-in-button').click();
   await page.locator('#app[data-state="ready"]').waitFor();
 }

@@ -41,9 +41,15 @@ When `showSection('body-bloods')` is active, the page header is **Labs / Bloods*
 
 ### Summary row (three cards, keep)
 
-1. **In range** — existing ring; stroke `--success`. Caption `N of M in range`.
-2. **Flags this test** — one chip per currently High/Low marker. Empty: “Everything in range.”
+Three equal cards, each **one tile tall**. No card in this row may grow with content — anything list-shaped goes below the row.
+
+1. **In range** — ring; stroke `--success`, drawn unfilled (`fill="none"`) at the same size as the ring geometry (64) so it is a ring, not a disc. Caption `N of M in range`.
+2. **Flags this test** — count only: `N markers flagged` with a `7 high · 2 low` caption. Empty: “Everything in range.” **No chips in this card.**
 3. **Last collected** — display date (friendly), lab if present, stale note if >90 days.
+
+### Flag strip (full width, under the summary row)
+
+One chip per currently High/Low marker, wrapping across the **full page width** so a long flag list is two or three rows, not a tall third-width column. Chips keep the centred pill styling below. Empty state is a single quiet caption line; the strip collapses when there is nothing to say.
 
 Toolbar: Expand all / Collapse all / filter use `.btn` and a labelled search field (not unstyled native buttons). Default visual state matches **expanded**.
 
