@@ -34,6 +34,18 @@ export function smoothLinePath(points) {
   return d;
 }
 
+/**
+ * Straight segments between points. Preferred over the smoothed path when the
+ * readings are irregular events rather than a continuous signal, because the
+ * curve between two lab draws is invented.
+ */
+export function straightLinePath(points) {
+  if (!points.length) return '';
+  return points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${fmt(point.x)} ${fmt(point.y)}`)
+    .join(' ');
+}
+
 export function smoothAreaPath(points, { width, baselineY, padding }) {
   const line = smoothLinePath(points);
   if (!line) return '';
@@ -51,7 +63,9 @@ export function buildAreaLine(
     rollingAverage = 0,
     guideValue = null,
     yDomain = 'zero',
-    includeValues = []
+    includeValues = [],
+    min: fixedMin = null,
+    max: fixedMax = null
   } = {}
 ) {
   const values = series.map(day => Number(day[valueKey]) || 0);
@@ -62,7 +76,14 @@ export function buildAreaLine(
   const plotBottom = height - paddingBottom;
 
   let scaleY;
-  if (yDomain === 'padded') {
+  if (yDomain === 'fixed' && Number.isFinite(Number(fixedMin)) && Number.isFinite(Number(fixedMax))) {
+    // The caller owns the domain, so charts drawn from different series can be
+    // put on the same scale.
+    const min = Number(fixedMin);
+    const max = Number(fixedMax);
+    const span = max - min || 1;
+    scaleY = value => plotBottom - ((value - min) / span) * (plotBottom - padding);
+  } else if (yDomain === 'padded') {
     const finite = [...values.filter(Number.isFinite), ...extras];
     const rawMin = finite.length ? Math.min(...finite) : 0;
     const rawMax = finite.length ? Math.max(...finite) : 1;

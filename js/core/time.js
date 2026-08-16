@@ -32,6 +32,16 @@ export function formatDisplayDate(value) {
   return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${String(year).slice(-2)}`;
 }
 
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Axis-tick form of a date: "May ’26". */
+export function formatShortMonth(value) {
+  if (value == null || value === '') return '';
+  if (!isCalendarDate(value)) return String(value);
+  const { year, month } = parseKey(value);
+  return `${SHORT_MONTHS[month - 1]} ’${String(year).slice(-2)}`;
+}
+
 function utcDate(key) {
   const { year, month, day } = parseKey(key);
   const date = new Date(0);

@@ -1,22 +1,102 @@
 import { animateAreaReveal } from './chart-kit/animate.js';
-import { buildAreaLine } from './chart-kit/area-line.js';
-import { compareChartPoints, glucoseZones, nextComparePins, rangeBarLayout, rangeTrackLayout } from './bloods-charts-layout.js';
+import { buildAreaLine, straightLinePath } from './chart-kit/area-line.js';
+import {
+  bandDomain,
+  compareChartPoints,
+  glucoseZones,
+  nextComparePins,
+  pointStatus,
+  rangeBarLayout
+} from './bloods-charts-layout.js';
+import { statusTone } from './bloods-model.js';
+import { formatShortMonth } from '../core/time.js';
 
-export { compareChartPoints, glucoseZones, nextComparePins, rangeBarLayout, rangeTrackLayout };
+export {
+  bandDomain,
+  compareChartPoints,
+  glucoseZones,
+  nextComparePins,
+  pointStatus,
+  rangeBarLayout
+};
 
 const SVG = 'http://www.w3.org/2000/svg';
 const CHART_WIDTH = 320;
-const CHART_HEIGHT = 120;
+// A wide, shallow plot: cards sit side by side, so the chart gets its detail
+// from width rather than from height it does not need.
+const CHART_HEIGHT = 80;
 const CHART_PADDING = 12;
-const TRACK_HEIGHT = 56;
+const METER_WIDTH = 320;
+const METER_HEIGHT = 16;
+const MAX_TICKS = 5;
 const COMBINED_WIDTH = 960;
 const COMBINED_HEIGHT = 160;
 
 export function markerVisual(root, marker, { flareMarks = [], flareOn = false } = {}) {
   if (marker.qualitative || marker.chartKind === 'none') return null;
-  if (marker.chartKind === 'range-bar') return rangeBarSvg(root, marker);
+  if (marker.chartKind === 'meter') return meterSvg(root, marker);
   if (marker.chartKind === 'zoned') return zonedChartSvg(root, marker);
   return lineChartSvg(root, marker, { flareMarks, flareOn });
+}
+
+/**
+ * A single reading placed on its reference band: enough to answer "is this
+ * where it should be" in one row, without spending a whole card on two dots.
+ */
+export function meterSvg(root, marker) {
+  const value = Number(marker.latest?.value);
+  const refLow = marker.latest?.ref_low;
+  const refHigh = marker.latest?.ref_high;
+  const previous = previousSeriesValue(marker);
+  const domain = bandDomain({
+    values: [previous, value].filter(n => n != null && Number.isFinite(Number(n))),
+    refLow,
+    refHigh
+  });
+  const chart = svgRoot(root, `${marker.label} against its reference range`, 'bloods-meter', METER_HEIGHT, METER_WIDTH);
+  const padX = 6;
+  const y = METER_HEIGHT / 2;
+  const xAt = n => padX + domain.fraction(n) * (METER_WIDTH - padX * 2);
+
+  const track = el(root, 'line');
+  track.setAttribute('data-role', 'meter-track');
+  track.setAttribute('x1', String(padX));
+  track.setAttribute('x2', String(METER_WIDTH - padX));
+  track.setAttribute('y1', String(y));
+  track.setAttribute('y2', String(y));
+  chart.append(track);
+
+  const band = el(root, 'line');
+  band.setAttribute('data-role', 'meter-band');
+  band.setAttribute('x1', String(xAt(domain.bandLow ?? domain.min)));
+  band.setAttribute('x2', String(xAt(domain.bandHigh ?? domain.max)));
+  band.setAttribute('y1', String(y));
+  band.setAttribute('y2', String(y));
+  chart.append(band);
+
+  if (previous != null && Number.isFinite(previous)) {
+    const ghost = el(root, 'circle');
+    ghost.setAttribute('data-role', 'meter-ghost');
+    ghost.setAttribute('cx', String(xAt(previous)));
+    ghost.setAttribute('cy', String(y));
+    ghost.setAttribute('r', '2.6');
+    chart.append(ghost);
+  }
+
+  if (Number.isFinite(value)) {
+    const halo = el(root, 'circle');
+    halo.setAttribute('data-role', 'meter-halo');
+    halo.setAttribute('cx', String(xAt(value)));
+    halo.setAttribute('cy', String(y));
+    halo.setAttribute('r', '5');
+    const dot = el(root, 'circle');
+    dot.setAttribute('data-role', 'meter-dot');
+    dot.setAttribute('cx', String(xAt(value)));
+    dot.setAttribute('cy', String(y));
+    dot.setAttribute('r', '3.6');
+    chart.append(halo, dot);
+  }
+  return chart;
 }
 
 export function combinedChartSvg(root, combined) {
@@ -26,7 +106,9 @@ export function combinedChartSvg(root, combined) {
       label: entry.label || entry.key,
       points: (entry.points ?? []).filter(point => point.value != null && Number.isFinite(point.value))
     }))
-    .filter(entry => entry.points.length);
+    // A single draw has no line to compare, and its lone dot on the left edge
+    // reads as a stray mark rather than a trend.
+    .filter(entry => entry.points.length > 1);
   if (!series.length) return null;
 
   const wrap = root.createElement('div');
@@ -65,7 +147,7 @@ export function combinedChartSvg(root, combined) {
     line.setAttribute('data-role', 'line');
     line.setAttribute('data-series', String(index % 4));
     line.setAttribute('data-marker', entry.key);
-    line.setAttribute('d', built.linePath || '');
+    line.setAttribute('d', straightLinePath(built.points));
     line.setAttribute('fill', 'none');
     chart.append(line);
     const last = built.points.at(-1);
@@ -100,81 +182,10 @@ export function combinedChartSvg(root, combined) {
   return wrap;
 }
 
-function rangeBarSvg(root, marker) {
-  const value = Number(marker.latest?.value);
-  const low = marker.latest?.ref_low;
-  const high = marker.latest?.ref_high;
-  const prior = previousSeriesValue(marker);
-  const chart = svgRoot(root, `${marker.label} range`, 'bloods-range-bar', TRACK_HEIGHT);
-  const trackY = TRACK_HEIGHT / 2 - 4;
-  const centreY = TRACK_HEIGHT / 2;
-  const track = el(root, 'rect');
-  track.setAttribute('data-role', 'range-track');
-  track.setAttribute('x', '16');
-  track.setAttribute('y', String(trackY));
-  track.setAttribute('width', '288');
-  track.setAttribute('height', '8');
-  track.setAttribute('rx', '4');
-  chart.append(track);
-
-  const layout = rangeTrackLayout({
-    value,
-    previous: prior,
-    refLow: low,
-    refHigh: high,
-    width: CHART_WIDTH,
-    padding: 16
-  });
-  const band = el(root, 'rect');
-  band.setAttribute('data-role', 'range-band');
-  const bandX = Math.min(layout.bandStartX, layout.bandEndX);
-  const bandW = Math.max(0, Math.abs(layout.bandEndX - layout.bandStartX));
-  band.setAttribute('x', String(bandX));
-  band.setAttribute('y', String(trackY));
-  band.setAttribute('width', String(bandW));
-  band.setAttribute('height', '8');
-  band.setAttribute('rx', '4');
-  chart.append(band);
-
-  if (layout.previousX != null) {
-    const ghost = el(root, 'circle');
-    ghost.setAttribute('data-role', 'range-ghost');
-    ghost.setAttribute('cx', String(layout.previousX));
-    ghost.setAttribute('cy', String(centreY));
-    ghost.setAttribute('r', '6');
-    chart.append(ghost);
-  }
-  if (layout.arrow && layout.previousX != null) {
-    const arrow = el(root, 'path');
-    arrow.setAttribute('data-role', 'range-arrow');
-    arrow.setAttribute('d', rangeArrowPath(layout.previousX, layout.latestX, centreY));
-    chart.append(arrow);
-  }
-  if (Number.isFinite(value)) {
-    const dot = el(root, 'circle');
-    dot.setAttribute('data-role', 'range-dot');
-    dot.setAttribute('cx', String(layout.latestX));
-    dot.setAttribute('cy', String(centreY));
-    dot.setAttribute('r', '7');
-    chart.append(dot);
-  }
-  return chart;
-}
-
 function previousSeriesValue(marker) {
   const series = (marker.series ?? []).filter(point => point.value != null && Number.isFinite(Number(point.value)));
   if (series.length < 2) return null;
   return Number(series.at(-2).value);
-}
-
-function rangeArrowPath(fromX, toX, y) {
-  const left = Math.min(fromX, toX) + 10;
-  const right = Math.max(fromX, toX) - 10;
-  if (right <= left) return `M ${fromX} ${y} L ${toX} ${y}`;
-  const tip = toX > fromX ? right : left;
-  const tail = toX > fromX ? left : right;
-  const dir = toX > fromX ? 1 : -1;
-  return `M ${tail} ${y} L ${tip} ${y} M ${tip} ${y} L ${tip - 5 * dir} ${y - 4} M ${tip} ${y} L ${tip - 5 * dir} ${y + 4}`;
 }
 
 function zonedChartSvg(root, marker) {
@@ -212,7 +223,7 @@ function zonedChartSvg(root, marker) {
     });
     const line = el(root, 'path');
     line.setAttribute('data-role', 'line');
-    line.setAttribute('d', built.linePath || '');
+    line.setAttribute('d', straightLinePath(built.points));
     chart.append(line);
     bindScrub(chart, built.points);
     bindCompare(root, wrap, chart, built.points);
@@ -227,6 +238,8 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
   const chart = svgRoot(root, `${marker.label} trend`);
   const band = el(root, 'rect');
   band.setAttribute('data-role', 'ref-band');
+  const axis = el(root, 'line');
+  axis.setAttribute('data-role', 'axis');
   const area = el(root, 'path');
   area.setAttribute('data-role', 'area');
   const line = el(root, 'path');
@@ -235,41 +248,50 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
   points.setAttribute('data-role', 'points');
   const flares = el(root, 'g');
   flares.setAttribute('data-role', 'flare-ticks');
-  chart.append(band, area, line, points, flares);
+  chart.append(band, axis, area, line, points, flares);
 
   const refLow = marker.latest?.ref_low;
   const refHigh = marker.latest?.ref_high;
   const series = (marker.series ?? []).map(point => ({ date: point.date, value: point.value }));
+  const plotBottom = CHART_HEIGHT - CHART_PADDING;
+  const domain = bandDomain({ values: series.map(point => point.value), refLow, refHigh });
   const built = buildAreaLine(series, {
-    height: CHART_HEIGHT,
-    yDomain: 'padded',
-    includeValues: nearbyRefs(series, [refLow, refHigh])
+    height: plotBottom,
+    yDomain: 'fixed',
+    min: domain.min,
+    max: domain.max,
+    includeValues: [domain.min, domain.max]
   });
 
-  if (Number.isFinite(Number(refLow)) && Number.isFinite(Number(refHigh))) {
-    const plotTop = CHART_PADDING;
-    const plotBottom = CHART_HEIGHT - CHART_PADDING;
-    const yHigh = built.scaleY(Number(refHigh));
-    const yLow = built.scaleY(Number(refLow));
-    const top = clamp(Math.min(yHigh, yLow), plotTop, plotBottom);
-    const bottom = clamp(Math.max(yHigh, yLow), plotTop, plotBottom);
+  const top = built.scaleY(domain.bandHigh ?? domain.max);
+  const bottom = built.scaleY(domain.bandLow ?? domain.min);
+  if (domain.bandLow != null || domain.bandHigh != null) {
     band.setAttribute('x', String(CHART_PADDING));
     band.setAttribute('width', String(CHART_WIDTH - CHART_PADDING * 2));
-    band.setAttribute('y', String(top));
-    band.setAttribute('height', String(bottom - top));
+    band.setAttribute('y', String(clamp(Math.min(top, bottom), CHART_PADDING, plotBottom)));
+    band.setAttribute('height', String(Math.abs(bottom - top)));
+    band.setAttribute('rx', '4');
   } else {
     band.setAttribute('height', '0');
   }
 
+  axis.setAttribute('x1', String(CHART_PADDING));
+  axis.setAttribute('x2', String(CHART_WIDTH - CHART_PADDING));
+  axis.setAttribute('y1', String(plotBottom));
+  axis.setAttribute('y2', String(plotBottom));
+
   area.setAttribute('d', built.areaPath || built.areaPoints || '');
-  line.setAttribute('d', built.linePath || '');
+  line.setAttribute('d', straightLinePath(built.points));
   const lastIndex = built.points.length - 1;
   for (const [index, point] of built.points.entries()) {
     const circle = el(root, 'circle');
     circle.setAttribute('cx', String(point.x));
     circle.setAttribute('cy', String(point.y));
-    circle.setAttribute('r', index === lastIndex ? '4' : '2.5');
+    circle.setAttribute('r', index === lastIndex ? '4.5' : '3');
     circle.setAttribute('data-role', index === lastIndex ? 'latest-point' : 'point');
+    // Each draw is coloured by how it read on the day, so a run of flagged
+    // results is visible without reading the numbers.
+    circle.setAttribute('data-tone', statusTone(pointStatus(point.value, refLow, refHigh), marker.key));
     circle.dataset.date = point.date ?? '';
     circle.dataset.value = String(point.value ?? '');
     points.append(circle);
@@ -283,7 +305,7 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
       tick.setAttribute('x1', String(match.x));
       tick.setAttribute('x2', String(match.x));
       tick.setAttribute('y1', String(CHART_PADDING));
-      tick.setAttribute('y2', String(CHART_HEIGHT - CHART_PADDING));
+      tick.setAttribute('y2', String(plotBottom));
       tick.setAttribute('data-role', 'flare-tick');
       flares.append(tick);
     }
@@ -293,7 +315,49 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
   bindCompare(root, wrap, chart, built.points);
   queueMicrotask(() => animateAreaReveal(chart));
   wrap.append(chart);
+  const ticks = tickRow(root, built.points);
+  if (ticks) wrap.append(ticks);
   return wrap;
+}
+
+/**
+ * Dates live in HTML rather than SVG text: the chart scales to the card width,
+ * and scaled type would drift away from the rest of the page.
+ */
+function tickRow(root, points) {
+  const chosen = tickPoints(points);
+  if (chosen.length < 2) return null;
+  const row = root.createElement('div');
+  row.className = 'bloods-ticks';
+  for (const point of chosen) {
+    const tick = root.createElement('span');
+    tick.className = 'bloods-ticks__item';
+    tick.dataset.anchor = point.anchor;
+    tick.style.left = `${(point.x / CHART_WIDTH) * 100}%`;
+    tick.textContent = formatShortMonth(point.date);
+    row.append(tick);
+  }
+  return row;
+}
+
+/**
+ * Labels the first and last draw plus a thinned selection between them, so a
+ * long history keeps readable dates instead of a smear of overlapping text.
+ */
+function tickPoints(points) {
+  if (!points?.length) return [];
+  if (points.length === 1) return [{ ...points[0], anchor: 'middle' }];
+  const step = Math.ceil(points.length / MAX_TICKS);
+  const chosen = [];
+  for (let index = 0; index < points.length; index += 1) {
+    const last = index === points.length - 1;
+    if (index !== 0 && !last && index % step !== 0) continue;
+    chosen.push({
+      ...points[index],
+      anchor: index === 0 ? 'start' : last ? 'end' : 'middle'
+    });
+  }
+  return chosen;
 }
 
 function bindScrub(chart, points) {
@@ -363,21 +427,6 @@ function nearestPoint(chart, points, event) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
-}
-
-/**
- * A reference limit only joins the y-scale when it sits near the readings. A
- * distant limit (vitamin D's upper 150 against readings in the 40s) would
- * otherwise squash the line flat; the band is clamped to the plot instead.
- */
-export function nearbyRefs(series, refs) {
-  const values = series.map(point => Number(point.value)).filter(Number.isFinite);
-  const finite = refs.map(Number).filter(Number.isFinite);
-  if (!values.length) return finite;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const reach = Math.max(max - min, Math.abs(max) * 0.1, Number.EPSILON);
-  return finite.filter(ref => ref >= min - reach && ref <= max + reach);
 }
 
 function svgRoot(root, label, extraClass = '', height = CHART_HEIGHT, width = CHART_WIDTH) {

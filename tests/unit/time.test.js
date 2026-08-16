@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addCalendarDays, daysBetween, enumerateDateKeys,
-  formatDisplayDate,
+  formatDisplayDate, formatShortMonth,
   getSydneyDateKey, getSydneyTimestamp, getSydneyWeekStart, isCalendarDate,
   sydneyLocalStamp
 } from '../../js/core/time.js';
@@ -64,6 +64,13 @@ test('formatDisplayDate is always DD/MM/YY', () => {
   assert.equal(formatDisplayDate('2015-12-31'), '31/12/15');
   assert.equal(formatDisplayDate('not-a-date'), 'not-a-date');
   assert.equal(formatDisplayDate(''), '');
+});
+
+test('formatShortMonth labels a chart tick as month and short year', () => {
+  assert.equal(formatShortMonth('2026-05-19'), 'May ’26');
+  assert.equal(formatShortMonth('2019-07-19'), 'Jul ’19');
+  assert.equal(formatShortMonth('not-a-date'), 'not-a-date');
+  assert.equal(formatShortMonth(''), '');
 });
 
 test('sydneyLocalStamp picks AEDT (+11) in late March', () => {

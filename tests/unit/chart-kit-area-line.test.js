@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAreaLine } from '../../js/app/chart-kit/area-line.js';
+import { buildAreaLine, straightLinePath } from '../../js/app/chart-kit/area-line.js';
 
 test('scales a 3-point series and omits any last-point marker field', () => {
   const week = [
@@ -52,6 +52,21 @@ test('buildAreaLine padded domain does not pin min to zero', () => {
   const ys = chart.points.map(p => p.y);
   const spread = Math.max(...ys) - Math.min(...ys);
   assert.ok(spread > 20, 'padded domain should use vertical range');
+});
+
+test('buildAreaLine takes a caller-owned domain so separate charts share a scale', () => {
+  const options = { yDomain: 'fixed', min: 0, max: 100, height: 120, width: 320, padding: 10 };
+  const low = buildAreaLine([{ date: '2026-01-01', value: 25 }], options);
+  const high = buildAreaLine([{ date: '2026-01-01', value: 75 }], options);
+  assert.ok(low.points[0].y > high.points[0].y, 'the larger value sits higher on the same scale');
+  assert.equal(Math.round(low.scaleY(0)), 110, 'the domain floor lands on the plot floor');
+  assert.equal(Math.round(low.scaleY(100)), 10, 'the domain ceiling lands on the plot ceiling');
+});
+
+test('straightLinePath joins points without inventing curvature between them', () => {
+  const path = straightLinePath([{ x: 0, y: 10 }, { x: 10, y: 20 }, { x: 20, y: 5 }]);
+  assert.equal(path, 'M 0.0 10.0 L 10.0 20.0 L 20.0 5.0');
+  assert.equal(straightLinePath([]), '');
 });
 
 test('buildAreaLine default still zero-based', () => {
