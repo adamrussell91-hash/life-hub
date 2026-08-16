@@ -40,6 +40,7 @@ test('repository path policy rejects noncanonical and nonallowlisted paths', () 
     'data/sleep/2026/08/2026-08-01-x.md',
     'data/mind/2026/08/2026-08-01-x.yml',
     'config/other.yml',
+    'config/vera-intake.md',
     'data/mind/2026/08/2026-08-01-x\u0000.md',
     'data/fitness/templates/../x.md'
   ];
