@@ -256,7 +256,10 @@ function markerModel(observations, bounds, selectedRange) {
       notes: latest.notes ?? null
     },
     series,
-    chartKind: chartKind(latest.key, qualitative, numeric.length),
+    // Count what actually gets drawn, not the lifetime history: a marker with
+    // five readings but two inside the window is still a sparse chart, and a
+    // full line chart for two points is mostly empty space.
+    chartKind: chartKind(latest.key, qualitative, series.length),
     statusTone: statusTone(latest.status, latest.key),
     span: 'narrow',
     previousDate,
