@@ -26,12 +26,12 @@ export function parseBloodsCsv(text) {
   const byDate = new Map();
 
   for (const row of rows) {
-    const dateKey = parseDateKey(row['Test Date'] ?? row.test_date ?? row.date);
+    const dateKey = parseDateKey(row['Test Date'] ?? row.test_date ?? row.Date ?? row.date);
     const rawName = String(row.Marker ?? row.marker ?? '').trim();
     if (!dateKey || !rawName) continue;
 
     if (!byDate.has(dateKey)) {
-      byDate.set(dateKey, { markers: [], notes: [] });
+      byDate.set(dateKey, { markers: new Map(), notes: [] });
     }
     const day = byDate.get(dateKey);
     const note = String(row.Notes ?? row.notes ?? '').trim();
@@ -39,7 +39,7 @@ export function parseBloodsCsv(text) {
 
     const key = canonicalMarkerKey(rawName);
     const statusRaw = String(row.Status ?? row.status ?? '').trim();
-    day.markers.push({
+    const marker = {
       key,
       label: LABELS[key] ?? rawName,
       category: String(row.Category ?? row.category ?? '').trim() || 'Other',
@@ -48,12 +48,16 @@ export function parseBloodsCsv(text) {
       ref_low: num(row['Ref Low'] ?? row.ref_low),
       ref_high: num(row['Ref High'] ?? row.ref_high),
       status: statusRaw || null
-    });
+    };
+    // One canonical key per visit: a duplicated row would otherwise create two
+    // same-date points and make the marker's latest value ambiguous.
+    const seen = day.markers.get(key);
+    if (!seen || (seen.value == null && marker.value != null)) day.markers.set(key, marker);
   }
 
   const events = [];
   for (const [dateKey, day] of [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    if (!day.markers.length) continue;
+    if (!day.markers.size) continue;
     const stamp = sydneyLocalStamp(dateKey, BODY_TIME);
     events.push({
       slug: 'bloods',
@@ -67,7 +71,7 @@ export function parseBloodsCsv(text) {
         created_at: stamp,
         updated_at: stamp,
         source: 'notion_import',
-        markers: day.markers
+        markers: [...day.markers.values()]
       }
     });
   }

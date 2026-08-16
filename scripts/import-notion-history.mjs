@@ -148,18 +148,26 @@ export function parseArgs(argv) {
 function writeEvent(root, relativePath, record, notes) {
   const full = join(root, relativePath);
   mkdirSync(join(full, '..'), { recursive: true });
+  let existing = null;
   if (existsSync(full)) {
     if (!args.force) return;
     try {
-      const existing = readFileSync(full, 'utf8');
+      existing = readFileSync(full, 'utf8');
       if (/^source:\s*"?chat"?/m.test(existing) || /^source:\s*chat\s*$/m.test(existing)) return;
     } catch {
       // rewrite if unreadable
     }
   }
   const yaml = renderFrontmatter(record);
-  const body = typeof notes === 'string' && notes.trim() ? `${notes.trim()}\n` : '';
-  writeFileSync(full, `---\n${yaml}---\n${body}`, 'utf8');
+  writeFileSync(full, `---\n${yaml}---\n${eventBody(existing, notes)}`, 'utf8');
+}
+
+// A source without a notes column must not erase prose a previous import wrote:
+// lab numbers, referring doctor, and per-result commentary only live in the body.
+export function eventBody(existingText, notes) {
+  if (typeof notes === 'string' && notes.trim()) return `${notes.trim()}\n`;
+  const body = String(existingText ?? '').replace(/^---\n[\s\S]*?\n---\n?/, '');
+  return body.trim() ? body : '';
 }
 
 function eventPath(domain, dateKey, slug) {

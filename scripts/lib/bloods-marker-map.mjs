@@ -13,6 +13,8 @@ function normalize(name) {
 // Keys are normalize(rawName). Values are canonical keys.
 const MARKER_ALIASES = {
   '25-oh vitamin d': 'vitamin_d',
+  'vitamin d': 'vitamin_d',
+  'vitamin d (25-oh)': 'vitamin_d',
   'vitamin d (25-hydroxyvitamin d)': 'vitamin_d',
   'adj. calcium': 'adjusted_calcium',
   'adjusted calcium': 'adjusted_calcium',
