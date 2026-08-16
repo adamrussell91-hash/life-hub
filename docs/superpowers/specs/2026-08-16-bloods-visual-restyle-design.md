@@ -83,7 +83,11 @@ Every numeric marker tile, in order:
 
 Qualitative markers: status line + one-liner, no chart.
 
-Wide/combined charts (iron, liver enzymes) stay as they are structurally; restyle strokes to Wave/kit, not maroon.
+### Combined strip (iron, liver enzymes)
+
+The model already expresses each point as its position inside that marker’s own reference range (0 = lower limit, 1 = upper). The strip must therefore draw **all series on one shared y-scale** — scaling each series separately makes the lines unrelated squiggles. A single sage band spans 0–1, each line takes a kit colour by index (Wave, marine, High Sea ink, success) with a dot on the latest point, and a legend plus one caption explains the scale. Viewport is `960 × 160` so a full-width strip stays short.
+
+Never assign to `className` on an SVG node — it is a read-only `SVGAnimatedString` and the throw takes the whole category render down. Use `setAttribute('class', …)`.
 
 ## Charts
 

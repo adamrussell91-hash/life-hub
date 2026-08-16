@@ -9,6 +9,8 @@ const CHART_WIDTH = 320;
 const CHART_HEIGHT = 120;
 const CHART_PADDING = 12;
 const TRACK_HEIGHT = 56;
+const COMBINED_WIDTH = 960;
+const COMBINED_HEIGHT = 160;
 
 export function markerVisual(root, marker, { flareMarks = [], flareOn = false } = {}) {
   if (marker.qualitative || marker.chartKind === 'none') return null;
@@ -18,25 +20,84 @@ export function markerVisual(root, marker, { flareMarks = [], flareOn = false } 
 }
 
 export function combinedChartSvg(root, combined) {
-  if (!combined?.series?.length) return null;
-  const chart = svgRoot(root, 'Combined marker trends');
-  const palette = ['#376fb7', '#142b51', '#a85a0c', '#2f7a4f'];
-  combined.series.forEach((series, index) => {
-    const points = series.points
-      .filter(point => point.value != null && Number.isFinite(point.value))
-      .map(point => ({ date: point.date, value: point.value }));
-    if (!points.length) return;
-    const built = buildAreaLine(points, { height: CHART_HEIGHT, yDomain: 'padded', includeValues: [0, 1] });
+  const series = (combined?.series ?? [])
+    .map(entry => ({
+      key: entry.key,
+      label: entry.label || entry.key,
+      points: (entry.points ?? []).filter(point => point.value != null && Number.isFinite(point.value))
+    }))
+    .filter(entry => entry.points.length);
+  if (!series.length) return null;
+
+  const wrap = root.createElement('div');
+  wrap.className = 'bloods-combined-chart';
+  const chart = svgRoot(root, 'Markers against their own reference ranges', 'bloods-combined-strip', COMBINED_HEIGHT, COMBINED_WIDTH);
+
+  // The model expresses every point as its position inside that marker's own
+  // reference range (0 = lower limit, 1 = upper), so one shared scale is what
+  // makes the lines comparable. Scaling each series on its own turned this into
+  // four unrelated squiggles.
+  const values = series.flatMap(entry => entry.points.map(point => point.value));
+  const domain = [Math.min(...values, 0), Math.max(...values, 1)];
+  const scale = buildAreaLine([{ value: domain[0] }, { value: domain[1] }], {
+    width: COMBINED_WIDTH,
+    height: COMBINED_HEIGHT,
+    yDomain: 'padded',
+    includeValues: domain
+  }).scaleY;
+
+  const band = el(root, 'rect');
+  band.setAttribute('data-role', 'ref-band');
+  band.setAttribute('x', String(CHART_PADDING));
+  band.setAttribute('width', String(COMBINED_WIDTH - CHART_PADDING * 2));
+  band.setAttribute('y', String(scale(1)));
+  band.setAttribute('height', String(Math.max(0, scale(0) - scale(1))));
+  chart.append(band);
+
+  series.forEach((entry, index) => {
+    const built = buildAreaLine(entry.points, {
+      width: COMBINED_WIDTH,
+      height: COMBINED_HEIGHT,
+      yDomain: 'padded',
+      includeValues: domain
+    });
     const line = el(root, 'path');
     line.setAttribute('data-role', 'line');
-    line.setAttribute('data-series', series.key);
+    line.setAttribute('data-series', String(index % 4));
+    line.setAttribute('data-marker', entry.key);
     line.setAttribute('d', built.linePath || '');
-    line.setAttribute('stroke', palette[index % palette.length]);
     line.setAttribute('fill', 'none');
     chart.append(line);
+    const last = built.points.at(-1);
+    if (!last) return;
+    const dot = el(root, 'circle');
+    dot.setAttribute('data-role', 'latest-point');
+    dot.setAttribute('data-series', String(index % 4));
+    dot.setAttribute('cx', String(last.x));
+    dot.setAttribute('cy', String(last.y));
+    dot.setAttribute('r', '4');
+    chart.append(dot);
   });
+
+  wrap.append(chart);
+
+  const legend = root.createElement('ul');
+  legend.className = 'bloods-combined-legend';
+  series.forEach((entry, index) => {
+    const item = root.createElement('li');
+    item.dataset.series = String(index % 4);
+    item.textContent = entry.label;
+    legend.append(item);
+  });
+  wrap.append(legend);
+
+  const note = root.createElement('p');
+  note.className = 'metric-caption bloods-combined-note';
+  note.textContent = 'Each line is that marker’s position in its own reference range. Inside the sage band is in range.';
+  wrap.append(note);
+
   queueMicrotask(() => animateAreaReveal(chart));
-  return chart;
+  return wrap;
 }
 
 function rangeBarSvg(root, marker) {
@@ -319,10 +380,10 @@ export function nearbyRefs(series, refs) {
   return finite.filter(ref => ref >= min - reach && ref <= max + reach);
 }
 
-function svgRoot(root, label, extraClass = '', height = CHART_HEIGHT) {
+function svgRoot(root, label, extraClass = '', height = CHART_HEIGHT, width = CHART_WIDTH) {
   const chart = root.createElementNS(SVG, 'svg');
   chart.setAttribute('class', `line-chart body-chart ${extraClass}`.trim());
-  chart.setAttribute('viewBox', `0 0 ${CHART_WIDTH} ${height}`);
+  chart.setAttribute('viewBox', `0 0 ${width} ${height}`);
   chart.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   chart.setAttribute('role', 'img');
   chart.setAttribute('aria-label', label);

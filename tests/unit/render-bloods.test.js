@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { renderBloods } from '../../js/app/render-bloods.js';
+import { combinedChartSvg } from '../../js/app/bloods-charts.js';
 
 function el(tag = 'div') {
   const node = {
@@ -397,7 +398,10 @@ test('a category with a combined chart still renders, and does not take later ca
     collapsed: false,
     summary: '1 marker',
     combined: {
-      series: [{ key: 'iron', points: [{ date: '2026-02-01', value: 18 }, { date: '2026-05-19', value: 21 }] }]
+      series: [
+        { key: 'iron', label: 'Iron', points: [{ date: '2026-02-01', value: 0.4 }, { date: '2026-05-19', value: 0.6 }] },
+        { key: 'ferritin', label: 'Ferritin', points: [{ date: '2026-02-01', value: 1.2 }, { date: '2026-05-19', value: 0.9 }] }
+      ]
     },
     markers: [{ ...alt, key: 'iron', label: 'Iron' }]
   };
@@ -405,9 +409,27 @@ test('a category with a combined chart still renders, and does not take later ca
   renderBloods(root, { ...model, categories: [combinedCategory, liver] });
 
   assert.equal(root._host.children.length, 2, 'both categories render');
-  const chart = root._host.children[0].querySelector('.bloods-combined');
-  assert.ok(chart, 'the combined chart is classed via setAttribute, not a className write');
-  assert.match(String(chart.getAttribute('class')), /line-chart/);
+  const combined = root._host.children[0].querySelector('.bloods-combined');
+  assert.ok(combined, 'the combined chart is classed via setAttribute, not a className write');
+  assert.ok(combined.querySelector('.bloods-combined-strip'), 'the strip svg is inside the wrapper');
+  const legend = combined.querySelector('.bloods-combined-legend');
+  assert.equal(legend.children.length, 2, 'one legend entry per marker');
+  assert.match(String(legend.textContent), /Iron/);
+});
+
+test('a combined strip puts every marker on one shared scale so the lines are comparable', () => {
+  const root = fakeRoot();
+  const near = { key: 'iron', label: 'Iron', points: [{ date: '2026-02-01', value: 0.4 }, { date: '2026-05-19', value: 0.6 }] };
+  const far = { key: 'ferritin', label: 'Ferritin', points: [{ date: '2026-02-01', value: 3 }, { date: '2026-05-19', value: 3.2 }] };
+  const chart = combinedChartSvg(root, { series: [near, far] });
+  const lines = chart.querySelectorAll('[data-role="line"]');
+  assert.equal(lines.length, 2);
+
+  const yOf = path => Number(/^M [\d.]+ ([\d.]+)/.exec(path.getAttribute('d'))?.[1]);
+  assert.ok(yOf(lines[0]) > yOf(lines[1]), 'the higher reading sits higher on the same axis');
+
+  const band = chart.querySelector('[data-role="ref-band"]');
+  assert.ok(Number(band.getAttribute('height')) > 0, 'the in-range band is drawn once for all series');
 });
 
 test('the summary is one card: a bar with a legend, no ring, and the date folded in', async () => {
