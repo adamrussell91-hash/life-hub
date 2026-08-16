@@ -282,7 +282,9 @@ function categoryCard(root, category, model, flareOn) {
   if (category.combined) {
     const combined = combinedChartSvg(root, category.combined);
     if (combined) {
-      combined.className = `${combined.className || ''} bloods-combined`.trim();
+      // An SVG element's className is a read-only SVGAnimatedString; assigning to
+      // it throws and takes the whole category render down with it.
+      combined.setAttribute('class', `${chartClass(combined)} bloods-combined`.trim());
       body.append(combined);
     }
   }
