@@ -49,8 +49,6 @@ Path: `/Users/adamrussell/Projects/knowledge-hub`
 
 - Kit root: `js/app/chart-kit/`
 - Prefer **ring**, **columns**, **area-line** for board metrics. Reach for heatmap / pie / sankey / etc. only when the same chart type already exists there and fits the data.
-- Area-line dots are **surface-specific**: Nutrition protein has none; Body has small vertices; Bloods series has a dot on every point plus a sage reference band. Sparse Bloods use a range track (shore + sage + ghost + arrow), never a fat black bar.
-- Canonical write-up: Life Hub `docs/superpowers/specs/2026-07-31-life-hub-design.md` → Charts.
 
 Path: `/Users/adamrussell/Projects/life-hub`
 

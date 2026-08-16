@@ -44,11 +44,15 @@ function renderInRange(root, model) {
     const node = root.createElementNS('http://www.w3.org/2000/svg', 'svg');
     node.id = 'bloods-in-range-ring';
     node.setAttribute('class', 'metric-ring metric-ring--bloods-in-range');
-    node.setAttribute('viewBox', '0 0 56 56');
+    node.setAttribute('viewBox', '0 0 64 64');
     const track = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
     track.setAttribute('data-role', 'track');
+    track.setAttribute('class', 'metric-ring-track');
+    track.setAttribute('fill', 'none');
     const fill = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
     fill.setAttribute('data-role', 'fill');
+    fill.setAttribute('class', 'metric-ring-fill');
+    fill.setAttribute('fill', 'none');
     node.append(track, fill);
     return node;
   })();
@@ -62,7 +66,31 @@ function renderInRange(root, model) {
   host.append(svg, caption);
 }
 
+function renderFlagSummary(root, model) {
+  const host = root.querySelector('#bloods-flag-summary');
+  if (!host) return;
+  host.replaceChildren();
+  if (!model.categories.length) {
+    host.append(caption(root, 'No blood results yet.'));
+    return;
+  }
+  const low = model.flagged.filter(flag => flag.status === 'Low').length;
+  const high = model.flagged.length - low;
+  const value = root.createElement('p');
+  value.className = 'metric-value';
+  const count = root.createElement('strong');
+  count.textContent = String(model.flagged.length);
+  const word = root.createElement('span');
+  word.textContent = model.flagged.length === 1 ? 'marker flagged' : 'markers flagged';
+  value.append(count, word);
+  host.append(value);
+  host.append(caption(root, model.flagged.length
+    ? [high ? `${high} high` : '', low ? `${low} low` : ''].filter(Boolean).join(' · ')
+    : 'Everything in range.'));
+}
+
 function renderFlags(root, model) {
+  renderFlagSummary(root, model);
   const flags = root.querySelector('#bloods-flags');
   if (!flags) return;
   flags.replaceChildren();

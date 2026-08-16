@@ -64,10 +64,10 @@ async function signIn(page, { origin = baseUrl, fixedTime = true } = {}) {
   if (fixedTime) await page.clock.setFixedTime(new Date('2026-07-30T12:00:00+10:00'));
   await page.goto(origin);
   await page.locator('#sign-in-view').waitFor();
-  await page.locator('#passphrase-input').fill(LOCAL_PASSPHRASE);
+  await page.locator('#sign-in-passphrase').fill(LOCAL_PASSPHRASE);
   await page.locator('#sign-in-button').click();
   await page.locator('#app[data-state="ready"]').waitFor();
-  assert.equal(await page.locator('#passphrase-input').inputValue(), '');
+  assert.equal(await page.locator('#sign-in-passphrase').inputValue(), '');
 }
 
 async function startShortSessionServer(sessionMs) {
@@ -127,13 +127,13 @@ test('rejects the wrong passphrase and clears the password field', async () => {
   await page.goto(baseUrl);
   await page.locator('#sign-in-view').waitFor();
 
-  await page.locator('#passphrase-input').fill('definitely-wrong');
+  await page.locator('#sign-in-passphrase').fill('definitely-wrong');
   await page.locator('#sign-in-button').click();
   await page.locator('#sign-in-error').waitFor();
 
-  assert.equal(await page.locator('#sign-in-error').textContent(), 'That passphrase was not accepted.');
-  assert.equal(await page.locator('#passphrase-input').inputValue(), '');
-  assert.equal(await page.locator('#passphrase-input').evaluate(input => document.activeElement === input), true);
+  assert.equal(await page.locator('#sign-in-error').textContent(), 'Invalid passphrase');
+  assert.equal(await page.locator('#sign-in-passphrase').inputValue(), '');
+  assert.equal(await page.locator('#sign-in-passphrase').evaluate(input => document.activeElement === input), true);
   assert.equal(await page.locator('#app-shell').isHidden(), true);
   await assertNoSecretResponses();
   await context.close();
@@ -357,7 +357,7 @@ test('rapid sign-in waits behind a delayed logout request', async () => {
   });
   await page.locator('#sign-out-button').click();
   await page.locator('#sign-in-view').waitFor();
-  await page.locator('#passphrase-input').fill(LOCAL_PASSPHRASE);
+  await page.locator('#sign-in-passphrase').fill(LOCAL_PASSPHRASE);
   await page.locator('#sign-in-button').click();
   await page.waitForTimeout(100);
   assert.equal(authRequests, 1);

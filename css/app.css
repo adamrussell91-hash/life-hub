@@ -52,8 +52,7 @@ button:active:not(:disabled),
 .floating-chat-button:active,
 .record-proposal__confirm:active,
 .record-proposal__discard:active,
-.quiet-button:active,
-.sign-in__submit:active {
+.quiet-button:active {
   transform: scale(0.96);
   opacity: 0.88;
   filter: brightness(0.92);
@@ -66,8 +65,7 @@ button:active:not(:disabled),
   .floating-chat-button:active,
   .record-proposal__confirm:active,
   .record-proposal__discard:active,
-  .quiet-button:active,
-  .sign-in__submit:active {
+  .quiet-button:active {
     transform: none;
   }
 }
@@ -106,8 +104,6 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
 }
 
 .quiet-button:disabled { cursor: wait; opacity: 0.58; }
-.sign-in .privacy-note { margin: 0; }
-.privacy-note { display: flex; align-items: center; gap: 0.55rem; margin: 1.4rem 0 0; color: var(--muted); font-size: var(--text-2xs); }
 
 .app-shell { min-height: 100vh; }
 
@@ -2050,8 +2046,15 @@ main { max-width: 76rem; margin: 0 auto; }
 .bloods-flags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0 0 1rem;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-stack);
+}
+.bloods-flags:empty {
+  display: none;
+}
+.bloods-flags > .metric-caption {
+  margin: 0;
 }
 .bloods-flag {
   display: inline-flex;
@@ -2132,12 +2135,32 @@ main { max-width: 76rem; margin: 0 auto; }
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-grid);
-  margin: 0 0 var(--space-stack);
+  margin: 0 0 var(--space-grid);
+}
+.bloods-signal__card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  padding: 1.05rem 1.15rem;
+}
+.bloods-signal__card .metric-value {
+  margin: 0.25rem 0 0;
+}
+.bloods-signal__card .metric-caption {
+  margin: 0.2rem 0 0;
 }
 .bloods-in-range {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+.bloods-in-range .metric-ring {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+.bloods-flag-summary .metric-value span {
+  font-weight: 600;
 }
 .metric-ring--bloods-in-range [data-role="fill"] {
   stroke: var(--success);
