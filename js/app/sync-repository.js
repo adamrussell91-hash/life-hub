@@ -31,24 +31,41 @@ export function diffManifest(previous, next) {
   };
 }
 
+/**
+ * Ranges in the same `lane` may run concurrently, which is what lets a backfill
+ * fetch several windows at once. Anything from another lane -- including the
+ * default, laneless caller -- is a new load cycle and supersedes what is in
+ * flight. Identical ranges always share one request.
+ */
 export function syncRepository(options) {
   if (!options?.cache || (typeof options.cache !== 'object' && typeof options.cache !== 'function')) {
     return Promise.reject(new TypeError('Repository cache is required'));
   }
 
   const key = `${options.from}\0${options.to}`;
-  const active = activeSyncs.get(options.cache);
-  if (active?.key === key) return active.promise;
-  active?.controller.abort(new DOMException('Superseded repository range', 'AbortError'));
+  const lane = options.lane ?? null;
+  let active = activeSyncs.get(options.cache);
+  if (!active) {
+    active = new Map();
+    activeSyncs.set(options.cache, active);
+  }
+
+  const existing = active.get(key);
+  if (existing) return existing.promise;
+  for (const [activeKey, entry] of active) {
+    if (lane !== null && entry.lane === lane) continue;
+    entry.controller.abort(new DOMException('Superseded repository range', 'AbortError'));
+    active.delete(activeKey);
+  }
 
   const controller = new AbortController();
   const detach = forwardAbort(options.signal, controller);
   const promise = performSync({ ...options, signal: controller.signal })
     .finally(() => {
       detach();
-      if (activeSyncs.get(options.cache)?.promise === promise) activeSyncs.delete(options.cache);
+      if (active.get(key)?.promise === promise) active.delete(key);
     });
-  activeSyncs.set(options.cache, { key, controller, promise });
+  active.set(key, { lane, controller, promise });
   return promise;
 }
 
