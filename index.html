@@ -578,17 +578,13 @@
             <button type="button" data-bloods-range="five_year" class="is-active" aria-pressed="true">5Y</button>
           </div>
           <div id="bloods-signal" class="bloods-signal">
-            <article class="metric-card bloods-signal__card" aria-label="Markers in range">
-              <p class="metric-label">Markers in range</p>
+            <article class="metric-card bloods-signal__card" aria-label="This panel">
+              <div class="bloods-signal__head">
+                <p class="metric-label">Markers in range</p>
+                <div id="bloods-last-collected" class="bloods-collected"></div>
+              </div>
               <div id="bloods-in-range" class="bloods-in-range"></div>
-            </article>
-            <article class="metric-card bloods-signal__card" aria-label="Flags this test">
-              <p class="metric-label">Flags this test</p>
               <div id="bloods-flag-summary" class="bloods-flag-summary" aria-live="polite"></div>
-            </article>
-            <article class="metric-card bloods-signal__card" aria-label="Last collected">
-              <p class="metric-label">Last collected</p>
-              <div id="bloods-last-collected"></div>
             </article>
           </div>
           <div id="bloods-flags" class="bloods-flags" aria-live="polite" aria-label="Flagged markers"></div>

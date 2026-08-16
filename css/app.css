@@ -2132,39 +2132,79 @@ main { max-width: 76rem; margin: 0 auto; }
   cursor: pointer;
 }
 .bloods-signal {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-grid);
   margin: 0 0 var(--space-grid);
 }
 .bloods-signal__card {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 0.35rem;
   padding: 1.05rem 1.15rem;
 }
-.bloods-signal__card .metric-value {
-  margin: 0.25rem 0 0;
-}
-.bloods-signal__card .metric-caption {
-  margin: 0.2rem 0 0;
-}
-.bloods-in-range {
+.bloods-signal__head {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
 }
-.bloods-in-range .metric-ring {
-  width: 3.25rem;
-  height: 3.25rem;
+.bloods-collected .metric-caption {
+  margin: 0;
+  white-space: nowrap;
 }
-.bloods-flag-summary .metric-value span {
+.bloods-collected [data-stale] {
+  color: var(--high-sea-ink);
+}
+.bloods-signal__value {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0.45rem 0 0.6rem;
+}
+.bloods-signal__value strong {
+  color: var(--depth);
+  font-size: var(--text-2xl);
+  letter-spacing: -0.055em;
+  font-variant-numeric: tabular-nums;
+}
+.bloods-signal__value span {
+  color: var(--muted);
+  font-size: var(--text-xs);
   font-weight: 600;
 }
-.metric-ring--bloods-in-range [data-role="fill"] {
-  stroke: var(--success);
+.bloods-bar {
+  display: flex;
+  overflow: hidden;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--shore);
 }
+.bloods-bar__segment {
+  height: 100%;
+  transition: width 520ms cubic-bezier(.2, .8, .2, 1);
+}
+.bloods-bar__segment[data-tone="in-range"] { background: var(--success); }
+.bloods-bar__segment[data-tone="high"] { background: var(--danger); }
+.bloods-bar__segment[data-tone="low"] { background: var(--high-sea); }
+.bloods-flag-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0.6rem 0 0;
+}
+.bloods-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+.bloods-legend__item::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--shore);
+}
+.bloods-legend__item[data-tone="in-range"]::before { background: var(--success); }
+.bloods-legend__item[data-tone="high"]::before { background: var(--danger); }
+.bloods-legend__item[data-tone="low"]::before { background: var(--high-sea); }
 .bloods-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -2259,6 +2299,7 @@ main { max-width: 76rem; margin: 0 auto; }
 #body-bloods-dashboard .body-chart [data-role="zone"][data-zone="normal"] { fill: var(--pastel-sage); }
 #body-bloods-dashboard .body-chart [data-role="zone"][data-zone="risk"] { fill: var(--pastel-gold); }
 #body-bloods-dashboard .body-chart [data-role="zone"][data-zone="diabetes"] { fill: var(--pastel-peach); }
+#body-bloods-dashboard .line-chart.bloods-range-bar { aspect-ratio: 320 / 56; }
 .bloods-range-bar [data-role="range-track"] { fill: var(--shore); }
 .bloods-range-bar [data-role="range-band"] { fill: var(--pastel-sage); }
 .bloods-range-bar [data-role="range-ghost"] { fill: var(--marine); fill-opacity: 0.22; }
@@ -2349,9 +2390,13 @@ main { max-width: 76rem; margin: 0 auto; }
   }
 }
 @media (max-width: 720px) {
-  .bloods-signal,
   .bloods-metric-grid {
     grid-template-columns: 1fr;
+  }
+  .bloods-signal__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
   }
 }
 .body-chart [data-role="ref-band"] {

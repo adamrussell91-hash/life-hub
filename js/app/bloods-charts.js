@@ -5,6 +5,10 @@ import { compareChartPoints, glucoseZones, nextComparePins, rangeBarLayout, rang
 export { compareChartPoints, glucoseZones, nextComparePins, rangeBarLayout, rangeTrackLayout };
 
 const SVG = 'http://www.w3.org/2000/svg';
+const CHART_WIDTH = 320;
+const CHART_HEIGHT = 120;
+const CHART_PADDING = 12;
+const TRACK_HEIGHT = 56;
 
 export function markerVisual(root, marker, { flareMarks = [], flareOn = false } = {}) {
   if (marker.qualitative || marker.chartKind === 'none') return null;
@@ -22,7 +26,7 @@ export function combinedChartSvg(root, combined) {
       .filter(point => point.value != null && Number.isFinite(point.value))
       .map(point => ({ date: point.date, value: point.value }));
     if (!points.length) return;
-    const built = buildAreaLine(points, { height: 168, yDomain: 'padded', includeValues: [0, 1] });
+    const built = buildAreaLine(points, { height: CHART_HEIGHT, yDomain: 'padded', includeValues: [0, 1] });
     const line = el(root, 'path');
     line.setAttribute('data-role', 'line');
     line.setAttribute('data-series', series.key);
@@ -40,11 +44,13 @@ function rangeBarSvg(root, marker) {
   const low = marker.latest?.ref_low;
   const high = marker.latest?.ref_high;
   const prior = previousSeriesValue(marker);
-  const chart = svgRoot(root, `${marker.label} range`, 'bloods-range-bar');
+  const chart = svgRoot(root, `${marker.label} range`, 'bloods-range-bar', TRACK_HEIGHT);
+  const trackY = TRACK_HEIGHT / 2 - 4;
+  const centreY = TRACK_HEIGHT / 2;
   const track = el(root, 'rect');
   track.setAttribute('data-role', 'range-track');
   track.setAttribute('x', '16');
-  track.setAttribute('y', '72');
+  track.setAttribute('y', String(trackY));
   track.setAttribute('width', '288');
   track.setAttribute('height', '8');
   track.setAttribute('rx', '4');
@@ -55,7 +61,7 @@ function rangeBarSvg(root, marker) {
     previous: prior,
     refLow: low,
     refHigh: high,
-    width: 320,
+    width: CHART_WIDTH,
     padding: 16
   });
   const band = el(root, 'rect');
@@ -63,7 +69,7 @@ function rangeBarSvg(root, marker) {
   const bandX = Math.min(layout.bandStartX, layout.bandEndX);
   const bandW = Math.max(0, Math.abs(layout.bandEndX - layout.bandStartX));
   band.setAttribute('x', String(bandX));
-  band.setAttribute('y', '72');
+  band.setAttribute('y', String(trackY));
   band.setAttribute('width', String(bandW));
   band.setAttribute('height', '8');
   band.setAttribute('rx', '4');
@@ -73,21 +79,21 @@ function rangeBarSvg(root, marker) {
     const ghost = el(root, 'circle');
     ghost.setAttribute('data-role', 'range-ghost');
     ghost.setAttribute('cx', String(layout.previousX));
-    ghost.setAttribute('cy', '76');
+    ghost.setAttribute('cy', String(centreY));
     ghost.setAttribute('r', '6');
     chart.append(ghost);
   }
   if (layout.arrow && layout.previousX != null) {
     const arrow = el(root, 'path');
     arrow.setAttribute('data-role', 'range-arrow');
-    arrow.setAttribute('d', rangeArrowPath(layout.previousX, layout.latestX, 76));
+    arrow.setAttribute('d', rangeArrowPath(layout.previousX, layout.latestX, centreY));
     chart.append(arrow);
   }
   if (Number.isFinite(value)) {
     const dot = el(root, 'circle');
     dot.setAttribute('data-role', 'range-dot');
     dot.setAttribute('cx', String(layout.latestX));
-    dot.setAttribute('cy', '76');
+    dot.setAttribute('cy', String(centreY));
     dot.setAttribute('r', '7');
     chart.append(dot);
   }
@@ -117,7 +123,8 @@ function zonedChartSvg(root, marker) {
   const unit = marker.latest?.unit || 'mmol/mol';
   const zones = glucoseZones(unit);
   const max = zones.at(-1)?.to || 1;
-  const y = value => 156 - (value / max) * 132;
+  const plotBottom = CHART_HEIGHT - CHART_PADDING;
+  const y = value => plotBottom - (value / max) * (plotBottom - CHART_PADDING);
   for (const zone of zones) {
     const band = el(root, 'rect');
     band.setAttribute('data-role', 'zone');
@@ -131,14 +138,14 @@ function zonedChartSvg(root, marker) {
     chart.append(band);
     const label = el(root, 'text');
     label.setAttribute('x', '18');
-    label.setAttribute('y', String(Math.min(y0, y1) + 14));
+    label.setAttribute('y', String(Math.min(y0, y1) + 11));
     label.textContent = zone.label;
     chart.append(label);
   }
   if (marker.series?.length) {
     const include = zones.flatMap(zone => [zone.from, zone.to]);
     const built = buildAreaLine(marker.series.map(point => ({ date: point.date, value: point.value })), {
-      height: 168,
+      height: CHART_HEIGHT,
       yDomain: 'padded',
       includeValues: include
     });
@@ -171,19 +178,24 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
 
   const refLow = marker.latest?.ref_low;
   const refHigh = marker.latest?.ref_high;
-  const includeValues = [refLow, refHigh].filter(value => value != null && Number.isFinite(Number(value)));
-  const built = buildAreaLine((marker.series ?? []).map(point => ({
-    date: point.date,
-    value: point.value
-  })), { height: 168, yDomain: 'padded', includeValues });
+  const series = (marker.series ?? []).map(point => ({ date: point.date, value: point.value }));
+  const built = buildAreaLine(series, {
+    height: CHART_HEIGHT,
+    yDomain: 'padded',
+    includeValues: nearbyRefs(series, [refLow, refHigh])
+  });
 
   if (Number.isFinite(Number(refLow)) && Number.isFinite(Number(refHigh))) {
+    const plotTop = CHART_PADDING;
+    const plotBottom = CHART_HEIGHT - CHART_PADDING;
     const yHigh = built.scaleY(Number(refHigh));
     const yLow = built.scaleY(Number(refLow));
-    band.setAttribute('x', String(built.points[0]?.x ?? 12));
-    band.setAttribute('width', String(Math.max(0, 320 - 24)));
-    band.setAttribute('y', String(Math.min(yHigh, yLow)));
-    band.setAttribute('height', String(Math.abs(yLow - yHigh)));
+    const top = clamp(Math.min(yHigh, yLow), plotTop, plotBottom);
+    const bottom = clamp(Math.max(yHigh, yLow), plotTop, plotBottom);
+    band.setAttribute('x', String(CHART_PADDING));
+    band.setAttribute('width', String(CHART_WIDTH - CHART_PADDING * 2));
+    band.setAttribute('y', String(top));
+    band.setAttribute('height', String(bottom - top));
   } else {
     band.setAttribute('height', '0');
   }
@@ -209,8 +221,8 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
       const tick = el(root, 'line');
       tick.setAttribute('x1', String(match.x));
       tick.setAttribute('x2', String(match.x));
-      tick.setAttribute('y1', '12');
-      tick.setAttribute('y2', '156');
+      tick.setAttribute('y1', String(CHART_PADDING));
+      tick.setAttribute('y2', String(CHART_HEIGHT - CHART_PADDING));
       tick.setAttribute('data-role', 'flare-tick');
       flares.append(tick);
     }
@@ -288,10 +300,29 @@ function nearestPoint(chart, points, event) {
   return nearest;
 }
 
-function svgRoot(root, label, extraClass = '') {
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * A reference limit only joins the y-scale when it sits near the readings. A
+ * distant limit (vitamin D's upper 150 against readings in the 40s) would
+ * otherwise squash the line flat; the band is clamped to the plot instead.
+ */
+export function nearbyRefs(series, refs) {
+  const values = series.map(point => Number(point.value)).filter(Number.isFinite);
+  const finite = refs.map(Number).filter(Number.isFinite);
+  if (!values.length) return finite;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const reach = Math.max(max - min, Math.abs(max) * 0.1, Number.EPSILON);
+  return finite.filter(ref => ref >= min - reach && ref <= max + reach);
+}
+
+function svgRoot(root, label, extraClass = '', height = CHART_HEIGHT) {
   const chart = root.createElementNS(SVG, 'svg');
   chart.setAttribute('class', `line-chart body-chart ${extraClass}`.trim());
-  chart.setAttribute('viewBox', '0 0 320 168');
+  chart.setAttribute('viewBox', `0 0 ${CHART_WIDTH} ${height}`);
   chart.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   chart.setAttribute('role', 'img');
   chart.setAttribute('aria-label', label);

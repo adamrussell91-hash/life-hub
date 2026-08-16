@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { glucoseZones, rangeBarLayout, rangeTrackLayout, compareChartPoints, nextComparePins } from '../../js/app/bloods-charts.js';
+import { readFileSync } from 'node:fs';
+import { glucoseZones, nearbyRefs, rangeBarLayout, rangeTrackLayout, compareChartPoints, nextComparePins } from '../../js/app/bloods-charts.js';
 
 test('rangeBarLayout places an in-range value between the ends', () => {
   const layout = rangeBarLayout(20, 10, 30, { width: 320, padding: 10 });
@@ -84,4 +85,28 @@ test('nextComparePins pins two points then resets on a third', () => {
   assert.deepEqual(nextComparePins([], a), [a]);
   assert.deepEqual(nextComparePins([a], b), [a, b]);
   assert.deepEqual(nextComparePins([a, b], c), [c]);
+});
+
+test('nearbyRefs keeps a limit close to the readings and drops a distant one', () => {
+  const vitaminD = [{ value: 61 }, { value: 55 }, { value: 48 }];
+  assert.deepEqual(nearbyRefs(vitaminD, [50, 150]), [50]);
+  const esr = [{ value: 23 }, { value: 15 }];
+  assert.deepEqual(nearbyRefs(esr, [0, 16]), [16]);
+  const calprotectin = [{ value: 242 }, { value: 117 }];
+  assert.deepEqual(nearbyRefs(calprotectin, [0, 50]), [0, 50]);
+  assert.deepEqual(nearbyRefs([], [0, 50]), [0, 50]);
+});
+
+test('chart viewBoxes match the aspect ratio the stylesheet gives them, so nothing is letterboxed', () => {
+  const js = readFileSync(new URL('../../js/app/bloods-charts.js', import.meta.url), 'utf8');
+  const width = Number(/const CHART_WIDTH = (\d+)/.exec(js)?.[1]);
+  const height = Number(/const CHART_HEIGHT = (\d+)/.exec(js)?.[1]);
+  const track = Number(/const TRACK_HEIGHT = (\d+)/.exec(js)?.[1]);
+  assert.ok(width && height && track);
+
+  const css = readFileSync(new URL('../../css/app.css', import.meta.url), 'utf8');
+  const line = new RegExp(`\\.line-chart\\.body-chart\\s*\\{[^}]*aspect-ratio:\\s*${width} / ${height}`);
+  const bar = new RegExp(`\\.line-chart\\.bloods-range-bar\\s*\\{[^}]*aspect-ratio:\\s*${width} / ${track}`);
+  assert.match(css, line);
+  assert.match(css, bar);
 });

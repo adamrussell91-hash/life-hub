@@ -1,4 +1,3 @@
-import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { categoryNote, explainerFor } from './bloods-explainers.js';
 import { combinedChartSvg, markerVisual } from './bloods-charts.js';
 import { formatDisplayDate } from '../core/time.js';
@@ -36,34 +35,41 @@ function bindRange(root, model, onRangeChange) {
   }
 }
 
+function flagSplit(model) {
+  const low = model.flagged.filter(flag => flag.status === 'Low').length;
+  return { low, high: model.flagged.length - low };
+}
+
 function renderInRange(root, model) {
   const host = root.querySelector('#bloods-in-range');
   if (!host) return;
   host.replaceChildren();
-  const svg = root.querySelector('#bloods-in-range-ring') || (() => {
-    const node = root.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    node.id = 'bloods-in-range-ring';
-    node.setAttribute('class', 'metric-ring metric-ring--bloods-in-range');
-    node.setAttribute('viewBox', '0 0 64 64');
-    const track = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    track.setAttribute('data-role', 'track');
-    track.setAttribute('class', 'metric-ring-track');
-    track.setAttribute('fill', 'none');
-    const fill = root.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    fill.setAttribute('data-role', 'fill');
-    fill.setAttribute('class', 'metric-ring-fill');
-    fill.setAttribute('fill', 'none');
-    node.append(track, fill);
-    return node;
-  })();
-  if (!svg.id) svg.id = 'bloods-in-range-ring';
-  applyRingTarget(svg, { value: model.inRangeCount ?? 0, target: model.markerCount || 1 });
-  const caption = root.createElement('p');
-  caption.className = 'metric-caption';
-  caption.textContent = model.markerCount
-    ? `${model.inRangeCount} of ${model.markerCount} in range`
-    : 'No numeric markers yet.';
-  host.append(svg, caption);
+  if (!model.markerCount) {
+    host.append(caption(root, 'No numeric markers yet.'));
+    return;
+  }
+  const value = root.createElement('p');
+  value.className = 'bloods-signal__value';
+  const count = root.createElement('strong');
+  count.textContent = String(model.inRangeCount);
+  const of = root.createElement('span');
+  of.textContent = `of ${model.markerCount} in range`;
+  value.append(count, of);
+
+  const { high, low } = flagSplit(model);
+  const bar = root.createElement('div');
+  bar.className = 'bloods-bar';
+  bar.setAttribute('role', 'img');
+  bar.setAttribute('aria-label', `${model.inRangeCount} of ${model.markerCount} markers in range`);
+  for (const [tone, amount] of [['in-range', model.inRangeCount], ['high', high], ['low', low]]) {
+    if (!amount) continue;
+    const segment = root.createElement('span');
+    segment.className = 'bloods-bar__segment';
+    segment.dataset.tone = tone;
+    segment.style.width = `${(amount / model.markerCount) * 100}%`;
+    bar.append(segment);
+  }
+  host.append(value, bar);
 }
 
 function renderFlagSummary(root, model) {
@@ -74,19 +80,22 @@ function renderFlagSummary(root, model) {
     host.append(caption(root, 'No blood results yet.'));
     return;
   }
-  const low = model.flagged.filter(flag => flag.status === 'Low').length;
-  const high = model.flagged.length - low;
-  const value = root.createElement('p');
-  value.className = 'metric-value';
-  const count = root.createElement('strong');
-  count.textContent = String(model.flagged.length);
-  const word = root.createElement('span');
-  word.textContent = model.flagged.length === 1 ? 'marker flagged' : 'markers flagged';
-  value.append(count, word);
-  host.append(value);
-  host.append(caption(root, model.flagged.length
-    ? [high ? `${high} high` : '', low ? `${low} low` : ''].filter(Boolean).join(' · ')
-    : 'Everything in range.'));
+  const { high, low } = flagSplit(model);
+  if (!model.flagged.length) {
+    host.append(legendItem(root, 'in-range', 'Everything in range'));
+    return;
+  }
+  host.append(legendItem(root, 'in-range', `${model.inRangeCount} in range`));
+  if (high) host.append(legendItem(root, 'high', `${high} high`));
+  if (low) host.append(legendItem(root, 'low', `${low} low`));
+}
+
+function legendItem(root, tone, text) {
+  const item = root.createElement('span');
+  item.className = 'bloods-legend__item';
+  item.dataset.tone = tone;
+  item.textContent = text;
+  return item;
 }
 
 function renderFlags(root, model) {
@@ -124,15 +133,11 @@ function renderLastCollected(root, model) {
     host.append(caption(root, 'No collection date yet.'));
     return;
   }
-  const line = root.createElement('p');
-  line.className = 'metric-value';
-  line.textContent = model.lastCollected.date;
-  host.append(line);
-  if (model.lastCollected.lab) {
-    host.append(caption(root, model.lastCollected.lab));
-  }
+  const parts = [`Collected ${formatDisplayDate(model.lastCollected.date)}`];
+  if (model.lastCollected.lab) parts.push(model.lastCollected.lab);
+  host.append(caption(root, parts.join(' · ')));
   if (model.lastCollected.stale) {
-    const stale = caption(root, 'Last panel is more than 90 days ago.');
+    const stale = caption(root, 'More than 90 days ago.');
     stale.dataset.stale = '1';
     host.append(stale);
   }
@@ -349,7 +354,7 @@ function markerBlock(root, marker, model, flareOn) {
 
   const visual = markerVisual(root, marker, { flareMarks: model.flareMarks, flareOn });
   if (visual) {
-    const chart = String(visual.className || '').includes('body-chart')
+    const chart = chartClass(visual).includes('body-chart')
       ? visual
       : visual.querySelector?.('.body-chart') || visual;
     if (chart?.dataset) chart.dataset.status = marker.statusTone || 'first';
@@ -368,6 +373,11 @@ function markerBlock(root, marker, model, flareOn) {
   tested.textContent = bits.join(' · ');
   wrap.append(tested);
   return wrap;
+}
+
+function chartClass(node) {
+  const name = node?.getAttribute?.('class') ?? node?.className;
+  return typeof name === 'string' ? name : String(name?.baseVal ?? '');
 }
 
 function openExplainer(root, marker) {

@@ -102,6 +102,10 @@ function fakeRoot() {
   flags.id = 'bloods-flags';
   const flagSummary = el('div');
   flagSummary.id = 'bloods-flag-summary';
+  const inRange = el('div');
+  inRange.id = 'bloods-in-range';
+  const collected = el('div');
+  collected.id = 'bloods-last-collected';
   const host = el('div');
   host.id = 'bloods-sections';
   const ranges = el('div');
@@ -118,6 +122,8 @@ function fakeRoot() {
     '#body-bloods-dashboard': dashboard,
     '#bloods-flags': flags,
     '#bloods-flag-summary': flagSummary,
+    '#bloods-in-range': inRange,
+    '#bloods-last-collected': collected,
     '#bloods-sections': host,
     '#bloods-range-control': ranges,
     '#bloods-appointment-open': open,
@@ -134,6 +140,8 @@ function fakeRoot() {
     _dashboard: dashboard,
     _flags: flags,
     _flagSummary: flagSummary,
+    _inRange: inRange,
+    _collected: collected,
     _host: host,
     _open: open
   };
@@ -164,6 +172,7 @@ const model = {
     { key: 'alt', label: 'ALT', value: 42, unit: 'U/L', status: 'High', date: '2026-05-19' }
   ],
   flareMarks: [],
+  lastCollected: { date: '2026-05-22', lab: null, stale: false },
   appointmentLines: ['ALT 42 U/L — High, ↓8.'],
   categories: [
     {
@@ -345,27 +354,31 @@ test('numeric tiles show a what-line, In range label, refs, and previous value',
   assert.doesNotMatch(String(crpRoot._host.querySelector('.bloods-status').textContent), /^Normal$/);
 });
 
-test('the flags tile carries a count, and the chips live in a strip outside the summary row', async () => {
+test('the summary is one card: a bar with a legend, no ring, and the date folded in', async () => {
   const root = fakeRoot();
   renderBloods(root, model);
-  assert.match(String(root._flagSummary.textContent), /1/);
-  assert.match(String(root._flagSummary.textContent), /marker flagged/);
+
+  const bar = root._inRange.querySelector('.bloods-bar');
+  assert.ok(bar, 'expected a horizontal in-range bar');
+  assert.equal(root._inRange.querySelector('.metric-ring'), null);
+  const inRangeSegment = bar.children.find(child => child.dataset.tone === 'in-range');
+  const highSegment = bar.children.find(child => child.dataset.tone === 'high');
+  assert.equal(inRangeSegment, undefined, 'nothing is in range in this model');
+  assert.equal(highSegment.style.width, '100%');
+  assert.match(String(root._inRange.textContent), /of 1 in range/);
+
   assert.match(String(root._flagSummary.textContent), /1 high/);
   assert.equal(root._flagSummary.querySelector('.bloods-flag'), null);
+  assert.match(String(root._collected.textContent), /Collected 22\/05\/26/);
 
   const { readFileSync } = await import('node:fs');
   const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
   const signal = html.match(/<div id="bloods-signal"[\s\S]*?\n {10}<\/div>/);
   assert.ok(signal, 'expected a #bloods-signal block');
   assert.doesNotMatch(signal[0], /id="bloods-flags"/);
+  assert.equal((signal[0].match(/<article/g) || []).length, 1, 'the summary row is a single card');
+  assert.match(signal[0], /id="bloods-last-collected"/);
   assert.match(html, /id="bloods-flags"/);
-});
-
-test('the in-range ring is drawn unfilled at the ring geometry size', async () => {
-  const { readFileSync } = await import('node:fs');
-  const js = readFileSync(new URL('../../js/app/render-bloods.js', import.meta.url), 'utf8');
-  assert.match(js, /viewBox', '0 0 64 64'/);
-  assert.equal((js.match(/setAttribute\('fill', 'none'\)/g) || []).length >= 2, true);
 });
 
 test('bloods flag chips are centred in CSS, not baseline-aligned tape chips', async () => {
