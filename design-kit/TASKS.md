@@ -4,7 +4,8 @@ Read `AGENTS.md` first. This file is the extra brief for **Tasks Hub only**. It 
 
 Chrome is Teaching. Product surfaces (board, graph, charts) stay in the hub. Data models and persistence are out of scope here.
 
-Canonical kit: `/Users/adamrussell/Projects/hub-design-kit`
+Canonical kit: `/Users/adamrussell/Projects/hub-design-kit`  
+Tasks Hub: `/Users/adamrussell/Projects/tasks-hub`
 
 ## Shell
 
@@ -42,14 +43,14 @@ Copy interaction and rendering from hubs that already have it. Restyle with kit 
 
 Use Knowledge’s habits: search field, select a node, preview card. Universe / fake-sun modes are Knowledge product, not a Tasks requirement.
 
-Path: `/Users/adamrussell/Documents/Codex/2026-08-13/files-mentioned-by-the-user-2026/outputs/knowledge-hub`
+Path: `/Users/adamrussell/Projects/knowledge-hub`
 
 **Charts (Life Hub)**
 
 - Kit root: `js/app/chart-kit/`
 - Prefer **ring**, **columns**, **area-line** for board metrics. Reach for heatmap / pie / sankey / etc. only when the same chart type already exists there and fits the data.
 
-Path: `/Users/adamrussell/Documents/Claude/Projects/life-hub`
+Path: `/Users/adamrussell/Projects/life-hub`
 
 Graph and chart CSS belongs in the hub (or a copy of those modules). Do not add viz packages to this design-kit repo in this pass.
 

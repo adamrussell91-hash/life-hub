@@ -44,6 +44,8 @@ Product UI (graphs, lesson blocks, bloods) stays in the hub. Chrome does not.
 - Do not start a new palette, font, or button style “just for this page”.
 - High Sea (`--high-sea`) is accent / decisive, not body text on orange, not focus rings (focus is Wave).
 - After changing this kit, run `scripts/sync-to-hubs.sh` so hub copies update.
+- **Never store repos or data under `~/Documents` or `~/Desktop` (iCloud).** Code lives in `~/Projects/<name>` or `~/Teaching Hub`. Archives/media go to Cloudflare R2. If this workspace is under Documents, stop and relocate.
+- **Hub sites must never need iCloud or any local Mac file to work.** Source is GitHub; runtime data is Cloudflare (Workers, R2, KV, D1). Do not add a required local-file fallback.
 
 ## New hub checklist
 
