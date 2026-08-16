@@ -1,48 +1,78 @@
-export function rangeTrackLayout({
-  value,
-  previous,
-  refLow,
-  refHigh,
-  width = 320,
-  padding = 16
-} = {}) {
+const BAND_PAD = 0.28;
+const VALUE_PAD = 0.06;
+
+/**
+ * Scales a marker against its reference band rather than against its own
+ * readings. Anchoring on the band keeps the sage stripe in the same place on
+ * every chart, so "where does this sit in normal" reads at a glance, and a
+ * marker that barely moves stays flat instead of being zoomed into a dramatic
+ * squiggle. Values outside the band always stay inside the plot.
+ *
+ * An open-ended range (a lone upper or lower limit) gets a working band three
+ * times the distance from the limit to the reading, which is enough to place
+ * the reading without pretending the missing limit exists.
+ */
+export function bandDomain({ values = [], refLow, refHigh } = {}) {
   const finite = n => n != null && n !== '' && Number.isFinite(Number(n));
-  const v = finite(value) ? Number(value) : null;
-  const prev = finite(previous) ? Number(previous) : null;
+  const points = values.map(Number).filter(Number.isFinite);
   const low = finite(refLow) ? Number(refLow) : null;
   const high = finite(refHigh) ? Number(refHigh) : null;
-  const values = [v, prev, low, high].filter(n => n != null);
-  let domainMin = values.length ? Math.min(...values) : 0;
-  let domainMax = values.length ? Math.max(...values) : 1;
-  if (domainMin === domainMax) {
-    domainMin -= 1;
-    domainMax += 1;
+  const reading = points.length ? points.at(-1) : null;
+
+  let bandLow = low;
+  let bandHigh = high;
+  if (bandLow == null && bandHigh == null) {
+    const min = points.length ? Math.min(...points) : 0;
+    const max = points.length ? Math.max(...points) : 1;
+    bandLow = min;
+    bandHigh = max > min ? max : min + 1;
+  } else if (bandLow == null) {
+    bandLow = bandHigh - Math.max(bandHigh - Math.min(reading ?? bandHigh, bandHigh), 0) * 3;
+  } else if (bandHigh == null) {
+    bandHigh = bandLow + Math.max(Math.max(reading ?? bandLow, bandLow) - bandLow, 0) * 3;
   }
-  const inner = Math.max(0, width - padding * 2);
-  const xAt = n => padding + ((Number(n) - domainMin) / (domainMax - domainMin)) * inner;
-  const bandStartX = low != null ? xAt(low) : padding;
-  const bandEndX = high != null ? xAt(high) : padding + inner;
-  const latestX = v != null ? xAt(v) : padding;
-  const previousX = prev != null ? xAt(prev) : null;
-  let arrow = null;
-  if (previousX != null && latestX !== previousX) {
-    arrow = latestX > previousX ? 'right' : 'left';
+
+  let width = bandHigh - bandLow;
+  if (!(width > 0)) width = Math.max(Math.abs(bandHigh) * 0.1, 1);
+  let min = bandLow - width * BAND_PAD;
+  let max = bandHigh + width * BAND_PAD;
+  for (const point of points) {
+    min = Math.min(min, point - width * VALUE_PAD);
+    max = Math.max(max, point + width * VALUE_PAD);
   }
-  const overflow = v != null && high != null && v > high
-    ? 'high'
-    : v != null && low != null && v < low
-      ? 'low'
-      : null;
+
   return {
-    domainMin,
-    domainMax,
-    bandStartX,
-    bandEndX,
-    latestX,
-    previousX,
-    arrow,
-    overflow
+    min,
+    max,
+    bandLow: low == null ? null : bandLow,
+    bandHigh: high == null ? null : bandHigh,
+    // Where a value sits across the plot, 0 at min and 1 at max.
+    fraction: value => {
+      const n = Number(value);
+      if (!Number.isFinite(n) || max === min) return 0;
+      return Math.min(1, Math.max(0, (n - min) / (max - min)));
+    }
   };
+}
+
+/**
+ * Judges one reading against the reference limits, in the same vocabulary the
+ * lab uses, so it can be passed through `statusTone` for markers where a high
+ * number is the good direction.
+ */
+export function pointStatus(value, refLow, refHigh) {
+  // Number(null) is 0, so a missing limit has to be rejected before conversion
+  // or every reading gets judged against zero.
+  const numeric = input => (input == null || input === '' || !Number.isFinite(Number(input))
+    ? null
+    : Number(input));
+  const n = numeric(value);
+  const low = numeric(refLow);
+  const high = numeric(refHigh);
+  if (n == null || (low == null && high == null)) return null;
+  if (low != null && n < low) return 'Low';
+  if (high != null && n > high) return 'High';
+  return 'Normal';
 }
 
 export function rangeBarLayout(value, refLow, refHigh, { width = 320, padding = 16 } = {}) {

@@ -145,7 +145,7 @@ test('statusTone is brick/copper/high and inverts HDL High', () => {
   assert.equal(tone('hdl'), 'normal');
 });
 
-test('chartKind counts the points actually drawn: range-bar under three, line at three, zoned for HbA1c', () => {
+test('chartKind follows the points drawn: meter under three, line at three, zoned for HbA1c', () => {
   const sparse = buildBloodsModel({
     date: '2026-08-13',
     range: 'five_year',
@@ -155,9 +155,8 @@ test('chartKind counts the points actually drawn: range-bar under three, line at
     ]
   });
   const tsh = sparse.categories.find(c => c.id === 'Thyroid').markers[0];
-  assert.equal(tsh.chartKind, 'range-bar');
+  assert.equal(tsh.chartKind, 'meter');
 
-  // 5Y aggregates into half-year buckets, so these three land on three drawn points.
   const lined = buildBloodsModel({
     date: '2026-08-13',
     range: 'five_year',
@@ -171,21 +170,6 @@ test('chartKind counts the points actually drawn: range-bar under three, line at
   assert.equal(crp.series.length, 3);
   assert.equal(crp.chartKind, 'line');
 
-  // Same three readings inside one half-year bucket draw two points, so the
-  // marker gets the compact range track rather than a mostly empty line chart.
-  const bucketed = buildBloodsModel({
-    date: '2026-08-13',
-    range: 'five_year',
-    events: [
-      bloodsEvent('2025-01-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 1, unit: 'mg/L', status: 'Normal' }]),
-      bloodsEvent('2026-01-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 2, unit: 'mg/L', status: 'Normal' }]),
-      bloodsEvent('2026-02-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 3, unit: 'mg/L', status: 'Normal' }])
-    ]
-  });
-  const collapsed = bucketed.categories[0].markers[0];
-  assert.equal(collapsed.series.length, 2);
-  assert.equal(collapsed.chartKind, 'range-bar');
-
   const glucose = buildBloodsModel({
     date: '2026-08-13',
     events: [
@@ -193,6 +177,37 @@ test('chartKind counts the points actually drawn: range-bar under three, line at
     ]
   });
   assert.equal(glucose.categories[0].markers[0].chartKind, 'zoned');
+});
+
+test('every draw in the window is plotted, never averaged into a period bucket', () => {
+  // Two draws in the same half-year used to be averaged, which put a value on
+  // the chart that was never measured and disagreed with the headline reading.
+  const model = buildBloodsModel({
+    date: '2026-08-13',
+    range: 'five_year',
+    events: [
+      bloodsEvent('2026-01-28', [{ key: 'esr', label: 'ESR', category: 'Inflammation Markers', value: 23, unit: 'mm/Hr', status: 'High', ref_low: 0, ref_high: 16 }]),
+      bloodsEvent('2026-02-20', [{ key: 'esr', label: 'ESR', category: 'Inflammation Markers', value: 19, unit: 'mm/Hr', status: 'High', ref_low: 0, ref_high: 16 }]),
+      bloodsEvent('2026-05-19', [{ key: 'esr', label: 'ESR', category: 'Inflammation Markers', value: 15, unit: 'mm/Hr', status: 'Normal', ref_low: 0, ref_high: 16 }])
+    ]
+  });
+  const esr = model.categories[0].markers[0];
+  assert.deepEqual(esr.series.map(point => point.value), [23, 19, 15]);
+  assert.deepEqual(esr.series.map(point => point.date), ['2026-01-28', '2026-02-20', '2026-05-19']);
+  assert.equal(esr.series.at(-1).value, esr.latest.value, 'the last plotted point is the headline reading');
+});
+
+test('a draw older than the selected window is left off the chart', () => {
+  const model = buildBloodsModel({
+    date: '2026-08-13',
+    range: 'year',
+    events: [
+      bloodsEvent('2019-07-19', [{ key: 'esr', label: 'ESR', category: 'Inflammation Markers', value: 12, unit: 'mm/Hr', status: 'Normal', ref_low: 0, ref_high: 16 }]),
+      bloodsEvent('2026-05-19', [{ key: 'esr', label: 'ESR', category: 'Inflammation Markers', value: 15, unit: 'mm/Hr', status: 'Normal', ref_low: 0, ref_high: 16 }])
+    ]
+  });
+  const esr = model.categories[0].markers[0];
+  assert.deepEqual(esr.series.map(point => point.value), [15]);
 });
 
 test('first reading is a grey tone and long gaps name the prior date', () => {

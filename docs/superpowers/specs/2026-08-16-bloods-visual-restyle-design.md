@@ -70,6 +70,25 @@ Today `.bloods-flag` reuses `.body-tape-chip` with `align-items: baseline` and t
 
 If Body tape chips must keep baseline alignment, **do not share that rule** with Bloods flags — override on `.bloods-flag` or give flags their own class.
 
+## Chart chosen by data shape (2026-08-16 revision)
+
+A category is a **mix of two treatments**, picked from how much history a marker has, rather than one tile per marker:
+
+| Drawn points | Treatment |
+|---|---|
+| 3 or more | **Trend card** in an auto-fitting grid (`minmax(17rem, 1fr)`), so three or four sit in a row |
+| 1 or 2, or qualitative | **Dense row** in a list: status dot, name, `i`, value, linear meter, band label, status pill, delta |
+
+Charted markers come first in the category body, rows after. A two-draw marker on a full card was what made the page a scroll of near-empty charts.
+
+### Band-anchored scale (`bandDomain`)
+
+Every marker visual scales against **its reference band**, never against the spread of its own readings: `[bandLow − 0.28·w, bandHigh + 0.28·w]`, widened to fit any reading with a 6% margin. The sage band therefore lands in the same place on every chart, "where does this sit in normal" reads at a glance, and a marker that barely moves stays flat instead of being zoomed into drama. An open-ended range gets a working band of three times the limit-to-reading distance, and the sage runs off the plot edge on the open side. This replaced `nearbyRefs`, which only decided whether a limit joined an otherwise reading-driven scale.
+
+### Every draw is plotted
+
+Bloods series are **not** bucketed by period like the rest of Body. Averaging two draws in one half-year invented a reading that was never taken, and put a red "High" dot on a card whose headline value said In range.
+
 ## Marker tile
 
 Every numeric marker tile, in order:
@@ -91,29 +110,21 @@ Never assign to `className` on an SVG node — it is a read-only `SVGAnimatedStr
 
 ## Charts
 
-### Range track (sparse / `chartKind === 'range-bar'`)
+### Linear meter (`chartKind === 'meter'`)
 
-Replace the fat black bar.
-
-- Full track: `--shore`, height ~8px, full pill radius
-- In-range segment: `--pastel-sage` between `ref_low` and `ref_high` (open-ended high or low still labelled)
-- **Latest:** solid dot, `--success` if in range, `--danger` / `--high-sea-ink` if High/Low
-- **Previous:** ghost dot (`marine` at ~20% opacity), same scale
-- **Arrow:** Wave, between ghost and latest, direction of travel on the track
-- If only one point: no ghost, no arrow
-- Overflow High/Low: dot sits at/ beyond the sage end; do not clamp so hard that High looks in-range
+The row's chart: a `320 × 16` strip carrying a `--line` track, a `--pastel-sage` band over the reference range, a ghost dot for the previous draw, and a haloed dot for the latest in `--success` / `--danger` / `--high-sea-ink`. It replaces the old range track, which spent 56px of height and an arrow on the same information.
 
 ### Geometry (must match the stylesheet)
 
-The SVG `viewBox` and the CSS `aspect-ratio` must describe the same box. When they disagree, `preserveAspectRatio="xMidYMid meet"` draws the chart at 1:1 inside a wider box and centres it, so the line and the sage band float in the middle of the tile with dead space either side. Line and zoned charts are `320 × 120`; the range track is `320 × 56`. Anything hard-coded off the old 168 height is a bug.
+The SVG `viewBox` and the CSS `aspect-ratio` must describe the same box. When they disagree, `preserveAspectRatio="xMidYMid meet"` draws the chart at 1:1 inside a wider box and centres it, so the line and the sage band float in the middle of the tile with dead space either side. Trend charts are `320 × 80`, meters `320 × 16`, the combined strip `960 × 160`; a unit test reads the constants and asserts the matching CSS rule.
 
-### Line + band (two or more points)
+### Trend card (three or more points)
 
-- Sage rectangle = current reference band, spanning the **full plot width** and clamped to the plot box so it never bleeds past the axis
-- A reference limit joins the y-scale **only when it sits near the readings** (`nearbyRefs`). Vitamin D’s upper limit of 150 against readings in the 40s would otherwise flatten the line into a straight edge; the band simply runs off the top instead
-- Line stroke `--wave` when in range; last point (and status-coloured line if the latest is flagged) uses semantic status
-- **Dot on every vertex** (not only endpoints). Latest slightly larger
-- No empty 168px hole with a 12px black slab
+- Sage rectangle = the reference band, full plot width, clamped to the plot box
+- A baseline axis line in `--line` under the plot
+- **Straight segments**, not the smoothed path: the curve between two lab draws is invented
+- **A dot on every draw, coloured by how that draw read on the day** (`data-tone`), so a run of flagged results is visible without reading numbers. Latest slightly larger
+- Dates below the chart as **HTML** ticks, absolutely positioned at each point's x fraction, thinned to at most five, first anchored left and last anchored right. SVG text would scale with the card and drift off the type scale
 
 Glucose zoned charts keep zones; restyle zone fills to kit pastels, not maroon.
 

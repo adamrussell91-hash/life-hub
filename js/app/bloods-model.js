@@ -1,8 +1,7 @@
 import {
   BODY_RANGES,
   DEFAULT_BODY_RANGE,
-  rangeWindow,
-  seriesInRange
+  rangeWindow
 } from './body-model.js';
 import { ratioTone } from './bloods-charts-layout.js';
 import { formatDisplayDate } from '../core/time.js';
@@ -74,7 +73,7 @@ export function buildBloodsModel({ events, date, range = DEFAULT_BODY_RANGE } = 
   const markers = [];
   for (const observations of grouped.values()) {
     observations.sort((a, b) => a.date.localeCompare(b.date) || compareNullable(a.value, b.value));
-    markers.push(markerModel(observations, bounds, selectedRange));
+    markers.push(markerModel(observations, bounds));
   }
 
   const numericLatest = markers.filter(marker => !marker.qualitative && marker.latest);
@@ -218,7 +217,7 @@ function normalisedSeries(marker) {
   };
 }
 
-function markerModel(observations, bounds, selectedRange) {
+function markerModel(observations, bounds) {
   const latest = observations.at(-1);
   const qualitative = latest.value == null || latest.unit === 'Qualitative';
   const numeric = observations
@@ -235,7 +234,12 @@ function markerModel(observations, bounds, selectedRange) {
     : null;
 
   const goodDirection = goodMove(latest.status, latest.key);
-  let series = qualitative ? [] : seriesInRange(numeric, bounds, selectedRange);
+  // Every draw is plotted as it was reported. Other Body series bucket their
+  // points by period, but averaging two blood draws invents a reading that was
+  // never taken, and it disagreed with the headline value on the same card.
+  let series = qualitative
+    ? []
+    : numeric.filter(point => point.date >= bounds.from && point.date <= bounds.to);
   if (!qualitative && series.length === 0 && numeric.length) {
     series = [{ date: numeric.at(-1).date, value: numeric.at(-1).value }];
   }
@@ -279,11 +283,16 @@ export function statusTone(status, key) {
   return 'first';
 }
 
+/**
+ * Chart follows data shape: a marker with real history earns a trend card,
+ * while one or two draws get the meter that sits in a dense row. Spending a
+ * full card on two points is what made the panel unreadable.
+ */
 function chartKind(key, qualitative, numericCount) {
   if (qualitative || numericCount < 1) return 'none';
   if (ZONED_MARKER_KEYS.has(key)) return 'zoned';
   if (numericCount >= 3) return 'line';
-  return 'range-bar';
+  return 'meter';
 }
 
 function goodMove(status, key) {

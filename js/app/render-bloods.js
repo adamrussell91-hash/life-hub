@@ -289,18 +289,109 @@ function categoryCard(root, category, model, flareOn) {
     }
   }
 
-  const grid = root.createElement('div');
-  grid.className = 'bloods-metric-grid body-metrics body-metrics--pair';
   if (!category.markers.length) {
     body.append(caption(root, 'Not yet tested'));
-  } else {
-    for (const marker of category.markers) {
-      grid.append(markerBlock(root, marker, model, flareOn));
-    }
+    article.append(body);
+    return article;
+  }
+
+  // Markers with a history get a chart card; a marker with one or two draws
+  // says everything it has to say in a row, so it does not take a card.
+  const charted = category.markers.filter(marker => hasTrend(marker));
+  const listed = category.markers.filter(marker => !hasTrend(marker));
+
+  if (charted.length) {
+    const grid = root.createElement('div');
+    grid.className = 'bloods-metric-grid body-metrics body-metrics--pair';
+    for (const marker of charted) grid.append(markerBlock(root, marker, model, flareOn));
     body.append(grid);
+  }
+  if (listed.length) {
+    const list = root.createElement('div');
+    list.className = 'bloods-rows';
+    for (const marker of listed) list.append(markerRow(root, marker));
+    body.append(list);
   }
   article.append(body);
   return article;
+}
+
+function hasTrend(marker) {
+  return marker.chartKind === 'line' || marker.chartKind === 'zoned';
+}
+
+function markerRow(root, marker) {
+  const row = root.createElement('div');
+  row.className = 'bloods-row';
+  row.id = `bloods-marker-${marker.key}`;
+  row.dataset.bloodsMarker = marker.key;
+  const tone = marker.statusTone || 'first';
+
+  const name = root.createElement('div');
+  name.className = 'bloods-row__name';
+  const dot = root.createElement('span');
+  dot.className = 'bloods-row__dot';
+  dot.dataset.status = tone;
+  const label = root.createElement('span');
+  label.className = 'bloods-row__label';
+  label.textContent = marker.label;
+  name.append(dot, label, infoButton(root, marker));
+  row.append(name);
+
+  const value = root.createElement('p');
+  value.className = 'bloods-row__value';
+  value.style.fontVariantNumeric = 'tabular-nums';
+  const number = root.createElement('span');
+  number.className = 'bloods-row__number';
+  if (marker.qualitative) {
+    number.textContent = marker.latest?.status || marker.latest?.unit || 'Qualitative';
+    value.append(number);
+  } else {
+    number.textContent = formatNumber(Number(marker.latest?.value));
+    value.append(number);
+    if (marker.latest?.unit) {
+      const unit = root.createElement('span');
+      unit.className = 'bloods-row__unit';
+      unit.textContent = marker.latest.unit;
+      value.append(unit);
+    }
+  }
+  row.append(value);
+
+  const meter = root.createElement('div');
+  meter.className = 'bloods-row__meter';
+  const visual = markerVisual(root, marker, {});
+  if (visual) {
+    visual.dataset.status = tone;
+    meter.append(visual);
+  }
+  const foot = root.createElement('div');
+  foot.className = 'bloods-row__foot';
+  const band = root.createElement('span');
+  band.textContent = refCaption(marker.latest?.ref_low, marker.latest?.ref_high);
+  const pill = root.createElement('span');
+  pill.className = 'bloods-status';
+  pill.dataset.status = tone;
+  pill.textContent = statusLabel(marker.latest?.status);
+  foot.append(band, pill);
+  meter.append(foot);
+  row.append(meter);
+
+  const delta = root.createElement('p');
+  delta.className = 'bloods-row__delta';
+  delta.textContent = marker.lastDeltaLabel || (marker.latest?.date ? formatDisplayDate(marker.latest.date) : '');
+  row.append(delta);
+  return row;
+}
+
+function infoButton(root, marker) {
+  const info = root.createElement('button');
+  info.type = 'button';
+  info.className = 'bloods-info';
+  info.setAttribute('aria-label', `About ${marker.label}`);
+  info.textContent = 'i';
+  info.addEventListener('click', () => openExplainer(root, marker));
+  return info;
 }
 
 function markerBlock(root, marker, model, flareOn) {
@@ -313,23 +404,11 @@ function markerBlock(root, marker, model, flareOn) {
   head.className = 'body-metric__head';
   const name = root.createElement('strong');
   name.textContent = marker.label;
-  const info = root.createElement('button');
-  info.type = 'button';
-  info.className = 'bloods-info';
-  info.setAttribute('aria-label', `About ${marker.label}`);
-  info.textContent = 'i';
-  info.addEventListener('click', () => openExplainer(root, marker));
-  head.append(name, info);
-
-  if (marker.lastDelta != null) {
-    const trends = root.createElement('div');
-    trends.className = 'body-metric__growth';
-    trends.append(
-      trendChip(root, marker.lastDelta, marker.lastColour, marker.lastDeltaLabel ? marker.lastDeltaLabel : 'Last'),
-      trendChip(root, marker.overallDelta, marker.overallColour, 'Overall')
-    );
-    head.append(trends);
-  }
+  const pill = root.createElement('span');
+  pill.className = 'bloods-status';
+  pill.dataset.status = marker.statusTone || 'first';
+  pill.textContent = statusLabel(marker.latest?.status);
+  head.append(name, infoButton(root, marker), pill);
   wrap.append(head);
 
   const what = root.createElement('p');
@@ -348,12 +427,6 @@ function markerBlock(root, marker, model, flareOn) {
   value.textContent = formatLatestValue(marker.latest?.value, marker.latest?.unit);
   wrap.append(value);
 
-  const pill = root.createElement('span');
-  pill.className = 'bloods-status';
-  pill.dataset.status = marker.statusTone || 'first';
-  pill.textContent = statusLabel(marker.latest?.status);
-  wrap.append(pill);
-
   const visual = markerVisual(root, marker, { flareMarks: model.flareMarks, flareOn });
   if (visual) {
     const chart = chartClass(visual).includes('body-chart')
@@ -367,12 +440,13 @@ function markerBlock(root, marker, model, flareOn) {
 
   const tested = root.createElement('p');
   tested.className = 'metric-caption bloods-tested';
-  const bits = [
-    refCaption(marker.latest?.ref_low, marker.latest?.ref_high),
-    previousCaption(marker),
-    marker.latest?.date ? formatDisplayDate(marker.latest.date) : ''
-  ].filter(Boolean);
-  tested.textContent = bits.join(' · ');
+  const band = root.createElement('span');
+  band.textContent = refCaption(marker.latest?.ref_low, marker.latest?.ref_high);
+  const when = root.createElement('span');
+  when.textContent = [marker.lastDeltaLabel, marker.latest?.date ? formatDisplayDate(marker.latest.date) : '']
+    .filter(Boolean)
+    .join(' · ');
+  tested.append(band, when);
   wrap.append(tested);
   return wrap;
 }
@@ -442,20 +516,6 @@ function filterMarkers(dashboard, query) {
   }
 }
 
-function trendChip(root, delta, colour, label) {
-  const chip = root.createElement('span');
-  chip.className = 'body-tape-chip';
-  chip.dataset.colour = colour || 'neutral';
-  const kind = root.createElement('span');
-  kind.className = 'body-tape-chip__label';
-  kind.textContent = label;
-  const deltaEl = root.createElement('span');
-  deltaEl.className = 'body-tape-chip__delta';
-  deltaEl.textContent = /[↑↓→]/.test(String(label)) ? '' : formatDeltaChip(delta);
-  chip.append(kind, deltaEl);
-  return chip;
-}
-
 function caption(root, text) {
   const node = root.createElement('p');
   node.className = 'metric-caption';
@@ -486,13 +546,6 @@ function refCaption(low, high) {
   return '';
 }
 
-function previousCaption(marker) {
-  const series = (marker.series ?? []).filter(point => point.value != null && Number.isFinite(Number(point.value)));
-  if (series.length < 2) return '';
-  const prior = series.at(-2);
-  return `Was ${formatNumber(Number(prior.value))}`;
-}
-
 function formatNumber(n) {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
@@ -504,11 +557,3 @@ function formatLatestValue(value, unit) {
   return unit ? `${text} ${unit}` : text;
 }
 
-function formatDeltaChip(delta) {
-  if (delta == null || !Number.isFinite(delta)) return '→ —';
-  if (delta === 0) return '→ 0';
-  const arrow = delta > 0 ? '↑' : '↓';
-  const mag = Math.abs(delta);
-  const text = Number.isInteger(mag) ? String(mag) : mag.toFixed(1);
-  return `${arrow} ${text}`;
-}

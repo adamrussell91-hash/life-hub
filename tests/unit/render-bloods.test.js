@@ -323,7 +323,7 @@ test('Lipid Studies render a Total:HDL ratio chip', () => {
   assert.equal(chip.dataset.status, 'low');
 });
 
-test('numeric tiles show a what-line, In range label, refs, and previous value', () => {
+test('a marker with history gets a trend card: what-line, status, band, and dated ticks', () => {
   const root = fakeRoot();
   renderBloods(root, {
     ...model,
@@ -337,7 +337,7 @@ test('numeric tiles show a what-line, In range label, refs, and previous value',
         key: 'calprotectin',
         label: 'Calprotectin',
         qualitative: false,
-        chartKind: 'range-bar',
+        chartKind: 'line',
         statusTone: 'high',
         latest: {
           date: '2025-10-24',
@@ -348,11 +348,12 @@ test('numeric tiles show a what-line, In range label, refs, and previous value',
           ref_high: 50
         },
         series: [
+          { date: '2025-01-11', value: 320 },
           { date: '2025-06-01', value: 242 },
           { date: '2025-10-24', value: 117 }
         ],
         lastDelta: -125,
-        overallDelta: -125,
+        overallDelta: -203,
         lastColour: 'green',
         overallColour: 'green',
         lastDeltaLabel: '↓125'
@@ -360,12 +361,27 @@ test('numeric tiles show a what-line, In range label, refs, and previous value',
     }]
   });
   const tile = root._host.querySelector('.bloods-metric');
+  assert.ok(tile, 'three draws earn a card, not a row');
+  assert.equal(root._host.querySelector('.bloods-row'), null);
   assert.match(String(tile.textContent), /gut|mucosal|Crohn/i);
   assert.match(String(tile.textContent), /High/);
-  assert.match(String(tile.textContent), /Was 242/);
   assert.match(String(tile.textContent), /<50|0–50|0-50/);
-  const crpRoot = fakeRoot();
-  renderBloods(crpRoot, {
+  assert.match(String(tile.textContent), /↓125/);
+
+  const dots = [
+    ...tile.querySelectorAll('[data-role="point"]'),
+    ...tile.querySelectorAll('[data-role="latest-point"]')
+  ];
+  assert.equal(dots.length, 3, 'one dot per draw');
+  assert.deepEqual(dots.map(dot => dot.getAttribute('data-tone')), ['high', 'high', 'high']);
+  const ticks = tile.querySelectorAll('.bloods-ticks__item');
+  assert.ok(ticks.length >= 2, 'the chart is dated at both ends');
+  assert.match(String(ticks[0].textContent), /’25/);
+});
+
+test('a marker with one or two draws becomes a row: value, meter, band, status', () => {
+  const root = fakeRoot();
+  renderBloods(root, {
     ...model,
     flagged: [],
     categories: [{
@@ -381,12 +397,63 @@ test('numeric tiles show a what-line, In range label, refs, and previous value',
         latest: { date: '2026-05-22', value: 2.4, unit: 'mg/L', status: 'Normal', ref_low: 0, ref_high: 5 },
         series: [{ date: '2026-05-22', value: 2.4 }],
         lastDelta: null,
-        chartKind: 'range-bar'
+        chartKind: 'meter'
       }]
     }]
   });
-  assert.match(String(crpRoot._host.querySelector('.bloods-metric').textContent), /In range/);
-  assert.doesNotMatch(String(crpRoot._host.querySelector('.bloods-status').textContent), /^Normal$/);
+  const row = root._host.querySelector('.bloods-row');
+  assert.ok(row, 'a single draw does not take a whole card');
+  assert.equal(root._host.querySelector('.bloods-metric'), null);
+  assert.equal(row.id, 'bloods-marker-crp', 'flag chips can still jump to it');
+  assert.equal(row.querySelector('.bloods-row__dot').dataset.status, 'normal');
+  assert.match(String(row.querySelector('.bloods-row__value').textContent), /2\.4\s*mg\/L/);
+  assert.ok(row.querySelector('.bloods-meter'), 'the row carries the reference meter');
+  assert.match(String(row.textContent), /In range/);
+  assert.doesNotMatch(String(row.querySelector('.bloods-status').textContent), /^Normal$/);
+});
+
+test('one category mixes both treatments: charted markers first, then the rows', () => {
+  const root = fakeRoot();
+  const charted = {
+    ...alt,
+    key: 'ferritin',
+    label: 'Ferritin',
+    chartKind: 'line',
+    statusTone: 'normal',
+    latest: { date: '2026-05-19', value: 96, unit: 'ug/L', status: 'Normal', ref_low: 30, ref_high: 300 },
+    series: [
+      { date: '2025-01-11', value: 150 },
+      { date: '2025-10-24', value: 124 },
+      { date: '2026-05-19', value: 96 }
+    ]
+  };
+  const listed = {
+    ...alt,
+    key: 'vitamin_d',
+    label: 'Vitamin D',
+    chartKind: 'meter',
+    statusTone: 'normal',
+    latest: { date: '2026-05-19', value: 62, unit: 'nmol/L', status: 'Normal', ref_low: 50, ref_high: 150 },
+    series: [{ date: '2026-05-19', value: 62 }]
+  };
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: [{
+      id: 'Iron Studies',
+      title: 'Iron Studies',
+      hasFlags: false,
+      collapsed: false,
+      markers: [listed, charted]
+    }]
+  });
+  const body = root._host.querySelector('.bloods-category__body');
+  const grid = body.querySelector('.bloods-metric-grid');
+  const rows = body.querySelector('.bloods-rows');
+  assert.ok(grid && rows, 'both treatments appear in the one category');
+  assert.equal(grid.querySelectorAll('.bloods-metric').length, 1);
+  assert.equal(rows.querySelectorAll('.bloods-row').length, 1);
+  assert.ok(body.children.indexOf(grid) < body.children.indexOf(rows), 'charts lead, rows follow');
 });
 
 test('a category with a combined chart still renders, and does not take later categories down with it', () => {

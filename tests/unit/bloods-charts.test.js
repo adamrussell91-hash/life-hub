@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { glucoseZones, nearbyRefs, rangeBarLayout, rangeTrackLayout, compareChartPoints, nextComparePins } from '../../js/app/bloods-charts.js';
+import {
+  bandDomain,
+  glucoseZones,
+  rangeBarLayout,
+  pointStatus,
+  compareChartPoints,
+  nextComparePins
+} from '../../js/app/bloods-charts.js';
 
 test('rangeBarLayout places an in-range value between the ends', () => {
   const layout = rangeBarLayout(20, 10, 30, { width: 320, padding: 10 });
@@ -19,34 +26,46 @@ test('rangeBarLayout clamps values outside the reference range', () => {
   assert.equal(low.x, 0);
 });
 
-test('rangeTrackLayout parks a high value on the shore past the sage band', () => {
-  const layout = rangeTrackLayout({
-    value: 117,
-    previous: 242,
-    refLow: 0,
-    refHigh: 50,
-    width: 320,
-    padding: 16
-  });
-  assert.equal(layout.overflow, 'high');
-  assert.ok(layout.latestX > layout.bandEndX);
-  assert.ok(layout.previousX > layout.latestX);
-  assert.equal(layout.arrow, 'left');
-  assert.ok(layout.bandStartX < layout.bandEndX);
+test('bandDomain anchors the scale on the reference range, not on the readings', () => {
+  // Two markers that barely move sit in the same place on their charts, because
+  // the band -- not the spread of the readings -- sets the scale.
+  const calm = bandDomain({ values: [2.4, 2.5, 2.45], refLow: 2.1, refHigh: 2.6 });
+  const bandShare = (calm.bandHigh - calm.bandLow) / (calm.max - calm.min);
+  assert.ok(bandShare > 0.6 && bandShare < 0.7, `band filled ${bandShare} of the plot`);
+  assert.equal(calm.bandLow, 2.1);
+  assert.equal(calm.bandHigh, 2.6);
+
+  const flat = bandDomain({ values: [0.87, 0.87], refLow: 0.7, refHigh: 1.1 });
+  const flatShare = (flat.bandHigh - flat.bandLow) / (flat.max - flat.min);
+  assert.ok(Math.abs(bandShare - flatShare) < 0.01, 'identical band padding regardless of movement');
 });
 
-test('rangeTrackLayout omits ghost and arrow when there is no previous', () => {
-  const layout = rangeTrackLayout({
-    value: 15,
-    refLow: 0,
-    refHigh: 20,
-    width: 200,
-    padding: 0
-  });
-  assert.equal(layout.overflow, null);
-  assert.equal(layout.previousX, null);
-  assert.equal(layout.arrow, null);
-  assert.equal(layout.latestX, layout.bandEndX * (15 / 20));
+test('bandDomain keeps out-of-range readings inside the plot', () => {
+  const domain = bandDomain({ values: [242, 320, 117], refLow: 0, refHigh: 50 });
+  assert.ok(domain.min <= 0);
+  assert.ok(domain.max >= 320);
+  assert.ok(domain.fraction(320) > 0.95, 'the extreme reading sits near the top with a little air');
+  assert.ok(domain.fraction(117) > 0 && domain.fraction(117) < 1);
+});
+
+test('bandDomain invents a working band for an open-ended reference range', () => {
+  const openLow = bandDomain({ values: [1], refHigh: 8 });
+  assert.equal(openLow.bandLow, null);
+  assert.equal(openLow.bandHigh, 8);
+  assert.ok(openLow.min < 1, 'the reading still has room beneath it');
+
+  const openHigh = bandDomain({ values: [86, 90], refLow: 59 });
+  assert.equal(openHigh.bandHigh, null);
+  assert.equal(openHigh.bandLow, 59);
+  assert.ok(openHigh.max >= 90);
+});
+
+test('pointStatus judges a single draw and stays silent without limits', () => {
+  assert.equal(pointStatus(23, 0, 16), 'High');
+  assert.equal(pointStatus(15, 0, 16), 'Normal');
+  assert.equal(pointStatus(4, 10, 30), 'Low');
+  assert.equal(pointStatus(4, null, null), null);
+  assert.equal(pointStatus(null, 0, 16), null);
 });
 
 test('glucoseZones uses mmol/mol bands by default and percent when unit is %', () => {
@@ -87,26 +106,23 @@ test('nextComparePins pins two points then resets on a third', () => {
   assert.deepEqual(nextComparePins([a, b], c), [c]);
 });
 
-test('nearbyRefs keeps a limit close to the readings and drops a distant one', () => {
-  const vitaminD = [{ value: 61 }, { value: 55 }, { value: 48 }];
-  assert.deepEqual(nearbyRefs(vitaminD, [50, 150]), [50]);
-  const esr = [{ value: 23 }, { value: 15 }];
-  assert.deepEqual(nearbyRefs(esr, [0, 16]), [16]);
-  const calprotectin = [{ value: 242 }, { value: 117 }];
-  assert.deepEqual(nearbyRefs(calprotectin, [0, 50]), [0, 50]);
-  assert.deepEqual(nearbyRefs([], [0, 50]), [0, 50]);
-});
-
 test('chart viewBoxes match the aspect ratio the stylesheet gives them, so nothing is letterboxed', () => {
   const js = readFileSync(new URL('../../js/app/bloods-charts.js', import.meta.url), 'utf8');
-  const width = Number(/const CHART_WIDTH = (\d+)/.exec(js)?.[1]);
-  const height = Number(/const CHART_HEIGHT = (\d+)/.exec(js)?.[1]);
-  const track = Number(/const TRACK_HEIGHT = (\d+)/.exec(js)?.[1]);
-  assert.ok(width && height && track);
+  const read = name => Number(new RegExp(`const ${name} = (\\d+)`).exec(js)?.[1]);
+  const width = read('CHART_WIDTH');
+  const height = read('CHART_HEIGHT');
+  const meterWidth = read('METER_WIDTH');
+  const meterHeight = read('METER_HEIGHT');
+  const combinedWidth = read('COMBINED_WIDTH');
+  const combinedHeight = read('COMBINED_HEIGHT');
+  assert.ok(width && height && meterWidth && meterHeight && combinedWidth && combinedHeight);
 
   const css = readFileSync(new URL('../../css/app.css', import.meta.url), 'utf8');
-  const line = new RegExp(`\\.line-chart\\.body-chart\\s*\\{[^}]*aspect-ratio:\\s*${width} / ${height}`);
-  const bar = new RegExp(`\\.line-chart\\.bloods-range-bar\\s*\\{[^}]*aspect-ratio:\\s*${width} / ${track}`);
-  assert.match(css, line);
-  assert.match(css, bar);
+  for (const [selector, ratio] of [
+    ['\\.bloods-metric \\.body-chart', `${width} / ${height}`],
+    ['\\.bloods-row__meter \\.body-chart', `${meterWidth} / ${meterHeight}`],
+    ['\\.line-chart\\.bloods-combined-strip', `${combinedWidth} / ${combinedHeight}`]
+  ]) {
+    assert.match(css, new RegExp(`${selector}\\s*\\{[^}]*aspect-ratio:\\s*${ratio}`), selector);
+  }
 });

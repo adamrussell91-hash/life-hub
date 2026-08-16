@@ -2246,7 +2246,9 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .bloods-metric-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Trend cards pack as many per row as fit, so a category is a short block
+     rather than a two-column column of scrolling. */
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
   gap: var(--space-grid);
 }
 .bloods-metric {
@@ -2260,6 +2262,155 @@ main { max-width: 76rem; margin: 0 auto; }
 .bloods-metric .body-chart,
 .bloods-combined {
   overflow: hidden;
+}
+.bloods-rows {
+  display: grid;
+  gap: 0;
+}
+.bloods-row {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(0, 6rem) minmax(0, 1fr) minmax(0, 9rem);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.bloods-row:last-child {
+  border-bottom: none;
+}
+.bloods-row__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.bloods-row .bloods-info {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: var(--text-2xs);
+  line-height: 1;
+  flex-shrink: 0;
+}
+.bloods-row__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bloods-row__dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+.bloods-row__dot[data-status="normal"] { background: var(--success); }
+.bloods-row__dot[data-status="high"] { background: var(--danger); }
+.bloods-row__dot[data-status="low"] { background: var(--high-sea-ink); }
+.bloods-row__dot[data-status="first"] { background: var(--muted); }
+.bloods-row__value {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+}
+.bloods-row__unit {
+  margin-left: 0.2rem;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-regular);
+}
+.bloods-row__meter {
+  min-width: 0;
+}
+.bloods-row__meter .body-chart {
+  width: 100%;
+  aspect-ratio: 320 / 16;
+}
+.bloods-row__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+.bloods-row__delta {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-align: right;
+  white-space: nowrap;
+}
+/* Below this the four columns squeeze the meter into uselessness, so the row
+   folds: name and value on one line, meter beneath. */
+@media (max-width: 54rem) {
+  .bloods-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-1) var(--space-3);
+  }
+  .bloods-row__meter {
+    grid-column: 1 / -1;
+  }
+  .bloods-row__value {
+    text-align: right;
+  }
+  .bloods-row__delta {
+    display: none;
+  }
+}
+#body-bloods-dashboard .bloods-meter [data-role="meter-track"] {
+  stroke: var(--line);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+#body-bloods-dashboard .bloods-meter [data-role="meter-band"] {
+  stroke: var(--pastel-sage);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+#body-bloods-dashboard .bloods-meter [data-role="meter-ghost"] {
+  fill: var(--muted);
+  opacity: 0.4;
+}
+#body-bloods-dashboard .bloods-meter [data-role="meter-halo"] {
+  fill: var(--paper);
+}
+#body-bloods-dashboard .bloods-meter [data-role="meter-dot"] { fill: var(--success); }
+#body-bloods-dashboard .bloods-meter[data-status="high"] [data-role="meter-dot"] { fill: var(--danger); }
+#body-bloods-dashboard .bloods-meter[data-status="low"] [data-role="meter-dot"] { fill: var(--high-sea-ink); }
+#body-bloods-dashboard .bloods-meter[data-status="first"] [data-role="meter-dot"] { fill: var(--muted); }
+#body-bloods-dashboard .body-chart [data-role="axis"] {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+#body-bloods-dashboard .bloods-metric .body-chart {
+  aspect-ratio: 320 / 80;
+}
+.bloods-ticks {
+  position: relative;
+  height: 1rem;
+  margin-top: 0.1rem;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+}
+.bloods-ticks__item {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+.bloods-ticks__item[data-anchor="start"] { transform: translateX(0); }
+.bloods-ticks__item[data-anchor="middle"] { transform: translateX(-50%); }
+.bloods-ticks__item[data-anchor="end"] { transform: translateX(-100%); }
+#body-bloods-dashboard .body-chart circle[data-tone="normal"] { fill: var(--success); }
+#body-bloods-dashboard .body-chart circle[data-tone="high"] { fill: var(--danger); }
+#body-bloods-dashboard .body-chart circle[data-tone="low"] { fill: var(--high-sea-ink); }
+#body-bloods-dashboard .body-chart circle[data-tone="first"] { fill: var(--muted); }
+.bloods-tested {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 .bloods-metric__what {
   margin: 0.35rem 0 0.75rem;
@@ -2309,22 +2460,26 @@ main { max-width: 76rem; margin: 0 auto; }
 #body-bloods-dashboard .body-chart [data-role="area"] {
   fill: none;
 }
-#body-bloods-dashboard .body-chart [data-role="point"] {
-  fill: var(--wave);
-}
+/* Trend dots are coloured per draw by [data-tone], so a run of flagged
+   results shows without reading the numbers. */
+#body-bloods-dashboard .body-chart [data-role="point"],
 #body-bloods-dashboard .body-chart [data-role="latest-point"] {
   fill: var(--wave);
 }
-#body-bloods-dashboard .body-chart[data-status="high"] [data-role="latest-point"] {
-  fill: var(--danger);
+#body-bloods-dashboard .body-chart [data-role="points"] circle {
+  stroke: var(--paper);
+  stroke-width: 1.5;
 }
-#body-bloods-dashboard .body-chart[data-status="low"] [data-role="latest-point"] {
-  fill: var(--high-sea-ink);
+.bloods-metric .body-metric__head {
+  justify-content: flex-start;
+  align-items: center;
+}
+.bloods-metric .body-metric__head .bloods-status {
+  margin-left: auto;
 }
 #body-bloods-dashboard .body-chart [data-role="zone"][data-zone="normal"] { fill: var(--pastel-sage); }
 #body-bloods-dashboard .body-chart [data-role="zone"][data-zone="risk"] { fill: var(--pastel-gold); }
 #body-bloods-dashboard .body-chart [data-role="zone"][data-zone="diabetes"] { fill: var(--pastel-peach); }
-#body-bloods-dashboard .line-chart.bloods-range-bar { aspect-ratio: 320 / 56; }
 #body-bloods-dashboard .line-chart.bloods-combined-strip { aspect-ratio: 960 / 160; }
 #body-bloods-dashboard .bloods-combined-strip [data-role="ref-band"] { fill: var(--pastel-sage); }
 #body-bloods-dashboard .bloods-combined-strip [data-role="line"] {
@@ -2368,18 +2523,6 @@ main { max-width: 76rem; margin: 0 auto; }
 .bloods-combined-legend li[data-series="2"]::before { background: var(--high-sea-ink); }
 .bloods-combined-legend li[data-series="3"]::before { background: var(--success); }
 .bloods-combined-note { margin: 0.3rem 0 0; }
-.bloods-range-bar [data-role="range-track"] { fill: var(--shore); }
-.bloods-range-bar [data-role="range-band"] { fill: var(--pastel-sage); }
-.bloods-range-bar [data-role="range-ghost"] { fill: var(--marine); fill-opacity: 0.22; }
-.bloods-range-bar [data-role="range-arrow"] {
-  fill: none;
-  stroke: var(--wave);
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-.bloods-range-bar [data-role="range-dot"] { fill: var(--success); }
-.bloods-range-bar[data-status="high"] [data-role="range-dot"] { fill: var(--danger); }
-.bloods-range-bar[data-status="low"] [data-role="range-dot"] { fill: var(--high-sea-ink); }
 .bloods-info {
   width: 2rem;
   height: 2rem;
