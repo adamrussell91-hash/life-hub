@@ -13,3 +13,7 @@ playwright-report/
 .superpowers/brainstorm/
 .netlify/
 .cursor/
+
+# Production records live in adamrussell91-hash/life-hub-data, never this public repo.
+/data/mind/
+/data/governance/
