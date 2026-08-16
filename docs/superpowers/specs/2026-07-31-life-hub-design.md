@@ -110,7 +110,7 @@ Living overview of how every Life Hub chart should look. Product charts live in 
 | Ring target | `ring.js` / `apply-ring.js` | Rounded track + `--success` or domain accent fill; centre value | Home macros, Nutrition macros, Central Node completeness, Bloods in-range, Mind streak |
 | Area line | `area-line.js` | Soft area + Wave stroke; optional sage reference **band**; optional **vertex dots** | Nutrition protein (no dots); Body scale/composition (small dots); Bloods series (dots + sage band) |
 | Columns | `columns.js` | Bars grow from 0; dual-tone week compare | Nutrition, Fitness volume |
-| Heatmap / hit strip | `heatmap.js` | Soft-medical tiles, not a new palette | Nutrition month, Fitness consistency, Skincare, Mind cadence |
+| Heatmap / hit strip | `heatmap.js` | Soft-medical tiles, not a new palette | Nutrition month, Fitness consistency, Skincare. **Not** Mind (cadence heatmap removed 16 Aug 2026) |
 | Pie / donut | `pie.js` | Kit pastels; legend with counts | Mind mood mix |
 | Masonry packer | `masonry.js` | Packing only, not a visual system | Mind board |
 | Stream / Sankey / chord / bump / horizon / radial year | `stream.js`, `sankey-flow.js`, `chord-layout.js`, `bump.js`, `horizon.js`, `radial-year.js` + vendored d3 | Clinical Glass strokes and pastels; one-line legend on the tile | Mind v2 analysis tiles |
@@ -147,7 +147,7 @@ Detail spec: `docs/superpowers/specs/2026-08-16-bloods-visual-restyle-design.md`
 
 ### Mind tiles (summary)
 
-Mind is a Clinical Glass masonry board. Every tile has a question kicker, title, one-line legend, chart, and hover/click hint. Charts listed in `2026-08-15-mind-dashboard-v2-design.md` (mood arc, mix, energy rings, factor bars, constellation, tension, stream, Sankey transitions, bump, chord, radial year, horizon, butterfly, lexical, waffle, cadence). Sparse data still draws with an honest caption. Click opens the thread sheet, not a new row in the masonry.
+Mind is a Clinical Glass masonry board. Conversation is **Chat only** — no Talk Vera/Penelope launchers on the tab. **No cadence heatmap.** Showing up is the 30-day streak ring. Every remaining tile has a question kicker, title, and either a real chart or an honest empty sentence (threshold + count). Session/insight cards are title + one line; full prose is the overlay sheet. Charts listed in `2026-08-15-mind-dashboard-v2-design.md` still exist as catalogue items; visual restyle: `2026-08-16-mind-visual-restyle-design.md`. Sparse data must not draw a fake filled shape.
 
 ### Fitness, Skincare, Home
 
