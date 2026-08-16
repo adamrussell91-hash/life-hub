@@ -145,7 +145,7 @@ test('statusTone is brick/copper/high and inverts HDL High', () => {
   assert.equal(tone('hdl'), 'normal');
 });
 
-test('chartKind is range-bar until three points, line after, zoned for HbA1c', () => {
+test('chartKind counts the points actually drawn: range-bar under three, line at three, zoned for HbA1c', () => {
   const sparse = buildBloodsModel({
     date: '2026-08-13',
     range: 'five_year',
@@ -157,16 +157,34 @@ test('chartKind is range-bar until three points, line after, zoned for HbA1c', (
   const tsh = sparse.categories.find(c => c.id === 'Thyroid').markers[0];
   assert.equal(tsh.chartKind, 'range-bar');
 
+  // 5Y aggregates into half-year buckets, so these three land on three drawn points.
   const lined = buildBloodsModel({
     date: '2026-08-13',
     range: 'five_year',
     events: [
       bloodsEvent('2025-01-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 1, unit: 'mg/L', status: 'Normal' }]),
-      bloodsEvent('2025-06-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 2, unit: 'mg/L', status: 'Normal' }]),
-      bloodsEvent('2026-01-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 3, unit: 'mg/L', status: 'Normal' }])
+      bloodsEvent('2025-08-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 2, unit: 'mg/L', status: 'Normal' }]),
+      bloodsEvent('2026-03-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 3, unit: 'mg/L', status: 'Normal' }])
     ]
   });
-  assert.equal(lined.categories[0].markers[0].chartKind, 'line');
+  const crp = lined.categories[0].markers[0];
+  assert.equal(crp.series.length, 3);
+  assert.equal(crp.chartKind, 'line');
+
+  // Same three readings inside one half-year bucket draw two points, so the
+  // marker gets the compact range track rather than a mostly empty line chart.
+  const bucketed = buildBloodsModel({
+    date: '2026-08-13',
+    range: 'five_year',
+    events: [
+      bloodsEvent('2025-01-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 1, unit: 'mg/L', status: 'Normal' }]),
+      bloodsEvent('2026-01-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 2, unit: 'mg/L', status: 'Normal' }]),
+      bloodsEvent('2026-02-01', [{ key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 3, unit: 'mg/L', status: 'Normal' }])
+    ]
+  });
+  const collapsed = bucketed.categories[0].markers[0];
+  assert.equal(collapsed.series.length, 2);
+  assert.equal(collapsed.chartKind, 'range-bar');
 
   const glucose = buildBloodsModel({
     date: '2026-08-13',
