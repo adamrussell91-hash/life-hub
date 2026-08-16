@@ -6,25 +6,31 @@
   <meta name="theme-color" content="#0A1536">
   <meta name="description" content="A private, read-only view of your Life Hub.">
   <title>Life Hub · Home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/icons/life-hub-192.png">
   <link rel="stylesheet" href="design-kit/tokens.css">
   <link rel="stylesheet" href="design-kit/overlays.css">
+  <link rel="stylesheet" href="design-kit/actions.css">
+  <link rel="stylesheet" href="design-kit/sign-in.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <section class="sign-in-view" id="sign-in-view" aria-labelledby="sign-in-heading">
-    <div class="sign-in-card">
-      <span class="brand-mark sign-in-mark" aria-hidden="true"><span></span></span>
-      <p class="eyebrow">Private dashboard</p>
-      <h1 id="sign-in-heading">Welcome to Life Hub</h1>
-      <p class="sign-in-copy">Sign in to open your private, read-only health dashboard.</p>
-      <form id="sign-in-form" method="post" action="#" onsubmit="return false">
-        <label for="passphrase-input">Passphrase</label>
-        <input id="passphrase-input" name="passphrase" type="password" autocomplete="current-password" required>
-        <button id="sign-in-button" type="submit">Sign in</button>
+  <section class="sign-in" id="sign-in-view" aria-labelledby="sign-in-heading">
+    <div class="sign-in__card">
+      <p class="sign-in__brand">Life Hub</p>
+      <h1 class="sign-in__title" id="sign-in-heading">Sign in</h1>
+      <p class="sign-in__supporting">Private, read-only health dashboard.</p>
+      <form class="sign-in__form" id="sign-in-form" method="post" action="#" onsubmit="return false">
+        <div class="sign-in__field">
+          <label for="passphrase-input" class="sign-in__label">Passphrase</label>
+          <input class="sign-in__input" id="passphrase-input" name="passphrase" type="password" autocomplete="current-password" required>
+        </div>
+        <p class="sign-in__error" id="sign-in-error" role="alert" hidden></p>
+        <button class="btn btn--primary sign-in__submit" id="sign-in-button" type="submit">Sign in</button>
       </form>
-      <p class="sign-in-error" id="sign-in-error" role="alert" hidden></p>
       <p class="privacy-note"><span class="privacy-dot" aria-hidden="true"></span>Your passphrase stays private.</p>
     </div>
   </section>
@@ -65,16 +71,16 @@
     </aside>
 
     <div class="page-frame">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow" id="page-eyebrow">Your day at a glance</p>
-          <h1 id="page-title">Home</h1>
+      <header class="topbar page-header">
+        <div class="page-header__copy">
+          <p class="eyebrow page-header__eyebrow" id="page-eyebrow">Your day at a glance</p>
+          <h1 class="page-header__title" id="page-title">Home</h1>
         </div>
-        <div class="topbar-actions">
+        <div class="topbar-actions page-header__actions">
           <p class="date-chip"><span aria-hidden="true">◷</span> <span data-value="date">Loading date</span></p>
           <p class="system-chip" id="network-status" hidden><span class="status-dot" aria-hidden="true"></span><span>Offline · saved view</span></p>
-          <button class="quiet-button" id="refresh-button" type="button">Refresh</button>
-          <button class="quiet-button" id="sign-out-button" type="button">Sign out</button>
+          <button class="btn btn--secondary quiet-button" id="refresh-button" type="button">Refresh</button>
+          <button class="btn btn--secondary quiet-button" id="sign-out-button" type="button">Sign out</button>
         </div>
       </header>
 
@@ -95,7 +101,7 @@
               <strong>Your saved view is unavailable</strong>
               <p data-error-message>Life Hub could not load its saved data.</p>
             </div>
-            <button id="retry-button" type="button">Try again</button>
+            <button id="retry-button" class="btn btn--primary" type="button">Try again</button>
           </div>
         </section>
 
@@ -455,14 +461,14 @@
             <form method="dialog" class="fitness-template-sheet__inner">
               <header class="fitness-template-sheet__header">
                 <h3 id="fitness-template-sheet-title">Template</h3>
-                <button type="submit" class="quiet-button" value="cancel" aria-label="Close">Close</button>
+                <button type="submit" class="btn btn--secondary quiet-button" value="cancel" aria-label="Close">Close</button>
               </header>
               <div id="fitness-template-sheet-maps" class="fitness-muscle-strip fitness-muscle-strip--lg"></div>
               <div id="fitness-template-sheet-focus" class="fitness-tags"></div>
               <div id="fitness-template-sheet-exercises" class="fitness-exercise-list"></div>
               <p id="fitness-template-sheet-note" class="metric-caption"></p>
               <menu class="fitness-template-sheet__actions">
-                <button type="button" id="fitness-template-use-today" class="quiet-button fitness-template-use">Use today</button>
+                <button type="button" id="fitness-template-use-today" class="btn btn--secondary quiet-button fitness-template-use">Use today</button>
               </menu>
             </form>
           </dialog>
@@ -541,9 +547,9 @@
 
           <article class="metric-card">
             <div class="calendar-month-nav">
-              <button type="button" class="quiet-button" data-calendar="prev-month" aria-label="Previous month">‹</button>
+              <button type="button" class="btn btn--secondary quiet-button" data-calendar="prev-month" aria-label="Previous month">‹</button>
               <p class="metric-label" data-calendar="month-label">—</p>
-              <button type="button" class="quiet-button" data-calendar="next-month" aria-label="Next month">›</button>
+              <button type="button" class="btn btn--secondary quiet-button" data-calendar="next-month" aria-label="Next month">›</button>
             </div>
             <div id="calendar-month-grid" class="calendar-month-grid" aria-label="Month grid"></div>
           </article>

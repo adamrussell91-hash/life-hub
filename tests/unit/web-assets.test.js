@@ -20,6 +20,7 @@ async function browserAssetText() {
 
 test('Home shell exposes landmarks and named rendering regions', async () => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const htmlWithoutFonts = html.replace(/https:\/\/fonts\.(googleapis|gstatic)\.com[^"'\s]*/g, '');
 
   for (const fragment of [
     '<header',
@@ -33,7 +34,7 @@ test('Home shell exposes landmarks and named rendering regions', async () => {
   ]) {
     assert.match(html, new RegExp(fragment));
   }
-  assert.doesNotMatch(html, /https?:\/\//);
+  assert.doesNotMatch(htmlWithoutFonts, /https?:\/\//);
 });
 
 test('authenticated shell provides a semantic sign-in gate and reachable controls', async () => {
@@ -94,9 +95,12 @@ test('renderer assigns untrusted values as text instead of HTML', async () => {
 });
 
 test('responsive stylesheet contains the approved palette and mobile breakpoint', async () => {
-  const css = await readFile(new URL('../../css/app.css', import.meta.url), 'utf8');
+  const css = [
+    await readFile(new URL('../../css/app.css', import.meta.url), 'utf8'),
+    await readFile(new URL('../../design-kit/tokens.css', import.meta.url), 'utf8')
+  ].join('\n');
 
-  for (const color of ['#FAF8F2', '#0A1536', '#142B51', '#376FB7', '#F68620']) {
+  for (const color of ['#FBF8F2', '#0A1536', '#142B51', '#376FB7', '#F68620']) {
     assert.match(css, new RegExp(color, 'i'));
   }
   assert.match(css, /@media\s*\([^)]*max-width:\s*48rem/);

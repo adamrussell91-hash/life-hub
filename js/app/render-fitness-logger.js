@@ -193,7 +193,7 @@ export function renderFitnessLogger(root, draft, {
 
     const add = root.createElement('button');
     add.type = 'button';
-    add.className = 'fitness-logger__add-set quiet-button';
+    add.className = 'fitness-logger__add-set btn btn--secondary quiet-button';
     add.textContent = '+ Set';
     add.addEventListener('click', () => onAddSet?.(exerciseIndex));
     card.append(add);
