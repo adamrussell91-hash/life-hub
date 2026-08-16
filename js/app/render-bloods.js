@@ -1,6 +1,7 @@
 import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { categoryNote, explainerFor } from './bloods-explainers.js';
 import { combinedChartSvg, markerVisual } from './bloods-charts.js';
+import { formatDisplayDate } from '../core/time.js';
 
 export function renderBloods(root, model, { onRangeChange } = {}) {
   const dashboard = root.querySelector('#body-bloods-dashboard');
@@ -76,16 +77,12 @@ function renderFlags(root, model) {
   for (const flag of model.flagged) {
     const chip = root.createElement('button');
     chip.type = 'button';
-    chip.className = 'body-tape-chip bloods-flag';
-    chip.dataset.colour = flag.status === 'Low' ? 'low' : flag.status === 'High' ? 'red' : 'neutral';
+    chip.className = 'bloods-flag';
+    chip.dataset.status = flag.status === 'Low' ? 'low' : 'high';
     chip.dataset.bloodsMarker = flag.key;
-    const label = root.createElement('span');
-    label.className = 'body-tape-chip__label';
-    label.textContent = flag.label;
-    const value = root.createElement('span');
-    value.className = 'body-tape-chip__delta';
-    value.textContent = [formatLatestValue(flag.value, flag.unit), flag.status].filter(Boolean).join(' ');
-    chip.append(label, value);
+    chip.textContent = [flag.label, formatLatestValue(flag.value, flag.unit), flag.status]
+      .filter(Boolean)
+      .join(' ');
     chip.addEventListener('click', () => jumpToMarker(root, flag.key));
     flags.append(chip);
   }
@@ -300,6 +297,11 @@ function markerBlock(root, marker, model, flareOn) {
   }
   wrap.append(head);
 
+  const what = root.createElement('p');
+  what.className = 'bloods-metric__what';
+  what.textContent = explainerFor(marker.key).what;
+  wrap.append(what);
+
   const value = root.createElement('p');
   value.className = 'body-metric__value';
   value.style.fontVariantNumeric = 'tabular-nums';
@@ -314,7 +316,7 @@ function markerBlock(root, marker, model, flareOn) {
   const pill = root.createElement('span');
   pill.className = 'bloods-status';
   pill.dataset.status = marker.statusTone || 'first';
-  pill.textContent = marker.latest?.status || 'First reading';
+  pill.textContent = statusLabel(marker.latest?.status);
   wrap.append(pill);
 
   const visual = markerVisual(root, marker, { flareMarks: model.flareMarks, flareOn });
@@ -330,7 +332,12 @@ function markerBlock(root, marker, model, flareOn) {
 
   const tested = root.createElement('p');
   tested.className = 'metric-caption bloods-tested';
-  tested.textContent = marker.latest?.date || '';
+  const bits = [
+    refCaption(marker.latest?.ref_low, marker.latest?.ref_high),
+    previousCaption(marker),
+    marker.latest?.date ? formatDisplayDate(marker.latest.date) : ''
+  ].filter(Boolean);
+  tested.textContent = bits.join(' · ');
   wrap.append(tested);
   return wrap;
 }
@@ -420,6 +427,34 @@ function documentText(root, text) {
   const span = root.createElement('span');
   span.textContent = text;
   return span;
+}
+
+function statusLabel(status) {
+  if (status === 'Normal') return 'In range';
+  return status || 'First reading';
+}
+
+function refCaption(low, high) {
+  const lo = low != null && Number.isFinite(Number(low)) ? Number(low) : null;
+  const hi = high != null && Number.isFinite(Number(high)) ? Number(high) : null;
+  if (lo != null && hi != null) {
+    if (lo === 0) return `In range <${formatNumber(hi)}`;
+    return `Band ${formatNumber(lo)}–${formatNumber(hi)}`;
+  }
+  if (hi != null) return `In range <${formatNumber(hi)}`;
+  if (lo != null) return `In range >${formatNumber(lo)}`;
+  return '';
+}
+
+function previousCaption(marker) {
+  const series = (marker.series ?? []).filter(point => point.value != null && Number.isFinite(Number(point.value)));
+  if (series.length < 2) return '';
+  const prior = series.at(-2);
+  return `Was ${formatNumber(Number(prior.value))}`;
+}
+
+function formatNumber(n) {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 function formatLatestValue(value, unit) {

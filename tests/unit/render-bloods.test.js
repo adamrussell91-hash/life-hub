@@ -194,8 +194,9 @@ test('renderBloods paints flags, category cards, and a ref-band chart', () => {
   assert.equal(root._dashboard.hidden, false);
   assert.ok(root._flags.children.length >= 1);
   const chip = root._flags.children[0];
-  assert.match(chip.className, /body-tape-chip/);
-  assert.equal(chip.dataset.colour, 'red');
+  assert.match(chip.className, /bloods-flag/);
+  assert.doesNotMatch(chip.className, /body-tape-chip/);
+  assert.equal(chip.dataset.status, 'high');
   assert.equal(chip.dataset.bloodsMarker, 'alt');
   assert.match(String(chip.textContent), /ALT/);
   const section = root._host.children[0];
@@ -274,7 +275,83 @@ test('Lipid Studies render a Total:HDL ratio chip', () => {
   assert.equal(chip.dataset.status, 'low');
 });
 
-test('normal categories start collapsed and the appointment control stays quiet', () => {
+test('numeric tiles show a what-line, In range label, refs, and previous value', () => {
+  const root = fakeRoot();
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: [{
+      id: 'Inflammation Markers',
+      title: 'Inflammation Markers',
+      hasFlags: true,
+      collapsed: false,
+      markers: [{
+        key: 'calprotectin',
+        label: 'Calprotectin',
+        qualitative: false,
+        chartKind: 'range-bar',
+        statusTone: 'high',
+        latest: {
+          date: '2025-10-24',
+          value: 117,
+          unit: 'ug/g',
+          status: 'High',
+          ref_low: 0,
+          ref_high: 50
+        },
+        series: [
+          { date: '2025-06-01', value: 242 },
+          { date: '2025-10-24', value: 117 }
+        ],
+        lastDelta: -125,
+        overallDelta: -125,
+        lastColour: 'green',
+        overallColour: 'green',
+        lastDeltaLabel: '↓125'
+      }]
+    }]
+  });
+  const tile = root._host.querySelector('.bloods-metric');
+  assert.match(String(tile.textContent), /gut|mucosal|Crohn/i);
+  assert.match(String(tile.textContent), /High/);
+  assert.match(String(tile.textContent), /Was 242/);
+  assert.match(String(tile.textContent), /<50|0–50|0-50/);
+  const crpRoot = fakeRoot();
+  renderBloods(crpRoot, {
+    ...model,
+    flagged: [],
+    categories: [{
+      id: 'Inflammation Markers',
+      title: 'Inflammation Markers',
+      hasFlags: false,
+      collapsed: false,
+      markers: [{
+        ...alt,
+        key: 'crp',
+        label: 'CRP',
+        statusTone: 'normal',
+        latest: { date: '2026-05-22', value: 2.4, unit: 'mg/L', status: 'Normal', ref_low: 0, ref_high: 5 },
+        series: [{ date: '2026-05-22', value: 2.4 }],
+        lastDelta: null,
+        chartKind: 'range-bar'
+      }]
+    }]
+  });
+  assert.match(String(crpRoot._host.querySelector('.bloods-metric').textContent), /In range/);
+  assert.doesNotMatch(String(crpRoot._host.querySelector('.bloods-status').textContent), /^Normal$/);
+});
+
+test('bloods flag chips are centred in CSS, not baseline-aligned tape chips', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../../css/app.css', import.meta.url), 'utf8');
+  const block = css.match(/\.bloods-flag\s*\{[^}]+\}/);
+  assert.ok(block, 'expected a .bloods-flag rule');
+  assert.match(block[0], /align-items:\s*center/);
+  assert.match(block[0], /justify-content:\s*center/);
+  assert.doesNotMatch(block[0], /baseline/);
+});
+
+test('categories honour collapsed from the model and the appointment control stays quiet', () => {
   const root = fakeRoot();
   renderBloods(root, {
     ...model,
@@ -299,3 +376,4 @@ test('normal categories start collapsed and the appointment control stays quiet'
   assert.equal(section.classList.contains('is-collapsed'), true);
   assert.equal(root._open.id, 'bloods-appointment-open');
 });
+

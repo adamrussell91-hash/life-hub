@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { glucoseZones, rangeBarLayout, compareChartPoints, nextComparePins } from '../../js/app/bloods-charts.js';
+import { glucoseZones, rangeBarLayout, rangeTrackLayout, compareChartPoints, nextComparePins } from '../../js/app/bloods-charts.js';
 
 test('rangeBarLayout places an in-range value between the ends', () => {
   const layout = rangeBarLayout(20, 10, 30, { width: 320, padding: 10 });
@@ -16,6 +16,36 @@ test('rangeBarLayout clamps values outside the reference range', () => {
   const low = rangeBarLayout(0, 10, 30, { width: 200, padding: 0 });
   assert.equal(low.overflow, 'low');
   assert.equal(low.x, 0);
+});
+
+test('rangeTrackLayout parks a high value on the shore past the sage band', () => {
+  const layout = rangeTrackLayout({
+    value: 117,
+    previous: 242,
+    refLow: 0,
+    refHigh: 50,
+    width: 320,
+    padding: 16
+  });
+  assert.equal(layout.overflow, 'high');
+  assert.ok(layout.latestX > layout.bandEndX);
+  assert.ok(layout.previousX > layout.latestX);
+  assert.equal(layout.arrow, 'left');
+  assert.ok(layout.bandStartX < layout.bandEndX);
+});
+
+test('rangeTrackLayout omits ghost and arrow when there is no previous', () => {
+  const layout = rangeTrackLayout({
+    value: 15,
+    refLow: 0,
+    refHigh: 20,
+    width: 200,
+    padding: 0
+  });
+  assert.equal(layout.overflow, null);
+  assert.equal(layout.previousX, null);
+  assert.equal(layout.arrow, null);
+  assert.equal(layout.latestX, layout.bandEndX * (15 / 20));
 });
 
 test('glucoseZones uses mmol/mol bands by default and percent when unit is %', () => {

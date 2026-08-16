@@ -109,7 +109,21 @@ test('buildBloodsModel sorts flagged categories above the default order', () => 
   assert.equal(model.categories[0].hasFlags, true);
   assert.equal(model.categories[0].collapsed, false);
   const inflammation = model.categories.find(c => c.id === 'Inflammation Markers');
-  assert.equal(inflammation.collapsed, true);
+  assert.equal(inflammation.collapsed, false);
+});
+
+test('buildBloodsModel starts every category expanded', () => {
+  const model = buildBloodsModel({
+    date: '2026-08-13',
+    events: [
+      bloodsEvent('2026-05-19', [
+        { key: 'crp', label: 'CRP', category: 'Inflammation Markers', value: 2.2, unit: 'mg/L', status: 'Normal' },
+        { key: 'tsh', label: 'TSH', category: 'Thyroid', value: 2, unit: 'mU/L', status: 'Normal' }
+      ])
+    ]
+  });
+  assert.ok(model.categories.length >= 2);
+  assert.ok(model.categories.every(category => category.collapsed === false));
 });
 
 test('statusTone is brick/copper/high and inverts HDL High', () => {

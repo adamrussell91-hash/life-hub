@@ -38,6 +38,20 @@ const MARKERS = {
     low: 'Not typically flagged.',
     related: ['esr']
   },
+  calprotectin: {
+    what: 'Protein from gut white cells. Raised means mucosal inflammation — the Crohn’s signal even when CRP looks calm.',
+    why: 'Tracks mucosal inflammation when systemic markers can look settled.',
+    high: 'Suggests active mucosal inflammation, including Crohn’s activity.',
+    low: 'Usually reassuring for mucosal inflammation.',
+    related: ['crp', 'esr']
+  },
+  ttg_iga: {
+    what: 'An antibody used when checking for coeliac activity. Read with the rest of the gut picture, not alone.',
+    why: 'Part of the inflammation / gut panel.',
+    high: 'Can suggest coeliac activity; interpreted with other gut markers.',
+    low: 'Usually the expected result.',
+    related: ['calprotectin']
+  },
   ferritin: {
     what: 'Reflects the body\'s stored iron. It can also rise as an inflammation marker, which is why it is read with CRP/ESR.',
     why: 'Tracked given IBD-related depletion risk.',

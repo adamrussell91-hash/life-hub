@@ -9,6 +9,14 @@ test('explainerFor returns seeded copy for CRP and related markers', () => {
   assert.ok(crp.related.includes('esr'));
 });
 
+test('explainerFor calprotectin names gut inflammation without stool language', () => {
+  const copy = explainerFor('calprotectin');
+  assert.match(copy.what, /gut|mucosal|Crohn/i);
+  assert.match(copy.high, /mucosal|inflammation|Crohn/i);
+  const blob = `${copy.what} ${copy.why} ${copy.high} ${copy.low}`;
+  assert.doesNotMatch(blob, /stool|faecal|fecal/i);
+});
+
 test('explainerFor unknown keys still return generic non-diagnostic copy', () => {
   const other = explainerFor('mystery_marker');
   assert.ok(other.what);

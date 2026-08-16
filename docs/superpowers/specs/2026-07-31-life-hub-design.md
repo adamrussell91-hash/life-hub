@@ -1,6 +1,6 @@
 # Life Hub Design
 
-Date: 31 July 2026  
+Date: 31 July 2026 (Charts section updated 16 August 2026)  
 Status: Approved  
 Source of truth: [Life Hub App](https://www.notion.so/3adf794f847680eda2bbf184ce894090)
 
@@ -20,7 +20,7 @@ Work is split into reviewable commits and feature branches. The repository maint
 
 ## System architecture
 
-The browser contains a static Progressive Web App built with semantic HTML, CSS, vanilla JavaScript modules, Chart.js, and a YAML parser. It has no application framework and no compilation step. The browser is presentation-only: it renders sanitized repository content, calculates view models, maintains ephemeral chat state, and requests authenticated server operations.
+The browser contains a static Progressive Web App built with semantic HTML, CSS, vanilla JavaScript modules, a shared SVG `chart-kit`, and a YAML parser. It has no application framework, no Chart.js (or other chart runtime), and no compilation step. The browser is presentation-only: it renders sanitized repository content, calculates view models, maintains ephemeral chat state, and requests authenticated server operations.
 
 Netlify hosts the static app and same-origin serverless functions:
 
@@ -91,9 +91,67 @@ Desktop uses a fixed Depth navigation rail with Home, Chat, Nutrition, Fitness, 
 
 Home leads with calories, protein, fat, workout, and five-category logging completeness. Supporting views show meal calories, protein distribution, polyphenols, and a week strip. Domain cards link directly to focused detail.
 
-Nutrition provides meal timelines, daily advice, weekly target comparisons, and monthly trends. Fitness provides session detail, coverage, streaks, active constraints, and all-time top-set strength progression. Body combines weight, composition, measurements, sleep, and heart observations. Mind combines mood, energy, diary entries, tag frequency, and Vera session records. Skincare combines AM/PM completion, product use, condition notes, and fragrance. Calendar combines week and month views, domain markers, local AND-term search, lazy history extension, and a complete day-detail sheet. Central Node is read-only with anchors, coordination lists, and a stale-status action. Chat is full-height, streaming, persona-labelled, colour-themed, and confirms writes with quiet system lines.
+Nutrition provides meal timelines, daily advice, weekly target comparisons, and monthly trends. Fitness provides session detail, coverage, streaks, active constraints, and all-time top-set strength progression. Body combines weight, composition, measurements, and a Labs / Bloods subpage (pathology trends). Mind combines mood, energy, diary entries, tag frequency, and Vera session records. Skincare combines AM/PM completion, product use, condition notes, and fragrance. Calendar combines week and month views, domain markers, local AND-term search, lazy history extension, and a complete day-detail sheet. Central Node is read-only with anchors, coordination lists, and a stale-status action. Chat is full-height, streaming, persona-labelled, colour-themed, and confirms writes with quiet system lines.
 
 Body and Mind support Daily, Weekly, Monthly, 6M, and 1Y ranges. Nutrition supports Daily, Weekly, and Monthly. Fitness strength remains all-time. Periods longer than 90 days use weekly means of available observations, preserve empty-week gaps, and render no more than approximately 120 points per line.
+
+## Charts (Clinical Glass)
+
+Living overview of how every Life Hub chart should look. Product charts live in the hub (`js/app/chart-kit/` plus domain renderers). Chrome stays in the hub design kit. Use closed tokens only: `--wave`, `--marine`, `--success`, `--danger`, `--high-sea-ink`, `--pastel-sage`, `--shore`, `--muted`. No maroon Bloods palette. `prefers-reduced-motion: reduce` snaps to the final geometry.
+
+**Motion:** fill-on-load or path reveal once (`cubic-bezier(.2,.8,.2,1)`). No looping “alive” animation. Replay on refresh or range change.
+
+**Trend colour** always travels with an arrow and a text label (see Trends and feedback). Colour is never the only signal.
+
+### Kit primitives
+
+| Primitive | File | Look | Where |
+|---|---|---|---|
+| Ring target | `ring.js` / `apply-ring.js` | Rounded track + `--success` or domain accent fill; centre value | Home macros, Nutrition macros, Central Node completeness, Bloods in-range, Mind streak |
+| Area line | `area-line.js` | Soft area + Wave stroke; optional sage reference **band**; optional **vertex dots** | Nutrition protein (no dots); Body scale/composition (small dots); Bloods series (dots + sage band) |
+| Columns | `columns.js` | Bars grow from 0; dual-tone week compare | Nutrition, Fitness volume |
+| Heatmap / hit strip | `heatmap.js` | Soft-medical tiles, not a new palette | Nutrition month, Fitness consistency, Skincare, Mind cadence |
+| Pie / donut | `pie.js` | Kit pastels; legend with counts | Mind mood mix |
+| Masonry packer | `masonry.js` | Packing only, not a visual system | Mind board |
+| Stream / Sankey / chord / bump / horizon / radial year | `stream.js`, `sankey-flow.js`, `chord-layout.js`, `bump.js`, `horizon.js`, `radial-year.js` + vendored d3 | Clinical Glass strokes and pastels; one-line legend on the tile | Mind v2 analysis tiles |
+
+Vendored d3 is layout only (no CDN). Do not add another chart library.
+
+### Vertex dots vs empty lines
+
+| Surface | Dots on the line | Reference band |
+|---|---|---|
+| Nutrition 7-day protein | **None** (soft area only; no end-circle) | No lab band |
+| Body weight / composition / tape charts | Small vertices (`r` 2.5) on each observation | No pathology band |
+| Bloods series (≥3 numeric points) | **Dot on every vertex**; latest slightly larger; out-of-range latest uses `--danger` / `--high-sea-ink` | Sage `--pastel-sage` rectangle for current `ref_low`–`ref_high`; Wave stroke when in range |
+| Bloods sparse (1–2 points) | Not a line. **Range track** (below) | Sage in-range segment on a `--shore` track |
+| Bloods glucose / HbA1c | Line in **zoned** pastel bands (normal / at-risk / diabetic), not a single lab rectangle | Zone fills: sage / gold / peach |
+
+Never draw a fat black bar, an empty 168 px hole, or a one-point “line” that looks like a slab.
+
+### Bloods range track (sparse markers)
+
+Used when `chartKind === 'range-bar'`.
+
+- Full track: `--shore`, ~8 px, pill ends.
+- In-range segment: `--pastel-sage` between labelled `ref_low` and `ref_high` (open high still labelled `In range <n`).
+- **Latest:** solid dot — `--success` in range, `--danger` High, `--high-sea-ink` Low.
+- **Previous:** ghost dot (marine ~20% opacity) on the same scale.
+- **Arrow:** Wave, on the track, showing direction of travel. Omit ghost and arrow when there is only one point.
+- Overflow High/Low sits on the shore **past** the sage segment so High cannot look in-range.
+- Tile also shows a one-line “what this is”, status **In range** (never maroon “Normal”), previous value (`Was 242`), and date.
+
+Copy never uses “stool” or “faecal”. Flag chips in the summary row are centred capsules (`align-items: center`), not Body tape chips.
+
+Detail spec: `docs/superpowers/specs/2026-08-16-bloods-visual-restyle-design.md`.
+
+### Mind tiles (summary)
+
+Mind is a Clinical Glass masonry board. Every tile has a question kicker, title, one-line legend, chart, and hover/click hint. Charts listed in `2026-08-15-mind-dashboard-v2-design.md` (mood arc, mix, energy rings, factor bars, constellation, tension, stream, Sankey transitions, bump, chord, radial year, horizon, butterfly, lexical, waffle, cadence). Sparse data still draws with an honest caption. Click opens the thread sheet, not a new row in the masonry.
+
+### Fitness, Skincare, Home
+
+Unchanged in spirit from the soft-medical pass: rings for targets, columns for volume/compare, heatmaps for consistency. Restyle with kit tokens if a stylesheet still hard-codes hex. Do not invent a per-tab palette.
 
 ## Trends and feedback
 

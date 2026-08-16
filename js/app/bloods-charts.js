@@ -1,8 +1,8 @@
 import { animateAreaReveal } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
-import { compareChartPoints, glucoseZones, nextComparePins, rangeBarLayout } from './bloods-charts-layout.js';
+import { compareChartPoints, glucoseZones, nextComparePins, rangeBarLayout, rangeTrackLayout } from './bloods-charts-layout.js';
 
-export { compareChartPoints, glucoseZones, nextComparePins, rangeBarLayout };
+export { compareChartPoints, glucoseZones, nextComparePins, rangeBarLayout, rangeTrackLayout };
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -16,7 +16,7 @@ export function markerVisual(root, marker, { flareMarks = [], flareOn = false } 
 export function combinedChartSvg(root, combined) {
   if (!combined?.series?.length) return null;
   const chart = svgRoot(root, 'Combined marker trends');
-  const palette = ['#8C2A2A', '#C2661C', '#F68620', '#7A3B32'];
+  const palette = ['#376fb7', '#142b51', '#a85a0c', '#2f7a4f'];
   combined.series.forEach((series, index) => {
     const points = series.points
       .filter(point => point.value != null && Number.isFinite(point.value))
@@ -37,27 +37,77 @@ export function combinedChartSvg(root, combined) {
 
 function rangeBarSvg(root, marker) {
   const value = Number(marker.latest?.value);
-  const low = Number(marker.latest?.ref_low);
-  const high = Number(marker.latest?.ref_high);
+  const low = marker.latest?.ref_low;
+  const high = marker.latest?.ref_high;
+  const prior = previousSeriesValue(marker);
   const chart = svgRoot(root, `${marker.label} range`, 'bloods-range-bar');
   const track = el(root, 'rect');
   track.setAttribute('data-role', 'range-track');
   track.setAttribute('x', '16');
-  track.setAttribute('y', '70');
+  track.setAttribute('y', '72');
   track.setAttribute('width', '288');
-  track.setAttribute('height', '12');
-  track.setAttribute('rx', '6');
+  track.setAttribute('height', '8');
+  track.setAttribute('rx', '4');
   chart.append(track);
-  if (Number.isFinite(low) && Number.isFinite(high) && Number.isFinite(value)) {
-    const layout = rangeBarLayout(value, low, high, { width: 320, padding: 16 });
+
+  const layout = rangeTrackLayout({
+    value,
+    previous: prior,
+    refLow: low,
+    refHigh: high,
+    width: 320,
+    padding: 16
+  });
+  const band = el(root, 'rect');
+  band.setAttribute('data-role', 'range-band');
+  const bandX = Math.min(layout.bandStartX, layout.bandEndX);
+  const bandW = Math.max(0, Math.abs(layout.bandEndX - layout.bandStartX));
+  band.setAttribute('x', String(bandX));
+  band.setAttribute('y', '72');
+  band.setAttribute('width', String(bandW));
+  band.setAttribute('height', '8');
+  band.setAttribute('rx', '4');
+  chart.append(band);
+
+  if (layout.previousX != null) {
+    const ghost = el(root, 'circle');
+    ghost.setAttribute('data-role', 'range-ghost');
+    ghost.setAttribute('cx', String(layout.previousX));
+    ghost.setAttribute('cy', '76');
+    ghost.setAttribute('r', '6');
+    chart.append(ghost);
+  }
+  if (layout.arrow && layout.previousX != null) {
+    const arrow = el(root, 'path');
+    arrow.setAttribute('data-role', 'range-arrow');
+    arrow.setAttribute('d', rangeArrowPath(layout.previousX, layout.latestX, 76));
+    chart.append(arrow);
+  }
+  if (Number.isFinite(value)) {
     const dot = el(root, 'circle');
     dot.setAttribute('data-role', 'range-dot');
-    dot.setAttribute('cx', String(layout.x));
+    dot.setAttribute('cx', String(layout.latestX));
     dot.setAttribute('cy', '76');
     dot.setAttribute('r', '7');
     chart.append(dot);
   }
   return chart;
+}
+
+function previousSeriesValue(marker) {
+  const series = (marker.series ?? []).filter(point => point.value != null && Number.isFinite(Number(point.value)));
+  if (series.length < 2) return null;
+  return Number(series.at(-2).value);
+}
+
+function rangeArrowPath(fromX, toX, y) {
+  const left = Math.min(fromX, toX) + 10;
+  const right = Math.max(fromX, toX) - 10;
+  if (right <= left) return `M ${fromX} ${y} L ${toX} ${y}`;
+  const tip = toX > fromX ? right : left;
+  const tail = toX > fromX ? left : right;
+  const dir = toX > fromX ? 1 : -1;
+  return `M ${tail} ${y} L ${tip} ${y} M ${tip} ${y} L ${tip - 5 * dir} ${y - 4} M ${tip} ${y} L ${tip - 5 * dir} ${y + 4}`;
 }
 
 function zonedChartSvg(root, marker) {
@@ -140,11 +190,13 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
 
   area.setAttribute('d', built.areaPath || built.areaPoints || '');
   line.setAttribute('d', built.linePath || '');
-  for (const point of built.points) {
+  const lastIndex = built.points.length - 1;
+  for (const [index, point] of built.points.entries()) {
     const circle = el(root, 'circle');
     circle.setAttribute('cx', String(point.x));
     circle.setAttribute('cy', String(point.y));
-    circle.setAttribute('r', '2.5');
+    circle.setAttribute('r', index === lastIndex ? '4' : '2.5');
+    circle.setAttribute('data-role', index === lastIndex ? 'latest-point' : 'point');
     circle.dataset.date = point.date ?? '';
     circle.dataset.value = String(point.value ?? '');
     points.append(circle);

@@ -46,7 +46,7 @@ index.html SVG shells + css/app.css soft-medical tokens
 ### Chart kit primitives
 
 1. **Ring target** — rounded stroke track + fill; center value + unit (or percent); animates `stroke-dashoffset` from empty → value on mount (~520–700ms, aligned with existing 520ms progress easing).
-2. **Area line** — line + soft gradient area; load reveal via path-length or clip; **day labels**; **no end-circle / last-point marker**.
+2. **Area line** — line + soft gradient area; load reveal via path-length or clip; **day labels**. **Nutrition protein:** no vertex / end-circle. **Body:** small dots on each observation. **Bloods series:** dot on every vertex, sage reference band, larger latest point (see Life Hub Design → Charts).
 3. **Columns** — bars grow from 0 height (meal timing, week comparisons).
 4. **Hit strip / heatmap** — keep existing geometry; restyle to soft-medical tokens rather than rewrite.
 
