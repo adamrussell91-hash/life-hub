@@ -69,6 +69,7 @@ class FakeDocument extends EventTarget {
       ['#app-shell', new FakeElement({ hidden: true })],
       ['#app', new FakeElement()],
       ['#sign-in-form', new FakeElement()],
+      ['.sign-in__supporting', new FakeElement()],
       ['#passphrase-input', new FakeElement()],
       ['#sign-in-button', new FakeElement()],
       ['#sign-in-error', new FakeElement({ hidden: true })],
@@ -195,6 +196,7 @@ function liveData(overrides = {}) {
 function harness(options = {}) {
   const root = new FakeDocument();
   const windowTarget = new EventTarget();
+  windowTarget.location = { hostname: options.hostname ?? '' };
   const clock = createClock();
   const sessionStorage = memoryStorage(options.sessionMarker
     ? { 'life-hub:session-expiry': options.sessionMarker }
@@ -367,6 +369,14 @@ function harness(options = {}) {
     chatPanelCalls: dependencies.chatPanel
   };
 }
+
+test('local preview rewrites the sign-in supporting line', () => {
+  const { root } = harness({ hostname: '127.0.0.1' });
+  assert.equal(
+    root.querySelector('.sign-in__supporting').textContent,
+    'Local preview. Use passphrase life-hub-local — not your live password.'
+  );
+});
 
 test('session API sends only the passphrase contract and unwraps successful data', async () => {
   const calls = [];

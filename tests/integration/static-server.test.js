@@ -54,6 +54,19 @@ test('serves the Home shell with the correct content type', async t => {
   assert.match(await response.text(), /Life Hub/);
 });
 
+test('publishes design-kit stylesheets linked from the Home shell', async t => {
+  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const hrefs = [...html.matchAll(/href="(design-kit\/[^"]+\.css)"/g)].map(match => match[1]);
+  assert.ok(hrefs.length > 0, 'index.html must link design-kit CSS');
+
+  const baseUrl = await startServer(t);
+  for (const href of hrefs) {
+    const response = await fetch(`${baseUrl}/${href}`);
+    assert.equal(response.status, 200, href);
+    assert.match(response.headers.get('content-type'), /css/);
+  }
+});
+
 test('native sign-in POST to / serves the shell instead of 405', async t => {
   const baseUrl = await startServer(t);
   const response = await fetch(`${baseUrl}/`, {

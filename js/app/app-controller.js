@@ -128,7 +128,7 @@ export function createAppController(dependencies) {
   });
   const localHost = windowTarget?.location?.hostname ?? '';
   if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(localHost)) {
-    const copy = root.querySelector('.sign-in-copy');
+    const copy = root.querySelector('.sign-in__supporting');
     if (copy) copy.textContent = 'Local preview. Use passphrase life-hub-local — not your live password.';
   }
   bind(root.querySelector('#refresh-button'), 'click', () => void refresh({ manual: true }));
