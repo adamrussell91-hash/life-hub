@@ -51,6 +51,32 @@ test('parseBloodsCsv canonicalizes aliases across dates onto the same key', () =
   assert.ok(may.record.markers.some(m => m.key === 'adjusted_calcium'));
 });
 
+test('parseBloodsCsv reads a plain Date column', () => {
+  const events = parseBloodsCsv(`Date,Marker,Value,Unit,Ref Low,Ref High,Status,Category
+2026-05-19,Haemoglobin,151,g/L,130,180,Normal,Full Blood Count
+`);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].record.date, '2026-05-19');
+  assert.equal(events[0].record.markers[0].key, 'haemoglobin');
+});
+
+test('parseBloodsCsv maps 25-OH vitamin D names onto the vitamin_d series', () => {
+  const events = parseBloodsCsv(`Date,Marker,Value,Unit,Ref Low,Ref High,Status,Category
+2026-05-19,Vitamin D (25-OH),58,nmol/L,50,150,Normal,Vitamins & Nutrients
+`);
+  assert.equal(events[0].record.markers[0].key, 'vitamin_d');
+  assert.equal(events[0].record.markers[0].label, 'Vitamin D');
+});
+
+test('parseBloodsCsv collapses a marker repeated within one visit', () => {
+  const events = parseBloodsCsv(`Date,Marker,Value,Unit,Ref Low,Ref High,Status,Category
+2026-05-19,WCC,12.3,10^9/L,4,11,High,Full Blood Count
+2026-05-19,WCC,12.3,x10^9/L,4,11,High,Full Blood Count
+`);
+  const wcc = events[0].record.markers.filter(m => m.key === 'wcc');
+  assert.equal(wcc.length, 1);
+});
+
 test('parseBloodsCsv parses Notion-style dates and skips rows without a date or marker', () => {
   const events = parseBloodsCsv(SAMPLE);
   assert.ok(events.some(e => e.record.date === '2026-05-19'));
