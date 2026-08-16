@@ -1,22 +1,10 @@
 :root {
-  color-scheme: light;
-  --warm-white: #FAF8F2;
-  --depth: #0A1536;
-  --marine: #142B51;
-  --wave: #376FB7;
-  --high-sea: #F68620;
-  --ink: #13213d;
-  --muted: #657086;
-  --line: rgba(20, 43, 81, 0.12);
-  --glass: rgba(255, 255, 255, 0.72);
-  --shadow: 0 1.4rem 3.5rem rgba(31, 53, 91, 0.09);
-  --shadow-card: 0 0.65rem 1.75rem rgba(31, 53, 91, 0.06);
+  /* Shared palette/type/space live in design-kit/tokens.css + overlays.css.
+     Only Life Hub domain tokens belong here. */
   --space-stack: 1.15rem;
   --space-grid: 1.15rem;
   --space-tile: 0.5rem;
-  --radius-lg: 1.5rem;
-  --radius-md: 1.05rem;
-  --rail-width: 15rem;
+  --shadow-card: 0 0.65rem 1.75rem rgba(31, 53, 91, 0.06);
   --chart-track: #e6ebf2;
   --chart-label: #8a97a8;
   --chart-ink: #15233a;
@@ -24,8 +12,6 @@
   --ring-protein: #3d6df2;
   --ring-fat: #2aa8a0;
   --ring-accent: #3d6df2;
-  --shallow: color-mix(in srgb, var(--wave) 28%, var(--warm-white));
-  --orca: color-mix(in srgb, var(--marine) 42%, var(--warm-white));
   --mood-great: var(--wave);
   --mood-good: color-mix(in srgb, var(--wave) 55%, var(--shallow));
   --mood-neutral: var(--orca);
@@ -38,26 +24,6 @@
   --heatmap-vera-hit: var(--vera-accent, #37598A);
   --fitness-accent: #2E7BD6;
   --area-fill: rgba(61, 109, 242, 0.18);
-
-  /* Closed type scale (same steps as Teaching Hub). If a size is not here,
-     pick the nearest step — do not invent another rem. */
-  --text-2xs: 0.6875rem; /* 11px — uppercase micro-labels only */
-  --text-xs: 0.75rem; /*    12px — captions, timestamps */
-  --text-sm: 0.8125rem; /*  13px — secondary UI text, metadata */
-  --text-base: 0.9375rem; /* 15px — default UI text */
-  --text-md: 1.0625rem; /*  17px — reading copy, card titles */
-  --text-lg: 1.3125rem; /*  21px — section headings */
-  --text-xl: 2rem; /*      32px — small page titles */
-  --text-2xl: 2.625rem; /* 42px — page titles */
-  --font-size-meta: var(--text-sm);
-  --font-size-card: var(--text-base);
-  --font-size-body: var(--text-md);
-  --font-size-section: var(--text-lg);
-  --font-size-page: var(--text-xl);
-  --font-size-hero: var(--text-2xl);
-  --font-size-tile-value: var(--text-2xl);
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-synthesis: none;
 }
 
 * { box-sizing: border-box; }
