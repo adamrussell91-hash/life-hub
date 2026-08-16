@@ -618,6 +618,15 @@ export function createAppController(dependencies) {
       chatSyncAccent?.();
     }
     currentSection = name;
+    // Title the page before rendering: a throw inside a section renderer used to
+    // leave the previous section's eyebrow and title on screen.
+    const titles = SECTION_TITLES[name];
+    if (titles) {
+      const eyebrow = root.querySelector('#page-eyebrow');
+      const title = root.querySelector('#page-title');
+      if (eyebrow) eyebrow.textContent = titles.eyebrow;
+      if (title) title.textContent = titles.title;
+    }
     if (name === 'nutrition') renderNutritionSection();
     if (name === 'fitness') renderFitnessSection();
     if (name === 'skincare') {
@@ -637,13 +646,6 @@ export function createAppController(dependencies) {
       button.classList.toggle('is-active', active);
       if (active && section !== 'more') button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
-    }
-    const titles = SECTION_TITLES[name];
-    if (titles) {
-      const eyebrow = root.querySelector('#page-eyebrow');
-      const title = root.querySelector('#page-title');
-      if (eyebrow) eyebrow.textContent = titles.eyebrow;
-      if (title) title.textContent = titles.title;
     }
   }
 

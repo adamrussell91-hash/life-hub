@@ -15,27 +15,22 @@ function el(tag = 'div') {
     listeners: [],
     style: {},
     classList: {
-      remove(name) {
-        this.owner.className = String(this.owner.className || '')
-          .split(/\s+/)
-          .filter(token => token && token !== name)
-          .join(' ');
+      remove(...names) {
+        setClass(this.owner, classTokens(this.owner).filter(token => !names.includes(token)).join(' '));
       },
-      add(name) {
-        const tokens = String(this.owner.className || '').split(/\s+/).filter(Boolean);
-        if (!tokens.includes(name)) this.owner.className = [...tokens, name].join(' ');
+      add(...names) {
+        setClass(this.owner, [...new Set([...classTokens(this.owner), ...names])].join(' '));
       },
       toggle(name, force) {
-        const tokens = String(this.owner.className || '').split(/\s+/).filter(Boolean);
-        const has = tokens.includes(name);
-        const on = force == null ? !has : !!force;
-        this.owner.className = on
+        const tokens = classTokens(this.owner);
+        const on = force == null ? !tokens.includes(name) : !!force;
+        setClass(this.owner, on
           ? [...new Set([...tokens, name])].join(' ')
-          : tokens.filter(token => token !== name).join(' ');
+          : tokens.filter(token => token !== name).join(' '));
         return on;
       },
       contains(name) {
-        return String(this.owner.className || '').split(/\s+/).includes(name);
+        return classTokens(this.owner).includes(name);
       },
       owner: null
     },
@@ -71,6 +66,45 @@ function el(tag = 'div') {
   return node;
 }
 
+function className(node) {
+  const value = node?.className;
+  return typeof value === 'string' ? value : String(value?.baseVal ?? '');
+}
+
+function classTokens(node) {
+  return className(node).split(/\s+/).filter(Boolean);
+}
+
+function setClass(node, value) {
+  node.attributes.class = String(value);
+  if (node._animatedClass) node._animatedClass.baseVal = String(value);
+  else node.className = String(value);
+}
+
+/**
+ * A real SVGElement exposes className as a read-only SVGAnimatedString, so
+ * assigning to it throws. Mirror that here, or the fake DOM keeps accepting
+ * writes that blow up the live page.
+ */
+function svgEl(tag) {
+  const node = el(tag);
+  const animated = { baseVal: '', animVal: '' };
+  node._animatedClass = animated;
+  Object.defineProperty(node, 'className', {
+    get: () => animated,
+    set() { throw new TypeError('Cannot set property className of #<SVGElement> which has only a getter'); },
+    configurable: true
+  });
+  node.setAttribute = (name, value) => {
+    node.attributes[name] = String(value);
+    if (name === 'class') animated.baseVal = String(value);
+    if (name === 'id') node.id = String(value);
+    if (name === 'data-role') node.dataset.role = String(value);
+    if (name === 'data-status') node.dataset.status = String(value);
+  };
+  return node;
+}
+
 function collect(node, selector) {
   const out = [];
   walk(node, child => { if (matches(child, selector)) out.push(child); });
@@ -86,7 +120,7 @@ function walk(node, visit) {
 
 function matches(node, selector) {
   if (selector.startsWith('.')) {
-    return String(node.className).split(/\s+/).includes(selector.slice(1));
+    return classTokens(node).includes(selector.slice(1));
   }
   if (selector.startsWith('#')) return node.id === selector.slice(1);
   const role = /^\[data-role="(.+)"\]$/.exec(selector);
@@ -132,7 +166,7 @@ function fakeRoot() {
   };
   return {
     createElement: tag => el(tag),
-    createElementNS: (_uri, tag) => el(tag),
+    createElementNS: (_uri, tag) => svgEl(tag),
     querySelector(selector) {
       if (map[selector]) return map[selector];
       return dashboard.querySelector(selector) || host.querySelector(selector);
@@ -352,6 +386,28 @@ test('numeric tiles show a what-line, In range label, refs, and previous value',
   });
   assert.match(String(crpRoot._host.querySelector('.bloods-metric').textContent), /In range/);
   assert.doesNotMatch(String(crpRoot._host.querySelector('.bloods-status').textContent), /^Normal$/);
+});
+
+test('a category with a combined chart still renders, and does not take later categories down with it', () => {
+  const root = fakeRoot();
+  const combinedCategory = {
+    id: 'Iron Studies',
+    title: 'Iron Studies',
+    hasFlags: false,
+    collapsed: false,
+    summary: '1 marker',
+    combined: {
+      series: [{ key: 'iron', points: [{ date: '2026-02-01', value: 18 }, { date: '2026-05-19', value: 21 }] }]
+    },
+    markers: [{ ...alt, key: 'iron', label: 'Iron' }]
+  };
+  const liver = model.categories[0];
+  renderBloods(root, { ...model, categories: [combinedCategory, liver] });
+
+  assert.equal(root._host.children.length, 2, 'both categories render');
+  const chart = root._host.children[0].querySelector('.bloods-combined');
+  assert.ok(chart, 'the combined chart is classed via setAttribute, not a className write');
+  assert.match(String(chart.getAttribute('class')), /line-chart/);
 });
 
 test('the summary is one card: a bar with a legend, no ring, and the date folded in', async () => {
