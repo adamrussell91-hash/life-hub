@@ -1,3 +1,50 @@
+export function rangeTrackLayout({
+  value,
+  previous,
+  refLow,
+  refHigh,
+  width = 320,
+  padding = 16
+} = {}) {
+  const finite = n => n != null && n !== '' && Number.isFinite(Number(n));
+  const v = finite(value) ? Number(value) : null;
+  const prev = finite(previous) ? Number(previous) : null;
+  const low = finite(refLow) ? Number(refLow) : null;
+  const high = finite(refHigh) ? Number(refHigh) : null;
+  const values = [v, prev, low, high].filter(n => n != null);
+  let domainMin = values.length ? Math.min(...values) : 0;
+  let domainMax = values.length ? Math.max(...values) : 1;
+  if (domainMin === domainMax) {
+    domainMin -= 1;
+    domainMax += 1;
+  }
+  const inner = Math.max(0, width - padding * 2);
+  const xAt = n => padding + ((Number(n) - domainMin) / (domainMax - domainMin)) * inner;
+  const bandStartX = low != null ? xAt(low) : padding;
+  const bandEndX = high != null ? xAt(high) : padding + inner;
+  const latestX = v != null ? xAt(v) : padding;
+  const previousX = prev != null ? xAt(prev) : null;
+  let arrow = null;
+  if (previousX != null && latestX !== previousX) {
+    arrow = latestX > previousX ? 'right' : 'left';
+  }
+  const overflow = v != null && high != null && v > high
+    ? 'high'
+    : v != null && low != null && v < low
+      ? 'low'
+      : null;
+  return {
+    domainMin,
+    domainMax,
+    bandStartX,
+    bandEndX,
+    latestX,
+    previousX,
+    arrow,
+    overflow
+  };
+}
+
 export function rangeBarLayout(value, refLow, refHigh, { width = 320, padding = 16 } = {}) {
   const span = Number(refHigh) - Number(refLow);
   const raw = !Number.isFinite(span) || span === 0

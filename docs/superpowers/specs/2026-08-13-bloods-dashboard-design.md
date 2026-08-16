@@ -62,12 +62,9 @@ No new chart-kit module needed — a reference-range band is a `<rect>` drawn be
 
 ## Visual design
 
-Reuses existing Life Hub tokens (`--warm-white`, `--marine`, `--wave`, `--high-sea`, `--glass`, `.metric-card` glass styling) — no new palette. Status colours: green = Normal (existing `data-colour="green"`), red = High (existing `data-colour="red"`), and a new third state for Low reusing the existing `--high-sea` orange accent (`data-colour="low"` or similar) since the codebase currently only has green/red/neutral.
+**Superseded for the read surface (16 Aug 2026).** Chart and chrome rules now live in Life Hub Design → Charts and `2026-08-16-bloods-visual-restyle-design.md`. Do not implement the maroon status colours or `.body-tape-chip` flags from the original pass.
 
-Page layout, top to bottom:
-1. **Flags strip** — horizontal row of chips for every currently-out-of-range marker (label + value + High/Low), styled like `.body-tape-chip`. Empty state: "Everything in range."
-2. **Category sections** — one collapsible `.metric-card.body-section`-style block per Notion category, each listing its markers.
-3. **Marker cards** — per marker: label, latest value + unit, Last/Overall trend chips (reuse `trendChip`/`formatDeltaChip` pattern from `render-body.js`), and the trend-line-with-reference-band SVG chart (`viewBox 0 0 320 168`, same as the existing body metric chart).
+Summary of the current look: kit semantics (`--success` in range, `--danger` High, `--high-sea-ink` Low); Wave chrome; every category expanded; one-line meaning on each tile; series charts use a sage band plus a dot on every vertex; sparse markers use a shore/sage range track with ghost previous + Wave arrow; flag pills are centred capsules, not tape chips.
 
 ## Testing
 

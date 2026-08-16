@@ -161,7 +161,7 @@ function decorateCategory(category) {
   }
   return {
     ...category,
-    collapsed: !category.hasFlags,
+    collapsed: false,
     summary,
     combined: combinedChart(category),
     lipidRatio: lipidRatio(category)

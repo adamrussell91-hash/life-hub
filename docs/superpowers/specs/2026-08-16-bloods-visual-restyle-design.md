@@ -1,8 +1,8 @@
 # Bloods dashboard visual restyle
 
 **Date:** 2026-08-16  
-**Status:** Draft for Adam review (brainstorm approved in chat).  
-**Does not replace:** `2026-08-13-bloods-dashboard-design.md` (data model, import, hidden Body subpage). This spec is the **read surface** only.  
+**Status:** Implemented in the hub; chart rules copied into the Life Hub Design overview (Charts).  
+**Does not replace:** `2026-08-13-bloods-dashboard-design.md` (data model, import, hidden Body subpage). This spec is the **read surface** only. Chart language for the whole app: `2026-07-31-life-hub-design.md` → Charts.  
 **Approach:** Restyle in place. Keep the category stack and two-column marker grid. Do not introduce masonry.
 
 ## Goal
