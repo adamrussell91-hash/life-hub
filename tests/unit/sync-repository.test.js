@@ -584,3 +584,34 @@ test('same-range refreshes share one request while a superseding range aborts th
   await superseding;
   assert.equal(calls, 2);
 });
+
+test('ranges in one lane run side by side, and a new lane supersedes them', async () => {
+  const cache = memoryCache();
+  const signals = [];
+  let release;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const fetchImpl = async (url, init) => {
+    signals.push(init.signal);
+    await blocked;
+    const requestUrl = new URL(url, 'https://life.example');
+    return json(manifest(`range-${signals.length}`, [], SHA.c, {
+      from: requestUrl.searchParams.get('from'),
+      to: requestUrl.searchParams.get('to')
+    }));
+  };
+  const common = { fetchImpl, cache, validateFile: () => ({ valid: true }) };
+  const backfill = [
+    syncRepository({ ...common, lane: 'load-1', from: '2026-07-01', to: '2026-07-31' }),
+    syncRepository({ ...common, lane: 'load-1', from: '2026-06-01', to: '2026-06-30' })
+  ];
+
+  await Promise.resolve();
+  assert.equal(signals.length, 2, 'both windows in the lane should be in flight');
+  assert.ok(signals.every(signal => !signal.aborted));
+
+  const nextCycle = syncRepository({ ...common, lane: 'load-2', from: '2026-05-01', to: '2026-05-31' });
+  assert.ok(signals.slice(0, 2).every(signal => signal.aborted), 'a new lane supersedes the old one');
+  release();
+
+  await Promise.allSettled([...backfill, nextCycle]);
+});

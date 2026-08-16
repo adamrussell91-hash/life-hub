@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { load } from 'js-yaml';
 import { buildHomeModel } from '../../js/app/home-model.js';
-import { loadLiveEvents as loadLiveEventsRaw } from '../../js/app/load-live-events.js';
+import {
+  MAX_LOOKBACK_DAYS,
+  loadLiveEvents as loadLiveEventsRaw,
+  planBackfillWindows
+} from '../../js/app/load-live-events.js';
 
 function loadLiveEvents(opts) {
   return loadLiveEventsRaw({ maxLookbackDays: 40, ...opts });
@@ -69,11 +73,14 @@ test('loads the current Sydney date window through existing parsers and exact Ho
   const result = await loadLiveEvents({ sync, loadYaml: load, date });
   const model = buildHomeModel({ ...result, date: '2026-07-30' });
 
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.equal(calls[0].from, '2026-07-24');
   assert.equal(calls[0].to, '2026-07-30');
   assert.equal(calls[1].from, '2026-06-24');
   assert.equal(calls[1].to, '2026-07-23');
+  // The last window is clamped to the 40-day cap rather than skipped.
+  assert.equal(calls[2].from, '2026-06-21');
+  assert.equal(calls[2].to, '2026-06-23');
   assert.equal(result.events.length, 4);
   assert.equal(result.commitSha, 'c'.repeat(40));
   assert.equal(result.changed, true);
@@ -209,11 +216,12 @@ test('a config-only older slice still extends until the lookback cap', async () 
     };
   };
   await loadLiveEvents({ sync, loadYaml: load, date });
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.deepEqual(
     { from: calls[1].from, to: calls[1].to },
     { from: '2026-06-26', to: '2026-07-25' }
   );
+  assert.equal(calls.at(-1).from, addCalendarDays(date, -39));
 });
 
 test('repeated boundary expansion never sends an individual range over 366 days', async () => {
@@ -234,11 +242,117 @@ test('repeated boundary expansion never sends an individual range over 366 days'
 
   await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', maxLookbackDays: 160 });
 
-  assert.equal(calls.length, 6);
   assert.ok(calls.every(call => daysBetween(call.from, call.to) < 366));
   assert.deepEqual(calls[0], { from: '2026-07-26', to: '2026-08-01' });
   assert.deepEqual(calls[1], { from: '2026-06-26', to: '2026-07-25' });
-  assert.deepEqual(calls[5], { from: '2026-02-26', to: '2026-03-27' });
+  // Windows widen as they go back, and the oldest one lands exactly on the cap.
+  assert.ok(daysBetween(calls[2].from, calls[2].to) > daysBetween(calls[1].from, calls[1].to));
+  assert.equal(calls.at(-1).from, addCalendarDays('2026-08-01', -159));
+  for (let index = 1; index < calls.length; index += 1) {
+    assert.equal(calls[index].to, addCalendarDays(calls[index - 1].from, -1));
+  }
+});
+
+test('backfill windows widen, stay contiguous, and cover the whole lookback without a request per month', () => {
+  const date = '2026-08-01';
+  const start = addCalendarDays(date, -6);
+  const windows = planBackfillWindows(date, start, MAX_LOOKBACK_DAYS);
+
+  assert.ok(windows.length < 20, `expected a handful of windows, planned ${windows.length}`);
+  assert.equal(windows[0].to, addCalendarDays(start, -1));
+  assert.equal(windows.at(-1).from, addCalendarDays(date, -(MAX_LOOKBACK_DAYS - 1)));
+  for (let index = 1; index < windows.length; index += 1) {
+    assert.equal(windows[index].to, addCalendarDays(windows[index - 1].from, -1));
+  }
+  // The manifest endpoint rejects spans of 366 days or more.
+  assert.ok(windows.every(window => daysBetween(window.from, window.to) < 366));
+});
+
+test('older windows are fetched concurrently but ingested oldest-last', async () => {
+  const date = '2026-08-01';
+  const started = [];
+  const finish = new Map();
+  let peak = 0;
+  let live = 0;
+  const sync = async ({ from, to }) => {
+    started.push(from);
+    live += 1;
+    peak = Math.max(peak, live);
+    if (to !== date) await new Promise(resolve => finish.set(from, resolve));
+    live -= 1;
+    return {
+      files: [bodyWeight(to, 80)], warnings: [], commitSha: 'c'.repeat(40),
+      manifestId: from, changed: true, freshness: 'confirmed'
+    };
+  };
+
+  const partials = [];
+  const done = loadLiveEvents({
+    sync, loadYaml: load, date, maxLookbackDays: 400,
+    onPartial: snapshot => partials.push(snapshot.events.at(-1).record.date)
+  });
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.ok(peak > 1, 'older windows should overlap in flight');
+  // Resolve out of order: the newest window finishes last.
+  for (const from of [...finish.keys()].reverse()) finish.get(from)();
+  await new Promise(resolve => setImmediate(resolve));
+  for (const resolve of finish.values()) resolve();
+  await done;
+
+  const ingested = partials.slice(1);
+  assert.deepEqual(ingested, [...ingested].sort().reverse());
+});
+
+test('a failing window waits for its concurrent siblings before rejecting', async () => {
+  const date = '2026-08-01';
+  const release = [];
+  let settled = 0;
+  const sync = async ({ to }) => {
+    if (to === date) {
+      return {
+        files: [bodyWeight(date, 80)], warnings: [], commitSha: 'c'.repeat(40),
+        manifestId: to, changed: true, freshness: 'confirmed'
+      };
+    }
+    await new Promise(resolve => release.push(resolve));
+    settled += 1;
+    throw new Error('aborted');
+  };
+
+  const done = loadLiveEvents({ sync, loadYaml: load, date, maxLookbackDays: 400 })
+    .then(() => 'resolved', () => 'rejected');
+  await new Promise(resolve => setImmediate(resolve));
+
+  const inFlight = release.length;
+  assert.ok(inFlight > 1, 'several windows should be in flight');
+  for (const resolve of release) resolve();
+
+  assert.equal(await done, 'rejected');
+  assert.equal(settled, inFlight, 'every sibling settles before the load unwinds');
+});
+
+test('a window that adds nothing does not trigger another parse and repaint', async () => {
+  const date = '2026-08-01';
+  let parses = 0;
+  const loadYaml = content => {
+    parses += 1;
+    return load(content);
+  };
+  const sync = async ({ to }) => ({
+    files: to === date ? [bodyWeight(date, 80)] : [],
+    warnings: [], commitSha: 'c'.repeat(40), manifestId: to, changed: false, freshness: 'confirmed'
+  });
+
+  const partials = [];
+  await loadLiveEvents({
+    sync, loadYaml, date, maxLookbackDays: 400, onPartial: () => partials.push(true)
+  });
+  const afterEmptyWindows = parses;
+
+  assert.equal(partials.length, 1);
+  // The single event is parsed once for the partial and reused for the result.
+  assert.equal(afterEmptyWindows, 1);
 });
 
 test('exact range snapshots restore a long streak offline across the disjoint-range boundary', async () => {
