@@ -39,8 +39,8 @@
       <header class="brand">
         <span class="brand-mark" aria-hidden="true"><span></span></span>
         <span class="brand-copy">
-          <strong>Life Hub</strong>
-          <small>Private dashboard</small>
+          <span class="hub-rail__brand">Life Hub</span>
+          <span class="hub-rail__tagline">Private dashboard</span>
         </span>
       </header>
 
@@ -76,8 +76,21 @@
         <div class="topbar-actions page-header__actions">
           <p class="date-chip"><span aria-hidden="true">◷</span> <span data-value="date">Loading date</span></p>
           <p class="system-chip" id="network-status" hidden><span class="status-dot" aria-hidden="true"></span><span>Offline · saved view</span></p>
-          <button class="btn btn--secondary quiet-button" id="refresh-button" type="button">Refresh</button>
-          <button class="btn btn--secondary quiet-button" id="sign-out-button" type="button">Sign out</button>
+          <div class="hub-utilities">
+            <button class="hub-icon-btn" id="refresh-button" type="button" aria-label="Refresh" title="Refresh">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-2.6-6.3" />
+                <path d="M21 3v6h-6" />
+              </svg>
+            </button>
+            <button class="hub-icon-btn" id="sign-out-button" type="button" aria-label="Sign out" title="Sign out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M10 7V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-1" />
+                <path d="M15 12H3" />
+                <path d="m7 8-4 4 4 4" />
+              </svg>
+            </button>
+          </div>
         </div>
       </header>
 
