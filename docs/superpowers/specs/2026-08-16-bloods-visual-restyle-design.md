@@ -39,15 +39,16 @@ When `showSection('body-bloods')` is active, the page header is **Labs / Bloods*
 - Range pills: same `.body-range` as Body; **active fill is `--wave`**, white type.
 - Appointment summary link stays, muted, not a second primary.
 
-### Summary row (three cards, keep)
+### Summary card (one card, not three)
 
-Three equal cards, each **one tile tall**. No card in this row may grow with content — anything list-shaped goes below the row.
+**One** card, one tile tall, that never grows with content — anything list-shaped goes below it. No ring: a circular gauge boxed in a rectangle is not the language here, and the collection date does not earn a card of its own.
 
-1. **In range** — ring; stroke `--success`, drawn unfilled (`fill="none"`) at the same size as the ring geometry (64) so it is a ring, not a disc. Caption `N of M in range`.
-2. **Flags this test** — count only: `N markers flagged` with a `7 high · 2 low` caption. Empty: “Everything in range.” **No chips in this card.**
-3. **Last collected** — display date (friendly), lab if present, stale note if >90 days.
+- Header row: label `Markers in range` on the left, quiet `Collected DD/MM/YY · lab` caption on the right. Stale (>90 days) is a second caption in `--high-sea-ink`.
+- Value: `N` in `--text-2xl` with `of M in range` beside it.
+- **Horizontal bar** (~8px, pill radius, `--shore` remainder) split into three proportional segments: in range `--success`, High `--danger`, Low `--high-sea`.
+- Legend under the bar: dot + `N in range` / `N high` / `N low`. Nothing flagged reads “Everything in range”.
 
-### Flag strip (full width, under the summary row)
+### Flag strip (full width, under the summary card)
 
 One chip per currently High/Low marker, wrapping across the **full page width** so a long flag list is two or three rows, not a tall third-width column. Chips keep the centred pill styling below. Empty state is a single quiet caption line; the strip collapses when there is nothing to say.
 
@@ -98,9 +99,14 @@ Replace the fat black bar.
 - If only one point: no ghost, no arrow
 - Overflow High/Low: dot sits at/ beyond the sage end; do not clamp so hard that High looks in-range
 
+### Geometry (must match the stylesheet)
+
+The SVG `viewBox` and the CSS `aspect-ratio` must describe the same box. When they disagree, `preserveAspectRatio="xMidYMid meet"` draws the chart at 1:1 inside a wider box and centres it, so the line and the sage band float in the middle of the tile with dead space either side. Line and zoned charts are `320 × 120`; the range track is `320 × 56`. Anything hard-coded off the old 168 height is a bug.
+
 ### Line + band (two or more points)
 
-- Sage rectangle = current reference band (`includeValues` already folds refs into scale)
+- Sage rectangle = current reference band, spanning the **full plot width** and clamped to the plot box so it never bleeds past the axis
+- A reference limit joins the y-scale **only when it sits near the readings** (`nearbyRefs`). Vitamin D’s upper limit of 150 against readings in the 40s would otherwise flatten the line into a straight edge; the band simply runs off the top instead
 - Line stroke `--wave` when in range; last point (and status-coloured line if the latest is flagged) uses semantic status
 - **Dot on every vertex** (not only endpoints). Latest slightly larger
 - No empty 168px hole with a 12px black slab
