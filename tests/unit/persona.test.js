@@ -39,6 +39,24 @@ test('vera prompt includes protocol when provided', () => {
   assert.match(prompt, /No log_entry/);
 });
 
+test('vera prompt includes psychological baseline when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'vera',
+    veraIntake: 'The work is helping him move when he already knows.'
+  });
+  assert.match(prompt, /Psychological baseline/);
+  assert.match(prompt, /already knows/);
+});
+
+test('non-vera prompts never include psychological baseline', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'penelope',
+    veraIntake: 'Baseline leak'
+  });
+  assert.doesNotMatch(prompt, /Baseline leak/);
+  assert.doesNotMatch(prompt, /Psychological baseline/);
+});
+
 test('the router lists every agent, infers the right one, and never narrates the handoff', () => {
   const prompt = buildSystemPrompt({ slug: 'router', digest: '', constraints: '' });
   assert.match(prompt, /Brisket Lasso/);

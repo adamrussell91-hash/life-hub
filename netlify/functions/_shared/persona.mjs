@@ -15,6 +15,7 @@ export function buildSystemPrompt({
   hyaluronicaProtocol = '',
   penelopeProtocol = '',
   veraProtocol = '',
+  veraIntake = '',
   brisketProtocol = '',
   saraProtocol = '',
   hammondProtocol = '',
@@ -122,6 +123,9 @@ export function buildSystemPrompt({
   const veraBlocks = slug === 'vera' ? [
     veraProtocol
       ? `Vera operating manual (follow these Life Hub rules):\n${veraProtocol}`
+      : '',
+    veraIntake
+      ? `Psychological baseline (longitudinal portrait, not a diagnosis; use it as standing context, do not quote it back at length):\n${veraIntake}`
       : '',
     'You MAY propose log_entry for mind_session at a natural close or when Adam asks to record. Diary stays Penelope. Life Hub writes mind_session immediately — a successful tool result means written, not awaiting confirm. Do not claim it was logged if the tool returns an error.',
     'Read Central Node before your opening question. When another agent must act, fill `cross_agent_note` on mind_session — chat-only lines are not memory.',

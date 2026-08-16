@@ -18,7 +18,7 @@ import { buildSystemPrompt } from './_shared/persona.mjs';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
 import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs';
 import { loadPenelopeProtocol } from './_shared/load-penelope-protocol.mjs';
-import { loadVeraProtocol } from './_shared/load-vera-protocol.mjs';
+import { loadVeraProtocol, VERA_INTAKE_PATH } from './_shared/load-vera-protocol.mjs';
 import { loadBrisketProtocol } from './_shared/load-brisket-protocol.mjs';
 import { loadSaraProtocol } from './_shared/load-sara-protocol.mjs';
 import { loadHammondProtocol } from './_shared/load-hammond-protocol.mjs';
@@ -288,6 +288,7 @@ export function createChatHandler({
         let onThisDay = '';
         let daysSinceLastEntry = null;
         let daysSinceLastMindSession = null;
+        let veraIntake = '';
         try {
           const current = await client.resolveTree();
           const manifest = selectManifestEntries(current.tree, { from, to: today });
@@ -347,6 +348,9 @@ export function createChatHandler({
           const onThisDayEntries = slug === 'penelope'
             ? selectOnThisDayEntries(current.tree, today)
             : [];
+          const veraIntakeEntry = slug === 'vera'
+            ? current.tree.find(entry => entry.path === VERA_INTAKE_PATH && entry.type === 'blob')
+            : null;
 
           const [
             dataBlobs,
@@ -363,7 +367,8 @@ export function createChatHandler({
             hammondFitnessBlobs,
             hammondCnBlobs,
             mindBlobs,
-            onThisDayBlobs
+            onThisDayBlobs,
+            veraIntakeBlob
           ] = await Promise.all([
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
@@ -379,7 +384,8 @@ export function createChatHandler({
             Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondCnEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(mindEntries.map(entry => client.readBlob(entry.sha))),
-            Promise.all(onThisDayEntries.map(entry => client.readBlob(entry.sha)))
+            Promise.all(onThisDayEntries.map(entry => client.readBlob(entry.sha))),
+            veraIntakeEntry ? client.readBlob(veraIntakeEntry.sha) : null
           ]);
 
           const files = dataEntries
@@ -532,6 +538,9 @@ export function createChatHandler({
               } catch { /* skip */ }
             }
           }
+          if (veraIntakeBlob) {
+            veraIntake = decodeBlob(veraIntakeBlob) || '';
+          }
         } catch {
           digest = '';
           constraints = '';
@@ -568,6 +577,7 @@ export function createChatHandler({
           onThisDay = '';
           daysSinceLastEntry = null;
           daysSinceLastMindSession = null;
+          veraIntake = '';
         }
 
         const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
@@ -595,6 +605,7 @@ export function createChatHandler({
           hyaluronicaProtocol,
           penelopeProtocol,
           veraProtocol,
+          veraIntake,
           brisketProtocol,
           saraProtocol,
           hammondProtocol,
