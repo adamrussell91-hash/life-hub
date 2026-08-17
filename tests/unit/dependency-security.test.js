@@ -4,6 +4,18 @@ import { readFile } from 'node:fs/promises';
 import { load } from 'js-yaml';
 import { config as authConfig } from '../../netlify/functions/auth.mjs';
 
+test('gitignore comments do not embed a GitHub owner/repo that secrets scanning would treat as GITHUB_REPOSITORY', async () => {
+  const gitignore = await readFile(new URL('../../.gitignore', import.meta.url), 'utf8');
+  for (const line of gitignore.split('\n')) {
+    if (!line.trim().startsWith('#')) continue;
+    assert.doesNotMatch(
+      line,
+      /[A-Za-z0-9][A-Za-z0-9.-]{0,38}\/[A-Za-z0-9_.-]{1,100}/,
+      line
+    );
+  }
+});
+
 test('environment example contains names but no usable credentials', async () => {
   const example = await readFile(new URL('../../.env.example', import.meta.url), 'utf8');
   const values = new Map(example

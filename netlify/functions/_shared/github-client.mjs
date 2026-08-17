@@ -4,6 +4,7 @@ const API_VERSION = '2026-03-10';
 const GITHUB_ORIGIN = 'https://api.github.com';
 const SHA = /^[0-9a-f]{40}$/;
 const REPOSITORY = /^(?<owner>[A-Za-z0-9](?:[A-Za-z0-9.-]{0,38}))\/(?<repo>[A-Za-z0-9_.-]{1,100})$/;
+const TREE_BATCH = 20;
 
 export class GitHubClientError extends Error {
   constructor(code, retryable) {
@@ -50,27 +51,193 @@ export function createGitHubClient({ env = process.env, fetchImpl = fetch } = {}
     }
   }
 
+  async function graphql(query, variables) {
+    let response;
+    try {
+      response = await fetchImpl(`${GITHUB_ORIGIN}/graphql`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${config.token}`,
+          'content-type': 'application/json',
+          'user-agent': 'life-hub'
+        },
+        body: JSON.stringify({ query, variables })
+      });
+    } catch {
+      throw new GitHubClientError('github_unavailable', true);
+    }
+    if (!response?.ok) throw mapGitHubFailure(response);
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      throw new GitHubClientError('github_invalid_response', true);
+    }
+    if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+      throw new GitHubClientError('github_invalid_response', true);
+    }
+    return payload?.data;
+  }
+
+  async function resolveTreeViaRest() {
+    const commit = await github(`${repositoryPath}/commits/${encodeURIComponent(config.branch)}`);
+    if (!SHA.test(commit?.sha) || !SHA.test(commit?.commit?.tree?.sha)) {
+      throw new GitHubClientError('github_invalid_response', true);
+    }
+    const commitSha = commit.sha;
+    const treeSha = commit.commit.tree.sha;
+    const resolved = await github(`${repositoryPath}/git/trees/${treeSha}?recursive=1`);
+    if (resolved?.truncated === true) {
+      throw new GitHubClientError('repository_tree_incomplete', true);
+    }
+    if (!Array.isArray(resolved?.tree)) {
+      throw new GitHubClientError('github_invalid_response', true);
+    }
+    return { commitSha, treeSha, tree: resolved.tree };
+  }
+
+  async function resolveTreeViaGraphql() {
+    const head = await graphql(
+      `query ($owner: String!, $name: String!, $ref: String!) {
+        repository(owner: $owner, name: $name) {
+          ref(qualifiedName: $ref) {
+            target {
+              ... on Commit {
+                oid
+                tree { oid }
+              }
+            }
+          }
+        }
+      }`,
+      {
+        owner: config.owner,
+        name: config.repo,
+        ref: `refs/heads/${config.branch}`
+      }
+    );
+    const commitSha = head?.repository?.ref?.target?.oid;
+    const treeSha = head?.repository?.ref?.target?.tree?.oid;
+    if (!SHA.test(commitSha) || !SHA.test(treeSha)) {
+      throw new GitHubClientError('github_invalid_response', true);
+    }
+
+    const tree = [];
+    const queue = [{ sha: treeSha, prefix: '' }];
+    while (queue.length > 0) {
+      const batch = queue.splice(0, TREE_BATCH);
+      const selection = batch.map((entry, index) => `
+        t${index}: object(oid: $oid${index}) {
+          ... on Tree {
+            entries {
+              name
+              type
+              oid
+              object { ... on Blob { byteSize } }
+            }
+          }
+        }`).join('\n');
+      const params = batch.map((_, index) => `$oid${index}: GitObjectID!`).join(', ');
+      const variables = {
+        owner: config.owner,
+        name: config.repo,
+        ...Object.fromEntries(batch.map((entry, index) => [`oid${index}`, entry.sha]))
+      };
+      const data = await graphql(
+        `query ($owner: String!, $name: String!, ${params}) {
+          repository(owner: $owner, name: $name) {
+            ${selection}
+          }
+        }`,
+        variables
+      );
+      const repository = data?.repository;
+      if (!repository) throw new GitHubClientError('github_invalid_response', true);
+
+      for (const [index, parent] of batch.entries()) {
+        const entries = repository[`t${index}`]?.entries;
+        if (!Array.isArray(entries)) {
+          throw new GitHubClientError('github_invalid_response', true);
+        }
+        for (const entry of entries) {
+          if (!entry || typeof entry.name !== 'string' || !SHA.test(entry.oid)) {
+            throw new GitHubClientError('github_invalid_response', true);
+          }
+          const path = parent.prefix ? `${parent.prefix}/${entry.name}` : entry.name;
+          if (entry.type === 'tree') {
+            tree.push({ path, mode: '040000', type: 'tree', sha: entry.oid, size: 0 });
+            queue.push({ sha: entry.oid, prefix: path });
+            continue;
+          }
+          if (entry.type === 'blob') {
+            const size = entry.object?.byteSize;
+            tree.push({
+              path,
+              mode: '100644',
+              type: 'blob',
+              sha: entry.oid,
+              size: Number.isInteger(size) ? size : 0
+            });
+            continue;
+          }
+        }
+      }
+    }
+
+    return { commitSha, treeSha, tree };
+  }
+
+  async function readBlobViaGraphql(sha) {
+    const data = await graphql(
+      `query ($owner: String!, $name: String!, $oid: GitObjectID!) {
+        repository(owner: $owner, name: $name) {
+          object(oid: $oid) {
+            ... on Blob {
+              text
+              byteSize
+              isBinary
+            }
+          }
+        }
+      }`,
+      { owner: config.owner, name: config.repo, oid: sha }
+    );
+    const blob = data?.repository?.object;
+    if (!blob || blob.isBinary === true || typeof blob.text !== 'string') {
+      throw new GitHubClientError('github_invalid_response', true);
+    }
+    return {
+      sha,
+      encoding: 'base64',
+      content: Buffer.from(blob.text, 'utf8').toString('base64'),
+      size: Number.isInteger(blob.byteSize) ? blob.byteSize : Buffer.byteLength(blob.text, 'utf8')
+    };
+  }
+
   return {
     async resolveTree() {
-      const commit = await github(`${repositoryPath}/commits/${encodeURIComponent(config.branch)}`);
-      if (!SHA.test(commit?.sha) || !SHA.test(commit?.commit?.tree?.sha)) {
-        throw new GitHubClientError('github_invalid_response', true);
+      try {
+        return await resolveTreeViaRest();
+      } catch (error) {
+        if (!(error instanceof GitHubClientError) || error.code !== 'repository_not_found') {
+          throw error;
+        }
+        return resolveTreeViaGraphql();
       }
-      const commitSha = commit.sha;
-      const treeSha = commit.commit.tree.sha;
-      const resolved = await github(`${repositoryPath}/git/trees/${treeSha}?recursive=1`);
-      if (resolved?.truncated === true) {
-        throw new GitHubClientError('repository_tree_incomplete', true);
-      }
-      if (!Array.isArray(resolved?.tree)) {
-        throw new GitHubClientError('github_invalid_response', true);
-      }
-      return { commitSha, treeSha, tree: resolved.tree };
     },
 
     readBlob(sha) {
       if (!SHA.test(sha)) throw new TypeError('Invalid blob SHA.');
-      return github(`${repositoryPath}/git/blobs/${sha}`);
+      return (async () => {
+        try {
+          return await github(`${repositoryPath}/git/blobs/${sha}`);
+        } catch (error) {
+          if (!(error instanceof GitHubClientError) || error.code !== 'repository_not_found') {
+            throw error;
+          }
+          return readBlobViaGraphql(sha);
+        }
+      })();
     },
 
     async writeFile({ path, content, sha, message }) {

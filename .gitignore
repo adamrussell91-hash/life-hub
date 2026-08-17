@@ -14,6 +14,6 @@ playwright-report/
 .netlify/
 .cursor/
 
-# Production records live in adamrussell91-hash/life-hub-data, never this public repo.
+# Production records live in the private data repo, never this public repo.
 /data/mind/
 /data/governance/

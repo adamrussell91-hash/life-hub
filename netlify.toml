@@ -1,5 +1,13 @@
+# Netlify hosts API Functions only. The site is on GitHub Pages.
+# GITHUB_REPOSITORY is an owner/repo name, not a credential — omit it so a
+# comment cannot fail the deploy the way secrets scanning did on 16 Aug.
 [build]
-publish = "netlify/public"
+  command = "true"
+  publish = "netlify/public"
+
+[build.environment]
+  NODE_VERSION = "22"
+  SECRETS_SCAN_OMIT_KEYS = "GITHUB_BRANCH,GITHUB_REPOSITORY"
 
 [functions]
 directory = "netlify/functions"
