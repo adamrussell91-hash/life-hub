@@ -2480,6 +2480,263 @@ main { max-width: 76rem; margin: 0 auto; }
 #body-bloods-dashboard .body-chart [data-role="zone"][data-zone="normal"] { fill: var(--pastel-sage); }
 #body-bloods-dashboard .body-chart [data-role="zone"][data-zone="risk"] { fill: var(--pastel-gold); }
 #body-bloods-dashboard .body-chart [data-role="zone"][data-zone="diabetes"] { fill: var(--pastel-peach); }
+.bloods-instrument-groups {
+  display: grid;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
+.bloods-instrument-group {
+  min-width: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.bloods-instrument-group__head {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+.bloods-instrument-group__head .metric-caption,
+.bloods-protein-block > .metric-caption {
+  margin: 0;
+}
+.bloods-instrument-meter-list {
+  display: grid;
+}
+.bloods-instrument-meter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(12rem, 1fr) minmax(0, 12rem) auto;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+.bloods-instrument-marker {
+  min-height: 44px;
+  justify-self: end;
+  cursor: pointer;
+}
+.bloods-instrument-identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+.bloods-instrument-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+}
+.bloods-instrument-name .bloods-info {
+  flex: 0 0 auto;
+}
+.bloods-instrument-identity strong {
+  overflow: hidden;
+  color: var(--depth);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bloods-instrument-identity span {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.bloods-instrument-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+.bloods-instrument-meter {
+  display: block;
+  width: 100%;
+  aspect-ratio: 320 / 24;
+}
+.bloods-instrument-meter [data-role="meter-track"] {
+  stroke: var(--line);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.bloods-instrument-meter [data-role="meter-band"] {
+  stroke: var(--pastel-sage);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+.bloods-instrument-meter [data-role="history-point"] {
+  fill: var(--muted);
+  opacity: 0.45;
+}
+.bloods-instrument-meter [data-role="latest-point"],
+.bloods-tube [data-role="tube-fill"] {
+  fill: var(--success);
+}
+.bloods-instrument-meter [data-role="latest-point"] {
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+.bloods-instrument-meter [data-role="latest-point"][data-status="high"],
+.bloods-tube [data-role="tube-fill"][data-status="high"] {
+  fill: var(--danger);
+}
+.bloods-instrument-meter [data-role="latest-point"][data-status="low"],
+.bloods-tube [data-role="tube-fill"][data-status="low"] {
+  fill: var(--high-sea-ink);
+}
+.bloods-instrument-meter [data-role="latest-point"][data-status="first"],
+.bloods-tube [data-role="tube-fill"][data-status="first"] {
+  fill: var(--muted);
+}
+.bloods-tube-rack {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-6);
+}
+.bloods-tube-unit {
+  display: grid;
+  width: min(10rem, 100%);
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  background: transparent;
+}
+.bloods-tube-unit .bloods-instrument-identity {
+  align-items: center;
+  text-align: center;
+}
+.bloods-tube-unit .bloods-instrument-meta {
+  flex-direction: column;
+  justify-content: center;
+  white-space: normal;
+}
+.bloods-tube {
+  display: block;
+  width: var(--space-16);
+  aspect-ratio: 64 / 176;
+}
+.bloods-tube [data-role="tube-shell"] {
+  fill: var(--shore);
+  stroke: var(--line);
+}
+.bloods-tube [data-role="tube-band"] {
+  fill: var(--pastel-sage);
+}
+.bloods-tube [data-role="history-point"] {
+  stroke: var(--muted);
+  stroke-width: 2;
+  opacity: 0.55;
+}
+.bloods-protein-profile,
+.bloods-protein-block {
+  display: grid;
+  gap: var(--space-3);
+}
+.bloods-protein-block + .bloods-protein-block {
+  margin-top: var(--space-4);
+}
+.bloods-protein-band {
+  display: block;
+  width: 100%;
+  aspect-ratio: 640 / 64;
+}
+.bloods-protein-band [data-role="protein-segment"] {
+  fill: var(--pastel-sage);
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+.bloods-protein-band [data-role="protein-segment"][data-status="high"] {
+  fill: var(--danger-surface);
+  stroke: var(--danger);
+}
+.bloods-protein-band [data-role="protein-segment"][data-status="low"] {
+  fill: var(--warning-surface);
+  stroke: var(--high-sea-ink);
+}
+.bloods-protein-band text {
+  fill: var(--pastel-sage-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+.bloods-protein-key {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-2);
+}
+.bloods-protein-key__item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+.bloods-protein-key__item .bloods-instrument-meta {
+  flex-direction: column;
+  align-items: flex-end;
+}
+.bloods-instrument-trend-slot:not(:empty) {
+  margin-top: var(--space-4);
+}
+.bloods-instrument-trend {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--glass);
+}
+.bloods-instrument-trend .body-chart {
+  width: 100%;
+  aspect-ratio: 320 / 80;
+}
+.bloods-instrument-trend .metric-label {
+  margin-bottom: var(--space-2);
+}
+@media (max-width: 54rem) {
+  .bloods-instrument-meter-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-3);
+  }
+  .bloods-instrument-meter {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .bloods-instrument-meter-row > .bloods-instrument-marker {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .bloods-instrument-meta {
+    justify-content: flex-end;
+  }
+}
+@media (max-width: 36rem) {
+  .bloods-tube-rack {
+    gap: var(--space-3);
+  }
+  .bloods-tube-unit {
+    width: calc(50% - var(--space-2));
+  }
+  .bloods-protein-key {
+    grid-template-columns: 1fr;
+  }
+}
 #body-bloods-dashboard .line-chart.bloods-combined-strip { aspect-ratio: 960 / 160; }
 #body-bloods-dashboard .bloods-combined-strip [data-role="ref-band"] { fill: var(--pastel-sage); }
 #body-bloods-dashboard .bloods-combined-strip [data-role="line"] {
@@ -2545,7 +2802,7 @@ main { max-width: 76rem; margin: 0 auto; }
 .bloods-summary-strip__item {
   cursor: pointer;
 }
-.bloods-metric.is-highlight {
+[data-bloods-marker].is-highlight {
   outline: 2px solid var(--danger);
 }
 .bloods-explainer {

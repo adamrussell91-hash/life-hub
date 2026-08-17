@@ -39,6 +39,11 @@ export function markerVisual(root, marker, { flareMarks = [], flareOn = false } 
   return lineChartSvg(root, marker, { flareMarks, flareOn });
 }
 
+export function trendChartSvg(root, marker, { flareMarks = [], flareOn = false } = {}) {
+  if (marker.qualitative || !(marker.series?.length > 1)) return null;
+  return lineChartSvg(root, marker, { flareMarks, flareOn });
+}
+
 /**
  * A single reading placed on its reference band: enough to answer "is this
  * where it should be" in one row, without spending a whole card on two dots.
