@@ -1,5 +1,6 @@
 import { categoryNote, explainerFor } from './bloods-explainers.js';
 import { combinedChartSvg, markerVisual } from './bloods-charts.js';
+import { renderBiochemistryGroups } from './bloods-instruments.js';
 import { formatDisplayDate } from '../core/time.js';
 
 export function renderBloods(root, model, { onRangeChange } = {}) {
@@ -245,18 +246,20 @@ function categoryCard(root, category, model, flareOn) {
   const body = root.createElement('div');
   body.className = 'bloods-category__body';
 
-  const strip = root.createElement('div');
-  strip.className = 'bloods-summary-strip';
-  for (const marker of category.markers.filter(m => !m.qualitative)) {
-    const mini = root.createElement('button');
-    mini.type = 'button';
-    mini.className = 'bloods-summary-strip__item';
-    mini.dataset.bloodsMarker = marker.key;
-    mini.textContent = marker.label;
-    mini.addEventListener('click', () => jumpToMarker(root, marker.key));
-    strip.append(mini);
+  if (category.id !== 'Biochemistry/Electrolytes') {
+    const strip = root.createElement('div');
+    strip.className = 'bloods-summary-strip';
+    for (const marker of category.markers.filter(m => !m.qualitative)) {
+      const mini = root.createElement('button');
+      mini.type = 'button';
+      mini.className = 'bloods-summary-strip__item';
+      mini.dataset.bloodsMarker = marker.key;
+      mini.textContent = marker.label;
+      mini.addEventListener('click', () => jumpToMarker(root, marker.key));
+      strip.append(mini);
+    }
+    if (strip.children.length) body.append(strip);
   }
-  if (strip.children.length) body.append(strip);
 
   if (['Inflammation Markers', 'Iron Studies'].includes(category.id) && model.flareMarks?.length) {
     const flare = root.createElement('label');
@@ -291,6 +294,16 @@ function categoryCard(root, category, model, flareOn) {
 
   if (!category.markers.length) {
     body.append(caption(root, 'Not yet tested'));
+    article.append(body);
+    return article;
+  }
+
+  if (category.id === 'Biochemistry/Electrolytes') {
+    body.append(renderBiochemistryGroups(root, category.markers, {
+      flareMarks: model.flareMarks,
+      flareOn,
+      onExplain: marker => openExplainer(root, marker)
+    }));
     article.append(body);
     return article;
   }
@@ -510,9 +523,15 @@ function setAllCollapsed(dashboard, collapsed) {
 
 function filterMarkers(dashboard, query) {
   const q = String(query || '').trim().toLowerCase();
-  for (const card of dashboard.querySelectorAll?.('.bloods-metric') ?? []) {
+  for (const card of dashboard.querySelectorAll?.('[data-bloods-marker]') ?? []) {
     const hay = String(card.textContent || '').toLowerCase();
     card.hidden = q ? !hay.includes(q) : false;
+  }
+  // A protein band represents every fraction together. Once a filter is
+  // active, leaving the full band visible would imply hidden markers still
+  // belong to the filtered result, so the matching labelled rows stand alone.
+  for (const band of dashboard.querySelectorAll?.('.bloods-protein-band') ?? []) {
+    band.hidden = Boolean(q);
   }
 }
 

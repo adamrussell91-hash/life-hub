@@ -126,6 +126,11 @@ function matches(node, selector) {
   if (selector.startsWith('#')) return node.id === selector.slice(1);
   const role = /^\[data-role="(.+)"\]$/.exec(selector);
   if (role) return node.dataset?.role === role[1] || node.attributes?.['data-role'] === role[1];
+  const data = /^\[data-([a-z-]+)\]$/.exec(selector);
+  if (data) {
+    const key = data[1].replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase());
+    return node.dataset?.[key] != null;
+  }
   return false;
 }
 
@@ -148,6 +153,9 @@ function fakeRoot() {
   ranges.querySelectorAll = () => [];
   const open = el('button');
   open.id = 'bloods-appointment-open';
+  const search = el('input');
+  search.id = 'bloods-search';
+  search.value = '';
   const explainer = el('div');
   explainer.id = 'bloods-explainer';
   explainer.hidden = true;
@@ -162,9 +170,11 @@ function fakeRoot() {
     '#bloods-sections': host,
     '#bloods-range-control': ranges,
     '#bloods-appointment-open': open,
+    '#bloods-search': search,
     '#bloods-explainer': explainer,
     '#bloods-explainer-body': explainerBody
   };
+  dashboard.append(host);
   return {
     createElement: tag => el(tag),
     createElementNS: (_uri, tag) => svgEl(tag),
@@ -178,7 +188,8 @@ function fakeRoot() {
     _inRange: inRange,
     _collected: collected,
     _host: host,
-    _open: open
+    _open: open,
+    _search: search
   };
 }
 
@@ -560,5 +571,229 @@ test('categories honour collapsed from the model and the appointment control sta
   const section = root._host.children[0];
   assert.equal(section.classList.contains('is-collapsed'), true);
   assert.equal(root._open.id, 'bloods-appointment-open');
+});
+
+test('Biochemistry/Electrolytes uses physiological instrument groups without changing other categories', () => {
+  const instrumentMarker = (key, label, value, low, high) => ({
+    ...alt,
+    key,
+    label,
+    statusTone: 'normal',
+    latest: {
+      date: '2026-05-19',
+      value,
+      unit: 'mmol/L',
+      status: 'Normal',
+      ref_low: low,
+      ref_high: high
+    },
+    series: [
+      { date: '2026-01-28', value: value * 0.95 },
+      { date: '2026-02-20', value: value * 0.98 },
+      { date: '2026-05-19', value }
+    ]
+  });
+  const biochemistry = {
+    id: 'Biochemistry/Electrolytes',
+    title: 'Biochemistry/Electrolytes',
+    hasFlags: false,
+    collapsed: false,
+    summary: '4 markers, all normal',
+    markers: [
+      instrumentMarker('sodium', 'Sodium', 140, 135, 145),
+      instrumentMarker('creatinine', 'Creatinine', 98, 60, 110),
+      instrumentMarker('alpha_1_globulin', 'Alpha 1 Globulin', 3.1, 1.7, 3.9),
+      instrumentMarker('mystery_marker', 'Mystery marker', 7, 2, 9)
+    ]
+  };
+
+  const root = fakeRoot();
+  renderBloods(root, { ...model, flagged: [], categories: [biochemistry, model.categories[0]] });
+
+  const biochemSection = root._host.children[0];
+  const groups = biochemSection.querySelectorAll('.bloods-instrument-group');
+  assert.equal(groups.length, 4);
+  assert.deepEqual(groups.map(group => group.dataset.instrumentGroup), [
+    'electrolytes',
+    'kidney',
+    'protein',
+    'other'
+  ]);
+  assert.match(String(groups[0].textContent), /Electrolytes & Minerals/);
+  assert.match(String(groups[1].textContent), /Kidney & Waste Clearance/);
+  assert.match(String(groups[2].textContent), /Protein Profile/);
+  assert.match(String(groups[3].textContent), /Mystery marker/);
+  const meter = groups[0].querySelector('.bloods-instrument-meter');
+  assert.equal(meter.getAttribute('role'), 'img');
+  assert.match(meter.getAttribute('aria-label'), /Sodium.*140.*In range/);
+  assert.equal(meter.querySelectorAll('[data-role="history-point"]').length, 2);
+  const tube = groups[1].querySelector('.bloods-tube');
+  assert.equal(tube.getAttribute('role'), 'img');
+  assert.match(tube.getAttribute('aria-label'), /Creatinine.*98/);
+  const protein = groups[2].querySelector('.bloods-protein-band');
+  assert.equal(protein.getAttribute('role'), 'img');
+  assert.match(protein.getAttribute('aria-label'), /Alpha 1 Globulin.*3\.1/);
+  assert.equal(biochemSection.querySelector('.bloods-summary-strip'), null, 'group headings replace the flat jump strip');
+  assert.equal(biochemSection.querySelector('.bloods-metric-grid'), null);
+  assert.equal(biochemSection.querySelector('.bloods-rows'), null);
+  assert.ok(root._host.children[1].querySelector('.bloods-metric-grid'), 'Liver Function keeps its standard renderer');
+});
+
+test('a biochemical marker expands, switches, and collapses one inline trend', () => {
+  const marker = (key, label, values) => ({
+    ...alt,
+    key,
+    label,
+    statusTone: 'normal',
+    latest: {
+      date: '2026-05-19',
+      value: values.at(-1),
+      unit: 'mmol/L',
+      status: 'Normal',
+      ref_low: 0,
+      ref_high: 200
+    },
+    series: values.map((value, index) => ({
+      date: ['2026-01-28', '2026-02-20', '2026-05-19'][index],
+      value
+    }))
+  });
+  const root = fakeRoot();
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: [{
+      id: 'Biochemistry/Electrolytes',
+      title: 'Biochemistry/Electrolytes',
+      collapsed: false,
+      markers: [
+        marker('sodium', 'Sodium', [141, 143, 140]),
+        marker('potassium', 'Potassium', [4.3, 5, 4.8])
+      ]
+    }]
+  });
+
+  const controls = root._host.querySelectorAll('.bloods-instrument-marker');
+  assert.equal(controls.length, 2);
+  controls[0].listeners.find(([type]) => type === 'click')[1]();
+  assert.equal(controls[0].getAttribute('aria-expanded'), 'true');
+  assert.equal(root._host.querySelectorAll('.bloods-instrument-trend').length, 1);
+  assert.match(String(root._host.querySelector('.bloods-instrument-trend').textContent), /Sodium/);
+
+  controls[1].listeners.find(([type]) => type === 'click')[1]();
+  assert.equal(controls[0].getAttribute('aria-expanded'), 'false');
+  assert.equal(controls[1].getAttribute('aria-expanded'), 'true');
+  assert.match(String(root._host.querySelector('.bloods-instrument-trend').textContent), /Potassium/);
+
+  controls[1].listeners.find(([type]) => type === 'click')[1]();
+  assert.equal(controls[1].getAttribute('aria-expanded'), 'false');
+  assert.equal(root._host.querySelector('.bloods-instrument-trend'), null);
+});
+
+test('biochemical instruments keep marker explainers as separate controls', () => {
+  const root = fakeRoot();
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: [{
+      id: 'Biochemistry/Electrolytes',
+      title: 'Biochemistry/Electrolytes',
+      collapsed: false,
+      markers: [{
+        ...alt,
+        key: 'sodium',
+        label: 'Sodium',
+        latest: {
+          date: '2026-05-19',
+          value: 140,
+          unit: 'mmol/L',
+          status: 'Normal',
+          ref_low: 135,
+          ref_high: 145
+        },
+        series: [{ date: '2026-05-19', value: 140 }]
+      }]
+    }]
+  });
+
+  const info = root._host.querySelector('.bloods-info');
+  assert.ok(info, 'the instrument keeps the existing About control');
+  assert.match(info.getAttribute('aria-label'), /About Sodium/);
+  info.listeners.find(([type]) => type === 'click')[1]();
+  const drawer = root.querySelector('#bloods-explainer');
+  assert.equal(drawer.hidden, false);
+  assert.match(String(root.querySelector('#bloods-explainer-body').textContent), /Sodium/);
+  assert.equal(root._host.querySelectorAll('.bloods-instrument-marker').length, 0, 'one draw does not create a trend control');
+});
+
+test('the Bloods search filters biochemical instrument markers too', () => {
+  const marker = (key, label) => ({
+    ...alt,
+    key,
+    label,
+    statusTone: 'normal',
+    latest: {
+      date: '2026-05-19',
+      value: 10,
+      unit: 'mmol/L',
+      status: 'Normal',
+      ref_low: 0,
+      ref_high: 20
+    },
+    series: [{ date: '2026-05-19', value: 10 }]
+  });
+  const root = fakeRoot();
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: [{
+      id: 'Biochemistry/Electrolytes',
+      title: 'Biochemistry/Electrolytes',
+      collapsed: false,
+      markers: [
+        marker('sodium', 'Sodium'),
+        marker('copper', 'Copper')
+      ]
+    }]
+  });
+
+  root._search.value = 'sodium';
+  root._search.listeners.find(([type]) => type === 'input')[1]();
+  const sodium = root._host.querySelector('#bloods-marker-sodium');
+  const copper = root._host.querySelector('#bloods-marker-copper');
+  assert.equal(sodium.hidden, false);
+  assert.equal(copper.hidden, true);
+});
+
+test('filtering protein markers hides the aggregate band instead of showing unfiltered fractions', () => {
+  const protein = key => ({
+    ...alt,
+    key,
+    label: key === 'igg1' ? 'IgG1' : 'IgG2',
+    latest: {
+      date: '2026-05-19',
+      value: key === 'igg1' ? 6.5 : 5.4,
+      unit: 'g/L',
+      status: 'Normal',
+      ref_low: 1,
+      ref_high: 10
+    },
+    series: [{ date: '2026-05-19', value: key === 'igg1' ? 6.5 : 5.4 }]
+  });
+  const root = fakeRoot();
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: [{
+      id: 'Biochemistry/Electrolytes',
+      title: 'Biochemistry/Electrolytes',
+      collapsed: false,
+      markers: [protein('igg1'), protein('igg2')]
+    }]
+  });
+
+  root._search.value = 'igg1';
+  root._search.listeners.find(([type]) => type === 'input')[1]();
+  assert.equal(root._host.querySelector('.bloods-protein-band').hidden, true);
 });
 

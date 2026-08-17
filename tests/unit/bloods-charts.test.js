@@ -126,3 +126,33 @@ test('chart viewBoxes match the aspect ratio the stylesheet gives them, so nothi
     assert.match(css, new RegExp(`${selector}\\s*\\{[^}]*aspect-ratio:\\s*${ratio}`), selector);
   }
 });
+
+test('biochemistry instrument viewBoxes match their CSS geometry', () => {
+  const js = readFileSync(new URL('../../js/app/bloods-instruments.js', import.meta.url), 'utf8');
+  const read = name => Number(new RegExp(`(?:export )?const ${name} = (\\d+)`).exec(js)?.[1]);
+  const meterWidth = read('INSTRUMENT_METER_WIDTH');
+  const meterHeight = read('INSTRUMENT_METER_HEIGHT');
+  const tubeWidth = read('TUBE_WIDTH');
+  const tubeHeight = read('TUBE_HEIGHT');
+  const proteinWidth = read('PROTEIN_WIDTH');
+  const proteinHeight = read('PROTEIN_HEIGHT');
+  assert.ok(meterWidth && meterHeight && tubeWidth && tubeHeight && proteinWidth && proteinHeight);
+
+  const css = readFileSync(new URL('../../css/app.css', import.meta.url), 'utf8');
+  for (const [selector, ratio] of [
+    ['\\.bloods-instrument-meter\\s*', `${meterWidth} / ${meterHeight}`],
+    ['\\.bloods-tube\\s*', `${tubeWidth} / ${tubeHeight}`],
+    ['\\.bloods-protein-band\\s*', `${proteinWidth} / ${proteinHeight}`]
+  ]) {
+    assert.match(css, new RegExp(`${selector}\\{[^}]*aspect-ratio:\\s*${ratio}`), selector);
+  }
+
+  const control = css.match(/\.bloods-instrument-marker\s*\{[^}]+\}/);
+  assert.ok(control, 'expected a shared interactive marker rule');
+  assert.match(control[0], /min-height:\s*44px/);
+  assert.match(css, /\[data-bloods-marker\]\.is-highlight\s*\{/);
+
+  const instrumentCss = css.match(/\.bloods-instrument-groups\s*\{[\s\S]+?#body-bloods-dashboard \.line-chart\.bloods-combined-strip/);
+  assert.ok(instrumentCss, 'expected one bounded instrument CSS section');
+  assert.doesNotMatch(instrumentCss[0], /#[0-9a-f]{3,8}\b/i, 'instrument colours use design-kit tokens');
+});
