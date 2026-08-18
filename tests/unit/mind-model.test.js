@@ -5,7 +5,10 @@ import {
   diaryEntries,
   entriesByEnergy,
   entriesByMood,
+  MIND_RANGES,
+  moodRadialSeries,
   moodScoreSeries,
+  previousRangeWindow,
   recurringThemes,
   rangeWindow,
   sessionEntries,
@@ -81,10 +84,53 @@ test('recurringThemes exposes a human label beside the raw key', () => {
 });
 
 test('range helpers and empty themes', () => {
+  assert.deepEqual(MIND_RANGES, ['weekly', 'monthly', 'six_month', 'year']);
   assert.equal(rangeWindow('2026-08-05', 'weekly').days, 7);
+  assert.equal(rangeWindow('2026-08-18', 'year').from, '2026-01-01');
+  assert.equal(rangeWindow('2026-08-18', 'year').to, '2026-08-18');
   assert.deepEqual(recurringThemes([], rangeWindow('2026-08-05', 'weekly')), []);
   assert.equal(moodScoreSeries([], rangeWindow('2026-08-05', 'weekly')).length, 0);
   assert.equal(entriesByMood([], rangeWindow('2026-08-05', 'weekly')).every(item => item.value === 0), true);
+});
+
+test('moodRadialSeries keeps every diary day with energy, even across six months', () => {
+  const entries = [
+    { date: '2026-02-22', mood_score: 4, mood: 'low', energy: 'low' },
+    { date: '2026-03-14', mood_score: 7, mood: 'good', energy: 'medium' },
+    { date: '2026-08-13', mood_score: 4, mood: 'low', energy: 'low' },
+    { date: '2025-12-01', mood_score: 8, mood: 'great', energy: 'high' }
+  ];
+  const points = moodRadialSeries(entries, rangeWindow('2026-08-18', 'six_month'));
+  assert.equal(points.length, 3);
+  assert.equal(points[1].energy, 'medium');
+  assert.equal(points[1].value, 7);
+  const yearPoints = moodRadialSeries(entries, rangeWindow('2026-08-18', 'year'));
+  assert.equal(yearPoints.length, 3);
+  assert.equal(yearPoints[0].date, '2026-02-22');
+});
+
+test('previousRangeWindow is the same-length window immediately before the current one', () => {
+  assert.deepEqual(previousRangeWindow('2026-08-18', 'weekly'), {
+    from: '2026-08-05',
+    to: '2026-08-11',
+    days: 7
+  });
+  const year = previousRangeWindow('2026-08-18', 'year');
+  assert.equal(year.from, '2025-01-01');
+  assert.equal(year.to, '2025-08-18');
+});
+
+test('buildMindModel themes carry previous-window counts and mean mood', () => {
+  const events = [
+    { record: { type: 'diary', date: '2026-08-01', mood_score: 8, tags: ['work'] }, path: 'a', body: '' },
+    { record: { type: 'diary', date: '2026-08-10', mood_score: 8, tags: ['work'] }, path: 'b', body: '' },
+    { record: { type: 'diary', date: '2026-07-15', mood_score: 4, tags: ['work'] }, path: 'c', body: '' }
+  ];
+  const model = buildMindModel({ events, date: '2026-08-18', range: 'monthly' });
+  const work = model.themes.find(theme => theme.key === 'work');
+  assert.equal(work.value, 2);
+  assert.equal(work.prevValue, 1);
+  assert.equal(work.meanMood, 8);
 });
 
 test('sessionEntries maps mind_session records and ignores diary', () => {

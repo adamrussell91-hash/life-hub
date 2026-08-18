@@ -5,8 +5,10 @@ import { buildAreaLine } from './chart-kit/area-line.js';
 import { buildBumpLines } from './chart-kit/bump.js';
 import { buildChordLayout } from './chart-kit/chord-layout.js';
 import { buildHorizonBands } from './chart-kit/horizon.js';
+import { buildMoodRadial } from './chart-kit/mood-radial.js';
+import { buildMoodMixDonut } from './chart-kit/mood-mix.js';
+import { buildThemeOrbit, THEME_ARMS } from './chart-kit/theme-orbit.js';
 import { packMasonry } from './chart-kit/masonry.js';
-import { buildDistributionPie } from './chart-kit/pie.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
 import { buildSankeyFlow } from './chart-kit/sankey-flow.js';
 import { buildStreamPaths } from './chart-kit/stream.js';
@@ -113,10 +115,10 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConf
   renderTension(root, model);
 
   if (!model.empty) {
-    renderMoodChart(root, model.moodSeries);
-    renderMoodMix(root, model.byMood);
+    renderMoodChart(root, model.moodRadial ?? model.moodSeries, model.bounds, model.range);
+    renderMoodMix(root, model);
     renderEnergyRings(root, model);
-    renderThemeChips(root, model.themes);
+    renderThemeOrbit(root, model);
   }
   renderSilenceBanner(root, model);
   renderSessionList(root, model.sessions);
@@ -423,71 +425,300 @@ function paintLegend(root, host, items) {
   }
 }
 
-function renderMoodChart(root, series) {
-  const svg = root.querySelector('#mind-mood-chart');
-  if (!svg) return;
-  const area = svg.querySelector('[data-role="area"]');
-  const line = svg.querySelector('[data-role="line"]');
-  const dots = svg.querySelector('[data-role="dots"]');
-  dots?.replaceChildren?.();
-  if (!series.length) {
-    if (area) area.setAttribute('d', '');
-    if (line) line.setAttribute('d', '');
-    svg.classList?.remove?.('chart-animating', 'chart-static');
-    return;
-  }
-  const chart = buildAreaLine(series.map(point => ({ date: point.date, value: point.value })));
-  if (area) area.setAttribute('d', chart.areaPath || '');
-  if (line) line.setAttribute('d', chart.linePath || '');
-  if (dots) {
-    chart.points.forEach((point, index) => {
-      const source = series[index] ?? {};
-      const mood = source.mood && MOOD_TOKEN[source.mood] ? source.mood : null;
-      const dot = createSvg(root, 'circle');
-      dot.setAttribute('cx', String(point.x));
-      dot.setAttribute('cy', String(point.y));
-      dot.setAttribute('r', '3.5');
-      dot.setAttribute('class', 'mind-mood-dot');
-      if (mood) {
-        dot.setAttribute('data-mood', mood);
-        dot.setAttribute('fill', MOOD_TOKEN[mood]);
-      } else {
-        dot.setAttribute('fill', 'var(--mood-neutral)');
-      }
-      dot.style.animationDelay = `${Math.min(index * 25, 400)}ms`;
-      dots.append(dot);
-    });
-  }
-  animateAreaReveal(svg, quietMotion(root));
+const CHART_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatChartDay(dateKey) {
+  if (!isCalendarDate(dateKey)) return '';
+  const [, month, day] = dateKey.split('-');
+  return `${Number(day)} ${CHART_MONTHS[Number(month) - 1]}`;
 }
 
-function renderMoodMix(root, byMood) {
+function renderMoodChart(root, series, bounds, range) {
+  const svg = root.querySelector('#mind-mood-chart');
+  if (!svg) return;
+  const chart = buildMoodRadial(series, { bounds, range: range ?? 'monthly' });
+  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+  const nodes = [];
+
+  for (const tick of chart.angleTicks) {
+    const spoke = createSvg(root, 'line');
+    spoke.setAttribute('data-role', 'spoke');
+    spoke.setAttribute('x1', String(chart.cx));
+    spoke.setAttribute('y1', String(chart.cy));
+    spoke.setAttribute('x2', String(tick.x));
+    spoke.setAttribute('y2', String(tick.y));
+    nodes.push(spoke);
+  }
+
+  for (const ring of chart.rings) {
+    const grid = createSvg(root, 'circle');
+    grid.setAttribute('data-role', 'grid');
+    grid.setAttribute('cx', String(chart.cx));
+    grid.setAttribute('cy', String(chart.cy));
+    grid.setAttribute('r', String(ring.radius));
+    nodes.push(grid);
+    const label = createSvg(root, 'text');
+    label.setAttribute('data-role', 'grid-label');
+    label.setAttribute('x', String(chart.cx - ring.radius));
+    label.setAttribute('y', String(chart.cy - 4));
+    label.setAttribute('text-anchor', 'middle');
+    label.textContent = ring.label;
+    nodes.push(label);
+  }
+
+  for (const tick of chart.angleTicks) {
+    const label = createSvg(root, 'text');
+    label.setAttribute('data-role', 'angle-label');
+    label.setAttribute('x', String(tick.labelX));
+    label.setAttribute('y', String(tick.labelY + 4));
+    label.setAttribute('text-anchor', 'middle');
+    label.textContent = tick.label;
+    nodes.push(label);
+  }
+
+  if (chart.averageRadius != null) {
+    const average = createSvg(root, 'circle');
+    average.setAttribute('data-role', 'average');
+    average.setAttribute('cx', String(chart.cx));
+    average.setAttribute('cy', String(chart.cy));
+    average.setAttribute('r', String(chart.averageRadius));
+    const title = createSvg(root, 'title');
+    title.textContent = `Average ${chart.averageScore.toFixed(1)}/10`;
+    average.append(title);
+    nodes.push(average);
+  }
+
+  if (!chart.points.length) {
+    const empty = createSvg(root, 'text');
+    empty.setAttribute('data-role', 'empty');
+    empty.setAttribute('x', String(chart.cx));
+    empty.setAttribute('y', String(chart.cy));
+    empty.setAttribute('text-anchor', 'middle');
+    empty.textContent = 'No mood score logged in this range';
+    nodes.push(empty);
+    svg.replaceChildren(...nodes);
+    svg.classList?.remove?.('chart-animating', 'chart-static');
+    paintLegend(root, svg.parentNode, []);
+    return;
+  }
+
+  chart.points.forEach((point, index) => {
+    const mood = point.mood && MOOD_TOKEN[point.mood] ? point.mood : null;
+    const dot = createSvg(root, 'circle');
+    dot.setAttribute('data-role', 'point');
+    dot.setAttribute('cx', String(point.x));
+    dot.setAttribute('cy', String(point.y));
+    dot.setAttribute('r', String(point.r));
+    dot.setAttribute('class', 'mind-mood-dot');
+    dot.setAttribute('fill', mood ? MOOD_TOKEN[mood] : 'var(--mood-neutral)');
+    if (mood) dot.setAttribute('data-mood', mood);
+    dot.style.animationDelay = `${Math.min(index * 25, 400)}ms`;
+    const title = createSvg(root, 'title');
+    const energy = point.energy ? ` · ${point.energy} energy` : '';
+    title.textContent = `${formatChartDay(point.date)} — ${point.mood ?? 'score'} ${point.value}/10${energy}`;
+    dot.append(title);
+    nodes.push(dot);
+  });
+
+  svg.replaceChildren(...nodes);
+  animateAreaReveal(svg, quietMotion(root));
+
+  const seen = new Set();
+  const legend = [];
+  for (const mood of Object.keys(MOOD_TOKEN)) {
+    if (!chart.points.some(point => point.mood === mood) || seen.has(mood)) continue;
+    seen.add(mood);
+    legend.push({
+      label: mood[0].toUpperCase() + mood.slice(1),
+      swatch: MOOD_TOKEN[mood]
+    });
+  }
+  if (chart.averageScore != null) {
+    legend.push({ label: `Average ${chart.averageScore.toFixed(1)}/10` });
+  }
+  paintLegend(root, svg.parentNode, legend);
+}
+
+const MIX_RANGE_UNITS = {
+  weekly: 'diary entries this week',
+  monthly: 'diary entries this month',
+  six_month: 'diary entries over 6 months',
+  year: 'diary entries this year'
+};
+
+function setMoodMixCenter(root, segment, { sub } = {}) {
+  const count = root.querySelector('[data-mind="mood-mix-count"]');
+  const label = root.querySelector('[data-mind="mood-mix-label"]');
+  const subEl = root.querySelector('[data-mind="mood-mix-sub"]');
+  if (count) count.textContent = segment ? String(segment.value) : '—';
+  if (label) {
+    label.textContent = segment?.label ?? 'No mood entries yet';
+    if (segment?.colour) label.style?.setProperty?.('--label-color', segment.colour);
+    else label.style?.removeProperty?.('--label-color');
+  }
+  if (subEl) subEl.textContent = sub ?? '';
+}
+
+function hoverMoodMix(root, host, moodKey) {
+  const donut = host._moodMix;
+  if (!donut) return;
+  const hovered = moodKey
+    ? donut.segments.find(segment => segment.key === moodKey)
+    : null;
+  for (const node of host.querySelectorAll?.('[data-mood]') ?? []) {
+    const isHovered = moodKey && node.dataset.mood === moodKey;
+    const dim = Boolean(moodKey) && !isHovered;
+    if (node.tagName === 'CIRCLE' || node.getAttribute?.('data-role') === 'slice') {
+      node.style.opacity = dim ? '0.32' : '1';
+      if (node.tagName === 'CIRCLE' || node.getAttribute?.('r')) {
+        node.setAttribute('stroke-width', String(isHovered ? 30 : 26));
+      }
+    }
+    if (String(node.className || '').includes('mind-mood-mix__legend-row')) {
+      node.classList?.toggle?.('is-active', Boolean(isHovered));
+      if (isHovered && hovered?.colour) node.style?.setProperty?.('--row-wash', hovered.colour);
+      else node.style?.removeProperty?.('--row-wash');
+    }
+  }
+  if (hovered) {
+    setMoodMixCenter(root, hovered, { sub: `${hovered.pct}% of entries` });
+    return;
+  }
+  setMoodMixCenter(root, donut.dominant, {
+    sub: donut.dominant ? 'largest share' : ''
+  });
+}
+
+function bindMoodMixHover(root, host, node, moodKey) {
+  node.addEventListener('pointerenter', () => hoverMoodMix(root, host, moodKey));
+  node.addEventListener('pointerleave', () => hoverMoodMix(root, host, null));
+  node.addEventListener('focus', () => hoverMoodMix(root, host, moodKey));
+  node.addEventListener('blur', () => hoverMoodMix(root, host, null));
+}
+
+function renderMoodMix(root, model) {
   const host = root.querySelector('#mind-mood-mix');
   const slicesHost = root.querySelector('#mind-mood-pie [data-role="slices"]')
     ?? root.querySelector('#mind-mood-pie')?.querySelector?.('[data-role="slices"]');
-  const label = root.querySelector('[data-mind="mood-mix-label"]');
   if (!host && !slicesHost) return;
-  slicesHost?.replaceChildren?.();
-  const items = (byMood ?? []).map(item => ({
+
+  const items = (model.byMood ?? []).map(item => ({
     ...item,
     colour: MOOD_TOKEN[item.key] ?? 'var(--mood-neutral)'
   }));
-  const pie = buildDistributionPie(items);
-  if (pie.empty) {
-    if (label) label.textContent = 'No mood entries yet';
+  const donut = buildMoodMixDonut(items);
+  host._moodMix = donut;
+  slicesHost?.replaceChildren?.();
+  const legend = root.querySelector('[data-role="mood-mix-legend"]');
+  legend?.replaceChildren?.();
+  const tableBody = root.querySelector('[data-role="mood-mix-table-body"]');
+  tableBody?.replaceChildren?.();
+  const total = root.querySelector('[data-mind="mood-mix-total"]');
+  if (total) total.textContent = String(donut.total);
+  const unit = root.querySelector('[data-mind="mood-mix-unit"]');
+  if (unit) unit.textContent = MIX_RANGE_UNITS[model.range] ?? 'diary entries in this range';
+
+  if (donut.empty) {
+    setMoodMixCenter(root, null);
     return;
   }
-  pie.slices.forEach((slice, index) => {
-    const path = createSvg(root, 'path');
-    path.setAttribute('d', slice.path);
-    path.setAttribute('fill', slice.colour);
-    path.setAttribute('class', 'mind-pie-slice');
-    path.setAttribute('data-mood', slice.key);
-    path.style.animationDelay = `${index * 40}ms`;
-    slicesHost?.append(path);
+
+  setMoodMixCenter(root, donut.dominant, { sub: 'largest share' });
+  const quiet = Boolean(root.querySelector('#mind-dashboard')?._quiet);
+
+  donut.segments.forEach((segment, index) => {
+    if (segment.visible > 0 && slicesHost) {
+      const circle = createSvg(root, 'circle');
+      circle.setAttribute('data-role', 'slice');
+      circle.setAttribute('class', 'mind-mood-mix__seg mind-pie-slice');
+      circle.setAttribute('cx', String(donut.center));
+      circle.setAttribute('cy', String(donut.center));
+      circle.setAttribute('r', String(donut.radius));
+      circle.setAttribute('fill', 'none');
+      circle.setAttribute('stroke', segment.colour);
+      circle.setAttribute('stroke-width', '26');
+      circle.setAttribute('stroke-linecap', 'round');
+      circle.setAttribute('stroke-dasharray', segment.dasharray);
+      circle.setAttribute('stroke-dashoffset', String(segment.dashoffset));
+      circle.setAttribute('data-mood', segment.key);
+      circle.setAttribute('tabindex', '0');
+      circle.setAttribute('aria-label', `${segment.label}, ${segment.value} entries, ${segment.pct}%`);
+      const title = createSvg(root, 'title');
+      title.textContent = `${segment.label} — ${segment.value} (${segment.pct}%)`;
+      circle.append(title);
+      if (!quiet) circle.style.animationDelay = `${index * 40}ms`;
+      bindMoodMixHover(root, host, circle, segment.key);
+      slicesHost.append(circle);
+    }
+
+    if (legend) {
+      const row = root.createElement('li');
+      row.className = 'mind-mood-mix__legend-row';
+      row.dataset.mood = segment.key;
+      row.tabIndex = 0;
+      const swatch = root.createElement('span');
+      swatch.className = 'mind-mood-mix__swatch';
+      swatch.style.background = segment.colour;
+      swatch.setAttribute('aria-hidden', 'true');
+      const info = root.createElement('span');
+      info.className = 'mind-mood-mix__info';
+      const row1 = root.createElement('span');
+      row1.className = 'mind-mood-mix__row1';
+      const name = root.createElement('span');
+      name.className = 'mind-mood-mix__name';
+      name.textContent = segment.label;
+      const pct = root.createElement('span');
+      pct.className = 'mind-mood-mix__pct';
+      pct.textContent = `${segment.pct}%`;
+      row1.append(name, pct);
+      const track = root.createElement('span');
+      track.className = 'mind-mood-mix__bar-track';
+      const fill = root.createElement('span');
+      fill.className = 'mind-mood-mix__bar-fill';
+      fill.style.background = segment.colour;
+      fill.style.width = quiet ? `${segment.pct}%` : '0%';
+      track.append(fill);
+      info.append(row1, track);
+      row.append(swatch, info);
+      bindMoodMixHover(root, host, row, segment.key);
+      legend.append(row);
+      if (!quiet) {
+        void fill.getBoundingClientRect?.();
+        fill.style.width = `${segment.pct}%`;
+      }
+    }
+
+    if (tableBody) {
+      const tr = root.createElement('tr');
+      const th = root.createElement('th');
+      th.scope = 'row';
+      const dot = root.createElement('span');
+      dot.className = 'mind-mood-mix__dot';
+      dot.style.background = segment.colour;
+      dot.setAttribute('aria-hidden', 'true');
+      const moodName = root.createElement('span');
+      moodName.textContent = segment.label;
+      th.append(dot, moodName);
+      const tdCount = root.createElement('td');
+      tdCount.textContent = String(segment.value);
+      const tdPct = root.createElement('td');
+      tdPct.textContent = `${segment.pct}%`;
+      tr.append(th, tdCount, tdPct);
+      tableBody.append(tr);
+    }
   });
-  const dominant = pie.slices.reduce((best, slice) => slice.value > best.value ? slice : best);
-  if (label) label.textContent = `${dominant.label} · ${pie.total}`;
+
+  const toggle = root.querySelector('[data-mind="mood-mix-table-toggle"]');
+  const table = root.querySelector('[data-role="mood-mix-table"]');
+  if (toggle && table && !toggle.dataset.bound) {
+    toggle.dataset.bound = '1';
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      toggle.textContent = expanded ? 'View as table' : 'Hide table';
+      table.hidden = expanded;
+    });
+  }
 }
 
 function renderEnergyRings(root, model) {
@@ -534,31 +765,310 @@ function paintChartOrEmpty(root, host, svg, { need, have, unit }) {
   return false;
 }
 
-function renderThemeChips(root, themes) {
+const THEME_RANGE_UNITS = {
+  weekly: 'themes charted this week',
+  monthly: 'themes charted this month',
+  six_month: 'themes charted over 6 months',
+  year: 'themes charted this year'
+};
+
+const THEME_PERIOD = {
+  weekly: 'week',
+  monthly: 'month',
+  six_month: '6 months',
+  year: 'year'
+};
+
+function setThemeOrbitFocus(host, chart, themeKey) {
+  for (const node of host.querySelectorAll?.('[data-theme], [data-arm]') ?? []) {
+    const isStar = node.dataset?.theme;
+    const isArm = node.dataset?.arm;
+    if (isStar) {
+      const on = !themeKey || node.dataset.theme === themeKey;
+      node.classList?.toggle?.('is-active', Boolean(themeKey) && on);
+      node.classList?.toggle?.('is-dim', Boolean(themeKey) && !on);
+    }
+    if (isArm) {
+      const star = chart.stars.find(item => item.key === themeKey);
+      node.classList?.toggle?.('is-dim', Boolean(themeKey) && star?.arm !== node.dataset.arm);
+    }
+  }
+  const caption = host.querySelector('[data-mind="themes-hover"]');
+  if (!caption) return;
+  const star = themeKey ? chart.stars.find(item => item.key === themeKey) : null;
+  if (!star) {
+    caption.textContent = '';
+    caption.hidden = true;
+    return;
+  }
+  const delta = star.delta >= 0 ? `+${star.delta}` : String(star.delta);
+  caption.hidden = false;
+  caption.textContent = `${star.label} · ${star.value} mentions · ${delta} vs last period · ${star.armLabel}`;
+}
+
+function renderThemeOrbit(root, model) {
   const host = root.querySelector('#mind-themes');
   if (!host) return;
   host.replaceChildren();
-  if (!themes?.length) {
+  const themes = model.themes ?? [];
+  if (!themes.length) {
     const caption = root.createElement('p');
     caption.className = 'metric-caption';
     caption.textContent = 'No recurring themes in this range yet.';
     host.append(caption);
     return;
   }
-  const caption = root.createElement('p');
-  caption.className = 'metric-caption';
-  caption.textContent = `${themes.length} in this range`;
-  host.append(caption);
-  themes.forEach((theme, index) => {
-    const chip = root.createElement('span');
-    chip.className = 'mind-theme-chip';
-    chip.style.animationDelay = root.querySelector('#mind-dashboard')?._quiet
-      ? '0ms'
-      : `${Math.min(index, 5) * 40}ms`;
-    if (index >= 6) chip.classList.add('mind-theme-chip--group');
-    chip.textContent = theme.label;
-    host.append(chip);
+
+  const chart = buildThemeOrbit(themes);
+  const quiet = Boolean(root.querySelector('#mind-dashboard')?._quiet);
+  const stage = root.createElement('div');
+  stage.className = 'mind-theme-orbit__stage';
+
+  const svg = createSvg(root, 'svg');
+  svg.id = 'mind-theme-orbit';
+  svg.setAttribute('class', 'mind-theme-orbit__svg');
+  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', 'Constellation of recurring themes. Closer to the centre and larger means mentioned more.');
+
+  const defs = createSvg(root, 'defs');
+  const glow = createSvg(root, 'filter');
+  glow.id = 'mind-theme-glow';
+  glow.setAttribute('x', '-80%');
+  glow.setAttribute('y', '-80%');
+  glow.setAttribute('width', '260%');
+  glow.setAttribute('height', '260%');
+  const blur = createSvg(root, 'feGaussianBlur');
+  blur.setAttribute('stdDeviation', '3.2');
+  blur.setAttribute('result', 'blur');
+  const merge = createSvg(root, 'feMerge');
+  const blurNode = createSvg(root, 'feMergeNode');
+  blurNode.setAttribute('in', 'blur');
+  const sourceNode = createSvg(root, 'feMergeNode');
+  sourceNode.setAttribute('in', 'SourceGraphic');
+  merge.append(blurNode, sourceNode);
+  glow.append(blur, merge);
+  const coreGrad = createSvg(root, 'radialGradient');
+  coreGrad.id = 'mind-theme-core';
+  coreGrad.setAttribute('cx', '50%');
+  coreGrad.setAttribute('cy', '50%');
+  coreGrad.setAttribute('r', '50%');
+  const stop0 = createSvg(root, 'stop');
+  stop0.setAttribute('offset', '0%');
+  stop0.setAttribute('stop-color', 'var(--warm-white)');
+  stop0.setAttribute('stop-opacity', '0.95');
+  const stop1 = createSvg(root, 'stop');
+  stop1.setAttribute('offset', '45%');
+  stop1.setAttribute('stop-color', 'var(--wave)');
+  stop1.setAttribute('stop-opacity', '0.35');
+  const stop2 = createSvg(root, 'stop');
+  stop2.setAttribute('offset', '100%');
+  stop2.setAttribute('stop-color', 'var(--wave)');
+  stop2.setAttribute('stop-opacity', '0');
+  coreGrad.append(stop0, stop1, stop2);
+  defs.append(glow, coreGrad);
+  svg.append(defs);
+
+  for (const radius of chart.rings) {
+    const ring = createSvg(root, 'circle');
+    ring.setAttribute('class', 'mind-theme-orbit__ring');
+    ring.setAttribute('cx', String(chart.cx));
+    ring.setAttribute('cy', String(chart.cy));
+    ring.setAttribute('r', String(radius));
+    svg.append(ring);
+  }
+
+  const core = createSvg(root, 'circle');
+  core.setAttribute('class', 'mind-theme-orbit__core-glow');
+  core.setAttribute('cx', String(chart.cx));
+  core.setAttribute('cy', String(chart.cy));
+  core.setAttribute('r', '46');
+  core.setAttribute('fill', 'url(#mind-theme-core)');
+  svg.append(core);
+
+  for (const arm of chart.arms) {
+    const armGroup = createSvg(root, 'g');
+    armGroup.setAttribute('class', 'mind-theme-orbit__arm');
+    armGroup.dataset.arm = arm.key;
+    const rot = createSvg(root, 'g');
+    if (quiet) {
+      rot.setAttribute('transform', `rotate(${arm.staticRotate} ${chart.cx} ${chart.cy})`);
+    } else {
+      const spin = createSvg(root, 'animateTransform');
+      spin.setAttribute('attributeName', 'transform');
+      spin.setAttribute('type', 'rotate');
+      spin.setAttribute('from', `${arm.staticRotate} ${chart.cx} ${chart.cy}`);
+      spin.setAttribute('to', `${arm.staticRotate + 360} ${chart.cx} ${chart.cy}`);
+      spin.setAttribute('dur', arm.period);
+      spin.setAttribute('repeatCount', 'indefinite');
+      rot.append(spin);
+    }
+    const path = createSvg(root, 'path');
+    path.setAttribute('class', 'mind-theme-orbit__arm-line');
+    path.setAttribute('d', arm.d);
+    path.setAttribute('stroke', arm.colour);
+    rot.append(path);
+
+    for (const star of chart.stars.filter(item => item.arm === arm.key)) {
+      const group = createSvg(root, 'g');
+      group.setAttribute('class', `mind-theme-orbit__star${star.rising ? ' is-rising' : ''}${star.falling ? ' is-falling' : ''}`);
+      group.dataset.theme = star.key;
+      group.setAttribute('tabindex', '0');
+      group.setAttribute('role', 'img');
+      group.setAttribute('aria-label', `${star.label}, ${star.armLabel}, ${star.value} mentions`);
+      const pulse = createSvg(root, 'circle');
+      pulse.setAttribute('class', 'mind-theme-orbit__pulse');
+      pulse.setAttribute('cx', String(star.x));
+      pulse.setAttribute('cy', String(star.y));
+      pulse.setAttribute('r', String(star.r + 4));
+      pulse.setAttribute('stroke', star.colour);
+      const dot = createSvg(root, 'circle');
+      dot.setAttribute('class', 'mind-theme-orbit__core');
+      dot.setAttribute('cx', String(star.x));
+      dot.setAttribute('cy', String(star.y));
+      dot.setAttribute('r', String(star.r));
+      dot.setAttribute('fill', star.colour);
+      dot.setAttribute('filter', 'url(#mind-theme-glow)');
+      const hit = createSvg(root, 'circle');
+      hit.setAttribute('class', 'mind-theme-orbit__hit');
+      hit.setAttribute('cx', String(star.x));
+      hit.setAttribute('cy', String(star.y));
+      hit.setAttribute('r', '16');
+      const title = createSvg(root, 'title');
+      title.textContent = star.label;
+      group.append(title, pulse, dot, hit);
+      rot.append(group);
+    }
+    armGroup.append(rot);
+    svg.append(armGroup);
+  }
+
+  const coreLabel = root.createElement('div');
+  coreLabel.className = 'mind-theme-orbit__core-label';
+  const rangeName = root.createElement('span');
+  rangeName.dataset.mind = 'themes-range';
+  rangeName.textContent = model.rangeLabel ?? '';
+  const total = root.createElement('span');
+  total.dataset.mind = 'themes-total';
+  total.textContent = String(chart.total);
+  coreLabel.append(rangeName, total);
+  stage.append(svg, coreLabel);
+
+  const legend = root.createElement('ul');
+  legend.className = 'mind-theme-orbit__legend';
+  for (const arm of THEME_ARMS) {
+    const item = root.createElement('li');
+    const swatch = root.createElement('i');
+    swatch.setAttribute('aria-hidden', 'true');
+    swatch.style.background = arm.colour;
+    const name = root.createElement('span');
+    name.textContent = arm.label;
+    item.append(swatch, name);
+    legend.append(item);
+  }
+
+  const note = root.createElement('p');
+  note.className = 'mind-tile__legend';
+  note.textContent = 'Closer to the centre and larger — mentioned more. A pulse means it’s rising; a dimmer star is fading.';
+
+  const hover = root.createElement('p');
+  hover.className = 'metric-caption';
+  hover.dataset.mind = 'themes-hover';
+  hover.hidden = true;
+
+  const narrative = root.createElement('p');
+  narrative.className = 'metric-caption';
+  narrative.dataset.mind = 'themes-narrative';
+  if (chart.top) {
+    const trendWord = chart.top.rising ? 'still climbing' : chart.top.falling ? 'easing off' : 'holding steady';
+    narrative.textContent = `This ${THEME_PERIOD[model.range] ?? 'range'}, ${chart.top.label} pulls hardest — ${chart.top.value} mentions, ${trendWord}.`;
+  }
+
+  const foot = root.createElement('div');
+  foot.className = 'mind-theme-orbit__foot';
+  const countLine = root.createElement('p');
+  countLine.className = 'metric-caption';
+  const strong = root.createElement('strong');
+  strong.textContent = String(chart.stars.length);
+  const unit = root.createElement('span');
+  unit.textContent = ` ${THEME_RANGE_UNITS[model.range] ?? 'themes in this range'}`;
+  countLine.append(strong, unit);
+  const toggle = root.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'mind-theme-orbit__table-toggle';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.textContent = 'View as data';
+  foot.append(countLine, toggle);
+
+  const tableWrap = root.createElement('div');
+  tableWrap.className = 'mind-theme-orbit__table';
+  tableWrap.hidden = true;
+  const table = root.createElement('table');
+  const caption = root.createElement('caption');
+  caption.className = 'visually-hidden';
+  caption.textContent = 'Recurring themes, exact counts for this range';
+  const thead = root.createElement('thead');
+  const headRow = root.createElement('tr');
+  for (const heading of ['Theme', 'Category', 'Mentions', 'Vs. last period']) {
+    const th = root.createElement('th');
+    th.scope = 'col';
+    th.textContent = heading;
+    headRow.append(th);
+  }
+  thead.append(headRow);
+  const tbody = root.createElement('tbody');
+  for (const star of chart.stars.slice().sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))) {
+    const tr = root.createElement('tr');
+    const th = root.createElement('th');
+    th.scope = 'row';
+    th.textContent = star.label;
+    const tdArm = root.createElement('td');
+    tdArm.textContent = star.armLabel;
+    const tdCount = root.createElement('td');
+    tdCount.textContent = String(star.value);
+    const tdDelta = root.createElement('td');
+    tdDelta.textContent = star.delta >= 0 ? `+${star.delta}` : String(star.delta);
+    tr.append(th, tdArm, tdCount, tdDelta);
+    tbody.append(tr);
+  }
+  table.append(caption, thead, tbody);
+  tableWrap.append(table);
+
+  toggle.addEventListener('click', event => {
+    event.stopPropagation();
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!expanded));
+    toggle.textContent = expanded ? 'View as data' : 'Hide data';
+    tableWrap.hidden = expanded;
   });
+
+  host.append(narrative, stage, legend, note, hover, foot, tableWrap);
+
+  for (const group of svg.querySelectorAll?.('[data-theme]') ?? []) {
+    const key = group.dataset.theme;
+    group.addEventListener('pointerenter', () => {
+      svg.pauseAnimations?.();
+      setThemeOrbitFocus(host, chart, key);
+    });
+    group.addEventListener('pointerleave', () => {
+      if (!quiet) svg.unpauseAnimations?.();
+      setThemeOrbitFocus(host, chart, null);
+    });
+    group.addEventListener('focus', () => setThemeOrbitFocus(host, chart, key));
+    group.addEventListener('blur', () => setThemeOrbitFocus(host, chart, null));
+    group.addEventListener('click', () => {
+      openMindThreadSheet(root, {
+        title: displayThemeLabel(key),
+        rows: themeRows(model, key),
+        continueAgent: 'vera',
+        onContinue: slug => root.querySelector('#mind-dashboard')?._onOpenAgent?.(slug),
+        anchor: group
+      });
+    });
+    group.addEventListener('keydown', event => {
+      if (event.key === 'Enter') group.dispatchEvent?.(new Event('click'));
+    });
+  }
 }
 
 function renderSilenceBanner(root, model) {
