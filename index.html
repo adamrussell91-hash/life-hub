@@ -629,37 +629,51 @@
             <button type="button" data-mind-range="weekly" aria-pressed="false">Weekly</button>
             <button type="button" data-mind-range="monthly" class="is-active" aria-pressed="true">Monthly</button>
             <button type="button" data-mind-range="six_month" aria-pressed="false">6M</button>
+            <button type="button" data-mind-range="year" aria-pressed="false">Year</button>
           </div>
           <p class="metric-caption" data-mind="ambient" hidden></p>
           <p id="mind-empty" class="metric-caption" hidden>No diary entries in this range yet — open Chat to log one with Penelope.</p>
 
           <div id="mind-board" class="mind-board">
-          <div id="mind-hero" class="hero-grid">
-            <article class="metric-card chart-card" aria-labelledby="mind-mood-arc-label">
-              <p class="mind-tile__question">How has mood moved?</p>
-              <p class="metric-label" id="mind-mood-arc-label">Mood arc</p>
-              <svg id="mind-mood-chart" class="line-chart body-chart" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mood score over time">
-                <defs>
-                  <linearGradient id="mind-mood-stroke" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="var(--wave)"></stop>
-                    <stop offset="55%" stop-color="var(--mood-neutral)"></stop>
-                    <stop offset="100%" stop-color="var(--mood-bad)"></stop>
-                  </linearGradient>
-                </defs>
-                <path data-role="area" d=""></path>
-                <path data-role="line" d=""></path>
-                <g data-role="dots"></g>
-              </svg>
-            </article>
+          <article class="metric-card chart-card mind-mood-radial-card" aria-labelledby="mind-mood-radial-label">
+            <p class="mind-tile__question">How has mood moved?</p>
+            <p class="metric-label" id="mind-mood-radial-label">Mood radial</p>
+            <p class="mind-tile__legend">Closer to centre is better. Bubble size is energy.</p>
+            <svg id="mind-mood-chart" class="mind-mood-chart" viewBox="0 0 592 592" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mood score around the selected range. Closer to the centre is better. Bubble size is energy."></svg>
+          </article>
 
-            <article class="metric-card" aria-labelledby="mind-mood-mix-label">
+          <div id="mind-hero" class="hero-grid mind-hero--support">
+            <article class="metric-card" aria-labelledby="mind-mood-mix-heading">
               <p class="mind-tile__question">What’s the mix?</p>
-              <p class="metric-label" id="mind-mood-mix-label">Mood mix</p>
+              <p class="metric-label" id="mind-mood-mix-heading">Mood mix</p>
               <div id="mind-mood-mix" class="mind-mood-mix">
-                <svg id="mind-mood-pie" class="mind-mood-pie" viewBox="0 0 72 72" role="img" aria-label="Diary entries by mood">
-                  <g data-role="slices"></g>
-                </svg>
-                <p class="metric-value" data-mind="mood-mix-label">—</p>
+                <div class="mind-mood-mix__row">
+                  <div class="mind-mood-mix__donut">
+                    <svg id="mind-mood-pie" class="mind-mood-pie" viewBox="0 0 218 218" role="img" aria-label="Diary entries by mood">
+                      <circle data-role="track" class="mind-mood-mix__track" cx="109" cy="109" r="90" fill="none"></circle>
+                      <g data-role="slices" transform="rotate(-90 109 109)"></g>
+                    </svg>
+                    <div class="mind-mood-mix__center">
+                      <p class="mind-mood-mix__value" data-mind="mood-mix-count">—</p>
+                      <p class="mind-mood-mix__name" data-mind="mood-mix-label">—</p>
+                      <p class="mind-mood-mix__sub" data-mind="mood-mix-sub"></p>
+                    </div>
+                  </div>
+                  <ul class="mind-mood-mix__legend" data-role="mood-mix-legend"></ul>
+                </div>
+                <div class="mind-mood-mix__foot">
+                  <p class="metric-caption"><strong data-mind="mood-mix-total">0</strong> <span data-mind="mood-mix-unit">diary entries in this range</span></p>
+                  <button type="button" class="mind-mood-mix__table-toggle" data-mind="mood-mix-table-toggle" aria-expanded="false">View as table</button>
+                </div>
+                <div class="mind-mood-mix__table" data-role="mood-mix-table" hidden>
+                  <table>
+                    <caption class="visually-hidden">Mood mix, exact counts for this range</caption>
+                    <thead>
+                      <tr><th scope="col">Mood</th><th scope="col">Entries</th><th scope="col">Share</th></tr>
+                    </thead>
+                    <tbody data-role="mood-mix-table-body"></tbody>
+                  </table>
+                </div>
               </div>
             </article>
 
@@ -696,7 +710,7 @@
           <article id="mind-tile-themes" class="metric-card mind-tile" aria-labelledby="mind-themes-label">
             <p class="mind-tile__question">What keeps coming back?</p>
             <p class="metric-label" id="mind-themes-label">Recurring themes</p>
-            <div id="mind-themes" class="mind-theme-chips" aria-label="Recurring diary tags"></div>
+            <div id="mind-themes" class="mind-theme-orbit" aria-label="Recurring diary tags"></div>
           </article>
 
           <div id="mind-silence" class="mind-silence" hidden aria-live="polite"></div>

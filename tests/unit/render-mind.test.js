@@ -130,23 +130,33 @@ function fakeRoot() {
   ambient.dataset.mind = 'ambient';
   const moodChart = el('svg');
   moodChart.id = 'mind-mood-chart';
-  const area = el('path');
-  area.dataset.role = 'area';
-  const line = el('path');
-  line.dataset.role = 'line';
-  const dots = el('g');
-  dots.dataset.role = 'dots';
-  moodChart.append(area, line, dots);
   const slices = el('g');
   slices.dataset.role = 'slices';
   const pie = el('svg');
   pie.id = 'mind-mood-pie';
   pie.append(slices);
-  const mix = el('div');
-  mix.id = 'mind-mood-mix';
-  mix.append(pie);
+  const mixLegend = el('ul');
+  mixLegend.dataset.role = 'mood-mix-legend';
+  const mixCount = el('p');
+  mixCount.dataset.mind = 'mood-mix-count';
   const mixLabel = el('p');
   mixLabel.dataset.mind = 'mood-mix-label';
+  const mixSub = el('p');
+  mixSub.dataset.mind = 'mood-mix-sub';
+  const mixTotal = el('strong');
+  mixTotal.dataset.mind = 'mood-mix-total';
+  const mixTableToggle = el('button');
+  mixTableToggle.dataset.mind = 'mood-mix-table-toggle';
+  mixTableToggle.setAttribute('aria-expanded', 'false');
+  const mixTable = el('div');
+  mixTable.dataset.role = 'mood-mix-table';
+  mixTable.hidden = true;
+  const mixTableBody = el('tbody');
+  mixTableBody.dataset.role = 'mood-mix-table-body';
+  mixTable.append(mixTableBody);
+  const mix = el('div');
+  mix.id = 'mind-mood-mix';
+  mix.append(pie, mixLegend, mixCount, mixLabel, mixSub, mixTotal, mixTableToggle, mixTable);
   const energy = el('div');
   energy.id = 'mind-energy-rings';
   const high = ringSvg('high');
@@ -257,7 +267,14 @@ function fakeRoot() {
     '#mind-mood-mix': mix,
     '#mind-mood-pie': pie,
     '#mind-mood-pie [data-role="slices"]': slices,
+    '[data-role="mood-mix-legend"]': mixLegend,
+    '[data-mind="mood-mix-count"]': mixCount,
     '[data-mind="mood-mix-label"]': mixLabel,
+    '[data-mind="mood-mix-sub"]': mixSub,
+    '[data-mind="mood-mix-total"]': mixTotal,
+    '[data-mind="mood-mix-table-toggle"]': mixTableToggle,
+    '[data-role="mood-mix-table"]': mixTable,
+    '[data-role="mood-mix-table-body"]': mixTableBody,
     '#mind-energy-rings': energy,
     '[data-mind="energy-empty"]': energyEmpty,
     '[data-mind-energy-ring="high"]': high,
@@ -321,8 +338,13 @@ function fakeRoot() {
     _cross: cross,
     _themes: themes,
     _hero: hero,
-    _dots: dots,
-    _mixLabel: mixLabel
+    _moodChart: moodChart,
+    _mixLabel: mixLabel,
+    _mixLegend: mixLegend,
+    _mixCount: mixCount,
+    _mixSub: mixSub,
+    _mixTotal: mixTotal,
+    _mixTableBody: mixTableBody
   };
 }
 
@@ -426,8 +448,13 @@ test('renderMind renders energy rings, session mood-shift, insights, and silence
   assert.match(root._themes.textContent, /school/);
   assert.doesNotMatch(root._themes.textContent, /school · 2/);
   assert.match(root._mixLabel.textContent, /Good/);
-  assert.equal(root._dots.children.length, 2);
-  assert.equal(root._dots.children[0].dataset.mood, 'low');
+  assert.equal(root._mixCount.textContent, '1');
+  assert.match(root._mixSub.textContent, /largest share/);
+  assert.equal(root._mixTotal.textContent, '2');
+  assert.equal(root._mixLegend.children.length, 5);
+  const moodPoints = root._moodChart.querySelectorAll('[data-role="point"]');
+  assert.equal(moodPoints.length, 2);
+  assert.equal(moodPoints[0].dataset.mood, 'low');
 });
 
 test('renderMind hides hero in the empty state and does not require launchers', () => {
@@ -581,4 +608,7 @@ test('index.html Mind board has no Talk launchers or cadence heatmap', async () 
   assert.doesNotMatch(mind, /id="mind-heatmap-diary"/);
   assert.match(mind, /id="mind-themes"/);
   assert.match(mind, /id="mind-tile-streak"/);
+  assert.match(mind, /data-mind-range="year"/);
+  assert.match(mind, /id="mind-mood-radial-label"/);
+  assert.match(mind, /viewBox="0 0 592 592"/);
 });

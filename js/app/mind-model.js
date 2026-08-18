@@ -3,7 +3,7 @@ import { extractCrossAgentCoordination } from '../core/constraints.js';
 import { parseGovernanceEntries } from '../core/governance-log.js';
 import { addCalendarDays, daysBetween, getSydneyWeekStart, isCalendarDate } from '../core/time.js';
 
-export const MIND_RANGES = ['weekly', 'monthly', 'six_month'];
+export const MIND_RANGES = ['weekly', 'monthly', 'six_month', 'year'];
 export const DEFAULT_MIND_RANGE = 'monthly';
 export const DEFAULT_MIND_WATCHLIST = ['should', 'just', 'fine', 'unfulfilled', 'flake'];
 
@@ -11,6 +11,13 @@ const RANGE_DAYS = {
   weekly: 7,
   monthly: 30,
   six_month: 182
+};
+
+const RANGE_LABELS = {
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  six_month: '6M',
+  year: 'Year'
 };
 
 export const MOOD_ORDER = ['great', 'good', 'neutral', 'low', 'bad'];
@@ -26,8 +33,29 @@ export function moodDelta(open, close) {
 export function rangeWindow(date, range) {
   if (!isCalendarDate(date)) throw new TypeError(`Invalid calendar date: ${date}`);
   if (!MIND_RANGES.includes(range)) throw new TypeError(`Unknown mind range: ${range}`);
+  if (range === 'year') {
+    const from = `${date.slice(0, 4)}-01-01`;
+    return { from, to: date, days: daysBetween(from, date) + 1 };
+  }
   const days = RANGE_DAYS[range];
   return { from: addCalendarDays(date, -(days - 1)), to: date, days };
+}
+
+export function previousRangeWindow(date, range) {
+  const current = rangeWindow(date, range);
+  if (range === 'year') {
+    const year = Number(current.from.slice(0, 4)) - 1;
+    const from = `${year}-01-01`;
+    let to = `${year}${current.to.slice(4)}`;
+    if (!isCalendarDate(to)) {
+      const month = Number(current.to.slice(5, 7));
+      const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      to = `${year}-${String(month).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+    }
+    return { from, to, days: daysBetween(from, to) + 1 };
+  }
+  const to = addCalendarDays(current.from, -1);
+  return { from: addCalendarDays(to, -(current.days - 1)), to, days: current.days };
 }
 
 export function diaryEntries(events) {
@@ -319,17 +347,32 @@ export function mindCrossAgentLines(centralNodeMarkdown) {
     .filter(line => line && CROSS_AGENT_MARKERS.some(marker => line.includes(marker)));
 }
 
+export function moodRadialSeries(entries, bounds) {
+  return entries
+    .filter(entry => (
+      entry.date >= bounds.from
+      && entry.date <= bounds.to
+      && entry.mood_score != null
+    ))
+    .map(entry => ({
+      date: entry.date,
+      value: entry.mood_score,
+      mood: entry.mood ?? null,
+      energy: entry.energy ?? null
+    }));
+}
+
 export function moodScoreSeries(entries, bounds) {
   const inRange = entries.filter(entry => (
     entry.date >= bounds.from
     && entry.date <= bounds.to
     && entry.mood_score != null
   ));
-  const points = inRange.map(entry => ({ date: entry.date, value: entry.mood_score }));
+  const points = inRange.map(entry => ({ date: entry.date, value: entry.mood_score, mood: entry.mood }));
   if (bounds.days > 90 && points.length) {
     return downsampleWeekly(points, 'value')
       .filter(point => point.value != null)
-      .map(point => ({ date: point.date, value: point.value }));
+      .map(point => ({ date: point.date, value: point.value, mood: null }));
   }
   return points;
 }
@@ -621,9 +664,20 @@ export function buildMindModel({
   const entries = diaryEntries(events);
   const inRangeEntries = entries.filter(entry => entry.date >= bounds.from && entry.date <= bounds.to);
   const moodSeries = moodScoreSeries(entries, bounds);
+  const moodRadial = moodRadialSeries(entries, bounds);
   const byMood = entriesByMood(entries, bounds);
-  const themes = recurringThemes(entries, bounds);
   const allSessions = sessionEntries(events);
+  const nodes = themeNodes(entries, allSessions, bounds);
+  const meanByKey = new Map(nodes.map(node => [node.key, node.meanMood]));
+  const prevCounts = new Map(
+    recurringThemes(entries, previousRangeWindow(date, selectedRange), { limit: 50 })
+      .map(theme => [theme.key, theme.value])
+  );
+  const themes = recurringThemes(entries, bounds).map(theme => ({
+    ...theme,
+    prevValue: prevCounts.get(theme.key) ?? 0,
+    meanMood: meanByKey.get(theme.key) ?? null
+  }));
   const sessions = allSessions
     .filter(session => session.date >= bounds.from && session.date <= bounds.to)
     .slice()
@@ -672,9 +726,11 @@ export function buildMindModel({
   return {
     date,
     range: selectedRange,
-    rangeLabel: selectedRange === 'weekly' ? 'Weekly' : selectedRange === 'monthly' ? 'Monthly' : '6M',
+    rangeLabel: RANGE_LABELS[selectedRange],
     entryCount: inRangeEntries.length,
+    bounds,
     moodSeries,
+    moodRadial,
     byMood,
     themes,
     sessions,
@@ -689,7 +745,7 @@ export function buildMindModel({
     launchers,
     factorEffects: factorEffects(entries, allSessions, bounds),
     consistency: consistencyRing(entries, allSessions, date),
-    themeNodes: themeNodes(entries, allSessions, bounds),
+    themeNodes: nodes,
     themeCooccurrence: themeCooccurrence(entries, allSessions, bounds),
     themeWeekly: weekly,
     themeRanks: themeRanks(weekly),
