@@ -17,6 +17,10 @@ const OMEGA3_LEVELS = ['high', 'medium', 'low', 'none'];
 const SESSION_TYPES = ['check-in', 'deep-dive', 'pattern-review', 'historical'];
 const DIARY_SOURCE_AGENTS = ['penelope', 'import'];
 const SESSION_SOURCE_AGENTS = ['vera', 'import'];
+const CROSS_AGENT_AGENT_NAMES = ['Vera', 'Penelope', 'Hammond', 'Sara', 'Brisket', 'Chadwick', 'Hyaluronica'];
+const CROSS_AGENT_NOTE_RE = new RegExp(
+  `^(${CROSS_AGENT_AGENT_NAMES.join('|')})\\u2192(${CROSS_AGENT_AGENT_NAMES.join('|')}):\\s*\\S`
+);
 
 const MEAL_NUMBERS = [
   'calories', 'protein_g', 'fat_g', 'saturated_fat_g', 'unsaturated_fat_g',
@@ -74,6 +78,31 @@ function requireString(record, field, errors) {
 function optionalString(record, field, errors) {
   if (record[field] != null && typeof record[field] !== 'string') {
     errors.push(`${field} must be a string or null`);
+  }
+}
+
+function crossAgentNote(record, field, errors, { senderName } = {}) {
+  const value = record[field];
+  if (value == null) return;
+  if (typeof value !== 'string') {
+    errors.push(`${field} must be a string or null`);
+    return;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  const match = CROSS_AGENT_NOTE_RE.exec(trimmed);
+  if (!match) {
+    errors.push(
+      `${field} must be "Sender→Recipient: ..." using implemented agent names (${CROSS_AGENT_AGENT_NAMES.join(', ')})`
+    );
+    return;
+  }
+  const [, sender, recipient] = match;
+  if (senderName && sender !== senderName) {
+    errors.push(`${field} sender must be ${senderName} on a ${senderName === 'Vera' ? 'mind_session' : 'diary'} record`);
+  }
+  if (sender === recipient) {
+    errors.push(`${field} sender and recipient must differ`);
   }
 }
 
@@ -223,7 +252,7 @@ function validateDiary(record, errors) {
   optionalString(record, 'highlights', errors);
   optionalString(record, 'challenges', errors);
   optionalString(record, 'system_note', errors);
-  optionalString(record, 'cross_agent_note', errors);
+  crossAgentNote(record, 'cross_agent_note', errors, { senderName: 'Penelope' });
   booleanField(record, 'dayone_sent', errors);
   if (record.moods != null) {
     if (!Array.isArray(record.moods) || record.moods.length < 1 || record.moods.length > 3) {
@@ -247,7 +276,7 @@ function validateMindSession(record, errors) {
   optionalString(record, 'insight', errors);
   optionalString(record, 'framework', errors);
   optionalString(record, 'observation', errors);
-  optionalString(record, 'cross_agent_note', errors);
+  crossAgentNote(record, 'cross_agent_note', errors, { senderName: 'Vera' });
   stringArray(record, 'themes', errors);
   stringArray(record, 'pattern_tags', errors);
   enumeration(record, 'session_type', SESSION_TYPES, errors);

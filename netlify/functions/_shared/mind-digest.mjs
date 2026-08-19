@@ -78,6 +78,21 @@ export function summarizeDiaryForPrompt(events, today) {
   ].filter(Boolean).join('\n');
 }
 
+const SYSTEM_NOTE_TAIL_DAYS = 7;
+const SYSTEM_NOTE_TAIL_MAX_LINES = 5;
+
+export function recentSystemNoteTail(events, today, { days = SYSTEM_NOTE_TAIL_DAYS, maxLines = SYSTEM_NOTE_TAIL_MAX_LINES } = {}) {
+  const from = addCalendarDays(today, -(days - 1));
+  const lines = (events ?? [])
+    .filter(e => e?.record?.type === 'diary' && typeof e.record.date === 'string' && e.record.date >= from && e.record.date <= today)
+    .filter(e => typeof e.record.system_note === 'string' && e.record.system_note.trim())
+    .sort((a, b) => a.record.date.localeCompare(b.record.date))
+    .slice(-maxLines)
+    .map(e => `${e.record.date}: ${e.record.system_note.trim()}`);
+  if (!lines.length) return '';
+  return ['Recent day-to-day signal (system_note, metadata only):', ...lines].join('\n');
+}
+
 export function summarizeMindSessionsForPrompt(events, today) {
   const sessions = (events ?? []).filter(e => e?.record?.type === 'mind_session');
   if (!sessions.length) return '';

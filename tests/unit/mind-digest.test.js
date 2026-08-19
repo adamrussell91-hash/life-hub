@@ -11,7 +11,8 @@ import {
   excerptOnThisDay,
   selectMindEntries,
   isHammondMindBriefTurn,
-  hammondDiaryDigestForTurn
+  hammondDiaryDigestForTurn,
+  recentSystemNoteTail
 } from '../../netlify/functions/_shared/mind-digest.mjs';
 
 const TODAY = '2026-08-13';
@@ -176,3 +177,58 @@ test('hammondDiaryDigestForTurn is empty unless Hammond and a brief phrase', () 
     slug: 'vera', message: 'monthly three-way brief', events, today: TODAY
   }), '');
 });
+
+test('recentSystemNoteTail is empty when there are no diary system_notes', () => {
+  assert.equal(recentSystemNoteTail([], TODAY), '');
+  assert.equal(recentSystemNoteTail(null, TODAY), '');
+});
+
+test('recentSystemNoteTail surfaces recent system_note lines, never diary prose', () => {
+  const events = [
+    {
+      record: { type: 'diary', date: '2026-08-10', system_note: 'Weekend collapse' },
+      body: 'SECRET PROSE ADAM SHOULD NOT SEE'
+    },
+    {
+      record: { type: 'diary', date: '2026-08-12', system_note: '  quiet work day  ' },
+      body: 'more secret'
+    },
+    {
+      record: { type: 'mind_session', date: '2026-08-12', system_note: 'not a diary' },
+      body: ''
+    },
+    {
+      record: { type: 'diary', date: '2026-08-13', system_note: '   ' },
+      body: ''
+    }
+  ];
+  const text = recentSystemNoteTail(events, TODAY);
+  assert.match(text, /^Recent day-to-day signal \(system_note, metadata only\):/);
+  assert.match(text, /2026-08-10: Weekend collapse/);
+  assert.match(text, /2026-08-12: quiet work day/);
+  assert.doesNotMatch(text, /SECRET PROSE/);
+  assert.doesNotMatch(text, /not a diary/);
+  assert.doesNotMatch(text, /2026-08-13/);
+});
+
+test('recentSystemNoteTail keeps a 7-day window and caps at 5 lines', () => {
+  const events = [
+    { record: { type: 'diary', date: '2026-08-05', system_note: 'too old' } },
+    { record: { type: 'diary', date: '2026-08-07', system_note: 'window start' } },
+    { record: { type: 'diary', date: '2026-08-08', system_note: 'day 2' } },
+    { record: { type: 'diary', date: '2026-08-09', system_note: 'day 3' } },
+    { record: { type: 'diary', date: '2026-08-10', system_note: 'day 4' } },
+    { record: { type: 'diary', date: '2026-08-11', system_note: 'day 5' } },
+    { record: { type: 'diary', date: '2026-08-12', system_note: 'day 6' } },
+    { record: { type: 'diary', date: '2026-08-13', system_note: 'day 7' } }
+  ];
+  const text = recentSystemNoteTail(events, TODAY);
+  assert.doesNotMatch(text, /too old/);
+  assert.doesNotMatch(text, /window start/);
+  assert.doesNotMatch(text, /day 2/);
+  assert.match(text, /2026-08-09: day 3/);
+  assert.match(text, /2026-08-13: day 7/);
+  const noteLines = text.split('\n').slice(1);
+  assert.equal(noteLines.length, 5);
+});
+

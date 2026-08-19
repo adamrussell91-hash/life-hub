@@ -112,7 +112,8 @@ import {
   simultaneousSilenceFlag,
   divergenceLine,
   excerptOnThisDay,
-  hammondDiaryDigestForTurn
+  hammondDiaryDigestForTurn,
+  recentSystemNoteTail
 } from './_shared/mind-digest.mjs';
 import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
@@ -282,6 +283,7 @@ export function createChatHandler({
         let sessionAdherenceDays = null;
         let mindDiaryDigest = '';
         let hammondDiaryDigest = '';
+        let hammondMindAmbient = '';
         let mindSessionDigest = '';
         let mindSilence = '';
         let mindDivergence = '';
@@ -497,6 +499,7 @@ export function createChatHandler({
               events: cnEvents,
               today
             });
+            hammondMindAmbient = recentSystemNoteTail(cnEvents, today);
           }
 
           if (slug === 'vera' || slug === 'penelope' || slug === 'hammond') {
@@ -553,6 +556,7 @@ export function createChatHandler({
           governanceLogTail = '';
           hammondDigest = '';
           hammondCnSummary = '';
+          hammondMindAmbient = '';
           foodLibraryEntries = [];
           foodLibrary = '';
           foodLibrarySha = undefined;
@@ -617,6 +621,7 @@ export function createChatHandler({
           daysSinceLastSession: sessionAdherenceDays,
           mindDiaryDigest,
           hammondDiaryDigest,
+          hammondMindAmbient,
           mindSessionDigest,
           mindSilence,
           mindDivergence,

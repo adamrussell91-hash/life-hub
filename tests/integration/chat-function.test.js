@@ -2192,7 +2192,7 @@ test('Hammond 5e/6b brief injects diary metadata from the CN window without quot
   assert.ok(blobUrls.some(url => url.includes(HAMMOND_DIARY_SHA)));
 });
 
-test('ordinary Hammond turns do not inject diary metadata and fetch the same CN blobs', async () => {
+test('ordinary Hammond turns skip the 5e/6b diary digest but still get a system_note tail', async () => {
   let receivedArgs;
   const { fetchImpl, blobUrls } = hammondFetchWithDiary();
   const handler = createChatHandler({
@@ -2213,6 +2213,8 @@ test('ordinary Hammond turns do not inject diary metadata and fetch the same CN 
   })));
 
   assert.doesNotMatch(receivedArgs.system, /Diary \(metadata only/);
-  assert.doesNotMatch(receivedArgs.system, /Weekend collapse/);
+  assert.match(receivedArgs.system, /Recent day-to-day signal \(system_note, metadata only\)/);
+  assert.match(receivedArgs.system, /Weekend collapse/);
+  assert.doesNotMatch(receivedArgs.system, /SECRET PROSE/);
   assert.ok(blobUrls.some(url => url.includes(HAMMOND_DIARY_SHA)), 'CN window still reads the mind blob');
 });

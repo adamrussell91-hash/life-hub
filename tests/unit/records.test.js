@@ -477,3 +477,58 @@ test('diary moods is 1–3 MOODS and must include primary mood', () => {
   assert.ok(validateRecord({ ...diary, moods: ['low', 'good', 'neutral', 'bad'] }).some(e => /moods/.test(e)));
   assert.ok(validateRecord({ ...diary, mood: 'low', moods: ['good'] }).some(e => /mood/.test(e)));
 });
+
+const diaryBase = {
+  schema_version: 1, id: 'd-1', type: 'diary', date: '2026-08-13',
+  time: '21:00',
+  created_at: '2026-08-13T21:00:00+10:00', updated_at: '2026-08-13T21:00:00+10:00',
+  source: 'chat', mood_score: 6, mood: 'low', energy: 'medium', tags: [], dayone_sent: false
+};
+
+const mindSessionBase = {
+  schema_version: 1, id: 'ms-1', type: 'mind_session', date: '2026-08-13',
+  time: '17:00',
+  created_at: '2026-08-13T17:00:00+10:00', updated_at: '2026-08-13T17:00:00+10:00',
+  source: 'chat', theme: 'Weekend'
+};
+
+test('diary rejects cross_agent_note with the wrong sender', () => {
+  const errors = validateRecord({ ...diaryBase, cross_agent_note: 'Vera→Penelope: bad day.' });
+  assert.ok(errors.some(e => /sender must be Penelope/.test(e)));
+});
+
+test('mind_session rejects a cross_agent_note with no arrow', () => {
+  const errors = validateRecord({
+    ...mindSessionBase,
+    cross_agent_note: 'Hammond: ex-principal…'
+  });
+  assert.ok(errors.some(e => /Sender→Recipient/.test(e)));
+});
+
+test('mind_session rejects a cross_agent_note addressed to Ann', () => {
+  const errors = validateRecord({
+    ...mindSessionBase,
+    cross_agent_note: 'Vera→Ann: teaching handoff.'
+  });
+  assert.ok(errors.some(e => /implemented agent names/.test(e)));
+});
+
+test('diary rejects a cross_agent_note where sender equals recipient', () => {
+  const errors = validateRecord({
+    ...diaryBase,
+    cross_agent_note: 'Penelope→Penelope: looping.'
+  });
+  assert.ok(errors.some(e => /sender and recipient must differ/.test(e)));
+});
+
+test('diary accepts a well-formed Penelope→Hammond cross_agent_note', () => {
+  assert.equal(validateRecord({
+    ...diaryBase,
+    cross_agent_note: 'Penelope→Hammond: purpose language recurring.'
+  }).length, 0);
+});
+
+test('diary and mind_session stay valid when cross_agent_note is omitted', () => {
+  assert.equal(validateRecord(diaryBase).length, 0);
+  assert.equal(validateRecord(mindSessionBase).length, 0);
+});
