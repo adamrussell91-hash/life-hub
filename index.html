@@ -642,6 +642,23 @@
             <svg id="mind-mood-chart" class="mind-mood-chart" viewBox="0 0 592 592" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mood score around the selected range. Closer to the centre is better. Bubble size is energy."></svg>
           </article>
 
+          <article class="metric-card chart-card mind-energy-orbit-card" aria-labelledby="mind-energy-label">
+            <p class="mind-tile__question">Where is energy sitting?</p>
+            <p class="metric-label" id="mind-energy-label">Energy Orbit</p>
+            <p class="mind-tile__legend" data-mind="energy-legend">Each day lands on the level that best reflects your energy.</p>
+            <p data-mind="energy-empty" class="metric-caption" hidden>No energy entries in this range yet.</p>
+            <div class="mind-energy-orbit">
+              <svg id="mind-energy-orbit" class="mind-energy-orbit__chart" viewBox="0 0 680 680" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Diary energy around the selected range. Outer ring is high, inner ring is low."></svg>
+              <div class="mind-energy-orbit__center" data-mind="energy-center" hidden>
+                <p class="mind-energy-orbit__kicker">Energy</p>
+                <p class="mind-energy-orbit__status" data-mind="energy-status">—</p>
+                <p class="mind-energy-orbit__period" data-mind="energy-period"></p>
+                <p class="mind-energy-orbit__trend" data-mind="energy-trend"></p>
+              </div>
+            </div>
+            <p class="mind-energy-orbit__hint" data-mind="energy-hint" hidden>Tap a day to see notes.</p>
+          </article>
+
           <div id="mind-hero" class="hero-grid mind-hero--support">
             <article class="metric-card" aria-labelledby="mind-mood-mix-heading">
               <p class="mind-tile__question">What’s the mix?</p>
@@ -676,36 +693,112 @@
                 </div>
               </div>
             </article>
-
-            <article class="metric-card" aria-labelledby="mind-energy-label">
-              <p class="mind-tile__question">Where is energy sitting?</p>
-              <p class="metric-label" id="mind-energy-label">Energy</p>
-              <p data-mind="energy-empty" class="metric-caption" hidden>No energy entries in this range yet.</p>
-              <div id="mind-energy-rings" class="mind-energy-rings" aria-label="Diary entries by energy">
-                <div class="mind-energy-ring">
-                  <svg class="metric-ring metric-ring--mind-high" data-mind-energy-ring="high" viewBox="0 0 56 56" role="img" aria-label="High energy share">
-                    <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                    <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                  </svg>
-                  <p class="metric-caption">High <span data-mind-energy-count>0</span></p>
-                </div>
-                <div class="mind-energy-ring">
-                  <svg class="metric-ring metric-ring--mind-medium" data-mind-energy-ring="medium" viewBox="0 0 56 56" role="img" aria-label="Medium energy share">
-                    <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                    <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                  </svg>
-                  <p class="metric-caption">Medium <span data-mind-energy-count>0</span></p>
-                </div>
-                <div class="mind-energy-ring">
-                  <svg class="metric-ring metric-ring--mind-low" data-mind-energy-ring="low" viewBox="0 0 56 56" role="img" aria-label="Low energy share">
-                    <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                    <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                  </svg>
-                  <p class="metric-caption">Low <span data-mind-energy-count>0</span></p>
-                </div>
-              </div>
-            </article>
           </div>
+
+          <article id="mind-tile-lexical" class="metric-card chart-card mind-watchlist-card" aria-labelledby="mind-lexical-label">
+            <div class="mind-watchlist__head">
+              <div>
+                <p class="mind-tile__question">Is the language shifting?</p>
+                <p class="metric-label" id="mind-lexical-label">Watchlist term counts by week</p>
+              </div>
+              <button type="button" class="btn btn--ghost" data-mind="lexical-table-toggle" aria-expanded="false">Table view</button>
+            </div>
+            <p class="mind-watchlist__scale">
+              <span class="mind-watchlist__swatches" aria-hidden="true">
+                <i data-mix="0"></i>
+                <i data-mix="25"></i>
+                <i data-mix="50"></i>
+                <i data-mix="75"></i>
+                <i data-mix="100"></i>
+              </span>
+              darker = more mentions that week · gray = none · each term scales to its own busiest week
+            </p>
+            <div id="mind-lexical" class="mind-watchlist__grid" aria-label="Watchlist term counts by week"></div>
+            <div class="mind-watchlist__table" data-role="lexical-table" hidden>
+              <table>
+                <caption class="visually-hidden">Watchlist term counts by week</caption>
+                <thead data-role="lexical-table-head"></thead>
+                <tbody data-role="lexical-table-body"></tbody>
+              </table>
+            </div>
+            <form class="mind-lexical-form" data-mind="lexical-form">
+              <input type="text" maxlength="24" aria-label="Add watchlist term" placeholder="Add a term to watch, e.g. “overwhelmed”">
+              <button type="submit" class="btn btn--primary">Watch</button>
+            </form>
+          </article>
+
+          <article id="mind-tile-horizon" class="metric-card chart-card mind-metric-strip-card" aria-labelledby="mind-horizon-label">
+            <p class="mind-tile__question">Many metrics, one strip?</p>
+            <p class="metric-label" id="mind-horizon-label">Mood and energy on one timeline</p>
+            <p class="mind-tile__legend">Opacity = intensity. Each vertical line is a day.</p>
+            <div id="mind-horizon" class="mind-metric-strip" aria-label="Mood and energy by day"></div>
+            <div class="mind-metric-strip__foot" data-role="strip-foot" hidden>
+              <ul class="mind-metric-strip__guide">
+                <li>Each vertical line = one day</li>
+                <li>Darker = more intense</li>
+                <li>Top band = Mood, bottom = Energy</li>
+                <li>One strip. All your patterns.</li>
+              </ul>
+              <div class="mind-metric-strip__period">
+                <p class="mind-metric-strip__period-label">This period</p>
+                <p data-mind="strip-mood">Mood —</p>
+                <p data-mind="strip-energy">Energy —</p>
+              </div>
+            </div>
+            <p class="mind-metric-strip__hint" data-mind="strip-hint" hidden>Hover or tap any day to see details.</p>
+          </article>
+
+          <article id="mind-tile-constellation" class="metric-card chart-card mind-constellation-card" aria-labelledby="mind-constellation-label">
+            <div class="mind-constellation__head">
+              <div>
+                <p class="mind-tile__question">What keeps showing up together?</p>
+                <p class="metric-label" id="mind-constellation-label">Themes that appear together</p>
+                <p class="mind-tile__legend">Thicker, taller arcs = more often together.</p>
+              </div>
+              <button type="button" class="btn btn--ghost" data-mind="constellation-compare" aria-pressed="false">Compare last period</button>
+            </div>
+            <div class="mind-constellation">
+              <svg id="mind-constellation" class="mind-constellation__chart" viewBox="0 0 960 440" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Themes that showed up together"></svg>
+            </div>
+          </article>
+
+          <article id="mind-tile-bump" class="metric-card chart-card mind-bump-card" aria-labelledby="mind-bump-label">
+            <p class="mind-tile__question">Who’s rising?</p>
+            <p class="metric-label" id="mind-bump-label">Theme rank by week</p>
+            <p class="mind-tile__legend">Larger dot = more mentions that week. Rank 1 is the top.</p>
+            <div class="mind-bump">
+              <svg id="mind-bump" class="mind-bump__chart" viewBox="0 0 960 420" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Theme rank by week"></svg>
+            </div>
+            <div class="mind-bump__foot" data-role="bump-foot" hidden>
+              <ul class="mind-bump__legend" data-role="bump-legend"></ul>
+              <ul class="mind-bump__guide">
+                <li>Each line is a theme’s rank across the weeks in this range.</li>
+                <li>Larger dot = appeared more that week.</li>
+                <li>↑ rising in rank · ↓ falling · — holding</li>
+                <li>Hover a theme to isolate its path.</li>
+              </ul>
+            </div>
+            <p class="mind-bump__hint" data-mind="bump-hint" hidden>Hover a theme to highlight its path. Tap a week to see notes.</p>
+          </article>
+
+          <article id="mind-tile-stream" class="metric-card chart-card mind-stream-card" aria-labelledby="mind-stream-label">
+            <p class="mind-tile__question">What’s swelling?</p>
+            <p class="metric-label" id="mind-stream-label">Theme topography</p>
+            <p class="mind-tile__legend">More contours and darker colour = more volume that week.</p>
+            <div class="mind-stream">
+              <svg id="mind-stream" class="mind-stream__chart" viewBox="0 0 960 480" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Theme volume over weeks"></svg>
+            </div>
+            <div class="mind-stream__foot" data-role="stream-foot" hidden>
+              <ul class="mind-stream__legend" data-role="stream-legend"></ul>
+              <ul class="mind-stream__guide">
+                <li>Each territory is a theme.</li>
+                <li>More contours = more mentions that week.</li>
+                <li>Hover a band to isolate it.</li>
+                <li>Tap a week or a peak to open those notes.</li>
+              </ul>
+            </div>
+            <p class="mind-stream__hint" data-mind="stream-hint" hidden>Hover a territory to highlight it. Tap a week to see entries.</p>
+          </article>
 
           <article id="mind-tile-themes" class="metric-card mind-tile" aria-labelledby="mind-themes-label">
             <p class="mind-tile__question">What keeps coming back?</p>
@@ -742,29 +835,14 @@
             <p class="metric-caption" data-mind="streak">—</p>
           </article>
 
-          <article id="mind-tile-constellation" class="metric-card mind-tile">
-            <p class="mind-tile__question">What keeps showing up together?</p>
-            <svg id="mind-constellation" class="mind-chart mind-chart--constellation" viewBox="0 0 240 240" role="img" aria-label="Themes that show up together"></svg>
-          </article>
           <article id="mind-tension" class="metric-card mind-tile">
             <p class="mind-tile__question">Where is the split?</p>
             <svg id="mind-tension-chart" class="mind-chart mind-chart--tension" viewBox="0 0 240 120" role="img" aria-label="Stated versus revealed tension"></svg>
-          </article>
-
-          <article id="mind-tile-stream" class="metric-card mind-tile">
-            <p class="mind-tile__question">What’s swelling?</p>
-            <p class="mind-tile__legend">Stacked weekly theme volume. Band → that theme.</p>
-            <svg id="mind-stream" class="mind-chart mind-chart--stream" viewBox="0 0 320 168" role="img" aria-label="Theme stream"></svg>
           </article>
           <article id="mind-tile-transitions" class="metric-card mind-tile">
             <p class="mind-tile__question">What follows a Low day?</p>
             <p class="mind-tile__legend">Mood-to-mood flow. Band → those transitions.</p>
             <svg id="mind-sankey" class="mind-chart mind-chart--sankey" viewBox="0 0 320 200" role="img" aria-label="Mood transitions"></svg>
-          </article>
-          <article id="mind-tile-bump" class="metric-card mind-tile">
-            <p class="mind-tile__question">Who’s rising?</p>
-            <p class="mind-tile__legend">Theme rank by week. Line → that theme.</p>
-            <svg id="mind-bump" class="mind-chart mind-chart--bump" viewBox="0 0 320 168" role="img" aria-label="Theme ranks"></svg>
           </article>
           <article id="mind-tile-chord" class="metric-card mind-tile">
             <p class="mind-tile__question">Whole network at once?</p>
@@ -776,20 +854,10 @@
             <p class="mind-tile__legend">One tick per day, coloured by mood.</p>
             <svg id="mind-radial-year" class="mind-chart mind-chart--radial" viewBox="0 0 240 240" role="img" aria-label="Year of mood"></svg>
           </article>
-          <article id="mind-tile-horizon" class="metric-card mind-tile">
-            <p class="mind-tile__question">Many metrics, one strip?</p>
-            <p class="mind-tile__legend">Opacity = intensity. Band → that metric.</p>
-            <div id="mind-horizon"></div>
-          </article>
           <article id="mind-tile-butterfly" class="metric-card mind-tile">
             <p class="mind-tile__question">Vera vs Penelope on a theme?</p>
             <p class="mind-tile__legend">Vera left, Penelope right.</p>
             <div id="mind-butterfly"></div>
-          </article>
-          <article id="mind-tile-lexical" class="metric-card mind-tile">
-            <p class="mind-tile__question">Is the language shifting?</p>
-            <p class="mind-tile__legend">Watchlist term counts by week.</p>
-            <div id="mind-lexical"></div>
           </article>
           <article id="mind-tile-waffle" class="metric-card mind-tile">
             <p class="mind-tile__question">Volume and quality?</p>
