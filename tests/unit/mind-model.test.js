@@ -352,6 +352,21 @@ test('mindCrossAgentLines keeps Vera/Penelope prefixes and drops others', () => 
   ]);
 });
 
+test('mindCrossAgentLines keeps Hammond↔Vera/Penelope lines and still drops Hammond→Ann', () => {
+  const markdown = `## 🤝 Cross-Agent Coordination
+- Hammond→Vera: diary keeps circling weekend-as-escape.
+- Vera→Hammond: named tension on career vs rest.
+- Hammond→Penelope: make room for the career thread.
+- Hammond→Ann: teaching handoff.
+`;
+  const lines = mindCrossAgentLines(markdown);
+  assert.deepEqual(lines, [
+    'Hammond→Vera: diary keeps circling weekend-as-escape.',
+    'Vera→Hammond: named tension on career vs rest.',
+    'Hammond→Penelope: make room for the career thread.'
+  ]);
+});
+
 test('buildMindModel returns sessions, energy, insights, cross-agent lines, and silence', () => {
   const events = [
     { record: { type: 'diary', date: '2026-08-01', mood_score: 4, mood: 'low', energy: 'low', tags: [] }, path: 'd' },

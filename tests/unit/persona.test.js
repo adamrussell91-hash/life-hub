@@ -487,12 +487,26 @@ test('vera protocol restore includes diagnostic, ACE, and mind_session logging',
   assert.doesNotMatch(text, /You do not propose `log_entry`/);
 });
 
+test('vera protocol retries a rejected log_entry and tells Adam what changed', () => {
+  const text = loadVeraProtocol();
+  assert.match(text, /If `log_entry` returns an error/);
+  assert.match(text, /omit `cross_agent_note`/);
+  assert.match(text, /tell Adam/i);
+});
+
 test('penelope protocol restore includes gather-context, moods, and cross_agent_note', () => {
   const text = loadPenelopeProtocol();
   assert.match(text, /Relationships and social context|relationship dynamic/i);
   assert.match(text, /moods/);
   assert.match(text, /cross_agent_note/);
   assert.match(text, /On this day/);
+});
+
+test('penelope protocol retries a rejected log_entry and tells Adam what changed', () => {
+  const text = loadPenelopeProtocol();
+  assert.match(text, /If `log_entry` returns an error/);
+  assert.match(text, /omit `cross_agent_note`/);
+  assert.match(text, /tell Adam/i);
 });
 
 test('hammond protocol includes Mind domain brief and retrospective', () => {
@@ -558,6 +572,28 @@ test('non-hammond prompts never include hammondDiaryDigest', () => {
     hammondDiaryDigest: 'Diary leak'
   });
   assert.doesNotMatch(prompt, /Diary leak/);
+});
+
+test('hammond prompt includes hammondMindAmbient when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    hammondMindAmbient: 'Recent day-to-day signal (system_note, metadata only):\n2026-08-12: quiet work day'
+  });
+  assert.match(prompt, /Recent day-to-day signal/);
+  assert.match(prompt, /quiet work day/);
+});
+
+test('hammond prompt omits ambient tail when hammondMindAmbient is empty', () => {
+  const prompt = buildSystemPrompt({ slug: 'hammond', hammondMindAmbient: '' });
+  assert.doesNotMatch(prompt, /Recent day-to-day signal/);
+});
+
+test('non-hammond prompts never include hammondMindAmbient', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    hammondMindAmbient: 'Ambient leak'
+  });
+  assert.doesNotMatch(prompt, /Ambient leak/);
 });
 
 test('brisket prompt never receives mind diary digest', () => {

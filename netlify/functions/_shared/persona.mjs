@@ -28,6 +28,7 @@ export function buildSystemPrompt({
   mindDiaryDigest = '',
   mindSessionDigest = '',
   hammondDiaryDigest = '',
+  hammondMindAmbient = '',
   mindSilence = '',
   mindDivergence = '',
   onThisDay = '',
@@ -181,6 +182,9 @@ export function buildSystemPrompt({
     mindSilence,
     hammondDiaryDigest
       ? `Mind diary digest (5e/6b this turn — metadata only, do not quote prose):\n${hammondDiaryDigest}`
+      : '',
+    hammondMindAmbient
+      ? hammondMindAmbient
       : '',
     'You do not propose log_entry. Coach and triage; specialists own domain logs.',
     'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.'
