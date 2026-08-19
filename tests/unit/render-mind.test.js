@@ -105,17 +105,6 @@ function matches(node, selector) {
   return false;
 }
 
-function ringSvg(level) {
-  const svg = el('svg');
-  svg.dataset.mindEnergyRing = level;
-  const track = el('circle');
-  track.dataset.role = 'track';
-  const fill = el('circle');
-  fill.dataset.role = 'fill';
-  svg.append(track, fill);
-  return svg;
-}
-
 function fakeRoot() {
   const dashboard = el('section');
   dashboard.id = 'mind-dashboard';
@@ -157,15 +146,26 @@ function fakeRoot() {
   const mix = el('div');
   mix.id = 'mind-mood-mix';
   mix.append(pie, mixLegend, mixCount, mixLabel, mixSub, mixTotal, mixTableToggle, mixTable);
-  const energy = el('div');
-  energy.id = 'mind-energy-rings';
-  const high = ringSvg('high');
-  const medium = ringSvg('medium');
-  const low = ringSvg('low');
-  energy.append(high, medium, low);
+  const energyOrbit = el('svg');
+  energyOrbit.id = 'mind-energy-orbit';
   const energyEmpty = el('p');
   energyEmpty.dataset.mind = 'energy-empty';
   energyEmpty.hidden = true;
+  const energyLegend = el('p');
+  energyLegend.dataset.mind = 'energy-legend';
+  const energyCenter = el('div');
+  energyCenter.dataset.mind = 'energy-center';
+  energyCenter.hidden = true;
+  const energyStatus = el('p');
+  energyStatus.dataset.mind = 'energy-status';
+  const energyPeriod = el('p');
+  energyPeriod.dataset.mind = 'energy-period';
+  const energyTrend = el('p');
+  energyTrend.dataset.mind = 'energy-trend';
+  const energyHint = el('p');
+  energyHint.dataset.mind = 'energy-hint';
+  energyHint.hidden = true;
+  energyCenter.append(energyStatus, energyPeriod, energyTrend);
   const hero = el('div');
   hero.id = 'mind-hero';
   const themes = el('div');
@@ -209,7 +209,13 @@ function fakeRoot() {
   tileConstellation.id = 'mind-tile-constellation';
   const constellation = el('svg');
   constellation.id = 'mind-constellation';
-  tileConstellation.append(constellation);
+  const constellationHint = el('p');
+  constellationHint.dataset.mind = 'constellation-hint';
+  constellationHint.hidden = true;
+  const constellationFoot = el('div');
+  constellationFoot.dataset.role = 'constellation-foot';
+  constellationFoot.hidden = true;
+  tileConstellation.append(constellation, constellationFoot, constellationHint);
   const tension = el('article');
   tension.id = 'mind-tension';
   tension.hidden = false;
@@ -217,7 +223,19 @@ function fakeRoot() {
   tileStream.id = 'mind-tile-stream';
   const streamSvg = el('svg');
   streamSvg.id = 'mind-stream';
-  tileStream.append(streamSvg);
+  const streamWrap = el('div');
+  streamWrap.className = 'mind-stream';
+  streamWrap.append(streamSvg);
+  const streamLegend = el('ul');
+  streamLegend.dataset.role = 'stream-legend';
+  const streamFoot = el('div');
+  streamFoot.dataset.role = 'stream-foot';
+  streamFoot.hidden = true;
+  streamFoot.append(streamLegend);
+  const streamHint = el('p');
+  streamHint.dataset.mind = 'stream-hint';
+  streamHint.hidden = true;
+  tileStream.append(streamWrap, streamFoot, streamHint);
   const tileTransitions = el('article');
   tileTransitions.id = 'mind-tile-transitions';
   const sankeySvg = el('svg');
@@ -227,7 +245,19 @@ function fakeRoot() {
   tileBump.id = 'mind-tile-bump';
   const bumpSvg = el('svg');
   bumpSvg.id = 'mind-bump';
-  tileBump.append(bumpSvg);
+  const bumpWrap = el('div');
+  bumpWrap.className = 'mind-bump';
+  bumpWrap.append(bumpSvg);
+  const bumpLegend = el('ul');
+  bumpLegend.dataset.role = 'bump-legend';
+  const bumpFoot = el('div');
+  bumpFoot.dataset.role = 'bump-foot';
+  bumpFoot.hidden = true;
+  bumpFoot.append(bumpLegend);
+  const bumpHint = el('p');
+  bumpHint.dataset.mind = 'bump-hint';
+  bumpHint.hidden = true;
+  tileBump.append(bumpWrap, bumpFoot, bumpHint);
   const tileChord = el('article');
   tileChord.id = 'mind-tile-chord';
   const chordSvg = el('svg');
@@ -242,7 +272,18 @@ function fakeRoot() {
   tileHorizon.id = 'mind-tile-horizon';
   const horizonHost = el('div');
   horizonHost.id = 'mind-horizon';
-  tileHorizon.append(horizonHost);
+  const stripMood = el('p');
+  stripMood.dataset.mind = 'strip-mood';
+  const stripEnergy = el('p');
+  stripEnergy.dataset.mind = 'strip-energy';
+  const stripFoot = el('div');
+  stripFoot.dataset.role = 'strip-foot';
+  stripFoot.hidden = true;
+  stripFoot.append(stripMood, stripEnergy);
+  const stripHint = el('p');
+  stripHint.dataset.mind = 'strip-hint';
+  stripHint.hidden = true;
+  tileHorizon.append(horizonHost, stripFoot, stripHint);
   const tileButterfly = el('article');
   tileButterfly.id = 'mind-tile-butterfly';
   const butterflyHost = el('div');
@@ -275,11 +316,14 @@ function fakeRoot() {
     '[data-mind="mood-mix-table-toggle"]': mixTableToggle,
     '[data-role="mood-mix-table"]': mixTable,
     '[data-role="mood-mix-table-body"]': mixTableBody,
-    '#mind-energy-rings': energy,
+    '#mind-energy-orbit': energyOrbit,
     '[data-mind="energy-empty"]': energyEmpty,
-    '[data-mind-energy-ring="high"]': high,
-    '[data-mind-energy-ring="medium"]': medium,
-    '[data-mind-energy-ring="low"]': low,
+    '[data-mind="energy-legend"]': energyLegend,
+    '[data-mind="energy-center"]': energyCenter,
+    '[data-mind="energy-status"]': energyStatus,
+    '[data-mind="energy-period"]': energyPeriod,
+    '[data-mind="energy-trend"]': energyTrend,
+    '[data-mind="energy-hint"]': energyHint,
     '#mind-hero': hero,
     '#mind-themes': themes,
     '#mind-empty': empty,
@@ -330,8 +374,9 @@ function fakeRoot() {
       if (selector === '[data-mind-agent]') return [];
       return [];
     },
-    _energy: energy,
-    _high: high,
+    _energyOrbit: energyOrbit,
+    _energyStatus: energyStatus,
+    _energyEmpty: energyEmpty,
     _silence: silence,
     _sessions: sessions,
     _insights: insights,
@@ -344,7 +389,15 @@ function fakeRoot() {
     _mixCount: mixCount,
     _mixSub: mixSub,
     _mixTotal: mixTotal,
-    _mixTableBody: mixTableBody
+    _horizon: horizonHost,
+    _stripMood: stripMood,
+    _stripEnergy: stripEnergy,
+    _stripFoot: stripFoot,
+    _bump: bumpSvg,
+    _bumpFoot: bumpFoot,
+    _bumpLegend: bumpLegend,
+    _stream: streamSvg,
+    _streamFoot: streamFoot
   };
 }
 
@@ -359,6 +412,8 @@ function emptyModel(overrides = {}) {
     themes: [],
     sessions: [],
     energyByLevel: [],
+    energyOrbit: [],
+    previousEnergyOrbit: [],
     insights: [],
     crossAgentLines: [],
     daysSinceLastDiary: null,
@@ -379,7 +434,7 @@ test('renderMind shows empty states for sessions, insights, and cross-agent', ()
   assert.equal(root._silence.children.length, 0);
 });
 
-test('renderMind renders energy rings, session mood-shift, insights, and silence', () => {
+test('renderMind renders energy orbit, session mood-shift, insights, and silence', () => {
   const root = fakeRoot();
   renderMind(root, emptyModel({
     empty: false,
@@ -401,6 +456,16 @@ test('renderMind renders energy rings, session mood-shift, insights, and silence
       { key: 'medium', label: 'Medium', value: 0 },
       { key: 'low', label: 'Low', value: 2 }
     ],
+    energyOrbit: [
+      { date: '2026-08-10', energy: 'low', body: 'Tired.' },
+      { date: '2026-08-11', energy: 'low', body: '' },
+      { date: '2026-08-12', energy: 'high', body: 'Bright.' }
+    ],
+    previousEnergyOrbit: [
+      { date: '2026-07-10', energy: 'high' },
+      { date: '2026-07-11', energy: 'high' }
+    ],
+    bounds: { from: '2026-08-01', to: '2026-08-13', days: 13 },
     sessions: [{
       date: '2026-08-10',
       theme: 'Weekend',
@@ -425,7 +490,12 @@ test('renderMind renders energy rings, session mood-shift, insights, and silence
     daysSinceLastMindSession: 9
   }));
 
-  assert.equal(root._high.querySelector('[data-role="fill"]').getAttribute('stroke-dasharray'), String(2 * Math.PI * 25));
+  assert.equal(root._energyEmpty.hidden, true);
+  assert.equal(root._energyStatus.textContent, 'Mostly Low');
+  const energyPoints = root._energyOrbit.querySelectorAll('[data-role="point"]');
+  assert.equal(energyPoints.length, 3);
+  assert.equal(energyPoints[0].dataset.energy, 'low');
+  assert.ok(energyPoints[0].listeners?.some(([type]) => type === 'click'));
   const card = root._sessions.querySelector('.mind-session-card');
   assert.ok(card);
   assert.match(card.textContent, /Weekend/);
@@ -521,12 +591,22 @@ test('renderMind draws constellation nodes and keeps empty tension as honest emp
   const root = fakeRoot();
   renderMind(root, emptyModel({
     empty: false,
-    themeNodes: [{ key: 'work', count: 4, meanMood: 7 }],
-    themeCooccurrence: [{ themeA: 'work', themeB: 'shame', count: 2 }],
+    themeNodes: [
+      { key: 'work', count: 4, meanMood: 7 },
+      { key: 'sleep', count: 2, meanMood: 5 }
+    ],
+    themeCooccurrence: [{ themeA: 'sleep', themeB: 'work', count: 2 }],
     tensions: []
   }));
   const node = root.querySelector('#mind-constellation').querySelector('[data-theme="work"]');
+  const edge = root.querySelector('#mind-constellation').querySelector('[data-role="edge"]');
   assert.ok(node);
+  assert.ok(edge);
+  assert.ok(edge.listeners?.some(([type]) => type === 'click'));
+  const map = root.querySelector('#mind-constellation').listeners ?? [];
+  assert.ok(map.some(([type]) => type === 'pointerover'));
+  assert.ok(map.some(([type]) => type === 'click'));
+  assert.ok(map.some(([type]) => type === 'dblclick'));
   assert.equal(root.querySelector('#mind-tension').hidden, false);
   assert.match(root.querySelector('#mind-tension').textContent, /Need /);
 });
@@ -544,6 +624,27 @@ test('renderMind paints waffle and stream marks', () => {
   }));
   assert.ok(root.querySelector('#mind-waffle').querySelector('[data-mood]'));
   assert.ok(root.querySelector('#mind-stream').querySelector('path'));
+});
+
+test('renderMind paints interactive theme topography', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({
+    empty: false,
+    themeWeekly: {
+      weeks: ['2026-07-27', '2026-08-03'],
+      themes: ['work', 'sleep'],
+      series: [
+        { key: 'work', values: [1, 6] },
+        { key: 'sleep', values: [2, 1] }
+      ]
+    }
+  }));
+  const samples = root._stream.querySelectorAll('[data-role="sample"]');
+  assert.ok(samples.length >= 2);
+  assert.ok(samples[0].listeners?.some(([type]) => type === 'click'));
+  assert.ok(root._stream.listeners?.some(([type]) => type === 'pointerover'));
+  assert.equal(root._streamFoot.hidden, false);
+  assert.match(root._stream.textContent, /Work/);
 });
 
 test('renderMind paints tension poles and keeps the tile visible', () => {
@@ -592,7 +693,86 @@ test('renderMind shows human theme labels instead of snake_case keys', () => {
   assert.match(root.querySelector('#mind-tile-constellation').textContent, /Free will/);
   assert.match(root.querySelector('#mind-butterfly').textContent, /Free will/);
   const mark = root.querySelector('#mind-constellation').querySelector('[data-theme="free_will"]');
-  assert.ok(mark?.listeners?.some(([type]) => type === 'click'));
+  assert.ok(mark);
+  assert.ok(root.querySelector('#mind-constellation').listeners?.some(([type]) => type === 'click'));
+});
+
+test('renderMind paints a watchlist heatmap for lexical terms', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({
+    empty: false,
+    lexical: [
+      {
+        term: 'should',
+        points: [
+          { date: '2026-08-03', count: 2 },
+          { date: '2026-08-10', count: 0 }
+        ]
+      }
+    ],
+    bounds: { from: '2026-08-03', to: '2026-08-16', days: 14 }
+  }));
+  const cells = root.querySelector('#mind-lexical').querySelectorAll('.mind-watchlist__cell');
+  assert.equal(cells.length, 2);
+  assert.equal(cells[0].dataset.term, 'should');
+  assert.equal(cells[0].dataset.count, '2');
+  assert.match(cells[1].className, /is-zero/);
+  assert.ok(cells[0].listeners?.some(([type]) => type === 'click'));
+});
+
+test('renderMind paints an interactive mood and energy strip', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({
+    empty: false,
+    bounds: { from: '2026-08-10', to: '2026-08-16', days: 7 },
+    range: 'weekly',
+    diary: [
+      { date: '2026-08-10', mood_score: 8, mood: 'good', body: 'Bright morning.' },
+      { date: '2026-08-12', mood_score: 4, mood: 'low', body: 'Heavy day.' }
+    ],
+    energyOrbit: [
+      { date: '2026-08-10', energy: 'low', body: 'Tired.' },
+      { date: '2026-08-12', energy: 'high', body: 'Bright.' }
+    ],
+    previousEnergyOrbit: [
+      { date: '2026-08-01', energy: 'high' },
+      { date: '2026-08-02', energy: 'high' }
+    ]
+  }));
+  const bands = root._horizon.querySelectorAll('.mind-metric-strip__band');
+  const days = root._horizon.querySelectorAll('[data-role="day"]');
+  assert.equal(bands.length, 2);
+  assert.ok(days.length >= 2);
+  assert.ok(days[0].listeners?.some(([type]) => type === 'click'));
+  assert.ok(root._horizon.listeners?.some(([type]) => type === 'pointerover'));
+  assert.equal(root._stripFoot.hidden, false);
+  assert.match(root._stripEnergy.textContent, /Lower than last period/);
+  assert.equal(root._stripEnergy.dataset.dir, 'down');
+});
+
+test('renderMind paints an interactive theme rank bump chart', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({
+    empty: false,
+    themeWeekly: {
+      weeks: ['2026-07-27', '2026-08-03'],
+      themes: ['work', 'sleep'],
+      series: [
+        { key: 'work', values: [1, 4] },
+        { key: 'sleep', values: [3, 1] }
+      ]
+    },
+    themeRanks: [
+      { week: '2026-07-27', rankByTheme: { work: 2, sleep: 1 } },
+      { week: '2026-08-03', rankByTheme: { work: 1, sleep: 2 } }
+    ]
+  }));
+  const dots = root._bump.querySelectorAll('[data-role="dot"]');
+  assert.ok(dots.length >= 4);
+  assert.ok(dots[0].listeners?.some(([type]) => type === 'click'));
+  assert.ok(root._bump.listeners?.some(([type]) => type === 'pointerover'));
+  assert.equal(root._bumpFoot.hidden, false);
+  assert.match(root._bumpLegend.textContent, /Work/);
 });
 
 test('index.html Mind board has no Talk launchers or cadence heatmap', async () => {
@@ -610,5 +790,23 @@ test('index.html Mind board has no Talk launchers or cadence heatmap', async () 
   assert.match(mind, /id="mind-tile-streak"/);
   assert.match(mind, /data-mind-range="year"/);
   assert.match(mind, /id="mind-mood-radial-label"/);
+  assert.match(mind, /id="mind-energy-orbit"/);
+  assert.match(mind, /Energy Orbit/);
+  assert.match(mind, /id="mind-lexical-label"/);
+  assert.match(mind, /Watchlist term counts by week/);
+  assert.match(mind, /id="mind-horizon-label"/);
+  assert.match(mind, /Mood and energy on one timeline/);
+  assert.match(mind, /mind-metric-strip-card/);
+  assert.match(mind, /id="mind-constellation-label"/);
+  assert.match(mind, /Themes that appear together/);
+  assert.match(mind, /mind-constellation-card/);
+  assert.match(mind, /constellation-compare/);
+  assert.match(mind, /id="mind-bump-label"/);
+  assert.match(mind, /Theme rank by week/);
+  assert.match(mind, /mind-bump-card/);
+  assert.match(mind, /id="mind-stream-label"/);
+  assert.match(mind, /Theme topography/);
+  assert.match(mind, /mind-stream-card/);
+  assert.doesNotMatch(mind, /id="mind-energy-rings"/);
   assert.match(mind, /viewBox="0 0 592 592"/);
 });
