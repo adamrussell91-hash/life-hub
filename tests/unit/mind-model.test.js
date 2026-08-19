@@ -7,6 +7,8 @@ import {
   entriesByMood,
   MIND_RANGES,
   moodRadialSeries,
+  energyOrbitSeries,
+  entriesForWatchlistTerm,
   moodScoreSeries,
   previousRangeWindow,
   recurringThemes,
@@ -32,7 +34,9 @@ import {
   waffleEntries,
   parseInsightExtras,
   displayThemeLabel,
-  entriesForTheme
+  entriesForTheme,
+  entriesForThemePair,
+  entriesForThemeWeek
 } from '../../js/app/mind-model.js';
 
 test('buildMindModel builds mood series, by-mood counts, and themes', () => {
@@ -280,6 +284,34 @@ test('diaryEntries includes body and sourceAgent', () => {
   assert.equal(entries[0].sourceAgent, 'import');
 });
 
+test('energyOrbitSeries keeps every in-range diary day with energy', () => {
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-01', energy: 'high' }, body: 'Bright.', path: 'a' },
+    { record: { type: 'diary', date: '2026-08-03', energy: 'low' }, body: 'Flat.', path: 'b' },
+    { record: { type: 'diary', date: '2026-08-04', mood: 'good' }, path: 'c' },
+    { record: { type: 'diary', date: '2026-07-01', energy: 'high' }, path: 'old' }
+  ]);
+  const points = energyOrbitSeries(entries, rangeWindow('2026-08-05', 'weekly'));
+  assert.deepEqual(points.map(point => point.date), ['2026-08-01', '2026-08-03']);
+  assert.equal(points[0].energy, 'high');
+  assert.equal(points[1].body, 'Flat.');
+});
+
+test('entriesForWatchlistTerm lists diary and session hits in a week', () => {
+  const bounds = { from: '2026-08-03', to: '2026-08-09' };
+  const rows = entriesForWatchlistTerm(
+    diaryEntries([{ record: { type: 'diary', date: '2026-08-04' }, body: 'I should rest.', path: 'd' }]),
+    sessionEntries([{
+      record: { type: 'mind_session', date: '2026-08-05', title: 'Wait', insight: 'Stay with the pause.', observation: 'fine' },
+      path: 's'
+    }]),
+    'should',
+    bounds
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].date, '2026-08-04');
+});
+
 test('entriesByEnergy counts diary energy in range', () => {
   const entries = diaryEntries([
     { record: { type: 'diary', date: '2026-08-01', energy: 'high' }, path: 'a' },
@@ -382,6 +414,9 @@ test('buildMindModel returns sessions, energy, insights, cross-agent lines, and 
   assert.equal(model.sessions.length, 1);
   assert.equal(model.sessions[0].theme, 'Weekend');
   assert.equal(model.energyByLevel.find(item => item.key === 'low').value, 1);
+  assert.equal(model.energyOrbit.length, 1);
+  assert.equal(model.energyOrbit[0].energy, 'low');
+  assert.ok(Array.isArray(model.previousEnergyOrbit));
   assert.equal(model.insights.length, 1);
   assert.equal(model.insights[0].title, 'Weekend');
   assert.deepEqual(model.crossAgentLines, ['Vera→Penelope: ask what the weekend is actually for.']);
@@ -553,6 +588,7 @@ Body here.
   assert.ok(Array.isArray(model.factorEffects));
   assert.equal(model.consistency.windowDays, 30);
   assert.ok(model.themeNodes.length);
+  assert.ok(Array.isArray(model.previousThemeCooccurrence));
   assert.equal(model.tensions.length, 1);
   assert.equal(model.tensions[0].stated, 0.2);
   assert.ok(Array.isArray(model.waffle));
@@ -569,4 +605,33 @@ test('entriesForTheme lists diary and sessions newest last', () => {
   assert.equal(rows.length, 2);
   assert.equal(rows[0].date, '2026-08-01');
   assert.match(rows[1].excerpt, /filter/i);
+});
+
+test('entriesForThemePair keeps only notes that carry both themes', () => {
+  const rows = entriesForThemePair(
+    diaryEntries([
+      { record: { type: 'diary', date: '2026-08-01', tags: ['work', 'sleep'] }, body: 'Both.', path: 'a' },
+      { record: { type: 'diary', date: '2026-08-02', tags: ['work'] }, body: 'Work only.', path: 'b' }
+    ]),
+    sessionEntries([]),
+    'work',
+    'sleep'
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].date, '2026-08-01');
+});
+
+test('entriesForThemeWeek keeps only that theme inside the week', () => {
+  const rows = entriesForThemeWeek(
+    diaryEntries([
+      { record: { type: 'diary', date: '2026-08-04', tags: ['work'] }, body: 'This week.', path: 'a' },
+      { record: { type: 'diary', date: '2026-07-28', tags: ['work'] }, body: 'Last week.', path: 'b' },
+      { record: { type: 'diary', date: '2026-08-05', tags: ['sleep'] }, body: 'Other theme.', path: 'c' }
+    ]),
+    sessionEntries([]),
+    'work',
+    '2026-08-03'
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].date, '2026-08-04');
 });
