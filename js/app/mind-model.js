@@ -129,6 +129,40 @@ export function entriesForTheme(entries, sessions, theme) {
   return rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }
 
+export function entriesForThemePair(entries, sessions, themeA, themeB) {
+  const a = normalizeThemeKey(themeA ?? '');
+  const b = normalizeThemeKey(themeB ?? '');
+  if (!a || !b) return [];
+  const rows = [];
+  for (const entry of entries ?? []) {
+    const tags = uniqueThemeKeys(entry.tags);
+    if (!tags.includes(a) || !tags.includes(b)) continue;
+    rows.push({
+      date: entry.date,
+      title: entry.title ?? null,
+      excerpt: String(entry.body || entry.insight || entry.observation || '').slice(0, 140)
+    });
+  }
+  for (const session of sessions ?? []) {
+    const themes = uniqueThemeKeys(sessionThemes(session));
+    if (!themes.includes(a) || !themes.includes(b)) continue;
+    rows.push({
+      date: session.date,
+      title: session.title ?? null,
+      excerpt: String(session.body || session.insight || session.observation || '').slice(0, 140)
+    });
+  }
+  return rows.sort((left, right) => String(left.date).localeCompare(String(right.date)));
+}
+
+export function entriesForThemeWeek(entries, sessions, theme, weekStart) {
+  const from = String(weekStart ?? '');
+  if (!from) return [];
+  const to = addCalendarDays(from, 6);
+  return entriesForTheme(entries, sessions, theme)
+    .filter(row => row.date >= from && row.date <= to);
+}
+
 function normalizeThemeKey(value) {
   return String(value).trim().toLowerCase();
 }
@@ -362,6 +396,21 @@ export function moodRadialSeries(entries, bounds) {
     }));
 }
 
+export function energyOrbitSeries(entries, bounds) {
+  return entries
+    .filter(entry => (
+      entry.date >= bounds.from
+      && entry.date <= bounds.to
+      && ENERGY_ORDER.includes(entry.energy)
+    ))
+    .map(entry => ({
+      date: entry.date,
+      energy: entry.energy,
+      mood: entry.mood ?? null,
+      body: entry.body ?? ''
+    }));
+}
+
 export function moodScoreSeries(entries, bounds) {
   const inRange = entries.filter(entry => (
     entry.date >= bounds.from
@@ -529,15 +578,21 @@ export function themeRanks(weekly) {
   });
 }
 
+function countWatchlistTerm(text, term) {
+  if (!text || !term) return 0;
+  const matches = String(text).match(new RegExp(`\\b${escapeRegExp(term)}\\b`, 'gi'));
+  return matches?.length ?? 0;
+}
+
+function sessionWatchText(session) {
+  return [session?.insight, session?.observation, session?.closingQuestion, session?.title]
+    .filter(Boolean)
+    .join('\n');
+}
+
 export function lexicalSeries(entries, sessions, bounds, watchlist) {
   const weeks = weeksInBounds(bounds);
   const weekIndex = new Map(weeks.map((week, index) => [week, index]));
-
-  function countTerm(text, term) {
-    if (!text) return 0;
-    const matches = String(text).match(new RegExp(`\\b${escapeRegExp(term)}\\b`, 'gi'));
-    return matches?.length ?? 0;
-  }
 
   return (watchlist ?? []).map(term => {
     const points = weeks.map(date => ({ date, count: 0 }));
@@ -545,17 +600,37 @@ export function lexicalSeries(entries, sessions, bounds, watchlist) {
       if (date < bounds.from || date > bounds.to) return;
       const index = weekIndex.get(getSydneyWeekStart(date));
       if (index == null) return;
-      points[index].count += countTerm(text, term);
+      points[index].count += countWatchlistTerm(text, term);
     }
     for (const entry of entries ?? []) addText(entry.body, entry.date);
-    for (const session of sessions ?? []) {
-      addText(
-        [session.insight, session.observation, session.closingQuestion, session.title].filter(Boolean).join('\n'),
-        session.date
-      );
-    }
+    for (const session of sessions ?? []) addText(sessionWatchText(session), session.date);
     return { term, points };
   });
+}
+
+export function entriesForWatchlistTerm(entries, sessions, term, bounds) {
+  const key = String(term ?? '').trim();
+  if (!key || !bounds?.from || !bounds?.to) return [];
+  const rows = [];
+  for (const entry of entries ?? []) {
+    if (entry.date < bounds.from || entry.date > bounds.to) continue;
+    if (!countWatchlistTerm(entry.body, key)) continue;
+    rows.push({
+      date: entry.date,
+      title: entry.title ?? null,
+      excerpt: String(entry.body || '').slice(0, 140)
+    });
+  }
+  for (const session of sessions ?? []) {
+    if (session.date < bounds.from || session.date > bounds.to) continue;
+    if (!countWatchlistTerm(sessionWatchText(session), key)) continue;
+    rows.push({
+      date: session.date,
+      title: session.title ?? session.theme ?? null,
+      excerpt: String(session.insight || session.observation || '').slice(0, 140)
+    });
+  }
+  return rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }
 
 export function butterfly(entries, sessions, bounds) {
@@ -665,12 +740,15 @@ export function buildMindModel({
   const inRangeEntries = entries.filter(entry => entry.date >= bounds.from && entry.date <= bounds.to);
   const moodSeries = moodScoreSeries(entries, bounds);
   const moodRadial = moodRadialSeries(entries, bounds);
+  const previousBounds = previousRangeWindow(date, selectedRange);
+  const energyOrbit = energyOrbitSeries(entries, bounds);
+  const previousEnergyOrbit = energyOrbitSeries(entries, previousBounds);
   const byMood = entriesByMood(entries, bounds);
   const allSessions = sessionEntries(events);
   const nodes = themeNodes(entries, allSessions, bounds);
   const meanByKey = new Map(nodes.map(node => [node.key, node.meanMood]));
   const prevCounts = new Map(
-    recurringThemes(entries, previousRangeWindow(date, selectedRange), { limit: 50 })
+    recurringThemes(entries, previousBounds, { limit: 50 })
       .map(theme => [theme.key, theme.value])
   );
   const themes = recurringThemes(entries, bounds).map(theme => ({
@@ -731,6 +809,8 @@ export function buildMindModel({
     bounds,
     moodSeries,
     moodRadial,
+    energyOrbit,
+    previousEnergyOrbit,
     byMood,
     themes,
     sessions,
@@ -747,6 +827,7 @@ export function buildMindModel({
     consistency: consistencyRing(entries, allSessions, date),
     themeNodes: nodes,
     themeCooccurrence: themeCooccurrence(entries, allSessions, bounds),
+    previousThemeCooccurrence: themeCooccurrence(entries, allSessions, previousBounds),
     themeWeekly: weekly,
     themeRanks: themeRanks(weekly),
     moodTransitions: moodTransitions(entries, bounds),

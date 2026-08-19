@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v89';
+const CACHE_NAME = 'life-hub-shell-v95';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -38,8 +38,12 @@ const SHELL_FILES = [
   'js/app/chart-kit/chord-layout.js',
   'js/app/chart-kit/radial-year.js',
   'js/app/chart-kit/mood-radial.js',
+  'js/app/chart-kit/energy-orbit.js',
+  'js/app/chart-kit/polar-clock.js',
+  'js/app/chart-kit/watchlist-heat.js',
   'js/app/chart-kit/mood-mix.js',
   'js/app/chart-kit/theme-orbit.js',
+  'js/app/chart-kit/theme-constellation.js',
   'js/app/chart-kit/horizon.js',
   'js/app/chart-kit/d3-layout.js',
   'js/app/chart-kit/vendor/d3-shape.min.js',
