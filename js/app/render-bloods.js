@@ -1,5 +1,14 @@
 import { categoryNote, explainerFor } from './bloods-explainers.js';
-import { combinedChartSvg, markerVisual } from './bloods-charts.js';
+import {
+  buildFbcRadial,
+  buildGlucoseMap,
+  buildLipidRings,
+  combinedChartSvg,
+  fbcRadialSvg,
+  glucoseMapSvg,
+  lipidRingsSvg,
+  markerVisual
+} from './bloods-charts.js';
 import { renderBiochemistryGroups } from './bloods-instruments.js';
 import { formatDisplayDate } from '../core/time.js';
 
@@ -246,7 +255,9 @@ function categoryCard(root, category, model, flareOn) {
   const body = root.createElement('div');
   body.className = 'bloods-category__body';
 
-  if (category.id !== 'Biochemistry/Electrolytes') {
+  const pictureOnly = category.id === 'Glucose/Diabetes' || category.id === 'Lipid Studies';
+
+  if (category.id !== 'Biochemistry/Electrolytes' && !pictureOnly) {
     const strip = root.createElement('div');
     strip.className = 'bloods-summary-strip';
     for (const marker of category.markers.filter(m => !m.qualitative)) {
@@ -270,6 +281,25 @@ function categoryCard(root, category, model, flareOn) {
     box.checked = flareOn;
     flare.append(box, documentText(root, ' Show flare diary ticks'));
     body.append(flare);
+  }
+
+  if (category.id === 'Full Blood Count') {
+    const radial = fbcRadialSvg(root, buildFbcRadial(category.markers));
+    if (radial) body.append(radial);
+  }
+
+  if (category.id === 'Glucose/Diabetes') {
+    const map = glucoseMapSvg(root, buildGlucoseMap(category.markers));
+    if (map) body.append(map);
+    article.append(body);
+    return article;
+  }
+
+  if (category.id === 'Lipid Studies') {
+    const rings = lipidRingsSvg(root, buildLipidRings(category.markers));
+    if (rings) body.append(rings);
+    article.append(body);
+    return article;
   }
 
   if (category.lipidRatio) {

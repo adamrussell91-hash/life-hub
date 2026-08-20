@@ -1,10 +1,15 @@
 import { animateAreaReveal } from './chart-kit/animate.js';
 import { buildAreaLine, straightLinePath } from './chart-kit/area-line.js';
 import {
+  allowanceUsed,
   bandDomain,
+  buildFbcRadial,
+  buildGlucoseMap,
+  buildLipidRings,
   compareChartPoints,
   glucoseZones,
   nextComparePins,
+  pointHoverNote,
   pointStatus,
   rangeBarLayout
 } from './bloods-charts-layout.js';
@@ -12,10 +17,15 @@ import { statusTone } from './bloods-model.js';
 import { formatShortMonth } from '../core/time.js';
 
 export {
+  allowanceUsed,
   bandDomain,
+  buildFbcRadial,
+  buildGlucoseMap,
+  buildLipidRings,
   compareChartPoints,
   glucoseZones,
   nextComparePins,
+  pointHoverNote,
   pointStatus,
   rangeBarLayout
 };
@@ -31,6 +41,12 @@ const METER_HEIGHT = 16;
 const MAX_TICKS = 5;
 const COMBINED_WIDTH = 960;
 const COMBINED_HEIGHT = 160;
+const RADIAL_WIDTH = 720;
+const RADIAL_HEIGHT = 640;
+const GLUCOSE_WIDTH = 640;
+const GLUCOSE_HEIGHT = 400;
+const RINGS_WIDTH = 640;
+const RINGS_HEIGHT = 420;
 
 export function markerVisual(root, marker, { flareMarks = [], flareOn = false } = {}) {
   if (marker.qualitative || marker.chartKind === 'none') return null;
@@ -187,6 +203,287 @@ export function combinedChartSvg(root, combined) {
   return wrap;
 }
 
+export function fbcRadialSvg(root, layout) {
+  const spokes = layout?.spokes ?? [];
+  if (!spokes.length) return null;
+  const wrap = root.createElement('div');
+  wrap.className = 'bloods-fbc-radial';
+  const chart = svgRoot(root, 'Full blood count by how much of each marker’s allowance is used', 'bloods-fbc-radial__chart', RADIAL_HEIGHT, RADIAL_WIDTH);
+  const cx = RADIAL_WIDTH / 2;
+  const cy = RADIAL_HEIGHT / 2 + 8;
+  const R = 208;
+  const inner = 0.055;
+
+  for (const frac of [0.25, 0.5, 0.75]) {
+    const ring = el(root, 'circle');
+    ring.setAttribute('data-role', 'fbc-guide');
+    ring.setAttribute('cx', String(cx));
+    ring.setAttribute('cy', String(cy));
+    ring.setAttribute('r', String(R * frac));
+    chart.append(ring);
+  }
+  const limit = el(root, 'circle');
+  limit.setAttribute('data-role', 'fbc-limit');
+  limit.setAttribute('cx', String(cx));
+  limit.setAttribute('cy', String(cy));
+  limit.setAttribute('r', String(R));
+  chart.append(limit);
+
+  const radiusAt = used => R * (inner + Math.min(used ?? 0, 1.13) * (1 - inner));
+  for (const spoke of spokes) {
+    const g = el(root, 'g');
+    g.setAttribute('data-role', 'fbc-spoke');
+    g.setAttribute('data-marker', spoke.key);
+    g.setAttribute('data-tone', spoke.tone);
+    const [sx, sy] = polar(cx, cy, R * 1.08, spoke.angle);
+    const ray = el(root, 'line');
+    ray.setAttribute('data-role', 'fbc-ray');
+    ray.setAttribute('x1', String(cx));
+    ray.setAttribute('y1', String(cy));
+    ray.setAttribute('x2', String(sx));
+    ray.setAttribute('y2', String(sy));
+    g.append(ray);
+    const rNow = radiusAt(spoke.used);
+    if (spoke.prevUsed != null && Math.abs(spoke.prevUsed - spoke.used) > 0.02) {
+      const rPrev = radiusAt(spoke.prevUsed);
+      const [ax, ay] = polar(cx, cy, rPrev, spoke.angle);
+      const [bx, by] = polar(cx, cy, rNow, spoke.angle);
+      const tail = el(root, 'line');
+      tail.setAttribute('data-role', 'fbc-tail');
+      tail.setAttribute('x1', String(ax));
+      tail.setAttribute('y1', String(ay));
+      tail.setAttribute('x2', String(bx));
+      tail.setAttribute('y2', String(by));
+      const ghost = el(root, 'circle');
+      ghost.setAttribute('data-role', 'fbc-ghost');
+      ghost.setAttribute('cx', String(ax));
+      ghost.setAttribute('cy', String(ay));
+      ghost.setAttribute('r', '3.5');
+      g.append(tail, ghost);
+    }
+    const [px, py] = polar(cx, cy, rNow, spoke.angle);
+    const dot = el(root, 'circle');
+    dot.setAttribute('data-role', 'fbc-dot');
+    dot.setAttribute('cx', String(px));
+    dot.setAttribute('cy', String(py));
+    dot.setAttribute('r', '6');
+    g.append(dot);
+    const [tx, ty] = polar(cx, cy, R * 1.16, spoke.angle);
+    const flip = spoke.angle > 180;
+    const lab = el(root, 'text');
+    lab.setAttribute('data-role', 'fbc-label');
+    lab.setAttribute('x', String(tx));
+    lab.setAttribute('y', String(ty));
+    lab.setAttribute('text-anchor', flip ? 'end' : 'start');
+    lab.setAttribute('transform', `rotate(${flip ? spoke.angle + 90 : spoke.angle - 90} ${tx} ${ty})`);
+    lab.textContent = spoke.label;
+    g.append(lab);
+    g.setAttribute('aria-label', `${spoke.label} ${Math.round(spoke.used * 100)}% of allowance`);
+    chart.append(g);
+  }
+  wrap.append(chart);
+  return wrap;
+}
+
+export function glucoseMapSvg(root, layout) {
+  const points = layout?.points ?? [];
+  const wrap = root.createElement('div');
+  wrap.className = 'bloods-glucose-map';
+  const chart = svgRoot(root, 'Fasting glucose against HbA1c', 'bloods-glucose-map__chart', GLUCOSE_HEIGHT, GLUCOSE_WIDTH);
+  const L = 52, Rr = 24, T = 36, B = 48;
+  const x0 = L, x1 = GLUCOSE_WIDTH - Rr, y0 = T, y1 = GLUCOSE_HEIGHT - B;
+  const XD = [4.2, 7.4], YD = [4.6, 6.9];
+  const X = v => x0 + ((v - XD[0]) / (XD[1] - XD[0])) * (x1 - x0);
+  const Y = v => y1 - ((v - YD[0]) / (YD[1] - YD[0])) * (y1 - y0);
+  const FN = 5.5, FR = 7.0, AN = 5.7, AR = 6.5;
+
+  const diabetic = el(root, 'rect');
+  diabetic.setAttribute('data-role', 'glucose-zone');
+  diabetic.setAttribute('data-zone', 'diabetes');
+  diabetic.setAttribute('x', String(x0));
+  diabetic.setAttribute('y', String(y0));
+  diabetic.setAttribute('width', String(x1 - x0));
+  diabetic.setAttribute('height', String(y1 - y0));
+  chart.append(diabetic);
+
+  const risk = el(root, 'rect');
+  risk.setAttribute('data-role', 'glucose-zone');
+  risk.setAttribute('data-zone', 'risk');
+  risk.setAttribute('x', String(x0));
+  risk.setAttribute('y', String(Y(AR)));
+  risk.setAttribute('width', String(X(FR) - x0));
+  risk.setAttribute('height', String(y1 - Y(AR)));
+  chart.append(risk);
+
+  const normal = el(root, 'rect');
+  normal.setAttribute('data-role', 'glucose-zone');
+  normal.setAttribute('data-zone', 'normal');
+  normal.setAttribute('x', String(x0));
+  normal.setAttribute('y', String(Y(AN)));
+  normal.setAttribute('width', String(X(FN) - x0));
+  normal.setAttribute('height', String(y1 - Y(AN)));
+  chart.append(normal);
+
+  for (const [label, x, y, zone] of [
+    ['NORMAL', x0 + 8, y1 - 10, 'normal'],
+    ['AT RISK', X(FN) + 8, Y(AR) + 16, 'risk'],
+    ['DIABETIC', x1 - 8, y0 + 16, 'diabetes']
+  ]) {
+    const text = el(root, 'text');
+    text.setAttribute('data-role', 'glucose-zone-label');
+    text.setAttribute('data-zone', zone);
+    text.setAttribute('x', String(x));
+    text.setAttribute('y', String(y));
+    text.setAttribute('text-anchor', zone === 'diabetes' ? 'end' : 'start');
+    text.textContent = label;
+    chart.append(text);
+  }
+
+  if (points.length) {
+    const d = points.map((point, i) => `${i ? 'L' : 'M'}${X(point.fasting)},${Y(point.hba1c)}`).join(' ');
+    const path = el(root, 'path');
+    path.setAttribute('data-role', 'glucose-path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    chart.append(path);
+    if (points.length > 1) {
+      const a = points.at(-2), b = points.at(-1);
+      const ang = Math.atan2(Y(b.hba1c) - Y(a.hba1c), X(b.fasting) - X(a.fasting));
+      const arrow = el(root, 'path');
+      arrow.setAttribute('data-role', 'glucose-arrow');
+      arrow.setAttribute('d', 'M0,0 L-9,-4.2 L-9,4.2 Z');
+      arrow.setAttribute('transform', `translate(${X(b.fasting) - Math.cos(ang) * 7},${Y(b.hba1c) - Math.sin(ang) * 7}) rotate(${ang * 180 / Math.PI})`);
+      chart.append(arrow);
+    }
+    points.forEach((point, i) => {
+      const last = i === points.length - 1;
+      const dot = el(root, 'circle');
+      dot.setAttribute('data-role', last ? 'glucose-latest' : 'glucose-point');
+      dot.setAttribute('cx', String(X(point.fasting)));
+      dot.setAttribute('cy', String(Y(point.hba1c)));
+      dot.setAttribute('r', last ? '6.5' : '4.5');
+      chart.append(dot);
+    });
+  }
+  const xTitle = el(root, 'text');
+  xTitle.setAttribute('x', String((x0 + x1) / 2));
+  xTitle.setAttribute('y', String(GLUCOSE_HEIGHT - 10));
+  xTitle.setAttribute('text-anchor', 'middle');
+  xTitle.textContent = 'fasting glucose  mmol/L';
+  const yTitle = el(root, 'text');
+  yTitle.setAttribute('x', '14');
+  yTitle.setAttribute('y', String((y0 + y1) / 2));
+  yTitle.setAttribute('text-anchor', 'middle');
+  yTitle.setAttribute('transform', `rotate(-90 14 ${(y0 + y1) / 2})`);
+  yTitle.textContent = 'HbA1c  %';
+  chart.append(xTitle, yTitle);
+
+  wrap.append(chart);
+  if (layout?.insulin?.caption) {
+    const caption = root.createElement('p');
+    caption.className = 'metric-caption bloods-glucose-map__insulin';
+    caption.textContent = layout.insulin.caption;
+    wrap.append(caption);
+  }
+  return wrap;
+}
+
+export function lipidRingsSvg(root, layout) {
+  const rings = layout?.rings ?? [];
+  if (!rings.length) return null;
+  const wrap = root.createElement('div');
+  wrap.className = 'bloods-lipid-rings';
+  const chart = svgRoot(root, 'Lipids as nested allowances', 'bloods-lipid-rings__chart', RINGS_HEIGHT, RINGS_WIDTH);
+  const CX = 420, CY = 188, SWEEP = 286, START = -143;
+  const radii = [126, 94, 62];
+
+  rings.forEach((ring, index) => {
+    const r = radii[index] ?? 62;
+    const g = el(root, 'g');
+    g.setAttribute('data-role', 'lipid-ring');
+    g.setAttribute('data-ring', ring.id);
+    const track = el(root, 'path');
+    track.setAttribute('data-role', 'lipid-track');
+    track.setAttribute('d', arcPath(CX, CY, r, START, START + SWEEP));
+    track.setAttribute('fill', 'none');
+    g.append(track);
+    if (ring.prevUsed != null) {
+      const ghost = el(root, 'path');
+      ghost.setAttribute('data-role', 'lipid-ghost');
+      ghost.setAttribute('d', arcPath(CX, CY, r, START, START + Math.min(ring.prevUsed, 1) * SWEEP));
+      ghost.setAttribute('fill', 'none');
+      g.append(ghost);
+    }
+    if (ring.segs) {
+      let a = START;
+      ring.segs.forEach(seg => {
+        const sweep = (seg.value / ring.limit) * SWEEP;
+        if (!(sweep > 0)) return;
+        const slice = el(root, 'path');
+        slice.setAttribute('data-role', 'lipid-seg');
+        slice.setAttribute('data-seg', seg.id);
+        slice.setAttribute('d', arcPath(CX, CY, r, a, a + sweep));
+        slice.setAttribute('fill', 'none');
+        g.append(slice);
+        a += sweep;
+      });
+    } else {
+      const fill = el(root, 'path');
+      fill.setAttribute('data-role', 'lipid-fill');
+      fill.setAttribute('d', arcPath(CX, CY, r, START, START + Math.min(ring.used, 1) * SWEEP));
+      fill.setAttribute('fill', 'none');
+      g.append(fill);
+    }
+    if (ring.direction && ring.direction !== 'flat') {
+      const tip = START + Math.min(ring.used, 1) * SWEEP;
+      const [tx, ty] = polar(CX, CY, r, tip);
+      const tangent = (tip + (ring.direction === 'out' ? 90 : -90));
+      const arrow = el(root, 'path');
+      arrow.setAttribute('data-role', 'lipid-arrow');
+      arrow.setAttribute('data-dir', ring.direction);
+      arrow.setAttribute('d', 'M0,0 L-8,-3.6 L-8,3.6 Z');
+      arrow.setAttribute('transform', `translate(${tx},${ty}) rotate(${tangent})`);
+      g.append(arrow);
+    }
+    chart.append(g);
+  });
+
+  const total = rings.find(ring => ring.id === 'total');
+  if (total) {
+    const centre = el(root, 'text');
+    centre.setAttribute('data-role', 'lipid-centre');
+    centre.setAttribute('x', String(CX));
+    centre.setAttribute('y', String(CY + 4));
+    centre.setAttribute('text-anchor', 'middle');
+    centre.textContent = Number.isInteger(total.value) ? String(total.value) : total.value.toFixed(1);
+    chart.append(centre);
+  }
+
+  rings.forEach((ring, index) => {
+    const y = 70 + index * 52;
+    const name = el(root, 'text');
+    name.setAttribute('x', '16');
+    name.setAttribute('y', String(y));
+    name.textContent = `${ring.label} · ${Math.round(ring.used * 100)}% spent`;
+    chart.append(name);
+  });
+
+  wrap.append(chart);
+  return wrap;
+}
+
+function polar(cx, cy, r, deg) {
+  const a = (deg - 90) * Math.PI / 180;
+  return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+}
+
+function arcPath(cx, cy, r, a0, a1) {
+  const [sx, sy] = polar(cx, cy, r, a0);
+  const [ex, ey] = polar(cx, cy, r, a1);
+  const large = Math.abs(a1 - a0) > 180 ? 1 : 0;
+  return `M${sx},${sy} A${r},${r} 0 ${large} 1 ${ex},${ey}`;
+}
+
 function previousSeriesValue(marker) {
   const series = (marker.series ?? []).filter(point => point.value != null && Number.isFinite(Number(point.value)));
   if (series.length < 2) return null;
@@ -229,9 +526,15 @@ function zonedChartSvg(root, marker) {
     const line = el(root, 'path');
     line.setAttribute('data-role', 'line');
     line.setAttribute('d', straightLinePath(built.points));
-    chart.append(line);
+    const points = el(root, 'g');
+    points.setAttribute('data-role', 'points');
+    chart.append(line, points);
+    const drawn = paintPoints(root, points, built.points);
     bindScrub(chart, built.points);
     bindCompare(root, wrap, chart, built.points);
+    wrap.append(chart);
+    bindPointNotes(root, wrap, chart, built.points, drawn, { unit: marker.latest?.unit });
+    return wrap;
   }
   wrap.append(chart);
   return wrap;
@@ -287,20 +590,9 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
 
   area.setAttribute('d', built.areaPath || built.areaPoints || '');
   line.setAttribute('d', straightLinePath(built.points));
-  const lastIndex = built.points.length - 1;
-  for (const [index, point] of built.points.entries()) {
-    const circle = el(root, 'circle');
-    circle.setAttribute('cx', String(point.x));
-    circle.setAttribute('cy', String(point.y));
-    circle.setAttribute('r', index === lastIndex ? '4.5' : '3');
-    circle.setAttribute('data-role', index === lastIndex ? 'latest-point' : 'point');
-    // Each draw is coloured by how it read on the day, so a run of flagged
-    // results is visible without reading the numbers.
-    circle.setAttribute('data-tone', statusTone(pointStatus(point.value, refLow, refHigh), marker.key));
-    circle.dataset.date = point.date ?? '';
-    circle.dataset.value = String(point.value ?? '');
-    points.append(circle);
-  }
+  const drawn = paintPoints(root, points, built.points, {
+    toneFor: point => statusTone(pointStatus(point.value, refLow, refHigh), marker.key)
+  });
 
   if (flareOn) {
     for (const mark of flareMarks) {
@@ -320,6 +612,7 @@ function lineChartSvg(root, marker, { flareMarks, flareOn }) {
   bindCompare(root, wrap, chart, built.points);
   queueMicrotask(() => animateAreaReveal(chart));
   wrap.append(chart);
+  bindPointNotes(root, wrap, chart, built.points, drawn, { unit: marker.latest?.unit });
   const ticks = tickRow(root, built.points);
   if (ticks) wrap.append(ticks);
   return wrap;
@@ -363,6 +656,87 @@ function tickPoints(points) {
     });
   }
   return chosen;
+}
+
+function paintPoints(root, host, points, { toneFor } = {}) {
+  const lastIndex = points.length - 1;
+  const drawn = [];
+  for (const [index, point] of points.entries()) {
+    const circle = el(root, 'circle');
+    circle.setAttribute('cx', String(point.x));
+    circle.setAttribute('cy', String(point.y));
+    circle.setAttribute('r', index === lastIndex ? '4.5' : '3');
+    circle.setAttribute('data-role', index === lastIndex ? 'latest-point' : 'point');
+    if (toneFor) circle.setAttribute('data-tone', toneFor(point));
+    circle.dataset.date = point.date ?? '';
+    circle.dataset.value = String(point.value ?? '');
+    host.append(circle);
+    drawn.push({ point, circle });
+  }
+  return drawn;
+}
+
+function bindPointNotes(root, wrap, chart, points, drawn, { unit, width = CHART_WIDTH, height = CHART_HEIGHT } = {}) {
+  if (!points?.length) return;
+  const note = root.createElement('div');
+  note.className = 'bloods-point-note';
+  note.dataset.role = 'point-note';
+  note.hidden = true;
+  note.setAttribute('aria-live', 'polite');
+  wrap.append(note);
+
+  const show = point => {
+    const index = points.findIndex(item =>
+      item === point || (item.date === point.date && item.value === point.value)
+    );
+    const payload = pointHoverNote(point, index > 0 ? points[index - 1] : null, { unit });
+    if (!payload) {
+      note.hidden = true;
+      return;
+    }
+    note.replaceChildren();
+    const date = root.createElement('span');
+    date.className = 'bloods-point-note__date';
+    date.textContent = payload.date;
+    const amount = root.createElement('span');
+    amount.className = 'bloods-point-note__amount';
+    amount.textContent = payload.amount;
+    note.append(date, amount);
+    if (payload.change) {
+      const change = root.createElement('span');
+      change.className = 'bloods-point-note__change';
+      change.dataset.dir = payload.dir;
+      change.textContent = payload.change;
+      note.append(change);
+    }
+    if (note.style) {
+      note.style.left = `${(point.x / width) * 100}%`;
+      note.style.top = `${(point.y / height) * 100}%`;
+    }
+    note.hidden = false;
+    chart.dataset.scrubDate = point.date ?? '';
+    chart.dataset.scrubValue = String(point.value ?? '');
+  };
+  const hide = () => {
+    note.hidden = true;
+  };
+
+  for (const { point, circle } of drawn ?? []) {
+    const index = points.findIndex(item => item === point);
+    const payload = pointHoverNote(point, index > 0 ? points[index - 1] : null, { unit });
+    circle.setAttribute('tabindex', '0');
+    if (payload) circle.setAttribute('aria-label', payload.label);
+    circle.addEventListener?.('pointerenter', () => show(point));
+    circle.addEventListener?.('pointerleave', hide);
+    circle.addEventListener?.('focus', () => show(point));
+    circle.addEventListener?.('blur', hide);
+  }
+
+  chart.addEventListener?.('pointermove', event => {
+    const nearest = nearestPoint(chart, points, event);
+    if (nearest) show(nearest);
+  });
+  chart.addEventListener?.('pointerleave', hide);
 }
 
 function bindScrub(chart, points) {
