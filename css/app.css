@@ -2750,6 +2750,114 @@ main { max-width: 76rem; margin: 0 auto; }
   }
 }
 #body-bloods-dashboard .line-chart.bloods-combined-strip { aspect-ratio: 960 / 160; }
+.bloods-fbc-radial,
+.bloods-glucose-map,
+.bloods-lipid-rings {
+  margin: 0 0 var(--space-4);
+}
+#body-bloods-dashboard .line-chart.bloods-fbc-radial__chart { aspect-ratio: 720 / 640; overflow: visible; }
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-role="fbc-guide"] {
+  fill: none;
+  stroke: var(--line);
+}
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-role="fbc-limit"] {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-opacity: 0.55;
+}
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-role="fbc-ray"] {
+  stroke: var(--line);
+}
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-role="fbc-tail"] {
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-role="fbc-ghost"] {
+  fill: var(--paper);
+  stroke: var(--muted);
+  stroke-width: 2;
+}
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-role="fbc-dot"] {
+  fill: var(--wave);
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-tone="leaning"] [data-role="fbc-dot"] { fill: var(--high-sea); }
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-tone="ring"] [data-role="fbc-dot"] { fill: var(--warning); }
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-tone="out"] [data-role="fbc-dot"] { fill: var(--danger); }
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-role="fbc-label"] {
+  fill: var(--muted);
+  font-size: var(--text-xs);
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 3;
+}
+#body-bloods-dashboard .line-chart.bloods-glucose-map__chart { aspect-ratio: 640 / 400; }
+#body-bloods-dashboard .bloods-glucose-map__chart [data-zone="diabetes"] { fill: var(--danger-surface); }
+#body-bloods-dashboard .bloods-glucose-map__chart [data-zone="risk"] { fill: var(--warning-surface); }
+#body-bloods-dashboard .bloods-glucose-map__chart [data-zone="normal"] { fill: var(--success-surface); }
+#body-bloods-dashboard .bloods-glucose-map__chart [data-role="glucose-zone-label"] {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.08em;
+}
+#body-bloods-dashboard .bloods-glucose-map__chart [data-role="glucose-zone-label"][data-zone="normal"] { fill: var(--pastel-sage-ink); }
+#body-bloods-dashboard .bloods-glucose-map__chart [data-role="glucose-zone-label"][data-zone="risk"] { fill: var(--pastel-gold-ink); }
+#body-bloods-dashboard .bloods-glucose-map__chart [data-role="glucose-zone-label"][data-zone="diabetes"] { fill: var(--pastel-peach-ink); }
+#body-bloods-dashboard .bloods-glucose-map__chart [data-role="glucose-path"] {
+  stroke: var(--wave);
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+#body-bloods-dashboard .bloods-glucose-map__chart [data-role="glucose-arrow"] {
+  fill: var(--wave);
+  stroke: none;
+}
+#body-bloods-dashboard .bloods-glucose-map__chart [data-role="glucose-point"] {
+  fill: var(--paper);
+  stroke: var(--wave);
+  stroke-width: 2;
+}
+#body-bloods-dashboard .bloods-glucose-map__chart [data-role="glucose-latest"] {
+  fill: var(--wave);
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+.bloods-glucose-map__insulin { margin-top: var(--space-2); }
+#body-bloods-dashboard .line-chart.bloods-lipid-rings__chart { aspect-ratio: 640 / 420; }
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-track"] {
+  stroke: var(--line);
+  stroke-width: 16;
+  stroke-linecap: round;
+}
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-ghost"] {
+  stroke: var(--muted);
+  stroke-width: 8;
+  stroke-linecap: round;
+  opacity: 0.45;
+}
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-fill"] {
+  stroke: var(--wave);
+  stroke-width: 16;
+  stroke-linecap: round;
+}
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-seg="hdl"] { stroke: var(--success); stroke-width: 16; stroke-linecap: round; }
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-seg="ldl"] { stroke: var(--high-sea); stroke-width: 16; stroke-linecap: round; }
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-seg="other"] { stroke: var(--wave); stroke-width: 16; stroke-linecap: round; }
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-arrow"] { fill: var(--ink); }
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-centre"] {
+  fill: var(--ink);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+}
+#body-bloods-dashboard .bloods-lipid-rings__chart text:not([data-role="lipid-centre"]) {
+  fill: var(--muted);
+  font-size: var(--text-xs);
+}
 #body-bloods-dashboard .bloods-combined-strip [data-role="ref-band"] { fill: var(--pastel-sage); }
 #body-bloods-dashboard .bloods-combined-strip [data-role="line"] {
   fill: none;

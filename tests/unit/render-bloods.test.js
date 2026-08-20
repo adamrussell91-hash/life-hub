@@ -307,7 +307,7 @@ test('renderBloods empty flags copy and skips charts for qualitative markers', (
   assert.equal(root._host.querySelector('.body-chart'), null);
 });
 
-test('Lipid Studies render a Total:HDL ratio chip', () => {
+test('Lipid Studies render nested rings and drop the ratio chip and tiles', () => {
   const root = fakeRoot();
   renderBloods(root, {
     ...model,
@@ -316,22 +316,54 @@ test('Lipid Studies render a Total:HDL ratio chip', () => {
       id: 'Lipid Studies',
       title: 'Lipid Studies',
       hasFlags: false,
-      collapsed: true,
-      lipidRatio: { value: 4, source: 'computed', date: '2026-05-19', tone: 'low' },
-      markers: [{
-        ...alt,
-        key: 'hdl',
-        label: 'HDL',
-        chartKind: 'range-bar',
-        statusTone: 'normal',
-        latest: { date: '2026-05-19', value: 1.3, unit: 'mmol/L', status: 'Normal' }
-      }]
+      collapsed: false,
+      lipidRatio: { value: 3.5, source: 'computed', date: '2026-02-20', tone: 'normal' },
+      markers: [
+        {
+          ...alt,
+          key: 'cholesterol',
+          label: 'Cholesterol',
+          chartKind: 'line',
+          statusTone: 'normal',
+          latest: { date: '2026-02-20', value: 4.5, unit: 'mmol/L', status: 'Normal', ref_high: 5.6 },
+          series: [
+            { date: '2025-11-03', value: 5.2 },
+            { date: '2026-02-20', value: 4.5 }
+          ]
+        },
+        {
+          ...alt,
+          key: 'hdl',
+          label: 'HDL',
+          chartKind: 'meter',
+          statusTone: 'normal',
+          latest: { date: '2026-02-20', value: 1.3, unit: 'mmol/L', status: 'Normal', ref_low: 0.9 },
+          series: [
+            { date: '2025-11-03', value: 1.28 },
+            { date: '2026-02-20', value: 1.3 }
+          ]
+        },
+        {
+          ...alt,
+          key: 'ldl',
+          label: 'LDL',
+          chartKind: 'line',
+          statusTone: 'normal',
+          latest: { date: '2026-02-20', value: 2.8, unit: 'mmol/L', status: 'Normal', ref_high: 3.1 },
+          series: [
+            { date: '2025-11-03', value: 3.3 },
+            { date: '2026-02-20', value: 2.8 }
+          ]
+        }
+      ]
     }]
   });
-  const chip = root._host.querySelector('.bloods-lipid-ratio');
-  assert.ok(chip);
-  assert.match(String(chip.textContent), /Total : HDL 4/);
-  assert.equal(chip.dataset.status, 'low');
+  assert.ok(root._host.querySelector('.bloods-lipid-rings'));
+  assert.ok(root._host.querySelector('[data-role="lipid-ring"]'));
+  assert.ok(root._host.querySelector('[data-role="lipid-arrow"]'));
+  assert.equal(root._host.querySelector('.bloods-lipid-ratio'), null);
+  assert.equal(root._host.querySelector('.bloods-metric-grid'), null);
+  assert.equal(root._host.querySelector('.bloods-rows'), null);
 });
 
 test('a marker with history gets a trend card: what-line, status, band, and dated ticks', () => {
@@ -388,6 +420,30 @@ test('a marker with history gets a trend card: what-line, status, band, and date
   const ticks = tile.querySelectorAll('.bloods-ticks__item');
   assert.ok(ticks.length >= 2, 'the chart is dated at both ends');
   assert.match(String(ticks[0].textContent), /’25/);
+
+  const wrap = tile.querySelector('.bloods-line-wrap');
+  const note = wrap?.querySelector('[data-role="point-note"]');
+  assert.ok(note, 'each trend chart carries a hover note');
+  assert.equal(note.hidden, true);
+  const mid = dots[1];
+  const enter = mid.listeners.find(([type]) => type === 'pointerenter');
+  assert.ok(enter, 'hovering a dot shows the note');
+  enter[1]();
+  assert.equal(note.hidden, false);
+  assert.match(String(note.textContent), /01\/06\/25/);
+  assert.match(String(note.textContent), /242/);
+  assert.match(String(note.textContent), /↓24\.4%|↓24%/);
+  assert.equal(note.querySelector('.bloods-point-note__change')?.dataset.dir, 'down');
+  const leave = mid.listeners.find(([type]) => type === 'pointerleave');
+  leave[1]();
+  assert.equal(note.hidden, true);
+
+  const first = dots[0];
+  first.listeners.find(([type]) => type === 'pointerenter')[1]();
+  assert.match(String(note.textContent), /11\/01\/25/);
+  assert.match(String(note.textContent), /320/);
+  assert.doesNotMatch(String(note.textContent), /[↑↓%]/);
+  assert.equal(first.getAttribute('aria-label')?.includes('%'), false);
 });
 
 test('a marker with one or two draws becomes a row: value, meter, band, status', () => {
@@ -795,5 +851,105 @@ test('filtering protein markers hides the aggregate band instead of showing unfi
   root._search.value = 'igg1';
   root._search.listeners.find(([type]) => type === 'input')[1]();
   assert.equal(root._host.querySelector('.bloods-protein-band').hidden, true);
+});
+
+test('Full Blood Count renders a radial and keeps the marker tiles', () => {
+  const root = fakeRoot();
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: [{
+      id: 'Full Blood Count',
+      title: 'Full Blood Count',
+      hasFlags: false,
+      collapsed: false,
+      markers: [
+        {
+          ...alt,
+          key: 'haemoglobin',
+          label: 'Haemoglobin',
+          chartKind: 'line',
+          statusTone: 'normal',
+          latest: { date: '2026-05-19', value: 151, unit: 'g/L', status: 'Normal', ref_low: 130, ref_high: 180 },
+          series: [
+            { date: '2026-02-20', value: 147 },
+            { date: '2026-04-10', value: 141 },
+            { date: '2026-05-19', value: 151 }
+          ]
+        },
+        {
+          ...alt,
+          key: 'haematocrit',
+          label: 'Haematocrit',
+          chartKind: 'meter',
+          statusTone: 'normal',
+          latest: { date: '2026-05-19', value: 0.5, unit: 'L/L', status: 'Normal', ref_low: 0.4, ref_high: 0.5 },
+          series: [
+            { date: '2026-02-20', value: 0.46 },
+            { date: '2026-05-19', value: 0.5 }
+          ]
+        }
+      ]
+    }]
+  });
+  assert.ok(root._host.querySelector('.bloods-fbc-radial'));
+  assert.ok(root._host.querySelector('[data-role="fbc-spoke"]'));
+  assert.ok(root._host.querySelector('.bloods-metric-grid') || root._host.querySelector('.bloods-rows'));
+});
+
+test('Glucose/Diabetes renders the zone map and no marker tiles', () => {
+  const root = fakeRoot();
+  renderBloods(root, {
+    ...model,
+    flagged: [],
+    categories: [{
+      id: 'Glucose/Diabetes',
+      title: 'Glucose/Diabetes',
+      hasFlags: false,
+      collapsed: false,
+      markers: [
+        {
+          ...alt,
+          key: 'fasting_glucose',
+          label: 'Fasting glucose',
+          chartKind: 'zoned',
+          statusTone: 'normal',
+          latest: { date: '2026-05-19', value: 5.3, unit: 'mmol/L', status: 'Normal', ref_low: 3, ref_high: 5.4 },
+          series: [
+            { date: '2025-11-03', value: 4.6 },
+            { date: '2026-02-20', value: 4.7 },
+            { date: '2026-05-19', value: 5.3 }
+          ]
+        },
+        {
+          ...alt,
+          key: 'hba1c_ngsp',
+          label: 'HbA1c',
+          chartKind: 'zoned',
+          statusTone: 'normal',
+          latest: { date: '2026-05-19', value: 5.0, unit: '%', status: 'Normal', ref_low: 4, ref_high: 5.9 },
+          series: [
+            { date: '2025-11-03', value: 5.6 },
+            { date: '2026-02-20', value: 5.7 },
+            { date: '2026-05-19', value: 5.0 }
+          ]
+        },
+        {
+          ...alt,
+          key: 'insulin',
+          label: 'Insulin',
+          chartKind: 'meter',
+          statusTone: 'normal',
+          latest: { date: '2026-02-20', value: 7.7, unit: 'mIU/L', status: 'Normal', ref_low: 3, ref_high: 25 },
+          series: [{ date: '2026-02-20', value: 7.7 }]
+        }
+      ]
+    }]
+  });
+  assert.ok(root._host.querySelector('.bloods-glucose-map'));
+  assert.ok(root._host.querySelector('[data-role="glucose-zone"]'));
+  assert.match(String(root._host.textContent), /Insulin 7\.7/);
+  assert.equal(root._host.querySelector('.bloods-metric-grid'), null);
+  assert.equal(root._host.querySelector('.bloods-rows'), null);
 });
 
