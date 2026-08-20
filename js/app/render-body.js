@@ -30,6 +30,7 @@ export function renderBody(root, model, {
   onLogWeight,
   onLogComposition,
   onViewBloods,
+  onViewMedical,
   quiet = false
 } = {}) {
   const dashboard = root.querySelector('#body-dashboard');
@@ -71,7 +72,7 @@ export function renderBody(root, model, {
         quiet,
         reuseImg
       }),
-      bloodsTile(root, onViewBloods)
+      medicalLinks(root, onViewBloods, onViewMedical)
     );
   }
 
@@ -142,12 +143,28 @@ function compositionCard(root, metric, quiet) {
   return article;
 }
 
+function medicalLinks(root, onViewBloods, onViewMedical) {
+  const wrap = root.createElement('div');
+  wrap.className = 'body-medical-links';
+  wrap.append(bloodsTile(root, onViewBloods), medicalTile(root, onViewMedical));
+  return wrap;
+}
+
 function bloodsTile(root, onViewBloods) {
   const button = root.createElement('button');
   button.type = 'button';
   button.className = 'metric-card body-section bloods-entry';
   button.textContent = 'View bloods →';
   button.addEventListener('click', () => onViewBloods?.());
+  return button;
+}
+
+function medicalTile(root, onViewMedical) {
+  const button = root.createElement('button');
+  button.type = 'button';
+  button.className = 'metric-card body-section bloods-entry';
+  button.textContent = 'View medical →';
+  button.addEventListener('click', () => onViewMedical?.());
   return button;
 }
 

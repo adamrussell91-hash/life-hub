@@ -104,6 +104,25 @@ test('skincare and body logs can land Flags from notes', () => {
   assert.match(nextBody, /\*\*Flags:\*\* 88.2 kg — stable vs last/);
 });
 
+test('medical logs land compact Health/Flags from notes and never dump the visit essay', () => {
+  const notes = 'Check-in — flare context unchanged. Long visit narrative must not land on Status.';
+  const next = applyLogToCentralNode(base, {
+    record: {
+      type: 'medical',
+      date: '2026-08-01',
+      title: 'GP review',
+      record_type: 'Appointment',
+      notes
+    },
+    actionLine: '\n**1 Aug:** Dr. Sara Tonin: Logged medical visit: GP review.',
+    flagNotes: 'Check-in — flare context unchanged'
+  });
+  assert.match(next, /\*\*Health:\*\* GP review\./);
+  assert.match(next, /\*\*Flags:\*\* Check-in — flare context unchanged/);
+  assert.match(next, /Logged medical visit: GP review/);
+  assert.doesNotMatch(next, /Long visit narrative must not land on Status/);
+});
+
 test('same-day meal log preserves other Status fields', () => {
   const sameDayBase = base.replace('Friday 19 June 2026', 'Saturday 1 August 2026');
   const next = applyLogToCentralNode(sameDayBase, {

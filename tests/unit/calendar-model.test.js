@@ -102,6 +102,19 @@ test('bloods events title as Body with a marker count brief', () => {
   assert.equal(eventBrief({ record }), '2 markers');
 });
 
+test('medical events title from the visit and brief from provider or type', () => {
+  assert.equal(eventDetailTitle({ type: 'medical', title: 'GP review' }), 'GP review');
+  assert.equal(eventDetailTitle({ type: 'medical' }), 'Medical');
+  assert.equal(
+    eventBrief({ record: { type: 'medical', title: 'GP review', provider: 'Dr Nerida McDonald' } }),
+    'Dr Nerida McDonald'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'medical', title: 'Stelara', record_type: 'Prescription' } }),
+    'Prescription'
+  );
+});
+
 test('eventsForDate includes brief and category affordance', () => {
   const rows = eventsForDate([
     { record: { type: 'meal', date: '2026-08-05', meal: 'lunch', protein_g: 40, calories: 520 }, body: '', path: 'a' }
