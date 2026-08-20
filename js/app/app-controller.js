@@ -1,7 +1,7 @@
 import { getSydneyDateKey } from '../core/time.js';
 import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
-import { DEFAULT_MIND_WATCHLIST } from './mind-model.js';
+import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
@@ -829,11 +829,11 @@ export function createAppController(dependencies) {
 
   function renderMindSection() {
     if (!latestResult || !buildMindModel || !renderMind) return;
-    let watchlist = DEFAULT_MIND_WATCHLIST;
+    let watchlistStore = { preset: 'topics', extra: [] };
     try {
-      watchlist = JSON.parse(localStorage.getItem('life-hub-mind-watchlist') || 'null') ?? DEFAULT_MIND_WATCHLIST;
+      watchlistStore = resolveWatchlist(JSON.parse(localStorage.getItem('life-hub-mind-watchlist') || 'null'));
     } catch {
-      watchlist = DEFAULT_MIND_WATCHLIST;
+      watchlistStore = resolveWatchlist(null);
     }
     const model = buildMindModel({
       events: latestResult.events,
@@ -841,8 +841,10 @@ export function createAppController(dependencies) {
       range: mindRange,
       governanceLogMarkdown: latestResult.governanceLogMarkdown,
       centralNodeMarkdown: latestResult.centralNodeMarkdown,
-      watchlist
+      watchlist: watchlistStore.terms?.length ? watchlistStore.terms : DEFAULT_MIND_WATCHLIST
     });
+    model.watchlistPreset = watchlistStore.preset;
+    model.watchlistExtra = watchlistStore.extra;
     renderMind(root, model, {
       onRangeChange: next => {
         mindRange = next;
@@ -850,7 +852,8 @@ export function createAppController(dependencies) {
       },
       onWatchlistChange: next => {
         try {
-          localStorage.setItem('life-hub-mind-watchlist', JSON.stringify(next));
+          const store = Array.isArray(next) ? resolveWatchlist({ preset: watchlistStore.preset, extra: next }) : resolveWatchlist(next);
+          localStorage.setItem('life-hub-mind-watchlist', JSON.stringify({ preset: store.preset, extra: store.extra }));
         } catch {
           // Ignore quota / private-mode write failures.
         }

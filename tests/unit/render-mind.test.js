@@ -739,15 +739,11 @@ test('renderMind paints an interactive mood and energy strip', () => {
       { date: '2026-08-02', energy: 'high' }
     ]
   }));
-  const bands = root._horizon.querySelectorAll('.mind-metric-strip__band');
-  const days = root._horizon.querySelectorAll('[data-role="day"]');
-  assert.equal(bands.length, 2);
-  assert.ok(days.length >= 2);
-  assert.ok(days[0].listeners?.some(([type]) => type === 'click'));
-  assert.ok(root._horizon.listeners?.some(([type]) => type === 'pointerover'));
+  const cols = root._horizon.querySelectorAll('.mind-grouped-bars__col');
+  assert.ok(cols.length >= 2);
+  assert.ok(cols[0].listeners?.some(([type]) => type === 'click'));
   assert.equal(root._stripFoot.hidden, false);
-  assert.match(root._stripEnergy.textContent, /Lower than last period/);
-  assert.equal(root._stripEnergy.dataset.dir, 'down');
+  assert.match(root._horizon.className, /mind-grouped-bars/);
 });
 
 test('renderMind paints an interactive theme rank bump chart', () => {
@@ -795,8 +791,9 @@ test('index.html Mind board has no Talk launchers or cadence heatmap', async () 
   assert.match(mind, /id="mind-lexical-label"/);
   assert.match(mind, /Watchlist term counts by week/);
   assert.match(mind, /id="mind-horizon-label"/);
-  assert.match(mind, /Mood and energy on one timeline/);
+  assert.match(mind, /Mood and energy together/);
   assert.match(mind, /mind-metric-strip-card/);
+  assert.match(mind, /mind-hero-clocks/);
   assert.match(mind, /id="mind-constellation-label"/);
   assert.match(mind, /Themes that appear together/);
   assert.match(mind, /mind-constellation-card/);
@@ -804,9 +801,11 @@ test('index.html Mind board has no Talk launchers or cadence heatmap', async () 
   assert.match(mind, /id="mind-bump-label"/);
   assert.match(mind, /Theme rank by week/);
   assert.match(mind, /mind-bump-card/);
-  assert.match(mind, /id="mind-stream-label"/);
-  assert.match(mind, /Theme topography/);
-  assert.match(mind, /mind-stream-card/);
+  assert.doesNotMatch(mind, /Theme topography/);
+  assert.doesNotMatch(mind, /id="mind-stream"/);
+  assert.doesNotMatch(mind, /Does the year have a season/);
+  assert.doesNotMatch(mind, /Vera vs Penelope/);
+  assert.doesNotMatch(mind, /Where is the split/);
   assert.doesNotMatch(mind, /id="mind-energy-rings"/);
   assert.match(mind, /viewBox="0 0 592 592"/);
 });

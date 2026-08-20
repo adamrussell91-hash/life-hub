@@ -533,9 +533,9 @@
             </ul>
           </article>
           <div class="skincare-beauty-drawer">
-            <div id="skincare-routine-segment" class="skincare-segment" role="tablist" aria-label="AM or PM routine">
-              <button type="button" class="skincare-segment__btn" role="tab" data-routine="am" aria-controls="skincare-routine-cards" aria-selected="true">AM</button>
-              <button type="button" class="skincare-segment__btn" role="tab" data-routine="pm" aria-controls="skincare-routine-cards" aria-selected="false">PM</button>
+            <div id="skincare-routine-segment" class="skincare-segment hub-pills" role="tablist" aria-label="AM or PM routine">
+              <button type="button" class="skincare-segment__btn hub-pills__btn" role="tab" data-routine="am" aria-controls="skincare-routine-cards" aria-selected="true">AM</button>
+              <button type="button" class="skincare-segment__btn hub-pills__btn" role="tab" data-routine="pm" aria-controls="skincare-routine-cards" aria-selected="false">PM</button>
             </div>
             <div class="skincare-drawer-viewport">
               <div id="skincare-routine-cards" class="skincare-drawer-track" data-active="am" role="tabpanel" aria-label="Skincare routine"></div>
@@ -568,11 +568,11 @@
         </section>
 
         <section id="body-dashboard" class="dashboard" aria-label="Body" hidden>
-          <div id="body-range-control" class="body-range" role="group" aria-label="Body time range">
-            <button type="button" data-body-range="monthly" aria-pressed="false">Month</button>
-            <button type="button" data-body-range="six_month" class="is-active" aria-pressed="true">6M</button>
-            <button type="button" data-body-range="year" aria-pressed="false">Year</button>
-            <button type="button" data-body-range="five_year" aria-pressed="false">5Y</button>
+          <div id="body-range-control" class="body-range hub-pills" role="group" aria-label="Body time range">
+            <button type="button" class="hub-pills__btn" data-body-range="monthly" aria-pressed="false">Month</button>
+            <button type="button" class="hub-pills__btn is-active" data-body-range="six_month" aria-pressed="true">6M</button>
+            <button type="button" class="hub-pills__btn" data-body-range="year" aria-pressed="false">Year</button>
+            <button type="button" class="hub-pills__btn" data-body-range="five_year" aria-pressed="false">5Y</button>
           </div>
           <p id="body-status" class="metric-caption" aria-live="polite"></p>
           <div id="body-sections" class="body-sections"></div>
@@ -584,11 +584,11 @@
             <button type="button" id="bloods-back" class="btn btn--secondary quiet-button bloods-back">← Body</button>
             <button type="button" id="bloods-appointment-open" class="bloods-appointment-open">Summary for appointment</button>
           </div>
-          <div id="bloods-range-control" class="body-range" role="group" aria-label="Bloods time range">
-            <button type="button" data-bloods-range="monthly" aria-pressed="false">Month</button>
-            <button type="button" data-bloods-range="six_month" aria-pressed="false">6M</button>
-            <button type="button" data-bloods-range="year" aria-pressed="false">Year</button>
-            <button type="button" data-bloods-range="five_year" class="is-active" aria-pressed="true">5Y</button>
+          <div id="bloods-range-control" class="body-range hub-pills" role="group" aria-label="Bloods time range">
+            <button type="button" class="hub-pills__btn" data-bloods-range="monthly" aria-pressed="false">Month</button>
+            <button type="button" class="hub-pills__btn" data-bloods-range="six_month" aria-pressed="false">6M</button>
+            <button type="button" class="hub-pills__btn" data-bloods-range="year" aria-pressed="false">Year</button>
+            <button type="button" class="hub-pills__btn is-active" data-bloods-range="five_year" aria-pressed="true">5Y</button>
           </div>
           <div id="bloods-signal" class="bloods-signal">
             <article class="metric-card bloods-signal__card" aria-label="This panel">
@@ -606,7 +606,7 @@
             <button type="button" id="bloods-collapse-all" class="btn btn--secondary quiet-button">Collapse all</button>
             <label class="bloods-search-label">
               <span class="visually-hidden">Search markers</span>
-              <input id="bloods-search" type="search" placeholder="Filter markers" autocomplete="off">
+              <input id="bloods-search" class="hub-search" type="search" placeholder="Filter markers" autocomplete="off">
             </label>
           </div>
           <div id="bloods-sections" class="bloods-sections"></div>
@@ -625,16 +625,17 @@
 
         <section id="mind-dashboard" class="dashboard" aria-label="Mind" hidden>
           <p class="metric-caption" data-mind="entry-count">—</p>
-          <div id="mind-range-control" class="body-range" role="group" aria-label="Mind time range">
-            <button type="button" data-mind-range="weekly" aria-pressed="false">Weekly</button>
-            <button type="button" data-mind-range="monthly" class="is-active" aria-pressed="true">Monthly</button>
-            <button type="button" data-mind-range="six_month" aria-pressed="false">6M</button>
-            <button type="button" data-mind-range="year" aria-pressed="false">Year</button>
+          <div id="mind-range-control" class="body-range hub-pills" role="group" aria-label="Mind time range">
+            <button type="button" class="hub-pills__btn" data-mind-range="weekly" aria-pressed="false">Weekly</button>
+            <button type="button" class="hub-pills__btn is-active" data-mind-range="monthly" aria-pressed="true">Monthly</button>
+            <button type="button" class="hub-pills__btn" data-mind-range="six_month" aria-pressed="false">6M</button>
+            <button type="button" class="hub-pills__btn" data-mind-range="year" aria-pressed="false">Year</button>
           </div>
           <p class="metric-caption" data-mind="ambient" hidden></p>
           <p id="mind-empty" class="metric-caption" hidden>No diary entries in this range yet — open Chat to log one with Penelope.</p>
 
           <div id="mind-board" class="mind-board">
+          <div class="mind-hero-clocks">
           <article class="metric-card chart-card mind-mood-radial-card" aria-labelledby="mind-mood-radial-label">
             <p class="mind-tile__question">How has mood moved?</p>
             <p class="metric-label" id="mind-mood-radial-label">Mood radial</p>
@@ -648,7 +649,7 @@
             <p class="mind-tile__legend" data-mind="energy-legend">Each day lands on the level that best reflects your energy.</p>
             <p data-mind="energy-empty" class="metric-caption" hidden>No energy entries in this range yet.</p>
             <div class="mind-energy-orbit">
-              <svg id="mind-energy-orbit" class="mind-energy-orbit__chart" viewBox="0 0 680 680" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Diary energy around the selected range. Outer ring is high, inner ring is low."></svg>
+              <svg id="mind-energy-orbit" class="mind-energy-orbit__chart" viewBox="0 0 680 680" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Diary energy around the selected range. Outer ring is high, inner ring is low. Shaded sectors are streaks."></svg>
               <div class="mind-energy-orbit__center" data-mind="energy-center" hidden>
                 <p class="mind-energy-orbit__kicker">Energy</p>
                 <p class="mind-energy-orbit__status" data-mind="energy-status">—</p>
@@ -656,7 +657,28 @@
                 <p class="mind-energy-orbit__trend" data-mind="energy-trend"></p>
               </div>
             </div>
-            <p class="mind-energy-orbit__hint" data-mind="energy-hint" hidden>Tap a day to see notes.</p>
+            <p class="mind-energy-orbit__hint" data-mind="energy-hint" hidden>Tap a streak to see why.</p>
+          </article>
+          </div>
+
+          <article id="mind-tile-horizon" class="metric-card chart-card mind-metric-strip-card" aria-labelledby="mind-horizon-label">
+            <p class="mind-tile__question">Mood and energy, day by day</p>
+            <p class="metric-label" id="mind-horizon-label">Mood and energy together</p>
+            <p class="mind-tile__legend">Each pair is a day. Left bar is mood, right bar is energy.</p>
+            <div id="mind-horizon" class="mind-metric-strip" aria-label="Mood and energy by day"></div>
+            <div class="mind-metric-strip__foot" data-role="strip-foot" hidden>
+              <ul class="mind-metric-strip__guide">
+                <li>Each pair = one day (or one week in 6M / Year)</li>
+                <li>Left bar = mood · right bar = energy</li>
+                <li>Taller = higher</li>
+              </ul>
+              <div class="mind-metric-strip__period">
+                <p class="mind-metric-strip__period-label">This period</p>
+                <p data-mind="strip-mood">Mood —</p>
+                <p data-mind="strip-energy">Energy —</p>
+              </div>
+            </div>
+            <p class="mind-metric-strip__hint" data-mind="strip-hint" hidden>Hover or tap any day to see details.</p>
           </article>
 
           <div id="mind-hero" class="hero-grid mind-hero--support">
@@ -677,9 +699,13 @@
                     </div>
                   </div>
                   <ul class="mind-mood-mix__legend" data-role="mood-mix-legend"></ul>
+                  <div class="mind-energy-mix" data-role="energy-mix">
+                    <p class="mind-energy-mix__label">Energy</p>
+                    <ul class="mind-energy-mix__list" data-role="energy-mix-list"></ul>
+                  </div>
                 </div>
                 <div class="mind-mood-mix__foot">
-                  <p class="metric-caption"><strong data-mind="mood-mix-total">0</strong> <span data-mind="mood-mix-unit">diary entries in this range</span></p>
+                  <p class="metric-caption mind-mood-mix__count"><strong data-mind="mood-mix-total">0</strong><span data-mind="mood-mix-unit">diary entries in this range</span></p>
                   <button type="button" class="mind-mood-mix__table-toggle" data-mind="mood-mix-table-toggle" aria-expanded="false">View as table</button>
                 </div>
                 <div class="mind-mood-mix__table" data-role="mood-mix-table" hidden>
@@ -701,7 +727,13 @@
                 <p class="mind-tile__question">Is the language shifting?</p>
                 <p class="metric-label" id="mind-lexical-label">Watchlist term counts by week</p>
               </div>
-              <button type="button" class="btn btn--ghost" data-mind="lexical-table-toggle" aria-expanded="false">Table view</button>
+              <div class="mind-watchlist__tools">
+                <div class="mind-watchlist__presets" role="group" aria-label="Watchlist set">
+                  <button type="button" class="btn btn--ghost" data-mind-watchlist-preset="topics" aria-pressed="true">Topics</button>
+                  <button type="button" class="btn btn--ghost" data-mind-watchlist-preset="inner" aria-pressed="false">Inner</button>
+                </div>
+                <button type="button" class="btn btn--ghost" data-mind="lexical-table-toggle" aria-expanded="false">Table view</button>
+              </div>
             </div>
             <p class="mind-watchlist__scale">
               <span class="mind-watchlist__swatches" aria-hidden="true">
@@ -725,27 +757,6 @@
               <input type="text" maxlength="24" aria-label="Add watchlist term" placeholder="Add a term to watch, e.g. “overwhelmed”">
               <button type="submit" class="btn btn--primary">Watch</button>
             </form>
-          </article>
-
-          <article id="mind-tile-horizon" class="metric-card chart-card mind-metric-strip-card" aria-labelledby="mind-horizon-label">
-            <p class="mind-tile__question">Many metrics, one strip?</p>
-            <p class="metric-label" id="mind-horizon-label">Mood and energy on one timeline</p>
-            <p class="mind-tile__legend">Opacity = intensity. Each vertical line is a day.</p>
-            <div id="mind-horizon" class="mind-metric-strip" aria-label="Mood and energy by day"></div>
-            <div class="mind-metric-strip__foot" data-role="strip-foot" hidden>
-              <ul class="mind-metric-strip__guide">
-                <li>Each vertical line = one day</li>
-                <li>Darker = more intense</li>
-                <li>Top band = Mood, bottom = Energy</li>
-                <li>One strip. All your patterns.</li>
-              </ul>
-              <div class="mind-metric-strip__period">
-                <p class="mind-metric-strip__period-label">This period</p>
-                <p data-mind="strip-mood">Mood —</p>
-                <p data-mind="strip-energy">Energy —</p>
-              </div>
-            </div>
-            <p class="mind-metric-strip__hint" data-mind="strip-hint" hidden>Hover or tap any day to see details.</p>
           </article>
 
           <article id="mind-tile-constellation" class="metric-card chart-card mind-constellation-card" aria-labelledby="mind-constellation-label">
@@ -781,25 +792,6 @@
             <p class="mind-bump__hint" data-mind="bump-hint" hidden>Hover a theme to highlight its path. Tap a week to see notes.</p>
           </article>
 
-          <article id="mind-tile-stream" class="metric-card chart-card mind-stream-card" aria-labelledby="mind-stream-label">
-            <p class="mind-tile__question">What’s swelling?</p>
-            <p class="metric-label" id="mind-stream-label">Theme topography</p>
-            <p class="mind-tile__legend">More contours and darker colour = more volume that week.</p>
-            <div class="mind-stream">
-              <svg id="mind-stream" class="mind-stream__chart" viewBox="0 0 960 480" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Theme volume over weeks"></svg>
-            </div>
-            <div class="mind-stream__foot" data-role="stream-foot" hidden>
-              <ul class="mind-stream__legend" data-role="stream-legend"></ul>
-              <ul class="mind-stream__guide">
-                <li>Each territory is a theme.</li>
-                <li>More contours = more mentions that week.</li>
-                <li>Hover a band to isolate it.</li>
-                <li>Tap a week or a peak to open those notes.</li>
-              </ul>
-            </div>
-            <p class="mind-stream__hint" data-mind="stream-hint" hidden>Hover a territory to highlight it. Tap a week to see entries.</p>
-          </article>
-
           <article id="mind-tile-themes" class="metric-card mind-tile" aria-labelledby="mind-themes-label">
             <p class="mind-tile__question">What keeps coming back?</p>
             <p class="metric-label" id="mind-themes-label">Recurring themes</p>
@@ -808,9 +800,9 @@
 
           <div id="mind-silence" class="mind-silence" hidden aria-live="polite"></div>
 
-          <article id="mind-tile-sessions" class="metric-card mind-tile" aria-labelledby="mind-sessions-label">
+          <article id="mind-tile-sessions" class="metric-card mind-tile mind-session-tile" aria-labelledby="mind-sessions-label">
             <p class="mind-tile__question">Latest Vera session</p>
-            <p class="metric-label" id="mind-sessions-label">Vera sessions</p>
+            <p class="metric-label" id="mind-sessions-label">Vera session</p>
             <div id="mind-sessions"></div>
           </article>
 
@@ -820,10 +812,10 @@
             <div id="mind-insights" class="mind-insight-timeline"></div>
           </article>
 
-          <article id="mind-tile-factors" class="metric-card mind-tile">
+          <article id="mind-tile-factors" class="metric-card mind-tile mind-factors-card">
             <p class="mind-tile__question">What’s moving my mood?</p>
-            <p class="mind-tile__legend">Bar = mean mood with this minus without. Need 3 days each side.</p>
-            <div data-role="factor-bars"></div>
+            <p class="mind-tile__legend">Right of centre lifts mood. Left of centre drags it. Need 3 days each side.</p>
+            <div data-role="factor-bars" class="mind-factor-list"></div>
           </article>
           <article id="mind-tile-streak" class="metric-card mind-tile">
             <p class="mind-tile__question">Am I showing up?</p>
@@ -835,29 +827,15 @@
             <p class="metric-caption" data-mind="streak">—</p>
           </article>
 
-          <article id="mind-tension" class="metric-card mind-tile">
-            <p class="mind-tile__question">Where is the split?</p>
-            <svg id="mind-tension-chart" class="mind-chart mind-chart--tension" viewBox="0 0 240 120" role="img" aria-label="Stated versus revealed tension"></svg>
-          </article>
-          <article id="mind-tile-transitions" class="metric-card mind-tile">
+          <article id="mind-tile-transitions" class="metric-card mind-tile mind-sankey-card">
             <p class="mind-tile__question">What follows a Low day?</p>
-            <p class="mind-tile__legend">Mood-to-mood flow. Band → those transitions.</p>
-            <svg id="mind-sankey" class="mind-chart mind-chart--sankey" viewBox="0 0 320 200" role="img" aria-label="Mood transitions"></svg>
+            <p class="mind-tile__legend">From yesterday’s mood to today’s. Thicker band = more often.</p>
+            <svg id="mind-sankey" class="mind-chart mind-chart--sankey" viewBox="0 0 560 280" role="img" aria-label="Mood transitions"></svg>
           </article>
-          <article id="mind-tile-chord" class="metric-card mind-tile">
+          <article id="mind-tile-chord" class="metric-card mind-tile mind-network-card">
             <p class="mind-tile__question">Whole network at once?</p>
-            <p class="mind-tile__legend">Theme co-occurrence. Arc → that theme.</p>
-            <svg id="mind-chord" class="mind-chart mind-chart--chord" viewBox="0 0 240 240" role="img" aria-label="Theme network"></svg>
-          </article>
-          <article id="mind-tile-radial" class="metric-card mind-tile">
-            <p class="mind-tile__question">Does the year have a season?</p>
-            <p class="mind-tile__legend">One tick per day, coloured by mood.</p>
-            <svg id="mind-radial-year" class="mind-chart mind-chart--radial" viewBox="0 0 240 240" role="img" aria-label="Year of mood"></svg>
-          </article>
-          <article id="mind-tile-butterfly" class="metric-card mind-tile">
-            <p class="mind-tile__question">Vera vs Penelope on a theme?</p>
-            <p class="mind-tile__legend">Vera left, Penelope right.</p>
-            <div id="mind-butterfly"></div>
+            <p class="mind-tile__legend">Top themes that show up together. Arc is a theme, ribbon is a pairing.</p>
+            <svg id="mind-chord" class="mind-chart mind-chart--chord" viewBox="0 0 360 360" role="img" aria-label="Theme network"></svg>
           </article>
           <article id="mind-tile-waffle" class="metric-card mind-tile">
             <p class="mind-tile__question">Volume and quality?</p>
