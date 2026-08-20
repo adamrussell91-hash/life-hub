@@ -65,6 +65,9 @@ export function createAppController(dependencies) {
     bodyController,
     buildBloodsModel,
     renderBloods,
+    renderBloodsSnapshot,
+    renderMedical,
+    medicalController,
     buildMindModel,
     renderMind,
     chatSelectAgent,
@@ -186,7 +189,8 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#body-chat-button'), 'click', () => {
     toggleSectionChat('#body-dashboard', BODY_AGENT_SLUG);
   });
-  bind(root.querySelector('#bloods-back'), 'click', () => showSection('body'));
+    bind(root.querySelector('#bloods-back'), 'click', () => showSection('body'));
+    bind(root.querySelector('#medical-back'), 'click', () => showSection('body'));
   bind(root.querySelector('#central-node-chat-button'), 'click', () => {
     toggleSectionChat('#central-node-dashboard', CENTRAL_NODE_AGENT_SLUG);
   });
@@ -365,6 +369,7 @@ export function createAppController(dependencies) {
         if (currentSection === 'calendar') renderCalendarSection();
         if (currentSection === 'body') renderBodySection();
         if (currentSection === 'body-bloods') renderBloodsSection();
+        if (currentSection === 'body-medical') renderMedicalSection();
         if (currentSection === 'mind') renderMindSection();
         if (currentSection === 'central-node') renderCentralNodeSection();
         syncQuiet = false;
@@ -536,6 +541,7 @@ export function createAppController(dependencies) {
     calendar: { eyebrow: 'Your logged days', title: 'Calendar' },
     body: { eyebrow: 'Scale, composition, tape', title: 'Body' },
     'body-bloods': { eyebrow: 'Labs', title: 'Bloods' },
+    'body-medical': { eyebrow: 'History', title: 'Medical Overview' },
     mind: { eyebrow: 'Mood and themes', title: 'Mind' },
     'central-node': { eyebrow: 'Coordination hub', title: 'Central Node' }
   };
@@ -590,6 +596,7 @@ export function createAppController(dependencies) {
     const calendar = root.querySelector('#calendar-dashboard');
     const body = root.querySelector('#body-dashboard');
     const bloods = root.querySelector('#body-bloods-dashboard');
+    const medical = root.querySelector('#body-medical-dashboard');
     const mind = root.querySelector('#mind-dashboard');
     const centralNode = root.querySelector('#central-node-dashboard');
     if (home) home.hidden = name !== 'home';
@@ -599,6 +606,7 @@ export function createAppController(dependencies) {
     if (calendar) calendar.hidden = name !== 'calendar';
     if (body) body.hidden = name !== 'body';
     if (bloods) bloods.hidden = name !== 'body-bloods';
+    if (medical) medical.hidden = name !== 'body-medical';
     if (mind) mind.hidden = name !== 'mind';
     if (centralNode) centralNode.hidden = name !== 'central-node';
     if (chat) chat.hidden = name !== 'chat' && !chatPanel?.isOpen?.();
@@ -636,13 +644,14 @@ export function createAppController(dependencies) {
     if (name === 'calendar') renderCalendarSection();
     if (name === 'body') renderBodySection();
     if (name === 'body-bloods') renderBloodsSection();
+    if (name === 'body-medical') renderMedicalSection();
     if (name === 'mind') renderMindSection();
     if (name === 'central-node') renderCentralNodeSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const section = button.dataset.section;
       const active = section === name
         || (section === 'more' && MORE_SECTIONS.has(name))
-        || (section === 'body' && name === 'body-bloods');
+        || (section === 'body' && (name === 'body-bloods' || name === 'body-medical'));
       button.classList.toggle('is-active', active);
       if (active && section !== 'more') button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
@@ -805,6 +814,7 @@ export function createAppController(dependencies) {
       onLogWeight: bodyController?.onLogWeight,
       onLogComposition: bodyController?.onLogComposition,
       onViewBloods: () => showSection('body-bloods'),
+      onViewMedical: () => showSection('body-medical'),
       quiet: syncQuiet
     });
     const button = root.querySelector('#body-chat-button');
@@ -824,6 +834,24 @@ export function createAppController(dependencies) {
         renderBloodsSection();
       },
       quiet: syncQuiet
+    });
+  }
+
+  function renderMedicalSection() {
+    if (!latestResult || !renderMedical || !medicalController) return;
+    const model = medicalController.model(latestResult.events);
+    const hooks = medicalController.hooks(() => renderMedicalSection());
+    renderMedical(root, model, {
+      ...hooks,
+      renderLabSnapshot: (host, visit) => {
+        if (!buildBloodsModel || !renderBloods) return;
+        const snapshot = buildBloodsModel({
+          events: latestResult.events,
+          date: visit.date,
+          range: 'five_year'
+        });
+        renderBloodsSnapshot?.(root, host, snapshot);
+      }
     });
   }
 

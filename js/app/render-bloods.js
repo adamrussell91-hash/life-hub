@@ -211,9 +211,14 @@ function bindExplainer(root) {
 function renderSections(root, model, dashboard) {
   const host = root.querySelector('#bloods-sections');
   if (!host) return;
-  host.replaceChildren();
   const flareOn = dashboard.querySelector?.('[data-bloods-flare]')?.checked === true;
-  for (const category of model.categories) {
+  renderBloodsSnapshot(root, host, model, flareOn);
+}
+
+export function renderBloodsSnapshot(root, host, model, flareOn = false) {
+  if (!host || !model) return;
+  host.replaceChildren();
+  for (const category of model.categories ?? []) {
     host.append(categoryCard(root, category, model, flareOn));
   }
 }

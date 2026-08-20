@@ -8,6 +8,7 @@
  *     --body-csv "/Users/.../Private & Shared 3/..._all.csv" \
  *     --body-history-csv "/Users/.../body-history.csv" \
  *     --bloods-csv "/Users/.../blood-test-tracker.csv" \
+ *     --medical-csv "/Users/.../medical-records.csv" \
  *     --body-dir "/Users/.../Private & Shared 4/.../Body Measurements" \
  *     --body-log "/Users/.../Body Data Record ....md" \
  *     --out "/Users/.../life-hub-data"
@@ -19,6 +20,7 @@ import { sydneyLocalStamp } from '../js/core/time.js';
 import { parseBodyLogMarkdown } from './lib/body-log-import.mjs';
 import { parseBodyHistoryCsv } from './lib/body-history-csv-import.mjs';
 import { parseBloodsCsv } from './lib/bloods-csv-import.mjs';
+import { parseMedicalCsv } from './lib/medical-csv-import.mjs';
 
 const isMain = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 let args = {};
@@ -32,9 +34,10 @@ const bodyHistoryCsv = args.bodyHistoryCsv ? resolve(args.bodyHistoryCsv) : null
 const bodyDir = args.bodyDir ? resolve(args.bodyDir) : null;
 const bodyLog = args.bodyLog ? resolve(args.bodyLog) : null;
 const bloodsCsv = args.bloodsCsv ? resolve(args.bloodsCsv) : null;
+const medicalCsv = args.medicalCsv ? resolve(args.medicalCsv) : null;
 
-if (!workoutsDir && !bodyCsv && !bodyHistoryCsv && !bodyDir && !bodyLog && !bloodsCsv) {
-  console.error('Provide --workouts <dir> and/or --body-csv <file> and/or --body-history-csv <file> and/or --body-dir <dir> and/or --body-log <file> and/or --bloods-csv <file> and --out <life-hub-data>');
+if (!workoutsDir && !bodyCsv && !bodyHistoryCsv && !bodyDir && !bodyLog && !bloodsCsv && !medicalCsv) {
+  console.error('Provide --workouts <dir> and/or --body-csv <file> and/or --body-history-csv <file> and/or --body-dir <dir> and/or --body-log <file> and/or --bloods-csv <file> and/or --medical-csv <file> and --out <life-hub-data>');
   process.exit(1);
 }
 
@@ -117,11 +120,20 @@ if (bloodsCsv) {
   }
 }
 
+if (medicalCsv) {
+  const events = parseMedicalCsv(readFileSync(medicalCsv, 'utf8'));
+  for (const event of events) {
+    const path = eventPath('body', event.record.date, event.slug);
+    writeEvent(outRoot, path, event.record, event.notes);
+    bodyCount += 1;
+  }
+}
 
 console.log(JSON.stringify({
   outRoot,
   bodyLog,
   bloodsCsv,
+  medicalCsv,
   workoutCount,
   bodyCount,
   skipped: skipped.length,
@@ -139,6 +151,7 @@ export function parseArgs(argv) {
     else if (arg === '--body-dir') out.bodyDir = argv[++i];
     else if (arg === '--body-log') out.bodyLog = argv[++i];
     else if (arg === '--bloods-csv') out.bloodsCsv = argv[++i];
+    else if (arg === '--medical-csv') out.medicalCsv = argv[++i];
     else if (arg === '--out') out.out = argv[++i];
     else if (arg === '--force') out.force = true;
   }

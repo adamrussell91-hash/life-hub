@@ -9,6 +9,7 @@ const CATEGORY = {
   composition: 'body',
   measurements: 'body',
   bloods: 'body',
+  medical: 'body',
   sleep: 'sleep'
 };
 

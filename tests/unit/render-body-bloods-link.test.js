@@ -53,12 +53,50 @@ test('renderBody appends a View bloods control that calls onViewBloods', () => {
     composition: { ...emptySection, id: 'composition' },
     tape: { ...emptySection, id: 'tape' }
   }, { onViewBloods: () => { viewed = true; } });
-  const tile = host.children.at(-1);
-  assert.match(String(tile.textContent), /View bloods/);
-  const button = tile.listeners?.length
-    ? tile
-    : tile.children.find(child => child.listeners?.length);
-  assert.ok(button, 'expected a clickable View bloods control');
-  button.listeners[0][1]();
+  const tile = findButton(host, /View bloods/);
+  assert.ok(tile, 'expected a clickable View bloods control');
+  tile.listeners[0][1]();
   assert.equal(viewed, true);
 });
+
+test('renderBody appends a View medical control that calls onViewMedical', () => {
+  const dashboard = el();
+  dashboard.id = 'body-dashboard';
+  const host = el();
+  host.id = 'body-sections';
+  const ranges = el();
+  ranges.id = 'body-range-control';
+  ranges.querySelectorAll = () => [];
+  const root = {
+    createElement: () => el(),
+    querySelector(selector) {
+      if (selector === '#body-dashboard') return dashboard;
+      if (selector === '#body-sections') return host;
+      if (selector === '#body-range-control') return ranges;
+      return null;
+    }
+  };
+  let viewed = false;
+  const emptySection = { id: 'scale', title: 'Scale', metrics: [] };
+  renderBody(root, {
+    range: 'six_month',
+    scale: { ...emptySection, id: 'scale' },
+    composition: { ...emptySection, id: 'composition' },
+    tape: { ...emptySection, id: 'tape' }
+  }, { onViewMedical: () => { viewed = true; } });
+  const text = host.children.map(child => String(child.textContent)).join(' ');
+  assert.match(text, /View medical/);
+  const medical = findButton(host, /View medical/);
+  assert.ok(medical, 'expected a clickable View medical control');
+  medical.listeners[0][1]();
+  assert.equal(viewed, true);
+});
+
+function findButton(node, pattern) {
+  if (pattern.test(String(node.textContent)) && node.listeners?.length) return node;
+  for (const child of node.children ?? []) {
+    const found = findButton(child, pattern);
+    if (found) return found;
+  }
+  return null;
+}

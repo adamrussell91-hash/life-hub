@@ -11,6 +11,7 @@ test('section dashboards do not repeat the page name as a kicker under the topba
     'calendar-dashboard',
     'body-dashboard',
     'body-bloods-dashboard',
+    'body-medical-dashboard',
     'mind-dashboard',
     'central-node-dashboard'
   ];

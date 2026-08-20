@@ -297,3 +297,54 @@ test('mind_session schema includes themes, session_type, and observation', () =>
 test('diary schema includes source_agent', () => {
   assert.ok(Object.hasOwn(DOMAIN_PROPERTIES.diary, 'source_agent'));
 });
+
+test('medical slugs include a title stem so same-day visits do not collide', () => {
+  assert.equal(
+    buildRecordSlug({ type: 'medical', title: 'GP review', time: '09:15' }),
+    'medical-gp-review-0915'
+  );
+  assert.equal(
+    buildRecordSlug({ type: 'medical', title: 'Therapy Session with Kate', time: '15:45' }),
+    'medical-therapy-session-with-kate-1545'
+  );
+  assert.equal(
+    buildCanonicalPath({
+      type: 'medical',
+      date: '2026-08-20',
+      slug: buildRecordSlug({ type: 'medical', title: 'GP review', time: '09:15' })
+    }),
+    'data/body/2026/08/2026-08-20-medical-gp-review-0915.md'
+  );
+});
+
+test('validates a well-formed medical log entry', () => {
+  const result = validateLogEntry({
+    type: 'medical',
+    date: '2026-08-20',
+    time: '09:15',
+    notes: 'Check-in — stable vs last.',
+    fields: {
+      title: 'GP review',
+      record_type: 'Appointment',
+      lane: 'appointment',
+      provider: 'Dr Nerida McDonald',
+      location: 'Walker Street Doctors',
+      location_kind: 'place',
+      episode: null
+    }
+  }, { id: 'med-1', now: '2026-08-20T09:15:00+10:00' });
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.type, 'medical');
+  assert.equal(result.record.title, 'GP review');
+  assert.equal(result.notes, 'Check-in — stable vs last.');
+});
+
+test('medical schema includes visit fields and episode', () => {
+  const keys = Object.keys(DOMAIN_PROPERTIES.medical);
+  for (const key of [
+    'title', 'record_type', 'lane', 'date_end', 'provider', 'location',
+    'location_kind', 'follow_up_date', 'cost_aud', 'insurance_status', 'episode'
+  ]) {
+    assert.ok(keys.includes(key), key);
+  }
+});

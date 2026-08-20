@@ -2021,6 +2021,14 @@ main { max-width: 76rem; margin: 0 auto; }
   color: var(--high-sea);
   background: rgba(246, 134, 32, 0.14);
 }
+.body-medical-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-grid);
+}
+.body-medical-links > .bloods-entry {
+  margin: 0;
+}
 .bloods-entry {
   display: flex;
   align-items: center;
@@ -5139,4 +5147,152 @@ main { max-width: 76rem; margin: 0 auto; }
 
 @media (prefers-reduced-motion: reduce) {
   .mind-tile { animation: none; }
+}
+
+.medical-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: end;
+  margin: 0 0 var(--space-stack);
+}
+.medical-toolbar .hub-search { min-width: 12rem; flex: 1 1 12rem; }
+.medical-density {
+  display: grid;
+  gap: 0.2rem;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.medical-density__ticks { letter-spacing: 0.02em; }
+.medical-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.95fr);
+  gap: var(--space-grid);
+  align-items: start;
+}
+.medical-timeline {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 0 0 1.25rem;
+  border-left: 2px solid var(--wave);
+}
+.medical-timeline.is-density-weeks { gap: var(--space-5); }
+.medical-timeline.is-density-years { gap: var(--space-2); }
+.medical-today {
+  margin-left: -1.45rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: var(--radius-full);
+  background: var(--wave);
+  color: var(--warm-white);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  width: max-content;
+}
+.medical-band {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--pastel-blue) 55%, transparent);
+}
+.medical-band__title {
+  margin: 0;
+  color: var(--pastel-blue-ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.medical-card {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.medical-card[data-lane="appointment"],
+.medical-card[data-lane="eye"] { border-left-color: var(--pastel-blue); }
+.medical-card[data-lane="lab"],
+.medical-card[data-lane="prescription"] { border-left-color: var(--pastel-sage); }
+.medical-card[data-lane="hospital"] { border-left-color: var(--pastel-peach); }
+.medical-card[data-lane="imaging"],
+.medical-card[data-lane="vaccine"],
+.medical-card[data-lane="dental"] { border-left-color: var(--pastel-gold); }
+.medical-card[data-lane="referral"],
+.medical-card[data-lane="therapy"] { border-left-color: var(--pastel-lilac); }
+.medical-card.is-selected {
+  outline: 2px solid var(--wave);
+  outline-offset: 1px;
+  background: var(--pastel-blue);
+}
+.medical-card__title { font-size: var(--text-base); font-weight: var(--weight-semibold); }
+.medical-card__meta { color: var(--muted); font-size: var(--text-xs); }
+.medical-card__labs { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: 0.35rem; }
+.medical-sheet {
+  position: sticky;
+  top: 1rem;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+}
+.medical-sheet h2 { margin: 0.2rem 0 0.4rem; font-size: var(--text-lg); }
+.medical-sheet__notes { margin: 0 0 var(--space-3); color: var(--orca); font-size: var(--text-md); }
+.medical-sheet__line { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
+.medical-sheet__map { color: var(--wave); font-weight: var(--weight-semibold); }
+.medical-sheet__labs { margin: var(--space-3) 0; }
+.medical-sheet__close {
+  display: none;
+}
+.medical-form { display: grid; gap: var(--space-3); }
+.medical-form__field { display: grid; gap: 0.25rem; font-size: var(--text-sm); color: var(--muted); }
+.medical-form__field input,
+.medical-form__field textarea {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+.medical-form__actions { display: flex; gap: var(--space-2); }
+
+@media (max-width: 40rem) {
+  .medical-layout { grid-template-columns: 1fr; }
+  .medical-sheet {
+    position: fixed;
+    inset: 8vh 1rem 1rem;
+    z-index: 20;
+    overflow: auto;
+  }
+  .medical-sheet:not([hidden]) + .medical-sheet__close,
+  #body-medical-dashboard:has(#medical-sheet:not([hidden])) .medical-sheet__close {
+    display: inline-grid;
+    position: fixed;
+    top: calc(8vh + 0.6rem);
+    right: 1.6rem;
+    z-index: 21;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--cotton);
+    color: var(--ink);
+    font-size: var(--text-lg);
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .medical-sheet { transition: none; }
 }

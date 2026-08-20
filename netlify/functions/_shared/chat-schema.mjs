@@ -1,8 +1,9 @@
 import { TYPE_DOMAINS } from '../../../js/core/records.js';
 import { validateRecord } from '../../../js/core/validate.js';
 import { isCalendarDate } from '../../../js/core/time.js';
+import { buildMedicalSlug } from '../../../js/app/medical-model.js';
 
-const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare', 'mind_session'];
+const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare', 'mind_session', 'medical'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const DOMAIN_PROPERTIES = {
@@ -130,6 +131,37 @@ const DOMAIN_PROPERTIES = {
     mood_at_close: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] },
     cross_agent_note: { type: 'string' },
     source_agent: { type: 'string', enum: ['vera', 'import'] }
+  },
+  medical: {
+    title: { type: 'string' },
+    record_type: {
+      type: 'string',
+      enum: [
+        'Appointment', 'Consultation', 'Lab Work', 'Test Result', 'Imaging',
+        'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination'
+      ]
+    },
+    lane: {
+      type: 'string',
+      enum: [
+        'hospital', 'lab', 'imaging', 'prescription', 'referral', 'vaccine',
+        'dental', 'therapy', 'eye', 'appointment'
+      ]
+    },
+    date_end: { type: 'string' },
+    provider: { type: 'string' },
+    location: { type: 'string' },
+    location_kind: { type: 'string', enum: ['place', 'telehealth', 'unknown'] },
+    follow_up_date: { type: 'string' },
+    cost_aud: { type: 'number' },
+    insurance_status: { type: 'string' },
+    episode: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        title: { type: 'string' }
+      }
+    }
   }
 };
 
@@ -190,6 +222,7 @@ export function buildRecordSlug(record) {
     return record.meal;
   }
   if (record.type === 'mind_session') return 'session';
+  if (record.type === 'medical') return buildMedicalSlug(record.title, record.time);
   const label = record.type === 'skincare' ? record.routine : record.type;
   if (typeof label !== 'string' || !SLUG.test(label)) {
     throw new TypeError(`Invalid slug label: ${label}`);
