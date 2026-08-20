@@ -4,7 +4,7 @@ import { buildStreamPaths, buildThemeTopography } from '../../js/app/chart-kit/s
 import { buildSankeyFlow } from '../../js/app/chart-kit/sankey-flow.js';
 import { buildBumpLines, buildBumpChart } from '../../js/app/chart-kit/bump.js';
 import { buildRadialYear } from '../../js/app/chart-kit/radial-year.js';
-import { buildHorizonBands, buildMetricStrip } from '../../js/app/chart-kit/horizon.js';
+import { buildHorizonBands, buildMetricStrip, buildGroupedMetricBars } from '../../js/app/chart-kit/horizon.js';
 import { buildMoodRadial } from '../../js/app/chart-kit/mood-radial.js';
 import { buildEnergyOrbit } from '../../js/app/chart-kit/energy-orbit.js';
 import { buildWatchlistHeat } from '../../js/app/chart-kit/watchlist-heat.js';
@@ -90,6 +90,37 @@ test('buildHorizonBands one band per metric', () => {
     { key: 'mood', points: [{ date: '2026-08-01', value: 6 }] }
   ], { width: 320, height: 24 });
   assert.equal(bands.length, 1);
+});
+
+test('buildGroupedMetricBars pairs mood and energy per day and buckets year to weeks', () => {
+  const daily = buildGroupedMetricBars({
+    bounds: { from: '2026-08-10', to: '2026-08-12', days: 3 },
+    range: 'weekly',
+    mood: [{ date: '2026-08-10', value: 9, mood: 'great' }],
+    energy: [{ date: '2026-08-10', energy: 'high' }, { date: '2026-08-11', energy: 'low' }]
+  });
+  assert.equal(daily.bucket, 'day');
+  assert.equal(daily.columns.length, 2);
+  const first = daily.columns[0];
+  assert.equal(first.date, '2026-08-10');
+  assert.ok(first.mood.height > 0);
+  assert.ok(first.energy.height > 0);
+  assert.equal(first.mood.key, 'great');
+
+  const year = buildGroupedMetricBars({
+    bounds: { from: '2026-01-05', to: '2026-01-18', days: 14 },
+    range: 'year',
+    mood: [
+      { date: '2026-01-06', value: 8, mood: 'good' },
+      { date: '2026-01-13', value: 3, mood: 'low' }
+    ],
+    energy: [
+      { date: '2026-01-06', energy: 'high' },
+      { date: '2026-01-13', energy: 'low' }
+    ]
+  });
+  assert.equal(year.bucket, 'week');
+  assert.ok(year.columns.length <= 3);
 });
 
 test('buildMetricStrip maps mood score and energy onto high/medium/low day ticks', () => {
@@ -298,7 +329,7 @@ test('buildEnergyOrbit summarises the dominant level against the previous window
   assert.equal(chart.legend, 'A week in motion. Each day lands on the level that best reflects your energy.');
 });
 
-test('buildEnergyOrbit callouts the longest high and low runs', () => {
+test('buildEnergyOrbit paints shaded sectors for the longest high and low runs', () => {
   const series = [];
   for (let day = 11; day <= 22; day += 1) {
     series.push({ date: `2026-01-${day}`, energy: 'high' });
@@ -313,13 +344,17 @@ test('buildEnergyOrbit callouts the longest high and low runs', () => {
     bounds: { from: '2026-01-01', to: '2026-08-20', days: 232 },
     range: 'year'
   });
-  const titles = chart.callouts.map(item => item.title);
+  assert.equal(chart.callouts, undefined);
+  const titles = chart.sectors.map(item => item.title);
   assert.ok(titles.includes('High period'));
   assert.ok(titles.includes('Low streak'));
   assert.ok(titles.includes('Elevated stretch'));
-  const high = chart.callouts.find(item => item.title === 'High period');
+  const high = chart.sectors.find(item => item.title === 'High period');
   assert.match(high.when, /Jan 11/);
   assert.match(high.when, /Jan 22/);
+  assert.ok(high.d.startsWith('M'));
+  assert.ok(Number.isFinite(high.thetaStart));
+  assert.ok(high.thetaEnd > high.thetaStart);
   const streakDays = chart.points.filter(point => point.r > 4);
   assert.ok(streakDays.length >= 3);
 });

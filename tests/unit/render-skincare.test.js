@@ -746,7 +746,7 @@ test('index.html uses an AM|PM beauty drawer (segment + sliding track) instead o
 
   assert.match(html, /class="skincare-beauty-drawer"/);
   assert.match(html, /id="skincare-routine-segment"/);
-  assert.match(html, /class="skincare-segment"/);
+  assert.match(html, /class="[^"]*skincare-segment/);
   assert.match(html, /data-routine="am"/);
   assert.match(html, /data-routine="pm"/);
   assert.match(html, /class="skincare-drawer-viewport"/);

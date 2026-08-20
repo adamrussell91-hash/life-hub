@@ -36,7 +36,10 @@ import {
   displayThemeLabel,
   entriesForTheme,
   entriesForThemePair,
-  entriesForThemeWeek
+  entriesForThemeWeek,
+  energyStreakWhy,
+  isSalientTheme,
+  WATCHLIST_PRESETS
 } from '../../js/app/mind-model.js';
 
 test('buildMindModel builds mood series, by-mood counts, and themes', () => {
@@ -634,4 +637,59 @@ test('entriesForThemeWeek keeps only that theme inside the week', () => {
   );
   assert.equal(rows.length, 1);
   assert.equal(rows[0].date, '2026-08-04');
+});
+
+test('energyStreakWhy leads with overlapping Vera insight then diary themes', () => {
+  const why = energyStreakWhy(
+    { energy: 'low', from: '2026-08-07', to: '2026-08-12', dates: ['2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12'] },
+    {
+      diary: diaryEntries([
+        { record: { type: 'diary', date: '2026-08-08', tags: ['sleep', 'work'] }, body: 'Late again.', path: 'd1' },
+        { record: { type: 'diary', date: '2026-08-09', tags: ['work'] }, body: 'Behind on marking.', path: 'd2' }
+      ]),
+      sessions: sessionEntries([{
+        record: {
+          type: 'mind_session',
+          date: '2026-08-10',
+          theme: 'rest',
+          insight: 'Rest is not a prize. Late nights stacked.'
+        },
+        path: 's1'
+      }])
+    }
+  );
+  assert.equal(why.title, 'Low streak');
+  assert.match(why.when, /Aug/);
+  assert.match(why.vera, /Rest is not a prize/);
+  assert.deepEqual(why.themes, ['sleep', 'work']);
+  assert.ok(why.rows.length >= 2);
+  assert.equal(why.rows[0].title, 'Vera');
+});
+
+test('isSalientTheme drops times of day and keeps life themes', () => {
+  assert.equal(isSalientTheme('afternoon'), false);
+  assert.equal(isSalientTheme('Morning'), false);
+  assert.equal(isSalientTheme('evening'), false);
+  assert.equal(isSalientTheme('night'), false);
+  assert.equal(isSalientTheme('work'), true);
+  assert.equal(isSalientTheme('Corey'), true);
+});
+
+test('WATCHLIST_PRESETS exposes topics and inner eights', () => {
+  assert.deepEqual(WATCHLIST_PRESETS.topics, ['work', 'school', 'sleep', 'rest', 'Corey', 'flare', 'family', 'weekend']);
+  assert.deepEqual(WATCHLIST_PRESETS.inner, ['behind', 'hollow', 'shame', 'pressure', 'stuck', 'tired', 'lonely', 'dread']);
+});
+
+test('recurringThemes and theme nodes skip time-of-day labels', () => {
+  const bounds = rangeWindow('2026-08-10', 'monthly');
+  const entries = diaryEntries([
+    { record: { type: 'diary', date: '2026-08-01', tags: ['afternoon', 'work'] }, path: 'a' },
+    { record: { type: 'diary', date: '2026-08-02', tags: ['afternoon'] }, path: 'b' },
+    { record: { type: 'diary', date: '2026-08-03', tags: ['work'] }, path: 'c' }
+  ]);
+  const themes = recurringThemes(entries, bounds);
+  assert.ok(themes.every(theme => theme.key !== 'afternoon'));
+  assert.ok(themes.some(theme => theme.key === 'work'));
+  const nodes = themeNodes(entries, sessionEntries([]), bounds);
+  assert.ok(nodes.every(node => node.key !== 'afternoon'));
 });

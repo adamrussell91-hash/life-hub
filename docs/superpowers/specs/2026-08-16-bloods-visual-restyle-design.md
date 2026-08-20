@@ -36,7 +36,7 @@ Make Bloods look like Life Hub Clinical Glass instead of a maroon lab dump. Ever
 When `showSection('body-bloods')` is active, the page header is **Labs / Bloods**, not Scale, composition, tape.
 
 - Back control: kit `.btn` ghost, Wave/marine text, min-height 44px. Not maroon underlined text.
-- Range pills: same `.body-range` as Body; **active fill is `--wave`**, white type.
+- Range pills: kit `.hub-pills` / `.hub-pills__btn` on the existing `.body-range` group. Selected state is pastel-blue, not Wave fill.
 - Appointment summary link stays, muted, not a second primary.
 
 ### Summary card (one card, not three)
@@ -52,7 +52,7 @@ When `showSection('body-bloods')` is active, the page header is **Labs / Bloods*
 
 One chip per currently High/Low marker, wrapping across the **full page width** so a long flag list is two or three rows, not a tall third-width column. Chips keep the centred pill styling below. Empty state is a single quiet caption line; the strip collapses when there is nothing to say.
 
-Toolbar: Expand all / Collapse all / filter use `.btn` and a labelled search field (not unstyled native buttons). Default visual state matches **expanded**.
+Toolbar: Expand all / Collapse all stay `.btn`. Marker filter is kit `.hub-search` (pill). Default visual state matches **expanded**.
 
 ## Flag chips (must fix)
 

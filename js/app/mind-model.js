@@ -5,7 +5,48 @@ import { addCalendarDays, daysBetween, getSydneyWeekStart, isCalendarDate } from
 
 export const MIND_RANGES = ['weekly', 'monthly', 'six_month', 'year'];
 export const DEFAULT_MIND_RANGE = 'monthly';
-export const DEFAULT_MIND_WATCHLIST = ['should', 'just', 'fine', 'unfulfilled', 'flake'];
+export const WATCHLIST_PRESETS = {
+  topics: ['work', 'school', 'sleep', 'rest', 'Corey', 'flare', 'family', 'weekend'],
+  inner: ['behind', 'hollow', 'shame', 'pressure', 'stuck', 'tired', 'lonely', 'dread']
+};
+export const DEFAULT_MIND_WATCHLIST = WATCHLIST_PRESETS.topics;
+const LEGACY_WATCHLIST = ['should', 'just', 'fine', 'unfulfilled', 'flake'];
+
+export function parseWatchlistStore(raw) {
+  if (raw == null) return { preset: 'topics', extra: [] };
+  if (Array.isArray(raw)) {
+    const isLegacy = raw.length === LEGACY_WATCHLIST.length
+      && raw.every((term, index) => term === LEGACY_WATCHLIST[index]);
+    return { preset: 'topics', extra: isLegacy ? [] : raw.map(term => String(term).trim()).filter(Boolean) };
+  }
+  const preset = raw.preset === 'inner' ? 'inner' : 'topics';
+  const extra = Array.isArray(raw.extra) ? raw.extra.map(term => String(term).trim()).filter(Boolean) : [];
+  return { preset, extra };
+}
+
+export function resolveWatchlist(raw) {
+  const { preset, extra } = parseWatchlistStore(raw);
+  const base = WATCHLIST_PRESETS[preset] ?? WATCHLIST_PRESETS.topics;
+  const seen = new Set(base.map(term => term.toLowerCase()));
+  const extras = [];
+  for (const term of extra) {
+    const key = term.toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    extras.push(term);
+  }
+  return { preset, extra: extras, terms: [...base, ...extras] };
+}
+
+const TIME_OF_DAY_THEMES = new Set([
+  'morning', 'afternoon', 'evening', 'night', 'midnight',
+  'am', 'pm', 'today', 'yesterday', 'tomorrow'
+]);
+
+export function isSalientTheme(value) {
+  const key = normalizeThemeKey(value);
+  return Boolean(key) && !TIME_OF_DAY_THEMES.has(key);
+}
 
 const RANGE_DAYS = {
   weekly: 7,
@@ -186,7 +227,7 @@ function uniqueThemeKeys(values) {
   const seen = new Set();
   for (const value of values ?? []) {
     const key = normalizeThemeKey(value);
-    if (!key || seen.has(key)) continue;
+    if (!key || !isSalientTheme(key) || seen.has(key)) continue;
     seen.add(key);
     keys.push(key);
   }
@@ -411,6 +452,67 @@ export function energyOrbitSeries(entries, bounds) {
     }));
 }
 
+const STREAK_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatStreakDay(dateKey) {
+  const [, month, day] = String(dateKey).split('-');
+  return `${STREAK_MONTHS[Number(month) - 1]} ${Number(day)}`;
+}
+
+function streakTitle(energy) {
+  if (energy === 'low') return 'Low streak';
+  if (energy === 'medium') return 'Medium stretch';
+  if (energy === 'high') return 'High period';
+  return 'Energy streak';
+}
+
+export function energyStreakWhy(run, { diary = [], sessions = [] } = {}) {
+  const from = run?.from ?? run?.dates?.[0] ?? '';
+  const to = run?.to ?? run?.dates?.at(-1) ?? from;
+  const when = from && to && from !== to
+    ? `${formatStreakDay(from)} – ${formatStreakDay(to)}`
+    : from ? formatStreakDay(from) : '';
+  const dates = new Set(run?.dates ?? []);
+  if (from) dates.add(from);
+  if (to) dates.add(to);
+
+  const veraSession = (sessions ?? []).find(session => (
+    dates.has(session.date) && String(session.insight || session.observation || '').trim()
+  ));
+  const vera = veraSession ? String(veraSession.insight || veraSession.observation).trim() : '';
+
+  const themes = [];
+  const seen = new Set();
+  const rows = [];
+  if (veraSession) {
+    rows.push({
+      date: veraSession.date,
+      title: 'Vera',
+      excerpt: vera
+    });
+  }
+  for (const entry of diary ?? []) {
+    if (!dates.has(entry.date)) continue;
+    for (const key of uniqueThemeKeys(entry.tags)) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      themes.push(key);
+    }
+    rows.push({
+      date: entry.date,
+      title: entry.mood ? `${entry.mood} mood` : 'Diary',
+      excerpt: String(entry.body || '').trim() || 'No notes for this day.'
+    });
+  }
+  return {
+    title: streakTitle(run?.energy),
+    when,
+    vera,
+    themes,
+    rows
+  };
+}
+
 export function moodScoreSeries(entries, bounds) {
   const inRange = entries.filter(entry => (
     entry.date >= bounds.from
@@ -448,7 +550,7 @@ export function recurringThemes(entries, bounds, { limit = 8 } = {}) {
     if (entry.date < bounds.from || entry.date > bounds.to) continue;
     for (const tag of entry.tags) {
       const key = tag.trim().toLowerCase();
-      if (!key) continue;
+      if (!key || !isSalientTheme(key)) continue;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   }
@@ -524,7 +626,7 @@ export function themeWeekly(entries, sessions, bounds, { limit = 8 } = {}) {
 
   function addTheme(theme, date) {
     const key = normalizeThemeKey(theme);
-    if (!key) return;
+    if (!key || !isSalientTheme(key)) return;
     const index = weekIndex.get(getSydneyWeekStart(date));
     if (index == null) return;
     totals.set(key, (totals.get(key) ?? 0) + 1);

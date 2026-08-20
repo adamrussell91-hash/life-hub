@@ -4,7 +4,7 @@ import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { buildBumpChart } from './chart-kit/bump.js';
 import { buildChordLayout } from './chart-kit/chord-layout.js';
-import { buildMetricStrip } from './chart-kit/horizon.js';
+import { buildGroupedMetricBars } from './chart-kit/horizon.js';
 import { buildMoodRadial } from './chart-kit/mood-radial.js';
 import { buildEnergyOrbit } from './chart-kit/energy-orbit.js';
 import { buildMoodMixDonut } from './chart-kit/mood-mix.js';
@@ -15,7 +15,7 @@ import { packMasonry } from './chart-kit/masonry.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
 import { buildSankeyFlow } from './chart-kit/sankey-flow.js';
 import { buildThemeTopography } from './chart-kit/stream.js';
-import { entriesForTheme, entriesForThemePair, entriesForThemeWeek, entriesForWatchlistTerm, MOOD_ORDER, displayThemeLabel, previousRangeWindow } from './mind-model.js';
+import { entriesForTheme, entriesForThemePair, entriesForThemeWeek, entriesForWatchlistTerm, energyStreakWhy, MOOD_ORDER, displayThemeLabel } from './mind-model.js';
 import { addCalendarDays, formatDisplayDate, isCalendarDate } from '../core/time.js';
 import { openMindThreadSheet } from './mind-thread-sheet.js';
 
@@ -27,6 +27,12 @@ const MOOD_TOKEN = {
   neutral: 'var(--mood-neutral)',
   low: 'var(--mood-low)',
   bad: 'var(--mood-bad)'
+};
+
+const ENERGY_TOKEN = {
+  high: 'var(--wave)',
+  medium: 'var(--marine)',
+  low: 'var(--high-sea)'
 };
 
 const SHIFT_COPY = {
@@ -144,29 +150,33 @@ function renderFactorPanel(root, model) {
     ?? root.querySelector('#mind-tile-factors');
   if (!host) return;
   host.replaceChildren();
-  const factors = model.factorEffects ?? [];
-  const max = Math.max(0, ...factors.map(factor => Math.abs(Number(factor.effect) || 0)));
+  const factors = [...(model.factorEffects ?? [])].sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
+  const max = Math.max(0.01, ...factors.map(factor => Math.abs(Number(factor.effect) || 0)));
   for (const factor of factors) {
     const label = factor.label || displayThemeLabel(factor.key);
+    const effect = Number(factor.effect) || 0;
+    const lift = effect > 0;
     const button = root.createElement('button');
     button.type = 'button';
+    button.className = `mind-factor ${lift ? 'is-lift' : 'is-drag'}`;
     const name = root.createElement('span');
+    name.className = 'mind-factor__name';
     name.textContent = label;
-    const bar = root.createElement('span');
+    const rail = root.createElement('span');
+    rail.className = 'mind-factor__rail';
     const fill = root.createElement('span');
     fill.className = 'mind-factor-fill';
-    const pct = max > 0 ? (Math.abs(Number(factor.effect) || 0) / max) * 100 : 0;
+    const pct = (Math.abs(effect) / max) * 50;
     fill.style.width = `${pct}%`;
-    if (root.querySelector('#mind-dashboard')?._quiet) {
-      fill.style.transform = 'scaleX(1)';
-    } else {
-      fill.style.transform = 'scaleX(0)';
-    }
-    bar.append(fill);
-    button.append(name, bar);
+    fill.style.left = lift ? '50%' : `${50 - pct}%`;
+    rail.append(fill);
+    const delta = root.createElement('span');
+    delta.className = 'mind-factor__delta';
+    delta.textContent = `${lift ? '+' : ''}${effect.toFixed(1)}`;
+    button.append(name, rail, delta);
     button.addEventListener('click', () => {
       openMindThreadSheet(root, {
-        title: label,
+        title: `${label} · ${lift ? 'lifts' : 'drags'} mood`,
         rows: entriesForTheme(model.diary ?? [], model.sessions ?? [], factor.key),
         continueAgent: 'vera',
         onContinue: slug => root.querySelector('#mind-dashboard')?._onOpenAgent?.(slug),
@@ -174,10 +184,6 @@ function renderFactorPanel(root, model) {
       });
     });
     host.append(button);
-    if (!root.querySelector('#mind-dashboard')?._quiet) {
-      void fill.getBoundingClientRect?.();
-      fill.style.transform = 'scaleX(1)';
-    }
   }
 }
 
@@ -1057,6 +1063,36 @@ function renderMoodMix(root, model) {
       table.hidden = expanded;
     });
   }
+
+  paintEnergyMix(root, model);
+}
+
+function paintEnergyMix(root, model) {
+  const list = root.querySelector('[data-role="energy-mix-list"]');
+  if (!list) return;
+  list.replaceChildren();
+  const levels = model.energyByLevel ?? [];
+  const total = levels.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+  for (const item of levels) {
+    const row = root.createElement('li');
+    row.className = 'mind-energy-mix__row';
+    const name = root.createElement('span');
+    name.className = 'mind-energy-mix__name';
+    name.textContent = item.label;
+    const track = root.createElement('span');
+    track.className = 'mind-energy-mix__track';
+    const fill = root.createElement('span');
+    fill.className = 'mind-energy-mix__fill';
+    fill.style.background = ENERGY_TOKEN[item.key] ?? 'var(--marine)';
+    const pct = total > 0 ? Math.round((Number(item.value) || 0) / total * 100) : 0;
+    fill.style.width = `${pct}%`;
+    track.append(fill);
+    const value = root.createElement('span');
+    value.className = 'mind-energy-mix__pct';
+    value.textContent = `${pct}%`;
+    row.append(name, track, value);
+    list.append(row);
+  }
 }
 
 function renderEnergyOrbit(root, model) {
@@ -1137,29 +1173,49 @@ function renderEnergyOrbit(root, model) {
     nodes.push(label);
   }
 
-  for (const callout of chart.callouts) {
-    const line = createSvg(root, 'line');
-    line.setAttribute('data-role', 'callout-line');
-    line.setAttribute('x1', String(callout.x1));
-    line.setAttribute('y1', String(callout.y1));
-    line.setAttribute('x2', String(callout.x2));
-    line.setAttribute('y2', String(callout.y2));
-    line.setAttribute('stroke', callout.colour);
-    const title = createSvg(root, 'text');
-    title.setAttribute('data-role', 'callout-title');
-    title.setAttribute('x', String(callout.labelX));
-    title.setAttribute('y', String(callout.labelY - 6));
-    title.setAttribute('text-anchor', callout.textAnchor);
-    title.setAttribute('fill', callout.colour);
-    title.textContent = callout.title;
-    const when = createSvg(root, 'text');
-    when.setAttribute('data-role', 'callout-when');
-    when.setAttribute('x', String(callout.labelX));
-    when.setAttribute('y', String(callout.labelY + 10));
-    when.setAttribute('text-anchor', callout.textAnchor);
-    when.setAttribute('fill', callout.colour);
-    when.textContent = callout.when;
-    nodes.push(line, title, when);
+  for (const sector of chart.sectors ?? []) {
+    const wash = createSvg(root, 'path');
+    wash.setAttribute('data-role', 'sector');
+    wash.setAttribute('d', sector.d);
+    wash.setAttribute('fill', sector.colour);
+    wash.setAttribute('class', 'mind-energy-orbit__sector');
+    wash.setAttribute('tabindex', '0');
+    wash.setAttribute('role', 'button');
+    wash.setAttribute('aria-label', `${sector.title} ${sector.when}`);
+    const why = energyStreakWhy(sector, {
+      diary: model.diary ?? [],
+      sessions: model.sessions ?? []
+    });
+    const rows = [];
+    if (why.vera) {
+      rows.push({ date: sector.from, title: 'Vera', excerpt: why.vera });
+    }
+    if (why.themes.length) {
+      rows.push({
+        date: sector.from,
+        title: 'In those days',
+        excerpt: why.themes.map(displayThemeLabel).join(' · ')
+      });
+    }
+    rows.push(...(why.rows ?? []).filter(row => row.title !== 'Vera'));
+    const openSector = () => openMindThreadSheet(root, {
+      title: `${why.title} · ${why.when}`,
+      rows: rows.length ? rows : [{ date: sector.from, title: why.title, excerpt: 'No notes in this streak.' }],
+      continueAgent: 'vera',
+      onContinue: slug => root.querySelector('#mind-dashboard')?._onOpenAgent?.(slug),
+      anchor: svg
+    });
+    wash.addEventListener('click', event => {
+      event.stopPropagation?.();
+      openSector();
+    });
+    wash.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault?.();
+        openSector();
+      }
+    });
+    nodes.push(wash);
   }
 
   chart.points.forEach((point, index) => {
@@ -1950,7 +2006,7 @@ function renderSankeyTile(root, model) {
   const transitions = model.moodTransitions ?? [];
   if (!paintChartOrEmpty(root, tile, svg, { need: 3, have: transitions.length, unit: 'transitions' })) return;
   svg.replaceChildren();
-  const chart = buildSankeyFlow(transitions, { width: 320, height: 200 });
+  const chart = buildSankeyFlow(transitions, { width: 560, height: 280 });
   for (const link of chart.links) {
     const mark = createSvg(root, 'path');
     const x0 = link.x0 ?? 20;
@@ -1959,8 +2015,11 @@ function renderSankeyTile(root, model) {
     const y1 = link.y1 ?? 40;
     mark.setAttribute('d', `M${x0},${y0} C${(x0 + x1) / 2},${y0} ${(x0 + x1) / 2},${y1} ${x1},${y1}`);
     mark.setAttribute('fill', 'none');
-    mark.setAttribute('stroke', 'color-mix(in srgb, var(--wave) 45%, transparent)');
-    mark.setAttribute('stroke-width', String(Math.max(2, link.width)));
+    const fromLow = String(link.source) === 'low' || String(link.source) === 'bad';
+    mark.setAttribute('stroke', fromLow
+      ? 'color-mix(in srgb, var(--high-sea) 70%, transparent)'
+      : 'color-mix(in srgb, var(--wave) 40%, transparent)');
+    mark.setAttribute('stroke-width', String(Math.max(fromLow ? 4 : 2, link.width)));
     bindMark(mark, root, {
       title: `${link.source} → ${link.target}`,
       rows: [{ date: '', title: `${link.source} → ${link.target}`, excerpt: `${link.value ?? ''} transitions` }]
@@ -2244,16 +2303,26 @@ function renderChordTile(root, model) {
   const svg = root.querySelector('#mind-chord');
   if (!svg) return;
   const tile = root.querySelector('#mind-tile-chord') ?? svg.parentNode;
-  const pairs = model.themeCooccurrence ?? [];
-  if (!paintChartOrEmpty(root, tile, svg, { need: 3, have: pairs.length, unit: 'paired themes' })) {
+  const pairs = (model.themeCooccurrence ?? [])
+    .slice()
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+  const topKeys = new Set();
+  for (const pair of pairs) {
+    if (topKeys.size >= 8) break;
+    topKeys.add(pair.themeA);
+    if (topKeys.size >= 8) break;
+    topKeys.add(pair.themeB);
+  }
+  const focused = pairs.filter(pair => topKeys.has(pair.themeA) && topKeys.has(pair.themeB));
+  if (!paintChartOrEmpty(root, tile, svg, { need: 3, have: focused.length, unit: 'paired themes' })) {
     paintLegend(root, tile, []);
     return;
   }
   svg.replaceChildren();
-  const layout = buildChordLayout(pairs);
-  const cx = 120;
-  const cy = 120;
-  const radius = 78;
+  const layout = buildChordLayout(focused);
+  const cx = 180;
+  const cy = 180;
+  const radius = 120;
   for (const arc of layout.arcs) {
     const path = createSvg(root, 'path');
     const x0 = cx + radius * Math.cos(arc.startAngle - Math.PI / 2);
@@ -2271,6 +2340,30 @@ function renderChordTile(root, model) {
       rows: themeRows(model, arc.key),
       continueAgent: 'vera'
     });
+    svg.append(path);
+    const mid = (arc.startAngle + arc.endAngle) / 2;
+    const label = createSvg(root, 'text');
+    label.setAttribute('x', String(cx + (radius + 22) * Math.cos(mid - Math.PI / 2)));
+    label.setAttribute('y', String(cy + (radius + 22) * Math.sin(mid - Math.PI / 2) + 4));
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('class', 'mind-chart-label');
+    label.textContent = displayThemeLabel(arc.key);
+    svg.append(label);
+  }
+  for (const ribbon of layout.ribbons ?? []) {
+    const source = ribbon.source ?? {};
+    const target = ribbon.target ?? {};
+    const start = ((source.startAngle ?? 0) + (source.endAngle ?? 0)) / 2;
+    const end = ((target.startAngle ?? 0) + (target.endAngle ?? 0)) / 2;
+    const x0 = cx + (radius - 10) * Math.cos(start - Math.PI / 2);
+    const y0 = cy + (radius - 10) * Math.sin(start - Math.PI / 2);
+    const x1 = cx + (radius - 10) * Math.cos(end - Math.PI / 2);
+    const y1 = cy + (radius - 10) * Math.sin(end - Math.PI / 2);
+    const path = createSvg(root, 'path');
+    path.setAttribute('d', `M${x0},${y0} Q${cx},${cy} ${x1},${y1}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'color-mix(in srgb, var(--wave) 35%, transparent)');
+    path.setAttribute('stroke-width', String(Math.max(2, Math.min(14, Number(ribbon.value) || 2))));
     svg.append(path);
   }
   paintLegend(root, root.querySelector('#mind-tile-chord') ?? svg.parentNode, (layout.arcs ?? []).map(arc => ({
@@ -2329,30 +2422,20 @@ function renderHorizonTile(root, model) {
   const host = root.querySelector('#mind-horizon');
   if (!host) return;
   const tile = root.querySelector('#mind-tile-horizon') ?? host;
-  const previous = model.date && model.range
-    ? previousRangeWindow(model.date, model.range)
-    : null;
   const inWindow = (entry, bounds) => entry.date >= bounds.from && entry.date <= bounds.to;
   const mood = (model.diary ?? [])
     .filter(entry => model.bounds && inWindow(entry, model.bounds) && entry.mood_score != null)
     .map(entry => ({ date: entry.date, value: entry.mood_score, mood: entry.mood }));
   const energy = (model.energyOrbit ?? []).map(entry => ({ date: entry.date, energy: entry.energy }));
-  const previousMood = previous
-    ? (model.diary ?? [])
-      .filter(entry => inWindow(entry, previous) && entry.mood_score != null)
-      .map(entry => ({ date: entry.date, value: entry.mood_score, mood: entry.mood }))
-    : [];
-  const chart = buildMetricStrip({
+  const grouped = buildGroupedMetricBars({
     bounds: model.bounds,
     range: model.range ?? 'monthly',
     mood,
-    energy,
-    previousMood,
-    previousEnergy: model.previousEnergyOrbit ?? []
+    energy
   });
   const foot = tile.querySelector?.('[data-role="strip-foot"]');
   const hint = tile.querySelector?.('[data-mind="strip-hint"]');
-  if (!paintChartOrEmpty(root, tile, null, { need: 1, have: chart.bands.length, unit: 'metrics' })) {
+  if (!paintChartOrEmpty(root, tile, null, { need: 1, have: grouped.columns.length, unit: 'days' })) {
     host.replaceChildren();
     if (foot) foot.hidden = true;
     if (hint) hint.hidden = true;
@@ -2360,17 +2443,42 @@ function renderHorizonTile(root, model) {
   }
   if (foot) foot.hidden = false;
   if (hint) hint.hidden = false;
-  paintMetricStrip(root, host, chart, model);
+  paintGroupedBars(root, host, grouped, model);
   const moodSummary = tile.querySelector?.('[data-mind="strip-mood"]');
   const energySummary = tile.querySelector?.('[data-mind="strip-energy"]');
-  if (moodSummary) {
-    moodSummary.textContent = chart.summary.mood ? `Mood · ${chart.summary.mood}` : 'Mood —';
+  if (moodSummary) moodSummary.textContent = `Mood · ${grouped.columns.length} ${grouped.bucket === 'week' ? 'weeks' : 'days'}`;
+  if (energySummary) energySummary.textContent = `Energy · paired with mood`;
+}
+
+function paintGroupedBars(root, host, chart, model) {
+  host.replaceChildren();
+  host.className = `${String(host.className || '').replace(/\bmind-metric-strip\b/g, '').trim()} mind-metric-strip mind-grouped-bars`.trim();
+  const plot = root.createElement('div');
+  plot.className = 'mind-grouped-bars__plot';
+  const count = Math.max(1, chart.columns.length);
+  for (const column of chart.columns) {
+    const group = root.createElement('button');
+    group.type = 'button';
+    group.className = 'mind-grouped-bars__col';
+    group.style.flex = `1 1 ${Math.max(8, 100 / count)}%`;
+    const mood = root.createElement('span');
+    mood.className = 'mind-grouped-bars__bar is-mood';
+    mood.style.height = `${column.mood?.height ?? 0}px`;
+    mood.style.background = column.mood ? (MOOD_TOKEN[column.mood.key] ?? 'var(--mood-neutral)') : 'transparent';
+    const energy = root.createElement('span');
+    energy.className = 'mind-grouped-bars__bar is-energy';
+    energy.style.height = `${column.energy?.height ?? 0}px`;
+    energy.style.background = column.energy ? (ENERGY_TOKEN[column.energy.key] ?? 'var(--marine)') : 'transparent';
+    group.append(mood, energy);
+    group.setAttribute('aria-label', `${column.date} mood ${column.mood?.key ?? '—'} energy ${column.energy?.key ?? '—'}`);
+    bindMark(group, root, {
+      title: column.date,
+      rows: dateRows(model, column.date),
+      continueAgent: 'penelope'
+    });
+    plot.append(group);
   }
-  if (energySummary) {
-    const mark = chart.summary.energyDir === 'down' ? '↓ ' : chart.summary.energyDir === 'up' ? '↑ ' : '';
-    energySummary.textContent = chart.summary.energy ? `Energy · ${mark}${chart.summary.energy}` : 'Energy —';
-    energySummary.dataset.dir = chart.summary.energyDir || 'flat';
-  }
+  host.append(plot);
 }
 
 function paintMetricStrip(root, host, chart, model) {
@@ -2599,13 +2707,13 @@ function renderLexicalTile(root, model, onWatchlistChange) {
   if (!paintChartOrEmpty(root, tile, null, { need: 1, have: series.length, unit: 'watchlist terms' })) {
     host.replaceChildren();
     if (table) table.hidden = true;
-    bindLexicalChrome(root, tile, series, onWatchlistChange);
+    bindLexicalChrome(root, tile, series, onWatchlistChange, model);
     return;
   }
 
   paintWatchlistHeat(root, host, chart, model);
   paintLexicalTable(root, tile, chart);
-  bindLexicalChrome(root, tile, series, onWatchlistChange);
+  bindLexicalChrome(root, tile, series, onWatchlistChange, model);
 }
 
 function deltaCopy(delta) {
@@ -2731,7 +2839,7 @@ function paintLexicalTable(root, tile, chart) {
   body.replaceChildren(...rows);
 }
 
-function bindLexicalChrome(root, tile, series, onWatchlistChange) {
+function bindLexicalChrome(root, tile, series, onWatchlistChange, model) {
   const toggle = tile.querySelector?.('[data-mind="lexical-table-toggle"]');
   const table = tile.querySelector?.('[data-role="lexical-table"]');
   const grid = tile.querySelector?.('#mind-lexical');
@@ -2762,15 +2870,27 @@ function bindLexicalChrome(root, tile, series, onWatchlistChange) {
     form.append(input, button);
     tile.append(form);
   }
+  const preset = model?.watchlistPreset === 'inner' ? 'inner' : 'topics';
+  const extra = model?.watchlistExtra ?? [];
+  for (const button of tile.querySelectorAll?.('[data-mind-watchlist-preset]') ?? []) {
+    const key = button.dataset.mindWatchlistPreset;
+    button.setAttribute('aria-pressed', key === preset ? 'true' : 'false');
+    button.classList.toggle('is-active', key === preset);
+    if (button.dataset.bound) continue;
+    button.dataset.bound = '1';
+    button.addEventListener('click', () => {
+      onWatchlistChange?.({ preset: key, extra });
+    });
+  }
   if (form.dataset.bound) return;
   form.dataset.bound = '1';
   form.addEventListener('submit', event => {
     event.preventDefault?.();
     const input = form.querySelector?.('input');
-    const term = String(input?.value ?? '').trim().toLowerCase();
+    const term = String(input?.value ?? '').trim();
     if (!term) return;
     if (input) input.value = '';
-    onWatchlistChange?.([...new Set([...series.map(item => item.term), term])]);
+    onWatchlistChange?.({ preset, extra: [...new Set([...extra, term])] });
   });
 }
 
@@ -2880,28 +3000,16 @@ function renderInsightList(root, insights, resurfacing) {
   if (!host) return;
   host.replaceChildren();
   const showResurfacing = Boolean(resurfacing) && !isResurfacingDismissed(resurfacing);
-  if (showResurfacing) {
-    const card = root.createElement('article');
-    card.className = 'mind-resurfacing';
-    const copy = root.createElement('p');
-    copy.textContent = `${displayThemeLabel(resurfacing.theme)} came up again. Last time was ${formatDisplayDate(resurfacing.priorDate)}: ${resurfacing.excerpt ?? ''}`;
-    const dismiss = root.createElement('button');
-    dismiss.type = 'button';
-    dismiss.setAttribute('data-mind-resurfacing-dismiss', '');
-    dismiss.textContent = 'Dismiss';
-    dismiss.addEventListener('click', () => dismissResurfacing(resurfacing));
-    card.append(copy, dismiss);
-    host.append(card);
-  }
-  if (!insights?.length) {
-    if (showResurfacing) return;
+  const ordered = [...(insights ?? [])].sort((a, b) => String(b.dateKey || '').localeCompare(String(a.dateKey || '')));
+  if (!ordered.length) {
     const empty = root.createElement('p');
     empty.className = 'governance-empty';
     empty.textContent = 'No governance entries yet.';
     host.append(empty);
+    if (showResurfacing) appendResurfacing(root, host, resurfacing);
     return;
   }
-  const visible = insights.slice(0, 3);
+  const visible = ordered.slice(0, 3);
   visible.forEach((entry, index) => {
     const block = root.createElement('article');
     block.className = 'governance-entry mind-insight';
@@ -2934,12 +3042,27 @@ function renderInsightList(root, insights, resurfacing) {
     });
     host.append(block);
   });
-  if (insights.length > 3) {
+  if (ordered.length > 3) {
     const more = root.createElement('p');
     more.className = 'metric-caption';
     more.textContent = 'more in sheet';
     host.append(more);
   }
+  if (showResurfacing) appendResurfacing(root, host, resurfacing);
+}
+
+function appendResurfacing(root, host, resurfacing) {
+  const card = root.createElement('article');
+  card.className = 'mind-resurfacing';
+  const copy = root.createElement('p');
+  copy.textContent = `${displayThemeLabel(resurfacing.theme)} came up again. Last time was ${formatDisplayDate(resurfacing.priorDate)}: ${resurfacing.excerpt ?? ''}`;
+  const dismiss = root.createElement('button');
+  dismiss.type = 'button';
+  dismiss.setAttribute('data-mind-resurfacing-dismiss', '');
+  dismiss.textContent = 'Dismiss';
+  dismiss.addEventListener('click', () => dismissResurfacing(resurfacing));
+  card.append(copy, dismiss);
+  host.append(card);
 }
 
 function renderCrossAgentStrip(root, lines, { veraColour, penelopeColour } = {}) {
