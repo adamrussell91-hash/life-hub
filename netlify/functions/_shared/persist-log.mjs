@@ -53,6 +53,8 @@ export function describeRecordForLog(record, notes) {
       return `Logged body composition${record.weight_kg != null ? ` (${record.weight_kg}kg${record.body_fat_pct != null ? `, ${record.body_fat_pct}% body fat` : ''})` : ''}.`;
     case 'measurements':
       return 'Logged body measurements.';
+    case 'medical':
+      return `Logged medical visit: ${record.title || 'visit'}.`;
     default:
       return `Logged a ${record.type} record.`;
   }
@@ -114,7 +116,7 @@ async function syncCentralNodeAfterLog(client, record, notes) {
     record,
     actionLine,
     nutritionTotals,
-    flagNotes: ['meal', 'skincare', 'weight', 'composition', 'measurements'].includes(record.type)
+    flagNotes: ['meal', 'skincare', 'weight', 'composition', 'measurements', 'medical'].includes(record.type)
       ? notes
       : null
   });

@@ -326,6 +326,46 @@ function validateFragrance(record, errors) {
   optionalString(record, 'occasion', errors);
 }
 
+const MEDICAL_RECORD_TYPES = [
+  'Appointment', 'Consultation', 'Lab Work', 'Test Result', 'Imaging',
+  'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination'
+];
+const MEDICAL_LANES = [
+  'hospital', 'lab', 'imaging', 'prescription', 'referral', 'vaccine',
+  'dental', 'therapy', 'eye', 'appointment'
+];
+const LOCATION_KINDS = ['place', 'telehealth', 'unknown'];
+
+function validateMedical(record, errors) {
+  requireString(record, 'title', errors);
+  enumeration(record, 'record_type', MEDICAL_RECORD_TYPES, errors, true);
+  enumeration(record, 'lane', MEDICAL_LANES, errors, true);
+  enumeration(record, 'location_kind', LOCATION_KINDS, errors);
+  optionalString(record, 'provider', errors);
+  optionalString(record, 'location', errors);
+  optionalString(record, 'notes', errors);
+  optionalString(record, 'insurance_status', errors);
+  finiteNumber(record, 'cost_aud', errors, { minimum: 0 });
+  if (record.date_end != null && !isCalendarDate(record.date_end)) {
+    errors.push('date_end must be a valid calendar date in YYYY-MM-DD form');
+  }
+  if (record.follow_up_date != null && !isCalendarDate(record.follow_up_date)) {
+    errors.push('follow_up_date must be a valid calendar date in YYYY-MM-DD form');
+  }
+  if (record.episode != null) {
+    if (!isObject(record.episode)) {
+      errors.push('episode must be an object or null');
+    } else {
+      if (typeof record.episode.id !== 'string' || record.episode.id.trim() === '') {
+        errors.push('episode id must be a non-empty string');
+      }
+      if (typeof record.episode.title !== 'string' || record.episode.title.trim() === '') {
+        errors.push('episode title must be a non-empty string');
+      }
+    }
+  }
+}
+
 function validateBloods(record, errors) {
   const markers = record.markers;
   if (!Array.isArray(markers)) {
@@ -363,7 +403,8 @@ const VALIDATORS = {
   heart: validateHeart,
   skincare: validateSkincare,
   fragrance: validateFragrance,
-  bloods: validateBloods
+  bloods: validateBloods,
+  medical: validateMedical
 };
 
 export function validateUniqueIds(eventsOrRecords) {
