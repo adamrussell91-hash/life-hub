@@ -36,7 +36,7 @@ Rebuild the Mind tab as an analysis dashboard on conversational data. Entry is s
 
 ## Page architecture
 
-`#mind-dashboard` remains the Mind section. Same heading/kicker language as other tabs. Range control stays `.body-range`. Ambient line (`[data-mind="ambient"]`) stays current-state (last diary, last Vera, last Penelope), not range-clipped.
+`#mind-dashboard` remains the Mind section. Same heading/kicker language as other tabs. Range control stays `.body-range` plus kit `.hub-pills`. Ambient line (`[data-mind="ambient"]`) stays current-state (last diary, last Vera, last Penelope), not range-clipped.
 
 **Masonry:** a small JS packer (not CSS `columns`, which cannot span, and not sparse CSS grid). 12px gaps. Column count: 2 narrow, 3 default desktop, 4 when the Mind pane is actually wide. Height = content (question + title + legend + chart + hint). Short tiles (tension, Cross-Agent) pack under their column neighbour.
 
