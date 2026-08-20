@@ -55,6 +55,8 @@ export function eventDetailTitle(record, body = '') {
     case 'measurements':
     case 'bloods':
       return 'Body';
+    case 'medical':
+      return record.title || 'Medical';
     case 'sleep':
       return 'Sleep';
     default:
@@ -103,6 +105,8 @@ export function eventBrief(event) {
       const n = Array.isArray(record.markers) ? record.markers.length : 0;
       return n ? `${n} marker${n === 1 ? '' : 's'}` : '';
     }
+    case 'medical':
+      return record.provider || record.record_type || '';
     case 'diary': {
       const parts = [];
       if (record.mood) parts.push(String(record.mood));

@@ -363,6 +363,7 @@ test('sara prompt includes protocol when provided', () => {
   });
   assert.match(prompt, /Sara operating manual/);
   assert.match(prompt, /Weekly health scan/);
+  assert.match(prompt, /medical/);
 });
 
 test('hammond prompt includes protocol when provided', () => {

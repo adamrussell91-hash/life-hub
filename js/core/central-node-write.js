@@ -303,6 +303,13 @@ export function applyLogToCentralNode(content, {
     const flags = buildMealFlagsLine(flagNotes)
       ?? `**Flags:** Skincare ${record.routine ?? ''} logged.`.replace(/\s+/g, ' ').trim();
     body = upsertStatusField(body, 'Flags', flags);
+  } else if (record.type === 'medical') {
+    const title = typeof record.title === 'string' && record.title.trim()
+      ? record.title.trim()
+      : 'Visit logged';
+    body = upsertStatusField(body, 'Health', `**Health:** ${title}.`);
+    const flags = buildMealFlagsLine(flagNotes);
+    if (flags) body = upsertStatusField(body, 'Flags', flags);
   } else {
     return next;
   }

@@ -1,11 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { loadSaraProtocol } from '../../netlify/functions/_shared/load-sara-protocol.mjs';
 
 test('loads the checked-in Sara protocol markdown', () => {
   const text = loadSaraProtocol();
   assert.match(text, /Operating Manual|Weekly health scan|Boundaries/i);
   assert.match(text, /Before advising or logging|Central Node after body log/i);
+  assert.match(text, /Life Hub Medical Overview is the medical record/);
+  assert.doesNotMatch(text, /You do not maintain Medical Records/);
+  assert.match(text, /confirm/i);
 });
 
 test('returns an empty string when the seed file cannot be read', () => {
@@ -16,3 +20,10 @@ test('returns an empty string when the seed file cannot be read', () => {
   });
   assert.equal(text, '');
 });
+
+test('central node constraints point full medical history at Life Hub', () => {
+  const text = readFileSync(new URL('../../central-node.md', import.meta.url), 'utf8');
+  assert.match(text, /Full medical history lives in Life Hub Medical Overview/);
+  assert.doesNotMatch(text, /2d0f794f847680cfbd95ef30837b5b66/);
+});
+

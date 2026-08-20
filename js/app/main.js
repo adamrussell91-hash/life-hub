@@ -13,6 +13,7 @@ import {
 import { createBodyController } from './body-controller.js';
 import { buildBodyModel } from './body-model.js';
 import { buildBloodsModel } from './bloods-model.js';
+import { createMedicalController } from './medical-controller.js';
 import { buildCentralNodeModel } from './central-node-model.js';
 import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
@@ -27,7 +28,8 @@ import { loadLiveEvents } from './load-live-events.js';
 import { buildMindModel } from './mind-model.js';
 import { buildNutritionModel } from './nutrition-model.js';
 import { renderBody } from './render-body.js';
-import { renderBloods } from './render-bloods.js';
+import { renderBloods, renderBloodsSnapshot } from './render-bloods.js';
+import { renderMedical } from './render-medical.js';
 import { renderCentralNode } from './render-central-node.js';
 import { renderGovernance } from './render-governance.js';
 import { setChatUnread } from './render-chat.js';
@@ -114,6 +116,11 @@ const bodyController = createBodyController({
   getDate: () => controller.getDisplayDate?.() ?? null,
   onRecordWritten: () => void controller.refresh({ manual: true, force: true })
 });
+const medicalController = createMedicalController({
+  chatApi,
+  getDate: () => controller.getDisplayDate?.() ?? null,
+  onRecordWritten: () => void controller.refresh({ manual: true, force: true })
+});
 
 controller = createAppController({
   root: document,
@@ -144,6 +151,9 @@ controller = createAppController({
   bodyController,
   buildBloodsModel,
   renderBloods,
+  renderBloodsSnapshot,
+  renderMedical,
+  medicalController,
   buildMindModel,
   renderMind,
   chatSelectAgent: slug => chatController?.selectAgent?.(slug),

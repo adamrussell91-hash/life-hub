@@ -623,6 +623,34 @@
           </div>
         </section>
 
+        <section id="body-medical-dashboard" class="dashboard" aria-label="Medical Overview" hidden>
+          <div class="bloods-top">
+            <button type="button" id="medical-back" class="btn btn--secondary quiet-button bloods-back">← Body</button>
+            <button type="button" id="medical-today" class="btn btn--ghost">Today</button>
+          </div>
+          <div class="medical-toolbar">
+            <label class="bloods-search-label">
+              <span class="visually-hidden">Search visits</span>
+              <input id="medical-search" class="hub-search" type="search" placeholder="Search visits" autocomplete="off">
+            </label>
+            <select id="medical-type" class="hub-filter" aria-label="Medical type"></select>
+            <select id="medical-provider" class="hub-filter" aria-label="Practitioner"></select>
+            <label class="medical-density">
+              <span>Zoom</span>
+              <input id="medical-density" type="range" min="0" max="2" step="1" value="1" aria-label="Timeline density">
+              <span class="medical-density__ticks">Weeks · Months · Years</span>
+            </label>
+            <button type="button" id="medical-add" class="btn btn--primary">Add</button>
+          </div>
+          <div id="medical-chips" class="hub-chips"></div>
+          <p id="medical-empty" class="metric-caption" hidden></p>
+          <div class="medical-layout">
+            <div id="medical-timeline" class="medical-timeline" aria-label="Medical timeline"></div>
+            <aside id="medical-sheet" class="medical-sheet" aria-label="Medical overview"></aside>
+          </div>
+          <button type="button" id="medical-sheet-close" class="medical-sheet__close" aria-label="Close details">×</button>
+        </section>
+
         <section id="mind-dashboard" class="dashboard" aria-label="Mind" hidden>
           <p class="metric-caption" data-mind="entry-count">—</p>
           <div id="mind-range-control" class="body-range hub-pills" role="group" aria-label="Mind time range">

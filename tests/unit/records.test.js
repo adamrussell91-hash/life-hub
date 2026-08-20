@@ -181,7 +181,11 @@ test('accepts every canonical domain record and nullable observations', () => {
       products: ['cleanser'], skin_note: null
     },
     { ...common, type: 'fragrance', fragrance: 'Aether', occasion: null },
-    { ...common, type: 'bloods', markers: [] }
+    { ...common, type: 'bloods', markers: [] },
+    {
+      ...common, type: 'medical', title: 'GP review', record_type: 'Appointment',
+      lane: 'appointment', location_kind: 'unknown', episode: null
+    }
   ];
 
   for (const record of records) {
@@ -245,7 +249,7 @@ markers: [{"key":"alt","label":"ALT","category":"Liver Function","value":42,"uni
 });
 
 test('rejects unknown types and invalid enumerations', () => {
-  assert.match(validateRecord({ ...common, type: 'medical' }).join('; '), /Unknown record type/);
+  assert.match(validateRecord({ ...common, type: 'wizardry' }).join('; '), /Unknown record type/);
 
   const invalid = [
     [{ ...common, type: 'meal', meal: 'brunch', calories: 1, protein_g: 1, fat_g: 1 }, 'meal'],
