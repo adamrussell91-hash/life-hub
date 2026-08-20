@@ -1386,23 +1386,6 @@ main { max-width: 76rem; margin: 0 auto; }
   background: rgba(255, 252, 248, 0.72);
   max-width: 16rem;
 }
-.skincare-segment__btn {
-  border: 0;
-  border-radius: 999px;
-  padding: 0.55rem 0.9rem;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-}
-.skincare-segment__btn[aria-selected="true"] {
-  background: rgba(185, 158, 224, 0.28);
-  color: var(--depth);
-  box-shadow: 0 1px 0 rgba(26, 20, 36, 0.04);
-}
 .skincare-drawer-viewport {
   overflow: hidden;
   width: 100%;
@@ -1800,27 +1783,7 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 .body-range {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
   margin: 0 0 0.85rem;
-}
-.body-range button {
-  border: 1px solid var(--line);
-  background: var(--warm-white);
-  border-radius: 999px;
-  padding: 0.4rem 0.85rem;
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--muted);
-  cursor: pointer;
-  min-height: 44px;
-}
-.body-range button.is-active {
-  background: var(--wave);
-  border-color: var(--wave);
-  color: #fff;
 }
 .body-sections {
   display: grid;
@@ -2134,10 +2097,6 @@ main { max-width: 76rem; margin: 0 auto; }
 #body-bloods-dashboard .body-chart [data-role="ref-band"] {
   fill: var(--pastel-sage);
 }
-#body-bloods-dashboard .body-range button.is-active {
-  background: var(--wave);
-  color: var(--warm-white);
-}
 .bloods-top {
   display: flex;
   align-items: center;
@@ -2239,12 +2198,8 @@ main { max-width: 76rem; margin: 0 auto; }
   align-items: center;
   margin: 0 0 1rem;
 }
-.bloods-toolbar input {
-  min-height: 44px;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
+.bloods-toolbar .hub-search {
+  flex: 1 1 12rem;
 }
 .bloods-metric-grid {
   display: grid;

@@ -533,9 +533,9 @@
             </ul>
           </article>
           <div class="skincare-beauty-drawer">
-            <div id="skincare-routine-segment" class="skincare-segment" role="tablist" aria-label="AM or PM routine">
-              <button type="button" class="skincare-segment__btn" role="tab" data-routine="am" aria-controls="skincare-routine-cards" aria-selected="true">AM</button>
-              <button type="button" class="skincare-segment__btn" role="tab" data-routine="pm" aria-controls="skincare-routine-cards" aria-selected="false">PM</button>
+            <div id="skincare-routine-segment" class="skincare-segment hub-pills" role="tablist" aria-label="AM or PM routine">
+              <button type="button" class="skincare-segment__btn hub-pills__btn" role="tab" data-routine="am" aria-controls="skincare-routine-cards" aria-selected="true">AM</button>
+              <button type="button" class="skincare-segment__btn hub-pills__btn" role="tab" data-routine="pm" aria-controls="skincare-routine-cards" aria-selected="false">PM</button>
             </div>
             <div class="skincare-drawer-viewport">
               <div id="skincare-routine-cards" class="skincare-drawer-track" data-active="am" role="tabpanel" aria-label="Skincare routine"></div>
@@ -568,11 +568,11 @@
         </section>
 
         <section id="body-dashboard" class="dashboard" aria-label="Body" hidden>
-          <div id="body-range-control" class="body-range" role="group" aria-label="Body time range">
-            <button type="button" data-body-range="monthly" aria-pressed="false">Month</button>
-            <button type="button" data-body-range="six_month" class="is-active" aria-pressed="true">6M</button>
-            <button type="button" data-body-range="year" aria-pressed="false">Year</button>
-            <button type="button" data-body-range="five_year" aria-pressed="false">5Y</button>
+          <div id="body-range-control" class="body-range hub-pills" role="group" aria-label="Body time range">
+            <button type="button" class="hub-pills__btn" data-body-range="monthly" aria-pressed="false">Month</button>
+            <button type="button" class="hub-pills__btn is-active" data-body-range="six_month" aria-pressed="true">6M</button>
+            <button type="button" class="hub-pills__btn" data-body-range="year" aria-pressed="false">Year</button>
+            <button type="button" class="hub-pills__btn" data-body-range="five_year" aria-pressed="false">5Y</button>
           </div>
           <p id="body-status" class="metric-caption" aria-live="polite"></p>
           <div id="body-sections" class="body-sections"></div>
@@ -584,11 +584,11 @@
             <button type="button" id="bloods-back" class="btn btn--secondary quiet-button bloods-back">← Body</button>
             <button type="button" id="bloods-appointment-open" class="bloods-appointment-open">Summary for appointment</button>
           </div>
-          <div id="bloods-range-control" class="body-range" role="group" aria-label="Bloods time range">
-            <button type="button" data-bloods-range="monthly" aria-pressed="false">Month</button>
-            <button type="button" data-bloods-range="six_month" aria-pressed="false">6M</button>
-            <button type="button" data-bloods-range="year" aria-pressed="false">Year</button>
-            <button type="button" data-bloods-range="five_year" class="is-active" aria-pressed="true">5Y</button>
+          <div id="bloods-range-control" class="body-range hub-pills" role="group" aria-label="Bloods time range">
+            <button type="button" class="hub-pills__btn" data-bloods-range="monthly" aria-pressed="false">Month</button>
+            <button type="button" class="hub-pills__btn" data-bloods-range="six_month" aria-pressed="false">6M</button>
+            <button type="button" class="hub-pills__btn" data-bloods-range="year" aria-pressed="false">Year</button>
+            <button type="button" class="hub-pills__btn is-active" data-bloods-range="five_year" aria-pressed="true">5Y</button>
           </div>
           <div id="bloods-signal" class="bloods-signal">
             <article class="metric-card bloods-signal__card" aria-label="This panel">
@@ -606,7 +606,7 @@
             <button type="button" id="bloods-collapse-all" class="btn btn--secondary quiet-button">Collapse all</button>
             <label class="bloods-search-label">
               <span class="visually-hidden">Search markers</span>
-              <input id="bloods-search" type="search" placeholder="Filter markers" autocomplete="off">
+              <input id="bloods-search" class="hub-search" type="search" placeholder="Filter markers" autocomplete="off">
             </label>
           </div>
           <div id="bloods-sections" class="bloods-sections"></div>
@@ -625,11 +625,11 @@
 
         <section id="mind-dashboard" class="dashboard" aria-label="Mind" hidden>
           <p class="metric-caption" data-mind="entry-count">—</p>
-          <div id="mind-range-control" class="body-range" role="group" aria-label="Mind time range">
-            <button type="button" data-mind-range="weekly" aria-pressed="false">Weekly</button>
-            <button type="button" data-mind-range="monthly" class="is-active" aria-pressed="true">Monthly</button>
-            <button type="button" data-mind-range="six_month" aria-pressed="false">6M</button>
-            <button type="button" data-mind-range="year" aria-pressed="false">Year</button>
+          <div id="mind-range-control" class="body-range hub-pills" role="group" aria-label="Mind time range">
+            <button type="button" class="hub-pills__btn" data-mind-range="weekly" aria-pressed="false">Weekly</button>
+            <button type="button" class="hub-pills__btn is-active" data-mind-range="monthly" aria-pressed="true">Monthly</button>
+            <button type="button" class="hub-pills__btn" data-mind-range="six_month" aria-pressed="false">6M</button>
+            <button type="button" class="hub-pills__btn" data-mind-range="year" aria-pressed="false">Year</button>
           </div>
           <p class="metric-caption" data-mind="ambient" hidden></p>
           <p id="mind-empty" class="metric-caption" hidden>No diary entries in this range yet — open Chat to log one with Penelope.</p>
