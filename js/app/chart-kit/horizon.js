@@ -1,4 +1,4 @@
-import { enumerateDateKeys } from '../../core/time.js';
+import { enumerateDateKeys, getSydneyWeekStart } from '../../core/time.js';
 import { MONTHS } from './polar-clock.js';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -204,5 +204,84 @@ export function buildMetricStrip({
       energy: energyTrend.text,
       energyDir: energyTrend.dir
     }
+  };
+}
+
+const GROUP_HEIGHT = 96;
+const MOOD_BAR = { great: 1, good: 0.8, neutral: 0.58, low: 0.36, bad: 0.2 };
+const ENERGY_BAR = { high: 1, medium: 0.64, low: 0.32 };
+
+function moodKeyFromPoint(point) {
+  if (point?.mood && MOOD_BAR[point.mood] != null) return point.mood;
+  return moodLevelFromScore(point?.value) === 'high'
+    ? (Number(point.value) >= 8 ? 'great' : 'good')
+    : moodLevelFromScore(point?.value) === 'medium' ? 'neutral' : 'low';
+}
+
+function modalEnergy(levels) {
+  const tally = { high: 0, medium: 0, low: 0 };
+  for (const level of levels) {
+    if (tally[level] != null) tally[level] += 1;
+  }
+  return ['high', 'medium', 'low'].sort((a, b) => tally[b] - tally[a] || ENERGY_RANK[b] - ENERGY_RANK[a])[0];
+}
+
+function columnFrom(date, moodPoint, energyPoint) {
+  const moodKey = moodPoint ? moodKeyFromPoint(moodPoint) : null;
+  const energyKey = energyPoint?.energy && ENERGY_BAR[energyPoint.energy] != null ? energyPoint.energy : null;
+  if (!moodKey && !energyKey) return null;
+  return {
+    date,
+    mood: moodKey ? { key: moodKey, height: MOOD_BAR[moodKey] * GROUP_HEIGHT, value: moodPoint?.value ?? null } : null,
+    energy: energyKey ? { key: energyKey, height: ENERGY_BAR[energyKey] * GROUP_HEIGHT, value: energyKey } : null
+  };
+}
+
+/**
+ * Grouped mood + energy columns. Day grain for week/month; week grain for 6M/year.
+ */
+export function buildGroupedMetricBars({
+  bounds,
+  range = 'monthly',
+  mood = [],
+  energy = []
+} = {}) {
+  const bucket = range === 'year' || range === 'six_month' ? 'week' : 'day';
+  const moodByDate = new Map((mood ?? []).filter(point => point?.date).map(point => [point.date, point]));
+  const energyByDate = new Map((energy ?? []).filter(point => point?.date).map(point => [point.date, point]));
+  const columns = [];
+
+  if (bucket === 'day') {
+    const dates = [...new Set([...moodByDate.keys(), ...energyByDate.keys()])].sort();
+    for (const date of dates) {
+      const column = columnFrom(date, moodByDate.get(date), energyByDate.get(date));
+      if (column) columns.push(column);
+    }
+  } else {
+    const groups = new Map();
+    for (const date of [...new Set([...moodByDate.keys(), ...energyByDate.keys()])]) {
+      const week = getSydneyWeekStart(date);
+      const group = groups.get(week) ?? { moods: [], energies: [] };
+      const moodPoint = moodByDate.get(date);
+      if (moodPoint) group.moods.push(moodPoint);
+      const energyPoint = energyByDate.get(date);
+      if (energyPoint?.energy) group.energies.push(energyPoint.energy);
+      groups.set(week, group);
+    }
+    for (const week of [...groups.keys()].sort()) {
+      const group = groups.get(week);
+      const avg = mean(group.moods.map(point => Number(point.value)).filter(Number.isFinite));
+      const moodPoint = avg == null ? null : { date: week, value: avg, mood: group.moods[0]?.mood };
+      const energyPoint = group.energies.length ? { energy: modalEnergy(group.energies) } : null;
+      const column = columnFrom(week, moodPoint, energyPoint);
+      if (column) columns.push(column);
+    }
+  }
+
+  return {
+    width: PLOT_WIDTH,
+    height: GROUP_HEIGHT,
+    bucket,
+    columns
   };
 }

@@ -123,7 +123,26 @@ function calloutTitle(run, highOrder) {
   return highOrder === 0 ? 'High period' : 'Elevated stretch';
 }
 
-function buildCallouts(runs, rings, bounds, range) {
+function dayWidth(bounds, range) {
+  if (range === 'year') {
+    const year = Number(String(bounds.from).slice(0, 4));
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    return 360 / (leap ? 366 : 365);
+  }
+  const days = Math.max(1, Number(bounds.days) || 1);
+  return 360 / days;
+}
+
+function sectorPath(thetaStart, thetaEnd) {
+  const sweep = ((thetaEnd - thetaStart) + 360) % 360 || dayWidth({ days: 1 }, 'weekly');
+  const end = thetaStart + sweep;
+  const startPt = polar(CX, CY, R_PLOT, thetaStart);
+  const endPt = polar(CX, CY, R_PLOT, end);
+  const large = sweep > 180 ? 1 : 0;
+  return `M${CX} ${CY} L${startPt.x.toFixed(2)} ${startPt.y.toFixed(2)} A${R_PLOT} ${R_PLOT} 0 ${large} 1 ${endPt.x.toFixed(2)} ${endPt.y.toFixed(2)} Z`;
+}
+
+function buildSectors(runs, bounds, range) {
   const notable = runs
     .filter(run => run.length >= MIN_STREAK)
     .sort((a, b) => b.length - a.length || a.from.localeCompare(b.from))
@@ -134,13 +153,10 @@ function buildCallouts(runs, rings, bounds, range) {
       .sort((a, b) => a.from.localeCompare(b.from))
       .map((run, index) => [run.from + run.energy, index])
   );
-  const byKey = Object.fromEntries(rings.map(ring => [ring.key, ring]));
+  const step = dayWidth(bounds, range);
   return notable.map(run => {
-    const ring = byKey[run.energy];
-    const mid = run.dates[Math.floor((run.dates.length - 1) / 2)];
-    const theta = thetaForDate(mid, bounds, range);
-    const anchor = polar(CX, CY, ring.radius, theta);
-    const label = polar(CX, CY, R_PLOT + 46, theta);
+    const thetaStart = thetaForDate(run.from, bounds, range);
+    const thetaEnd = thetaForDate(run.to, bounds, range) + step;
     const title = calloutTitle(run, highOrder.get(run.from + run.energy) ?? 0);
     return {
       energy: run.energy,
@@ -150,13 +166,9 @@ function buildCallouts(runs, rings, bounds, range) {
       from: run.from,
       to: run.to,
       dates: run.dates,
-      x1: anchor.x,
-      y1: anchor.y,
-      x2: label.x,
-      y2: label.y,
-      labelX: label.x,
-      labelY: label.y,
-      textAnchor: label.x >= CX ? 'start' : 'end'
+      thetaStart,
+      thetaEnd,
+      d: sectorPath(thetaStart, thetaEnd)
     };
   });
 }
@@ -196,8 +208,8 @@ export function buildEnergyOrbit(series, { bounds, range = 'monthly', previous =
   });
   const radiusByEnergy = Object.fromEntries(rings.map(ring => [ring.key, ring.radius]));
   const runs = energyRuns(points);
-  const callouts = buildCallouts(runs, rings, resolvedBounds, range);
-  const streakDates = new Set(callouts.flatMap(item => item.dates));
+  const sectors = buildSectors(runs, resolvedBounds, range);
+  const streakDates = new Set(sectors.flatMap(item => item.dates));
   const headline = headlineFor(points, previous, range);
 
   const plotted = points.map(point => {
@@ -227,7 +239,7 @@ export function buildEnergyOrbit(series, { bounds, range = 'monthly', previous =
     rings,
     angleTicks: angleTicksForRange(resolvedBounds, range, TICK_GEOMETRY),
     points: plotted,
-    callouts,
+    sectors,
     headline,
     legend: headline.legend
   };
