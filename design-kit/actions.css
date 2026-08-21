@@ -44,7 +44,7 @@
   display: block;
 }
 
-/* Site tile — canvas top-right, after .hub-utilities. Same file as favicon + login. */
+/* Site tile — canvas top-left, level with the page title. Same file as favicon + login. */
 .hub-mark {
   display: block;
   width: 2rem;

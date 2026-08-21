@@ -65,6 +65,17 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
   assert.match(html, /id="app-shell"[^>]*hidden/);
 });
 
+test('hub mark sits left of the page title, not in header actions', async () => {
+  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const copy = html.slice(html.indexOf('page-header__copy'), html.indexOf('page-header__actions'));
+  const actions = html.slice(html.indexOf('page-header__actions'), html.indexOf('id="main-content"'));
+  assert.match(copy, /class="page-header__title-row"/);
+  assert.match(copy, /class="hub-mark"/);
+  assert.match(copy, /id="page-title"/);
+  assert.ok(copy.indexOf('hub-mark') < copy.indexOf('page-title'));
+  assert.doesNotMatch(actions, /class="hub-mark"/);
+});
+
 test('skip link is unavailable until the authenticated shell is revealed', async () => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
   const shellStart = html.indexOf('id="app-shell"');
