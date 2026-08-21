@@ -10,7 +10,8 @@ import { buildEnergyOrbit } from './chart-kit/energy-orbit.js';
 import { buildMoodMixDonut } from './chart-kit/mood-mix.js';
 import { buildThemeOrbit, THEME_ARMS } from './chart-kit/theme-orbit.js';
 import { buildThemeConstellation, arcFor } from './chart-kit/theme-constellation.js';
-import { buildWatchlistHeat, WATCHLIST_SLOTS } from './chart-kit/watchlist-heat.js';
+import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
+import { buildWatchlistHeat } from './chart-kit/watchlist-heat.js';
 import { packMasonry } from './chart-kit/masonry.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
 import { buildSankeyFlow } from './chart-kit/sankey-flow.js';
@@ -2383,7 +2384,7 @@ function renderChordTile(root, model) {
 }
 
 function themeSlotColour(index) {
-  return WATCHLIST_SLOTS[Number(index) % WATCHLIST_SLOTS.length];
+  return CLINICAL_CHART_SLOTS[Number(index) % CLINICAL_CHART_SLOTS.length];
 }
 
 function renderRadialTile(root, model) {
