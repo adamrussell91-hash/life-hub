@@ -37,6 +37,24 @@ test('Home shell exposes landmarks and named rendering regions', async () => {
   assert.doesNotMatch(htmlWithoutFonts, /https?:\/\//);
 });
 
+test('desktop rail adopts kit rail.css as labeled pages, not dots or an icon column', async () => {
+  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../../css/app.css', import.meta.url), 'utf8');
+  const rail = html.slice(html.indexOf('class="desktop-rail"'), html.indexOf('class="page-frame"'));
+
+  assert.match(html, /href="design-kit\/rail\.css"/);
+  assert.match(html, /class="hub-rail__brand"[^>]*data-section="home"/);
+  assert.doesNotMatch(html, /nav-dot|brand-mark|--rail-width\s*:/);
+  assert.doesNotMatch(css, /--rail-width\s*:/);
+  assert.doesNotMatch(rail, /class="nav-label"|Domains/);
+
+  for (const label of ['Home', 'Chat', 'Nutrition', 'Fitness', 'Body', 'Mind', 'Skincare', 'Calendar', 'Central Node']) {
+    assert.match(rail, new RegExp(`class="hub-rail__label">${label}<`));
+    assert.match(rail, new RegExp(`data-section="[^"]+"[\\s\\S]{0,400}class="hub-rail__label">${label}<`));
+  }
+  assert.match(rail, /<svg[^>]*fill="none"[^>]*stroke="currentColor"/);
+});
+
 test('authenticated shell provides a semantic sign-in gate and reachable controls', async () => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
 

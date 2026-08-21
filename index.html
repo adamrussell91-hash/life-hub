@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="design-kit/overlays.css">
   <link rel="stylesheet" href="design-kit/actions.css">
   <link rel="stylesheet" href="design-kit/sign-in.css">
+  <link rel="stylesheet" href="design-kit/rail.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -36,29 +37,45 @@
   <a class="skip-link" href="#main-content">Skip to Life Hub Home</a>
   <div class="app-shell" id="app" data-state="loading">
     <aside class="desktop-rail" aria-label="Life Hub navigation">
-      <header class="brand">
-        <span class="brand-mark" aria-hidden="true"><span></span></span>
-        <span class="brand-copy">
-          <span class="hub-rail__brand">Life Hub</span>
-          <span class="hub-rail__tagline">Private dashboard</span>
-        </span>
-      </header>
+      <button class="hub-rail__brand" type="button" data-section="home">Life Hub</button>
 
       <nav class="rail-nav" aria-label="Primary">
-        <button class="nav-item is-active" type="button" data-section="home" aria-current="page">
-          <span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg></span><span>Home</span>
+        <button class="nav-item hub-rail__item is-active" type="button" data-section="home" aria-current="page">
+          <span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg></span>
+          <span class="hub-rail__label">Home</span>
         </button>
-        <button class="nav-item" type="button" data-section="chat">
-          <span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z"/></svg></span><span>Chat</span>
+        <button class="nav-item hub-rail__item" type="button" data-section="chat">
+          <span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z"/></svg></span>
+          <span class="hub-rail__label">Chat</span>
         </button>
-        <p class="nav-label">Domains</p>
-        <button class="nav-item" type="button" data-section="nutrition"><span class="nav-dot nutrition" aria-hidden="true"></span><span>Nutrition</span></button>
-        <button class="nav-item" type="button" data-section="fitness"><span class="nav-dot fitness" aria-hidden="true"></span><span>Fitness</span></button>
-        <button class="nav-item" type="button" data-section="body"><span class="nav-dot body" aria-hidden="true"></span><span>Body</span></button>
-        <button class="nav-item" type="button" data-section="mind"><span class="nav-dot mind" aria-hidden="true"></span><span>Mind</span></button>
-        <button class="nav-item" type="button" data-section="skincare"><span class="nav-dot skincare" aria-hidden="true"></span><span>Skincare</span></button>
-        <button class="nav-item" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg></span><span>Calendar</span></button>
-        <button class="nav-item" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true">◎</span><span>Central Node</span></button>
+        <button class="nav-item hub-rail__item" type="button" data-section="nutrition">
+          <span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V4"/><path d="M10 13v7"/><path d="M16 4v16"/><path d="M16 4c2 2 2 5 0 7"/></svg></span>
+          <span class="hub-rail__label">Nutrition</span>
+        </button>
+        <button class="nav-item hub-rail__item" type="button" data-section="fitness">
+          <span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9v6M18 9v6M4 11v2M20 11v2M6 12h12"/></svg></span>
+          <span class="hub-rail__label">Fitness</span>
+        </button>
+        <button class="nav-item hub-rail__item" type="button" data-section="body">
+          <span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="2.5"/><path d="M6.5 20v-1.5A5.5 5.5 0 0 1 12 13a5.5 5.5 0 0 1 5.5 5.5V20"/></svg></span>
+          <span class="hub-rail__label">Body</span>
+        </button>
+        <button class="nav-item hub-rail__item" type="button" data-section="mind">
+          <span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11" r="5.5"/><path d="M9 17.5 8 20"/></svg></span>
+          <span class="hub-rail__label">Mind</span>
+        </button>
+        <button class="nav-item hub-rail__item" type="button" data-section="skincare">
+          <span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11Z"/></svg></span>
+          <span class="hub-rail__label">Skincare</span>
+        </button>
+        <button class="nav-item hub-rail__item" type="button" data-section="calendar">
+          <span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg></span>
+          <span class="hub-rail__label">Calendar</span>
+        </button>
+        <button class="nav-item hub-rail__item" type="button" data-section="central-node">
+          <span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5"/></svg></span>
+          <span class="hub-rail__label">Central Node</span>
+        </button>
       </nav>
 
       <div class="rail-footer">
@@ -984,12 +1001,12 @@
           <button type="button" id="more-sheet-close" class="more-sheet__close" aria-label="Close">Close</button>
         </header>
         <nav class="more-sheet__nav" aria-label="Secondary sections">
-          <button type="button" data-section="nutrition"><span class="nav-dot nutrition" aria-hidden="true"></span>Nutrition</button>
-          <button type="button" data-section="fitness"><span class="nav-dot fitness" aria-hidden="true"></span>Fitness</button>
-          <button type="button" data-section="body"><span class="nav-dot body" aria-hidden="true"></span>Body</button>
-          <button type="button" data-section="mind"><span class="nav-dot mind" aria-hidden="true"></span>Mind</button>
-          <button type="button" data-section="skincare"><span class="nav-dot skincare" aria-hidden="true"></span>Skincare</button>
-          <button type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true">◎</span>Central Node</button>
+          <button type="button" data-section="nutrition"><span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V4"/><path d="M10 13v7"/><path d="M16 4v16"/><path d="M16 4c2 2 2 5 0 7"/></svg></span>Nutrition</button>
+          <button type="button" data-section="fitness"><span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9v6M18 9v6M4 11v2M20 11v2M6 12h12"/></svg></span>Fitness</button>
+          <button type="button" data-section="body"><span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="2.5"/><path d="M6.5 20v-1.5A5.5 5.5 0 0 1 12 13a5.5 5.5 0 0 1 5.5 5.5V20"/></svg></span>Body</button>
+          <button type="button" data-section="mind"><span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11" r="5.5"/><path d="M9 17.5 8 20"/></svg></span>Mind</button>
+          <button type="button" data-section="skincare"><span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11Z"/></svg></span>Skincare</button>
+          <button type="button" data-section="central-node"><span class="hub-rail__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5"/></svg></span>Central Node</button>
         </nav>
       </div>
     </dialog>

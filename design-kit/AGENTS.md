@@ -10,10 +10,11 @@ Tasks Hub agents: also read `TASKS.md` (Teaching chrome, board home, graph/chart
 2. `css/overlays.css` — the only per-hub differences (glass / tile density)
 3. `css/actions.css` — `.btn`, Wave `:focus-visible`, `.confirm-card` (import in existing hubs). Pulls in `filters.css`.
 4. `css/sign-in.css` — passphrase gate (brand, Sign in, labelled field)
-5. `css/chrome.css` — rail, page header, buttons, confirm cards (new hubs). Pulls in `filters.css`.
-6. `css/filters.css` — `.hub-search`, `.hub-filter`, `.hub-menu`, `.hub-pills`, `.hub-chips` (list/search chrome only — not form fields)
-7. `js/hub-filter-menu.js` — `createHubFilter` for custom filter menus
-8. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `hub-utilities.html`, `sign-in.html`, `confirm-card.html`, `hub-search.html`, `hub-filter.html`, `hub-pills.html`, `hub-chips.html`)
+5. `css/chrome.css` — rail, page header, buttons, confirm cards (new hubs). Pulls in `filters.css` and `rail.css`.
+6. `css/rail.css` — labeled left rail. Brief: `RAIL.md`. Existing hubs load this file even when they do not load `chrome.css`.
+7. `css/filters.css` — `.hub-search`, `.hub-filter`, `.hub-menu`, `.hub-pills`, `.hub-chips` (list/search chrome only — not form fields)
+8. `js/hub-filter-menu.js` — `createHubFilter` for custom filter menus
+9. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `hub-utilities.html`, `sign-in.html`, `confirm-card.html`, `hub-search.html`, `hub-filter.html`, `hub-pills.html`, `hub-chips.html`)
 
 Canonical repo: `/Users/adamrussell/Projects/hub-design-kit`  
 GitHub: https://github.com/adamrussell91-hash/hub-design-kit  
@@ -23,8 +24,9 @@ Each hub also has a copy at `design-kit/` so this workspace can see it.
 
 - Colours, type scale, spacing, radius, shadows
 - Page header: uppercase eyebrow → `h1` title → optional supporting → actions on the right
-- Left rail: `--rail-width`, depth→marine gradient, `--on-dark*` text
-- Rail brand: `.hub-rail__brand` — single line, CSS `text-transform: uppercase`, `--text-2xs`. Copy is `"Teaching Hub"` / `"Life Hub"` / `"Knowledge Hub"` / `"Tasks Hub"`. No stacked `<br>`, no large title-case hero on the rail. Optional `.hub-rail__tagline` only.
+- Left rail: `RAIL.md` + `rail.css`. `--rail-width` from tokens, depth→marine gradient, `--on-dark*` text. No hub `--rail-width` override, no icon column, no coloured dots.
+- Rail brand: `.hub-rail__brand` is a **home control** — single line, CSS `text-transform: uppercase`, `--text-2xs`. Copy is `"Teaching Hub"` / `"Life Hub"` / `"Knowledge Hub"` / `"Tasks Hub"`. No stacked `<br>`, no large title-case hero on the rail.
+- First-class rail pages: outline icon + title-case label (`.hub-rail__item` / `.hub-rail__icon` / `.hub-rail__label`). Same row for every page, including Home.
 - Chrome utilities: refresh and sign out are `.hub-icon-btn` icons in `.hub-utilities` at the **canvas top-right** (last child of `.page-header__actions`). Faded `--shallow` icons — never labelled pill `.btn`s on the rail or header. Snippet: `snippets/hub-utilities.html`.
 - Buttons: `.btn` + `--primary` / `--secondary` / `--ghost` / `--decisive`
 - Filter chrome: `.hub-search` (pill), `.hub-filter` (bordered dropdown + `.hub-menu`), `.hub-pills` (view / range), `.hub-chips` (active filters). Restyle existing list/search/range controls only. Do not add a new toolbar. Do not use these classes on labelled form fields.
@@ -56,7 +58,7 @@ Product UI (graphs, lesson blocks, bloods) stays in the hub. Chrome does not.
 
 When editing a hub, replace local logout/refresh chrome with the kit pattern (after sync):
 
-1. Rail brand → `.hub-rail__brand` (or map the hub’s brand class to the same token rules). Single line of copy `"… Hub"`; CSS uppercases it. Drop stacked `<br>` titles and large title-case rail heroes.
+1. Load `rail.css`. Rail brand → `.hub-rail__brand` as a home control (button / in-app link). Single line of copy `"… Hub"`; CSS uppercases it. Drop stacked `<br>` titles, ring marks, and large title-case rail heroes. Every first-class page is outline icon + title-case label. No coloured dots.
 2. Sign out / refresh → copy `snippets/hub-utilities.html` into `.page-header__actions` (canvas top-right). Keep existing ids/data attributes if tests rely on them; change the markup to `.hub-icon-btn`.
 3. Delete labelled pill logout styles on the rail (`.teacher-layout__logout`, `.rail__logout`, `.hub-rail__logout`, `.quiet-button` used as Sign out/Refresh).
 4. Load `actions.css` (or `chrome.css`) so `.hub-icon-btn` is defined.

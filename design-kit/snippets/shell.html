@@ -17,12 +17,11 @@
   <body>
     <div class="hub-layout">
       <aside class="hub-rail">
-        <div class="hub-rail__brand-block">
-          <!-- Single line; CSS uppercases. Do not stack with <br> or restyle as a hero. -->
-          <p class="hub-rail__brand">Knowledge Hub</p>
-          <!-- Optional: <p class="hub-rail__tagline">Private dashboard</p> -->
-        </div>
-        <!-- nav buttons: use .btn.btn--ghost; colour with --on-dark on the rail -->
+        <!-- Brand is a home control. Single line; CSS uppercases. See RAIL.md. -->
+        <button class="hub-rail__brand" type="button" data-section="home">Knowledge Hub</button>
+        <nav class="hub-rail__nav" aria-label="Primary">
+          <!-- Every first-class page: outline icon + title-case label. No dots, no icon column. -->
+        </nav>
       </aside>
       <div class="hub-canvas">
         <header class="page-header">
