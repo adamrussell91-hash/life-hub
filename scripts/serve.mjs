@@ -12,6 +12,7 @@ const MIME_TYPES = {
   '.md': 'text/markdown; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
   '.png': 'image/png',
+  '.svg': 'image/svg+xml',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.yaml': 'application/yaml; charset=utf-8',
   '.yml': 'application/yaml; charset=utf-8'

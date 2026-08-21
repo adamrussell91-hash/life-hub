@@ -116,7 +116,8 @@ test('serves only browser modules and the generated YAML runtime', async t => {
   const cases = [
     ['/js/app/main.js', /^text\/javascript/],
     ['/vendor/js-yaml.mjs', /^text\/javascript/],
-    ['/manifest.webmanifest', /^application\/manifest\+json/]
+    ['/manifest.webmanifest', /^application\/manifest\+json/],
+    ['/icons/life-hub.svg', /^image\/svg\+xml/]
   ];
 
   for (const [path, contentType] of cases) {
