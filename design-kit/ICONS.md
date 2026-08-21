@@ -25,7 +25,7 @@ Read this before adding a favicon, a sign-in mark, or a header glyph.
 |-------|------|--------|------|
 | Browser tab / home screen | Tile | `<link rel="icon" href="…/icons/<hub>.svg" type="image/svg+xml">` | browser |
 | Sign-in card | Tile | `<img class="sign-in__mark" src="…/icons/<hub>.svg" alt="" width="56" height="56">` | `3.5rem` |
-| Signed-in canvas, **top-right** | Tile | `<img class="hub-mark" …>` last child of `.page-header__actions` (after `.hub-utilities`) | `2rem` |
+| Signed-in canvas, **top-left** with the title | Tile | `<img class="hub-mark" …>` first child of `.page-header__title-row`, left of `h1.page-header__title` | `2rem` |
 
 `alt=""` — the brand text / page title already names the hub.
 
