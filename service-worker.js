@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v99';
+const CACHE_NAME = 'life-hub-shell-v101';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -39,6 +39,7 @@ const SHELL_FILES = [
   'js/app/chart-kit/sankey-flow.js',
   'js/app/chart-kit/bump.js',
   'js/app/chart-kit/chord-layout.js',
+  'js/app/chart-kit/clinical-slots.js',
   'js/app/chart-kit/radial-year.js',
   'js/app/chart-kit/mood-radial.js',
   'js/app/chart-kit/energy-orbit.js',
