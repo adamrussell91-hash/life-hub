@@ -2764,7 +2764,8 @@ main { max-width: 76rem; margin: 0 auto; }
   margin: 0 0 var(--space-4);
 }
 /* Half of the 76rem desktop canvas. Narrower viewports stay 100%. */
-.bloods-fbc-radial {
+.bloods-fbc-radial,
+.bloods-glucose-map {
   width: min(100%, 38rem);
   margin-inline: auto;
 }

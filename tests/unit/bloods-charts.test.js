@@ -183,7 +183,7 @@ test('chart viewBoxes match the aspect ratio the stylesheet gives them, so nothi
   ]) {
     assert.match(css, new RegExp(`${selector}\\s*\\{[^}]*aspect-ratio:\\s*${ratio}`), selector);
   }
-  assert.match(css, /\.bloods-fbc-radial\s*\{[^}]*width:\s*min\(100%,\s*38rem\)/);
+  assert.match(css, /\.bloods-fbc-radial,\s*\n\.bloods-glucose-map\s*\{[^}]*width:\s*min\(100%,\s*38rem\)/);
 });
 
 test('biochemistry instrument viewBoxes match their CSS geometry', () => {
