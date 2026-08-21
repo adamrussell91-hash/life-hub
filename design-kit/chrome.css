@@ -109,6 +109,12 @@ html[data-hub="life"] .glass-panel {
   margin-bottom: var(--space-2);
 }
 
+.page-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 .page-header__title {
   font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
@@ -172,7 +178,7 @@ html[data-hub="life"] .glass-panel {
   display: block;
 }
 
-/* Site tile — canvas top-right, after .hub-utilities. Same file as favicon + login. */
+/* Site tile — canvas top-left, level with the page title. Same file as favicon + login. */
 .hub-mark {
   display: block;
   width: 2rem;
