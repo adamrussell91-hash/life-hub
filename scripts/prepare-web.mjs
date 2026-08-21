@@ -16,6 +16,14 @@ async function copyDesignKitStyles() {
   )));
 }
 
+async function copyDesignKitModules() {
+  await cp(
+    new URL('design-kit/js/', projectRoot),
+    new URL('design-kit/js/', publishRoot),
+    { recursive: true }
+  );
+}
+
 async function copyHubTile() {
   const iconPublish = new URL('icons/', publishRoot);
   await mkdir(iconPublish, { recursive: true });
@@ -40,6 +48,7 @@ export async function prepareWeb() {
       new URL(file, publishRoot)
     )),
     copyDesignKitStyles(),
+    copyDesignKitModules(),
     copyHubTile()
   ]);
 

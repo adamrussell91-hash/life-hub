@@ -67,6 +67,21 @@ test('publishes design-kit stylesheets linked from the Home shell', async t => {
   }
 });
 
+test('publishes design-kit modules imported by the app shell', async t => {
+  const sources = await readFile(new URL('../../js/app/render-medical.js', import.meta.url), 'utf8');
+  const imports = [...sources.matchAll(/from ['"](\.\.\/\.\.\/design-kit\/[^'"]+)['"]/g)]
+    .map(match => match[1].replace('../../', ''));
+  assert.ok(imports.includes('design-kit/js/hub-filter-menu.js'));
+
+  const baseUrl = await startServer(t);
+  for (const href of imports) {
+    const response = await fetch(`${baseUrl}/${href}`);
+    assert.equal(response.status, 200, href);
+    assert.match(response.headers.get('content-type'), /javascript/);
+    assert.match(await response.text(), /createHubFilter|export /);
+  }
+});
+
 test('native sign-in POST to / serves the shell instead of 405', async t => {
   const baseUrl = await startServer(t);
   const response = await fetch(`${baseUrl}/`, {
