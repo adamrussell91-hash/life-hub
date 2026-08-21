@@ -10,6 +10,7 @@ import { buildEnergyOrbit } from './chart-kit/energy-orbit.js';
 import { buildMoodMixDonut } from './chart-kit/mood-mix.js';
 import { buildThemeOrbit, THEME_ARMS } from './chart-kit/theme-orbit.js';
 import { buildThemeConstellation, arcFor } from './chart-kit/theme-constellation.js';
+import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
 import { buildWatchlistHeat } from './chart-kit/watchlist-heat.js';
 import { packMasonry } from './chart-kit/masonry.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
@@ -2320,10 +2321,14 @@ function renderChordTile(root, model) {
   }
   svg.replaceChildren();
   const layout = buildChordLayout(focused);
+  const colourByKey = new Map(
+    (layout.arcs ?? []).map((arc, index) => [arc.key, themeSlotColour(index)])
+  );
   const cx = 180;
   const cy = 180;
   const radius = 120;
   for (const arc of layout.arcs) {
+    const colour = colourByKey.get(arc.key) ?? themeSlotColour(0);
     const path = createSvg(root, 'path');
     const x0 = cx + radius * Math.cos(arc.startAngle - Math.PI / 2);
     const y0 = cy + radius * Math.sin(arc.startAngle - Math.PI / 2);
@@ -2332,8 +2337,10 @@ function renderChordTile(root, model) {
     const large = arc.endAngle - arc.startAngle > Math.PI ? 1 : 0;
     path.setAttribute('d', `M${x0},${y0} A${radius},${radius},0,${large},1,${x1},${y1}`);
     path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'var(--wave)');
+    path.setAttribute('stroke', colour);
     path.setAttribute('stroke-width', '10');
+    path.setAttribute('data-theme', arc.key);
+    path.setAttribute('data-role', 'arc');
     path.setAttribute('title', displayThemeLabel(arc.key));
     bindMark(path, root, {
       title: arc.key,
@@ -2359,17 +2366,25 @@ function renderChordTile(root, model) {
     const y0 = cy + (radius - 10) * Math.sin(start - Math.PI / 2);
     const x1 = cx + (radius - 10) * Math.cos(end - Math.PI / 2);
     const y1 = cy + (radius - 10) * Math.sin(end - Math.PI / 2);
+    const sourceKey = layout.themes?.[source.index] ?? layout.arcs?.[source.index]?.key;
+    const colour = colourByKey.get(sourceKey) ?? themeSlotColour(Number(source.index) || 0);
     const path = createSvg(root, 'path');
     path.setAttribute('d', `M${x0},${y0} Q${cx},${cy} ${x1},${y1}`);
     path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'color-mix(in srgb, var(--wave) 35%, transparent)');
+    path.setAttribute('stroke', `color-mix(in srgb, ${colour} 55%, transparent)`);
     path.setAttribute('stroke-width', String(Math.max(2, Math.min(14, Number(ribbon.value) || 2))));
+    path.setAttribute('data-role', 'ribbon');
+    if (sourceKey) path.setAttribute('data-theme', sourceKey);
     svg.append(path);
   }
   paintLegend(root, root.querySelector('#mind-tile-chord') ?? svg.parentNode, (layout.arcs ?? []).map(arc => ({
     label: displayThemeLabel(arc.key),
-    swatch: 'var(--wave)'
+    swatch: colourByKey.get(arc.key) ?? themeSlotColour(0)
   })));
+}
+
+function themeSlotColour(index) {
+  return CLINICAL_CHART_SLOTS[Number(index) % CLINICAL_CHART_SLOTS.length];
 }
 
 function renderRadialTile(root, model) {
