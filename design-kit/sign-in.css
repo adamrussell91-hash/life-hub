@@ -3,7 +3,6 @@
  * Markup: snippets/sign-in.html
  * Do not restyle per hub. Only the tile src + brand eyebrow change.
  * No supporting / purpose copy. Enter submits (form submit, not click-only).
- * Decorative Wave band lives on the card (`.sign-in__wave`); it is not a second layout.
  * Glass density overlays do not apply here.
  */
 
@@ -28,69 +27,18 @@
 }
 
 .sign-in__card {
-  position: relative;
   box-sizing: border-box;
   width: min(100%, 24rem);
   margin: 0;
-  padding: var(--space-8) var(--space-6) calc(var(--space-8) + var(--space-16) + var(--space-2));
+  padding: var(--space-8) var(--space-6);
   display: grid;
   gap: var(--space-5);
-  overflow: hidden;
   background: var(--sign-in-glass-fill);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--elev-3);
   backdrop-filter: blur(var(--sign-in-glass-blur));
   -webkit-backdrop-filter: blur(var(--sign-in-glass-blur));
-}
-
-.sign-in__card > :not(.sign-in__wave) {
-  position: relative;
-  z-index: 1;
-}
-
-.sign-in__wave {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  z-index: 0;
-  height: calc(var(--space-16) + var(--space-6));
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.sign-in__wave-svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.sign-in__wave-drift {
-  transform-box: fill-box;
-  transform-origin: 0 50%;
-}
-
-.sign-in__wave-drift--back {
-  animation: sign-in-wave-drift 22s linear infinite;
-}
-
-.sign-in__wave-drift--mid {
-  animation: sign-in-wave-drift 15s linear infinite reverse;
-}
-
-.sign-in__wave-drift--front {
-  animation: sign-in-wave-drift 9s linear infinite;
-}
-
-@keyframes sign-in-wave-drift {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sign-in__wave-drift {
-    animation: none;
-  }
 }
 
 .sign-in__mark {
