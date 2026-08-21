@@ -4,6 +4,33 @@
      Load: tokens.css → overlays.css → actions.css → sign-in.css -->
 <div class="sign-in">
   <form class="sign-in__card" method="post" action="#" novalidate>
+    <div class="sign-in__wave" aria-hidden="true">
+      <svg class="sign-in__wave-svg" viewBox="0 0 1200 180" preserveAspectRatio="none" focusable="false">
+        <defs>
+          <linearGradient id="sign-in-wave-back" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--navy)"/>
+            <stop offset="1" stop-color="var(--depth)"/>
+          </linearGradient>
+          <linearGradient id="sign-in-wave-mid" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--wave)"/>
+            <stop offset="1" stop-color="var(--marine)"/>
+          </linearGradient>
+          <linearGradient id="sign-in-wave-front" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="color-mix(in srgb, var(--wave) 72%, var(--pastel-blue))"/>
+            <stop offset="1" stop-color="var(--navy)"/>
+          </linearGradient>
+        </defs>
+        <g class="sign-in__wave-drift sign-in__wave-drift--back">
+          <path fill="url(#sign-in-wave-back)" d="M0 72 C100 44 200 44 300 72 C400 100 500 100 600 72 C700 44 800 44 900 72 C1000 100 1100 100 1200 72 C1300 44 1400 44 1500 72 C1600 100 1700 100 1800 72 C1900 44 2000 44 2100 72 C2200 100 2300 100 2400 72 L2400 180 L0 180 Z"/>
+        </g>
+        <g class="sign-in__wave-drift sign-in__wave-drift--mid">
+          <path fill="url(#sign-in-wave-mid)" fill-opacity="0.88" d="M0 98 C80 76 160 76 240 98 C320 120 400 120 480 98 C560 76 640 76 720 98 C800 120 880 120 960 98 C1040 76 1120 76 1200 98 C1280 120 1360 120 1440 98 C1520 76 1600 76 1680 98 C1760 120 1840 120 1920 98 C2000 76 2080 76 2160 98 C2240 120 2320 120 2400 98 L2400 180 L0 180 Z"/>
+        </g>
+        <g class="sign-in__wave-drift sign-in__wave-drift--front">
+          <path fill="url(#sign-in-wave-front)" d="M0 124 C67 108 133 108 200 124 C267 140 333 140 400 124 C467 108 533 108 600 124 C667 140 733 140 800 124 C867 108 933 108 1000 124 C1067 140 1133 140 1200 124 C1267 108 1333 108 1400 124 C1467 140 1533 140 1600 124 C1667 108 1733 108 1800 124 C1867 140 1933 140 2000 124 C2067 108 2133 108 2200 124 C2267 140 2333 140 2400 124 L2400 180 L0 180 Z"/>
+        </g>
+      </svg>
+    </div>
     <img class="sign-in__mark" src="../icons/life-hub.svg" alt="" width="56" height="56">
     <p class="sign-in__brand">Life Hub</p>
     <h1 class="sign-in__title">Sign in</h1>

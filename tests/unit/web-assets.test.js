@@ -37,6 +37,15 @@ test('Home shell exposes landmarks and named rendering regions', async () => {
   assert.doesNotMatch(htmlWithoutFonts, /https?:\/\//);
 });
 
+test('sign-in card wave uses kit tokens and stops under reduced motion', async () => {
+  const css = await readFile(new URL('../../design-kit/sign-in.css', import.meta.url), 'utf8');
+
+  assert.match(css, /\.sign-in__wave\s*\{/);
+  assert.match(css, /@keyframes\s+sign-in-wave-drift/);
+  assert.match(css, /prefers-reduced-motion:\s*reduce[\s\S]*?\.sign-in__wave-drift/);
+  assert.doesNotMatch(css, /#[0-9a-fA-F]{3,8}/);
+});
+
 test('authenticated shell provides a semantic sign-in gate and reachable controls', async () => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
 
@@ -44,6 +53,8 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
     'id="sign-in-view"',
     'class="sign-in"',
     'class="sign-in__card"',
+    'class="sign-in__wave"',
+    'aria-hidden="true"',
     'id="sign-in-form"',
     'novalidate',
     'enterkeyhint="go"',
