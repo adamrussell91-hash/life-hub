@@ -11,6 +11,7 @@ export function createMedicalController({
   let provider = '';
   let density = DEFAULT_MEDICAL_DENSITY;
   let selectedId = null;
+  let expandedYears = [];
   let mode = 'read';
   let draft = null;
 
@@ -34,6 +35,7 @@ export function createMedicalController({
         provider,
         density,
         selectedId,
+        expandedYears,
         today: date
       });
       return { ...model, mode, draft };
@@ -49,7 +51,18 @@ export function createMedicalController({
         onSearch: value => { query = value; paint(); },
         onTypeChange: value => { recordType = value; paint(); },
         onProviderChange: value => { provider = value; paint(); },
-        onDensityChange: value => { density = value; paint(); },
+        onDensityChange: value => {
+          density = value;
+          if (value !== 'years') expandedYears = [];
+          paint();
+        },
+        onToggleYear: year => {
+          const key = String(year);
+          expandedYears = expandedYears.includes(key)
+            ? expandedYears.filter(item => item !== key)
+            : [...expandedYears, key];
+          paint();
+        },
         onToday: () => {
           const marker = globalThis.document?.querySelector?.('.medical-today');
           marker?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });

@@ -36,7 +36,8 @@ test('buildMedicalModel puts future soonest-first above today and past newest-fi
   });
   const ids = model.items.filter(item => item.kind === 'visit').map(item => item.visit.id);
   assert.deepEqual(ids, ['next', 'later', 'past-new', 'past-old']);
-  assert.equal(model.items[2].kind, 'today');
+  assert.equal(model.items.find(item => item.kind === 'today')?.kind, 'today');
+  assert.ok(model.items.some(item => item.kind === 'heading' && item.label === 'August 2026'));
 });
 
 test('buildMedicalModel AND-filters query, type, and provider', () => {
@@ -73,7 +74,7 @@ test('buildMedicalModel wraps contiguous episode runs of two or more', () => {
   assert.deepEqual(bands[0].visits.map(v => v.id), ['c3', 'c2']);
 });
 
-test('buildMedicalModel joins bloods by date and does not drop records when density changes', () => {
+test('buildMedicalModel joins bloods by date and keeps month headings at months zoom', () => {
   const events = [
     visit({ id: 'lab', date: '2026-05-19', title: 'Panel', record_type: 'Lab Work', lane: 'lab' }),
     {
@@ -89,13 +90,58 @@ test('buildMedicalModel joins bloods by date and does not drop records when dens
     }
   ];
   const months = buildMedicalModel({ today: '2026-08-20', events, density: 'months' });
-  const years = buildMedicalModel({ today: '2026-08-20', events, density: 'years' });
   const lab = months.items.find(item => item.kind === 'visit').visit;
   assert.equal(lab.lab.total, 3);
   assert.equal(lab.lab.inRange, 1);
   assert.equal(lab.lab.flags.length, 2);
-  assert.equal(
-    years.items.filter(item => item.kind === 'visit').length,
-    months.items.filter(item => item.kind === 'visit').length
-  );
+  assert.ok(months.items.some(item => item.kind === 'heading' && item.label === 'May 2026'));
+});
+
+test('buildMedicalModel collapses visits into year rows at years zoom', () => {
+  const events = [
+    visit({ id: 'a', date: '2026-05-01', title: 'May' }),
+    visit({ id: 'b', date: '2026-08-01', title: 'August' }),
+    visit({ id: 'c', date: '2025-12-01', title: 'Last year' }),
+    visit({ id: 'd', date: '2027-01-10', title: 'Next year' })
+  ];
+  const years = buildMedicalModel({ today: '2026-08-20', events, density: 'years' });
+  const rows = years.items.filter(item => item.kind === 'year');
+  assert.equal(years.items.filter(item => item.kind === 'visit').length, 0);
+  assert.ok(rows.length >= 2);
+  assert.equal(rows.reduce((sum, item) => sum + item.count, 0), 4);
+  assert.equal(rows.every(item => item.items.length === 0), true);
+});
+
+test('buildMedicalModel expands a year into month-headed visits', () => {
+  const events = [
+    visit({ id: 'a', date: '2026-05-01', title: 'May' }),
+    visit({ id: 'b', date: '2026-08-01', title: 'August' })
+  ];
+  const model = buildMedicalModel({
+    today: '2026-08-20',
+    events,
+    density: 'years',
+    expandedYears: ['2026']
+  });
+  const year = model.items.find(item => item.kind === 'year' && item.year === '2026');
+  assert.equal(year.expanded, true);
+  assert.equal(year.caption, '2 visits');
+  assert.ok(year.items.some(item => item.kind === 'heading'));
+  assert.deepEqual(year.items.filter(item => item.kind === 'visit').map(item => item.visit.id), ['b', 'a']);
+});
+
+test('buildMedicalModel opens the selected visit year', () => {
+  const events = [
+    visit({ id: 'a', date: '2025-03-01', title: 'Old' }),
+    visit({ id: 'b', date: '2026-05-01', title: 'Keep' })
+  ];
+  const model = buildMedicalModel({
+    today: '2026-08-20',
+    events,
+    density: 'years',
+    selectedId: 'a'
+  });
+  const year = model.items.find(item => item.kind === 'year' && item.year === '2025');
+  assert.equal(year.expanded, true);
+  assert.ok(year.items.some(item => item.visit?.id === 'a'));
 });
