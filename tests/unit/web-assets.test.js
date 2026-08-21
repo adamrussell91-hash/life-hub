@@ -43,7 +43,7 @@ test('desktop rail adopts kit rail.css as labeled pages, not dots or an icon col
   const rail = html.slice(html.indexOf('class="desktop-rail"'), html.indexOf('class="page-frame"'));
 
   assert.match(html, /href="design-kit\/rail\.css"/);
-  assert.match(html, /class="hub-rail__brand"[^>]*data-section="home"/);
+  assert.match(html, /<button class="hub-rail__brand" type="button">Life Hub<\/button>/);
   assert.doesNotMatch(html, /nav-dot|brand-mark|--rail-width\s*:/);
   assert.doesNotMatch(css, /--rail-width\s*:/);
   assert.doesNotMatch(rail, /class="nav-label"|Domains/);

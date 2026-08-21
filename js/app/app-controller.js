@@ -151,6 +151,9 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="home"]') ?? []) {
     bind(button, 'click', () => showSection('home'));
   }
+  for (const button of root.querySelectorAll?.('.hub-rail__brand') ?? []) {
+    bind(button, 'click', () => showSection('home'));
+  }
   for (const button of root.querySelectorAll?.('[data-section="nutrition"]') ?? []) {
     bind(button, 'click', () => showSection('nutrition'));
   }
@@ -652,10 +655,9 @@ export function createAppController(dependencies) {
       const active = section === name
         || (section === 'more' && MORE_SECTIONS.has(name))
         || (section === 'body' && (name === 'body-bloods' || name === 'body-medical'));
-      const isBrand = Boolean(button.classList?.contains?.('hub-rail__brand'));
-      if (!isBrand) button.classList.toggle('is-active', active);
-      if (active && section !== 'more' && !isBrand) button.setAttribute('aria-current', 'page');
-      else if (!isBrand) button.removeAttribute('aria-current');
+      button.classList.toggle('is-active', active);
+      if (active && section !== 'more') button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
     }
   }
 

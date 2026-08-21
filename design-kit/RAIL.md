@@ -17,7 +17,7 @@ Load `rail.css` after tokens / overlays (and after `actions.css` or `chrome.css`
 
 ```html
 <aside class="desktop-rail" aria-label="Life Hub navigation">
-  <button class="hub-rail__brand" type="button" data-section="home">Life Hub</button>
+  <button class="hub-rail__brand" type="button">Life Hub</button>
   <nav class="rail-nav" aria-label="Primary">
     <button class="nav-item hub-rail__item is-active" type="button" data-section="home" aria-current="page">
       <span class="hub-rail__icon" aria-hidden="true"><!-- outline svg --></span>
@@ -28,7 +28,7 @@ Load `rail.css` after tokens / overlays (and after `actions.css` or `chrome.css`
 </aside>
 ```
 
-Life Hub keeps `.desktop-rail`, `.rail-nav`, `.nav-item`, and the existing `data-section` values. New hubs may use `.hub-rail` / `.hub-rail__nav` instead.
+Life Hub keeps `.desktop-rail`, `.rail-nav`, `.nav-item`, and a single `[data-section]` per route so existing tests stay unique. Wire `.hub-rail__brand` to home in the hub controller. New hubs may use `.hub-rail` / `.hub-rail__nav` instead.
 
 ## Not this
 
