@@ -370,12 +370,9 @@ function harness(options = {}) {
   };
 }
 
-test('local preview rewrites the sign-in supporting line', () => {
+test('local preview keeps the passphrase gate free of supporting copy', () => {
   const { root } = harness({ hostname: '127.0.0.1' });
-  assert.equal(
-    root.querySelector('.sign-in__supporting').textContent,
-    'Local preview. Use passphrase life-hub-local — not your live password.'
-  );
+  assert.equal(root.querySelector('.sign-in__supporting').textContent, '');
 });
 
 test('session API sends only the passphrase contract and unwraps successful data', async () => {
