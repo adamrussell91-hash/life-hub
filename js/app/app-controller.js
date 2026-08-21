@@ -151,6 +151,9 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="home"]') ?? []) {
     bind(button, 'click', () => showSection('home'));
   }
+  for (const button of root.querySelectorAll?.('.hub-rail__brand') ?? []) {
+    bind(button, 'click', () => showSection('home'));
+  }
   for (const button of root.querySelectorAll?.('[data-section="nutrition"]') ?? []) {
     bind(button, 'click', () => showSection('nutrition'));
   }
