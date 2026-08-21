@@ -10,22 +10,24 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="design-kit/icons/life-hub.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/icons/life-hub-192.png">
   <link rel="stylesheet" href="design-kit/tokens.css">
   <link rel="stylesheet" href="design-kit/overlays.css">
   <link rel="stylesheet" href="design-kit/actions.css">
   <link rel="stylesheet" href="design-kit/sign-in.css">
+  <link rel="stylesheet" href="design-kit/rail.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
   <section class="sign-in" id="sign-in-view" aria-labelledby="sign-in-heading">
-    <form class="sign-in__card" id="sign-in-form" method="post" action="#" onsubmit="return false">
+    <form class="sign-in__card" id="sign-in-form" method="post" action="#" novalidate>
+      <img class="sign-in__mark" src="design-kit/icons/life-hub.svg" alt="" width="56" height="56">
       <p class="sign-in__brand">Life Hub</p>
       <h1 class="sign-in__title" id="sign-in-heading">Sign in</h1>
-      <p class="sign-in__supporting">Private, read-only health dashboard.</p>
       <div class="sign-in__field">
         <label class="sign-in__label" for="sign-in-passphrase">Passphrase</label>
-        <input class="sign-in__input" id="sign-in-passphrase" name="passphrase" type="password" autocomplete="current-password" required>
+        <input class="sign-in__input" id="sign-in-passphrase" name="passphrase" type="password" autocomplete="current-password" required enterkeyhint="go">
       </div>
       <p class="sign-in__error" id="sign-in-error" role="alert" hidden></p>
       <button class="btn btn--primary sign-in__submit" id="sign-in-button" type="submit">Sign in</button>
@@ -35,30 +37,29 @@
   <div id="app-shell" hidden>
   <a class="skip-link" href="#main-content">Skip to Life Hub Home</a>
   <div class="app-shell" id="app" data-state="loading">
-    <aside class="desktop-rail" aria-label="Life Hub navigation">
+    <aside class="desktop-rail hub-rail" aria-label="Life Hub navigation">
       <header class="brand">
-        <span class="brand-mark" aria-hidden="true"><span></span></span>
         <span class="brand-copy">
-          <span class="hub-rail__brand">Life Hub</span>
+          <a class="hub-rail__brand" href="#" data-section="home">Life Hub</a>
           <span class="hub-rail__tagline">Private dashboard</span>
         </span>
       </header>
 
       <nav class="rail-nav" aria-label="Primary">
-        <button class="nav-item is-active" type="button" data-section="home" aria-current="page">
+        <button class="nav-item hub-rail__link is-active" type="button" data-section="home" aria-current="page">
           <span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg></span><span>Home</span>
         </button>
-        <button class="nav-item" type="button" data-section="chat">
+        <button class="nav-item hub-rail__link" type="button" data-section="chat">
           <span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z"/></svg></span><span>Chat</span>
         </button>
         <p class="nav-label">Domains</p>
-        <button class="nav-item" type="button" data-section="nutrition"><span class="nav-dot nutrition" aria-hidden="true"></span><span>Nutrition</span></button>
-        <button class="nav-item" type="button" data-section="fitness"><span class="nav-dot fitness" aria-hidden="true"></span><span>Fitness</span></button>
-        <button class="nav-item" type="button" data-section="body"><span class="nav-dot body" aria-hidden="true"></span><span>Body</span></button>
-        <button class="nav-item" type="button" data-section="mind"><span class="nav-dot mind" aria-hidden="true"></span><span>Mind</span></button>
-        <button class="nav-item" type="button" data-section="skincare"><span class="nav-dot skincare" aria-hidden="true"></span><span>Skincare</span></button>
-        <button class="nav-item" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg></span><span>Calendar</span></button>
-        <button class="nav-item" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true">◎</span><span>Central Node</span></button>
+        <button class="nav-item hub-rail__link" type="button" data-section="nutrition"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M12 3v18M5 8h14M6 16h12"/></svg><span>Nutrition</span></button>
+        <button class="nav-item hub-rail__link" type="button" data-section="fitness"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M4 10h3v4H4zM17 10h3v4h-3zM7 12h10"/></svg><span>Fitness</span></button>
+        <button class="nav-item hub-rail__link" type="button" data-section="body"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="7" r="3"/><path d="M6 21c.5-5 3-8 6-8s5.5 3 6 8"/></svg><span>Body</span></button>
+        <button class="nav-item hub-rail__link" type="button" data-section="mind"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M8 18a5 5 0 1 1 2-9 4 4 0 1 1 6 6"/></svg><span>Mind</span></button>
+        <button class="nav-item hub-rail__link" type="button" data-section="skincare"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11Z"/></svg><span>Skincare</span></button>
+        <button class="nav-item hub-rail__link" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg></span><span>Calendar</span></button>
+        <button class="nav-item hub-rail__link" type="button" data-section="central-node"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="7" r="2"/><circle cx="19" cy="7" r="2"/><path d="m7 8 3 2m7-2-3 2"/></svg><span>Central Node</span></button>
       </nav>
 
       <div class="rail-footer">
@@ -91,6 +92,7 @@
               </svg>
             </button>
           </div>
+          <img class="hub-mark" src="design-kit/icons/life-hub.svg" alt="" width="32" height="32">
         </div>
       </header>
 
