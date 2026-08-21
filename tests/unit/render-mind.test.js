@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { CLINICAL_CHART_SLOTS } from '../../js/app/chart-kit/clinical-slots.js';
 import { firstSentence, renderMind } from '../../js/app/render-mind.js';
 
 function el(tag = 'div') {
@@ -577,6 +578,11 @@ test('chord arcs, ribbons, and legend use distinct theme slot colours', () => {
   assert.ok(arcs.length >= 3, `expected several theme arcs, got ${arcs.length}`);
   assert.ok(ribbons.length >= 1, 'expected pairing ribbons');
   assert.equal(new Set(arcStrokes).size, arcStrokes.length, 'each theme arc should have its own colour');
+  assert.ok(arcStrokes.every(stroke => CLINICAL_CHART_SLOTS.includes(stroke)));
+  assert.ok(
+    arcStrokes.every(stroke => stroke !== 'var(--high-sea)' && stroke !== 'var(--navy-2)'),
+    'High Sea fill and navy-2 are not Clinical Glass chart slots'
+  );
   assert.ok(
     arcStrokes.filter(stroke => stroke === 'var(--wave)').length <= 1,
     'wave may colour one theme, not the whole ring'
@@ -591,6 +597,7 @@ test('chord arcs, ribbons, and legend use distinct theme slot colours', () => {
     .filter(Boolean);
   assert.ok(swatches.length >= 3);
   assert.equal(new Set(swatches).size, swatches.length);
+  assert.ok(swatches.every(swatch => CLINICAL_CHART_SLOTS.includes(swatch)));
 });
 
 test('renderMind paints honest empty instead of sparse chord, sankey, radial, and tension', () => {
