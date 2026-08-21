@@ -9,6 +9,9 @@ import {
   compareChartPoints,
   nextComparePins,
   pointHoverNote,
+  spokeHoverNote,
+  glucoseHoverNote,
+  lipidHoverNote,
   allowanceUsed,
   buildFbcRadial,
   buildGlucoseMap,
@@ -184,6 +187,10 @@ test('chart viewBoxes match the aspect ratio the stylesheet gives them, so nothi
     assert.match(css, new RegExp(`${selector}\\s*\\{[^}]*aspect-ratio:\\s*${ratio}`), selector);
   }
   assert.match(css, /\.bloods-fbc-radial,\s*\n\.bloods-glucose-map\s*\{[^}]*width:\s*min\(100%,\s*38rem\)/);
+  assert.match(css, /\[data-seg="ldl"\][^}]*stroke:\s*var\(--high-sea-ink\)/);
+  assert.match(css, /\[data-role="lipid-arrow"\][^}]*fill:\s*var\(--wave\)/);
+  assert.match(css, /\[data-role="lipid-centre"\][^}]*fill:\s*var\(--marine\)/);
+  assert.match(css, /\[data-role="lipid-track"\][^}]*stroke:\s*var\(--shore\)/);
 });
 
 test('biochemistry instrument viewBoxes match their CSS geometry', () => {
@@ -251,6 +258,55 @@ function fbcMarker(overrides = {}) {
     ...overrides
   };
 }
+
+test('spoke, glucose, and lipid hover notes name the reading', () => {
+  const spoke = spokeHoverNote({
+    label: 'Haemoglobin',
+    value: 151,
+    unit: 'g/L',
+    refLow: 130,
+    refHigh: 180,
+    date: '2026-05-19',
+    used: 0.16,
+    prevValue: 141,
+    prevDate: '2026-04-10',
+    prevUsed: 0.56
+  });
+  assert.match(spoke.amount, /Haemoglobin/);
+  assert.match(spoke.amount, /151/);
+  assert.match(spoke.detail, /130–180/);
+  assert.match(spoke.detail, /16% used/);
+  assert.match(spoke.date, /19\/05\/26/);
+  const previous = spokeHoverNote({
+    label: 'Haemoglobin',
+    value: 151,
+    unit: 'g/L',
+    date: '2026-05-19',
+    used: 0.16,
+    prevValue: 141,
+    prevDate: '2026-04-10',
+    prevUsed: 0.56
+  }, { previous: true });
+  assert.match(previous.amount, /141/);
+  assert.match(previous.detail, /56% used/);
+
+  const glucose = glucoseHoverNote({ date: '2026-05-19', fasting: 5.3, hba1c: 5 });
+  assert.match(glucose.amount, /5\.3 mmol\/L/);
+  assert.match(glucose.detail, /HbA1c 5 %|HbA1c 5%/);
+
+  const lipid = lipidHoverNote({
+    label: 'Total cholesterol',
+    value: 4.5,
+    unit: 'mmol/L',
+    limit: 5.6,
+    used: 4.5 / 5.6,
+    date: '2026-02-20',
+    direction: 'in'
+  });
+  assert.match(lipid.amount, /Total cholesterol/);
+  assert.match(lipid.detail, /80% spent/);
+  assert.equal(lipid.dir, 'down');
+});
 
 test('buildFbcRadial places numeric markers on spokes and keeps a previous ghost', () => {
   const layout = buildFbcRadial([
