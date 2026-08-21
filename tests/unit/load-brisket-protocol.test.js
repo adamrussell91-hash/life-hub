@@ -38,6 +38,19 @@ test('protocol defers longitudinal patterns to Hammond via Cross-Agent rather th
   assert.match(text, /do not (guess at trends|fabricate a pattern)/i);
 });
 
+test('protocol requires iterative restaurant nutrition resolution instead of one-shot guessing', () => {
+  const text = loadBrisketProtocol();
+  assert.match(text, /Nutrition data resolution/i);
+  assert.match(text, /retrieval pipeline|progressive fallback/i);
+  assert.match(text, /official menu/i);
+  assert.match(text, /venue and location/i);
+  assert.match(text, /comparable/);
+  assert.match(text, /Ask only for missing variables that materially affect/i);
+  assert.match(text, /One miss is not permission to guess/i);
+  assert.match(text, /Divide8|Butcher's Cut/);
+  assert.doesNotMatch(text, /One solid Australian source is enough/);
+});
+
 test('returns an empty string when the seed file cannot be read', () => {
   const text = loadBrisketProtocol({
     readFileSyncImpl: () => {
