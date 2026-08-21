@@ -410,7 +410,8 @@ function markerRow(root, marker) {
   meter.className = 'bloods-row__meter';
   const visual = markerVisual(root, marker, {});
   if (visual) {
-    visual.dataset.status = tone;
+    const chart = visual.querySelector?.('.bloods-meter') ?? visual;
+    if (chart?.dataset) chart.dataset.status = tone;
     meter.append(visual);
   }
   const foot = root.createElement('div');

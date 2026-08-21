@@ -140,11 +140,12 @@ export function buildFbcRadial(markers = []) {
         refHigh: marker.latest.ref_high
       });
       if (used == null) return null;
-      const previous = previousValue(marker);
+      const series = numericSeries(marker);
+      const previous = series.length > 1 ? series.at(-2) : null;
       const prevUsed = previous == null
         ? null
         : allowanceUsed({
-          value: previous,
+          value: previous.value,
           refLow: marker.latest.ref_low,
           refHigh: marker.latest.ref_high
         });
@@ -157,6 +158,8 @@ export function buildFbcRadial(markers = []) {
         refHigh: marker.latest.ref_high ?? null,
         date: marker.latest.date ?? null,
         used,
+        prevValue: previous?.value ?? null,
+        prevDate: previous?.date ?? null,
         prevUsed,
         tone: usedTone(used)
       };
@@ -353,6 +356,7 @@ function ringFrom(marker, { id, label, limit, segs } = {}) {
     value,
     limit,
     unit: marker.latest?.unit ?? '',
+    date: marker.latest?.date ?? null,
     used,
     prevUsed,
     direction,
@@ -379,10 +383,10 @@ export function glucoseZones(unit) {
  * Hover copy for one chart draw: the date, the amount, and the percent
  * move from the previous check. The first draw has no arrow.
  */
-export function pointHoverNote(point, previous, { unit } = {}) {
+export function pointHoverNote(point, previous, { unit, name } = {}) {
   if (!point || point.value == null || !Number.isFinite(Number(point.value))) return null;
   const value = Number(point.value);
-  const amount = formatAmount(value, unit);
+  const amount = name ? `${name} · ${formatAmount(value, unit)}` : formatAmount(value, unit);
   const date = formatDisplayDate(point.date);
   const prior = previous?.value == null || !Number.isFinite(Number(previous.value))
     ? null
@@ -401,6 +405,68 @@ export function pointHoverNote(point, previous, { unit } = {}) {
     change,
     label: `${date} · ${amount} · ${change}`
   };
+}
+
+export function spokeHoverNote(spoke, { previous = false } = {}) {
+  if (!spoke) return null;
+  const value = previous ? spoke.prevValue : spoke.value;
+  if (value == null || !Number.isFinite(Number(value))) return null;
+  const date = formatDisplayDate(previous ? spoke.prevDate : spoke.date);
+  const amount = `${spoke.label} · ${formatAmount(Number(value), spoke.unit)}`;
+  const used = previous ? spoke.prevUsed : spoke.used;
+  const usedText = used == null ? '' : `${Math.round(used * 100)}% used`;
+  const ref = rangeText(spoke.refLow, spoke.refHigh);
+  const detail = [ref, usedText].filter(Boolean).join(' · ');
+  return {
+    date,
+    amount,
+    detail,
+    dir: null,
+    change: '',
+    label: [spoke.label, formatAmount(Number(value), spoke.unit), ref, usedText, date].filter(Boolean).join(' · ')
+  };
+}
+
+export function glucoseHoverNote(point) {
+  if (!point || point.fasting == null || point.hba1c == null) return null;
+  const date = formatDisplayDate(point.date);
+  const fasting = formatAmount(point.fasting, 'mmol/L');
+  const hba1c = formatAmount(point.hba1c, '%');
+  return {
+    date,
+    amount: `Fasting ${fasting}`,
+    detail: `HbA1c ${hba1c}`,
+    dir: null,
+    change: '',
+    label: `${date} · Fasting ${fasting} · HbA1c ${hba1c}`
+  };
+}
+
+export function lipidHoverNote(ring) {
+  if (!ring || ring.value == null) return null;
+  const amount = `${ring.label} · ${formatAmount(ring.value, ring.unit)}`;
+  const used = `${Math.round(ring.used * 100)}% spent`;
+  const limit = ring.limit != null ? `limit ${formatAmount(ring.limit, ring.unit)}` : '';
+  const date = formatDisplayDate(ring.date);
+  const dir = ring.direction === 'out' ? 'up' : ring.direction === 'in' ? 'down' : null;
+  const change = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '';
+  return {
+    date,
+    amount,
+    detail: [limit, used].filter(Boolean).join(' · '),
+    dir,
+    change,
+    label: [ring.label, formatAmount(ring.value, ring.unit), limit, used, date].filter(Boolean).join(' · ')
+  };
+}
+
+function rangeText(refLow, refHigh) {
+  const low = refLow == null || refLow === '' || !Number.isFinite(Number(refLow)) ? null : Number(refLow);
+  const high = refHigh == null || refHigh === '' || !Number.isFinite(Number(refHigh)) ? null : Number(refHigh);
+  if (low != null && high != null) return `${low}–${high}`;
+  if (high != null) return `<${high}`;
+  if (low != null) return `>${low}`;
+  return '';
 }
 
 function formatAmount(value, unit) {
