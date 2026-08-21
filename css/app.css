@@ -2763,6 +2763,12 @@ main { max-width: 76rem; margin: 0 auto; }
 .bloods-lipid-rings {
   margin: 0 0 var(--space-4);
 }
+/* Desktop canvas is 76rem. The radial was filling that, about twice the
+   size it needs. Phone width stays 100% because it is already under 38rem. */
+.bloods-fbc-radial {
+  width: min(100%, 38rem);
+  margin-inline: auto;
+}
 #body-bloods-dashboard .line-chart.bloods-fbc-radial__chart { aspect-ratio: 720 / 640; overflow: visible; }
 #body-bloods-dashboard .bloods-fbc-radial__chart [data-role="fbc-guide"] {
   fill: none;
