@@ -14,7 +14,11 @@ function el(tag = 'div') {
     children: [],
     attributes: {},
     listeners: [],
-    style: { setProperty() {} },
+    style: {
+      setProperty(name, value) {
+        this[name] = value;
+      }
+    },
     classList: {
       remove() {},
       add() {},
@@ -553,6 +557,40 @@ test('renderMind caps insights to three scan rows', () => {
   }));
   assert.doesNotMatch(root._insights.textContent, /Hidden/);
   assert.match(root._insights.textContent, /more in sheet/i);
+});
+
+test('chord arcs, ribbons, and legend use distinct theme slot colours', () => {
+  const root = fakeRoot();
+  renderMind(root, emptyModel({
+    empty: false,
+    themeCooccurrence: [
+      { themeA: 'burnout', themeB: 'marking', count: 4 },
+      { themeA: 'burnout', themeB: 'corey', count: 3 },
+      { themeA: 'marking', themeB: 'corey', count: 2 },
+      { themeA: 'corey', themeB: 'exhaustion', count: 2 }
+    ]
+  }));
+  const svg = root.querySelector('#mind-chord');
+  const arcs = svg.children.filter(node => node.getAttribute('data-role') === 'arc');
+  const ribbons = svg.children.filter(node => node.getAttribute('data-role') === 'ribbon');
+  const arcStrokes = arcs.map(node => node.getAttribute('stroke'));
+  assert.ok(arcs.length >= 3, `expected several theme arcs, got ${arcs.length}`);
+  assert.ok(ribbons.length >= 1, 'expected pairing ribbons');
+  assert.equal(new Set(arcStrokes).size, arcStrokes.length, 'each theme arc should have its own colour');
+  assert.ok(
+    arcStrokes.filter(stroke => stroke === 'var(--wave)').length <= 1,
+    'wave may colour one theme, not the whole ring'
+  );
+  assert.ok(ribbons.every(node => String(node.getAttribute('stroke') || '').includes('color-mix')));
+  assert.ok(ribbons.some(node => !String(node.getAttribute('stroke') || '').includes('var(--wave) 35%')));
+
+  const legend = root.querySelector('#mind-tile-chord').querySelector('.mind-chart-legend');
+  assert.ok(legend);
+  const swatches = legend.children
+    .map(row => row.children.find(child => child.tagName === 'I')?.style?.['--swatch'])
+    .filter(Boolean);
+  assert.ok(swatches.length >= 3);
+  assert.equal(new Set(swatches).size, swatches.length);
 });
 
 test('renderMind paints honest empty instead of sparse chord, sankey, radial, and tension', () => {
