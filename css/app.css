@@ -2763,8 +2763,7 @@ main { max-width: 76rem; margin: 0 auto; }
 .bloods-lipid-rings {
   margin: 0 0 var(--space-4);
 }
-/* Desktop canvas is 76rem. The radial was filling that, about twice the
-   size it needs. Phone width stays 100% because it is already under 38rem. */
+/* Half of the 76rem desktop canvas. Narrower viewports stay 100%. */
 .bloods-fbc-radial {
   width: min(100%, 38rem);
   margin-inline: auto;
