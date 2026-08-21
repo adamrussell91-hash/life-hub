@@ -7,11 +7,14 @@ import {
   buildGlucoseMap,
   buildLipidRings,
   compareChartPoints,
+  glucoseHoverNote,
   glucoseZones,
+  lipidHoverNote,
   nextComparePins,
   pointHoverNote,
   pointStatus,
-  rangeBarLayout
+  rangeBarLayout,
+  spokeHoverNote
 } from './bloods-charts-layout.js';
 import { statusTone } from './bloods-model.js';
 import { formatShortMonth } from '../core/time.js';
@@ -23,11 +26,14 @@ export {
   buildGlucoseMap,
   buildLipidRings,
   compareChartPoints,
+  glucoseHoverNote,
   glucoseZones,
+  lipidHoverNote,
   nextComparePins,
   pointHoverNote,
   pointStatus,
-  rangeBarLayout
+  rangeBarLayout,
+  spokeHoverNote
 };
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -68,16 +74,19 @@ export function meterSvg(root, marker) {
   const value = Number(marker.latest?.value);
   const refLow = marker.latest?.ref_low;
   const refHigh = marker.latest?.ref_high;
-  const previous = previousSeriesValue(marker);
+  const previous = previousSeriesPoint(marker);
   const domain = bandDomain({
-    values: [previous, value].filter(n => n != null && Number.isFinite(Number(n))),
+    values: [previous?.value, value].filter(n => n != null && Number.isFinite(Number(n))),
     refLow,
     refHigh
   });
+  const wrap = root.createElement('div');
+  wrap.className = 'bloods-line-wrap';
   const chart = svgRoot(root, `${marker.label} against its reference range`, 'bloods-meter', METER_HEIGHT, METER_WIDTH);
   const padX = 6;
   const y = METER_HEIGHT / 2;
   const xAt = n => padX + domain.fraction(n) * (METER_WIDTH - padX * 2);
+  const marks = [];
 
   const track = el(root, 'line');
   track.setAttribute('data-role', 'meter-track');
@@ -95,13 +104,19 @@ export function meterSvg(root, marker) {
   band.setAttribute('y2', String(y));
   chart.append(band);
 
-  if (previous != null && Number.isFinite(previous)) {
+  if (previous?.value != null && Number.isFinite(previous.value)) {
     const ghost = el(root, 'circle');
     ghost.setAttribute('data-role', 'meter-ghost');
-    ghost.setAttribute('cx', String(xAt(previous)));
+    ghost.setAttribute('cx', String(xAt(previous.value)));
     ghost.setAttribute('cy', String(y));
     ghost.setAttribute('r', '2.6');
     chart.append(ghost);
+    marks.push({
+      x: xAt(previous.value),
+      y,
+      node: ghost,
+      payload: pointHoverNote(previous, null, { unit: marker.latest?.unit, name: marker.label })
+    });
   }
 
   if (Number.isFinite(value)) {
@@ -116,8 +131,20 @@ export function meterSvg(root, marker) {
     dot.setAttribute('cy', String(y));
     dot.setAttribute('r', '3.6');
     chart.append(halo, dot);
+    marks.push({
+      x: xAt(value),
+      y,
+      node: dot,
+      payload: pointHoverNote(
+        { date: marker.latest?.date, value },
+        previous,
+        { unit: marker.latest?.unit, name: marker.label }
+      )
+    });
   }
-  return chart;
+  wrap.append(chart);
+  bindHoverNote(root, wrap, marks, { width: METER_WIDTH, height: METER_HEIGHT });
+  return wrap;
 }
 
 export function combinedChartSvg(root, combined) {
@@ -157,6 +184,7 @@ export function combinedChartSvg(root, combined) {
   band.setAttribute('height', String(Math.max(0, scale(0) - scale(1))));
   chart.append(band);
 
+  const marks = [];
   series.forEach((entry, index) => {
     const built = buildAreaLine(entry.points, {
       width: COMBINED_WIDTH,
@@ -171,18 +199,28 @@ export function combinedChartSvg(root, combined) {
     line.setAttribute('d', straightLinePath(built.points));
     line.setAttribute('fill', 'none');
     chart.append(line);
-    const last = built.points.at(-1);
-    if (!last) return;
-    const dot = el(root, 'circle');
-    dot.setAttribute('data-role', 'latest-point');
-    dot.setAttribute('data-series', String(index % 4));
-    dot.setAttribute('cx', String(last.x));
-    dot.setAttribute('cy', String(last.y));
-    dot.setAttribute('r', '4');
-    chart.append(dot);
+    const host = el(root, 'g');
+    host.setAttribute('data-role', 'points');
+    host.setAttribute('data-series', String(index % 4));
+    chart.append(host);
+    const drawn = paintPoints(root, host, built.points);
+    drawn.forEach(({ point, circle }, pointIndex) => {
+      circle.setAttribute('data-series', String(index % 4));
+      marks.push({
+        x: point.x,
+        y: point.y,
+        node: circle,
+        payload: pointHoverNote(
+          point,
+          pointIndex > 0 ? built.points[pointIndex - 1] : null,
+          { name: entry.label }
+        )
+      });
+    });
   });
 
   wrap.append(chart);
+  bindHoverNote(root, wrap, marks, { width: COMBINED_WIDTH, height: COMBINED_HEIGHT });
 
   const legend = root.createElement('ul');
   legend.className = 'bloods-combined-legend';
@@ -230,6 +268,7 @@ export function fbcRadialSvg(root, layout) {
   chart.append(limit);
 
   const radiusAt = used => R * (inner + Math.min(used ?? 0, 1.13) * (1 - inner));
+  const marks = [];
   for (const spoke of spokes) {
     const g = el(root, 'g');
     g.setAttribute('data-role', 'fbc-spoke');
@@ -244,6 +283,7 @@ export function fbcRadialSvg(root, layout) {
     ray.setAttribute('y2', String(sy));
     g.append(ray);
     const rNow = radiusAt(spoke.used);
+    let ghost = null;
     if (spoke.prevUsed != null && Math.abs(spoke.prevUsed - spoke.used) > 0.02) {
       const rPrev = radiusAt(spoke.prevUsed);
       const [ax, ay] = polar(cx, cy, rPrev, spoke.angle);
@@ -254,7 +294,7 @@ export function fbcRadialSvg(root, layout) {
       tail.setAttribute('y1', String(ay));
       tail.setAttribute('x2', String(bx));
       tail.setAttribute('y2', String(by));
-      const ghost = el(root, 'circle');
+      ghost = el(root, 'circle');
       ghost.setAttribute('data-role', 'fbc-ghost');
       ghost.setAttribute('cx', String(ax));
       ghost.setAttribute('cy', String(ay));
@@ -278,10 +318,24 @@ export function fbcRadialSvg(root, layout) {
     lab.setAttribute('transform', `rotate(${flip ? spoke.angle + 90 : spoke.angle - 90} ${tx} ${ty})`);
     lab.textContent = spoke.label;
     g.append(lab);
-    g.setAttribute('aria-label', `${spoke.label} ${Math.round(spoke.used * 100)}% of allowance`);
     chart.append(g);
+    marks.push({
+      x: px,
+      y: py,
+      node: dot,
+      payload: spokeHoverNote(spoke)
+    });
+    if (ghost) {
+      marks.push({
+        x: Number(ghost.getAttribute('cx')),
+        y: Number(ghost.getAttribute('cy')),
+        node: ghost,
+        payload: spokeHoverNote(spoke, { previous: true })
+      });
+    }
   }
   wrap.append(chart);
+  bindHoverNote(root, wrap, marks, { width: RADIAL_WIDTH, height: RADIAL_HEIGHT });
   return wrap;
 }
 
@@ -339,6 +393,7 @@ export function glucoseMapSvg(root, layout) {
     chart.append(text);
   }
 
+  const marks = [];
   if (points.length) {
     const d = points.map((point, i) => `${i ? 'L' : 'M'}${X(point.fasting)},${Y(point.hba1c)}`).join(' ');
     const path = el(root, 'path');
@@ -363,6 +418,12 @@ export function glucoseMapSvg(root, layout) {
       dot.setAttribute('cy', String(Y(point.hba1c)));
       dot.setAttribute('r', last ? '6.5' : '4.5');
       chart.append(dot);
+      marks.push({
+        x: X(point.fasting),
+        y: Y(point.hba1c),
+        node: dot,
+        payload: glucoseHoverNote(point)
+      });
     });
   }
   const xTitle = el(root, 'text');
@@ -385,6 +446,7 @@ export function glucoseMapSvg(root, layout) {
     caption.textContent = layout.insulin.caption;
     wrap.append(caption);
   }
+  bindHoverNote(root, wrap, marks, { width: GLUCOSE_WIDTH, height: GLUCOSE_HEIGHT });
   return wrap;
 }
 
@@ -396,6 +458,7 @@ export function lipidRingsSvg(root, layout) {
   const chart = svgRoot(root, 'Lipids as nested allowances', 'bloods-lipid-rings__chart', RINGS_HEIGHT, RINGS_WIDTH);
   const CX = 420, CY = 188, SWEEP = 286, START = -143;
   const radii = [126, 94, 62];
+  const marks = [];
 
   rings.forEach((ring, index) => {
     const r = radii[index] ?? 62;
@@ -446,6 +509,12 @@ export function lipidRingsSvg(root, layout) {
       g.append(arrow);
     }
     chart.append(g);
+    marks.push({
+      x: CX,
+      y: CY - (radii[index] ?? 62),
+      node: g,
+      payload: lipidHoverNote(ring)
+    });
   });
 
   const total = rings.find(ring => ring.id === 'total');
@@ -469,6 +538,7 @@ export function lipidRingsSvg(root, layout) {
   });
 
   wrap.append(chart);
+  bindHoverNote(root, wrap, marks, { width: RINGS_WIDTH, height: RINGS_HEIGHT });
   return wrap;
 }
 
@@ -484,10 +554,11 @@ function arcPath(cx, cy, r, a0, a1) {
   return `M${sx},${sy} A${r},${r} 0 ${large} 1 ${ex},${ey}`;
 }
 
-function previousSeriesValue(marker) {
+function previousSeriesPoint(marker) {
   const series = (marker.series ?? []).filter(point => point.value != null && Number.isFinite(Number(point.value)));
   if (series.length < 2) return null;
-  return Number(series.at(-2).value);
+  const point = series.at(-2);
+  return { date: point.date, value: Number(point.value) };
 }
 
 function zonedChartSvg(root, marker) {
@@ -676,8 +747,28 @@ function paintPoints(root, host, points, { toneFor } = {}) {
   return drawn;
 }
 
-function bindPointNotes(root, wrap, chart, points, drawn, { unit, width = CHART_WIDTH, height = CHART_HEIGHT } = {}) {
-  if (!points?.length) return;
+function bindPointNotes(root, wrap, chart, points, drawn, {
+  unit,
+  width = CHART_WIDTH,
+  height = CHART_HEIGHT,
+  noteFor
+} = {}) {
+  const marks = (drawn ?? []).map(({ point, circle }, index) => ({
+    x: point.x,
+    y: point.y,
+    node: circle,
+    point,
+    payload: (noteFor ?? ((item, prev) => pointHoverNote(item, prev, { unit })))(
+      point,
+      index > 0 ? points[index - 1] : null
+    )
+  }));
+  bindHoverNote(root, wrap, marks, { width, height, chart, points });
+}
+
+function bindHoverNote(root, wrap, marks, { width, height, chart, points } = {}) {
+  const usable = (marks ?? []).filter(mark => mark?.node && mark.payload);
+  if (!usable.length) return;
   const note = root.createElement('div');
   note.className = 'bloods-point-note';
   note.dataset.role = 'point-note';
@@ -685,58 +776,71 @@ function bindPointNotes(root, wrap, chart, points, drawn, { unit, width = CHART_
   note.setAttribute('aria-live', 'polite');
   wrap.append(note);
 
-  const show = point => {
-    const index = points.findIndex(item =>
-      item === point || (item.date === point.date && item.value === point.value)
-    );
-    const payload = pointHoverNote(point, index > 0 ? points[index - 1] : null, { unit });
-    if (!payload) {
-      note.hidden = true;
-      return;
-    }
+  const paint = payload => {
     note.replaceChildren();
-    const date = root.createElement('span');
-    date.className = 'bloods-point-note__date';
-    date.textContent = payload.date;
+    if (payload.date) {
+      const date = root.createElement('span');
+      date.className = 'bloods-point-note__date';
+      date.textContent = payload.date;
+      note.append(date);
+    }
     const amount = root.createElement('span');
     amount.className = 'bloods-point-note__amount';
     amount.textContent = payload.amount;
-    note.append(date, amount);
+    note.append(amount);
+    if (payload.detail) {
+      const detail = root.createElement('span');
+      detail.className = 'bloods-point-note__detail';
+      detail.textContent = payload.detail;
+      note.append(detail);
+    }
     if (payload.change) {
       const change = root.createElement('span');
       change.className = 'bloods-point-note__change';
-      change.dataset.dir = payload.dir;
+      if (payload.dir) change.dataset.dir = payload.dir;
       change.textContent = payload.change;
       note.append(change);
     }
-    if (note.style) {
-      note.style.left = `${(point.x / width) * 100}%`;
-      note.style.top = `${(point.y / height) * 100}%`;
+  };
+
+  const show = mark => {
+    if (!mark?.payload) {
+      note.hidden = true;
+      return;
+    }
+    paint(mark.payload);
+    if (note.style && width && height) {
+      note.style.left = `${(mark.x / width) * 100}%`;
+      note.style.top = `${(mark.y / height) * 100}%`;
     }
     note.hidden = false;
-    chart.dataset.scrubDate = point.date ?? '';
-    chart.dataset.scrubValue = String(point.value ?? '');
+    if (chart?.dataset && mark.point) {
+      chart.dataset.scrubDate = mark.point.date ?? '';
+      chart.dataset.scrubValue = String(mark.point.value ?? '');
+    }
   };
   const hide = () => {
     note.hidden = true;
   };
 
-  for (const { point, circle } of drawn ?? []) {
-    const index = points.findIndex(item => item === point);
-    const payload = pointHoverNote(point, index > 0 ? points[index - 1] : null, { unit });
-    circle.setAttribute('tabindex', '0');
-    if (payload) circle.setAttribute('aria-label', payload.label);
-    circle.addEventListener?.('pointerenter', () => show(point));
-    circle.addEventListener?.('pointerleave', hide);
-    circle.addEventListener?.('focus', () => show(point));
-    circle.addEventListener?.('blur', hide);
+  for (const mark of usable) {
+    mark.node.setAttribute('tabindex', '0');
+    mark.node.setAttribute('aria-label', mark.payload.label);
+    mark.node.addEventListener?.('pointerenter', () => show(mark));
+    mark.node.addEventListener?.('pointerleave', hide);
+    mark.node.addEventListener?.('focus', () => show(mark));
+    mark.node.addEventListener?.('blur', hide);
   }
 
-  chart.addEventListener?.('pointermove', event => {
-    const nearest = nearestPoint(chart, points, event);
-    if (nearest) show(nearest);
-  });
-  chart.addEventListener?.('pointerleave', hide);
+  if (chart && points?.length) {
+    chart.addEventListener?.('pointermove', event => {
+      const nearest = nearestPoint(chart, points, event);
+      const mark = usable.find(item => item.point === nearest)
+        || usable.find(item => item.point?.date === nearest?.date && item.point?.value === nearest?.value);
+      if (mark) show(mark);
+    });
+    chart.addEventListener?.('pointerleave', hide);
+  }
 }
 
 function bindScrub(chart, points) {
