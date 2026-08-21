@@ -5180,17 +5180,15 @@ main { max-width: 76rem; margin: 0 auto; }
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  align-items: end;
+  align-items: center;
   margin: 0 0 var(--space-stack);
 }
-.medical-toolbar .hub-search { min-width: 12rem; flex: 1 1 12rem; }
-.medical-density {
-  display: grid;
-  gap: 0.2rem;
-  color: var(--muted);
-  font-size: var(--text-xs);
+.medical-toolbar .hub-search {
+  min-width: 12rem;
+  flex: 1 1 12rem;
+  width: auto;
 }
-.medical-density__ticks { letter-spacing: 0.02em; }
+.medical-toolbar .hub-pills { flex: none; }
 .medical-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.95fr);
@@ -5198,23 +5196,118 @@ main { max-width: 76rem; margin: 0 auto; }
   align-items: start;
 }
 .medical-timeline {
+  --medical-spine: 0.4rem;
+  --medical-gutter: 1.35rem;
+  --medical-dot: 0.5rem;
   position: relative;
   display: grid;
   gap: var(--space-3);
-  padding: 0 0 0 1.25rem;
-  border-left: 2px solid var(--wave);
+  padding: 0 0 var(--space-2) var(--medical-gutter);
 }
-.medical-timeline.is-density-weeks { gap: var(--space-5); }
+.medical-timeline::before {
+  content: "";
+  position: absolute;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  left: var(--medical-spine);
+  width: 1px;
+  background: var(--line);
+}
+.medical-timeline.is-density-weeks { gap: var(--space-4); }
 .medical-timeline.is-density-years { gap: var(--space-2); }
-.medical-today {
-  margin-left: -1.45rem;
-  padding: 0.2rem 0.65rem;
-  border-radius: var(--radius-full);
-  background: var(--wave);
-  color: var(--warm-white);
-  font-size: var(--text-xs);
+.medical-heading {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.medical-today,
+.medical-year,
+.medical-card {
+  position: relative;
+}
+.medical-today::before,
+.medical-year::before,
+.medical-card::before {
+  content: "";
+  position: absolute;
+  left: calc((var(--medical-gutter) * -1) + var(--medical-spine) - (var(--medical-dot) / 2) + 0.5px);
+  top: 1rem;
+  width: var(--medical-dot);
+  height: var(--medical-dot);
+  border-radius: var(--radius-full);
+  background: var(--pastel-blue);
+  box-shadow: 0 0 0 3px var(--paper);
+}
+.medical-card[data-lane="appointment"]::before,
+.medical-card[data-lane="eye"]::before { background: var(--pastel-blue); }
+.medical-card[data-lane="lab"]::before,
+.medical-card[data-lane="prescription"]::before { background: var(--pastel-sage); }
+.medical-card[data-lane="hospital"]::before { background: var(--pastel-peach); }
+.medical-card[data-lane="imaging"]::before,
+.medical-card[data-lane="vaccine"]::before,
+.medical-card[data-lane="dental"]::before { background: var(--pastel-gold); }
+.medical-card[data-lane="referral"]::before,
+.medical-card[data-lane="therapy"]::before { background: var(--pastel-lilac); }
+.medical-today {
+  display: flex;
+  align-items: center;
+  min-height: 1.8rem;
+  margin: 0;
+  padding: 0;
+  color: var(--wave);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
   width: max-content;
+  background: none;
+}
+.medical-today::before {
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--wave);
+}
+.medical-year {
+  display: grid;
+  gap: var(--space-2);
+}
+.medical-year::before {
+  top: 1.05rem;
+  background: var(--shore);
+}
+.medical-year__toggle {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--cotton);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.medical-year__toggle:hover,
+.medical-year.is-open .medical-year__toggle {
+  background: var(--paper);
+}
+.medical-year__label {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+.medical-year__caption {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.medical-year__items {
+  display: grid;
+  gap: var(--space-3);
 }
 .medical-band {
   display: grid;

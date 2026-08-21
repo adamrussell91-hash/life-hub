@@ -1,6 +1,7 @@
 import { formatDisplayDate } from '../core/time.js';
+import { createHubFilter } from '../../design-kit/js/hub-filter-menu.js';
 
-const DENSITY_VALUES = ['weeks', 'months', 'years'];
+const filterCache = new WeakMap();
 
 export function renderMedical(root, model, {
   onSelect,
@@ -8,6 +9,7 @@ export function renderMedical(root, model, {
   onTypeChange,
   onProviderChange,
   onDensityChange,
+  onToggleYear,
   onToday,
   onAdd,
   onClose,
@@ -20,11 +22,12 @@ export function renderMedical(root, model, {
   if (!dashboard || !model) return;
 
   bindOnce(root, '#medical-search', 'input', event => onSearch?.(event.target.value));
-  bindOnce(root, '#medical-type', 'change', event => onTypeChange?.(event.target.value));
-  bindOnce(root, '#medical-provider', 'change', event => onProviderChange?.(event.target.value));
-  bindOnce(root, '#medical-density', 'input', event => {
-    const index = Number(event.target.value);
-    onDensityChange?.(DENSITY_VALUES[index] ?? 'months');
+  bindOnce(root, '#medical-density', 'click', event => {
+    const target = event.target;
+    const btn = target?.closest?.('[data-medical-density]')
+      || (target?.dataset?.medicalDensity ? target : null);
+    const value = btn?.dataset?.medicalDensity;
+    if (value) onDensityChange?.(value);
   });
   bindOnce(root, '#medical-today', 'click', () => onToday?.());
   bindOnce(root, '#medical-add', 'click', () => onAdd?.());
@@ -32,14 +35,12 @@ export function renderMedical(root, model, {
 
   const search = root.querySelector('#medical-search');
   if (search && search.value !== model.query) search.value = model.query ?? '';
-  fillSelect(root.querySelector('#medical-type'), ['', ...model.recordTypes], model.recordType, 'All types');
-  fillSelect(root.querySelector('#medical-provider'), ['', ...model.providers], model.provider, 'All practitioners');
-  const density = root.querySelector('#medical-density');
-  if (density) density.value = String(Math.max(0, DENSITY_VALUES.indexOf(model.density)));
+  paintFilters(root, model, { onTypeChange, onProviderChange });
+  paintDensity(root, model.density);
 
-  renderChips(root, model);
+  renderChips(root, model, { onSearch, onTypeChange, onProviderChange });
   renderEmpty(root, model);
-  renderTimeline(root, model, onSelect);
+  renderTimeline(root, model, { onSelect, onToggleYear });
   renderSheet(root, model, { onEdit, onSave, onCancel, onClose, renderLabSnapshot });
   dashboard.hidden = false;
   dashboard.removeAttribute?.('hidden');
@@ -52,39 +53,92 @@ function bindOnce(root, selector, type, handler) {
   node.addEventListener(type, handler);
 }
 
-function fillSelect(select, values, current, allLabel) {
-  if (!select) return;
-  select.replaceChildren();
-  const createOption = select.ownerDocument?.createElement?.bind(select.ownerDocument);
-  for (const value of values) {
-    const option = createOption ? createOption('option') : {
-      value: '',
-      textContent: '',
-      tagName: 'OPTION',
-      children: [],
-      append() {},
-      setAttribute() {}
-    };
-    option.value = value;
-    option.textContent = value || allLabel;
-    if (value === (current ?? '')) option.selected = true;
-    select.append(option);
+function canUseKitFilter() {
+  try {
+    return typeof document !== 'undefined'
+      && typeof document.createElement === 'function'
+      && !!document.body;
+  } catch {
+    return false;
   }
-  select.value = current ?? '';
 }
 
-function renderChips(root, model) {
+function paintFilters(root, model, { onTypeChange, onProviderChange }) {
+  let cache = filterCache.get(root);
+  if (!cache) {
+    cache = {};
+    filterCache.set(root, cache);
+  }
+  cache.type = ensureFilter(root, root.querySelector('#medical-type-host'), cache.type, {
+    key: 'Type',
+    label: 'Medical type',
+    options: [
+      { value: '', label: 'All types' },
+      ...model.recordTypes.map(value => ({ value, label: value }))
+    ],
+    value: model.recordType ?? '',
+    onChange: onTypeChange
+  });
+  cache.provider = ensureFilter(root, root.querySelector('#medical-provider-host'), cache.provider, {
+    key: 'Practitioner',
+    label: 'Practitioner',
+    options: [
+      { value: '', label: 'All practitioners' },
+      ...model.providers.map(value => ({ value, label: value }))
+    ],
+    value: model.provider ?? '',
+    onChange: onProviderChange
+  });
+}
+
+function ensureFilter(root, host, existing, config) {
+  if (!host) return existing ?? null;
+  if (existing?.setOptions) {
+    existing.setOptions(config.options, config.value);
+    return existing;
+  }
+  if (canUseKitFilter()) {
+    const filter = createHubFilter(config);
+    host.replaceChildren(filter.el);
+    return filter;
+  }
+  host.replaceChildren();
+  const btn = root.createElement('button');
+  btn.type = 'button';
+  btn.className = 'hub-filter';
+  btn.setAttribute('aria-label', config.label);
+  const current = config.options.find(option => option.value === config.value) ?? config.options[0];
+  btn.textContent = current?.label ?? config.key;
+  host.append(btn);
+  return { setOptions() {}, setValue() {} };
+}
+
+function paintDensity(root, density) {
+  const host = root.querySelector('#medical-density');
+  if (!host) return;
+  const buttons = host.querySelectorAll?.('[data-medical-density]') ?? host.children ?? [];
+  for (const btn of buttons) {
+    const on = btn.dataset?.medicalDensity === density;
+    btn.classList?.toggle?.('is-active', on);
+    btn.setAttribute?.('aria-pressed', on ? 'true' : 'false');
+  }
+}
+
+function renderChips(root, model, { onSearch, onTypeChange, onProviderChange } = {}) {
   const host = root.querySelector('#medical-chips');
   if (!host) return;
   host.replaceChildren();
   const chips = [];
-  if (model.query) chips.push(`“${model.query}”`);
-  if (model.recordType) chips.push(model.recordType);
-  if (model.provider) chips.push(model.provider);
-  for (const label of chips) {
-    const chip = root.createElement('span');
-    chip.className = 'hub-chip';
-    chip.textContent = label;
+  if (model.query) chips.push({ key: 'query', label: `“${model.query}”`, clear: () => onSearch?.('') });
+  if (model.recordType) chips.push({ key: 'type', label: model.recordType, clear: () => onTypeChange?.('') });
+  if (model.provider) chips.push({ key: 'provider', label: model.provider, clear: () => onProviderChange?.('') });
+  for (const item of chips) {
+    const chip = root.createElement('button');
+    chip.type = 'button';
+    chip.className = 'hub-chip is-active';
+    chip.dataset.clear = item.key;
+    chip.textContent = item.label;
+    chip.addEventListener('click', () => item.clear());
     host.append(chip);
   }
 }
@@ -103,25 +157,71 @@ function renderEmpty(root, model) {
     : 'No visits yet.';
 }
 
-function renderTimeline(root, model, onSelect) {
+function renderTimeline(root, model, { onSelect, onToggleYear } = {}) {
   const host = root.querySelector('#medical-timeline');
   if (!host) return;
   host.className = `medical-timeline is-density-${model.density}`;
   host.replaceChildren();
-  for (const item of model.items) {
-    if (item.kind === 'today') {
-      const marker = root.createElement('div');
-      marker.className = 'medical-today';
-      marker.textContent = 'Today';
-      host.append(marker);
-      continue;
-    }
-    if (item.kind === 'band') {
-      host.append(bandBlock(root, item, model.selected, onSelect));
-      continue;
-    }
-    host.append(visitCard(root, item.visit, model.selected, onSelect));
+  for (const item of model.items) appendTimelineItem(root, host, item, model.selected, { onSelect, onToggleYear });
+}
+
+function appendTimelineItem(root, host, item, selected, hooks) {
+  if (item.kind === 'today') {
+    const marker = root.createElement('div');
+    marker.className = 'medical-today';
+    marker.textContent = 'Today';
+    host.append(marker);
+    return;
   }
+  if (item.kind === 'heading') {
+    const heading = root.createElement('p');
+    heading.className = 'medical-heading';
+    heading.textContent = item.label;
+    host.append(heading);
+    return;
+  }
+  if (item.kind === 'year') {
+    host.append(yearRow(root, item, selected, hooks));
+    return;
+  }
+  if (item.kind === 'band') {
+    host.append(bandBlock(root, item, selected, hooks.onSelect));
+    return;
+  }
+  if (item.kind === 'visit' && item.visit) {
+    host.append(visitCard(root, item.visit, selected, hooks.onSelect));
+  }
+}
+
+function yearRow(root, item, selected, { onSelect, onToggleYear }) {
+  const wrap = root.createElement('div');
+  wrap.className = item.expanded ? 'medical-year is-open' : 'medical-year';
+  wrap.dataset.year = item.year;
+  wrap.setAttribute('data-year', item.year);
+
+  const btn = root.createElement('button');
+  btn.type = 'button';
+  btn.className = 'medical-year__toggle';
+  btn.dataset.year = item.year;
+  btn.setAttribute('data-year', item.year);
+  btn.setAttribute('aria-expanded', item.expanded ? 'true' : 'false');
+  const title = root.createElement('strong');
+  title.className = 'medical-year__label';
+  title.textContent = item.year;
+  const caption = root.createElement('span');
+  caption.className = 'medical-year__caption';
+  caption.textContent = item.caption || (item.count === 1 ? '1 visit' : `${item.count} visits`);
+  btn.append(title, caption);
+  btn.addEventListener('click', () => onToggleYear?.(item.year));
+  wrap.append(btn);
+
+  if (item.expanded && item.items?.length) {
+    const nest = root.createElement('div');
+    nest.className = 'medical-year__items';
+    for (const child of item.items) appendTimelineItem(root, nest, child, selected, { onSelect, onToggleYear });
+    wrap.append(nest);
+  }
+  return wrap;
 }
 
 function bandBlock(root, item, selected, onSelect) {

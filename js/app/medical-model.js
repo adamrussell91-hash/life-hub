@@ -55,6 +55,7 @@ export function buildMedicalModel({
   provider = '',
   density = DEFAULT_MEDICAL_DENSITY,
   selectedId = null,
+  expandedYears = [],
   today
 } = {}) {
   if (!today) throw new RangeError('Medical display date is unavailable');
@@ -78,13 +79,16 @@ export function buildMedicalModel({
     .filter(visit => visit.date <= today)
     .sort(compareNewest);
 
+  const selected = filtered.find(visit => visit.id === selectedId) ?? null;
+  const openYears = new Set(expandedYears ?? []);
+  if (selected?.date) openYears.add(selected.date.slice(0, 4));
+
   const items = [
-    ...toItems(future),
+    ...pack(future, selectedDensity, openYears),
     { kind: 'today', date: today },
-    ...toItems(past)
+    ...pack(past, selectedDensity, openYears)
   ];
 
-  const selected = filtered.find(visit => visit.id === selectedId) ?? null;
   const recordTypes = unique(medical.map(visit => visit.record_type).filter(Boolean));
   const providers = unique(medical.map(visit => visit.provider).filter(Boolean));
 
@@ -163,6 +167,62 @@ function compareSoonest(a, b) {
 function compareNewest(a, b) {
   return b.date.localeCompare(a.date) || String(b.time ?? '').localeCompare(String(a.time ?? '')) || a.title.localeCompare(b.title);
 }
+
+function pack(visits, density, expandedYears) {
+  if (density === 'years') return collapseYears(visits, expandedYears);
+  return withHeadings(toItems(visits), density);
+}
+
+function collapseYears(visits, expandedYears) {
+  const groups = [];
+  for (const visit of visits) {
+    const year = String(visit.date).slice(0, 4);
+    const last = groups.at(-1);
+    if (!last || last.year !== year) {
+      groups.push({ kind: 'year', year, visits: [visit], expanded: expandedYears.has(year) });
+    } else {
+      last.visits.push(visit);
+    }
+  }
+  return groups.map(group => ({
+    ...group,
+    count: group.visits.length,
+    caption: group.visits.length === 1 ? '1 visit' : `${group.visits.length} visits`,
+    items: group.expanded ? withHeadings(toItems(group.visits), 'months') : []
+  }));
+}
+
+function withHeadings(items, density) {
+  const out = [];
+  let last = '';
+  for (const item of items) {
+    const date = item.kind === 'visit'
+      ? item.visit.date
+      : item.kind === 'band'
+        ? item.visits[0]?.date
+        : null;
+    if (date) {
+      const label = headingFor(date, density);
+      if (label && label !== last) {
+        out.push({ kind: 'heading', label, date });
+        last = label;
+      }
+    }
+    out.push(item);
+  }
+  return out;
+}
+
+function headingFor(date, density) {
+  const [year, month] = String(date).split('-');
+  if (!year) return '';
+  if (density === 'weeks') return formatDisplayDate(date);
+  const monthIndex = Number(month) - 1;
+  const name = MONTHS[monthIndex];
+  return name ? `${name} ${year}` : year;
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function toItems(visits) {
   const items = [];

@@ -53,6 +53,8 @@ function el(tag = 'div') {
       if (name === 'hidden') this.hidden = true;
       if (name === 'data-lane') this.dataset.lane = String(value);
       if (name === 'data-visit-id') this.dataset.visitId = String(value);
+      if (name === 'data-year') this.dataset.year = String(value);
+      if (name === 'data-medical-density') this.dataset.medicalDensity = String(value);
     },
     getAttribute(name) { return this.attributes[name]; },
     removeAttribute(name) {
@@ -99,6 +101,8 @@ function matches(node, selector) {
   const data = /^\[data-visit-id="(.+)"\]$/.exec(selector);
   if (data) return node.dataset.visitId === data[1];
   if (selector === '[data-visit-id]') return node.dataset.visitId != null;
+  if (selector === '[data-medical-density]') return node.dataset.medicalDensity != null;
+  if (selector === '[data-year]') return node.dataset.year != null;
   return false;
 }
 
@@ -119,13 +123,21 @@ function fakeRoot() {
   sheet.id = 'medical-sheet';
   const search = el('input');
   search.id = 'medical-search';
-  const type = el('select');
-  type.id = 'medical-type';
-  const provider = el('select');
-  provider.id = 'medical-provider';
-  const density = el('input');
+  search.className = 'hub-search__input';
+  const typeHost = el('div');
+  typeHost.id = 'medical-type-host';
+  const providerHost = el('div');
+  providerHost.id = 'medical-provider-host';
+  const density = el('div');
   density.id = 'medical-density';
-  density.value = '1';
+  density.className = 'hub-pills';
+  for (const value of ['weeks', 'months', 'years']) {
+    const btn = el('button');
+    btn.dataset.medicalDensity = value;
+    btn.setAttribute('data-medical-density', value);
+    btn.textContent = value;
+    density.append(btn);
+  }
   const chips = el('div');
   chips.id = 'medical-chips';
   const empty = el('p');
@@ -135,8 +147,8 @@ function fakeRoot() {
     '#medical-timeline': timeline,
     '#medical-sheet': sheet,
     '#medical-search': search,
-    '#medical-type': type,
-    '#medical-provider': provider,
+    '#medical-type-host': typeHost,
+    '#medical-provider-host': providerHost,
     '#medical-density': density,
     '#medical-chips': chips,
     '#medical-empty': empty
@@ -278,4 +290,49 @@ test('renderMedical asks for a bloods snapshot when the selected visit has labs'
   });
   assert.equal(visit.id, 'lab');
   assert.equal(host.id, 'medical-bloods-host');
+});
+
+test('renderMedical paints kit zoom pills and year rows', () => {
+  const root = fakeRoot();
+  let year = null;
+  renderMedical(root, sampleModel({
+    density: 'years',
+    items: [
+      { kind: 'year', year: '2026', count: 2, caption: '2 visits', expanded: false, items: [] },
+      { kind: 'today', date: '2026-08-20' }
+    ]
+  }), { onToggleYear: value => { year = value; } });
+  const timeline = root.querySelector('#medical-timeline');
+  assert.match(timeline.textContent, /2026/);
+  assert.match(timeline.textContent, /2 visits/);
+  assert.equal(timeline.querySelector('[data-visit-id]'), null);
+  const months = root.querySelector('#medical-density').children.find(btn => btn.dataset.medicalDensity === 'months');
+  assert.equal(months.classList.contains('is-active'), false);
+  const years = root.querySelector('#medical-density').children.find(btn => btn.dataset.medicalDensity === 'years');
+  assert.equal(years.classList.contains('is-active'), true);
+  const toggle = timeline.querySelector('.medical-year__toggle');
+  toggle.listeners.find(entry => entry[0] === 'click')[1]({});
+  assert.equal(year, '2026');
+});
+
+test('renderMedical expands a year into nested visit cards', () => {
+  const visit = sampleModel().items[1].visit;
+  const root = fakeRoot();
+  renderMedical(root, sampleModel({
+    density: 'years',
+    items: [{
+      kind: 'year',
+      year: '2026',
+      count: 1,
+      caption: '1 visit',
+      expanded: true,
+      items: [
+        { kind: 'heading', label: 'May 2026' },
+        { kind: 'visit', visit }
+      ]
+    }]
+  }));
+  const timeline = root.querySelector('#medical-timeline');
+  assert.match(timeline.textContent, /May 2026/);
+  assert.match(timeline.textContent, /Gastroenterologist Follow-up/);
 });
