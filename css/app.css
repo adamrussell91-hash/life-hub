@@ -2228,6 +2228,9 @@ main { max-width: 76rem; margin: 0 auto; }
 .bloods-combined {
   overflow: hidden;
 }
+.bloods-combined-chart {
+  overflow: visible;
+}
 .bloods-rows {
   display: grid;
   gap: 0;
@@ -2413,6 +2416,10 @@ main { max-width: 76rem; margin: 0 auto; }
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
+}
+.bloods-point-note__detail {
+  color: var(--muted);
+  font-size: var(--text-2xs);
 }
 .bloods-point-note__change {
   color: var(--muted);
@@ -2760,8 +2767,11 @@ main { max-width: 76rem; margin: 0 auto; }
 #body-bloods-dashboard .line-chart.bloods-combined-strip { aspect-ratio: 960 / 160; }
 .bloods-fbc-radial,
 .bloods-glucose-map,
-.bloods-lipid-rings {
+.bloods-lipid-rings,
+.bloods-combined-chart {
+  position: relative;
   margin: 0 0 var(--space-4);
+  overflow: visible;
 }
 /* Half of the 76rem desktop canvas. Narrower viewports stay 100%. */
 .bloods-fbc-radial,
@@ -2797,6 +2807,10 @@ main { max-width: 76rem; margin: 0 auto; }
   fill: var(--wave);
   stroke: var(--paper);
   stroke-width: 2;
+  cursor: pointer;
+}
+#body-bloods-dashboard .bloods-fbc-radial__chart [data-role="fbc-ghost"] {
+  cursor: pointer;
 }
 #body-bloods-dashboard .bloods-fbc-radial__chart [data-tone="leaning"] [data-role="fbc-dot"] { fill: var(--high-sea); }
 #body-bloods-dashboard .bloods-fbc-radial__chart [data-tone="ring"] [data-role="fbc-dot"] { fill: var(--warning); }
@@ -2841,10 +2855,14 @@ main { max-width: 76rem; margin: 0 auto; }
   stroke: var(--paper);
   stroke-width: 2;
 }
+#body-bloods-dashboard .bloods-glucose-map__chart [data-role="glucose-point"],
+#body-bloods-dashboard .bloods-glucose-map__chart [data-role="glucose-latest"] {
+  cursor: pointer;
+}
 .bloods-glucose-map__insulin { margin-top: var(--space-2); }
 #body-bloods-dashboard .line-chart.bloods-lipid-rings__chart { aspect-ratio: 640 / 420; }
 #body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-track"] {
-  stroke: var(--line);
+  stroke: var(--shore);
   stroke-width: 16;
   stroke-linecap: round;
 }
@@ -2860,13 +2878,16 @@ main { max-width: 76rem; margin: 0 auto; }
   stroke-linecap: round;
 }
 #body-bloods-dashboard .bloods-lipid-rings__chart [data-seg="hdl"] { stroke: var(--success); stroke-width: 16; stroke-linecap: round; }
-#body-bloods-dashboard .bloods-lipid-rings__chart [data-seg="ldl"] { stroke: var(--high-sea); stroke-width: 16; stroke-linecap: round; }
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-seg="ldl"] { stroke: var(--high-sea-ink); stroke-width: 16; stroke-linecap: round; }
 #body-bloods-dashboard .bloods-lipid-rings__chart [data-seg="other"] { stroke: var(--wave); stroke-width: 16; stroke-linecap: round; }
-#body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-arrow"] { fill: var(--ink); }
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-arrow"] { fill: var(--wave); }
 #body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-centre"] {
-  fill: var(--ink);
+  fill: var(--marine);
   font-size: var(--text-2xl);
   font-weight: var(--weight-semibold);
+}
+#body-bloods-dashboard .bloods-lipid-rings__chart [data-role="lipid-ring"] {
+  cursor: pointer;
 }
 #body-bloods-dashboard .bloods-lipid-rings__chart text:not([data-role="lipid-centre"]) {
   fill: var(--muted);

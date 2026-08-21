@@ -364,6 +364,14 @@ test('Lipid Studies render nested rings and drop the ratio chip and tiles', () =
   assert.equal(root._host.querySelector('.bloods-lipid-ratio'), null);
   assert.equal(root._host.querySelector('.bloods-metric-grid'), null);
   assert.equal(root._host.querySelector('.bloods-rows'), null);
+  const rings = root._host.querySelector('.bloods-lipid-rings');
+  const note = rings.querySelector('[data-role="point-note"]');
+  const ring = rings.querySelector('[data-role="lipid-ring"]');
+  const enter = ring.listeners.find(([type]) => type === 'pointerenter');
+  assert.ok(note && enter, 'lipid rings show a hover note');
+  enter[1]();
+  assert.equal(note.hidden, false);
+  assert.match(String(note.textContent), /cholesterol|Non-HDL|Total/i);
 });
 
 test('a marker with history gets a trend card: what-line, status, band, and dated ticks', () => {
@@ -895,6 +903,15 @@ test('Full Blood Count renders a radial and keeps the marker tiles', () => {
   assert.ok(root._host.querySelector('.bloods-fbc-radial'));
   assert.ok(root._host.querySelector('[data-role="fbc-spoke"]'));
   assert.ok(root._host.querySelector('.bloods-metric-grid') || root._host.querySelector('.bloods-rows'));
+  const radial = root._host.querySelector('.bloods-fbc-radial');
+  const note = radial.querySelector('[data-role="point-note"]');
+  const dot = radial.querySelector('[data-role="fbc-dot"]');
+  const enter = dot.listeners.find(([type]) => type === 'pointerenter');
+  assert.ok(note && enter, 'FBC dots show a hover note');
+  enter[1]();
+  assert.equal(note.hidden, false);
+  assert.match(String(note.textContent), /Haemoglobin|Haematocrit/);
+  assert.match(String(note.textContent), /used/);
 });
 
 test('Glucose/Diabetes renders the zone map and no marker tiles', () => {
@@ -951,5 +968,15 @@ test('Glucose/Diabetes renders the zone map and no marker tiles', () => {
   assert.match(String(root._host.textContent), /Insulin 7\.7/);
   assert.equal(root._host.querySelector('.bloods-metric-grid'), null);
   assert.equal(root._host.querySelector('.bloods-rows'), null);
+  const map = root._host.querySelector('.bloods-glucose-map');
+  const note = map.querySelector('[data-role="point-note"]');
+  const dot = map.querySelector('[data-role="glucose-latest"]')
+    || map.querySelector('[data-role="glucose-point"]');
+  const enter = dot?.listeners.find(([type]) => type === 'pointerenter');
+  assert.ok(note && enter, 'glucose points show a hover note');
+  enter[1]();
+  assert.equal(note.hidden, false);
+  assert.match(String(note.textContent), /Fasting/);
+  assert.match(String(note.textContent), /HbA1c/);
 });
 
