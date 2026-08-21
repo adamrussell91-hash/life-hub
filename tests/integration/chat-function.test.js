@@ -82,38 +82,32 @@ test('streams an agent event, text, and a validated record proposal for a routed
   assert.deepEqual(events[3], { type: 'done' });
 });
 
-test('Chadwick gets a raised web_search max_uses; other agents keep the default budget cap', async () => {
-  let args;
-  const capture = createChatHandler({
+test('every agent gets web_search with no max_uses cap', async () => {
+  const captured = {};
+  const captureFor = message => createChatHandler({
     env: validEnv,
     now: () => Date.parse('2026-08-01T06:00:00Z'),
     fetchImpl: githubFetchStub(),
     createAnthropicClient: () => ({
       streamMessage: a => {
-        args = a;
+        captured[message] = a;
         return mockedStream([{ type: 'done' }]);
       }
     })
   });
-  await readSse(await capture(request({ message: 'Chadwick, plan a session' })));
-  const chadwickSearch = args.tools.find(tool => tool.name === 'web_search');
-  assert.ok(chadwickSearch.max_uses >= 4 && chadwickSearch.max_uses <= 5, `expected 4-5, got ${chadwickSearch.max_uses}`);
 
-  let brisketArgs;
-  const captureBrisket = createChatHandler({
-    env: validEnv,
-    now: () => Date.parse('2026-08-01T06:00:00Z'),
-    fetchImpl: githubFetchStub(),
-    createAnthropicClient: () => ({
-      streamMessage: a => {
-        brisketArgs = a;
-        return mockedStream([{ type: 'done' }]);
-      }
-    })
-  });
-  await readSse(await captureBrisket(request({ message: 'Brisket, what should I eat?' })));
-  const brisketSearch = brisketArgs.tools.find(tool => tool.name === 'web_search');
-  assert.equal(brisketSearch.max_uses, 2);
+  for (const message of [
+    'Chadwick, plan a session',
+    'Brisket, what should I eat?',
+    'Hyaluronica, what is on AM?',
+    'Sara, how is my iron?',
+    'Hammond, what is the mission today?'
+  ]) {
+    await readSse(await captureFor(message)(request({ message })));
+    const search = captured[message].tools.find(tool => tool.name === 'web_search');
+    assert.ok(search, `expected web_search for: ${message}`);
+    assert.equal(search.max_uses, undefined, `web_search must be uncapped for: ${message}`);
+  }
 });
 
 test('loads saved workout template summaries into Chadwick\'s system prompt', async () => {

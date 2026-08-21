@@ -7,6 +7,12 @@ test('loads the checked-in Chadwick protocol markdown', () => {
   assert.match(text, /Operating Manual|Logging protocol|Central Node/i);
 });
 
+test('Chadwick research is iterative with no search-use cap', () => {
+  const text = loadChadwickProtocol();
+  assert.match(text, /no search-use cap/);
+  assert.match(text, /refine the query and search again/);
+});
+
 test('trims surrounding whitespace from the loaded file', () => {
   const text = loadChadwickProtocol({
     readFileSyncImpl: () => '\n\n  # Heading\n\nBody text.\n\n'

@@ -224,10 +224,8 @@ export function createChatHandler({
 
     const nowInstant = new Date(now());
     const tools = [
-      // Chadwick's protocol asks him to research evidence-based physique programming
-      // (see "Using evidence and external sources"); the default budget of 2 is one
-      // lookup, not a research pass, so he alone gets a raised cap.
-      { type: 'web_search_20250305', name: 'web_search', max_uses: slug === 'chadwick' ? 5 : 2 },
+      // No max_uses — a use cap turns one miss into a guess. Agents iterate.
+      { type: 'web_search_20250305', name: 'web_search' },
       ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
       ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
       ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : []),

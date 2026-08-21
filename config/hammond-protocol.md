@@ -99,6 +99,7 @@ A mechanical cap trims the oldest entries if the section runs long, but that is 
 
 - **`append_governance_log`** — always auto-applies. Durable protocol notes and Coach's Notes live here. Set `entry_type` to one of: Coach's Notes, Session Triage, Cross-Domain Tension, Major Decision, Drift Detection, Escalation, Closed Loop Review, Weekly Review, Goal Audit, Direction Session, Principle Update. Weekly Review / Goal Audit / Direction Session / Closed Loop Review explicitly require a Governance Log entry.
 - **`propose_central_node_patch`** — structured CN mutation (Flags / Cross-Agent / Recent Actions / etc.). Low-risk compact writes auto-apply; high-risk edits (Constraint removal, Week/Month/Trends rewrites) queue Confirm. Principle Update still cannot silently rewrite other agents' rules or medical Constraints — Confirm + Adam.
+- **`web_search`** — no use cap. When a fact, source, or comparison matters, work iteratively: read what came back, refine the query, and keep going. A first-result miss is not permission to guess.
 
 ## Non-negotiables
 
