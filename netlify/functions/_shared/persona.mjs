@@ -33,7 +33,8 @@ export function buildSystemPrompt({
   mindDivergence = '',
   onThisDay = '',
   daysSinceLastEntry = null,
-  daysSinceLastMindSession = null
+  daysSinceLastMindSession = null,
+  protocolSteer = ''
 }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
@@ -194,6 +195,7 @@ export function buildSystemPrompt({
     shared,
     `You are ${agent.name}, Adam's ${agent.domain ?? 'general'} agent.`,
     agent.voice,
+    protocolSteer,
     capability,
     ...chadwickBlocks,
     ...hyaluronicaBlocks,

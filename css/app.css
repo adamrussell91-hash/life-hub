@@ -3138,6 +3138,29 @@ main { max-width: 76rem; margin: 0 auto; }
   gap: 0.45rem;
   margin: 0 0 0.85rem;
 }
+.agent-protocol-pills {
+  margin: -0.35rem 0 0.85rem;
+}
+.agent-protocol-pills__eyebrow {
+  margin: 0 0 var(--space-2);
+}
+.agent-protocol-pills .hub-pills {
+  display: flex;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .agent-protocol-pills .hub-pills__btn {
+    opacity: 0;
+    transform: scale(0.96);
+    animation: protocol-pill-in 280ms ease forwards;
+    animation-delay: calc(var(--pill-i, 0) * 40ms);
+  }
+}
+@keyframes protocol-pill-in {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 .agent-picker__avatar {
   width: 4rem;
   height: 4rem;

@@ -51,6 +51,16 @@ test('send forwards a non-empty history and priorAgentSlug alongside the message
   assert.deepEqual(sentBody, { message: 'hello', history, priorAgentSlug: 'brisket' });
 });
 
+test('send includes protocolId in the JSON body when provided', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (url, init) => {
+    sentBody = JSON.parse(init.body);
+    return sseResponse(['data: {"type":"done"}\n\n']);
+  });
+  for await (const event of chatApi.send('hello', { protocolId: 'flare-up' })) void event;
+  assert.deepEqual(sentBody, { message: 'hello', protocolId: 'flare-up' });
+});
+
 test('send includes auditSession in the JSON body when provided', async () => {
   let sentBody;
   const chatApi = createChatApi(async (url, init) => {
