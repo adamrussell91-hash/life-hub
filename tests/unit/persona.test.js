@@ -604,3 +604,16 @@ test('brisket prompt never receives mind diary digest', () => {
   });
   assert.doesNotMatch(prompt, /Diary leak/);
 });
+
+test('protocolSteer is injected after voice so the model stays in character', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    protocolSteer: 'Adam chose the "Flare-up eating" protocol for this turn (Active flare-up protocol in your operating manual). Run that protocol in character from your first word.'
+  });
+  assert.match(prompt, /You ARE Brisket Lasso/);
+  assert.match(prompt, /Flare-up eating/);
+  assert.match(prompt, /in character from your first word/);
+  const voiceAt = prompt.indexOf('You ARE Brisket Lasso');
+  const steerAt = prompt.indexOf('Flare-up eating');
+  assert.ok(voiceAt >= 0 && steerAt > voiceAt);
+});

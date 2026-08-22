@@ -8,6 +8,8 @@ import {
   showChatError
 } from './render-chat.js';
 import { applyAgentAvatarToBubble, renderAgentHero, renderAgentPicker } from './render-agent-picker.js';
+import { renderProtocolPills } from './render-protocol-pills.js';
+import { findProtocol, isAgentStatusLine, pickStatusLine } from './agent-protocols.js';
 import { isHammondAuditTrigger, nextAuditPhase } from './hammond-audit.js';
 import {
   loadStoredAuditSession,
@@ -61,6 +63,7 @@ export function createChatController({
   let lastAgentSlug = null;
   let lastAgentAt = 0;
   let pinnedAgentSlug = null;
+  let selectedProtocolId = null;
   let activeAbort = null;
   let auditSession = resumeAuditSession(storage);
   let savedMindSessionThisThread = false;
@@ -135,16 +138,45 @@ export function createChatController({
     return getDefaultAgentSlug?.();
   }
 
-  function applySelectAgent(slug) {
-    if (slug !== 'hammond') clearAuditSession();
-    pinnedAgentSlug = slug;
-    lastAgentSlug = slug;
-    lastAgentAt = now();
-    applyAgentAccent(slug);
+  function paintRoster() {
+    const slug = stickyAgentSlug() ?? null;
     renderAgentPicker(root, {
       selectedSlug: slug,
       onSelect: selectAgent
     });
+    renderProtocolPills(root, {
+      slug,
+      selectedId: selectedProtocolId,
+      onSelect: selectProtocol
+    });
+  }
+
+  function applySelectAgent(slug) {
+    if (slug !== 'hammond') clearAuditSession();
+    if (slug !== pinnedAgentSlug) selectedProtocolId = null;
+    pinnedAgentSlug = slug;
+    lastAgentSlug = slug;
+    lastAgentAt = now();
+    applyAgentAccent(slug);
+    paintRoster();
+  }
+
+  function selectProtocol(protocolId) {
+    const slug = stickyAgentSlug();
+    const pill = findProtocol(slug, protocolId);
+    if (!pill) return Promise.resolve();
+    if (selectedProtocolId === protocolId) {
+      selectedProtocolId = null;
+      paintRoster();
+      return Promise.resolve();
+    }
+    selectedProtocolId = protocolId;
+    paintRoster();
+    if (sending) return Promise.resolve();
+    const input = root.querySelector('#chat-input');
+    const typed = input?.value.trim();
+    if (input && typed) input.value = '';
+    return send(typed || pill.label);
   }
 
   function selectAgent(slug) {
@@ -180,10 +212,7 @@ export function createChatController({
   function syncAccent() {
     const slug = stickyAgentSlug();
     if (slug) applyAgentAccent(slug);
-    renderAgentPicker(root, {
-      selectedSlug: slug ?? null,
-      onSelect: selectAgent
-    });
+    paintRoster();
   }
 
   function remember(role, content) {
@@ -238,10 +267,7 @@ export function createChatController({
     list?.replaceChildren?.();
     const slug = stickyAgentSlug();
     if (slug) applyAgentAccent(slug);
-    renderAgentPicker(root, {
-      selectedSlug: slug ?? null,
-      onSelect: selectAgent
-    });
+    paintRoster();
     clearUnread();
   }
 
@@ -319,10 +345,11 @@ export function createChatController({
     let assistantBubble = null;
     let assistantBuffer = '';
     let assistantFullText = '';
+    let statusLine = pickStatusLine(assistantSlug);
     let workingBubble = appendMessage(root, {
       role: 'assistant',
       agentSlug: assistantSlug,
-      text: hiddenUser ? 'Wrapping up…' : 'On it…'
+      text: statusLine
     });
     addStatusClass(workingBubble);
     const abort = new AbortController();
@@ -335,11 +362,11 @@ export function createChatController({
       workingBubble = null;
     }
 
-    // Keeps a single sticky bubble alive across the "On it… → Looking that up…
-    // → Researching…" turn instead of leaving a trail of separate wait bubbles.
-    // Re-appended to the end each update so it stays below search chips and
-    // library confirmations instead of getting stranded above them.
+    // Keeps a single sticky bubble alive across wait/search/research instead of
+    // leaving a trail of separate wait bubbles. Re-appended to the end each
+    // update so it stays below search chips and library confirmations.
     function setWorkingStatus(text) {
+      statusLine = text;
       if (!workingBubble) {
         workingBubble = appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text });
       } else {
@@ -353,6 +380,10 @@ export function createChatController({
       }
       addStatusClass(workingBubble);
       scrollChatToBottom();
+    }
+
+    function rotateWorkingStatus() {
+      setWorkingStatus(pickStatusLine(assistantSlug, { exclude: statusLine }));
     }
 
     // Streamed text arrives as one long buffer; splitting on paragraph breaks into
@@ -386,23 +417,31 @@ export function createChatController({
     }
 
     try {
+      const protocolId = !hiddenUser && findProtocol(priorAgentSlug, selectedProtocolId)
+        ? selectedProtocolId
+        : undefined;
       for await (const event of chatApi.send(message, {
         history,
         priorAgentSlug,
         signal: abort.signal,
-        ...(sessionForSend ? { auditSession: sessionForSend } : {})
+        ...(sessionForSend ? { auditSession: sessionForSend } : {}),
+        ...(protocolId ? { protocolId } : {})
       })) {
         if (event.type === 'agent') {
           if (event.slug !== 'hammond') clearAuditSession();
           assistantSlug = event.slug;
           lastAgentSlug = event.slug;
           lastAgentAt = now();
-          if (!pinnedAgentSlug) {
-            renderAgentPicker(root, { selectedSlug: event.slug, onSelect: selectAgent });
+          if (selectedProtocolId && !findProtocol(event.slug, selectedProtocolId)) {
+            selectedProtocolId = null;
           }
+          if (!pinnedAgentSlug) paintRoster();
           applyAgentAccent(event.slug);
           if (workingBubble) applyAgentAvatarToBubble(workingBubble, event.slug);
           if (assistantBubble) applyAgentAvatarToBubble(assistantBubble, event.slug);
+          if (workingBubble && !isAgentStatusLine(event.slug, statusLine)) {
+            rotateWorkingStatus();
+          }
         } else if (event.type === 'text') {
           turnSignaled = true;
           gotUsefulOutput = true;
@@ -465,21 +504,21 @@ export function createChatController({
           showChatError(root, 'Chat is unavailable right now. Please try again.');
         } else if (event.type === 'status') {
           if (typeof event.text === 'string' && event.text.trim()) {
-            setWorkingStatus(event.text.trim());
+            rotateWorkingStatus();
           }
         } else if (event.type === 'search') {
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `🔍 Searched the web: ${event.query ?? '…'}` });
-          setWorkingStatus('Looking that up…');
+          rotateWorkingStatus();
         } else if (event.type === 'food_library_saved') {
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `📚 Saved "${event.name}" to the Food Library for next time.` });
-          setWorkingStatus('Researching…');
+          rotateWorkingStatus();
         } else if (event.type === 'exercise_library_saved') {
           sawExerciseLibrarySaved = true;
           endTextTurn();
           appendMessage(root, { role: 'assistant', text: `Saved "${event.name}" to the Exercise Library.` });
-          setWorkingStatus('Researching…');
+          rotateWorkingStatus();
         } else if (event.type === 'governance_log_appended') {
           sawGovernanceLogAppended = true;
         }
@@ -621,20 +660,19 @@ export function createChatController({
   {
     const slug = stickyAgentSlug() ?? null;
     if (slug) applyAgentAccent(slug);
-    renderAgentPicker(root, {
-      selectedSlug: slug,
-      onSelect: selectAgent
-    });
+    paintRoster();
   }
 
   return {
     send,
     selectAgent,
+    selectProtocol,
     startNewChat,
     flushVeraSession,
     startCentralNodeAudit,
     syncAccent,
     getSelectedAgentSlug: () => stickyAgentSlug() ?? null,
+    getSelectedProtocolId: () => selectedProtocolId,
     clearUnread
   };
 }

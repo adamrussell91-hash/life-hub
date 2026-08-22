@@ -15,6 +15,7 @@ import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
 import { buildSystemPrompt } from './_shared/persona.mjs';
+import { normalizeProtocolId, protocolSteerBlock } from '../../js/app/agent-protocols.js';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
 import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs';
 import { loadPenelopeProtocol } from './_shared/load-penelope-protocol.mjs';
@@ -627,7 +628,8 @@ export function createChatHandler({
           mindDivergence,
           onThisDay,
           daysSinceLastEntry,
-          daysSinceLastMindSession
+          daysSinceLastMindSession,
+          protocolSteer: protocolSteerBlock(slug, parsed.protocolId)
         });
 
         try {
@@ -962,7 +964,8 @@ async function parseRequest(request) {
     message: body.message,
     history: sanitizeHistory(body.history),
     priorAgentSlug: typeof body.priorAgentSlug === 'string' ? body.priorAgentSlug : undefined,
-    auditSession: normalizeAuditSession(body.auditSession)
+    auditSession: normalizeAuditSession(body.auditSession),
+    protocolId: normalizeProtocolId(body.protocolId)
   };
 }
 

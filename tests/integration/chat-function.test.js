@@ -1229,6 +1229,56 @@ test('Hammond auditSession injects phase contract into the system prompt', async
   assert.match(receivedArgs.system, /triage/i);
 });
 
+test('protocolId steers Brisket’s prompt without dumping a canned description', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'Shoot, buddy — let’s keep it gentle today.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'Flare-up eating',
+    priorAgentSlug: 'brisket',
+    protocolId: 'flare-up'
+  })));
+
+  assert.match(receivedArgs.system, /Flare-up eating/);
+  assert.match(receivedArgs.system, /Active flare-up protocol/);
+  assert.match(receivedArgs.system, /in character/);
+  assert.doesNotMatch(receivedArgs.system, /hog-tying a polyphenol/i);
+});
+
+test('a protocolId for the wrong agent is ignored', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'Let’s build it, bro.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'next session',
+    priorAgentSlug: 'chadwick',
+    protocolId: 'flare-up'
+  })));
+
+  assert.doesNotMatch(receivedArgs.system, /Flare-up eating/);
+  assert.doesNotMatch(receivedArgs.system, /Active flare-up protocol/);
+});
+
 test('invalid auditSession is ignored for prompt injection', async () => {
   let receivedArgs;
   const handler = createChatHandler({

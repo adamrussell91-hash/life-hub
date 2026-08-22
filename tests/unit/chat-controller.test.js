@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createChatController } from '../../js/app/chat-controller.js';
 import { agentColour } from '../../js/app/agent-colour.js';
+import { isAgentStatusLine, isGenericStatusCopy } from '../../js/app/agent-protocols.js';
 
 class FakeElement extends EventTarget {
   constructor(tag) {
@@ -74,6 +75,7 @@ class FakeDocument {
       ['#chat-new', new FakeElement('button')],
       ['#chat-view', new FakeElement('section')],
       ['#agent-picker', new FakeElement('div')],
+      ['#agent-protocol-pills', new FakeElement('div')],
       ['#chat-agent-hero', new FakeElement('div')]
     ]);
   }
@@ -608,7 +610,7 @@ test('omitting the default hint entirely preserves today\'s existing behaviour (
   assert.equal(sendCalls[0].priorAgentSlug, undefined);
 });
 
-test('shows On it… immediately and clears it when real text arrives', async () => {
+test('shows an in-character wait line immediately and clears it when real text arrives', async () => {
   const root = new FakeDocument();
   let resolveGate;
   const gate = new Promise(resolve => {
@@ -623,12 +625,14 @@ test('shows On it… immediately and clears it when real text arrives', async ()
     }
   };
   const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('chadwick');
   const pending = controller.send('build today\'s session');
   await flushMicrotasks();
 
   const during = messageBubbles(root);
   assert.equal(during.length, 2);
-  assert.equal(bubbleText(during[1]), 'On it…');
+  assert.equal(isAgentStatusLine('chadwick', bubbleText(during[1])), true);
+  assert.equal(isGenericStatusCopy(bubbleText(during[1])), false);
 
   resolveGate();
   await pending;
@@ -636,10 +640,8 @@ test('shows On it… immediately and clears it when real text arrives', async ()
   const after = messageBubbles(root);
   assert.equal(after.length, 2);
   assert.equal(bubbleText(after[1]), 'Here is the plan.');
-  assert.equal(after.every(bubble => bubbleText(bubble) !== 'On it…'), true);
+  assert.equal(after.every(bubble => !isAgentStatusLine('chadwick', bubbleText(bubble))), true);
 });
-
-const STATUS_COPY = ['On it…', 'Looking that up…', 'Researching…'];
 
 function statusBubbles(root) {
   return messageBubbles(root).filter(bubble => bubble.className?.includes('chat-message--status'));
@@ -662,12 +664,14 @@ test('a search followed by a saved-library note keeps a sticky Researching… st
     }
   };
   const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
   const pending = controller.send('log a quest bar');
   await flushMicrotasks();
 
   const duringStatus = statusBubbles(root);
   assert.equal(duringStatus.length, 1, 'exactly one sticky status bubble should exist while waiting');
-  assert.equal(bubbleText(duringStatus[0]), 'Researching…');
+  assert.equal(isAgentStatusLine('brisket', bubbleText(duringStatus[0])), true);
+  assert.equal(isGenericStatusCopy(bubbleText(duringStatus[0])), false);
   assert.match(duringStatus[0].className, /chat-message--status/);
 
   const list = root.querySelector('#chat-messages');
@@ -683,9 +687,9 @@ test('a search followed by a saved-library note keeps a sticky Researching… st
   const after = messageBubbles(root);
   assert.equal(statusBubbles(root).length, 0, 'the status bubble should be gone once real text arrives');
   assert.equal(
-    after.every(bubble => !STATUS_COPY.includes(bubbleText(bubble))),
+    after.every(bubble => !isGenericStatusCopy(bubbleText(bubble))),
     true,
-    'no leftover status copy should remain in any bubble'
+    'no leftover generic status copy should remain in any bubble'
   );
 });
 
@@ -706,9 +710,9 @@ test('food_library_saved followed by text leaves no status copy behind', async (
   const after = messageBubbles(root);
   assert.equal(statusBubbles(root).length, 0);
   assert.equal(
-    after.every(bubble => !STATUS_COPY.includes(bubbleText(bubble))),
+    after.every(bubble => !isGenericStatusCopy(bubbleText(bubble))),
     true,
-    'no leftover status copy should remain in any bubble'
+    'no leftover generic status copy should remain in any bubble'
   );
 });
 
@@ -743,7 +747,7 @@ test('the sticky status bubble carries the status class while waiting and loses 
   }
 });
 
-test('the status bubble rotates On it… → Looking that up… → Researching… across a full research turn, then clears on text', async () => {
+test('the status bubble rotates Brisket wait lines across a full research turn, then clears on text', async () => {
   const root = new FakeDocument();
   const seenStatuses = [];
   let resolveSearch;
@@ -771,6 +775,7 @@ test('the status bubble rotates On it… → Looking that up… → Researching�
     }
   };
   const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
   const pending = controller.send('log a quest bar');
 
   await flushMicrotasks();
@@ -787,7 +792,11 @@ test('the status bubble rotates On it… → Looking that up… → Researching�
   resolveText();
   await pending;
 
-  assert.deepEqual(seenStatuses, ['On it…', 'Looking that up…', 'Researching…']);
+  assert.equal(seenStatuses.length, 3);
+  assert.ok(seenStatuses.every(line => isAgentStatusLine('brisket', line)));
+  assert.ok(seenStatuses.every(line => !isGenericStatusCopy(line)));
+  assert.notEqual(seenStatuses[0], seenStatuses[1], 'search should rotate off the opening wait line');
+  assert.notEqual(seenStatuses[1], seenStatuses[2], 'library save should rotate off the search wait line');
   assert.equal(statusBubbles(root).length, 0, 'status bubble should be cleared once the real answer streams in');
 });
 
@@ -831,6 +840,76 @@ test('selectAgent updates accent immediately from roster even without agentsConf
     root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'),
     '#EEB046'
   );
+});
+
+function protocolButtons(root) {
+  const host = root.querySelector('#agent-protocol-pills');
+  return host?.children?.[1]?.children ?? [];
+}
+
+test('selecting an agent reveals that character’s protocol pills', async () => {
+  const root = new FakeDocument();
+  const controller = createChatController({
+    root,
+    chatApi: { async *send() { yield { type: 'done' }; } }
+  });
+  await controller.selectAgent('brisket');
+  const labels = protocolButtons(root).map(button => button.textContent);
+  assert.deepEqual(labels, [
+    'Log a meal',
+    'Flare-up eating',
+    'Weekend / eating out',
+    'Plan the rest of today',
+    'Why I ate that'
+  ]);
+  assert.equal(root.querySelector('#agent-protocol-pills').hidden, false);
+});
+
+test('tapping a protocol pill steers the next turn without a canned assistant blurb', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Shoot, buddy — let’s walk that flare like we mean it.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  await controller.selectProtocol('flare-up');
+
+  assert.equal(sendCalls[0].message, 'Flare-up eating');
+  assert.equal(sendCalls[0].protocolId, 'flare-up');
+  assert.equal(controller.getSelectedProtocolId(), 'flare-up');
+  assert.equal(
+    messageBubbles(root).some(bubble => /Active flare-up protocol|hog-tying|polyphenol/i.test(bubbleText(bubble))),
+    false,
+    'pill tap must not inject the mock description'
+  );
+  assert.ok(messageBubbles(root).some(bubble => /walk that flare/i.test(bubbleText(bubble))));
+});
+
+test('a typed message plus a selected protocol sends both', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, protocolId: options.protocolId });
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: 'Let’s build it, bro.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('chadwick');
+  root.querySelector('#chat-input').value = 'keep it to 30 minutes';
+  await controller.selectProtocol('next-session');
+
+  assert.equal(sendCalls[0].message, 'keep it to 30 minutes');
+  assert.equal(sendCalls[0].protocolId, 'next-session');
+  assert.equal(root.querySelector('#chat-input').value, '');
 });
 
 function unreadCalls() {
@@ -987,8 +1066,8 @@ test('empty stream after On it shows a durable recovery message', async () => {
     'expected empty-turn recovery copy'
   );
   assert.ok(
-    messageBubbles(root).every(b => bubbleText(b) !== 'On it…'),
-    'On it bubble must not linger'
+    messageBubbles(root).every(b => !isGenericStatusCopy(bubbleText(b))),
+    'generic wait copy must not linger'
   );
 });
 
