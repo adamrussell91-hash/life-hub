@@ -67,14 +67,13 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
   assert.match(html, /id="app-shell"[^>]*hidden/);
 });
 
-test('hub mark sits left of the page title, not in header actions', async () => {
+test('signed-in header has no hub tile', async () => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
   const copy = html.slice(html.indexOf('page-header__copy'), html.indexOf('page-header__actions'));
   const actions = html.slice(html.indexOf('page-header__actions'), html.indexOf('id="main-content"'));
-  assert.match(copy, /class="page-header__title-row"/);
-  assert.match(copy, /class="hub-mark"/);
   assert.match(copy, /id="page-title"/);
-  assert.ok(copy.indexOf('hub-mark') < copy.indexOf('page-title'));
+  assert.doesNotMatch(html, /class="hub-mark"/);
+  assert.doesNotMatch(copy, /class="page-header__title-row"/);
   assert.doesNotMatch(actions, /class="hub-mark"/);
 });
 
