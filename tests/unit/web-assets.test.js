@@ -40,6 +40,8 @@ test('Home shell exposes landmarks and named rendering regions', async () => {
 test('authenticated shell provides a semantic sign-in gate and reachable controls', async () => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
 
+  assert.doesNotMatch(html, /class="sign-in__mark"/);
+
   for (const fragment of [
     'id="sign-in-view"',
     'class="sign-in"',

@@ -1,8 +1,8 @@
 /* Shared passphrase gate — locked across every hub.
  *
  * Markup: snippets/sign-in.html
- * Do not restyle per hub. Only the tile src + brand eyebrow change.
- * No supporting / purpose copy. Enter submits (form submit, not click-only).
+ * Do not restyle per hub. Only the brand eyebrow + one supporting line change.
+ * No hub tile / .sign-in__mark. Enter submits (form submit, not click-only).
  * Glass density overlays do not apply here.
  */
 
@@ -130,12 +130,6 @@
   .sign-in__sparkle {
     opacity: 0.45;
   }
-}
-
-.sign-in__mark {
-  display: block;
-  width: 3.5rem;
-  height: 3.5rem;
 }
 
 .sign-in__brand {
