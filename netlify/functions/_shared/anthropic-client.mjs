@@ -2,8 +2,10 @@ const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 8192;
-const MAX_TOOL_ROUNDS = 6;
-const MAX_PAUSE_CONTINUATIONS = 3;
+// High enough that iterative web_search / pause_turn research can finish.
+// These are runaway-loop brakes, not a research budget.
+export const MAX_TOOL_ROUNDS = 24;
+export const MAX_PAUSE_CONTINUATIONS = 20;
 
 export class AnthropicClientError extends Error {
   constructor(code, retryable) {
