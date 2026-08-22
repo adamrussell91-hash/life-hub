@@ -205,6 +205,9 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
   width: 1.15rem;
   height: 1.15rem;
   display: block;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  opacity: 0.84;
 }
 .nav-dot { width: 0.48rem; height: 0.48rem; margin-inline: 0.36rem; border-radius: 50%; background: var(--wave); box-shadow: 0 0 0 4px rgba(55, 111, 183, 0.12); }
 .nav-dot.fitness { background: var(--high-sea); box-shadow: 0 0 0 4px rgba(246, 134, 32, 0.12); }
