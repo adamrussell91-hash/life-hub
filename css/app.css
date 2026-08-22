@@ -3232,13 +3232,11 @@ main { max-width: 76rem; margin: 0 auto; }
   font-size: 8px;
   font-weight: 600;
 }
-#mind-chord text,
-#mind-sankey text {
+#mind-chord text {
   fill: var(--marine);
   font-size: 11px;
   font-weight: 600;
 }
-.mind-sankey-card .mind-chart--sankey,
 .mind-network-card .mind-chart--chord {
   width: 100%;
   min-height: 16rem;
