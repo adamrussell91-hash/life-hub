@@ -67,12 +67,16 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
   assert.match(html, /id="app-shell"[^>]*hidden/);
 });
 
-test('page title has no hub-mark tile beside it', async () => {
+test('no Life Hub tile appears on any page', async () => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
   const copy = html.slice(html.indexOf('page-header__copy'), html.indexOf('page-header__actions'));
   assert.match(copy, /class="page-header__title-row"/);
   assert.match(copy, /id="page-title"/);
   assert.doesNotMatch(html, /class="hub-mark"/);
+  assert.doesNotMatch(html, /class="sign-in__mark"/);
+  assert.doesNotMatch(html, /rel="icon"/);
+  assert.doesNotMatch(html, /apple-touch-icon/);
+  assert.doesNotMatch(html, /icons\/life-hub\.svg/);
 });
 
 test('skip link is unavailable until the authenticated shell is revealed', async () => {
