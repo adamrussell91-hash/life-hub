@@ -94,6 +94,14 @@ function pillButtons(root) {
   return root.host.children[1]?.children ?? [];
 }
 
+function pillLabel(button) {
+  return button.children.find(child => child.className === 'agent-protocol-pills__label')?.textContent ?? '';
+}
+
+function pillTip(button) {
+  return button.children.find(child => child.className === 'agent-protocol-pills__tip') ?? null;
+}
+
 test('renderProtocolPills hides the tray when no agent is selected', () => {
   const root = new FakeDocument();
   renderProtocolPills(root, { slug: null, onSelect() {} });
@@ -106,7 +114,7 @@ test('selecting Brisket renders the approved pills under BRISKET CAN', () => {
   renderProtocolPills(root, { slug: 'brisket', onSelect() {} });
   assert.equal(root.host.hidden, false);
   assert.match(root.host.children[0].textContent, /brisket can/i);
-  assert.deepEqual(pillButtons(root).map(button => button.textContent), [
+  assert.deepEqual(pillButtons(root).map(pillLabel), [
     'Log a meal',
     'Flare-up eating',
     'Weekend / eating out',
@@ -125,6 +133,18 @@ test('an active pill is marked without inventing a description', () => {
     root.host.children.some(child => /polyphenol|lasso/i.test(child.textContent)),
     false
   );
+});
+
+test('each pill carries a one-sentence hover explainer card', () => {
+  const root = new FakeDocument();
+  renderProtocolPills(root, { slug: 'brisket', onSelect() {} });
+  const flare = pillButtons(root).find(button => button.dataset.protocolId === 'flare-up');
+  const tip = pillTip(flare);
+  assert.ok(tip, 'expected a hover card on the pill');
+  assert.equal(tip.attributes.role, 'tooltip');
+  assert.match(tip.textContent, /flare-up rules/i);
+  assert.equal(flare.attributes['aria-describedby'], tip.id);
+  assert.equal(pillLabel(flare), 'Flare-up eating');
 });
 
 test('clicking a pill reports its id and does not write assistant copy', () => {
