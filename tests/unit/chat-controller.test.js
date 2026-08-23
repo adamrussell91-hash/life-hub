@@ -854,7 +854,10 @@ test('selecting an agent reveals that character’s protocol pills', async () =>
     chatApi: { async *send() { yield { type: 'done' }; } }
   });
   await controller.selectAgent('brisket');
-  const labels = protocolButtons(root).map(button => button.textContent);
+  const labels = protocolButtons(root).map(button => (
+    button.children.find(child => child.className === 'agent-protocol-pills__label')?.textContent
+    ?? button.textContent
+  ));
   assert.deepEqual(labels, [
     'Log a meal',
     'Flare-up eating',

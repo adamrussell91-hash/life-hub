@@ -5,75 +5,75 @@ export const AGENT_PROTOCOLS = {
     firstName: 'Brisket',
     eyebrow: 'Brisket can',
     pills: [
-      { id: 'log-meal', label: 'Log a meal', steer: 'Logging protocol' },
-      { id: 'flare-up', label: 'Flare-up eating', steer: 'Active flare-up protocol' },
-      { id: 'weekend', label: 'Weekend / eating out', steer: 'Weekend / eating out' },
-      { id: 'forward-plan', label: 'Plan the rest of today', steer: 'Forward-plan remaining meals' },
-      { id: 'why-ate', label: 'Why I ate that', steer: 'Psychology & behaviour' }
+      { id: 'log-meal', label: 'Log a meal', steer: 'Logging protocol', explain: 'Record what you ate so Brisket can put it on the day.' },
+      { id: 'flare-up', label: 'Flare-up eating', steer: 'Active flare-up protocol', explain: 'Shift today’s food onto the gentler flare-up rules.' },
+      { id: 'weekend', label: 'Weekend / eating out', steer: 'Weekend / eating out', explain: 'Plan or log a meal out without blowing the week.' },
+      { id: 'forward-plan', label: 'Plan the rest of today', steer: 'Forward-plan remaining meals', explain: 'Map the remaining meals so the day still lands.' },
+      { id: 'why-ate', label: 'Why I ate that', steer: 'Psychology & behaviour', explain: 'Talk through the urge or the choice, not just the macros.' }
     ]
   },
   chadwick: {
     firstName: 'Chadwick',
     eyebrow: 'Chadwick can',
     pills: [
-      { id: 'log-session', label: 'Log a session', steer: 'Logging protocol — status completed' },
-      { id: 'next-session', label: 'Next session', steer: 'Logging protocol — status planned; design today’s session' },
-      { id: 'missed-day', label: 'Missed a day', steer: 'Adherence (2+ missed days → lower the bar)' },
-      { id: 'program-check', label: "How's the program", steer: 'Rotation, deload, and aesthetic bias' },
-      { id: 'form-safety', label: 'Form / safety', steer: 'Safety' }
+      { id: 'log-session', label: 'Log a session', steer: 'Logging protocol — status completed', explain: 'Write down what you actually lifted.' },
+      { id: 'next-session', label: 'Next session', steer: 'Logging protocol — status planned; design today’s session', explain: 'Build today’s planned workout.' },
+      { id: 'missed-day', label: 'Missed a day', steer: 'Adherence (2+ missed days → lower the bar)', explain: 'Get moving again without running the full program.' },
+      { id: 'program-check', label: "How's the program", steer: 'Rotation, deload, and aesthetic bias', explain: 'Check rotation, deload, and whether the plan still fits.' },
+      { id: 'form-safety', label: 'Form / safety', steer: 'Safety', explain: 'Flag pain or form before you push.' }
     ]
   },
   hyaluronica: {
     firstName: 'Hyaluronica',
     eyebrow: 'Hyaluronica can',
     pills: [
-      { id: 'tonight', label: 'What to use tonight', steer: 'Advise from the Current AM/PM rotation' },
-      { id: 'whats-on', label: "What's in my routine", steer: 'Routines and library — membership is the source of truth' },
-      { id: 'add-library', label: 'Add to the library', steer: 'Routines and library' },
-      { id: 'am-pm', label: 'AM vs PM', steer: 'Routines and library — AM/PM membership' },
-      { id: 'irritating', label: "Something's irritating", steer: 'Advise; do not invent a routine from shelf flags' }
+      { id: 'tonight', label: 'What to use tonight', steer: 'Advise from the Current AM/PM rotation', explain: 'Ask what belongs on tonight’s routine.' },
+      { id: 'whats-on', label: "What's in my routine", steer: 'Routines and library — membership is the source of truth', explain: 'See what is actually on AM or PM right now.' },
+      { id: 'add-library', label: 'Add to the library', steer: 'Routines and library', explain: 'Save a product to the shelf for later.' },
+      { id: 'am-pm', label: 'AM vs PM', steer: 'Routines and library — AM/PM membership', explain: 'Sort what belongs in the morning versus night.' },
+      { id: 'irritating', label: "Something's irritating", steer: 'Advise; do not invent a routine from shelf flags', explain: 'Work out what’s stinging or breaking you out.' }
     ]
   },
   sara: {
     firstName: 'Sara',
     eyebrow: 'Sara can',
     pills: [
-      { id: 'read-results', label: 'Read these results', steer: 'Interpret from Medical Overview' },
-      { id: 'tracking', label: 'How am I tracking', steer: 'Weekly health scan posture' },
-      { id: 'log-reading', label: 'Log a reading', steer: 'Logging protocol (body figures and medical visits)' },
-      { id: 'weekly-scan', label: 'Weekly scan', steer: 'Weekly health scan posture' },
-      { id: 'something-off', label: "Something's off", steer: 'Interpret; name concerns without catastrophising' }
+      { id: 'read-results', label: 'Read these results', steer: 'Interpret from Medical Overview', explain: 'Walk through labs or visit notes you already have.' },
+      { id: 'tracking', label: 'How am I tracking', steer: 'Weekly health scan posture', explain: 'Look at the recent body and health trend.' },
+      { id: 'log-reading', label: 'Log a reading', steer: 'Logging protocol (body figures and medical visits)', explain: 'Record a weight, tape, or visit figure.' },
+      { id: 'weekly-scan', label: 'Weekly scan', steer: 'Weekly health scan posture', explain: 'Do the weekly health-scan pass.' },
+      { id: 'something-off', label: "Something's off", steer: 'Interpret; name concerns without catastrophising', explain: 'Name a concern without catastrophising it.' }
     ]
   },
   penelope: {
     firstName: 'Penelope',
     eyebrow: 'Penelope can',
     pills: [
-      { id: 'start-diary', label: 'Start a diary', steer: 'Interview flow (every time)' },
-      { id: 'continue', label: 'Continue', steer: 'Interview flow — continue one question at a time' },
-      { id: 'on-this-day', label: 'On this day', steer: 'On this day' },
-      { id: 'just-a-thought', label: 'Just a thought', steer: 'Interview flow — follow his lead, one question' }
+      { id: 'start-diary', label: 'Start a diary', steer: 'Interview flow (every time)', explain: 'Open a fresh interview about the day.' },
+      { id: 'continue', label: 'Continue', steer: 'Interview flow — continue one question at a time', explain: 'Pick up the diary questions where you left off.' },
+      { id: 'on-this-day', label: 'On this day', steer: 'On this day', explain: 'Look back at what you wrote on this date before.' },
+      { id: 'just-a-thought', label: 'Just a thought', steer: 'Interview flow — follow his lead, one question', explain: 'Offer one thing and let her follow it.' }
     ]
   },
   vera: {
     firstName: 'Vera',
     eyebrow: 'Vera can',
     pills: [
-      { id: 'thinking-partner', label: 'Think this through', steer: 'Job — thinking partner, one open question' },
-      { id: 'sit-with-this', label: 'Sit with this', steer: 'Presence — sit with it first' },
-      { id: 'dropping-anchor', label: 'Dropping Anchor', steer: 'Dropping Anchor (ACE)' },
-      { id: 'close-session', label: 'Close the session', steer: 'Closing — always three parts; log mind_session if there is one' }
+      { id: 'thinking-partner', label: 'Think this through', steer: 'Job — thinking partner, one open question', explain: 'Sit with a question as a thinking partner.' },
+      { id: 'sit-with-this', label: 'Sit with this', steer: 'Presence — sit with it first', explain: 'Stay with the feeling instead of fixing it.' },
+      { id: 'dropping-anchor', label: 'Dropping Anchor', steer: 'Dropping Anchor (ACE)', explain: 'Run the ACE grounding exercise.' },
+      { id: 'close-session', label: 'Close the session', steer: 'Closing — always three parts; log mind_session if there is one', explain: 'End the hour and record it if there is one.' }
     ]
   },
   hammond: {
     firstName: 'Hammond',
     eyebrow: 'Hammond can',
     pills: [
-      { id: 'whats-running', label: "What's running", steer: 'Session Triage (gateway)' },
-      { id: 'decision', label: 'Decision help', steer: 'Decision Priority Hierarchy (provisional)' },
-      { id: 'weekly-review', label: 'Weekly review', steer: 'Follow-on protocols — Weekly Review' },
-      { id: 'drifting', label: "Something's drifting", steer: 'Follow-on protocols — Drift' },
-      { id: 'specialist', label: 'Talk to a specialist', steer: 'Specialist pattern relay' }
+      { id: 'whats-running', label: "What's running", steer: 'Session Triage (gateway)', explain: 'Triage what’s live across the hubs.' },
+      { id: 'decision', label: 'Decision help', steer: 'Decision Priority Hierarchy (provisional)', explain: 'Work a choice through the priority hierarchy.' },
+      { id: 'weekly-review', label: 'Weekly review', steer: 'Follow-on protocols — Weekly Review', explain: 'Do the weekly governance pass.' },
+      { id: 'drifting', label: "Something's drifting", steer: 'Follow-on protocols — Drift', explain: 'Name a drift before it becomes a problem.' },
+      { id: 'specialist', label: 'Talk to a specialist', steer: 'Specialist pattern relay', explain: 'Hand the pattern to the right specialist.' }
     ]
   }
 };

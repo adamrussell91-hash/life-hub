@@ -25,6 +25,11 @@ test('every Life Hub agent has user-facing pills and 10–12 status lines', () =
     assert.ok(lines.length >= 10 && lines.length <= 12, `${slug} should rotate 10–12 lines`);
     assert.ok(lines.every(line => line.endsWith('…')), `${slug} status lines end in an ellipsis`);
     assert.ok(lines.every(line => !isGenericStatusCopy(line)), `${slug} must not reuse generic wait copy`);
+    for (const pill of pack.pills) {
+      assert.equal(typeof pill.explain, 'string', `${slug}/${pill.id} needs a hover explainer`);
+      assert.match(pill.explain, /^[A-Z].*\.$/, `${slug}/${pill.id} explainer must be one sentence`);
+      assert.equal(pill.explain.split(/(?<=[.])\s+/).length, 1, `${slug}/${pill.id} explainer must stay one sentence`);
+    }
   }
 });
 
