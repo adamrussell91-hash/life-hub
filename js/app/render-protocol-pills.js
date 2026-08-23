@@ -32,7 +32,6 @@ export function renderProtocolPills(root, {
     button.type = 'button';
     button.className = 'hub-pills__btn';
     button.dataset.protocolId = pill.id;
-    button.textContent = pill.label;
     button.style?.setProperty?.('--pill-i', String(index));
     const active = pill.id === selectedId;
     button.classList?.toggle?.('is-active', active);
@@ -40,6 +39,19 @@ export function renderProtocolPills(root, {
       button.className = active ? 'hub-pills__btn is-active' : 'hub-pills__btn';
     }
     button.setAttribute?.('aria-pressed', active ? 'true' : 'false');
+
+    const label = root.createElement('span');
+    label.className = 'agent-protocol-pills__label';
+    label.textContent = pill.label;
+
+    const tip = root.createElement('span');
+    tip.className = 'agent-protocol-pills__tip';
+    tip.id = `protocol-tip-${slug}-${pill.id}`;
+    tip.setAttribute?.('role', 'tooltip');
+    tip.textContent = pill.explain;
+    button.setAttribute?.('aria-describedby', tip.id);
+
+    button.append(label, tip);
     button.addEventListener('click', () => onSelect?.(pill.id));
     row.append(button);
   });

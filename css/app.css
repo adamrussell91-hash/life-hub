@@ -3143,12 +3143,46 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .agent-protocol-pills {
   margin: -0.35rem 0 0.85rem;
+  overflow: visible;
 }
 .agent-protocol-pills__eyebrow {
   margin: 0 0 var(--space-2);
 }
 .agent-protocol-pills .hub-pills {
   display: flex;
+  overflow: visible;
+}
+.agent-protocol-pills .hub-pills__btn {
+  position: relative;
+}
+.agent-protocol-pills__tip {
+  position: absolute;
+  left: 0;
+  top: calc(100% + var(--space-2));
+  z-index: 30;
+  width: max-content;
+  max-width: 16rem;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--elev-4);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-snug);
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+.agent-protocol-pills .hub-pills__btn:hover .agent-protocol-pills__tip,
+.agent-protocol-pills .hub-pills__btn:focus-visible .agent-protocol-pills__tip {
+  opacity: 1;
+  visibility: visible;
 }
 @media (prefers-reduced-motion: no-preference) {
   .agent-protocol-pills .hub-pills__btn {
