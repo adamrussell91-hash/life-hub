@@ -24,15 +24,6 @@ async function copyDesignKitModules() {
   );
 }
 
-async function copyHubTile() {
-  const iconPublish = new URL('icons/', publishRoot);
-  await mkdir(iconPublish, { recursive: true });
-  await copyFile(
-    new URL('design-kit/icons/life-hub.svg', projectRoot),
-    new URL('life-hub.svg', iconPublish)
-  );
-}
-
 export async function prepareWeb() {
   await rm(publishRoot, { recursive: true, force: true });
   await mkdir(publishRoot, { recursive: true });
@@ -48,8 +39,7 @@ export async function prepareWeb() {
       new URL(file, publishRoot)
     )),
     copyDesignKitStyles(),
-    copyDesignKitModules(),
-    copyHubTile()
+    copyDesignKitModules()
   ]);
 
   const vendorDirectory = new URL('vendor/', publishRoot);
