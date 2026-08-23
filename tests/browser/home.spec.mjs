@@ -164,6 +164,38 @@ test('signs in and renders the approved Home values at desktop width', async () 
   await context.close();
 });
 
+test('the Life Hub tile does not appear on sign-in or any signed-in page', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(baseUrl);
+    await page.locator('#sign-in-view').waitFor();
+    assert.equal(await page.locator('.hub-mark, .sign-in__mark, img[src*="life-hub"]').count(), 0);
+    assert.equal(await page.locator('link[rel="icon"], link[rel="apple-touch-icon"]').count(), 0);
+
+    await signIn(page);
+
+    const sections = [
+      ['home', 'Home'],
+      ['chat', 'Chat'],
+      ['nutrition', 'Nutrition'],
+      ['fitness', 'Fitness'],
+      ['body', 'Body'],
+      ['mind', 'Mind'],
+      ['skincare', 'Skincare'],
+      ['calendar', 'Calendar'],
+      ['central-node', 'Central Node']
+    ];
+    for (const [section, title] of sections) {
+      await page.locator(`.desktop-rail .nav-item[data-section="${section}"]`).click();
+      await page.locator('#page-title', { hasText: title }).waitFor();
+      assert.equal(await page.locator('.hub-mark, img[src*="life-hub"]').count(), 0, section);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
 test('uses mobile navigation without overflow at 390 px after sign-in', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
