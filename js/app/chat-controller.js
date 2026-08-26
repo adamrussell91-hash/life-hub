@@ -729,5 +729,11 @@ function formatRejectionMessage(errors) {
   if (!Array.isArray(errors) || errors.length === 0) {
     return 'Life Hub could not prepare that record. Try rephrasing it.';
   }
+  const medicalish = errors.every(error =>
+    /record_type|lane|location_kind|cost_aud|follow_up_date|episode|title/.test(error)
+  );
+  if (medicalish) {
+    return 'Life Hub could not prepare that medical visit yet. Sara will try again — a title and what happened is enough.';
+  }
   return `Life Hub could not save that record: ${errors.join('; ')}`;
 }

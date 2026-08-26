@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { mergeMedicalFields } from '../../js/app/medical-normalize.js';
 import { verifySessionToken, serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
 import {
   errorResponse,
@@ -923,37 +924,78 @@ export function createChatHandler({
 }
 
 async function persistOrProposeLogEntry({ client, slug, today, validation, send }) {
+  let proposal = validation;
   const path = buildCanonicalPath({
     type: validation.record.type,
     date: validation.record.date,
     slug: buildRecordSlug(validation.record)
   });
-  const autoWrite = slug === 'vera' && validation.record.type === 'mind_session';
+
+  if (validation.record.type === 'medical') {
+    try {
+      const current = await client.resolveTree();
+      const existingEntry = current.tree.find(entry => entry.path === path && entry.type === 'blob');
+      if (existingEntry?.sha) {
+        const text = decodeBlob(await client.readBlob(existingEntry.sha));
+        if (text) {
+          const existing = parseEventDocument(text, path, loadYaml);
+          const merged = mergeMedicalFields(existing.record, validation.record, {
+            notes: validation.notes,
+            existingNotes: existing.body
+          });
+          const remerged = validateLogEntry({
+            type: 'medical',
+            date: validation.record.date,
+            time: validation.record.time,
+            notes: merged.notes,
+            fields: merged.fields
+          }, {
+            id: existing.record.id,
+            now: validation.record.updated_at,
+            source: existing.record.source ?? 'chat'
+          });
+          if (remerged.valid) {
+            proposal = {
+              ...remerged,
+              record: {
+                ...remerged.record,
+                created_at: existing.record.created_at ?? remerged.record.created_at
+              }
+            };
+          }
+        }
+      }
+    } catch {
+      // Best-effort append — fall back to the original proposal.
+    }
+  }
+
+  const autoWrite = slug === 'vera' && proposal.record.type === 'mind_session';
   if (autoWrite) {
     try {
       const current = await client.resolveTree();
       const existingSha = current.tree.find(e => e.path === path && e.type === 'blob')?.sha;
       const persisted = await persistLogEntry(client, {
-        record: validation.record,
-        notes: validation.notes,
+        record: proposal.record,
+        notes: proposal.notes,
         path,
         existingSha,
         nowDateKey: today
       });
       send({
         type: 'record_saved',
-        record: validation.record,
-        notes: validation.notes,
+        record: proposal.record,
+        notes: proposal.notes,
         path,
-        summary: describeRecordForLog(validation.record, validation.notes),
+        summary: describeRecordForLog(proposal.record, proposal.notes),
         centralNodeUpdated: persisted.centralNodeUpdated
       });
       return { ok: true, status: 'written', path };
     } catch {
       send({
         type: 'record_proposal',
-        record: validation.record,
-        notes: validation.notes,
+        record: proposal.record,
+        notes: proposal.notes,
         path,
         warnings: [],
         autoWriteFailed: true
@@ -963,12 +1005,12 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send 
   }
   send({
     type: 'record_proposal',
-    record: validation.record,
-    notes: validation.notes,
+    record: proposal.record,
+    notes: proposal.notes,
     path,
     // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
     // Confirm anyway. No-op (empty array) for anything but a workout proposal.
-    warnings: lintWorkoutProposal(validation.record)
+    warnings: lintWorkoutProposal(proposal.record)
   });
   return { ok: true, status: 'awaiting_confirm' };
 }
