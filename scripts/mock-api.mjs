@@ -4,9 +4,10 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDateRange, CONFIG_PATHS } from '../netlify/functions/_shared/repo-policy.mjs';
 
+import { SESSION_MS } from '../netlify/functions/_shared/auth-security.mjs';
+
 const PASSPHRASE = 'life-hub-local';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
-const SESSION_MS = 8 * 60 * 60 * 1000;
 const FIXTURE_FILES = [
   { path: 'config/agents.yml', source: 'config/agents.yml' },
   { path: 'config/targets.yml', source: 'config/targets.yml' },
