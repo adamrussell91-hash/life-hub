@@ -501,6 +501,16 @@ test('vera protocol includes data and search routing for repo tools', () => {
   assert.match(text, /get_mind_session/);
   assert.match(text, /search_mind_records/);
   assert.match(text, /is not repo search/);
+  assert.match(text, /Ground before you respond/);
+  assert.match(text, /tournament of minds/);
+});
+
+test('vera protocol includes working model and cross-domain synthesis', () => {
+  const text = loadVeraProtocol();
+  assert.match(text, /Working Model of Adam/);
+  assert.match(text, /working_model/);
+  assert.match(text, /forming.*holding.*weakening.*retired/s);
+  assert.match(text, /only agent handed this full slice/);
 });
 
 test('vera protocol retries a rejected log_entry and tells Adam what changed', () => {
