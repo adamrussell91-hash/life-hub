@@ -528,6 +528,8 @@ main { max-width: 76rem; margin: 0 auto; }
   .mobile-nav button .nav-icon {
     width: 1.2rem;
     height: 1.2rem;
+    filter: none;
+    opacity: 1;
   }
   .mobile-nav button.is-active { color: var(--depth); background: rgba(55,111,183,0.08); }
   .warning-panel, .unavailable-panel { align-items: flex-start; flex-wrap: wrap; }
