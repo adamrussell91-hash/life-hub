@@ -146,6 +146,31 @@ export function summarizeTodaysMindSession(events, today) {
   return parts.join('\n');
 }
 
+const WORKING_MODEL_MAX_LIVE = 5;
+
+export function summarizeWorkingModelForPrompt(events, today) {
+  const byLabel = new Map();
+  for (const e of events ?? []) {
+    const r = e?.record;
+    if (r?.type !== 'mind_session' || !Array.isArray(r.working_model)) continue;
+    for (const entry of r.working_model) {
+      if (!entry?.label || !entry?.status) continue;
+      const key = entry.label.trim().toLowerCase();
+      const existing = byLabel.get(key);
+      if (!existing || r.date >= existing.date) {
+        byLabel.set(key, { ...entry, date: r.date });
+      }
+    }
+  }
+  const live = [...byLabel.values()]
+    .filter(e => e.status !== 'retired')
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, WORKING_MODEL_MAX_LIVE);
+  if (!live.length) return '';
+  const lines = live.map(e => `- ${e.label} — ${e.status} (last touched ${e.date}${e.evidence ? `: ${e.evidence}` : ''})`);
+  return ['Working model of Adam (your standing hypotheses — confirm, weaken, or retire; not fixed):', ...lines].join('\n');
+}
+
 function lastMindPathDate(tree, { session }) {
   const dates = [];
   for (const entry of tree ?? []) {

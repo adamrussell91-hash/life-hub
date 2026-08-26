@@ -6,6 +6,7 @@ import {
   getMindDigestWindowStart,
   summarizeDiaryForPrompt,
   summarizeMindSessionsForPrompt,
+  summarizeWorkingModelForPrompt,
   summarizeTodaysMindSession,
   simultaneousSilenceFlag,
   divergenceLine,
@@ -261,5 +262,64 @@ test('recentSystemNoteTail keeps a 7-day window and caps at 5 lines', () => {
   assert.match(text, /2026-08-13: day 7/);
   const noteLines = text.split('\n').slice(1);
   assert.equal(noteLines.length, 5);
+});
+
+test('summarizeWorkingModelForPrompt returns empty when no working_model entries exist', () => {
+  assert.equal(summarizeWorkingModelForPrompt([], TODAY), '');
+  assert.equal(summarizeWorkingModelForPrompt([
+    { record: { type: 'mind_session', date: '2026-08-10', theme: 'x' } }
+  ], TODAY), '');
+});
+
+test('summarizeWorkingModelForPrompt last-write-wins per label across sessions', () => {
+  const events = [
+    {
+      record: {
+        type: 'mind_session', date: '2026-08-10',
+        working_model: [{ label: 'Sunday spirals', status: 'forming', evidence: 'missed alarm' }]
+      }
+    },
+    {
+      record: {
+        type: 'mind_session', date: '2026-08-12',
+        working_model: [{ label: 'Sunday spirals', status: 'holding', evidence: 'got up anyway' }]
+      }
+    }
+  ];
+  const text = summarizeWorkingModelForPrompt(events, TODAY);
+  assert.match(text, /Sunday spirals — holding/);
+  assert.match(text, /2026-08-12/);
+  assert.match(text, /got up anyway/);
+  assert.doesNotMatch(text, /forming/);
+});
+
+test('summarizeWorkingModelForPrompt excludes retired entries', () => {
+  const text = summarizeWorkingModelForPrompt([{
+    record: {
+      type: 'mind_session', date: '2026-08-12',
+      working_model: [{ label: 'Old pattern', status: 'retired', evidence: 'not true anymore' }]
+    }
+  }], TODAY);
+  assert.equal(text, '');
+});
+
+test('summarizeWorkingModelForPrompt surfaces only five most recently touched live labels', () => {
+  const events = [];
+  for (let i = 1; i <= 6; i += 1) {
+    const day = String(i).padStart(2, '0');
+    events.push({
+      record: {
+        type: 'mind_session',
+        date: `2026-08-${day}`,
+        working_model: [{ label: `Hypothesis ${i}`, status: 'holding' }]
+      }
+    });
+  }
+  const text = summarizeWorkingModelForPrompt(events, TODAY);
+  assert.doesNotMatch(text, /Hypothesis 1 — holding/);
+  assert.match(text, /Hypothesis 2 — holding/);
+  assert.match(text, /Hypothesis 6 — holding/);
+  const bullets = text.split('\n').filter(line => line.startsWith('- '));
+  assert.equal(bullets.length, 5);
 });
 

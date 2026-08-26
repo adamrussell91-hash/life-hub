@@ -110,6 +110,7 @@ import {
   selectOnThisDayEntries,
   summarizeDiaryForPrompt,
   summarizeMindSessionsForPrompt,
+  summarizeWorkingModelForPrompt,
   summarizeTodaysMindSession,
   simultaneousSilenceFlag,
   divergenceLine,
@@ -301,6 +302,7 @@ export function createChatHandler({
         let hammondMindAmbient = '';
         let mindSessionDigest = '';
         let mindTodaySession = '';
+        let workingModelDigest = '';
         let mindSilence = '';
         let mindDivergence = '';
         let onThisDay = '';
@@ -536,6 +538,7 @@ export function createChatHandler({
             mindDiaryDigest = summarizeDiaryForPrompt(mindEvents, today);
             mindSessionDigest = summarizeMindSessionsForPrompt(mindEvents, today);
             mindTodaySession = slug === 'vera' ? summarizeTodaysMindSession(mindEvents, today) : '';
+            workingModelDigest = slug === 'vera' ? summarizeWorkingModelForPrompt(mindEvents, today) : '';
             mindDivergence = slug === 'vera' ? divergenceLine(mindEvents, today) : '';
             const lastDiary = mindEvents.filter(e => e.record.type === 'diary').map(e => e.record.date).sort().at(-1);
             const lastSession = mindEvents.filter(e => e.record.type === 'mind_session').map(e => e.record.date).sort().at(-1);
@@ -597,6 +600,7 @@ export function createChatHandler({
           mindDiaryDigest = '';
           mindSessionDigest = '';
           mindTodaySession = '';
+          workingModelDigest = '';
           mindSilence = '';
           mindDivergence = '';
           onThisDay = '';
@@ -647,6 +651,7 @@ export function createChatHandler({
           hammondMindAmbient,
           mindSessionDigest,
           mindTodaySession,
+          workingModelDigest,
           mindSilence,
           mindDivergence,
           onThisDay,

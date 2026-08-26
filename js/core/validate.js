@@ -283,10 +283,36 @@ function validateMindSession(record, errors) {
   enumeration(record, 'source_agent', SESSION_SOURCE_AGENTS, errors);
   enumeration(record, 'mood_at_open', MOODS, errors);
   enumeration(record, 'mood_at_close', MOODS, errors);
+  validateWorkingModel(record, errors);
   const hasCore = [record.title, record.theme, record.closing_question, record.insight]
     .some(v => typeof v === 'string' && v.trim() !== '')
     || (Array.isArray(record.themes) && record.themes.some(t => String(t).trim()));
   if (!hasCore) errors.push('mind_session requires title, theme, themes, insight, or closing_question');
+}
+
+const WORKING_MODEL_STATUSES = ['forming', 'holding', 'weakening', 'retired'];
+
+function validateWorkingModel(record, errors) {
+  if (record.working_model == null) return;
+  if (!Array.isArray(record.working_model)) {
+    errors.push('working_model must be an array');
+    return;
+  }
+  if (record.working_model.length > 3) {
+    errors.push('working_model may contain at most 3 entries per turn');
+  }
+  for (const entry of record.working_model) {
+    if (!entry || typeof entry !== 'object') {
+      errors.push('working_model entries must be objects');
+      continue;
+    }
+    if (typeof entry.label !== 'string' || entry.label.trim() === '') {
+      errors.push('working_model entries require label');
+    }
+    if (typeof entry.status !== 'string' || !WORKING_MODEL_STATUSES.includes(entry.status)) {
+      errors.push(`working_model status must be one of: ${WORKING_MODEL_STATUSES.join(', ')}`);
+    }
+  }
 }
 
 function validateWeight(record, errors) {

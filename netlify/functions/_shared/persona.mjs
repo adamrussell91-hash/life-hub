@@ -28,6 +28,7 @@ export function buildSystemPrompt({
   mindDiaryDigest = '',
   mindSessionDigest = '',
   mindTodaySession = '',
+  workingModelDigest = '',
   hammondDiaryDigest = '',
   hammondMindAmbient = '',
   mindSilence = '',
@@ -137,6 +138,7 @@ export function buildSystemPrompt({
     mindTodaySession ? `Today's mind_session:\n${mindTodaySession}` : '',
     mindDiaryDigest ? `Mind diary digest:\n${mindDiaryDigest}` : '',
     mindSessionDigest ? `Mind session digest:\n${mindSessionDigest}` : '',
+    workingModelDigest ? workingModelDigest : '',
     mindSilence,
     mindDivergence,
     daysSinceLastMindSession != null ? `Days since last Vera session: ${daysSinceLastMindSession}.` : ''

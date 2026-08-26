@@ -542,6 +542,15 @@ test('hammond protocol includes Mind domain brief and retrospective', () => {
   assert.match(text, /two-voice/i);
 });
 
+test('vera prompt includes workingModelDigest when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'vera',
+    workingModelDigest: 'Working model of Adam (your standing hypotheses — confirm, weaken, or retire; not fixed):\n- Sunday spirals — holding (last touched 2026-08-26: alarm ignored)'
+  });
+  assert.match(prompt, /Working model of Adam/);
+  assert.match(prompt, /Sunday spirals — holding/);
+});
+
 test('vera prompt includes mind diary and session digest and lists mind_session', () => {
   const prompt = buildSystemPrompt({
     slug: 'vera',

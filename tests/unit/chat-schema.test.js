@@ -297,9 +297,50 @@ test('diary whitelist accepts moods, system_note, cross_agent_note', () => {
 
 test('mind_session schema includes themes, session_type, and observation', () => {
   const keys = Object.keys(DOMAIN_PROPERTIES.mind_session);
-  for (const key of ['themes', 'pattern_tags', 'session_type', 'framework', 'observation', 'title', 'source_agent']) {
+  for (const key of ['themes', 'pattern_tags', 'session_type', 'framework', 'observation', 'title', 'source_agent', 'working_model']) {
     assert.ok(keys.includes(key), key);
   }
+});
+
+test('mind_session with valid working_model passes validation', () => {
+  const result = validateLogEntry({
+    type: 'mind_session',
+    date: '2026-08-26',
+    fields: {
+      theme: 'Sunday pattern',
+      closing_question: 'What is the weekend for?',
+      working_model: [
+        { label: 'Sunday spirals are time-blindness', status: 'holding', evidence: 'alarm ignored again' }
+      ]
+    }
+  }, { id: 'ms-wm-1', now: '2026-08-26T17:00:00+10:00' });
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+
+test('mind_session rejects working_model entry missing label', () => {
+  const result = validateLogEntry({
+    type: 'mind_session',
+    date: '2026-08-26',
+    fields: {
+      theme: 'Sunday pattern',
+      working_model: [{ status: 'forming' }]
+    }
+  }, { id: 'ms-wm-2', now: '2026-08-26T17:00:00+10:00' });
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(error => /label/i.test(error)));
+});
+
+test('mind_session rejects working_model with unknown status', () => {
+  const result = validateLogEntry({
+    type: 'mind_session',
+    date: '2026-08-26',
+    fields: {
+      theme: 'Sunday pattern',
+      working_model: [{ label: 'Sunday spirals', status: 'confirmed' }]
+    }
+  }, { id: 'ms-wm-3', now: '2026-08-26T17:00:00+10:00' });
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(error => /status/i.test(error)));
 });
 
 test('diary schema includes source_agent', () => {

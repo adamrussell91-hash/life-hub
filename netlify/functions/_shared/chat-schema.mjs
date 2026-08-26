@@ -130,7 +130,18 @@ const DOMAIN_PROPERTIES = {
     mood_at_open: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] },
     mood_at_close: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] },
     cross_agent_note: { type: 'string' },
-    source_agent: { type: 'string', enum: ['vera', 'import'] }
+    source_agent: { type: 'string', enum: ['vera', 'import'] },
+    working_model: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          label: { type: 'string' },
+          status: { type: 'string', enum: ['forming', 'holding', 'weakening', 'retired'] },
+          evidence: { type: 'string' }
+        }
+      }
+    }
   },
   medical: {
     title: { type: 'string' },
