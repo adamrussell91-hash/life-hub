@@ -16,6 +16,7 @@ import {
   removeStoredAuditSession,
   saveStoredAuditSession
 } from './hammond-audit-session-storage.js';
+import { CHAT_TURN_TIMEOUT_MS } from '../core/chat-turn-limits.js';
 
 const PARAGRAPH_BREAK = /\n{2,}/;
 const HISTORY_WINDOW_MS = 20 * 60 * 1000;
@@ -24,6 +25,7 @@ const MAX_HISTORY_ENTRY_CHARS = 1000;
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
 const EMPTY_TURN_RECOVERY = 'That reply got cut off before it finished (usually a timeout while looking things up). Send the same message again and I’ll continue.';
+const TURN_TIMEOUT_MESSAGE = 'That turn hit Life Hub\'s one-minute limit. If you were closing or logging a Vera session, check Mind or ask "did it log?" — the save may still have landed.';
 const CANCEL_AUDIT_RE = /cancel audit|stop audit/i;
 const SKIP_INTAKE_RE = /skip intake|continue audit|\bgo on\b/i;
 export const VERA_SESSION_FLUSH_MESSAGE = "That's enough for today — record the session if there is one.";
@@ -354,7 +356,7 @@ export function createChatController({
     addStatusClass(workingBubble);
     const abort = new AbortController();
     activeAbort = abort;
-    const timeoutId = setTimeout(() => abort.abort(), 90_000);
+    const timeoutId = setTimeout(() => abort.abort('turn-timeout'), CHAT_TURN_TIMEOUT_MS);
 
     function clearWorkingBubble() {
       if (!workingBubble) return;
@@ -554,7 +556,7 @@ export function createChatController({
       const abortedForNewChat = abort.signal.reason === 'new-chat';
       if (error?.name === 'AbortError') {
         if (!abortedForNewChat) {
-          showChatError(root, 'That search took too long. Try again in a moment.');
+          showChatError(root, abort.signal.reason === 'turn-timeout' ? TURN_TIMEOUT_MESSAGE : 'That search took too long. Try again in a moment.');
         }
       } else {
         showChatError(root, 'Chat is unavailable right now. Please try again.');
