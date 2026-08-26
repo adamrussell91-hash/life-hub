@@ -27,6 +27,7 @@ export function buildSystemPrompt({
   daysSinceLastSession = null,
   mindDiaryDigest = '',
   mindSessionDigest = '',
+  mindTodaySession = '',
   hammondDiaryDigest = '',
   hammondMindAmbient = '',
   mindSilence = '',
@@ -129,8 +130,11 @@ export function buildSystemPrompt({
     veraIntake
       ? `Psychological baseline (longitudinal portrait, not a diagnosis; use it as standing context, do not quote it back at length):\n${veraIntake}`
       : '',
-    'You MAY propose log_entry for mind_session at a natural close or when Adam asks to record. Diary stays Penelope. Life Hub writes mind_session immediately — a successful tool result means written, not awaiting confirm. Do not claim it was logged if the tool returns an error.',
+    'You MAY propose log_entry for mind_session at a natural close or when Adam asks to record. Diary stays Penelope. Life Hub writes mind_session immediately — when log_entry returns `{ ok: true, status: "written" }`, the session is saved (not awaiting Confirm). Do not claim it was logged on tool error alone.',
+    'Before answering whether today\'s session logged: read Today\'s mind_session, Mind session digest, and Central Node Mind / Recent Actions. If today\'s date appears there, confirm yes and summarise — never deny a save visible in those sources.',
+    'When Adam asks what you logged or what you would log, show theme / insight / observation / closing_question and other session fields in chat. Privacy rules block quoting diary and past session archives — not draft previews or summaries of today\'s session he asked for.',
     'Read Central Node before your opening question. When another agent must act, fill `cross_agent_note` on mind_session — chat-only lines are not memory.',
+    mindTodaySession ? `Today's mind_session:\n${mindTodaySession}` : '',
     mindDiaryDigest ? `Mind diary digest:\n${mindDiaryDigest}` : '',
     mindSessionDigest ? `Mind session digest:\n${mindSessionDigest}` : '',
     mindSilence,

@@ -6,6 +6,7 @@ import {
   getMindDigestWindowStart,
   summarizeDiaryForPrompt,
   summarizeMindSessionsForPrompt,
+  summarizeTodaysMindSession,
   simultaneousSilenceFlag,
   divergenceLine,
   excerptOnThisDay,
@@ -64,6 +65,36 @@ test('summarizeMindSessionsForPrompt includes themes and session_type', () => {
   ], '2026-08-10');
   assert.match(text, /work/);
   assert.match(text, /deep-dive|Filter/);
+});
+
+test('summarizeTodaysMindSession reports not logged when missing', () => {
+  assert.match(
+    summarizeTodaysMindSession([], '2026-08-26'),
+    /2026-08-26.*not logged yet/i
+  );
+});
+
+test('summarizeTodaysMindSession surfaces today session fields and path', () => {
+  const text = summarizeTodaysMindSession([{
+    record: {
+      type: 'mind_session',
+      date: '2026-08-26',
+      id: 'mind_session-2026-08-26-5e2cc1',
+      session_type: 'deep-dive',
+      theme: 'fear of authority',
+      insight: 'Nationals would not matter',
+      observation: 'not enough twice',
+      closing_question: 'what getting in trouble feels like in the body',
+      cross_agent_note: 'Vera→Hammond: open with body question'
+    },
+    path: 'data/mind/2026/08/2026-08-26-session.md'
+  }], '2026-08-26');
+  assert.match(text, /logged/i);
+  assert.match(text, /mind_session-2026-08-26-5e2cc1/);
+  assert.match(text, /deep-dive/);
+  assert.match(text, /fear of authority/);
+  assert.match(text, /2026-08-26-session\.md/);
+  assert.match(text, /Vera→Hammond/);
 });
 
 test('silence flag only when both gaps >= 7', () => {

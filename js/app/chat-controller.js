@@ -469,10 +469,12 @@ export function createChatController({
           clearWorkingBubble();
           endTextTurn();
           if (event.record?.type === 'mind_session') savedMindSessionThisThread = true;
+          const savedSummary = event.summary || 'Session logged.';
           appendRecordSaved(root, {
-            summary: event.summary,
+            summary: savedSummary,
             agentSlug: assistantSlug
           });
+          assistantFullText += (assistantFullText ? '\n\n' : '') + savedSummary;
           onRecordWritten?.(event);
         } else if (event.type === 'cn_patch_proposal') {
           turnSignaled = true;
