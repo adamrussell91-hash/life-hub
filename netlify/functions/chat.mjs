@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mergeMedicalFields } from '../../js/app/medical-normalize.js';
+import { mergeMedicalFields, resolveMedicalLogCandidate, parseMedicalEventTolerant } from '../../js/app/medical-normalize.js';
 import { verifySessionToken, serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
 import {
   errorResponse,
@@ -797,8 +797,15 @@ export function createChatHandler({
                 if (event.input?.type === 'mind_session') {
                   send({ type: 'status', text: 'Saving your session…' });
                 }
-                const validation = validateLogEntry(event.input, {
-                  id: `${event.input?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
+                const medicalInput = event.input?.type === 'medical'
+                  ? await resolveMedicalLogCandidate(client, event.input, {
+                    today,
+                    loadYaml,
+                    decodeBlob
+                  })
+                  : event.input;
+                const validation = validateLogEntry(medicalInput, {
+                  id: `${medicalInput?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
                   now: getSydneyTimestamp(nowInstant)
                 });
                 if (!validation.valid) {
@@ -888,8 +895,15 @@ export function createChatHandler({
             }
           })) {
             if (event.type === 'tool_call' && event.name === 'log_entry') {
-              const validation = validateLogEntry(event.input, {
-                id: `${event.input?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
+              const medicalInput = event.input?.type === 'medical'
+                ? await resolveMedicalLogCandidate(client, event.input, {
+                  today,
+                  loadYaml,
+                  decodeBlob
+                })
+                : event.input;
+              const validation = validateLogEntry(medicalInput, {
+                id: `${medicalInput?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
                 now: getSydneyTimestamp(nowInstant)
               });
               if (validation.valid) {
@@ -938,30 +952,32 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send 
       if (existingEntry?.sha) {
         const text = decodeBlob(await client.readBlob(existingEntry.sha));
         if (text) {
-          const existing = parseEventDocument(text, path, loadYaml);
-          const merged = mergeMedicalFields(existing.record, validation.record, {
-            notes: validation.notes,
-            existingNotes: existing.body
-          });
-          const remerged = validateLogEntry({
-            type: 'medical',
-            date: validation.record.date,
-            time: validation.record.time,
-            notes: merged.notes,
-            fields: merged.fields
-          }, {
-            id: existing.record.id,
-            now: validation.record.updated_at,
-            source: existing.record.source ?? 'chat'
-          });
-          if (remerged.valid) {
-            proposal = {
-              ...remerged,
-              record: {
-                ...remerged.record,
-                created_at: existing.record.created_at ?? remerged.record.created_at
-              }
-            };
+          const existing = parseMedicalEventTolerant(text, path, loadYaml);
+          if (existing) {
+            const merged = mergeMedicalFields(existing.record, validation.record, {
+              notes: validation.notes,
+              existingNotes: existing.body
+            });
+            const remerged = validateLogEntry({
+              type: 'medical',
+              date: validation.record.date,
+              time: validation.record.time,
+              notes: merged.notes,
+              fields: merged.fields
+            }, {
+              id: existing.record.id,
+              now: validation.record.updated_at,
+              source: existing.record.source ?? 'chat'
+            });
+            if (remerged.valid) {
+              proposal = {
+                ...remerged,
+                record: {
+                  ...remerged.record,
+                  created_at: existing.record.created_at ?? remerged.record.created_at
+                }
+              };
+            }
           }
         }
       }
