@@ -36,6 +36,14 @@ test('the tool schema restricts type to the allowed list when supplied', () => {
   const schema = logEntryToolSchema(['meal']);
   assert.equal(schema.name, 'log_entry');
   assert.deepEqual(schema.input_schema.properties.type.enum, ['meal']);
+  assert.match(schema.description, /confirm/i);
+});
+
+test('mind_session-only tool schema describes immediate write', () => {
+  const schema = logEntryToolSchema(['mind_session']);
+  assert.match(schema.description, /immediately/i);
+  assert.match(schema.description, /no Confirm card/i);
+  assert.doesNotMatch(schema.description, /review and confirm before it is saved/);
 });
 
 const FULL_MEAL_FIELDS = {

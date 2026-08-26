@@ -488,6 +488,13 @@ test('vera protocol restore includes diagnostic, ACE, and mind_session logging',
   assert.doesNotMatch(text, /You do not propose `log_entry`/);
 });
 
+test('vera protocol includes session verification and chat preview rules', () => {
+  const text = loadVeraProtocol();
+  assert.match(text, /Checking whether a session logged/);
+  assert.match(text, /Showing log content in chat/);
+  assert.match(text, /Never deny a save/);
+});
+
 test('vera protocol retries a rejected log_entry and tells Adam what changed', () => {
   const text = loadVeraProtocol();
   assert.match(text, /If `log_entry` returns an error/);
@@ -522,12 +529,16 @@ test('vera prompt includes mind diary and session digest and lists mind_session'
     slug: 'vera',
     mindDiaryDigest: 'Diary (metadata only): 2026-08-10 mood low',
     mindSessionDigest: 'thread: What is the weekend actually for?',
+    mindTodaySession: "Today's mind_session (2026-08-26): logged.\ntheme: fear of authority",
     mindSilence: 'Mind silence: both quiet 8d'
   });
   assert.match(prompt, /mind_session/);
   assert.doesNotMatch(prompt, /You do not propose log_entry/);
   assert.match(prompt, /Diary \(metadata only\)/);
   assert.match(prompt, /What is the weekend actually for/);
+  assert.match(prompt, /Today's mind_session/);
+  assert.match(prompt, /fear of authority/);
+  assert.match(prompt, /never deny a save visible in those sources/i);
   assert.match(prompt, /Mind silence/);
 });
 

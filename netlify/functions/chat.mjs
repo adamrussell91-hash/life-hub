@@ -110,6 +110,7 @@ import {
   selectOnThisDayEntries,
   summarizeDiaryForPrompt,
   summarizeMindSessionsForPrompt,
+  summarizeTodaysMindSession,
   simultaneousSilenceFlag,
   divergenceLine,
   excerptOnThisDay,
@@ -286,6 +287,7 @@ export function createChatHandler({
         let hammondDiaryDigest = '';
         let hammondMindAmbient = '';
         let mindSessionDigest = '';
+        let mindTodaySession = '';
         let mindSilence = '';
         let mindDivergence = '';
         let onThisDay = '';
@@ -517,6 +519,7 @@ export function createChatHandler({
             }
             mindDiaryDigest = summarizeDiaryForPrompt(mindEvents, today);
             mindSessionDigest = summarizeMindSessionsForPrompt(mindEvents, today);
+            mindTodaySession = slug === 'vera' ? summarizeTodaysMindSession(mindEvents, today) : '';
             mindDivergence = slug === 'vera' ? divergenceLine(mindEvents, today) : '';
             const lastDiary = mindEvents.filter(e => e.record.type === 'diary').map(e => e.record.date).sort().at(-1);
             const lastSession = mindEvents.filter(e => e.record.type === 'mind_session').map(e => e.record.date).sort().at(-1);
@@ -577,6 +580,7 @@ export function createChatHandler({
           sessionAdherenceDays = null;
           mindDiaryDigest = '';
           mindSessionDigest = '';
+          mindTodaySession = '';
           mindSilence = '';
           mindDivergence = '';
           onThisDay = '';
@@ -624,6 +628,7 @@ export function createChatHandler({
           hammondDiaryDigest,
           hammondMindAmbient,
           mindSessionDigest,
+          mindTodaySession,
           mindSilence,
           mindDivergence,
           onThisDay,

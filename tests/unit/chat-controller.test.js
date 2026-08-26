@@ -1648,6 +1648,38 @@ test('record_saved appends the summary without a Confirm card and notifies onRec
   assert.equal(written[0].summary, summary);
 });
 
+test('record_saved summary is included in chat history for the next turn', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  let clock = Date.parse('2026-08-26T07:00:00Z');
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'vera' };
+      if (sendCalls.length === 1) {
+        yield {
+          type: 'record_saved',
+          summary: 'Logged a mind session (Weekend permission).',
+          record: { type: 'mind_session' }
+        };
+      } else {
+        yield { type: 'text', delta: 'It is saved.' };
+      }
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi, now: () => clock });
+
+  await controller.send('close the session');
+  clock += 60_000;
+  await controller.send('did it log?');
+
+  assert.deepEqual(sendCalls[1].history, [
+    { role: 'user', content: 'close the session' },
+    { role: 'assistant', content: 'Logged a mind session (Weekend permission).' }
+  ]);
+});
+
 test('central_node_patched appends a success chat line without using the error banner', async () => {
   const root = new FakeDocument();
   const chatApi = {

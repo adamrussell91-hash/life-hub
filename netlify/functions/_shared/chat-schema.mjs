@@ -185,7 +185,9 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
 
   return {
     name: 'log_entry',
-    description: 'Propose one Life Hub record for Adam to review and confirm before it is saved. Never call this unless Adam has clearly described a specific record.',
+    description: allowedTypes.length === 1 && allowedTypes[0] === 'mind_session'
+      ? 'Write one mind_session record for Adam. Life Hub saves immediately (no Confirm card). Call at close or when Adam asks to record. Returns { ok: true, status: "written", path } on success.'
+      : 'Propose one Life Hub record for Adam to review and confirm before it is saved. Never call this unless Adam has clearly described a specific record.',
     input_schema: {
       type: 'object',
       properties: {
