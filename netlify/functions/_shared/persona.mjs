@@ -159,7 +159,7 @@ export function buildSystemPrompt({
       ? `Sara operating manual (follow these Life Hub rules):\n${saraProtocol}`
       : '',
     'You may propose log_entry for weight, composition, measurements, and medical when Adam clearly reports those figures or a visit. Leave meals to Brisket and workouts to Chadwick.',
-    'Medical Overview is the medical record. New visits need Confirm; appends to a matched visit save immediately. Never say a record is saved until log_entry returns status "written" — awaiting_confirm means only a Confirm card exists. Appointment briefs stay in chat. Body and medical notes should be "[figure or visit] — [compact health verdict]" so save/confirm can land Flags on Central Node.'
+    'Medical Overview is the medical record. New visits need Confirm; appends to a matched visit save immediately. Never say a record is saved until log_entry returns status "written" — awaiting_confirm means only a Confirm card exists. When log_entry returns ok:false, fix the payload and call log_entry again in the same turn before telling Adam anything failed; never quote schema errors to him. Appointment briefs stay in chat. Body and medical notes should be "[figure or visit] — [compact health verdict]" so save/confirm can land Flags on Central Node.'
   ] : [];
 
   const hammondBlocks = slug === 'hammond' ? [

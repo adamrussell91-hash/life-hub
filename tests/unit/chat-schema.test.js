@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCanonicalPath, logEntryToolSchema, validateLogEntry, buildRecordSlug, DOMAIN_PROPERTIES } from '../../netlify/functions/_shared/chat-schema.mjs';
+import { buildCanonicalPath, logEntryToolSchema, validateLogEntry, buildRecordSlug, DOMAIN_PROPERTIES, logEntryRejectionPayload } from '../../netlify/functions/_shared/chat-schema.mjs';
 
 test('builds the canonical path for each writable record type', () => {
   assert.equal(buildCanonicalPath({ type: 'meal', date: '2026-08-01', slug: 'breakfast' }), 'data/nutrition/2026/08/2026-08-01-breakfast.md');
@@ -358,6 +358,16 @@ test('normalizes a title-only medical log entry from chat', () => {
   assert.equal(result.record.record_type, 'Prescription');
   assert.equal(result.record.lane, 'prescription');
   assert.equal(result.record.location_kind, 'unknown');
+});
+
+test('logEntryRejectionPayload includes a retry hint for medical payloads', () => {
+  const payload = logEntryRejectionPayload(
+    { type: 'medical', date: '2026-08-01', fields: { title: 'Stelara injection' } },
+    ['lane must be one of: prescription']
+  );
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, 'validation_failed');
+  assert.match(payload.retry, /title.*notes only/i);
 });
 
 test('medical schema includes visit fields and episode', () => {
