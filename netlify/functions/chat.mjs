@@ -117,6 +117,12 @@ import {
   hammondDiaryDigestForTurn,
   recentSystemNoteTail
 } from './_shared/mind-digest.mjs';
+import {
+  getMindSession,
+  getMindSessionSchema,
+  searchMindRecords,
+  searchMindRecordsSchema
+} from './_shared/mind-session-read.mjs';
 import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
@@ -225,6 +231,7 @@ export function createChatHandler({
       ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
       ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
       ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : []),
+      ...(slug === 'vera' ? [getMindSessionSchema(), searchMindRecordsSchema()] : []),
       ...(needsSkincareLibrary
         ? [
             listSkincareRoutinesSchema(),
@@ -294,8 +301,11 @@ export function createChatHandler({
         let daysSinceLastEntry = null;
         let daysSinceLastMindSession = null;
         let veraIntake = '';
+        let mindEvents = [];
+        let repoTree = [];
         try {
           const current = await client.resolveTree();
+          repoTree = current.tree ?? [];
           const manifest = selectManifestEntries(current.tree, { from, to: today });
           const dataEntries = manifest.filter(entry => entry.path.startsWith('data/'));
           const centralNodeEntry = current.tree.find(entry => entry.path === 'central-node.md' && entry.type === 'blob');
@@ -512,7 +522,7 @@ export function createChatHandler({
             const mindFiles = mindEntries
               .map((entry, index) => ({ path: entry.path, content: decodeBlob(mindBlobs[index]) }))
               .filter(file => file.content !== null);
-            const mindEvents = [];
+            mindEvents = [];
             for (const file of mindFiles) {
               try { mindEvents.push(parseEventDocument(file.content, file.path, loadYaml)); }
               catch { /* skip */ }
@@ -587,6 +597,8 @@ export function createChatHandler({
           daysSinceLastEntry = null;
           daysSinceLastMindSession = null;
           veraIntake = '';
+          mindEvents = [];
+          repoTree = [];
         }
 
         const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
@@ -645,6 +657,20 @@ export function createChatHandler({
             tools,
             signal: request.signal,
             executeTools: async event => {
+              if (event.name === 'get_mind_session') {
+                const date = typeof event.input?.date === 'string' ? event.input.date.trim() : '';
+                const result = await getMindSession({
+                  date,
+                  events: mindEvents,
+                  tree: repoTree,
+                  readBlob: async sha => decodeBlob(await client.readBlob(sha)),
+                  parseDocument: (content, path) => parseEventDocument(content, path, loadYaml)
+                });
+                return JSON.stringify(result);
+              }
+              if (event.name === 'search_mind_records') {
+                return JSON.stringify(searchMindRecords(mindEvents, event.input ?? {}));
+              }
               if (event.name === 'search_exercise_library') {
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
               }

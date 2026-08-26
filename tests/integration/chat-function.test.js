@@ -2268,3 +2268,104 @@ test('ordinary Hammond turns skip the 5e/6b diary digest but still get a system_
   assert.doesNotMatch(receivedArgs.system, /SECRET PROSE/);
   assert.ok(blobUrls.some(url => url.includes(HAMMOND_DIARY_SHA)), 'CN window still reads the mind blob');
 });
+
+const VERA_SESSION_PATH = 'data/mind/2026/08/2026-08-01-session.md';
+const VERA_SESSION_SHA = 'b'.repeat(40);
+const VERA_SESSION_CONTENT = [
+  '---',
+  'schema_version: 1',
+  'id: mind_session-2026-08-01-5e2cc1',
+  'type: mind_session',
+  'date: 2026-08-01',
+  'time: "17:57"',
+  'created_at: 2026-08-01T17:57:00+10:00',
+  'updated_at: 2026-08-01T17:57:00+10:00',
+  'source: chat',
+  'session_type: deep-dive',
+  'theme: fear of authority beneath the competence ledger',
+  'insight: Nationals outcome would not matter',
+  'observation: not enough showed up twice',
+  'closing_question: what getting in trouble feels like in the body',
+  'cross_agent_note: "Vera→Hammond: open with the body question"',
+  '---',
+  'Compact session body.'
+].join('\n');
+
+test('Vera chat exposes get_mind_session and search_mind_records repo tools', async () => {
+  let receivedArgs;
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: VERA_SESSION_PATH, type: 'blob', sha: VERA_SESSION_SHA, size: VERA_SESSION_CONTENT.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${VERA_SESSION_SHA}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(VERA_SESSION_CONTENT, 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'Vera, did today\'s session log?',
+    priorAgentSlug: 'vera'
+  })));
+
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'get_mind_session'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_mind_records'));
+  assert.match(receivedArgs.system, /Today's mind_session/);
+  assert.match(receivedArgs.system, /get_mind_session/);
+
+  const loaded = JSON.parse(await receivedArgs.executeTools({
+    id: 'call_get',
+    name: 'get_mind_session',
+    input: { date: '2026-08-01' }
+  }));
+  assert.equal(loaded.found, true);
+  assert.equal(loaded.id, 'mind_session-2026-08-01-5e2cc1');
+  assert.match(loaded.theme, /fear of authority/);
+
+  const search = JSON.parse(await receivedArgs.executeTools({
+    id: 'call_search',
+    name: 'search_mind_records',
+    input: { query: 'authority nationals', record_types: ['mind_session'] }
+  }));
+  assert.equal(search.ok, true);
+  assert.ok(search.results.some(hit => hit.date === '2026-08-01'));
+});
+
+test('non-Vera agents do not receive mind repo read tools', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Brisket, log lunch', priorAgentSlug: 'brisket' })));
+
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'get_mind_session'));
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'search_mind_records'));
+});
