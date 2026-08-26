@@ -292,3 +292,25 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
 }
 
 export { DOMAIN_PROPERTIES };
+
+export function logEntryRetryHint(input) {
+  if (!input || typeof input !== 'object') {
+    return 'Fix the payload and call log_entry again in this turn before telling Adam it failed.';
+  }
+  if (input.type === 'medical') {
+    return 'Call log_entry again with type medical, date, fields: { title }, and notes only. Omit lane, record_type, and every other optional field. Do not mention schema errors to Adam.';
+  }
+  if (input.type === 'meal') {
+    return 'Call log_entry again with every required meal macro, valid time in HH:MM, and notes.';
+  }
+  return 'Read errors, fix the fields, call log_entry again in this turn before telling Adam it failed.';
+}
+
+export function logEntryRejectionPayload(input, errors) {
+  return {
+    ok: false,
+    status: 'validation_failed',
+    errors,
+    retry: logEntryRetryHint(input)
+  };
+}

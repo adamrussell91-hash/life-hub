@@ -33,7 +33,7 @@ import {
 } from '../../js/core/constraints.js';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
-import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug } from './_shared/chat-schema.mjs';
+import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug, logEntryRejectionPayload } from './_shared/chat-schema.mjs';
 import { persistLogEntry, describeRecordForLog } from './_shared/persist-log.mjs';
 import {
   FOOD_LIBRARY_PATH,
@@ -656,7 +656,15 @@ export function createChatHandler({
           protocolSteer: protocolSteerBlock(slug, parsed.protocolId)
         });
 
+        let pendingLogRejection = null;
         try {
+          const emit = event => {
+            if (event.type === 'record_proposal' || event.type === 'record_saved') {
+              pendingLogRejection = null;
+            }
+            send(event);
+          };
+
           send({ type: 'status', text: 'Thinking…' });
           for await (const event of anthropic.streamMessage({
             system,
@@ -809,11 +817,11 @@ export function createChatHandler({
                   now: getSydneyTimestamp(nowInstant)
                 });
                 if (!validation.valid) {
-                  send({ type: 'record_rejected', errors: validation.errors });
-                  return JSON.stringify({ ok: false, errors: validation.errors });
+                  pendingLogRejection = { errors: validation.errors };
+                  return JSON.stringify(logEntryRejectionPayload(medicalInput, validation.errors));
                 }
                 const outcome = await persistOrProposeLogEntry({
-                  client, slug, today, validation, send
+                  client, slug, today, validation, send: emit
                 });
                 if (outcome.status === 'written') {
                   return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
@@ -907,9 +915,9 @@ export function createChatHandler({
                 now: getSydneyTimestamp(nowInstant)
               });
               if (validation.valid) {
-                await persistOrProposeLogEntry({ client, slug, today, validation, send });
+                await persistOrProposeLogEntry({ client, slug, today, validation, send: emit });
               } else {
-                send({ type: 'record_rejected', errors: validation.errors });
+                pendingLogRejection = { errors: validation.errors };
               }
             } else if (event.type === 'tool_call' && event.name === 'propose_central_node_patch') {
               const patch = validateCentralNodePatchInput(event.input);
@@ -925,6 +933,9 @@ export function createChatHandler({
         } catch (error) {
           send({ type: 'error', code: error instanceof AnthropicClientError ? error.code : 'anthropic_unavailable' });
         } finally {
+          if (pendingLogRejection) {
+            send({ type: 'record_rejected', errors: pendingLogRejection.errors });
+          }
           controller.close();
         }
       }

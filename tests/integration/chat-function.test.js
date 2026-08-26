@@ -425,9 +425,10 @@ test('emits record_rejected instead of a proposal for a semantically invalid too
 
   const response = await handler(request({ message: 'Brisket, log breakfast' }));
   const events = contentEvents(await readSse(response));
-  assert.equal(events[1].type, 'record_rejected');
-  assert.ok(Array.isArray(events[1].errors) && events[1].errors.length > 0);
-  assert.deepEqual(events[2], { type: 'done' });
+  const rejected = events.find(event => event.type === 'record_rejected');
+  assert.ok(rejected, JSON.stringify(events.map(event => event.type)));
+  assert.ok(Array.isArray(rejected.errors) && rejected.errors.length > 0);
+  assert.ok(events.some(event => event.type === 'done'));
 });
 
 test('log_entry via executeTools returns real validation errors (not fake ok) and emits record_rejected', async () => {
@@ -470,10 +471,60 @@ test('log_entry via executeTools returns real validation errors (not fake ok) an
 
   const events = contentEvents(await readSse(await handler(request({ message: 'Brisket, log the protein bar' }))));
   assert.equal(events[0].type, 'agent');
-  assert.equal(events[1].type, 'record_rejected');
-  assert.ok(events[1].errors.some(e => /time must be HH:MM/i.test(e)));
-  assert.deepEqual(events[2], { type: 'text', delta: 'Time format was wrong — retrying.' });
-  assert.ok(!events.some(e => e.type === 'record_proposal'));
+  const rejected = events.find(event => event.type === 'record_rejected');
+  assert.ok(rejected, JSON.stringify(events.map(event => event.type)));
+  assert.ok(rejected.errors.some(error => /time must be HH:MM/i.test(error)));
+  assert.match(toolResult, /retry/i);
+  assert.deepEqual(events.find(event => event.type === 'text'), { type: 'text', delta: 'Time format was wrong — retrying.' });
+  assert.ok(!events.some(event => event.type === 'record_proposal'));
+});
+
+test('does not emit record_rejected when a later log_entry succeeds in the same turn', async () => {
+  const FULL_MEAL_FIELDS = {
+    meal: 'snack',
+    calories: 202,
+    protein_g: 15,
+    fat_g: 6,
+    sodium_mg: 150,
+    calcium_mg: 90,
+    polyphenol_score: 2,
+    omega3: 'none'
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        await executeTools({
+          id: 'call_bad',
+          name: 'log_entry',
+          input: {
+            type: 'meal',
+            date: '2026-08-01',
+            time: '1:35pm',
+            fields: FULL_MEAL_FIELDS,
+            notes: 'Bad time format'
+          }
+        });
+        await executeTools({
+          id: 'call_good',
+          name: 'log_entry',
+          input: {
+            type: 'meal',
+            date: '2026-08-01',
+            time: '13:35',
+            fields: FULL_MEAL_FIELDS,
+            notes: 'Muscle Nation bar — emulsifier flag'
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+  const events = contentEvents(await readSse(await handler(request({ message: 'Brisket, log the bar' }))));
+  assert.ok(events.some(event => event.type === 'record_proposal'));
+  assert.equal(events.find(event => event.type === 'record_rejected'), undefined);
 });
 
 test('log_entry via executeTools emits record_proposal and returns awaiting_confirm', async () => {
