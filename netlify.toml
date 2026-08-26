@@ -22,3 +22,6 @@ included_files = [
   "config/physique-target.yml",
   "central-node.md"
 ]
+
+# Streaming chat uses Netlify's synchronous 60s execution cap (platform default, not configurable).
+# Client timeout is js/core/chat-turn-limits.js — keep them aligned.

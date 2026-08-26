@@ -248,7 +248,13 @@ export function createChatHandler({
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
-        const send = event => controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        const send = event => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+          } catch {
+            /* Client disconnected or the stream already closed. */
+          }
+        };
         send({ type: 'agent', slug });
         if (hammondAuditContract && parsed.auditSession) {
           send({
@@ -658,6 +664,7 @@ export function createChatHandler({
             signal: request.signal,
             executeTools: async event => {
               if (event.name === 'get_mind_session') {
+                send({ type: 'status', text: 'Checking Life Hub records…' });
                 const date = typeof event.input?.date === 'string' ? event.input.date.trim() : '';
                 const result = await getMindSession({
                   date,
@@ -669,6 +676,7 @@ export function createChatHandler({
                 return JSON.stringify(result);
               }
               if (event.name === 'search_mind_records') {
+                send({ type: 'status', text: 'Searching mind records…' });
                 return JSON.stringify(searchMindRecords(mindEvents, event.input ?? {}));
               }
               if (event.name === 'search_exercise_library') {
@@ -785,6 +793,9 @@ export function createChatHandler({
                 }
               }
               if (event.name === 'log_entry') {
+                if (event.input?.type === 'mind_session') {
+                  send({ type: 'status', text: 'Saving your session…' });
+                }
                 const validation = validateLogEntry(event.input, {
                   id: `${event.input?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
                   now: getSydneyTimestamp(nowInstant)
