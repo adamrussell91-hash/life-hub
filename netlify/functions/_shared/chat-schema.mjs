@@ -2,6 +2,7 @@ import { TYPE_DOMAINS } from '../../../js/core/records.js';
 import { validateRecord } from '../../../js/core/validate.js';
 import { isCalendarDate } from '../../../js/core/time.js';
 import { buildMedicalSlug } from '../../../js/app/medical-model.js';
+import { normalizeMedicalFields } from '../../../js/app/medical-normalize.js';
 
 const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare', 'mind_session', 'medical'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -133,9 +134,10 @@ const DOMAIN_PROPERTIES = {
     source_agent: { type: 'string', enum: ['vera', 'import'] }
   },
   medical: {
-    title: { type: 'string' },
+    title: { type: 'string', description: 'Short visit label, e.g. "Stelara injection". Required.' },
     record_type: {
       type: 'string',
+      description: 'Optional — Life Hub infers this from the title/notes when omitted. One of Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination.',
       enum: [
         'Appointment', 'Consultation', 'Lab Work', 'Test Result', 'Imaging',
         'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination'
@@ -143,20 +145,26 @@ const DOMAIN_PROPERTIES = {
     },
     lane: {
       type: 'string',
+      description: 'Optional — inferred from record_type when omitted.',
       enum: [
         'hospital', 'lab', 'imaging', 'prescription', 'referral', 'vaccine',
         'dental', 'therapy', 'eye', 'appointment'
       ]
     },
-    date_end: { type: 'string' },
-    provider: { type: 'string' },
-    location: { type: 'string' },
-    location_kind: { type: 'string', enum: ['place', 'telehealth', 'unknown'] },
-    follow_up_date: { type: 'string' },
-    cost_aud: { type: 'number' },
-    insurance_status: { type: 'string' },
+    date_end: { type: 'string', description: 'Optional end date YYYY-MM-DD. Omit when unknown.' },
+    provider: { type: 'string', description: 'Optional clinician or clinic name.' },
+    location: { type: 'string', description: 'Optional place name.' },
+    location_kind: {
+      type: 'string',
+      enum: ['place', 'telehealth', 'unknown'],
+      description: 'Optional — defaults to place/telehealth/unknown from location text.'
+    },
+    follow_up_date: { type: 'string', description: 'Optional follow-up date YYYY-MM-DD. Omit when unknown.' },
+    cost_aud: { type: 'number', description: 'Optional out-of-pocket cost in AUD. Omit when unknown.' },
+    insurance_status: { type: 'string', description: 'Optional insurance note. Omit when unknown.' },
     episode: {
       type: 'object',
+      description: 'Optional episode grouping. Omit entirely unless grouping related visits.',
       properties: {
         id: { type: 'string' },
         title: { type: 'string' }
@@ -264,8 +272,12 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
     }
   }
 
+  const normalizedFields = type === 'medical'
+    ? normalizeMedicalFields(fields, { notes })
+    : fields;
+
   const record = {
-    ...fields,
+    ...normalizedFields,
     schema_version: 1,
     id,
     type,

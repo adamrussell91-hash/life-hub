@@ -347,6 +347,19 @@ test('validates a well-formed medical log entry', () => {
   assert.equal(result.notes, 'Check-in — stable vs last.');
 });
 
+test('normalizes a title-only medical log entry from chat', () => {
+  const result = validateLogEntry({
+    type: 'medical',
+    date: '2026-08-26',
+    notes: 'Just had my stelara injection at the doctors',
+    fields: { title: 'Stelara injection' }
+  }, { id: 'med-2', now: '2026-08-26T21:33:00+10:00' });
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.record_type, 'Prescription');
+  assert.equal(result.record.lane, 'prescription');
+  assert.equal(result.record.location_kind, 'unknown');
+});
+
 test('medical schema includes visit fields and episode', () => {
   const keys = Object.keys(DOMAIN_PROPERTIES.medical);
   for (const key of [
