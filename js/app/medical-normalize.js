@@ -146,7 +146,7 @@ export function mergeMedicalFields(existing, incoming, { notes, existingNotes } 
   const mergedRaw = {
     ...base,
     ...next,
-    title: next.title || base.title,
+    title: scoreMedicalTitleMatch(next.title, base.title) >= 55 ? base.title : (next.title || base.title),
     provider: next.provider ?? base.provider,
     location: next.location ?? base.location,
     record_type: next.record_type ?? base.record_type,

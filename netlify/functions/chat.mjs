@@ -945,11 +945,14 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send 
     slug: buildRecordSlug(validation.record)
   });
 
+  let existingSha = null;
+
   if (validation.record.type === 'medical') {
     try {
       const current = await client.resolveTree();
       const existingEntry = current.tree.find(entry => entry.path === path && entry.type === 'blob');
       if (existingEntry?.sha) {
+        existingSha = existingEntry.sha;
         const text = decodeBlob(await client.readBlob(existingEntry.sha));
         if (text) {
           const existing = parseMedicalEventTolerant(text, path, loadYaml);
@@ -986,16 +989,17 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send 
     }
   }
 
-  const autoWrite = slug === 'vera' && proposal.record.type === 'mind_session';
-  if (autoWrite) {
+  const autoWriteMindSession = slug === 'vera' && proposal.record.type === 'mind_session';
+  const autoWriteMedicalAppend = slug === 'sara' && proposal.record.type === 'medical' && existingSha != null;
+  if (autoWriteMindSession || autoWriteMedicalAppend) {
     try {
       const current = await client.resolveTree();
-      const existingSha = current.tree.find(e => e.path === path && e.type === 'blob')?.sha;
+      const sha = existingSha ?? current.tree.find(e => e.path === path && e.type === 'blob')?.sha;
       const persisted = await persistLogEntry(client, {
         record: proposal.record,
         notes: proposal.notes,
         path,
-        existingSha,
+        existingSha: sha,
         nowDateKey: today
       });
       send({
@@ -1003,7 +1007,9 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send 
         record: proposal.record,
         notes: proposal.notes,
         path,
-        summary: describeRecordForLog(proposal.record, proposal.notes),
+        summary: describeRecordForLog(proposal.record, proposal.notes, {
+          medicalAppend: autoWriteMedicalAppend
+        }),
         centralNodeUpdated: persisted.centralNodeUpdated
       });
       return { ok: true, status: 'written', path };

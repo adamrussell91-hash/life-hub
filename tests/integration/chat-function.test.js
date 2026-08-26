@@ -574,6 +574,90 @@ test('Vera mind_session log_entry writes immediately and emits record_saved', as
   assert.equal(events.find(e => e.type === 'record_proposal'), undefined);
 });
 
+test('Sara medical append to an existing visit writes immediately and emits record_saved', async () => {
+  const medicalPath = 'data/body/2026/08/2026-08-01-medical-stelara-maintenance-injection-0930.md';
+  const medicalYaml = `---
+schema_version: 1
+id: "stored-stelara"
+type: "medical"
+date: "2026-08-01"
+time: "09:30"
+created_at: "2026-08-01T09:30:00+10:00"
+updated_at: "2026-08-01T09:30:00+10:00"
+source: "chat"
+title: "Stelara maintenance injection"
+record_type: "Prescription"
+lane: "prescription"
+location_kind: "place"
+provider: "Dr Chris Keily"
+---
+Maintenance dose logged.
+`;
+  const medicalSha = '1'.repeat(40);
+  const puts = [];
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: medicalPath, type: 'blob', sha: medicalSha, size: medicalYaml.length },
+          { path: 'central-node.md', type: 'blob', sha: '5'.repeat(40), size: 20 }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${medicalSha}`)) {
+      return Response.json({
+        content: Buffer.from(medicalYaml).toString('base64'),
+        encoding: 'base64'
+      });
+    }
+    if (url.includes('/git/blobs/')) {
+      return Response.json({ content: Buffer.from('# Purpose\n').toString('base64'), encoding: 'base64' });
+    }
+    if (options?.method === 'PUT') {
+      puts.push(url);
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  let toolResult;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        toolResult = await executeTools({
+          id: 'call_1',
+          name: 'log_entry',
+            input: {
+            type: 'medical',
+            date: '2026-08-01',
+            notes: '[Stelara injection] — mild site pain; same-morning cramping likely diet/anxiety, not Stelara.',
+            fields: { title: 'Stelara injection' }
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Sara, add that note to the Stelara record',
+    priorAgentSlug: 'sara'
+  }))));
+  const parsed = JSON.parse(toolResult);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.status, 'written');
+  const saved = events.find(e => e.type === 'record_saved');
+  assert.ok(saved, JSON.stringify(events.map(e => e.type)));
+  assert.equal(saved.record.type, 'medical');
+  assert.match(saved.summary, /Updated medical visit/i);
+  assert.ok(puts.some(url => url.includes(medicalPath)));
+  assert.equal(events.find(e => e.type === 'record_proposal'), undefined);
+});
+
 test('Penelope diary log_entry still awaits confirm', async () => {
   let toolResult;
   const handler = createChatHandler({
