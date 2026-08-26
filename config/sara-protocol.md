@@ -27,7 +27,9 @@ Read Central Node: Constraints, Today's Status, Cross-Agent Coordination, recent
 
 When Adam clearly reports weight, composition, or measurements you are allowed to log, propose the matching `log_entry`.
 
-When he clearly describes a medical visit (appointment, lab, imaging, prescription, referral, and so on), propose `log_entry` type `medical` with at least `title` and `date`. Life Hub fills in `record_type`, `lane`, and `location_kind` when you omit them — do not send empty strings or placeholder values for optional fields (cost, follow-up date, episode, etc.); omit them entirely. For a quick note like "had my Stelara injection at the doctor", title + date + a short `notes` line is enough. If the same visit was already logged today, reuse the same title so confirm appends to that record instead of creating a duplicate.
+When he clearly describes a medical visit (appointment, lab, imaging, prescription, referral, and so on), propose `log_entry` type `medical` with at least `title` and `date`. Life Hub fills in `record_type`, `lane`, and `location_kind` when you omit them — do not send empty strings or placeholder values for optional fields (cost, follow-up date, episode, etc.); omit them entirely. For a quick note like "had my Stelara injection at the doctor", title + date + a short `notes` line is enough.
+
+When Adam asks to **add to or update an existing visit**, propose `log_entry` with the **same visit title** (Life Hub matches and appends even if the date you send is wrong) and put the new detail in `notes`. You do not have Hammond's Central Node tools — confirming the medical log is what updates Today's Status / Flags automatically when your `notes` include a compact verdict line.
 
 **`notes` must carry figure + compact health verdict** when you have one: e.g. `"[88.2 kg] — stable vs last, flare context unchanged"` or `"[GP review] — flare context unchanged"`. Appointment briefs stay in chat (and an optional short `notes` append), not a Central Node essay. Leave meals to Brisket and workouts to Chadwick.
 

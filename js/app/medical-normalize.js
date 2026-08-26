@@ -143,22 +143,21 @@ export function mergeMedicalFields(existing, incoming, { notes, existingNotes } 
   const base = normalizeMedicalFields(existing ?? {}, { notes: existingNotes ?? existing?.notes ?? notes });
   const next = normalizeMedicalFields(incoming ?? {}, { notes });
   const mergedNotes = mergeNotes(existingNotes ?? existing?.notes, notes);
+  const mergedRaw = {
+    ...base,
+    ...next,
+    title: next.title || base.title,
+    provider: next.provider ?? base.provider,
+    location: next.location ?? base.location,
+    record_type: next.record_type ?? base.record_type,
+    date_end: next.date_end ?? base.date_end,
+    follow_up_date: next.follow_up_date ?? base.follow_up_date,
+    cost_aud: next.cost_aud ?? base.cost_aud,
+    insurance_status: next.insurance_status ?? base.insurance_status,
+    episode: next.episode ?? base.episode
+  };
   return {
-    fields: {
-      ...base,
-      ...next,
-      title: next.title || base.title,
-      provider: next.provider ?? base.provider ?? undefined,
-      location: next.location ?? base.location ?? undefined,
-      location_kind: next.location_kind ?? base.location_kind,
-      record_type: next.record_type ?? base.record_type,
-      lane: next.lane ?? base.lane,
-      date_end: next.date_end ?? base.date_end ?? undefined,
-      follow_up_date: next.follow_up_date ?? base.follow_up_date ?? undefined,
-      cost_aud: next.cost_aud ?? base.cost_aud ?? undefined,
-      insurance_status: next.insurance_status ?? base.insurance_status ?? undefined,
-      episode: next.episode ?? base.episode ?? undefined
-    },
+    fields: normalizeMedicalFields(mergedRaw, { notes: mergedNotes }),
     notes: mergedNotes
   };
 }
@@ -170,4 +169,95 @@ function mergeNotes(existingNotes, incomingNotes) {
   if (!right) return left;
   if (left.includes(right) || right.includes(left)) return left.length >= right.length ? left : right;
   return `${left}\n\n${right}`;
+}
+
+const MEDICAL_PATH = /^data\/body\/\d{4}\/\d{2}\/\d{4}-\d{2}-\d{2}-medical-[a-z0-9-]+\.md$/;
+
+function normaliseTitle(value) {
+  return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/['’]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+const TITLE_KEYWORDS = new Set([
+  'stelara', 'ustekinumab', 'infusion', 'injection', 'maintenance', 'biologic'
+]);
+
+export function scoreMedicalTitleMatch(candidateTitle, recordTitle) {
+  const left = normaliseTitle(candidateTitle);
+  const right = normaliseTitle(recordTitle);
+  if (!left || !right) return 0;
+  if (left === right) return 100;
+  if (left.includes(right) || right.includes(left)) return 80;
+  const leftTokens = left.split(/\s+/).filter(Boolean);
+  const rightTokens = right.split(/\s+/).filter(Boolean);
+  const shared = leftTokens.filter(token =>
+    token.length > 3 && rightTokens.includes(token)
+  );
+  if (shared.length >= 2) return 70;
+  if (shared.length === 1 && TITLE_KEYWORDS.has(shared[0])) return 55;
+  return 0;
+}
+
+export function parseMedicalEventTolerant(text, path, loadYaml) {
+  if (typeof text !== 'string' || typeof loadYaml !== 'function') return null;
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n)?([\s\S]*)$/.exec(text.trim());
+  if (!match) return null;
+  const record = loadYaml(match[1]);
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  if (record.type !== 'medical') return null;
+  return { record, body: match[2].trim(), path };
+}
+
+/**
+ * When Sara appends to an existing visit, match by title (not just exact slug)
+ * and merge onto the stored record's date/time before validation.
+ */
+export async function resolveMedicalLogCandidate(client, input, {
+  today,
+  loadYaml,
+  decodeBlob
+} = {}) {
+  if (!input || input.type !== 'medical' || !client) return input;
+  const fields = input.fields ?? {};
+  const titleHint = cleanString(fields.title) ?? cleanString(input.notes) ?? '';
+  if (!titleHint) return input;
+
+  const current = await client.resolveTree();
+  const entries = current.tree.filter(entry =>
+    entry.type === 'blob' && MEDICAL_PATH.test(entry.path)
+  );
+
+  let best = null;
+  let bestScore = 0;
+  for (const entry of entries) {
+    const text = decodeBlob(await client.readBlob(entry.sha));
+    if (!text) continue;
+    const parsed = parseMedicalEventTolerant(text, entry.path, loadYaml);
+    if (!parsed) continue;
+    let score = scoreMedicalTitleMatch(titleHint, parsed.record.title);
+    if (input.date && parsed.record.date === input.date) score += 20;
+    if (score > bestScore) {
+      best = parsed;
+      bestScore = score;
+    }
+  }
+
+  if (!best || bestScore < 55) return input;
+
+  const merged = mergeMedicalFields(best.record, fields, {
+    notes: input.notes,
+    existingNotes: best.body
+  });
+
+  return {
+    type: 'medical',
+    date: best.record.date,
+    time: best.record.time ?? input.time,
+    notes: merged.notes,
+    fields: merged.fields
+  };
 }
