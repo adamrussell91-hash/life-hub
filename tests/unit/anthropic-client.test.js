@@ -56,6 +56,54 @@ test('requires a non-empty API key', () => {
   assert.throws(() => createAnthropicClient({ apiKey: '' }), TypeError);
 });
 
+test('sends the system prompt array through to the API body unchanged', async () => {
+  let requestBody;
+  const system = [
+    { type: 'text', text: 'You are Brisket Lasso.', cache_control: { type: 'ephemeral', ttl: '1h' } },
+    { type: 'text', text: 'Recent context:\nStreak 2' }
+  ];
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async (url, init) => {
+      requestBody = JSON.parse(init.body);
+      return sseResponse([frame('message_stop', {})]);
+    }
+  });
+
+  for await (const event of client.streamMessage({ system, messages: [], tools: [] })) void event;
+
+  assert.deepEqual(requestBody.system, system);
+  assert.deepEqual(requestBody.thinking, { type: 'disabled' });
+  assert.equal(requestBody.max_tokens, 8192);
+});
+
+test('yields usage events from message_start and message_delta payloads', async () => {
+  const frames = [
+    frame('message_start', { message: { usage: { input_tokens: 1200, output_tokens: 0, cache_creation_input_tokens: 800, cache_read_input_tokens: 400 } } }),
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Hi.' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 12 } }),
+    frame('message_stop', {})
+  ];
+  const client = createAnthropicClient({ apiKey: 'k', fetchImpl: async () => sseResponse(frames) });
+
+  const events = [];
+  for await (const event of client.streamMessage({ system: [{ type: 'text', text: 's', cache_control: { type: 'ephemeral', ttl: '1h' } }], messages: [], tools: [] })) {
+    events.push(event);
+  }
+
+  assert.deepEqual(events.filter(e => e.type === 'usage'), [
+    {
+      type: 'usage',
+      phase: 'start',
+      usage: { input_tokens: 1200, output_tokens: 0, cache_creation_input_tokens: 800, cache_read_input_tokens: 400 }
+    },
+    { type: 'usage', phase: 'delta', usage: { output_tokens: 12 } }
+  ]);
+  assert.deepEqual(events.filter(e => e.type === 'text'), [{ type: 'text', delta: 'Hi.' }]);
+});
+
 test('sends the system prompt as a cacheable block so repeat calls in one conversation stay cheap', async () => {
   let requestBody;
   const client = createAnthropicClient({
