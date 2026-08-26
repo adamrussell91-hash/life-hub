@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sendDiaryToDayOne } from '../../netlify/functions/_shared/dayone-send.mjs';
 import { loadPenelopeProtocol } from '../../netlify/functions/_shared/load-penelope-protocol.mjs';
-import { buildSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
+import { buildSystemPrompt, joinSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
 
 test('Penelope protocol forbids survey-style energy/mood questions and requires inference', () => {
   const text = loadPenelopeProtocol();
@@ -14,10 +14,10 @@ test('Penelope protocol forbids survey-style energy/mood questions and requires 
 });
 
 test('Penelope prompt bans rating questions and keeps Day One on confirm', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = joinSystemPrompt(buildSystemPrompt({
     slug: 'penelope',
     penelopeProtocol: loadPenelopeProtocol()
-  });
+  }));
   assert.match(prompt, /Never ask him to rate energy/i);
   assert.match(prompt, /dayone_sent:false/i);
   assert.match(prompt, /emails Day One after he confirms/i);

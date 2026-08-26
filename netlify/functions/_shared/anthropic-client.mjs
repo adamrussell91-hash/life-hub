@@ -139,7 +139,7 @@ async function* streamOnce({ apiKey, fetchImpl, system, messages, tools, signal,
         // routinely burn 40s+ before the first visible token on CN audits — past
         // Netlify's function budget, which surfaces as a stalled/empty chat turn.
         thinking: { type: 'disabled' },
-        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral', ttl: '1h' } }],
+        system: Array.isArray(system) ? system : [{ type: 'text', text: system, cache_control: { type: 'ephemeral', ttl: '1h' } }],
         messages,
         tools,
         stream: true
@@ -207,6 +207,11 @@ function sanitizeAssistantBlocks(blocks) {
 }
 
 function* interpretEvent(event, toolBuffers, roundState) {
+  if (event.name === 'message_start') {
+    const usage = event.payload.message?.usage;
+    if (usage) yield { type: 'usage', phase: 'start', usage };
+    return;
+  }
   if (event.name === 'content_block_start') {
     const block = event.payload.content_block;
     const blockType = block?.type;
@@ -293,6 +298,8 @@ function* interpretEvent(event, toolBuffers, roundState) {
   if (event.name === 'message_delta') {
     const reason = event.payload.delta?.stop_reason;
     if (reason != null && roundState) roundState.stopReason = reason;
+    const usage = event.payload.usage ?? event.payload.delta?.usage;
+    if (usage) yield { type: 'usage', phase: 'delta', usage };
     return;
   }
   if (event.name === 'message_stop') yield { type: 'done' };

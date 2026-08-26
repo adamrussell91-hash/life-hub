@@ -1,14 +1,73 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
+import { buildSystemPrompt, joinSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
 import { loadChadwickProtocol } from '../../netlify/functions/_shared/load-chadwick-protocol.mjs';
 import { loadBrisketProtocol } from '../../netlify/functions/_shared/load-brisket-protocol.mjs';
 import { loadVeraProtocol } from '../../netlify/functions/_shared/load-vera-protocol.mjs';
 import { loadPenelopeProtocol } from '../../netlify/functions/_shared/load-penelope-protocol.mjs';
 import { loadHammondProtocol } from '../../netlify/functions/_shared/load-hammond-protocol.mjs';
 
+function promptText(args) {
+  return joinSystemPrompt(buildSystemPrompt(args));
+}
+
+const VERA_SPLIT_FIXTURE = {
+  slug: 'vera',
+  digest: 'Recent: workout logged',
+  constraints: 'Fat < 50g daily',
+  centralNodeLog: '**Mind:** Weekend permission session',
+  veraProtocol: '## Vera rules\nReflect only.',
+  veraIntake: 'Baseline portrait text.',
+  mindDiaryDigest: 'Diary (metadata only): 2026-08-10 mood low',
+  mindSessionDigest: 'Vera sessions: 2026-08-12 theme Weekend',
+  mindTodaySession: "Today's mind_session (2026-08-26): logged.\ntheme: fear",
+  workingModelDigest: 'Working model of Adam:\n- Sunday spirals — holding',
+  mindSilence: 'Mind silence: both quiet 8d',
+  mindDivergence: 'Hypothesis only: moods did not overlap',
+  daysSinceLastMindSession: 3,
+  protocolSteer: 'Run in character.'
+};
+
+test('buildSystemPrompt returns stable and volatile blocks for Vera', () => {
+  const { stable, volatile } = buildSystemPrompt(VERA_SPLIT_FIXTURE);
+  assert.match(stable, /Vera operating manual/);
+  assert.match(stable, /Baseline portrait text/);
+  assert.match(stable, /Reflect only/);
+  assert.doesNotMatch(stable, /theme: fear/);
+  assert.match(volatile, /Today's mind_session \(2026-08-26\): logged/);
+  assert.match(volatile, /Weekend permission session/);
+  assert.match(volatile, /Sunday spirals — holding/);
+});
+
+test('joinSystemPrompt preserves every Vera prompt section after stable/volatile split', () => {
+  const golden = promptText(VERA_SPLIT_FIXTURE);
+  const { stable, volatile } = buildSystemPrompt(VERA_SPLIT_FIXTURE);
+  const joined = joinSystemPrompt({ stable, volatile });
+  assert.deepEqual(joined.split('\n\n').sort(), golden.split('\n\n').sort());
+});
+
+test('Hammond stable block holds protocol and audit contract; volatile holds CN and digests', () => {
+  const { stable, volatile } = buildSystemPrompt({
+    slug: 'hammond',
+    hammondProtocol: '## Hammond rules\nTriage first.',
+    hammondAuditContract: 'THIS TURN ONLY: triage',
+    centralNodeFull: '## This Week\n- Lift Mon',
+    hammondDigest: 'Logging last 90 days — nutrition: 41/90',
+    hammondCnSummary: 'Central Node computed snapshot\nProtein rising.',
+    governanceLogTail: "## Coach's Notes\nHold the line.",
+    mindSilence: 'Mind silence: both quiet 8d',
+    hammondMindAmbient: 'Recent day-to-day signal:\n2026-08-12: quiet'
+  });
+  assert.match(stable, /Hammond operating manual/);
+  assert.match(stable, /THIS TURN ONLY: triage/);
+  assert.doesNotMatch(stable, /This Week/);
+  assert.match(volatile, /This Week/);
+  assert.match(volatile, /41\/90/);
+  assert.match(volatile, /Hold the line/);
+});
+
 test('builds a named agent prompt naming its writable record types', () => {
-  const prompt = buildSystemPrompt({ slug: 'chadwick', digest: 'Streak: 2', constraints: 'Fat < 50g' });
+  const prompt = promptText({ slug: 'chadwick', digest: 'Streak: 2', constraints: 'Fat < 50g' });
   assert.match(prompt, /You are Chadwick Flexington/);
   assert.match(prompt, /workout/);
   assert.match(prompt, /Streak: 2/);
@@ -16,7 +75,7 @@ test('builds a named agent prompt naming its writable record types', () => {
 });
 
 test('penelope prompt includes protocol when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'penelope',
     digest: '',
     constraints: '',
@@ -29,7 +88,7 @@ test('penelope prompt includes protocol when provided', () => {
 });
 
 test('vera prompt includes protocol when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'vera',
     digest: '',
     constraints: '',
@@ -40,7 +99,7 @@ test('vera prompt includes protocol when provided', () => {
 });
 
 test('vera prompt includes psychological baseline when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'vera',
     veraIntake: 'The work is helping him move when he already knows.'
   });
@@ -49,7 +108,7 @@ test('vera prompt includes psychological baseline when provided', () => {
 });
 
 test('non-vera prompts never include psychological baseline', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'penelope',
     veraIntake: 'Baseline leak'
   });
@@ -58,7 +117,7 @@ test('non-vera prompts never include psychological baseline', () => {
 });
 
 test('the router lists every agent, infers the right one, and never narrates the handoff', () => {
-  const prompt = buildSystemPrompt({ slug: 'router', digest: '', constraints: '' });
+  const prompt = promptText({ slug: 'router', digest: '', constraints: '' });
   assert.match(prompt, /Brisket Lasso/);
   assert.match(prompt, /infer/i);
   assert.match(prompt, /[Nn]ever narrate or announce this inference/);
@@ -69,7 +128,7 @@ test('rejects an unknown slug', () => {
 });
 
 test('an empty food library falls back to a plain web_search instruction', () => {
-  const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
+  const prompt = promptText({ slug: 'brisket', digest: '', constraints: '' });
   assert.match(prompt, /use web_search to look up its actual Australian nutrition figures/);
   assert.match(prompt, /Never use US Nutrition Facts/);
   assert.match(prompt, /do not silently cite the US bottle/);
@@ -77,7 +136,7 @@ test('an empty food library falls back to a plain web_search instruction', () =>
 });
 
 test('a populated food library is included with instructions to check it before searching', () => {
-  const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '', foodLibrary: '- Domino\'s Meatlovers Pizza (1 slice) — calories=250' });
+  const prompt = promptText({ slug: 'brisket', digest: '', constraints: '', foodLibrary: '- Domino\'s Meatlovers Pizza (1 slice) — calories=250' });
   assert.match(prompt, /check the Food Library below first/);
   assert.match(prompt, /save_food_library_entry/);
   assert.match(prompt, /Domino's Meatlovers Pizza/);
@@ -86,13 +145,13 @@ test('a populated food library is included with instructions to check it before 
 });
 
 test('an empty central node log is omitted entirely', () => {
-  const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
+  const prompt = promptText({ slug: 'brisket', digest: '', constraints: '' });
   assert.doesNotMatch(prompt, /your memory across conversations/);
   assert.doesNotMatch(prompt, /Central Node \(today's status/);
 });
 
 test('a populated central node log is included with instructions to treat it as memory', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket', digest: '', constraints: '',
     centralNodeLog: '**3 Aug:** Brisket Lasso: Logged Domino\'s Meatlovers pizza for lunch (280 kcal).'
   });
@@ -101,7 +160,7 @@ test('a populated central node log is included with instructions to treat it as 
 });
 
 test('chadwick prompt includes protocol when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'chadwick',
     chadwickProtocol: '## Logging protocol\nComplete-only writes.'
   });
@@ -110,12 +169,12 @@ test('chadwick prompt includes protocol when provided', () => {
 });
 
 test('chadwick prompt omits the protocol block when none is provided', () => {
-  const prompt = buildSystemPrompt({ slug: 'chadwick' });
+  const prompt = promptText({ slug: 'chadwick' });
   assert.doesNotMatch(prompt, /operating manual/i);
 });
 
 test('chadwick prompt includes saved templates when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'chadwick',
     workoutTemplates: '- Chest and Curls (strength, last actuals from 2026-07-30)'
   });
@@ -124,20 +183,20 @@ test('chadwick prompt includes saved templates when provided', () => {
 });
 
 test('chadwick prompt always carries design-only and schema-gap instructions', () => {
-  const prompt = buildSystemPrompt({ slug: 'chadwick' });
+  const prompt = promptText({ slug: 'chadwick' });
   assert.match(prompt, /status planned/i);
   assert.match(prompt, /cable_type on every strength set/);
   assert.match(prompt, /Never invent YAML fields/);
 });
 
 test('other agents never receive the chadwick-only protocol instructions', () => {
-  const prompt = buildSystemPrompt({ slug: 'brisket' });
+  const prompt = promptText({ slug: 'brisket' });
   assert.doesNotMatch(prompt, /status planned/i);
   assert.doesNotMatch(prompt, /operating manual/i);
 });
 
 test('chadwick prompt includes exercise library highlights when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'chadwick',
     exerciseLibrary: '- Bar Press — Chest · Crossbar · 42 kg · in rotation'
   });
@@ -148,7 +207,7 @@ test('chadwick prompt includes exercise library highlights when provided', () =>
 });
 
 test('chadwick prompt includes the body state block when provided, and instructs him to use it honestly', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'chadwick',
     bodyState: 'Shoulder:waist ratio: 1.43 (improving) — target 1.60, gap 0.17.'
   });
@@ -158,7 +217,7 @@ test('chadwick prompt includes the body state block when provided, and instructs
 });
 
 test('chadwick prompt tells him to name the binding constraint and defer to Brisket rather than sell more sets', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'chadwick',
     bodyState: 'Shoulder:waist ratio: 1.43 (improving) — target 1.60, gap 0.17.'
   });
@@ -167,12 +226,12 @@ test('chadwick prompt tells him to name the binding constraint and defer to Bris
 });
 
 test('chadwick prompt omits the body state block when empty', () => {
-  const prompt = buildSystemPrompt({ slug: 'chadwick', bodyState: '' });
+  const prompt = promptText({ slug: 'chadwick', bodyState: '' });
   assert.doesNotMatch(prompt, /Body state/i);
 });
 
 test('non-chadwick, non-brisket agents never receive the body-state block', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'sara',
     bodyState: 'Shoulder:waist ratio: 1.43 (improving).'
   });
@@ -181,7 +240,7 @@ test('non-chadwick, non-brisket agents never receive the body-state block', () =
 });
 
 test('brisket prompt includes the body state block when provided, framed as his lane to address', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     bodyState: 'Shoulder:waist ratio: 1.43 (improving) — target 1.60, gap 0.17.'
   });
@@ -190,12 +249,12 @@ test('brisket prompt includes the body state block when provided, framed as his 
 });
 
 test('brisket prompt omits the body state block when empty', () => {
-  const prompt = buildSystemPrompt({ slug: 'brisket', bodyState: '' });
+  const prompt = promptText({ slug: 'brisket', bodyState: '' });
   assert.doesNotMatch(prompt, /Shoulder:waist ratio/i);
 });
 
 test('chadwick prompt reports days since last session and instructs him to lower the bar at 2+ missed days', () => {
-  const prompt = buildSystemPrompt({ slug: 'chadwick', daysSinceLastSession: 3 });
+  const prompt = promptText({ slug: 'chadwick', daysSinceLastSession: 3 });
   assert.match(prompt, /3 days since/i);
   assert.match(prompt, /lower the bar/i);
   assert.match(prompt, /10-minute/i);
@@ -203,34 +262,34 @@ test('chadwick prompt reports days since last session and instructs him to lower
 });
 
 test('chadwick prompt omits the adherence line when days-since-last-session is unknown (null)', () => {
-  const prompt = buildSystemPrompt({ slug: 'chadwick', daysSinceLastSession: null });
+  const prompt = promptText({ slug: 'chadwick', daysSinceLastSession: null });
   assert.doesNotMatch(prompt, /days since/i);
 });
 
 test('chadwick prompt reports zero days since last session without triggering the lower-the-bar instruction text oddly', () => {
-  const prompt = buildSystemPrompt({ slug: 'chadwick', daysSinceLastSession: 0 });
+  const prompt = promptText({ slug: 'chadwick', daysSinceLastSession: 0 });
   assert.match(prompt, /0 days since/i);
 });
 
 test('non-chadwick agents never receive the days-since-last-session line', () => {
-  const prompt = buildSystemPrompt({ slug: 'brisket', daysSinceLastSession: 5 });
+  const prompt = promptText({ slug: 'brisket', daysSinceLastSession: 5 });
   assert.doesNotMatch(prompt, /days since/i);
 });
 
 test('chadwick prompt always instructs him to generate coach_cues on a planned session, up front, not per set', () => {
-  const prompt = buildSystemPrompt({ slug: 'chadwick' });
+  const prompt = promptText({ slug: 'chadwick' });
   assert.match(prompt, /coach_cues/);
   assert.match(prompt, /start.{0,20}rest.{0,20}final_set|final_set.{0,80}start.{0,80}rest/is);
   assert.match(prompt, /up front|in that same turn|alongside the plan/i);
 });
 
 test('chadwick prompt omits exercise library block when empty', () => {
-  const prompt = buildSystemPrompt({ slug: 'chadwick', exerciseLibrary: '' });
+  const prompt = promptText({ slug: 'chadwick', exerciseLibrary: '' });
   assert.doesNotMatch(prompt, /Exercise Library highlights/);
 });
 
 test('non-chadwick agents never receive exercise library instructions', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     exerciseLibrary: '- Bar Press — Chest'
   });
@@ -239,7 +298,7 @@ test('non-chadwick agents never receive exercise library instructions', () => {
 });
 
 test('hyaluronica prompt includes protocol when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hyaluronica',
     hyaluronicaProtocol: '## Job\nPrefer the Skincare tab.'
   });
@@ -249,7 +308,7 @@ test('hyaluronica prompt includes protocol when provided', () => {
 });
 
 test('hyaluronica prompt injects current AM/PM rotation when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hyaluronica',
     skincareRoutines: 'Current AM/PM rotation (Skincare tab source of truth; not the same as shelf status):\nAM:\n- La Roche SPF (spf-50) [Sunscreen]\nPM:\n(empty)'
   });
@@ -259,7 +318,7 @@ test('hyaluronica prompt injects current AM/PM rotation when provided', () => {
 });
 
 test('other agents never receive skincare routines block', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'chadwick',
     skincareRoutines: 'Current AM/PM rotation:\nAM:\n- La Roche SPF'
   });
@@ -268,7 +327,7 @@ test('other agents never receive skincare routines block', () => {
 });
 
 test('Chadwick prompt requires planned log_entry after design and CN-shaped programming', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'chadwick',
     centralNodeLog: '**Today\'s Status:** Brisket flagged a big deficit yesterday.'
   });
@@ -306,7 +365,7 @@ test('the checked-in Chadwick protocol carves out coach_cues from the never-inve
 });
 
 test('other agents never receive hyaluronica protocol instructions', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     hyaluronicaProtocol: '## Job\nPrefer the Skincare tab.'
   });
@@ -314,7 +373,7 @@ test('other agents never receive hyaluronica protocol instructions', () => {
 });
 
 test('brisket prompt includes protocol when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     brisketProtocol: '## Job\nFood Library first.'
   });
@@ -324,7 +383,7 @@ test('brisket prompt includes protocol when provided', () => {
 });
 
 test('shared logging prompt: proposals await Confirm; estimates are last resort; never fake a completed log', () => {
-  const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
+  const prompt = promptText({ slug: 'brisket', digest: '', constraints: '' });
   assert.match(prompt, /awaiting confirm|Confirm card|before that record is saved/i);
   assert.match(prompt, /do not (say|claim|tell).{0,60}(logged|saved to (Nutrition|today))/i);
   assert.match(prompt, /Only fall back to a good-faith estimate when/i);
@@ -333,7 +392,7 @@ test('shared logging prompt: proposals await Confirm; estimates are last resort;
 });
 
 test('shared logging prompt: calcium, polyphenol_score, and omega3 are mandatory with no "couldn\'t find data" excuse', () => {
-  const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
+  const prompt = promptText({ slug: 'brisket', digest: '', constraints: '' });
   assert.match(prompt, /calcium_mg,? polyphenol_score,? and omega3/i);
   assert.match(prompt, /category density estimate/i);
   assert.match(prompt, /never leave it blank/i);
@@ -342,7 +401,7 @@ test('shared logging prompt: calcium, polyphenol_score, and omega3 are mandatory
 
 test('checked-in Brisket protocol requires meal verdicts on Central Node', () => {
   const protocol = loadBrisketProtocol();
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     brisketProtocol: protocol,
     centralNodeLog: '**Nutrition:** 400 kcal.'
@@ -357,7 +416,7 @@ test('checked-in Brisket protocol requires meal verdicts on Central Node', () =>
 });
 
 test('sara prompt includes protocol when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'sara',
     saraProtocol: '## Job\nWeekly health scan.'
   });
@@ -367,7 +426,7 @@ test('sara prompt includes protocol when provided', () => {
 });
 
 test('hammond prompt includes protocol when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hammond',
     hammondProtocol: '## Job\nSession Triage first.'
   });
@@ -376,7 +435,7 @@ test('hammond prompt includes protocol when provided', () => {
 });
 
 test('hammond prompt includes audit phase contract when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hammond',
     hammondAuditContract: 'THIS TURN ONLY: triage then one intake question.'
   });
@@ -384,7 +443,7 @@ test('hammond prompt includes audit phase contract when provided', () => {
 });
 
 test('non-hammond prompts never include hammond audit contract', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     hammondAuditContract: 'THIS TURN ONLY: triage'
   });
@@ -392,7 +451,7 @@ test('non-hammond prompts never include hammond audit contract', () => {
 });
 
 test('Hammond prompt includes full central node markdown when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hammond',
     centralNodeFull: '## 📅 This Week\n- Lift',
     centralNodeLog: 'thin-slice-only',
@@ -407,7 +466,7 @@ test('Hammond prompt includes full central node markdown when provided', () => {
 });
 
 test('Brisket prompt does not include centralNodeFull', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     centralNodeFull: '## 📅 This Week\n- SECRET',
     centralNodeLog: 'thin only'
@@ -416,7 +475,7 @@ test('Brisket prompt does not include centralNodeFull', () => {
 });
 
 test('Hammond prompt includes governance log tail when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hammond',
     governanceLogTail: "## 2026-08-01 — Coach's Notes\nHold the line."
   });
@@ -425,7 +484,7 @@ test('Hammond prompt includes governance log tail when provided', () => {
 });
 
 test('Hammond prompt includes the one-time carried-over Notion items when the governance log is empty', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hammond',
     governanceLogIsEmpty: true
   });
@@ -436,17 +495,17 @@ test('Hammond prompt includes the one-time carried-over Notion items when the go
 
 test('carried-over Notion items instruction is Hammond-only and absent when the log is not empty', () => {
   assert.equal(
-    buildSystemPrompt({ slug: 'brisket', governanceLogIsEmpty: true }).includes('Notion carried two open items'),
+    promptText({ slug: 'brisket', governanceLogIsEmpty: true }).includes('Notion carried two open items'),
     false
   );
   assert.equal(
-    buildSystemPrompt({ slug: 'hammond', governanceLogIsEmpty: false }).includes('Notion carried two open items'),
+    promptText({ slug: 'hammond', governanceLogIsEmpty: false }).includes('Notion carried two open items'),
     false
   );
 });
 
 test('Hammond prompt includes the 90-day hammondDigest when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hammond',
     hammondDigest: 'Logging last 90 days — nutrition: 41/90 days, current gap 2d, longest gap 9d (14–22 Jun).'
   });
@@ -455,7 +514,7 @@ test('Hammond prompt includes the 90-day hammondDigest when provided', () => {
 });
 
 test('Hammond prompt includes the CN computed snapshot when hammondCnSummary is provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hammond',
     hammondCnSummary: 'Central Node computed snapshot\nProtein (7d): rising.'
   });
@@ -464,7 +523,7 @@ test('Hammond prompt includes the CN computed snapshot when hammondCnSummary is 
 });
 
 test('non-hammond prompts never include hammondCnSummary', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     hammondCnSummary: 'Central Node computed snapshot\nProtein (7d): rising.'
   });
@@ -472,7 +531,7 @@ test('non-hammond prompts never include hammondCnSummary', () => {
 });
 
 test('non-hammond prompts never include hammondDigest', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     hammondDigest: 'Logging last 90 days — nutrition: 41/90 days, current gap 2d, longest gap 9d (14–22 Jun).'
   });
@@ -543,7 +602,7 @@ test('hammond protocol includes Mind domain brief and retrospective', () => {
 });
 
 test('vera prompt includes workingModelDigest when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'vera',
     workingModelDigest: 'Working model of Adam (your standing hypotheses — confirm, weaken, or retire; not fixed):\n- Sunday spirals — holding (last touched 2026-08-26: alarm ignored)'
   });
@@ -552,7 +611,7 @@ test('vera prompt includes workingModelDigest when provided', () => {
 });
 
 test('vera prompt includes mind diary and session digest and lists mind_session', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'vera',
     mindDiaryDigest: 'Diary (metadata only): 2026-08-10 mood low',
     mindSessionDigest: 'thread: What is the weekend actually for?',
@@ -572,7 +631,7 @@ test('vera prompt includes mind diary and session digest and lists mind_session'
 });
 
 test('penelope prompt includes mind diary digest and keeps nutrition digest', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'penelope',
     digest: 'Today: 1800 kcal',
     mindDiaryDigest: 'Days since last entry: 2',
@@ -584,7 +643,7 @@ test('penelope prompt includes mind diary digest and keeps nutrition digest', ()
 });
 
 test('hammond prompt includes silence flag and not diary excerpt', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hammond',
     mindSilence: 'Mind silence: both quiet 8d',
     onThisDay: 'On this day 2025-08-13: Excerpt: SECRET'
@@ -594,7 +653,7 @@ test('hammond prompt includes silence flag and not diary excerpt', () => {
 });
 
 test('hammond prompt includes hammondDiaryDigest when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hammond',
     hammondDiaryDigest: 'Diary (metadata only — do not quote prose):\n2026-08-10: mood low'
   });
@@ -603,12 +662,12 @@ test('hammond prompt includes hammondDiaryDigest when provided', () => {
 });
 
 test('hammond prompt omits diary digest when hammondDiaryDigest is empty', () => {
-  const prompt = buildSystemPrompt({ slug: 'hammond', hammondDiaryDigest: '' });
+  const prompt = promptText({ slug: 'hammond', hammondDiaryDigest: '' });
   assert.doesNotMatch(prompt, /Diary \(metadata only/);
 });
 
 test('non-hammond prompts never include hammondDiaryDigest', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     hammondDiaryDigest: 'Diary leak'
   });
@@ -616,7 +675,7 @@ test('non-hammond prompts never include hammondDiaryDigest', () => {
 });
 
 test('hammond prompt includes hammondMindAmbient when provided', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'hammond',
     hammondMindAmbient: 'Recent day-to-day signal (system_note, metadata only):\n2026-08-12: quiet work day'
   });
@@ -625,12 +684,12 @@ test('hammond prompt includes hammondMindAmbient when provided', () => {
 });
 
 test('hammond prompt omits ambient tail when hammondMindAmbient is empty', () => {
-  const prompt = buildSystemPrompt({ slug: 'hammond', hammondMindAmbient: '' });
+  const prompt = promptText({ slug: 'hammond', hammondMindAmbient: '' });
   assert.doesNotMatch(prompt, /Recent day-to-day signal/);
 });
 
 test('non-hammond prompts never include hammondMindAmbient', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     hammondMindAmbient: 'Ambient leak'
   });
@@ -638,7 +697,7 @@ test('non-hammond prompts never include hammondMindAmbient', () => {
 });
 
 test('brisket prompt never receives mind diary digest', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     mindDiaryDigest: 'Diary leak'
   });
@@ -646,7 +705,7 @@ test('brisket prompt never receives mind diary digest', () => {
 });
 
 test('protocolSteer is injected after voice so the model stays in character', () => {
-  const prompt = buildSystemPrompt({
+  const prompt = promptText({
     slug: 'brisket',
     protocolSteer: 'Adam chose the "Flare-up eating" protocol for this turn (Active flare-up protocol in your operating manual). Run that protocol in character from your first word.'
   });

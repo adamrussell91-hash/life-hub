@@ -14,7 +14,7 @@ import { createGitHubClient, GitHubConfigurationError } from './_shared/github-c
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
-import { buildSystemPrompt } from './_shared/persona.mjs';
+import { buildSystemPrompt, joinSystemPrompt } from './_shared/persona.mjs';
 import { normalizeProtocolId, protocolSteerBlock } from '../../js/app/agent-protocols.js';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
 import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs';
@@ -621,7 +621,7 @@ export function createChatHandler({
         const skincareRoutines = needsSkincareLibrary
           ? formatSkincareRoutinesForPrompt(skincareMembership, skincareLibrary)
           : '';
-        const system = buildSystemPrompt({
+        const { stable, volatile } = buildSystemPrompt({
           slug,
           digest,
           constraints,
@@ -659,6 +659,12 @@ export function createChatHandler({
           daysSinceLastMindSession,
           protocolSteer: protocolSteerBlock(slug, parsed.protocolId)
         });
+        const system = volatile
+          ? [
+              { type: 'text', text: stable, cache_control: { type: 'ephemeral', ttl: '1h' } },
+              { type: 'text', text: volatile }
+            ]
+          : [{ type: 'text', text: stable, cache_control: { type: 'ephemeral', ttl: '1h' } }];
 
         try {
           send({ type: 'status', text: 'Thinking…' });
@@ -891,6 +897,10 @@ export function createChatHandler({
               return null;
             }
           })) {
+            if (event.type === 'usage') {
+              console.log(JSON.stringify({ metric: 'anthropic_usage', slug, phase: event.phase, ...event.usage }));
+              continue;
+            }
             if (event.type === 'tool_call' && event.name === 'log_entry') {
               const validation = validateLogEntry(event.input, {
                 id: `${event.input?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,

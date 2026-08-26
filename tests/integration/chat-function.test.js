@@ -49,6 +49,12 @@ function contentEvents(events) {
   return events.filter(event => event.type !== 'status');
 }
 
+function systemText(system) {
+  if (typeof system === 'string') return system;
+  if (Array.isArray(system)) return system.map(block => block.text).join('\n\n');
+  return String(system ?? '');
+}
+
 test('streams an agent event, text, and a validated record proposal for a routed message', async () => {
   const handler = createChatHandler({
     env: validEnv,
@@ -155,8 +161,8 @@ test('loads saved workout template summaries into Chadwick\'s system prompt', as
 
   await readSse(await handler(request({ message: 'Chadwick, what should I do today?' })));
 
-  assert.match(receivedArgs.system, /Chest and Curls/);
-  assert.match(receivedArgs.system, /2026-07-30/);
+  assert.match(systemText(receivedArgs.system), /Chest and Curls/);
+  assert.match(systemText(receivedArgs.system), /2026-07-30/);
 });
 
 test('conversation history is forwarded to Anthropic ahead of the new message', async () => {
@@ -877,8 +883,8 @@ test('loads exercise library highlights into Chadwick system prompt', async () =
 
   await readSse(await handler(request({ message: 'Chadwick, plan a chest session' })));
 
-  assert.match(receivedArgs.system, /Exercise Library/);
-  assert.match(receivedArgs.system, /Bar Press/);
+  assert.match(systemText(receivedArgs.system), /Exercise Library/);
+  assert.match(systemText(receivedArgs.system), /Bar Press/);
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_exercise_library'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_exercise_library_entry'));
   assert.equal(typeof receivedArgs.executeTools, 'function');
@@ -926,8 +932,8 @@ test('reports days since last session from the exercise library\'s last_performe
 
   await readSse(await handler(request({ message: 'Chadwick, what should I do today?' })));
 
-  assert.match(receivedArgs.system, /3 days since/i);
-  assert.match(receivedArgs.system, /lower the bar/i);
+  assert.match(systemText(receivedArgs.system), /3 days since/i);
+  assert.match(systemText(receivedArgs.system), /lower the bar/i);
   assert.equal(blobFetches.length, 1, 'the library blob should only be fetched once -- no extra reads for adherence');
 });
 
@@ -988,10 +994,10 @@ test('loads latest body composition/measurements into Chadwick\'s prompt via a b
 
   await readSse(await handler(request({ message: 'Chadwick, what should I do today?' })));
 
-  assert.match(receivedArgs.system, /Body composition/);
-  assert.match(receivedArgs.system, /85\.5kg/);
-  assert.match(receivedArgs.system, /Shoulder:waist ratio/);
-  assert.match(receivedArgs.system, /1\.43/);
+  assert.match(systemText(receivedArgs.system), /Body composition/);
+  assert.match(systemText(receivedArgs.system), /85\.5kg/);
+  assert.match(systemText(receivedArgs.system), /Shoulder:waist ratio/);
+  assert.match(systemText(receivedArgs.system), /1\.43/);
   assert.equal(blobCalls.length, 2, 'expected exactly one bounded read per body record type, not a history scan');
 });
 
@@ -1032,9 +1038,9 @@ test('loads body state into Brisket\'s prompt too (Phase 3 extends body state be
 
   await readSse(await handler(request({ message: 'Brisket, what did I eat today?' })));
 
-  assert.match(receivedArgs.system, /Body composition/);
-  assert.match(receivedArgs.system, /85\.5kg/);
-  assert.match(receivedArgs.system, /your lane/i);
+  assert.match(systemText(receivedArgs.system), /Body composition/);
+  assert.match(systemText(receivedArgs.system), /85\.5kg/);
+  assert.match(systemText(receivedArgs.system), /your lane/i);
 });
 
 test('non-chadwick, non-brisket agents never receive body state in their prompt', async () => {
@@ -1074,8 +1080,8 @@ test('non-chadwick, non-brisket agents never receive body state in their prompt'
 
   await readSse(await handler(request({ message: 'Sara, how is my body doing?' })));
 
-  assert.doesNotMatch(receivedArgs.system, /Shoulder:waist ratio/);
-  assert.doesNotMatch(receivedArgs.system, /85\.5kg/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /Shoulder:waist ratio/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /85\.5kg/);
 });
 
 test('save_exercise_library_entry writes the cache to GitHub, emits exercise_library_saved, continues the round, and lets a follow-up log_entry produce a record_proposal', async () => {
@@ -1202,7 +1208,7 @@ test('non-chadwick agents do not register exercise library tools', async () => {
 
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'search_exercise_library'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'save_exercise_library_entry'));
-  assert.doesNotMatch(receivedArgs.system, /search_exercise_library/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /search_exercise_library/);
 });
 
 test('Hammond auditSession injects phase contract into the system prompt', async () => {
@@ -1224,9 +1230,9 @@ test('Hammond auditSession injects phase contract into the system prompt', async
     auditSession: { kind: 'cn_audit', phase: 'triage', intakeCount: 0 }
   })));
 
-  assert.match(receivedArgs.system, /audit phase contract/i);
-  assert.match(receivedArgs.system, /THIS TURN ONLY/i);
-  assert.match(receivedArgs.system, /triage/i);
+  assert.match(systemText(receivedArgs.system), /audit phase contract/i);
+  assert.match(systemText(receivedArgs.system), /THIS TURN ONLY/i);
+  assert.match(systemText(receivedArgs.system), /triage/i);
 });
 
 test('protocolId steers Brisket’s prompt without dumping a canned description', async () => {
@@ -1249,10 +1255,10 @@ test('protocolId steers Brisket’s prompt without dumping a canned description'
     protocolId: 'flare-up'
   })));
 
-  assert.match(receivedArgs.system, /Flare-up eating/);
-  assert.match(receivedArgs.system, /Active flare-up protocol/);
-  assert.match(receivedArgs.system, /in character/);
-  assert.doesNotMatch(receivedArgs.system, /hog-tying a polyphenol/i);
+  assert.match(systemText(receivedArgs.system), /Flare-up eating/);
+  assert.match(systemText(receivedArgs.system), /Active flare-up protocol/);
+  assert.match(systemText(receivedArgs.system), /in character/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /hog-tying a polyphenol/i);
 });
 
 test('a protocolId for the wrong agent is ignored', async () => {
@@ -1275,8 +1281,8 @@ test('a protocolId for the wrong agent is ignored', async () => {
     protocolId: 'flare-up'
   })));
 
-  assert.doesNotMatch(receivedArgs.system, /Flare-up eating/);
-  assert.doesNotMatch(receivedArgs.system, /Active flare-up protocol/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /Flare-up eating/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /Active flare-up protocol/);
 });
 
 test('invalid auditSession is ignored for prompt injection', async () => {
@@ -1298,7 +1304,7 @@ test('invalid auditSession is ignored for prompt injection', async () => {
     auditSession: { kind: 'cn_audit', phase: 'not-a-phase', intakeCount: 0 }
   })));
 
-  assert.doesNotMatch(receivedArgs.system, /audit phase contract/i);
+  assert.doesNotMatch(systemText(receivedArgs.system), /audit phase contract/i);
 });
 
 test('Hyaluronica registers skincare library and routine membership tools', async () => {
@@ -1360,11 +1366,11 @@ test('Hyaluronica registers skincare library and routine membership tools', asyn
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_skincare_library'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_skincare_library_entry'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'set_skincare_routine_membership'));
-  assert.match(receivedArgs.system, /search_skincare_library/);
-  assert.match(receivedArgs.system, /list_skincare_routines/);
-  assert.match(receivedArgs.system, /Current AM\/PM rotation/);
-  assert.match(receivedArgs.system, /La Roche SPF/);
-  assert.match(receivedArgs.system, /Never invent a routine from shelf status/);
+  assert.match(systemText(receivedArgs.system), /search_skincare_library/);
+  assert.match(systemText(receivedArgs.system), /list_skincare_routines/);
+  assert.match(systemText(receivedArgs.system), /Current AM\/PM rotation/);
+  assert.match(systemText(receivedArgs.system), /La Roche SPF/);
+  assert.match(systemText(receivedArgs.system), /Never invent a routine from shelf status/);
   const searchHits = JSON.parse(await receivedArgs.executeTools({
     name: 'search_skincare_library',
     id: 'call_1',
@@ -1459,9 +1465,9 @@ test('non-hyaluronica agents do not register skincare library tools', async () =
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'search_skincare_library'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'save_skincare_library_entry'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'set_skincare_routine_membership'));
-  assert.doesNotMatch(receivedArgs.system, /search_skincare_library/);
-  assert.doesNotMatch(receivedArgs.system, /list_skincare_routines/);
-  assert.doesNotMatch(receivedArgs.system, /Current AM\/PM rotation/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /search_skincare_library/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /list_skincare_routines/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /Current AM\/PM rotation/);
 });
 
 test('search_skincare_library returns matches and continues the round', async () => {
@@ -1825,11 +1831,11 @@ test('Hammond registers CN patch and governance tools and gets full CN in system
 
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'propose_central_node_patch'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'append_governance_log'));
-  assert.match(receivedArgs.system, /propose_central_node_patch/);
-  assert.match(receivedArgs.system, /append_governance_log/);
-  assert.match(receivedArgs.system, /full Central Node/i);
-  assert.match(receivedArgs.system, /This Week/);
-  assert.match(receivedArgs.system, /Lift Mon/);
+  assert.match(systemText(receivedArgs.system), /propose_central_node_patch/);
+  assert.match(systemText(receivedArgs.system), /append_governance_log/);
+  assert.match(systemText(receivedArgs.system), /full Central Node/i);
+  assert.match(systemText(receivedArgs.system), /This Week/);
+  assert.match(systemText(receivedArgs.system), /Lift Mon/);
 });
 
 test('Hammond prompt-time Central Node rolls a stale This Week heading before buildSystemPrompt', async () => {
@@ -1896,10 +1902,10 @@ Rule one.
 
   await readSse(await handler(request({ message: 'Hammond, what should I focus on?' })));
 
-  assert.match(receivedArgs.system, /This Week \(27 Jul – 2 Aug 2026\)/);
-  assert.match(receivedArgs.system, /This Month \(August 2026\)/);
-  assert.doesNotMatch(receivedArgs.system, /Stale June body/);
-  assert.doesNotMatch(receivedArgs.system, /Stale April body/);
+  assert.match(systemText(receivedArgs.system), /This Week \(27 Jul – 2 Aug 2026\)/);
+  assert.match(systemText(receivedArgs.system), /This Month \(August 2026\)/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /Stale June body/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /Stale April body/);
 });
 
 test('non-hammond agents do not register Hammond CN or governance tools', async () => {
@@ -1920,8 +1926,8 @@ test('non-hammond agents do not register Hammond CN or governance tools', async 
 
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'propose_central_node_patch'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'append_governance_log'));
-  assert.doesNotMatch(receivedArgs.system, /propose_central_node_patch/);
-  assert.doesNotMatch(receivedArgs.system, /append_governance_log/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /propose_central_node_patch/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /append_governance_log/);
 });
 
 test('propose_central_node_patch auto cross_agent append writes central-node.md', async () => {
@@ -2237,8 +2243,8 @@ test('Hammond 5e/6b brief injects diary metadata from the CN window without quot
     priorAgentSlug: 'hammond'
   })));
 
-  assert.match(receivedArgs.system, /Weekend collapse/);
-  assert.doesNotMatch(receivedArgs.system, /SECRET PROSE/);
+  assert.match(systemText(receivedArgs.system), /Weekend collapse/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /SECRET PROSE/);
   assert.ok(blobUrls.some(url => url.includes(HAMMOND_DIARY_SHA)));
 });
 
@@ -2262,10 +2268,10 @@ test('ordinary Hammond turns skip the 5e/6b diary digest but still get a system_
     priorAgentSlug: 'hammond'
   })));
 
-  assert.doesNotMatch(receivedArgs.system, /Diary \(metadata only/);
-  assert.match(receivedArgs.system, /Recent day-to-day signal \(system_note, metadata only\)/);
-  assert.match(receivedArgs.system, /Weekend collapse/);
-  assert.doesNotMatch(receivedArgs.system, /SECRET PROSE/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /Diary \(metadata only/);
+  assert.match(systemText(receivedArgs.system), /Recent day-to-day signal \(system_note, metadata only\)/);
+  assert.match(systemText(receivedArgs.system), /Weekend collapse/);
+  assert.doesNotMatch(systemText(receivedArgs.system), /SECRET PROSE/);
   assert.ok(blobUrls.some(url => url.includes(HAMMOND_DIARY_SHA)), 'CN window still reads the mind blob');
 });
 
@@ -2329,8 +2335,8 @@ test('Vera chat exposes get_mind_session and search_mind_records repo tools', as
 
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'get_mind_session'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_mind_records'));
-  assert.match(receivedArgs.system, /Today's mind_session/);
-  assert.match(receivedArgs.system, /get_mind_session/);
+  assert.match(systemText(receivedArgs.system), /Today's mind_session/);
+  assert.match(systemText(receivedArgs.system), /get_mind_session/);
 
   const loaded = JSON.parse(await receivedArgs.executeTools({
     id: 'call_get',
@@ -2368,4 +2374,31 @@ test('non-Vera agents do not receive mind repo read tools', async () => {
 
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'get_mind_session'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'search_mind_records'));
+});
+
+test('Vera chat sends stable and volatile system blocks with cache_control only on stable', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'Vera, how are you holding up?',
+    priorAgentSlug: 'vera'
+  })));
+
+  assert.ok(Array.isArray(receivedArgs.system));
+  assert.equal(receivedArgs.system.length, 2);
+  assert.deepEqual(receivedArgs.system[0].cache_control, { type: 'ephemeral', ttl: '1h' });
+  assert.equal(receivedArgs.system[1].cache_control, undefined);
+  assert.match(receivedArgs.system[0].text, /Vera operating manual|Dr Vera Lenz/);
+  assert.match(receivedArgs.system[1].text, /Today's mind_session|not logged yet/i);
 });
