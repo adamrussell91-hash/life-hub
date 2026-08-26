@@ -73,6 +73,15 @@ test('lane and location kind follow record context', () => {
   assert.equal(locationKindFor('GP review', 'Walker Street Doctors'), 'place');
 });
 
+test('mergeMedicalFields keeps the stored visit title when titles match loosely', () => {
+  const merged = mergeMedicalFields(
+    { title: 'Redacted maintenance injection', record_type: 'Prescription', lane: 'prescription' },
+    { title: 'Redacted injection' },
+    { notes: 'Follow-up note.' }
+  );
+  assert.equal(merged.fields.title, 'Redacted maintenance injection');
+});
+
 test('mergeMedicalFields appends notes and keeps existing visit details', () => {
   const merged = mergeMedicalFields(
     {
