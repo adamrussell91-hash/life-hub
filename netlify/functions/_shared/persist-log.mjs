@@ -24,7 +24,7 @@ export function renderMarkdown(record, notes) {
   return `---\n${frontmatter}\n---\n${body}`;
 }
 
-export function describeRecordForLog(record, notes) {
+export function describeRecordForLog(record, notes, { medicalAppend = false } = {}) {
   const label = typeof notes === 'string' && notes.trim() !== '' ? notes.trim() : null;
   switch (record.type) {
     case 'meal': {
@@ -54,7 +54,9 @@ export function describeRecordForLog(record, notes) {
     case 'measurements':
       return 'Logged body measurements.';
     case 'medical':
-      return `Logged medical visit: ${record.title || 'visit'}.`;
+      return medicalAppend
+        ? `Updated medical visit: ${record.title || 'visit'}.`
+        : `Logged medical visit: ${record.title || 'visit'}.`;
     default:
       return `Logged a ${record.type} record.`;
   }

@@ -1,4 +1,5 @@
 import { isCalendarDate } from './time.js';
+import { laneFor, locationKindFor } from '../app/medical-normalize.js';
 
 const COMMON_FIELDS = [
   'schema_version', 'id', 'type', 'date', 'time', 'created_at', 'updated_at', 'source'
@@ -336,7 +337,27 @@ const MEDICAL_LANES = [
 ];
 const LOCATION_KINDS = ['place', 'telehealth', 'unknown'];
 
+function coerceMedicalEnums(record) {
+  const title = typeof record.title === 'string' ? record.title.trim() : '';
+  if (!title) return;
+
+  if (!MEDICAL_LANES.includes(record.lane)) {
+    record.lane = laneFor(record.record_type, title, record.provider, record.location);
+  }
+  if (!LOCATION_KINDS.includes(record.location_kind)) {
+    record.location_kind = locationKindFor(title, record.location);
+  }
+
+  if (record.cost_aud != null && (typeof record.cost_aud !== 'number' || !Number.isFinite(record.cost_aud))) {
+    delete record.cost_aud;
+  }
+  if (record.date_end != null && !isCalendarDate(record.date_end)) delete record.date_end;
+  if (record.follow_up_date != null && !isCalendarDate(record.follow_up_date)) delete record.follow_up_date;
+  if (record.episode != null && record.episode === '') delete record.episode;
+}
+
 function validateMedical(record, errors) {
+  coerceMedicalEnums(record);
   requireString(record, 'title', errors);
   enumeration(record, 'record_type', MEDICAL_RECORD_TYPES, errors, true);
   enumeration(record, 'lane', MEDICAL_LANES, errors, true);

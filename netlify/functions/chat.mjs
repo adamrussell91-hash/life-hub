@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { mergeMedicalFields, resolveMedicalLogCandidate, parseMedicalEventTolerant } from '../../js/app/medical-normalize.js';
 import { verifySessionToken, serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
 import {
   errorResponse,
@@ -32,7 +33,7 @@ import {
 } from '../../js/core/constraints.js';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
-import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug } from './_shared/chat-schema.mjs';
+import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug, logEntryRejectionPayload } from './_shared/chat-schema.mjs';
 import { persistLogEntry, describeRecordForLog } from './_shared/persist-log.mjs';
 import {
   FOOD_LIBRARY_PATH,
@@ -655,7 +656,15 @@ export function createChatHandler({
           protocolSteer: protocolSteerBlock(slug, parsed.protocolId)
         });
 
+        let pendingLogRejection = null;
         try {
+          const emit = event => {
+            if (event.type === 'record_proposal' || event.type === 'record_saved') {
+              pendingLogRejection = null;
+            }
+            send(event);
+          };
+
           send({ type: 'status', text: 'Thinking…' });
           for await (const event of anthropic.streamMessage({
             system,
@@ -796,16 +805,23 @@ export function createChatHandler({
                 if (event.input?.type === 'mind_session') {
                   send({ type: 'status', text: 'Saving your session…' });
                 }
-                const validation = validateLogEntry(event.input, {
-                  id: `${event.input?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
+                const medicalInput = event.input?.type === 'medical'
+                  ? await resolveMedicalLogCandidate(client, event.input, {
+                    today,
+                    loadYaml,
+                    decodeBlob
+                  })
+                  : event.input;
+                const validation = validateLogEntry(medicalInput, {
+                  id: `${medicalInput?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
                   now: getSydneyTimestamp(nowInstant)
                 });
                 if (!validation.valid) {
-                  send({ type: 'record_rejected', errors: validation.errors });
-                  return JSON.stringify({ ok: false, errors: validation.errors });
+                  pendingLogRejection = { errors: validation.errors };
+                  return JSON.stringify(logEntryRejectionPayload(medicalInput, validation.errors));
                 }
                 const outcome = await persistOrProposeLogEntry({
-                  client, slug, today, validation, send
+                  client, slug, today, validation, send: emit
                 });
                 if (outcome.status === 'written') {
                   return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
@@ -887,14 +903,21 @@ export function createChatHandler({
             }
           })) {
             if (event.type === 'tool_call' && event.name === 'log_entry') {
-              const validation = validateLogEntry(event.input, {
-                id: `${event.input?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
+              const medicalInput = event.input?.type === 'medical'
+                ? await resolveMedicalLogCandidate(client, event.input, {
+                  today,
+                  loadYaml,
+                  decodeBlob
+                })
+                : event.input;
+              const validation = validateLogEntry(medicalInput, {
+                id: `${medicalInput?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
                 now: getSydneyTimestamp(nowInstant)
               });
               if (validation.valid) {
-                await persistOrProposeLogEntry({ client, slug, today, validation, send });
+                await persistOrProposeLogEntry({ client, slug, today, validation, send: emit });
               } else {
-                send({ type: 'record_rejected', errors: validation.errors });
+                pendingLogRejection = { errors: validation.errors };
               }
             } else if (event.type === 'tool_call' && event.name === 'propose_central_node_patch') {
               const patch = validateCentralNodePatchInput(event.input);
@@ -910,6 +933,9 @@ export function createChatHandler({
         } catch (error) {
           send({ type: 'error', code: error instanceof AnthropicClientError ? error.code : 'anthropic_unavailable' });
         } finally {
+          if (pendingLogRejection) {
+            send({ type: 'record_rejected', errors: pendingLogRejection.errors });
+          }
           controller.close();
         }
       }
@@ -923,37 +949,86 @@ export function createChatHandler({
 }
 
 async function persistOrProposeLogEntry({ client, slug, today, validation, send }) {
+  let proposal = validation;
   const path = buildCanonicalPath({
     type: validation.record.type,
     date: validation.record.date,
     slug: buildRecordSlug(validation.record)
   });
-  const autoWrite = slug === 'vera' && validation.record.type === 'mind_session';
-  if (autoWrite) {
+
+  let existingSha = null;
+
+  if (validation.record.type === 'medical') {
     try {
       const current = await client.resolveTree();
-      const existingSha = current.tree.find(e => e.path === path && e.type === 'blob')?.sha;
+      const existingEntry = current.tree.find(entry => entry.path === path && entry.type === 'blob');
+      if (existingEntry?.sha) {
+        existingSha = existingEntry.sha;
+        const text = decodeBlob(await client.readBlob(existingEntry.sha));
+        if (text) {
+          const existing = parseMedicalEventTolerant(text, path, loadYaml);
+          if (existing) {
+            const merged = mergeMedicalFields(existing.record, validation.record, {
+              notes: validation.notes,
+              existingNotes: existing.body
+            });
+            const remerged = validateLogEntry({
+              type: 'medical',
+              date: validation.record.date,
+              time: validation.record.time,
+              notes: merged.notes,
+              fields: merged.fields
+            }, {
+              id: existing.record.id,
+              now: validation.record.updated_at,
+              source: existing.record.source ?? 'chat'
+            });
+            if (remerged.valid) {
+              proposal = {
+                ...remerged,
+                record: {
+                  ...remerged.record,
+                  created_at: existing.record.created_at ?? remerged.record.created_at
+                }
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      // Best-effort append — fall back to the original proposal.
+    }
+  }
+
+  const autoWriteMindSession = slug === 'vera' && proposal.record.type === 'mind_session';
+  const autoWriteMedicalAppend = slug === 'sara' && proposal.record.type === 'medical' && existingSha != null;
+  if (autoWriteMindSession || autoWriteMedicalAppend) {
+    try {
+      const current = await client.resolveTree();
+      const sha = existingSha ?? current.tree.find(e => e.path === path && e.type === 'blob')?.sha;
       const persisted = await persistLogEntry(client, {
-        record: validation.record,
-        notes: validation.notes,
+        record: proposal.record,
+        notes: proposal.notes,
         path,
-        existingSha,
+        existingSha: sha,
         nowDateKey: today
       });
       send({
         type: 'record_saved',
-        record: validation.record,
-        notes: validation.notes,
+        record: proposal.record,
+        notes: proposal.notes,
         path,
-        summary: describeRecordForLog(validation.record, validation.notes),
+        summary: describeRecordForLog(proposal.record, proposal.notes, {
+          medicalAppend: autoWriteMedicalAppend
+        }),
         centralNodeUpdated: persisted.centralNodeUpdated
       });
       return { ok: true, status: 'written', path };
     } catch {
       send({
         type: 'record_proposal',
-        record: validation.record,
-        notes: validation.notes,
+        record: proposal.record,
+        notes: proposal.notes,
         path,
         warnings: [],
         autoWriteFailed: true
@@ -963,12 +1038,12 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send 
   }
   send({
     type: 'record_proposal',
-    record: validation.record,
-    notes: validation.notes,
+    record: proposal.record,
+    notes: proposal.notes,
     path,
     // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
     // Confirm anyway. No-op (empty array) for anything but a workout proposal.
-    warnings: lintWorkoutProposal(validation.record)
+    warnings: lintWorkoutProposal(proposal.record)
   });
   return { ok: true, status: 'awaiting_confirm' };
 }
