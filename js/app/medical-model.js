@@ -1,4 +1,5 @@
 import { formatDisplayDate } from '../core/time.js';
+import { normalizeMedicalFields } from './medical-normalize.js';
 
 export const MEDICAL_DENSITIES = ['weeks', 'months', 'years'];
 export const DEFAULT_MEDICAL_DENSITY = 'months';
@@ -23,27 +24,16 @@ export function buildMedicalSlug(title, time) {
 export function buildMedicalPayload(fields, { notes } = {}) {
   const date = fields.date;
   const time = fields.time || undefined;
+  const normalized = normalizeMedicalFields(fields, { notes });
   return {
     candidate: {
       type: 'medical',
       date,
       time,
       notes: notes ?? fields.notes ?? '',
-      fields: {
-        title: fields.title,
-        record_type: fields.record_type,
-        lane: fields.lane,
-        date_end: fields.date_end ?? null,
-        provider: fields.provider ?? null,
-        location: fields.location ?? null,
-        location_kind: fields.location_kind ?? (fields.location ? 'place' : 'unknown'),
-        follow_up_date: fields.follow_up_date ?? null,
-        cost_aud: fields.cost_aud ?? null,
-        insurance_status: fields.insurance_status ?? null,
-        episode: fields.episode ?? null
-      }
+      fields: normalized
     },
-    slug: buildMedicalSlug(fields.title, time),
+    slug: buildMedicalSlug(normalized.title, time),
     overwrite: true
   };
 }
