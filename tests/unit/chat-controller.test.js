@@ -1157,7 +1157,26 @@ test('nudge when Chadwick dumps a numbered plan with no record_proposal', async 
     bubbles.some(bubble => /lock it onto Fitness/i.test(bubbleText(bubble)) && /Confirm card/i.test(bubbleText(bubble))),
     'expected a nudge when Chadwick listed a plan in chat only'
   );
+
+  const planBody = bubbles
+    .map(bubble => bubble.children.find(child => child.className === 'chat-message__body'))
+    .find(body => findNestedClass(body, 'chat-workout'));
+  assert.ok(planBody, 'expected the dumped plan to render as a structured workout');
+  const exercises = findNestedClass(planBody, 'chat-workout__exercises');
+  assert.equal(exercises.children.length, 4);
+  assert.equal(findNestedClass(exercises.children[0], 'chat-workout__name').textContent, 'Bar Press');
+  assert.equal(findNestedClass(exercises.children[0], 'chat-workout__set-load').textContent, '10 × 30 kg');
 });
+
+function findNestedClass(node, name) {
+  const classes = String(node?.className ?? '').split(/\s+/);
+  if (classes.includes(name)) return node;
+  for (const child of node?.children ?? []) {
+    const found = findNestedClass(child, name);
+    if (found) return found;
+  }
+  return null;
+}
 
 test('nudge when exercise library saved but no record_proposal in the turn', async () => {
   const root = new FakeDocument();

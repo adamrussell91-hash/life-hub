@@ -347,19 +347,34 @@ function hash(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
+const FLAT_WORKOUT_DUMP = [
+  '1. **Bar Squat** — legs first while you\'re fresh - Set 1: 10 reps x 25kg (cable: none) - Set 2: 10 reps x 25kg (cable: none) - Set 3: 10 reps x 25kg (cable: none)',
+  '2. **Bar Row** — pull that back thick - Set 1: 10 reps x 26kg (cable: constant force) - Set 2: 10 reps x 26kg (cable: constant force) - Set 3: 10 reps x 26kg (cable: constant force)',
+  '3. **Bar Press** — chest gets its pump, always - Set 1: 10 reps x 30kg (cable: constant force) - Set 2: 10 reps x 30kg (cable: constant force) - Set 3: 10 reps x 30kg (cable: constant force)',
+  '4. **Goblet Squat** — burnout finisher for the legs - Set 1: 12 reps x 14kg (cable: none) - Set 2: 12 reps x 14kg (cable: none)',
+  '5. **Single Arm Row with Chest Supported** — unilateral back detail work - Set 1: 12 reps x 14kg (cable: constant force) - Set 2: 12 reps x 14kg (cable: constant force)',
+  '6. **Bent Over Fly** — rear delt/upper back finisher, that shoulder cap growth - Set 1: 15 reps x 9kg (cable: elastic) - Set 2: 15 reps x 9kg (cable: elastic)',
+  '7. **Cable Bar Curl** — because we always end on guns, that\'s the law - Set 1: 12 reps x 20kg (cable: eccentric) - Set 2: 12 reps x 20kg (cable: eccentric)',
+  '8. **Bent Leg Reverse Crunch** — core, keep that waistline tight while Brisket handles the rest - Set 1: 15 reps x 0kg (cable: none) - Set 2: 15 reps x 0kg (cable: none)'
+].join(' ');
+
 function streamMockChat(response, message) {
   response.writeHead(200, {
     'Content-Type': 'text/event-stream',
     ...PRIVATE_HEADERS,
     Connection: 'keep-alive'
   });
-  const isWorkout = /chad|chadwick|workout/i.test(message);
+  const isLockIn = /lock (it|this|the plan) (in|onto)/i.test(message);
+  const isWorkout = isLockIn || /chad|chadwick|workout/i.test(message);
+  const isPlanDump = !isLockIn && /full send|describe the (plan|session)|show (me )?the (plan|session)/i.test(message);
   const isMeal = /brisket|meal|breakfast|lunch|dinner|lasagna|snack|ate|food/i.test(message);
   const send = event => response.write(`data: ${JSON.stringify(event)}\n\n`);
   send({ type: 'agent', slug: isWorkout ? 'chadwick' : isMeal ? 'brisket' : 'router' });
   send({ type: 'status', text: 'Loading your logs…' });
   send({ type: 'status', text: 'Thinking…' });
-  if (isWorkout) {
+  if (isWorkout && isPlanDump) {
+    send({ type: 'text', delta: `Here's today's full send.\n${FLAT_WORKOUT_DUMP}` });
+  } else if (isWorkout) {
     send({ type: 'text', delta: 'Here’s your workout for today. Start it when you’re ready.' });
     send({
       type: 'record_proposal',

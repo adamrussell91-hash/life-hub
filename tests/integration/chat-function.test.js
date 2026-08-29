@@ -453,6 +453,45 @@ test('a Chadwick lock-in with no log_entry forces a second round that can propos
   assert.equal(proposal.record.title, 'Comeback Full Body Burn');
 });
 
+test('lock it onto Fitness builds a Confirm card from history without a second model round', async () => {
+  let rounds = 0;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => {
+        rounds += 1;
+        return mockedStream([{ type: 'text', delta: 'On it.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'lock it onto Fitness',
+    priorAgentSlug: 'chadwick',
+    history: [
+      { role: 'assistant', content: [
+        '"Welcome Back, King" — Full Body Pump Session (60 min)',
+        '1. Bar Squat — 10x25kg, 10x25kg, 10x25kg (cable: none)',
+        '2. Bar Row — 10x26kg, 10x26kg, 10x26kg (cable: constant force)',
+        '3. Bar Press — 20 reps x 20kg (cable: constant force)'
+      ].join('\n') },
+      { role: 'user', content: 'ok good looks good' }
+    ]
+  }))));
+
+  assert.equal(rounds, 1, 'must not spend another Anthropic round after a parseable plan');
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a Confirm card built from the last plan in history');
+  assert.equal(proposal.record.status, 'planned');
+  assert.equal(proposal.record.title, 'Welcome Back, King');
+  assert.equal(proposal.record.exercises.length, 3);
+  assert.equal(proposal.record.exercises[0].name, 'Bar Squat');
+  assert.equal(proposal.record.exercises[0].sets.length, 3);
+  assert.equal(proposal.record.exercises[2].sets[0].reps, 20);
+});
+
 test('rejects an unauthenticated request', async () => {
   const handler = createChatHandler({ env: validEnv });
   const response = await handler(new Request('https://life.example/api/chat', {
