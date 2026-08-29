@@ -361,7 +361,8 @@ test('malformed history entries are dropped rather than breaking the request', a
 
 test('conversation history keeps the newest workout plan when earlier lectures overflow the budget', async () => {
   let receivedArgs;
-  const lecture = `OLD LECTURE ${'x'.repeat(3800)} SKI_PULL_MARKER`;
+  const firstLecture = `SKI_PULL_MARKER ${'x'.repeat(4200)}`;
+  const filler = `FILLER ${'x'.repeat(4200)}`;
   const latest = [
     'Comeback Full Body Burn',
     '1. Bar Press — 10 x 30kg',
@@ -386,11 +387,11 @@ test('conversation history keeps the newest workout plan when earlier lectures o
     priorAgentSlug: 'chadwick',
     history: [
       { role: 'user', content: 'welcome back' },
-      { role: 'assistant', content: lecture },
+      { role: 'assistant', content: firstLecture },
       { role: 'user', content: 'I can go longer' },
-      { role: 'assistant', content: lecture },
+      { role: 'assistant', content: filler },
       { role: 'user', content: 'option b' },
-      { role: 'assistant', content: lecture },
+      { role: 'assistant', content: filler },
       { role: 'user', content: 'you changed it' },
       { role: 'assistant', content: latest }
     ]
@@ -1155,7 +1156,7 @@ test('reports days since last session from the exercise library\'s last_performe
   await readSse(await handler(request({ message: 'Chadwick, what should I do today?' })));
 
   assert.match(receivedArgs.system, /3 days since/i);
-  assert.match(receivedArgs.system, /lower the bar/i);
+  assert.match(receivedArgs.system, /smaller default offer|honor that shape/i);
   assert.equal(blobFetches.length, 1, 'the library blob should only be fetched once -- no extra reads for adherence');
 });
 

@@ -1,7 +1,7 @@
 import {
   CHADWICK_FORCE_PLAN_NUDGE,
   shouldForceChadwickPlanProposal
-} from '../../js/core/workout-plan-detect.js';
+} from '../../../js/core/workout-plan-detect.js';
 
 export { CHADWICK_FORCE_PLAN_NUDGE, shouldForceChadwickPlanProposal };
 
