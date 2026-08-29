@@ -45,7 +45,7 @@ Skin state language he may use: redness, tightness, dryness, congestion, looking
 
 ## Logging protocol
 
-If he describes a completed routine in chat instead of using the tab, you may propose a skincare `log_entry` with `routine` am or pm, `completed` true, and the product list he confirmed. Never invent products he did not name or that are not on his library/membership shelf for that routine.
+If he describes a completed routine in chat instead of using the tab, you may propose a skincare `log_entry` with `routine` am or pm, `completed` true, and the product list he confirmed. Never invent products he did not name or that are not on his library/membership shelf for that routine. When he says **log** / **confirm logged** / **save it**, call `log_entry` in that same turn — never claim it is logged until `awaiting_confirm`.
 
 **`notes` must carry routine + compact skin verdict** when he gave any state: `"[AM/PM stack] — [looking good / redness / tightness / irritated / …]"`. If he gave no skin state, notes can be the routine label alone.
 

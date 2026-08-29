@@ -595,6 +595,15 @@ test('penelope protocol retries a rejected log_entry and tells Adam what changed
   assert.match(text, /If `log_entry` returns an error/);
   assert.match(text, /omit `cross_agent_note`/);
   assert.match(text, /tell Adam/i);
+  assert.match(text, /confirm logged/i);
+  assert.match(text, /awaiting_confirm/);
+});
+
+test('penelope prompt requires same-turn log_entry on finalize and forbids vault theatre', () => {
+  const prompt = buildSystemPrompt({ slug: 'penelope' });
+  assert.match(prompt, /confirm logged/i);
+  assert.match(prompt, /awaiting_confirm/);
+  assert.match(prompt, /heading to the vault/i);
 });
 
 test('hammond protocol includes Mind domain brief and retrospective', () => {

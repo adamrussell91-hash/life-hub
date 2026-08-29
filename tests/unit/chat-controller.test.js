@@ -1168,6 +1168,23 @@ test('nudge when Chadwick dumps a numbered plan with no record_proposal', async 
   assert.equal(findNestedClass(exercises.children[0], 'chat-workout__set-load').textContent, '10 × 30 kg');
 });
 
+test('nudge when Brisket claims in the books without a Confirm card', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: "It's in the books, buddy." };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('log lunch');
+  assert.ok(
+    messageBubbles(root).some(b => /stayed in chat only/i.test(bubbleText(b)) && /Confirm card/i.test(bubbleText(b))),
+    'expected a missing-log nudge when Brisket claimed a save without proposing'
+  );
+});
+
 function findNestedClass(node, name) {
   const classes = String(node?.className ?? '').split(/\s+/);
   if (classes.includes(name)) return node;
