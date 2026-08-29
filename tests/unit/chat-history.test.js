@@ -21,13 +21,15 @@ const PLAN_TAIL = [
 ].join('\n');
 
 test('truncateHistoryEntry keeps the numbered plan at the end of a long Chadwick lecture', () => {
-  const lecture = `${'Bro. '.repeat(400)}Here's the full session:\n${PLAN_TAIL}`;
+  const lecture = `HEAD_MARKER ${'x'.repeat(800)} MIDDLE_DROPPED ${'x'.repeat(4000)} Here's the full session:\n${PLAN_TAIL}`;
   assert.ok(lecture.length > MAX_HISTORY_ENTRY_CHARS);
   const truncated = truncateHistoryEntry(lecture);
   assert.ok(truncated.length <= MAX_HISTORY_ENTRY_CHARS);
+  assert.match(truncated, /HEAD_MARKER/);
   assert.match(truncated, /One Grip Russian Twist/);
   assert.match(truncated, /Seated Curl/);
-  assert.doesNotMatch(truncated, /^(Bro\. ){20}/);
+  assert.match(truncated, /\n…\n/);
+  assert.doesNotMatch(truncated, /MIDDLE_DROPPED/);
 });
 
 test('keepNewestHistory prefers the most recent plan when earlier lectures fill the budget', () => {
@@ -39,7 +41,7 @@ test('keepNewestHistory prefers the most recent plan when earlier lectures fill 
     { role: 'user', content: 'option b' },
     { role: 'assistant', content: latestPlan },
     { role: 'user', content: 'ok lets put it into action' }
-  ], { maxTotalChars: 4500, maxEntryChars: 2000 });
+  ], { maxTotalChars: 2000, maxEntryChars: 2000 });
 
   const joined = history.map(entry => entry.content).join('\n');
   assert.match(joined, /ok lets put it into action/);
