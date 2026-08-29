@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   AUDIT_PHASES,
   isHammondAuditTrigger,
+  isHammondAuditSkipIntakeTrigger,
+  startAuditSessionFromMessage,
   normalizeAuditSession,
   buildHammondAuditContract,
   nextAuditPhase
@@ -16,6 +18,33 @@ test('detects CN audit / weekly / monthly / goal audit phrases', () => {
   assert.equal(isHammondAuditTrigger('cn audit'), true);
   assert.equal(isHammondAuditTrigger('log lunch'), false);
   assert.equal(isHammondAuditTrigger('Hammond, what is the protein target?'), false);
+});
+
+test('isHammondAuditSkipIntakeTrigger requires both a trigger phrase and a skip marker', () => {
+  assert.equal(isHammondAuditSkipIntakeTrigger('Hammond, goal audit, skip intake'), true);
+  assert.equal(isHammondAuditSkipIntakeTrigger('auto weekly review, no intake'), true);
+  assert.equal(isHammondAuditSkipIntakeTrigger('weekly review'), false, 'a bare trigger must not skip intake');
+  assert.equal(isHammondAuditSkipIntakeTrigger('skip intake'), false, 'a skip marker with no trigger phrase is not a trigger at all');
+  assert.equal(isHammondAuditSkipIntakeTrigger('log lunch'), false);
+});
+
+test('startAuditSessionFromMessage bootstraps at triage for a plain trigger', () => {
+  assert.deepEqual(
+    startAuditSessionFromMessage('Hammond, run the weekly review'),
+    { kind: 'cn_audit', phase: 'triage', intakeCount: 0 }
+  );
+});
+
+test('startAuditSessionFromMessage bootstraps straight past intake for a skip-intake trigger', () => {
+  assert.deepEqual(
+    startAuditSessionFromMessage('Hammond, goal audit, skip intake'),
+    { kind: 'cn_audit', phase: 'stale_drift', intakeCount: 3 }
+  );
+});
+
+test('startAuditSessionFromMessage returns null for a non-trigger message', () => {
+  assert.equal(startAuditSessionFromMessage('log lunch'), null);
+  assert.equal(startAuditSessionFromMessage('skip intake'), null);
 });
 
 test('normalizeAuditSession accepts only known cn_audit phases', () => {

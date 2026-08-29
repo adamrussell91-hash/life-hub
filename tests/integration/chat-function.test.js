@@ -1617,6 +1617,105 @@ test('invalid auditSession is ignored for prompt injection', async () => {
   assert.doesNotMatch(receivedArgs.system, /audit phase contract/i);
 });
 
+test('a plain trigger message with no auditSession bootstraps a headless audit at triage', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'Triage complete. What is weighing on you?' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  const events = await readSse(await handler(request({ message: 'Hammond, run the weekly review' })));
+  assert.match(receivedArgs.system, /audit phase contract/i);
+  assert.match(receivedArgs.system, /triage/i);
+
+  const phaseEvent = events.find(event => event.type === 'audit_phase');
+  assert.deepEqual(phaseEvent, { type: 'audit_phase', phase: 'triage', intakeCount: 0 });
+
+  const nextEvent = events.find(event => event.type === 'audit_next_session');
+  assert.deepEqual(nextEvent.session, { kind: 'cn_audit', phase: 'intake', intakeCount: 1 });
+});
+
+test('a skip-intake trigger message bootstraps a headless audit straight to stale_drift', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'Here is what is stale and drifting.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  const events = await readSse(await handler(request({ message: 'Hammond, goal audit, skip intake' })));
+  assert.match(receivedArgs.system, /say what is stale and what is drifting/i);
+  assert.doesNotMatch(receivedArgs.system, /ask exactly ONE intake question/i);
+
+  const phaseEvent = events.find(event => event.type === 'audit_phase');
+  assert.deepEqual(phaseEvent, { type: 'audit_phase', phase: 'stale_drift', intakeCount: 3 });
+
+  const nextEvent = events.find(event => event.type === 'audit_next_session');
+  assert.deepEqual(nextEvent.session, { kind: 'cn_audit', phase: 'open_loops', intakeCount: 3 });
+});
+
+test('audit_next_session stays on lock until append_governance_log actually fires, then clears to null', async () => {
+  const stayHandler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([{ type: 'text', delta: 'One non-negotiable for this week.' }, { type: 'done' }])
+    })
+  });
+  const stayEvents = await readSse(await stayHandler(request({
+    message: 'Hammond, goal audit, skip intake',
+    auditSession: { kind: 'cn_audit', phase: 'lock', intakeCount: 3 }
+  })));
+  const stayNext = stayEvents.find(event => event.type === 'audit_next_session');
+  assert.deepEqual(stayNext.session, { kind: 'cn_audit', phase: 'lock', intakeCount: 3 });
+
+  const clearHandler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: async (url, options) => {
+      if (url.includes('/commits/')) {
+        return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+      }
+      if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+      if (options?.method === 'PUT') {
+        return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+      }
+      return Response.json({ message: 'not found' }, { status: 404 });
+    },
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        await executeTools({
+          id: 'call_1',
+          name: 'append_governance_log',
+          input: { entry_type: 'Goal Audit', body: 'Sustainability read for the week.' }
+        });
+        yield { type: 'text', delta: 'Locked in.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+  const clearEvents = await readSse(await clearHandler(request({
+    message: 'Hammond, goal audit, skip intake',
+    auditSession: { kind: 'cn_audit', phase: 'lock', intakeCount: 3 }
+  })));
+  const clearNext = clearEvents.find(event => event.type === 'audit_next_session');
+  assert.deepEqual(clearNext.session, null);
+});
+
 test('Hyaluronica registers skincare library and routine membership tools', async () => {
   let receivedArgs;
   const libraryPath = 'data/skincare/product-library.json';
