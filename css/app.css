@@ -1554,6 +1554,14 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: var(--weight-bold);
   cursor: pointer;
 }
+@media (max-width: 48rem) {
+  .fitness-logger__finish {
+    position: sticky;
+    bottom: 5.5rem;
+    z-index: 3;
+    box-shadow: var(--elev-2);
+  }
+}
 .fitness-logger__finish:disabled { opacity: 0.6; cursor: wait; }
 
 .skincare-streak-pair {
