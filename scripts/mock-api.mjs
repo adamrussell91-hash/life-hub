@@ -16,6 +16,10 @@ const FIXTURE_FILES = [
     source: 'tests/fixtures/valid/data/fitness/2026/07/2026-07-30-chest-curls.md'
   },
   {
+    path: 'data/fitness/2026/08/2026-08-29-upper-body.md',
+    source: 'tests/fixtures/valid/data/fitness/2026/08/2026-08-29-upper-body.md'
+  },
+  {
     path: 'data/mind/2026/07/2026-07-30-diary.md',
     source: 'tests/fixtures/valid/data/mind/2026/07/2026-07-30-diary.md'
   },
@@ -316,14 +320,29 @@ function streamMockChat(response, message) {
   send({ type: 'status', text: 'Loading your logs…' });
   send({ type: 'status', text: 'Thinking…' });
   if (isWorkout) {
-    send({ type: 'text', delta: 'Logging that session now.' });
+    send({ type: 'text', delta: 'Here’s your workout for today. Start it when you’re ready.' });
     send({
       type: 'record_proposal',
-      path: 'data/fitness/2026/08/2026-08-01-workout.md',
+      path: 'data/fitness/2026/08/2026-08-29-upper-body.md',
       record: {
-        schema_version: 1, id: 'mock-workout-1', type: 'workout', date: '2026-08-01',
-        day_type: 'workout_30', status: 'completed', duration_min: 30, exercises: [],
-        created_at: '2026-08-01T18:00:00+10:00', updated_at: '2026-08-01T18:00:00+10:00', source: 'chat'
+        schema_version: 1,
+        id: 'mock-workout-1',
+        type: 'workout',
+        date: '2026-08-29',
+        title: 'Upper Body',
+        session_kind: 'strength',
+        day_type: 'workout_30',
+        status: 'planned',
+        duration_min: 35,
+        exercises: [
+          { name: 'Bench Press', sets: [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }, { reps: 8, weight_kg: 36, cable_type: 'constant_force' }, { reps: 8, weight_kg: 36, cable_type: 'constant_force' }, { reps: 8, weight_kg: 36, cable_type: 'constant_force' }] },
+          { name: 'Decline Dumbbell Bench Press', sets: [{ reps: 10, weight_kg: 20, cable_type: 'none' }, { reps: 10, weight_kg: 20, cable_type: 'none' }, { reps: 10, weight_kg: 20, cable_type: 'none' }, { reps: 10, weight_kg: 20, cable_type: 'none' }] },
+          { name: 'Chair Dip', sets: [{ reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }] },
+          { name: 'Push-Up', sets: [{ reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }] }
+        ],
+        created_at: '2026-08-29T07:30:00+10:00',
+        updated_at: '2026-08-29T07:30:00+10:00',
+        source: 'chat'
       }
     });
   } else if (isMeal) {

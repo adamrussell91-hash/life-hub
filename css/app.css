@@ -1369,10 +1369,38 @@ main { max-width: 76rem; margin: 0 auto; }
   border-radius: 0.85rem;
   background: rgba(20, 43, 81, 0.04);
 }
+.fitness-logger__exercise-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
 .fitness-logger__exercise h4 {
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-size: var(--text-md);
   color: var(--depth);
+}
+.fitness-logger__exercise-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.fitness-logger__icon-btn {
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--warm-white);
+  color: var(--marine);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.fitness-logger__icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .fitness-logger__cue {
   margin: 0 0 0.5rem;
@@ -1431,6 +1459,74 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-logger__add-set {
   margin-top: 0.45rem;
   color: var(--fitness-accent);
+}
+.fitness-logger__add-exercise {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+.fitness-logger__add-exercise input,
+.fitness-logger__field input,
+.fitness-logger__pain-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--warm-white);
+  font: inherit;
+  color: var(--ink);
+}
+.fitness-logger__details {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: rgba(20, 43, 81, 0.04);
+}
+.fitness-logger__details h4 {
+  margin: 0;
+  color: var(--depth);
+  font-size: var(--text-md);
+}
+.fitness-logger__details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.fitness-logger__field {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.fitness-logger__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--depth);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.fitness-logger__pain,
+.fitness-logger__pain-list,
+.fitness-logger__pain-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.fitness-logger__pain-chip {
+  min-height: 44px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--warm-white);
+  color: var(--marine);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
 }
 .fitness-logger__notes {
   display: grid;

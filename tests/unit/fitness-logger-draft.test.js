@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   appendSet,
+  createExercise,
   cloneLoggerDraft,
   draftFingerprint,
   finishLabel,
@@ -9,6 +10,9 @@ import {
   loadDraft,
   saveDraft,
   clearDraft,
+  moveExercise,
+  optionalNumber,
+  parsePainFlag,
   resolveDraft,
   slugFromWorkoutPath,
   slugifyWorkoutTitle,
@@ -75,6 +79,33 @@ test('cloneLoggerDraft preserves coach_cues so they survive to the confirm paylo
 test('cloneLoggerDraft omits coach_cues entirely when the exercise has none', () => {
   const draft = cloneLoggerDraft(planned());
   assert.equal('coach_cues' in draft.exercises[0], false);
+});
+
+test('createExercise rejects a blank name and seeds one set', () => {
+  assert.equal(createExercise('   '), null);
+  const exercise = createExercise('Face Pull');
+  assert.equal(exercise.name, 'Face Pull');
+  assert.equal(exercise.sets.length, 1);
+  assert.equal(exercise.sets[0].reps, 10);
+  assert.equal(exercise.sets[0].cable_type, 'constant_force');
+});
+
+test('moveExercise reorders and ignores out-of-range indexes', () => {
+  const exercises = [{ name: 'A' }, { name: 'B' }, { name: 'C' }];
+  assert.deepEqual(moveExercise(exercises, 2, 0).map(item => item.name), ['C', 'A', 'B']);
+  assert.equal(moveExercise(exercises, 0, 0), exercises);
+  assert.equal(moveExercise(exercises, -1, 1), exercises);
+});
+
+test('parsePainFlag and optionalNumber keep empty values out of the record', () => {
+  assert.equal(parsePainFlag('  '), null);
+  assert.deepEqual(parsePainFlag('right shoulder', 'twinge'), {
+    site: 'right shoulder',
+    note: 'twinge'
+  });
+  assert.deepEqual(parsePainFlag('knee', ''), { site: 'knee' });
+  assert.equal(optionalNumber(''), null);
+  assert.equal(optionalNumber('128'), 128);
 });
 
 test('appendSet clones the last row defaults', () => {

@@ -124,6 +124,25 @@ test('renders no cue elements at all when the exercise has no coach_cues', () =>
   assert.equal(cuesIn(table, 'cue-final-set').length, 0);
 });
 
+test('logger shows add-exercise, reorder controls, and session detail fields', () => {
+  const root = new FakeRoot();
+  renderFitnessLogger(root, draftWithCues(undefined, [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }]), {});
+
+  const add = root.logger.children.find(child => child.className === 'fitness-logger__add-exercise');
+  assert.ok(add);
+  assert.equal(add.children[1].textContent, 'Add exercise');
+
+  const card = findExerciseCard(root.logger);
+  const tools = card.children[0].children[1];
+  assert.equal(tools.children[0].dataset.fitnessLogger, 'move-up');
+  assert.equal(tools.children[1].dataset.fitnessLogger, 'move-down');
+  assert.equal(tools.children[2].dataset.fitnessLogger, 'remove-exercise');
+
+  const details = root.logger.children.find(child => child.className === 'fitness-logger__details');
+  assert.ok(details);
+  assert.match(details.children[0].textContent, /Session details/);
+});
+
 test('a single-set exercise gets the final_set cue on that only set, never a rest cue', () => {
   const root = new FakeRoot();
   const draft = draftWithCues({ rest: 'Shake it out.', final_set: 'This is the one.' });
