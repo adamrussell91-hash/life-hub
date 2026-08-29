@@ -8,6 +8,7 @@ import {
   extractThisWeek,
   extractTodaysStatus
 } from '../core/constraints.js';
+import { dedupeRecentActions } from '../core/central-node-write.js';
 import { getDayTargets } from '../core/targets.js';
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
 
@@ -60,7 +61,7 @@ export function buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdo
       thisMonth: extractThisMonth(markdown),
       longTermTrends: extractLongTermTrends(markdown),
       crossAgentCoordination: extractCrossAgentCoordination(markdown),
-      recentAgentActions: extractRecentAgentActions(markdown)
+      recentAgentActions: dedupeRecentActions(extractRecentAgentActions(markdown))
     },
     completeness,
     liveStatus: {
