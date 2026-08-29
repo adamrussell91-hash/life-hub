@@ -3532,6 +3532,12 @@ main { max-width: 76rem; margin: 0 auto; }
   font-size: var(--text-sm);
   line-height: var(--leading-snug);
 }
+.chat-workout__between {
+  margin: var(--space-1) 0 0;
+  color: var(--wave);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
 .chat-workout__sets {
   list-style: none;
   margin: var(--space-2) 0 0;

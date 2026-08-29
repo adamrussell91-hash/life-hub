@@ -364,8 +364,9 @@ function streamMockChat(response, message) {
     ...PRIVATE_HEADERS,
     Connection: 'keep-alive'
   });
-  const isWorkout = /chad|chadwick|workout/i.test(message);
-  const isPlanDump = /full send|describe the (plan|session)|show (me )?the (plan|session)/i.test(message);
+  const isLockIn = /lock (it|this|the plan) (in|onto)/i.test(message);
+  const isWorkout = isLockIn || /chad|chadwick|workout/i.test(message);
+  const isPlanDump = !isLockIn && /full send|describe the (plan|session)|show (me )?the (plan|session)/i.test(message);
   const isMeal = /brisket|meal|breakfast|lunch|dinner|lasagna|snack|ate|food/i.test(message);
   const send = event => response.write(`data: ${JSON.stringify(event)}\n\n`);
   send({ type: 'agent', slug: isWorkout ? 'chadwick' : isMeal ? 'brisket' : 'router' });

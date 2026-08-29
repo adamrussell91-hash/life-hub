@@ -668,6 +668,7 @@ export function createChatHandler({
           for await (const event of streamWithChadwickPlanForce(anthropic, {
             slug,
             userMessage: parsed.message,
+            today,
             system,
             messages: [...parsed.history, { role: 'user', content: parsed.message }],
             tools,

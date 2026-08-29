@@ -427,6 +427,22 @@ test('renderChatMarkdown turns a flattened workout dump into stacked exercise ro
   assert.equal(findByClass(exercises.children[1], 'chat-workout__set-cable').textContent, 'constant force');
 });
 
+test('renderChatMarkdown parses compact loads and between-set arms', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderChatMarkdown(root, container, [
+    '1. Bar Squat — 10x25kg, 10x25kg, 10x25kg (cable: none) - *between sets:* Bar Bicep Curl — 10x5kg, 10x5kg (cable: none)',
+    '2. Bar Press — 20 reps x 20kg (cable: constant force)'
+  ].join('\n'));
+
+  const exercises = findByClass(container, 'chat-workout__exercises');
+  assert.equal(exercises.children.length, 2);
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__name').textContent, 'Bar Squat');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__set-n').textContent, '3 sets');
+  assert.match(findByClass(exercises.children[0], 'chat-workout__between').textContent, /Bar Bicep Curl/);
+  assert.equal(findByClass(exercises.children[1], 'chat-workout__set-load').textContent, '20 × 20 kg');
+});
+
 test('renderChatMarkdown leaves ordinary chat as multiline markdown', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');

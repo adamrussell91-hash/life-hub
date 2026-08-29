@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildPlannedWorkoutInput,
+  findLatestWorkoutPlanText,
   parseWorkoutChat,
   parseWorkoutSet,
   setsAreIdentical
@@ -23,7 +25,7 @@ test('parseWorkoutSet reads Chadwick chat loads and hub-style loads', () => {
     reps: 10,
     weightKg: 25,
     cable: 'none',
-    raw: '10 reps x 25kg (cable: none)'
+    raw: '10 reps x 25kg'
   });
   assert.equal(parseWorkoutSet('Set 2: 32 kg × 10 reps · cable: concentric').weightKg, 32);
   assert.equal(parseWorkoutSet('Set 3: 10x30kg').reps, 10);
@@ -68,6 +70,61 @@ test('parseWorkoutChat reads sets stacked under an exercise', () => {
 test('parseWorkoutChat ignores a numbered list that is not a workout', () => {
   assert.equal(parseWorkoutChat('1. Breathe\n2. Walk\n3. Stretch'), null);
   assert.equal(parseWorkoutChat('Welcome back, you absolute legend.'), null);
+});
+
+test('parseWorkoutChat reads compact 10x25kg lists and between-set supersets', () => {
+  const plan = parseWorkoutChat([
+    '"Welcome Back, King" — Full Body Pump Session (60 min)',
+    '1. Bar Squat — 10x25kg, 10x25kg, 10x25kg (cable: none) - *between sets:* Bar Bicep Curl — 10x5kg, 10x5kg (cable: none)',
+    '2. Goblet Squat — 12x14kg, 12x14kg (cable: none) - *between sets:* One Handle Arm Triceps — 10x6kg (cable: constant force)',
+    '3. Bar Row — 10x26kg, 10x26kg, 10x26kg (cable: constant force)',
+    '8. Bar Press — FINISHER SET — 20 reps x 20kg (cable: constant force)'
+  ].join('\n'));
+  assert.equal(plan.exercises[0].name, 'Bar Squat');
+  assert.equal(plan.exercises[0].sets.length, 3);
+  assert.equal(plan.exercises[0].sets[0].weightKg, 25);
+  assert.equal(plan.exercises[0].between.name, 'Bar Bicep Curl');
+  assert.equal(plan.exercises[0].between.sets.length, 2);
+  assert.equal(plan.exercises[3].name, 'Bar Press');
+  assert.equal(plan.exercises[3].sets[0].reps, 20);
+  assert.equal(plan.exercises[3].sets[0].weightKg, 20);
+});
+
+test('parseWorkoutChat reads history-style compact lines with trailing cable', () => {
+  const plan = parseWorkoutChat([
+    '1. Bar Press (Chest) — 10x30kg, 10x32kg, 8x34kg — cable: constant force',
+    '2. Bar Row (Back) — 10x27kg, 10x27kg — cable: constant force'
+  ].join('\n'));
+  assert.equal(plan.exercises[0].sets.length, 3);
+  assert.equal(plan.exercises[0].sets[2].reps, 8);
+  assert.equal(plan.exercises[0].sets[2].weightKg, 34);
+  assert.equal(plan.exercises[0].sets[0].cable, 'constant force');
+});
+
+test('buildPlannedWorkoutInput turns a compact dump into a valid planned log_entry', () => {
+  const input = buildPlannedWorkoutInput([
+    'Updated: "Welcome Back, King" — Full Body Pump Session (60 min)',
+    '1. Bar Squat — 10x25kg, 10x25kg, 10x25kg (cable: none)',
+    '2. Bar Row — 10x26kg, 10x26kg, 10x26kg (cable: constant_force)',
+    '3. Bar Press — 20 reps x 20kg (cable: constant force)'
+  ].join('\n'), { date: '2026-08-29' });
+  assert.equal(input.type, 'workout');
+  assert.equal(input.date, '2026-08-29');
+  assert.equal(input.fields.title, 'Welcome Back, King');
+  assert.equal(input.fields.status, 'planned');
+  assert.equal(input.fields.day_type, 'workout_45_60');
+  assert.equal(input.fields.exercises.length, 3);
+  assert.equal(input.fields.exercises[1].sets[0].cable_type, 'constant_force');
+  assert.equal(input.fields.exercises[2].sets[0].reps, 20);
+});
+
+test('findLatestWorkoutPlanText walks newest-first and ignores chatter', () => {
+  const latest = findLatestWorkoutPlanText([
+    '1. Bar Press — 10x30kg (cable: none)\n2. Bar Row — 10x27kg (cable: none)',
+    'Want me to lock this in?',
+    '1. Bar Squat — 10x25kg, 10x25kg (cable: none)\n2. Goblet Squat — 12x14kg (cable: none)\n3. Bar Press — 20x20kg (cable: none)'
+  ]);
+  assert.match(latest, /Goblet Squat/);
 });
 
 test('setsAreIdentical is true only when every set shares load and cable', () => {
