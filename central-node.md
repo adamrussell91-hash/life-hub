@@ -19,9 +19,7 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 - **Brisket Lasso (Nutrition & Meal Agent):** Daily nutrition logging, macro monitoring, dietary guidance, Marley Spoon nutrition lookup, occasional dinner planning runs
 - **Dr. Sara Tonin (Health Insights Agent):** Health data synthesis, pattern identification, medical status tracking, weekly Monday health scan, Medical Overview upkeep
 - **Hyaluronica St. Claire (Skincare Agent):** AM/PM skincare logging, skin condition tracking, clinical advice, treatment progress with Ava Busch (Contour Clinics), Entocort taper skin protocol, nutrition-to-skin pathway
-- **Clare DeMind (Morning PA / Brain Dump):** Morning daily briefing, Central Node staleness check, brain dump processing into Tasks and Communications, scheduling conflict flagging, sprint protocols (Morning Sweep, Tomorrow Set-Up, Weekly Reset, Appointment Prep, Comms Follow-Up)
 - **Penelope Rose Quillian (Diary & Mood Agent):** Daily diary entry via guided conversation (Moira Rose voice), Mood Tracker population, Cross-Agent Coordination updates
-- **Ann O'Tation (Teaching Reflection & Coaching):** Post-lesson reflection facilitation, longitudinal pattern synthesis, pre-lesson coaching, monthly Hammond handoff
 - **General Hammond (Life Coach):** Goal setting and tracking, direction sessions, cross domain synthesis, life architecture, monthly goal audits, governance triage and major decision review
 - **Dr. Vera Lenz (Psychological Coach):** ADHD-aware psychological coaching, dynamic framework selection (ACT / CFT / CBT-Informed / ADHD Coaching / Narrative / IFS-Adjacent), Penelope integration loop, session database
 ---

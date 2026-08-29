@@ -399,18 +399,27 @@ test('purgeStaleRecentActions is a no-op when everything is current', () => {
   assert.equal(purgeStaleRecentActions(content, '2026-08-11'), content);
 });
 
-test('hammond protocol no longer mentions Sterling; central-node.md is untouched by Move 8', () => {
+test('hammond protocol no longer mentions Sterling', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
   const protocol = readFileSync(join(root, 'config/hammond-protocol.md'), 'utf8');
   assert.doesNotMatch(protocol, /Sterling/);
   assert.match(protocol, /5\. Growth and learning/);
   assert.match(protocol, /6\. Comfort \/ convenience/);
+});
 
+test('seed central-node.md Agent Directory no longer lists the vestigial Clare DeMind / Ann O\'Tation entries', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
   const cn = readFileSync(join(root, 'central-node.md'), 'utf8');
-  assert.match(cn, /Clare DeMind/);
-  assert.match(cn, /Ann O'Tation/);
-  // Byte-for-byte guard: this move must not rewrite CN. Hash is stable for the
-  // checked-in file on this branch (assert length + Clare/Ann presence above).
+  const directorySection = cn.slice(cn.indexOf('## 🤖 Agent Directory'), cn.indexOf('## 🔴 Current Constraints'));
+  // Phase 34 deliberately preserved these Notion-era entries; a later cleanup
+  // (with explicit sign-off) removed them from the Agent Directory since they
+  // have zero code presence anywhere and every specialist protocol already
+  // disclaims them as unreachable. Historical "Clare DeMind: ..." lines still
+  // appear in the Recent Agent Actions demo content further down -- that's
+  // realistic seed data, not a claim she's a live agent, so this check is
+  // scoped to the directory listing only.
+  assert.doesNotMatch(directorySection, /Clare DeMind/);
+  assert.doesNotMatch(directorySection, /Ann O'Tation/);
   assert.ok(cn.length > 1000);
   assert.equal(createHash('sha256').update(cn).digest('hex').length, 64);
 });

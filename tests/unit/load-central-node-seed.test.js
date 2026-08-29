@@ -9,6 +9,13 @@ test('loads the checked-in central-node.md seed', () => {
   assert.match(text, /Writing Rules/);
 });
 
+test('seed Agent Directory no longer carries the vestigial Clare DeMind / Ann O\'Tation entries', () => {
+  const text = loadCentralNodeSeed();
+  const directorySection = text.slice(text.indexOf('## 🤖 Agent Directory'), text.indexOf('## 🔴 Current Constraints'));
+  assert.doesNotMatch(directorySection, /Clare DeMind/);
+  assert.doesNotMatch(directorySection, /Ann O'Tation/);
+});
+
 test('returns an empty string when the seed file cannot be read', () => {
   const text = loadCentralNodeSeed({
     readFileSyncImpl: () => {
