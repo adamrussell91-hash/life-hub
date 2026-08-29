@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAnthropicClient, AnthropicClientError } from '../../netlify/functions/_shared/anthropic-client.mjs';
+import {
+  createAnthropicClient,
+  AnthropicClientError,
+  MAX_TOOL_ROUNDS,
+  MAX_PAUSE_CONTINUATIONS
+} from '../../netlify/functions/_shared/anthropic-client.mjs';
 
 function frame(name, payload) {
   return `event: ${name}\ndata: ${JSON.stringify(payload)}\n\n`;
@@ -201,6 +206,52 @@ test('yields fire-and-forget tool_calls when executeTools returns null', async (
     { type: 'tool_call', id: 'call_1', name: 'log_entry', input: { type: 'meal' } },
     { type: 'done' }
   ]);
+});
+
+test('tool and pause-turn limits are runaway brakes, not a web-search budget', () => {
+  assert.ok(MAX_TOOL_ROUNDS >= 16, `expected a high tool-round brake, got ${MAX_TOOL_ROUNDS}`);
+  assert.ok(MAX_PAUSE_CONTINUATIONS >= 10, `expected a high pause-turn brake, got ${MAX_PAUSE_CONTINUATIONS}`);
+});
+
+test('keeps continuing pause_turn past the old 3-search cap so research can iterate', async () => {
+  let calls = 0;
+  const pauseFrames = n => [
+    frame('content_block_start', {
+      index: 0,
+      content_block: { type: 'server_tool_use', id: `srvtoolu_${n}`, name: 'web_search' }
+    }),
+    frame('content_block_delta', {
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: `{"query":"pass ${n}"}` }
+    }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'pause_turn' } }),
+    frame('message_stop', {})
+  ];
+  const doneFrames = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Found it.' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'end_turn' } }),
+    frame('message_stop', {})
+  ];
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async () => {
+      calls += 1;
+      return sseResponse(calls <= 4 ? pauseFrames(calls) : doneFrames);
+    }
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'keep looking' }],
+    tools: [{ type: 'web_search_20250305', name: 'web_search' }]
+  })) events.push(event);
+
+  assert.equal(calls, 5, 'four pause_turns plus a finishing turn');
+  assert.ok(events.some(event => event.type === 'text' && event.delta === 'Found it.'));
 });
 
 test('continues when stop_reason is pause_turn by re-sending assistant content as-is', async () => {

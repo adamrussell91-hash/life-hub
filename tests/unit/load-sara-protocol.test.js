@@ -10,6 +10,8 @@ test('loads the checked-in Sara protocol markdown', () => {
   assert.match(text, /Life Hub Medical Overview is the medical record/);
   assert.doesNotMatch(text, /You do not maintain Medical Records/);
   assert.match(text, /confirm/i);
+  assert.match(text, /no search-use cap/);
+  assert.match(text, /refine and search again/);
 });
 
 test('returns an empty string when the seed file cannot be read', () => {
