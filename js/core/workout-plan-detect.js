@@ -1,4 +1,4 @@
-const LOCK_IN_RE = /\b(put (it|this) into action|lock (it|this|the plan) in|let'?s (do|run|go) (it|this)|go crush it|that'?s the one|save (this|the plan)|log this (in|as|now)|use this (one|plan)|go with this)\b/i;
+const LOCK_IN_RE = /\b(put (it|this) into action|lock (it|this|the plan) (in|onto(?:\s+\w+)?)|lock (it|this) onto fitness|let'?s (do|run|go) (it|this)|go crush it|that'?s the one|save (this|the plan)|log this (in|as|now)|use this (one|plan)|go with this)\b/i;
 
 const CLAIMED_LOCKED_RE = /\b(locked in|logging this as (your|the) plan|i loaded up|the full send)\b/i;
 

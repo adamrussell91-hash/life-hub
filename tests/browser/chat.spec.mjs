@@ -121,3 +121,19 @@ test('a flattened Chadwick prescription renders as stacked exercise rows', async
   assert.doesNotMatch(await workout.innerText(), /Set 1: 10 reps x 25kg \(cable: none\) - Set 2:/);
   await context.close();
 });
+
+test('lock it onto Fitness shows a Confirm card', async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#chat-input').fill('lock it onto Fitness');
+  await page.locator('#chat-send').click();
+
+  const proposal = page.locator('.record-proposal');
+  await proposal.waitFor();
+  assert.match(await proposal.innerText(), /Start workout|Confirm/i);
+  await context.close();
+});

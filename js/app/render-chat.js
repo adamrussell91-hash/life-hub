@@ -192,17 +192,28 @@ function renderWorkoutChat(root, container, plan) {
       item.append(cue);
     }
 
-    if (exercise.sets.length) {
-      const sets = root.createElement('ul');
-      sets.className = 'chat-workout__sets';
-      if (setsAreIdentical(exercise.sets)) {
-        appendChatSetRow(root, sets, exercise.sets[0], { collapsedCount: exercise.sets.length });
-      } else {
-        for (const set of exercise.sets) appendChatSetRow(root, sets, set);
+      if (exercise.sets.length) {
+        const sets = root.createElement('ul');
+        sets.className = 'chat-workout__sets';
+        if (setsAreIdentical(exercise.sets)) {
+          appendChatSetRow(root, sets, exercise.sets[0], { collapsedCount: exercise.sets.length });
+        } else {
+          for (const set of exercise.sets) appendChatSetRow(root, sets, set);
+        }
+        item.append(sets);
       }
-      item.append(sets);
-    }
-    list.append(item);
+      if (exercise.between?.name) {
+        const between = root.createElement('p');
+        between.className = 'chat-workout__between';
+        const load = exercise.between.sets[0];
+        const count = exercise.between.sets.length;
+        const loadText = load
+          ? `${count > 1 ? `${count} × ` : ''}${load.reps} × ${load.weightKg === 0 ? 'bodyweight' : `${load.weightKg} kg`}`
+          : '';
+        between.textContent = `Between sets: ${exercise.between.name}${loadText ? ` · ${loadText}` : ''}`;
+        item.append(between);
+      }
+      list.append(item);
   }
   card.append(list);
 
