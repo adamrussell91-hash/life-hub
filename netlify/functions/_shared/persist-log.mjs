@@ -2,7 +2,8 @@ import { load } from 'js-yaml';
 import { parseEventDocument, TYPE_DOMAINS } from '../../../js/core/records.js';
 import {
   applyLogToCentralNode,
-  formatLogDate
+  formatLogDate,
+  humanizeDayType
 } from '../../../js/core/central-node-write.js';
 import {
   GOVERNANCE_LOG_PATH,
@@ -37,9 +38,13 @@ export function describeRecordForLog(record, notes, { medicalAppend = false } = 
       return `Logged ${what}${macros ? ` (${macros})` : ''}.`;
     }
     case 'workout': {
-      const duration = record.duration_min != null ? `${record.duration_min}-min ` : '';
-      const title = record.title ? ` (${record.title})` : '';
-      return `Logged a ${duration}${record.day_type ?? 'workout'} session${title}.`;
+      const title = typeof record.title === 'string' ? record.title.trim() : '';
+      const dayLabel = humanizeDayType(record.day_type);
+      if (title) {
+        return `Logged a ${dayLabel} session (${title}).`;
+      }
+      const duration = record.duration_min != null ? ` (${record.duration_min} mins)` : '';
+      return `Logged a ${dayLabel} session${duration}.`;
     }
     case 'skincare':
       return `Logged ${record.routine ?? ''} skincare${record.completed === false ? ' (incomplete)' : ''}.`.replace(/\s+/g, ' ');

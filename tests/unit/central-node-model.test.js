@@ -55,7 +55,7 @@ Intro text.
 **30 Jul:** Chadwick: Chest and Curls session completed and logged.
 `;
 
-test('builds the seven markdown sections from central-node.md via js/core/constraints.js, unmodified', () => {
+test('builds the seven markdown sections from central-node.md via js/core/constraints.js', () => {
   const model = buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdown: markdown, date: '2026-07-30' });
 
   assert.match(model.sections.constraints, /Constraint line/);
@@ -65,6 +65,24 @@ test('builds the seven markdown sections from central-node.md via js/core/constr
   assert.match(model.sections.longTermTrends, /Protein target consistency improving/);
   assert.match(model.sections.crossAgentCoordination, /Chadwick→Brisket/);
   assert.match(model.sections.recentAgentActions, /Chest and Curls session completed and logged/);
+});
+
+test('Recent Agent Actions display collapses stacked same-action clones', () => {
+  const spam = `${markdown}
+**29 Aug:** Chadwick Flexington: Logged a 30-min workout_30 session (Biceps and Boobs, 20 mins).
+**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).
+**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).
+`;
+  const model = buildCentralNodeModel({
+    events,
+    targetsConfig,
+    centralNodeMarkdown: spam,
+    date: '2026-07-30'
+  });
+  assert.equal(
+    model.sections.recentAgentActions.split('\n').filter(line => line.includes('Biceps and Boobs')).length,
+    1
+  );
 });
 
 test('builds today\'s logging completeness the same way Home does', () => {
