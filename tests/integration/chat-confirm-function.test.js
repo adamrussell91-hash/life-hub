@@ -232,7 +232,7 @@ test('confirm still succeeds and reports centralNodeUpdated:false when the centr
   assert.equal(putCalls.length, 1, 'only the meal write should happen; central-node.md must not be written on a decode failure');
 });
 
-test('appends Chadwick→Brisket Day Type on completed workout confirm', async () => {
+test('enriches Exercise status and Recent Actions on completed workout confirm (no Day Type directive)', async () => {
   const workoutCandidate = {
     type: 'workout',
     date: '2026-08-01',
@@ -289,7 +289,14 @@ test('appends Chadwick→Brisket Day Type on completed workout confirm', async (
   const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
   // Day Type is derived from the workout record itself, so no directive is written.
   assert.doesNotMatch(writtenContent, /Set Day Type to/);
-  assert.match(writtenContent, /\*\*Exercise:\*\* Chest and Curls · 26 min · completed\./);
+  assert.match(
+    writtenContent,
+    /\*\*Exercise:\*\* Chest and Curls · 26 min · 1 moves · chest\/arms · completed\./
+  );
+  assert.match(
+    writtenContent,
+    /\*\*1 Aug:\*\* Chadwick Flexington: Logged Chest and Curls \(1 moves, 26 min, chest\/arms\)\./
+  );
   assert.match(writtenContent, /Keep prior directives/);
 });
 

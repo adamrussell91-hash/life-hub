@@ -76,6 +76,16 @@ test('an empty food library falls back to a plain web_search instruction', () =>
   assert.doesNotMatch(prompt, /Food Library:/);
 });
 
+test('shared prompt tells every agent to iterate on web search with no use cap', () => {
+  for (const slug of ['brisket', 'chadwick', 'hyaluronica', 'sara', 'hammond']) {
+    const prompt = buildSystemPrompt({ slug, digest: '', constraints: '' });
+    assert.match(prompt, /Web search has no use cap/);
+    assert.match(prompt, /work iteratively/);
+    assert.match(prompt, /first-result miss is not permission to guess/);
+    assert.doesNotMatch(prompt, /don't run multiple searches to cross-verify/);
+  }
+});
+
 test('a populated food library is included with instructions to check it before searching', () => {
   const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '', foodLibrary: '- Domino\'s Meatlovers Pizza (1 slice) — calories=250' });
   assert.match(prompt, /check the Food Library below first/);
@@ -341,13 +351,31 @@ test('brisket prompt includes protocol when provided', () => {
   assert.match(prompt, /Brisket operating manual/);
   assert.match(prompt, /Food Library first/);
   assert.match(prompt, /compact verdict/i);
+  assert.match(prompt, /Nutrition lookup is a pipeline/);
+  assert.match(prompt, /comparable AU restaurant nutrition/);
+});
+
+test('food-search instructions require iterative venue resolution instead of one-shot guessing', () => {
+  const empty = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
+  const withLibrary = buildSystemPrompt({
+    slug: 'brisket',
+    digest: '',
+    constraints: '',
+    foodLibrary: '- Domino\'s Meatlovers Pizza (1 slice) — calories=250'
+  });
+  for (const prompt of [empty, withLibrary]) {
+    assert.match(prompt, /never .{0,2}too generic to search/i);
+    assert.match(prompt, /venue \+ location \+ item/);
+    assert.match(prompt, /do not guess and do not stop/i);
+    assert.doesNotMatch(prompt, /One solid Australian source is enough/);
+  }
 });
 
 test('shared logging prompt: proposals await Confirm; estimates are last resort; never fake a completed log', () => {
   const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
   assert.match(prompt, /awaiting confirm|Confirm card|before that record is saved/i);
   assert.match(prompt, /do not (say|claim|tell).{0,60}(logged|saved to (Nutrition|today))/i);
-  assert.match(prompt, /Only fall back to a good-faith estimate when/i);
+  assert.match(prompt, /Only fall back to a labelled estimate after/i);
   assert.match(prompt, /partial|incomplete|re-search|ask Adam for the AU label/i);
   assert.match(prompt, /do not (call )?save_food_library_entry.{0,80}estimate/i);
 });

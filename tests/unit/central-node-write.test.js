@@ -7,13 +7,16 @@ import {
   buildMealFlagsLine,
   buildNutritionStatusLine,
   dedupeCrossAgentSection,
+  dedupeRecentActions,
   formatStatusHeadingDate,
   formatThisMonthHeading,
   formatThisWeekHeading,
   humanizeDayType,
   purgeStaleRecentActions,
+  recentActionFingerprint,
   replaceTodaysStatus,
   rollStaleSections,
+  shouldAppendRecentAction,
   trimCrossAgentSection,
   upsertStatusField
 } from '../../js/core/central-node-write.js';
@@ -43,24 +46,154 @@ test('appendRecentAction inserts directly under the Recent Agent Actions heading
   assert.match(next, /## 📝 Recent Agent Actions\n\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast\.\n\*\*1 Aug:\*\*/);
 });
 
-test('appendRecentAction skips an exact repeat of an already-present bullet', () => {
-  const once = appendRecentAction(base, '\n**1 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).');
-  const twice = appendRecentAction(once, '\n**1 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).');
-  assert.equal(twice, once);
-  assert.equal((twice.match(/Biceps and Boobs/g) ?? []).length, 1);
+test('appendRecentAction replaces a same-fingerprint workout line instead of stacking clones', () => {
+  const withDupeSeed = [
+    '## 📝 Recent Agent Actions',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**28 Aug:** Brisket Lasso: Logged lunch.'
+  ].join('\n');
+
+  const next = appendRecentAction(
+    withDupeSeed,
+    '**29 Aug:** Chadwick Flexington: Logged a 30-min Workout session (Biceps and Boobs, 20 mins).'
+  );
+  const bullets = next.split('\n').filter(line => line.startsWith('**29 Aug:** Chadwick'));
+  assert.equal(bullets.length, 1);
+  assert.match(bullets[0], /30-min Workout session/);
+  assert.match(next, /\*\*28 Aug:\*\* Brisket Lasso: Logged lunch\./);
 });
 
-test('appendRecentAction dedups regardless of date-stamp/whitespace differences', () => {
-  const once = appendRecentAction(base, '\n**1 Aug:**   Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).');
-  const twice = appendRecentAction(once, '\n**2 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).');
-  assert.equal(twice, once);
+test('appendRecentAction is a no-op when the identical action line already exists', () => {
+  const line = '**1 Aug:** Brisket Lasso: Logged breakfast for breakfast (520 kcal).';
+  const content = `## 📝 Recent Agent Actions\n${line}`;
+  assert.equal(appendRecentAction(content, `\n${line}`), content);
 });
 
-test('appendRecentAction still inserts a genuinely different same-day action', () => {
-  const once = appendRecentAction(base, '\n**1 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).');
-  const twice = appendRecentAction(once, '\n**1 Aug:** Brisket Lasso: Logged breakfast.');
-  assert.match(twice, /Biceps and Boobs/);
-  assert.match(twice, /Logged breakfast/);
+test('dedupeRecentActions keeps the newest line of each fingerprint', () => {
+  const content = [
+    '## 📝 Recent Agent Actions',
+    '**29 Aug:** Chadwick Flexington: Logged a 30-min workout_30 session (Biceps and Boobs, 20 mins).',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**7 Aug:** Hyaluronica St. Claire: Logged pm skincare.',
+    '**7 Aug:** Hyaluronica St. Claire: Logged pm skincare.',
+    '*48-hour rolling window.*'
+  ].join('\n');
+  const next = dedupeRecentActions(content);
+  assert.equal(
+    next.split('\n').filter(line => line.includes('Biceps and Boobs')).length,
+    1
+  );
+  assert.equal(
+    next.split('\n').filter(line => line.includes('Logged pm skincare')).length,
+    1
+  );
+  assert.match(next, /48-hour rolling window/);
+});
+
+test('recentActionFingerprint treats duration-prefixed workout clones as the same action', () => {
+  assert.equal(
+    recentActionFingerprint(
+      '**29 Aug:** Chadwick Flexington: Logged a 30-min workout_30 session (Biceps and Boobs, 20 mins).'
+    ),
+    recentActionFingerprint(
+      '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).'
+    )
+  );
+});
+
+test('shouldAppendRecentAction skips planned workouts but keeps completed ones', () => {
+  assert.equal(shouldAppendRecentAction({ type: 'workout', status: 'planned' }), false);
+  assert.equal(shouldAppendRecentAction({ type: 'workout', status: 'completed' }), true);
+  assert.equal(shouldAppendRecentAction({ type: 'workout', status: 'skipped' }), true);
+  assert.equal(shouldAppendRecentAction({ type: 'meal', meal: 'lunch' }), true);
+});
+
+test('applyLogToCentralNode does not touch Status or Recent Actions for planned workouts', () => {
+  const next = applyLogToCentralNode(base, {
+    record: {
+      type: 'workout',
+      date: '2026-08-01',
+      status: 'planned',
+      title: 'Biceps and Boobs, 20 mins',
+      day_type: 'workout_30'
+    },
+    actionLine: '\n**1 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).'
+  });
+  assert.equal(next, base);
+});
+
+test('applyLogToCentralNode collapses stacked workout clones when a completed session lands', () => {
+  const spam = [
+    '# Purpose',
+    '---',
+    "## ⚡ Today's Status (Friday 29 August 2026)",
+    '**Exercise:** prior.',
+    '---',
+    '## 📝 Recent Agent Actions',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).'
+  ].join('\n');
+
+  const next = applyLogToCentralNode(spam, {
+    record: {
+      type: 'workout',
+      date: '2026-08-29',
+      status: 'completed',
+      title: 'Biceps and Boobs, 20 mins',
+      day_type: 'workout_30',
+      duration_min: 20,
+      focus: ['chest', 'arms'],
+      exercises: [{ name: 'Bar Press' }, { name: 'Curl' }]
+    },
+    actionLine:
+      '\n**29 Aug:** Chadwick Flexington: Logged Biceps and Boobs, 20 mins (2 moves, 20 min, chest/arms).',
+    flagNotes: 'Biceps and Boobs — AC clear, matched last loads'
+  });
+  const recent = next.slice(next.indexOf('## 📝 Recent Agent Actions'));
+  assert.equal(
+    recent.split('\n').filter(line => line.includes('Biceps and Boobs')).length,
+    1
+  );
+  assert.match(recent, /Logged Biceps and Boobs, 20 mins \(2 moves, 20 min, chest\/arms\)/);
+  assert.match(next, /\*\*Exercise:\*\* Biceps and Boobs, 20 mins · 20 min · 2 moves · chest\/arms · completed\./);
+  assert.match(next, /\*\*Flags:\*\* Biceps and Boobs — AC clear, matched last loads/);
+});
+
+test('completed workout with pain_flags writes Flags and Chadwick→Sara Cross-Agent lines', () => {
+  const baseWithXa = [
+    '# Purpose',
+    '---',
+    "## ⚡ Today's Status (Friday 29 August 2026)",
+    '**Health:** Stable.',
+    '---',
+    '## 🤝 Cross-Agent Coordination',
+    '- Keep me.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+
+  const next = applyLogToCentralNode(baseWithXa, {
+    record: {
+      type: 'workout',
+      date: '2026-08-29',
+      status: 'completed',
+      title: 'Biceps and Boobs, 20 mins',
+      day_type: 'workout_30',
+      duration_min: 20,
+      exercises: [{ name: 'Bar Press' }],
+      pain_flags: [{ site: 'right AC', note: 'mild twinge on fly, parked' }]
+    },
+    actionLine: '\n**29 Aug:** Chadwick Flexington: Logged Biceps and Boobs, 20 mins (1 moves, 20 min).'
+  });
+  assert.match(next, /\*\*Flags:\*\* right AC: mild twinge on fly, parked/);
+  assert.match(
+    next,
+    /Chadwick→Sara: Biceps and Boobs, 20 mins — right AC: mild twinge on fly, parked/
+  );
+  assert.match(next, /- Keep me\./);
 });
 
 test('buildNutritionStatusLine formats totals only', () => {

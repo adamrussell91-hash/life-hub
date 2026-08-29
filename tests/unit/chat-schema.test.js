@@ -203,7 +203,8 @@ test('the workout whitelist accepts every field validateWorkout actually recogni
         },
         sets: [{ reps: 8, weight_kg: 60, cable_type: 'concentric' }]
       }],
-      pain_flags: [{ site: 'left shoulder', note: 'mild twinge' }]
+      pain_flags: [{ site: 'left shoulder', note: 'mild twinge' }],
+      cross_agent_note: 'Chadwick→Sara: left shoulder twinge on press, monitor.'
     }
   }, { id: 'workout-1', now: '2026-08-01T07:45:00+10:00' });
 

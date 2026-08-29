@@ -5,6 +5,8 @@ import {
   createPassphraseHash,
   createSessionToken,
   serializeSessionCookie,
+  SESSION_MS,
+  shouldRefreshSession,
   verifyPassphrase,
   verifySessionToken
 } from '../../netlify/functions/_shared/auth-security.mjs';
@@ -18,16 +20,18 @@ test('scrypt verifier accepts only the original passphrase', async () => {
   assert.equal(await verifyPassphrase('wrong horse', encoded), false);
 });
 
-test('signed session expires after eight hours and rejects tampering', () => {
+test('signed session expires after thirty days and rejects tampering', () => {
   const secret = 's'.repeat(32);
   const issued = createSessionToken({
     now: Date.parse('2026-08-01T00:00:00Z'),
     randomBytes: () => Buffer.alloc(16, 3)
   }, secret);
-  assert.equal(verifySessionToken(issued.token, secret, Date.parse('2026-08-01T07:59:59Z')).valid, true);
-  assert.equal(verifySessionToken(issued.token, secret, Date.parse('2026-08-01T08:00:00Z')).reason, 'expired');
-  assert.equal(verifySessionToken(`${issued.token}x`, secret, Date.parse('2026-08-01T01:00:00Z')).valid, false);
-  assert.equal(verifySessionToken(issued.token, secret, Date.parse('2026-08-01T08:00:01Z')).reason, 'expired');
+  const beforeExpiry = Date.parse('2026-08-01T00:00:00Z') + SESSION_MS - 1;
+  const atExpiry = Date.parse('2026-08-01T00:00:00Z') + SESSION_MS;
+  assert.equal(verifySessionToken(issued.token, secret, beforeExpiry).valid, true);
+  assert.equal(verifySessionToken(issued.token, secret, atExpiry).reason, 'expired');
+  assert.equal(verifySessionToken(`${issued.token}x`, secret, beforeExpiry).valid, false);
+  assert.equal(verifySessionToken(issued.token, secret, atExpiry + 1).reason, 'expired');
 });
 
 test('rejects non-canonical base64url session signatures and password hash components', async () => {
@@ -51,9 +55,19 @@ test('rejects non-canonical base64url session signatures and password hash compo
 
 test('session cookie uses every required browser security attribute', () => {
   const cookie = serializeSessionCookie('abc');
-  for (const value of ['life_hub_session=abc', 'Secure', 'HttpOnly', 'SameSite=None', 'Path=/', 'Max-Age=28800']) {
+  const maxAgeSeconds = Math.floor(SESSION_MS / 1000);
+  for (const value of ['life_hub_session=abc', 'Secure', 'HttpOnly', 'SameSite=Lax', 'Path=/', `Max-Age=${maxAgeSeconds}`]) {
     assert.match(cookie, new RegExp(value.replace('/', '\\/')));
   }
+});
+
+test('shouldRefreshSession is true only in the second half of the session lifetime', () => {
+  const issuedAt = Date.parse('2026-08-01T00:00:00Z');
+  const payload = { v: 1, iat: issuedAt, exp: issuedAt + SESSION_MS, jti: 'abc' };
+  assert.equal(shouldRefreshSession(payload, issuedAt + SESSION_MS / 2 - 1), false);
+  assert.equal(shouldRefreshSession(payload, issuedAt + SESSION_MS / 2), true);
+  assert.equal(shouldRefreshSession(payload, issuedAt + SESSION_MS - 1), true);
+  assert.equal(shouldRefreshSession(payload, issuedAt + SESSION_MS), false);
 });
 
 test('hidden passphrase input ends on a newline within a pasted data chunk', async () => {

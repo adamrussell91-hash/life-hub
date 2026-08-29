@@ -81,6 +81,10 @@ const DOMAIN_PROPERTIES = {
         properties: { site: { type: 'string' }, note: { type: 'string' } },
         required: ['site']
       }
+    },
+    cross_agent_note: {
+      type: 'string',
+      description: 'Optional one-line Chadwick→Sara/Brisket directive when another agent must act. Format: Chadwick→Sara: ...'
     }
   },
   diary: {

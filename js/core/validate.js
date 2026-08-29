@@ -100,7 +100,7 @@ function crossAgentNote(record, field, errors, { senderName } = {}) {
   }
   const [, sender, recipient] = match;
   if (senderName && sender !== senderName) {
-    errors.push(`${field} sender must be ${senderName} on a ${senderName === 'Vera' ? 'mind_session' : 'diary'} record`);
+    errors.push(`${field} sender must be ${senderName}`);
   }
   if (sender === recipient) {
     errors.push(`${field} sender and recipient must differ`);
@@ -243,6 +243,7 @@ function validateWorkout(record, errors) {
       });
     }
   }
+  crossAgentNote(record, 'cross_agent_note', errors, { senderName: 'Chadwick' });
 }
 
 function validateDiary(record, errors) {

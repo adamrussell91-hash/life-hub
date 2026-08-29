@@ -55,7 +55,7 @@ test('auth issues a protected cookie and session validates it', async () => {
   const body = await session.json();
   assert.equal(body.ok, true);
   assert.equal(body.data.authenticated, true);
-  assert.equal(body.data.expiresAt, new Date(1_754_009_600_000 + 8 * 60 * 60 * 1_000).toISOString());
+  assert.equal(body.data.expiresAt, new Date(1_754_009_600_000 + 30 * 24 * 60 * 60 * 1_000).toISOString());
 });
 
 test('handlers reject unsupported methods with their Allow contract', async () => {
@@ -160,6 +160,27 @@ test('auth reports absent required environment as misconfigured', async () => {
   assert.deepEqual((await response.json()).error.code, 'misconfigured');
 });
 
+test('session refreshes cookies in the second half of the lifetime', async () => {
+  const issuedAt = 1_754_009_600_000;
+  const auth = createAuthHandler({
+    env: validEnv,
+    verifyPassphrase: async value => value === 'accepted',
+    now: () => issuedAt,
+    randomBytes: () => Buffer.alloc(16, 1)
+  });
+  const signed = await auth(authRequest('accepted'));
+  const cookie = signed.headers.get('set-cookie');
+  const refreshAt = issuedAt + 30 * 24 * 60 * 60 * 1_000 / 2;
+  const sessionHandler = createSessionHandler({ env: validEnv, now: () => refreshAt });
+  const response = await sessionHandler(requestWithCookie(cookie));
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.match(response.headers.get('set-cookie'), /life_hub_session=/);
+  assert.equal(body.data.expiresAt, new Date(refreshAt + 30 * 24 * 60 * 60 * 1_000).toISOString());
+});
+
 test('session clears invalid and expired cookies', async () => {
   const invalid = await createSessionHandler({ env: validEnv })(requestWithCookie('life_hub_session=invalid'));
   const expiredToken = createAuthHandler({
@@ -169,10 +190,10 @@ test('session clears invalid and expired cookies', async () => {
     randomBytes: () => Buffer.alloc(16, 2)
   });
   const signed = await expiredToken(authRequest('accepted'));
-  const expired = await createSessionHandler({ env: validEnv, now: () => 1_754_038_400_001 })(
+  const expired = await createSessionHandler({ env: validEnv, now: () => 1_754_009_600_000 + 30 * 24 * 60 * 60 * 1_000 + 1 })(
     requestWithCookie(signed.headers.get('set-cookie'))
   );
-  const exactBoundary = await createSessionHandler({ env: validEnv, now: () => 1_754_038_400_000 })(
+  const exactBoundary = await createSessionHandler({ env: validEnv, now: () => 1_754_009_600_000 + 30 * 24 * 60 * 60 * 1_000 })(
     requestWithCookie(signed.headers.get('set-cookie'))
   );
 

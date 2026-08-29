@@ -6,6 +6,8 @@ test('loads the checked-in Hyaluronica protocol markdown', () => {
   const text = loadHyaluronicaProtocol();
   assert.match(text, /Skincare tab|Operating Manual/i);
   assert.match(text, /Before advising or logging|Central Node after skincare/i);
+  assert.match(text, /Work iteratively/);
+  assert.match(text, /no search-use cap/);
 });
 
 test('returns an empty string when the seed file cannot be read', () => {
