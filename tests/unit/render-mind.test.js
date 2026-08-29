@@ -200,16 +200,6 @@ function fakeRoot() {
   tileInsights.id = 'mind-tile-insights';
   const tileFactors = el('article');
   tileFactors.id = 'mind-tile-factors';
-  const tileStreak = el('article');
-  tileStreak.id = 'mind-tile-streak';
-  const streakRing = el('svg');
-  streakRing.id = 'mind-streak-ring';
-  const streakTrack = el('circle');
-  streakTrack.dataset.role = 'track';
-  const streakFill = el('circle');
-  streakFill.dataset.role = 'fill';
-  streakRing.append(streakTrack, streakFill);
-  tileStreak.append(streakRing);
   const tileConstellation = el('article');
   tileConstellation.id = 'mind-tile-constellation';
   const constellation = el('svg');
@@ -241,11 +231,6 @@ function fakeRoot() {
   streamHint.dataset.mind = 'stream-hint';
   streamHint.hidden = true;
   tileStream.append(streamWrap, streamFoot, streamHint);
-  const tileTransitions = el('article');
-  tileTransitions.id = 'mind-tile-transitions';
-  const sankeySvg = el('svg');
-  sankeySvg.id = 'mind-sankey';
-  tileTransitions.append(sankeySvg);
   const tileBump = el('article');
   tileBump.id = 'mind-tile-bump';
   const bumpSvg = el('svg');
@@ -340,15 +325,11 @@ function fakeRoot() {
     '#mind-board': board,
     '#mind-thread-sheet': threadSheet,
     '#mind-tile-factors': tileFactors,
-    '#mind-tile-streak': tileStreak,
-    '#mind-streak-ring': streakRing,
     '#mind-tile-constellation': tileConstellation,
     '#mind-constellation': constellation,
     '#mind-tension': tension,
     '#mind-tile-stream': tileStream,
     '#mind-stream': streamSvg,
-    '#mind-tile-transitions': tileTransitions,
-    '#mind-sankey': sankeySvg,
     '#mind-tile-bump': tileBump,
     '#mind-bump': bumpSvg,
     '#mind-tile-chord': tileChord,
@@ -600,19 +581,16 @@ test('chord arcs, ribbons, and legend use distinct theme slot colours', () => {
   assert.ok(swatches.every(swatch => CLINICAL_CHART_SLOTS.includes(swatch)));
 });
 
-test('renderMind paints honest empty instead of sparse chord, sankey, radial, and tension', () => {
+test('renderMind paints honest empty instead of sparse chord, radial, and tension', () => {
   const root = fakeRoot();
   renderMind(root, emptyModel({
     empty: false,
     themeCooccurrence: [{ themeA: 'work', themeB: 'shame', count: 1 }],
-    moodTransitions: [{ from: 'low', to: 'good', count: 1 }],
     moodSeries: [],
     tensions: []
   }));
   assert.match(root.querySelector('#mind-tile-chord').textContent, /Need 3 paired themes/);
   assert.equal(root.querySelector('#mind-chord').children.length, 0);
-  assert.match(root.querySelector('#mind-tile-transitions').textContent, /Need 3 transitions/);
-  assert.equal(root.querySelector('#mind-sankey').children.length, 0);
   assert.match(root.querySelector('#mind-tile-radial').textContent, /Need /);
   assert.equal(root.querySelector('#mind-radial-year').children.length, 0);
   const tension = root.querySelector('#mind-tension');
@@ -620,16 +598,14 @@ test('renderMind paints honest empty instead of sparse chord, sankey, radial, an
   assert.match(tension.textContent, /Need /);
 });
 
-test('renderMind paints factor bars and streak label', () => {
+test('renderMind paints factor bars', () => {
   const root = fakeRoot();
   renderMind(root, {
     ...emptyModel(),
     empty: false,
-    factorEffects: [{ key: 'walk', label: 'walk', effect: 1.5, direction: 'positive' }],
-    consistency: { daysWithEntry: 10, windowDays: 30, streak: 3 }
+    factorEffects: [{ key: 'walk', label: 'walk', effect: 1.5, direction: 'positive' }]
   });
   assert.match(root.querySelector('#mind-tile-factors').textContent, /walk/);
-  assert.match(root.querySelector('#mind-tile-streak').textContent, /3/);
 });
 
 test('renderMind draws constellation nodes and keeps empty tension as honest empty', () => {
@@ -828,7 +804,10 @@ test('index.html Mind board has no Talk launchers or cadence heatmap', async () 
   assert.doesNotMatch(mind, /id="mind-cadence"/);
   assert.doesNotMatch(mind, /id="mind-heatmap-diary"/);
   assert.match(mind, /id="mind-themes"/);
-  assert.match(mind, /id="mind-tile-streak"/);
+  assert.doesNotMatch(mind, /id="mind-tile-streak"/);
+  assert.doesNotMatch(mind, /id="mind-tile-transitions"/);
+  assert.doesNotMatch(mind, /Am I showing up/);
+  assert.doesNotMatch(mind, /What follows a Low day/);
   assert.match(mind, /data-mind-range="year"/);
   assert.match(mind, /id="mind-mood-radial-label"/);
   assert.match(mind, /id="mind-energy-orbit"/);
