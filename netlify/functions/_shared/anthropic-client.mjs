@@ -2,7 +2,11 @@ const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 8192;
-const MAX_TOOL_ROUNDS = 6;
+// A session build can call search_exercise_library / save_exercise_library_entry
+// once per move (5-9 exercises) before ever reaching log_entry if the model
+// doesn't batch those calls in one turn -- 6 rounds was too tight for that
+// realistic, non-batched pattern and silently ended turns with no proposal.
+const MAX_TOOL_ROUNDS = 9;
 const MAX_PAUSE_CONTINUATIONS = 3;
 
 export class AnthropicClientError extends Error {
