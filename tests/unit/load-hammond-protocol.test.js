@@ -30,6 +30,8 @@ test('protocol points write-back at CN tools and Governance Log', () => {
   assert.match(text, /propose_central_node_patch/);
   assert.match(text, /## Tools/);
   assert.match(text, /entry_type/);
+  assert.match(text, /web_search/);
+  assert.match(text, /no use cap/);
   assert.doesNotMatch(text, /Life Hub persists CN from confirmed specialist logs/);
   assert.doesNotMatch(text, /No fake database write/);
 });
