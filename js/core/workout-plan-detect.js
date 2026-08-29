@@ -1,6 +1,6 @@
-const LOCK_IN_RE = /\b(put (it|this) into action|lock (it|this|the plan) (in|onto(?:\s+\w+)?)|lock (it|this) onto fitness|let'?s (do|run|go) (it|this)|go crush it|that'?s the one|save (this|the plan)|log this (in|as|now)|use this (one|plan)|go with this)\b/i;
+const LOCK_IN_RE = /\b(?:put (?:it|this) into action|lock(?:ed|ing)? (?:it|this|the plan) (?:in|onto(?:\s+\w+)?)|lock(?:ed|ing)? (?:it|this) onto fitness|let'?s (?:do|run|go) (?:it|this)|go crush it|that'?s the one|save (?:this|the plan)|log this (?:in|as|now)|use this (?:one|plan)|go with this|make (?:the|this|my) workout|is (?:it|this) ready(?: to go)?|ready to go|go ahead|start (?:the |this )?(?:workout|session)|put (?:it|this) on(?:to)? fitness)\b/i;
 
-const CLAIMED_LOCKED_RE = /\b(locked in|logging this as (your|the) plan|i loaded up|the full send)\b/i;
+const CLAIMED_LOCKED_RE = /\b(?:locked in|locking (?:it|this|the plan) (?:in|onto)|logging this as (?:your|the) plan|i loaded up|the full send)\b/i;
 
 export const CHADWICK_FORCE_PLAN_NUDGE = [
   'You described a finished workout in chat but did not call log_entry.',

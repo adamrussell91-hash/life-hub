@@ -360,8 +360,13 @@ test('malformed history entries are dropped rather than breaking the request', a
 });
 
 test('conversation history keeps the newest workout plan when earlier lectures overflow the budget', async () => {
-  let receivedArgs;
-  const firstLecture = `SKI_PULL_MARKER ${'x'.repeat(4200)}`;
+  let rounds = 0;
+  const firstLecture = [
+    '1. Ski Pull — 10x20kg SKI_PULL_MARKER',
+    '2. Bar Row — 10x20kg',
+    '3. Bar Squat — 10x20kg',
+    'x'.repeat(4200)
+  ].join('\n');
   const filler = `FILLER ${'x'.repeat(4200)}`;
   const latest = [
     'Comeback Full Body Burn',
@@ -375,14 +380,14 @@ test('conversation history keeps the newest workout plan when earlier lectures o
     now: () => Date.parse('2026-08-01T06:00:00Z'),
     fetchImpl: githubFetchStub(),
     createAnthropicClient: () => ({
-      streamMessage: args => {
-        receivedArgs = args;
+      streamMessage: () => {
+        rounds += 1;
         return mockedStream([{ type: 'text', delta: 'On it.' }, { type: 'done' }]);
       }
     })
   });
 
-  await readSse(await handler(request({
+  const events = contentEvents(await readSse(await handler(request({
     message: 'ok lets put it into action',
     priorAgentSlug: 'chadwick',
     history: [
@@ -395,12 +400,14 @@ test('conversation history keeps the newest workout plan when earlier lectures o
       { role: 'user', content: 'you changed it' },
       { role: 'assistant', content: latest }
     ]
-  })));
+  }))));
 
-  const joined = receivedArgs.messages.map(entry => entry.content).join('\n');
-  assert.match(joined, /RUSSIAN_TWIST_MARKER/);
-  assert.match(joined, /ok lets put it into action/);
-  assert.doesNotMatch(joined, /SKI_PULL_MARKER/);
+  assert.equal(rounds, 0, 'lock-in must not wait on Anthropic when the newest plan still parses');
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a Confirm card from the newest plan');
+  const names = proposal.record.exercises.map(exercise => exercise.name).join('\n');
+  assert.match(names, /One Grip Russian Twist/);
+  assert.doesNotMatch(names, /Ski Pull/);
 });
 
 test('a Chadwick lock-in with no log_entry forces a second round that can propose the plan', async () => {
@@ -453,12 +460,16 @@ test('a Chadwick lock-in with no log_entry forces a second round that can propos
   assert.equal(proposal.record.title, 'Comeback Full Body Burn');
 });
 
-test('lock it onto Fitness builds a Confirm card from history without a second model round', async () => {
+test('lock it onto Fitness builds a Confirm card from history without calling the model', async () => {
   let rounds = 0;
+  let githubCalls = 0;
   const handler = createChatHandler({
     env: validEnv,
     now: () => Date.parse('2026-08-01T06:00:00Z'),
-    fetchImpl: githubFetchStub(),
+    fetchImpl: async url => {
+      githubCalls += 1;
+      return githubFetchStub()(url);
+    },
     createAnthropicClient: () => ({
       streamMessage: () => {
         rounds += 1;
@@ -481,7 +492,8 @@ test('lock it onto Fitness builds a Confirm card from history without a second m
     ]
   }))));
 
-  assert.equal(rounds, 1, 'must not spend another Anthropic round after a parseable plan');
+  assert.equal(rounds, 0, 'must not wait on Anthropic when the plan is already in history');
+  assert.equal(githubCalls, 0, 'must not load logs before emitting the Confirm card');
   const proposal = events.find(event => event.type === 'record_proposal');
   assert.ok(proposal, 'expected a Confirm card built from the last plan in history');
   assert.equal(proposal.record.status, 'planned');
@@ -490,6 +502,42 @@ test('lock it onto Fitness builds a Confirm card from history without a second m
   assert.equal(proposal.record.exercises[0].name, 'Bar Squat');
   assert.equal(proposal.record.exercises[0].sets.length, 3);
   assert.equal(proposal.record.exercises[2].sets[0].reps, 20);
+});
+
+test('make the workout after Locking it in now emits a Confirm card immediately', async () => {
+  let rounds = 0;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => {
+        rounds += 1;
+        return mockedStream([{ type: 'text', delta: 'That reply got cut off.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'make the workout',
+    priorAgentSlug: 'chadwick',
+    history: [
+      { role: 'assistant', content: [
+        '1. Bar Squat — 10x25kg, 10x25kg, 10x25kg, 10x25kg (cable: none)',
+        '12. One Grip Russian Twist — 20×6kg (cable: none)',
+        '13. Bar Press — FINISHER — 20×20kg (cable: constant force)'
+      ].join('\n') },
+      { role: 'assistant', content: 'Locking it in now.' }
+    ]
+  }))));
+
+  assert.equal(rounds, 0);
+  assert.ok(events.some(event => event.type === 'text' && /On Fitness/i.test(event.delta)));
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a Confirm card instead of a timeout');
+  assert.equal(proposal.record.status, 'planned');
+  assert.equal(proposal.record.exercises.at(-1).name, 'Bar Press');
+  assert.equal(proposal.record.exercises.at(-1).sets[0].reps, 20);
 });
 
 test('rejects an unauthenticated request', async () => {
