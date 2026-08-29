@@ -519,6 +519,30 @@ test('non-hammond prompts never include hammondCnSummary', () => {
   assert.equal(prompt.includes('Central Node computed snapshot'), false);
 });
 
+test('Hammond prompt includes pending Central Node patches when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    pendingCnPatches: '- [cnp_abc123] (proposed 2026-08-29): Condense Trends. (section: long_term_trends, op: condense)'
+  });
+  assert.match(prompt, /Pending Central Node patches awaiting Adam's Confirm/);
+  assert.match(prompt, /cnp_abc123/);
+  assert.match(prompt, /do not silently re-propose the same edit/);
+});
+
+test('Hammond prompt omits the pending patches block when none are provided', () => {
+  const prompt = buildSystemPrompt({ slug: 'hammond' });
+  assert.equal(prompt.includes('Pending Central Node patches'), false);
+});
+
+test('non-hammond prompts never include pendingCnPatches', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    pendingCnPatches: '- [cnp_abc123] (proposed 2026-08-29): Condense Trends. (section: long_term_trends, op: condense)'
+  });
+  assert.equal(prompt.includes('cnp_abc123'), false);
+  assert.equal(prompt.includes('Pending Central Node patches'), false);
+});
+
 test('non-hammond prompts never include hammondDigest', () => {
   const prompt = buildSystemPrompt({
     slug: 'brisket',

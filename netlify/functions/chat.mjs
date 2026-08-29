@@ -24,7 +24,13 @@ import { loadVeraProtocol, VERA_INTAKE_PATH } from './_shared/load-vera-protocol
 import { loadBrisketProtocol } from './_shared/load-brisket-protocol.mjs';
 import { loadSaraProtocol } from './_shared/load-sara-protocol.mjs';
 import { loadHammondProtocol } from './_shared/load-hammond-protocol.mjs';
-import { normalizeAuditSession, buildHammondAuditContract } from './_shared/hammond-audit.mjs';
+import {
+  normalizeAuditSession,
+  buildHammondAuditContract,
+  startAuditSessionFromMessage,
+  nextAuditPhase,
+  SKIP_INTAKE_RE as AUDIT_SKIP_INTAKE_RE
+} from './_shared/hammond-audit.mjs';
 import {
   extractConstraints,
   extractCrossAgentCoordination,
@@ -73,6 +79,15 @@ import {
   classifyCentralNodePatchRisk,
   applyCentralNodePatch
 } from './_shared/hammond-tools.mjs';
+import {
+  PENDING_CN_PATCHES_PATH,
+  createPendingCnPatchId,
+  parsePendingCnPatches,
+  serializePendingCnPatches,
+  addPendingCnPatch,
+  purgeStalePendingCnPatches,
+  formatPendingCnPatchesForPrompt
+} from './_shared/cn-patch-queue.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -189,8 +204,17 @@ export function createChatHandler({
 
     const slug = routeAgent(parsed.message, parsed.priorAgentSlug);
     const agent = slug === ROUTER_SLUG ? null : findAgent(slug);
-    const hammondAuditContract = slug === 'hammond' && parsed.auditSession
-      ? buildHammondAuditContract(parsed.auditSession)
+    // The browser client owns its own audit-session state machine and always
+    // supplies auditSession once one is active. A caller with no client-side
+    // state to carry across turns (a headless/scheduled trigger) gets one
+    // bootstrapped here from the message text alone -- purely additive, so the
+    // existing browser flow (which always sends its own auditSession) is
+    // unaffected.
+    const effectiveAuditSession = slug === 'hammond'
+      ? (parsed.auditSession ?? startAuditSessionFromMessage(parsed.message))
+      : null;
+    const hammondAuditContract = effectiveAuditSession
+      ? buildHammondAuditContract(effectiveAuditSession)
       : '';
     const today = getSydneyDateKey(new Date(now()));
     // Chat only needs a thin digest (today + yesterday). A full week of blob
@@ -254,11 +278,11 @@ export function createChatHandler({
           }
         };
         send({ type: 'agent', slug });
-        if (hammondAuditContract && parsed.auditSession) {
+        if (hammondAuditContract && effectiveAuditSession) {
           send({
             type: 'audit_phase',
-            phase: parsed.auditSession.phase,
-            intakeCount: parsed.auditSession.intakeCount
+            phase: effectiveAuditSession.phase,
+            intakeCount: effectiveAuditSession.intakeCount
           });
         }
 
@@ -294,6 +318,8 @@ export function createChatHandler({
         let governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
         let governanceLogSha;
         let governanceLogTail = '';
+        let pendingCnPatches = [];
+        let pendingCnPatchesSha;
         let hammondDigest = '';
         let hammondCnSummary = '';
         let foodLibraryEntries = [];
@@ -340,6 +366,10 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === GOVERNANCE_LOG_PATH && entry.type === 'blob')
             : null;
           governanceLogSha = governanceLogEntry?.sha;
+          const pendingCnPatchesEntry = needsHammondTools
+            ? current.tree.find(entry => entry.path === PENDING_CN_PATCHES_PATH && entry.type === 'blob')
+            : null;
+          pendingCnPatchesSha = pendingCnPatchesEntry?.sha;
           const foodLibraryEntry = needsFoodLibrary
             ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
             : null;
@@ -397,6 +427,7 @@ export function createChatHandler({
             dataBlobs,
             centralNodeBlob,
             governanceLogBlob,
+            pendingCnPatchesBlob,
             foodLibraryBlob,
             exerciseLibraryBlob,
             skincareLibraryBlob,
@@ -414,6 +445,7 @@ export function createChatHandler({
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
             governanceLogEntry ? client.readBlob(governanceLogEntry.sha) : null,
+            pendingCnPatchesEntry ? client.readBlob(pendingCnPatchesEntry.sha) : null,
             foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
             skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
@@ -459,6 +491,9 @@ export function createChatHandler({
               governanceLog = emptyGovernanceLog();
             }
             governanceLogTail = recentGovernanceTail(governanceLog);
+
+            const decodedPendingCnPatches = pendingCnPatchesBlob ? decodeBlob(pendingCnPatchesBlob) : null;
+            pendingCnPatches = purgeStalePendingCnPatches(parsePendingCnPatches(decodedPendingCnPatches), today);
           }
 
           const decodedFoodLibrary = foodLibraryBlob ? decodeBlob(foodLibraryBlob) : null;
@@ -594,6 +629,8 @@ export function createChatHandler({
           governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
           governanceLogSha = undefined;
           governanceLogTail = '';
+          pendingCnPatches = [];
+          pendingCnPatchesSha = undefined;
           hammondDigest = '';
           hammondCnSummary = '';
           hammondMindAmbient = '';
@@ -647,6 +684,7 @@ export function createChatHandler({
           governanceLogIsEmpty: needsHammondTools && governanceLog === emptyGovernanceLog(),
           hammondDigest,
           hammondCnSummary,
+          pendingCnPatches: needsHammondTools ? formatPendingCnPatchesForPrompt(pendingCnPatches) : '',
           foodLibrary,
           chadwickProtocol,
           hyaluronicaProtocol,
@@ -676,6 +714,33 @@ export function createChatHandler({
         });
 
         let pendingLogRejection = null;
+        let governanceLogAppendedThisTurn = false;
+        let turnErrored = false;
+        // Persists a Confirm-class Central Node patch to the durable pending queue
+        // before emitting its Confirm card, so it survives past this one response
+        // instead of living only in the SSE stream + DOM (see cn-patch-queue.mjs).
+        // Best-effort: a queue write failure still lets the same-turn Confirm work,
+        // it just won't be resurfaceable in a later turn if this one gets dropped.
+        const proposeCentralNodePatch = async patch => {
+          let persistedId = null;
+          try {
+            const entry = { id: createPendingCnPatchId(), createdAt: today, slug, patch };
+            const nextQueue = addPendingCnPatch(pendingCnPatches, entry);
+            const result = await client.writeFile({
+              path: PENDING_CN_PATCHES_PATH,
+              content: serializePendingCnPatches(nextQueue),
+              ...(pendingCnPatchesSha ? { sha: pendingCnPatchesSha } : {}),
+              message: `chore(cn-patch-queue): propose ${patch.payload.summary}`
+            });
+            pendingCnPatches = nextQueue;
+            pendingCnPatchesSha = result.sha;
+            persistedId = entry.id;
+          } catch {
+            // Swallowed — see comment above.
+          }
+          send({ type: 'cn_patch_proposal', patch, id: persistedId });
+          return persistedId;
+        };
         try {
           const emit = event => {
             if (event.type === 'record_proposal' || event.type === 'record_saved') {
@@ -869,6 +934,7 @@ export function createChatHandler({
                   });
                   governanceLog = next;
                   governanceLogSha = result.sha;
+                  governanceLogAppendedThisTurn = true;
                   send({ type: 'governance_log_appended', entryType: dated.entryType });
                   return JSON.stringify({ ok: true, path: GOVERNANCE_LOG_PATH });
                 } catch {
@@ -884,11 +950,12 @@ export function createChatHandler({
                 if (risk === 'confirm') {
                   // Anthropic client swallows tool_call when executeTools returns
                   // non-null — emit Confirm SSE here (same as central_node_patched).
-                  send({ type: 'cn_patch_proposal', patch });
+                  const pendingId = await proposeCentralNodePatch(patch);
                   return JSON.stringify({
                     ok: true,
                     status: 'awaiting_confirm',
-                    summary: patch.payload.summary
+                    summary: patch.payload.summary,
+                    ...(pendingId ? { pendingId } : {})
                   });
                 }
                 if (!centralNodeMarkdown) {
@@ -944,7 +1011,7 @@ export function createChatHandler({
             } else if (event.type === 'tool_call' && event.name === 'propose_central_node_patch') {
               const patch = validateCentralNodePatchInput(event.input);
               if (patch && classifyCentralNodePatchRisk(patch) === 'confirm') {
-                send({ type: 'cn_patch_proposal', patch });
+                await proposeCentralNodePatch(patch);
               } else {
                 send(event);
               }
@@ -953,10 +1020,31 @@ export function createChatHandler({
             }
           }
         } catch (error) {
+          turnErrored = true;
           send({ type: 'error', code: error instanceof AnthropicClientError ? error.code : 'anthropic_unavailable' });
         } finally {
           if (pendingLogRejection) {
             send({ type: 'record_rejected', errors: pendingLogRejection.errors });
+          }
+          // Server-side phase advancement for a headless/scheduled caller with no
+          // client-side audit state machine of its own (see effectiveAuditSession
+          // above) -- gives it a simple contract: read the next session off this
+          // event, resend it as auditSession next turn, stop once it's null.
+          // Skipped on a turn error (nothing meaningful happened to advance from),
+          // and mirrors chat-controller.js's advanceAuditSession: lock cannot
+          // advance without append_governance_log having actually fired this turn.
+          if (effectiveAuditSession && !turnErrored) {
+            const phase = effectiveAuditSession.phase;
+            const nextSession = phase === 'lock' && !governanceLogAppendedThisTurn
+              ? effectiveAuditSession
+              : nextAuditPhase(effectiveAuditSession, (phase === 'triage' || phase === 'intake')
+                ? {
+                    askedIntakeQuestion: true,
+                    skipRemainingIntake: AUDIT_SKIP_INTAKE_RE.test(parsed.message),
+                    intakeComplete: AUDIT_SKIP_INTAKE_RE.test(parsed.message)
+                  }
+                : {});
+            send({ type: 'audit_next_session', session: nextSession });
           }
           controller.close();
         }

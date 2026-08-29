@@ -615,6 +615,233 @@ test('cn_patch confirm writes central-node.md for a confirm-class delete_lines p
   assert.match(JSON.parse(putCall.options.body).message, /chore\(cn\): Remove taper constraint/);
 });
 
+const PENDING_QUEUE_PATH = 'data/hammond/pending-cn-patches.json';
+
+function queuedEntry(id, patch = confirmPatch) {
+  return { id, createdAt: '2026-07-30', slug: 'hammond', patch };
+}
+
+test('cn_patch confirm loads the patch from the pending queue by id (ignoring a stale candidate) and dequeues it on success', async () => {
+  const cnSha = 'f'.repeat(40);
+  const queueSha = 'e'.repeat(40);
+  const queue = [queuedEntry('cnp_abc123'), queuedEntry('cnp_other', { ...confirmPatch, payload: { ...confirmPatch.payload, summary: 'Other' } })];
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'central-node.md', type: 'blob', sha: cnSha },
+          { path: PENDING_QUEUE_PATH, type: 'blob', sha: queueSha }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(CN_FIXTURE, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  // A deliberately different, invalid candidate -- proves the server prefers
+  // the stored patch found by id over whatever the client resubmitted.
+  const response = await handler(request({
+    kind: 'cn_patch',
+    slug: 'hammond',
+    id: 'cnp_abc123',
+    candidate: { section: 'not_a_real_section', op: 'append_line', payload: { summary: 'ignored' } }
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.summary, 'Remove taper constraint');
+
+  const cnPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('central-node.md'));
+  assert.ok(cnPut);
+  const written = Buffer.from(JSON.parse(cnPut.options.body).content, 'base64').toString('utf8');
+  assert.doesNotMatch(written, /Steroid taper/);
+
+  const queuePut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('pending-cn-patches.json'));
+  assert.ok(queuePut, 'expected the queue to be rewritten to dequeue the confirmed entry');
+  const nextQueue = JSON.parse(Buffer.from(JSON.parse(queuePut.options.body).content, 'base64').toString('utf8'));
+  assert.equal(nextQueue.length, 1);
+  assert.equal(nextQueue[0].id, 'cnp_other');
+});
+
+test('cn_patch confirm falls back to the resubmitted candidate when the id is not found in the queue', async () => {
+  const cnSha = 'f'.repeat(40);
+  const queueSha = 'e'.repeat(40);
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'central-node.md', type: 'blob', sha: cnSha },
+          { path: PENDING_QUEUE_PATH, type: 'blob', sha: queueSha }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(CN_FIXTURE, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify([]), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({
+    kind: 'cn_patch',
+    slug: 'hammond',
+    id: 'cnp_gone',
+    candidate: confirmPatch
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.summary, 'Remove taper constraint');
+});
+
+test('cn_patch confirm write-conflict on central-node.md leaves the pending entry queued', async () => {
+  const cnSha = 'f'.repeat(40);
+  const queueSha = 'e'.repeat(40);
+  const queue = [queuedEntry('cnp_abc123')];
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'central-node.md', type: 'blob', sha: cnSha },
+          { path: PENDING_QUEUE_PATH, type: 'blob', sha: queueSha }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(CN_FIXTURE, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT' && url.includes('central-node.md')) {
+      return Response.json({ message: 'conflict' }, { status: 409 });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({ kind: 'cn_patch', slug: 'hammond', id: 'cnp_abc123', candidate: confirmPatch }));
+  assert.equal(response.status, 409);
+
+  const queuePut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('pending-cn-patches.json'));
+  assert.equal(queuePut, undefined, 'the queue must not be touched when the Central Node write itself failed');
+});
+
+test('cn_patch_dismiss removes the queued entry and never touches central-node.md', async () => {
+  const queueSha = 'e'.repeat(40);
+  const queue = [queuedEntry('cnp_abc123'), queuedEntry('cnp_keep')];
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: PENDING_QUEUE_PATH, type: 'blob', sha: queueSha }] });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({ kind: 'cn_patch_dismiss', slug: 'hammond', id: 'cnp_abc123' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(payload.data, { id: 'cnp_abc123', dismissed: true });
+  assert.equal(calls.some(call => call.url.includes('central-node.md')), false);
+
+  const queuePut = calls.find(call => call.options?.method === 'PUT');
+  assert.ok(queuePut);
+  const nextQueue = JSON.parse(Buffer.from(JSON.parse(queuePut.options.body).content, 'base64').toString('utf8'));
+  assert.deepEqual(nextQueue.map(entry => entry.id), ['cnp_keep']);
+});
+
+test('cn_patch_dismiss is idempotent for an unknown or already-removed id', async () => {
+  const { calls, fetchImpl } = githubFetchStub();
+  const treeFetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    return fetchImpl(url, options);
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl: treeFetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({ kind: 'cn_patch_dismiss', slug: 'hammond', id: 'cnp_never_existed' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(payload.data, { id: 'cnp_never_existed', dismissed: true });
+  assert.equal(calls.some(call => call.options?.method === 'PUT'), false);
+});
+
+test('cn_patch_dismiss without an id is rejected', async () => {
+  const { fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T06:00:00Z') });
+
+  const response = await handler(request({ kind: 'cn_patch_dismiss', slug: 'hammond' }));
+  assert.equal(response.status, 400);
+});
+
 test('cn_patch confirm rejects auto-class patches with 400', async () => {
   const { calls, fetchImpl } = githubFetchStub();
   const handler = createChatConfirmHandler({

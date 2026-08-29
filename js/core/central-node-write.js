@@ -276,6 +276,54 @@ export function humanizeDayType(dayType) {
 // Hammond owns semantic purge (condense op); this is the mechanical floor underneath him.
 export const MAX_CROSS_AGENT_LINES = 12;
 
+const CROSS_AGENT_LINE_RE = /^-\s*([A-Za-z][\w' ]*?)(?:→([A-Za-z][\w' ]*?))?:\s*(.*)$/;
+
+// Coarse (sender, recipient, topic) key for a Cross-Agent bullet. Two lines from
+// the same sender→recipient pair whose body opens with the same handful of words
+// are treated as the same unresolved thread restated, not two distinct notes.
+function crossAgentLineKey(line) {
+  const match = CROSS_AGENT_LINE_RE.exec(line.trim());
+  if (!match) return null;
+  const [, sender, recipient, body] = match;
+  // Plain [a-z]+ (no apostrophe) deliberately: real repeated lines vary between
+  // quoted ('getting in trouble') and unquoted (getting in trouble) phrasing of
+  // the same thread, and an apostrophe in the char class would make "'getting"
+  // and "getting" tokenize differently, breaking the exact case this must catch.
+  const fingerprint = (body.toLowerCase().match(/[a-z]+/g) ?? []).slice(0, 8).join(' ');
+  if (!fingerprint) return null;
+  return `${sender.trim().toLowerCase()}|${(recipient ?? '').trim().toLowerCase()}|${fingerprint}`;
+}
+
+/**
+ * Collapse consecutive near-duplicate directives from the same sender→recipient
+ * pair about the same topic, keeping only the newest. Directives insert
+ * newest-first, so "newest" is whichever occurrence comes first walking top to
+ * bottom. Mechanical dedup only — runs alongside, not instead of, the line-count
+ * cap in trimCrossAgentSection. Unparseable bullets are always kept.
+ */
+export function dedupeCrossAgentSection(content) {
+  const headingIndex = content.indexOf(CROSS_AGENT_HEADING);
+  if (headingIndex === -1) return content;
+  const sectionStart = headingIndex + CROSS_AGENT_HEADING.length;
+  const after = content.slice(sectionStart);
+  const endRel = after.search(/\n## /);
+  const section = endRel === -1 ? after : after.slice(0, endRel);
+  const rest = endRel === -1 ? '' : after.slice(endRel);
+
+  const lines = section.split('\n');
+  const seenKeys = new Set();
+  const kept = lines.filter(line => {
+    if (!/^\s*[-*]\s+\S/.test(line)) return true;
+    const key = crossAgentLineKey(line);
+    if (!key) return true;
+    if (seenKeys.has(key)) return false;
+    seenKeys.add(key);
+    return true;
+  });
+  if (kept.length === lines.length) return content;
+  return `${content.slice(0, sectionStart)}${kept.join('\n')}${rest}`;
+}
+
 export function trimCrossAgentSection(content, { maxLines = MAX_CROSS_AGENT_LINES } = {}) {
   const headingIndex = content.indexOf(CROSS_AGENT_HEADING);
   if (headingIndex === -1) return content;
@@ -511,6 +559,7 @@ export function applyLogToCentralNode(content, {
   // it from the workout record and getDayTargets() has already applied it to the targets
   // Brisket reads, so the line instructed him to set a value that was computed and used
   // two steps earlier. Removed 2026-08-11; the honest signal is Today's Status Exercise.
+  next = dedupeCrossAgentSection(next);
   next = trimCrossAgentSection(next);
   next = rollStaleSections(next, record.date);
   next = purgeStaleRecentActions(next, record.date);

@@ -6,6 +6,7 @@ import {
   applyLogToCentralNode,
   buildMealFlagsLine,
   buildNutritionStatusLine,
+  dedupeCrossAgentSection,
   dedupeRecentActions,
   formatStatusHeadingDate,
   formatThisMonthHeading,
@@ -313,6 +314,66 @@ test('trimCrossAgentSection keeps the newest directives and drops the tail', () 
   assert.match(next, /## 📝 Recent Agent Actions/);
 });
 
+test('dedupeCrossAgentSection collapses repeated same-thread lines from the same sender, keeping the newest', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    "- Vera→Hammond: Body-level question (what 'getting in trouble' feels like physically) has now been left open at close five times without landing. Strong recommend: next session open directly with this.",
+    "- Vera→Hammond: Body-level question (what getting in trouble feels like physically) has now been left open at close four times across today's sessions without landing.",
+    '- Penelope→Hammond: Adam reports persistent low mood, unrelated thread.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+
+  const next = dedupeCrossAgentSection(base);
+  assert.match(next, /left open at close five times/);
+  assert.doesNotMatch(next, /left open at close four times/);
+  assert.match(next, /Penelope→Hammond: Adam reports persistent low mood/);
+});
+
+test('dedupeCrossAgentSection leaves distinct threads from the same sender alone', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    '- Chadwick→Sara: 26 Jul right AC deep ache recurring during everyday movement.',
+    '- Chadwick→Sara: 24 Jul mild AC noise on upright close grip curls during the session.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+  assert.equal(dedupeCrossAgentSection(base), base);
+});
+
+test('dedupeCrossAgentSection keeps unparseable bullets untouched', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    '- Just a note with no sender arrow at all.',
+    '- Just a note with no sender arrow at all.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+  assert.equal(dedupeCrossAgentSection(base), base);
+});
+
+test('dedupeCrossAgentSection runs before trimCrossAgentSection so a duplicate never displaces a distinct line', () => {
+  const duplicatePair = [
+    '- Vera→Hammond: same open thread left open at close today, restated a second time, still not landing.',
+    '- Vera→Hammond: same open thread left open at close today, this is the first time it was raised.'
+  ];
+  const distinctOld = Array.from({ length: 11 }, (_, index) => `- Distinct directive ${index + 1}.`);
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    ...duplicatePair,
+    ...distinctOld,
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+
+  const deduped = trimCrossAgentSection(dedupeCrossAgentSection(base), { maxLines: 12 });
+  assert.match(deduped, /restated a second time, still not landing/);
+  assert.match(deduped, /Distinct directive 11\./);
+
+  const notDeduped = trimCrossAgentSection(base, { maxLines: 12 });
+  assert.doesNotMatch(notDeduped, /Distinct directive 11\./);
+});
+
 test('trimCrossAgentSection leaves a short section untouched', () => {
   const base = [
     '## 🤝 Cross-Agent Coordination',
@@ -471,18 +532,27 @@ test('purgeStaleRecentActions is a no-op when everything is current', () => {
   assert.equal(purgeStaleRecentActions(content, '2026-08-11'), content);
 });
 
-test('hammond protocol no longer mentions Sterling; central-node.md is untouched by Move 8', () => {
+test('hammond protocol no longer mentions Sterling', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
   const protocol = readFileSync(join(root, 'config/hammond-protocol.md'), 'utf8');
   assert.doesNotMatch(protocol, /Sterling/);
   assert.match(protocol, /5\. Growth and learning/);
   assert.match(protocol, /6\. Comfort \/ convenience/);
+});
 
+test('seed central-node.md Agent Directory no longer lists the vestigial Clare DeMind / Ann O\'Tation entries', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
   const cn = readFileSync(join(root, 'central-node.md'), 'utf8');
-  assert.match(cn, /Clare DeMind/);
-  assert.match(cn, /Ann O'Tation/);
-  // Byte-for-byte guard: this move must not rewrite CN. Hash is stable for the
-  // checked-in file on this branch (assert length + Clare/Ann presence above).
+  const directorySection = cn.slice(cn.indexOf('## 🤖 Agent Directory'), cn.indexOf('## 🔴 Current Constraints'));
+  // Phase 34 deliberately preserved these Notion-era entries; a later cleanup
+  // (with explicit sign-off) removed them from the Agent Directory since they
+  // have zero code presence anywhere and every specialist protocol already
+  // disclaims them as unreachable. Historical "Clare DeMind: ..." lines still
+  // appear in the Recent Agent Actions demo content further down -- that's
+  // realistic seed data, not a claim she's a live agent, so this check is
+  // scoped to the directory listing only.
+  assert.doesNotMatch(directorySection, /Clare DeMind/);
+  assert.doesNotMatch(directorySection, /Ann O'Tation/);
   assert.ok(cn.length > 1000);
   assert.equal(createHash('sha256').update(cn).digest('hex').length, 64);
 });

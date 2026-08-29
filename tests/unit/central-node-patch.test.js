@@ -135,6 +135,21 @@ test('apply append_line to cross_agent', () => {
   assert.match(next, /Hammond→Brisket: hold surplus/);
 });
 
+test('apply append_line to cross_agent dedupes a repeat of the same thread', () => {
+  const withFirst = applyCentralNodePatch(FIXTURE, {
+    section: 'cross_agent',
+    op: 'append_line',
+    payload: { text: "- Vera→Hammond: body-level question left open at close today, first time raised." }
+  });
+  const withSecond = applyCentralNodePatch(withFirst, {
+    section: 'cross_agent',
+    op: 'append_line',
+    payload: { text: "- Vera→Hammond: body-level question left open at close today, restated a second time." }
+  });
+  assert.doesNotMatch(withSecond, /first time raised/);
+  assert.match(withSecond, /restated a second time/);
+});
+
 test('apply append_line to constraints', () => {
   const next = applyCentralNodePatch(FIXTURE, {
     section: 'constraints',
@@ -210,7 +225,7 @@ Purpose body.
 - 1 Jan — Brisket: meal logged
 `;
 
-test('apply append_line lands before section-closing ---', () => {
+test('apply append_line to cross_agent prepends newest-first, still before section-closing ---', () => {
   const next = applyCentralNodePatch(FIXTURE_WITH_HR, {
     section: 'cross_agent',
     op: 'append_line',
@@ -218,7 +233,28 @@ test('apply append_line lands before section-closing ---', () => {
   });
   assert.match(
     next,
-    /## 🤝 Cross-Agent Coordination\n- Chadwick→Brisket: training day\n- Hammond→Brisket: hold surplus\n---\n## 📝 Recent Agent Actions/
+    /## 🤝 Cross-Agent Coordination\n- Hammond→Brisket: hold surplus\n- Chadwick→Brisket: training day\n---\n## 📝 Recent Agent Actions/
+  );
+});
+
+test('apply append_line to this_week still lands before section-closing --- (bottom-append)', () => {
+  const fixture = `# Purpose
+Purpose body.
+---
+## 📅 This Week
+- Lift Mon
+---
+## 📊 This Month
+- Sleep by 11
+`;
+  const next = applyCentralNodePatch(fixture, {
+    section: 'this_week',
+    op: 'append_line',
+    payload: { text: '- Ran 5k Wed' }
+  });
+  assert.match(
+    next,
+    /## 📅 This Week\n- Lift Mon\n- Ran 5k Wed\n---\n## 📊 This Month/
   );
 });
 
