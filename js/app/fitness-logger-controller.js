@@ -3,7 +3,11 @@ import {
   appendSet,
   clearDraft,
   cloneLoggerDraft,
+  createExercise,
   draftFingerprint,
+  moveExercise,
+  optionalNumber,
+  parsePainFlag,
   resolveDraft,
   saveDraft,
   toConfirmPayload
@@ -106,33 +110,82 @@ export function createFitnessLoggerController({
     }, idleMs);
   }
 
+  function touchDraft({ rerenderAfter = false } = {}) {
+    persistLocal();
+    setSaveState('Unsaved edits');
+    if (rerenderAfter) rerender();
+    scheduleAutosave();
+  }
+
   function applyChange(change) {
     if (!draft) return;
     if (change.type === 'notes') {
       draft.notes = change.value;
+    } else if (change.type === 'session') {
+      if (change.field === 'recovery_flag_next_day') {
+        draft.recovery_flag_next_day = Boolean(change.value);
+      } else if (['avg_hr', 'calories_kcal', 'distance_km', 'duration_min'].includes(change.field)) {
+        draft[change.field] = optionalNumber(change.value);
+      } else {
+        return;
+      }
     } else if (change.type === 'bench') {
       const exercise = draft.exercises[change.exerciseIndex];
       if (!exercise) return;
       if (change.value == null) delete exercise.bench_angle_deg;
       else exercise.bench_angle_deg = change.value;
+    } else if (change.type === 'intensification') {
+      const exercise = draft.exercises[change.exerciseIndex];
+      if (!exercise) return;
+      if (!change.value) delete exercise.intensification;
+      else exercise.intensification = change.value;
     } else if (change.type === 'set') {
       const set = draft.exercises[change.exerciseIndex]?.sets?.[change.setIndex];
       if (!set) return;
       if (change.field === 'cable_type') set.cable_type = change.value;
       else set[change.field] = Number.isFinite(change.value) ? change.value : 0;
+    } else if (change.type === 'pain-add') {
+      const flag = parsePainFlag(change.site, change.note);
+      if (!flag) return;
+      draft.pain_flags = [...(draft.pain_flags ?? []), flag];
+      touchDraft({ rerenderAfter: true });
+      return;
+    } else if (change.type === 'pain-remove') {
+      draft.pain_flags = (draft.pain_flags ?? []).filter((_, index) => index !== change.index);
+      touchDraft({ rerenderAfter: true });
+      return;
+    } else {
+      return;
     }
-    persistLocal();
-    setSaveState('Unsaved edits');
-    scheduleAutosave();
+    touchDraft();
   }
 
   function addSet(exerciseIndex) {
     if (!draft?.exercises?.[exerciseIndex]) return;
     draft.exercises[exerciseIndex] = appendSet(draft.exercises[exerciseIndex]);
-    persistLocal();
-    setSaveState('Unsaved edits');
-    rerender();
-    scheduleAutosave();
+    touchDraft({ rerenderAfter: true });
+  }
+
+  function addExercise(name) {
+    if (!draft) return;
+    const exercise = createExercise(name);
+    if (!exercise) return;
+    draft.exercises = [...(draft.exercises ?? []), exercise];
+    touchDraft({ rerenderAfter: true });
+  }
+
+  function reorderExercise(fromIndex, toIndex) {
+    if (!draft) return;
+    const next = moveExercise(draft.exercises, fromIndex, toIndex);
+    if (next === draft.exercises) return;
+    draft.exercises = next;
+    touchDraft({ rerenderAfter: true });
+  }
+
+  function removeExercise(exerciseIndex) {
+    if (!draft?.exercises?.[exerciseIndex]) return;
+    draft.exercises = draft.exercises.filter((_, index) => index !== exerciseIndex);
+    touchDraft({ rerenderAfter: true });
   }
 
   function captureRunningSegment() {
@@ -192,6 +245,9 @@ export function createFitnessLoggerController({
       timer: getTimerState(),
       onChange: applyChange,
       onAddSet: addSet,
+      onAddExercise: addExercise,
+      onMoveExercise: reorderExercise,
+      onRemoveExercise: removeExercise,
       onFinish: () => void finish(),
       onStart: startTimer,
       onPause: pauseTimer,
@@ -233,7 +289,7 @@ export function createFitnessLoggerController({
     if (timerState === 'running') captureRunningSegment();
     stopInterval();
     const mins = Math.round(elapsedMs() / 60_000);
-    if (mins > 0) draft.duration_min = mins;
+    if (mins > 0 && draft.duration_min == null) draft.duration_min = mins;
     setSaveState('Finishing…');
     const finishButton = root.querySelector('[data-fitness-logger="finish"]');
     if (finishButton) finishButton.disabled = true;
@@ -311,6 +367,9 @@ export function createFitnessLoggerController({
     startTimer,
     pauseTimer,
     completeTimer,
-    undoCompleteTimer
+    undoCompleteTimer,
+    addExercise,
+    reorderExercise,
+    removeExercise
   };
 }

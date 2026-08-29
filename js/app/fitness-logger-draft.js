@@ -7,6 +7,15 @@ export const CABLE_TYPES = [
   'none'
 ];
 
+export const INTENSIFICATIONS = [
+  'drop_set',
+  'rest_pause',
+  'eccentric_overload',
+  'elastic_finisher',
+  'superset',
+  'other'
+];
+
 export const AUTOSAVE_IDLE_MS = 45_000;
 
 export function slugifyWorkoutTitle(title) {
@@ -145,6 +154,41 @@ export function appendSet(exercise) {
     ...exercise,
     sets: [...(exercise.sets ?? []), next]
   };
+}
+
+export function createExercise(name) {
+  const trimmed = String(name ?? '').trim();
+  if (!trimmed) return null;
+  return {
+    name: trimmed,
+    sets: [{ reps: 10, weight_kg: 0, cable_type: 'constant_force' }]
+  };
+}
+
+export function moveExercise(exercises, fromIndex, toIndex) {
+  if (!Array.isArray(exercises)) return exercises ?? [];
+  if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex)) return exercises;
+  if (fromIndex < 0 || toIndex < 0 || fromIndex >= exercises.length || toIndex >= exercises.length) {
+    return exercises;
+  }
+  if (fromIndex === toIndex) return exercises;
+  const next = [...exercises];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
+}
+
+export function parsePainFlag(site, note) {
+  const trimmedSite = String(site ?? '').trim();
+  if (!trimmedSite) return null;
+  const trimmedNote = String(note ?? '').trim();
+  return trimmedNote ? { site: trimmedSite, note: trimmedNote } : { site: trimmedSite };
+}
+
+export function optionalNumber(value) {
+  if (value == null || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function formatElapsed(ms) {
