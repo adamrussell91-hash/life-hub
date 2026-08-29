@@ -884,6 +884,136 @@ Maintenance dose logged.
   assert.equal(events.find(e => e.type === 'record_proposal'), undefined);
 });
 
+test('Sara future same-title Stelara dose with AU date stays a new Confirm visit', async () => {
+  const medicalPath = 'data/body/2026/08/2026-08-27-medical-stelara-maintenance-injection-0930.md';
+  const medicalYaml = `---
+schema_version: 1
+id: "stored-stelara"
+type: "medical"
+date: "2026-08-27"
+time: "09:30"
+created_at: "2026-08-27T09:30:00+10:00"
+updated_at: "2026-08-27T09:30:00+10:00"
+source: "chat"
+title: "Stelara maintenance injection"
+record_type: "Prescription"
+lane: "prescription"
+location_kind: "place"
+provider: "Dr Chris Keily"
+---
+First SC maintenance dose.
+`;
+  const medicalSha = '1'.repeat(40);
+  const puts = [];
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: medicalPath, type: 'blob', sha: medicalSha, size: medicalYaml.length },
+          { path: 'central-node.md', type: 'blob', sha: '5'.repeat(40), size: 20 }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${medicalSha}`)) {
+      return Response.json({
+        content: Buffer.from(medicalYaml).toString('base64'),
+        encoding: 'base64'
+      });
+    }
+    if (url.includes('/git/blobs/')) {
+      return Response.json({ content: Buffer.from('# Purpose\n').toString('base64'), encoding: 'base64' });
+    }
+    if (options?.method === 'PUT') {
+      puts.push(url);
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  let toolResult;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-29T02:05:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        toolResult = await executeTools({
+          id: 'call_1',
+          name: 'log_entry',
+          input: {
+            type: 'medical',
+            date: '27/10',
+            notes: '[Stelara maintenance] — next 8-weekly SC dose',
+            fields: { title: 'Stelara maintenance injection' }
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Sara, put the next Stelara in medical logs for 27/10',
+    priorAgentSlug: 'sara'
+  }))));
+  const parsed = JSON.parse(toolResult);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.status, 'awaiting_confirm');
+  const proposal = events.find(e => e.type === 'record_proposal');
+  assert.ok(proposal, JSON.stringify(events.map(e => e.type)));
+  assert.equal(proposal.record.date, '2026-10-27');
+  assert.equal(proposal.record.title, 'Stelara maintenance injection');
+  assert.equal(events.find(e => e.type === 'record_saved'), undefined);
+  assert.equal(events.find(e => e.type === 'error'), undefined);
+  assert.equal(puts.length, 0);
+});
+
+test('Sara medical log_entry survives resolveTree failures without error SSE', async () => {
+  let toolResult;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-29T02:05:00Z'),
+    fetchImpl: async (url, options) => {
+      if (url.includes('/commits/') || url.includes('/git/trees/')) {
+        return Response.json({ message: 'boom' }, { status: 503 });
+      }
+      if (options?.method === 'PUT') {
+        return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+      }
+      return Response.json({ message: 'not found' }, { status: 404 });
+    },
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        toolResult = await executeTools({
+          id: 'call_1',
+          name: 'log_entry',
+          input: {
+            type: 'medical',
+            date: '27/10/2026',
+            notes: '[Stelara maintenance] — next dose',
+            fields: { title: 'Stelara maintenance dose' }
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Sara, log next Stelara for 27/10',
+    priorAgentSlug: 'sara'
+  }))));
+  assert.equal(events.find(e => e.type === 'error'), undefined, JSON.stringify(events));
+  const parsed = JSON.parse(toolResult);
+  // Tree resolve fails for match + for persist path lookup; still must not kill the turn.
+  assert.ok(parsed.ok === true || parsed.ok === false, JSON.stringify(parsed));
+  if (parsed.ok && parsed.status === 'awaiting_confirm') {
+    const proposal = events.find(e => e.type === 'record_proposal');
+    assert.ok(proposal, JSON.stringify(events.map(e => e.type)));
+    assert.equal(proposal.record.date, '2026-10-27');
+  }
+});
+
 test('Penelope diary log_entry still awaits confirm', async () => {
   let toolResult;
   const handler = createChatHandler({

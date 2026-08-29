@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'js-yaml';
 import {
+  coerceCalendarDate,
   inferRecordType,
   laneFor,
   locationKindFor,
@@ -125,6 +126,106 @@ test('validateRecord coerces legacy medical records missing lane metadata', () =
   assert.deepEqual(validateRecord(record), []);
   assert.equal(record.lane, 'prescription');
   assert.equal(record.location_kind, 'unknown');
+});
+
+test('coerceCalendarDate accepts AU and casual chat dates', () => {
+  assert.equal(coerceCalendarDate('2026-10-27'), '2026-10-27');
+  assert.equal(coerceCalendarDate('27/10/2026'), '2026-10-27');
+  assert.equal(coerceCalendarDate('27/10', { today: '2026-08-29' }), '2026-10-27');
+  assert.equal(coerceCalendarDate('27 Oct 2026'), '2026-10-27');
+  assert.equal(coerceCalendarDate('TBD'), null);
+});
+
+test('validateLogEntry coerces AU medical dates like 27/10', () => {
+  const result = validateLogEntry({
+    type: 'medical',
+    date: '27/10',
+    notes: '[Stelara maintenance] — next 8-weekly SC dose booked',
+    fields: { title: 'Stelara maintenance dose' }
+  }, { id: 'med-oct', now: '2026-08-29T12:05:00+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.date, '2026-10-27');
+});
+
+test('validateLogEntry coerces AU follow_up_date', () => {
+  const result = validateLogEntry({
+    type: 'medical',
+    date: '2026-08-27',
+    fields: {
+      title: 'Stelara maintenance injection',
+      follow_up_date: '27/10/2026'
+    }
+  }, { id: 'med-fu', now: '2026-08-29T12:05:00+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.follow_up_date, '2026-10-27');
+});
+
+test('resolveMedicalLogCandidate keeps a far-future same-title dose as a new visit', async () => {
+  const yaml = `---
+schema_version: 1
+id: "stored-stelara"
+type: "medical"
+date: "2026-08-27"
+time: "09:30"
+created_at: "2026-08-27T09:30:00+10:00"
+updated_at: "2026-08-27T09:30:00+10:00"
+source: "chat"
+title: "Stelara maintenance injection"
+record_type: "Prescription"
+lane: "prescription"
+location_kind: "place"
+provider: "Dr Keily"
+---
+First SC maintenance dose.
+`;
+  const client = {
+    resolveTree: async () => ({
+      tree: [{
+        type: 'blob',
+        path: 'data/body/2026/08/2026-08-27-medical-stelara-maintenance-injection-0930.md',
+        sha: 'sha-1'
+      }]
+    }),
+    readBlob: async () => new TextEncoder().encode(yaml).buffer
+  };
+  const resolved = await resolveMedicalLogCandidate(client, {
+    type: 'medical',
+    date: '27/10',
+    notes: '[Stelara maintenance] — next 8-weekly SC dose',
+    fields: { title: 'Stelara maintenance injection' }
+  }, {
+    today: '2026-08-29',
+    loadYaml: load,
+    decodeBlob: bytes => new TextDecoder().decode(bytes)
+  });
+
+  assert.equal(resolved.date, '2026-10-27');
+  assert.equal(resolved.fields.title, 'Stelara maintenance injection');
+  assert.equal(resolved.fields.follow_up_date, undefined);
+});
+
+test('resolveMedicalLogCandidate survives GitHub resolveTree failures', async () => {
+  const client = {
+    resolveTree: async () => {
+      throw new Error('github_unavailable');
+    },
+    readBlob: async () => {
+      throw new Error('should not read');
+    }
+  };
+  const resolved = await resolveMedicalLogCandidate(client, {
+    type: 'medical',
+    date: '27/10/2026',
+    fields: { title: 'Stelara maintenance dose' }
+  }, {
+    today: '2026-08-29',
+    loadYaml: load,
+    decodeBlob: () => ''
+  });
+  assert.equal(resolved.date, '2026-10-27');
+  assert.equal(resolved.fields.title, 'Stelara maintenance dose');
 });
 
 test('resolveMedicalLogCandidate merges onto a matching stored visit', async () => {
