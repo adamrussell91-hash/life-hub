@@ -9,6 +9,14 @@ const TRIGGER_PATTERNS = [
   /goal\s*audit/i
 ];
 
+// Same phrase means the same thing whether it opens a session (jump straight to
+// stale_drift, no bootstrap questions) or arrives mid-flow (move past whatever
+// intake question is pending) -- mirrors chat-controller.js's client-only
+// SKIP_INTAKE_RE, exported here so a non-browser caller (a scheduled trigger
+// with nobody available to answer "concerns / how he feels / goals") has the
+// same vocabulary without needing its own copy of the regex.
+export const SKIP_INTAKE_RE = /skip\s*intake|no\s*intake|continue\s*audit|\bgo\s*on\b/i;
+
 const PHASE_CONTRACTS = {
   triage: `You are mid a Central Node audit. THIS TURN ONLY: glance Central Node, run compact Session Triage (seven bullets, short), then ask exactly ONE intake question (concerns, how Adam feels, or goals/thinking). Do not cover stale inventory, drift essay, open loops, or lock in this reply.`,
   intake: `You are mid a Central Node audit. THIS TURN ONLY: acknowledge Adam's answer and either ask the next intake question (concerns / feeling / goals) or state that intake is complete and stop. Cap three intake questions total. Do not dump stale/drift/open-loops/lock yet.`,
@@ -20,6 +28,24 @@ const PHASE_CONTRACTS = {
 export function isHammondAuditTrigger(message) {
   if (typeof message !== 'string' || message.trim() === '') return false;
   return TRIGGER_PATTERNS.some(re => re.test(message));
+}
+
+/** A trigger message that also asks to skip conversational intake, e.g. "goal audit, skip intake". */
+export function isHammondAuditSkipIntakeTrigger(message) {
+  return isHammondAuditTrigger(message) && SKIP_INTAKE_RE.test(message);
+}
+
+/**
+ * Bootstrap a fresh audit session from message text alone -- used when no
+ * auditSession was supplied by the caller (a headless/automated trigger has no
+ * client-side session state to carry across turns the way the browser does).
+ * Returns null when the message isn't a trigger at all.
+ */
+export function startAuditSessionFromMessage(message) {
+  if (!isHammondAuditTrigger(message)) return null;
+  return isHammondAuditSkipIntakeTrigger(message)
+    ? { kind: 'cn_audit', phase: 'stale_drift', intakeCount: 3 }
+    : { kind: 'cn_audit', phase: 'triage', intakeCount: 0 };
 }
 
 export function normalizeAuditSession(value) {

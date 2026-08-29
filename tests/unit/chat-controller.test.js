@@ -1657,6 +1657,73 @@ test('cn_patch_proposal Confirm posts kind cn_patch with the patch candidate', a
   assert.match(proposal.children[0]?.textContent ?? '', /Central Node updated: Remove taper constraint/);
 });
 
+test('cn_patch_proposal Confirm includes the pending id when the propose SSE carried one', async () => {
+  const root = new FakeDocument();
+  const patch = {
+    section: 'long_term_trends',
+    op: 'condense',
+    payload: { summary: 'Condense Trends' }
+  };
+  const confirmCalls = [];
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'cn_patch_proposal', patch, id: 'cnp_abc123' };
+      yield { type: 'done' };
+    },
+    async confirm(payload) {
+      confirmCalls.push(payload);
+      return { path: 'central-node.md', summary: patch.payload.summary };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Hammond, run the weekly review');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
+  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  confirmButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(confirmCalls.length, 1);
+  assert.equal(confirmCalls[0].id, 'cnp_abc123');
+  assert.deepEqual(confirmCalls[0].candidate, patch);
+});
+
+test('cn_patch_proposal Discard also dismisses the server-side queue entry when an id is present', async () => {
+  const root = new FakeDocument();
+  const patch = {
+    section: 'long_term_trends',
+    op: 'condense',
+    payload: { summary: 'Condense Trends' }
+  };
+  const confirmCalls = [];
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'cn_patch_proposal', patch, id: 'cnp_abc123' };
+      yield { type: 'done' };
+    },
+    async confirm(payload) {
+      confirmCalls.push(payload);
+      return { ok: true };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Hammond, run the weekly review');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
+  const discardButton = proposal.children.find(child => child.className === 'record-proposal__discard');
+  discardButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(list.children.includes(proposal), false);
+  assert.equal(confirmCalls.length, 1);
+  assert.equal(confirmCalls[0].kind, 'cn_patch_dismiss');
+  assert.equal(confirmCalls[0].id, 'cnp_abc123');
+});
+
 test('cn_patch_proposal Discard removes the card without confirming', async () => {
   const root = new FakeDocument();
   const patch = {

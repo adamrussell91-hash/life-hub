@@ -14,7 +14,9 @@ import {
   upsertStatusField,
   extractTodaysStatusBlock,
   replaceTodaysStatus,
-  appendRecentAction
+  appendRecentAction,
+  appendCrossAgentLine,
+  dedupeCrossAgentSection
 } from './central-node-write.js';
 
 export const CENTRAL_NODE_SECTIONS = [
@@ -127,6 +129,14 @@ export function applyCentralNodePatch(content, patch) {
     if (patch.section === 'recent_actions') {
       const next = appendRecentAction(content, text);
       return next === content && !content.includes(RECENT_ACTIONS_HEADING) ? null : next;
+    }
+    if (patch.section === 'cross_agent') {
+      // Prepend (not the generic bottom-append below) to match appendCrossAgentLine's
+      // newest-at-top convention used by every specialist auto-write -- trimCrossAgentSection
+      // drops from the tail assuming newest-first, so Hammond's own directives must land
+      // there too or they'd be the first ones silently trimmed despite being the newest.
+      const next = appendCrossAgentLine(content, text);
+      return next === content && !content.includes(CROSS_AGENT_HEADING) ? null : dedupeCrossAgentSection(next);
     }
     return appendLineToSection(content, heading, text);
   }

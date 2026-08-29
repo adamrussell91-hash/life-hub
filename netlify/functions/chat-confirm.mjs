@@ -28,6 +28,13 @@ import {
   classifyCentralNodePatchRisk,
   applyCentralNodePatch
 } from './_shared/hammond-tools.mjs';
+import {
+  PENDING_CN_PATCHES_PATH,
+  parsePendingCnPatches,
+  serializePendingCnPatches,
+  removePendingCnPatchById,
+  findPendingCnPatchById
+} from './_shared/cn-patch-queue.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
@@ -75,6 +82,9 @@ export function createChatConfirmHandler({
 
     if (parsed.kind === 'cn_patch') {
       return handleCnPatchConfirm(parsed);
+    }
+    if (parsed.kind === 'cn_patch_dismiss') {
+      return handleCnPatchDismiss(parsed);
     }
 
     const validation = validateLogEntry(parsed.candidate, {
@@ -197,20 +207,30 @@ export function createChatConfirmHandler({
       return errorResponse(400, 'invalid_request', 'Central Node patches require the hammond slug.', false, PRIVATE_CACHE);
     }
 
-    const patch = validateCentralNodePatchInput(parsed.candidate);
-    if (!patch) {
-      return errorResponse(400, 'invalid_patch', 'This Central Node patch could not be validated.', false, PRIVATE_CACHE);
-    }
-
-    const risk = classifyCentralNodePatchRisk(patch);
-    if (risk !== 'confirm') {
-      return errorResponse(
-        400,
-        'auto_class_rejected',
-        'Auto-class Central Node patches cannot be confirmed via this endpoint.',
-        false,
-        PRIVATE_CACHE
-      );
+    // Fail fast on the resubmitted candidate, with zero GitHub calls, exactly like
+    // before the pending-patch queue existed -- but only for an id-less request.
+    // When an id is present the stored queue entry takes priority over whatever
+    // candidate came along with it (a caller might resubmit a stale/placeholder
+    // candidate alongside a good id), so that case always needs the queue fetch
+    // below rather than pre-rejecting on the candidate alone.
+    let candidatePatch = null;
+    if (!parsed.id) {
+      if (!parsed.candidate) {
+        return errorResponse(400, 'invalid_patch', 'This Central Node patch could not be validated.', false, PRIVATE_CACHE);
+      }
+      candidatePatch = validateCentralNodePatchInput(parsed.candidate);
+      if (!candidatePatch) {
+        return errorResponse(400, 'invalid_patch', 'This Central Node patch could not be validated.', false, PRIVATE_CACHE);
+      }
+      if (classifyCentralNodePatchRisk(candidatePatch) !== 'confirm') {
+        return errorResponse(
+          400,
+          'auto_class_rejected',
+          'Auto-class Central Node patches cannot be confirmed via this endpoint.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
     }
 
     let client;
@@ -223,19 +243,57 @@ export function createChatConfirmHandler({
 
     let content;
     let existingSha;
+    let queue = [];
+    let queueSha;
     try {
       const current = await client.resolveTree();
-      const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
-      if (!entry) {
+      const cnEntry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
+      if (!cnEntry) {
         return errorResponse(404, 'central_node_missing', 'Central Node is not available.', true, PRIVATE_CACHE);
       }
-      content = decodeBlob(await client.readBlob(entry.sha));
+      // Prefer the server-stored patch (found by id) over a client-resubmitted
+      // payload -- the queue read only happens when an id was actually supplied.
+      const queueEntry = parsed.id
+        ? current.tree.find(item => item.path === PENDING_CN_PATCHES_PATH && item.type === 'blob')
+        : null;
+      const [cnBlob, queueBlob] = await Promise.all([
+        client.readBlob(cnEntry.sha),
+        queueEntry ? client.readBlob(queueEntry.sha) : Promise.resolve(null)
+      ]);
+      content = decodeBlob(cnBlob);
       if (content === null) {
         return errorResponse(503, 'central_node_unreadable', 'Central Node could not be read.', true, PRIVATE_CACHE);
       }
-      existingSha = entry.sha;
+      existingSha = cnEntry.sha;
+      if (queueEntry) {
+        queue = parsePendingCnPatches(decodeBlob(queueBlob));
+        queueSha = queueEntry.sha;
+      }
     } catch (error) {
       return mapRepositoryError(error);
+    }
+
+    const stored = parsed.id ? findPendingCnPatchById(queue, parsed.id) : null;
+    // Re-validate the stored payload rather than trusting it blindly -- it's
+    // server-written, but validation is cheap. Prefer it over the resubmitted
+    // candidate, which is only validated lazily here as a fallback for when an
+    // id was supplied but the queue entry is gone (already actioned, purged, or
+    // the propose-time queue write itself failed).
+    const storedPatch = stored ? validateCentralNodePatchInput(stored.patch) : null;
+    const fallbackCandidatePatch = candidatePatch ?? (parsed.candidate ? validateCentralNodePatchInput(parsed.candidate) : null);
+    const patch = storedPatch ?? fallbackCandidatePatch;
+    if (!patch) {
+      return errorResponse(400, 'invalid_patch', 'This Central Node patch could not be validated.', false, PRIVATE_CACHE);
+    }
+
+    if (classifyCentralNodePatchRisk(patch) !== 'confirm') {
+      return errorResponse(
+        400,
+        'auto_class_rejected',
+        'Auto-class Central Node patches cannot be confirmed via this endpoint.',
+        false,
+        PRIVATE_CACHE
+      );
     }
 
     const next = applyCentralNodePatch(content, patch);
@@ -250,16 +308,72 @@ export function createChatConfirmHandler({
         sha: existingSha,
         message: `chore(cn): ${patch.payload.summary}`
       });
-      return jsonResponse(200, {
-        ok: true,
-        data: {
-          path: CENTRAL_NODE_PATH,
-          summary: patch.payload.summary
-        }
-      }, PRIVATE_CACHE);
     } catch (error) {
       if (error instanceof GitHubClientError && error.code === 'write_conflict') {
         return errorResponse(409, 'write_conflict', 'Central Node changed while confirming. Try again.', true, PRIVATE_CACHE);
+      }
+      return mapRepositoryError(error);
+    }
+
+    // Central Node already wrote successfully -- a dequeue failure (conflict,
+    // transient error) must never surface as a failed confirmation. A stale
+    // entry left behind is cleaned up by the next read's mechanical TTL purge.
+    if (parsed.id) {
+      try {
+        await client.writeFile({
+          path: PENDING_CN_PATCHES_PATH,
+          content: serializePendingCnPatches(removePendingCnPatchById(queue, parsed.id)),
+          ...(queueSha ? { sha: queueSha } : {}),
+          message: `chore(cn-patch-queue): confirm ${patch.payload.summary}`
+        });
+      } catch {
+        // Swallowed -- see comment above.
+      }
+    }
+
+    return jsonResponse(200, {
+      ok: true,
+      data: {
+        path: CENTRAL_NODE_PATH,
+        summary: patch.payload.summary
+      }
+    }, PRIVATE_CACHE);
+  }
+
+  async function handleCnPatchDismiss(parsed) {
+    if (parsed.slug !== HAMMOND_SLUG) {
+      return errorResponse(400, 'invalid_request', 'Central Node patches require the hammond slug.', false, PRIVATE_CACHE);
+    }
+
+    let client;
+    try {
+      client = createClient({ env, fetchImpl });
+    } catch (error) {
+      if (error instanceof GitHubConfigurationError) return withPrivateCache(misconfiguredResponse());
+      return repositoryError('github_unavailable', true);
+    }
+
+    try {
+      const current = await client.resolveTree();
+      const entry = current.tree.find(item => item.path === PENDING_CN_PATCHES_PATH && item.type === 'blob');
+      if (!entry) {
+        // Nothing to dismiss -- already gone (confirmed, purged, or never persisted). Idempotent.
+        return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+      }
+      const queue = parsePendingCnPatches(decodeBlob(await client.readBlob(entry.sha)));
+      const next = removePendingCnPatchById(queue, parsed.id);
+      if (next.length !== queue.length) {
+        await client.writeFile({
+          path: PENDING_CN_PATCHES_PATH,
+          content: serializePendingCnPatches(next),
+          sha: entry.sha,
+          message: `chore(cn-patch-queue): dismiss ${parsed.id}`
+        });
+      }
+      return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+    } catch (error) {
+      if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+        return errorResponse(409, 'write_conflict', 'Pending patches changed while dismissing. Try again.', true, PRIVATE_CACHE);
       }
       return mapRepositoryError(error);
     }
@@ -324,12 +438,28 @@ async function parseRequest(request) {
   } catch {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
-  if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.slug !== 'string' ||
-      !SLUG.test(body.slug) || !body.candidate || typeof body.candidate !== 'object' || Array.isArray(body.candidate)) {
+  if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.slug !== 'string' || !SLUG.test(body.slug)) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
-  const kind = body.kind === 'cn_patch' ? 'cn_patch' : 'log';
-  return { candidate: body.candidate, slug: body.slug, overwrite: body.overwrite === true, kind };
+
+  const id = typeof body.id === 'string' && body.id.trim() !== '' ? body.id.trim() : null;
+  const kind = body.kind === 'cn_patch' ? 'cn_patch' : body.kind === 'cn_patch_dismiss' ? 'cn_patch_dismiss' : 'log';
+
+  if (kind === 'cn_patch_dismiss') {
+    if (!id) {
+      return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
+    }
+    return { slug: body.slug, kind, id };
+  }
+
+  const hasCandidate = body.candidate && typeof body.candidate === 'object' && !Array.isArray(body.candidate);
+  // cn_patch may arrive as just an id (server looks the patch up in the queue) or,
+  // as a fallback when a propose-time queue write failed, a resubmitted candidate.
+  if (kind === 'cn_patch' ? (!id && !hasCandidate) : !hasCandidate) {
+    return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
+  }
+
+  return { candidate: body.candidate, slug: body.slug, overwrite: body.overwrite === true, kind, id };
 }
 
 async function readAtMost(stream, limit) {
