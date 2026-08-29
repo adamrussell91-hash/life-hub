@@ -52,10 +52,58 @@ export function buildMealFlagsLine(notes) {
 }
 
 export function buildExerciseStatusLine(record) {
-  const duration = record.duration_min != null ? `${record.duration_min} min` : null;
   const title = record.title ? record.title : (record.day_type ?? 'workout');
-  const bits = [title, duration, record.status].filter(Boolean);
+  const duration = record.duration_min != null ? `${record.duration_min} min` : null;
+  const moveCount = Array.isArray(record.exercises) && record.exercises.length > 0
+    ? `${record.exercises.length} moves`
+    : null;
+  const focus = Array.isArray(record.focus)
+    ? record.focus.map(item => String(item).trim()).filter(Boolean).slice(0, 4).join('/')
+    : null;
+  const bits = [title, duration, moveCount, focus || null, record.status].filter(Boolean);
   return `**Exercise:** ${bits.join(' · ')}.`;
+}
+
+/** Compact Flags line from workout notes and/or pain_flags (completed sessions). */
+export function buildWorkoutFlagsLine(record, notes) {
+  const parts = [];
+  const noteText = typeof notes === 'string' ? notes.trim().replace(/\s+/g, ' ') : '';
+  if (noteText) parts.push(noteText);
+  if (Array.isArray(record?.pain_flags)) {
+    for (const flag of record.pain_flags) {
+      if (!flag || typeof flag !== 'object') continue;
+      const site = typeof flag.site === 'string' ? flag.site.trim() : '';
+      if (!site) continue;
+      const detail = typeof flag.note === 'string' && flag.note.trim()
+        ? `${site}: ${flag.note.trim()}`
+        : site;
+      parts.push(detail);
+    }
+  }
+  if (parts.length === 0) return null;
+  const compact = parts.join(' · ');
+  const truncated = compact.length > 140 ? `${compact.slice(0, 137)}...` : compact;
+  return `**Flags:** ${truncated}`;
+}
+
+/** One Cross-Agent line per pain flag so Sara sees new session signals. */
+export function buildWorkoutPainCrossAgentLines(record) {
+  if (!record || record.type !== 'workout' || record.status !== 'completed') return [];
+  if (!Array.isArray(record.pain_flags) || record.pain_flags.length === 0) return [];
+  const title = typeof record.title === 'string' && record.title.trim()
+    ? record.title.trim()
+    : 'session';
+  const lines = [];
+  for (const flag of record.pain_flags) {
+    if (!flag || typeof flag !== 'object') continue;
+    const site = typeof flag.site === 'string' ? flag.site.trim() : '';
+    if (!site) continue;
+    const detail = typeof flag.note === 'string' && flag.note.trim()
+      ? flag.note.trim().replace(/\s+/g, ' ')
+      : 'flagged during session';
+    lines.push(`- Chadwick→Sara: ${title} — ${site}: ${detail}`);
+  }
+  return lines;
 }
 
 /**
@@ -83,11 +131,16 @@ export function recentActionFingerprint(line) {
     return `${dateKey}|${agentKey}|skincare:${skin[1].toLowerCase()}`;
   }
 
-  const workout = /^Logged a (?:\d+-min )?(.+?) session(?: \((.+)\))?\.?$/i.exec(body);
-  if (workout) {
-    const kind = workout[1].trim().toLowerCase();
-    const title = (workout[2] ?? '').trim().toLowerCase();
-    return `${dateKey}|${agentKey}|workout:${title || kind}`;
+  // Workouts: fingerprint by session title so notes/move-count wording can upsert.
+  const oldWorkout = /^Logged a (?:\d+-min )?(.+?) session(?: \((.+?)\))?/i.exec(body);
+  if (oldWorkout) {
+    const fromParens = (oldWorkout[2] ?? '').split(/\s+[—–]\s+/)[0].trim();
+    const titleKey = (fromParens || oldWorkout[1]).trim().toLowerCase();
+    return `${dateKey}|${agentKey}|workout:${titleKey}`;
+  }
+  const modernWorkout = /^Logged (.+?)(?:\s*\(|\s+[—–]\s+|\.|$)/i.exec(body);
+  if (modernWorkout && /\b(moves?|min|session|workout)\b/i.test(body)) {
+    return `${dateKey}|${agentKey}|workout:${modernWorkout[1].trim().toLowerCase()}`;
   }
 
   return `${dateKey}|${agentKey}|${body.toLowerCase()}`;
@@ -372,11 +425,18 @@ export function rollStaleSections(content, today) {
   return next;
 }
 
-/** Recent Actions is a finish signal — planned/autosaved workouts must not spam it. */
+/** Recent Actions / Status Exercise are finish signals — planned autosaves must not touch them. */
 export function shouldAppendRecentAction(record) {
   if (!record || typeof record !== 'object') return false;
-  if (record.type === 'workout' && record.status !== 'completed') return false;
+  if (record.type === 'workout' && record.status !== 'completed' && record.status !== 'skipped') {
+    return false;
+  }
   return true;
+}
+
+export function shouldUpdateWorkoutStatus(record) {
+  if (!record || record.type !== 'workout') return false;
+  return record.status === 'completed' || record.status === 'skipped';
 }
 
 export function applyLogToCentralNode(content, {
@@ -399,7 +459,13 @@ export function applyLogToCentralNode(content, {
     const flags = buildMealFlagsLine(flagNotes);
     if (flags) body = upsertStatusField(body, 'Flags', flags);
   } else if (record.type === 'workout') {
+    // Protocol: Central Node after finish — planned autosaves leave Status alone.
+    if (!shouldUpdateWorkoutStatus(record)) {
+      return dedupeRecentActions(next);
+    }
     body = upsertStatusField(body, 'Exercise', buildExerciseStatusLine(record));
+    const flags = buildWorkoutFlagsLine(record, flagNotes);
+    if (flags) body = upsertStatusField(body, 'Flags', flags);
   } else if (record.type === 'diary') {
     const mood = record.mood_score != null ? `${record.mood_score}/10` : (record.mood ?? 'logged');
     body = upsertStatusField(body, 'Mood', `**Mood:** ${mood}.`);
@@ -436,6 +502,9 @@ export function applyLogToCentralNode(content, {
   next = replaceTodaysStatus(next, { dateKey: record.date, body });
   if (typeof record.cross_agent_note === 'string' && record.cross_agent_note.trim()) {
     next = appendCrossAgentLine(next, `- ${record.cross_agent_note.trim()}`);
+  }
+  for (const painLine of buildWorkoutPainCrossAgentLines(record)) {
+    next = appendCrossAgentLine(next, painLine);
   }
   // Day Type used to be auto-written here as a "Chadwick→Brisket" directive. It was a
   // Notion day-page property that outlived its database: resolveDayType() already derives
