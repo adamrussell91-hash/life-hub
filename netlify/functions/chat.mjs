@@ -143,7 +143,15 @@ import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
-import { resolveForcedChadwickPlan, streamWithChadwickPlanForce } from './_shared/chadwick-plan-force.mjs';
+import { resolveForcedChadwickPlan } from './_shared/chadwick-plan-force.mjs';
+import { streamWithAgentLogForce } from './_shared/agent-log-force.mjs';
+import {
+  forceStatusFor,
+  isLogFinalize,
+  isThinMindTurn,
+  isVeraFlushMessage,
+  shouldStripWebSearch
+} from '../../js/core/log-finalize-detect.js';
 import { keepNewestHistory } from '../../js/core/chat-history.js';
 import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } from '../../js/core/time.js';
 import { parseEventDocument } from '../../js/core/records.js';
@@ -228,6 +236,13 @@ export function createChatHandler({
     const needsHammondTools = slug === 'hammond';
     const needsBodyState = slug === 'chadwick' || slug === 'brisket';
     const needsMindDigest = slug === 'vera' || slug === 'penelope';
+    // Finalize / Vera flush must not burn the Netlify budget on mind blob
+    // bodies or web_search before log_entry can fire — that was the empty-turn
+    // "reply got cut off" loop across agents.
+    const logFinalize = Boolean(allowedTypes?.length) && isLogFinalize(parsed.message);
+    const veraFlush = slug === 'vera' && isVeraFlushMessage(parsed.message);
+    const thinMindLoad = isThinMindTurn({ slug, message: parsed.message });
+    const stripWebSearch = shouldStripWebSearch({ slug, message: parsed.message });
     const mindFrom = needsMindDigest ? getMindDigestWindowStart(today) : null;
     // Hammond alone gets a wider, path-only window for the 90-day longitudinal
     // digest -- deliberately separate from `from`/`manifest`/`dataEntries` above,
@@ -249,7 +264,8 @@ export function createChatHandler({
     const nowInstant = new Date(now());
     const tools = [
       // No max_uses — a use cap turns one miss into a guess. Agents iterate.
-      { type: 'web_search_20250305', name: 'web_search' },
+      // Finalize / flush: log_entry only — web_search burned the turn before Confirm.
+      ...(stripWebSearch ? [] : [{ type: 'web_search_20250305', name: 'web_search' }]),
       ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
       ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
       ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : []),
@@ -416,7 +432,7 @@ export function createChatHandler({
           const mindEntries = needsMindDigest
             ? selectMindEntries(current.tree, { from: mindFrom, to: today })
             : [];
-          const onThisDayEntries = slug === 'penelope'
+          const onThisDayEntries = slug === 'penelope' && !thinMindLoad
             ? selectOnThisDayEntries(current.tree, today)
             : [];
           const veraIntakeEntry = slug === 'vera'
@@ -456,7 +472,8 @@ export function createChatHandler({
             Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondCnEntries.map(entry => client.readBlob(entry.sha))),
-            Promise.all(mindEntries.map(entry => client.readBlob(entry.sha))),
+            // Thin mind turns: keep path list for days-since; skip body reads.
+            Promise.all(thinMindLoad ? [] : mindEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(onThisDayEntries.map(entry => client.readBlob(entry.sha))),
             veraIntakeEntry ? client.readBlob(veraIntakeEntry.sha) : null
           ]);
@@ -580,22 +597,45 @@ export function createChatHandler({
             mindSilence = simultaneousSilenceFlag({ tree: current.tree, today });
           }
           if (needsMindDigest) {
-            const mindFiles = mindEntries
-              .map((entry, index) => ({ path: entry.path, content: decodeBlob(mindBlobs[index]) }))
-              .filter(file => file.content !== null);
-            mindEvents = [];
-            for (const file of mindFiles) {
-              try { mindEvents.push(parseEventDocument(file.content, file.path, loadYaml)); }
-              catch { /* skip */ }
+            if (thinMindLoad) {
+              const diaryDates = mindEntries
+                .map(entry => {
+                  const match = /\/(\d{4}-\d{2}-\d{2})-diary(?:-|\.md)/.exec(entry.path ?? '');
+                  return match?.[1] ?? null;
+                })
+                .filter(Boolean)
+                .sort();
+              const lastDiary = diaryDates.at(-1);
+              if (lastDiary) daysSinceLastEntry = daysBetween(lastDiary, today);
+              if (slug === 'vera') {
+                const sessionDates = mindEntries
+                  .map(entry => {
+                    const match = /\/(\d{4}-\d{2}-\d{2})-session(?:-|\.md)/.exec(entry.path ?? '');
+                    return match?.[1] ?? null;
+                  })
+                  .filter(Boolean)
+                  .sort();
+                const lastSession = sessionDates.at(-1);
+                if (lastSession) daysSinceLastMindSession = daysBetween(lastSession, today);
+              }
+            } else {
+              const mindFiles = mindEntries
+                .map((entry, index) => ({ path: entry.path, content: decodeBlob(mindBlobs[index]) }))
+                .filter(file => file.content !== null);
+              mindEvents = [];
+              for (const file of mindFiles) {
+                try { mindEvents.push(parseEventDocument(file.content, file.path, loadYaml)); }
+                catch { /* skip */ }
+              }
+              mindDiaryDigest = summarizeDiaryForPrompt(mindEvents, today);
+              mindSessionDigest = summarizeMindSessionsForPrompt(mindEvents, today);
+              mindTodaySession = slug === 'vera' ? summarizeTodaysMindSession(mindEvents, today) : '';
+              mindDivergence = slug === 'vera' ? divergenceLine(mindEvents, today) : '';
+              const lastDiary = mindEvents.filter(e => e.record.type === 'diary').map(e => e.record.date).sort().at(-1);
+              const lastSession = mindEvents.filter(e => e.record.type === 'mind_session').map(e => e.record.date).sort().at(-1);
+              if (lastDiary) daysSinceLastEntry = daysBetween(lastDiary, today);
+              if (lastSession) daysSinceLastMindSession = daysBetween(lastSession, today);
             }
-            mindDiaryDigest = summarizeDiaryForPrompt(mindEvents, today);
-            mindSessionDigest = summarizeMindSessionsForPrompt(mindEvents, today);
-            mindTodaySession = slug === 'vera' ? summarizeTodaysMindSession(mindEvents, today) : '';
-            mindDivergence = slug === 'vera' ? divergenceLine(mindEvents, today) : '';
-            const lastDiary = mindEvents.filter(e => e.record.type === 'diary').map(e => e.record.date).sort().at(-1);
-            const lastSession = mindEvents.filter(e => e.record.type === 'mind_session').map(e => e.record.date).sort().at(-1);
-            if (lastDiary) daysSinceLastEntry = daysBetween(lastDiary, today);
-            if (lastSession) daysSinceLastMindSession = daysBetween(lastSession, today);
           }
           if (slug === 'penelope' && onThisDayBlobs?.length) {
             const file = onThisDayEntries
@@ -749,8 +789,11 @@ export function createChatHandler({
             send(event);
           };
 
-          send({ type: 'status', text: 'Thinking…' });
-          for await (const event of streamWithChadwickPlanForce(anthropic, {
+          send({
+            type: 'status',
+            text: (logFinalize || veraFlush) ? forceStatusFor(slug) : 'Thinking…'
+          });
+          const streamOpts = {
             slug,
             userMessage: parsed.message,
             today,
@@ -1002,7 +1045,8 @@ export function createChatHandler({
               }
               return null;
             }
-          })) {
+          };
+          for await (const event of streamWithAgentLogForce(anthropic, streamOpts)) {
             if (event.type === 'tool_call' && event.name === 'log_entry') {
               let medicalInput = event.input;
               if (event.input?.type === 'medical') {
@@ -1024,7 +1068,9 @@ export function createChatHandler({
                 try {
                   await persistOrProposeLogEntry({ client, slug, today, validation, send: emit });
                 } catch {
-                  pendingLogRejection = { errors: ['Could not prepare that record. Retry with a simpler payload.'] };
+                  pendingLogRejection = {
+                    errors: ['Could not prepare that record. Retry with a simpler payload.']
+                  };
                 }
               } else {
                 pendingLogRejection = { errors: validation.errors };

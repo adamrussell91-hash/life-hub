@@ -1050,6 +1050,218 @@ test('Penelope diary log_entry still awaits confirm', async () => {
   assert.equal(events.find(e => e.type === 'record_saved'), undefined);
 });
 
+test('Penelope finalize skips mind blob reads, omits web_search, and force-nudges log_entry', async () => {
+  const diaryPath = 'data/mind/2026/07/2026-07-30-diary-2100.md';
+  const diarySha = 'a'.repeat(40);
+  const diaryContent = [
+    '---',
+    'schema_version: 1',
+    'id: d1',
+    'type: diary',
+    'date: 2026-07-30',
+    'time: "21:00"',
+    'created_at: 2026-07-30T21:00:00+10:00',
+    'updated_at: 2026-07-30T21:00:00+10:00',
+    'source: chat',
+    'mood: low',
+    'energy: low',
+    'mood_score: 3',
+    'dayone_sent: false',
+    '---',
+    'SECRET DIARY PROSE'
+  ].join('\n');
+  const cnSha = '5'.repeat(40);
+  const blobUrls = [];
+  const calls = [];
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: async url => {
+      if (url.includes('/git/blobs/')) blobUrls.push(url);
+      if (url.includes('/commits/')) {
+        return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+      }
+      if (url.includes('/git/trees/')) {
+        return Response.json({
+          tree: [
+            { path: 'central-node.md', type: 'blob', sha: cnSha, size: 20 },
+            { path: diaryPath, type: 'blob', sha: diarySha, size: diaryContent.length }
+          ]
+        });
+      }
+      if (url.includes(`/git/blobs/${cnSha}`)) {
+        return Response.json({
+          encoding: 'base64',
+          content: Buffer.from('# Central Node\n', 'utf8').toString('base64')
+        });
+      }
+      if (url.includes(`/git/blobs/${diarySha}`)) {
+        return Response.json({
+          encoding: 'base64',
+          content: Buffer.from(diaryContent, 'utf8').toString('base64')
+        });
+      }
+      return Response.json({ message: 'not found' }, { status: 404 });
+    },
+    createAnthropicClient: () => ({
+      streamMessage: async function* (args) {
+        calls.push(args);
+        if (calls.length === 1) {
+          yield { type: 'text', delta: 'Ah — hold your horses, dear!' };
+          yield { type: 'done' };
+          return;
+        }
+        const toolResult = await args.executeTools({
+          id: 'forced',
+          name: 'log_entry',
+          input: {
+            type: 'diary',
+            date: '2026-08-01',
+            fields: { mood: 'low', energy: 'low', mood_score: 3, dayone_sent: false },
+            notes: 'Rough day.'
+          }
+        });
+        assert.equal(JSON.parse(toolResult).status, 'awaiting_confirm');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Confirm logged',
+    priorAgentSlug: 'penelope',
+    history: [
+      { role: 'assistant', content: 'Alright, board this one goes onto — heading to the vault it goes.' },
+      { role: 'user', content: 'Confirm logged' }
+    ]
+  }))));
+
+  assert.equal(calls.length, 2, 'expected force-nudge second Anthropic round');
+  assert.equal(calls[0].tools.some(t => t.name === 'web_search'), false, 'finalize must not offer web_search');
+  assert.ok(calls[0].tools.some(t => t.name === 'log_entry'));
+  assert.equal(
+    blobUrls.some(url => url.includes(diarySha)),
+    false,
+    `finalize must not read mind diary blobs: ${blobUrls.join(', ')}`
+  );
+  assert.ok(events.some(e => e.type === 'record_proposal' && e.record?.type === 'diary'));
+  assert.equal(events.find(e => e.type === 'error'), undefined);
+});
+
+test('Brisket finalize omits web_search and force-nudges meal log_entry', async () => {
+  const calls = [];
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* (args) {
+        calls.push(args);
+        if (calls.length === 1) {
+          yield { type: 'text', delta: "It's in the books." };
+          yield { type: 'done' };
+          return;
+        }
+        await args.executeTools({
+          id: 'forced',
+          name: 'log_entry',
+          input: {
+            type: 'meal',
+            date: '2026-08-01',
+            fields: {
+              meal: 'lunch',
+              calories: 500,
+              protein_g: 40,
+              fat_g: 20,
+              saturated_fat_g: 5,
+              unsaturated_fat_g: 15,
+              carbs_g: 40,
+              sugar_g: 5,
+              fibre_g: 5,
+              sodium_mg: 400,
+              calcium_mg: 50,
+              polyphenol_score: 2,
+              omega3: 'none'
+            },
+            notes: 'Chicken — on track'
+          }
+        });
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Confirm logged',
+    priorAgentSlug: 'brisket'
+  }))));
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].tools.some(t => t.name === 'web_search'), false);
+  assert.ok(events.some(e => e.type === 'record_proposal' && e.record?.type === 'meal'));
+});
+
+test('Vera flush skips mind blob bodies and strips web_search', async () => {
+  const sessionPath = 'data/mind/2026/07/2026-07-30-session.md';
+  const sessionSha = 'a'.repeat(40);
+  const sessionContent = '---\nschema_version: 1\nid: s1\ntype: mind_session\ndate: 2026-07-30\ntime: "10:00"\ncreated_at: 2026-07-30T10:00:00+10:00\nupdated_at: 2026-07-30T10:00:00+10:00\nsource: chat\ntheme: stress\n---\nbody';
+  const cnSha = '5'.repeat(40);
+  const blobUrls = [];
+  let receivedArgs;
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: async url => {
+      if (url.includes('/git/blobs/')) blobUrls.push(url);
+      if (url.includes('/commits/')) {
+        return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+      }
+      if (url.includes('/git/trees/')) {
+        return Response.json({
+          tree: [
+            { path: 'central-node.md', type: 'blob', sha: cnSha, size: 20 },
+            { path: sessionPath, type: 'blob', sha: sessionSha, size: sessionContent.length }
+          ]
+        });
+      }
+      if (url.includes(`/git/blobs/${cnSha}`)) {
+        return Response.json({
+          encoding: 'base64',
+          content: Buffer.from('# Central Node\n', 'utf8').toString('base64')
+        });
+      }
+      if (url.includes(`/git/blobs/${sessionSha}`)) {
+        return Response.json({
+          encoding: 'base64',
+          content: Buffer.from(sessionContent, 'utf8').toString('base64')
+        });
+      }
+      return Response.json({ message: 'not found' }, { status: 404 });
+    },
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: "That's enough for today — record the session if there is one.",
+    priorAgentSlug: 'vera'
+  })));
+
+  assert.ok(receivedArgs);
+  assert.equal(receivedArgs.tools.some(t => t.name === 'web_search'), false);
+  assert.equal(
+    blobUrls.some(url => url.includes(sessionSha)),
+    false,
+    `flush must not read mind session blobs: ${blobUrls.join(', ')}`
+  );
+});
+
 test('log_entry via executeTools attaches protocol lint warnings to a workout record_proposal', async () => {
   const handler = createChatHandler({
     env: validEnv,

@@ -19,6 +19,10 @@ import {
 import { CHAT_TURN_TIMEOUT_MS } from '../core/chat-turn-limits.js';
 import { HISTORY_WINDOW_MS, keepNewestHistory } from '../core/chat-history.js';
 import { shouldNudgeUnsavedWorkoutPlan } from '../core/workout-plan-detect.js';
+import {
+  MISSING_LOG_NUDGE_TEXT,
+  shouldNudgeMissingLogEntry
+} from '../core/log-finalize-detect.js';
 
 const PARAGRAPH_BREAK = /\n{2,}/;
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
@@ -538,6 +542,15 @@ export function createChatController({
         gotUsefulOutput = true;
         clearWorkingBubble();
         appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text: LIBRARY_SAVE_NUDGE_TEXT });
+      } else if (shouldNudgeMissingLogEntry({
+        agentSlug: assistantSlug,
+        assistantText: assistantFullText,
+        sawRecordProposal
+      })) {
+        turnSignaled = true;
+        gotUsefulOutput = true;
+        clearWorkingBubble();
+        appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text: MISSING_LOG_NUDGE_TEXT });
       }
       if (!turnSignaled) {
         if (hiddenUser) {
