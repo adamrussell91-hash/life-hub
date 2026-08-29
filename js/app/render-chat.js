@@ -1,9 +1,11 @@
 import { formatExerciseSets, formatExerciseTitle, humanizeFieldLabel } from './format-exercise.js';
 import { applyAgentAvatarToBubble } from './render-agent-picker.js';
 import { showEphemeralMessage } from './ephemeral-message.js';
+import { appendWorkoutPlanCard } from './render-workout-plan.js';
 import { formatDisplayDate } from '../core/time.js';
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'pain_flags', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
+const WORKOUT_HEADER_FIELDS = new Set(['title', 'session_kind', 'day_type', 'status', 'duration_min']);
 const UNREAD_SELECTOR = '.floating-chat-button, [data-section="chat"]';
 const UNREAD_CLASS = 'has-unread';
 
@@ -112,36 +114,7 @@ function appendInlineSegments(root, container, text) {
   }
 }
 
-export function appendRecordProposal(root, { path, record, notes, warnings }) {
-  const list = root.querySelector('#chat-messages');
-  if (!list) return null;
-  const card = root.createElement('li');
-  card.className = 'record-proposal';
-  card.dataset.path = path;
-
-  const summary = root.createElement('p');
-  summary.textContent = `Proposed ${record.type} record for ${formatDisplayDate(record.date)}`;
-  card.append(summary);
-
-  const fields = root.createElement('dl');
-  fields.className = 'record-proposal__fields';
-  const inputs = {};
-  const displayRecord = { ...record };
-  // Always surface sodium on meal proposals so a missing estimate is obvious to edit.
-  if (record.type === 'meal' && displayRecord.sodium_mg == null) displayRecord.sodium_mg = '';
-  for (const [key, value] of Object.entries(displayRecord)) {
-    if (HIDDEN_FIELDS.has(key) || (typeof value === 'object' && value !== null)) continue;
-    const dt = root.createElement('dt');
-    dt.textContent = humanizeFieldLabel(key);
-    const dd = root.createElement('dd');
-    const input = root.createElement('input');
-    input.value = String(value ?? '');
-    input.dataset.field = key;
-    dd.append(input);
-    fields.append(dt, dd);
-    inputs[key] = input;
-  }
-
+function appendNotesField(root, fields, inputs, notes) {
   const notesDt = root.createElement('dt');
   notesDt.textContent = humanizeFieldLabel('notes');
   const notesDd = root.createElement('dd');
@@ -151,10 +124,54 @@ export function appendRecordProposal(root, { path, record, notes, warnings }) {
   notesDd.append(notesInput);
   fields.append(notesDt, notesDd);
   inputs.notes = notesInput;
+}
 
+export function appendRecordProposal(root, { path, record, notes, warnings, libraryByName }) {
+  const list = root.querySelector('#chat-messages');
+  if (!list) return null;
+  const card = root.createElement('li');
+  card.className = 'record-proposal';
+  card.dataset.path = path;
+
+  const isWorkout = record.type === 'workout';
+  const plannedWorkout = isWorkout && record.status === 'planned';
+
+  const summary = root.createElement('p');
+  summary.className = plannedWorkout ? 'record-proposal__eyebrow' : '';
+  summary.textContent = plannedWorkout
+    ? 'Proposed session'
+    : `Proposed ${record.type} record for ${formatDisplayDate(record.date)}`;
+  card.append(summary);
+
+  if (isWorkout) {
+    appendWorkoutPlanCard(root, card, { record, libraryByName });
+  }
+
+  const fields = root.createElement('dl');
+  fields.className = 'record-proposal__fields';
+  const inputs = {};
+  const displayRecord = { ...record };
+  // Always surface sodium on meal proposals so a missing estimate is obvious to edit.
+  if (record.type === 'meal' && displayRecord.sodium_mg == null) displayRecord.sodium_mg = '';
+  if (!plannedWorkout) {
+    for (const [key, value] of Object.entries(displayRecord)) {
+      if (HIDDEN_FIELDS.has(key) || (typeof value === 'object' && value !== null)) continue;
+      if (isWorkout && WORKOUT_HEADER_FIELDS.has(key)) continue;
+      const dt = root.createElement('dt');
+      dt.textContent = humanizeFieldLabel(key);
+      const dd = root.createElement('dd');
+      const input = root.createElement('input');
+      input.value = String(value ?? '');
+      input.dataset.field = key;
+      dd.append(input);
+      fields.append(dt, dd);
+      inputs[key] = input;
+    }
+  }
+  appendNotesField(root, fields, inputs, notes);
   card.append(fields);
 
-  if (Array.isArray(record.exercises) && record.exercises.length > 0) {
+  if (!isWorkout && Array.isArray(record.exercises) && record.exercises.length > 0) {
     const heading = root.createElement('p');
     heading.className = 'record-proposal__exercises-heading';
     heading.textContent = 'Exercises';
@@ -195,7 +212,7 @@ export function appendRecordProposal(root, { path, record, notes, warnings }) {
   const confirm = root.createElement('button');
   confirm.type = 'button';
   confirm.className = 'record-proposal__confirm';
-  confirm.textContent = 'Confirm';
+  confirm.textContent = plannedWorkout ? 'Start workout' : 'Confirm';
   card.append(confirm);
 
   const discard = root.createElement('button');

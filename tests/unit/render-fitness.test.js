@@ -73,6 +73,84 @@ test('region cards show current best and volume when the 30-day delta is missing
   assert.equal(copy.children[2].textContent, '1,200 kg volume');
 });
 
+function heroSession(overrides = {}) {
+  return {
+    date: '2026-07-30',
+    title: 'Upper Body',
+    duration_min: 35,
+    status: 'planned',
+    focus: ['chest'],
+    muscleMapKeys: [],
+    exercises: [
+      { name: 'Bench Press', sets: [{}, {}, {}, {}] },
+      { name: 'Push-Up', sets: [{}, {}, {}, {}] }
+    ],
+    ...overrides
+  };
+}
+
+function baseModel(overrides = {}) {
+  return {
+    streak: 0,
+    dayType: 'workout_30',
+    weekDots: [],
+    longTerm: emptyLongTerm,
+    regions: [],
+    heroSession: heroSession(),
+    focusHits: [],
+    comparisons: [],
+    month: [],
+    ...overrides
+  };
+}
+
+test('planned Fitness hero shows exercise rows and Start workout until the logger starts', () => {
+  const root = fitnessRoot();
+  const logger = {
+    mounted: false,
+    everStarted: false,
+    mount() { this.mounted = true; },
+    unmount() { this.mounted = false; },
+    startTimer() { this.everStarted = true; },
+    getTimerState() { return { everStarted: this.everStarted }; }
+  };
+
+  renderFitness(root, baseModel(), { logger });
+
+  assert.equal(root.ensure('[data-fitness="hero-day"]').textContent, 'Thursday');
+  assert.equal(root.ensure('[data-fitness="hero-title"]').textContent, 'Upper Body');
+  const list = root.ensure('#fitness-exercise-list');
+  assert.equal(list.children.length, 2);
+  assert.match(list.children[0].children[2].textContent, /4 sets/);
+  assert.equal(root.ensure('#fitness-start-workout').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-logger').attributes.hidden, '');
+  assert.equal(logger.mounted, false);
+
+  root.ensure('#fitness-start-workout').onclick();
+  assert.equal(logger.mounted, true);
+  assert.equal(logger.everStarted, true);
+  assert.equal(root.ensure('[data-fitness="hero-preview"]').attributes.hidden, '');
+  assert.equal(root.ensure('#fitness-logger').attributes.hidden, undefined);
+});
+
+test('completed Fitness hero keeps set details and hides Start workout', () => {
+  const root = fitnessRoot();
+  renderFitness(root, baseModel({
+    heroSession: heroSession({
+      status: 'completed',
+      exercises: [{
+        name: 'Chest Press',
+        sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }]
+      }]
+    })
+  }));
+
+  const list = root.ensure('#fitness-exercise-list');
+  assert.match(list.children[0].className, /fitness-exercise/);
+  assert.match(list.children[0].children[1].children[1].textContent, /32 kg/);
+  assert.equal(root.ensure('#fitness-start-workout').attributes.hidden, '');
+});
+
 test('region cards prefer the 30-day delta when both current and delta exist', () => {
   const root = fitnessRoot();
   renderFitness(root, {

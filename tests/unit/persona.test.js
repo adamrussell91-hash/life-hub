@@ -197,9 +197,10 @@ test('brisket prompt omits the body state block when empty', () => {
 test('chadwick prompt reports days since last session and instructs him to lower the bar at 2+ missed days', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick', daysSinceLastSession: 3 });
   assert.match(prompt, /3 days since/i);
-  assert.match(prompt, /lower the bar/i);
   assert.match(prompt, /10-minute/i);
   assert.match(prompt, /never a guilt trip/i);
+  assert.match(prompt, /honor that shape|explicit override/i);
+  assert.match(prompt, /do not keep rewriting/i);
 });
 
 test('chadwick prompt omits the adherence line when days-since-last-session is unknown (null)', () => {
@@ -279,6 +280,9 @@ test('Chadwick prompt requires planned log_entry after design and CN-shaped prog
   assert.match(prompt, /MUST use/i);
   assert.match(prompt, /shape the prescription/i);
   assert.match(prompt, /mention that influence/i);
+  assert.match(prompt, /AMEND it/i);
+  assert.match(prompt, /put it into action|lock it in/i);
+  assert.match(prompt, /Never say locked in/i);
 });
 
 test('the checked-in Chadwick protocol resolves the Job/stay-in-chat conflict', () => {
@@ -286,6 +290,9 @@ test('the checked-in Chadwick protocol resolves the Job/stay-in-chat conflict', 
   assert.match(protocol, /design, build, or set today.s session/i);
   assert.match(protocol, /status: planned/i);
   assert.match(protocol, /Confirm card/i);
+  assert.match(protocol, /Amend, don't rebuild/i);
+  assert.match(protocol, /Honor an explicit override/i);
+  assert.doesNotMatch(protocol, /never the full programmed session/i);
   assert.doesNotMatch(protocol, /stay in chat until he asks to commit/i);
   assert.doesNotMatch(protocol, /When he asks you to lock today's session onto Fitness/);
 });

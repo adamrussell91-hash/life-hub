@@ -17,11 +17,10 @@ import {
   saveStoredAuditSession
 } from './hammond-audit-session-storage.js';
 import { CHAT_TURN_TIMEOUT_MS } from '../core/chat-turn-limits.js';
+import { HISTORY_WINDOW_MS, keepNewestHistory } from '../core/chat-history.js';
+import { shouldNudgeUnsavedWorkoutPlan } from '../core/workout-plan-detect.js';
 
 const PARAGRAPH_BREAK = /\n{2,}/;
-const HISTORY_WINDOW_MS = 20 * 60 * 1000;
-const MAX_HISTORY_MESSAGES = 30;
-const MAX_HISTORY_ENTRY_CHARS = 1000;
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
 const EMPTY_TURN_RECOVERY = 'That reply got cut off before it finished (usually a timeout while looking things up). Send the same message again and I’ll continue.';
@@ -126,7 +125,7 @@ export function createChatController({
   function recentHistory() {
     const cutoff = now() - HISTORY_WINDOW_MS;
     transcript = transcript.filter(entry => entry.at >= cutoff);
-    return transcript.slice(-MAX_HISTORY_MESSAGES).map(({ role, content }) => ({ role, content }));
+    return keepNewestHistory(transcript.map(({ role, content }) => ({ role, content })));
   }
 
   // Pinned avatar wins until another avatar is clicked. Otherwise keep talking to
@@ -222,7 +221,7 @@ export function createChatController({
     if (!trimmed) return;
     transcript.push({
       role,
-      content: trimmed.length > MAX_HISTORY_ENTRY_CHARS ? trimmed.slice(0, MAX_HISTORY_ENTRY_CHARS) : trimmed,
+      content: trimmed,
       at: now()
     });
   }
@@ -529,7 +528,12 @@ export function createChatController({
         // audit_phase SSE is informational only — client owns advancement
       }
       remember('assistant', assistantFullText);
-      if (sawExerciseLibrarySaved && !sawRecordProposal && (!assistantSlug || assistantSlug === 'chadwick')) {
+      if (shouldNudgeUnsavedWorkoutPlan({
+        agentSlug: assistantSlug,
+        assistantText: assistantFullText,
+        sawRecordProposal,
+        sawExerciseLibrarySaved
+      })) {
         turnSignaled = true;
         gotUsefulOutput = true;
         clearWorkingBubble();

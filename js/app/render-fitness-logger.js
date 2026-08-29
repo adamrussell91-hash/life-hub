@@ -1,6 +1,27 @@
-import { CABLE_TYPES, appendSet, finishLabel, formatElapsed } from './fitness-logger-draft.js';
+import {
+  CABLE_TYPES,
+  INTENSIFICATIONS,
+  appendSet,
+  finishLabel,
+  formatElapsed
+} from './fitness-logger-draft.js';
 
 const cableLabel = value => String(value ?? 'none').replaceAll('_', ' ');
+const intensificationLabel = value => String(value ?? '').replaceAll('_', ' ');
+
+function labeledNumber(root, { label, value, step = '1', inputMode = 'decimal', onInput }) {
+  const wrap = root.createElement('label');
+  wrap.className = 'fitness-logger__field';
+  wrap.textContent = label;
+  const input = root.createElement('input');
+  input.type = 'number';
+  input.inputMode = inputMode;
+  input.step = step;
+  input.value = value ?? '';
+  input.addEventListener('input', () => onInput?.(input.value));
+  wrap.append(input);
+  return wrap;
+}
 
 export function renderFitnessLogger(root, draft, {
   elapsedMs = 0,
@@ -8,6 +29,9 @@ export function renderFitnessLogger(root, draft, {
   timer = { state: 'idle', everStarted: false, completeVisible: false },
   onChange,
   onAddSet,
+  onAddExercise,
+  onMoveExercise,
+  onRemoveExercise,
   onFinish,
   onStart,
   onPause,
@@ -63,10 +87,10 @@ export function renderFitnessLogger(root, draft, {
     complete.className = 'fitness-logger__control';
     complete.dataset.fitnessLogger = 'complete';
     if (timer.state === 'completed') {
-      complete.textContent = 'Undo Complete';
+      complete.textContent = 'Unlock time';
       complete.addEventListener('click', () => onUndoComplete?.());
     } else {
-      complete.textContent = 'Complete';
+      complete.textContent = 'Lock time';
       complete.disabled = timer.state !== 'running' && timer.state !== 'paused';
       complete.addEventListener('click', () => onComplete?.());
     }
@@ -86,9 +110,42 @@ export function renderFitnessLogger(root, draft, {
     const card = root.createElement('div');
     card.className = 'fitness-logger__exercise';
 
+    const head = root.createElement('div');
+    head.className = 'fitness-logger__exercise-head';
     const name = root.createElement('h4');
     name.textContent = exercise.name ?? 'Exercise';
-    card.append(name);
+    const tools = root.createElement('div');
+    tools.className = 'fitness-logger__exercise-tools';
+
+    const moveUp = root.createElement('button');
+    moveUp.type = 'button';
+    moveUp.className = 'fitness-logger__icon-btn';
+    moveUp.dataset.fitnessLogger = 'move-up';
+    moveUp.setAttribute('aria-label', `Move ${exercise.name ?? 'exercise'} up`);
+    moveUp.textContent = '↑';
+    moveUp.disabled = exerciseIndex === 0;
+    moveUp.addEventListener('click', () => onMoveExercise?.(exerciseIndex, exerciseIndex - 1));
+
+    const moveDown = root.createElement('button');
+    moveDown.type = 'button';
+    moveDown.className = 'fitness-logger__icon-btn';
+    moveDown.dataset.fitnessLogger = 'move-down';
+    moveDown.setAttribute('aria-label', `Move ${exercise.name ?? 'exercise'} down`);
+    moveDown.textContent = '↓';
+    moveDown.disabled = exerciseIndex === (draft.exercises.length - 1);
+    moveDown.addEventListener('click', () => onMoveExercise?.(exerciseIndex, exerciseIndex + 1));
+
+    const remove = root.createElement('button');
+    remove.type = 'button';
+    remove.className = 'fitness-logger__icon-btn';
+    remove.dataset.fitnessLogger = 'remove-exercise';
+    remove.setAttribute('aria-label', `Remove ${exercise.name ?? 'exercise'}`);
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => onRemoveExercise?.(exerciseIndex));
+
+    tools.append(moveUp, moveDown, remove);
+    head.append(name, tools);
+    card.append(head);
 
     // Mid-session presence (Phase 5): Chadwick's per-exercise cues, generated once up front
     // alongside the plan -- no extra API calls during the workout. The start cue greets the
@@ -120,16 +177,37 @@ export function renderFitnessLogger(root, draft, {
       card.append(benchRow);
     }
 
+    const intensificationRow = root.createElement('label');
+    intensificationRow.className = 'fitness-logger__bench';
+    intensificationRow.textContent = 'Strength move ';
+    const intensification = root.createElement('select');
+    const none = root.createElement('option');
+    none.value = '';
+    none.textContent = 'Standard';
+    intensification.append(none);
+    for (const option of INTENSIFICATIONS) {
+      const el = root.createElement('option');
+      el.value = option;
+      el.textContent = intensificationLabel(option);
+      if (option === exercise.intensification) el.selected = true;
+      intensification.append(el);
+    }
+    intensification.addEventListener('change', () => {
+      onChange?.({ type: 'intensification', exerciseIndex, value: intensification.value });
+    });
+    intensificationRow.append(intensification);
+    card.append(intensificationRow);
+
     const table = root.createElement('div');
     table.className = 'fitness-logger__sets';
-    const head = root.createElement('div');
-    head.className = 'fitness-logger__set fitness-logger__set--head';
+    const setHead = root.createElement('div');
+    setHead.className = 'fitness-logger__set fitness-logger__set--head';
     for (const label of ['#', 'kg', 'reps', 'cable']) {
       const cell = root.createElement('span');
       cell.textContent = label;
-      head.append(cell);
+      setHead.append(cell);
     }
-    table.append(head);
+    table.append(setHead);
 
     const exerciseSets = exercise.sets ?? [];
     exerciseSets.forEach((set, setIndex) => {
@@ -200,6 +278,117 @@ export function renderFitnessLogger(root, draft, {
     host.append(card);
   }
 
+  const addExercise = root.createElement('div');
+  addExercise.className = 'fitness-logger__add-exercise';
+  const addName = root.createElement('input');
+  addName.type = 'text';
+  addName.placeholder = 'Add an exercise you did';
+  addName.setAttribute('aria-label', 'New exercise name');
+  addName.dataset.fitnessLogger = 'add-exercise-name';
+  const addButton = root.createElement('button');
+  addButton.type = 'button';
+  addButton.className = 'btn btn--secondary quiet-button';
+  addButton.dataset.fitnessLogger = 'add-exercise';
+  addButton.textContent = 'Add exercise';
+  addButton.addEventListener('click', () => {
+    onAddExercise?.(addName.value);
+    addName.value = '';
+  });
+  addName.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault?.();
+    onAddExercise?.(addName.value);
+    addName.value = '';
+  });
+  addExercise.append(addName, addButton);
+  host.append(addExercise);
+
+  const details = root.createElement('div');
+  details.className = 'fitness-logger__details';
+  const detailsTitle = root.createElement('h4');
+  detailsTitle.textContent = 'Session details';
+  details.append(detailsTitle);
+
+  const detailsGrid = root.createElement('div');
+  detailsGrid.className = 'fitness-logger__details-grid';
+  detailsGrid.append(
+    labeledNumber(root, {
+      label: 'Avg HR',
+      value: draft.avg_hr,
+      onInput: value => onChange?.({ type: 'session', field: 'avg_hr', value })
+    }),
+    labeledNumber(root, {
+      label: 'Calories',
+      value: draft.calories_kcal,
+      onInput: value => onChange?.({ type: 'session', field: 'calories_kcal', value })
+    }),
+    labeledNumber(root, {
+      label: 'Distance (km)',
+      value: draft.distance_km,
+      step: '0.1',
+      onInput: value => onChange?.({ type: 'session', field: 'distance_km', value })
+    }),
+    labeledNumber(root, {
+      label: 'Duration (min)',
+      value: draft.duration_min,
+      onInput: value => onChange?.({ type: 'session', field: 'duration_min', value })
+    })
+  );
+  details.append(detailsGrid);
+
+  const recovery = root.createElement('label');
+  recovery.className = 'fitness-logger__check';
+  const recoveryBox = root.createElement('input');
+  recoveryBox.type = 'checkbox';
+  recoveryBox.checked = Boolean(draft.recovery_flag_next_day);
+  recoveryBox.addEventListener('change', () => {
+    onChange?.({ type: 'session', field: 'recovery_flag_next_day', value: recoveryBox.checked });
+  });
+  const recoveryText = root.createElement('span');
+  recoveryText.textContent = 'Recovery tomorrow';
+  recovery.append(recoveryBox, recoveryText);
+  details.append(recovery);
+
+  const pain = root.createElement('div');
+  pain.className = 'fitness-logger__pain';
+  const painList = root.createElement('div');
+  painList.className = 'fitness-logger__pain-list';
+  (draft.pain_flags ?? []).forEach((flag, index) => {
+    const chip = root.createElement('button');
+    chip.type = 'button';
+    chip.className = 'fitness-logger__pain-chip';
+    chip.dataset.fitnessLogger = 'pain-remove';
+    const site = typeof flag === 'string' ? flag : flag?.site;
+    const note = typeof flag === 'object' ? flag?.note : '';
+    chip.textContent = note ? `${site} — ${note} ×` : `${site} ×`;
+    chip.setAttribute('aria-label', `Remove pain flag ${site}`);
+    chip.addEventListener('click', () => onChange?.({ type: 'pain-remove', index }));
+    painList.append(chip);
+  });
+  const painForm = root.createElement('div');
+  painForm.className = 'fitness-logger__pain-form';
+  const painSite = root.createElement('input');
+  painSite.type = 'text';
+  painSite.placeholder = 'Pain site';
+  painSite.setAttribute('aria-label', 'Pain site');
+  const painNote = root.createElement('input');
+  painNote.type = 'text';
+  painNote.placeholder = 'Note';
+  painNote.setAttribute('aria-label', 'Pain note');
+  const painAdd = root.createElement('button');
+  painAdd.type = 'button';
+  painAdd.className = 'btn btn--secondary quiet-button';
+  painAdd.textContent = 'Add pain flag';
+  painAdd.addEventListener('click', () => {
+    onChange?.({ type: 'pain-add', site: painSite.value, note: painNote.value });
+    painSite.value = '';
+    painNote.value = '';
+  });
+  painForm.append(painSite, painNote, painAdd);
+  pain.append(painList, painForm);
+  details.append(pain);
+  host.append(details);
+
   const notesLabel = root.createElement('label');
   notesLabel.className = 'fitness-logger__notes';
   notesLabel.textContent = 'Session notes';
@@ -237,10 +426,10 @@ export function updateLoggerChrome(root, { elapsedMs, saveState, timer }) {
   const complete = root.querySelector('[data-fitness-logger="complete"]');
   if (complete) {
     if (timer.state === 'completed') {
-      complete.textContent = 'Undo Complete';
+      complete.textContent = 'Unlock time';
       complete.disabled = false;
     } else {
-      complete.textContent = 'Complete';
+      complete.textContent = 'Lock time';
       complete.disabled = timer.state !== 'running' && timer.state !== 'paused';
     }
   }
