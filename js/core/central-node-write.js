@@ -52,18 +52,180 @@ export function buildMealFlagsLine(notes) {
 }
 
 export function buildExerciseStatusLine(record) {
-  const duration = record.duration_min != null ? `${record.duration_min} min` : null;
   const title = record.title ? record.title : (record.day_type ?? 'workout');
-  const bits = [title, duration, record.status].filter(Boolean);
+  const duration = record.duration_min != null ? `${record.duration_min} min` : null;
+  const moveCount = Array.isArray(record.exercises) && record.exercises.length > 0
+    ? `${record.exercises.length} moves`
+    : null;
+  const focus = Array.isArray(record.focus)
+    ? record.focus.map(item => String(item).trim()).filter(Boolean).slice(0, 4).join('/')
+    : null;
+  const bits = [title, duration, moveCount, focus || null, record.status].filter(Boolean);
   return `**Exercise:** ${bits.join(' · ')}.`;
 }
 
+/** Compact Flags line from workout notes and/or pain_flags (completed sessions). */
+export function buildWorkoutFlagsLine(record, notes) {
+  const parts = [];
+  const noteText = typeof notes === 'string' ? notes.trim().replace(/\s+/g, ' ') : '';
+  if (noteText) parts.push(noteText);
+  if (Array.isArray(record?.pain_flags)) {
+    for (const flag of record.pain_flags) {
+      if (!flag || typeof flag !== 'object') continue;
+      const site = typeof flag.site === 'string' ? flag.site.trim() : '';
+      if (!site) continue;
+      const detail = typeof flag.note === 'string' && flag.note.trim()
+        ? `${site}: ${flag.note.trim()}`
+        : site;
+      parts.push(detail);
+    }
+  }
+  if (parts.length === 0) return null;
+  const compact = parts.join(' · ');
+  const truncated = compact.length > 140 ? `${compact.slice(0, 137)}...` : compact;
+  return `**Flags:** ${truncated}`;
+}
+
+/** One Cross-Agent line per pain flag so Sara sees new session signals. */
+export function buildWorkoutPainCrossAgentLines(record) {
+  if (!record || record.type !== 'workout' || record.status !== 'completed') return [];
+  if (!Array.isArray(record.pain_flags) || record.pain_flags.length === 0) return [];
+  const title = typeof record.title === 'string' && record.title.trim()
+    ? record.title.trim()
+    : 'session';
+  const lines = [];
+  for (const flag of record.pain_flags) {
+    if (!flag || typeof flag !== 'object') continue;
+    const site = typeof flag.site === 'string' ? flag.site.trim() : '';
+    if (!site) continue;
+    const detail = typeof flag.note === 'string' && flag.note.trim()
+      ? flag.note.trim().replace(/\s+/g, ' ')
+      : 'flagged during session';
+    lines.push(`- Chadwick→Sara: ${title} — ${site}: ${detail}`);
+  }
+  return lines;
+}
+
+/**
+ * Fingerprint for "one line per action" upserts.
+ * Collapses near-duplicates from overwrite/autosave (e.g. planned→completed
+ * workout lines that differ only by a leading "30-min " duration prefix,
+ * or meal/skincare slot corrections with updated wording).
+ */
+export function recentActionFingerprint(line) {
+  if (typeof line !== 'string') return null;
+  const match = /^\s*\*\*(.+?):\*\*\s*(.+?):\s*(.*)$/.exec(line);
+  if (!match) return null;
+  const dateKey = match[1].trim().toLowerCase();
+  const agentKey = match[2].trim().toLowerCase();
+  const body = match[3].replace(/\s+/g, ' ').trim();
+  if (!dateKey || !agentKey || !body) return null;
+
+  const mealSlot = /\bfor (breakfast|lunch|dinner|snack)\b/i.exec(body);
+  if (mealSlot) {
+    return `${dateKey}|${agentKey}|meal:${mealSlot[1].toLowerCase()}`;
+  }
+
+  const skin = /^Logged (am|pm) skincare\b/i.exec(body);
+  if (skin) {
+    return `${dateKey}|${agentKey}|skincare:${skin[1].toLowerCase()}`;
+  }
+
+  // Workouts: fingerprint by session title so notes/move-count wording can upsert.
+  const oldWorkout = /^Logged a (?:\d+-min )?(.+?) session(?: \((.+?)\))?/i.exec(body);
+  if (oldWorkout) {
+    const fromParens = (oldWorkout[2] ?? '').split(/\s+[—–]\s+/)[0].trim();
+    const titleKey = (fromParens || oldWorkout[1]).trim().toLowerCase();
+    return `${dateKey}|${agentKey}|workout:${titleKey}`;
+  }
+  const modernWorkout = /^Logged (.+?)(?:\s*\(|\s+[—–]\s+|\.|$)/i.exec(body);
+  if (modernWorkout && /\b(moves?|min|session|workout)\b/i.test(body)) {
+    return `${dateKey}|${agentKey}|workout:${modernWorkout[1].trim().toLowerCase()}`;
+  }
+
+  return `${dateKey}|${agentKey}|${body.toLowerCase()}`;
+}
+
+function splitRecentActionsSection(content) {
+  const headingIndex = content.indexOf(RECENT_ACTIONS_HEADING);
+  if (headingIndex === -1) return null;
+  const sectionStart = headingIndex + RECENT_ACTIONS_HEADING.length;
+  const after = content.slice(sectionStart);
+  const endRel = after.search(/\n## /);
+  const section = endRel === -1 ? after : after.slice(0, endRel);
+  const rest = endRel === -1 ? '' : after.slice(endRel);
+  return { sectionStart, section, rest };
+}
+
+/**
+ * Insert under Recent Agent Actions, or replace an existing same-action line.
+ * Writing Rules: one line per action — overwrite/autosave must not stack clones.
+ */
 export function appendRecentAction(content, line) {
   const headingIndex = content.indexOf(RECENT_ACTIONS_HEADING);
   if (headingIndex === -1) return content;
-  const insertAt = headingIndex + RECENT_ACTIONS_HEADING.length;
-  const normalized = line.startsWith('\n') ? line : `\n${line}`;
-  return `${content.slice(0, insertAt)}${normalized}${content.slice(insertAt)}`;
+  const bullet = line.replace(/^\n/, '').trim();
+  if (!bullet) return content;
+
+  const parts = splitRecentActionsSection(content);
+  if (!parts) return content;
+  const { sectionStart, section, rest } = parts;
+  const fingerprint = recentActionFingerprint(bullet);
+  const lines = section.split('\n');
+
+  if (fingerprint) {
+    const matchIndexes = lines
+      .map((existing, index) => (recentActionFingerprint(existing) === fingerprint ? index : -1))
+      .filter(index => index !== -1);
+    if (matchIndexes.length > 0) {
+      const [first, ...restMatches] = matchIndexes;
+      if (lines[first].trim() === bullet && restMatches.length === 0) return content;
+      lines[first] = bullet;
+      for (const index of restMatches.reverse()) lines.splice(index, 1);
+      return `${content.slice(0, sectionStart)}${lines.join('\n')}${rest}`;
+    }
+  } else if (lines.some(existing => existing.trim() === bullet)) {
+    return content;
+  }
+
+  const normalized = `\n${bullet}`;
+  return `${content.slice(0, sectionStart)}${normalized}${content.slice(sectionStart)}`;
+}
+
+/**
+ * Collapse stacked same-action bullets (keeps the newest / topmost of each fingerprint).
+ * Accepts either a full Central Node document or a bare Recent Actions section body.
+ */
+export function dedupeRecentActions(content) {
+  if (typeof content !== 'string' || !content) return content;
+  if (content.includes(RECENT_ACTIONS_HEADING)) {
+    const parts = splitRecentActionsSection(content);
+    if (!parts) return content;
+    const { sectionStart, section, rest } = parts;
+    const kept = dedupeRecentActionLines(section.split('\n'));
+    if (kept.unchanged) return content;
+    return `${content.slice(0, sectionStart)}${kept.lines.join('\n')}${rest}`;
+  }
+  const kept = dedupeRecentActionLines(content.split('\n'));
+  return kept.unchanged ? content : kept.lines.join('\n');
+}
+
+function dedupeRecentActionLines(lines) {
+  const seen = new Set();
+  let changed = false;
+  const kept = [];
+  for (const line of lines) {
+    const fingerprint = recentActionFingerprint(line);
+    if (fingerprint) {
+      if (seen.has(fingerprint)) {
+        changed = true;
+        continue;
+      }
+      seen.add(fingerprint);
+    }
+    kept.push(line);
+  }
+  return { lines: kept, unchanged: !changed };
 }
 
 export function appendCrossAgentLine(content, line) {
@@ -263,6 +425,20 @@ export function rollStaleSections(content, today) {
   return next;
 }
 
+/** Recent Actions / Status Exercise are finish signals — planned autosaves must not touch them. */
+export function shouldAppendRecentAction(record) {
+  if (!record || typeof record !== 'object') return false;
+  if (record.type === 'workout' && record.status !== 'completed' && record.status !== 'skipped') {
+    return false;
+  }
+  return true;
+}
+
+export function shouldUpdateWorkoutStatus(record) {
+  if (!record || record.type !== 'workout') return false;
+  return record.status === 'completed' || record.status === 'skipped';
+}
+
 export function applyLogToCentralNode(content, {
   record,
   actionLine,
@@ -270,7 +446,10 @@ export function applyLogToCentralNode(content, {
   flagNotes = null,
   preserveOtherStatusFields = true
 }) {
-  let next = appendRecentAction(content, actionLine);
+  let next = content;
+  if (actionLine && shouldAppendRecentAction(record)) {
+    next = appendRecentAction(next, actionLine);
+  }
   const existing = extractTodaysStatusBlock(next);
   const sameDay = existing.dateKey === record.date;
   let body = sameDay && preserveOtherStatusFields ? existing.body : '';
@@ -280,7 +459,13 @@ export function applyLogToCentralNode(content, {
     const flags = buildMealFlagsLine(flagNotes);
     if (flags) body = upsertStatusField(body, 'Flags', flags);
   } else if (record.type === 'workout') {
+    // Protocol: Central Node after finish — planned autosaves leave Status alone.
+    if (!shouldUpdateWorkoutStatus(record)) {
+      return dedupeRecentActions(next);
+    }
     body = upsertStatusField(body, 'Exercise', buildExerciseStatusLine(record));
+    const flags = buildWorkoutFlagsLine(record, flagNotes);
+    if (flags) body = upsertStatusField(body, 'Flags', flags);
   } else if (record.type === 'diary') {
     const mood = record.mood_score != null ? `${record.mood_score}/10` : (record.mood ?? 'logged');
     body = upsertStatusField(body, 'Mood', `**Mood:** ${mood}.`);
@@ -311,12 +496,15 @@ export function applyLogToCentralNode(content, {
     const flags = buildMealFlagsLine(flagNotes);
     if (flags) body = upsertStatusField(body, 'Flags', flags);
   } else {
-    return next;
+    return dedupeRecentActions(next);
   }
 
   next = replaceTodaysStatus(next, { dateKey: record.date, body });
   if (typeof record.cross_agent_note === 'string' && record.cross_agent_note.trim()) {
     next = appendCrossAgentLine(next, `- ${record.cross_agent_note.trim()}`);
+  }
+  for (const painLine of buildWorkoutPainCrossAgentLines(record)) {
+    next = appendCrossAgentLine(next, painLine);
   }
   // Day Type used to be auto-written here as a "Chadwick→Brisket" directive. It was a
   // Notion day-page property that outlived its database: resolveDayType() already derives
@@ -326,6 +514,7 @@ export function applyLogToCentralNode(content, {
   next = trimCrossAgentSection(next);
   next = rollStaleSections(next, record.date);
   next = purgeStaleRecentActions(next, record.date);
+  next = dedupeRecentActions(next);
   return next;
 }
 
@@ -353,8 +542,11 @@ export function purgeStaleRecentActions(content, today, { windowHours = 48 } = {
     if (!parsed) return true; // malformed / non-bullet — keep
     return parsed >= cutoff;
   });
-  if (kept.length === lines.length) return content;
-  return `${content.slice(0, sectionStart)}${kept.join('\n')}${rest}`;
+  const purged = kept.length === lines.length
+    ? content
+    : `${content.slice(0, sectionStart)}${kept.join('\n')}${rest}`;
+  // Same mechanical floor: Writing Rules promise one line per action.
+  return dedupeRecentActions(purged);
 }
 
 /** Parse `**30 Jul:** …` style leading dates into a YYYY-MM-DD near `today`. */

@@ -536,3 +536,43 @@ test('diary and mind_session stay valid when cross_agent_note is omitted', () =>
   assert.equal(validateRecord(diaryBase).length, 0);
   assert.equal(validateRecord(mindSessionBase).length, 0);
 });
+
+test('workout accepts a well-formed Chadwick→Sara cross_agent_note', () => {
+  const workout = {
+    schema_version: 1,
+    id: 'workout-1',
+    type: 'workout',
+    date: '2026-08-29',
+    time: '07:00',
+    created_at: '2026-08-29T07:00:00+10:00',
+    updated_at: '2026-08-29T07:00:00+10:00',
+    source: 'chat',
+    title: 'Biceps and Boobs, 20 mins',
+    session_kind: 'strength',
+    day_type: 'workout_30',
+    status: 'completed',
+    exercises: [{ name: 'Bar Press', sets: [{ reps: 8, weight_kg: 40, cable_type: 'constant_force' }] }],
+    cross_agent_note: 'Chadwick→Sara: right AC twinge on fly, parked.'
+  };
+  assert.equal(validateRecord(workout).length, 0);
+});
+
+test('workout rejects a cross_agent_note with the wrong sender', () => {
+  const errors = validateRecord({
+    schema_version: 1,
+    id: 'workout-2',
+    type: 'workout',
+    date: '2026-08-29',
+    time: '07:00',
+    created_at: '2026-08-29T07:00:00+10:00',
+    updated_at: '2026-08-29T07:00:00+10:00',
+    source: 'chat',
+    title: 'Session',
+    session_kind: 'strength',
+    day_type: 'workout_30',
+    status: 'completed',
+    exercises: [{ name: 'Curl', sets: [{ reps: 10, weight_kg: 10, cable_type: 'constant_force' }] }],
+    cross_agent_note: 'Vera→Sara: wrong sender.'
+  });
+  assert.ok(errors.some(e => /sender must be Chadwick/.test(e)));
+});

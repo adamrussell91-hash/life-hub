@@ -2,7 +2,8 @@ import { load } from 'js-yaml';
 import { parseEventDocument, TYPE_DOMAINS } from '../../../js/core/records.js';
 import {
   applyLogToCentralNode,
-  formatLogDate
+  formatLogDate,
+  humanizeDayType
 } from '../../../js/core/central-node-write.js';
 import {
   GOVERNANCE_LOG_PATH,
@@ -37,9 +38,25 @@ export function describeRecordForLog(record, notes, { medicalAppend = false } = 
       return `Logged ${what}${macros ? ` (${macros})` : ''}.`;
     }
     case 'workout': {
-      const duration = record.duration_min != null ? `${record.duration_min}-min ` : '';
-      const title = record.title ? ` (${record.title})` : '';
-      return `Logged a ${duration}${record.day_type ?? 'workout'} session${title}.`;
+      const title = typeof record.title === 'string' ? record.title.trim() : '';
+      const dayLabel = humanizeDayType(record.day_type);
+      const moveCount = Array.isArray(record.exercises) && record.exercises.length > 0
+        ? `${record.exercises.length} moves`
+        : null;
+      const duration = record.duration_min != null ? `${record.duration_min} min` : null;
+      const focus = Array.isArray(record.focus)
+        ? record.focus.map(item => String(item).trim()).filter(Boolean).slice(0, 3).join('/')
+        : null;
+      const detail = [moveCount, duration, focus].filter(Boolean).join(', ');
+      const label = typeof notes === 'string' && notes.trim() !== ''
+        ? notes.trim().replace(/\s+/g, ' ')
+        : null;
+      const head = title
+        ? `Logged ${title}`
+        : `Logged a ${dayLabel} session`;
+      const mid = detail ? ` (${detail})` : '';
+      const verdict = label ? ` — ${label}` : '';
+      return `${head}${mid}${verdict}.`;
     }
     case 'skincare':
       return `Logged ${record.routine ?? ''} skincare${record.completed === false ? ' (incomplete)' : ''}.`.replace(/\s+/g, ' ');
@@ -118,7 +135,7 @@ async function syncCentralNodeAfterLog(client, record, notes) {
     record,
     actionLine,
     nutritionTotals,
-    flagNotes: ['meal', 'skincare', 'weight', 'composition', 'measurements', 'medical'].includes(record.type)
+    flagNotes: ['meal', 'skincare', 'weight', 'composition', 'measurements', 'medical', 'workout'].includes(record.type)
       ? notes
       : null
   });
