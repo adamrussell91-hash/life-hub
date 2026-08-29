@@ -3470,6 +3470,105 @@ main { max-width: 76rem; margin: 0 auto; }
   margin-top: 0.1rem;
 }
 .chat-message__body { min-width: 0; flex: 1; }
+.chat-message__body p {
+  margin: 0;
+}
+.chat-message__body p + p {
+  margin-top: var(--space-2);
+}
+.chat-message__body > ul,
+.chat-message__body > ol {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}
+.chat-workout {
+  display: grid;
+  gap: var(--space-3);
+}
+.chat-workout__intro,
+.chat-workout__outro {
+  margin: 0;
+  color: var(--depth);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
+}
+.chat-workout__exercises {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+.chat-workout__exercise {
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--line);
+}
+.chat-workout__exercise:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+.chat-workout__head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  min-width: 0;
+}
+.chat-workout__num {
+  flex: 0 0 auto;
+  color: var(--wave);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+.chat-workout__name {
+  color: var(--depth);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+}
+.chat-workout__cue {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+.chat-workout__between {
+  margin: var(--space-1) 0 0;
+  color: var(--wave);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+.chat-workout__sets {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+.chat-workout__set {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-size: var(--text-sm);
+}
+.chat-workout__set-n {
+  color: var(--muted);
+  font-weight: var(--weight-semibold);
+}
+.chat-workout__set-load {
+  color: var(--depth);
+  font-weight: var(--weight-bold);
+}
+.chat-workout__set-cable {
+  color: var(--wave);
+  font-weight: var(--weight-medium);
+}
+.chat-workout__set-cable::before {
+  content: '·';
+  margin-right: var(--space-2);
+  color: var(--shallow);
+}
 .chat-message--user .chat-message__avatar { display: none; }
 
 .chat-message--status .chat-message__body {

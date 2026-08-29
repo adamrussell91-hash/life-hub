@@ -1,4 +1,4 @@
-const LOCK_IN_RE = /\b(put (it|this) into action|lock (it|this|the plan) in|let'?s (do|run|go) (it|this)|go crush it|that'?s the one|save (this|the plan)|log this (in|as|now)|use this (one|plan)|go with this)\b/i;
+const LOCK_IN_RE = /\b(put (it|this) into action|lock (it|this|the plan) (in|onto(?:\s+\w+)?)|lock (it|this) onto fitness|let'?s (do|run|go) (it|this)|go crush it|that'?s the one|save (this|the plan)|log this (in|as|now)|use this (one|plan)|go with this)\b/i;
 
 const CLAIMED_LOCKED_RE = /\b(locked in|logging this as (your|the) plan|i loaded up|the full send)\b/i;
 
@@ -20,7 +20,7 @@ export function claimedPlanLocked(text) {
 
 export function looksLikeWorkoutPlan(text) {
   if (typeof text !== 'string' || text.trim() === '') return false;
-  const numbered = (text.match(/^\s*\d+[\.)]\s+\S+/gm) || []).length;
+  const numbered = (text.match(/(?:^|\n|\s)(\d+)[\.)]\s+\S+/g) || []).length;
   const kgHits = (text.match(/\d+(?:\.\d+)?\s*kg/gi) || []).length;
   const setHits = (text.match(/\bset\s*\d+\b/gi) || []).length;
   return numbered >= 3 && (kgHits >= 2 || setHits >= 2);

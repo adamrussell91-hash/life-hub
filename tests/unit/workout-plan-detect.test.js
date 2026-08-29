@@ -19,6 +19,8 @@ const PLAN = [
 test('isWorkoutLockIn matches the phrases Adam actually used', () => {
   assert.equal(isWorkoutLockIn('ok lets put it into action'), true);
   assert.equal(isWorkoutLockIn('lock it in'), true);
+  assert.equal(isWorkoutLockIn('lock it onto Fitness'), true);
+  assert.equal(isWorkoutLockIn('lock this onto Fitness'), true);
   assert.equal(isWorkoutLockIn('let\'s do it'), true);
   assert.equal(isWorkoutLockIn('are the weights a little below my normal?'), false);
   assert.equal(isWorkoutLockIn('option b'), false);
@@ -26,6 +28,7 @@ test('isWorkoutLockIn matches the phrases Adam actually used', () => {
 
 test('looksLikeWorkoutPlan requires a numbered list plus loads', () => {
   assert.equal(looksLikeWorkoutPlan(PLAN), true);
+  assert.equal(looksLikeWorkoutPlan(PLAN.replaceAll('\n', ' ')), true);
   assert.equal(looksLikeWorkoutPlan('Welcome back, you absolute legend.'), false);
   assert.equal(looksLikeWorkoutPlan('1. Breathe\n2. Walk\n3. Stretch'), false);
 });
