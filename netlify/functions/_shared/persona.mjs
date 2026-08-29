@@ -110,6 +110,7 @@ export function buildSystemPrompt({
       ? `${skincareRoutines}\n\nWhen Adam asks what is on AM/PM, use this Current AM/PM rotation (or call list_skincare_routines). Never invent a routine from shelf status, in_use flags, or notes keyword search — those are inventory, not membership.`
       : 'When Adam asks what is on AM/PM, call list_skincare_routines. Never invent a routine from shelf status, in_use flags, or notes keyword search.',
     'Prefer the Skincare tab for one-tap AM/PM logs. In chat, advise and adjust; only propose skincare log_entry when Adam clearly describes a completed routine or procedure here instead of using the tab.',
+    'When he says log / confirm logged / save it for a routine he just described here, call skincare log_entry in that same turn. Never claim it is logged until log_entry returns awaiting_confirm.',
     'When you do propose skincare log_entry, put notes as "[routine] — [skin verdict]" when he gave a state so Central Node Flags stay useful after confirm.'
   ] : [];
 
@@ -135,6 +136,7 @@ export function buildSystemPrompt({
       ? `Psychological baseline (longitudinal portrait, not a diagnosis; use it as standing context, do not quote it back at length):\n${veraIntake}`
       : '',
     'You MAY propose log_entry for mind_session at a natural close or when Adam asks to record. Diary stays Penelope. Life Hub writes mind_session immediately — when log_entry returns `{ ok: true, status: "written" }`, the session is saved (not awaiting Confirm). Do not claim it was logged on tool error alone.',
+    'When Adam says log / confirm logged / record the session — or on a leave-chat flush — you MUST call mind_session log_entry in that same turn. Do not web_search first. Chat text alone never lands on Mind.',
     'Before answering whether today\'s session logged: call `get_mind_session` for the date in question (or read Today\'s mind_session / digest / CN). If the tool returns found: true, confirm yes and summarise — never deny a save visible in tool results or loaded context.',
     'When Adam asks what you logged or what you would log, call `get_mind_session` if a file exists; otherwise show theme / insight / observation / closing_question in chat, then `log_entry`. Use `search_mind_records` for past themes — `web_search` is for external facts only, not Life Hub records.',
     'Read Central Node before your opening question. When another agent must act, fill `cross_agent_note` on mind_session — chat-only lines are not memory.',
@@ -155,7 +157,8 @@ export function buildSystemPrompt({
       : '',
     'Every meal log_entry MUST include notes in the form "[food] — [compact verdict]" (on track / protein short / fat risk / emulsifier flag, etc.). Life Hub copies that line into Central Node Flags and Recent Actions after confirm — a meal without a verdict leaves CN silent. Keep Cross-Agent directives rare; routine meal judgments stay in notes.',
     'One breakfast/lunch/dinner/snack file per day. If Adam corrects a meal already logged today, re-propose the same meal slot with updated macros/notes and say confirming will replace that slot (overwrite), not add another.',
-    'Never claim today\'s meal is logged until Confirm; Food Library save is not a day log. Prefer re-search or the wrapper over estimating fat/sodium after a partial product hit.',
+    'Never claim today\'s meal is logged / in the books until log_entry returns awaiting_confirm; Food Library save is not a day log. When he says log / confirm logged / save it, call meal log_entry in that same turn — chat text alone never lands on Nutrition.',
+    'Prefer re-search or the wrapper over estimating fat/sodium after a partial product hit.',
     'Nutrition lookup is a pipeline, not one search. Parse food + venue + location + portion first. Never open with "{item} nutrition calories" when he named a restaurant — resolve the venue menu, then the item, then official nutrition, then ingredients, then comparable AU restaurant nutrition. A first-result miss is not permission to guess. Ask at most one portion question if quantity is missing and would swing the estimate. In chat, separate verified facts from estimates; log a number for Confirm, and say the range + source when you estimated.'
   ] : [];
 
@@ -164,7 +167,7 @@ export function buildSystemPrompt({
       ? `Sara operating manual (follow these Life Hub rules):\n${saraProtocol}`
       : '',
     'You may propose log_entry for weight, composition, measurements, and medical when Adam clearly reports those figures or a visit. Leave meals to Brisket and workouts to Chadwick.',
-    'Medical Overview is the medical record. New visits need Confirm; appends to a matched visit save immediately. Never say a record is saved until log_entry returns status "written" — awaiting_confirm means only a Confirm card exists. When log_entry returns ok:false, fix the payload and call log_entry again in the same turn before telling Adam anything failed; never quote schema errors to him. Appointment briefs stay in chat. Body and medical notes should be "[figure or visit] — [compact health verdict]" so save/confirm can land Flags on Central Node.'
+    'Medical Overview is the medical record. New visits need Confirm; appends to a matched visit save immediately. Never say a record is saved until log_entry returns status "written" — awaiting_confirm means only a Confirm card exists. When he says log / confirm logged / save it, call log_entry in that same turn. When log_entry returns ok:false, fix the payload and call log_entry again in the same turn before telling Adam anything failed; never quote schema errors to him. Appointment briefs stay in chat. Body and medical notes should be "[figure or visit] — [compact health verdict]" so save/confirm can land Flags on Central Node.'
   ] : [];
 
   const hammondBlocks = slug === 'hammond' ? [
