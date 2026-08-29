@@ -101,3 +101,23 @@ test('Brisket meal log reaches a Confirm card with sodium, not the cut-off recov
   assert.match(await proposal.innerText(), /Sodium/i);
   await context.close();
 });
+
+test('a flattened Chadwick prescription renders as stacked exercise rows', async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#chat-input').fill('Chadwick, describe the session — full send');
+  await page.locator('#chat-send').click();
+
+  const workout = page.locator('.chat-workout');
+  await workout.waitFor();
+  assert.equal(await page.locator('.chat-workout__exercise').count(), 8);
+  assert.equal(await page.locator('.chat-workout__name').first().innerText(), 'Bar Squat');
+  assert.match(await page.locator('.chat-workout__cue').first().innerText(), /legs first/i);
+  assert.match(await page.locator('.chat-workout__set-load').first().innerText(), /10 × 25 kg/);
+  assert.doesNotMatch(await workout.innerText(), /Set 1: 10 reps x 25kg \(cable: none\) - Set 2:/);
+  await context.close();
+});
