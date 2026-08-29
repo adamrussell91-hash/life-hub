@@ -3,7 +3,7 @@ import {
   appendCnPatchProposal,
   appendRecordProposal,
   appendRecordSaved,
-  renderInlineMarkdown,
+  renderChatMarkdown,
   setChatBusy,
   showChatError
 } from './render-chat.js';
@@ -394,7 +394,7 @@ export function createChatController({
       clearWorkingBubble();
       if (!assistantBubble) assistantBubble = appendMessage(root, { role: 'assistant', agentSlug: assistantSlug });
       const target = assistantBubble.querySelector?.('.chat-message__body') ?? assistantBubble;
-      renderInlineMarkdown(root, target, text);
+      renderChatMarkdown(root, target, text);
       scrollChatToBottom();
     }
 

@@ -20,7 +20,7 @@ export function claimedPlanLocked(text) {
 
 export function looksLikeWorkoutPlan(text) {
   if (typeof text !== 'string' || text.trim() === '') return false;
-  const numbered = (text.match(/^\s*\d+[\.)]\s+\S+/gm) || []).length;
+  const numbered = (text.match(/(?:^|\n|\s)(\d+)[\.)]\s+\S+/g) || []).length;
   const kgHits = (text.match(/\d+(?:\.\d+)?\s*kg/gi) || []).length;
   const setHits = (text.match(/\bset\s*\d+\b/gi) || []).length;
   return numbered >= 3 && (kgHits >= 2 || setHits >= 2);
