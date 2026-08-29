@@ -26,6 +26,7 @@ test('isWorkoutLockIn matches the phrases Adam actually used', () => {
 
 test('looksLikeWorkoutPlan requires a numbered list plus loads', () => {
   assert.equal(looksLikeWorkoutPlan(PLAN), true);
+  assert.equal(looksLikeWorkoutPlan(PLAN.replaceAll('\n', ' ')), true);
   assert.equal(looksLikeWorkoutPlan('Welcome back, you absolute legend.'), false);
   assert.equal(looksLikeWorkoutPlan('1. Breathe\n2. Walk\n3. Stretch'), false);
 });

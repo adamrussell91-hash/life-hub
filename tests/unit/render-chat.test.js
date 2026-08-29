@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMessage, appendRecordProposal, appendCnPatchProposal, renderInlineMarkdown } from '../../js/app/render-chat.js';
+import { appendMessage, appendRecordProposal, appendCnPatchProposal, renderChatMarkdown, renderInlineMarkdown } from '../../js/app/render-chat.js';
 
 class FakeElement {
   constructor(tag) {
@@ -389,4 +389,51 @@ test('renderInlineMarkdown keeps bullet lines in one list even when a blank line
   assert.equal(container.children[0].children.length, 2);
   assert.equal(container.children[0].children[0].children[0].textContent, 'One');
   assert.equal(container.children[0].children[1].children[0].textContent, 'Two');
+});
+
+test('renderInlineMarkdown groups consecutive numbered lines into an ordered list', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, 'Steps:\n1. First\n2. Second with **bold**', { multiline: true });
+
+  assert.equal(container.children.length, 2);
+  const list = container.children[1];
+  assert.equal(list.tagName, 'ol');
+  assert.equal(list.children.length, 2);
+  assert.equal(list.children[0].children[0].textContent, 'First');
+  assert.equal(list.children[1].children[1].tagName, 'strong');
+  assert.equal(list.children[1].children[1].textContent, 'bold');
+});
+
+test('renderChatMarkdown turns a flattened workout dump into stacked exercise rows', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderChatMarkdown(root, container, [
+    '1. **Bar Squat** — legs first while you\'re fresh - Set 1: 10 reps x 25kg (cable: none) - Set 2: 10 reps x 25kg (cable: none) - Set 3: 10 reps x 25kg (cable: none)',
+    '2. **Bar Row** — pull that back thick - Set 1: 10 reps x 26kg (cable: constant force) - Set 2: 10 reps x 26kg (cable: constant force) - Set 3: 10 reps x 26kg (cable: constant force)',
+    '3. **Bar Press** — chest gets its pump, always - Set 1: 10 reps x 30kg (cable: constant force)'
+  ].join(' '));
+
+  const card = findByClass(container, 'chat-workout');
+  assert.ok(card);
+  const exercises = findByClass(card, 'chat-workout__exercises');
+  assert.equal(exercises.children.length, 3);
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__name').textContent, 'Bar Squat');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__cue').textContent, 'legs first while you\'re fresh');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__set-n').textContent, '3 sets');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__set-load').textContent, '10 × 25 kg');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__set-cable').textContent, 'none');
+  assert.equal(findByClass(exercises.children[1], 'chat-workout__name').textContent, 'Bar Row');
+  assert.equal(findByClass(exercises.children[1], 'chat-workout__set-cable').textContent, 'constant force');
+});
+
+test('renderChatMarkdown leaves ordinary chat as multiline markdown', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderChatMarkdown(root, container, 'First.\n\nSecond.');
+
+  assert.equal(container.children.length, 2);
+  assert.equal(container.children[0].tagName, 'p');
+  assert.equal(container.children[0].children[0].textContent, 'First.');
+  assert.equal(container.children[1].children[0].textContent, 'Second.');
 });

@@ -2,6 +2,7 @@ import { formatExerciseSets, formatExerciseTitle, humanizeFieldLabel } from './f
 import { applyAgentAvatarToBubble } from './render-agent-picker.js';
 import { showEphemeralMessage } from './ephemeral-message.js';
 import { appendWorkoutPlanCard } from './render-workout-plan.js';
+import { parseWorkoutChat, setsAreIdentical } from '../core/parse-workout-chat.js';
 import { formatDisplayDate } from '../core/time.js';
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'pain_flags', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
@@ -62,13 +63,12 @@ export function appendRecordSaved(root, { summary, agentSlug }) {
 }
 
 // Renders a safe subset of markdown as real DOM nodes -- never innerHTML, so model
-// output can never be interpreted as markup. Multi-line/bullet-list parsing
-// ("- " lines grouped into <ul>, other non-blank lines as <p>) is opt-in via
-// { multiline: true } -- with no options, this is byte-for-byte identical to the
-// function's original single-pass bold-segment behaviour regardless of what's in
-// `text` (including any embedded single "\n"), so every existing streaming-chat
-// call site is provably unaffected. Central Node's card renderer passes
-// { multiline: true } explicitly for its multi-paragraph/list markdown blocks.
+// output can never be interpreted as markup. Multi-line/list parsing
+// ("- " bullets into <ul>, "1. " lines into <ol>, other non-blank lines as <p>)
+// is opt-in via { multiline: true }. With no options, this stays identical to the
+// original single-pass bold-segment behaviour (including embedded "\n").
+// Chat streaming uses renderChatMarkdown (multiline + workout cards).
+// Central Node's card renderer passes { multiline: true } explicitly.
 // Caller is responsible for scrolling the list into view afterwards.
 export function renderInlineMarkdown(root, container, text, { multiline = false } = {}) {
   container.replaceChildren();
@@ -84,24 +84,147 @@ export function renderInlineMarkdown(root, container, text, { multiline = false 
   }
 
   let currentList = null;
+  let currentListType = null;
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (line === '') continue;
-    if (line.startsWith('- ')) {
-      if (!currentList) {
-        currentList = root.createElement('ul');
+    const bullet = line.startsWith('- ') ? { type: 'ul', text: line.slice(2) } : null;
+    const numbered = bullet ? null : /^(\d+)[\.)]\s+(.*)$/.exec(line);
+    const listItem = bullet ?? (numbered ? { type: 'ol', text: numbered[2], start: Number(numbered[1]) } : null);
+    if (listItem) {
+      if (!currentList || currentListType !== listItem.type) {
+        currentList = root.createElement(listItem.type);
+        currentListType = listItem.type;
+        if (listItem.type === 'ol' && listItem.start > 1) {
+          currentList.setAttribute?.('start', String(listItem.start));
+          currentList.start = listItem.start;
+        }
         container.append(currentList);
       }
       const item = root.createElement('li');
-      appendInlineSegments(root, item, line.slice(2));
+      appendInlineSegments(root, item, listItem.text);
       currentList.append(item);
     } else {
       currentList = null;
+      currentListType = null;
       const paragraph = root.createElement('p');
       appendInlineSegments(root, paragraph, line);
       container.append(paragraph);
     }
   }
+}
+
+function formatChatCable(cable) {
+  if (!cable) return '';
+  const lower = cable.toLowerCase();
+  if (lower === 'none' || lower.startsWith('none ')) return 'none';
+  return cable;
+}
+
+function formatChatLoad(set) {
+  const reps = set.reps != null ? String(set.reps) : null;
+  let weight = null;
+  if (set.weightKg === 0) weight = 'bodyweight';
+  else if (set.weightKg != null) weight = `${set.weightKg} kg`;
+  if (reps && weight === 'bodyweight') return `${reps} bodyweight`;
+  if (reps && weight) return `${reps} × ${weight}`;
+  if (weight) return weight;
+  if (reps) return `${reps} reps`;
+  return set.raw || '';
+}
+
+function appendChatSetRow(root, list, set, { collapsedCount = 0 } = {}) {
+  const row = root.createElement('li');
+  row.className = collapsedCount > 1
+    ? 'chat-workout__set chat-workout__set--repeat'
+    : 'chat-workout__set';
+
+  const label = root.createElement('span');
+  label.className = 'chat-workout__set-n';
+  label.textContent = collapsedCount > 1 ? `${collapsedCount} sets` : `Set ${set.index}`;
+
+  const load = root.createElement('span');
+  load.className = 'chat-workout__set-load';
+  load.textContent = formatChatLoad(set);
+
+  row.append(label, load);
+  const cable = formatChatCable(set.cable);
+  if (cable) {
+    const cableNode = root.createElement('span');
+    cableNode.className = 'chat-workout__set-cable';
+    cableNode.textContent = cable;
+    row.append(cableNode);
+  }
+  list.append(row);
+}
+
+function renderWorkoutChat(root, container, plan) {
+  const card = root.createElement('div');
+  card.className = 'chat-workout';
+  if (plan.intro) {
+    const intro = root.createElement('p');
+    intro.className = 'chat-workout__intro';
+    appendInlineSegments(root, intro, plan.intro);
+    card.append(intro);
+  }
+
+  const list = root.createElement('ol');
+  list.className = 'chat-workout__exercises';
+  for (const [index, exercise] of plan.exercises.entries()) {
+    const item = root.createElement('li');
+    item.className = 'chat-workout__exercise';
+
+    const head = root.createElement('div');
+    head.className = 'chat-workout__head';
+    const num = root.createElement('span');
+    num.className = 'chat-workout__num';
+    num.textContent = `${index + 1}`;
+    const name = root.createElement('strong');
+    name.className = 'chat-workout__name';
+    name.textContent = exercise.name;
+    head.append(num, name);
+    item.append(head);
+
+    if (exercise.cue) {
+      const cue = root.createElement('p');
+      cue.className = 'chat-workout__cue';
+      cue.textContent = exercise.cue;
+      item.append(cue);
+    }
+
+    if (exercise.sets.length) {
+      const sets = root.createElement('ul');
+      sets.className = 'chat-workout__sets';
+      if (setsAreIdentical(exercise.sets)) {
+        appendChatSetRow(root, sets, exercise.sets[0], { collapsedCount: exercise.sets.length });
+      } else {
+        for (const set of exercise.sets) appendChatSetRow(root, sets, set);
+      }
+      item.append(sets);
+    }
+    list.append(item);
+  }
+  card.append(list);
+
+  if (plan.outro) {
+    const outro = root.createElement('p');
+    outro.className = 'chat-workout__outro';
+    appendInlineSegments(root, outro, plan.outro);
+    card.append(outro);
+  }
+  container.append(card);
+}
+
+// Chat bubbles always opt into multiline lists, and turn a dumped workout
+// prescription into stacked exercise rows instead of one run-on paragraph.
+export function renderChatMarkdown(root, container, text) {
+  container.replaceChildren();
+  const plan = parseWorkoutChat(text);
+  if (plan) {
+    renderWorkoutChat(root, container, plan);
+    return;
+  }
+  renderInlineMarkdown(root, container, text, { multiline: true });
 }
 
 function appendInlineSegments(root, container, text) {
