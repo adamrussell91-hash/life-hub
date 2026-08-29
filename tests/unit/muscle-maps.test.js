@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveMuscleMapKeys, muscleAssetPath } from '../../js/app/muscle-maps.js';
+import { resolveMuscleMapKeys, muscleAssetPath, resolveExerciseThumbKey } from '../../js/app/muscle-maps.js';
 
 test('coarse focus falls back to whole-region keys', () => {
   assert.deepEqual(
@@ -42,4 +42,13 @@ test('unknown tokens are omitted', () => {
 
 test('muscleAssetPath builds the static asset URL', () => {
   assert.equal(muscleAssetPath('chest-whole'), 'assets/fitness/muscles/chest-whole.png');
+});
+
+test('resolveExerciseThumbKey prefers library then name hints', () => {
+  const libraryByName = new Map([
+    ['Cable Fly', { name: 'Cable Fly', target_area: 'Chest', focus_areas: ['Upper Chest'] }]
+  ]);
+  assert.equal(resolveExerciseThumbKey({ name: 'Cable Fly' }, libraryByName), 'chest-upper');
+  assert.equal(resolveExerciseThumbKey({ name: 'Barbell Squat' }), 'thighs-front');
+  assert.equal(resolveExerciseThumbKey({ name: 'Unknown Move' }), 'chest-whole');
 });

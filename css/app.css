@@ -663,6 +663,130 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .record-proposal__discard { background: transparent; color: var(--muted); }
 
+.record-proposal__eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.record-proposal .workout-plan-card {
+  margin-top: var(--space-3);
+}
+
+.workout-plan-card__day {
+  margin: 0;
+  color: var(--wave);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.workout-plan-card__title,
+[data-fitness-hero] [data-fitness="hero-title"] {
+  margin: var(--space-1) 0 0;
+  color: var(--depth);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+}
+
+.workout-plan-card__meta {
+  margin: var(--space-1) 0 0;
+  color: var(--success);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.workout-plan-card__exercises,
+.record-proposal .record-proposal__exercises {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.workout-plan-card__row {
+  display: grid;
+  grid-template-columns: var(--space-10) minmax(0, 1fr) auto auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+
+.workout-plan-card__row.fitness-exercise {
+  padding: var(--space-3) 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.workout-plan-card__thumb {
+  width: var(--space-10);
+  height: var(--space-10);
+  border-radius: var(--radius-xs);
+  object-fit: cover;
+  background: var(--cotton);
+}
+
+.workout-plan-card__thumb--empty {
+  display: block;
+}
+
+.workout-plan-card__copy {
+  min-width: 0;
+}
+
+.workout-plan-card__copy strong {
+  display: block;
+  color: var(--depth);
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+
+.workout-plan-card__detail {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  white-space: pre-line;
+}
+
+.workout-plan-card__sets {
+  color: var(--wave);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.workout-plan-card__chevron {
+  color: var(--shallow);
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.workout-plan-card__start {
+  width: 100%;
+  margin-top: var(--space-4);
+}
+
+.record-proposal:has(.workout-plan-card) .record-proposal__confirm {
+  display: flex;
+  width: 100%;
+  margin: var(--space-4) 0 0;
+  background: var(--navy);
+  color: #fff;
+}
+
+.record-proposal:has(.workout-plan-card) .record-proposal__discard {
+  display: flex;
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
 .chat-form { display: flex; gap: 0.5rem; }
 #chat-input { flex: 1; min-height: 44px; padding: 0.6rem 0.9rem; border-radius: 0.75rem; border: 1px solid var(--line); }
 #chat-send {
