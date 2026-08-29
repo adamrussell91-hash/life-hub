@@ -1,4 +1,10 @@
-import { serializeExpiredSessionCookie, verifySessionToken } from './_shared/auth-security.mjs';
+import {
+  createSessionToken,
+  serializeExpiredSessionCookie,
+  serializeSessionCookie,
+  shouldRefreshSession,
+  verifySessionToken
+} from './_shared/auth-security.mjs';
 import {
   errorResponse,
   guardRequestOrigin,
@@ -16,6 +22,8 @@ export const config = { path: '/api/session' };
 export function createSessionHandler({
   env = process.env,
   verifySessionToken: verify = verifySessionToken,
+  createSessionToken: createToken = createSessionToken,
+  serializeSessionCookie: serializeCookie = serializeSessionCookie,
   serializeExpiredSessionCookie: clearCookie = serializeExpiredSessionCookie,
   now = Date.now
 } = {}) {
@@ -38,13 +46,26 @@ export function createSessionHandler({
       }), request, env);
     }
 
+    const currentTime = now();
+    const headers = {};
+    let expiresAt = new Date(session.payload.exp).toISOString();
+    if (shouldRefreshSession(session.payload, currentTime)) {
+      try {
+        const refreshed = createToken({ now: currentTime }, env.SESSION_SECRET);
+        headers['set-cookie'] = serializeCookie(refreshed.token);
+        expiresAt = refreshed.expiresAt;
+      } catch {
+        return withCors(misconfiguredResponse(), request, env);
+      }
+    }
+
     return withCors(jsonResponse(200, {
       ok: true,
       data: {
         authenticated: true,
-        expiresAt: new Date(session.payload.exp).toISOString()
+        expiresAt
       }
-    }), request, env);
+    }, headers), request, env);
   };
 }
 
