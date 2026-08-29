@@ -19,12 +19,50 @@ function latestPlanSource({ assistantText, messages, userMessage }) {
   return findLatestWorkoutPlanText(texts);
 }
 
+export function resolveForcedChadwickPlan({
+  slug,
+  userMessage,
+  today,
+  messages,
+  assistantText = '',
+  sawLogEntry = false
+} = {}) {
+  if (slug !== 'chadwick' || sawLogEntry) return null;
+  if (!shouldForceChadwickPlanProposal({ userMessage, assistantText, sawLogEntry })) {
+    return null;
+  }
+  const source = latestPlanSource({ assistantText, messages, userMessage });
+  return buildPlannedWorkoutInput(source, { date: today });
+}
+
+function forcedPlanEvents(input) {
+  return [
+    { type: 'status', text: 'Locking the plan onto Fitness…' },
+    { type: 'text', delta: 'On Fitness — confirm to start.' },
+    { type: 'tool_call', id: 'forced_plan', name: 'log_entry', input }
+  ];
+}
+
 export async function* streamWithChadwickPlanForce(anthropic, {
   slug,
   userMessage,
   today,
   ...streamOpts
 } = {}) {
+  const early = resolveForcedChadwickPlan({
+    slug,
+    userMessage,
+    today,
+    messages: streamOpts.messages,
+    assistantText: '',
+    sawLogEntry: false
+  });
+  if (early) {
+    for (const event of forcedPlanEvents(early)) yield event;
+    yield { type: 'done' };
+    return;
+  }
+
   let assistantText = '';
   let sawLogEntry = false;
 
@@ -38,21 +76,23 @@ export async function* streamWithChadwickPlanForce(anthropic, {
     yield event;
   }
 
+  const late = resolveForcedChadwickPlan({
+    slug,
+    userMessage,
+    today,
+    messages: streamOpts.messages,
+    assistantText,
+    sawLogEntry
+  });
+  if (late) {
+    for (const event of forcedPlanEvents(late)) yield event;
+    return;
+  }
+
   if (slug !== 'chadwick') return;
   if (!shouldForceChadwickPlanProposal({ userMessage, assistantText, sawLogEntry })) return;
 
   yield { type: 'status', text: 'Locking the plan onto Fitness…' };
-
-  const source = latestPlanSource({
-    assistantText,
-    messages: streamOpts.messages,
-    userMessage
-  });
-  const input = buildPlannedWorkoutInput(source, { date: today });
-  if (input) {
-    yield { type: 'tool_call', id: 'forced_plan', name: 'log_entry', input };
-    return;
-  }
 
   const forceMessages = [
     ...(streamOpts.messages ?? []),

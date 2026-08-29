@@ -118,6 +118,32 @@ test('buildPlannedWorkoutInput turns a compact dump into a valid planned log_ent
   assert.equal(input.fields.exercises[2].sets[0].reps, 20);
 });
 
+test('buildPlannedWorkoutInput reads the compact 13-line dump Adam saw in chat', () => {
+  const input = buildPlannedWorkoutInput([
+    '1. Bar Squat — 10x25kg, 10x25kg, 10x25kg, 10x25kg (cable: none)',
+    '2. Bar Row — 10x26kg, 10x26kg, 10x26kg (cable: constant force)',
+    '3. Bar Press — 10x30kg, 10x30kg (cable: constant force)',
+    '4. Goblet Squat — 12x14kg, 12x14kg (cable: none)',
+    '5. Single Arm Row — 12x14kg (cable: constant force)',
+    '6. Bent Over Fly — 15x9kg (cable: elastic)',
+    '7. Cable Bar Curl — 12x20kg (cable: eccentric)',
+    '8. Bent Leg Reverse Crunch — 15x0kg (cable: none)',
+    '9. Seated Curl — 12x8kg (cable: constant force)',
+    '10. Face Pull — 15x8kg (cable: constant force)',
+    '11. Lateral Raise — 12x6kg (cable: none)',
+    '12. One Grip Russian Twist — 20×6kg (cable: none)',
+    '13. Bar Press — FINISHER — 20×20kg (cable: constant force)'
+  ].join('\n'), { date: '2026-08-29' });
+  assert.equal(input.fields.exercises.length, 13);
+  assert.equal(input.fields.exercises[11].name, 'One Grip Russian Twist');
+  assert.equal(input.fields.exercises[11].sets[0].reps, 20);
+  assert.equal(input.fields.exercises[11].sets[0].weight_kg, 6);
+  assert.equal(input.fields.exercises[12].name, 'Bar Press');
+  assert.equal(input.fields.exercises[12].sets[0].reps, 20);
+  assert.equal(input.fields.exercises[12].sets[0].weight_kg, 20);
+  assert.equal(input.fields.exercises[12].sets[0].cable_type, 'constant_force');
+});
+
 test('findLatestWorkoutPlanText walks newest-first and ignores chatter', () => {
   const latest = findLatestWorkoutPlanText([
     '1. Bar Press — 10x30kg (cable: none)\n2. Bar Row — 10x27kg (cable: none)',

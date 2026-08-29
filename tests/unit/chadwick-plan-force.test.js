@@ -26,7 +26,7 @@ test('does not start a second round for non-Chadwick agents', async () => {
   assert.equal(events.some(event => event.type === 'status'), false);
 });
 
-test('lock-in with a parseable history plan emits log_entry without a second model round', async () => {
+test('lock-in with a parseable history plan emits log_entry without calling the model', async () => {
   const calls = [];
   const anthropic = {
     async *streamMessage(args) {
@@ -45,13 +45,45 @@ test('lock-in with a parseable history plan emits log_entry without a second mod
     ]
   }));
 
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 0, 'must not wait on Anthropic when the plan is already in history');
   assert.ok(events.some(event => event.type === 'status' && /Locking the plan onto Fitness/i.test(event.text)));
+  assert.ok(events.some(event => event.type === 'text' && /On Fitness/i.test(event.delta)));
   const proposal = events.find(event => event.type === 'tool_call' && event.name === 'log_entry');
   assert.ok(proposal);
   assert.equal(proposal.input.fields.status, 'planned');
   assert.equal(proposal.input.fields.exercises.length, 3);
   assert.equal(proposal.input.fields.exercises[0].name, 'Bar Press');
+});
+
+test('make the workout and is it ready to go emit the same card without the model', async () => {
+  const anthropic = {
+    async *streamMessage() {
+      throw new Error('Anthropic must not run on lock-in follow-ups');
+    }
+  };
+  const history = [
+    { role: 'assistant', content: [
+      '1. Bar Squat — 10x25kg, 10x25kg (cable: none)',
+      '12. One Grip Russian Twist — 20×6kg (cable: none)',
+      '13. Bar Press — FINISHER — 20×20kg (cable: constant force)'
+    ].join('\n') },
+    { role: 'assistant', content: 'Locking it in now.' }
+  ];
+
+  for (const userMessage of ['make the workout', 'is it ready to go?']) {
+    const events = await collect(streamWithChadwickPlanForce(anthropic, {
+      slug: 'chadwick',
+      userMessage,
+      today: '2026-08-29',
+      messages: [...history, { role: 'user', content: userMessage }]
+    }));
+    const proposal = events.find(event => event.type === 'tool_call' && event.name === 'log_entry');
+    assert.ok(proposal, `expected a Confirm card for "${userMessage}"`);
+    assert.equal(proposal.input.fields.exercises.length, 3);
+    assert.equal(proposal.input.fields.exercises[2].name, 'Bar Press');
+    assert.equal(proposal.input.fields.exercises[2].sets[0].reps, 20);
+    assert.equal(proposal.input.fields.exercises[2].sets[0].weight_kg, 20);
+  }
 });
 
 test('forces a second Anthropic round when lock-in has no parseable plan', async () => {
