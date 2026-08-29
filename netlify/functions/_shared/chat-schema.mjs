@@ -2,7 +2,7 @@ import { TYPE_DOMAINS } from '../../../js/core/records.js';
 import { validateRecord } from '../../../js/core/validate.js';
 import { isCalendarDate } from '../../../js/core/time.js';
 import { buildMedicalSlug } from '../../../js/app/medical-model.js';
-import { normalizeMedicalFields } from '../../../js/app/medical-normalize.js';
+import { coerceCalendarDate, normalizeMedicalFields } from '../../../js/app/medical-normalize.js';
 
 const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare', 'mind_session', 'medical'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -163,7 +163,10 @@ const DOMAIN_PROPERTIES = {
       enum: ['place', 'telehealth', 'unknown'],
       description: 'Optional — defaults to place/telehealth/unknown from location text.'
     },
-    follow_up_date: { type: 'string', description: 'Optional follow-up date YYYY-MM-DD. Omit when unknown.' },
+    follow_up_date: {
+      type: 'string',
+      description: 'Optional follow-up date. Prefer YYYY-MM-DD; AU forms like 27/10 or 27/10/2026 are accepted. Omit when unknown. This stays on the same visit — a future maintenance dose on a new day is a separate medical visit with that date, not follow_up_date.'
+    },
     cost_aud: { type: 'number', description: 'Optional out-of-pocket cost in AUD. Omit when unknown.' },
     insurance_status: { type: 'string', description: 'Optional insurance note. Omit when unknown.' },
     episode: {
@@ -204,7 +207,7 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
       type: 'object',
       properties: {
         type: { type: 'string', enum: allowedTypes },
-        date: { type: 'string', description: 'YYYY-MM-DD' },
+        date: { type: 'string', description: 'Visit/log date. Prefer YYYY-MM-DD; AU forms like 27/10 or 27/10/2026 are accepted for medical visits.' },
         time: { type: 'string', description: 'HH:MM, optional' },
         notes: { type: 'string', description: 'Optional free-text note saved as the record body, e.g. what food was eaten or how a workout felt. Not a domain field — do not put this in fields.' },
         fields: fieldsSchema
@@ -276,16 +279,20 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
     }
   }
 
+  const today = now.slice(0, 10);
   const normalizedFields = type === 'medical'
-    ? normalizeMedicalFields(fields, { notes })
+    ? normalizeMedicalFields(fields, { notes, today })
     : fields;
+  const resolvedDate = type === 'medical'
+    ? (coerceCalendarDate(date, { today }) ?? date)
+    : date;
 
   const record = {
     ...normalizedFields,
     schema_version: 1,
     id,
     type,
-    date,
+    date: resolvedDate,
     time: time ?? now.slice(11, 16),
     created_at: now,
     updated_at: now,
@@ -302,7 +309,7 @@ export function logEntryRetryHint(input) {
     return 'Fix the payload and call log_entry again in this turn before telling Adam it failed.';
   }
   if (input.type === 'medical') {
-    return 'Call log_entry again with type medical, date, fields: { title }, and notes only. Omit lane, record_type, and every other optional field. Do not mention schema errors to Adam.';
+    return 'Call log_entry again with type medical, date (YYYY-MM-DD or AU D/M/YYYY), fields: { title }, and notes only. For a future maintenance dose use that day as date (new visit). Omit lane, record_type, and every other optional field. Do not mention schema errors to Adam.';
   }
   if (input.type === 'meal') {
     return 'Call log_entry again with every required meal macro, valid time in HH:MM, and notes.';
