@@ -128,6 +128,8 @@ import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
+import { streamWithChadwickPlanForce } from './_shared/chadwick-plan-force.mjs';
+import { keepNewestHistory } from '../../js/core/chat-history.js';
 import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } from '../../js/core/time.js';
 import { parseEventDocument } from '../../js/core/records.js';
 import { load as loadYaml } from 'js-yaml';
@@ -135,9 +137,6 @@ import { load as loadYaml } from 'js-yaml';
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 24 * 1024;
 const MAX_MESSAGE_LENGTH = 4000;
-const MAX_HISTORY_MESSAGES = 8;
-const MAX_HISTORY_ENTRY_CHARS = 1500;
-const MAX_HISTORY_TOTAL_CHARS = 6000;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 
 export const config = { path: '/api/chat' };
@@ -666,7 +665,9 @@ export function createChatHandler({
           };
 
           send({ type: 'status', text: 'Thinking…' });
-          for await (const event of anthropic.streamMessage({
+          for await (const event of streamWithChadwickPlanForce(anthropic, {
+            slug,
+            userMessage: parsed.message,
             system,
             messages: [...parsed.history, { role: 'user', content: parsed.message }],
             tools,
@@ -1087,21 +1088,7 @@ async function parseRequest(request) {
 }
 
 function sanitizeHistory(value) {
-  if (!Array.isArray(value)) return [];
-  let totalChars = 0;
-  const sanitized = [];
-  for (const entry of value.slice(-MAX_HISTORY_MESSAGES)) {
-    if (!entry || typeof entry !== 'object') continue;
-    if (entry.role !== 'user' && entry.role !== 'assistant') continue;
-    if (typeof entry.content !== 'string' || entry.content.trim() === '') continue;
-    const content = entry.content.length > MAX_HISTORY_ENTRY_CHARS
-      ? entry.content.slice(0, MAX_HISTORY_ENTRY_CHARS)
-      : entry.content;
-    totalChars += content.length;
-    if (totalChars > MAX_HISTORY_TOTAL_CHARS) break;
-    sanitized.push({ role: entry.role, content });
-  }
-  return sanitized;
+  return keepNewestHistory(value);
 }
 
 async function readAtMost(stream, limit) {

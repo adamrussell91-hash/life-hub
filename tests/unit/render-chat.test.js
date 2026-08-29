@@ -154,6 +154,16 @@ test('renderInlineMarkdown without { multiline: true } renders embedded newlines
   assert.equal(container.children[0].textContent, 'Here are the options:\n- Option A\n- Option B');
 });
 
+function findByClass(node, name) {
+  const classes = String(node?.className ?? '').split(/\s+/);
+  if (classes.includes(name)) return node;
+  for (const child of node?.children ?? []) {
+    const found = findByClass(child, name);
+    if (found) return found;
+  }
+  return null;
+}
+
 test('appendRecordProposal adds a read-only exercises summary with cable types', () => {
   const root = new FakeDocument();
   const { card } = appendRecordProposal(root, {
@@ -179,15 +189,44 @@ test('appendRecordProposal adds a read-only exercises summary with cable types',
     notes: 'Good session.'
   });
 
-  const summary = card.children.find(child => child.className === 'record-proposal__exercises');
+  const summary = findByClass(card, 'record-proposal__exercises');
   assert.ok(summary);
   assert.equal(summary.tagName, 'ul');
   assert.equal(summary.children.length, 2);
-  assert.equal(summary.children[0].children[0].tagName, 'strong');
-  assert.match(summary.children[0].children[0].textContent, /Chest Press @ 0°/);
-  assert.match(summary.children[0].children[1].textContent, /Set 1: 32 kg × 10 reps · cable: concentric/);
-  assert.match(summary.children[1].children[0].textContent, /Bicep Curl/);
-  assert.match(summary.children[1].children[1].textContent, /cable: constant force/);
+  const firstCopy = summary.children[0].children[1];
+  assert.equal(firstCopy.children[0].tagName, 'strong');
+  assert.match(firstCopy.children[0].textContent, /Chest Press @ 0°/);
+  assert.match(firstCopy.children[1].textContent, /Set 1: 32 kg × 10 reps · cable: concentric/);
+  const secondCopy = summary.children[1].children[1];
+  assert.match(secondCopy.children[0].textContent, /Bicep Curl/);
+  assert.match(secondCopy.children[1].textContent, /cable: constant force/);
+});
+
+test('appendRecordProposal renders a planned workout as a startable session card', () => {
+  const root = new FakeDocument();
+  const { card, confirm } = appendRecordProposal(root, {
+    path: 'data/fitness/2026/07/2026-07-30-test.md',
+    record: {
+      type: 'workout',
+      date: '2026-07-30',
+      title: 'Upper Body',
+      session_kind: 'strength',
+      status: 'planned',
+      duration_min: 35,
+      exercises: [
+        { name: 'Bench Press', sets: [{}, {}, {}, {}] },
+        { name: 'Push-Up', sets: [{}, {}, {}, {}] }
+      ]
+    },
+    notes: ''
+  });
+
+  assert.equal(findByClass(card, 'workout-plan-card__day').textContent, 'Thursday');
+  assert.equal(findByClass(card, 'workout-plan-card__title').textContent, 'Upper Body');
+  assert.equal(findByClass(card, 'workout-plan-card__meta').textContent, '35 min');
+  assert.equal(findByClass(card, 'workout-plan-card__sets').textContent, '4 sets');
+  assert.equal(confirm.textContent, 'Start workout');
+  assert.equal(card.children.find(child => child.className === 'record-proposal__fields').children.length, 2);
 });
 
 test('appendRecordProposal renders protocol lint warnings without disabling Confirm', () => {

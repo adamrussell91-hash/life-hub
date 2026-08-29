@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatCableType,
+  formatExerciseSetCount,
   formatExerciseSets,
   formatExerciseTitle,
   humanizeFieldLabel
@@ -11,6 +12,12 @@ test('formatExerciseTitle includes bench angle when present', () => {
   assert.equal(formatExerciseTitle({ name: 'Chest Press', bench_angle_deg: 0 }), 'Chest Press @ 0°');
   assert.equal(formatExerciseTitle({ name: 'Row' }), 'Row');
   assert.equal(formatExerciseTitle({}), 'Exercise');
+});
+
+test('formatExerciseSetCount uses a short plural', () => {
+  assert.equal(formatExerciseSetCount({ sets: [{ reps: 10 }] }), '1 set');
+  assert.equal(formatExerciseSetCount({ sets: [{}, {}] }), '2 sets');
+  assert.equal(formatExerciseSetCount({}), '0 sets');
 });
 
 test('formatExerciseSets labels weight, reps, and cable type per set', () => {
