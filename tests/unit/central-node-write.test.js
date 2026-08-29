@@ -6,6 +6,7 @@ import {
   applyLogToCentralNode,
   buildMealFlagsLine,
   buildNutritionStatusLine,
+  dedupeCrossAgentSection,
   formatStatusHeadingDate,
   formatThisMonthHeading,
   formatThisWeekHeading,
@@ -40,6 +41,26 @@ test('formatStatusHeadingDate uses en-AU long form', () => {
 test('appendRecentAction inserts directly under the Recent Agent Actions heading', () => {
   const next = appendRecentAction(base, '\n**1 Aug:** Brisket Lasso: Logged breakfast.');
   assert.match(next, /## 📝 Recent Agent Actions\n\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast\.\n\*\*1 Aug:\*\*/);
+});
+
+test('appendRecentAction skips an exact repeat of an already-present bullet', () => {
+  const once = appendRecentAction(base, '\n**1 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).');
+  const twice = appendRecentAction(once, '\n**1 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).');
+  assert.equal(twice, once);
+  assert.equal((twice.match(/Biceps and Boobs/g) ?? []).length, 1);
+});
+
+test('appendRecentAction dedups regardless of date-stamp/whitespace differences', () => {
+  const once = appendRecentAction(base, '\n**1 Aug:**   Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).');
+  const twice = appendRecentAction(once, '\n**2 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).');
+  assert.equal(twice, once);
+});
+
+test('appendRecentAction still inserts a genuinely different same-day action', () => {
+  const once = appendRecentAction(base, '\n**1 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).');
+  const twice = appendRecentAction(once, '\n**1 Aug:** Brisket Lasso: Logged breakfast.');
+  assert.match(twice, /Biceps and Boobs/);
+  assert.match(twice, /Logged breakfast/);
 });
 
 test('buildNutritionStatusLine formats totals only', () => {
@@ -158,6 +179,66 @@ test('trimCrossAgentSection keeps the newest directives and drops the tail', () 
   // Non-directive content and later sections survive the trim.
   assert.match(next, /\*One-line directives only\.\*/);
   assert.match(next, /## 📝 Recent Agent Actions/);
+});
+
+test('dedupeCrossAgentSection collapses repeated same-thread lines from the same sender, keeping the newest', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    "- Vera→Hammond: Body-level question (what 'getting in trouble' feels like physically) has now been left open at close five times without landing. Strong recommend: next session open directly with this.",
+    "- Vera→Hammond: Body-level question (what getting in trouble feels like physically) has now been left open at close four times across today's sessions without landing.",
+    '- Penelope→Hammond: Adam reports persistent low mood, unrelated thread.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+
+  const next = dedupeCrossAgentSection(base);
+  assert.match(next, /left open at close five times/);
+  assert.doesNotMatch(next, /left open at close four times/);
+  assert.match(next, /Penelope→Hammond: Adam reports persistent low mood/);
+});
+
+test('dedupeCrossAgentSection leaves distinct threads from the same sender alone', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    '- Chadwick→Sara: 26 Jul right AC deep ache recurring during everyday movement.',
+    '- Chadwick→Sara: 24 Jul mild AC noise on upright close grip curls during the session.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+  assert.equal(dedupeCrossAgentSection(base), base);
+});
+
+test('dedupeCrossAgentSection keeps unparseable bullets untouched', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    '- Just a note with no sender arrow at all.',
+    '- Just a note with no sender arrow at all.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+  assert.equal(dedupeCrossAgentSection(base), base);
+});
+
+test('dedupeCrossAgentSection runs before trimCrossAgentSection so a duplicate never displaces a distinct line', () => {
+  const duplicatePair = [
+    '- Vera→Hammond: same open thread left open at close today, restated a second time, still not landing.',
+    '- Vera→Hammond: same open thread left open at close today, this is the first time it was raised.'
+  ];
+  const distinctOld = Array.from({ length: 11 }, (_, index) => `- Distinct directive ${index + 1}.`);
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    ...duplicatePair,
+    ...distinctOld,
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+
+  const deduped = trimCrossAgentSection(dedupeCrossAgentSection(base), { maxLines: 12 });
+  assert.match(deduped, /restated a second time, still not landing/);
+  assert.match(deduped, /Distinct directive 11\./);
+
+  const notDeduped = trimCrossAgentSection(base, { maxLines: 12 });
+  assert.doesNotMatch(notDeduped, /Distinct directive 11\./);
 });
 
 test('trimCrossAgentSection leaves a short section untouched', () => {
