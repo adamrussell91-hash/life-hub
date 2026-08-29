@@ -87,10 +87,10 @@ export function renderFitnessLogger(root, draft, {
     complete.className = 'fitness-logger__control';
     complete.dataset.fitnessLogger = 'complete';
     if (timer.state === 'completed') {
-      complete.textContent = 'Undo Complete';
+      complete.textContent = 'Unlock time';
       complete.addEventListener('click', () => onUndoComplete?.());
     } else {
-      complete.textContent = 'Complete';
+      complete.textContent = 'Lock time';
       complete.disabled = timer.state !== 'running' && timer.state !== 'paused';
       complete.addEventListener('click', () => onComplete?.());
     }
@@ -426,10 +426,10 @@ export function updateLoggerChrome(root, { elapsedMs, saveState, timer }) {
   const complete = root.querySelector('[data-fitness-logger="complete"]');
   if (complete) {
     if (timer.state === 'completed') {
-      complete.textContent = 'Undo Complete';
+      complete.textContent = 'Unlock time';
       complete.disabled = false;
     } else {
-      complete.textContent = 'Complete';
+      complete.textContent = 'Lock time';
       complete.disabled = timer.state !== 'running' && timer.state !== 'paused';
     }
   }

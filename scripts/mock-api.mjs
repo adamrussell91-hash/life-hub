@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dump } from 'js-yaml';
 import { parseDateRange, CONFIG_PATHS } from '../netlify/functions/_shared/repo-policy.mjs';
+import { TYPE_DOMAINS } from '../js/core/records.js';
 
 const PASSPHRASE = 'life-hub-local';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
@@ -33,9 +35,35 @@ const FIXTURE_FILES = [
   }
 ];
 
+function confirmedPath(candidate, slug) {
+  const date = candidate?.date;
+  const domain = TYPE_DOMAINS[candidate?.type] ?? 'fitness';
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || typeof slug !== 'string') {
+    return `data/${domain}/mock/${slug}.md`;
+  }
+  return `data/${domain}/${date.slice(0, 4)}/${date.slice(5, 7)}/${date}-${slug}.md`;
+}
+
+function confirmedMarkdown(candidate, slug) {
+  const fields = candidate?.fields && typeof candidate.fields === 'object' ? candidate.fields : {};
+  const front = {
+    schema_version: 1,
+    id: slug,
+    type: candidate.type,
+    date: candidate.date,
+    ...(candidate.time ? { time: candidate.time } : {}),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    source: 'chat',
+    ...fields
+  };
+  return `---\n${dump(front, { lineWidth: 120 })}---\n${candidate.notes ?? ''}\n`;
+}
+
 export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) {
   const rootPath = resolve(root instanceof URL ? fileURLToPath(root) : root);
   const sessions = new Map();
+  const confirmedFiles = new Map();
   let nextSessionId = 0;
 
   const readSession = request => {
@@ -109,7 +137,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
         error(response, 400, 'invalid_date_range', 'Provide a valid date range.', false);
         return true;
       }
-      const repository = await readFixtureRepository(rootPath);
+      const repository = await readFixtureRepository(rootPath, confirmedFiles);
       const files = repository.files.filter(file => isInRange(file.path, range));
       const manifestId = hash(`${repository.commitSha}\0${range.from}\0${range.to}`);
       const etag = `"${manifestId}"`;
@@ -141,7 +169,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
         return true;
       }
 
-      const repository = await readFixtureRepository(rootPath);
+      const repository = await readFixtureRepository(rootPath, confirmedFiles);
       const allowed = new Map(repository.files
         .filter(file => isInRange(file.path, range))
         .map(file => [`${file.path}\0${file.sha}`, file]));
@@ -180,12 +208,15 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
         error(response, 400, 'invalid_request', 'Provide a valid confirmation request.', false);
         return true;
       }
+      const path = confirmedPath(body.candidate, body.slug);
+      const content = confirmedMarkdown(body.candidate, body.slug);
+      confirmedFiles.set(path, content);
       json(response, 200, {
         ok: true,
         data: {
-          path: `data/fitness/mock/${body.slug}.md`,
-          sha: hash(body.slug).slice(0, 40),
-          commitSha: hash('mock-commit').slice(0, 40)
+          path,
+          sha: hash(content).slice(0, 40),
+          commitSha: hash(`mock-commit\0${path}\0${content}`).slice(0, 40)
         }
       });
       return true;
@@ -196,16 +227,25 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
   };
 }
 
-async function readFixtureRepository(rootPath) {
+function asRepoFile(path, content) {
+  return {
+    path,
+    content,
+    size: Buffer.byteLength(content),
+    sha: hash(content).slice(0, 40)
+  };
+}
+
+async function readFixtureRepository(rootPath, confirmedFiles = new Map()) {
   const files = await Promise.all(FIXTURE_FILES.map(async fixture => {
-    const content = await readFile(resolve(rootPath, fixture.source), 'utf8');
-    return {
-      path: fixture.path,
-      content,
-      size: Buffer.byteLength(content),
-      sha: hash(content).slice(0, 40)
-    };
+    const content = confirmedFiles.get(fixture.path)
+      ?? await readFile(resolve(rootPath, fixture.source), 'utf8');
+    return asRepoFile(fixture.path, content);
   }));
+  for (const [path, content] of confirmedFiles) {
+    if (files.some(file => file.path === path)) continue;
+    files.push(asRepoFile(path, content));
+  }
   const fingerprint = files.map(file => `${file.path}\0${file.sha}\0${file.size}`).join('\0');
   return {
     files,
