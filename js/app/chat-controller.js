@@ -483,7 +483,7 @@ export function createChatController({
           clearWorkingBubble();
           endTextTurn();
           const proposal = appendCnPatchProposal(root, { patch: event.patch });
-          bindCnPatchProposal(proposal, event.patch);
+          bindCnPatchProposal(proposal, event.patch, event.id ?? null);
         } else if (event.type === 'central_node_patched') {
           turnSignaled = true;
           gotUsefulOutput = true;
@@ -584,15 +584,21 @@ export function createChatController({
     proposal.discard.addEventListener('click', () => proposal.card.remove());
   }
 
-  function bindCnPatchProposal(proposal, patch) {
+  function bindCnPatchProposal(proposal, patch, id = null) {
     if (!proposal) return;
     proposal.confirm.addEventListener('click', () => {
-      void confirmCnPatch(proposal, patch);
+      void confirmCnPatch(proposal, patch, id);
     });
-    proposal.discard.addEventListener('click', () => proposal.card.remove());
+    proposal.discard.addEventListener('click', () => {
+      proposal.card.remove();
+      // Best-effort: clear the server-side queue entry too, so Discard actually
+      // means gone rather than just hidden in this one tab. Fire-and-forget --
+      // the card is already removed either way, and a stale entry self-purges.
+      if (id) void chatApi.confirm({ kind: 'cn_patch_dismiss', id, slug: 'hammond' }).catch(() => undefined);
+    });
   }
 
-  async function confirmCnPatch(proposal, patch) {
+  async function confirmCnPatch(proposal, patch, id = null) {
     const previousLabel = proposal.confirm.textContent;
     proposal.confirm.disabled = true;
     proposal.confirm.textContent = 'Saving…';
@@ -600,6 +606,7 @@ export function createChatController({
       const result = await chatApi.confirm({
         kind: 'cn_patch',
         candidate: patch,
+        ...(id ? { id } : {}),
         slug: stickyAgentSlug() === 'hammond' ? stickyAgentSlug() : 'hammond'
       });
       const saved = root.createElement('p');

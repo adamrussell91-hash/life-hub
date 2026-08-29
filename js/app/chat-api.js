@@ -47,15 +47,16 @@ export function createChatApi(fetchImpl = fetch) {
       }
     },
 
-    async confirm({ candidate, slug, overwrite = false, kind } = {}) {
+    async confirm({ candidate, slug, overwrite = false, kind, id } = {}) {
       const response = await fetchImpl('/api/chat/confirm', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          candidate,
+          ...(candidate ? { candidate } : {}),
           slug,
           overwrite,
-          ...(kind ? { kind } : {})
+          ...(kind ? { kind } : {}),
+          ...(id ? { id } : {})
         })
       });
       const payload = await response.json().catch(() => null);

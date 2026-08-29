@@ -108,6 +108,27 @@ test('confirm passes kind through when provided', async () => {
   assert.equal(result.path, 'central-node.md');
 });
 
+test('confirm passes id through when provided, and can omit candidate entirely', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return Response.json({ ok: true, data: { path: 'central-node.md', summary: 'Condense Trends' } });
+  });
+  await chatApi.confirm({ kind: 'cn_patch', id: 'cnp_abc123', slug: 'hammond' });
+  assert.equal(sentBody.id, 'cnp_abc123');
+  assert.equal('candidate' in sentBody, false);
+});
+
+test('confirm omits id from the body when not provided', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return Response.json({ ok: true, data: { path: 'data/nutrition/x.md' } });
+  });
+  await chatApi.confirm({ candidate: { type: 'meal' }, slug: 'breakfast' });
+  assert.equal('id' in sentBody, false);
+});
+
 test('confirm omits kind from the body when not provided', async () => {
   let sentBody;
   const chatApi = createChatApi(async (_url, init) => {

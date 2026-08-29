@@ -10,6 +10,7 @@ export function buildSystemPrompt({
   governanceLogIsEmpty = false,
   hammondDigest = '',
   hammondCnSummary = '',
+  pendingCnPatches = '',
   foodLibrary = '',
   chadwickProtocol = '',
   hyaluronicaProtocol = '',
@@ -177,6 +178,9 @@ export function buildSystemPrompt({
       : '',
     hammondCnSummary
       ? hammondCnSummary
+      : '',
+    pendingCnPatches
+      ? `Pending Central Node patches awaiting Adam's Confirm (proposed in an earlier turn, not yet applied or dismissed):\n${pendingCnPatches}\n\nMention these proactively if relevant, or if Adam asks what's outstanding — do not silently re-propose the same edit.`
       : '',
     governanceLogTail
       ? `Governance Log (recent tail — durable protocol notes and Coach's Notes):\n${governanceLogTail}`

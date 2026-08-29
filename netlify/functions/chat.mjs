@@ -74,6 +74,15 @@ import {
   applyCentralNodePatch
 } from './_shared/hammond-tools.mjs';
 import {
+  PENDING_CN_PATCHES_PATH,
+  createPendingCnPatchId,
+  parsePendingCnPatches,
+  serializePendingCnPatches,
+  addPendingCnPatch,
+  purgeStalePendingCnPatches,
+  formatPendingCnPatchesForPrompt
+} from './_shared/cn-patch-queue.mjs';
+import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
   emptyGovernanceLog,
@@ -296,6 +305,8 @@ export function createChatHandler({
         let governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
         let governanceLogSha;
         let governanceLogTail = '';
+        let pendingCnPatches = [];
+        let pendingCnPatchesSha;
         let hammondDigest = '';
         let hammondCnSummary = '';
         let foodLibraryEntries = [];
@@ -342,6 +353,10 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === GOVERNANCE_LOG_PATH && entry.type === 'blob')
             : null;
           governanceLogSha = governanceLogEntry?.sha;
+          const pendingCnPatchesEntry = needsHammondTools
+            ? current.tree.find(entry => entry.path === PENDING_CN_PATCHES_PATH && entry.type === 'blob')
+            : null;
+          pendingCnPatchesSha = pendingCnPatchesEntry?.sha;
           const foodLibraryEntry = needsFoodLibrary
             ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
             : null;
@@ -399,6 +414,7 @@ export function createChatHandler({
             dataBlobs,
             centralNodeBlob,
             governanceLogBlob,
+            pendingCnPatchesBlob,
             foodLibraryBlob,
             exerciseLibraryBlob,
             skincareLibraryBlob,
@@ -416,6 +432,7 @@ export function createChatHandler({
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
             governanceLogEntry ? client.readBlob(governanceLogEntry.sha) : null,
+            pendingCnPatchesEntry ? client.readBlob(pendingCnPatchesEntry.sha) : null,
             foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
             skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
@@ -461,6 +478,9 @@ export function createChatHandler({
               governanceLog = emptyGovernanceLog();
             }
             governanceLogTail = recentGovernanceTail(governanceLog);
+
+            const decodedPendingCnPatches = pendingCnPatchesBlob ? decodeBlob(pendingCnPatchesBlob) : null;
+            pendingCnPatches = purgeStalePendingCnPatches(parsePendingCnPatches(decodedPendingCnPatches), today);
           }
 
           const decodedFoodLibrary = foodLibraryBlob ? decodeBlob(foodLibraryBlob) : null;
@@ -596,6 +616,8 @@ export function createChatHandler({
           governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
           governanceLogSha = undefined;
           governanceLogTail = '';
+          pendingCnPatches = [];
+          pendingCnPatchesSha = undefined;
           hammondDigest = '';
           hammondCnSummary = '';
           hammondMindAmbient = '';
@@ -649,6 +671,7 @@ export function createChatHandler({
           governanceLogIsEmpty: needsHammondTools && governanceLog === emptyGovernanceLog(),
           hammondDigest,
           hammondCnSummary,
+          pendingCnPatches: needsHammondTools ? formatPendingCnPatchesForPrompt(pendingCnPatches) : '',
           foodLibrary,
           chadwickProtocol,
           hyaluronicaProtocol,
@@ -678,6 +701,31 @@ export function createChatHandler({
         });
 
         let pendingLogRejection = null;
+        // Persists a Confirm-class Central Node patch to the durable pending queue
+        // before emitting its Confirm card, so it survives past this one response
+        // instead of living only in the SSE stream + DOM (see cn-patch-queue.mjs).
+        // Best-effort: a queue write failure still lets the same-turn Confirm work,
+        // it just won't be resurfaceable in a later turn if this one gets dropped.
+        const proposeCentralNodePatch = async patch => {
+          let persistedId = null;
+          try {
+            const entry = { id: createPendingCnPatchId(), createdAt: today, slug, patch };
+            const nextQueue = addPendingCnPatch(pendingCnPatches, entry);
+            const result = await client.writeFile({
+              path: PENDING_CN_PATCHES_PATH,
+              content: serializePendingCnPatches(nextQueue),
+              ...(pendingCnPatchesSha ? { sha: pendingCnPatchesSha } : {}),
+              message: `chore(cn-patch-queue): propose ${patch.payload.summary}`
+            });
+            pendingCnPatches = nextQueue;
+            pendingCnPatchesSha = result.sha;
+            persistedId = entry.id;
+          } catch {
+            // Swallowed — see comment above.
+          }
+          send({ type: 'cn_patch_proposal', patch, id: persistedId });
+          return persistedId;
+        };
         try {
           const emit = event => {
             if (event.type === 'record_proposal' || event.type === 'record_saved') {
@@ -886,11 +934,12 @@ export function createChatHandler({
                 if (risk === 'confirm') {
                   // Anthropic client swallows tool_call when executeTools returns
                   // non-null — emit Confirm SSE here (same as central_node_patched).
-                  send({ type: 'cn_patch_proposal', patch });
+                  const pendingId = await proposeCentralNodePatch(patch);
                   return JSON.stringify({
                     ok: true,
                     status: 'awaiting_confirm',
-                    summary: patch.payload.summary
+                    summary: patch.payload.summary,
+                    ...(pendingId ? { pendingId } : {})
                   });
                 }
                 if (!centralNodeMarkdown) {
@@ -946,7 +995,7 @@ export function createChatHandler({
             } else if (event.type === 'tool_call' && event.name === 'propose_central_node_patch') {
               const patch = validateCentralNodePatchInput(event.input);
               if (patch && classifyCentralNodePatchRisk(patch) === 'confirm') {
-                send({ type: 'cn_patch_proposal', patch });
+                await proposeCentralNodePatch(patch);
               } else {
                 send(event);
               }

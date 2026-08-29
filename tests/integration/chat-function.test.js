@@ -2313,7 +2313,7 @@ test('propose_central_node_patch auto cross_agent append writes central-node.md'
   assert.match(body.message, /chore\(cn\): Direct Brisket to hold surplus/);
 });
 
-test('propose_central_node_patch confirm-class does not write and emits cn_patch_proposal from executeTools', async () => {
+test('propose_central_node_patch confirm-class does not write central-node.md, persists to the pending queue, and emits cn_patch_proposal with an id from executeTools', async () => {
   const cnSha = '5'.repeat(40);
   const calls = [];
   const fetchImpl = async (url, options) => {
@@ -2361,11 +2361,11 @@ test('propose_central_node_patch confirm-class does not write and emits cn_patch
         };
         const toolResult = await executeTools(toolCall);
         assert.ok(toolResult != null, 'confirm patch must return a tool_result so the round continues');
-        assert.deepEqual(JSON.parse(toolResult), {
-          ok: true,
-          status: 'awaiting_confirm',
-          summary: 'Remove taper constraint'
-        });
+        const parsedResult = JSON.parse(toolResult);
+        assert.equal(parsedResult.ok, true);
+        assert.equal(parsedResult.status, 'awaiting_confirm');
+        assert.equal(parsedResult.summary, 'Remove taper constraint');
+        assert.match(parsedResult.pendingId, /^cnp_[0-9a-f]{12}$/);
         // Intentionally do not yield toolCall — production anthropic-client continues past it.
         yield { type: 'text', delta: 'Queued for confirm.' };
         yield { type: 'done' };
@@ -2379,14 +2379,22 @@ test('propose_central_node_patch confirm-class does not write and emits cn_patch
   assert.equal(events[1].patch.section, 'constraints');
   assert.equal(events[1].patch.op, 'delete_lines');
   assert.equal(events[1].patch.payload.match, 'Steroid taper');
+  assert.match(events[1].id, /^cnp_[0-9a-f]{12}$/);
   assert.deepEqual(events[2], { type: 'text', delta: 'Queued for confirm.' });
   assert.ok(!events.some(event => event.type === 'tool_call'), 'swallowed tool_call must not appear in SSE');
 
   assert.equal(
-    calls.filter(call => call.options?.method === 'PUT').length,
+    calls.filter(call => call.options?.method === 'PUT' && call.url.includes('central-node.md')).length,
     0,
-    'confirm-class CN patch must not write'
+    'confirm-class CN patch must not write central-node.md'
   );
+  const queuePut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('pending-cn-patches.json'));
+  assert.ok(queuePut, 'expected a PUT request writing the pending patch queue');
+  const queueBody = JSON.parse(queuePut.options.body);
+  const queueContent = JSON.parse(Buffer.from(queueBody.content, 'base64').toString('utf8'));
+  assert.equal(queueContent.length, 1);
+  assert.equal(queueContent[0].patch.payload.summary, 'Remove taper constraint');
+  assert.equal(queueContent[0].slug, 'hammond');
 });
 
 test('append_governance_log cold-starts empty log then writes governance-log.md', async () => {
