@@ -1,4 +1,4 @@
-import { isCalendarDate } from '../core/time.js';
+import { daysBetween, isCalendarDate } from '../core/time.js';
 
 export const MEDICAL_RECORD_TYPES = [
   'Appointment', 'Consultation', 'Lab Work', 'Test Result', 'Imaging',
@@ -12,6 +12,15 @@ const MEDICAL_LANES = [
 
 const RECORD_TYPE_SET = new Set(MEDICAL_RECORD_TYPES);
 const LANE_SET = new Set(MEDICAL_LANES);
+
+/** Same-title visits more than this many days apart are new timeline entries, not appends. */
+const APPEND_DATE_SLOP_DAYS = 3;
+
+const MONTHS = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+  jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
+};
 
 function blankToNull(value) {
   if (value == null) return null;
@@ -31,10 +40,55 @@ function parseFiniteNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parseCalendarDate(value) {
+/**
+ * Coerce chat/tool date strings into YYYY-MM-DD.
+ * Accepts ISO, AU D/M/YYYY, AU D/M (year from `today`), and day-month-name forms.
+ */
+export function coerceCalendarDate(value, { today } = {}) {
   const cleaned = cleanString(value);
   if (!cleaned) return null;
-  return isCalendarDate(cleaned) ? cleaned : null;
+  if (isCalendarDate(cleaned)) return cleaned;
+
+  const iso = /^(\d{4})-(\d{2})-(\d{2})\b/.exec(cleaned);
+  if (iso) {
+    const key = `${iso[1]}-${iso[2]}-${iso[3]}`;
+    return isCalendarDate(key) ? key : null;
+  }
+
+  const dmyY = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(cleaned);
+  if (dmyY) {
+    const key = `${dmyY[3]}-${String(Number(dmyY[2])).padStart(2, '0')}-${String(Number(dmyY[1])).padStart(2, '0')}`;
+    return isCalendarDate(key) ? key : null;
+  }
+
+  const dmy = /^(\d{1,2})[/.-](\d{1,2})$/.exec(cleaned);
+  if (dmy && typeof today === 'string' && isCalendarDate(today)) {
+    const year = today.slice(0, 4);
+    const key = `${year}-${String(Number(dmy[2])).padStart(2, '0')}-${String(Number(dmy[1])).padStart(2, '0')}`;
+    return isCalendarDate(key) ? key : null;
+  }
+
+  const dayFirst = /^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/.exec(cleaned);
+  if (dayFirst) {
+    const month = MONTHS[dayFirst[2].toLowerCase()];
+    if (!month) return null;
+    const key = `${dayFirst[3]}-${String(month).padStart(2, '0')}-${String(Number(dayFirst[1])).padStart(2, '0')}`;
+    return isCalendarDate(key) ? key : null;
+  }
+
+  const monthFirst = /^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/.exec(cleaned);
+  if (monthFirst) {
+    const month = MONTHS[monthFirst[1].toLowerCase()];
+    if (!month) return null;
+    const key = `${monthFirst[3]}-${String(month).padStart(2, '0')}-${String(Number(monthFirst[2])).padStart(2, '0')}`;
+    return isCalendarDate(key) ? key : null;
+  }
+
+  return null;
+}
+
+function parseCalendarDate(value, { today } = {}) {
+  return coerceCalendarDate(value, { today });
 }
 
 function normalizeEpisode(value) {
@@ -89,7 +143,7 @@ export function inferRecordType(recordType, title, notes) {
  * Mirrors the import path: infer missing enums, drop empty placeholders, and
  * only keep optional fields when they are actually valid.
  */
-export function normalizeMedicalFields(fields, { notes } = {}) {
+export function normalizeMedicalFields(fields, { notes, today } = {}) {
   if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
     return { title: 'Medical visit' };
   }
@@ -110,13 +164,13 @@ export function normalizeMedicalFields(fields, { notes } = {}) {
     location_kind
   };
 
-  const date_end = parseCalendarDate(fields.date_end);
+  const date_end = parseCalendarDate(fields.date_end, { today });
   if (date_end) normalized.date_end = date_end;
 
   if (provider) normalized.provider = provider;
   if (location) normalized.location = location;
 
-  const follow_up_date = parseCalendarDate(fields.follow_up_date);
+  const follow_up_date = parseCalendarDate(fields.follow_up_date, { today });
   if (follow_up_date) normalized.follow_up_date = follow_up_date;
 
   const cost_aud = parseFiniteNumber(fields.cost_aud);
@@ -139,9 +193,12 @@ function inferTitleFromNotes(notes) {
   return firstLine.length > 80 ? `${firstLine.slice(0, 77)}...` : firstLine;
 }
 
-export function mergeMedicalFields(existing, incoming, { notes, existingNotes } = {}) {
-  const base = normalizeMedicalFields(existing ?? {}, { notes: existingNotes ?? existing?.notes ?? notes });
-  const next = normalizeMedicalFields(incoming ?? {}, { notes });
+export function mergeMedicalFields(existing, incoming, { notes, existingNotes, today } = {}) {
+  const base = normalizeMedicalFields(existing ?? {}, {
+    notes: existingNotes ?? existing?.notes ?? notes,
+    today
+  });
+  const next = normalizeMedicalFields(incoming ?? {}, { notes, today });
   const mergedNotes = mergeNotes(existingNotes ?? existing?.notes, notes);
   const mergedRaw = {
     ...base,
@@ -157,7 +214,7 @@ export function mergeMedicalFields(existing, incoming, { notes, existingNotes } 
     episode: next.episode ?? base.episode
   };
   return {
-    fields: normalizeMedicalFields(mergedRaw, { notes: mergedNotes }),
+    fields: normalizeMedicalFields(mergedRaw, { notes: mergedNotes, today }),
     notes: mergedNotes
   };
 }
@@ -215,6 +272,10 @@ export function parseMedicalEventTolerant(text, path, loadYaml) {
 /**
  * When Sara appends to an existing visit, match by title (not just exact slug)
  * and merge onto the stored record's date/time before validation.
+ *
+ * Same-title visits dated more than APPEND_DATE_SLOP_DAYS apart stay separate
+ * timeline entries (e.g. next Stelara dose on 27/10) unless Sara explicitly
+ * sets follow_up_date on the prior visit.
  */
 export async function resolveMedicalLogCandidate(client, input, {
   today,
@@ -224,9 +285,17 @@ export async function resolveMedicalLogCandidate(client, input, {
   if (!input || input.type !== 'medical' || !client) return input;
   const fields = input.fields ?? {};
   const titleHint = cleanString(fields.title) ?? cleanString(input.notes) ?? '';
-  if (!titleHint) return input;
+  const coercedDate = coerceCalendarDate(input.date, { today }) ?? cleanString(input.date);
+  if (!titleHint) {
+    return coercedDate && coercedDate !== input.date ? { ...input, date: coercedDate } : input;
+  }
 
-  const current = await client.resolveTree();
+  let current;
+  try {
+    current = await client.resolveTree();
+  } catch {
+    return coercedDate && coercedDate !== input.date ? { ...input, date: coercedDate } : input;
+  }
   const entries = current.tree.filter(entry =>
     entry.type === 'blob' && MEDICAL_PATH.test(entry.path)
   );
@@ -234,23 +303,53 @@ export async function resolveMedicalLogCandidate(client, input, {
   let best = null;
   let bestScore = 0;
   for (const entry of entries) {
-    const text = decodeBlob(await client.readBlob(entry.sha));
+    let text;
+    try {
+      text = decodeBlob(await client.readBlob(entry.sha));
+    } catch {
+      continue;
+    }
     if (!text) continue;
     const parsed = parseMedicalEventTolerant(text, entry.path, loadYaml);
     if (!parsed) continue;
     let score = scoreMedicalTitleMatch(titleHint, parsed.record.title);
-    if (input.date && parsed.record.date === input.date) score += 20;
+    if (coercedDate && parsed.record.date === coercedDate) score += 20;
     if (score > bestScore) {
       best = parsed;
       bestScore = score;
     }
   }
 
-  if (!best || bestScore < 55) return input;
+  if (!best || bestScore < 55) {
+    return coercedDate && coercedDate !== input.date ? { ...input, date: coercedDate } : input;
+  }
 
-  const merged = mergeMedicalFields(best.record, fields, {
+  const explicitFollowUp = coerceCalendarDate(fields.follow_up_date, { today });
+  if (
+    coercedDate
+    && isCalendarDate(best.record.date)
+    && isCalendarDate(coercedDate)
+    && !explicitFollowUp
+  ) {
+    const delta = daysBetween(best.record.date, coercedDate);
+    if (Math.abs(delta) > APPEND_DATE_SLOP_DAYS) {
+      // Future (or distant past) same-title dose = its own Medical Overview card.
+      return {
+        ...input,
+        date: coercedDate,
+        fields: normalizeMedicalFields(fields, { notes: input.notes, today })
+      };
+    }
+  }
+
+  const mergeFields = explicitFollowUp
+    ? { ...fields, follow_up_date: explicitFollowUp }
+    : fields;
+
+  const merged = mergeMedicalFields(best.record, mergeFields, {
     notes: input.notes,
-    existingNotes: best.body
+    existingNotes: best.body,
+    today
   });
 
   return {

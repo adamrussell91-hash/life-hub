@@ -892,13 +892,19 @@ export function createChatHandler({
                 if (event.input?.type === 'mind_session') {
                   send({ type: 'status', text: 'Saving your session…' });
                 }
-                const medicalInput = event.input?.type === 'medical'
-                  ? await resolveMedicalLogCandidate(client, event.input, {
-                    today,
-                    loadYaml,
-                    decodeBlob
-                  })
-                  : event.input;
+                let medicalInput = event.input;
+                if (event.input?.type === 'medical') {
+                  try {
+                    medicalInput = await resolveMedicalLogCandidate(client, event.input, {
+                      today,
+                      loadYaml,
+                      decodeBlob
+                    });
+                  } catch {
+                    // GitHub blips must not kill the SSE turn — fall back to the raw payload.
+                    medicalInput = event.input;
+                  }
+                }
                 const validation = validateLogEntry(medicalInput, {
                   id: `${medicalInput?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
                   now: getSydneyTimestamp(nowInstant)
@@ -907,16 +913,22 @@ export function createChatHandler({
                   pendingLogRejection = { errors: validation.errors };
                   return JSON.stringify(logEntryRejectionPayload(medicalInput, validation.errors));
                 }
-                const outcome = await persistOrProposeLogEntry({
-                  client, slug, today, validation, send: emit
-                });
-                if (outcome.status === 'written') {
-                  return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
+                try {
+                  const outcome = await persistOrProposeLogEntry({
+                    client, slug, today, validation, send: emit
+                  });
+                  if (outcome.status === 'written') {
+                    return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
+                  }
+                  if (outcome.error === 'write_failed') {
+                    return JSON.stringify({ ok: false, error: 'write_failed' });
+                  }
+                  return JSON.stringify({ ok: true, status: 'awaiting_confirm' });
+                } catch {
+                  const errors = ['Could not prepare that record. Retry with a simpler payload.'];
+                  pendingLogRejection = { errors };
+                  return JSON.stringify(logEntryRejectionPayload(medicalInput, errors));
                 }
-                if (outcome.error === 'write_failed') {
-                  return JSON.stringify({ ok: false, error: 'write_failed' });
-                }
-                return JSON.stringify({ ok: true, status: 'awaiting_confirm' });
               }
               if (event.name === 'append_governance_log') {
                 const entry = validateGovernanceLogAppendInput(event.input);
@@ -992,19 +1004,28 @@ export function createChatHandler({
             }
           })) {
             if (event.type === 'tool_call' && event.name === 'log_entry') {
-              const medicalInput = event.input?.type === 'medical'
-                ? await resolveMedicalLogCandidate(client, event.input, {
-                  today,
-                  loadYaml,
-                  decodeBlob
-                })
-                : event.input;
+              let medicalInput = event.input;
+              if (event.input?.type === 'medical') {
+                try {
+                  medicalInput = await resolveMedicalLogCandidate(client, event.input, {
+                    today,
+                    loadYaml,
+                    decodeBlob
+                  });
+                } catch {
+                  medicalInput = event.input;
+                }
+              }
               const validation = validateLogEntry(medicalInput, {
                 id: `${medicalInput?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
                 now: getSydneyTimestamp(nowInstant)
               });
               if (validation.valid) {
-                await persistOrProposeLogEntry({ client, slug, today, validation, send: emit });
+                try {
+                  await persistOrProposeLogEntry({ client, slug, today, validation, send: emit });
+                } catch {
+                  pendingLogRejection = { errors: ['Could not prepare that record. Retry with a simpler payload.'] };
+                }
               } else {
                 pendingLogRejection = { errors: validation.errors };
               }
