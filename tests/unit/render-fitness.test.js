@@ -80,6 +80,7 @@ function heroSession(overrides = {}) {
     duration_min: 35,
     status: 'planned',
     focus: ['chest'],
+    muscleMapKeys: [],
     exercises: [
       { name: 'Bench Press', sets: [{}, {}, {}, {}] },
       { name: 'Push-Up', sets: [{}, {}, {}, {}] }
