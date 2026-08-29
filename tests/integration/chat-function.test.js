@@ -359,6 +359,99 @@ test('malformed history entries are dropped rather than breaking the request', a
   ]);
 });
 
+test('conversation history keeps the newest workout plan when earlier lectures overflow the budget', async () => {
+  let receivedArgs;
+  const lecture = `OLD LECTURE ${'x'.repeat(3800)} SKI_PULL_MARKER`;
+  const latest = [
+    'Comeback Full Body Burn',
+    '1. Bar Press — 10 x 30kg',
+    '2. Bar Row — 10 x 27kg',
+    '3. Bar Squat — 10 x 25kg',
+    '10. One Grip Russian Twist — 20 x 6kg RUSSIAN_TWIST_MARKER'
+  ].join('\n');
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'On it.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'ok lets put it into action',
+    priorAgentSlug: 'chadwick',
+    history: [
+      { role: 'user', content: 'welcome back' },
+      { role: 'assistant', content: lecture },
+      { role: 'user', content: 'I can go longer' },
+      { role: 'assistant', content: lecture },
+      { role: 'user', content: 'option b' },
+      { role: 'assistant', content: lecture },
+      { role: 'user', content: 'you changed it' },
+      { role: 'assistant', content: latest }
+    ]
+  })));
+
+  const joined = receivedArgs.messages.map(entry => entry.content).join('\n');
+  assert.match(joined, /RUSSIAN_TWIST_MARKER/);
+  assert.match(joined, /ok lets put it into action/);
+  assert.doesNotMatch(joined, /SKI_PULL_MARKER/);
+});
+
+test('a Chadwick lock-in with no log_entry forces a second round that can propose the plan', async () => {
+  let rounds = 0;
+  const planned = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Comeback Full Body Burn',
+      session_kind: 'strength',
+      day_type: 'workout_45_60',
+      status: 'planned',
+      duration_min: 50,
+      exercises: [{ name: 'Bar Press', sets: [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }] }]
+    }
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      async *streamMessage() {
+        rounds += 1;
+        if (rounds === 1) {
+          yield { type: 'text', delta: 'Alright king, LOCKED IN. Full send.' };
+          yield { type: 'done' };
+          return;
+        }
+        yield {
+          type: 'tool_call',
+          id: 'call_plan',
+          name: 'log_entry',
+          input: planned
+        };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'ok lets put it into action',
+    priorAgentSlug: 'chadwick'
+  }))));
+
+  assert.equal(rounds, 2);
+  assert.ok(events.some(event => event.type === 'text' && /LOCKED IN/i.test(event.delta)));
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a planned Confirm card after the force round');
+  assert.equal(proposal.record.status, 'planned');
+  assert.equal(proposal.record.title, 'Comeback Full Body Burn');
+});
+
 test('rejects an unauthenticated request', async () => {
   const handler = createChatHandler({ env: validEnv });
   const response = await handler(new Request('https://life.example/api/chat', {

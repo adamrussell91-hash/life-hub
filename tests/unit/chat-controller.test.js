@@ -471,7 +471,7 @@ test('a second message within the memory window carries the prior turn as histor
   const controller = createChatController({ root, chatApi, now: () => clock });
 
   await controller.send('Brisket, log 2 eggs for breakfast');
-  clock += 60_000; // one minute later, still well inside the 20-minute window
+  clock += 60_000; // one minute later, still well inside the 45-minute window
   await controller.send('actually make that 3 eggs');
 
   assert.equal(sendCalls.length, 2);
@@ -499,7 +499,7 @@ test('memory expires after the window so a stale conversation does not stick to 
   const controller = createChatController({ root, chatApi, now: () => clock });
 
   await controller.send('Brisket, log 2 eggs for breakfast');
-  clock += 21 * 60_000; // just past the 20-minute memory window
+  clock += 46 * 60_000; // just past the 45-minute memory window
   await controller.send('what should I have for lunch');
 
   assert.deepEqual(sendCalls[1].history, []);
@@ -586,7 +586,7 @@ test('the default hint returns once the memory window lapses, instead of staying
   });
 
   await controller.send('Brisket, log 2 eggs for breakfast');
-  clock += 21 * 60_000;
+  clock += 46 * 60_000;
   await controller.send('how is my week looking');
 
   assert.equal(sendCalls[1].priorAgentSlug, 'hammond');
@@ -1130,6 +1130,35 @@ test('clearUnread notifies listeners that chat is read, independent of any send'
   assert.deepEqual(calls, [false]);
 });
 
+test('nudge when Chadwick dumps a numbered plan with no record_proposal', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'chadwick' };
+      yield {
+        type: 'text',
+        delta: [
+          "Here's the plan:",
+          '1. Bar Press — Set 1: 10 reps x 30kg (cable: constant force)',
+          '2. Bar Row — Set 1: 10 reps x 27kg (cable: constant force)',
+          '3. Bar Squat — Set 1: 10 reps x 25kg (cable: none)',
+          '4. Seated Curl — Set 1: 12 reps x 8kg (cable: constant force)'
+        ].join('\n')
+      };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('build a full body session');
+
+  const bubbles = messageBubbles(root);
+  assert.ok(
+    bubbles.some(bubble => /lock it onto Fitness/i.test(bubbleText(bubble)) && /Confirm card/i.test(bubbleText(bubble))),
+    'expected a nudge when Chadwick listed a plan in chat only'
+  );
+});
+
 test('nudge when exercise library saved but no record_proposal in the turn', async () => {
   const root = new FakeDocument();
   const chatApi = {
@@ -1207,6 +1236,34 @@ test('omitting isChatVisible/onUnreadChange entirely preserves existing behaviou
 
   await assert.doesNotReject(controller.send('log a snack'));
   assert.doesNotThrow(() => controller.clearUnread());
+});
+
+test('a long Chadwick plan is sent in history with the numbered list still intact', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const plan = [
+    `${'Bro. '.repeat(300)}Here's the full session:`,
+    '1. Bar Press — 10x30kg',
+    '2. Bar Row — 10x27kg',
+    '3. Bar Squat — 10x25kg',
+    '10. One Grip Russian Twist — 20x6kg'
+  ].join('\n');
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: sendCalls.length === 1 ? plan : 'Locked.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('option b');
+  await controller.send('ok lets put it into action');
+
+  const historyText = sendCalls[1].history.map(entry => entry.content).join('\n');
+  assert.match(historyText, /One Grip Russian Twist/);
+  assert.match(historyText, /Bar Press/);
 });
 
 test('API history carries up to 30 prior messages inside the memory window', async () => {
