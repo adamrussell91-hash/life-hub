@@ -22,6 +22,11 @@ export function formatExerciseTitle(exercise) {
   return title;
 }
 
+export function formatExerciseSetCount(exercise) {
+  const count = Array.isArray(exercise?.sets) ? exercise.sets.length : 0;
+  return count === 1 ? '1 set' : `${count} sets`;
+}
+
 export function formatExerciseSets(exercise) {
   return (exercise?.sets ?? [])
     .map((set, index) => {

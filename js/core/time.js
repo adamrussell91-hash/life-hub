@@ -79,6 +79,14 @@ export function addCalendarDays(key, count) {
   return date.toISOString().slice(0, 10);
 }
 
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** Weekday name for a calendar key (the date itself, not a clock timezone). */
+export function formatWeekday(value) {
+  if (!isCalendarDate(value)) return '';
+  return WEEKDAYS[utcDate(value).getUTCDay()];
+}
+
 export function getSydneyWeekStart(key) {
   const day = utcDate(key).getUTCDay();
   return addCalendarDays(key, -((day + 6) % 7));

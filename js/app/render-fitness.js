@@ -1,8 +1,8 @@
 import { animateAreaReveal } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
-import { formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
+import { fillExercisePlanList } from './render-workout-plan.js';
 import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
-import { formatDisplayDate } from '../core/time.js';
+import { formatDisplayDate, formatWeekday } from '../core/time.js';
 
 const DAY_TYPE_LABELS = {
   movement: 'Movement day',
@@ -238,7 +238,14 @@ function renderRegions(root, regions) {
   }
 }
 
+function setHidden(element, hidden) {
+  if (!element) return;
+  if (hidden) element.setAttribute('hidden', '');
+  else element.removeAttribute('hidden');
+}
+
 function renderHero(root, session, { logger, libraryByName } = {}) {
+  setText(root, '[data-fitness="hero-day"]', formatWeekday(session.date) || '');
   setText(root, '[data-fitness="hero-title"]', session.title ?? 'Session');
   setText(root, '[data-fitness="hero-duration"]', session.duration_min != null ? `${session.duration_min} min` : '—');
   setText(root, '[data-fitness="hero-status"]', session.status ?? '—');
@@ -262,36 +269,46 @@ function renderHero(root, session, { logger, libraryByName } = {}) {
   }
 
   const list = root.querySelector('#fitness-exercise-list');
+  const preview = root.querySelector('[data-fitness="hero-preview"]');
+  const startBtn = root.querySelector('#fitness-start-workout');
+  const loggerEl = root.querySelector('#fitness-logger');
   const notesEl = root.querySelector('[data-fitness="hero-notes"]');
   const planned = session.status === 'planned';
+  const started = Boolean(logger?.getTimerState?.()?.everStarted);
+
+  if (list) {
+    fillExercisePlanList(root, list, {
+      exercises: session.exercises ?? [],
+      libraryByName,
+      detail: planned ? 'count' : 'sets'
+    });
+  }
 
   if (planned && logger) {
-    list?.setAttribute('hidden', '');
+    setHidden(preview, started);
+    setHidden(startBtn, started);
+    setHidden(loggerEl, !started);
     if (notesEl) {
       notesEl.textContent = '';
       notesEl.setAttribute('hidden', '');
     }
-    logger.mount(session);
+    if (started) {
+      logger.mount(session);
+    } else if (startBtn) {
+      startBtn.onclick = () => {
+        logger.mount(session);
+        logger.startTimer();
+        setHidden(preview, true);
+        setHidden(startBtn, true);
+        setHidden(loggerEl, false);
+      };
+    }
   } else {
     logger?.unmount?.();
-    list?.removeAttribute('hidden');
+    setHidden(preview, false);
+    setHidden(startBtn, true);
     notesEl?.removeAttribute('hidden');
     if (notesEl) notesEl.textContent = session.notes?.trim() || '';
-    if (list) {
-      list.replaceChildren();
-      for (const exercise of session.exercises ?? []) {
-        const row = root.createElement('div');
-        row.className = 'fitness-exercise';
-        const title = root.createElement('strong');
-        title.textContent = formatExerciseTitle(exercise);
-        row.append(title);
-        const detail = root.createElement('p');
-        detail.className = 'fitness-exercise__sets';
-        detail.textContent = formatExerciseSets(exercise) || (session.status === 'planned' ? 'Sets to be confirmed' : 'No sets logged');
-        row.append(detail);
-        list.append(row);
-      }
-    }
   }
 
   const pain = root.querySelector('#fitness-pain-flags');

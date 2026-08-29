@@ -121,6 +121,31 @@ export function resolveMuscleMapKeys({
   return keys;
 }
 
+const NAME_HINTS = [
+  [/press|fly|pec|bench/i, 'chest-whole'],
+  [/row|pulldown|pull-?up|deadlift|lat/i, 'back-full'],
+  [/squat|lunge|split|leg /i, 'thighs-front'],
+  [/hip thrust|glute|kickback/i, 'glutes'],
+  [/curl|bicep/i, 'arm-bicep'],
+  [/tricep|dip/i, 'back-triceps'],
+  [/crunch|twist|plank|ab |core/i, 'abs-full'],
+  [/shoulder|delt|raise/i, 'shoulders']
+];
+
+export function resolveExerciseThumbKey(exercise, libraryByName) {
+  const fromLibrary = resolveMuscleMapKeys({
+    exercises: [exercise],
+    libraryByName,
+    limit: 1
+  })[0];
+  if (fromLibrary) return fromLibrary;
+  const name = exercise?.name ?? '';
+  for (const [pattern, key] of NAME_HINTS) {
+    if (pattern.test(name)) return key;
+  }
+  return 'chest-whole';
+}
+
 export function muscleAssetPath(key) {
   return `assets/fitness/muscles/${key}.png`;
 }
