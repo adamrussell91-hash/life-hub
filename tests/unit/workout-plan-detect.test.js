@@ -22,6 +22,10 @@ test('isWorkoutLockIn matches the phrases Adam actually used', () => {
   assert.equal(isWorkoutLockIn('lock it onto Fitness'), true);
   assert.equal(isWorkoutLockIn('lock this onto Fitness'), true);
   assert.equal(isWorkoutLockIn('let\'s do it'), true);
+  assert.equal(isWorkoutLockIn('make the workout'), true);
+  assert.equal(isWorkoutLockIn('is it ready to go?'), true);
+  assert.equal(isWorkoutLockIn('ready to go'), true);
+  assert.equal(isWorkoutLockIn('start the workout'), true);
   assert.equal(isWorkoutLockIn('are the weights a little below my normal?'), false);
   assert.equal(isWorkoutLockIn('option b'), false);
 });
@@ -36,6 +40,8 @@ test('looksLikeWorkoutPlan requires a numbered list plus loads', () => {
 test('claimedPlanLocked catches Chadwick narrating a save he never made', () => {
   assert.equal(claimedPlanLocked('Alright king, LOCKED IN. Full 10-movement Option B.'), true);
   assert.equal(claimedPlanLocked('Logging this as your plan now — go crush it.'), true);
+  assert.equal(claimedPlanLocked('Locking it in now.'), true);
+  assert.equal(claimedPlanLocked('Locking this onto Fitness.'), true);
   assert.equal(claimedPlanLocked('Want me to lock this in as planned, or shuffle any exercises first?'), false);
 });
 

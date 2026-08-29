@@ -137,3 +137,21 @@ test('lock it onto Fitness shows a Confirm card', async () => {
   assert.match(await proposal.innerText(), /Start workout|Confirm/i);
   await context.close();
 });
+
+test('make the workout shows a Confirm card', async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#chat-input').fill('make the workout');
+  await page.locator('#chat-send').click();
+
+  const proposal = page.locator('.record-proposal');
+  await proposal.waitFor();
+  assert.match(await proposal.innerText(), /Start workout|Confirm/i);
+  await page.locator('#chat-messages').waitFor();
+  assert.doesNotMatch(await page.locator('#chat-messages').innerText(), /got cut off/i);
+  await context.close();
+});

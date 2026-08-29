@@ -364,7 +364,7 @@ function streamMockChat(response, message) {
     ...PRIVATE_HEADERS,
     Connection: 'keep-alive'
   });
-  const isLockIn = /lock (it|this|the plan) (in|onto)/i.test(message);
+  const isLockIn = /lock (it|this|the plan) (in|onto)|make (the|this|my) workout|is (it|this) ready|ready to go|start (the |this )?(workout|session)|put (it|this) on(to)? fitness/i.test(message);
   const isWorkout = isLockIn || /chad|chadwick|workout/i.test(message);
   const isPlanDump = !isLockIn && /full send|describe the (plan|session)|show (me )?the (plan|session)/i.test(message);
   const isMeal = /brisket|meal|breakfast|lunch|dinner|lasagna|snack|ate|food/i.test(message);

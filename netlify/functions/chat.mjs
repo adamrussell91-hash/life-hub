@@ -128,7 +128,7 @@ import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
-import { streamWithChadwickPlanForce } from './_shared/chadwick-plan-force.mjs';
+import { resolveForcedChadwickPlan, streamWithChadwickPlanForce } from './_shared/chadwick-plan-force.mjs';
 import { keepNewestHistory } from '../../js/core/chat-history.js';
 import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } from '../../js/core/time.js';
 import { parseEventDocument } from '../../js/core/records.js';
@@ -263,6 +263,28 @@ export function createChatHandler({
             intakeCount: parsed.auditSession.intakeCount
           });
         }
+
+        const forcedPlan = resolveForcedChadwickPlan({
+          slug,
+          userMessage: parsed.message,
+          today,
+          messages: [...parsed.history, { role: 'user', content: parsed.message }]
+        });
+        if (forcedPlan) {
+          send({ type: 'status', text: 'Locking the plan onto Fitness…' });
+          send({ type: 'text', delta: 'On Fitness — confirm to start.' });
+          const validation = validateLogEntry(forcedPlan, {
+            id: `${forcedPlan.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
+            now: getSydneyTimestamp(nowInstant)
+          });
+          if (validation.valid) {
+            await persistOrProposeLogEntry({ client, slug, today, validation, send });
+          }
+          send({ type: 'done' });
+          controller.close();
+          return;
+        }
+
         send({ type: 'status', text: 'Loading your logs…' });
 
         let digest = '';
