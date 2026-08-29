@@ -147,6 +147,19 @@ test('chadwick prompt includes exercise library highlights when provided', () =>
   assert.match(prompt, /Bar Press/);
 });
 
+test('chadwick prompt tells him to batch exercise-library lookups instead of one call per move', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    exerciseLibrary: '- Bar Press — Chest · Crossbar · 42 kg · in rotation'
+  });
+  assert.match(prompt, /batch/i);
+});
+
+test('chadwick prompt tells him a ready plan\'s log_entry always comes before further library search/save calls', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick' });
+  assert.match(prompt, /do not delay (it|the proposal) behind/i);
+});
+
 test('chadwick prompt includes the body state block when provided, and instructs him to use it honestly', () => {
   const prompt = buildSystemPrompt({
     slug: 'chadwick',
