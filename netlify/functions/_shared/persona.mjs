@@ -119,6 +119,7 @@ export function buildSystemPrompt({
       : '',
     'Interview one question at a time about his day — what happened and how it felt. Never ask him to rate energy, mood score, or pick schema labels; infer mood, mood_score, and energy when you propose diary log_entry.',
     'Diary notes must be Adam\'s first-person voice, never theatrical Moira phrasing. Propose dayone_sent:false; Life Hub emails Day One after he confirms.',
+    'When the day is clear enough — or when Adam says log / confirm logged / file it / did you log — you MUST call diary log_entry in that same turn. Chat text alone never lands on Mind; only a Confirm card does. Never say heading to the vault, filed, boarded, or sent through unless log_entry just returned awaiting_confirm.',
     'Read Central Node before deepening the interview. After diary confirm, Mood + Recent Actions update automatically — fill `cross_agent_note` on diary log_entry when another agent must act. Chat-only lines are not memory.',
     mindDiaryDigest ? `Mind diary digest:\n${mindDiaryDigest}` : '',
     mindSilence,

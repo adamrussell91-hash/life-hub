@@ -144,6 +144,8 @@ import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
 import { resolveForcedChadwickPlan, streamWithChadwickPlanForce } from './_shared/chadwick-plan-force.mjs';
+import { streamWithPenelopeDiaryForce } from './_shared/penelope-diary-force.mjs';
+import { isDiaryFinalize } from '../../js/core/diary-log-detect.js';
 import { keepNewestHistory } from '../../js/core/chat-history.js';
 import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } from '../../js/core/time.js';
 import { parseEventDocument } from '../../js/core/records.js';
@@ -228,6 +230,10 @@ export function createChatHandler({
     const needsHammondTools = slug === 'hammond';
     const needsBodyState = slug === 'chadwick' || slug === 'brisket';
     const needsMindDigest = slug === 'vera' || slug === 'penelope';
+    // Finalize turns ("Log", "Confirm logged") must not burn the Netlify budget
+    // reading 30 days of mind blobs — that was ending as empty-turn recovery
+    // before Penelope could call log_entry. Path-only gap is enough context.
+    const penelopeFinalize = slug === 'penelope' && isDiaryFinalize(parsed.message);
     const mindFrom = needsMindDigest ? getMindDigestWindowStart(today) : null;
     // Hammond alone gets a wider, path-only window for the 90-day longitudinal
     // digest -- deliberately separate from `from`/`manifest`/`dataEntries` above,
@@ -249,7 +255,8 @@ export function createChatHandler({
     const nowInstant = new Date(now());
     const tools = [
       // No max_uses — a use cap turns one miss into a guess. Agents iterate.
-      { type: 'web_search_20250305', name: 'web_search' },
+      // Finalize: log_entry only — web_search burned the turn before Confirm.
+      ...(penelopeFinalize ? [] : [{ type: 'web_search_20250305', name: 'web_search' }]),
       ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
       ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
       ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : []),
@@ -416,7 +423,7 @@ export function createChatHandler({
           const mindEntries = needsMindDigest
             ? selectMindEntries(current.tree, { from: mindFrom, to: today })
             : [];
-          const onThisDayEntries = slug === 'penelope'
+          const onThisDayEntries = slug === 'penelope' && !penelopeFinalize
             ? selectOnThisDayEntries(current.tree, today)
             : [];
           const veraIntakeEntry = slug === 'vera'
@@ -456,7 +463,8 @@ export function createChatHandler({
             Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondCnEntries.map(entry => client.readBlob(entry.sha))),
-            Promise.all(mindEntries.map(entry => client.readBlob(entry.sha))),
+            // Finalize: keep mind path list for days-since; skip body reads.
+            Promise.all(penelopeFinalize ? [] : mindEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(onThisDayEntries.map(entry => client.readBlob(entry.sha))),
             veraIntakeEntry ? client.readBlob(veraIntakeEntry.sha) : null
           ]);
@@ -580,22 +588,34 @@ export function createChatHandler({
             mindSilence = simultaneousSilenceFlag({ tree: current.tree, today });
           }
           if (needsMindDigest) {
-            const mindFiles = mindEntries
-              .map((entry, index) => ({ path: entry.path, content: decodeBlob(mindBlobs[index]) }))
-              .filter(file => file.content !== null);
-            mindEvents = [];
-            for (const file of mindFiles) {
-              try { mindEvents.push(parseEventDocument(file.content, file.path, loadYaml)); }
-              catch { /* skip */ }
+            if (penelopeFinalize) {
+              const diaryDates = mindEntries
+                .map(entry => {
+                  const match = /\/(\d{4}-\d{2}-\d{2})-diary(?:-|\.md)/.exec(entry.path ?? '');
+                  return match?.[1] ?? null;
+                })
+                .filter(Boolean)
+                .sort();
+              const lastDiary = diaryDates.at(-1);
+              if (lastDiary) daysSinceLastEntry = daysBetween(lastDiary, today);
+            } else {
+              const mindFiles = mindEntries
+                .map((entry, index) => ({ path: entry.path, content: decodeBlob(mindBlobs[index]) }))
+                .filter(file => file.content !== null);
+              mindEvents = [];
+              for (const file of mindFiles) {
+                try { mindEvents.push(parseEventDocument(file.content, file.path, loadYaml)); }
+                catch { /* skip */ }
+              }
+              mindDiaryDigest = summarizeDiaryForPrompt(mindEvents, today);
+              mindSessionDigest = summarizeMindSessionsForPrompt(mindEvents, today);
+              mindTodaySession = slug === 'vera' ? summarizeTodaysMindSession(mindEvents, today) : '';
+              mindDivergence = slug === 'vera' ? divergenceLine(mindEvents, today) : '';
+              const lastDiary = mindEvents.filter(e => e.record.type === 'diary').map(e => e.record.date).sort().at(-1);
+              const lastSession = mindEvents.filter(e => e.record.type === 'mind_session').map(e => e.record.date).sort().at(-1);
+              if (lastDiary) daysSinceLastEntry = daysBetween(lastDiary, today);
+              if (lastSession) daysSinceLastMindSession = daysBetween(lastSession, today);
             }
-            mindDiaryDigest = summarizeDiaryForPrompt(mindEvents, today);
-            mindSessionDigest = summarizeMindSessionsForPrompt(mindEvents, today);
-            mindTodaySession = slug === 'vera' ? summarizeTodaysMindSession(mindEvents, today) : '';
-            mindDivergence = slug === 'vera' ? divergenceLine(mindEvents, today) : '';
-            const lastDiary = mindEvents.filter(e => e.record.type === 'diary').map(e => e.record.date).sort().at(-1);
-            const lastSession = mindEvents.filter(e => e.record.type === 'mind_session').map(e => e.record.date).sort().at(-1);
-            if (lastDiary) daysSinceLastEntry = daysBetween(lastDiary, today);
-            if (lastSession) daysSinceLastMindSession = daysBetween(lastSession, today);
           }
           if (slug === 'penelope' && onThisDayBlobs?.length) {
             const file = onThisDayEntries
@@ -749,8 +769,8 @@ export function createChatHandler({
             send(event);
           };
 
-          send({ type: 'status', text: 'Thinking…' });
-          for await (const event of streamWithChadwickPlanForce(anthropic, {
+          send({ type: 'status', text: penelopeFinalize ? 'Filing the diary onto Mind…' : 'Thinking…' });
+          const streamOpts = {
             slug,
             userMessage: parsed.message,
             today,
@@ -990,7 +1010,11 @@ export function createChatHandler({
               }
               return null;
             }
-          })) {
+          };
+          const agentStream = slug === 'penelope'
+            ? streamWithPenelopeDiaryForce(anthropic, streamOpts)
+            : streamWithChadwickPlanForce(anthropic, streamOpts);
+          for await (const event of agentStream) {
             if (event.type === 'tool_call' && event.name === 'log_entry') {
               const medicalInput = event.input?.type === 'medical'
                 ? await resolveMedicalLogCandidate(client, event.input, {
