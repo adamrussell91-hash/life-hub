@@ -360,8 +360,13 @@ test('malformed history entries are dropped rather than breaking the request', a
 });
 
 test('conversation history keeps the newest workout plan when earlier lectures overflow the budget', async () => {
-  let receivedArgs;
-  const firstLecture = `SKI_PULL_MARKER ${'x'.repeat(4200)}`;
+  let rounds = 0;
+  const firstLecture = [
+    '1. Ski Pull — 10x20kg SKI_PULL_MARKER',
+    '2. Bar Row — 10x20kg',
+    '3. Bar Squat — 10x20kg',
+    'x'.repeat(4200)
+  ].join('\n');
   const filler = `FILLER ${'x'.repeat(4200)}`;
   const latest = [
     'Comeback Full Body Burn',
@@ -375,14 +380,14 @@ test('conversation history keeps the newest workout plan when earlier lectures o
     now: () => Date.parse('2026-08-01T06:00:00Z'),
     fetchImpl: githubFetchStub(),
     createAnthropicClient: () => ({
-      streamMessage: args => {
-        receivedArgs = args;
+      streamMessage: () => {
+        rounds += 1;
         return mockedStream([{ type: 'text', delta: 'On it.' }, { type: 'done' }]);
       }
     })
   });
 
-  await readSse(await handler(request({
+  const events = contentEvents(await readSse(await handler(request({
     message: 'ok lets put it into action',
     priorAgentSlug: 'chadwick',
     history: [
@@ -395,12 +400,14 @@ test('conversation history keeps the newest workout plan when earlier lectures o
       { role: 'user', content: 'you changed it' },
       { role: 'assistant', content: latest }
     ]
-  })));
+  }))));
 
-  const joined = receivedArgs.messages.map(entry => entry.content).join('\n');
-  assert.match(joined, /RUSSIAN_TWIST_MARKER/);
-  assert.match(joined, /ok lets put it into action/);
-  assert.doesNotMatch(joined, /SKI_PULL_MARKER/);
+  assert.equal(rounds, 0, 'lock-in must not wait on Anthropic when the newest plan still parses');
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a Confirm card from the newest plan');
+  const names = proposal.record.exercises.map(exercise => exercise.name).join('\n');
+  assert.match(names, /One Grip Russian Twist/);
+  assert.doesNotMatch(names, /Ski Pull/);
 });
 
 test('a Chadwick lock-in with no log_entry forces a second round that can propose the plan', async () => {
