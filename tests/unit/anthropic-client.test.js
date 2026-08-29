@@ -427,3 +427,56 @@ test('stub tool_results cover fire-and-forget tool_use when another tool continu
   assert.ok(events.some(e => e.type === 'tool_call' && e.id === 'call_log'));
   assert.ok(events.some(e => e.type === 'text' && e.delta === 'Done.'));
 });
+
+test('a realistic session-build sequence of single continuing tool calls (e.g. exercise-library search/save per move) still reaches a final proposal tool call before the round budget runs out', async () => {
+  // Regression for: Chadwick building a 5-9 exercise session can call
+  // search_exercise_library / save_exercise_library_entry one move at a time
+  // (each continuing the round) and never gets a free round left to call
+  // log_entry, so the turn silently ends with no proposal. The old cap of 6
+  // rounds was too tight for this realistic, non-batched tool-use pattern.
+  const CONTINUING_ROUNDS = 8;
+  const continuingRoundFrames = index => [
+    frame('content_block_start', {
+      index: 0,
+      content_block: { type: 'tool_use', id: `call_${index}`, name: 'search_exercise_library' }
+    }),
+    frame('content_block_delta', {
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: `{"query":"move ${index}"}` }
+    }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_stop', {})
+  ];
+  const finalRoundFrames = [
+    frame('content_block_start', {
+      index: 0,
+      content_block: { type: 'tool_use', id: 'call_final', name: 'log_entry' }
+    }),
+    frame('content_block_delta', {
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: '{"type":"workout"}' }
+    }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_stop', {})
+  ];
+
+  let calls = 0;
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async () => {
+      calls += 1;
+      return sseResponse(calls <= CONTINUING_ROUNDS ? continuingRoundFrames(calls) : finalRoundFrames);
+    }
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'build today\'s session' }],
+    tools: [],
+    executeTools: async event => (event.name === 'search_exercise_library' ? JSON.stringify({ ok: true }) : null)
+  })) events.push(event);
+
+  assert.equal(calls, CONTINUING_ROUNDS + 1, 'expected the round budget to allow one round per tool call plus the final proposal round');
+  assert.ok(events.some(e => e.type === 'tool_call' && e.id === 'call_final' && e.name === 'log_entry'));
+});
