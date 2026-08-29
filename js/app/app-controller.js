@@ -1132,6 +1132,14 @@ export function createAppController(dependencies) {
   async function handleVisibilityChange() {
     if (!authenticated || documentTarget.visibilityState !== 'visible') return;
     if (!requireUnexpiredSession()) return;
+    try {
+      const session = await sessionApi.getSession();
+      if (session?.authenticated && validFutureExpiry(session.expiresAt)) {
+        acceptExpiry(session.expiresAt);
+      }
+    } catch {
+      // Data refresh below will surface auth errors if the session is gone.
+    }
     await refresh();
   }
 
