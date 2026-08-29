@@ -1,6 +1,5 @@
 import { agentColour } from './agent-colour.js';
 import { animateAreaReveal } from './chart-kit/animate.js';
-import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { buildBumpChart } from './chart-kit/bump.js';
 import { buildChordLayout } from './chart-kit/chord-layout.js';
@@ -14,7 +13,6 @@ import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
 import { buildWatchlistHeat } from './chart-kit/watchlist-heat.js';
 import { packMasonry } from './chart-kit/masonry.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
-import { buildSankeyFlow } from './chart-kit/sankey-flow.js';
 import { buildThemeTopography } from './chart-kit/stream.js';
 import { entriesForTheme, entriesForThemePair, entriesForThemeWeek, entriesForWatchlistTerm, energyStreakWhy, MOOD_ORDER, displayThemeLabel } from './mind-model.js';
 import { addCalendarDays, formatDisplayDate, isCalendarDate } from '../core/time.js';
@@ -111,7 +109,6 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConf
   if (hero) hero.hidden = Boolean(model.empty);
 
   renderFactorPanel(root, model);
-  renderStreak(root, model);
   renderConstellation(root, model);
   renderTension(root, model);
 
@@ -127,7 +124,6 @@ export function renderMind(root, model, { onRangeChange, onOpenAgent, agentsConf
   renderInsightList(root, model.insights, model.resurfacing);
   renderCrossAgentStrip(root, model.crossAgentLines, { veraColour, penelopeColour });
   renderStreamTile(root, model);
-  renderSankeyTile(root, model);
   renderBumpTile(root, model);
   renderChordTile(root, model);
   renderRadialTile(root, model);
@@ -186,28 +182,6 @@ function renderFactorPanel(root, model) {
     });
     host.append(button);
   }
-}
-
-function renderStreak(root, model) {
-  const consistency = model.consistency ?? {};
-  const daysWithEntry = Number(consistency.daysWithEntry) || 0;
-  const windowDays = Number(consistency.windowDays) || 30;
-  const streak = consistency.streak ?? 0;
-  applyRingTarget(root.querySelector('#mind-streak-ring'), {
-    value: daysWithEntry,
-    target: windowDays
-  }, { size: 56, strokeWidth: 6 });
-  const caption = root.querySelector('[data-mind="streak"]');
-  if (caption) {
-    caption.textContent = String(streak);
-    return;
-  }
-  const tile = root.querySelector('#mind-tile-streak');
-  if (!tile) return;
-  const label = root.createElement('p');
-  label.dataset.mind = 'streak';
-  label.textContent = String(streak);
-  tile.append(label);
 }
 
 function renderConstellation(root, model) {
@@ -1998,46 +1972,6 @@ function bindStreamHover(svg, host) {
   svg.addEventListener('focusout', event => {
     if (!svg.contains?.(event.relatedTarget)) paint(null);
   });
-}
-
-function renderSankeyTile(root, model) {
-  const svg = root.querySelector('#mind-sankey');
-  if (!svg) return;
-  const tile = root.querySelector('#mind-tile-transitions') ?? svg.parentNode;
-  const transitions = model.moodTransitions ?? [];
-  if (!paintChartOrEmpty(root, tile, svg, { need: 3, have: transitions.length, unit: 'transitions' })) return;
-  svg.replaceChildren();
-  const chart = buildSankeyFlow(transitions, { width: 560, height: 280 });
-  for (const link of chart.links) {
-    const mark = createSvg(root, 'path');
-    const x0 = link.x0 ?? 20;
-    const x1 = link.x1 ?? 300;
-    const y0 = link.y0 ?? 20;
-    const y1 = link.y1 ?? 40;
-    mark.setAttribute('d', `M${x0},${y0} C${(x0 + x1) / 2},${y0} ${(x0 + x1) / 2},${y1} ${x1},${y1}`);
-    mark.setAttribute('fill', 'none');
-    const fromLow = String(link.source) === 'low' || String(link.source) === 'bad';
-    mark.setAttribute('stroke', fromLow
-      ? 'color-mix(in srgb, var(--high-sea) 70%, transparent)'
-      : 'color-mix(in srgb, var(--wave) 40%, transparent)');
-    mark.setAttribute('stroke-width', String(Math.max(fromLow ? 4 : 2, link.width)));
-    bindMark(mark, root, {
-      title: `${link.source} → ${link.target}`,
-      rows: [{ date: '', title: `${link.source} → ${link.target}`, excerpt: `${link.value ?? ''} transitions` }]
-    });
-    svg.append(mark);
-  }
-  for (const node of chart.nodes ?? []) {
-    const label = createSvg(root, 'text');
-    const left = (node.x0 ?? 0) < 80;
-    label.setAttribute('x', String(left ? (node.x1 ?? 12) + 4 : (node.x0 ?? 308) - 4));
-    label.setAttribute('y', String(((node.y0 ?? 0) + (node.y1 ?? 0)) / 2 + 3));
-    label.setAttribute('text-anchor', left ? 'start' : 'end');
-    label.setAttribute('class', 'mind-chart-label');
-    label.setAttribute('pointer-events', 'none');
-    label.textContent = displayThemeLabel(node.id);
-    svg.append(label);
-  }
 }
 
 function renderBumpTile(root, model) {
