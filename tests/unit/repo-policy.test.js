@@ -50,6 +50,7 @@ test('repository path policy rejects noncanonical and nonallowlisted paths', () 
     'config/agents.yml',
     'config/targets.yml',
     'central-node.md',
+    'data/nutrition/challenges.json',
     'data/nutrition/2026/08/2026-08-01-breakfast.md',
     'data/fitness/2026/08/2026-08-01-workout.md',
     'data/body/2026/08/2026-08-01-weight.md',
@@ -92,6 +93,7 @@ test('client file range allows config and in-range events, not templates or out-
   assert.equal(isClientFileInRange('config/targets.yml', range), true);
   assert.equal(isClientFileInRange('config/agents.yml', range), true);
   assert.equal(isClientFileInRange('central-node.md', range), true);
+  assert.equal(isClientFileInRange('data/nutrition/challenges.json', range), true);
   assert.equal(isClientFileInRange('data/nutrition/2026/08/2026-08-01-breakfast.md', range), true);
   assert.equal(isClientFileInRange('data/nutrition/2026/07/2026-07-01-old.md', range), false);
   assert.equal(isClientFileInRange('data/fitness/templates/chest-and-curls.md', range), false);

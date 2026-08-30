@@ -35,8 +35,25 @@ import {
   extractConstraints,
   extractCrossAgentCoordination,
   extractRecentAgentActions,
+  extractThisWeek,
   extractTodaysStatus
 } from '../../js/core/constraints.js';
+import {
+  NUTRITION_CHALLENGES_PATH,
+  emptyNutritionChallenges,
+  parseNutritionChallenges,
+  serializeNutritionChallenges,
+  upsertNutritionChallengeSchema,
+  markNutritionChallengeDaySchema,
+  listNutritionChallengesSchema,
+  validateUpsertNutritionChallengeInput,
+  validateMarkNutritionChallengeDayInput,
+  upsertNutritionChallenge,
+  markNutritionChallengeDay,
+  formatNutritionChallengesForPrompt,
+  tallyChallenge
+} from '../../js/core/nutrition-challenges.js';
+import { syncChallengeToCentralNode } from '../../js/core/nutrition-challenge-cn.js';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
 import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug, logEntryRejectionPayload } from './_shared/chat-schema.mjs';
@@ -234,6 +251,9 @@ export function createChatHandler({
     const needsExerciseLibrary = slug === 'chadwick';
     const needsSkincareLibrary = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
+    const needsNutritionChallenges = slug === 'brisket';
+    // Brisket writes challenge scoreboards onto Central Node; keep markdown mutable.
+    const needsCentralNodeWrite = needsHammondTools || needsNutritionChallenges;
     const needsBodyState = slug === 'chadwick' || slug === 'brisket';
     const needsMindDigest = slug === 'vera' || slug === 'penelope';
     // Finalize / Vera flush must not burn the Netlify budget on mind blob
@@ -280,6 +300,13 @@ export function createChatHandler({
         : []),
       ...(needsHammondTools
         ? [proposeCentralNodePatchSchema(), appendGovernanceLogSchema()]
+        : []),
+      ...(needsNutritionChallenges
+        ? [
+            listNutritionChallengesSchema(),
+            upsertNutritionChallengeSchema(),
+            markNutritionChallengeDaySchema()
+          ]
         : [])
     ];
 
@@ -341,6 +368,9 @@ export function createChatHandler({
         let foodLibraryEntries = [];
         let foodLibrary = '';
         let foodLibrarySha;
+        let nutritionChallenges = emptyNutritionChallenges();
+        let nutritionChallengesText = '';
+        let nutritionChallengesSha;
         let exerciseLibraryEntries = [];
         let exerciseLibrary = '';
         let exerciseLibrarySha;
@@ -390,6 +420,10 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
             : null;
           foodLibrarySha = foodLibraryEntry?.sha;
+          const nutritionChallengesEntry = needsNutritionChallenges
+            ? current.tree.find(entry => entry.path === NUTRITION_CHALLENGES_PATH && entry.type === 'blob')
+            : null;
+          nutritionChallengesSha = nutritionChallengesEntry?.sha;
           const exerciseLibraryEntry = needsExerciseLibrary
             ? current.tree.find(entry => entry.path === EXERCISE_LIBRARY_PATH && entry.type === 'blob')
             : null;
@@ -445,6 +479,7 @@ export function createChatHandler({
             governanceLogBlob,
             pendingCnPatchesBlob,
             foodLibraryBlob,
+            nutritionChallengesBlob,
             exerciseLibraryBlob,
             skincareLibraryBlob,
             skincareMembershipBlob,
@@ -463,6 +498,7 @@ export function createChatHandler({
             governanceLogEntry ? client.readBlob(governanceLogEntry.sha) : null,
             pendingCnPatchesEntry ? client.readBlob(pendingCnPatchesEntry.sha) : null,
             foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
+            nutritionChallengesEntry ? client.readBlob(nutritionChallengesEntry.sha) : null,
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
             skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
             skincareMembershipEntry ? client.readBlob(skincareMembershipEntry.sha) : null,
@@ -491,15 +527,27 @@ export function createChatHandler({
             constraints = extractConstraints(centralNodeForTurn);
             centralNodeLog = [
               extractTodaysStatus(centralNodeForTurn),
+              needsNutritionChallenges ? extractThisWeek(centralNodeForTurn) : '',
               extractCrossAgentCoordination(centralNodeForTurn),
               extractRecentAgentActions(centralNodeForTurn)
             ].filter(Boolean).join('\n\n');
+            if (needsCentralNodeWrite) {
+              centralNodeMarkdown = centralNodeForTurn;
+            }
             if (needsHammondTools) {
               centralNodeFull = centralNodeForTurn;
-              centralNodeMarkdown = centralNodeForTurn;
             }
           }
 
+          if (needsNutritionChallenges) {
+            const decodedChallenges = nutritionChallengesBlob
+              ? decodeBlob(nutritionChallengesBlob)
+              : null;
+            nutritionChallenges = decodedChallenges !== null
+              ? parseNutritionChallenges(decodedChallenges)
+              : emptyNutritionChallenges();
+            nutritionChallengesText = formatNutritionChallengesForPrompt(nutritionChallenges, { today });
+          }
           if (needsHammondTools) {
             const decodedGovernanceLog = governanceLogBlob ? decodeBlob(governanceLogBlob) : null;
             if (decodedGovernanceLog !== null) {
@@ -677,6 +725,9 @@ export function createChatHandler({
           foodLibraryEntries = [];
           foodLibrary = '';
           foodLibrarySha = undefined;
+          nutritionChallenges = emptyNutritionChallenges();
+          nutritionChallengesText = '';
+          nutritionChallengesSha = undefined;
           exerciseLibraryEntries = [];
           exerciseLibrary = '';
           exerciseLibrarySha = undefined;
@@ -726,6 +777,7 @@ export function createChatHandler({
           hammondCnSummary,
           pendingCnPatches: needsHammondTools ? formatPendingCnPatchesForPrompt(pendingCnPatches) : '',
           foodLibrary,
+          nutritionChallenges: nutritionChallengesText,
           chadwickProtocol,
           hyaluronicaProtocol,
           penelopeProtocol,
@@ -870,6 +922,147 @@ export function createChatHandler({
                     calories: entry.calories,
                     protein_g: entry.protein_g,
                     fat_g: entry.fat_g
+                  });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (event.name === 'list_nutrition_challenges') {
+                const includeCompleted = event.input?.include_completed === true;
+                const text = formatNutritionChallengesForPrompt(nutritionChallenges, {
+                  today,
+                  includeCompleted
+                });
+                return JSON.stringify({
+                  ok: true,
+                  challenges: text || 'No nutrition challenges on file.',
+                  count: nutritionChallenges.challenges?.length ?? 0
+                });
+              }
+              if (event.name === 'upsert_nutrition_challenge') {
+                const draft = validateUpsertNutritionChallengeInput(event.input, { today });
+                if (!draft) {
+                  return JSON.stringify({ ok: false, error: 'invalid_challenge' });
+                }
+                try {
+                  const outcome = upsertNutritionChallenge(nutritionChallenges, draft);
+                  const serialized = serializeNutritionChallenges({ challenges: outcome.challenges });
+                  const fileResult = await client.writeFile({
+                    path: NUTRITION_CHALLENGES_PATH,
+                    content: serialized,
+                    ...(nutritionChallengesSha ? { sha: nutritionChallengesSha } : {}),
+                    message: `chore(nutrition-challenge): ${outcome.created ? 'open' : 'update'} ${outcome.challenge.id}`
+                  });
+                  nutritionChallenges = { challenges: outcome.challenges };
+                  nutritionChallengesSha = fileResult.sha;
+                  nutritionChallengesText = formatNutritionChallengesForPrompt(nutritionChallenges, { today });
+
+                  let cnSynced = false;
+                  if (centralNodeMarkdown) {
+                    const nextCn = syncChallengeToCentralNode(centralNodeMarkdown, outcome.challenge, {
+                      actionLine: outcome.created
+                        ? `- Brisket: opened nutrition challenge tracker — ${outcome.challenge.title} (${outcome.challenge.start}→${outcome.challenge.end}).`
+                        : `- Brisket: updated nutrition challenge tracker — ${outcome.challenge.title}.`
+                    });
+                    if (nextCn && nextCn !== centralNodeMarkdown) {
+                      const cnResult = await client.writeFile({
+                        path: 'central-node.md',
+                        content: nextCn,
+                        ...(centralNodeSha ? { sha: centralNodeSha } : {}),
+                        message: `chore(cn): nutrition challenge ${outcome.challenge.title}`
+                      });
+                      centralNodeMarkdown = nextCn;
+                      centralNodeSha = cnResult.sha;
+                      cnSynced = true;
+                      send({
+                        type: 'central_node_patched',
+                        summary: `Nutrition challenge: ${outcome.challenge.title}`,
+                        risk: 'auto'
+                      });
+                    }
+                  }
+
+                  const tally = tallyChallenge(outcome.challenge);
+                  send({
+                    type: 'nutrition_challenge_upserted',
+                    id: outcome.challenge.id,
+                    title: outcome.challenge.title,
+                    created: outcome.created
+                  });
+                  return JSON.stringify({
+                    ok: true,
+                    status: outcome.created ? 'created' : 'updated',
+                    id: outcome.challenge.id,
+                    title: outcome.challenge.title,
+                    start: outcome.challenge.start,
+                    end: outcome.challenge.end,
+                    tally,
+                    central_node_synced: cnSynced,
+                    path: NUTRITION_CHALLENGES_PATH
+                  });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (event.name === 'mark_nutrition_challenge_day') {
+                const mark = validateMarkNutritionChallengeDayInput(event.input);
+                if (!mark) {
+                  return JSON.stringify({ ok: false, error: 'invalid_mark' });
+                }
+                try {
+                  const outcome = markNutritionChallengeDay(nutritionChallenges, mark);
+                  if (!outcome) {
+                    return JSON.stringify({ ok: false, error: 'challenge_or_date_not_found' });
+                  }
+                  const serialized = serializeNutritionChallenges({ challenges: outcome.challenges });
+                  const fileResult = await client.writeFile({
+                    path: NUTRITION_CHALLENGES_PATH,
+                    content: serialized,
+                    ...(nutritionChallengesSha ? { sha: nutritionChallengesSha } : {}),
+                    message: `chore(nutrition-challenge): mark ${mark.date} ${mark.result}`
+                  });
+                  nutritionChallenges = { challenges: outcome.challenges };
+                  nutritionChallengesSha = fileResult.sha;
+                  nutritionChallengesText = formatNutritionChallengesForPrompt(nutritionChallenges, { today });
+
+                  let cnSynced = false;
+                  if (centralNodeMarkdown) {
+                    const nextCn = syncChallengeToCentralNode(centralNodeMarkdown, outcome.challenge, {
+                      actionLine: `- Brisket: challenge day ${mark.date} → ${mark.result}${mark.note ? ` (${mark.note})` : ''}.`,
+                      updateFlags: mark.result !== 'pending'
+                    });
+                    if (nextCn && nextCn !== centralNodeMarkdown) {
+                      const cnResult = await client.writeFile({
+                        path: 'central-node.md',
+                        content: nextCn,
+                        ...(centralNodeSha ? { sha: centralNodeSha } : {}),
+                        message: `chore(cn): challenge day ${mark.date} ${mark.result}`
+                      });
+                      centralNodeMarkdown = nextCn;
+                      centralNodeSha = cnResult.sha;
+                      cnSynced = true;
+                      send({
+                        type: 'central_node_patched',
+                        summary: `Challenge ${mark.date}: ${mark.result}`,
+                        risk: 'auto'
+                      });
+                    }
+                  }
+
+                  const tally = tallyChallenge(outcome.challenge);
+                  send({
+                    type: 'nutrition_challenge_marked',
+                    id: outcome.challenge.id,
+                    date: mark.date,
+                    result: mark.result
+                  });
+                  return JSON.stringify({
+                    ok: true,
+                    id: outcome.challenge.id,
+                    date: mark.date,
+                    result: mark.result,
+                    tally,
+                    central_node_synced: cnSynced
                   });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });

@@ -33,6 +33,10 @@ const FIXTURE_FILES = [
   {
     path: 'data/nutrition/2026/07/2026-07-30-lunch.md',
     source: 'tests/fixtures/valid/data/nutrition/2026/07/2026-07-30-lunch.md'
+  },
+  {
+    path: 'data/nutrition/challenges.json',
+    source: 'tests/fixtures/valid/data/nutrition/challenges.json'
   }
 ];
 

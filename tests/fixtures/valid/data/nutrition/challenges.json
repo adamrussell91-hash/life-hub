@@ -1,0 +1,23 @@
+{
+  "challenges": [
+    {
+      "id": "no-refined-sugar-2026-07-28",
+      "title": "No refined sugar",
+      "rule": "No refined sugar or ultra-processed sweets; flag sauces and bars with hidden sugar.",
+      "start": "2026-07-28",
+      "end": "2026-08-03",
+      "status": "active",
+      "days": {
+        "2026-07-28": { "result": "clean" },
+        "2026-07-29": { "result": "clean" },
+        "2026-07-30": { "result": "pending" },
+        "2026-07-31": { "result": "pending" },
+        "2026-08-01": { "result": "pending" },
+        "2026-08-02": { "result": "pending" },
+        "2026-08-03": { "result": "pending" }
+      },
+      "created_by": "brisket",
+      "updated_at": "2026-07-29T10:00:00.000Z"
+    }
+  ]
+}

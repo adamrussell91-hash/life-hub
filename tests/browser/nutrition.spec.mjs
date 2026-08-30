@@ -82,6 +82,10 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
 
     const heatmapTiles = page.locator('#nutrition-heatmap .heatmap-tile');
     assert.equal(await heatmapTiles.count(), 30);
+
+    await page.locator('#nutrition-challenges').waitFor({ state: 'visible' });
+    assert.match(await page.locator('.nutrition-challenge__heading strong').textContent(), /No refined sugar/);
+    assert.equal(await page.locator('.nutrition-challenge__day').count(), 7);
   } finally {
     await context.close();
   }

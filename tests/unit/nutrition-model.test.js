@@ -194,3 +194,35 @@ test('day-specific day type and recovery bonus resolve per day within the week s
   // the outer date instead of each day's own).
   assert.equal(laterDay.proteinTarget, 120);
 });
+
+test('active nutrition challenges appear on the model with day scoreboard cells', () => {
+  const model = buildNutritionModel({
+    events,
+    targetsConfig,
+    date: '2026-07-30',
+    nutritionChallenges: {
+      challenges: [{
+        id: 'no-refined-sugar-2026-07-28',
+        title: 'No refined sugar',
+        rule: 'No refined sugar',
+        start: '2026-07-28',
+        end: '2026-08-03',
+        status: 'active',
+        days: {
+          '2026-07-28': { result: 'clean' },
+          '2026-07-29': { result: 'miss', note: 'sauce' },
+          '2026-07-30': { result: 'pending' },
+          '2026-07-31': { result: 'pending' },
+          '2026-08-01': { result: 'pending' },
+          '2026-08-02': { result: 'pending' },
+          '2026-08-03': { result: 'pending' }
+        }
+      }]
+    }
+  });
+
+  assert.equal(model.challenges.length, 1);
+  assert.equal(model.challenges[0].title, 'No refined sugar');
+  assert.deepEqual(model.challenges[0].tally, { clean: 1, miss: 1, pending: 5, total: 7 });
+  assert.equal(model.challenges[0].days.find(day => day.date === '2026-07-30').isToday, true);
+});

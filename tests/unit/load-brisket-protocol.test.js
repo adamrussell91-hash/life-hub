@@ -31,6 +31,14 @@ test('protocol anticipates the Vyvanse eating baseline rather than treating it a
   assert.match(text, /skipped breakfast\/lunch on a workday is the expected pattern/i);
 });
 
+test('protocol owns weekly challenge trackers instead of refusing a counter', () => {
+  const text = loadBrisketProtocol();
+  assert.match(text, /Weekly \/ challenge goals are yours|Weekly challenge trackers/i);
+  assert.match(text, /upsert_nutrition_challenge/);
+  assert.match(text, /mark_nutrition_challenge_day/);
+  assert.match(text, /Never say you don't have a persistent counter|never say you don't have a persistent counter/i);
+});
+
 test('protocol defers longitudinal patterns to Hammond via Cross-Agent rather than self-computing trends', () => {
   const text = loadBrisketProtocol();
   assert.match(text, /Patterns are Hammond's job/i);

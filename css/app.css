@@ -330,6 +330,66 @@ main { max-width: 76rem; margin: 0 auto; }
 .meal-log__macros { color: var(--depth) !important; font-weight: 600; font-variant-numeric: tabular-nums; }
 .meal-log__empty { margin: 0.75rem 0 0; color: var(--muted); font-size: var(--text-sm); }
 
+.nutrition-challenges {
+  margin: var(--space-grid) 0;
+  padding: var(--space-card, 1rem);
+  border: 1px solid color-mix(in srgb, var(--wave) 28%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface, #fff) 88%, var(--wave));
+}
+.nutrition-challenge-list { display: grid; gap: 0.85rem; margin-top: 0.55rem; }
+.nutrition-challenge__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+}
+.nutrition-challenge__heading strong {
+  color: var(--depth);
+  font-size: var(--text-md);
+}
+.nutrition-challenge__tally {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.nutrition-challenge__rule {
+  margin: 0.35rem 0 0.65rem;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+.nutrition-challenge__days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+.nutrition-challenge__day {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem 0.15rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface, #fff) 70%, transparent);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.nutrition-challenge__day[data-today="true"] {
+  outline: 1px solid color-mix(in srgb, var(--wave) 55%, transparent);
+}
+.nutrition-challenge__mark {
+  font-size: var(--text-md);
+  line-height: 1;
+  color: var(--depth);
+}
+.nutrition-challenge__day[data-result="clean"] .nutrition-challenge__mark { color: #2f6b4f; }
+.nutrition-challenge__day[data-result="miss"] .nutrition-challenge__mark { color: #9b3b2e; }
+.nutrition-challenge__day[data-result="pending"] .nutrition-challenge__mark { color: var(--muted); }
+
 .macro-split {
   display: grid;
   grid-template-columns: auto 1fr 1.2fr;
