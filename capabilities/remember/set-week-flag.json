@@ -1,0 +1,15 @@
+{
+  "id": "remember.set-week-flag",
+  "tool_name": "remember_set_week_flag",
+  "verb": "Remember",
+  "agents": [
+    "*"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Set a week-scoped flag (e.g. no refined sugar this week). Auto-writes; expires on a date.",
+  "surfaces": [
+    "governance_log",
+    "agent_context"
+  ]
+}

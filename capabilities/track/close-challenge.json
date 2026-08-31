@@ -1,0 +1,21 @@
+{
+  "id": "track.close-challenge",
+  "tool_name": "track_close_challenge",
+  "verb": "Track",
+  "agents": [
+    "brisket",
+    "chadwick",
+    "hammond",
+    "sara",
+    "hyaluronica",
+    "penelope",
+    "vera"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Close an open challenge with an auto-judged or revised verdict. On dispute, propose a revised verdict for Confirm.",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}

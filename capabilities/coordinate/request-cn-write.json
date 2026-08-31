@@ -1,0 +1,20 @@
+{
+  "id": "coordinate.request-cn-write",
+  "tool_name": "coordinate_request_cn_write",
+  "verb": "Coordinate",
+  "agents": [
+    "brisket",
+    "chadwick",
+    "sara",
+    "hyaluronica",
+    "penelope",
+    "vera"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Ask Hammond in-band for a specific Central Node write you cannot make directly. Low-risk ops apply automatically (loan inherits lower risk).",
+  "surfaces": [
+    "central_node",
+    "governance_log"
+  ]
+}

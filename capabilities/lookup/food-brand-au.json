@@ -1,0 +1,15 @@
+{
+  "id": "lookup.food-brand-au",
+  "tool_name": "lookup_food_brand_au",
+  "verb": "Lookup",
+  "agents": [
+    "brisket"
+  ],
+  "risk": "auto",
+  "kind": "resourcing",
+  "prompt_one_liner": "AU-first nutrition lookup reminder \u2014 search Australian sources only, then cache with save_food_library_entry.",
+  "surfaces": [
+    "chat",
+    "food_library"
+  ]
+}
