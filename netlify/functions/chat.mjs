@@ -39,11 +39,10 @@ import {
 } from '../../js/core/constraints.js';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
-import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug, logEntryRejectionPayload } from './_shared/chat-schema.mjs';
+import { validateLogEntry, buildCanonicalPath, buildRecordSlug, logEntryRejectionPayload } from './_shared/chat-schema.mjs';
 import { persistLogEntry, describeRecordForLog } from './_shared/persist-log.mjs';
 import {
   FOOD_LIBRARY_PATH,
-  foodLibraryEntrySchema,
   formatFoodLibraryForPrompt,
   parseFoodLibrary,
   upsertFoodLibraryEntry,
@@ -54,9 +53,7 @@ import {
   EXERCISE_LIBRARY_PATH,
   formatExerciseLibraryForPrompt,
   parseExerciseLibrary,
-  saveExerciseLibraryEntrySchema,
   searchExerciseLibrary,
-  searchExerciseLibrarySchema,
   upsertExerciseLibraryEntry,
   validateExerciseLibraryEntry
 } from './_shared/exercise-library.mjs';
@@ -65,15 +62,9 @@ import {
   applySetSkincareRoutineMembership,
   executeListSkincareRoutines,
   executeSearchSkincareLibrary,
-  formatSkincareRoutinesForPrompt,
-  listSkincareRoutinesSchema,
-  saveSkincareLibraryEntrySchema,
-  searchSkincareLibrarySchema,
-  setSkincareRoutineMembershipSchema
+  formatSkincareRoutinesForPrompt
 } from './_shared/skincare-library-tools.mjs';
 import {
-  proposeCentralNodePatchSchema,
-  appendGovernanceLogSchema,
   validateCentralNodePatchInput,
   validateGovernanceLogAppendInput,
   classifyCentralNodePatchRisk,
@@ -88,6 +79,15 @@ import {
   purgeStalePendingCnPatches,
   formatPendingCnPatchesForPrompt
 } from './_shared/cn-patch-queue.mjs';
+import { buildAgentTools } from './_shared/capabilities/registry.mjs';
+import {
+  PENDING_ACTIONS_PATH,
+  createPendingActionId,
+  parsePendingActions,
+  serializePendingActions,
+  addPendingAction,
+  validateProposeActionInput
+} from './_shared/capabilities/propose-action.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -135,9 +135,7 @@ import {
 } from './_shared/mind-digest.mjs';
 import {
   getMindSession,
-  getMindSessionSchema,
-  searchMindRecords,
-  searchMindRecordsSchema
+  searchMindRecords
 } from './_shared/mind-session-read.mjs';
 import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
@@ -262,26 +260,18 @@ export function createChatHandler({
     }
 
     const nowInstant = new Date(now());
-    const tools = [
-      // No max_uses — a use cap turns one miss into a guess. Agents iterate.
-      // Finalize / flush: log_entry only — web_search burned the turn before Confirm.
-      ...(stripWebSearch ? [] : [{ type: 'web_search_20250305', name: 'web_search' }]),
-      ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
-      ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
-      ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : []),
-      ...(slug === 'vera' ? [getMindSessionSchema(), searchMindRecordsSchema()] : []),
-      ...(needsSkincareLibrary
-        ? [
-            listSkincareRoutinesSchema(),
-            searchSkincareLibrarySchema(),
-            saveSkincareLibraryEntrySchema(),
-            setSkincareRoutineMembershipSchema()
-          ]
-        : []),
-      ...(needsHammondTools
-        ? [proposeCentralNodePatchSchema(), appendGovernanceLogSchema()]
-        : [])
-    ];
+    // Capacity shortcuts + os.propose-action come from /capabilities registry.
+    // Finalize / flush: strip web_search so log_entry can fire before the budget dies.
+    const tools = buildAgentTools({
+      slug,
+      allowedTypes,
+      stripWebSearch,
+      needsFoodLibrary,
+      needsExerciseLibrary,
+      needsSkincareLibrary,
+      needsHammondTools,
+      needsVeraMindTools: slug === 'vera'
+    });
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -336,6 +326,8 @@ export function createChatHandler({
         let governanceLogTail = '';
         let pendingCnPatches = [];
         let pendingCnPatchesSha;
+        let pendingActions = [];
+        let pendingActionsSha;
         let hammondDigest = '';
         let hammondCnSummary = '';
         let foodLibraryEntries = [];
@@ -386,6 +378,10 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === PENDING_CN_PATCHES_PATH && entry.type === 'blob')
             : null;
           pendingCnPatchesSha = pendingCnPatchesEntry?.sha;
+          const pendingActionsEntry = current.tree.find(
+            entry => entry.path === PENDING_ACTIONS_PATH && entry.type === 'blob'
+          );
+          pendingActionsSha = pendingActionsEntry?.sha;
           const foodLibraryEntry = needsFoodLibrary
             ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
             : null;
@@ -444,6 +440,7 @@ export function createChatHandler({
             centralNodeBlob,
             governanceLogBlob,
             pendingCnPatchesBlob,
+            pendingActionsBlob,
             foodLibraryBlob,
             exerciseLibraryBlob,
             skincareLibraryBlob,
@@ -462,6 +459,7 @@ export function createChatHandler({
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
             governanceLogEntry ? client.readBlob(governanceLogEntry.sha) : null,
             pendingCnPatchesEntry ? client.readBlob(pendingCnPatchesEntry.sha) : null,
+            pendingActionsEntry ? client.readBlob(pendingActionsEntry.sha) : null,
             foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
             skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
@@ -512,6 +510,9 @@ export function createChatHandler({
             const decodedPendingCnPatches = pendingCnPatchesBlob ? decodeBlob(pendingCnPatchesBlob) : null;
             pendingCnPatches = purgeStalePendingCnPatches(parsePendingCnPatches(decodedPendingCnPatches), today);
           }
+
+          const decodedPendingActions = pendingActionsBlob ? decodeBlob(pendingActionsBlob) : null;
+          pendingActions = parsePendingActions(decodedPendingActions);
 
           const decodedFoodLibrary = foodLibraryBlob ? decodeBlob(foodLibraryBlob) : null;
           if (decodedFoodLibrary !== null) {
@@ -781,6 +782,28 @@ export function createChatHandler({
           send({ type: 'cn_patch_proposal', patch, id: persistedId });
           return persistedId;
         };
+
+        // os.propose-action: validate allowlist, persist pending queue, emit Confirm card with diffs.
+        const proposeOsAction = async proposal => {
+          let persistedId = null;
+          try {
+            const entry = { id: createPendingActionId(), createdAt: today, slug, proposal };
+            const nextQueue = addPendingAction(pendingActions, entry);
+            const result = await client.writeFile({
+              path: PENDING_ACTIONS_PATH,
+              content: serializePendingActions(nextQueue),
+              ...(pendingActionsSha ? { sha: pendingActionsSha } : {}),
+              message: `chore(propose-action): queue ${proposal.intent}`.slice(0, 200)
+            });
+            pendingActions = nextQueue;
+            pendingActionsSha = result.sha;
+            persistedId = entry.id;
+          } catch {
+            // Same-turn Confirm still works if the queue write fails.
+          }
+          send({ type: 'action_proposal', proposal, id: persistedId });
+          return persistedId;
+        };
         try {
           const emit = event => {
             if (event.type === 'record_proposal' || event.type === 'record_saved') {
@@ -1043,6 +1066,28 @@ export function createChatHandler({
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
               }
+              if (event.name === 'os_propose_action') {
+                const validated = validateProposeActionInput(event.input, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  intent: validated.proposal.intent,
+                  writes: validated.proposal.writes.map(write => ({
+                    path: write.path,
+                    mode: write.mode,
+                    diff: write.diff
+                  })),
+                  ...(pendingId ? { pendingId } : {})
+                });
+              }
               return null;
             }
           };
@@ -1081,6 +1126,17 @@ export function createChatHandler({
                 await proposeCentralNodePatch(patch);
               } else {
                 send(event);
+              }
+            } else if (event.type === 'tool_call' && event.name === 'os_propose_action') {
+              const validated = validateProposeActionInput(event.input, { agentSlug: slug });
+              if (validated.ok) {
+                await proposeOsAction(validated.proposal);
+              } else {
+                send({
+                  type: 'action_rejected',
+                  error: validated.error,
+                  ...(validated.detail ? { detail: validated.detail } : {})
+                });
               }
             } else {
               send(event);

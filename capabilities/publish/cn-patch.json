@@ -1,0 +1,21 @@
+{
+  "id": "publish.cn-patch",
+  "tool_name": "propose_central_node_patch",
+  "verb": "Publish",
+  "agents": ["hammond"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "legacy_tool": "propose_central_node_patch",
+  "inputs": {
+    "section": "string",
+    "op": "string",
+    "payload": "object"
+  },
+  "side_effects": [
+    "Auto-applies low-risk Central Node patches",
+    "Queues Confirm for high-risk patches"
+  ],
+  "surfaces": ["central_node", "confirm_card", "governance_log"],
+  "prompt_one_liner": "Propose a structured Central Node edit. Low-risk writes auto-apply; high-risk edits need Confirm.",
+  "reads": ["central_node"]
+}

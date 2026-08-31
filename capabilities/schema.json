@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "life-hub://capabilities/schema",
+  "title": "Life Hub Capability",
+  "description": "Open generation, closed execution. Shortcuts are pre-worn propose-action shapes; os.propose-action is the universal fallback.",
+  "version": "0.1.0",
+  "type": "object",
+  "required": ["id", "verb", "agents", "risk", "surfaces", "prompt_one_liner"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9-]+)+$",
+      "description": "Stable capability id, e.g. log.entry or os.propose-action"
+    },
+    "tool_name": {
+      "type": "string",
+      "description": "Anthropic tool name. Defaults to id with dots→underscores."
+    },
+    "verb": { "type": "string" },
+    "agents": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Allowlist of agent slugs. Use [\"*\"] for every agent."
+    },
+    "risk": { "type": "string", "enum": ["auto", "confirm"] },
+    "inputs": { "type": "object", "additionalProperties": true },
+    "side_effects": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "surfaces": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "prompt_one_liner": {
+      "type": "string",
+      "description": "Only text from this capability that enters the system prompt."
+    },
+    "reads": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["capacity", "resourcing"],
+      "default": "capacity"
+    },
+    "legacy_tool": {
+      "type": "string",
+      "description": "Existing chat.mjs tool name this shortcut wraps (Phase 0 migration)."
+    }
+  },
+  "additionalProperties": false
+}

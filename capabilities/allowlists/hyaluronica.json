@@ -1,0 +1,16 @@
+{
+  "agent": "hyaluronica",
+  "write_globs": [
+    "data/skincare/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/research/**"
+  ],
+  "read_globs": [
+    "data/skincare/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/research/**",
+    "central-node.md"
+  ]
+}

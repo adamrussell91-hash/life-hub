@@ -1,0 +1,53 @@
+{
+  "version": "0.1.0",
+  "generated_from": "capability definition files (single source of truth)",
+  "capabilities": {
+    "os.propose-action": {
+      "file": "propose-action.json",
+      "agents": ["*"],
+      "risk": "confirm",
+      "surfaces": ["confirm_card", "governance_log"],
+      "tool_name": "os_propose_action"
+    },
+    "log.entry": {
+      "file": "log/log-entry.json",
+      "agents": ["brisket", "chadwick", "hyaluronica", "penelope", "sara", "vera"],
+      "risk": "confirm",
+      "surfaces": ["confirm_card", "central_node", "domain_tab"],
+      "tool_name": "log_entry",
+      "legacy_tool": "log_entry"
+    },
+    "publish.cn-patch": {
+      "file": "publish/cn-patch.json",
+      "agents": ["hammond"],
+      "risk": "confirm",
+      "surfaces": ["central_node", "confirm_card", "governance_log"],
+      "tool_name": "propose_central_node_patch",
+      "legacy_tool": "propose_central_node_patch"
+    },
+    "publish.governance-log-entry": {
+      "file": "publish/governance-log-entry.json",
+      "agents": ["hammond"],
+      "risk": "auto",
+      "surfaces": ["governance_log"],
+      "tool_name": "append_governance_log",
+      "legacy_tool": "append_governance_log"
+    },
+    "lookup.save-food-library": {
+      "file": "lookup/save-food-library.json",
+      "agents": ["brisket"],
+      "risk": "auto",
+      "surfaces": ["food_library"],
+      "tool_name": "save_food_library_entry",
+      "legacy_tool": "save_food_library_entry"
+    },
+    "lookup.save-exercise-library": {
+      "file": "lookup/save-exercise-library.json",
+      "agents": ["chadwick"],
+      "risk": "auto",
+      "surfaces": ["exercise_library"],
+      "tool_name": "save_exercise_library_entry",
+      "legacy_tool": "save_exercise_library_entry"
+    }
+  }
+}

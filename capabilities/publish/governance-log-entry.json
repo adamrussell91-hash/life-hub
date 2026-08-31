@@ -1,0 +1,20 @@
+{
+  "id": "publish.governance-log-entry",
+  "tool_name": "append_governance_log",
+  "verb": "Publish",
+  "agents": ["hammond"],
+  "risk": "auto",
+  "kind": "capacity",
+  "legacy_tool": "append_governance_log",
+  "inputs": {
+    "entry_type": "string",
+    "body": "string",
+    "title": "string?",
+    "status": "string?",
+    "dateKey": "YYYY-MM-DD?"
+  },
+  "side_effects": ["Appends a dated Governance Log entry"],
+  "surfaces": ["governance_log"],
+  "prompt_one_liner": "Append a dated Governance Log entry for durable protocol reasoning.",
+  "reads": ["governance_log"]
+}

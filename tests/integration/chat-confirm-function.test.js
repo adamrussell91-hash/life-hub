@@ -935,3 +935,76 @@ test('cn_patch confirm rejects non-hammond slug', async () => {
   assert.equal(payload.error.code, 'invalid_request');
   assert.equal(calls.length, 0);
 });
+
+test('action confirm writes allowlisted files and appends a Capability Action governance entry', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const proposal = {
+    capability: 'os.propose-action',
+    agent: 'brisket',
+    intent: 'open a 7-day no-refined-sugar tracker',
+    reads: [],
+    writes: [{
+      path: 'data/challenges/2026-08-01-no-sugar.json',
+      mode: 'create',
+      content: JSON.stringify({ title: 'No refined sugar', duration_days: 7 }, null, 2),
+      diff: 'new challenge file'
+    }],
+    surfaces: ['governance_log']
+  };
+
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'brisket',
+    candidate: proposal
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.data.intent, 'open a 7-day no-refined-sugar tracker');
+  assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('data/challenges/2026-08-01-no-sugar.json')));
+  assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('data/governance/governance-log.md')));
+});
+
+test('action confirm rejects out-of-allowlist writes', async () => {
+  const { calls, fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'brisket',
+    candidate: {
+      intent: 'hack cn',
+      writes: [{ path: 'central-node.md', mode: 'overwrite', content: '# nope', diff: 'bad' }]
+    }
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'invalid_action');
+  assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 0);
+});

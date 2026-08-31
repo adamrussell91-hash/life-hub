@@ -1,0 +1,22 @@
+{
+  "id": "os.propose-action",
+  "tool_name": "os_propose_action",
+  "verb": "Propose",
+  "agents": ["*"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "inputs": {
+    "intent": "string",
+    "reads": "string[]",
+    "writes": "{ path, mode, content?, diff? }[]",
+    "surfaces": "string[]"
+  },
+  "side_effects": [
+    "Queues a Confirm card showing the concrete diff",
+    "On Confirm, writes only allowlisted paths",
+    "Appends a Capability Action entry to the Governance Log"
+  ],
+  "surfaces": ["confirm_card", "governance_log"],
+  "prompt_one_liner": "Propose any durable action as a structured plan (reads, writes, paths, why). Adam always sees the real diff before anything is written. Prefer a named shortcut when one fits.",
+  "reads": []
+}

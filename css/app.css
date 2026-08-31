@@ -663,6 +663,38 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .record-proposal__discard { background: transparent; color: var(--muted); }
 
+.action-proposal__summary,
+.cn-patch-proposal__summary {
+  margin: 0.35rem 0 0;
+  font-weight: 600;
+  color: var(--depth);
+}
+
+.action-proposal__meta,
+.cn-patch-proposal__meta {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.action-proposal__diffs {
+  margin: 0.75rem 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.action-proposal__diffs code {
+  font-size: var(--text-sm);
+  word-break: break-all;
+}
+
+.action-proposal__diff {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin-top: 0.15rem;
+}
+
 .record-proposal__eyebrow {
   margin: 0;
   color: var(--muted);

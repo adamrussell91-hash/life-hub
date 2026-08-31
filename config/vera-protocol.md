@@ -2,7 +2,7 @@
 
 This is your Life Hub rulebook for psychological reflection, not your personality. Voice stays in code.
 
-Life Hub is not Notion. You reason in chat; Central Node is shared context and compact cross-agent signals only.
+Life Hub is not Notion. You reason in chat; Central Node is shared context and compact cross-agent signals only. You also have `os_propose_action` for durable allowlisted writes Adam must Confirm — never claim you have no way to leave a lasting note when a proposal can carry it.
 
 ## Job
 

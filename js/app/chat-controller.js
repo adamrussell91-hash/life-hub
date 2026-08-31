@@ -1,5 +1,6 @@
 import {
   appendMessage,
+  appendActionProposal,
   appendCnPatchProposal,
   appendRecordProposal,
   appendRecordSaved,
@@ -488,6 +489,20 @@ export function createChatController({
           endTextTurn();
           const proposal = appendCnPatchProposal(root, { patch: event.patch });
           bindCnPatchProposal(proposal, event.patch, event.id ?? null);
+        } else if (event.type === 'action_proposal') {
+          turnSignaled = true;
+          gotUsefulOutput = true;
+          clearWorkingBubble();
+          endTextTurn();
+          const proposal = appendActionProposal(root, { proposal: event.proposal });
+          bindActionProposal(proposal, event.proposal, event.id ?? null);
+        } else if (event.type === 'action_rejected') {
+          turnSignaled = true;
+          clearWorkingBubble();
+          const detail = typeof event.detail === 'string' && event.detail.trim()
+            ? ` (${event.detail.trim()})`
+            : '';
+          showChatError(root, `That action was blocked${detail}. Try a path inside this agent's allowlist.`);
         } else if (event.type === 'central_node_patched') {
           turnSignaled = true;
           gotUsefulOutput = true;
@@ -609,6 +624,49 @@ export function createChatController({
       // the card is already removed either way, and a stale entry self-purges.
       if (id) void chatApi.confirm({ kind: 'cn_patch_dismiss', id, slug: 'hammond' }).catch(() => undefined);
     });
+  }
+
+  function bindActionProposal(proposalUi, proposal, id = null) {
+    if (!proposalUi) return;
+    proposalUi.confirm.addEventListener('click', () => {
+      void confirmAction(proposalUi, proposal, id);
+    });
+    proposalUi.discard.addEventListener('click', () => {
+      proposalUi.card.remove();
+      if (id) {
+        const slug = stickyAgentSlug()
+          || (typeof proposal?.agent === 'string' ? proposal.agent : null)
+          || 'hammond';
+        void chatApi.confirm({ kind: 'action_dismiss', id, slug }).catch(() => undefined);
+      }
+    });
+  }
+
+  async function confirmAction(proposalUi, proposal, id = null) {
+    const previousLabel = proposalUi.confirm.textContent;
+    proposalUi.confirm.disabled = true;
+    proposalUi.confirm.textContent = 'Saving…';
+    try {
+      const slug = stickyAgentSlug()
+        || (typeof proposal?.agent === 'string' ? proposal.agent : null)
+        || 'hammond';
+      const result = await chatApi.confirm({
+        kind: 'action',
+        candidate: proposal,
+        ...(id ? { id } : {}),
+        slug
+      });
+      const saved = root.createElement('p');
+      saved.textContent = result?.intent
+        ? `Saved: ${result.intent}`
+        : 'Action applied.';
+      proposalUi.card.replaceChildren(saved);
+      onRecordWritten?.(result);
+    } catch {
+      proposalUi.confirm.disabled = false;
+      proposalUi.confirm.textContent = previousLabel;
+      showChatError(root, 'Saving that action failed. You can try again.');
+    }
   }
 
   async function confirmCnPatch(proposal, patch, id = null) {
