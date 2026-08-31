@@ -77,7 +77,7 @@ function mockCtx(agentSlug = 'brisket') {
 test('registry loads propose-action and Phase 1-3 shortcuts', () => {
   resetCapabilityCaches();
   const registry = loadRegistry();
-  assert.equal(registry.version, '0.2.0');
+  assert.equal(registry.version, '0.3.0');
   assert.ok(registry.capabilities['os.propose-action']);
   assert.ok(registry.capabilities['track.open-challenge']);
   assert.ok(registry.capabilities['coordinate.request-cn-write']);
@@ -265,7 +265,9 @@ test('shortcutSchemas covers Phase 1-3 tool names', () => {
     'publish_surface_widget',
     'plan_week_meals',
     'lookup_food_brand_au',
-    'os_capability_scoreboard'
+    'os_capability_scoreboard',
+    'intuition_edit_pack',
+    'os_promote_shortcut'
   ]) {
     assert.ok(isShortcutTool(name), name);
     assert.ok(names.includes(name), name);
@@ -381,4 +383,49 @@ test('capability scoreboard returns rows when asked', async () => {
   const result = await executeShortcut('os_capability_scoreboard', { detail: true }, ctx);
   assert.equal(result.kind, 'ok');
   assert.ok(result.count >= 10);
+});
+
+
+test('intuition_edit_pack updates owned pack for Sara', async () => {
+  resetCapabilityCaches();
+  const { ctx, writes } = mockCtx('sara');
+  // Seed flare-rules into the mock tree via a prior write
+  const seed = await import('node:fs');
+  const raw = seed.readFileSync(new URL('../../intuition/flare-rules.json', import.meta.url), 'utf8');
+  await ctx.client.writeFile({ path: 'intuition/flare-rules.json', content: raw, message: 'seed' });
+  writes.length = 0;
+  const result = await executeShortcut(
+    'intuition_edit_pack',
+    { pack_id: 'flare-rules', guidance: 'Deload earlier in flare week 2.', reason: 'Hard flare week' },
+    ctx
+  );
+  assert.equal(result.kind, 'ok');
+  assert.equal(writes[0].path, 'intuition/flare-rules.json');
+});
+
+test('os_promote_shortcut returns Confirm draft under data/os', async () => {
+  const { ctx } = mockCtx('brisket');
+  const result = await executeShortcut(
+    'os_promote_shortcut',
+    {
+      proposed_id: 'track.morning-weigh-in',
+      summary: 'Morning weigh-in tracker',
+      example_intent: 'log morning weight',
+      risk: 'confirm'
+    },
+    ctx
+  );
+  assert.equal(result.kind, 'propose');
+  const validated = validateProposeActionInput(result.proposal, { agentSlug: 'brisket' });
+  assert.equal(validated.ok, true);
+  assert.match(validated.proposal.writes[0].path, /^data\/os\/promoted-shortcuts\//);
+});
+
+test('intent router surfaces intuition.edit-pack on flare-update asks', () => {
+  resetCapabilityCaches();
+  const ids = selectCapabilityIdsForTurn({
+    slug: 'sara',
+    message: 'Update the flare intuition after this bad week'
+  });
+  assert.ok(ids.includes('intuition.edit-pack'));
 });

@@ -1,7 +1,7 @@
 # Agent Capability Layer — Design
 
 **Date:** 2026-08-31  
-**Status:** Approved for Phase 0 implementation  
+**Status:** Phase 0–3 implemented (PR #44)  
 **Scope:** Open generation / closed execution for Life Hub agents (`os.propose-action`), per-agent path allowlists, capability registry, migrate existing chat tools as shortcuts  
 **Out of scope (later phases):** Remember/Track named shortcuts, capability loans, intuition packs, intent router, surface widgets, shortcut promotion
 
@@ -69,5 +69,7 @@ Handlers live under `netlify/functions/_shared/capabilities/`.
 7. **Challenge close disputes** — When auto-judge ≠ Adam's sense of the week, the owning agent proposes a revised verdict for Confirm (Adam does not own the rewrite himself).
 
 ## Phases 1–3
+
+**Implemented:** Remember/Track/Coordinate loans, research + surface widgets, intuition packs + intent router + shortcut promotion (`os.promote-shortcut` drafts for Confirm; `intuition.edit-pack` auto for owners).
 
 See the full thesis in the originating brief: Remember/Track/Publish P0 shortcuts + capability loans; research artifacts + surface widgets; intuition packs + intent router + shortcut promotion.

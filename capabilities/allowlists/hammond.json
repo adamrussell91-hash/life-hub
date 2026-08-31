@@ -8,13 +8,15 @@
     "data/remember/**",
     "data/research/**",
     "data/widgets/**",
-    "data/os/**"
+    "data/os/**",
+    "intuition/**"
   ],
   "read_globs": [
     "central-node.md",
     "data/**",
     "data/widgets/**",
-    "data/os/**"
+    "data/os/**",
+    "intuition/**"
   ],
   "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1."
 }
