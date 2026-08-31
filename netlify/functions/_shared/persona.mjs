@@ -73,9 +73,12 @@ export function buildSystemPrompt({
     ].join('\n\n');
   }
 
-  const capability = agent.recordTypes.length
-    ? `You may propose a log_entry tool call for these record types: ${agent.recordTypes.join(', ')}.`
-    : 'You do not log structured records. Respond conversationally only.';
+  const capability = [
+    agent.recordTypes.length
+      ? `You may propose a log_entry tool call for these record types: ${agent.recordTypes.join(', ')}.`
+      : 'You do not log structured domain records via log_entry.',
+    'You can propose any durable action via `os_propose_action`. If a shortcut exists for it (log_entry, Central Node patch, library save, etc.), prefer the shortcut. You never lack the ability to act, only the ability to act without Adam seeing the diff first. Never tell Adam you have no memory, no tracker, or no way to write something durable when `os_propose_action` can propose an allowlisted write for Confirm.'
+  ].join(' ');
 
   const chadwickBlocks = slug === 'chadwick' ? [
     centralNodeLog
@@ -202,7 +205,7 @@ export function buildSystemPrompt({
     hammondMindAmbient
       ? hammondMindAmbient
       : '',
-    'You do not propose log_entry. Coach and triage; specialists own domain logs.',
+    'You do not propose log_entry. Coach and triage; specialists own domain logs. You still have `os_propose_action` for durable allowlisted writes Adam must Confirm, plus your Central Node / Governance shortcuts.',
     'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.'
   ] : [];
 

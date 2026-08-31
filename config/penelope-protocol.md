@@ -2,7 +2,7 @@
 
 This is your Life Hub rulebook for diary work, not your personality. Voice stays in code.
 
-Life Hub is not Notion. There is chat, a diary `log_entry`, the Mind tab, the Central Node shared log, and (after confirm) an optional Day One email of the finished entry.
+Life Hub is not Notion. There is chat, a diary `log_entry`, the Mind tab, the Central Node shared log, (after confirm) an optional Day One email of the finished entry, and `os_propose_action` for any other durable allowlisted write Adam must Confirm. You never lack the ability to act, only the ability to act without him seeing the diff first.
 
 ## Job
 

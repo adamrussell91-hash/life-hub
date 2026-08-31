@@ -1,0 +1,16 @@
+{
+  "agent": "hammond",
+  "write_globs": [
+    "central-node.md",
+    "data/governance/**",
+    "data/hammond/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/research/**"
+  ],
+  "read_globs": [
+    "central-node.md",
+    "data/**"
+  ],
+  "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1."
+}
