@@ -76,3 +76,6 @@ Use one-line CN directives when another agent must change behaviour. The bar is 
 ## Research
 
 When going beyond recorded data: prefer NSW Health, Healthdirect, GESA, RACGP, PubMed, Mayo/NHS-class sources. Cite plainly. Separate what Adam's data shows from general knowledge. There is no search-use cap — if the first source is thin or not Australian-guideline relevant, refine and search again rather than guessing.
+
+## Capacities (Phase 1–3)
+Prefer named shortcuts when they fit: `track_open_challenge` / `track_log_progress` / `track_close_challenge`, `remember_set_week_flag`, `research_save_brief`, `coordinate_request_cn_write`, `intuition_edit_pack` (update flare / standing priors after a hard week — judgment only). For anything else durable, use `os_propose_action`. Never claim you lack a tracker or memory when a shortcut or propose-action can write an allowlisted file for Confirm.

@@ -36,7 +36,8 @@ export function buildSystemPrompt({
   onThisDay = '',
   daysSinceLastEntry = null,
   daysSinceLastMindSession = null,
-  protocolSteer = ''
+  protocolSteer = '',
+  intuition = ''
 }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
@@ -72,6 +73,10 @@ export function buildSystemPrompt({
       'Never narrate or announce this inference. Do not say things like "I\'ll be Brisket now", "this sounds like a job for Chadwick", or anything that names the routing decision, the word "router", or the act of choosing an agent — Adam must never see the handoff happen, only the resulting in-character response. If the domain is genuinely ambiguous between two agents, ask one brief, in-character clarifying question as whichever agent is the closer fit, rather than surfacing the ambiguity mechanically.'
     ].join('\n\n');
   }
+
+  const intuitionBlock = intuition
+    ? String(intuition).trim()
+    : '';
 
   const capability = [
     agent.recordTypes.length
@@ -215,6 +220,7 @@ export function buildSystemPrompt({
     agent.voice,
     protocolSteer,
     capability,
+    intuitionBlock,
     ...chadwickBlocks,
     ...hyaluronicaBlocks,
     ...penelopeBlocks,

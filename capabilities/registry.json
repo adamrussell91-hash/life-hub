@@ -1,53 +1,284 @@
 {
-  "version": "0.1.0",
+  "version": "0.3.0",
   "generated_from": "capability definition files (single source of truth)",
   "capabilities": {
     "os.propose-action": {
       "file": "propose-action.json",
-      "agents": ["*"],
+      "agents": [
+        "*"
+      ],
       "risk": "confirm",
-      "surfaces": ["confirm_card", "governance_log"],
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
       "tool_name": "os_propose_action"
     },
     "log.entry": {
       "file": "log/log-entry.json",
-      "agents": ["brisket", "chadwick", "hyaluronica", "penelope", "sara", "vera"],
+      "agents": [
+        "brisket",
+        "chadwick",
+        "hyaluronica",
+        "penelope",
+        "sara",
+        "vera"
+      ],
       "risk": "confirm",
-      "surfaces": ["confirm_card", "central_node", "domain_tab"],
+      "surfaces": [
+        "confirm_card",
+        "central_node",
+        "domain_tab"
+      ],
       "tool_name": "log_entry",
       "legacy_tool": "log_entry"
     },
     "publish.cn-patch": {
       "file": "publish/cn-patch.json",
-      "agents": ["hammond"],
+      "agents": [
+        "hammond"
+      ],
       "risk": "confirm",
-      "surfaces": ["central_node", "confirm_card", "governance_log"],
+      "surfaces": [
+        "central_node",
+        "confirm_card",
+        "governance_log"
+      ],
       "tool_name": "propose_central_node_patch",
       "legacy_tool": "propose_central_node_patch"
     },
     "publish.governance-log-entry": {
       "file": "publish/governance-log-entry.json",
-      "agents": ["hammond"],
+      "agents": [
+        "hammond"
+      ],
       "risk": "auto",
-      "surfaces": ["governance_log"],
+      "surfaces": [
+        "governance_log"
+      ],
       "tool_name": "append_governance_log",
       "legacy_tool": "append_governance_log"
     },
     "lookup.save-food-library": {
       "file": "lookup/save-food-library.json",
-      "agents": ["brisket"],
+      "agents": [
+        "brisket"
+      ],
       "risk": "auto",
-      "surfaces": ["food_library"],
+      "surfaces": [
+        "food_library"
+      ],
       "tool_name": "save_food_library_entry",
       "legacy_tool": "save_food_library_entry"
     },
     "lookup.save-exercise-library": {
       "file": "lookup/save-exercise-library.json",
-      "agents": ["chadwick"],
+      "agents": [
+        "chadwick"
+      ],
       "risk": "auto",
-      "surfaces": ["exercise_library"],
+      "surfaces": [
+        "exercise_library"
+      ],
       "tool_name": "save_exercise_library_entry",
       "legacy_tool": "save_exercise_library_entry"
+    },
+    "remember.set-week-flag": {
+      "file": "remember/set-week-flag.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log",
+        "agent_context"
+      ],
+      "tool_name": "remember_set_week_flag"
+    },
+    "remember.note-context": {
+      "file": "remember/note-context.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log",
+        "agent_context"
+      ],
+      "tool_name": "remember_note_context"
+    },
+    "track.open-challenge": {
+      "file": "track/open-challenge.json",
+      "agents": [
+        "brisket",
+        "chadwick",
+        "hammond",
+        "sara",
+        "hyaluronica",
+        "penelope",
+        "vera"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "track_open_challenge"
+    },
+    "track.log-progress": {
+      "file": "track/log-progress.json",
+      "agents": [
+        "brisket",
+        "chadwick",
+        "hammond",
+        "sara",
+        "hyaluronica",
+        "penelope",
+        "vera"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log"
+      ],
+      "tool_name": "track_log_progress"
+    },
+    "track.close-challenge": {
+      "file": "track/close-challenge.json",
+      "agents": [
+        "brisket",
+        "chadwick",
+        "hammond",
+        "sara",
+        "hyaluronica",
+        "penelope",
+        "vera"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "track_close_challenge"
+    },
+    "coordinate.request-cn-write": {
+      "file": "coordinate/request-cn-write.json",
+      "agents": [
+        "brisket",
+        "chadwick",
+        "sara",
+        "hyaluronica",
+        "penelope",
+        "vera"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "central_node",
+        "governance_log"
+      ],
+      "tool_name": "coordinate_request_cn_write"
+    },
+    "research.save-brief": {
+      "file": "research/save-brief.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "research_save_brief"
+    },
+    "research.expiring-brief": {
+      "file": "research/expiring-brief.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "research_expiring_brief"
+    },
+    "publish.surface-widget": {
+      "file": "publish/surface-widget.json",
+      "agents": [
+        "brisket",
+        "chadwick",
+        "hammond",
+        "sara",
+        "hyaluronica",
+        "penelope",
+        "vera"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "hub_tab",
+        "governance_log"
+      ],
+      "tool_name": "publish_surface_widget"
+    },
+    "plan.week-meals": {
+      "file": "plan/week-meals.json",
+      "agents": [
+        "brisket"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "nutrition_tab",
+        "governance_log"
+      ],
+      "tool_name": "plan_week_meals"
+    },
+    "lookup.food-brand-au": {
+      "file": "lookup/food-brand-au.json",
+      "agents": [
+        "brisket"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "food_library"
+      ],
+      "tool_name": "lookup_food_brand_au"
+    },
+    "os.capability-scoreboard": {
+      "file": "os/capability-scoreboard.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat"
+      ],
+      "tool_name": "os_capability_scoreboard"
+    },
+    "intuition.edit-pack": {
+      "file": "intuition/edit-pack.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "agent_context",
+        "governance_log"
+      ],
+      "tool_name": "intuition_edit_pack"
+    },
+    "os.promote-shortcut": {
+      "file": "os/promote-shortcut.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "os_promote_shortcut"
     }
   }
 }

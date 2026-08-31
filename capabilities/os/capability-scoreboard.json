@@ -1,0 +1,14 @@
+{
+  "id": "os.capability-scoreboard",
+  "tool_name": "os_capability_scoreboard",
+  "verb": "OS",
+  "agents": [
+    "*"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "List what you can actually do for Adam right now. Use when he asks, or when you would otherwise narrate a false limit.",
+  "surfaces": [
+    "chat"
+  ]
+}
