@@ -13,6 +13,8 @@ import {
 import { getMindSessionSchema, searchMindRecordsSchema } from '../mind-session-read.mjs';
 import { proposeCentralNodePatchSchema, appendGovernanceLogSchema } from '../hammond-tools.mjs';
 import { proposeActionToolSchema } from './propose-action.mjs';
+import { shortcutSchemas } from './shortcuts.mjs';
+import { selectCapabilityIdsForTurn } from './intent-router.mjs';
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -126,10 +128,27 @@ export function isPathAllowedForAgent(slug, path, { mode = 'write' } = {}) {
   return globs.some(glob => matchGlob(glob, path));
 }
 
+const SHORTCUT_CAPABILITY_IDS = new Set([
+  'remember.set-week-flag',
+  'remember.note-context',
+  'track.open-challenge',
+  'track.log-progress',
+  'track.close-challenge',
+  'coordinate.request-cn-write',
+  'research.save-brief',
+  'research.expiring-brief',
+  'publish.surface-widget',
+  'plan.week-meals',
+  'lookup.food-brand-au',
+  'os.capability-scoreboard',
+  'intuition.edit-pack',
+  'os.promote-shortcut'
+]);
+
 /**
  * Build the Anthropic tools array for one agent turn.
- * Capacity shortcuts come from the registry; a few resourcing tools stay
- * feature-flagged (search / list) until Phase 3 intent routing lands.
+ * Capacity shortcuts come from the registry; Phase 1–3 named shortcuts are
+ * narrowed by the same-call intent pass when `message` is provided.
  */
 export function buildAgentTools({
   slug,
@@ -139,7 +158,8 @@ export function buildAgentTools({
   needsExerciseLibrary = false,
   needsSkincareLibrary = false,
   needsHammondTools = false,
-  needsVeraMindTools = false
+  needsVeraMindTools = false,
+  message = null
 } = {}) {
   if (typeof slug !== 'string' || !slug) throw new TypeError('slug is required');
 
@@ -148,8 +168,14 @@ export function buildAgentTools({
     tools.push({ type: 'web_search_20250305', name: 'web_search' });
   }
 
-  const ids = capabilityIdsForAgent(slug);
-  const has = id => ids.includes(id);
+    const allIds = capabilityIdsForAgent(slug);
+  // Intent pass narrows Phase 1–3 shortcuts only; legacy/domain tools stay
+  // available whenever their feature flags / allowlists say so.
+  const selectedIds = message == null
+    ? allIds
+    : selectCapabilityIdsForTurn({ slug, message });
+  const has = id => allIds.includes(id);
+  const hasShortcut = id => selectedIds.includes(id);
 
   if (has('os.propose-action')) {
     tools.push(proposeActionToolSchema());
@@ -188,6 +214,15 @@ export function buildAgentTools({
   }
   if (has('publish.governance-log-entry') && needsHammondTools) {
     tools.push(appendGovernanceLogSchema());
+  }
+
+  const schemas = shortcutSchemas();
+  for (const id of selectedIds) {
+    if (!SHORTCUT_CAPABILITY_IDS.has(id)) continue;
+    const def = loadCapability(id);
+    const toolName = def?.tool_name;
+    if (!toolName || !schemas[toolName]) continue;
+    tools.push(schemas[toolName]);
   }
 
   return tools;

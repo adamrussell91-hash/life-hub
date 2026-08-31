@@ -5,7 +5,10 @@
     "data/challenges/**",
     "data/remember/**",
     "data/research/**",
-    "data/exercise-library.json"
+    "data/exercise-library.json",
+    "data/widgets/**",
+    "data/os/**",
+    "intuition/**"
   ],
   "read_globs": [
     "data/fitness/**",
@@ -13,6 +16,9 @@
     "data/remember/**",
     "data/research/**",
     "data/exercise-library.json",
-    "central-node.md"
+    "central-node.md",
+    "data/widgets/**",
+    "data/os/**",
+    "intuition/**"
   ]
 }
