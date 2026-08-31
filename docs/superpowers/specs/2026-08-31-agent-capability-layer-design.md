@@ -58,15 +58,15 @@ Handlers live under `netlify/functions/_shared/capabilities/`.
 - Existing meal/workout logging still works via `log_entry`
 - Write paths outside the agent allowlist never reach Confirm
 
-## Open questions (Adam)
+## Locked decisions (Adam, 2026-08-31)
 
-1. Does `coordinate.request-cn-write` inherit risk class or always Confirm on Hammond's side?
-2. Where does `os.capability-scoreboard` live day to day?
-3. Default TTL for expiring research briefs — flat 30d or per-domain?
-4. Intuition files — Adam-only edits, or agents propose via Confirm?
-5. Widget template set size and pre-approval before publish?
-6. Intent router — separate cheap model call vs first pass in the same call?
-7. Who owns challenge close-out disputes when auto-judge ≠ Adam's sense of the week?
+1. **Capability loans / Confirm** — Loan inherits the lower risk class. If Brisket's ask is auto-risk, Hammond does not re-Confirm.
+2. **Capability scoreboard** — Surfaced when useful (agent would otherwise refuse, or Adam asks what they can do). Not a standing always-on command.
+3. **Expiring research TTL** — Per-domain defaults (clinical vs retail pricing decay at different rates), not a flat 30 days.
+4. **Intuition edits** — Agents may edit intuition files directly (e.g. Sara updates flare rules after a bad week).
+5. **Widget templates** — Add one at a time as needed; Adam approves each template before any agent can publish with it.
+6. **Intent router** — Prefer a first pass inside the same Anthropic call before persona voice (one round-trip, lower latency/cost) unless measuring shows a separate cheap call is clearly better.
+7. **Challenge close disputes** — When auto-judge ≠ Adam's sense of the week, the owning agent proposes a revised verdict for Confirm (Adam does not own the rewrite himself).
 
 ## Phases 1–3
 
