@@ -1,0 +1,19 @@
+{
+  "agent": "brisket",
+  "write_globs": [
+    "data/nutrition/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/research/**",
+    "data/food-library.json"
+  ],
+  "read_globs": [
+    "data/nutrition/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/research/**",
+    "data/food-library.json",
+    "central-node.md"
+  ],
+  "notes": "Nutrition domain writes plus short-horizon trackers. Central Node remains read-only here; CN mutations go through coordinate.request-cn-write (Phase 1) or Hammond."
+}

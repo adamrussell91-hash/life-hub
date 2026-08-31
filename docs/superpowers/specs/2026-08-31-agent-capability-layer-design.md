@@ -1,0 +1,73 @@
+# Agent Capability Layer — Design
+
+**Date:** 2026-08-31  
+**Status:** Approved for Phase 0 implementation  
+**Scope:** Open generation / closed execution for Life Hub agents (`os.propose-action`), per-agent path allowlists, capability registry, migrate existing chat tools as shortcuts  
+**Out of scope (later phases):** Remember/Track named shortcuts, capability loans, intuition packs, intent router, surface widgets, shortcut promotion
+
+## Thesis
+
+Agents previously only knew how to talk (plus a closed list of tools). A finite verb catalog only moves the wall. The fix is **open generation, closed execution**: any agent can draft an arbitrary durable action at runtime, but nothing executes until Adam confirms the concrete diff. `os.propose-action` is the default path; named shortcuts are fast lanes for frequent actions.
+
+Safety comes from:
+- per-agent **path allowlists** (not per-verb approval weeks in advance)
+- proposals as **inert declarative data** (no shell, network, or code)
+- **Confirm shows the real diff**
+- every executed/rejected proposal lands in the **Governance Log**
+
+Persona voice is unchanged.
+
+## Glossary (keep separate)
+
+| Term | Means |
+|------|--------|
+| Capacity | Ability to make a durable change (`os.propose-action` + shortcuts) |
+| Skill | How well an agent performs inside a capacity (persona / training) |
+| Built intuition | Standing priors (`/intuition/` in Phase 3) — judgment, not availability |
+| Resourcing | Read-only reach (search, libraries, digests) |
+| Surfaces | Where output lands (Confirm, CN, tabs, Governance Log) |
+
+## Phase 0 deliverables
+
+1. `/capabilities` tree: schema, registry, `propose-action.json`, migrated shortcuts, per-agent allowlists
+2. Runtime loader (`buildAgentTools`) replaces hardcoded tool lists in `chat.mjs`
+3. `os_propose_action` tool: allowlist check → pending queue → Confirm card with diffs → confirm writes + Governance Log
+4. Protocol + persona line: agents never claim they lack the ability to act
+5. Existing shortcuts keep verbatim behaviour (`log_entry`, CN patch, governance append, food/exercise library saves)
+
+## Layout
+
+```
+/capabilities
+  schema.json
+  registry.json
+  propose-action.json
+  allowlists/{agent}.json
+  log/log-entry.json
+  publish/cn-patch.json
+  publish/governance-log-entry.json
+  lookup/save-food-library.json
+  lookup/save-exercise-library.json
+```
+
+Handlers live under `netlify/functions/_shared/capabilities/`.
+
+## Acceptance (Phase 0)
+
+- Ask any agent for something with no matching shortcut → Confirm card with visible path diffs (not a refusal)
+- Existing meal/workout logging still works via `log_entry`
+- Write paths outside the agent allowlist never reach Confirm
+
+## Open questions (Adam)
+
+1. Does `coordinate.request-cn-write` inherit risk class or always Confirm on Hammond's side?
+2. Where does `os.capability-scoreboard` live day to day?
+3. Default TTL for expiring research briefs — flat 30d or per-domain?
+4. Intuition files — Adam-only edits, or agents propose via Confirm?
+5. Widget template set size and pre-approval before publish?
+6. Intent router — separate cheap model call vs first pass in the same call?
+7. Who owns challenge close-out disputes when auto-judge ≠ Adam's sense of the week?
+
+## Phases 1–3
+
+See the full thesis in the originating brief: Remember/Track/Publish P0 shortcuts + capability loans; research artifacts + surface widgets; intuition packs + intent router + shortcut promotion.

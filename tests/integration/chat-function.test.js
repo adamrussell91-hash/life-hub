@@ -3128,3 +3128,87 @@ test('non-Vera agents do not receive mind repo read tools', async () => {
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'get_mind_session'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'search_mind_records'));
 });
+
+test('every agent receives os_propose_action and Brisket can propose an allowlisted challenge write', async () => {
+  let receivedArgs;
+  const puts = [];
+  const fetchImpl = async (url, options) => {
+    if (options?.method === 'PUT') {
+      puts.push({ url });
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        receivedArgs = args;
+        yield { type: 'text', delta: 'Opening that tracker.' };
+        const result = await args.executeTools({
+          id: 'call_act',
+          name: 'os_propose_action',
+          input: {
+            intent: 'open a 7-day no-refined-sugar tracker',
+            writes: [{
+              path: 'data/challenges/2026-08-01-no-sugar.json',
+              mode: 'create',
+              content: JSON.stringify({ title: 'No refined sugar', duration_days: 7 }, null, 2),
+              diff: 'new challenge file'
+            }]
+          }
+        });
+        assert.equal(JSON.parse(result).status, 'awaiting_confirm');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Brisket, open a no-sugar week tracker',
+    priorAgentSlug: 'brisket'
+  }))));
+
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'os_propose_action'));
+  assert.match(receivedArgs.system, /os_propose_action/);
+  const card = events.find(event => event.type === 'action_proposal');
+  assert.ok(card, 'expected action_proposal SSE event');
+  assert.equal(card.proposal.intent, 'open a 7-day no-refined-sugar tracker');
+  assert.equal(card.proposal.writes[0].path, 'data/challenges/2026-08-01-no-sugar.json');
+  assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
+});
+
+test('os_propose_action rejects Brisket writes outside allowlist without a Confirm card', async () => {
+  const liveHandler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      async *streamMessage({ executeTools }) {
+        const result = await executeTools({
+          id: 'call_bad',
+          name: 'os_propose_action',
+          input: {
+            intent: 'rewrite medical constraints',
+            writes: [{ path: 'central-node.md', mode: 'overwrite', content: '# nope' }]
+          }
+        });
+        assert.equal(JSON.parse(result).error, 'write_path_denied');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await liveHandler(request({
+    message: 'Brisket, rewrite central node',
+    priorAgentSlug: 'brisket'
+  }))));
+  assert.ok(!events.some(event => event.type === 'action_proposal'));
+});

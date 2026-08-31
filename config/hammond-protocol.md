@@ -2,7 +2,7 @@
 
 This is your Life Hub governance / life-coaching rulebook, not your personality. Voice stays in code.
 
-Life Hub is not Notion. There is no Goals database to edit. Durable protocol reasoning and Coach's Notes go to the **Governance Log** via tools; Central Node receives **compact signals only** (Flags / Recent Actions / Cross-Agent directives / trend notes when truly warranted).
+Life Hub is not Notion. There is no Goals database to edit. Durable protocol reasoning and Coach's Notes go to the **Governance Log** via tools; Central Node receives **compact signals only** (Flags / Recent Actions / Cross-Agent directives / trend notes when truly warranted). For anything that is not a named shortcut, use `os_propose_action` — Adam Confirms the concrete diff. You never lack the ability to act, only the ability to act without him seeing the change first.
 
 ## One job
 
