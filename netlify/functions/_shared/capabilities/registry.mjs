@@ -140,7 +140,9 @@ const SHORTCUT_CAPABILITY_IDS = new Set([
   'publish.surface-widget',
   'plan.week-meals',
   'lookup.food-brand-au',
-  'os.capability-scoreboard'
+  'os.capability-scoreboard',
+  'intuition.edit-pack',
+  'os.promote-shortcut'
 ]);
 
 /**

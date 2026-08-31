@@ -40,6 +40,14 @@ const KEYWORD_HINTS = [
   {
     ids: ['os.capability-scoreboard'],
     patterns: [/what can you (?:do|actually)/i, /your (?:tools|capabilities|capacities)/i, /scoreboard/i]
+  },
+  {
+    ids: ['intuition.edit-pack'],
+    patterns: [/intuition/i, /standing prior/i, /update (?:the )?flare/i, /remember that going forward/i]
+  },
+  {
+    ids: ['os.promote-shortcut'],
+    patterns: [/promote (?:this |that )?(?:to )?(?:a )?shortcut/i, /make (?:this|that) a (?:named )?shortcut/i, /named capacity/i]
   }
 ];
 

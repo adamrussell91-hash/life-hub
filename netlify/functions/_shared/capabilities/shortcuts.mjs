@@ -38,6 +38,7 @@ import {
   CENTRAL_NODE_SECTIONS,
   classifyCentralNodePatchRisk
 } from '../../../../js/core/central-node-patch.js';
+import { applyIntuitionEdit } from './intuition.mjs';
 
 const CN_OPS = ['upsert_field', 'append_line', 'replace_section', 'delete_lines', 'condense'];
 
@@ -279,6 +280,38 @@ export function shortcutSchemas() {
         properties: {
           detail: { type: 'boolean' }
         },
+        additionalProperties: false
+      }
+    },
+    intuition_edit_pack: {
+      name: 'intuition_edit_pack',
+      description: 'Update a standing intuition pack this agent owns (judgment only — never gates capacity). Auto when allowlisted.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          pack_id: { type: 'string', description: 'Existing intuition pack id, e.g. flare-rules' },
+          summary: { type: 'string' },
+          guidance: { type: 'string' },
+          reason: { type: 'string', description: 'Why this prior is changing' }
+        },
+        required: ['pack_id', 'reason'],
+        additionalProperties: false
+      }
+    },
+    os_promote_shortcut: {
+      name: 'os_promote_shortcut',
+      description: 'Propose promoting a repeated durable pattern into a named shortcut draft for Adam to Confirm (does not mutate the live registry).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          proposed_id: { type: 'string', description: 'e.g. track.morning-weigh-in' },
+          tool_name: { type: 'string' },
+          summary: { type: 'string' },
+          example_intent: { type: 'string' },
+          example_writes: { type: 'array', items: { type: 'object' } },
+          risk: { type: 'string', enum: ['auto', 'confirm'] }
+        },
+        required: ['proposed_id', 'summary', 'example_intent'],
         additionalProperties: false
       }
     }
@@ -682,11 +715,93 @@ async function handleOsCapabilityScoreboard(ctx, input) {
   });
 }
 
-/**
- * @param {string} toolName
- * @param {object} input
- * @param {{ client, agentSlug, today, repoTree, readBlob }} ctx
- */
+
+
+
+
+async function handleIntuitionEditPack(ctx, input) {
+  const packId = String(input.pack_id || '').trim();
+  const reason = String(input.reason || '').trim();
+  if (!packId || !reason) return deny('pack_id and reason are required');
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(packId)) return deny('pack_id must be a kebab-case id');
+  const path = `intuition/${packId}.json`;
+  const { value: existing, sha } = await readJson(ctx, path, null);
+  if (!existing || typeof existing !== 'object') {
+    return deny(`Intuition pack not found: ${packId}`);
+  }
+  const agents = Array.isArray(existing.agents) ? existing.agents : [];
+  if (agents.length && !agents.includes(ctx.agentSlug) && !agents.includes('*')) {
+    return deny(`Agent ${ctx.agentSlug} does not own intuition pack ${packId}`);
+  }
+  const patched = applyIntuitionEdit(existing, {
+    id: packId,
+    summary: input.summary,
+    guidance: input.guidance
+  });
+  if (!patched) return deny('Invalid intuition edit');
+  if (typeof input.guidance === 'string' && input.guidance.trim()) {
+    patched.guidance = input.guidance.trim();
+  }
+  if (typeof input.summary === 'string' && input.summary.trim()) {
+    patched.summary = input.summary.trim();
+  }
+  patched.updated_at = new Date().toISOString();
+  patched.updated_by = ctx.agentSlug;
+  patched.last_edit_reason = reason;
+  await writeAllowlisted(
+    ctx.client,
+    ctx.agentSlug,
+    path,
+    serializeJson(patched),
+    `intuition: edit ${packId}`,
+    sha
+  );
+  return ok(`Updated intuition pack ${packId}`, { path, pack_id: packId, reason });
+}
+
+async function handleOsPromoteShortcut(ctx, input) {
+  const proposedId = String(input.proposed_id || '').trim();
+  const summary = String(input.summary || '').trim();
+  const exampleIntent = String(input.example_intent || '').trim();
+  if (!proposedId || !summary || !exampleIntent) {
+    return deny('proposed_id, summary, and example_intent are required');
+  }
+  if (!/^[a-z][a-z0-9]*(?:\.[a-z0-9-]+)+$/.test(proposedId)) {
+    return deny('proposed_id must look like area.name (e.g. track.morning-weigh-in)');
+  }
+  const toolName = String(input.tool_name || proposedId.replace(/\./g, '_').replace(/-/g, '_'));
+  const risk = input.risk === 'auto' ? 'auto' : 'confirm';
+  const id = newId('promo');
+  const path = `${OS_DIR}/promoted-shortcuts/${slugify(proposedId)}.json`;
+  const body = {
+    id,
+    proposed_id: proposedId,
+    tool_name: toolName,
+    summary,
+    example_intent: exampleIntent,
+    example_writes: Array.isArray(input.example_writes) ? input.example_writes : [],
+    risk,
+    status: 'pending_adam',
+    proposed_by: ctx.agentSlug,
+    created_at: new Date().toISOString(),
+    note: 'Draft only — does not mutate capabilities/registry until Adam confirms and a follow-up lands the live def.'
+  };
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Promote shortcut: ${proposedId}`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes: [{
+        path,
+        mode: 'create',
+        content: serializeJson(body),
+        diff: `${proposedId} (${risk}) — ${summary}`
+      }]
+    })
+  );
+}
+
+
 export async function executeShortcut(toolName, input, ctx) {
   if (!shortcutSchemas()[toolName]) return deny(`Unknown shortcut: ${toolName}`);
   try {
@@ -715,6 +830,10 @@ export async function executeShortcut(toolName, input, ctx) {
         return await handleLookupFoodBrandAu(ctx, input);
       case 'os_capability_scoreboard':
         return await handleOsCapabilityScoreboard(ctx, input);
+      case 'intuition_edit_pack':
+        return await handleIntuitionEditPack(ctx, input);
+      case 'os_promote_shortcut':
+        return await handleOsPromoteShortcut(ctx, input);
       default:
         return deny(`Unhandled shortcut: ${toolName}`);
     }

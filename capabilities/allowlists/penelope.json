@@ -6,7 +6,8 @@
     "data/remember/**",
     "data/research/**",
     "data/widgets/**",
-    "data/os/**"
+    "data/os/**",
+    "intuition/**"
   ],
   "read_globs": [
     "data/mind/**",
@@ -15,6 +16,7 @@
     "data/research/**",
     "central-node.md",
     "data/widgets/**",
-    "data/os/**"
+    "data/os/**",
+    "intuition/**"
   ]
 }

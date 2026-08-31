@@ -3212,3 +3212,51 @@ test('os_propose_action rejects Brisket writes outside allowlist without a Confi
   }))));
   assert.ok(!events.some(event => event.type === 'action_proposal'));
 });
+
+test('Brisket track_open_challenge yields action_proposal Confirm card', async () => {
+  let receivedArgs;
+  const puts = [];
+  const fetchImpl = async (url, options) => {
+    if (options?.method === 'PUT') {
+      puts.push({ url });
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  // Keep now within the fixture session lifetime (issued 2026-08-01; expires exactly 30d later).
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        receivedArgs = args;
+        yield { type: 'text', delta: 'Opening that challenge.' };
+        const result = await args.executeTools({
+          id: 'call_track',
+          name: 'track_open_challenge',
+          input: { title: 'No refined sugar', goal: '7 days clean' }
+        });
+        assert.equal(JSON.parse(result).status, 'awaiting_confirm');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Brisket, open a no-sugar challenge for me this week',
+    priorAgentSlug: 'brisket'
+  }))));
+
+  assert.ok(receivedArgs, 'expected Anthropic streamMessage to run');
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'track_open_challenge'));
+  const card = events.find(event => event.type === 'action_proposal');
+  assert.ok(card, 'expected action_proposal SSE event from track shortcut');
+  assert.match(card.proposal.intent, /challenge/i);
+  assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
+});

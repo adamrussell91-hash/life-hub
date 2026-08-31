@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "generated_from": "capability definition files (single source of truth)",
   "capabilities": {
     "os.propose-action": {
@@ -255,6 +255,30 @@
         "chat"
       ],
       "tool_name": "os_capability_scoreboard"
+    },
+    "intuition.edit-pack": {
+      "file": "intuition/edit-pack.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "agent_context",
+        "governance_log"
+      ],
+      "tool_name": "intuition_edit_pack"
+    },
+    "os.promote-shortcut": {
+      "file": "os/promote-shortcut.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "os_promote_shortcut"
     }
   }
 }

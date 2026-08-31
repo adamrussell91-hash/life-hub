@@ -7,7 +7,8 @@
     "data/research/**",
     "data/exercise-library.json",
     "data/widgets/**",
-    "data/os/**"
+    "data/os/**",
+    "intuition/**"
   ],
   "read_globs": [
     "data/fitness/**",
@@ -17,6 +18,7 @@
     "data/exercise-library.json",
     "central-node.md",
     "data/widgets/**",
-    "data/os/**"
+    "data/os/**",
+    "intuition/**"
   ]
 }

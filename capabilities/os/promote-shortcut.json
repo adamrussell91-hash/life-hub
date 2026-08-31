@@ -1,0 +1,15 @@
+{
+  "id": "os.promote-shortcut",
+  "tool_name": "os_promote_shortcut",
+  "verb": "OS",
+  "agents": [
+    "*"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Promote a repeated propose-action pattern into a draft named shortcut for Adam to Confirm. Does not publish into the live registry until he approves.",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}
