@@ -1,0 +1,15 @@
+{
+  "id": "research.expiring-brief",
+  "tool_name": "research_expiring_brief",
+  "verb": "Research",
+  "agents": [
+    "*"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Save a research brief with a domain-specific expiry (clinical lasts longer than retail pricing).",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}

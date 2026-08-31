@@ -1,0 +1,22 @@
+{
+  "id": "publish.surface-widget",
+  "tool_name": "publish_surface_widget",
+  "verb": "Publish",
+  "agents": [
+    "brisket",
+    "chadwick",
+    "hammond",
+    "sara",
+    "hyaluronica",
+    "penelope",
+    "vera"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Publish a small typed widget to a hub tab using an Adam-approved template only \u2014 never arbitrary HTML.",
+  "surfaces": [
+    "confirm_card",
+    "hub_tab",
+    "governance_log"
+  ]
+}

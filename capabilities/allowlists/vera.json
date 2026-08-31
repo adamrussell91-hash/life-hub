@@ -4,7 +4,9 @@
     "data/mind/**",
     "data/challenges/**",
     "data/remember/**",
-    "data/research/**"
+    "data/research/**",
+    "data/widgets/**",
+    "data/os/**"
   ],
   "read_globs": [
     "data/mind/**",
@@ -12,6 +14,8 @@
     "data/remember/**",
     "data/research/**",
     "central-node.md",
-    "data/governance/governance-log.md"
+    "data/governance/governance-log.md",
+    "data/widgets/**",
+    "data/os/**"
   ]
 }

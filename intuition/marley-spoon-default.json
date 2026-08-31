@@ -1,0 +1,12 @@
+{
+  "id": "marley-spoon-default",
+  "agents": [
+    "brisket"
+  ],
+  "capacities": [
+    "plan.week-meals",
+    "log.entry"
+  ],
+  "summary": "Marley Spoon is the default dinner most weeknights.",
+  "guidance": "Treat it as the anchor, not something to improve on. Search the specific recipe by name when logging."
+}

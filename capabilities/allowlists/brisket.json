@@ -5,7 +5,9 @@
     "data/challenges/**",
     "data/remember/**",
     "data/research/**",
-    "data/food-library.json"
+    "data/food-library.json",
+    "data/widgets/**",
+    "data/os/**"
   ],
   "read_globs": [
     "data/nutrition/**",
@@ -13,7 +15,9 @@
     "data/remember/**",
     "data/research/**",
     "data/food-library.json",
-    "central-node.md"
+    "central-node.md",
+    "data/widgets/**",
+    "data/os/**"
   ],
   "notes": "Nutrition domain writes plus short-horizon trackers. Central Node remains read-only here; CN mutations go through coordinate.request-cn-write (Phase 1) or Hammond."
 }

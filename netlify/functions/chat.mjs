@@ -88,6 +88,8 @@ import {
   addPendingAction,
   validateProposeActionInput
 } from './_shared/capabilities/propose-action.mjs';
+import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
+import { loadIntuitionFor, formatIntuitionForPrompt } from './_shared/capabilities/intuition.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -270,7 +272,8 @@ export function createChatHandler({
       needsExerciseLibrary,
       needsSkincareLibrary,
       needsHammondTools,
-      needsVeraMindTools: slug === 'vera'
+      needsVeraMindTools: slug === 'vera',
+      message: parsed.message
     });
 
     const stream = new ReadableStream({
@@ -715,6 +718,8 @@ export function createChatHandler({
         const skincareRoutines = needsSkincareLibrary
           ? formatSkincareRoutinesForPrompt(skincareMembership, skincareLibrary)
           : '';
+        const intuitionPacks = loadIntuitionFor({ agentSlug: slug });
+        const intuitionPrompt = formatIntuitionForPrompt(intuitionPacks);
         const system = buildSystemPrompt({
           slug,
           digest,
@@ -751,7 +756,8 @@ export function createChatHandler({
           onThisDay,
           daysSinceLastEntry,
           daysSinceLastMindSession,
-          protocolSteer: protocolSteerBlock(slug, parsed.protocolId)
+          protocolSteer: protocolSteerBlock(slug, parsed.protocolId),
+          intuition: intuitionPrompt
         });
 
         let pendingLogRejection = null;
@@ -1066,6 +1072,41 @@ export function createChatHandler({
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
               }
+              
+              if (isShortcutTool(event.name)) {
+                const shortcutResult = await executeShortcut(event.name, event.input ?? {}, {
+                  client,
+                  agentSlug: slug,
+                  today,
+                  repoTree,
+                  readBlob: async sha => decodeBlob(await client.readBlob(sha))
+                });
+                if (shortcutResult.kind === 'propose' || shortcutResult.kind === 'loan_confirm') {
+                  const proposalInput = shortcutResult.proposal;
+                  const validated = validateProposeActionInput(proposalInput, { agentSlug: slug });
+                  if (!validated.ok) {
+                    return JSON.stringify({
+                      ok: false,
+                      error: validated.error,
+                      ...(validated.detail ? { detail: validated.detail } : {})
+                    });
+                  }
+                  const pendingId = await proposeOsAction(validated.proposal);
+                  return JSON.stringify({
+                    ok: true,
+                    status: 'awaiting_confirm',
+                    intent: validated.proposal.intent,
+                    writes: validated.proposal.writes.map(write => ({
+                      path: write.path,
+                      mode: write.mode,
+                      diff: write.diff
+                    })),
+                    ...(pendingId ? { pendingId } : {}),
+                    ...(shortcutResult.loan ? { loan: shortcutResult.loan } : {})
+                  });
+                }
+                return JSON.stringify(shortcutResult);
+              }
               if (event.name === 'os_propose_action') {
                 const validated = validateProposeActionInput(event.input, { agentSlug: slug });
                 if (!validated.ok) {
@@ -1124,6 +1165,21 @@ export function createChatHandler({
               const patch = validateCentralNodePatchInput(event.input);
               if (patch && classifyCentralNodePatchRisk(patch) === 'confirm') {
                 await proposeCentralNodePatch(patch);
+              } else {
+                send(event);
+              }
+            } else if (event.type === 'tool_call' && isShortcutTool(event.name)) {
+              const shortcutResult = await executeShortcut(event.name, event.input ?? {}, {
+                client,
+                agentSlug: slug,
+                today,
+                repoTree,
+                readBlob: async sha => decodeBlob(await client.readBlob(sha))
+              });
+              if (shortcutResult.kind === 'propose' || shortcutResult.kind === 'loan_confirm') {
+                const validated = validateProposeActionInput(shortcutResult.proposal, { agentSlug: slug });
+                if (validated.ok) await proposeOsAction(validated.proposal);
+                else send({ type: 'action_rejected', error: validated.error, ...(validated.detail ? { detail: validated.detail } : {}) });
               } else {
                 send(event);
               }

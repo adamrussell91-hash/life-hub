@@ -6,11 +6,15 @@
     "data/hammond/**",
     "data/challenges/**",
     "data/remember/**",
-    "data/research/**"
+    "data/research/**",
+    "data/widgets/**",
+    "data/os/**"
   ],
   "read_globs": [
     "central-node.md",
-    "data/**"
+    "data/**",
+    "data/widgets/**",
+    "data/os/**"
   ],
   "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1."
 }
