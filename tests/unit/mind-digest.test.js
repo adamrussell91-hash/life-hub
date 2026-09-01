@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addCalendarDays } from '../../js/core/time.js';
+import { addCalendarDays } from '../../apps/life/js/core/time.js';
 import {
   MIND_DIGEST_WINDOW_DAYS,
   getMindDigestWindowStart,

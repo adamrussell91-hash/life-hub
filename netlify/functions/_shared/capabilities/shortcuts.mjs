@@ -37,7 +37,7 @@ import {
 import {
   CENTRAL_NODE_SECTIONS,
   classifyCentralNodePatchRisk
-} from '../../../../js/core/central-node-patch.js';
+} from '../../../../apps/life/js/core/central-node-patch.js';
 import { applyIntuitionEdit } from './intuition.mjs';
 import { validateProposeActionInput } from './propose-action.mjs';
 

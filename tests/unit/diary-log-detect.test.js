@@ -4,7 +4,7 @@ import {
   claimedDiaryFiling,
   isDiaryFinalize,
   shouldForcePenelopeDiaryProposal
-} from '../../js/core/diary-log-detect.js';
+} from '../../apps/life/js/core/diary-log-detect.js';
 
 test('isDiaryFinalize catches confirm/log/vault phrasing and bare Log', () => {
   for (const text of [

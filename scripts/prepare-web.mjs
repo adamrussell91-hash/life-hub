@@ -1,6 +1,7 @@
-import { copyFile, cp, mkdir, readdir, rm } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readdir, rm, readFile, writeFile } from 'node:fs/promises';
 
 const projectRoot = new URL('../', import.meta.url);
+const lifeRoot = new URL('../apps/life/', import.meta.url);
 const publishRoot = new URL('../dist/', import.meta.url);
 const publishedDirectories = ['assets', 'css', 'js'];
 const publishedFiles = ['index.html', 'manifest.webmanifest', 'service-worker.js'];
@@ -24,23 +25,43 @@ async function copyDesignKitModules() {
   );
 }
 
+async function rewritePublishedKitImports(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  await Promise.all(entries.map(async entry => {
+    const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory);
+    if (entry.isDirectory()) {
+      await rewritePublishedKitImports(next);
+      return;
+    }
+    if (!entry.name.endsWith('.js')) return;
+    const source = await readFile(next, 'utf8');
+    const published = source.replaceAll(
+      '../../../../packages/design-kit/',
+      '../../packages/design-kit/'
+    );
+    if (published !== source) await writeFile(next, published);
+  }));
+}
+
 export async function prepareWeb() {
   await rm(publishRoot, { recursive: true, force: true });
   await mkdir(publishRoot, { recursive: true });
 
   await Promise.all([
     ...publishedDirectories.map(directory => cp(
-      new URL(`${directory}/`, projectRoot),
+      new URL(`${directory}/`, lifeRoot),
       new URL(`${directory}/`, publishRoot),
       { recursive: true }
     )),
     ...publishedFiles.map(file => copyFile(
-      new URL(file, projectRoot),
+      new URL(file, lifeRoot),
       new URL(file, publishRoot)
     )),
     copyDesignKitStyles(),
     copyDesignKitModules()
   ]);
+
+  await rewritePublishedKitImports(new URL('js/', publishRoot));
 
   const vendorDirectory = new URL('vendor/', publishRoot);
   await mkdir(vendorDirectory, { recursive: true });

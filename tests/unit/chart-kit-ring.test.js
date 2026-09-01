@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRingTarget } from '../../js/app/chart-kit/ring.js';
+import { buildRingTarget } from '../../apps/life/js/app/chart-kit/ring.js';
 
 test('buildRingTarget maps complete/total into circumference and capped dashoffset', () => {
   const ring = buildRingTarget({ value: 1, target: 5 }, { size: 64, strokeWidth: 8 });

@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { comparePeriods } from '../../js/core/trends.js';
+import { comparePeriods } from '../../apps/life/js/core/trends.js';
 import {
   buildNutritionModel,
   PROTEIN_TREND_CONFIG,
   polyphenolVsAim
-} from '../../js/app/nutrition-model.js';
+} from '../../apps/life/js/app/nutrition-model.js';
 
 const records = [
   { type: 'meal', date: '2026-07-30', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420, calcium_mg: 380, polyphenol_score: 6 },

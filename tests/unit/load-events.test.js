@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'js-yaml';
-import { loadEventManifest } from '../../js/app/load-events.js';
+import { loadEventManifest } from '../../apps/life/js/app/load-events.js';
 
 const responses = new Map([
   ['/fixtures/manifest.json', {

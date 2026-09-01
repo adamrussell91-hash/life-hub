@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderMedical } from '../../js/app/render-medical.js';
+import { renderMedical } from '../../apps/life/js/app/render-medical.js';
 
 function el(tag = 'div') {
   const node = {

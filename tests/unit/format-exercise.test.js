@@ -6,7 +6,7 @@ import {
   formatExerciseSets,
   formatExerciseTitle,
   humanizeFieldLabel
-} from '../../js/app/format-exercise.js';
+} from '../../apps/life/js/app/format-exercise.js';
 
 test('formatExerciseTitle includes bench angle when present', () => {
   assert.equal(formatExerciseTitle({ name: 'Chest Press', bench_angle_deg: 0 }), 'Chest Press @ 0°');

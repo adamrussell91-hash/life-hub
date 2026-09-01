@@ -2,5 +2,5 @@
 export {
   PENELOPE_FORCE_DIARY_NUDGE,
   shouldForcePenelopeDiaryProposal
-} from '../../../js/core/log-finalize-detect.js';
+} from '../../../apps/life/js/core/log-finalize-detect.js';
 export { streamWithAgentLogForce as streamWithPenelopeDiaryForce } from './agent-log-force.mjs';

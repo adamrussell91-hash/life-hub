@@ -10,7 +10,7 @@ import {
   pickStatusLine,
   protocolSteerBlock,
   protocolsForSlug
-} from '../../js/app/agent-protocols.js';
+} from '../../apps/life/js/app/agent-protocols.js';
 
 test('every Life Hub agent has user-facing pills and 10–12 status lines', () => {
   const slugs = ['brisket', 'chadwick', 'hyaluronica', 'sara', 'penelope', 'vera', 'hammond'];

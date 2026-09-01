@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { packMasonry } from '../../js/app/chart-kit/masonry.js';
+import { packMasonry } from '../../apps/life/js/app/chart-kit/masonry.js';
 
 test('packMasonry fills short columns and never leaves a hole', () => {
   const packed = packMasonry(

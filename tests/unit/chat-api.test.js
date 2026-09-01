@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createChatApi } from '../../js/app/chat-api.js';
+import { createChatApi } from '../../apps/life/js/app/chat-api.js';
 
 function sseResponse(frames) {
   const encoder = new TextEncoder();

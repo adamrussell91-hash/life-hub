@@ -7,8 +7,8 @@ import {
   resolveActiveProducts,
   appendProduct,
   retireProduct
-} from '../../js/app/skincare-catalog.js';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+} from '../../apps/life/js/app/skincare-catalog.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
 
 test('SKINCARE_CATALOG_PATH is the GitHub blob path', () => {
   assert.equal(SKINCARE_CATALOG_PATH, 'data/skincare/routine-catalog.json');

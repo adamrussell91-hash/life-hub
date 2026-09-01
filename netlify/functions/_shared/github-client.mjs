@@ -1,4 +1,4 @@
-import { isCalendarDate } from '../../../js/core/time.js';
+import { isCalendarDate } from '../../../apps/life/js/core/time.js';
 
 const API_VERSION = '2026-03-10';
 const GITHUB_ORIGIN = 'https://api.github.com';

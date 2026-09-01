@@ -5,18 +5,18 @@ import {
   parseProductLibrary,
   seedProductLibraryFromDefaults,
   upgradeOtherProductCategories
-} from '../../../js/app/skincare-product-library.js';
+} from '../../../apps/life/js/app/skincare-product-library.js';
 import {
   SKINCARE_ROUTINE_MEMBERSHIP_PATH,
   migrateMembershipFromCatalog,
   parseMembership,
   seedMembershipFromDefaults
-} from '../../../js/app/skincare-routine-membership.js';
+} from '../../../apps/life/js/app/skincare-routine-membership.js';
 import {
   SKINCARE_CATALOG_PATH,
   parseCatalog
-} from '../../../js/app/skincare-catalog.js';
-import { SKINCARE_ROUTINES } from '../../../js/app/skincare-routines-data.js';
+} from '../../../apps/life/js/app/skincare-catalog.js';
+import { SKINCARE_ROUTINES } from '../../../apps/life/js/app/skincare-routines-data.js';
 
 function findBlob(tree, path) {
   return tree.find(item => item.path === path && item.type === 'blob');

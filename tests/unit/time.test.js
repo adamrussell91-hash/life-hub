@@ -5,7 +5,7 @@ import {
   formatDisplayDate, formatShortMonth, formatWeekday,
   getSydneyDateKey, getSydneyTimestamp, getSydneyWeekStart, isCalendarDate,
   sydneyLocalStamp
-} from '../../js/core/time.js';
+} from '../../apps/life/js/core/time.js';
 
 test('Sydney date key crosses the spring DST boundary by calendar date', () => {
   assert.equal(getSydneyDateKey(new Date('2026-10-03T15:30:00Z')), '2026-10-04');

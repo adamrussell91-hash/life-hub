@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { categoryNote, explainerFor } from '../../js/app/bloods-explainers.js';
+import { categoryNote, explainerFor } from '../../apps/life/js/app/bloods-explainers.js';
 
 test('explainerFor returns seeded copy for CRP and related markers', () => {
   const crp = explainerFor('crp');

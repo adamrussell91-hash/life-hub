@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setChatUnread } from '../../js/app/render-chat.js';
+import { setChatUnread } from '../../apps/life/js/app/render-chat.js';
 
 const UNREAD_SELECTOR = '.floating-chat-button, [data-section="chat"]';
 

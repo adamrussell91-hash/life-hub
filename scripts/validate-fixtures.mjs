@@ -1,9 +1,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { load } from 'js-yaml';
-import { parseEventDocument } from '../js/core/records.js';
-import { aggregateNutrition, calculateWorkoutStreak, resolveDayType } from '../js/core/aggregate.js';
-import { validateUniqueIds } from '../js/core/validate.js';
+import { parseEventDocument } from '../apps/life/js/core/records.js';
+import { aggregateNutrition, calculateWorkoutStreak, resolveDayType } from '../apps/life/js/core/aggregate.js';
+import { validateUniqueIds } from '../apps/life/js/core/validate.js';
 
 async function files(dir) {
   const entries = await readdir(dir, { withFileTypes: true });

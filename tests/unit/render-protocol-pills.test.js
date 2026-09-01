@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderProtocolPills } from '../../js/app/render-protocol-pills.js';
+import { renderProtocolPills } from '../../apps/life/js/app/render-protocol-pills.js';
 
 class FakeClassList {
   constructor(owner) {

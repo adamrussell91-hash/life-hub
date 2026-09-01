@@ -1,5 +1,5 @@
-import { daysBetween, isCalendarDate } from '../../../js/core/time.js';
-import { GOVERNANCE_LOG_PATH } from '../../../js/core/governance-log.js';
+import { daysBetween, isCalendarDate } from '../../../apps/life/js/core/time.js';
+import { GOVERNANCE_LOG_PATH } from '../../../apps/life/js/core/governance-log.js';
 import { isTemplatePath } from './workout-templates.mjs';
 
 export const CONFIG_PATHS = new Set([

@@ -16,7 +16,7 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { sydneyLocalStamp } from '../js/core/time.js';
+import { sydneyLocalStamp } from '../apps/life/js/core/time.js';
 import { parseBodyLogMarkdown } from './lib/body-log-import.mjs';
 import { parseBodyHistoryCsv } from './lib/body-history-csv-import.mjs';
 import { parseBloodsCsv } from './lib/bloods-csv-import.mjs';

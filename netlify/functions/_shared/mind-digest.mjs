@@ -1,4 +1,4 @@
-import { addCalendarDays, daysBetween } from '../../../js/core/time.js';
+import { addCalendarDays, daysBetween } from '../../../apps/life/js/core/time.js';
 
 export const MIND_DIGEST_WINDOW_DAYS = 30;
 const MIND_PATH = /^data\/mind\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;

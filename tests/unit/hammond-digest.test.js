@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addCalendarDays, enumerateDateKeys } from '../../js/core/time.js';
+import { addCalendarDays, enumerateDateKeys } from '../../apps/life/js/core/time.js';
 import {
   DOMAIN_PATH,
   WINDOW_DAYS,
@@ -12,7 +12,7 @@ import {
   summarizeHammondDigest,
   formatCentralNodeModelForPrompt
 } from '../../netlify/functions/_shared/hammond-digest.mjs';
-import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
+import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
 
 const TODAY = '2026-08-11';
 

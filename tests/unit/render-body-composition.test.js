@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderBody } from '../../js/app/render-body.js';
+import { renderBody } from '../../apps/life/js/app/render-body.js';
 
 function el() {
   const node = {

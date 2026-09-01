@@ -7,7 +7,7 @@ import {
   normalizeExerciseName,
   REGION_KEYS,
   resolveExerciseRegion
-} from '../../js/app/fitness-model.js';
+} from '../../apps/life/js/app/fitness-model.js';
 
 const workout = (overrides) => ({
   type: 'workout',

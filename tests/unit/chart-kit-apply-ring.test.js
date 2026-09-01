@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyRingTarget } from '../../js/app/chart-kit/apply-ring.js';
-import { buildRingTarget } from '../../js/app/chart-kit/ring.js';
+import { applyRingTarget } from '../../apps/life/js/app/chart-kit/apply-ring.js';
+import { buildRingTarget } from '../../apps/life/js/app/chart-kit/ring.js';
 
 function makeSvg() {
   const fillOffsets = [];

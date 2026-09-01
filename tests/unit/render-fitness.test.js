@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderFitness } from '../../js/app/render-fitness.js';
+import { renderFitness } from '../../apps/life/js/app/render-fitness.js';
 
 class FakeEl {
   constructor() {

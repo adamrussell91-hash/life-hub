@@ -1,11 +1,11 @@
 import {
   CHADWICK_FORCE_PLAN_NUDGE,
   shouldForceChadwickPlanProposal
-} from '../../../js/core/workout-plan-detect.js';
+} from '../../../apps/life/js/core/workout-plan-detect.js';
 import {
   buildPlannedWorkoutInput,
   findLatestWorkoutPlanText
-} from '../../../js/core/parse-workout-chat.js';
+} from '../../../apps/life/js/core/parse-workout-chat.js';
 
 export { CHADWICK_FORCE_PLAN_NUDGE, shouldForceChadwickPlanProposal };
 

@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const css = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '../../css/app.css'),
+  join(dirname(fileURLToPath(import.meta.url)), '../../apps/life/css/app.css'),
   'utf8'
 );
 

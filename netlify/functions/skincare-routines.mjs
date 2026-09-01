@@ -20,7 +20,7 @@ import {
   SKINCARE_ROUTINE_MEMBERSHIP_PATH,
   addToRoutine,
   removeFromRoutine
-} from '../../js/app/skincare-routine-membership.js';
+} from '../../apps/life/js/app/skincare-routine-membership.js';
 import { loadOrSeedLibrary, loadOrSeedMembership, writeJson } from './_shared/skincare-store.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };

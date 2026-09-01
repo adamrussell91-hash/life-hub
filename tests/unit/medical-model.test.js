@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMedicalModel, mapsUrl } from '../../js/app/medical-model.js';
+import { buildMedicalModel, mapsUrl } from '../../apps/life/js/app/medical-model.js';
 
 function visit(overrides = {}) {
   return {

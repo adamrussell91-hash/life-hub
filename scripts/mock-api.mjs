@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dump } from 'js-yaml';
 import { parseDateRange, CONFIG_PATHS } from '../netlify/functions/_shared/repo-policy.mjs';
-import { TYPE_DOMAINS } from '../js/core/records.js';
+import { TYPE_DOMAINS } from '../apps/life/js/core/records.js';
 
 import { SESSION_MS } from '../netlify/functions/_shared/auth-security.mjs';
 
