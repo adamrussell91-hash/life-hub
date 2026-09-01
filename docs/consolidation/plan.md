@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v2.8 — auth lock merged (PR #57). Checkpoint-03 PASS. Next: route remaining function call sites through umbrella auth names.  
+> **Status:** v2.9 — auth call sites merged (PR #58). Checkpoint-04 PASS. Next slice: remount Life app source into `apps/life/` without changing Pages URLs or Netlify function paths.  
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
 ## Intent
@@ -188,13 +188,14 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v2.8 | auth lock merged; call-site migration next | Slice 03 merged 2026-09-01 as PR #57 |
+| Plan v2.9 | auth call sites merged; Life app remount next | Slice 04 merged 2026-09-01 as PR #58 |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
 | Claude checkpoint-01 | **PASS** | `checkpoints/checkpoint-01.md` — merge #55 |
 | Claude checkpoint-02 | **PASS** | `checkpoints/checkpoint-02.md` — merge #56 |
 | Claude checkpoint-03 | **PASS** | `checkpoints/checkpoint-03.md` — merge #57 |
+| Claude checkpoint-04 | **PASS** | `checkpoints/checkpoint-04.md` — merge #58 |
 | Deploy inventory | **filled** | See table above; `life-hub2` is absorb target |
 | Auth decision | **decided** | Retain Life Hub secrets |
 | Repo naming decision | **decided** | Reuse `life-hub`, leave as-is |
@@ -202,7 +203,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Umbrella seed | **shipped** | PR #55 merged; Life app still at repo root |
 | Kit remount | **shipped** | PR #56 merged 2026-09-01 |
 | Auth lock | **shipped** | PR #57 merged 2026-09-01 |
-| Auth call sites | **shipped (this PR)** | Slice 04 — remaining functions read cookie/secret via umbrella helpers |
+| Auth call sites | **shipped** | PR #58 merged 2026-09-01 |
+| Life app remount | in progress | Slice 05 — source in `apps/life/`; `dist/` URLs and `netlify/functions` paths unchanged |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -214,7 +216,6 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 ### Slice 01 — deferred to fold / remount steps
 
-- Move Life app into `apps/life/` (would break Pages workflow + Netlify `included_files` if done now)
 - Fold Teaching / Knowledge / Tasks code or Netlify sites
 - Wire calendar sources to any hub API or external feed
 - Unified auth handler / section routing skeleton beyond this stub
@@ -247,32 +248,22 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 - Cookie serialization in `auth-security.mjs` uses `UMBRELLA_SESSION_COOKIE`
 - Same env names and cookie value as today — no rotation, no `apps/life/` move
 
+### Slice 05 — Life app remount (this slice)
+
+Move Life shell **source** into `apps/life/` (`index.html`, `js/`, `css/`, `assets/`, `manifest.webmanifest`, `service-worker.js`).
+
+Keep deploy URLs and Netlify function **paths** stable:
+
+- `scripts/prepare-web.mjs` still publishes `dist/index.html`, `dist/js/`, `dist/css/`, `dist/assets/`
+- `.github/workflows/pages.yml` still uploads `dist/`
+- `netlify.toml` `directory = "netlify/functions"` and `included_files` stay at repo-root `config/`, `capabilities/`, `central-node.md`
+- Function files stay under `netlify/functions/`; only their `js/` import specifiers change to `apps/life/js/`
+
+Do **not** retarget `life-hub2`, fold other hubs, or rotate secrets.
+
 ## Next action
 
-Claude observe-only **checkpoint-04** against this call-site PR. Do not start `apps/life/` or fold other hubs until that report lands.
-
-Paste:
-
-```text
-You are the consolidation overseer at checkpoint-04. cwd = life-hub repo root.
-Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.8).
-
-Observe-only rules (hard):
-- Do NOT edit application code, move files, run destructive git, or commit.
-- You MAY create exactly one report:
-  docs/consolidation/checkpoints/checkpoint-04.md
-
-Inspect: the auth call-site PR vs main, and plan.md Slice 04 notes.
-Confirm: cookie/secret literals live only in umbrella-auth.mjs;
-LIFE_HUB_PASSPHRASE_HASH and SESSION_SECRET still the env names;
-no new secrets; netlify.toml unchanged; life-hub-data untouched;
-apps/life/ not moved.
-
-Write the report using the template in OVERSEER.md.
-End with: next 3 concrete steps for Cursor local agent — no patches.
-If auth, life-hub-data boundary, or public student URL safety looks wrong,
-open with DO NOT MERGE YET.
-```
+Finish Slice 05 as a PR against `main`. After merge, Claude observe-only **checkpoint-05**.
 
 
 ## Open questions (Adam)
