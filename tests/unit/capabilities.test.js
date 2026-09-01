@@ -387,6 +387,33 @@ test('capability scoreboard returns rows when asked', async () => {
   assert.ok(result.count >= 10);
 });
 
+test('capability scoreboard includes promoted shortcut drafts when detail is on', async () => {
+  const { ctx } = mockCtx('brisket');
+  const promote = await executeShortcut(
+    'os_promote_shortcut',
+    {
+      proposed_id: 'track.morning-weigh-in',
+      summary: 'Morning weigh-in tracker',
+      example_intent: 'log morning weight',
+      example_writes: [{
+        path: 'data/challenges/2026-08-31-weigh-in.json',
+        mode: 'create',
+        content: '{\n  "title": "Morning weigh-in"\n}\n'
+      }]
+    },
+    ctx
+  );
+  await ctx.client.writeFile({
+    path: promote.proposal.writes[0].path,
+    content: promote.proposal.writes[0].content,
+    message: 'seed promoted draft'
+  });
+  const result = await executeShortcut('os_capability_scoreboard', { detail: true }, ctx);
+  assert.equal(result.kind, 'ok');
+  assert.equal(result.promoted_shortcut_count, 1);
+  assert.equal(result.promoted_shortcuts[0].proposed_id, 'track.morning-weigh-in');
+});
+
 
 test('intuition_edit_pack updates owned pack for Sara', async () => {
   resetCapabilityCaches();
