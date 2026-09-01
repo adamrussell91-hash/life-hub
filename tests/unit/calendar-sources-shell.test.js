@@ -11,6 +11,6 @@ test('calendar dashboard includes a shared-source placeholder card', async () =>
   assert.match(chunk, /id="calendar-source-registry"/);
   assert.match(chunk, /data-calendar="sources-empty"/);
   assert.match(chunk, /id="calendar-source-list"/);
-  assert.match(chunk, /No shared sources yet/);
+  assert.match(chunk, /Shared sources/);
   assert.doesNotMatch(chunk, /teaching-api|knowledge-api|tasks-api/i);
 });

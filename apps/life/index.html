@@ -72,6 +72,10 @@
         <button class="nav-item hub-rail__link" type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/skincare.png" alt=""></span><span>Skincare</span></button>
         <button class="nav-item hub-rail__link" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/calendar.png" alt=""></span><span>Calendar</span></button>
         <button class="nav-item hub-rail__link" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/central-node.png" alt=""></span><span>Central Node</span></button>
+        <p class="nav-label">Hubs</p>
+        <button class="nav-item hub-rail__link" type="button" data-section="teaching"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span><span>Teaching</span></button>
+        <button class="nav-item hub-rail__link" type="button" data-section="knowledge"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5h6.5A3.5 3.5 0 0 1 15 9v10H8.5A3.5 3.5 0 0 0 5 15.5V5.5Z"/><path d="M15 9h4v10h-4"/></svg></span><span>Knowledge</span></button>
+        <button class="nav-item hub-rail__link" type="button" data-section="tasks"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h11M8 12h11M8 17h11"/><path d="m4.5 7 .8.8L7 6M4.5 12l.8.8L7 11"/></svg></span><span>Tasks</span></button>
       </nav>
 
       <div class="rail-footer">
@@ -607,7 +611,7 @@
 
           <article class="metric-card" id="calendar-source-registry" aria-label="Shared calendar sources">
             <p class="metric-label">Shared sources</p>
-            <p class="metric-caption" data-calendar="sources-empty">No shared sources yet. Teaching, Knowledge, and Tasks feeds are not wired.</p>
+            <p class="metric-caption" data-calendar="sources-empty">No shared sources yet.</p>
             <ul id="calendar-source-list" hidden></ul>
           </article>
         </section>
@@ -1001,6 +1005,25 @@
           <button id="central-node-audit-button" class="cn-audit-button" type="button">Run audit</button>
           <button id="central-node-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Hammond">💬</button>
         </section>
+
+        <section id="teaching-dashboard" class="dashboard" aria-label="Teaching" hidden>
+          <article class="metric-card">
+            <p class="metric-caption">SPA stays on GitHub Pages. Student URLs under <code>/s/</code> stay public and unauthenticated.</p>
+            <p data-hub-open="teaching"></p>
+          </article>
+        </section>
+
+        <section id="knowledge-dashboard" class="dashboard" aria-label="Knowledge" hidden>
+          <article class="metric-card">
+            <p class="metric-caption">Not folded. Knowledge API and the R2 archive are separate — neither is moved in this slice.</p>
+          </article>
+        </section>
+
+        <section id="tasks-dashboard" class="dashboard" aria-label="Tasks" hidden>
+          <article class="metric-card">
+            <p class="metric-caption">Not folded. Tasks Hub is not inventoried yet.</p>
+          </article>
+        </section>
       </main>
     </div>
 
@@ -1024,6 +1047,9 @@
           <button type="button" data-section="mind"><span class="nav-dot mind" aria-hidden="true"></span>Mind</button>
           <button type="button" data-section="skincare"><span class="nav-dot skincare" aria-hidden="true"></span>Skincare</button>
           <button type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true">◎</span>Central Node</button>
+          <button type="button" data-section="teaching">Teaching</button>
+          <button type="button" data-section="knowledge">Knowledge</button>
+          <button type="button" data-section="tasks">Tasks</button>
         </nav>
       </div>
     </dialog>

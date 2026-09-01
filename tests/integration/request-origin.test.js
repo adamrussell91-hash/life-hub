@@ -67,3 +67,14 @@ for (const [label, headers] of [
     assert.equal(providerCreates, 0);
   });
 }
+
+test('Teaching Pages origin is allowed on the umbrella API', async () => {
+  const handler = createSessionHandler({
+    env,
+    verifySessionToken: () => ({ valid: false })
+  });
+  const response = await handler(new Request('https://api.adam-russell.com/api/session', {
+    headers: { origin: 'https://teaching-hub.adam-russell.com' }
+  }));
+  assert.notEqual(response.status, 403);
+});

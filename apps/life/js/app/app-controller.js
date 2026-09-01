@@ -1,4 +1,5 @@
 import { getSydneyDateKey } from '../core/time.js';
+import { renderHubSection } from '../shell/render-hub-sections.js';
 import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
@@ -24,7 +25,10 @@ const MORE_SECTIONS = new Set([
   'body',
   'mind',
   'skincare',
-  'central-node'
+  'central-node',
+  'teaching',
+  'knowledge',
+  'tasks'
 ]);
 
 function clampDateToYearMonth(date, yearMonth) {
@@ -540,7 +544,10 @@ export function createAppController(dependencies) {
     'body-bloods': { eyebrow: 'Labs', title: 'Bloods' },
     'body-medical': { eyebrow: 'History', title: 'Medical Overview' },
     mind: { eyebrow: 'Mood and themes', title: 'Mind' },
-    'central-node': { eyebrow: 'Coordination hub', title: 'Central Node' }
+    'central-node': { eyebrow: 'Coordination hub', title: 'Central Node' },
+    teaching: { eyebrow: 'Classes and lessons', title: 'Teaching' },
+    knowledge: { eyebrow: 'Archive and research', title: 'Knowledge' },
+    tasks: { eyebrow: 'Board', title: 'Tasks' }
   };
 
   function closeMoreSheet() {
@@ -596,6 +603,9 @@ export function createAppController(dependencies) {
     const medical = root.querySelector('#body-medical-dashboard');
     const mind = root.querySelector('#mind-dashboard');
     const centralNode = root.querySelector('#central-node-dashboard');
+    const teaching = root.querySelector('#teaching-dashboard');
+    const knowledge = root.querySelector('#knowledge-dashboard');
+    const tasks = root.querySelector('#tasks-dashboard');
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
     if (fitness) fitness.hidden = name !== 'fitness';
@@ -606,6 +616,9 @@ export function createAppController(dependencies) {
     if (medical) medical.hidden = name !== 'body-medical';
     if (mind) mind.hidden = name !== 'mind';
     if (centralNode) centralNode.hidden = name !== 'central-node';
+    if (teaching) teaching.hidden = name !== 'teaching';
+    if (knowledge) knowledge.hidden = name !== 'knowledge';
+    if (tasks) tasks.hidden = name !== 'tasks';
     if (chat) chat.hidden = name !== 'chat' && !chatPanel?.isOpen?.();
   }
 
@@ -644,6 +657,7 @@ export function createAppController(dependencies) {
     if (name === 'body-medical') renderMedicalSection();
     if (name === 'mind') renderMindSection();
     if (name === 'central-node') renderCentralNodeSection();
+    if (name === 'teaching' || name === 'knowledge' || name === 'tasks') renderHubSection(root, name);
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const section = button.dataset.section;
       const active = section === name
