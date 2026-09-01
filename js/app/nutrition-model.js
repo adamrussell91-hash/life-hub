@@ -2,6 +2,10 @@ import { aggregateNutrition, hasRecoveryBonus, resolveDayType } from '../core/ag
 import { getDayTargets } from '../core/targets.js';
 import { comparePeriods } from '../core/trends.js';
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
+import {
+  activeChallengesForDate,
+  tallyChallenge
+} from '../core/nutrition-challenges.js';
 
 const WEEK_DAYS = 7;
 const MONTH_DAYS = 30;
@@ -55,7 +59,7 @@ const averageProtein = days => (
   days.length === 0 ? 0 : days.reduce((sum, day) => sum + day.protein_g, 0) / days.length
 );
 
-export function buildNutritionModel({ events, targetsConfig, date }) {
+export function buildNutritionModel({ events, targetsConfig, date, nutritionChallenges = null }) {
   if (!date) throw new RangeError('Nutrition display date is unavailable');
 
   const nutrition = aggregateNutrition(events, date);
@@ -107,6 +111,26 @@ export function buildNutritionModel({ events, targetsConfig, date }) {
     }
   }
 
+  const challenges = activeChallengesForDate(nutritionChallenges, date).map(challenge => {
+    const tally = tallyChallenge(challenge);
+    const days = enumerateDateKeys(challenge.start, challenge.end).map(day => ({
+      date: day,
+      result: challenge.days?.[day]?.result ?? 'pending',
+      note: challenge.days?.[day]?.note ?? null,
+      isToday: day === date
+    }));
+    return {
+      id: challenge.id,
+      title: challenge.title,
+      rule: challenge.rule,
+      start: challenge.start,
+      end: challenge.end,
+      status: challenge.status,
+      tally,
+      days
+    };
+  });
+
   return {
     date,
     nutrition,
@@ -119,6 +143,7 @@ export function buildNutritionModel({ events, targetsConfig, date }) {
     polyphenolVsAim: polyphenolVsAim(nutrition.polyphenol_score, targets.polyphenol_daily_aim),
     mealsToday,
     advice,
+    challenges,
     macroSplit: {
       calories: nutrition.calories,
       caloriesTarget: targets.calories,

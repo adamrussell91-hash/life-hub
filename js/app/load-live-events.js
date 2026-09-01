@@ -1,6 +1,10 @@
 import { parseEventDocument } from '../core/records.js';
 import { addCalendarDays, daysBetween, isCalendarDate } from '../core/time.js';
 import { GOVERNANCE_LOG_PATH } from '../core/governance-log.js';
+import {
+  NUTRITION_CHALLENGES_PATH,
+  parseNutritionChallenges
+} from '../core/nutrition-challenges.js';
 
 const TARGETS_PATH = 'config/targets.yml';
 const AGENTS_PATH = 'config/agents.yml';
@@ -92,6 +96,7 @@ export async function loadLiveEvents({
       agentsConfig: parsedFiles.agentsConfig,
       centralNodeMarkdown: parsedFiles.centralNodeMarkdown,
       governanceLogMarkdown: parsedFiles.governanceLogMarkdown,
+      nutritionChallenges: parsedFiles.nutritionChallenges,
       warnings: [...warnings, ...parsedFiles.warnings],
       commitSha,
       changed,
@@ -142,6 +147,8 @@ function createValidator(loadYaml) {
         loadYaml(file.content);
       } else if (file.path === CENTRAL_NODE_PATH || file.path === GOVERNANCE_LOG_PATH) {
         // Freeform markdown, no schema to violate -- any string content is acceptable.
+      } else if (file.path === NUTRITION_CHALLENGES_PATH) {
+        parseNutritionChallenges(file.content);
       } else if (EVENT_PATH.test(file.path)) {
         parseEventDocument(file.content, file.path, loadYaml);
       } else {
@@ -169,6 +176,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
   let agentsConfig = null;
   let centralNodeMarkdown = null;
   let governanceLogMarkdown = null;
+  let nutritionChallenges = null;
 
   for (const file of files) {
     const key = `${file.path}\0${file.sha}`;
@@ -185,13 +193,22 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
     else if (entry.kind === 'agents') agentsConfig = entry.value;
     else if (entry.kind === 'central_node') centralNodeMarkdown = entry.value;
     else if (entry.kind === 'governance_log') governanceLogMarkdown = entry.value;
+    else if (entry.kind === 'nutrition_challenges') nutritionChallenges = entry.value;
     else if (entry.kind === 'event') events.push(entry.value);
   }
 
   if (!files.some(file => file.path === TARGETS_PATH)) {
     warnings.push({ path: TARGETS_PATH, code: 'missing_targets' });
   }
-  return { events, targetsConfig, agentsConfig, centralNodeMarkdown, governanceLogMarkdown, warnings };
+  return {
+    events,
+    targetsConfig,
+    agentsConfig,
+    centralNodeMarkdown,
+    governanceLogMarkdown,
+    nutritionChallenges,
+    warnings
+  };
 }
 
 function parseFile(file, loadYaml) {
@@ -200,6 +217,9 @@ function parseFile(file, loadYaml) {
     if (file.path === AGENTS_PATH) return { kind: 'agents', value: loadYaml(file.content) };
     if (file.path === CENTRAL_NODE_PATH) return { kind: 'central_node', value: file.content };
     if (file.path === GOVERNANCE_LOG_PATH) return { kind: 'governance_log', value: file.content };
+    if (file.path === NUTRITION_CHALLENGES_PATH) {
+      return { kind: 'nutrition_challenges', value: parseNutritionChallenges(file.content) };
+    }
     if (EVENT_PATH.test(file.path)) {
       return { kind: 'event', value: parseEventDocument(file.content, file.path, loadYaml) };
     }
@@ -210,6 +230,7 @@ function parseFile(file, loadYaml) {
         path: file.path,
         code: file.path === TARGETS_PATH ? 'invalid_targets'
           : file.path === AGENTS_PATH ? 'invalid_agents'
+          : file.path === NUTRITION_CHALLENGES_PATH ? 'invalid_nutrition_challenges'
           : 'invalid_event'
       }
     };

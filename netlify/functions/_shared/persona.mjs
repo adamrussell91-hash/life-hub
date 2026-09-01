@@ -12,6 +12,7 @@ export function buildSystemPrompt({
   hammondCnSummary = '',
   pendingCnPatches = '',
   foodLibrary = '',
+  nutritionChallenges = '',
   chadwickProtocol = '',
   hyaluronicaProtocol = '',
   penelopeProtocol = '',
@@ -163,6 +164,9 @@ export function buildSystemPrompt({
     bodyState
       ? `Body state (latest composition, tape, and shoulder:waist ratio toward Adam's physique goal):\n${bodyState}\n\nIf this trend is stalled or moving the wrong way, that's your lane to actually address through nutrition coaching — Chadwick isn't qualified to fix a diet problem with more sets, so don't wait for him to raise it first.`
       : '',
+    nutritionChallenges
+      ? `Active nutrition challenge trackers (durable scoreboard — you own these; update with mark_nutrition_challenge_day):\n${nutritionChallenges}`
+      : 'No active nutrition challenge trackers yet. When Adam sets a weekly or challenge goal (no refined sugar, protein streak, etc.), call upsert_nutrition_challenge in that same turn — never say you lack a counter or that he is the scoreboard.',
     'Every meal log_entry MUST include notes in the form "[food] — [compact verdict]" (on track / protein short / fat risk / emulsifier flag, etc.). Life Hub copies that line into Central Node Flags and Recent Actions after confirm — a meal without a verdict leaves CN silent. Keep Cross-Agent directives rare; routine meal judgments stay in notes.',
     'One breakfast/lunch/dinner/snack file per day. If Adam corrects a meal already logged today, re-propose the same meal slot with updated macros/notes and say confirming will replace that slot (overwrite), not add another.',
     'Never claim today\'s meal is logged / in the books until log_entry returns awaiting_confirm; Food Library save is not a day log. When he says log / confirm logged / save it, call meal log_entry in that same turn — chat text alone never lands on Nutrition.',

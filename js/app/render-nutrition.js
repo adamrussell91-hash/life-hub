@@ -30,6 +30,7 @@ export function renderNutrition(root, model) {
 
   renderMacroSplit(root, model);
   renderMealsToday(root, model.mealsToday);
+  renderChallengeTrackers(root, model.challenges);
   renderMacroRings(root, model);
   const proteinGuide = model.week.find(day => day.proteinTarget > 0)?.proteinTarget ?? model.targets.protein_g;
   const fatGuide = model.week.find(day => day.fatCeiling > 0)?.fatCeiling ?? model.targets.fat_ceiling_g;
@@ -273,6 +274,59 @@ function renderMealsToday(root, mealsToday) {
     macros.textContent = `${meal.calories} kcal · ${meal.protein_g} g protein · ${meal.fat_g} g fat`;
     item.append(title, detail, macros);
     list.append(item);
+  }
+}
+
+function renderChallengeTrackers(root, challenges) {
+  const section = root.querySelector('#nutrition-challenges');
+  const list = root.querySelector('#nutrition-challenge-list');
+  if (!section || !list) return;
+  list.replaceChildren();
+  if (!challenges?.length) {
+    section.setAttribute('hidden', '');
+    return;
+  }
+  section.removeAttribute('hidden');
+  for (const challenge of challenges) {
+    const card = root.createElement('article');
+    card.className = 'nutrition-challenge';
+    card.dataset.challengeId = challenge.id;
+
+    const heading = root.createElement('div');
+    heading.className = 'nutrition-challenge__heading';
+    const title = root.createElement('strong');
+    title.textContent = challenge.title;
+    const tally = root.createElement('span');
+    tally.className = 'nutrition-challenge__tally';
+    tally.textContent = `${challenge.tally.clean} clean · ${challenge.tally.miss} miss · ${challenge.tally.pending} left`;
+    heading.append(title, tally);
+
+    const rule = root.createElement('p');
+    rule.className = 'nutrition-challenge__rule';
+    rule.textContent = challenge.rule;
+
+    const days = root.createElement('ol');
+    days.className = 'nutrition-challenge__days';
+    for (const day of challenge.days) {
+      const item = root.createElement('li');
+      item.className = 'nutrition-challenge__day';
+      item.dataset.result = day.result;
+      if (day.isToday) item.dataset.today = 'true';
+      const mark = root.createElement('span');
+      mark.className = 'nutrition-challenge__mark';
+      mark.textContent = day.result === 'clean' ? '✓' : day.result === 'miss' ? '✗' : '·';
+      const label = root.createElement('span');
+      label.className = 'nutrition-challenge__day-label';
+      label.textContent = weekdayLetter(day.date);
+      item.title = day.note
+        ? `${formatDisplayDate(day.date)}: ${day.result} — ${day.note}`
+        : `${formatDisplayDate(day.date)}: ${day.result}`;
+      item.append(mark, label);
+      days.append(item);
+    }
+
+    card.append(heading, rule, days);
+    list.append(card);
   }
 }
 
