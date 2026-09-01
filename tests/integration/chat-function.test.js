@@ -534,6 +534,77 @@ test('make the workout after Locking it in now emits a Confirm card immediately'
   assert.equal(proposal.record.exercises.at(-1).sets[0].reps, 20);
 });
 
+test('superset pairing and It is not there emits a Confirm card without calling the model', async () => {
+  let rounds = 0;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => {
+        rounds += 1;
+        return mockedStream([{ type: 'text', delta: 'Let me get this actually saved.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  const pairingPlan = [
+    'Pairing it your way:',
+    '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
+    '3&4 superset: Reverse Grip Incline Bench Press / One Handle Arm Triceps',
+    '5&6 superset: Biceps Curl / Overhead Triceps'
+  ].join('\n');
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: "It's not there.",
+    priorAgentSlug: 'chadwick',
+    history: [
+      { role: 'assistant', content: pairingPlan },
+      { role: 'assistant', content: 'Locking this in now with cues loaded for mid-session:' }
+    ]
+  }))));
+
+  assert.equal(rounds, 0);
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a Confirm card for the superset plan in history');
+  assert.equal(proposal.record.status, 'planned');
+  assert.equal(proposal.record.exercises.length, 6);
+  assert.equal(proposal.record.exercises[0].name, 'Bar Press');
+});
+
+test('a superset plan in the same Chadwick turn forces a Confirm card after the stream', async () => {
+  const pairingPlan = [
+    'Pairing it your way:',
+    '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
+    '3&4 superset: Reverse Grip Incline Bench Press / One Handle Arm Triceps'
+  ].join('\n');
+  let rounds = 0;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => {
+        rounds += 1;
+        return mockedStream([
+          { type: 'text', delta: `${pairingPlan}\n\nLocking this in now with cues loaded.` },
+          { type: 'done' }
+        ]);
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'go ahead',
+    priorAgentSlug: 'chadwick'
+  }))));
+
+  assert.equal(rounds, 1);
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a Confirm card when Chadwick dumps a superset plan without log_entry');
+  assert.equal(proposal.record.exercises.length, 4);
+});
+
 test('rejects an unauthenticated request', async () => {
   const handler = createChatHandler({ env: validEnv });
   const response = await handler(new Request('https://life.example/api/chat', {
