@@ -1,0 +1,14 @@
+{
+  "id": "os.list-promoted-shortcuts",
+  "tool_name": "os_list_promoted_shortcuts",
+  "verb": "OS",
+  "agents": [
+    "*"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "List Adam-confirmed promoted shortcut drafts under data/os (catalog only).",
+  "surfaces": [
+    "chat"
+  ]
+}

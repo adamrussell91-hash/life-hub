@@ -7,7 +7,7 @@
   ],
   "risk": "confirm",
   "kind": "capacity",
-  "prompt_one_liner": "Promote a repeated propose-action pattern into a draft named shortcut for Adam to Confirm. Does not publish into the live registry until he approves.",
+  "prompt_one_liner": "Promote a repeated propose-action pattern into a draft under data/os for Adam to Confirm. Run later via os.run-promoted-shortcut; does not mutate the live registry.",
   "surfaces": [
     "confirm_card",
     "governance_log"
