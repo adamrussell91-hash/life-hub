@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v115';
+const CACHE_NAME = 'life-hub-shell-v116';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -7,11 +7,11 @@ const SHELL_FILES = [
   '',
   'index.html',
   'css/app.css',
-  'design-kit/tokens.css',
-  'design-kit/overlays.css',
-  'design-kit/actions.css',
-  'design-kit/filters.css',
-  'design-kit/sign-in.css',
+  'packages/design-kit/tokens.css',
+  'packages/design-kit/overlays.css',
+  'packages/design-kit/actions.css',
+  'packages/design-kit/filters.css',
+  'packages/design-kit/sign-in.css',
   'js/app/main.js',
   'js/app/api-session.js',
   'js/app/app-controller.js',
@@ -23,8 +23,8 @@ const SHELL_FILES = [
   'js/app/bloods-model.js',
   'js/app/medical-model.js',
   'js/app/medical-controller.js',
-  'design-kit/js/hub-filter-menu.js',
-  'design-kit/js/format-display-date.js',
+  'packages/design-kit/js/hub-filter-menu.js',
+  'packages/design-kit/js/format-display-date.js',
   'js/app/bloods-explainers.js',
   'js/app/bloods-charts.js',
   'js/app/bloods-charts-layout.js',

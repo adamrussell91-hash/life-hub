@@ -198,7 +198,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Repo naming decision | **decided** | Reuse `life-hub`, leave as-is |
 | Design-kit mechanic | decided | Copy-then-freeze into `packages/design-kit/` |
 | Umbrella seed | **shipped** | PR #55 merged; Life app still at repo root |
-| Kit remount | in progress | Slice 02 — single source `packages/design-kit/`; published URL becomes `packages/design-kit/*` |
+| Kit remount | **shipped (this PR)** | Slice 02 — single source `packages/design-kit/`; published URL `packages/design-kit/*` |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -233,7 +233,29 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 ## Next action
 
-Finish Slice 02 (kit remount) as a PR against `main`. After merge, Claude observe-only **checkpoint-02**. Do not remount `apps/life/` or unify auth in the same PR.
+Claude observe-only **checkpoint-02** against this remount PR. Do not start `apps/life/` or auth unification until that report lands.
+
+Paste:
+
+```text
+You are the consolidation overseer at checkpoint-02. cwd = life-hub repo root.
+Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.6).
+
+Observe-only rules (hard):
+- Do NOT edit application code, move files, run destructive git, or commit.
+- You MAY create exactly one report:
+  docs/consolidation/checkpoints/checkpoint-02.md
+
+Inspect: the design-kit remount PR vs main, and plan.md Slice 02 notes.
+Confirm: root design-kit/ is gone; Pages publishes packages/design-kit/;
+netlify.toml / functions / secrets unchanged; life-hub-data untouched.
+
+Write the report using the template in OVERSEER.md.
+End with: next 3 concrete steps for Cursor local agent — no patches.
+If auth, life-hub-data boundary, or public student URL safety looks wrong,
+open with DO NOT MERGE YET.
+```
+
 
 ## Open questions (Adam)
 
