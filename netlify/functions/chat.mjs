@@ -307,6 +307,8 @@ export function createChatHandler({
           });
           if (validation.valid) {
             await persistOrProposeLogEntry({ client, slug, today, validation, send });
+          } else {
+            send({ type: 'record_rejected', errors: validation.errors });
           }
           send({ type: 'done' });
           controller.close();

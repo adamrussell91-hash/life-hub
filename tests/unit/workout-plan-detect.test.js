@@ -75,6 +75,18 @@ test('shouldForceChadwickPlanProposal fires when he claims saved without a numbe
   }), true);
 });
 
+test('shouldForceChadwickPlanProposal fires when he dumps a superset plan without claiming saved', () => {
+  const pairing = [
+    '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
+    '3&4 superset: Reverse Grip Incline Bench Press / One Handle Arm Triceps'
+  ].join('\n');
+  assert.equal(shouldForceChadwickPlanProposal({
+    userMessage: 'sounds good',
+    assistantText: pairing,
+    sawLogEntry: false
+  }), true);
+});
+
 test('shouldForceChadwickPlanProposal also fires when he claims locked and dumps a plan', () => {
   assert.equal(shouldForceChadwickPlanProposal({
     userMessage: 'you changed it from 8 to 6',
