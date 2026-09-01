@@ -116,6 +116,35 @@ test('forces a second Anthropic round when lock-in has no parseable plan', async
   assert.ok(events.some(event => event.type === 'tool_call' && event.name === 'log_entry'));
 });
 
+test('superset pairing with lock-in complaint emits log_entry without calling the model', async () => {
+  const anthropic = {
+    async *streamMessage() {
+      throw new Error('Anthropic must not run when superset plan is in history');
+    }
+  };
+  const pairingPlan = [
+    'Pairing it your way:',
+    '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
+    '3&4 superset: Reverse Grip Incline Bench Press / One Handle Arm Triceps',
+    '5&6 superset: Biceps Curl / Overhead Triceps'
+  ].join('\n');
+  const events = await collect(streamWithChadwickPlanForce(anthropic, {
+    slug: 'chadwick',
+    userMessage: "It's not there.",
+    today: '2026-08-29',
+    messages: [
+      { role: 'assistant', content: pairingPlan },
+      { role: 'assistant', content: 'Locking this in now with cues loaded for mid-session:' },
+      { role: 'user', content: "It's not there." }
+    ]
+  }));
+  const proposal = events.find(event => event.type === 'tool_call' && event.name === 'log_entry');
+  assert.ok(proposal, 'expected a Confirm card proposal from history');
+  assert.equal(proposal.input.fields.status, 'planned');
+  assert.equal(proposal.input.fields.exercises.length, 6);
+  assert.equal(proposal.input.fields.exercises[0].name, 'Bar Press');
+});
+
 test('does not force a second round once log_entry already ran', async () => {
   let calls = 0;
   const anthropic = {
