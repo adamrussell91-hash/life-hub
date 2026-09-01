@@ -91,12 +91,22 @@ Known env **names**:
 - **Teaching Hub API:** `TEACHING_HUB_PASSPHRASE_HASH`, `SESSION_SECRET`, `SITE_ORIGIN`, `ANTHROPIC_API_KEY` (later); cookie `teaching_hub_session`
 - **Umbrella (target — decide in plan step 2):** single passphrase hash env name TBD (e.g. `HUB_PASSPHRASE_HASH`), one `SESSION_SECRET`
 
+### Netlify (no secret values)
+
+Public URLs below are from **committed repo config** (2026-09-01). Netlify **dashboard site names** still need Adam.
+
+| Hub / API | Site name (Netlify dashboard) | Public Functions URL | `SITE_ORIGIN` (app origin) | Notes |
+|-----------|------------------------------|----------------------|----------------------------|--------|
+| Life Hub API | **AWAITING ADAM** | `https://api.adam-russell.com` | `https://life-hub.adam-russell.com` | Retarget candidate; source: `js/app/config.js` |
+| Teaching Hub API | **AWAITING ADAM** | `https://teaching-api.adam-russell.com` | `https://teaching-hub.adam-russell.com` | Fold later; source: `teaching-hub/README.md` |
+| Other | FILL_IN | FILL_IN | FILL_IN | |
+
 ### Cloudflare / R2
 
 | Resource | Name | Used by | Notes |
 |----------|------|---------|--------|
-| R2 bucket | `knowledge-hub-archive` (seen) | FILL_IN | |
-| Worker | `knowledge-hub-research` (seen) | FILL_IN | |
+| R2 bucket | `knowledge-hub-archive` | `knowledge-hub` repo (confirm) | Archive storage; bindings must be documented at Knowledge fold |
+| Worker | `knowledge-hub-research` | `knowledge-hub` repo (confirm) | Research edge; merge vs keep-separate decision at fold |
 | Other R2 / KV / D1 / Workers | FILL_IN | FILL_IN | |
 
 ### Local paths (Adam machine)
