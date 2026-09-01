@@ -737,11 +737,16 @@ async function handleOsCapabilityScoreboard(ctx, input) {
       one_liner: def?.prompt_one_liner || id
     };
   });
+  const detail = input.detail !== false;
+  const promoted = detail ? await handleOsListPromotedShortcuts(ctx, { limit: 12 }) : null;
   return ok(`Capability scoreboard for ${ctx.agentSlug}`, {
     agent_id: ctx.agentSlug,
     count: rows.length,
-    capabilities: input.detail === false ? rows.map(row => row.id) : rows,
-    registry_version: registry.version
+    capabilities: detail ? rows : rows.map(row => row.id),
+    registry_version: registry.version,
+    ...(detail && promoted?.kind === 'ok'
+      ? { promoted_shortcuts: promoted.drafts, promoted_shortcut_count: promoted.count }
+      : {})
   });
 }
 
