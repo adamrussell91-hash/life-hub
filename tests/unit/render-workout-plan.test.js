@@ -36,6 +36,31 @@ test('renderExercisePlanRow shows a thumb, title, set count, and chevron', () =>
   assert.equal(row.children[3].textContent, '›');
 });
 
+test('appendWorkoutPlanCard groups superset pairs under a labelled block', () => {
+  const root = new FakeRoot();
+  const host = new FakeEl('div');
+  appendWorkoutPlanCard(root, host, {
+    record: {
+      date: '2026-07-30',
+      title: 'Chest and Arms',
+      status: 'planned',
+      duration_min: 35,
+      exercises: [
+        { name: 'Bar Press', superset_group: 1, superset_label: '1&2 superset' },
+        { name: 'Cable Curl', superset_group: 1 },
+        { name: 'Bar Row', sets: [{}, {}] }
+      ]
+    }
+  });
+  const card = host.children[0];
+  const list = card.children[3];
+  assert.equal(list.children.length, 2);
+  assert.equal(list.children[0].className, 'workout-plan-card__group workout-plan-card__group--superset');
+  assert.equal(list.children[0].children[0].textContent, '1&2 superset');
+  assert.equal(list.children[0].children[1].children.length, 3);
+  assert.equal(list.children[1].className, 'workout-plan-card__row');
+});
+
 test('appendWorkoutPlanCard writes weekday, title, duration, and rows', () => {
   const root = new FakeRoot();
   const host = new FakeEl('div');

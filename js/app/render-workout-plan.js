@@ -1,6 +1,10 @@
 import { formatExerciseSetCount, formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
 import { muscleAssetPath, resolveExerciseThumbKey } from './muscle-maps.js';
 import { formatWeekday } from '../core/time.js';
+import {
+  formatSupersetBlockLabel,
+  groupWorkoutPlanExercises
+} from '../core/workout-plan-groups.js';
 
 function create(root, name) {
   if (typeof root.createElement === 'function') return root.createElement(name);
@@ -11,10 +15,23 @@ function classNames(...parts) {
   return parts.filter(Boolean).join(' ');
 }
 
+function formatBetweenSetsLine(betweenSets) {
+  if (!betweenSets?.name) return '';
+  const sets = Array.isArray(betweenSets.sets) ? betweenSets.sets : [];
+  if (!sets.length) return betweenSets.name;
+  const first = sets[0];
+  const count = sets.length;
+  const reps = first.reps != null ? first.reps : '—';
+  const weight = first.weight_kg != null ? `${first.weight_kg} kg` : 'bodyweight';
+  const prefix = count > 1 ? `${count} × ` : '';
+  return `${betweenSets.name} · ${prefix}${weight} × ${reps} reps`;
+}
+
 export function renderExercisePlanRow(root, exercise, libraryByName, {
   tag = 'li',
   detail = 'count',
-  extraClass = ''
+  extraClass = '',
+  showBetweenSets = true
 } = {}) {
   const row = create(root, tag);
   row.className = classNames('workout-plan-card__row', extraClass);
@@ -45,6 +62,12 @@ export function renderExercisePlanRow(root, exercise, libraryByName, {
       copy.append(line);
     }
   }
+  if (showBetweenSets && exercise?.between_sets?.name) {
+    const between = create(root, 'p');
+    between.className = 'workout-plan-card__between';
+    between.textContent = `Between sets: ${formatBetweenSetsLine(exercise.between_sets)}`;
+    copy.append(between);
+  }
 
   const sets = create(root, 'span');
   sets.className = 'workout-plan-card__sets';
@@ -57,6 +80,46 @@ export function renderExercisePlanRow(root, exercise, libraryByName, {
 
   row.append(thumb, copy, sets, chevron);
   return row;
+}
+
+function renderSupersetConnector(root) {
+  const connector = create(root, 'li');
+  connector.className = 'workout-plan-card__connector';
+  connector.setAttribute?.('aria-hidden', 'true');
+  connector.textContent = '↔';
+  return connector;
+}
+
+function appendPlanBlock(root, list, block, libraryByName, detail, blockIndex) {
+  if (block.kind === 'single' && !block.exercises[0]?.superset_group) {
+    list.append(renderExercisePlanRow(root, block.exercises[0], libraryByName, { detail }));
+    return;
+  }
+
+  const group = create(root, 'li');
+  group.className = classNames(
+    'workout-plan-card__group',
+    block.kind === 'between' ? 'workout-plan-card__group--between' : 'workout-plan-card__group--superset'
+  );
+
+  const label = create(root, 'p');
+  label.className = 'workout-plan-card__group-label';
+  label.textContent = formatSupersetBlockLabel(block, blockIndex);
+  group.append(label);
+
+  const inner = create(root, 'ul');
+  inner.className = 'workout-plan-card__group-exercises';
+  block.exercises.forEach((exercise, index) => {
+    if (index > 0) inner.append(renderSupersetConnector(root));
+    inner.append(renderExercisePlanRow(root, exercise, libraryByName, {
+      tag: 'li',
+      detail,
+      extraClass: 'workout-plan-card__row--paired',
+      showBetweenSets: block.kind === 'between'
+    }));
+  });
+  group.append(inner);
+  list.append(group);
 }
 
 export function appendWorkoutPlanCard(root, host, {
@@ -91,9 +154,10 @@ export function appendWorkoutPlanCard(root, host, {
 
   const list = create(root, 'ul');
   list.className = 'workout-plan-card__exercises record-proposal__exercises';
-  for (const exercise of record.exercises ?? []) {
-    list.append(renderExercisePlanRow(root, exercise, libraryByName, { detail: resolvedDetail }));
-  }
+  const blocks = groupWorkoutPlanExercises(record.exercises ?? []);
+  blocks.forEach((block, index) => {
+    appendPlanBlock(root, list, block, libraryByName, resolvedDetail, index);
+  });
   card.append(list);
   host.append(card);
   return card;
@@ -108,8 +172,39 @@ export function fillExercisePlanList(root, host, {
   if (!host) return;
   host.replaceChildren();
   const tag = /^(ul|ol)$/i.test(host.tagName ?? '') ? 'li' : 'div';
-  for (const exercise of exercises) {
-    host.append(renderExercisePlanRow(root, exercise, libraryByName, { tag, detail, extraClass }));
+  const blocks = groupWorkoutPlanExercises(exercises);
+  for (const [index, block] of blocks.entries()) {
+    if (block.kind === 'single' && !block.exercises[0]?.superset_group) {
+      host.append(renderExercisePlanRow(root, block.exercises[0], libraryByName, {
+        tag,
+        detail,
+        extraClass
+      }));
+      continue;
+    }
+    const wrap = create(root, tag === 'li' ? 'li' : 'div');
+    wrap.className = classNames(
+      'workout-plan-card__group',
+      block.kind === 'between' ? 'workout-plan-card__group--between' : 'workout-plan-card__group--superset',
+      extraClass
+    );
+    const label = create(root, 'p');
+    label.className = 'workout-plan-card__group-label';
+    label.textContent = formatSupersetBlockLabel(block, index);
+    wrap.append(label);
+    const inner = create(root, tag === 'li' ? 'ul' : 'div');
+    inner.className = 'workout-plan-card__group-exercises';
+    block.exercises.forEach((exercise, exerciseIndex) => {
+      if (exerciseIndex > 0) inner.append(renderSupersetConnector(root));
+      inner.append(renderExercisePlanRow(root, exercise, libraryByName, {
+        tag: tag === 'li' ? 'li' : 'div',
+        detail,
+        extraClass: 'workout-plan-card__row--paired',
+        showBetweenSets: block.kind === 'between'
+      }));
+    });
+    wrap.append(inner);
+    host.append(wrap);
   }
 }
 

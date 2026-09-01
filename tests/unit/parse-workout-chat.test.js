@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildPlannedWorkoutInput,
   findLatestWorkoutPlanText,
+  flattenWorkoutExercises,
   parseSupersetPairing,
   parseWorkoutChat,
   parseWorkoutSet,
@@ -164,12 +165,27 @@ test('parseSupersetPairing reads paired exercise names without loads', () => {
   ].join('\n'));
   assert.equal(plan.exercises.length, 8);
   assert.equal(plan.exercises[0].name, 'Bar Press');
-  assert.equal(plan.exercises[1].name, 'Cable Bar Wide Grip Curl');
+  assert.equal(plan.exercises[0].superset_group, 1);
+  assert.equal(plan.exercises[0].superset_label, '1&2 superset');
+  assert.equal(plan.exercises[1].superset_group, 1);
   assert.equal(plan.exercises[6].name, 'Flat Fly');
-  assert.equal(plan.exercises[7].name, 'Alt Biceps Curl');
+  assert.equal(plan.exercises[6].superset_label, '7&8 straight');
 });
 
-test('buildPlannedWorkoutInput turns superset pairing into a name-only planned log_entry', () => {
+test('flattenWorkoutExercises keeps between-set arms on the main exercise', () => {
+  const plan = parseWorkoutChat([
+    '1. Bar Squat — 10x25kg, 10x25kg (cable: none) - *between sets:* Bar Bicep Curl — 10x5kg (cable: none)',
+    '2. Bar Row — 10x26kg (cable: constant force)'
+  ].join('\n'));
+  const exercises = flattenWorkoutExercises(plan);
+  assert.equal(exercises.length, 2);
+  assert.equal(exercises[0].name, 'Bar Squat');
+  assert.equal(exercises[0].between_sets.name, 'Bar Bicep Curl');
+  assert.equal(exercises[0].between_sets.sets[0].weight_kg, 5);
+  assert.equal(exercises[1].name, 'Bar Row');
+});
+
+test('buildPlannedWorkoutInput turns superset pairing into grouped planned exercises', () => {
   const input = buildPlannedWorkoutInput([
     'Pairing it your way:',
     '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
@@ -178,8 +194,9 @@ test('buildPlannedWorkoutInput turns superset pairing into a name-only planned l
   assert.equal(input.type, 'workout');
   assert.equal(input.fields.status, 'planned');
   assert.equal(input.fields.exercises.length, 4);
-  assert.equal(input.fields.exercises[0].name, 'Bar Press');
-  assert.equal(input.fields.exercises[0].sets, undefined);
+  assert.equal(input.fields.exercises[0].superset_group, 1);
+  assert.equal(input.fields.exercises[0].superset_label, '1&2 superset');
+  assert.equal(input.fields.exercises[2].superset_group, 2);
 });
 
 test('setsAreIdentical is true only when every set shares load and cable', () => {
