@@ -271,7 +271,30 @@ Do **not** retarget `life-hub2`, fold other hubs, or rotate secrets.
 
 ## Next action
 
-Finish Slice 06 as a PR against `main`. After merge, Claude observe-only **checkpoint-06**.
+Claude observe-only **checkpoint-06** against this published kit-import PR. Do not retarget `life-hub2` or fold other hubs until that report lands.
+
+Paste:
+
+```text
+You are the consolidation overseer at checkpoint-06. cwd = life-hub repo root.
+Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v3.0).
+
+Observe-only rules (hard):
+- Do NOT edit application code, move files, run destructive git, or commit.
+- You MAY create exactly one report:
+  docs/consolidation/checkpoints/checkpoint-06.md
+
+Inspect: the published kit-import PR vs main, and plan.md Slice 06 notes.
+Confirm: prepare-web still publishes the same dist/ public paths;
+every dist/js packages/design-kit import resolves;
+netlify.toml, function filenames, included_files, and secrets unchanged;
+life-hub-data untouched; no Teaching/Knowledge/Tasks fold.
+
+Write the report using the template in OVERSEER.md.
+End with: next 3 concrete steps for Cursor local agent — no patches.
+If auth, life-hub-data boundary, or public student URL safety looks wrong,
+open with DO NOT MERGE YET.
+```
 
 
 ## Open questions (Adam)

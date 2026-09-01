@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { execFile } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
@@ -80,6 +81,32 @@ test('publishes design-kit modules imported by the app shell', async t => {
     assert.match(response.headers.get('content-type'), /javascript/);
     assert.match(await response.text(), /createHubFilter|export /);
   }
+});
+
+test('every published design-kit import in dist/js resolves', async () => {
+  const files = [];
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory);
+      if (entry.isDirectory()) {
+        await walk(next);
+        continue;
+      }
+      if (entry.name.endsWith('.js')) files.push(next);
+    }
+  }
+  await walk(new URL('../../dist/js/', import.meta.url));
+  assert.ok(files.length > 0, 'prepare-web must publish js into dist/js');
+
+  let imports = 0;
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+    for (const [, spec] of source.matchAll(/from ['"]((?:\.\.\/)+packages\/design-kit\/[^'"]+)['"]/g)) {
+      imports += 1;
+      await access(new URL(spec, file), constants.F_OK);
+    }
+  }
+  assert.ok(imports > 0, 'dist/js must keep at least one packages/design-kit import');
 });
 
 test('native sign-in POST to / serves the shell instead of 405', async t => {
