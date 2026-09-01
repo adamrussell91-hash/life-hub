@@ -3335,3 +3335,72 @@ test('Brisket os_run_promoted_shortcut yields action_proposal from catalogued dr
   assert.equal(card.proposal.writes[0].path, 'data/challenges/2026-08-31-weigh-in.json');
   assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
 });
+
+test('Brisket catalogued promoted draft appears as a named dynamic tool', async () => {
+  let receivedArgs;
+  const draftPath = 'data/os/promoted-shortcuts/track-morning-weigh-in.json';
+  const draftSha = 'e'.repeat(40);
+  const draftContent = JSON.stringify({
+    id: 'promo_test',
+    proposed_id: 'track.morning-weigh-in',
+    tool_name: 'track_morning_weigh_in',
+    summary: 'Morning weigh-in tracker',
+    example_intent: 'log morning weight',
+    example_writes: [{
+      path: 'data/challenges/2026-08-31-weigh-in.json',
+      mode: 'create',
+      content: '{\n  "title": "Morning weigh-in"\n}\n',
+      diff: 'new weigh-in challenge'
+    }],
+    risk: 'confirm',
+    status: 'ready'
+  }, null, 2);
+
+  const fetchImpl = async (url, options) => {
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: draftPath, type: 'blob', sha: draftSha, size: draftContent.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${draftSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(draftContent, 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        receivedArgs = args;
+        yield { type: 'text', delta: 'Using the named promoted shortcut.' };
+        assert.ok(args.tools.some(tool => tool.name === 'track_morning_weigh_in'));
+        const result = await args.executeTools({
+          id: 'call_named',
+          name: 'track_morning_weigh_in',
+          input: {}
+        });
+        assert.equal(JSON.parse(result).status, 'awaiting_confirm');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'Brisket, log my morning weigh-in using the promoted shortcut',
+    priorAgentSlug: 'brisket'
+  })));
+
+  assert.ok(receivedArgs?.tools.some(tool => tool.name === 'track_morning_weigh_in'));
+});

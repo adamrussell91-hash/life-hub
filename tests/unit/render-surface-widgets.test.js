@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { renderSurfaceWidgets } from '../../js/app/render-surface-widgets.js';
+import { renderFitnessSurfaceWidgets, renderNutritionSurfaceWidgets } from '../../js/app/render-surface-widgets.js';
 
 class FakeEl {
   constructor() {
@@ -31,15 +31,15 @@ function widgetRoot() {
   };
 }
 
-test('renderSurfaceWidgets hides section when no widgets are ready', () => {
+test('renderFitnessSurfaceWidgets hides section when no widgets are ready', () => {
   const root = widgetRoot();
-  renderSurfaceWidgets(root, { status: 'ready', widgets: [] });
+  renderFitnessSurfaceWidgets(root, { status: 'ready', widgets: [] });
   assert.equal(root.nodes.get('#fitness-surface-widgets').hidden, true);
 });
 
-test('renderSurfaceWidgets renders challenge-progress cards', () => {
+test('renderFitnessSurfaceWidgets renders challenge-progress cards', () => {
   const root = widgetRoot();
-  renderSurfaceWidgets(root, {
+  renderFitnessSurfaceWidgets(root, {
     status: 'ready',
     widgets: [{
       template_id: 'challenge-progress',
@@ -51,4 +51,27 @@ test('renderSurfaceWidgets renders challenge-progress cards', () => {
   assert.equal(rail.children.length, 1);
   assert.match(rail.children[0].className, /surface-widget-card--challenge/);
   assert.equal(root.nodes.get('#fitness-surface-widgets').hidden, false);
+});
+
+test('renderNutritionSurfaceWidgets renders meal-plan-week cards', () => {
+  const root = widgetRoot();
+  renderNutritionSurfaceWidgets(root, {
+    status: 'ready',
+    widgets: [{
+      template_id: 'meal-plan-week',
+      title: 'Week plan',
+      props: {
+        title: 'Week 2026-W35',
+        days: [
+          { key: 'mon', label: 'Mon', text: 'Dinner: Marley Spoon bowl' },
+          { key: 'tue', label: 'Tue', text: 'Leftovers' }
+        ],
+        notes: 'Light lunches'
+      }
+    }]
+  });
+  const rail = root.nodes.get('#nutrition-surface-widgets-rail');
+  assert.equal(rail.children.length, 1);
+  assert.match(rail.children[0].className, /surface-widget-card--meal-plan/);
+  assert.equal(root.nodes.get('#nutrition-surface-widgets').hidden, false);
 });
