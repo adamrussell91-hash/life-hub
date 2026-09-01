@@ -80,27 +80,33 @@ Fill before the first serious critique. Secret **values** are never pasted here 
 
 | Item | Value |
 |------|--------|
-| Umbrella / code repo (target) | FILL_IN — e.g. `adamrussell91-hash/hubs` or reuse `life-hub` |
+| Umbrella / code repo (target) | **Reuse `adamrussell91-hash/life-hub`** (grow in place; decided 2026-09-01) |
 | Data repo (frozen) | `adamrussell91-hash/life-hub-data` (confirm) |
 | Current hub code repos | `life-hub`, `teaching-hub`, `knowledge-hub`, `Tasks-Hub`, `widgets`, `proxies` (confirm), `hub-design-kit` (confirm) |
-| Design kit canonical remote | FILL_IN |
+| Design kit canonical remote | `github.com/adamrussell91-hash/hub-design-kit` |
+
+Known env **names**:
+
+- **Life Hub API:** `LIFE_HUB_PASSPHRASE_HASH`, `SESSION_SECRET`, `GITHUB_REPOSITORY`, `GITHUB_BRANCH`, `GITHUB_TOKEN`, `GITHUB_TOKEN_EXPIRES`, `SITE_ORIGIN`, `ANTHROPIC_API_KEY`
+- **Teaching Hub API:** `TEACHING_HUB_PASSPHRASE_HASH`, `SESSION_SECRET`, `SITE_ORIGIN`, `ANTHROPIC_API_KEY` (later); cookie `teaching_hub_session`
+- **Umbrella (target):** retain Life Hub env names — `LIFE_HUB_PASSPHRASE_HASH`, `SESSION_SECRET` (no new umbrella secret set; decided 2026-09-01)
 
 ### Netlify (no secret values)
 
-| Hub / API | Site name | Public Functions URL | `SITE_ORIGIN` (Pages or app origin) | Notes |
-|-----------|-----------|----------------------|-------------------------------------|--------|
-| Life Hub API | FILL_IN | FILL_IN | FILL_IN | Prefer **retarget this site** at umbrella |
-| Teaching Hub API | FILL_IN | FILL_IN | FILL_IN | Fold later |
-| Other | FILL_IN | FILL_IN | FILL_IN | |
+Public URLs below are from **committed repo config** (2026-09-01). Netlify **dashboard site names** still need Adam.
 
-Known env **names** (Life): `LIFE_HUB_PASSPHRASE_HASH`, `SESSION_SECRET`, `GITHUB_REPOSITORY`, `GITHUB_BRANCH`, `GITHUB_TOKEN`, `GITHUB_TOKEN_EXPIRES`, `SITE_ORIGIN`, `ANTHROPIC_API_KEY` (and Teaching equivalents as discovered).
+| Hub / API | Site name (Netlify dashboard) | Public Functions URL | `SITE_ORIGIN` (app origin) | Notes |
+|-----------|------------------------------|----------------------|----------------------------|--------|
+| Life Hub API | **AWAITING ADAM** | `https://api.adam-russell.com` | `https://life-hub.adam-russell.com` | Retarget candidate; source: `js/app/config.js` |
+| Teaching Hub API | **AWAITING ADAM** | `https://teaching-api.adam-russell.com` | `https://teaching-hub.adam-russell.com` | Fold later; source: `teaching-hub/README.md` |
+| Other | FILL_IN | FILL_IN | FILL_IN | |
 
 ### Cloudflare / R2
 
 | Resource | Name | Used by | Notes |
 |----------|------|---------|--------|
-| R2 bucket | `knowledge-hub-archive` (seen) | FILL_IN | |
-| Worker | `knowledge-hub-research` (seen) | FILL_IN | |
+| R2 bucket | `knowledge-hub-archive` | `knowledge-hub` repo (confirm) | Archive storage; bindings must be documented at Knowledge fold |
+| Worker | `knowledge-hub-research` | `knowledge-hub` repo (confirm) | Research edge; merge vs keep-separate decision at fold |
 | Other R2 / KV / D1 / Workers | FILL_IN | FILL_IN | |
 
 ### Local paths (Adam machine)
