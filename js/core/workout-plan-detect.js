@@ -37,7 +37,10 @@ export function looksLikeSupersetPairing(text) {
 export function shouldForceChadwickPlanProposal({ userMessage, assistantText, sawLogEntry } = {}) {
   if (sawLogEntry) return false;
   if (isWorkoutLockIn(userMessage)) return true;
-  return claimedPlanLocked(assistantText);
+  if (claimedPlanLocked(assistantText)) return true;
+  // Any full prescription in this turn must become a Confirm card — chat text alone
+  // never mounts Fitness, and Chadwick often narrates instead of calling log_entry.
+  return looksLikeWorkoutPlan(assistantText) || looksLikeSupersetPairing(assistantText);
 }
 
 export function shouldNudgeUnsavedWorkoutPlan({ agentSlug, assistantText, sawRecordProposal, sawExerciseLibrarySaved } = {}) {
