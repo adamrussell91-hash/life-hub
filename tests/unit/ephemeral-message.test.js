@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { showEphemeralMessage } from '../../js/app/ephemeral-message.js';
+import { showEphemeralMessage } from '../../apps/life/js/app/ephemeral-message.js';
 
 class FakeEl {
   constructor() {
@@ -36,7 +36,7 @@ test('empty message clears immediately', () => {
 });
 
 test('clearEphemeralMessage cancels a pending fade so sticky status can stick', async () => {
-  const { clearEphemeralMessage } = await import('../../js/app/ephemeral-message.js');
+  const { clearEphemeralMessage } = await import('../../apps/life/js/app/ephemeral-message.js');
   const el = new FakeEl();
   showEphemeralMessage(el, 'Logged', { holdMs: 40, fadeMs: 40 });
   clearEphemeralMessage(el);

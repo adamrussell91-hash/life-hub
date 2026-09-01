@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createChatPanelController } from '../../js/app/chat-panel.js';
+import { createChatPanelController } from '../../apps/life/js/app/chat-panel.js';
 
 class FakeElement {
   constructor(tag) {

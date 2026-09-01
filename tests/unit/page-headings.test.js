@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 test('section dashboards do not repeat the page name as a kicker under the topbar', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const ids = [
     'nutrition-dashboard',
     'fitness-dashboard',

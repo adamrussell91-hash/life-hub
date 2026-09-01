@@ -1,4 +1,4 @@
-import { isCalendarDate } from '../../../js/core/time.js';
+import { isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { buildCanonicalPath } from './chat-schema.mjs';
 
 export function getMindSessionSchema() {

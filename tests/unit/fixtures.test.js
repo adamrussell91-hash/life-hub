@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { load } from 'js-yaml';
-import { parseEventDocument } from '../../js/core/records.js';
+import { parseEventDocument } from '../../apps/life/js/core/records.js';
 
 const exec = promisify(execFile);
 

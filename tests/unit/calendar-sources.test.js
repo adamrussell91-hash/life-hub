@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { listCalendarSources } from '../../js/shell/calendar-sources.js';
-import { renderCalendarSources } from '../../js/shell/render-calendar-sources.js';
+import { listCalendarSources } from '../../apps/life/js/shell/calendar-sources.js';
+import { renderCalendarSources } from '../../apps/life/js/shell/render-calendar-sources.js';
 
 function fakeRoot() {
   const empty = {
@@ -59,7 +59,7 @@ test('shared calendar source registry is empty — no live feeds', () => {
 });
 
 test('shared calendar source registry does not name other hub APIs', async () => {
-  const source = await readFile(new URL('../../js/shell/calendar-sources.js', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../../apps/life/js/shell/calendar-sources.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /teaching-api|knowledge-api|tasks-api|jade-melomakarona/i);
   assert.doesNotMatch(source, /teaching-hub|knowledge-hub|Tasks-Hub/i);
 });

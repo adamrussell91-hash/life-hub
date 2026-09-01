@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildColumns } from '../../js/app/chart-kit/columns.js';
+import { buildColumns } from '../../apps/life/js/app/chart-kit/columns.js';
 
 test('buildColumns scales heights to max and preserves labels', () => {
   const chart = buildColumns([

@@ -1,15 +1,15 @@
 import { load } from 'js-yaml';
-import { parseEventDocument, TYPE_DOMAINS } from '../../../js/core/records.js';
+import { parseEventDocument, TYPE_DOMAINS } from '../../../apps/life/js/core/records.js';
 import {
   applyLogToCentralNode,
   formatLogDate,
   humanizeDayType
-} from '../../../js/core/central-node-write.js';
+} from '../../../apps/life/js/core/central-node-write.js';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
   emptyGovernanceLog
-} from '../../../js/core/governance-log.js';
+} from '../../../apps/life/js/core/governance-log.js';
 import { AGENTS } from './agent-directory.mjs';
 import { decodeBlob } from './decode-blob.mjs';
 import { loadCentralNodeSeed } from './load-central-node-seed.mjs';

@@ -2,12 +2,12 @@ import {
   searchProductLibrary,
   saveProductLibraryEntry,
   findProductByName
-} from '../../../js/app/skincare-product-library.js';
+} from '../../../apps/life/js/app/skincare-product-library.js';
 import {
   addToRoutine,
   removeFromRoutine,
   resolveRoutineProducts
-} from '../../../js/app/skincare-routine-membership.js';
+} from '../../../apps/life/js/app/skincare-routine-membership.js';
 
 const DEFAULT_PROMPT_LIMIT = 40;
 

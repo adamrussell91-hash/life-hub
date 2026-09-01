@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { CLINICAL_CHART_SLOTS } from '../../js/app/chart-kit/clinical-slots.js';
-import { firstSentence, renderMind } from '../../js/app/render-mind.js';
+import { CLINICAL_CHART_SLOTS } from '../../apps/life/js/app/chart-kit/clinical-slots.js';
+import { firstSentence, renderMind } from '../../apps/life/js/app/render-mind.js';
 
 function el(tag = 'div') {
   let text = '';
@@ -793,7 +793,7 @@ test('renderMind paints an interactive theme rank bump chart', () => {
 });
 
 test('index.html Mind board has no Talk launchers or cadence heatmap', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const start = html.indexOf('id="mind-dashboard"');
   const end = html.indexOf('id="central-node-dashboard"');
   const mind = html.slice(start, end);

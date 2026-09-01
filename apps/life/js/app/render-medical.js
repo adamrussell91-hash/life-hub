@@ -1,5 +1,5 @@
 import { formatDisplayDate } from '../core/time.js';
-import { createHubFilter } from '../../packages/design-kit/js/hub-filter-menu.js';
+import { createHubFilter } from '../../../../packages/design-kit/js/hub-filter-menu.js';
 
 const filterCache = new WeakMap();
 

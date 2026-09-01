@@ -6,9 +6,9 @@ import {
   currentRoutineKey,
   slugifySkincareTitle,
   toSkincareConfirmPayload
-} from '../../js/app/skincare-routines-data.js';
-import { buildSkincareModel } from '../../js/app/skincare-model.js';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+} from '../../apps/life/js/app/skincare-routines-data.js';
+import { buildSkincareModel } from '../../apps/life/js/app/skincare-model.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
 
 test('currentRoutineKey is am before noon Sydney', () => {
   assert.equal(currentRoutineKey(new Date('2026-08-05T01:00:00Z')), 'am');

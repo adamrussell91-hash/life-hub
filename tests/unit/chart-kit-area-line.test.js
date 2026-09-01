@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAreaLine, straightLinePath } from '../../js/app/chart-kit/area-line.js';
+import { buildAreaLine, straightLinePath } from '../../apps/life/js/app/chart-kit/area-line.js';
 
 test('scales a 3-point series and omits any last-point marker field', () => {
   const week = [

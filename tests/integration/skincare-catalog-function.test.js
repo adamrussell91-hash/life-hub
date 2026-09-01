@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createSkincareCatalogHandler } from '../../netlify/functions/skincare-catalog.mjs';
-import { SKINCARE_CATALOG_PATH } from '../../js/app/skincare-catalog.js';
+import { SKINCARE_CATALOG_PATH } from '../../apps/life/js/app/skincare-catalog.js';
 
 const SECRET = 's'.repeat(32);
 const COMMIT_SHA = 'c'.repeat(40);

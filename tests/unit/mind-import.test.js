@@ -7,7 +7,7 @@ import {
   recordFromDiaryMarkdown,
   recordFromHistoricalMarkdown,
   planImport
-} from '../../js/core/mind-import.js';
+} from '../../apps/life/js/core/mind-import.js';
 
 test('parseCsv respects quoted commas', () => {
   const rows = parseCsv('a,b\n"x, y",z\n');

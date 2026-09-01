@@ -9,14 +9,14 @@ import {
   removeFromRoutine,
   seedMembershipFromDefaults,
   migrateMembershipFromCatalog
-} from '../../js/app/skincare-routine-membership.js';
+} from '../../apps/life/js/app/skincare-routine-membership.js';
 import {
   emptyProductLibrary,
   saveProductLibraryEntry,
   seedProductLibraryFromDefaults,
   findProductByName
-} from '../../js/app/skincare-product-library.js';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+} from '../../apps/life/js/app/skincare-product-library.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
 
 test('path is data/skincare/routine-membership.json', () => {
   assert.equal(SKINCARE_ROUTINE_MEMBERSHIP_PATH, 'data/skincare/routine-membership.json');

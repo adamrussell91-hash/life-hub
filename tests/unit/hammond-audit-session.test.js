@@ -5,8 +5,8 @@ import {
   loadStoredAuditSession,
   removeStoredAuditSession,
   saveStoredAuditSession
-} from '../../js/app/hammond-audit-session-storage.js';
-import { createChatController } from '../../js/app/chat-controller.js';
+} from '../../apps/life/js/app/hammond-audit-session-storage.js';
+import { createChatController } from '../../apps/life/js/app/chat-controller.js';
 
 class FakeStorage {
   constructor(seed = {}) {

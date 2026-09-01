@@ -10,7 +10,7 @@ import {
   parseGovernanceEntries,
   openGovernanceEntries,
   oldestOpenGovernanceEntry
-} from '../../js/core/governance-log.js';
+} from '../../apps/life/js/core/governance-log.js';
 
 test('path is data/governance/governance-log.md', () => {
   assert.equal(GOVERNANCE_LOG_PATH, 'data/governance/governance-log.md');

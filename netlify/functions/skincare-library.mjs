@@ -19,7 +19,7 @@ import {
 import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   saveProductLibraryEntry
-} from '../../js/app/skincare-product-library.js';
+} from '../../apps/life/js/app/skincare-product-library.js';
 import { loadOrSeedLibrary, writeJson } from './_shared/skincare-store.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };

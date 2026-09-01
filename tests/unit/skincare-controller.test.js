@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSkincareController } from '../../js/app/skincare-controller.js';
+import { createSkincareController } from '../../apps/life/js/app/skincare-controller.js';
 
 class FakeStatus {
   constructor() {

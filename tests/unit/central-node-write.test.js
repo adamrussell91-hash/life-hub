@@ -19,7 +19,7 @@ import {
   shouldAppendRecentAction,
   trimCrossAgentSection,
   upsertStatusField
-} from '../../js/core/central-node-write.js';
+} from '../../apps/life/js/core/central-node-write.js';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';

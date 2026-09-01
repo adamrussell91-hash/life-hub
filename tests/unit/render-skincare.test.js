@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { renderSkincare } from '../../js/app/render-skincare.js';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
-import { formatDisplayDate } from '../../js/core/time.js';
+import { renderSkincare } from '../../apps/life/js/app/render-skincare.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
+import { formatDisplayDate } from '../../apps/life/js/core/time.js';
 
 class FakeElement {
   constructor(tag) {
@@ -719,7 +719,7 @@ test('Just this time creates one-off without keep create', () => {
 });
 
 test('index.html leads Skincare with the consistency hero, heatmap, and legend; week-dots strip is gone', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
 
   const dashboardStart = html.indexOf('id="skincare-dashboard"');
   const heroIndex = html.indexOf('skincare-consistency-card', dashboardStart);
@@ -741,8 +741,8 @@ test('index.html leads Skincare with the consistency hero, heatmap, and legend; 
 });
 
 test('index.html uses an AM|PM beauty drawer (segment + sliding track) instead of a dual-card grid', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
-  const css = await readFile(new URL('../../css/app.css', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
   assert.match(html, /class="skincare-beauty-drawer"/);
   assert.match(html, /id="skincare-routine-segment"/);

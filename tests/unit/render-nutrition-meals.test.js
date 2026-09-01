@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderMealProteinPie } from '../../js/app/render-nutrition.js';
+import { renderMealProteinPie } from '../../apps/life/js/app/render-nutrition.js';
 
 function makeRoot() {
   const empty = { hidden: true, removeAttribute(name) { if (name === 'hidden') this.hidden = false; }, setAttribute(name) { if (name === 'hidden') this.hidden = true; } };

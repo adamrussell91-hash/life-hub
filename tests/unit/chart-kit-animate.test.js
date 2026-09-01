@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { animateAreaReveal } from '../../js/app/chart-kit/animate.js';
+import { animateAreaReveal } from '../../apps/life/js/app/chart-kit/animate.js';
 
 test('animateAreaReveal clears stroke dash after animationend so the solid line stays visible', () => {
   const listeners = [];

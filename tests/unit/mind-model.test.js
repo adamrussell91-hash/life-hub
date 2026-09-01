@@ -40,7 +40,7 @@ import {
   energyStreakWhy,
   isSalientTheme,
   WATCHLIST_PRESETS
-} from '../../js/app/mind-model.js';
+} from '../../apps/life/js/app/mind-model.js';
 
 test('buildMindModel builds mood series, by-mood counts, and themes', () => {
   const events = [

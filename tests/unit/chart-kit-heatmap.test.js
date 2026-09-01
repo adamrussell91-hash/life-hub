@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHeatmapRow } from '../../js/app/chart-kit/heatmap.js';
-import { rangeWindow } from '../../js/app/mind-model.js';
+import { buildHeatmapRow } from '../../apps/life/js/app/chart-kit/heatmap.js';
+import { rangeWindow } from '../../apps/life/js/app/mind-model.js';
 
 test('buildHeatmapRow uses 7 tiles for the weekly range', () => {
   const bounds = rangeWindow('2026-08-13', 'weekly');

@@ -1,5 +1,5 @@
-import { formatLogDate } from '../../../js/core/central-node-write.js';
-import { daysBetween } from '../../../js/core/time.js';
+import { formatLogDate } from '../../../apps/life/js/core/central-node-write.js';
+import { daysBetween } from '../../../apps/life/js/core/time.js';
 
 export const EXERCISE_LIBRARY_PATH = 'data/exercise-library.json';
 

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mergeMedicalFields, resolveMedicalLogCandidate, parseMedicalEventTolerant } from '../../js/app/medical-normalize.js';
+import { mergeMedicalFields, resolveMedicalLogCandidate, parseMedicalEventTolerant } from '../../apps/life/js/app/medical-normalize.js';
 import { verifySessionToken, serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
 import {
   errorResponse,
@@ -17,7 +17,7 @@ import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
 import { buildSystemPrompt } from './_shared/persona.mjs';
-import { normalizeProtocolId, protocolSteerBlock } from '../../js/app/agent-protocols.js';
+import { normalizeProtocolId, protocolSteerBlock } from '../../apps/life/js/app/agent-protocols.js';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
 import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs';
 import { loadPenelopeProtocol } from './_shared/load-penelope-protocol.mjs';
@@ -38,7 +38,7 @@ import {
   extractRecentAgentActions,
   extractThisWeek,
   extractTodaysStatus
-} from '../../js/core/constraints.js';
+} from '../../apps/life/js/core/constraints.js';
 import {
   NUTRITION_CHALLENGES_PATH,
   emptyNutritionChallenges,
@@ -53,8 +53,8 @@ import {
   markNutritionChallengeDay,
   formatNutritionChallengesForPrompt,
   tallyChallenge
-} from '../../js/core/nutrition-challenges.js';
-import { syncChallengeToCentralNode } from '../../js/core/nutrition-challenge-cn.js';
+} from '../../apps/life/js/core/nutrition-challenges.js';
+import { syncChallengeToCentralNode } from '../../apps/life/js/core/nutrition-challenge-cn.js';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
 import { validateLogEntry, buildCanonicalPath, buildRecordSlug, logEntryRejectionPayload } from './_shared/chat-schema.mjs';
@@ -119,8 +119,8 @@ import {
   appendGovernanceEntry,
   emptyGovernanceLog,
   recentGovernanceTail
-} from '../../js/core/governance-log.js';
-import { rollStaleSections, purgeStaleRecentActions } from '../../js/core/central-node-write.js';
+} from '../../apps/life/js/core/governance-log.js';
+import { rollStaleSections, purgeStaleRecentActions } from '../../apps/life/js/core/central-node-write.js';
 import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   emptyProductLibrary,
@@ -128,16 +128,16 @@ import {
   parseProductLibrary,
   seedProductLibraryFromDefaults,
   upgradeOtherProductCategories
-} from '../../js/app/skincare-product-library.js';
+} from '../../apps/life/js/app/skincare-product-library.js';
 import {
   SKINCARE_ROUTINE_MEMBERSHIP_PATH,
   emptyMembership,
   migrateMembershipFromCatalog,
   parseMembership,
   seedMembershipFromDefaults
-} from '../../js/app/skincare-routine-membership.js';
-import { SKINCARE_CATALOG_PATH, parseCatalog } from '../../js/app/skincare-catalog.js';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+} from '../../apps/life/js/app/skincare-routine-membership.js';
+import { SKINCARE_CATALOG_PATH, parseCatalog } from '../../apps/life/js/app/skincare-catalog.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
 import {
   formatTemplatesForPrompt,
   isTemplatePath,
@@ -163,7 +163,7 @@ import {
   getMindSession,
   searchMindRecords
 } from './_shared/mind-session-read.mjs';
-import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
+import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
@@ -175,10 +175,10 @@ import {
   isThinMindTurn,
   isVeraFlushMessage,
   shouldStripWebSearch
-} from '../../js/core/log-finalize-detect.js';
-import { keepNewestHistory } from '../../js/core/chat-history.js';
-import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } from '../../js/core/time.js';
-import { parseEventDocument } from '../../js/core/records.js';
+} from '../../apps/life/js/core/log-finalize-detect.js';
+import { keepNewestHistory } from '../../apps/life/js/core/chat-history.js';
+import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } from '../../apps/life/js/core/time.js';
+import { parseEventDocument } from '../../apps/life/js/core/records.js';
 import { load as loadYaml } from 'js-yaml';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };

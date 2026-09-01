@@ -2,8 +2,8 @@ import {
   CENTRAL_NODE_SECTIONS,
   classifyCentralNodePatchRisk,
   applyCentralNodePatch
-} from '../../../js/core/central-node-patch.js';
-import { GOVERNANCE_ENTRY_TYPES } from '../../../js/core/governance-log.js';
+} from '../../../apps/life/js/core/central-node-patch.js';
+import { GOVERNANCE_ENTRY_TYPES } from '../../../apps/life/js/core/governance-log.js';
 
 export { classifyCentralNodePatchRisk, applyCentralNodePatch };
 
