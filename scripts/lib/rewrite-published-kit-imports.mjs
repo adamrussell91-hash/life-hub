@@ -1,6 +1,7 @@
 import { dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Static `import` / `export … from` only — dynamic import() of kit paths is not rewritten.
 const KIT_FROM = /from (['"])((?:\.\.\/)+packages\/design-kit\/)([^'"]+)\1/g;
 
 export function rewritePublishedKitSpecifiers(source, fromFile, publishRoot) {
