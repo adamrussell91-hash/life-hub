@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { UMBRELLA_SESSION_COOKIE } from './umbrella-auth.mjs';
 import { promisify } from 'node:util';
 
 const scryptAsync = promisify(scrypt);
@@ -68,7 +69,7 @@ export function verifySessionToken(token, secret, now = Date.now()) {
 
 export function serializeSessionCookie(token) {
   const maxAgeSeconds = Math.floor(SESSION_MS / 1000);
-  return `life_hub_session=${token}; Max-Age=${maxAgeSeconds}; ${SESSION_COOKIE_ATTRIBUTES}`;
+  return `${UMBRELLA_SESSION_COOKIE}=${token}; Max-Age=${maxAgeSeconds}; ${SESSION_COOKIE_ATTRIBUTES}`;
 }
 
 export function shouldRefreshSession(payload, now = Date.now()) {
@@ -78,7 +79,7 @@ export function shouldRefreshSession(payload, now = Date.now()) {
 }
 
 export function serializeExpiredSessionCookie() {
-  return `life_hub_session=; Max-Age=0; ${SESSION_COOKIE_ATTRIBUTES}`;
+  return `${UMBRELLA_SESSION_COOKIE}=; Max-Age=0; ${SESSION_COOKIE_ATTRIBUTES}`;
 }
 
 async function derivePassphraseHash(passphrase, salt) {
