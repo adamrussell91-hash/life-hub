@@ -80,7 +80,7 @@ Fill before the first serious critique. Secret **values** are never pasted here 
 
 | Item | Value |
 |------|--------|
-| Umbrella / code repo (target) | FILL_IN — e.g. `adamrussell91-hash/hubs` or reuse `life-hub` |
+| Umbrella / code repo (target) | **Reuse `adamrussell91-hash/life-hub`** (grow in place; decided 2026-09-01) |
 | Data repo (frozen) | `adamrussell91-hash/life-hub-data` (confirm) |
 | Current hub code repos | `life-hub`, `teaching-hub`, `knowledge-hub`, `Tasks-Hub`, `widgets`, `proxies` (confirm), `hub-design-kit` (confirm) |
 | Design kit canonical remote | `github.com/adamrussell91-hash/hub-design-kit` |
@@ -89,7 +89,7 @@ Known env **names**:
 
 - **Life Hub API:** `LIFE_HUB_PASSPHRASE_HASH`, `SESSION_SECRET`, `GITHUB_REPOSITORY`, `GITHUB_BRANCH`, `GITHUB_TOKEN`, `GITHUB_TOKEN_EXPIRES`, `SITE_ORIGIN`, `ANTHROPIC_API_KEY`
 - **Teaching Hub API:** `TEACHING_HUB_PASSPHRASE_HASH`, `SESSION_SECRET`, `SITE_ORIGIN`, `ANTHROPIC_API_KEY` (later); cookie `teaching_hub_session`
-- **Umbrella (target — decide in plan step 2):** single passphrase hash env name TBD (e.g. `HUB_PASSPHRASE_HASH`), one `SESSION_SECRET`
+- **Umbrella (target):** retain Life Hub env names — `LIFE_HUB_PASSPHRASE_HASH`, `SESSION_SECRET` (no new umbrella secret set; decided 2026-09-01)
 
 ### Netlify (no secret values)
 

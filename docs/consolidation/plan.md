@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v2.1 — partial critique #2 applied; **execution blockers remain** (auth + repo decisions).  
+> **Status:** v2.2 — auth + repo decided (minimal secret churn). Netlify dashboard site names still AWAITING ADAM.  
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
 ## Intent
@@ -9,20 +9,31 @@ One operator-facing hub product: one code repo, one Adam session/auth, one desig
 
 ## Decisions (source of truth — must be filled here, not only in chat)
 
-### Repo (step 1 blocker)
+### Repo (step 1)
 
 | Field | Value |
 |-------|--------|
-| Umbrella code repo | **AWAITING ADAM** — `reuse life-hub` **or** `new repo: ___` |
-| Existing `life-hub` GitHub repo after consolidation | **AWAITING ADAM** — `rename` / `redirect` / `leave as-is` |
+| Umbrella code repo | **Reuse `life-hub`** — grow in place; no new GitHub repo |
+| Existing `life-hub` GitHub repo after consolidation | **Leave as-is** — same repo name, same Netlify hook target, same clone URLs |
 
-### Auth (step 2 blocker — no step 1 production retarget until written)
+Rationale (Adam, 2026-09-01): retain workable secrets and avoid re-keying — reusing the repo keeps GitHub Pages workflow, Netlify link, and env var names stable.
+
+### Auth (step 2)
 
 | Field | Value |
 |-------|--------|
-| Secret strategy | **AWAITING ADAM** — `new umbrella secrets` **or** `retain Life Hub secrets` |
-| Umbrella passphrase hash env name (if new) | TBD — e.g. `HUB_PASSPHRASE_HASH` |
-| Session invalidation on cutover | One-time Adam re-login (automatic if new `SESSION_SECRET`) |
+| Secret strategy | **Retain Life Hub secrets** — no new passphrase hash or `SESSION_SECRET` for umbrella |
+| Passphrase hash env | Keep `LIFE_HUB_PASSPHRASE_HASH` (unchanged on Netlify) |
+| Session secret env | Keep `SESSION_SECRET` (unchanged on Netlify) |
+| Session invalidation on cutover | **None expected** for Life — existing cookies remain valid if secrets unchanged |
+| Teaching secrets at fold | `TEACHING_HUB_PASSPHRASE_HASH` retired when Teaching API merges onto umbrella; Adam uses existing Life passphrase everywhere |
+| Data + API tokens (unchanged) | Keep `GITHUB_REPOSITORY`, `GITHUB_BRANCH`, `GITHUB_TOKEN`, `GITHUB_TOKEN_EXPIRES`, `ANTHROPIC_API_KEY` on the Life Netlify site |
+
+**Implementation notes:**
+
+- Single auth check lives in umbrella `netlify/functions/` but reads the **same** Life env var names above.
+- When Teaching (and later hubs) fold in, extend CORS/`SITE_ORIGIN` allow-list to additional app origins (e.g. `https://teaching-hub.adam-russell.com`) — do **not** rotate secrets just to add origins.
+- Prefer **one Netlify site** (existing Life API site at `api.adam-russell.com`) absorbing folded section APIs over standing up new Netlify sites with duplicate secrets.
 
 ## Deploy inventory (public URLs — from committed config)
 
@@ -52,7 +63,7 @@ hubs/                          # umbrella code repo (name decided above)
 docs/consolidation/            # this folder (carried into umbrella)
 ```
 
-Deploy preference: **retarget existing Life Hub Netlify** at the umbrella repo (keep secrets); do not invent a second production Netlify for Adam-auth APIs unless forced. Full execution-readiness stress test requires **Decisions** + Netlify site names filled.
+Deploy preference: **retarget existing Life Hub Netlify** at the umbrella repo — **keep all existing env vars**; only add origins/bindings as new hub sections fold in. Full execution-readiness stress test still needs Netlify **dashboard site names** filled.
 
 ## Invariants (named — checkpoint gates)
 
@@ -146,21 +157,15 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 ## Open questions (Adam)
 
-- Fill **Decisions** tables above (repo + auth)
-- Netlify dashboard site names for Life + Teaching API sites
+- Netlify dashboard site names for Life + Teaching API sites (only remaining blocker for full critique #2)
 - Calendar: first event source when wiring (Life vs Teaching vs external)
 - Fold trigger (A/B/C) for Teaching — recommend (A) when consolidated calendar is the driver
 
 ## Next action
 
-Adam updates **Decisions** + Netlify site names in this file → Claude runs **full** critique #2 (execution-readiness stress test).
-
-Copy-paste reply format for Adam:
+Adam fills Netlify **dashboard site names** in this file → Claude runs **full** critique #2 (execution-readiness stress test).
 
 ```text
-Repo: reuse life-hub | new repo: <name>
-life-hub after: rename | redirect | leave as-is
-Auth: new umbrella secrets | retain Life Hub secrets
 Life Netlify site name: <from dashboard>
 Teaching Netlify site name: <from dashboard>
 ```
