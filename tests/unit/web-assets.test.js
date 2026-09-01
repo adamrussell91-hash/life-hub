@@ -115,7 +115,7 @@ test('renderer assigns untrusted values as text instead of HTML', async () => {
 test('responsive stylesheet contains the approved palette and mobile breakpoint', async () => {
   const css = [
     await readFile(new URL('../../css/app.css', import.meta.url), 'utf8'),
-    await readFile(new URL('../../design-kit/tokens.css', import.meta.url), 'utf8')
+    await readFile(new URL('../../packages/design-kit/tokens.css', import.meta.url), 'utf8')
   ].join('\n');
 
   for (const color of ['#FBF8F2', '#0A1536', '#142B51', '#376FB7', '#F68620']) {
