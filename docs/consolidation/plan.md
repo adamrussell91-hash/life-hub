@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v2.4 — auth + repo decided; Netlify inventory filled; proxies + `knowledge-hub-archive` name-collision clarified. Ready for full Claude critique #2.  
+> **Status:** v2.5 — umbrella seed slice shipped (kit freeze + calendar stub). Life Hub Pages + `life-hub2` paths unchanged. Waiting on Claude checkpoint-01.  
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
 ## Intent
@@ -188,16 +188,40 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v2.4 | ready for critique #2 | Proxies + R2 name collision clarified 2026-09-01 |
+| Plan v2.5 | umbrella seed shipped | Slice 01 — 2026-09-01 |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
-| Claude critique #2 (full) | **unblocked** | Auth + repo + Netlify inventory in this file |
+| Claude critique #2 (full) | **deferred** | Seed implemented first per Adam; Claude audits the seed at checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
 | Deploy inventory | **filled** | See table above; `life-hub2` is absorb target |
 | Auth decision | **decided** | Retain Life Hub secrets |
 | Repo naming decision | **decided** | Reuse `life-hub`, leave as-is |
-| Design-kit mechanic | decided | Copy-then-freeze |
-| Umbrella seed | not started | |
-| Netlify retarget | not started | Target site: `life-hub2` |
+| Design-kit mechanic | decided | Copy-then-freeze into `packages/design-kit/` |
+| Umbrella seed | **shipped (partial)** | Kit freeze + calendar stub; Life app still at repo root |
+| Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
+
+### Slice 01 — what shipped
+
+- `packages/design-kit/` — frozen copy of repo-root `design-kit/` (the Pages-facing vendored kit, not a fresh `hub-design-kit` pull; that repo uses a `css/` layout that would break current `href="design-kit/*.css"` paths)
+- `apps/README.md` — documents why `apps/life/` is deferred
+- Shared calendar stub: `js/shell/calendar-sources.js` (empty registry, no live feeds) + placeholder card on the existing Calendar dashboard
+- Life Hub still builds from repo root: `scripts/prepare-web.mjs` → `dist/`; Netlify still `netlify/functions` + `included_files`
+
+### Slice 01 — deferred to fold / remount steps
+
+- Remount kit: stop publishing repo-root `design-kit/`; point `prepare-web.mjs` and JS imports at `packages/design-kit/`
+- Move Life app into `apps/life/` (would break Pages workflow + Netlify `included_files` if done now)
+- Fold Teaching / Knowledge / Tasks code or Netlify sites
+- Wire calendar sources to any hub API or external feed
+- Unified auth handler / section routing skeleton beyond this stub
+- Retarget `life-hub2` production
+- Migrate widgets off `jade-melomakarona-ea20fe`
+- Any change to `life-hub-data`
+
+### Slice 01 — `life-hub2` deploy-path risks
+
+- **None intended.** This slice does not change `netlify.toml`, function filenames, `included_files`, env var names, or secrets.
+- Dual kit copies (`design-kit/` + `packages/design-kit/`) can drift until remount — treat root `design-kit/` as the live Pages source.
+- Calendar placeholder is additive HTML/JS only; Life’s `loadLiveEvents` path is unchanged.
 
 ## Open questions (Adam)
 
@@ -208,17 +232,24 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 ## Next action
 
-Claude Code runs **full** critique #2 (execution-readiness stress test) against this plan + [`OVERSEER.md`](./OVERSEER.md).
+Claude Code runs **checkpoint-01** (observe-only audit of the umbrella seed) against this plan + [`OVERSEER.md`](./OVERSEER.md). Do not start the next implementer slice until that report lands.
 
 Paste:
 
 ```text
-You are the consolidation overseer. cwd = life-hub repo root.
-Read: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.4).
-Run full critique #2 — execution-readiness stress test of the migrate order
-against the filled Netlify inventory (life-hub2 absorb target; retain secrets).
-Treat proxies as a widgets dependency (not a hub fold). Treat Knowledge Netlify
-API and R2 bucket `knowledge-hub-archive` as separate checklist items.
-Write report only to docs/consolidation/checkpoints/checkpoint-01-critique-2.md
-Observe-only: no application code edits, no file moves, no git commits.
+You are the consolidation overseer at checkpoint-01. cwd = life-hub repo root.
+Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.5).
+
+Observe-only rules (hard):
+- Do NOT edit application code, move files, run destructive git, or commit.
+- You MAY create exactly one report:
+  docs/consolidation/checkpoints/checkpoint-01.md
+
+Inspect: git status, the umbrella-seed PR vs main, and plan.md Status
+(Slice 01 shipped / deferred / life-hub2 risks).
+
+Write the report using the template in OVERSEER.md.
+End with: next 3 concrete steps for Cursor local agent — no patches.
+If auth, life-hub-data boundary, or public student URL safety looks wrong,
+open with DO NOT MERGE YET.
 ```
