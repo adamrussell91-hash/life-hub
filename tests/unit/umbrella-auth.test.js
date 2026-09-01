@@ -44,3 +44,22 @@ test('configured-auth check and login read the retained Life env keys', async ()
   assert.match(auth, /UMBRELLA_PASSPHRASE_HASH_ENV/);
   assert.match(auth, /UMBRELLA_SESSION_SECRET_ENV/);
 });
+
+test('session cookie and secret literals live only in umbrella-auth.mjs', async () => {
+  const files = await functionSources();
+  for (const { url, source } of files) {
+    const name = url.pathname.split('/').pop();
+    if (name === 'umbrella-auth.mjs') continue;
+    assert.doesNotMatch(source, /['"]life_hub_session['"]/, name);
+    assert.doesNotMatch(source, /env\.SESSION_SECRET/, name);
+  }
+});
+
+test('functions verify sessions through umbrella helpers', async () => {
+  const http = await readFile(new URL('../../netlify/functions/_shared/http.mjs', import.meta.url), 'utf8');
+  assert.match(http, /export function readUmbrellaSessionCookie/);
+  assert.match(http, /export function umbrellaSessionSecret/);
+
+  const security = await readFile(new URL('../../netlify/functions/_shared/auth-security.mjs', import.meta.url), 'utf8');
+  assert.match(security, /UMBRELLA_SESSION_COOKIE/);
+});

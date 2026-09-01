@@ -1,5 +1,6 @@
 import {
   UMBRELLA_PASSPHRASE_HASH_ENV,
+  UMBRELLA_SESSION_COOKIE,
   UMBRELLA_SESSION_SECRET_ENV
 } from './umbrella-auth.mjs';
 
@@ -78,6 +79,14 @@ export function readCookie(request, name) {
     if (value.startsWith(prefix)) return value.slice(prefix.length);
   }
   return null;
+}
+
+export function readUmbrellaSessionCookie(request) {
+  return readCookie(request, UMBRELLA_SESSION_COOKIE);
+}
+
+export function umbrellaSessionSecret(env) {
+  return env?.[UMBRELLA_SESSION_SECRET_ENV];
 }
 
 export function methodNotAllowed(allow) {
