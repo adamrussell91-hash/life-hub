@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.1 — umbrella shell merged (PR #62). Checkpoint-08 PASS. Next: Teaching public handlers on `life-hub2` (503 if Blobs unbound).  
+> **Status:** v4.1 — umbrella shell merged (PR #62). Checkpoint-08 PASS. This slice: Teaching public handlers on `life-hub2` (503 if Blobs unbound).  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -213,7 +213,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Published kit-import check | **shipped** | PR #60 merged 2026-09-01 |
 | Kit-import from-anchor | **shipped** | PR #61 merged 2026-09-01 |
 | Umbrella shell | **shipped** | PR #62 merged 2026-09-01 |
-| Teaching public handlers | not started | Slice 09 — bind or 503; wire `isPublicStudentApi()` first |
+| Teaching public handlers | in progress | Slice 09 — public handlers + 503 if Blobs unbound |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -301,9 +301,32 @@ Land the public student API on `life-hub2` without breaking production if Blobs 
 
 ## Next action
 
-Wait for Adam: bind `teaching-hub-content` on `life-hub2` now, or land Slice 09 with 503-if-unbound.
+Claude observe-only **checkpoint-09** against the Teaching public-handlers PR.
 
-Primary checkout `~/Projects/life-hub` is still on `cursor/life-protocol-pills-c87b` with uncommitted work (~94 commits behind). Overseer/implementer cwd stays this worktree until that is committed/stashed or named as a Decision.
+Paste:
+
+```text
+You are the consolidation overseer at checkpoint-09. cwd = life-hub worktree
+~/Projects/life-hub/.worktrees/umbrella-seed-slice-01
+(not the primary checkout — that may be on an unrelated branch).
+Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v4.1).
+
+Observe-only rules (hard):
+- Do NOT edit application code, move files, run destructive git, or commit.
+- You MAY create exactly one report:
+  docs/consolidation/checkpoints/checkpoint-09.md
+
+Inspect: the Teaching public-handlers PR vs main, and plan.md Slice 09 notes.
+Confirm: only public student handlers landed; isPublicStudentApi() runs before any session gate;
+unbound teaching-hub-content Blobs returns 503 not 500; teacher-auth handlers were not copied;
+no TEACHING_HUB_PASSPHRASE_HASH / teaching_hub_session; netlify.toml and secrets unchanged;
+arteaching-hub not retired; life-hub-data untouched.
+
+Write the report using the template in OVERSEER.md.
+End with: next 3 concrete steps for Cursor local agent — no patches.
+If auth, life-hub-data boundary, or public student URL safety looks wrong,
+open with DO NOT MERGE YET.
+```
 
 ## Open questions (Adam)
 
