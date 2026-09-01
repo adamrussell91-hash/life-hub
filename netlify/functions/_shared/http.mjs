@@ -17,6 +17,10 @@ export function jsonResponse(status, body, headers = {}) {
   });
 }
 
+export function okResponse(status, data, headers = {}) {
+  return jsonResponse(status, { ok: true, data }, headers);
+}
+
 export function errorResponse(status, code, message, retryable, headers = {}) {
   return jsonResponse(status, {
     ok: false,
