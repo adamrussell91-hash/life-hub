@@ -534,6 +534,79 @@ test('make the workout after Locking it in now emits a Confirm card immediately'
   assert.equal(proposal.record.exercises.at(-1).sets[0].reps, 20);
 });
 
+test('superset pairing and It is not there emits a Confirm card without calling the model', async () => {
+  let rounds = 0;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => {
+        rounds += 1;
+        return mockedStream([{ type: 'text', delta: 'Let me get this actually saved.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  const pairingPlan = [
+    'Pairing it your way:',
+    '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
+    '3&4 superset: Reverse Grip Incline Bench Press / One Handle Arm Triceps',
+    '5&6 superset: Biceps Curl / Overhead Triceps'
+  ].join('\n');
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: "It's not there.",
+    priorAgentSlug: 'chadwick',
+    history: [
+      { role: 'assistant', content: pairingPlan },
+      { role: 'assistant', content: 'Locking this in now with cues loaded for mid-session:' }
+    ]
+  }))));
+
+  assert.equal(rounds, 0);
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a Confirm card for the superset plan in history');
+  assert.equal(proposal.record.status, 'planned');
+  assert.equal(proposal.record.exercises.length, 6);
+  assert.equal(proposal.record.exercises[0].name, 'Bar Press');
+  assert.equal(proposal.record.exercises[0].superset_group, 1);
+  assert.equal(proposal.record.exercises[0].superset_label, '1&2 superset');
+});
+
+test('a superset plan in the same Chadwick turn forces a Confirm card after the stream', async () => {
+  const pairingPlan = [
+    'Pairing it your way:',
+    '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
+    '3&4 superset: Reverse Grip Incline Bench Press / One Handle Arm Triceps'
+  ].join('\n');
+  let rounds = 0;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => {
+        rounds += 1;
+        return mockedStream([
+          { type: 'text', delta: `${pairingPlan}\n\nLocking this in now with cues loaded.` },
+          { type: 'done' }
+        ]);
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'go ahead',
+    priorAgentSlug: 'chadwick'
+  }))));
+
+  assert.equal(rounds, 1);
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal, 'expected a Confirm card when Chadwick dumps a superset plan without log_entry');
+  assert.equal(proposal.record.exercises.length, 4);
+});
+
 test('rejects an unauthenticated request', async () => {
   const handler = createChatHandler({ env: validEnv });
   const response = await handler(new Request('https://life.example/api/chat', {
@@ -3127,4 +3200,280 @@ test('non-Vera agents do not receive mind repo read tools', async () => {
 
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'get_mind_session'));
   assert.ok(!receivedArgs.tools.some(tool => tool.name === 'search_mind_records'));
+});
+
+test('every agent receives os_propose_action and Brisket can propose an allowlisted challenge write', async () => {
+  let receivedArgs;
+  const puts = [];
+  const fetchImpl = async (url, options) => {
+    if (options?.method === 'PUT') {
+      puts.push({ url });
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        receivedArgs = args;
+        yield { type: 'text', delta: 'Opening that tracker.' };
+        const result = await args.executeTools({
+          id: 'call_act',
+          name: 'os_propose_action',
+          input: {
+            intent: 'open a 7-day no-refined-sugar tracker',
+            writes: [{
+              path: 'data/challenges/2026-08-01-no-sugar.json',
+              mode: 'create',
+              content: JSON.stringify({ title: 'No refined sugar', duration_days: 7 }, null, 2),
+              diff: 'new challenge file'
+            }]
+          }
+        });
+        assert.equal(JSON.parse(result).status, 'awaiting_confirm');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Brisket, open a no-sugar week tracker',
+    priorAgentSlug: 'brisket'
+  }))));
+
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'os_propose_action'));
+  assert.match(receivedArgs.system, /os_propose_action/);
+  const card = events.find(event => event.type === 'action_proposal');
+  assert.ok(card, 'expected action_proposal SSE event');
+  assert.equal(card.proposal.intent, 'open a 7-day no-refined-sugar tracker');
+  assert.equal(card.proposal.writes[0].path, 'data/challenges/2026-08-01-no-sugar.json');
+  assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
+});
+
+test('os_propose_action rejects Brisket writes outside allowlist without a Confirm card', async () => {
+  const liveHandler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      async *streamMessage({ executeTools }) {
+        const result = await executeTools({
+          id: 'call_bad',
+          name: 'os_propose_action',
+          input: {
+            intent: 'rewrite medical constraints',
+            writes: [{ path: 'central-node.md', mode: 'overwrite', content: '# nope' }]
+          }
+        });
+        assert.equal(JSON.parse(result).error, 'write_path_denied');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await liveHandler(request({
+    message: 'Brisket, rewrite central node',
+    priorAgentSlug: 'brisket'
+  }))));
+  assert.ok(!events.some(event => event.type === 'action_proposal'));
+});
+
+test('Brisket track_open_challenge yields action_proposal Confirm card', async () => {
+  let receivedArgs;
+  const puts = [];
+  const fetchImpl = async (url, options) => {
+    if (options?.method === 'PUT') {
+      puts.push({ url });
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  // Keep now within the fixture session lifetime (issued 2026-08-01; expires exactly 30d later).
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        receivedArgs = args;
+        yield { type: 'text', delta: 'Opening that challenge.' };
+        const result = await args.executeTools({
+          id: 'call_track',
+          name: 'track_open_challenge',
+          input: { title: 'No refined sugar', goal: '7 days clean' }
+        });
+        assert.equal(JSON.parse(result).status, 'awaiting_confirm');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Brisket, open a no-sugar challenge for me this week',
+    priorAgentSlug: 'brisket'
+  }))));
+
+  assert.ok(receivedArgs, 'expected Anthropic streamMessage to run');
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'track_open_challenge'));
+  const card = events.find(event => event.type === 'action_proposal');
+  assert.ok(card, 'expected action_proposal SSE event from track shortcut');
+  assert.match(card.proposal.intent, /challenge/i);
+  assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
+});
+
+test('Brisket os_run_promoted_shortcut yields action_proposal from catalogued draft', async () => {
+  let receivedArgs;
+  const puts = [];
+  const draftPath = 'data/os/promoted-shortcuts/track-morning-weigh-in.json';
+  const draftSha = 'e'.repeat(40);
+  const draftContent = JSON.stringify({
+    id: 'promo_test',
+    proposed_id: 'track.morning-weigh-in',
+    summary: 'Morning weigh-in tracker',
+    example_intent: 'log morning weight',
+    example_writes: [{
+      path: 'data/challenges/2026-08-31-weigh-in.json',
+      mode: 'create',
+      content: '{\n  "title": "Morning weigh-in"\n}\n',
+      diff: 'new weigh-in challenge'
+    }],
+    risk: 'confirm',
+    status: 'ready'
+  }, null, 2);
+
+  const fetchImpl = async (url, options) => {
+    if (options?.method === 'PUT') {
+      puts.push({ url });
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: draftPath, type: 'blob', sha: draftSha, size: draftContent.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${draftSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(draftContent, 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        receivedArgs = args;
+        yield { type: 'text', delta: 'Running that promoted shortcut.' };
+        const result = await args.executeTools({
+          id: 'call_run',
+          name: 'os_run_promoted_shortcut',
+          input: { proposed_id: 'track.morning-weigh-in' }
+        });
+        assert.equal(JSON.parse(result).status, 'awaiting_confirm');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Brisket, run the promoted shortcut for morning weigh-in',
+    priorAgentSlug: 'brisket'
+  }))));
+
+  assert.ok(receivedArgs, 'expected Anthropic streamMessage to run');
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'os_run_promoted_shortcut'));
+  const card = events.find(event => event.type === 'action_proposal');
+  assert.ok(card, 'expected action_proposal SSE event from promoted shortcut run');
+  assert.match(card.proposal.intent, /morning/i);
+  assert.equal(card.proposal.writes[0].path, 'data/challenges/2026-08-31-weigh-in.json');
+  assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
+});
+
+test('Brisket catalogued promoted draft appears as a named dynamic tool', async () => {
+  let receivedArgs;
+  const draftPath = 'data/os/promoted-shortcuts/track-morning-weigh-in.json';
+  const draftSha = 'e'.repeat(40);
+  const draftContent = JSON.stringify({
+    id: 'promo_test',
+    proposed_id: 'track.morning-weigh-in',
+    tool_name: 'track_morning_weigh_in',
+    summary: 'Morning weigh-in tracker',
+    example_intent: 'log morning weight',
+    example_writes: [{
+      path: 'data/challenges/2026-08-31-weigh-in.json',
+      mode: 'create',
+      content: '{\n  "title": "Morning weigh-in"\n}\n',
+      diff: 'new weigh-in challenge'
+    }],
+    risk: 'confirm',
+    status: 'ready'
+  }, null, 2);
+
+  const fetchImpl = async (url, options) => {
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: draftPath, type: 'blob', sha: draftSha, size: draftContent.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${draftSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(draftContent, 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        receivedArgs = args;
+        yield { type: 'text', delta: 'Using the named promoted shortcut.' };
+        assert.ok(args.tools.some(tool => tool.name === 'track_morning_weigh_in'));
+        const result = await args.executeTools({
+          id: 'call_named',
+          name: 'track_morning_weigh_in',
+          input: {}
+        });
+        assert.equal(JSON.parse(result).status, 'awaiting_confirm');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  await readSse(await handler(request({
+    message: 'Brisket, log my morning weigh-in using the promoted shortcut',
+    priorAgentSlug: 'brisket'
+  })));
+
+  assert.ok(receivedArgs?.tools.some(tool => tool.name === 'track_morning_weigh_in'));
 });

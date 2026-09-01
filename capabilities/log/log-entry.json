@@ -1,0 +1,24 @@
+{
+  "id": "log.entry",
+  "tool_name": "log_entry",
+  "verb": "Log",
+  "agents": ["brisket", "chadwick", "hyaluronica", "penelope", "sara", "vera"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "legacy_tool": "log_entry",
+  "inputs": {
+    "type": "string",
+    "date": "YYYY-MM-DD",
+    "time": "HH:MM?",
+    "notes": "string?",
+    "fields": "object"
+  },
+  "side_effects": [
+    "Renders a Confirm card for the structured record",
+    "On Confirm, writes the canonical data/<domain>/… markdown file",
+    "May update Central Node Flags / Recent Actions"
+  ],
+  "surfaces": ["confirm_card", "central_node", "domain_tab"],
+  "prompt_one_liner": "Propose one Life Hub record for Adam to review and confirm before it is saved.",
+  "reads": ["central_node", "recent_digest"]
+}

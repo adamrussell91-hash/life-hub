@@ -1,0 +1,23 @@
+{
+  "agent": "vera",
+  "write_globs": [
+    "data/mind/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/research/**",
+    "data/widgets/**",
+    "data/os/**",
+    "intuition/**"
+  ],
+  "read_globs": [
+    "data/mind/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/research/**",
+    "central-node.md",
+    "data/governance/governance-log.md",
+    "data/widgets/**",
+    "data/os/**",
+    "intuition/**"
+  ]
+}

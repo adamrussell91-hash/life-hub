@@ -426,6 +426,70 @@ export function appendCnPatchProposal(root, { patch }) {
   return { card, confirm, discard };
 }
 
+export function appendActionProposal(root, { proposal }) {
+  const list = root.querySelector('#chat-messages');
+  if (!list) return null;
+  const card = root.createElement('li');
+  card.className = 'record-proposal action-proposal';
+
+  const eyebrow = root.createElement('p');
+  eyebrow.className = 'record-proposal__eyebrow';
+  eyebrow.textContent = 'Proposed action';
+  card.append(eyebrow);
+
+  const summary = root.createElement('p');
+  summary.className = 'action-proposal__summary';
+  summary.textContent = typeof proposal?.intent === 'string' && proposal.intent.trim()
+    ? proposal.intent.trim()
+    : 'Proposed durable write';
+  card.append(summary);
+
+  if (typeof proposal?.agent === 'string' && proposal.agent.trim()) {
+    const meta = root.createElement('p');
+    meta.className = 'action-proposal__meta';
+    meta.textContent = `via ${proposal.agent}`;
+    card.append(meta);
+  }
+
+  const writes = Array.isArray(proposal?.writes) ? proposal.writes : [];
+  if (writes.length > 0) {
+    const diffs = root.createElement('ul');
+    diffs.className = 'action-proposal__diffs';
+    for (const write of writes) {
+      const item = root.createElement('li');
+      const path = root.createElement('code');
+      path.textContent = typeof write?.path === 'string' ? write.path : '(unknown path)';
+      item.append(path);
+      const detail = root.createElement('div');
+      detail.className = 'action-proposal__diff';
+      const mode = typeof write?.mode === 'string' ? write.mode : 'write';
+      const diff = typeof write?.diff === 'string' && write.diff.trim()
+        ? write.diff.trim()
+        : mode;
+      detail.textContent = `${mode}: ${diff}`;
+      item.append(detail);
+      diffs.append(item);
+    }
+    card.append(diffs);
+  }
+
+  const confirm = root.createElement('button');
+  confirm.type = 'button';
+  confirm.className = 'record-proposal__confirm';
+  confirm.textContent = 'Confirm';
+  card.append(confirm);
+
+  const discard = root.createElement('button');
+  discard.type = 'button';
+  discard.className = 'record-proposal__discard';
+  discard.textContent = 'Discard';
+  card.append(discard);
+
+  list.append(card);
+  list.scrollTop = list.scrollHeight;
+  return { card, confirm, discard };
+}
+
 export function setChatBusy(root, busy) {
   const input = root.querySelector('#chat-input');
   const button = root.querySelector('#chat-send');

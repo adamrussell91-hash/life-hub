@@ -194,6 +194,30 @@ function validateWorkout(record, errors) {
       if (exercise.intensification != null) {
         enumeration(exercise, 'intensification', INTENSIFICATIONS, errors);
       }
+      finiteNumber(exercise, 'superset_group', errors, { minimum: 1 });
+      optionalString(exercise, 'superset_label', errors);
+      if (exercise.between_sets != null) {
+        if (!isObject(exercise.between_sets)) {
+          errors.push(`${prefix}.between_sets must be an object`);
+        } else if (typeof exercise.between_sets.name !== 'string' || !exercise.between_sets.name.trim()) {
+          errors.push(`${prefix}.between_sets.name must be a non-empty string`);
+        } else if (exercise.between_sets.sets != null) {
+          if (!Array.isArray(exercise.between_sets.sets)) {
+            errors.push(`${prefix}.between_sets.sets must be an array`);
+          } else {
+            exercise.between_sets.sets.forEach((set, setIndex) => {
+              const setPrefix = `${prefix}.between_sets.sets[${setIndex}]`;
+              if (!isObject(set)) {
+                errors.push(`${setPrefix} must be an object`);
+                return;
+              }
+              finiteNumber(set, 'reps', errors, { required: true });
+              finiteNumber(set, 'weight_kg', errors, { required: true, minimum: 0 });
+              enumeration(set, 'cable_type', CABLE_TYPES, errors, true);
+            });
+          }
+        }
+      }
       if (exercise.coach_cues != null) {
         if (!isObject(exercise.coach_cues)) {
           errors.push(`${prefix}.coach_cues must be an object`);

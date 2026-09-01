@@ -56,11 +56,10 @@ import {
 import { syncChallengeToCentralNode } from '../../js/core/nutrition-challenge-cn.js';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
-import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug, logEntryRejectionPayload } from './_shared/chat-schema.mjs';
+import { validateLogEntry, buildCanonicalPath, buildRecordSlug, logEntryRejectionPayload } from './_shared/chat-schema.mjs';
 import { persistLogEntry, describeRecordForLog } from './_shared/persist-log.mjs';
 import {
   FOOD_LIBRARY_PATH,
-  foodLibraryEntrySchema,
   formatFoodLibraryForPrompt,
   parseFoodLibrary,
   upsertFoodLibraryEntry,
@@ -71,9 +70,7 @@ import {
   EXERCISE_LIBRARY_PATH,
   formatExerciseLibraryForPrompt,
   parseExerciseLibrary,
-  saveExerciseLibraryEntrySchema,
   searchExerciseLibrary,
-  searchExerciseLibrarySchema,
   upsertExerciseLibraryEntry,
   validateExerciseLibraryEntry
 } from './_shared/exercise-library.mjs';
@@ -82,15 +79,9 @@ import {
   applySetSkincareRoutineMembership,
   executeListSkincareRoutines,
   executeSearchSkincareLibrary,
-  formatSkincareRoutinesForPrompt,
-  listSkincareRoutinesSchema,
-  saveSkincareLibraryEntrySchema,
-  searchSkincareLibrarySchema,
-  setSkincareRoutineMembershipSchema
+  formatSkincareRoutinesForPrompt
 } from './_shared/skincare-library-tools.mjs';
 import {
-  proposeCentralNodePatchSchema,
-  appendGovernanceLogSchema,
   validateCentralNodePatchInput,
   validateGovernanceLogAppendInput,
   classifyCentralNodePatchRisk,
@@ -105,6 +96,23 @@ import {
   purgeStalePendingCnPatches,
   formatPendingCnPatchesForPrompt
 } from './_shared/cn-patch-queue.mjs';
+import { buildAgentTools } from './_shared/capabilities/registry.mjs';
+import {
+  buildPromotedShortcutToolSchemas,
+  findPromotedDraftByToolName,
+  isPromotedShortcutToolName,
+  loadPromotedShortcutDrafts
+} from './_shared/capabilities/promoted-shortcut-tools.mjs';
+import {
+  PENDING_ACTIONS_PATH,
+  createPendingActionId,
+  parsePendingActions,
+  serializePendingActions,
+  addPendingAction,
+  validateProposeActionInput
+} from './_shared/capabilities/propose-action.mjs';
+import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
+import { loadIntuitionFor, formatIntuitionForPrompt } from './_shared/capabilities/intuition.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -152,9 +160,7 @@ import {
 } from './_shared/mind-digest.mjs';
 import {
   getMindSession,
-  getMindSessionSchema,
-  searchMindRecords,
-  searchMindRecordsSchema
+  searchMindRecords
 } from './_shared/mind-session-read.mjs';
 import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
@@ -282,33 +288,10 @@ export function createChatHandler({
     }
 
     const nowInstant = new Date(now());
-    const tools = [
-      // No max_uses — a use cap turns one miss into a guess. Agents iterate.
-      // Finalize / flush: log_entry only — web_search burned the turn before Confirm.
-      ...(stripWebSearch ? [] : [{ type: 'web_search_20250305', name: 'web_search' }]),
-      ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
-      ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
-      ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : []),
-      ...(slug === 'vera' ? [getMindSessionSchema(), searchMindRecordsSchema()] : []),
-      ...(needsSkincareLibrary
-        ? [
-            listSkincareRoutinesSchema(),
-            searchSkincareLibrarySchema(),
-            saveSkincareLibraryEntrySchema(),
-            setSkincareRoutineMembershipSchema()
-          ]
-        : []),
-      ...(needsHammondTools
-        ? [proposeCentralNodePatchSchema(), appendGovernanceLogSchema()]
-        : []),
-      ...(needsNutritionChallenges
-        ? [
-            listNutritionChallengesSchema(),
-            upsertNutritionChallengeSchema(),
-            markNutritionChallengeDaySchema()
-          ]
-        : [])
-    ];
+    // Base tools are built after repo tree load so promoted-shortcut drafts can
+    // become per-draft named tools without mutating capabilities/registry.json.
+    let tools = [];
+    let promotedShortcutDrafts = [];
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -344,6 +327,8 @@ export function createChatHandler({
           });
           if (validation.valid) {
             await persistOrProposeLogEntry({ client, slug, today, validation, send });
+          } else {
+            send({ type: 'record_rejected', errors: validation.errors });
           }
           send({ type: 'done' });
           controller.close();
@@ -363,6 +348,8 @@ export function createChatHandler({
         let governanceLogTail = '';
         let pendingCnPatches = [];
         let pendingCnPatchesSha;
+        let pendingActions = [];
+        let pendingActionsSha;
         let hammondDigest = '';
         let hammondCnSummary = '';
         let foodLibraryEntries = [];
@@ -416,6 +403,10 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === PENDING_CN_PATCHES_PATH && entry.type === 'blob')
             : null;
           pendingCnPatchesSha = pendingCnPatchesEntry?.sha;
+          const pendingActionsEntry = current.tree.find(
+            entry => entry.path === PENDING_ACTIONS_PATH && entry.type === 'blob'
+          );
+          pendingActionsSha = pendingActionsEntry?.sha;
           const foodLibraryEntry = needsFoodLibrary
             ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
             : null;
@@ -478,6 +469,7 @@ export function createChatHandler({
             centralNodeBlob,
             governanceLogBlob,
             pendingCnPatchesBlob,
+            pendingActionsBlob,
             foodLibraryBlob,
             nutritionChallengesBlob,
             exerciseLibraryBlob,
@@ -497,6 +489,7 @@ export function createChatHandler({
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
             governanceLogEntry ? client.readBlob(governanceLogEntry.sha) : null,
             pendingCnPatchesEntry ? client.readBlob(pendingCnPatchesEntry.sha) : null,
+            pendingActionsEntry ? client.readBlob(pendingActionsEntry.sha) : null,
             foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
             nutritionChallengesEntry ? client.readBlob(nutritionChallengesEntry.sha) : null,
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
@@ -560,6 +553,9 @@ export function createChatHandler({
             const decodedPendingCnPatches = pendingCnPatchesBlob ? decodeBlob(pendingCnPatchesBlob) : null;
             pendingCnPatches = purgeStalePendingCnPatches(parsePendingCnPatches(decodedPendingCnPatches), today);
           }
+
+          const decodedPendingActions = pendingActionsBlob ? decodeBlob(pendingActionsBlob) : null;
+          pendingActions = parsePendingActions(decodedPendingActions);
 
           const decodedFoodLibrary = foodLibraryBlob ? decodeBlob(foodLibraryBlob) : null;
           if (decodedFoodLibrary !== null) {
@@ -755,6 +751,37 @@ export function createChatHandler({
           repoTree = [];
         }
 
+        try {
+          promotedShortcutDrafts = await loadPromotedShortcutDrafts(
+            repoTree,
+            async sha => decodeBlob(await client.readBlob(sha)),
+            { limit: 12 }
+          );
+        } catch {
+          promotedShortcutDrafts = [];
+        }
+        tools = [
+          ...buildAgentTools({
+            slug,
+            allowedTypes,
+            stripWebSearch,
+            needsFoodLibrary,
+            needsExerciseLibrary,
+            needsSkincareLibrary,
+            needsHammondTools,
+            needsVeraMindTools: slug === 'vera',
+            message: parsed.message
+          }),
+          ...(needsNutritionChallenges
+            ? [
+                listNutritionChallengesSchema(),
+                upsertNutritionChallengeSchema(),
+                markNutritionChallengeDaySchema()
+              ]
+            : []),
+          ...buildPromotedShortcutToolSchemas(promotedShortcutDrafts)
+        ];
+
         const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
         const hyaluronicaProtocol = slug === 'hyaluronica' ? loadHyaluronicaProtocol() : '';
         const penelopeProtocol = slug === 'penelope' ? loadPenelopeProtocol() : '';
@@ -765,6 +792,8 @@ export function createChatHandler({
         const skincareRoutines = needsSkincareLibrary
           ? formatSkincareRoutinesForPrompt(skincareMembership, skincareLibrary)
           : '';
+        const intuitionPacks = loadIntuitionFor({ agentSlug: slug });
+        const intuitionPrompt = formatIntuitionForPrompt(intuitionPacks);
         const system = buildSystemPrompt({
           slug,
           digest,
@@ -802,7 +831,8 @@ export function createChatHandler({
           onThisDay,
           daysSinceLastEntry,
           daysSinceLastMindSession,
-          protocolSteer: protocolSteerBlock(slug, parsed.protocolId)
+          protocolSteer: protocolSteerBlock(slug, parsed.protocolId),
+          intuition: intuitionPrompt
         });
 
         let pendingLogRejection = null;
@@ -831,6 +861,28 @@ export function createChatHandler({
             // Swallowed — see comment above.
           }
           send({ type: 'cn_patch_proposal', patch, id: persistedId });
+          return persistedId;
+        };
+
+        // os.propose-action: validate allowlist, persist pending queue, emit Confirm card with diffs.
+        const proposeOsAction = async proposal => {
+          let persistedId = null;
+          try {
+            const entry = { id: createPendingActionId(), createdAt: today, slug, proposal };
+            const nextQueue = addPendingAction(pendingActions, entry);
+            const result = await client.writeFile({
+              path: PENDING_ACTIONS_PATH,
+              content: serializePendingActions(nextQueue),
+              ...(pendingActionsSha ? { sha: pendingActionsSha } : {}),
+              message: `chore(propose-action): queue ${proposal.intent}`.slice(0, 200)
+            });
+            pendingActions = nextQueue;
+            pendingActionsSha = result.sha;
+            persistedId = entry.id;
+          } catch {
+            // Same-turn Confirm still works if the queue write fails.
+          }
+          send({ type: 'action_proposal', proposal, id: persistedId });
           return persistedId;
         };
         try {
@@ -1236,6 +1288,68 @@ export function createChatHandler({
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
               }
+              
+              if (isShortcutTool(event.name) || isPromotedShortcutToolName(event.name, promotedShortcutDrafts)) {
+                const promotedDraft = findPromotedDraftByToolName(event.name, promotedShortcutDrafts);
+                const shortcutName = promotedDraft ? 'os_run_promoted_shortcut' : event.name;
+                const shortcutInput = promotedDraft
+                  ? { proposed_id: promotedDraft.proposed_id, ...(event.input ?? {}) }
+                  : (event.input ?? {});
+                const shortcutResult = await executeShortcut(shortcutName, shortcutInput, {
+                  client,
+                  agentSlug: slug,
+                  today,
+                  repoTree,
+                  readBlob: async sha => decodeBlob(await client.readBlob(sha))
+                });
+                if (shortcutResult.kind === 'propose' || shortcutResult.kind === 'loan_confirm') {
+                  const proposalInput = shortcutResult.proposal;
+                  const validated = validateProposeActionInput(proposalInput, { agentSlug: slug });
+                  if (!validated.ok) {
+                    return JSON.stringify({
+                      ok: false,
+                      error: validated.error,
+                      ...(validated.detail ? { detail: validated.detail } : {})
+                    });
+                  }
+                  const pendingId = await proposeOsAction(validated.proposal);
+                  return JSON.stringify({
+                    ok: true,
+                    status: 'awaiting_confirm',
+                    intent: validated.proposal.intent,
+                    writes: validated.proposal.writes.map(write => ({
+                      path: write.path,
+                      mode: write.mode,
+                      diff: write.diff
+                    })),
+                    ...(pendingId ? { pendingId } : {}),
+                    ...(shortcutResult.loan ? { loan: shortcutResult.loan } : {})
+                  });
+                }
+                return JSON.stringify(shortcutResult);
+              }
+              if (event.name === 'os_propose_action') {
+                const validated = validateProposeActionInput(event.input, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  intent: validated.proposal.intent,
+                  writes: validated.proposal.writes.map(write => ({
+                    path: write.path,
+                    mode: write.mode,
+                    diff: write.diff
+                  })),
+                  ...(pendingId ? { pendingId } : {})
+                });
+              }
               return null;
             }
           };
@@ -1274,6 +1388,40 @@ export function createChatHandler({
                 await proposeCentralNodePatch(patch);
               } else {
                 send(event);
+              }
+            } else if (
+              event.type === 'tool_call'
+              && (isShortcutTool(event.name) || isPromotedShortcutToolName(event.name, promotedShortcutDrafts))
+            ) {
+              const promotedDraft = findPromotedDraftByToolName(event.name, promotedShortcutDrafts);
+              const shortcutName = promotedDraft ? 'os_run_promoted_shortcut' : event.name;
+              const shortcutInput = promotedDraft
+                ? { proposed_id: promotedDraft.proposed_id, ...(event.input ?? {}) }
+                : (event.input ?? {});
+              const shortcutResult = await executeShortcut(shortcutName, shortcutInput, {
+                client,
+                agentSlug: slug,
+                today,
+                repoTree,
+                readBlob: async sha => decodeBlob(await client.readBlob(sha))
+              });
+              if (shortcutResult.kind === 'propose' || shortcutResult.kind === 'loan_confirm') {
+                const validated = validateProposeActionInput(shortcutResult.proposal, { agentSlug: slug });
+                if (validated.ok) await proposeOsAction(validated.proposal);
+                else send({ type: 'action_rejected', error: validated.error, ...(validated.detail ? { detail: validated.detail } : {}) });
+              } else {
+                send(event);
+              }
+            } else if (event.type === 'tool_call' && event.name === 'os_propose_action') {
+              const validated = validateProposeActionInput(event.input, { agentSlug: slug });
+              if (validated.ok) {
+                await proposeOsAction(validated.proposal);
+              } else {
+                send({
+                  type: 'action_rejected',
+                  error: validated.error,
+                  ...(validated.detail ? { detail: validated.detail } : {})
+                });
               }
             } else {
               send(event);

@@ -723,6 +723,38 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .record-proposal__discard { background: transparent; color: var(--muted); }
 
+.action-proposal__summary,
+.cn-patch-proposal__summary {
+  margin: 0.35rem 0 0;
+  font-weight: 600;
+  color: var(--depth);
+}
+
+.action-proposal__meta,
+.cn-patch-proposal__meta {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.action-proposal__diffs {
+  margin: 0.75rem 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.action-proposal__diffs code {
+  font-size: var(--text-sm);
+  word-break: break-all;
+}
+
+.action-proposal__diff {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin-top: 0.15rem;
+}
+
 .record-proposal__eyebrow {
   margin: 0;
   color: var(--muted);
@@ -766,6 +798,69 @@ main { max-width: 76rem; margin: 0 auto; }
   padding: 0;
   display: grid;
   gap: 0;
+}
+
+.workout-plan-card__group {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+
+.workout-plan-card__group:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.workout-plan-card__group-label {
+  margin: 0 0 var(--space-2);
+  color: var(--wave);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.workout-plan-card__group-exercises {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--wave) 7%, transparent);
+  display: grid;
+  gap: 0;
+}
+
+.workout-plan-card__group--between .workout-plan-card__group-exercises {
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+
+.workout-plan-card__row--paired {
+  padding: var(--space-2) 0;
+  min-height: 40px;
+  border-top: 0;
+}
+
+.workout-plan-card__row--paired:first-child {
+  padding-top: 0;
+}
+
+.workout-plan-card__connector {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  color: var(--wave);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.workout-plan-card__between {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
 }
 
 .workout-plan-card__row {
@@ -1272,6 +1367,51 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-muscle-strip--card .fitness-muscle-strip__img { height: 44px; }
 
 .fitness-templates-card { overflow: hidden; }
+.fitness-surface-widgets-card { overflow: hidden; }
+.fitness-surface-widgets-rail {
+  display: grid;
+  gap: 0.75rem;
+}
+.nutrition-surface-widgets-card { overflow: hidden; }
+.nutrition-surface-widgets-rail {
+  display: grid;
+  gap: 0.75rem;
+}
+.surface-widget-meal-plan {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.surface-widget-meal-plan__day {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: var(--text-sm);
+}
+.surface-widget-meal-plan__label {
+  font-weight: 600;
+  color: var(--depth, #142b51);
+}
+.surface-widget-meal-plan__text {
+  color: var(--muted, #5a6d86);
+}
+.surface-widget-card {
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-md, 0.75rem);
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(20, 43, 81, 0.08);
+}
+.surface-widget-card__title {
+  margin: 0 0 0.55rem;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ink, #142b51);
+}
+.surface-widget-card__progress { margin-bottom: 0.35rem; }
+.surface-widget-card__subtitle { margin: 0; }
 .fitness-templates-rail {
   display: flex;
   gap: 0.75rem;

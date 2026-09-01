@@ -41,8 +41,17 @@ test('claimedPlanLocked catches Chadwick narrating a save he never made', () => 
   assert.equal(claimedPlanLocked('Alright king, LOCKED IN. Full 10-movement Option B.'), true);
   assert.equal(claimedPlanLocked('Logging this as your plan now — go crush it.'), true);
   assert.equal(claimedPlanLocked('Locking it in now.'), true);
+  assert.equal(claimedPlanLocked('Locking this in now with cues loaded for mid-session:'), true);
   assert.equal(claimedPlanLocked('Locking this onto Fitness.'), true);
+  assert.equal(claimedPlanLocked('Let me get this actually saved as the plan for today with the superset pairing baked in.'), true);
   assert.equal(claimedPlanLocked('Want me to lock this in as planned, or shuffle any exercises first?'), false);
+});
+
+test('isWorkoutLockIn catches missing-plan complaints', () => {
+  assert.equal(isWorkoutLockIn("It's not there."), true);
+  assert.equal(isWorkoutLockIn('not on fitness'), true);
+  assert.equal(isWorkoutLockIn("didn't save"), true);
+  assert.equal(isWorkoutLockIn('where is the workout'), true);
 });
 
 test('shouldForceChadwickPlanProposal fires on lock-in even when this turn has no list', () => {
@@ -58,6 +67,26 @@ test('shouldForceChadwickPlanProposal fires on lock-in even when this turn has n
   }), false);
 });
 
+test('shouldForceChadwickPlanProposal fires when he claims saved without a numbered list in the same turn', () => {
+  assert.equal(shouldForceChadwickPlanProposal({
+    userMessage: 'sounds good',
+    assistantText: 'Locking this in now with cues loaded for mid-session:',
+    sawLogEntry: false
+  }), true);
+});
+
+test('shouldForceChadwickPlanProposal fires when he dumps a superset plan without claiming saved', () => {
+  const pairing = [
+    '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
+    '3&4 superset: Reverse Grip Incline Bench Press / One Handle Arm Triceps'
+  ].join('\n');
+  assert.equal(shouldForceChadwickPlanProposal({
+    userMessage: 'sounds good',
+    assistantText: pairing,
+    sawLogEntry: false
+  }), true);
+});
+
 test('shouldForceChadwickPlanProposal also fires when he claims locked and dumps a plan', () => {
   assert.equal(shouldForceChadwickPlanProposal({
     userMessage: 'you changed it from 8 to 6',
@@ -70,6 +99,11 @@ test('shouldNudgeUnsavedWorkoutPlan is Chadwick-only and skips once a Confirm ca
   assert.equal(shouldNudgeUnsavedWorkoutPlan({
     agentSlug: 'chadwick',
     assistantText: PLAN,
+    sawRecordProposal: false
+  }), true);
+  assert.equal(shouldNudgeUnsavedWorkoutPlan({
+    agentSlug: 'chadwick',
+    assistantText: 'Locking this in now with cues loaded for mid-session:',
     sawRecordProposal: false
   }), true);
   assert.equal(shouldNudgeUnsavedWorkoutPlan({

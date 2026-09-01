@@ -1,0 +1,15 @@
+{
+  "id": "research.save-brief",
+  "tool_name": "research_save_brief",
+  "verb": "Research",
+  "agents": [
+    "*"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Save a lookup as a durable dated research brief instead of leaving it in scrollback.",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}

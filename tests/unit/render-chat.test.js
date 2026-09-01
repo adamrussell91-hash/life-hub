@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMessage, appendRecordProposal, appendCnPatchProposal, renderChatMarkdown, renderInlineMarkdown } from '../../js/app/render-chat.js';
+import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, renderChatMarkdown, renderInlineMarkdown } from '../../js/app/render-chat.js';
 
 class FakeElement {
   constructor(tag) {
@@ -452,4 +452,36 @@ test('renderChatMarkdown leaves ordinary chat as multiline markdown', () => {
   assert.equal(container.children[0].tagName, 'p');
   assert.equal(container.children[0].children[0].textContent, 'First.');
   assert.equal(container.children[1].children[0].textContent, 'Second.');
+});
+
+test('appendActionProposal renders intent, path diffs, and Confirm/Discard', () => {
+  const root = new FakeDocument();
+  const { card, confirm, discard } = appendActionProposal(root, {
+    proposal: {
+      agent: 'brisket',
+      intent: 'open a 7-day no-refined-sugar tracker',
+      writes: [{
+        path: 'data/challenges/2026-08-01-no-sugar.json',
+        mode: 'create',
+        diff: 'new challenge file'
+      }]
+    }
+  });
+
+  assert.ok(card);
+  assert.match(card.className, /action-proposal/);
+  assert.equal(
+    card.children.find(child => child.className === 'action-proposal__summary')?.textContent,
+    'open a 7-day no-refined-sugar tracker'
+  );
+  assert.equal(
+    card.children.find(child => child.className === 'action-proposal__meta')?.textContent,
+    'via brisket'
+  );
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  assert.ok(diffs);
+  assert.match(diffs.children[0].children[0].textContent, /data\/challenges\/2026-08-01-no-sugar\.json/);
+  assert.match(diffs.children[0].children[1].textContent, /create: new challenge file/);
+  assert.equal(confirm.textContent, 'Confirm');
+  assert.equal(discard.textContent, 'Discard');
 });

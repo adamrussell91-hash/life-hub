@@ -104,6 +104,47 @@ export function parseWorkoutSet(raw, fallbackIndex = 0) {
   };
 }
 
+function parseSupersetPairingLine(line) {
+  const match = /^\s*(\d+(?:&\d+)?)\s+(superset|straight after[^:]*):\s*(.+)$/i.exec(String(line ?? '').trim());
+  if (!match) return null;
+  const label = match[1].trim();
+  const straight = /straight after/i.test(match[2]);
+  const chunk = match[3].replace(/\s*→\s*/g, ' / ');
+  const names = chunk
+    .split('/')
+    .map(part => part.replace(/\bburnout\b/gi, '').replace(/\s+/g, ' ').trim())
+    .filter(name => name.length >= 3);
+  if (names.length === 0) return null;
+  return { label, straight, names };
+}
+
+export function parseSupersetPairing(text) {
+  if (typeof text !== 'string' || text.trim() === '') return null;
+  const exercises = [];
+  let group = 0;
+  for (const line of text.split('\n')) {
+    const parsedLine = parseSupersetPairingLine(line);
+    if (!parsedLine) continue;
+    group += 1;
+    const supersetLabel = parsedLine.straight
+      ? `${parsedLine.label} straight`
+      : `${parsedLine.label} superset`;
+    parsedLine.names.forEach((name, index) => {
+      exercises.push({
+        name,
+        cue: '',
+        sets: [],
+        between: null,
+        superset_group: group,
+        ...(index === 0 ? { superset_label: supersetLabel } : {})
+      });
+    });
+  }
+  if (exercises.length < 2) return null;
+  const intro = text.split('\n').find(entry => /pairing|superset|burnout/i.test(entry)) ?? '';
+  return { intro: intro.trim(), exercises, outro: '' };
+}
+
 function findExerciseStarts(text) {
   const starts = [];
   ITEM_START.lastIndex = 0;
@@ -186,7 +227,15 @@ export function parseWorkoutChat(text) {
 export function flattenWorkoutExercises(plan) {
   const exercises = [];
   for (const exercise of plan?.exercises ?? []) {
-    if (exercise.sets.length) exercises.push(exercise);
+    if (exercise.sets.length) {
+      const row = { ...exercise };
+      if (exercise.between?.sets?.length) {
+        row.between_sets = mapBetweenSetsExercise(exercise.between);
+        delete row.between;
+      }
+      exercises.push(row);
+      continue;
+    }
     if (exercise.between?.sets?.length) {
       exercises.push({
         ...exercise.between,
@@ -195,6 +244,50 @@ export function flattenWorkoutExercises(plan) {
     }
   }
   return exercises;
+}
+
+function mapBetweenSetsExercise(between) {
+  return {
+    name: between.name,
+    sets: (between.sets ?? [])
+      .filter(set => set.reps != null && set.weightKg != null)
+      .map(set => ({
+        reps: set.reps,
+        weight_kg: set.weightKg,
+        cable_type: normalizeCableType(set.cable)
+      }))
+  };
+}
+
+function mapRecordExercise(exercise) {
+  const mapped = {
+    name: exercise.name,
+    ...(exercise.superset_group != null ? { superset_group: exercise.superset_group } : {}),
+    ...(typeof exercise.superset_label === 'string' && exercise.superset_label.trim()
+      ? { superset_label: exercise.superset_label.trim() }
+      : {}),
+    sets: (exercise.sets ?? [])
+      .filter(set => set.reps != null && set.weightKg != null)
+      .map(set => ({
+        reps: set.reps,
+        weight_kg: set.weightKg,
+        cable_type: normalizeCableType(set.cable)
+      }))
+  };
+  if (exercise.between?.sets?.length) {
+    mapped.between_sets = mapBetweenSetsExercise(exercise.between);
+  }
+  return mapped;
+}
+
+function mapNameOnlyExercise(exercise) {
+  return {
+    name: exercise.name,
+    ...(exercise.superset_group != null ? { superset_group: exercise.superset_group } : {}),
+    ...(typeof exercise.superset_label === 'string' && exercise.superset_label.trim()
+      ? { superset_label: exercise.superset_label.trim() }
+      : {})
+  };
 }
 
 export function extractWorkoutTitle(text) {
@@ -213,42 +306,56 @@ export function extractWorkoutDuration(text) {
 export function findLatestWorkoutPlanText(texts) {
   const list = Array.isArray(texts) ? texts : [];
   for (let i = list.length - 1; i >= 0; i -= 1) {
-    const plan = parseWorkoutChat(list[i]);
+    const plan = parseWorkoutChat(list[i]) ?? parseSupersetPairing(list[i]);
     if (flattenWorkoutExercises(plan).length >= 2) return list[i];
+    if ((plan?.exercises ?? []).length >= 2) return list[i];
   }
   return null;
 }
 
 export function buildPlannedWorkoutInput(text, { date } = {}) {
-  const plan = parseWorkoutChat(text);
-  const exercises = flattenWorkoutExercises(plan)
-    .map(exercise => ({
-      name: exercise.name,
-      sets: exercise.sets
-        .filter(set => set.reps != null && set.weightKg != null)
-        .map(set => ({
-          reps: set.reps,
-          weight_kg: set.weightKg,
-          cable_type: normalizeCableType(set.cable)
-        }))
-    }))
+  const plan = parseWorkoutChat(text) ?? parseSupersetPairing(text);
+  const loaded = (plan?.exercises ?? [])
+    .map(mapRecordExercise)
     .filter(exercise => exercise.sets.length > 0);
-  if (exercises.length < 2 || typeof date !== 'string' || !date) return null;
+  if (loaded.length >= 2 && typeof date === 'string' && date) {
+    const duration = extractWorkoutDuration(text);
+    return {
+      type: 'workout',
+      date,
+      notes: plan.intro ? plan.intro.replace(/\s+/g, ' ').trim().slice(0, 240) : '',
+      fields: {
+        title: extractWorkoutTitle(text) || 'Planned session',
+        session_kind: 'strength',
+        day_type: (duration ?? 45) >= 45 ? 'workout_45_60' : 'workout_30',
+        status: 'planned',
+        ...(duration != null ? { duration_min: duration } : {}),
+        exercises: loaded
+      }
+    };
+  }
 
-  const duration = extractWorkoutDuration(text);
-  return {
-    type: 'workout',
-    date,
-    notes: plan.intro ? plan.intro.replace(/\s+/g, ' ').trim().slice(0, 240) : '',
-    fields: {
-      title: extractWorkoutTitle(text) || 'Planned session',
-      session_kind: 'strength',
-      day_type: (duration ?? 45) >= 45 ? 'workout_45_60' : 'workout_30',
-      status: 'planned',
-      ...(duration != null ? { duration_min: duration } : {}),
-      exercises
-    }
-  };
+  const namesOnly = (plan?.exercises ?? [])
+    .map(mapNameOnlyExercise)
+    .filter(exercise => typeof exercise.name === 'string' && exercise.name.trim());
+  if (namesOnly.length >= 2 && typeof date === 'string' && date) {
+    const duration = extractWorkoutDuration(text);
+    return {
+      type: 'workout',
+      date,
+      notes: plan.intro ? plan.intro.replace(/\s+/g, ' ').trim().slice(0, 240) : '',
+      fields: {
+        title: extractWorkoutTitle(text) || 'Planned session',
+        session_kind: 'strength',
+        day_type: (duration ?? 45) >= 45 ? 'workout_45_60' : 'workout_30',
+        status: 'planned',
+        ...(duration != null ? { duration_min: duration } : {}),
+        exercises: namesOnly
+      }
+    };
+  }
+
+  return null;
 }
 
 export function setsAreIdentical(sets) {

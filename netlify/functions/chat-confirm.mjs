@@ -35,6 +35,20 @@ import {
   removePendingCnPatchById,
   findPendingCnPatchById
 } from './_shared/cn-patch-queue.mjs';
+import {
+  PENDING_ACTIONS_PATH,
+  parsePendingActions,
+  serializePendingActions,
+  removePendingActionById,
+  findPendingActionById,
+  validateProposeActionInput,
+  executeProposeActionWrites
+} from './_shared/capabilities/propose-action.mjs';
+import {
+  GOVERNANCE_LOG_PATH,
+  appendGovernanceEntry,
+  emptyGovernanceLog
+} from '../../js/core/governance-log.js';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
@@ -85,6 +99,12 @@ export function createChatConfirmHandler({
     }
     if (parsed.kind === 'cn_patch_dismiss') {
       return handleCnPatchDismiss(parsed);
+    }
+    if (parsed.kind === 'action') {
+      return handleActionConfirm(parsed);
+    }
+    if (parsed.kind === 'action_dismiss') {
+      return handleActionDismiss(parsed);
     }
 
     const validation = validateLogEntry(parsed.candidate, {
@@ -378,6 +398,217 @@ export function createChatConfirmHandler({
       return mapRepositoryError(error);
     }
   }
+
+  async function handleActionConfirm(parsed) {
+    let candidateProposal = null;
+    if (!parsed.id) {
+      if (!parsed.candidate) {
+        return errorResponse(400, 'invalid_action', 'This proposed action could not be validated.', false, PRIVATE_CACHE);
+      }
+      const validated = validateProposeActionInput(parsed.candidate, { agentSlug: parsed.slug });
+      if (!validated.ok) {
+        return errorResponse(400, 'invalid_action', 'This proposed action could not be validated.', false, PRIVATE_CACHE);
+      }
+      candidateProposal = validated.proposal;
+    }
+
+    let client;
+    try {
+      client = createClient({ env, fetchImpl });
+    } catch (error) {
+      if (error instanceof GitHubConfigurationError) return withPrivateCache(misconfiguredResponse());
+      return repositoryError('github_unavailable', true);
+    }
+
+    let queue = [];
+    let queueSha;
+    let tree;
+    try {
+      const current = await client.resolveTree();
+      tree = current.tree;
+      const queueEntry = current.tree.find(item => item.path === PENDING_ACTIONS_PATH && item.type === 'blob');
+      if (queueEntry) {
+        queue = parsePendingActions(decodeBlob(await client.readBlob(queueEntry.sha)));
+        queueSha = queueEntry.sha;
+      }
+    } catch (error) {
+      return mapRepositoryError(error);
+    }
+
+    const stored = parsed.id ? findPendingActionById(queue, parsed.id) : null;
+    const storedValidated = stored
+      ? validateProposeActionInput(stored.proposal, { agentSlug: stored.slug || parsed.slug })
+      : null;
+    const fallback = candidateProposal
+      ?? (parsed.candidate
+        ? validateProposeActionInput(parsed.candidate, { agentSlug: parsed.slug }).proposal
+        : null);
+    const proposal = storedValidated?.ok ? storedValidated.proposal : fallback;
+    if (!proposal) {
+      return errorResponse(400, 'invalid_action', 'This proposed action could not be validated.', false, PRIVATE_CACHE);
+    }
+
+    // Re-check allowlist on confirm (defense in depth).
+    const recheck = validateProposeActionInput(proposal, { agentSlug: proposal.agent || parsed.slug });
+    if (!recheck.ok) {
+      return errorResponse(400, 'write_path_denied', 'A write path is outside this agent\'s allowlist.', false, PRIVATE_CACHE);
+    }
+
+    const files = {};
+    for (const write of proposal.writes) {
+      const entry = tree.find(item => item.path === write.path && item.type === 'blob');
+      if (!entry) continue;
+      try {
+        const content = decodeBlob(await client.readBlob(entry.sha));
+        files[write.path] = { sha: entry.sha, content: content ?? '' };
+      } catch (error) {
+        return mapRepositoryError(error);
+      }
+    }
+
+    let writeResult;
+    try {
+      writeResult = await executeProposeActionWrites(client, proposal, { files });
+    } catch (error) {
+      if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+        return errorResponse(409, 'write_conflict', 'A target file changed while confirming. Try again.', true, PRIVATE_CACHE);
+      }
+      return mapRepositoryError(error);
+    }
+    if (!writeResult.ok) {
+      if (writeResult.error === 'already_exists') {
+        return errorResponse(409, 'write_conflict', `File already exists: ${writeResult.detail}`, true, PRIVATE_CACHE);
+      }
+      return errorResponse(400, writeResult.error ?? 'apply_failed', 'The proposed action could not be applied.', false, PRIVATE_CACHE);
+    }
+
+    // Best-effort governance log + dequeue.
+    try {
+      const govEntry = tree.find(item => item.path === GOVERNANCE_LOG_PATH && item.type === 'blob');
+      let govContent = emptyGovernanceLog();
+      let govSha;
+      if (govEntry) {
+        const decoded = decodeBlob(await client.readBlob(govEntry.sha));
+        if (decoded != null) {
+          govContent = decoded;
+          govSha = govEntry.sha;
+        }
+      }
+      const diffBody = [
+        `**Agent:** ${proposal.agent}`,
+        `**Intent:** ${proposal.intent}`,
+        `**Status:** Approved`,
+        '',
+        ...proposal.writes.map(write => `- \`${write.path}\` (${write.mode}): ${write.diff}`)
+      ].join('\n');
+      const nextGov = appendGovernanceEntry(govContent, {
+        dateKey: getSydneyDateKey(new Date(now())),
+        entryType: 'Capability Action',
+        title: proposal.intent.slice(0, 120),
+        body: diffBody,
+        status: 'Resolved'
+      });
+      await client.writeFile({
+        path: GOVERNANCE_LOG_PATH,
+        content: nextGov,
+        ...(govSha ? { sha: govSha } : {}),
+        message: `chore(governance): capability action by ${proposal.agent}`
+      });
+    } catch {
+      // Writes already landed; governance is audit trail only.
+    }
+
+    if (parsed.id) {
+      try {
+        await client.writeFile({
+          path: PENDING_ACTIONS_PATH,
+          content: serializePendingActions(removePendingActionById(queue, parsed.id)),
+          ...(queueSha ? { sha: queueSha } : {}),
+          message: `chore(propose-action): confirm ${proposal.intent}`.slice(0, 200)
+        });
+      } catch {
+        // Stale queue entry is harmless.
+      }
+    }
+
+    return jsonResponse(200, {
+      ok: true,
+      data: {
+        intent: proposal.intent,
+        results: writeResult.results
+      }
+    }, PRIVATE_CACHE);
+  }
+
+  async function handleActionDismiss(parsed) {
+    let client;
+    try {
+      client = createClient({ env, fetchImpl });
+    } catch (error) {
+      if (error instanceof GitHubConfigurationError) return withPrivateCache(misconfiguredResponse());
+      return repositoryError('github_unavailable', true);
+    }
+
+    try {
+      const current = await client.resolveTree();
+      const entry = current.tree.find(item => item.path === PENDING_ACTIONS_PATH && item.type === 'blob');
+      if (!entry) {
+        return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+      }
+      const queue = parsePendingActions(decodeBlob(await client.readBlob(entry.sha)));
+      const next = removePendingActionById(queue, parsed.id);
+      if (next.length !== queue.length) {
+        await client.writeFile({
+          path: PENDING_ACTIONS_PATH,
+          content: serializePendingActions(next),
+          sha: entry.sha,
+          message: `chore(propose-action): dismiss ${parsed.id}`
+        });
+      }
+
+      // Log rejection for the audit trail.
+      try {
+        const stored = findPendingActionById(queue, parsed.id);
+        const govEntry = current.tree.find(item => item.path === GOVERNANCE_LOG_PATH && item.type === 'blob');
+        let govContent = emptyGovernanceLog();
+        let govSha;
+        if (govEntry) {
+          const decoded = decodeBlob(await client.readBlob(govEntry.sha));
+          if (decoded != null) {
+            govContent = decoded;
+            govSha = govEntry.sha;
+          }
+        }
+        const intent = stored?.proposal?.intent ?? parsed.id;
+        const nextGov = appendGovernanceEntry(govContent, {
+          dateKey: getSydneyDateKey(new Date(now())),
+          entryType: 'Capability Action',
+          title: String(intent).slice(0, 120),
+          body: [
+            `**Agent:** ${stored?.slug ?? parsed.slug}`,
+            `**Intent:** ${intent}`,
+            '**Status:** Rejected'
+          ].join('\n'),
+          status: 'Resolved'
+        });
+        await client.writeFile({
+          path: GOVERNANCE_LOG_PATH,
+          content: nextGov,
+          ...(govSha ? { sha: govSha } : {}),
+          message: `chore(governance): capability action rejected`
+        });
+      } catch {
+        // Best-effort.
+      }
+
+      return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+    } catch (error) {
+      if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+        return errorResponse(409, 'write_conflict', 'Pending actions changed while dismissing. Try again.', true, PRIVATE_CACHE);
+      }
+      return mapRepositoryError(error);
+    }
+  }
 }
 
 async function upsertWorkoutTemplate(client, record) {
@@ -443,9 +674,17 @@ async function parseRequest(request) {
   }
 
   const id = typeof body.id === 'string' && body.id.trim() !== '' ? body.id.trim() : null;
-  const kind = body.kind === 'cn_patch' ? 'cn_patch' : body.kind === 'cn_patch_dismiss' ? 'cn_patch_dismiss' : 'log';
+  const kind = body.kind === 'cn_patch'
+    ? 'cn_patch'
+    : body.kind === 'cn_patch_dismiss'
+      ? 'cn_patch_dismiss'
+      : body.kind === 'action'
+        ? 'action'
+        : body.kind === 'action_dismiss'
+          ? 'action_dismiss'
+          : 'log';
 
-  if (kind === 'cn_patch_dismiss') {
+  if (kind === 'cn_patch_dismiss' || kind === 'action_dismiss') {
     if (!id) {
       return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
     }
@@ -453,9 +692,9 @@ async function parseRequest(request) {
   }
 
   const hasCandidate = body.candidate && typeof body.candidate === 'object' && !Array.isArray(body.candidate);
-  // cn_patch may arrive as just an id (server looks the patch up in the queue) or,
-  // as a fallback when a propose-time queue write failed, a resubmitted candidate.
-  if (kind === 'cn_patch' ? (!id && !hasCandidate) : !hasCandidate) {
+  // cn_patch / action may arrive as just an id (server looks the proposal up) or
+  // as a fallback candidate when a propose-time queue write failed.
+  if ((kind === 'cn_patch' || kind === 'action') ? (!id && !hasCandidate) : !hasCandidate) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
 

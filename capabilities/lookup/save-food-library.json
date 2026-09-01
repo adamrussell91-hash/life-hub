@@ -1,0 +1,19 @@
+{
+  "id": "lookup.save-food-library",
+  "tool_name": "save_food_library_entry",
+  "verb": "Lookup",
+  "agents": ["brisket"],
+  "risk": "auto",
+  "kind": "capacity",
+  "legacy_tool": "save_food_library_entry",
+  "inputs": {
+    "name": "string",
+    "calories": "number",
+    "protein_g": "number",
+    "fat_g": "number"
+  },
+  "side_effects": ["Upserts a Food Library cache entry"],
+  "surfaces": ["food_library"],
+  "prompt_one_liner": "Cache verified AU nutrition figures in the Food Library after a successful lookup.",
+  "reads": ["food_library"]
+}

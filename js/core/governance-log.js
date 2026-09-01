@@ -14,7 +14,8 @@ export const GOVERNANCE_ENTRY_TYPES = [
   'Goal Audit',
   'Direction Session',
   'Principle Update',
-  'Mind Insight'
+  'Mind Insight',
+  'Capability Action'
 ];
 
 const TITLE_LINE = '# Governance Log\n';

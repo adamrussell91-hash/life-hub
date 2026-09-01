@@ -1,0 +1,20 @@
+{
+  "id": "track.log-progress",
+  "tool_name": "track_log_progress",
+  "verb": "Track",
+  "agents": [
+    "brisket",
+    "chadwick",
+    "hammond",
+    "sara",
+    "hyaluronica",
+    "penelope",
+    "vera"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Append progress to an open challenge without reopening it.",
+  "surfaces": [
+    "governance_log"
+  ]
+}

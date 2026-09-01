@@ -20,7 +20,9 @@ included_files = [
   "config/sara-protocol.md",
   "config/hammond-protocol.md",
   "config/physique-target.yml",
-  "central-node.md"
+  "central-node.md",
+  "capabilities/**",
+  "intuition/**"
 ]
 
 # Streaming chat uses Netlify's synchronous 60s execution cap (platform default, not configurable).

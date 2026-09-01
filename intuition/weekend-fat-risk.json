@@ -1,0 +1,13 @@
+{
+  "id": "weekend-fat-risk",
+  "agents": [
+    "brisket"
+  ],
+  "capacities": [
+    "plan.week-meals",
+    "log.entry",
+    "track.open-challenge"
+  ],
+  "summary": "Weekend eating is the main fat/sodium risk window.",
+  "guidance": "Front-load protein Friday\u2013Sunday; flag emulsifier-heavy takeaway early."
+}

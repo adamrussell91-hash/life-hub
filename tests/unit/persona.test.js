@@ -76,6 +76,14 @@ test('an empty food library falls back to a plain web_search instruction', () =>
   assert.doesNotMatch(prompt, /Food Library:/);
 });
 
+test('every agent prompt includes the os_propose_action open-hands mandate', () => {
+  for (const slug of ['brisket', 'chadwick', 'hyaluronica', 'penelope', 'sara', 'vera', 'hammond']) {
+    const prompt = buildSystemPrompt({ slug, digest: '', constraints: '' });
+    assert.match(prompt, /os_propose_action/);
+    assert.match(prompt, /never lack the ability to act/i);
+  }
+});
+
 test('shared prompt tells every agent to iterate on web search with no use cap', () => {
   for (const slug of ['brisket', 'chadwick', 'hyaluronica', 'sara', 'hammond']) {
     const prompt = buildSystemPrompt({ slug, digest: '', constraints: '' });
