@@ -2,6 +2,8 @@
 
 Private personal dashboard and conversational logging application.
 
+**Hub consolidation (Claude Code overseer):** [`docs/consolidation/OVERSEER.md`](docs/consolidation/OVERSEER.md) — role, scope, and checkpoint prompts. Claude Code also loads root [`CLAUDE.md`](CLAUDE.md) when opened in this repo.
+
 ## Current slice
 
 The site is hosted on **GitHub Pages** (via `.github/workflows/pages.yml`, on every push to `main`). **Netlify hosts nothing but the API Functions** — the GitHub token, passphrase verifier, session secret, and Anthropic key live only there, never in the deployed site. The two are different origins by design; every `/api/*` call is a cross-origin request from the GitHub Pages site to the Netlify Functions site, with an explicit `SITE_ORIGIN` allow-list and `credentials: 'include'` carrying the session cookie across.
