@@ -1,5 +1,9 @@
 # Hub consolidation — working files
 
+**Repo:** `adamrussell91-hash/life-hub`  
+**Folder:** `docs/consolidation/` (from repo root)  
+**Claude Code entry:** root [`CLAUDE.md`](../../CLAUDE.md) → [`OVERSEER.md`](./OVERSEER.md)
+
 This folder is the **single working area** for merging Adam’s hubs into one code repo (+ `life-hub-data` unchanged).
 
 ## File map

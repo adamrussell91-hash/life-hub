@@ -1,7 +1,20 @@
 # Consolidation overseer (Claude Code)
 
-**Canonical path:** `docs/consolidation/OVERSEER.md`  
-(In the future umbrella repo, keep this exact relative path.)
+## How to find this file
+
+Claude Code must run with **cwd = the `life-hub` git repo root** (same folder as root `CLAUDE.md`).
+
+| Location | Path |
+|----------|------|
+| **Repo-relative (use in prompts)** | `docs/consolidation/OVERSEER.md` |
+| **Plan (SoT)** | `docs/consolidation/plan.md` |
+| **Checkpoint reports** | `docs/consolidation/checkpoints/checkpoint-NN.md` |
+| **Adam’s Mac (typical)** | `~/Projects/life-hub/docs/consolidation/OVERSEER.md` |
+| **GitHub** | `adamrussell91-hash/life-hub` → `docs/consolidation/` on branch `main` |
+
+Root [`CLAUDE.md`](../../CLAUDE.md) points here automatically when Claude Code opens this repo.
+
+(In the future umbrella repo, keep this exact relative path: `docs/consolidation/OVERSEER.md`.)
 
 This file defines Claude Code’s **role and scope**. It is not the migration plan. The plan is [`plan.md`](./plan.md). Checkpoint outputs go only under [`checkpoints/`](./checkpoints/).
 
