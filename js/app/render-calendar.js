@@ -1,4 +1,6 @@
 import { formatDisplayDate } from '../core/time.js';
+import { listCalendarSources } from '../shell/calendar-sources.js';
+import { renderCalendarSources } from '../shell/render-calendar-sources.js';
 
 const CATEGORY_CLASS = {
   nutrition: 'nutrition',
@@ -89,6 +91,7 @@ export function renderCalendar(root, model, {
   }
 
   dashboard.removeAttribute('hidden');
+  renderCalendarSources(root, listCalendarSources());
 }
 
 function eventRow(root, event) {
