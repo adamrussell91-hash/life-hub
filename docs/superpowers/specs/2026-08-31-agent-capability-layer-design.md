@@ -1,9 +1,9 @@
 # Agent Capability Layer — Design
 
 **Date:** 2026-08-31  
-**Status:** Phase 0–4 on main (promoted-shortcut runner shipped in PR #45)  
-**Scope:** Open generation / closed execution for Life Hub agents (`os.propose-action`), per-agent path allowlists, capability registry, migrate existing chat tools as shortcuts, Remember/Track/Coordinate loans, research + widgets, intuition packs, intent router, shortcut promotion + promoted-shortcut catalog runner  
-**Out of scope (not started):** Further widget templates beyond `challenge-progress`; writing live capability defs into `capabilities/` from Confirm; separate cheap intent-router model if same-call keyword narrow proves insufficient
+**Status:** Phase 0–4 on main; Phase 5 in progress (surface widget renderer)  
+**Scope:** Open generation / closed execution for Life Hub agents (`os.propose-action`), per-agent path allowlists, capability registry, migrate existing chat tools as shortcuts, Remember/Track/Coordinate loans, research + widgets, intuition packs, intent router, shortcut promotion + promoted-shortcut catalog runner, hub rendering for approved widget templates  
+**Out of scope (not started):** Additional widget templates beyond `challenge-progress`; writing live capability defs into `capabilities/` from Confirm; separate cheap intent-router model if same-call keyword narrow proves insufficient
 
 ## Thesis
 
@@ -84,4 +84,12 @@ See the full thesis in the originating brief: Remember/Track/Publish P0 shortcut
 - Scoreboard (`os.capability-scoreboard`, detail on) surfaces catalogued promoted shortcuts
 
 Live `capabilities/registry.json` stays PR-only. No runtime handler codegen.
+
+## Phase 5
+
+**In progress:** Hub renderer for Adam-approved surface widgets.
+
+- `GET /api/surface/widgets` — list published instances under `data/widgets/` for approved templates only
+- Fitness tab renders `challenge-progress` as a progress bar card (design-kit tokens / existing `.progress-track`)
+- Unknown or unapproved templates stay invisible until a template def + renderer lands in a PR
 
