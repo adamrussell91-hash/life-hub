@@ -570,6 +570,8 @@ test('superset pairing and It is not there emits a Confirm card without calling 
   assert.equal(proposal.record.status, 'planned');
   assert.equal(proposal.record.exercises.length, 6);
   assert.equal(proposal.record.exercises[0].name, 'Bar Press');
+  assert.equal(proposal.record.exercises[0].superset_group, 1);
+  assert.equal(proposal.record.exercises[0].superset_label, '1&2 superset');
 });
 
 test('a superset plan in the same Chadwick turn forces a Confirm card after the stream', async () => {

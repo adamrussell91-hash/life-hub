@@ -740,6 +740,69 @@ main { max-width: 76rem; margin: 0 auto; }
   gap: 0;
 }
 
+.workout-plan-card__group {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+
+.workout-plan-card__group:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.workout-plan-card__group-label {
+  margin: 0 0 var(--space-2);
+  color: var(--wave);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.workout-plan-card__group-exercises {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--wave) 7%, transparent);
+  display: grid;
+  gap: 0;
+}
+
+.workout-plan-card__group--between .workout-plan-card__group-exercises {
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+
+.workout-plan-card__row--paired {
+  padding: var(--space-2) 0;
+  min-height: 40px;
+  border-top: 0;
+}
+
+.workout-plan-card__row--paired:first-child {
+  padding-top: 0;
+}
+
+.workout-plan-card__connector {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  color: var(--wave);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.workout-plan-card__between {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+
 .workout-plan-card__row {
   display: grid;
   grid-template-columns: var(--space-10) minmax(0, 1fr) auto auto;
