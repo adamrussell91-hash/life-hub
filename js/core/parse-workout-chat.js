@@ -104,6 +104,26 @@ export function parseWorkoutSet(raw, fallbackIndex = 0) {
   };
 }
 
+function parseSupersetPairingLine(line) {
+  const match = /^\s*\d+(?:&\d+)?\s+(?:superset|straight after[^:]*):\s*(.+)$/i.exec(String(line ?? '').trim());
+  if (!match) return [];
+  const chunk = match[1].replace(/\s*→\s*/g, ' / ');
+  return chunk.split('/').map(part => part.replace(/\bburnout\b/gi, '').replace(/\s+/g, ' ').trim()).filter(name => name.length >= 3);
+}
+
+export function parseSupersetPairing(text) {
+  if (typeof text !== 'string' || text.trim() === '') return null;
+  const exercises = [];
+  for (const line of text.split('\n')) {
+    for (const name of parseSupersetPairingLine(line)) {
+      exercises.push({ name, cue: '', sets: [], between: null });
+    }
+  }
+  if (exercises.length < 2) return null;
+  const intro = text.split('\n').find(line => /pairing|superset|burnout/i.test(line)) ?? '';
+  return { intro: intro.trim(), exercises, outro: '' };
+}
+
 function findExerciseStarts(text) {
   const starts = [];
   ITEM_START.lastIndex = 0;
@@ -213,15 +233,16 @@ export function extractWorkoutDuration(text) {
 export function findLatestWorkoutPlanText(texts) {
   const list = Array.isArray(texts) ? texts : [];
   for (let i = list.length - 1; i >= 0; i -= 1) {
-    const plan = parseWorkoutChat(list[i]);
+    const plan = parseWorkoutChat(list[i]) ?? parseSupersetPairing(list[i]);
     if (flattenWorkoutExercises(plan).length >= 2) return list[i];
+    if ((plan?.exercises ?? []).length >= 2) return list[i];
   }
   return null;
 }
 
 export function buildPlannedWorkoutInput(text, { date } = {}) {
-  const plan = parseWorkoutChat(text);
-  const exercises = flattenWorkoutExercises(plan)
+  const plan = parseWorkoutChat(text) ?? parseSupersetPairing(text);
+  const loaded = flattenWorkoutExercises(plan)
     .map(exercise => ({
       name: exercise.name,
       sets: exercise.sets
@@ -233,22 +254,44 @@ export function buildPlannedWorkoutInput(text, { date } = {}) {
         }))
     }))
     .filter(exercise => exercise.sets.length > 0);
-  if (exercises.length < 2 || typeof date !== 'string' || !date) return null;
+  if (loaded.length >= 2 && typeof date === 'string' && date) {
+    const duration = extractWorkoutDuration(text);
+    return {
+      type: 'workout',
+      date,
+      notes: plan.intro ? plan.intro.replace(/\s+/g, ' ').trim().slice(0, 240) : '',
+      fields: {
+        title: extractWorkoutTitle(text) || 'Planned session',
+        session_kind: 'strength',
+        day_type: (duration ?? 45) >= 45 ? 'workout_45_60' : 'workout_30',
+        status: 'planned',
+        ...(duration != null ? { duration_min: duration } : {}),
+        exercises: loaded
+      }
+    };
+  }
 
-  const duration = extractWorkoutDuration(text);
-  return {
-    type: 'workout',
-    date,
-    notes: plan.intro ? plan.intro.replace(/\s+/g, ' ').trim().slice(0, 240) : '',
-    fields: {
-      title: extractWorkoutTitle(text) || 'Planned session',
-      session_kind: 'strength',
-      day_type: (duration ?? 45) >= 45 ? 'workout_45_60' : 'workout_30',
-      status: 'planned',
-      ...(duration != null ? { duration_min: duration } : {}),
-      exercises
-    }
-  };
+  const namesOnly = (plan?.exercises ?? [])
+    .map(exercise => ({ name: exercise.name }))
+    .filter(exercise => typeof exercise.name === 'string' && exercise.name.trim());
+  if (namesOnly.length >= 2 && typeof date === 'string' && date) {
+    const duration = extractWorkoutDuration(text);
+    return {
+      type: 'workout',
+      date,
+      notes: plan.intro ? plan.intro.replace(/\s+/g, ' ').trim().slice(0, 240) : '',
+      fields: {
+        title: extractWorkoutTitle(text) || 'Planned session',
+        session_kind: 'strength',
+        day_type: (duration ?? 45) >= 45 ? 'workout_45_60' : 'workout_30',
+        status: 'planned',
+        ...(duration != null ? { duration_min: duration } : {}),
+        exercises: namesOnly
+      }
+    };
+  }
+
+  return null;
 }
 
 export function setsAreIdentical(sets) {
