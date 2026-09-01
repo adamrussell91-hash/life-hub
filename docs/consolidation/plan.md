@@ -1,6 +1,7 @@
 # Hub consolidation plan
 
-> **Status:** v3.0 — Life app remount merged (PR #59). Checkpoint-05 PASS. Next slice: assert every published `dist/js` design-kit import resolves after `prepare-web`.  
+> **Status:** v3.1 — published kit-import check merged (PR #60). Checkpoint-06 PASS. Next slice: rewrite only `from '...'` kit specifiers.  
+> **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
 ## Intent
@@ -188,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v3.0 | Life app remount merged; published kit-import check next | Slice 05 merged 2026-09-01 as PR #59 |
+| Plan v3.1 | published kit-import check merged; from-anchor rewrite next | Slice 06 merged 2026-09-01 as PR #60 |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -197,6 +198,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Claude checkpoint-03 | **PASS** | `checkpoints/checkpoint-03.md` — merge #57 |
 | Claude checkpoint-04 | **PASS** | `checkpoints/checkpoint-04.md` — merge #58 |
 | Claude checkpoint-05 | **PASS** | `checkpoints/checkpoint-05.md` — merge #59 |
+| Claude checkpoint-06 | **PASS** | `checkpoints/checkpoint-06.md` — merge #60 |
 | Deploy inventory | **filled** | See table above; `life-hub2` is absorb target |
 | Auth decision | **decided** | Retain Life Hub secrets |
 | Repo naming decision | **decided** | Reuse `life-hub`, leave as-is |
@@ -206,7 +208,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Auth lock | **shipped** | PR #57 merged 2026-09-01 |
 | Auth call sites | **shipped** | PR #58 merged 2026-09-01 |
 | Life app remount | **shipped** | PR #59 merged 2026-09-01 |
-| Published kit-import check | in progress | Slice 06 — walk `dist/js` after `prepare-web` and assert every `packages/design-kit` import resolves |
+| Published kit-import check | **shipped** | PR #60 merged 2026-09-01 |
+| Kit-import from-anchor | in progress | Slice 07 — rewrite only `import`/`export` `from '...'` kit specifiers |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -269,25 +272,32 @@ Checkpoint-05 flagged `rewritePublishedKitImports()` as a fixed string replace. 
 
 Do **not** retarget `life-hub2`, fold other hubs, or rotate secrets.
 
+### Slice 07 — kit-import from-anchor (this slice)
+
+Checkpoint-06: only rewrite `import`/`export` `from '...'` kit specifiers, not comments or string literals. Same `dist/` URLs. No Netlify/secret changes.
+
+Do **not** retarget `life-hub2`, fold other hubs, or rotate secrets.
+
 ## Next action
 
-Claude observe-only **checkpoint-06** against this published kit-import PR. Do not retarget `life-hub2` or fold other hubs until that report lands.
+Claude observe-only **checkpoint-07** against this from-anchor PR. Do not retarget `life-hub2` or fold other hubs until that report lands.
 
 Paste:
 
 ```text
-You are the consolidation overseer at checkpoint-06. cwd = life-hub repo root.
-Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v3.0).
+You are the consolidation overseer at checkpoint-07. cwd = life-hub worktree
+~/Projects/life-hub/.worktrees/umbrella-seed-slice-01
+(not the primary checkout — that may be on an unrelated branch).
+Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v3.1).
 
 Observe-only rules (hard):
 - Do NOT edit application code, move files, run destructive git, or commit.
 - You MAY create exactly one report:
-  docs/consolidation/checkpoints/checkpoint-06.md
+  docs/consolidation/checkpoints/checkpoint-07.md
 
-Inspect: the published kit-import PR vs main, and plan.md Slice 06 notes.
-Confirm: prepare-web still publishes the same dist/ public paths;
-every dist/js packages/design-kit import resolves;
-netlify.toml, function filenames, included_files, and secrets unchanged;
+Inspect: the kit-import from-anchor PR vs main, and plan.md Slice 07 notes.
+Confirm: rewrite only matches import/export from specifiers;
+dist/ public paths unchanged; netlify.toml and secrets unchanged;
 life-hub-data untouched; no Teaching/Knowledge/Tasks fold.
 
 Write the report using the template in OVERSEER.md.
