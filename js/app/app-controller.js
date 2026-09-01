@@ -3,7 +3,7 @@ import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
-import { renderSurfaceWidgets } from './render-surface-widgets.js';
+import { renderFitnessSurfaceWidgets, renderNutritionSurfaceWidgets } from './render-surface-widgets.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
 const LAST_SUCCESS_KEY = 'life-hub:last-success';
@@ -658,8 +658,13 @@ export function createAppController(dependencies) {
   function renderNutritionSection() {
     if (!latestResult || !buildNutritionModel || !renderNutrition) return;
     renderNutrition(root, buildNutritionModel(latestResult), { quiet: syncQuiet });
+    renderNutritionSurfaceWidgets(root, surfaceWidgetLibrary?.getState?.() ?? { status: 'idle', widgets: [] });
     const button = root.querySelector('#nutrition-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, NUTRITION_AGENT_SLUG));
+    void surfaceWidgetLibrary?.ensureLoaded?.().then(() => {
+      if (currentSection !== 'nutrition' || !latestResult) return;
+      renderNutritionSurfaceWidgets(root, surfaceWidgetLibrary.getState());
+    });
   }
 
   function renderFitnessSection() {
@@ -674,7 +679,7 @@ export function createAppController(dependencies) {
       onSelectTemplate: template => fitnessTemplateLibrary?.openTemplate?.(template),
       quiet: syncQuiet
     });
-    renderSurfaceWidgets(root, surfaceWidgetLibrary?.getState?.() ?? { status: 'idle', widgets: [] });
+    renderFitnessSurfaceWidgets(root, surfaceWidgetLibrary?.getState?.() ?? { status: 'idle', widgets: [] });
     const button = root.querySelector('#fitness-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, FITNESS_AGENT_SLUG));
     void fitnessTemplateLibrary?.ensureLoaded?.().then(() => {
@@ -688,11 +693,11 @@ export function createAppController(dependencies) {
         onSelectTemplate: template => fitnessTemplateLibrary.openTemplate(template),
         quiet: syncQuiet
       });
-      renderSurfaceWidgets(root, surfaceWidgetLibrary?.getState?.() ?? { status: 'idle', widgets: [] });
+      renderFitnessSurfaceWidgets(root, surfaceWidgetLibrary?.getState?.() ?? { status: 'idle', widgets: [] });
     });
     void surfaceWidgetLibrary?.ensureLoaded?.().then(() => {
       if (currentSection !== 'fitness' || !latestResult) return;
-      renderSurfaceWidgets(root, surfaceWidgetLibrary.getState());
+      renderFitnessSurfaceWidgets(root, surfaceWidgetLibrary.getState());
     });
   }
 

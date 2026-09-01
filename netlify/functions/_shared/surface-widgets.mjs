@@ -6,7 +6,18 @@ export const WIDGETS_PREFIX = 'data/widgets/';
 export const WIDGET_PATH = /^data\/widgets\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.json$/;
 export const MAX_SURFACE_WIDGETS = 24;
 
-const APPROVED_TEMPLATES = new Set(['challenge-progress']);
+const APPROVED_TEMPLATES = new Set(['challenge-progress', 'meal-plan-week']);
+
+const MEAL_PLAN_DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const MEAL_PLAN_DAY_LABELS = {
+  mon: 'Mon',
+  tue: 'Tue',
+  wed: 'Wed',
+  thu: 'Thu',
+  fri: 'Fri',
+  sat: 'Sat',
+  sun: 'Sun'
+};
 
 export function isWidgetPath(path) {
   return typeof path === 'string' && WIDGET_PATH.test(path);
@@ -78,11 +89,60 @@ export function normalizeChallengeProgressWidget(widget) {
   };
 }
 
+function mealPlanDayText(value) {
+  if (typeof value === 'string') return value.trim();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  const parts = ['breakfast', 'lunch', 'dinner']
+    .map(slot => {
+      const text = typeof value[slot] === 'string' ? value[slot].trim() : '';
+      return text ? `${slot[0].toUpperCase()}${slot.slice(1)}: ${text}` : '';
+    })
+    .filter(Boolean);
+  return parts.join(' · ');
+}
+
+export function normalizeMealPlanWeekWidget(widget) {
+  if (!widget || widget.template_id !== 'meal-plan-week') return null;
+  const props = widget.props ?? {};
+  const week_id = typeof props.week_id === 'string' && props.week_id.trim()
+    ? props.week_id.trim()
+    : widget.title;
+  const title = typeof props.title === 'string' && props.title.trim()
+    ? props.title.trim()
+    : (week_id ? `Week ${week_id}` : widget.title);
+  const rawMeals = props.meals && typeof props.meals === 'object' && !Array.isArray(props.meals)
+    ? props.meals
+    : {};
+  const days = MEAL_PLAN_DAY_ORDER.map(key => {
+    const direct = rawMeals[key] ?? rawMeals[key.toUpperCase()] ?? rawMeals[MEAL_PLAN_DAY_LABELS[key]];
+    const text = mealPlanDayText(direct);
+    if (!text) return null;
+    return { key, label: MEAL_PLAN_DAY_LABELS[key], text };
+  }).filter(Boolean);
+  const notes = typeof props.notes === 'string' && props.notes.trim()
+    ? props.notes.trim()
+    : null;
+  if (!days.length && !notes) return null;
+  return {
+    ...widget,
+    title,
+    props: {
+      week_id,
+      title,
+      meals: rawMeals,
+      days,
+      ...(notes ? { notes } : {})
+    }
+  };
+}
+
 export function normalizeSurfaceWidget(widget) {
   if (!widget) return null;
   switch (widget.template_id) {
     case 'challenge-progress':
       return normalizeChallengeProgressWidget(widget);
+    case 'meal-plan-week':
+      return normalizeMealPlanWeekWidget(widget);
     default:
       return null;
   }

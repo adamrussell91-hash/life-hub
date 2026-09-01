@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   isWidgetPath,
   normalizeChallengeProgressWidget,
+  normalizeMealPlanWeekWidget,
   normalizeSurfaceWidget,
   parseWidgetBlob
 } from '../../netlify/functions/_shared/surface-widgets.mjs';
@@ -35,10 +36,34 @@ test('normalizeChallengeProgressWidget clamps progress_pct', () => {
   assert.equal(normalized.props.subtitle, 'Day 5');
 });
 
-test('normalizeSurfaceWidget rejects unknown templates', () => {
-  assert.equal(normalizeSurfaceWidget({
-    template_id: 'unknown',
-    title: 'Nope',
-    props: {}
-  }), null);
+test('normalizeMealPlanWeekWidget builds day rows from meals object', () => {
+  const normalized = normalizeMealPlanWeekWidget({
+    template_id: 'meal-plan-week',
+    title: 'Meal plan',
+    props: {
+      week_id: '2026-W35',
+      meals: {
+        mon: { dinner: 'Marley Spoon chicken bowl' },
+        tue: 'Leftovers + salad'
+      },
+      notes: 'Vyvanse-light lunches'
+    }
+  });
+  assert.equal(normalized.props.week_id, '2026-W35');
+  assert.equal(normalized.props.days.length, 2);
+  assert.match(normalized.props.days[0].text, /Marley Spoon/);
+  assert.equal(normalized.props.notes, 'Vyvanse-light lunches');
+});
+
+test('normalizeSurfaceWidget accepts meal-plan-week', () => {
+  const normalized = normalizeSurfaceWidget({
+    template_id: 'meal-plan-week',
+    title: 'Week plan',
+    props: {
+      week_id: '2026-W35',
+      meals: { wed: 'Soup' }
+    }
+  });
+  assert.equal(normalized.template_id, 'meal-plan-week');
+  assert.equal(normalized.props.days.length, 1);
 });

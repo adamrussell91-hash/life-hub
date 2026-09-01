@@ -81,6 +81,12 @@ import {
 } from './_shared/cn-patch-queue.mjs';
 import { buildAgentTools } from './_shared/capabilities/registry.mjs';
 import {
+  buildPromotedShortcutToolSchemas,
+  findPromotedDraftByToolName,
+  isPromotedShortcutToolName,
+  loadPromotedShortcutDrafts
+} from './_shared/capabilities/promoted-shortcut-tools.mjs';
+import {
   PENDING_ACTIONS_PATH,
   createPendingActionId,
   parsePendingActions,
@@ -262,19 +268,10 @@ export function createChatHandler({
     }
 
     const nowInstant = new Date(now());
-    // Capacity shortcuts + os.propose-action come from /capabilities registry.
-    // Finalize / flush: strip web_search so log_entry can fire before the budget dies.
-    const tools = buildAgentTools({
-      slug,
-      allowedTypes,
-      stripWebSearch,
-      needsFoodLibrary,
-      needsExerciseLibrary,
-      needsSkincareLibrary,
-      needsHammondTools,
-      needsVeraMindTools: slug === 'vera',
-      message: parsed.message
-    });
+    // Base tools are built after repo tree load so promoted-shortcut drafts can
+    // become per-draft named tools without mutating capabilities/registry.json.
+    let tools = [];
+    let promotedShortcutDrafts = [];
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -708,6 +705,30 @@ export function createChatHandler({
           repoTree = [];
         }
 
+        try {
+          promotedShortcutDrafts = await loadPromotedShortcutDrafts(
+            repoTree,
+            async sha => decodeBlob(await client.readBlob(sha)),
+            { limit: 12 }
+          );
+        } catch {
+          promotedShortcutDrafts = [];
+        }
+        tools = [
+          ...buildAgentTools({
+            slug,
+            allowedTypes,
+            stripWebSearch,
+            needsFoodLibrary,
+            needsExerciseLibrary,
+            needsSkincareLibrary,
+            needsHammondTools,
+            needsVeraMindTools: slug === 'vera',
+            message: parsed.message
+          }),
+          ...buildPromotedShortcutToolSchemas(promotedShortcutDrafts)
+        ];
+
         const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
         const hyaluronicaProtocol = slug === 'hyaluronica' ? loadHyaluronicaProtocol() : '';
         const penelopeProtocol = slug === 'penelope' ? loadPenelopeProtocol() : '';
@@ -1073,8 +1094,13 @@ export function createChatHandler({
                 }
               }
               
-              if (isShortcutTool(event.name)) {
-                const shortcutResult = await executeShortcut(event.name, event.input ?? {}, {
+              if (isShortcutTool(event.name) || isPromotedShortcutToolName(event.name, promotedShortcutDrafts)) {
+                const promotedDraft = findPromotedDraftByToolName(event.name, promotedShortcutDrafts);
+                const shortcutName = promotedDraft ? 'os_run_promoted_shortcut' : event.name;
+                const shortcutInput = promotedDraft
+                  ? { proposed_id: promotedDraft.proposed_id, ...(event.input ?? {}) }
+                  : (event.input ?? {});
+                const shortcutResult = await executeShortcut(shortcutName, shortcutInput, {
                   client,
                   agentSlug: slug,
                   today,
@@ -1168,8 +1194,16 @@ export function createChatHandler({
               } else {
                 send(event);
               }
-            } else if (event.type === 'tool_call' && isShortcutTool(event.name)) {
-              const shortcutResult = await executeShortcut(event.name, event.input ?? {}, {
+            } else if (
+              event.type === 'tool_call'
+              && (isShortcutTool(event.name) || isPromotedShortcutToolName(event.name, promotedShortcutDrafts))
+            ) {
+              const promotedDraft = findPromotedDraftByToolName(event.name, promotedShortcutDrafts);
+              const shortcutName = promotedDraft ? 'os_run_promoted_shortcut' : event.name;
+              const shortcutInput = promotedDraft
+                ? { proposed_id: promotedDraft.proposed_id, ...(event.input ?? {}) }
+                : (event.input ?? {});
+              const shortcutResult = await executeShortcut(shortcutName, shortcutInput, {
                 client,
                 agentSlug: slug,
                 today,

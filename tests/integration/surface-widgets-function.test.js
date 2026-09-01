@@ -91,3 +91,50 @@ test('surface widgets returns approved challenge-progress instances', async () =
   assert.equal(payload.data.widgets[0].template_id, 'challenge-progress');
   assert.equal(payload.data.widgets[0].props.progress_pct, 42);
 });
+
+test('surface widgets returns approved meal-plan-week instances', async () => {
+  const mealPlanJson = JSON.stringify({
+    id: 'wg_meal',
+    template_id: 'meal-plan-week',
+    title: 'Week plan',
+    props: {
+      week_id: '2026-W35',
+      meals: { mon: 'Marley Spoon chicken bowl', tue: 'Leftovers' },
+      notes: 'Vyvanse-light lunches'
+    },
+    owner_agent: 'brisket',
+    created_at: '2026-08-31T00:00:00.000Z',
+    status: 'published'
+  }, null, 2);
+
+  const fetchImpl = async (url) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: COMMIT_SHA, commit: { tree: { sha: TREE_SHA } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        sha: TREE_SHA,
+        truncated: false,
+        tree: [
+          { path: 'data/widgets/2026-08-31-week-plan.json', type: 'blob', sha: WIDGET_SHA, size: 200 }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${WIDGET_SHA}`)) {
+      return Response.json(encodeBlob(mealPlanJson));
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createSurfaceWidgetsHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+  const response = await handler(request());
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.data.widgets.length, 1);
+  assert.equal(payload.data.widgets[0].template_id, 'meal-plan-week');
+  assert.equal(payload.data.widgets[0].props.days.length, 2);
+});

@@ -10,8 +10,28 @@ const KEYWORD_HINTS = [
     patterns: [/remember/i, /\bflag\b/i, /traveling/i, /this week/i, /note that/i]
   },
   {
+    ids: ['publish.surface-widget', 'plan.week-meals'],
+    patterns: [/meal plan widget/i, /week(?:ly)? meal/i, /on the nutrition tab/i]
+  },
+  {
+    ids: ['track.close-challenge'],
+    patterns: [/close (?:the |this )?challenge/i, /challenge verdict/i, /dispute (?:the )?judge/i]
+  },
+  {
+    ids: ['remember.note-context', 'coordinate.request-cn-write'],
+    patterns: [/loan (?:a )?capacity/i, /borrow (?:from|capacity)/i, /ask (?:chadwick|brisket|hammond|sara) to/i]
+  },
+  {
+    ids: ['lookup.save-food-library', 'lookup.food-brand-au'],
+    patterns: [/food library/i, /save (?:to |this )?(?:brand|product)/i, /fsanz/i, /woolworths/i, /coles/i]
+  },
+  {
+    ids: ['lookup.save-exercise-library'],
+    patterns: [/exercise library/i, /save (?:this )?exercise/i]
+  },
+  {
     ids: ['research.save-brief', 'research.expiring-brief'],
-    patterns: [/look(?:ed|ing)? up/i, /research/i, /save (?:this|a) brief/i, /artifact/i]
+    patterns: [/look(?:ed|ing)? up/i, /research/i, /save (?:this|a) brief/i, /artifact/i, /clinical/i]
   },
   {
     ids: ['publish.surface-widget'],
