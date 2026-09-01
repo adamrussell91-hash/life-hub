@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSessionApi } from '../../js/app/api-session.js';
-import { createAppController } from '../../js/app/app-controller.js';
+import { createSessionApi } from '../../apps/life/js/app/api-session.js';
+import { createAppController } from '../../apps/life/js/app/app-controller.js';
 
 const EXPIRY = '2026-08-01T18:00:00.000Z';
 const NOW = new Date('2026-08-01T01:00:00.000Z');

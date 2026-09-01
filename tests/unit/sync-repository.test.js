@@ -4,7 +4,7 @@ import {
   diffManifest,
   SyncError,
   syncRepository
-} from '../../js/app/sync-repository.js';
+} from '../../apps/life/js/app/sync-repository.js';
 
 const SHA = {
   a: 'a'.repeat(40),

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { renderCentralNode } from '../../js/app/render-central-node.js';
+import { renderCentralNode } from '../../apps/life/js/app/render-central-node.js';
 
 class FakeElement {
   constructor(tag) {
@@ -194,7 +194,7 @@ function baseModel(overrides = {}) {
 }
 
 test('protein this week markup places chart before this-week prose and includes rolling elements', () => {
-  const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const weekStart = html.indexOf('id="central-node-week-label"');
   const weekEnd = html.indexOf('central-node-month-label');
   assert.ok(weekStart >= 0 && weekEnd > weekStart);

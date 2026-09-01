@@ -4,7 +4,7 @@ import {
   classifyCentralNodePatchRisk,
   applyCentralNodePatch,
   CENTRAL_NODE_SECTIONS
-} from '../../js/core/central-node-patch.js';
+} from '../../apps/life/js/core/central-node-patch.js';
 
 const FIXTURE = `# Purpose
 Purpose body.

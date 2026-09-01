@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCalendarMarkers, getSearchExtension, searchEvents } from '../../js/core/search.js';
+import { buildCalendarMarkers, getSearchExtension, searchEvents } from '../../apps/life/js/core/search.js';
 
 const events = [
   { record: { id: 'm1', type: 'meal', date: '2026-07-30', meal: 'lunch' }, body: 'Marley Spoon chicken bowl.', path: 'data/nutrition/2026/07/2026-07-30-lunch.md' },

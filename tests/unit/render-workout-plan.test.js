@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendWorkoutPlanCard, fillExercisePlanList, renderExercisePlanRow } from '../../js/app/render-workout-plan.js';
+import { appendWorkoutPlanCard, fillExercisePlanList, renderExercisePlanRow } from '../../apps/life/js/app/render-workout-plan.js';
 
 class FakeEl {
   constructor(tag = 'div') {

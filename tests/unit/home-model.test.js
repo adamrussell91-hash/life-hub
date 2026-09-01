@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'js-yaml';
 import { readFile } from 'node:fs/promises';
-import { loadEventManifest } from '../../js/app/load-events.js';
-import { buildHomeModel, selectDisplayDate } from '../../js/app/home-model.js';
+import { loadEventManifest } from '../../apps/life/js/app/load-events.js';
+import { buildHomeModel, selectDisplayDate } from '../../apps/life/js/app/home-model.js';
 
 const manifest = JSON.parse(await readFile(new URL('../../fixtures/manifest.json', import.meta.url)));
 const targetsConfig = load(await readFile(new URL('../../config/targets.yml', import.meta.url), 'utf8'));

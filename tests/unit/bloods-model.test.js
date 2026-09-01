@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBloodsModel } from '../../js/app/bloods-model.js';
+import { buildBloodsModel } from '../../apps/life/js/app/bloods-model.js';
 
 function bloodsEvent(date, markers) {
   return { record: { type: 'bloods', date, markers } };

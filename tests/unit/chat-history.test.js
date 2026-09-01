@@ -5,7 +5,7 @@ import {
   MAX_HISTORY_ENTRY_CHARS,
   MAX_HISTORY_TOTAL_CHARS,
   truncateHistoryEntry
-} from '../../js/core/chat-history.js';
+} from '../../apps/life/js/core/chat-history.js';
 
 const PLAN_TAIL = [
   '1. Bar Press (Chest) — 10x30kg, 10x32kg, 8x34kg — cable: constant force',

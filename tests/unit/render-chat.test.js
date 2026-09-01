@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, renderChatMarkdown, renderInlineMarkdown } from '../../js/app/render-chat.js';
+import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, renderChatMarkdown, renderInlineMarkdown } from '../../apps/life/js/app/render-chat.js';
 
 class FakeElement {
   constructor(tag) {

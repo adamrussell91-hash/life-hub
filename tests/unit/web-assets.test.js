@@ -5,13 +5,13 @@ import { readFile, readdir } from 'node:fs/promises';
 async function browserAssetText() {
   const root = new URL('../../', import.meta.url);
   const paths = [
-    'index.html',
-    'css/app.css',
-    'manifest.webmanifest',
-    'service-worker.js',
+    'apps/life/index.html',
+    'apps/life/css/app.css',
+    'apps/life/manifest.webmanifest',
+    'apps/life/service-worker.js',
     'node_modules/js-yaml/dist/js-yaml.mjs'
   ];
-  for (const directory of ['js/app', 'js/core']) {
+  for (const directory of ['apps/life/js/app', 'apps/life/js/core']) {
     const entries = await readdir(new URL(directory, root));
     paths.push(...entries.filter(name => name.endsWith('.js')).map(name => `${directory}/${name}`));
   }
@@ -19,7 +19,7 @@ async function browserAssetText() {
 }
 
 test('Home shell exposes landmarks and named rendering regions', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const htmlWithoutFonts = html.replace(/https:\/\/fonts\.(googleapis|gstatic)\.com[^"'\s]*/g, '');
 
   for (const fragment of [
@@ -38,7 +38,7 @@ test('Home shell exposes landmarks and named rendering regions', async () => {
 });
 
 test('authenticated shell provides a semantic sign-in gate and reachable controls', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
 
   assert.doesNotMatch(html, /class="sign-in__mark"/);
 
@@ -68,7 +68,7 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
 });
 
 test('no Life Hub tile appears on any page', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const copy = html.slice(html.indexOf('page-header__copy'), html.indexOf('page-header__actions'));
   assert.match(copy, /class="page-header__title-row"/);
   assert.match(copy, /id="page-title"/);
@@ -80,7 +80,7 @@ test('no Life Hub tile appears on any page', async () => {
 });
 
 test('skip link is unavailable until the authenticated shell is revealed', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const shellStart = html.indexOf('id="app-shell"');
   const skipLink = html.indexOf('class="skip-link"');
   const mainContent = html.indexOf('id="main-content"');
@@ -106,7 +106,7 @@ test('browser assets contain no server environment names that reveal values', as
 });
 
 test('renderer assigns untrusted values as text instead of HTML', async () => {
-  const source = await readFile(new URL('../../js/app/render-home.js', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../../apps/life/js/app/render-home.js', import.meta.url), 'utf8');
 
   assert.match(source, /textContent/);
   assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML|outerHTML/);
@@ -114,7 +114,7 @@ test('renderer assigns untrusted values as text instead of HTML', async () => {
 
 test('responsive stylesheet contains the approved palette and mobile breakpoint', async () => {
   const css = [
-    await readFile(new URL('../../css/app.css', import.meta.url), 'utf8'),
+    await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8'),
     await readFile(new URL('../../packages/design-kit/tokens.css', import.meta.url), 'utf8')
   ].join('\n');
 
@@ -126,13 +126,13 @@ test('responsive stylesheet contains the approved palette and mobile breakpoint'
 });
 
 test('author styles preserve the semantic hidden state', async () => {
-  const css = await readFile(new URL('../../css/app.css', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
   assert.match(css, /\[hidden\]\s*{\s*display:\s*none\s*!important;?\s*}/);
 });
 
 test('web app manifest is installable and uses only local icons', async () => {
-  const manifest = JSON.parse(await readFile(new URL('../../manifest.webmanifest', import.meta.url)));
+  const manifest = JSON.parse(await readFile(new URL('../../apps/life/manifest.webmanifest', import.meta.url)));
 
   assert.equal(manifest.name, 'Life Hub');
   assert.equal(manifest.display, 'standalone');

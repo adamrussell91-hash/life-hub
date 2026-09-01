@@ -10,8 +10,8 @@
 // path-only scan built specifically for this module, so widening this window never
 // costs every other agent an unbounded blob read.
 
-import { addCalendarDays, daysBetween } from '../../../js/core/time.js';
-import { calculateWorkoutStreak } from '../../../js/core/aggregate.js';
+import { addCalendarDays, daysBetween } from '../../../apps/life/js/core/time.js';
+import { calculateWorkoutStreak } from '../../../apps/life/js/core/aggregate.js';
 
 // Mirrors repo-policy.mjs's EVENT_PATH -- the 5 domains it recognises as real Life
 // Hub data paths (data/<domain>/<year>/<month>/<date>-<name>.md). Duplicated here

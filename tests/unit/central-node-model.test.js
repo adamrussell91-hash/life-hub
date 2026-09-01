@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
+import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
 
 const records = [
   { type: 'meal', date: '2026-07-30', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420, calcium_mg: 380, polyphenol_score: 6 },

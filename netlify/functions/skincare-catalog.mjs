@@ -17,14 +17,14 @@ import {
   GitHubConfigurationError
 } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
 import {
   SKINCARE_CATALOG_PATH,
   appendProduct,
   emptyCatalog,
   parseCatalog,
   retireProduct
-} from '../../js/app/skincare-catalog.js';
+} from '../../apps/life/js/app/skincare-catalog.js';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const REPOSITORY_MESSAGE = 'The repository is temporarily unavailable.';

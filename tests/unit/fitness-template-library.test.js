@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createFitnessTemplateLibrary } from '../../js/app/fitness-template-library.js';
+import { createFitnessTemplateLibrary } from '../../apps/life/js/app/fitness-template-library.js';
 
 class FakeEl {
   constructor(tag) {

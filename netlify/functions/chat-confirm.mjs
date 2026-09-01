@@ -22,7 +22,7 @@ import {
   parseExerciseLibrary
 } from './_shared/exercise-library.mjs';
 import { persistLogEntry, renderMarkdown } from './_shared/persist-log.mjs';
-import { getSydneyDateKey, getSydneyTimestamp } from '../../js/core/time.js';
+import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
 import {
   validateCentralNodePatchInput,
@@ -49,7 +49,7 @@ import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
   emptyGovernanceLog
-} from '../../js/core/governance-log.js';
+} from '../../apps/life/js/core/governance-log.js';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;

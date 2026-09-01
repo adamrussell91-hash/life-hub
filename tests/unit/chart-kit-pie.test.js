@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDistributionPie, buildMealProteinPie } from '../../js/app/chart-kit/pie.js';
-import { buildMoodMixDonut } from '../../js/app/chart-kit/mood-mix.js';
+import { buildDistributionPie, buildMealProteinPie } from '../../apps/life/js/app/chart-kit/pie.js';
+import { buildMoodMixDonut } from '../../apps/life/js/app/chart-kit/mood-mix.js';
 
 test('buildMealProteinPie returns empty when all meal protein is zero', () => {
   const pie = buildMealProteinPie({

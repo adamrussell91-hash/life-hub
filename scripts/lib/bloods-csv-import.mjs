@@ -1,4 +1,4 @@
-import { sydneyLocalStamp } from '../../js/core/time.js';
+import { sydneyLocalStamp } from '../../apps/life/js/core/time.js';
 import { canonicalMarkerKey } from './bloods-marker-map.mjs';
 
 const BODY_TIME = '12:00';

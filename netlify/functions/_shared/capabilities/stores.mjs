@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { isCalendarDate, addCalendarDays } from '../../../../js/core/time.js';
+import { isCalendarDate, addCalendarDays } from '../../../../apps/life/js/core/time.js';
 
 export const REMEMBER_DIR = 'data/remember';
 export const CHALLENGES_DIR = 'data/challenges';

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderBloods } from '../../js/app/render-bloods.js';
-import { combinedChartSvg } from '../../js/app/bloods-charts.js';
+import { renderBloods } from '../../apps/life/js/app/render-bloods.js';
+import { combinedChartSvg } from '../../apps/life/js/app/bloods-charts.js';
 
 function el(tag = 'div') {
   const node = {
@@ -592,7 +592,7 @@ test('the summary is one card: a bar with a legend, no ring, and the date folded
   assert.match(String(root._collected.textContent), /Collected 22\/05\/26/);
 
   const { readFileSync } = await import('node:fs');
-  const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const signal = html.match(/<div id="bloods-signal"[\s\S]*?\n {10}<\/div>/);
   assert.ok(signal, 'expected a #bloods-signal block');
   assert.doesNotMatch(signal[0], /id="bloods-flags"/);
@@ -603,7 +603,7 @@ test('the summary is one card: a bar with a legend, no ring, and the date folded
 
 test('bloods flag chips are centred in CSS, not baseline-aligned tape chips', async () => {
   const { readFileSync } = await import('node:fs');
-  const css = readFileSync(new URL('../../css/app.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
   const block = css.match(/\.bloods-flag\s*\{[^}]+\}/);
   assert.ok(block, 'expected a .bloods-flag rule');
   assert.match(block[0], /align-items:\s*center/);

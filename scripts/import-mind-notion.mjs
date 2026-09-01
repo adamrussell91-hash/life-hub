@@ -9,8 +9,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { appendGovernanceEntry } from '../js/core/governance-log.js';
-import { planImport, slug } from '../js/core/mind-import.js';
+import { appendGovernanceEntry } from '../apps/life/js/core/governance-log.js';
+import { planImport, slug } from '../apps/life/js/core/mind-import.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = parseArgs(process.argv.slice(2));

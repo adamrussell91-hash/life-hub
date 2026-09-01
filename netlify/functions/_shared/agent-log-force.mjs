@@ -2,7 +2,7 @@ import {
   forceLogNudgeFor,
   forceStatusFor,
   shouldForceAgentLog
-} from '../../../js/core/log-finalize-detect.js';
+} from '../../../apps/life/js/core/log-finalize-detect.js';
 import { streamWithChadwickPlanForce } from './chadwick-plan-force.mjs';
 
 export {

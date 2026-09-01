@@ -9,7 +9,7 @@ import {
   resolveCalendarDayClick,
   shiftYearMonth,
   yearMonthFromDate
-} from '../../js/app/calendar-model.js';
+} from '../../apps/life/js/app/calendar-model.js';
 
 test('yearMonth and shift helpers', () => {
   assert.equal(yearMonthFromDate('2026-08-05'), '2026-08');

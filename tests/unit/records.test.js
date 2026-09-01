@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'js-yaml';
-import { parseCanonicalPath, parseEventDocument } from '../../js/core/records.js';
-import { validateRecord } from '../../js/core/validate.js';
-import * as recordValidation from '../../js/core/validate.js';
+import { parseCanonicalPath, parseEventDocument } from '../../apps/life/js/core/records.js';
+import { validateRecord } from '../../apps/life/js/core/validate.js';
+import * as recordValidation from '../../apps/life/js/core/validate.js';
 
 const valid = `---
 schema_version: 1

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'js-yaml';
 import { readFile } from 'node:fs/promises';
-import { getDayTargets, resolveTargetSet } from '../../js/core/targets.js';
+import { getDayTargets, resolveTargetSet } from '../../apps/life/js/core/targets.js';
 
 const config = load(await readFile(new URL('../../config/targets.yml', import.meta.url), 'utf8'));
 

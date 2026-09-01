@@ -11,9 +11,9 @@ import {
   parseMedicalEventTolerant,
   resolveMedicalLogCandidate,
   scoreMedicalTitleMatch
-} from '../../js/app/medical-normalize.js';
+} from '../../apps/life/js/app/medical-normalize.js';
 import { validateLogEntry } from '../../netlify/functions/_shared/chat-schema.mjs';
-import { validateRecord } from '../../js/core/validate.js';
+import { validateRecord } from '../../apps/life/js/core/validate.js';
 
 test('infers prescription type for injections and biologics', () => {
   assert.equal(

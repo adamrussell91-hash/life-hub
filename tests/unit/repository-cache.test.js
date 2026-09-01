@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRepositoryCache } from '../../js/app/repository-cache.js';
+import { createRepositoryCache } from '../../apps/life/js/app/repository-cache.js';
 
 class MemoryCacheStorage {
   constructor() {

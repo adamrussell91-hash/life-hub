@@ -2,17 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { load } from 'js-yaml';
-import { buildHomeModel } from '../../js/app/home-model.js';
+import { buildHomeModel } from '../../apps/life/js/app/home-model.js';
 import {
   MAX_LOOKBACK_DAYS,
   loadLiveEvents as loadLiveEventsRaw,
   planBackfillWindows
-} from '../../js/app/load-live-events.js';
+} from '../../apps/life/js/app/load-live-events.js';
 
 function loadLiveEvents(opts) {
   return loadLiveEventsRaw({ maxLookbackDays: 40, ...opts });
 }
-import { addCalendarDays, daysBetween } from '../../js/core/time.js';
+import { addCalendarDays, daysBetween } from '../../apps/life/js/core/time.js';
 
 const SHA = 'a'.repeat(40);
 const raw = (path, content) => ({ path, sha: SHA, content });

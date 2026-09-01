@@ -9,7 +9,7 @@
 import { readdirSync, readFileSync, writeFileSync, unlinkSync, statSync, existsSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { load } from 'js-yaml';
-import { parseCanonicalPath, parseEventDocument } from '../js/core/records.js';
+import { parseCanonicalPath, parseEventDocument } from '../apps/life/js/core/records.js';
 import {
   spacedDuplicateCandidates,
   repairRecordFrontmatter,

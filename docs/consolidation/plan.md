@@ -200,7 +200,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Auth decision | **decided** | Retain Life Hub secrets |
 | Repo naming decision | **decided** | Reuse `life-hub`, leave as-is |
 | Design-kit mechanic | decided | Copy-then-freeze into `packages/design-kit/` |
-| Umbrella seed | **shipped** | PR #55 merged; Life app still at repo root |
+| Umbrella seed | **shipped** | PR #55 merged; Life source remounted in slice 05 |
 | Kit remount | **shipped** | PR #56 merged 2026-09-01 |
 | Auth lock | **shipped** | PR #57 merged 2026-09-01 |
 | Auth call sites | **shipped** | PR #58 merged 2026-09-01 |
@@ -263,7 +263,30 @@ Do **not** retarget `life-hub2`, fold other hubs, or rotate secrets.
 
 ## Next action
 
-Finish Slice 05 as a PR against `main`. After merge, Claude observe-only **checkpoint-05**.
+Claude observe-only **checkpoint-05** against this remount PR. Do not retarget `life-hub2` or fold other hubs until that report lands.
+
+Paste:
+
+```text
+You are the consolidation overseer at checkpoint-05. cwd = life-hub repo root.
+Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.9).
+
+Observe-only rules (hard):
+- Do NOT edit application code, move files, run destructive git, or commit.
+- You MAY create exactly one report:
+  docs/consolidation/checkpoints/checkpoint-05.md
+
+Inspect: the apps/life remount PR vs main, and plan.md Slice 05 notes.
+Confirm: Life shell source lives under apps/life/;
+dist/ still publishes the same public paths (index.html, js/, css/, assets/);
+netlify.toml, function filenames, included_files, and secrets unchanged;
+life-hub-data untouched; no Teaching/Knowledge/Tasks fold.
+
+Write the report using the template in OVERSEER.md.
+End with: next 3 concrete steps for Cursor local agent — no patches.
+If auth, life-hub-data boundary, or public student URL safety looks wrong,
+open with DO NOT MERGE YET.
+```
 
 
 ## Open questions (Adam)

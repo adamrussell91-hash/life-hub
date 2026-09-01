@@ -1,4 +1,4 @@
-import { sydneyLocalStamp } from '../../js/core/time.js';
+import { sydneyLocalStamp } from '../../apps/life/js/core/time.js';
 
 const MONTHS = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,

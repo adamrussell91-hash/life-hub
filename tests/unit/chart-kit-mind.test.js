@@ -1,16 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildStreamPaths, buildThemeTopography } from '../../js/app/chart-kit/stream.js';
-import { buildSankeyFlow } from '../../js/app/chart-kit/sankey-flow.js';
-import { buildBumpLines, buildBumpChart } from '../../js/app/chart-kit/bump.js';
-import { buildRadialYear } from '../../js/app/chart-kit/radial-year.js';
-import { buildHorizonBands, buildMetricStrip, buildGroupedMetricBars } from '../../js/app/chart-kit/horizon.js';
-import { buildMoodRadial } from '../../js/app/chart-kit/mood-radial.js';
-import { buildEnergyOrbit } from '../../js/app/chart-kit/energy-orbit.js';
-import { CLINICAL_CHART_SLOTS } from '../../js/app/chart-kit/clinical-slots.js';
-import { buildWatchlistHeat } from '../../js/app/chart-kit/watchlist-heat.js';
-import { buildThemeOrbit } from '../../js/app/chart-kit/theme-orbit.js';
-import { buildThemeConstellation } from '../../js/app/chart-kit/theme-constellation.js';
+import { buildStreamPaths, buildThemeTopography } from '../../apps/life/js/app/chart-kit/stream.js';
+import { buildSankeyFlow } from '../../apps/life/js/app/chart-kit/sankey-flow.js';
+import { buildBumpLines, buildBumpChart } from '../../apps/life/js/app/chart-kit/bump.js';
+import { buildRadialYear } from '../../apps/life/js/app/chart-kit/radial-year.js';
+import { buildHorizonBands, buildMetricStrip, buildGroupedMetricBars } from '../../apps/life/js/app/chart-kit/horizon.js';
+import { buildMoodRadial } from '../../apps/life/js/app/chart-kit/mood-radial.js';
+import { buildEnergyOrbit } from '../../apps/life/js/app/chart-kit/energy-orbit.js';
+import { CLINICAL_CHART_SLOTS } from '../../apps/life/js/app/chart-kit/clinical-slots.js';
+import { buildWatchlistHeat } from '../../apps/life/js/app/chart-kit/watchlist-heat.js';
+import { buildThemeOrbit } from '../../apps/life/js/app/chart-kit/theme-orbit.js';
+import { buildThemeConstellation } from '../../apps/life/js/app/chart-kit/theme-constellation.js';
 
 test('Clinical Glass chart slots stay on the approved Life Hub tokens', () => {
   assert.deepEqual(CLINICAL_CHART_SLOTS, [

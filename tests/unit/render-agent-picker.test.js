@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderAgentPicker, applyAgentAvatarToBubble } from '../../js/app/render-agent-picker.js';
+import { renderAgentPicker, applyAgentAvatarToBubble } from '../../apps/life/js/app/render-agent-picker.js';
 
 class FakeClassList {
   constructor(owner) {

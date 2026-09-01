@@ -1,8 +1,8 @@
-import { TYPE_DOMAINS } from '../../../js/core/records.js';
-import { validateRecord } from '../../../js/core/validate.js';
-import { isCalendarDate } from '../../../js/core/time.js';
-import { buildMedicalSlug } from '../../../js/app/medical-model.js';
-import { coerceCalendarDate, normalizeMedicalFields } from '../../../js/app/medical-normalize.js';
+import { TYPE_DOMAINS } from '../../../apps/life/js/core/records.js';
+import { validateRecord } from '../../../apps/life/js/core/validate.js';
+import { isCalendarDate } from '../../../apps/life/js/core/time.js';
+import { buildMedicalSlug } from '../../../apps/life/js/app/medical-model.js';
+import { coerceCalendarDate, normalizeMedicalFields } from '../../../apps/life/js/app/medical-normalize.js';
 
 const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare', 'mind_session', 'medical'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

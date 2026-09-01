@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AGENT_AVATARS, avatarForSlug } from '../../js/app/agent-avatars.js';
-import { renderAgentHero } from '../../js/app/render-agent-picker.js';
+import { AGENT_AVATARS, avatarForSlug } from '../../apps/life/js/app/agent-avatars.js';
+import { renderAgentHero } from '../../apps/life/js/app/render-agent-picker.js';
 
 class FakeEl {
   constructor(tag) {
