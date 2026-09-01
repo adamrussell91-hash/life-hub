@@ -48,6 +48,10 @@ const KEYWORD_HINTS = [
   {
     ids: ['os.promote-shortcut'],
     patterns: [/promote (?:this |that )?(?:to )?(?:a )?shortcut/i, /make (?:this|that) a (?:named )?shortcut/i, /named capacity/i]
+  },
+  {
+    ids: ['os.list-promoted-shortcuts', 'os.run-promoted-shortcut'],
+    patterns: [/promoted shortcut/i, /run (?:the |that |a )?promoted/i, /list promoted/i, /catalogued shortcut/i]
   }
 ];
 

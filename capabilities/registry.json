@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "generated_from": "capability definition files (single source of truth)",
   "capabilities": {
     "os.propose-action": {
@@ -279,6 +279,29 @@
         "governance_log"
       ],
       "tool_name": "os_promote_shortcut"
+    },
+    "os.list-promoted-shortcuts": {
+      "file": "os/list-promoted-shortcuts.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat"
+      ],
+      "tool_name": "os_list_promoted_shortcuts"
+    },
+    "os.run-promoted-shortcut": {
+      "file": "os/run-promoted-shortcut.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "os_run_promoted_shortcut"
     }
   }
 }

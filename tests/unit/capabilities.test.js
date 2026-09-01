@@ -77,7 +77,7 @@ function mockCtx(agentSlug = 'brisket') {
 test('registry loads propose-action and Phase 1-3 shortcuts', () => {
   resetCapabilityCaches();
   const registry = loadRegistry();
-  assert.equal(registry.version, '0.3.0');
+  assert.equal(registry.version, '0.4.0');
   assert.ok(registry.capabilities['os.propose-action']);
   assert.ok(registry.capabilities['track.open-challenge']);
   assert.ok(registry.capabilities['coordinate.request-cn-write']);
@@ -267,7 +267,9 @@ test('shortcutSchemas covers Phase 1-3 tool names', () => {
     'lookup_food_brand_au',
     'os_capability_scoreboard',
     'intuition_edit_pack',
-    'os_promote_shortcut'
+    'os_promote_shortcut',
+    'os_list_promoted_shortcuts',
+    'os_run_promoted_shortcut'
   ]) {
     assert.ok(isShortcutTool(name), name);
     assert.ok(names.includes(name), name);
@@ -428,4 +430,79 @@ test('intent router surfaces intuition.edit-pack on flare-update asks', () => {
     message: 'Update the flare intuition after this bad week'
   });
   assert.ok(ids.includes('intuition.edit-pack'));
+});
+
+test('os_list_promoted_shortcuts and os_run_promoted_shortcut replay Confirm writes', async () => {
+  resetCapabilityCaches();
+  const { ctx, writes } = mockCtx('brisket');
+  const promote = await executeShortcut(
+    'os_promote_shortcut',
+    {
+      proposed_id: 'track.morning-weigh-in',
+      summary: 'Morning weigh-in tracker',
+      example_intent: 'log morning weight',
+      example_writes: [{
+        path: 'data/challenges/2026-08-31-weigh-in.json',
+        mode: 'create',
+        content: '{\n  "title": "Morning weigh-in"\n}\n',
+        diff: 'new weigh-in challenge'
+      }],
+      risk: 'confirm'
+    },
+    ctx
+  );
+  assert.equal(promote.kind, 'propose');
+  const draftPath = promote.proposal.writes[0].path;
+  assert.match(draftPath, /^data\/os\/promoted-shortcuts\//);
+
+  // Simulate Adam Confirm of the promote draft.
+  await ctx.client.writeFile({
+    path: draftPath,
+    content: promote.proposal.writes[0].content,
+    message: 'confirm promote draft'
+  });
+
+  const listed = await executeShortcut('os_list_promoted_shortcuts', {}, ctx);
+  assert.equal(listed.kind, 'ok');
+  assert.equal(listed.count, 1);
+  assert.equal(listed.drafts[0].proposed_id, 'track.morning-weigh-in');
+
+  const run = await executeShortcut(
+    'os_run_promoted_shortcut',
+    { proposed_id: 'track.morning-weigh-in' },
+    ctx
+  );
+  assert.equal(run.kind, 'propose');
+  const validated = validateProposeActionInput(run.proposal, { agentSlug: 'brisket' });
+  assert.equal(validated.ok, true);
+  assert.equal(validated.proposal.writes[0].path, 'data/challenges/2026-08-31-weigh-in.json');
+  assert.match(run.proposal.intent, /morning/i);
+
+  const missing = await executeShortcut(
+    'os_run_promoted_shortcut',
+    { proposed_id: 'track.does-not-exist' },
+    ctx
+  );
+  assert.equal(missing.kind, 'error');
+});
+
+test('registry 0.4 includes promoted-shortcut runner tools', () => {
+  resetCapabilityCaches();
+  const registry = loadRegistry();
+  assert.equal(registry.version, '0.4.0');
+  assert.ok(capabilityIdsForAgent('brisket').includes('os.run-promoted-shortcut'));
+  assert.ok(capabilityIdsForAgent('brisket').includes('os.list-promoted-shortcuts'));
+  const tools = buildAgentTools({ slug: 'brisket', message: 'run the promoted shortcut for morning weigh-in' });
+  assert.ok(tools.some(tool => tool.name === 'os_run_promoted_shortcut'));
+  assert.ok(isShortcutTool('os_run_promoted_shortcut'));
+  assert.ok(isShortcutTool('os_list_promoted_shortcuts'));
+});
+
+test('intent router surfaces os.run-promoted-shortcut on promoted asks', () => {
+  resetCapabilityCaches();
+  const ids = selectCapabilityIdsForTurn({
+    slug: 'brisket',
+    message: 'Run the promoted shortcut for morning weigh-in'
+  });
+  assert.ok(ids.includes('os.run-promoted-shortcut'));
 });
