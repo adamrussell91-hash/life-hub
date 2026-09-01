@@ -13,6 +13,10 @@ import {
   preflightResponse,
   withCors
 } from './_shared/http.mjs';
+import {
+  UMBRELLA_PASSPHRASE_HASH_ENV,
+  UMBRELLA_SESSION_SECRET_ENV
+} from './_shared/umbrella-auth.mjs';
 
 const MAX_BODY_BYTES = 1_024;
 const BODY_TOO_LARGE = Symbol('body_too_large');
@@ -45,7 +49,7 @@ export function createAuthHandler({
 
     let accepted = false;
     try {
-      accepted = await verify(parsed.passphrase, env.LIFE_HUB_PASSPHRASE_HASH);
+      accepted = await verify(parsed.passphrase, env[UMBRELLA_PASSPHRASE_HASH_ENV]);
     } catch {
       accepted = false;
     }
@@ -54,7 +58,7 @@ export function createAuthHandler({
     }
 
     try {
-      const session = createToken({ now: now(), ...(randomBytes ? { randomBytes } : {}) }, env.SESSION_SECRET);
+      const session = createToken({ now: now(), ...(randomBytes ? { randomBytes } : {}) }, env[UMBRELLA_SESSION_SECRET_ENV]);
       return withCors(jsonResponse(200, {
         ok: true,
         data: { authenticated: true, expiresAt: session.expiresAt }

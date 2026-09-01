@@ -1,3 +1,8 @@
+import {
+  UMBRELLA_PASSPHRASE_HASH_ENV,
+  UMBRELLA_SESSION_SECRET_ENV
+} from './umbrella-auth.mjs';
+
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store'
@@ -80,8 +85,10 @@ export function methodNotAllowed(allow) {
 }
 
 export function isConfigured(env) {
-  return typeof env?.LIFE_HUB_PASSPHRASE_HASH === 'string' && env.LIFE_HUB_PASSPHRASE_HASH.length > 0 &&
-    typeof env?.SESSION_SECRET === 'string' && Buffer.byteLength(env.SESSION_SECRET, 'utf8') >= 32;
+  const passphrase = env?.[UMBRELLA_PASSPHRASE_HASH_ENV];
+  const sessionSecret = env?.[UMBRELLA_SESSION_SECRET_ENV];
+  return typeof passphrase === 'string' && passphrase.length > 0 &&
+    typeof sessionSecret === 'string' && Buffer.byteLength(sessionSecret, 'utf8') >= 32;
 }
 
 export function misconfiguredResponse() {
