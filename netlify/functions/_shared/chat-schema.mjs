@@ -46,6 +46,37 @@ const DOMAIN_PROPERTIES = {
             enum: ['drop_set', 'rest_pause', 'eccentric_overload', 'elastic_finisher', 'superset', 'other']
           },
           equipment: { type: 'string' },
+          superset_group: {
+            type: 'number',
+            description: 'Exercises sharing the same superset_group are performed back-to-back before resting.'
+          },
+          superset_label: {
+            type: 'string',
+            description: 'Optional card label for the pair, e.g. "1&2 superset".'
+          },
+          between_sets: {
+            type: 'object',
+            description: 'Optional between-set arm performed during rest on the main exercise.',
+            properties: {
+              name: { type: 'string' },
+              sets: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    reps: { type: 'number' },
+                    weight_kg: { type: 'number' },
+                    cable_type: {
+                      type: 'string',
+                      enum: ['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing', 'none']
+                    }
+                  },
+                  required: ['reps', 'weight_kg', 'cable_type']
+                }
+              }
+            },
+            required: ['name']
+          },
           coach_cues: {
             type: 'object',
             description: 'Optional presence during the session (planned exercises only): a short line to show on starting this exercise, during rest between sets, and on the final set. Zero extra API calls -- generated once, up front, alongside the plan.',
