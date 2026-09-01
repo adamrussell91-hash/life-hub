@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.0 — kit-import from-anchor merged (PR #61). Checkpoint-07 PASS. This slice: umbrella hub mounts, Life calendar source, multi-origin CORS, public student route table.  
+> **Status:** v4.1 — umbrella shell merged (PR #62). Checkpoint-08 PASS. Next: Teaching public handlers on `life-hub2` (503 if Blobs unbound).  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -189,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v4.0 | umbrella shell + Life calendar source + Teaching CORS | Slice 07 merged 2026-09-01 as PR #61 |
+| Plan v4.1 | Teaching public handlers next | Slice 08 merged 2026-09-01 as PR #62 |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -200,6 +200,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Claude checkpoint-05 | **PASS** | `checkpoints/checkpoint-05.md` — merge #59 |
 | Claude checkpoint-06 | **PASS** | `checkpoints/checkpoint-06.md` — merge #60 |
 | Claude checkpoint-07 | **PASS** | `checkpoints/checkpoint-07.md` — merge #61 |
+| Claude checkpoint-08 | **PASS** | `checkpoints/checkpoint-08.md` — merge #62 |
 | Deploy inventory | **filled** | See table above; `life-hub2` is absorb target |
 | Auth decision | **decided** | Retain Life Hub secrets |
 | Repo naming decision | **decided** | Reuse `life-hub`, leave as-is |
@@ -211,7 +212,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Life app remount | **shipped** | PR #59 merged 2026-09-01 |
 | Published kit-import check | **shipped** | PR #60 merged 2026-09-01 |
 | Kit-import from-anchor | **shipped** | PR #61 merged 2026-09-01 |
-| Umbrella shell | in progress | Slice 08 — hub mounts, Life calendar source, CORS allow-list, public student route table |
+| Umbrella shell | **shipped** | PR #62 merged 2026-09-01 |
+| Teaching public handlers | not started | Slice 09 — bind or 503; wire `isPublicStudentApi()` first |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -280,46 +282,28 @@ Checkpoint-06: only rewrite `import`/`export` `from '...'` kit specifiers, not c
 
 Do **not** retarget `life-hub2`, fold other hubs, or rotate secrets.
 
-### Slice 08 — umbrella shell (this slice)
-
-One chunk, not another kit-import nit:
+### Slice 08 — umbrella shell (shipped, PR #62)
 
 - Hub mounts in the Life rail: Teaching, Knowledge, Tasks
 - Calendar first source = Life logged days (`loadLiveEvents` unchanged)
-- CORS allow-list: Life + Teaching Pages origins (plus `SITE_ORIGIN`)
-- Public student API route table so `/api/published/*` stays unauthenticated when Teaching handlers land
+- CORS allow-list: Life + Teaching Pages origins (plus `SITE_ORIGIN`); exact-match only
+- Public student API route table defined; not called until Teaching handlers land
 - Teaching SPA stays on Pages; no Blobs, no `arteaching-hub` retire, no secret rotation
 
-Do **not** retarget `life-hub2` production or copy Teaching Functions onto this site in this slice.
+### Slice 09 — Teaching public handlers (this slice)
+
+Land the public student API on `life-hub2` without breaking production if Blobs is not bound yet:
+
+- Copy only public handlers (`published-lesson`, `published-unit`, `published-class`, `media-file`, `html-app-ai`)
+- Call `isPublicStudentApi()` **before** the session gate — first thing when handlers land
+- If Blobs store `teaching-hub-content` is unbound, respond **503**, not 500
+- Do **not** copy teacher-auth handlers, retire `arteaching-hub`, rotate secrets, or retarget `life-hub2` production
 
 ## Next action
 
-Claude observe-only **checkpoint-08** against this umbrella-shell PR.
+Wait for Adam: bind `teaching-hub-content` on `life-hub2` now, or land Slice 09 with 503-if-unbound.
 
-Paste:
-
-```text
-You are the consolidation overseer at checkpoint-08. cwd = life-hub worktree
-~/Projects/life-hub/.worktrees/umbrella-seed-slice-01
-(not the primary checkout — that may be on an unrelated branch).
-Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v4.0).
-
-Observe-only rules (hard):
-- Do NOT edit application code, move files, run destructive git, or commit.
-- You MAY create exactly one report:
-  docs/consolidation/checkpoints/checkpoint-08.md
-
-Inspect: the umbrella-shell PR vs main, and plan.md Slice 08 notes.
-Confirm: Teaching/Knowledge/Tasks are shell mounts only (no Functions copied);
-Life calendar source is live and loadLiveEvents is unchanged;
-CORS allow-list includes Teaching Pages; public student routes stay ungated;
-netlify.toml and secrets unchanged; life-hub-data untouched.
-
-Write the report using the template in OVERSEER.md.
-End with: next 3 concrete steps for Cursor local agent — no patches.
-If auth, life-hub-data boundary, or public student URL safety looks wrong,
-open with DO NOT MERGE YET.
-```
+Primary checkout `~/Projects/life-hub` is still on `cursor/life-protocol-pills-c87b` with uncommitted work (~94 commits behind). Overseer/implementer cwd stays this worktree until that is committed/stashed or named as a Decision.
 
 ## Open questions (Adam)
 
