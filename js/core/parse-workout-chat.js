@@ -105,22 +105,43 @@ export function parseWorkoutSet(raw, fallbackIndex = 0) {
 }
 
 function parseSupersetPairingLine(line) {
-  const match = /^\s*\d+(?:&\d+)?\s+(?:superset|straight after[^:]*):\s*(.+)$/i.exec(String(line ?? '').trim());
-  if (!match) return [];
-  const chunk = match[1].replace(/\s*→\s*/g, ' / ');
-  return chunk.split('/').map(part => part.replace(/\bburnout\b/gi, '').replace(/\s+/g, ' ').trim()).filter(name => name.length >= 3);
+  const match = /^\s*(\d+(?:&\d+)?)\s+(superset|straight after[^:]*):\s*(.+)$/i.exec(String(line ?? '').trim());
+  if (!match) return null;
+  const label = match[1].trim();
+  const straight = /straight after/i.test(match[2]);
+  const chunk = match[3].replace(/\s*→\s*/g, ' / ');
+  const names = chunk
+    .split('/')
+    .map(part => part.replace(/\bburnout\b/gi, '').replace(/\s+/g, ' ').trim())
+    .filter(name => name.length >= 3);
+  if (names.length === 0) return null;
+  return { label, straight, names };
 }
 
 export function parseSupersetPairing(text) {
   if (typeof text !== 'string' || text.trim() === '') return null;
   const exercises = [];
+  let group = 0;
   for (const line of text.split('\n')) {
-    for (const name of parseSupersetPairingLine(line)) {
-      exercises.push({ name, cue: '', sets: [], between: null });
-    }
+    const parsedLine = parseSupersetPairingLine(line);
+    if (!parsedLine) continue;
+    group += 1;
+    const supersetLabel = parsedLine.straight
+      ? `${parsedLine.label} straight`
+      : `${parsedLine.label} superset`;
+    parsedLine.names.forEach((name, index) => {
+      exercises.push({
+        name,
+        cue: '',
+        sets: [],
+        between: null,
+        superset_group: group,
+        ...(index === 0 ? { superset_label: supersetLabel } : {})
+      });
+    });
   }
   if (exercises.length < 2) return null;
-  const intro = text.split('\n').find(line => /pairing|superset|burnout/i.test(line)) ?? '';
+  const intro = text.split('\n').find(entry => /pairing|superset|burnout/i.test(entry)) ?? '';
   return { intro: intro.trim(), exercises, outro: '' };
 }
 
@@ -206,7 +227,15 @@ export function parseWorkoutChat(text) {
 export function flattenWorkoutExercises(plan) {
   const exercises = [];
   for (const exercise of plan?.exercises ?? []) {
-    if (exercise.sets.length) exercises.push(exercise);
+    if (exercise.sets.length) {
+      const row = { ...exercise };
+      if (exercise.between?.sets?.length) {
+        row.between_sets = mapBetweenSetsExercise(exercise.between);
+        delete row.between;
+      }
+      exercises.push(row);
+      continue;
+    }
     if (exercise.between?.sets?.length) {
       exercises.push({
         ...exercise.between,
@@ -215,6 +244,50 @@ export function flattenWorkoutExercises(plan) {
     }
   }
   return exercises;
+}
+
+function mapBetweenSetsExercise(between) {
+  return {
+    name: between.name,
+    sets: (between.sets ?? [])
+      .filter(set => set.reps != null && set.weightKg != null)
+      .map(set => ({
+        reps: set.reps,
+        weight_kg: set.weightKg,
+        cable_type: normalizeCableType(set.cable)
+      }))
+  };
+}
+
+function mapRecordExercise(exercise) {
+  const mapped = {
+    name: exercise.name,
+    ...(exercise.superset_group != null ? { superset_group: exercise.superset_group } : {}),
+    ...(typeof exercise.superset_label === 'string' && exercise.superset_label.trim()
+      ? { superset_label: exercise.superset_label.trim() }
+      : {}),
+    sets: (exercise.sets ?? [])
+      .filter(set => set.reps != null && set.weightKg != null)
+      .map(set => ({
+        reps: set.reps,
+        weight_kg: set.weightKg,
+        cable_type: normalizeCableType(set.cable)
+      }))
+  };
+  if (exercise.between?.sets?.length) {
+    mapped.between_sets = mapBetweenSetsExercise(exercise.between);
+  }
+  return mapped;
+}
+
+function mapNameOnlyExercise(exercise) {
+  return {
+    name: exercise.name,
+    ...(exercise.superset_group != null ? { superset_group: exercise.superset_group } : {}),
+    ...(typeof exercise.superset_label === 'string' && exercise.superset_label.trim()
+      ? { superset_label: exercise.superset_label.trim() }
+      : {})
+  };
 }
 
 export function extractWorkoutTitle(text) {
@@ -242,17 +315,8 @@ export function findLatestWorkoutPlanText(texts) {
 
 export function buildPlannedWorkoutInput(text, { date } = {}) {
   const plan = parseWorkoutChat(text) ?? parseSupersetPairing(text);
-  const loaded = flattenWorkoutExercises(plan)
-    .map(exercise => ({
-      name: exercise.name,
-      sets: exercise.sets
-        .filter(set => set.reps != null && set.weightKg != null)
-        .map(set => ({
-          reps: set.reps,
-          weight_kg: set.weightKg,
-          cable_type: normalizeCableType(set.cable)
-        }))
-    }))
+  const loaded = (plan?.exercises ?? [])
+    .map(mapRecordExercise)
     .filter(exercise => exercise.sets.length > 0);
   if (loaded.length >= 2 && typeof date === 'string' && date) {
     const duration = extractWorkoutDuration(text);
@@ -272,7 +336,7 @@ export function buildPlannedWorkoutInput(text, { date } = {}) {
   }
 
   const namesOnly = (plan?.exercises ?? [])
-    .map(exercise => ({ name: exercise.name }))
+    .map(mapNameOnlyExercise)
     .filter(exercise => typeof exercise.name === 'string' && exercise.name.trim());
   if (namesOnly.length >= 2 && typeof date === 'string' && date) {
     const duration = extractWorkoutDuration(text);
