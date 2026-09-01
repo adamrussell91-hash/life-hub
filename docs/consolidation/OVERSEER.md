@@ -83,17 +83,13 @@ Fill before the first serious critique. Secret **values** are never pasted here 
 | Umbrella / code repo (target) | FILL_IN — e.g. `adamrussell91-hash/hubs` or reuse `life-hub` |
 | Data repo (frozen) | `adamrussell91-hash/life-hub-data` (confirm) |
 | Current hub code repos | `life-hub`, `teaching-hub`, `knowledge-hub`, `Tasks-Hub`, `widgets`, `proxies` (confirm), `hub-design-kit` (confirm) |
-| Design kit canonical remote | FILL_IN |
+| Design kit canonical remote | `github.com/adamrussell91-hash/hub-design-kit` |
 
-### Netlify (no secret values)
+Known env **names**:
 
-| Hub / API | Site name | Public Functions URL | `SITE_ORIGIN` (Pages or app origin) | Notes |
-|-----------|-----------|----------------------|-------------------------------------|--------|
-| Life Hub API | FILL_IN | FILL_IN | FILL_IN | Prefer **retarget this site** at umbrella |
-| Teaching Hub API | FILL_IN | FILL_IN | FILL_IN | Fold later |
-| Other | FILL_IN | FILL_IN | FILL_IN | |
-
-Known env **names** (Life): `LIFE_HUB_PASSPHRASE_HASH`, `SESSION_SECRET`, `GITHUB_REPOSITORY`, `GITHUB_BRANCH`, `GITHUB_TOKEN`, `GITHUB_TOKEN_EXPIRES`, `SITE_ORIGIN`, `ANTHROPIC_API_KEY` (and Teaching equivalents as discovered).
+- **Life Hub API:** `LIFE_HUB_PASSPHRASE_HASH`, `SESSION_SECRET`, `GITHUB_REPOSITORY`, `GITHUB_BRANCH`, `GITHUB_TOKEN`, `GITHUB_TOKEN_EXPIRES`, `SITE_ORIGIN`, `ANTHROPIC_API_KEY`
+- **Teaching Hub API:** `TEACHING_HUB_PASSPHRASE_HASH`, `SESSION_SECRET`, `SITE_ORIGIN`, `ANTHROPIC_API_KEY` (later); cookie `teaching_hub_session`
+- **Umbrella (target — decide in plan step 2):** single passphrase hash env name TBD (e.g. `HUB_PASSPHRASE_HASH`), one `SESSION_SECRET`
 
 ### Cloudflare / R2
 
