@@ -200,7 +200,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Design-kit mechanic | decided | Copy-then-freeze into `packages/design-kit/` |
 | Umbrella seed | **shipped** | PR #55 merged; Life app still at repo root |
 | Kit remount | **shipped** | PR #56 merged 2026-09-01 |
-| Auth lock | in progress | Slice 03 — retain `LIFE_HUB_PASSPHRASE_HASH` + `SESSION_SECRET`; no new secrets; no `apps/life/` move |
+| Auth lock | **shipped (this PR)** | Slice 03 — retain `LIFE_HUB_PASSPHRASE_HASH` + `SESSION_SECRET`; no new secrets; no `apps/life/` move |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -241,7 +241,29 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 ## Next action
 
-Finish Slice 03 as a PR against `main`. After merge, Claude observe-only **checkpoint-03**.
+Claude observe-only **checkpoint-03** against this auth-lock PR. Do not start `apps/life/` or fold other hubs until that report lands.
+
+Paste:
+
+```text
+You are the consolidation overseer at checkpoint-03. cwd = life-hub repo root.
+Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.7).
+
+Observe-only rules (hard):
+- Do NOT edit application code, move files, run destructive git, or commit.
+- You MAY create exactly one report:
+  docs/consolidation/checkpoints/checkpoint-03.md
+
+Inspect: the umbrella auth-lock PR vs main, and plan.md Slice 03 notes.
+Confirm: LIFE_HUB_PASSPHRASE_HASH and SESSION_SECRET retained;
+no new secrets; cookie still life_hub_session; netlify.toml unchanged;
+life-hub-data untouched; apps/life/ not moved.
+
+Write the report using the template in OVERSEER.md.
+End with: next 3 concrete steps for Cursor local agent — no patches.
+If auth, life-hub-data boundary, or public student URL safety looks wrong,
+open with DO NOT MERGE YET.
+```
 
 
 ## Open questions (Adam)
