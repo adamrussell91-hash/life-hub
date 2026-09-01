@@ -1,0 +1,43 @@
+# Checkpoint 05 — 2026-09-01
+
+## Verdict
+PASS
+
+## Diff vs plan
+- Done: matches `plan.md`'s "Slice 05 — Life app remount" exactly. Verified against **GitHub PR [#59](https://github.com/adamrussell91-hash/life-hub/pull/59)** ("Remount Life shell under apps/life/"), base `main`, head `b71b720` on `cursor/apps-life-remount` (2 commits ahead of `origin/main`: `ce8f1a2`, `b71b720`). PR is **OPEN, mergeStateStatus=CLEAN, mergeable=MERGEABLE**, 325 files changed (+358/-285) — the overwhelming majority are pure renames (0-line or `Bin` diffs) moving `assets/`, `css/`, `js/`, `index.html`, `manifest.webmanifest`, `service-worker.js` into `apps/life/`.
+  - Life shell source now lives at `apps/life/{index.html,js/,css/,assets/,manifest.webmanifest,service-worker.js}` — confirmed all paths exist on disk, and that root-level `index.html` no longer exists. This is exactly what the new `tests/unit/apps-life-remount.test.js` asserts (including an explicit `ENOENT` check on the old root path).
+  - `scripts/prepare-web.mjs`: `publishedDirectories`/`publishedFiles` are now copied from a new `lifeRoot = apps/life/` URL instead of `projectRoot`, into the **same** `dist/` relative destinations (`dist/index.html`, `dist/js/`, `dist/css/`, `dist/assets/`) — only the copy *source* moved, the publish *destination* side is untouched.
+  - New `rewritePublishedKitImports()` walks the copied `dist/js/` tree after the copy and rewrites the source-relative design-kit import `'../../../../packages/design-kit/'` (correct from `apps/life/js/app/**`, one directory deeper than before) down to the dist-relative `'../../packages/design-kit/'` (correct from `dist/js/app/**`, unchanged depth) — needed because the two trees now sit at different depths from `packages/design-kit/`. Hand-verified: `dist/js/app/render-medical.js` imports `../../packages/design-kit/js/hub-filter-menu.js`, and `dist/packages/design-kit/js/hub-filter-menu.js` exists on disk after a real build.
+  - 17 `netlify/functions/**/*.mjs` files (9 top-level + 8 `_shared`) got 1–6 line import-specifier edits only — every changed line is `'../../js/...'` → `'../../apps/life/js/...'` or equivalent. `git diff --diff-filter=R` against `netlify/functions/` returns nothing — zero renames, zero filename or logic changes in that directory.
+  - `apps/README.md` and root `README.md` prose updated to reference the new location (`apps/life/js/app/config.js`, etc.) — documentation-only.
+  - `plan.md` bumped to v2.9 (status banner, new "Slice 05" section, Next-action banner replaced with this checkpoint's own paste-prompt, now consumed).
+  - New test `tests/unit/apps-life-remount.test.js` (source layout, `prepare-web.mjs` sourcing/rewrite, `netlify.toml` untouched) plus small path updates to `tests/unit/design-kit-remount.test.js` and `tests/unit/web-assets.test.js`.
+  - Independently re-verified rather than trusting the PR body: `npm test` → **1604 pass / 0 fail**. `npm run build` → exit 0. Inspected the actual `dist/` output rather than the script source — top level is `assets/, css/, index.html, js/, manifest.webmanifest, packages/, service-worker.js, vendor/`; no `apps/` directory leaked into the publish output.
+- Drifted: none against Slice 05's stated scope.
+- Blocked (correctly, per plan): no `life-hub2` retarget, no Teaching/Knowledge/Tasks fold, no secret rotation, no Functions move into `apps/life/netlify`. Confirmed by grepping the diff for `teaching|knowledge|tasks-hub` path names (zero hits) and for any `process.env.`/`env.[A-Z_]+`/`_ENV` pattern (zero new names — the diff's only auth/secret-adjacent hit is one **deleted** prose line in `plan.md`'s old text).
+
+## Boundary check
+- life-hub-data untouched: **yes** — no file in the diff touches `life-hub-data`; the only `life-hub-data` strings anywhere in the diff are prose inside `plan.md`'s own status banner / non-goal text, not code.
+- Single Adam session/auth path: **yes** — no file under `netlify/functions/**/*auth*` appears in the changed-file list; no `SESSION_SECRET` / `*PASSPHRASE*` / `life_hub_session` literal changed anywhere in the diff except one **deleted** `plan.md` prose line. Slices 03/04's auth-lock and call-site work are untouched by this slice.
+- Public student (or other public) routes still unauthenticated by design: **n/a** — Teaching isn't part of this repo/slice; no public-route code appears in the diff.
+- Secrets / tokens blast radius: **ok** — `netlify.toml` has a **zero-line diff** vs `origin/main` (diffed directly, not inferred from the PR checklist); a full grep of the diff for new env-var patterns returns nothing. PR #59's own two unchecked test-plan boxes ("Confirm `netlify.toml` diff is empty", "Confirm no new env vars or secrets") are both **independently confirmed true** here.
+- Design kit still single source: **yes** — `packages/design-kit/` itself isn't touched by this diff; only the *published* `dist/` import path changes, which is exactly what moving the source one directory deeper requires to keep working. Checkpoint-02's PASS on the kit remount still holds.
+
+## Deploy / env
+- No env var names, secret strategy, `SITE_ORIGIN` values, `netlify.toml` `directory`/`included_files`, or `.github/workflows/pages.yml` changed by this slice — all diffed directly against `origin/main`, not taken from the PR description.
+- Function **paths** and filenames unchanged; only their internal import specifiers were edited to point at `apps/life/js/` instead of `js/`.
+- `dist/` publish shape verified unchanged by actually running the build: `assets/`, `css/`, `js/`, `index.html`, `manifest.webmanifest`, `service-worker.js` all still land at `dist/`'s top level; `packages/` and `vendor/` predate this slice.
+- Process note (same drift flagged at checkpoint-04, still open): the **main checkout's** `docs/consolidation/` on this machine holds only `checkpoint-02.md` and `checkpoint-04.md` and is missing `OVERSEER.md`, `plan.md` v2.9, and most other checkpoint files on disk. This checkpoint was read from and is being written into the `.worktrees/umbrella-seed-slice-01` worktree (branch `cursor/apps-life-remount`, PR #59's head), which carries the correct current copies — the main checkout was left untouched throughout, including Adam's unrelated uncommitted work there on `cursor/life-protocol-pills-c87b` (`index.html`, `render-central-node.js`, `render-chat.js` and their tests). Not a merge blocker, but worth a `git pull origin main` into the main checkout at some point.
+
+## Calendar / cross-domain
+- No change in this slice. `js/shell/calendar-sources.js` and `render-calendar-sources.js` from Slice 01 moved verbatim into `apps/life/js/shell/` (0-line diffs).
+
+## Risks
+1. `rewritePublishedKitImports()` is now load-bearing for every `dist/js/**/*.js` file that imports `packages/design-kit/` — it's a fixed string-replace (`'../../../../packages/design-kit/'` → `'../../packages/design-kit/'`), not path arithmetic, so a future file at a different relative depth would silently fail to rewrite (no error, just a broken import in `dist/`) rather than being caught by the new test, which only checks that the function and the source/target literals exist in `prepare-web.mjs`, not that every resulting `dist/` import actually resolves. Not a blocker — today's `apps/life/js/` tree is uniformly one level deeper than before — but worth a future test that walks `dist/js/**/*.js` and asserts every `packages/design-kit` import resolves to a real file.
+2. Two PR test-plan checkboxes on #59 are still visually unchecked even though both are independently verified true here (see Boundary check / Deploy-env) — same pattern left for PRs #57 and #58 at checkpoints 03 and 04.
+3. Main-checkout `docs/consolidation/` drift (see Deploy/env) has now persisted across checkpoints 04 and 05 without being resolved — still cosmetic, flagging again so it doesn't get lost.
+
+## Next 3 steps (Cursor only)
+1. Tick PR #59's two open test-plan boxes ("Confirm `netlify.toml` diff is empty", "Confirm no new env vars or secrets") — both independently confirmed true above — then merge PR #59 into `main`; it's already CLEAN/MERGEABLE.
+2. After merge, update `plan.md` Status: flip "Life app remount" from "in progress" to a merged/dated shipped state (mirroring the #55→#58 pattern) and clear the Next-action banner pointing at this checkpoint.
+3. Run `git pull origin main` into the main `life-hub` checkout's `docs/consolidation/` (currently untracked/stale there) so it stops diverging from the worktree/`origin` copy that has been the actual source of truth for checkpoints 04 and 05 — do this without touching Adam's separate uncommitted work on `cursor/life-protocol-pills-c87b` already sitting in that checkout.
