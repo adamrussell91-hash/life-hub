@@ -177,7 +177,7 @@ Implementation rules (once decision recorded):
 | Hub | Fold work | Checkpoint gates |
 |-----|-----------|------------------|
 | **Teaching** | Migrate Blobs/content API into umbrella namespace; keep `/s/lessons/*` public | Public student routes unauthenticated; auth allow-list test; cookie domain still valid under umbrella API hostname |
-| **Knowledge** | Migrate or repoint Worker `knowledge-hub-research` + R2 `knowledge-hub-archive` bindings into umbrella CF account scope; document whether Worker stays separate or merges into umbrella edge | CF token blast radius reviewed; R2 bucket access unchanged for existing archive paths; no accidental auth gate on any public research/archive URLs |
+| **Knowledge** | (1) Fold Netlify API site `knowledge-hub-archive` onto umbrella/`life-hub2`; (2) separately migrate or repoint Worker `knowledge-hub-research` + R2 bucket `knowledge-hub-archive` (binding `ARCHIVE`) — do not conflate the two | CF token blast radius reviewed; R2 access unchanged for existing archive paths; Netlify API fold does not delete/rename R2; no accidental auth gate on public research/archive URLs |
 | **Tasks** | TBD when Tasks Hub repo is inventoried (likely Blobs or markdown — record at fold time) | Per-hub auth gate only if Tasks has public routes; otherwise operator-session + data-boundary check |
 
 Teaching fold detail: `/s/lessons/*` public; content API namespaced under umbrella.
@@ -214,9 +214,11 @@ Paste:
 
 ```text
 You are the consolidation overseer. cwd = life-hub repo root.
-Read: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.3).
+Read: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.4).
 Run full critique #2 — execution-readiness stress test of the migrate order
 against the filled Netlify inventory (life-hub2 absorb target; retain secrets).
+Treat proxies as a widgets dependency (not a hub fold). Treat Knowledge Netlify
+API and R2 bucket `knowledge-hub-archive` as separate checklist items.
 Write report only to docs/consolidation/checkpoints/checkpoint-01-critique-2.md
 Observe-only: no application code edits, no file moves, no git commits.
 ```
