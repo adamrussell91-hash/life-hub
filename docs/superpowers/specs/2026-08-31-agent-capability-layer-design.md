@@ -1,9 +1,9 @@
 # Agent Capability Layer — Design
 
 **Date:** 2026-08-31  
-**Status:** Phase 0–4 on main; Phase 5 in progress (surface widget renderer)  
-**Scope:** Open generation / closed execution for Life Hub agents (`os.propose-action`), per-agent path allowlists, capability registry, migrate existing chat tools as shortcuts, Remember/Track/Coordinate loans, research + widgets, intuition packs, intent router, shortcut promotion + promoted-shortcut catalog runner, hub rendering for approved widget templates  
-**Out of scope (not started):** Additional widget templates beyond `challenge-progress`; writing live capability defs into `capabilities/` from Confirm; separate cheap intent-router model if same-call keyword narrow proves insufficient
+**Status:** Phase 0–6 on main  
+**Scope:** Open generation / closed execution for Life Hub agents (`os.propose-action`), per-agent path allowlists, capability registry, migrate existing chat tools as shortcuts, Remember/Track/Coordinate loans, research + widgets, intuition packs, intent router, shortcut promotion + promoted-shortcut catalog runner, hub rendering for approved widget templates, dynamic promoted-shortcut tool aliases in chat  
+**Permanent non-goals:** Writing live capability defs into `capabilities/` from Confirm (use `data/os/promoted-shortcuts/` + dynamic tool aliases instead); separate cheap intent-router model unless same-call keyword narrow proves insufficient in production metrics
 
 ## Thesis
 
@@ -87,9 +87,17 @@ Live `capabilities/registry.json` stays PR-only. No runtime handler codegen.
 
 ## Phase 5
 
-**In progress:** Hub renderer for Adam-approved surface widgets.
+**Implemented (PR #47):** Hub renderer for Adam-approved surface widgets.
 
 - `GET /api/surface/widgets` — list published instances under `data/widgets/` for approved templates only
 - Fitness tab renders `challenge-progress` as a progress bar card (design-kit tokens / existing `.progress-track`)
 - Unknown or unapproved templates stay invisible until a template def + renderer lands in a PR
 
+## Phase 6
+
+**Implemented:** Remaining deferred items from the original brief.
+
+- **Widget template #2:** `meal-plan-week` on the Nutrition tab (companion to `plan.week-meals` writes under `data/nutrition/meal-plans/`)
+- **Promoted shortcuts as named tools:** after repo tree load, `chat.mjs` scans `data/os/promoted-shortcuts/*.json` and appends per-draft Anthropic tool schemas that dispatch to `os.run-promoted-shortcut` — no registry file writes
+- **Intent router:** expanded keyword hints (meal-plan widget, challenge close, loans, food/exercise library, AU lookup cues)
+- **Separate intent-router model:** remains deferred per locked decision #6 until production measurement justifies it

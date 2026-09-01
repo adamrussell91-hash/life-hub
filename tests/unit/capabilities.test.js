@@ -533,3 +533,22 @@ test('intent router surfaces os.run-promoted-shortcut on promoted asks', () => {
   });
   assert.ok(ids.includes('os.run-promoted-shortcut'));
 });
+
+test('intent router surfaces plan.week-meals and publish.surface-widget on nutrition widget asks', () => {
+  resetCapabilityCaches();
+  const ids = selectCapabilityIdsForTurn({
+    slug: 'brisket',
+    message: 'Put a weekly meal plan widget on the nutrition tab'
+  });
+  assert.ok(ids.includes('plan.week-meals'));
+  assert.ok(ids.includes('publish.surface-widget'));
+});
+
+test('intent router surfaces track.close-challenge on dispute asks', () => {
+  resetCapabilityCaches();
+  const ids = selectCapabilityIdsForTurn({
+    slug: 'brisket',
+    message: 'Close this challenge — I dispute the auto judge verdict'
+  });
+  assert.ok(ids.includes('track.close-challenge'));
+});

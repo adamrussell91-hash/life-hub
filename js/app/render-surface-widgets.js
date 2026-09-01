@@ -48,10 +48,51 @@ function renderChallengeProgressCard(root, widget) {
   return card;
 }
 
-export function renderSurfaceWidgets(root, widgetsState) {
-  const rail = root.querySelector('#fitness-surface-widgets-rail');
-  const status = root.querySelector('#fitness-surface-widgets-status');
-  const section = root.querySelector('#fitness-surface-widgets');
+function renderMealPlanWeekCard(root, widget) {
+  const card = createElement(root, 'article');
+  card.className = 'surface-widget-card surface-widget-card--meal-plan';
+
+  const title = createElement(root, 'h3');
+  title.className = 'surface-widget-card__title';
+  title.textContent = widget.props?.title ?? widget.title ?? 'Meal plan';
+  card.append(title);
+
+  const list = createElement(root, 'ul');
+  list.className = 'surface-widget-meal-plan';
+  for (const day of widget.props?.days ?? []) {
+    const item = createElement(root, 'li');
+    item.className = 'surface-widget-meal-plan__day';
+    const label = createElement(root, 'span');
+    label.className = 'surface-widget-meal-plan__label';
+    label.textContent = day.label ?? day.key ?? '';
+    const text = createElement(root, 'span');
+    text.className = 'surface-widget-meal-plan__text';
+    text.textContent = day.text ?? '';
+    item.append(label, text);
+    list.append(item);
+  }
+  if (list.children.length) card.append(list);
+
+  const notes = widget.props?.notes;
+  if (typeof notes === 'string' && notes.trim()) {
+    const caption = createElement(root, 'p');
+    caption.className = 'metric-caption surface-widget-card__subtitle';
+    caption.textContent = notes.trim();
+    card.append(caption);
+  }
+
+  return card;
+}
+
+function filterWidgets(widgets, templateId) {
+  if (!Array.isArray(widgets)) return [];
+  return widgets.filter(widget => widget.template_id === templateId);
+}
+
+function renderWidgetRail(root, { sectionId, railId, statusId, widgetsState, templateId, renderCard }) {
+  const rail = root.querySelector(railId);
+  const status = root.querySelector(statusId);
+  const section = root.querySelector(sectionId);
   if (!rail || !section) return;
 
   const state = widgetsState ?? { status: 'idle', widgets: [] };
@@ -62,17 +103,43 @@ export function renderSurfaceWidgets(root, widgetsState) {
   }
 
   rail.replaceChildren();
-  if (state.status !== 'ready' || !Array.isArray(state.widgets) || state.widgets.length === 0) {
+  const widgets = filterWidgets(state.widgets, templateId);
+  if (state.status !== 'ready' || widgets.length === 0) {
     section.hidden = state.status === 'ready';
     return;
   }
 
   section.hidden = false;
-  for (const widget of state.widgets) {
-    if (widget.template_id === 'challenge-progress') {
-      rail.append(renderChallengeProgressCard(root, widget));
-    }
+  for (const widget of widgets) {
+    rail.append(renderCard(root, widget));
   }
 
   if (!rail.children.length) section.hidden = true;
+}
+
+export function renderFitnessSurfaceWidgets(root, widgetsState) {
+  renderWidgetRail(root, {
+    sectionId: '#fitness-surface-widgets',
+    railId: '#fitness-surface-widgets-rail',
+    statusId: '#fitness-surface-widgets-status',
+    widgetsState,
+    templateId: 'challenge-progress',
+    renderCard: renderChallengeProgressCard
+  });
+}
+
+export function renderNutritionSurfaceWidgets(root, widgetsState) {
+  renderWidgetRail(root, {
+    sectionId: '#nutrition-surface-widgets',
+    railId: '#nutrition-surface-widgets-rail',
+    statusId: '#nutrition-surface-widgets-status',
+    widgetsState,
+    templateId: 'meal-plan-week',
+    renderCard: renderMealPlanWeekCard
+  });
+}
+
+/** @deprecated alias — fitness section */
+export function renderSurfaceWidgets(root, widgetsState) {
+  renderFitnessSurfaceWidgets(root, widgetsState);
 }
