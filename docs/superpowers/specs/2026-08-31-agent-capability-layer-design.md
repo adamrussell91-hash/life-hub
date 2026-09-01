@@ -1,9 +1,9 @@
 # Agent Capability Layer — Design
 
 **Date:** 2026-08-31  
-**Status:** Phase 0–3 on main; Phase 4 in progress (promoted-shortcut runner)  
-**Scope:** Open generation / closed execution for Life Hub agents (`os.propose-action`), per-agent path allowlists, capability registry, migrate existing chat tools as shortcuts, Remember/Track/Coordinate loans, research + widgets, intuition packs, intent router, shortcut promotion  
-**Out of scope (not started):** Further widget templates beyond `challenge-progress`; writing live capability defs into `capabilities/` from Confirm (promoted drafts stay under `data/os` and run via `os.run-promoted-shortcut`); separate cheap intent-router model if same-call keyword narrow proves insufficient
+**Status:** Phase 0–4 on main (promoted-shortcut runner shipped in PR #45)  
+**Scope:** Open generation / closed execution for Life Hub agents (`os.propose-action`), per-agent path allowlists, capability registry, migrate existing chat tools as shortcuts, Remember/Track/Coordinate loans, research + widgets, intuition packs, intent router, shortcut promotion + promoted-shortcut catalog runner  
+**Out of scope (not started):** Further widget templates beyond `challenge-progress`; writing live capability defs into `capabilities/` from Confirm; separate cheap intent-router model if same-call keyword narrow proves insufficient
 
 ## Thesis
 
@@ -76,11 +76,12 @@ See the full thesis in the originating brief: Remember/Track/Publish P0 shortcut
 
 ## Phase 4
 
-**In progress:** Promoted-shortcut catalog runner.
+**Implemented (PR #45):** Promoted-shortcut catalog runner.
 
 - `os.promote-shortcut` — Confirm writes a draft under `data/os/promoted-shortcuts/`
 - `os.list-promoted-shortcuts` — auto list of catalogued drafts
 - `os.run-promoted-shortcut` — replay draft `example_writes` as a Confirm propose-action
+- Scoreboard (`os.capability-scoreboard`, detail on) surfaces catalogued promoted shortcuts
 
 Live `capabilities/registry.json` stays PR-only. No runtime handler codegen.
 

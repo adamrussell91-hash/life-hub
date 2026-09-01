@@ -3260,3 +3260,78 @@ test('Brisket track_open_challenge yields action_proposal Confirm card', async (
   assert.match(card.proposal.intent, /challenge/i);
   assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
 });
+
+test('Brisket os_run_promoted_shortcut yields action_proposal from catalogued draft', async () => {
+  let receivedArgs;
+  const puts = [];
+  const draftPath = 'data/os/promoted-shortcuts/track-morning-weigh-in.json';
+  const draftSha = 'e'.repeat(40);
+  const draftContent = JSON.stringify({
+    id: 'promo_test',
+    proposed_id: 'track.morning-weigh-in',
+    summary: 'Morning weigh-in tracker',
+    example_intent: 'log morning weight',
+    example_writes: [{
+      path: 'data/challenges/2026-08-31-weigh-in.json',
+      mode: 'create',
+      content: '{\n  "title": "Morning weigh-in"\n}\n',
+      diff: 'new weigh-in challenge'
+    }],
+    risk: 'confirm',
+    status: 'ready'
+  }, null, 2);
+
+  const fetchImpl = async (url, options) => {
+    if (options?.method === 'PUT') {
+      puts.push({ url });
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: draftPath, type: 'blob', sha: draftSha, size: draftContent.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${draftSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(draftContent, 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        receivedArgs = args;
+        yield { type: 'text', delta: 'Running that promoted shortcut.' };
+        const result = await args.executeTools({
+          id: 'call_run',
+          name: 'os_run_promoted_shortcut',
+          input: { proposed_id: 'track.morning-weigh-in' }
+        });
+        assert.equal(JSON.parse(result).status, 'awaiting_confirm');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Brisket, run the promoted shortcut for morning weigh-in',
+    priorAgentSlug: 'brisket'
+  }))));
+
+  assert.ok(receivedArgs, 'expected Anthropic streamMessage to run');
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'os_run_promoted_shortcut'));
+  const card = events.find(event => event.type === 'action_proposal');
+  assert.ok(card, 'expected action_proposal SSE event from promoted shortcut run');
+  assert.match(card.proposal.intent, /morning/i);
+  assert.equal(card.proposal.writes[0].path, 'data/challenges/2026-08-31-weigh-in.json');
+  assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
+});
