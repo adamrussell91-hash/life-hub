@@ -142,7 +142,9 @@ const SHORTCUT_CAPABILITY_IDS = new Set([
   'lookup.food-brand-au',
   'os.capability-scoreboard',
   'intuition.edit-pack',
-  'os.promote-shortcut'
+  'os.promote-shortcut',
+  'os.list-promoted-shortcuts',
+  'os.run-promoted-shortcut'
 ]);
 
 /**

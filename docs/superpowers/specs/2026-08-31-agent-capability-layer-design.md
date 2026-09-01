@@ -1,9 +1,9 @@
 # Agent Capability Layer — Design
 
 **Date:** 2026-08-31  
-**Status:** Phase 0–3 implemented (PR #44 — ready to merge)  
+**Status:** Phase 0–3 on main; Phase 4 in progress (promoted-shortcut runner)  
 **Scope:** Open generation / closed execution for Life Hub agents (`os.propose-action`), per-agent path allowlists, capability registry, migrate existing chat tools as shortcuts, Remember/Track/Coordinate loans, research + widgets, intuition packs, intent router, shortcut promotion  
-**Out of scope (not started):** Further widget templates beyond `challenge-progress`; live registry mutation from promoted-shortcut drafts (Confirm only queues the draft today); separate cheap intent-router model if same-call keyword narrow proves insufficient
+**Out of scope (not started):** Further widget templates beyond `challenge-progress`; writing live capability defs into `capabilities/` from Confirm (promoted drafts stay under `data/os` and run via `os.run-promoted-shortcut`); separate cheap intent-router model if same-call keyword narrow proves insufficient
 
 ## Thesis
 
@@ -73,3 +73,14 @@ Handlers live under `netlify/functions/_shared/capabilities/`.
 **Implemented:** Remember/Track/Coordinate loans, research + surface widgets, intuition packs + intent router + shortcut promotion (`os.promote-shortcut` drafts for Confirm; `intuition.edit-pack` auto for owners).
 
 See the full thesis in the originating brief: Remember/Track/Publish P0 shortcuts + capability loans; research artifacts + surface widgets; intuition packs + intent router + shortcut promotion.
+
+## Phase 4
+
+**In progress:** Promoted-shortcut catalog runner.
+
+- `os.promote-shortcut` — Confirm writes a draft under `data/os/promoted-shortcuts/`
+- `os.list-promoted-shortcuts` — auto list of catalogued drafts
+- `os.run-promoted-shortcut` — replay draft `example_writes` as a Confirm propose-action
+
+Live `capabilities/registry.json` stays PR-only. No runtime handler codegen.
+

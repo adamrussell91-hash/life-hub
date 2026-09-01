@@ -39,6 +39,7 @@ import {
   classifyCentralNodePatchRisk
 } from '../../../../js/core/central-node-patch.js';
 import { applyIntuitionEdit } from './intuition.mjs';
+import { validateProposeActionInput } from './propose-action.mjs';
 
 const CN_OPS = ['upsert_field', 'append_line', 'replace_section', 'delete_lines', 'condense'];
 
@@ -312,6 +313,35 @@ export function shortcutSchemas() {
           risk: { type: 'string', enum: ['auto', 'confirm'] }
         },
         required: ['proposed_id', 'summary', 'example_intent'],
+        additionalProperties: false
+      }
+    },
+    os_list_promoted_shortcuts: {
+      name: 'os_list_promoted_shortcuts',
+      description: 'List Adam-confirmed promoted shortcut drafts under data/os/promoted-shortcuts (catalog only; does not execute them).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number' }
+        },
+        additionalProperties: false
+      }
+    },
+    os_run_promoted_shortcut: {
+      name: 'os_run_promoted_shortcut',
+      description: 'Run a promoted shortcut draft by proposed_id. Replays its example_writes (or provided writes) as a Confirm propose-action. Does not mutate the live capabilities registry.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          proposed_id: { type: 'string', description: 'e.g. track.morning-weigh-in' },
+          intent: { type: 'string', description: 'Optional intent override' },
+          writes: {
+            type: 'array',
+            items: { type: 'object' },
+            description: 'Optional write override; defaults to the draft example_writes'
+          }
+        },
+        required: ['proposed_id'],
         additionalProperties: false
       }
     }
@@ -759,6 +789,84 @@ async function handleIntuitionEditPack(ctx, input) {
   return ok(`Updated intuition pack ${packId}`, { path, pack_id: packId, reason });
 }
 
+
+function promotedShortcutPath(proposedId) {
+  return `${OS_DIR}/promoted-shortcuts/${slugify(proposedId)}.json`;
+}
+
+function normalizeWrite(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const path = typeof entry.path === 'string' ? entry.path.trim() : '';
+  const mode = typeof entry.mode === 'string' ? entry.mode.trim() : 'create';
+  const content = typeof entry.content === 'string' ? entry.content : null;
+  const diff = typeof entry.diff === 'string' ? entry.diff.trim() : '';
+  if (!path || content == null) return null;
+  return { path, mode, content, ...(diff ? { diff } : {}) };
+}
+
+async function handleOsListPromotedShortcuts(ctx, input) {
+  const limit = Number.isFinite(input?.limit) ? Math.min(Math.max(Math.floor(input.limit), 1), 50) : 20;
+  const tree = repoTreeOf(ctx);
+  const prefix = `${OS_DIR}/promoted-shortcuts/`;
+  const paths = (Array.isArray(tree) ? tree : [])
+    .filter(item => item?.type === 'blob' && typeof item.path === 'string' && item.path.startsWith(prefix) && item.path.endsWith('.json'))
+    .map(item => item.path)
+    .sort();
+  const drafts = [];
+  for (const path of paths.slice(0, limit)) {
+    const { value } = await readJson(ctx, path, null);
+    if (!value || typeof value !== 'object') continue;
+    drafts.push({
+      path,
+      proposed_id: value.proposed_id || null,
+      tool_name: value.tool_name || null,
+      summary: value.summary || null,
+      risk: value.risk || 'confirm',
+      status: value.status || null,
+      write_count: Array.isArray(value.example_writes) ? value.example_writes.length : 0
+    });
+  }
+  return ok(`Found ${drafts.length} promoted shortcut draft(s)`, { drafts, count: drafts.length });
+}
+
+async function handleOsRunPromotedShortcut(ctx, input) {
+  const proposedId = String(input.proposed_id || '').trim();
+  if (!proposedId) return deny('proposed_id is required');
+  if (!/^[a-z][a-z0-9]*(?:\.[a-z0-9-]+)+$/.test(proposedId)) {
+    return deny('proposed_id must look like area.name (e.g. track.morning-weigh-in)');
+  }
+  const path = promotedShortcutPath(proposedId);
+  const { value: draft } = await readJson(ctx, path, null);
+  if (!draft || typeof draft !== 'object') {
+    return deny(`No promoted shortcut draft at ${path}. Promote + Confirm first.`);
+  }
+  const rawWrites = Array.isArray(input.writes) && input.writes.length
+    ? input.writes
+    : (Array.isArray(draft.example_writes) ? draft.example_writes : []);
+  const writes = rawWrites.map(normalizeWrite).filter(Boolean);
+  if (!writes.length) {
+    return deny('Draft has no example_writes. Pass writes when calling os_run_promoted_shortcut, or re-promote with example_writes.');
+  }
+  const intent = String(input.intent || draft.example_intent || draft.summary || `Run promoted shortcut: ${proposedId}`).trim();
+  const proposal = buildProposal({
+    agentSlug: ctx.agentSlug,
+    intent,
+    surfaces: ['confirm_card', 'governance_log'],
+    writes: writes.map(write => ({
+      path: write.path,
+      mode: write.mode,
+      content: write.content,
+      diff: write.diff || `${write.mode} ${write.path} via ${proposedId}`
+    })),
+    reads: [path]
+  });
+  const validated = validateProposeActionInput(proposal, { agentSlug: ctx.agentSlug });
+  if (!validated.ok) {
+    return deny(`Promoted shortcut writes failed allowlist/validation: ${validated.error}${validated.detail ? ` (${validated.detail})` : ''}`);
+  }
+  return propose(validated.proposal);
+}
+
 async function handleOsPromoteShortcut(ctx, input) {
   const proposedId = String(input.proposed_id || '').trim();
   const summary = String(input.summary || '').trim();
@@ -772,7 +880,7 @@ async function handleOsPromoteShortcut(ctx, input) {
   const toolName = String(input.tool_name || proposedId.replace(/\./g, '_').replace(/-/g, '_'));
   const risk = input.risk === 'auto' ? 'auto' : 'confirm';
   const id = newId('promo');
-  const path = `${OS_DIR}/promoted-shortcuts/${slugify(proposedId)}.json`;
+  const path = promotedShortcutPath(proposedId);
   const body = {
     id,
     proposed_id: proposedId,
@@ -781,10 +889,10 @@ async function handleOsPromoteShortcut(ctx, input) {
     example_intent: exampleIntent,
     example_writes: Array.isArray(input.example_writes) ? input.example_writes : [],
     risk,
-    status: 'pending_adam',
+    status: 'ready',
     proposed_by: ctx.agentSlug,
     created_at: new Date().toISOString(),
-    note: 'Draft only — does not mutate capabilities/registry until Adam confirms and a follow-up lands the live def.'
+    note: 'Confirm materialises this draft under data/os. Run it later with os_run_promoted_shortcut (still Confirm for the concrete writes). Does not mutate capabilities/registry.'
   };
   return propose(
     buildProposal({
@@ -834,6 +942,10 @@ export async function executeShortcut(toolName, input, ctx) {
         return await handleIntuitionEditPack(ctx, input);
       case 'os_promote_shortcut':
         return await handleOsPromoteShortcut(ctx, input);
+      case 'os_list_promoted_shortcuts':
+        return await handleOsListPromotedShortcuts(ctx, input);
+      case 'os_run_promoted_shortcut':
+        return await handleOsRunPromotedShortcut(ctx, input);
       default:
         return deny(`Unhandled shortcut: ${toolName}`);
     }
