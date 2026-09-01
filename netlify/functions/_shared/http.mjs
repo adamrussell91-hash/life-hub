@@ -3,6 +3,7 @@ import {
   UMBRELLA_SESSION_COOKIE,
   UMBRELLA_SESSION_SECRET_ENV
 } from './umbrella-auth.mjs';
+import { isAllowedRequestOrigin } from './umbrella-origins.mjs';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -32,12 +33,10 @@ export function requireSameOrigin(request) {
 
 // The site (GitHub Pages) and this API (Netlify Functions) are different origins by
 // design, so a request is allowed if it's same-origin (local dev, direct calls) OR
-// from the one explicitly configured SITE_ORIGIN.
+// from SITE_ORIGIN / the umbrella app origin list (Life + Teaching Pages).
 export function requireAllowedOrigin(request, env) {
   if (requireSameOrigin(request)) return true;
-  const origin = request.headers.get('origin');
-  const allowed = typeof env?.SITE_ORIGIN === 'string' ? env.SITE_ORIGIN : '';
-  return Boolean(allowed) && origin === allowed;
+  return isAllowedRequestOrigin(request.headers.get('origin'), env);
 }
 
 export function guardRequestOrigin(request, env) {
@@ -48,10 +47,9 @@ export function guardRequestOrigin(request, env) {
 
 export function corsHeaders(request, env) {
   const origin = request.headers.get('origin');
-  const allowed = typeof env?.SITE_ORIGIN === 'string' ? env.SITE_ORIGIN : '';
-  if (!allowed || origin !== allowed) return {};
+  if (!isAllowedRequestOrigin(origin, env)) return {};
   return {
-    'access-control-allow-origin': allowed,
+    'access-control-allow-origin': origin,
     'access-control-allow-credentials': 'true',
     'access-control-allow-headers': 'content-type',
     'access-control-allow-methods': 'GET, POST, OPTIONS',
