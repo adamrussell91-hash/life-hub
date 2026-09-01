@@ -1244,6 +1244,25 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-muscle-strip--card .fitness-muscle-strip__img { height: 44px; }
 
 .fitness-templates-card { overflow: hidden; }
+.fitness-surface-widgets-card { overflow: hidden; }
+.fitness-surface-widgets-rail {
+  display: grid;
+  gap: 0.75rem;
+}
+.surface-widget-card {
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-md, 0.75rem);
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(20, 43, 81, 0.08);
+}
+.surface-widget-card__title {
+  margin: 0 0 0.55rem;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ink, #142b51);
+}
+.surface-widget-card__progress { margin-bottom: 0.35rem; }
+.surface-widget-card__subtitle { margin: 0; }
 .fitness-templates-rail {
   display: flex;
   gap: 0.75rem;

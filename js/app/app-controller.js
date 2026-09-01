@@ -3,6 +3,7 @@ import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
+import { renderSurfaceWidgets } from './render-surface-widgets.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
 const LAST_SUCCESS_KEY = 'life-hub:last-success';
@@ -52,6 +53,7 @@ export function createAppController(dependencies) {
     renderFitness,
     fitnessLogger,
     fitnessTemplateLibrary,
+    surfaceWidgetLibrary,
     buildSkincareModel,
     renderSkincare,
     skincareApi,
@@ -672,6 +674,7 @@ export function createAppController(dependencies) {
       onSelectTemplate: template => fitnessTemplateLibrary?.openTemplate?.(template),
       quiet: syncQuiet
     });
+    renderSurfaceWidgets(root, surfaceWidgetLibrary?.getState?.() ?? { status: 'idle', widgets: [] });
     const button = root.querySelector('#fitness-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, FITNESS_AGENT_SLUG));
     void fitnessTemplateLibrary?.ensureLoaded?.().then(() => {
@@ -685,6 +688,11 @@ export function createAppController(dependencies) {
         onSelectTemplate: template => fitnessTemplateLibrary.openTemplate(template),
         quiet: syncQuiet
       });
+      renderSurfaceWidgets(root, surfaceWidgetLibrary?.getState?.() ?? { status: 'idle', widgets: [] });
+    });
+    void surfaceWidgetLibrary?.ensureLoaded?.().then(() => {
+      if (currentSection !== 'fitness' || !latestResult) return;
+      renderSurfaceWidgets(root, surfaceWidgetLibrary.getState());
     });
   }
 

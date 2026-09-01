@@ -22,6 +22,8 @@ import { API_BASE_URL } from './config.js';
 import { createFitnessLoggerController } from './fitness-logger-controller.js';
 import { createFitnessTemplateLibrary } from './fitness-template-library.js';
 import { createFitnessTemplatesApi } from './fitness-templates-api.js';
+import { createSurfaceWidgetLibrary } from './surface-widget-library.js';
+import { createSurfaceWidgetsApi } from './surface-widgets-api.js';
 import { buildFitnessModel } from './fitness-model.js';
 import { buildHomeModel } from './home-model.js';
 import { loadLiveEvents } from './load-live-events.js';
@@ -96,6 +98,7 @@ const fitnessLogger = createFitnessLoggerController({
   onSessionWritten: () => void controller.refresh({ manual: true })
 });
 const fitnessTemplatesApi = createFitnessTemplatesApi(fetchImpl);
+const surfaceWidgetsApi = createSurfaceWidgetsApi(fetchImpl);
 const fitnessTemplateLibrary = createFitnessTemplateLibrary({
   root: document,
   templatesApi: fitnessTemplatesApi,
@@ -103,6 +106,7 @@ const fitnessTemplateLibrary = createFitnessTemplateLibrary({
   getFitnessContext: () => controller?.getFitnessLibraryContext?.() ?? {},
   onPlanned: () => void controller.refresh({ manual: true, force: true })
 });
+const surfaceWidgetLibrary = createSurfaceWidgetLibrary({ widgetsApi: surfaceWidgetsApi });
 const skincareController = createSkincareController({
   root: document,
   chatApi,
@@ -138,6 +142,7 @@ controller = createAppController({
   renderFitness,
   fitnessLogger,
   fitnessTemplateLibrary,
+  surfaceWidgetLibrary,
   buildSkincareModel,
   renderSkincare,
   skincareApi,
