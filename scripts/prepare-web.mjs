@@ -1,4 +1,6 @@
 import { copyFile, cp, mkdir, readdir, rm, readFile, writeFile } from 'node:fs/promises';
+import { dirname, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const projectRoot = new URL('../', import.meta.url);
 const lifeRoot = new URL('../apps/life/', import.meta.url);
@@ -35,9 +37,13 @@ async function rewritePublishedKitImports(directory) {
     }
     if (!entry.name.endsWith('.js')) return;
     const source = await readFile(next, 'utf8');
-    const published = source.replaceAll(
-      '../../../../packages/design-kit/',
-      '../../packages/design-kit/'
+    const fromDir = dirname(fileURLToPath(next));
+    const published = source.replace(
+      /(?:\.\.\/)+packages\/design-kit\/([^'"]+)/g,
+      (_all, rest) => relative(
+        fromDir,
+        fileURLToPath(new URL(`packages/design-kit/${rest}`, publishRoot))
+      ).split('\\').join('/')
     );
     if (published !== source) await writeFile(next, published);
   }));

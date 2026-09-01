@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v2.9 — auth call sites merged (PR #58). Checkpoint-04 PASS. Next slice: remount Life app source into `apps/life/` without changing Pages URLs or Netlify function paths.  
+> **Status:** v3.0 — Life app remount merged (PR #59). Checkpoint-05 PASS. Next slice: assert every published `dist/js` design-kit import resolves after `prepare-web`.  
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
 ## Intent
@@ -188,7 +188,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v2.9 | auth call sites merged; Life app remount next | Slice 04 merged 2026-09-01 as PR #58 |
+| Plan v3.0 | Life app remount merged; published kit-import check next | Slice 05 merged 2026-09-01 as PR #59 |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -196,6 +196,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Claude checkpoint-02 | **PASS** | `checkpoints/checkpoint-02.md` — merge #56 |
 | Claude checkpoint-03 | **PASS** | `checkpoints/checkpoint-03.md` — merge #57 |
 | Claude checkpoint-04 | **PASS** | `checkpoints/checkpoint-04.md` — merge #58 |
+| Claude checkpoint-05 | **PASS** | `checkpoints/checkpoint-05.md` — merge #59 |
 | Deploy inventory | **filled** | See table above; `life-hub2` is absorb target |
 | Auth decision | **decided** | Retain Life Hub secrets |
 | Repo naming decision | **decided** | Reuse `life-hub`, leave as-is |
@@ -204,7 +205,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Kit remount | **shipped** | PR #56 merged 2026-09-01 |
 | Auth lock | **shipped** | PR #57 merged 2026-09-01 |
 | Auth call sites | **shipped** | PR #58 merged 2026-09-01 |
-| Life app remount | in progress | Slice 05 — source in `apps/life/`; `dist/` URLs and `netlify/functions` paths unchanged |
+| Life app remount | **shipped** | PR #59 merged 2026-09-01 |
+| Published kit-import check | in progress | Slice 06 — walk `dist/js` after `prepare-web` and assert every `packages/design-kit` import resolves |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -261,24 +263,30 @@ Keep deploy URLs and Netlify function **paths** stable:
 
 Do **not** retarget `life-hub2`, fold other hubs, or rotate secrets.
 
+### Slice 06 — published kit-import check (this slice)
+
+Checkpoint-05 flagged `rewritePublishedKitImports()` as a fixed string replace. Walk `dist/js/**/*.js` after `prepare-web` and assert every `packages/design-kit` import resolves to a real file under `dist/packages/design-kit/`.
+
+Do **not** retarget `life-hub2`, fold other hubs, or rotate secrets.
+
 ## Next action
 
-Claude observe-only **checkpoint-05** against this remount PR. Do not retarget `life-hub2` or fold other hubs until that report lands.
+Claude observe-only **checkpoint-06** against this published kit-import PR. Do not retarget `life-hub2` or fold other hubs until that report lands.
 
 Paste:
 
 ```text
-You are the consolidation overseer at checkpoint-05. cwd = life-hub repo root.
-Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.9).
+You are the consolidation overseer at checkpoint-06. cwd = life-hub repo root.
+Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v3.0).
 
 Observe-only rules (hard):
 - Do NOT edit application code, move files, run destructive git, or commit.
 - You MAY create exactly one report:
-  docs/consolidation/checkpoints/checkpoint-05.md
+  docs/consolidation/checkpoints/checkpoint-06.md
 
-Inspect: the apps/life remount PR vs main, and plan.md Slice 05 notes.
-Confirm: Life shell source lives under apps/life/;
-dist/ still publishes the same public paths (index.html, js/, css/, assets/);
+Inspect: the published kit-import PR vs main, and plan.md Slice 06 notes.
+Confirm: prepare-web still publishes the same dist/ public paths;
+every dist/js packages/design-kit import resolves;
 netlify.toml, function filenames, included_files, and secrets unchanged;
 life-hub-data untouched; no Teaching/Knowledge/Tasks fold.
 
