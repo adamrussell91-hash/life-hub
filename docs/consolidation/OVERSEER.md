@@ -93,13 +93,15 @@ Known env **names**:
 
 ### Netlify (no secret values)
 
-Public URLs below are from **committed repo config** (2026-09-01). Netlify **dashboard site names** still need Adam.
+Adam dashboard export 2026-09-01:
 
-| Hub / API | Site name (Netlify dashboard) | Public Functions URL | `SITE_ORIGIN` (app origin) | Notes |
-|-----------|------------------------------|----------------------|----------------------------|--------|
-| Life Hub API | **AWAITING ADAM** | `https://api.adam-russell.com` | `https://life-hub.adam-russell.com` | Retarget candidate; source: `js/app/config.js` |
-| Teaching Hub API | **AWAITING ADAM** | `https://teaching-api.adam-russell.com` | `https://teaching-hub.adam-russell.com` | Fold later; source: `teaching-hub/README.md` |
-| Other | FILL_IN | FILL_IN | FILL_IN | |
+| Hub / API | Site name (dashboard) | Site ID | Public Functions URL | `SITE_ORIGIN` (app origin) | Notes |
+|-----------|----------------------|---------|----------------------|----------------------------|--------|
+| Life Hub API | `life-hub2` | `5771ee5c-0cb2-4858-b03d-2637f092050e` | `https://api.adam-russell.com` | `https://life-hub.adam-russell.com` | **Absorb target** — keep secrets |
+| Teaching Hub API | `arteaching-hub` | `899b0fd3-53b3-45a0-bbfb-0238264d9246` | `https://teaching-api.adam-russell.com` | `https://teaching-hub.adam-russell.com` | Fold later |
+| Tasks Hub API | `artasks-hub` | `c6696619-f478-4ac1-b0cd-1e4cfd3101df` | `https://tasks-api.adam-russell.com` | confirm at fold | Fold later |
+| Knowledge Hub API | `knowledge-hub-archive` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `https://knowledge-api.adam-russell.com` | confirm at fold | Site name ≠ R2 bucket (same label) |
+| Proxies | `jade-melomakarona-ea20fe` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `https://jade-melomakarona-ea20fe.netlify.app` | n/a | Keep separate for now |
 
 ### Cloudflare / R2
 

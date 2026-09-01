@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v2.2 — auth + repo decided (minimal secret churn). Netlify dashboard site names still AWAITING ADAM.  
+> **Status:** v2.3 — auth + repo decided; Netlify inventory filled (Adam, 2026-09-01). Ready for full Claude critique #2.  
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
 ## Intent
@@ -35,16 +35,30 @@ Rationale (Adam, 2026-09-01): retain workable secrets and avoid re-keying — re
 - When Teaching (and later hubs) fold in, extend CORS/`SITE_ORIGIN` allow-list to additional app origins (e.g. `https://teaching-hub.adam-russell.com`) — do **not** rotate secrets just to add origins.
 - Prefer **one Netlify site** (existing Life API site at `api.adam-russell.com`) absorbing folded section APIs over standing up new Netlify sites with duplicate secrets.
 
-## Deploy inventory (public URLs — from committed config)
+## Deploy inventory (Netlify — Adam, 2026-09-01)
 
-Verified in repo source (not Netlify dashboard). **Netlify internal site names** still need Adam confirmation from Netlify UI.
+Exact dashboard export:
 
-| Hub / API | Netlify site name (dashboard) | Public Functions URL | `SITE_ORIGIN` (app origin) | Source |
-|-----------|------------------------------|----------------------|----------------------------|--------|
-| Life Hub API | **AWAITING ADAM** | `https://api.adam-russell.com` | `https://life-hub.adam-russell.com` | `js/app/config.js` |
-| Teaching Hub API | **AWAITING ADAM** | `https://teaching-api.adam-russell.com` | `https://teaching-hub.adam-russell.com` | `teaching-hub/README.md`, `src/api/config.ts` |
+| Project / site | Production URL | Site ID | GitHub source | Role in consolidation |
+|----------------|----------------|---------|---------------|------------------------|
+| `life-hub2` | `https://api.adam-russell.com` | `5771ee5c-0cb2-4858-b03d-2637f092050e` | `life-hub` | **Retarget / absorb target** — keep secrets; fold other hub APIs onto this site over time |
+| `artasks-hub` | `https://tasks-api.adam-russell.com` | `c6696619-f478-4ac1-b0cd-1e4cfd3101df` | `Tasks-Hub` | Fold later |
+| `arteaching-hub` | `https://teaching-api.adam-russell.com` | `899b0fd3-53b3-45a0-bbfb-0238264d9246` | `teaching-hub` | Fold later; retire site after Teaching API lands on `life-hub2` |
+| `knowledge-hub-archive` | `https://knowledge-api.adam-russell.com` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `knowledge-hub` | Fold later (Netlify site name shares label with R2 bucket — treat as separate resources) |
+| `jade-melomakarona-ea20fe` | `https://jade-melomakarona-ea20fe.netlify.app` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `proxies` | **Keep separate** for now — proxy surface, not a hub section |
 
-Same-site cookie pattern: app and API are sibling subdomains under `adam-russell.com` (Life: `life-hub` + `api`; Teaching: `teaching-hub` + `teaching-api`). Umbrella retarget must preserve or deliberately redesign this pattern.
+Created / last update (dashboard): Life Aug 2→Sep 1 2026; Tasks Aug 16→Aug 31; Teaching Aug 8→Aug 29; Knowledge Aug 13→Aug 29; proxies Mar 9→Aug 25.
+
+### App origins (`SITE_ORIGIN` — from committed config / README)
+
+| Hub | API host | App origin (`SITE_ORIGIN`) |
+|-----|----------|----------------------------|
+| Life | `api.adam-russell.com` | `https://life-hub.adam-russell.com` |
+| Teaching | `teaching-api.adam-russell.com` | `https://teaching-hub.adam-russell.com` |
+| Tasks | `tasks-api.adam-russell.com` | confirm at fold |
+| Knowledge | `knowledge-api.adam-russell.com` | confirm at fold |
+
+Same-site cookie pattern: app and API are sibling subdomains under `adam-russell.com`. Umbrella retarget of `life-hub2` must preserve Life’s pattern; folding other hubs may mean either (a) extending CORS allow-list on `life-hub2` while app origins stay separate, or (b) consolidating app hosts later — decide per fold, do not rotate secrets.
 
 Mirror table also lives in [`OVERSEER.md`](./OVERSEER.md).
 
@@ -63,7 +77,7 @@ hubs/                          # umbrella code repo (name decided above)
 docs/consolidation/            # this folder (carried into umbrella)
 ```
 
-Deploy preference: **retarget existing Life Hub Netlify** at the umbrella repo — **keep all existing env vars**; only add origins/bindings as new hub sections fold in. Full execution-readiness stress test still needs Netlify **dashboard site names** filled.
+Deploy preference: **retarget Netlify site `life-hub2`** (`api.adam-russell.com`, ID `5771ee5c-0cb2-4858-b03d-2637f092050e`) — **keep all existing env vars**; only add origins/bindings as hub sections fold in. Teaching/Tasks/Knowledge Netlify sites retire after their APIs are absorbed.
 
 ## Invariants (named — checkpoint gates)
 
@@ -144,28 +158,34 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v2.1 | in progress | Partial critique #2 applied 2026-09-01 |
+| Plan v2.3 | ready for critique #2 | Netlify inventory filled 2026-09-01 |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
-| Claude critique #2 (full) | **blocked** | Needs Decisions + Netlify site names in this file |
+| Claude critique #2 (full) | **unblocked** | Auth + repo + Netlify inventory in this file |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
-| Deploy URLs (public) | partial | From committed config; Netlify site names AWAITING ADAM |
-| Auth decision | **AWAITING ADAM** | |
-| Repo naming decision | **AWAITING ADAM** | |
+| Deploy inventory | **filled** | See table above; `life-hub2` is absorb target |
+| Auth decision | **decided** | Retain Life Hub secrets |
+| Repo naming decision | **decided** | Reuse `life-hub`, leave as-is |
 | Design-kit mechanic | decided | Copy-then-freeze |
 | Umbrella seed | not started | |
-| Netlify retarget | not started | |
+| Netlify retarget | not started | Target site: `life-hub2` |
 
 ## Open questions (Adam)
 
-- Netlify dashboard site names for Life + Teaching API sites (only remaining blocker for full critique #2)
 - Calendar: first event source when wiring (Life vs Teaching vs external)
 - Fold trigger (A/B/C) for Teaching — recommend (A) when consolidated calendar is the driver
+- Tasks / Knowledge app `SITE_ORIGIN` values (confirm at fold)
 
 ## Next action
 
-Adam fills Netlify **dashboard site names** in this file → Claude runs **full** critique #2 (execution-readiness stress test).
+Claude Code runs **full** critique #2 (execution-readiness stress test) against this plan + [`OVERSEER.md`](./OVERSEER.md).
+
+Paste:
 
 ```text
-Life Netlify site name: <from dashboard>
-Teaching Netlify site name: <from dashboard>
+You are the consolidation overseer. cwd = life-hub repo root.
+Read: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.3).
+Run full critique #2 — execution-readiness stress test of the migrate order
+against the filled Netlify inventory (life-hub2 absorb target; retain secrets).
+Write report only to docs/consolidation/checkpoints/checkpoint-01-critique-2.md
+Observe-only: no application code edits, no file moves, no git commits.
 ```
