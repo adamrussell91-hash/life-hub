@@ -13,7 +13,8 @@ import {
   methodNotAllowed,
   misconfiguredResponse,
   preflightResponse,
-  readCookie,
+  readUmbrellaSessionCookie,
+  umbrellaSessionSecret,
   withCors
 } from './_shared/http.mjs';
 
@@ -36,7 +37,7 @@ export function createSessionHandler({
 
     let session;
     try {
-      session = verify(readCookie(request, 'life_hub_session'), env.SESSION_SECRET, now());
+      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withCors(misconfiguredResponse(), request, env);
     }
@@ -51,7 +52,7 @@ export function createSessionHandler({
     let expiresAt = new Date(session.payload.exp).toISOString();
     if (shouldRefreshSession(session.payload, currentTime)) {
       try {
-        const refreshed = createToken({ now: currentTime }, env.SESSION_SECRET);
+        const refreshed = createToken({ now: currentTime }, umbrellaSessionSecret(env));
         headers['set-cookie'] = serializeCookie(refreshed.token);
         expiresAt = refreshed.expiresAt;
       } catch {
