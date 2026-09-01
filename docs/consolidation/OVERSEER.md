@@ -100,15 +100,17 @@ Adam dashboard export 2026-09-01:
 | Life Hub API | `life-hub2` | `5771ee5c-0cb2-4858-b03d-2637f092050e` | `https://api.adam-russell.com` | `https://life-hub.adam-russell.com` | **Absorb target** — keep secrets |
 | Teaching Hub API | `arteaching-hub` | `899b0fd3-53b3-45a0-bbfb-0238264d9246` | `https://teaching-api.adam-russell.com` | `https://teaching-hub.adam-russell.com` | Fold later |
 | Tasks Hub API | `artasks-hub` | `c6696619-f478-4ac1-b0cd-1e4cfd3101df` | `https://tasks-api.adam-russell.com` | confirm at fold | Fold later |
-| Knowledge Hub API | `knowledge-hub-archive` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `https://knowledge-api.adam-russell.com` | confirm at fold | Site name ≠ R2 bucket (same label) |
-| Proxies | `jade-melomakarona-ea20fe` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `https://jade-melomakarona-ea20fe.netlify.app` | n/a | Keep separate for now |
+| Knowledge Hub API | `knowledge-hub-archive` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `https://knowledge-api.adam-russell.com` | confirm at fold | **Netlify Functions only** — not the R2 bucket (same label; see collision note in `plan.md`) |
+| Proxies (widgets OpenAI) | `jade-melomakarona-ea20fe` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `https://jade-melomakarona-ea20fe.netlify.app` | n/a | Functions-only; root 404; consumers in `widgets`; not a hub — keep until migrate/retire |
+
+**Proxies functions:** `/.netlify/functions/ai` (OpenAI chat proxy), `/.netlify/functions/generate` (HSC Paper 1). Risk: permissive CORS; `ai` accepts caller-supplied model/messages/token limits against shared OpenAI key.
 
 ### Cloudflare / R2
 
 | Resource | Name | Used by | Notes |
 |----------|------|---------|--------|
-| R2 bucket | `knowledge-hub-archive` | `knowledge-hub` repo (confirm) | Archive storage; bindings must be documented at Knowledge fold |
-| Worker | `knowledge-hub-research` | `knowledge-hub` repo (confirm) | Research edge; merge vs keep-separate decision at fold |
+| R2 bucket | `knowledge-hub-archive` | Worker `knowledge-hub-research` as binding `ARCHIVE` | ~5,940 objects / 4.07 GB (`notes/`, `podcast/`, `research/`, `university/`); CF account `100c592ec8d777abf2646a08525d0cc4`; **independent of** Netlify site with same name |
+| Worker | `knowledge-hub-research` | `knowledge-hub` | Research edge; merge vs keep-separate at fold |
 | Other R2 / KV / D1 / Workers | FILL_IN | FILL_IN | |
 
 ### Local paths (Adam machine)
