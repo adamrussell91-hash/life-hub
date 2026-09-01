@@ -453,6 +453,29 @@ test('exposes parsed config/agents.yml and raw central-node.md content when both
   assert.equal(result.centralNodeMarkdown, centralNodeMarkdown);
 });
 
+test('exposes parsed nutrition challenge trackers when challenges.json is present', async () => {
+  const files = [
+    raw('data/nutrition/challenges.json', JSON.stringify({
+      challenges: [{
+        id: 'no-refined-sugar-2026-08-01',
+        title: 'No refined sugar',
+        rule: 'No refined sugar',
+        start: '2026-08-01',
+        end: '2026-08-07',
+        status: 'active',
+        days: {}
+      }]
+    }))
+  ];
+  const sync = async () => ({
+    files, warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+    changed: true, freshness: 'confirmed'
+  });
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', backfill: false });
+  assert.equal(result.nutritionChallenges.challenges[0].title, 'No refined sugar');
+});
+
 test('an unparseable config/agents.yml produces a warning instead of throwing, and central-node.md needs no parsing to fail', async () => {
   const files = [
     raw('config/agents.yml', 'agents: [invalid'),

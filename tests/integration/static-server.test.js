@@ -179,12 +179,14 @@ test('local sign-in exposes the fixture repository contract', async t => {
   });
   assert.equal(manifest.status, 200);
   const payload = await manifest.json();
-  assert.equal(payload.data.files.length, 7);
+  assert.equal(payload.data.files.length, 8);
   assert.deepEqual(payload.data.files[0], {
     path: 'config/agents.yml',
     sha: '4d25a8e7888a482039b3558a21f2fde45b97d1bd',
     size: 1310
   });
+  const challenges = payload.data.files.find(f => f.path === 'data/nutrition/challenges.json');
+  assert.ok(challenges);
   const centralNode = payload.data.files.find(f => f.path === 'central-node.md');
   assert.ok(centralNode);
   assert.deepEqual(centralNode, {
@@ -310,8 +312,11 @@ test('local repository file reads return exact fixture pairs in request order', 
     { headers: { cookie } }
   );
   const manifest = (await manifestResponse.json()).data;
-  const requested = [manifest.files.at(-1), manifest.files[0]]
-    .map(({ path, sha }) => ({ path, sha }));
+  const meal = manifest.files.find(file => file.path.includes('2026-07-30-lunch'));
+  const agents = manifest.files.find(file => file.path === 'config/agents.yml');
+  assert.ok(meal);
+  assert.ok(agents);
+  const requested = [meal, agents].map(({ path, sha }) => ({ path, sha }));
 
   const response = await fetch(`${baseUrl}/api/repo/files`, {
     method: 'POST',
