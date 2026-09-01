@@ -7,7 +7,7 @@ import {
   getTopSets,
   hasRecoveryBonus,
   resolveDayType
-} from '../../js/core/aggregate.js';
+} from '../../apps/life/js/core/aggregate.js';
 
 const records = [
   { type: 'meal', date: '2026-07-30', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, carbs_g: 48, sodium_mg: 420, calcium_mg: 380, polyphenol_score: 6 },

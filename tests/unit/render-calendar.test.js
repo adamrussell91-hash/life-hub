@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderCalendar } from '../../js/app/render-calendar.js';
-import { buildCalendarModel } from '../../js/app/calendar-model.js';
+import { renderCalendar } from '../../apps/life/js/app/render-calendar.js';
+import { buildCalendarModel } from '../../apps/life/js/app/calendar-model.js';
 
 function fakeRoot() {
   const store = new Map();

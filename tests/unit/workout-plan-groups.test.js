@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatSupersetBlockLabel,
   groupWorkoutPlanExercises
-} from '../../js/core/workout-plan-groups.js';
+} from '../../apps/life/js/core/workout-plan-groups.js';
 
 test('groupWorkoutPlanExercises groups exercises by superset_group', () => {
   const blocks = groupWorkoutPlanExercises([

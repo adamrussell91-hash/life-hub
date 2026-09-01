@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentColour, DEFAULT_AGENT_COLOUR } from '../../js/app/agent-colour.js';
+import { agentColour, DEFAULT_AGENT_COLOUR } from '../../apps/life/js/app/agent-colour.js';
 
 const agentsConfig = {
   agents: [

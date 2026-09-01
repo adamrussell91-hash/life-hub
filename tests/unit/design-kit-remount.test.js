@@ -19,14 +19,14 @@ test('prepare-web copies the kit from packages/design-kit into dist/packages/des
 });
 
 test('Home shell and app imports load the kit from packages/design-kit', async () => {
-  const html = await readFile(new URL('index.html', root), 'utf8');
+  const html = await readFile(new URL('apps/life/index.html', root), 'utf8');
   const hrefs = [...html.matchAll(/href="(packages\/design-kit\/[^"]+\.css)"/g)].map(match => match[1]);
   assert.ok(hrefs.length > 0, 'index.html must link packages/design-kit CSS');
   assert.doesNotMatch(html, /href="design-kit\//);
 
-  const medical = await readFile(new URL('js/app/render-medical.js', root), 'utf8');
-  assert.match(medical, /from ['"]\.\.\/\.\.\/packages\/design-kit\/js\/hub-filter-menu\.js['"]/);
+  const medical = await readFile(new URL('apps/life/js/app/render-medical.js', root), 'utf8');
+  assert.match(medical, /from ['"]\.\.\/\.\.\/\.\.\/\.\.\/packages\/design-kit\/js\/hub-filter-menu\.js['"]/);
 
-  const time = await readFile(new URL('js/core/time.js', root), 'utf8');
-  assert.match(time, /from ['"]\.\.\/\.\.\/packages\/design-kit\/js\/format-display-date\.js['"]/);
+  const time = await readFile(new URL('apps/life/js/core/time.js', root), 'utf8');
+  assert.match(time, /from ['"]\.\.\/\.\.\/\.\.\/\.\.\/packages\/design-kit\/js\/format-display-date\.js['"]/);
 });

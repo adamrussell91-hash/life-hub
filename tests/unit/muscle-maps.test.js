@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveMuscleMapKeys, muscleAssetPath, resolveExerciseThumbKey } from '../../js/app/muscle-maps.js';
+import { resolveMuscleMapKeys, muscleAssetPath, resolveExerciseThumbKey } from '../../apps/life/js/app/muscle-maps.js';
 
 test('coarse focus falls back to whole-region keys', () => {
   assert.deepEqual(

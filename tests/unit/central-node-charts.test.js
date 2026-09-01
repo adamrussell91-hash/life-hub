@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCompletionRing } from '../../js/app/central-node-charts.js';
+import { buildCompletionRing } from '../../apps/life/js/app/central-node-charts.js';
 
 test('computes stroke-dasharray geometry for a partial ring using default dimensions', () => {
   const ring = buildCompletionRing({ complete: 3, total: 5 });

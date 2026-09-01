@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMedicalController } from '../../js/app/medical-controller.js';
+import { createMedicalController } from '../../apps/life/js/app/medical-controller.js';
 
 test('createMedicalController saves through chatApi.confirm', async () => {
   let payload = null;

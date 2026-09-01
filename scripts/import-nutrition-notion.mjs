@@ -13,7 +13,7 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { sydneyLocalStamp } from '../js/core/time.js';
+import { sydneyLocalStamp } from '../apps/life/js/core/time.js';
 
 const args = parseArgs(process.argv.slice(2));
 const nutritionRoot = resolve(args.nutritionRoot || '');

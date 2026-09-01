@@ -6,7 +6,7 @@ import {
   looksLikeWorkoutPlan,
   shouldForceChadwickPlanProposal,
   shouldNudgeUnsavedWorkoutPlan
-} from '../../js/core/workout-plan-detect.js';
+} from '../../apps/life/js/core/workout-plan-detect.js';
 
 const PLAN = [
   "Here's the plan:",

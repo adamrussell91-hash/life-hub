@@ -1,9 +1,9 @@
 import { load } from 'js-yaml';
-import { parseEventDocument } from '../../../js/core/records.js';
+import { parseEventDocument } from '../../../apps/life/js/core/records.js';
 // Deliberately reused from the browser bundle: pure aggregation logic with no DOM
 // dependency, kept as one source of truth rather than re-derived for the server digest.
-import { buildHomeModel } from '../../../js/app/home-model.js';
-import { addCalendarDays } from '../../../js/core/time.js';
+import { buildHomeModel } from '../../../apps/life/js/app/home-model.js';
+import { addCalendarDays } from '../../../apps/life/js/core/time.js';
 
 export function summarizeRecentHistory(files, targetsConfig, today) {
   const events = [];

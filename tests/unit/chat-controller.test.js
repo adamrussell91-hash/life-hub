@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createChatController } from '../../js/app/chat-controller.js';
-import { agentColour } from '../../js/app/agent-colour.js';
-import { isAgentStatusLine, isGenericStatusCopy } from '../../js/app/agent-protocols.js';
+import { createChatController } from '../../apps/life/js/app/chat-controller.js';
+import { agentColour } from '../../apps/life/js/app/agent-colour.js';
+import { isAgentStatusLine, isGenericStatusCopy } from '../../apps/life/js/app/agent-protocols.js';
 
 class FakeElement extends EventTarget {
   constructor(tag) {

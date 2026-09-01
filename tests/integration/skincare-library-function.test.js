@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createSkincareLibraryHandler } from '../../netlify/functions/skincare-library.mjs';
-import { SKINCARE_PRODUCT_LIBRARY_PATH } from '../../js/app/skincare-product-library.js';
-import { SKINCARE_ROUTINE_MEMBERSHIP_PATH } from '../../js/app/skincare-routine-membership.js';
-import { SKINCARE_CATALOG_PATH } from '../../js/app/skincare-catalog.js';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+import { SKINCARE_PRODUCT_LIBRARY_PATH } from '../../apps/life/js/app/skincare-product-library.js';
+import { SKINCARE_ROUTINE_MEMBERSHIP_PATH } from '../../apps/life/js/app/skincare-routine-membership.js';
+import { SKINCARE_CATALOG_PATH } from '../../apps/life/js/app/skincare-catalog.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
 
 const SECRET = 's'.repeat(32);
 const COMMIT_SHA = 'c'.repeat(40);

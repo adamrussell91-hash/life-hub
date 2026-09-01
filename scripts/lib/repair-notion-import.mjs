@@ -1,4 +1,4 @@
-import { sydneyLocalStamp } from '../../js/core/time.js';
+import { sydneyLocalStamp } from '../../apps/life/js/core/time.js';
 
 const BODY_TYPES = new Set(['weight', 'composition', 'measurements']);
 

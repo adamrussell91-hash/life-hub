@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildProteinLineChart } from '../../js/app/nutrition-charts.js';
+import { buildProteinLineChart } from '../../apps/life/js/app/nutrition-charts.js';
 
 test('scales a 3-point series into SVG coordinates within the given viewport', () => {
   const week = [

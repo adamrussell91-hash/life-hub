@@ -17,7 +17,7 @@ import {
   slugFromWorkoutPath,
   slugifyWorkoutTitle,
   toConfirmPayload
-} from '../../js/app/fitness-logger-draft.js';
+} from '../../apps/life/js/app/fitness-logger-draft.js';
 
 const planned = () => ({
   type: 'workout',

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createFitnessLoggerController } from '../../js/app/fitness-logger-controller.js';
+import { createFitnessLoggerController } from '../../apps/life/js/app/fitness-logger-controller.js';
 
 class FakeEl {
   constructor(tag = 'div') {

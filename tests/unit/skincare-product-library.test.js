@@ -14,8 +14,8 @@ import {
   groupProductsByCategory,
   defaultCategoryForProductName,
   upgradeOtherProductCategories
-} from '../../js/app/skincare-product-library.js';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+} from '../../apps/life/js/app/skincare-product-library.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
 
 test('path is data/skincare/product-library.json', () => {
   assert.equal(SKINCARE_PRODUCT_LIBRARY_PATH, 'data/skincare/product-library.json');

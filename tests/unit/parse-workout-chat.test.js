@@ -8,7 +8,7 @@ import {
   parseWorkoutChat,
   parseWorkoutSet,
   setsAreIdentical
-} from '../../js/core/parse-workout-chat.js';
+} from '../../apps/life/js/core/parse-workout-chat.js';
 
 const FLAT = [
   '1. **Bar Squat** — legs first while you\'re fresh - Set 1: 10 reps x 25kg (cable: none) - Set 2: 10 reps x 25kg (cable: none) - Set 3: 10 reps x 25kg (cable: none)',

@@ -16,8 +16,8 @@ import {
   upsertNutritionChallengeSchema,
   markNutritionChallengeDaySchema,
   listNutritionChallengesSchema
-} from '../../js/core/nutrition-challenges.js';
-import { syncChallengeToCentralNode } from '../../js/core/nutrition-challenge-cn.js';
+} from '../../apps/life/js/core/nutrition-challenges.js';
+import { syncChallengeToCentralNode } from '../../apps/life/js/core/nutrition-challenge-cn.js';
 
 const SEED_CN = `# Purpose
 x

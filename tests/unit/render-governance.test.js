@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderGovernance } from '../../js/app/render-governance.js';
-import { appendGovernanceEntry, emptyGovernanceLog } from '../../js/core/governance-log.js';
+import { renderGovernance } from '../../apps/life/js/app/render-governance.js';
+import { appendGovernanceEntry, emptyGovernanceLog } from '../../apps/life/js/core/governance-log.js';
 
 class FakeElement {
   constructor(tag) {

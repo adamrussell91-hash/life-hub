@@ -11,7 +11,7 @@ import {
   rangeGrowthPercent,
   rangeWindow,
   seriesInRange
-} from '../../js/app/body-model.js';
+} from '../../apps/life/js/app/body-model.js';
 
 test('BODY_RANGES are month 6M year 5Y', () => {
   assert.deepEqual(BODY_RANGES, ['monthly', 'six_month', 'year', 'five_year']);

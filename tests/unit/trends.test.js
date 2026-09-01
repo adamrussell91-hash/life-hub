@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { comparePeriods, downsampleWeekly, getTrend } from '../../js/core/trends.js';
+import { comparePeriods, downsampleWeekly, getTrend } from '../../apps/life/js/core/trends.js';
 
 const weight = { field: 'weight_kg', unit: 'kg', good: 'down', thresholds: [0.2, 0.5, 1.0] };
 const steps = { field: 'steps', unit: 'steps', good: 'up', thresholds: [500, 1_000, 2_000] };

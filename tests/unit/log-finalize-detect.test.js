@@ -10,7 +10,7 @@ import {
   shouldForceAgentLog,
   shouldNudgeMissingLogEntry,
   shouldStripWebSearch
-} from '../../js/core/log-finalize-detect.js';
+} from '../../apps/life/js/core/log-finalize-detect.js';
 import { streamWithAgentLogForce } from '../../netlify/functions/_shared/agent-log-force.mjs';
 
 async function collect(iterable) {

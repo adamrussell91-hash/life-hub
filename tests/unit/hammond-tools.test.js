@@ -8,7 +8,7 @@ import {
   classifyCentralNodePatchRisk,
   applyCentralNodePatch
 } from '../../netlify/functions/_shared/hammond-tools.mjs';
-import { GOVERNANCE_ENTRY_TYPES } from '../../js/core/governance-log.js';
+import { GOVERNANCE_ENTRY_TYPES } from '../../apps/life/js/core/governance-log.js';
 
 test('schemas expose expected names', () => {
   assert.equal(proposeCentralNodePatchSchema().name, 'propose_central_node_patch');

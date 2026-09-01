@@ -40,7 +40,7 @@ import {
   resolveResearchTtl,
   researchExpiresAt
 } from '../../netlify/functions/_shared/capabilities/stores.mjs';
-import { classifyCentralNodePatchRisk } from '../../js/core/central-node-patch.js';
+import { classifyCentralNodePatchRisk } from '../../apps/life/js/core/central-node-patch.js';
 
 function mockCtx(agentSlug = 'brisket') {
   const files = new Map();
