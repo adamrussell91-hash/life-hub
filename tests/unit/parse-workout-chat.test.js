@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildPlannedWorkoutInput,
   findLatestWorkoutPlanText,
+  parseSupersetPairing,
   parseWorkoutChat,
   parseWorkoutSet,
   setsAreIdentical
@@ -151,6 +152,34 @@ test('findLatestWorkoutPlanText walks newest-first and ignores chatter', () => {
     '1. Bar Squat — 10x25kg, 10x25kg (cable: none)\n2. Goblet Squat — 12x14kg (cable: none)\n3. Bar Press — 20x20kg (cable: none)'
   ]);
   assert.match(latest, /Goblet Squat/);
+});
+
+test('parseSupersetPairing reads paired exercise names without loads', () => {
+  const plan = parseSupersetPairing([
+    'Pairing it your way:',
+    '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
+    '3&4 superset: Reverse Grip Incline Bench Press / One Handle Arm Triceps',
+    '5&6 superset: Biceps Curl / Overhead Triceps',
+    '7&8 straight after each other: Flat Fly burnout → Alt Biceps Curl burnout'
+  ].join('\n'));
+  assert.equal(plan.exercises.length, 8);
+  assert.equal(plan.exercises[0].name, 'Bar Press');
+  assert.equal(plan.exercises[1].name, 'Cable Bar Wide Grip Curl');
+  assert.equal(plan.exercises[6].name, 'Flat Fly');
+  assert.equal(plan.exercises[7].name, 'Alt Biceps Curl');
+});
+
+test('buildPlannedWorkoutInput turns superset pairing into a name-only planned log_entry', () => {
+  const input = buildPlannedWorkoutInput([
+    'Pairing it your way:',
+    '1&2 superset: Bar Press / Cable Bar Wide Grip Curl',
+    '3&4 superset: Reverse Grip Incline Bench Press / One Handle Arm Triceps'
+  ].join('\n'), { date: '2026-08-29' });
+  assert.equal(input.type, 'workout');
+  assert.equal(input.fields.status, 'planned');
+  assert.equal(input.fields.exercises.length, 4);
+  assert.equal(input.fields.exercises[0].name, 'Bar Press');
+  assert.equal(input.fields.exercises[0].sets, undefined);
 });
 
 test('setsAreIdentical is true only when every set shares load and cable', () => {
