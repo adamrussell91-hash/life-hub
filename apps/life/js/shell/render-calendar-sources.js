@@ -1,4 +1,4 @@
-const EMPTY_COPY = 'No shared sources yet. Teaching, Knowledge, and Tasks feeds are not wired.';
+const EMPTY_COPY = 'No shared sources yet.';
 
 export function renderCalendarSources(root, sources = []) {
   const empty = root.querySelector('[data-calendar="sources-empty"]');

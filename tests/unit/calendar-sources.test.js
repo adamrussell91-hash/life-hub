@@ -27,6 +27,9 @@ function fakeRoot() {
     children: [],
     replaceChildren(...nodes) {
       this.children = [...nodes];
+    },
+    append(...nodes) {
+      this.children.push(...nodes);
     }
   };
   return {
@@ -52,9 +55,10 @@ function fakeRoot() {
   };
 }
 
-test('shared calendar source registry is empty — no live feeds', () => {
+test('shared calendar source registry names Life logged days', () => {
   const sources = listCalendarSources();
-  assert.deepEqual(sources, []);
+  assert.deepEqual(sources.map(source => source.id), ['life']);
+  assert.equal(sources[0].status, 'live');
   assert.equal(sources.some(source => source.fetch || source.url || source.endpoint), false);
 });
 
@@ -64,11 +68,11 @@ test('shared calendar source registry does not name other hub APIs', async () =>
   assert.doesNotMatch(source, /teaching-hub|knowledge-hub|Tasks-Hub/i);
 });
 
-test('source placeholder shows empty copy and hides the list', () => {
+test('source card lists Life Hub and hides the empty copy', () => {
   const root = fakeRoot();
   renderCalendarSources(root, listCalendarSources());
-  assert.equal(root._empty.hidden, false);
-  assert.match(root._empty.textContent, /No shared sources yet/);
-  assert.equal(root._list.hidden, true);
-  assert.equal(root._list.children.length, 0);
+  assert.equal(root._empty.hidden, true);
+  assert.equal(root._list.hidden, false);
+  assert.equal(root._list.children.length, 1);
+  assert.equal(root._list.children[0].textContent, 'Life Hub');
 });

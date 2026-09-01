@@ -1,13 +1,7 @@
 # apps/
 
-Target umbrella shape (`plan.md`): `apps/life`, `apps/teaching`, `apps/knowledge`, `apps/tasks`.
+Umbrella shape: `apps/life`, `apps/teaching`, `apps/knowledge`, `apps/tasks`.
 
-**Life shell source lives in `apps/life/`.** `scripts/prepare-web.mjs` copies `index.html`, `js/`, `css/`, `assets/`, `manifest.webmanifest`, and `service-worker.js` into the same `dist/` URLs Pages already publishes (`/`, `/js/`, `/css/`, `/assets/`).
+**Life shell source lives in `apps/life/`.** `scripts/prepare-web.mjs` copies it into the same `dist/` URLs Pages already publishes.
 
-Stay at repo root:
-
-- `netlify/` — Functions paths and `netlify.toml` `directory` / `included_files`
-- `scripts/prepare-web.mjs` and `.github/workflows/pages.yml` (still upload `dist/`)
-- `packages/design-kit/`, `config/`, `capabilities/`, `central-node.md`, `tests/`
-
-Do not move Functions into `apps/life/netlify`, retarget `life-hub2`, or fold other hubs in this slice.
+Teaching / Knowledge / Tasks are mounts in the Life shell. Their SPAs stay on their own Pages sites until each API fold. Do not move Functions into `apps/*/netlify` or retarget `life-hub2` until a fold slice says so.
