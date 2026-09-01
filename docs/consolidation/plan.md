@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v2.6 — umbrella seed merged (PR #55). Checkpoint-01 PASS. Next slice: remount kit to `packages/design-kit/` only.  
+> **Status:** v2.7 — kit remount merged (PR #56). Checkpoint-02 PASS. Next slice: lock umbrella auth env names (retain Life secrets).  
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
 ## Intent
@@ -188,17 +188,19 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v2.6 | seed merged; kit remount next | Slice 01 merged 2026-09-01 as PR #55 |
+| Plan v2.7 | kit remount merged; auth lock next | Slice 02 merged 2026-09-01 as PR #56 |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
 | Claude checkpoint-01 | **PASS** | `checkpoints/checkpoint-01.md` — merge #55 |
+| Claude checkpoint-02 | **PASS** | `checkpoints/checkpoint-02.md` — merge #56 |
 | Deploy inventory | **filled** | See table above; `life-hub2` is absorb target |
 | Auth decision | **decided** | Retain Life Hub secrets |
 | Repo naming decision | **decided** | Reuse `life-hub`, leave as-is |
 | Design-kit mechanic | decided | Copy-then-freeze into `packages/design-kit/` |
 | Umbrella seed | **shipped** | PR #55 merged; Life app still at repo root |
-| Kit remount | **shipped (this PR)** | Slice 02 — single source `packages/design-kit/`; published URL `packages/design-kit/*` |
+| Kit remount | **shipped** | PR #56 merged 2026-09-01 |
+| Auth lock | in progress | Slice 03 — retain `LIFE_HUB_PASSPHRASE_HASH` + `SESSION_SECRET`; no new secrets; no `apps/life/` move |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -231,30 +233,15 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 - Published CSS/JS URLs change from `design-kit/*` to `packages/design-kit/*` (bump SW cache name)
 - No `netlify.toml` / function / secret changes
 
+### Slice 03 — auth lock (this slice)
+
+- Name the retained Life env keys once (`LIFE_HUB_PASSPHRASE_HASH`, `SESSION_SECRET`, cookie `life_hub_session`)
+- Tests forbid Teaching/new passphrase env names in `netlify/functions/`
+- Do **not** rotate secrets, change cookie attributes, retarget `life-hub2`, or move `apps/life/`
+
 ## Next action
 
-Claude observe-only **checkpoint-02** against this remount PR. Do not start `apps/life/` or auth unification until that report lands.
-
-Paste:
-
-```text
-You are the consolidation overseer at checkpoint-02. cwd = life-hub repo root.
-Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v2.6).
-
-Observe-only rules (hard):
-- Do NOT edit application code, move files, run destructive git, or commit.
-- You MAY create exactly one report:
-  docs/consolidation/checkpoints/checkpoint-02.md
-
-Inspect: the design-kit remount PR vs main, and plan.md Slice 02 notes.
-Confirm: root design-kit/ is gone; Pages publishes packages/design-kit/;
-netlify.toml / functions / secrets unchanged; life-hub-data untouched.
-
-Write the report using the template in OVERSEER.md.
-End with: next 3 concrete steps for Cursor local agent — no patches.
-If auth, life-hub-data boundary, or public student URL safety looks wrong,
-open with DO NOT MERGE YET.
-```
+Finish Slice 03 as a PR against `main`. After merge, Claude observe-only **checkpoint-03**.
 
 
 ## Open questions (Adam)
