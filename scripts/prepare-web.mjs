@@ -6,8 +6,8 @@ const publishedDirectories = ['assets', 'css', 'js'];
 const publishedFiles = ['index.html', 'manifest.webmanifest', 'service-worker.js'];
 
 async function copyDesignKitStyles() {
-  const kitRoot = new URL('design-kit/', projectRoot);
-  const kitPublish = new URL('design-kit/', publishRoot);
+  const kitRoot = new URL('packages/design-kit/', projectRoot);
+  const kitPublish = new URL('packages/design-kit/', publishRoot);
   await mkdir(kitPublish, { recursive: true });
   const names = (await readdir(kitRoot)).filter(name => name.endsWith('.css'));
   await Promise.all(names.map(name => copyFile(
@@ -18,8 +18,8 @@ async function copyDesignKitStyles() {
 
 async function copyDesignKitModules() {
   await cp(
-    new URL('design-kit/js/', projectRoot),
-    new URL('design-kit/js/', publishRoot),
+    new URL('packages/design-kit/js/', projectRoot),
+    new URL('packages/design-kit/js/', publishRoot),
     { recursive: true }
   );
 }

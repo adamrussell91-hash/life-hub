@@ -25,7 +25,7 @@ function parseKey(key) {
   return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
 }
 
-export { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+export { formatDisplayDate } from '../../packages/design-kit/js/format-display-date.js';
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

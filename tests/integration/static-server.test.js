@@ -56,8 +56,8 @@ test('serves the Home shell with the correct content type', async t => {
 
 test('publishes design-kit stylesheets linked from the Home shell', async t => {
   const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
-  const hrefs = [...html.matchAll(/href="(design-kit\/[^"]+\.css)"/g)].map(match => match[1]);
-  assert.ok(hrefs.length > 0, 'index.html must link design-kit CSS');
+  const hrefs = [...html.matchAll(/href="(packages\/design-kit\/[^"]+\.css)"/g)].map(match => match[1]);
+  assert.ok(hrefs.length > 0, 'index.html must link packages/design-kit CSS');
 
   const baseUrl = await startServer(t);
   for (const href of hrefs) {
@@ -69,9 +69,9 @@ test('publishes design-kit stylesheets linked from the Home shell', async t => {
 
 test('publishes design-kit modules imported by the app shell', async t => {
   const sources = await readFile(new URL('../../js/app/render-medical.js', import.meta.url), 'utf8');
-  const imports = [...sources.matchAll(/from ['"](\.\.\/\.\.\/design-kit\/[^'"]+)['"]/g)]
+  const imports = [...sources.matchAll(/from ['"](\.\.\/\.\.\/packages\/design-kit\/[^'"]+)['"]/g)]
     .map(match => match[1].replace('../../', ''));
-  assert.ok(imports.includes('design-kit/js/hub-filter-menu.js'));
+  assert.ok(imports.includes('packages/design-kit/js/hub-filter-menu.js'));
 
   const baseUrl = await startServer(t);
   for (const href of imports) {
