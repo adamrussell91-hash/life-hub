@@ -1249,6 +1249,32 @@ main { max-width: 76rem; margin: 0 auto; }
   display: grid;
   gap: 0.75rem;
 }
+.nutrition-surface-widgets-card { overflow: hidden; }
+.nutrition-surface-widgets-rail {
+  display: grid;
+  gap: 0.75rem;
+}
+.surface-widget-meal-plan {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.surface-widget-meal-plan__day {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: var(--text-sm);
+}
+.surface-widget-meal-plan__label {
+  font-weight: 600;
+  color: var(--depth, #142b51);
+}
+.surface-widget-meal-plan__text {
+  color: var(--muted, #5a6d86);
+}
 .surface-widget-card {
   padding: 0.85rem 0.95rem;
   border-radius: var(--radius-md, 0.75rem);
