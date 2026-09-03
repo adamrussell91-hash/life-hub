@@ -1,2 +1,2 @@
-/** Keep in sync with Netlify synchronous streaming function limit (60s, not configurable). */
-export const CHAT_TURN_TIMEOUT_MS = 60_000;
+/** Netlify background functions can run this long. The browser does not abort chat turns. */
+export const CHAT_BACKGROUND_LIMIT_MS = 15 * 60 * 1000;
