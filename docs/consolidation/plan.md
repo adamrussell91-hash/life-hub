@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.10 — Tasks programs and maps. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.11 — Thin Teaching search and publish. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -189,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v4.10 | Tasks programs and maps | Slice 17 shipped as PR #73; this slice |
+| Plan v4.11 | Thin Teaching search and publish | Slice 18 shipped as PR #74; this slice |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -224,7 +224,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Tasks writes | **shipped** | PR #71 merged 2026-09-03 |
 | Tasks projects/areas/goals | **shipped** | PR #72 merged 2026-09-03 |
 | Teaching year/subject collections | **shipped** | PR #73 merged 2026-09-03 |
-| Tasks programs/maps | in progress | Slice 18 — GET/POST/PATCH/DELETE `/api/programs` and `/api/maps` |
+| Tasks programs/maps | **shipped** | PR #74 merged 2026-09-03 |
+| Teaching search/publish | in progress | Slice 19 — title search + thin lesson publish |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -386,7 +387,7 @@ Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 - Record GET/PATCH/DELETE on `/:id` already exist
 - No publish/search/AI fold, no `arteaching-hub` retire
 
-### Slice 18 — Tasks programs and maps (this slice)
+### Slice 18 — Tasks programs and maps (shipped, PR #74)
 
 Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 
@@ -395,9 +396,16 @@ Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 - Indexes stay in sync; no seed from competitions.json
 - No Clare, no Zod port, no `artasks-hub` retire
 
+### Slice 19 — Thin Teaching search and publish (this slice)
+
+- `GET /api/search?q=` title/code scan on years, subjects, classes, units, lessons
+- `POST /api/lessons/:id/publish` writes `published/lessons/:id` after dropping teacher-only blocks and sanitizing HTML
+- No `runContentSearch`, compositions, linked-section expand, version checkpoint, or Zod
+- No `arteaching-hub` retire
+
 ## Next action
 
-Keep shipping. Next: thin Teaching search/publish. Do not retarget `life-hub2`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
+Keep shipping. Next: Teaching outcomes/media list or Tasks frameworks. Do not retarget `life-hub2`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
 
 ## Open questions (Adam)
 
