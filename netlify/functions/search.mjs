@@ -8,6 +8,7 @@ import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import {
   CLASS_PREFIX,
   DRAFT_LESSON_PREFIX,
+  OUTCOME_PREFIX,
   SUBJECT_PREFIX,
   UNIT_PREFIX,
   YEAR_PREFIX,
@@ -22,7 +23,8 @@ const CORPUS = [
   { prefix: UNIT_PREFIX, type: 'unit' },
   { prefix: CLASS_PREFIX, type: 'class' },
   { prefix: YEAR_PREFIX, type: 'year' },
-  { prefix: SUBJECT_PREFIX, type: 'subject' }
+  { prefix: SUBJECT_PREFIX, type: 'subject' },
+  { prefix: OUTCOME_PREFIX, type: 'outcome' }
 ];
 
 export function createSearchHandler(deps = {}) {

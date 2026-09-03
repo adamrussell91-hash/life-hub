@@ -229,6 +229,9 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
 
     if (url.pathname === '/api/curriculum' ||
         url.pathname === '/api/search' ||
+        url.pathname === '/api/outcomes' ||
+        url.pathname.startsWith('/api/outcomes/') ||
+        (url.pathname === '/api/media' || /^\/api\/media\/[^/]+$/.test(url.pathname)) ||
         /^\/api\/(classes|units|lessons|years|subjects|scheduled-lessons)(\/|$)/.test(url.pathname)) {
       if (!readSession(request)) return unauthenticated(response);
       error(response, 503, 'blobs_unbound', 'Teaching content store is not bound.', true);
