@@ -10,7 +10,10 @@ const CATEGORY = {
   measurements: 'body',
   bloods: 'body',
   medical: 'body',
-  sleep: 'sleep'
+  sleep: 'sleep',
+  scheduled_lesson: 'teaching',
+  task: 'tasks',
+  knowledge_page: 'knowledge'
 };
 
 function searchText(event) {

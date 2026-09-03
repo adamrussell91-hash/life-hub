@@ -2,6 +2,8 @@ import { getSydneyDateKey } from '../core/time.js';
 import { renderHubSection } from '../shell/render-hub-sections.js';
 import { renderKnowledgeDashboard } from '../shell/render-knowledge.js';
 import { renderClareResult, renderTasksDashboard } from '../shell/render-tasks.js';
+import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
+import { tasksEventsFromTasks } from '../shell/tasks-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { renderTeachingDashboard } from '../shell/render-teaching.js';
 import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
@@ -122,6 +124,10 @@ export function createAppController(dependencies) {
   let calendarExpandedDate = null;
   let teachingEvents = [];
   let teachingCalendarInFlight = null;
+  let knowledgeEvents = [];
+  let knowledgeCalendarInFlight = null;
+  let tasksEvents = [];
+  let tasksCalendarInFlight = null;
   let bodyRange = 'six_month';
   let bloodsRange = 'five_year';
   let mindRange = 'monthly';
@@ -421,7 +427,7 @@ export function createAppController(dependencies) {
           if (manual) setStatus('Showing your last saved view.');
         }
         painted = true;
-        void loadTeachingCalendar();
+        void loadHubCalendars();
       }
     };
 
@@ -677,7 +683,7 @@ export function createAppController(dependencies) {
     }
     if (name === 'calendar') {
       renderCalendarSection();
-      void loadTeachingCalendar();
+      void loadHubCalendars();
     }
     if (name === 'body') renderBodySection();
     if (name === 'body-bloods') renderBloodsSection();
@@ -699,6 +705,14 @@ export function createAppController(dependencies) {
     }
   }
 
+  function loadHubCalendars() {
+    return Promise.all([
+      loadTeachingCalendar(),
+      loadKnowledgeCalendar(),
+      loadTasksCalendar()
+    ]);
+  }
+
   function loadTeachingCalendar() {
     if (!teachingApi?.getCurriculum) return Promise.resolve();
     if (teachingCalendarInFlight) return teachingCalendarInFlight;
@@ -714,6 +728,40 @@ export function createAppController(dependencies) {
         if (currentSection === 'calendar') renderCalendarSection();
       });
     return teachingCalendarInFlight;
+  }
+
+  function loadKnowledgeCalendar() {
+    if (!knowledgeApi?.listPages) return Promise.resolve();
+    if (knowledgeCalendarInFlight) return knowledgeCalendarInFlight;
+    knowledgeCalendarInFlight = knowledgeApi.listPages()
+      .then(pages => {
+        knowledgeEvents = knowledgeEventsFromPages(pages);
+      })
+      .catch(() => {
+        knowledgeEvents = [];
+      })
+      .finally(() => {
+        knowledgeCalendarInFlight = null;
+        if (currentSection === 'calendar') renderCalendarSection();
+      });
+    return knowledgeCalendarInFlight;
+  }
+
+  function loadTasksCalendar() {
+    if (!tasksApi?.listTasks) return Promise.resolve();
+    if (tasksCalendarInFlight) return tasksCalendarInFlight;
+    tasksCalendarInFlight = tasksApi.listTasks()
+      .then(tasks => {
+        tasksEvents = tasksEventsFromTasks(tasks);
+      })
+      .catch(() => {
+        tasksEvents = [];
+      })
+      .finally(() => {
+        tasksCalendarInFlight = null;
+        if (currentSection === 'calendar') renderCalendarSection();
+      });
+    return tasksCalendarInFlight;
   }
 
   async function loadTeachingSection() {
@@ -920,7 +968,7 @@ export function createAppController(dependencies) {
     if (!calendarSelectedDate) calendarSelectedDate = date;
     if (!calendarViewMonth) calendarViewMonth = calendarSelectedDate.slice(0, 7);
     const model = buildCalendarModel({
-      events: [...(latestResult.events ?? []), ...teachingEvents],
+      events: [...(latestResult.events ?? []), ...teachingEvents, ...knowledgeEvents, ...tasksEvents],
       date,
       selectedDate: calendarSelectedDate,
       viewMonth: calendarViewMonth
@@ -1218,6 +1266,10 @@ export function createAppController(dependencies) {
     rendered = false;
     teachingEvents = [];
     teachingCalendarInFlight = null;
+    knowledgeEvents = [];
+    knowledgeCalendarInFlight = null;
+    tasksEvents = [];
+    tasksCalendarInFlight = null;
     clearRefreshTimer();
     clearSessionExpiry();
     abortActiveRefresh(new DOMException('Session invalidated', 'AbortError'));
