@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.8 — Tasks projects, areas, and goals on the Life session. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.9 — Teaching year/subject collections. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -189,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v4.8 | Tasks projects, areas, and goals | Slice 15 shipped as PR #71; this slice |
+| Plan v4.9 | Teaching year/subject collections | Slice 16 shipped as PR #72; this slice |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -222,7 +222,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Blobs bind + Tasks list | **shipped** | PR #68 merged 2026-09-03; `NETLIFY_BLOBS_TOKEN` set on `life-hub2` (2026-09-03) — Teaching store reads `arteaching-hub` |
 | Knowledge GitHub token | **set** | 2026-09-03 — Production `GITHUB_TOKEN` replaced with PAT `life-hub2-data` (expires `2026-12-02`); Contents 200 on `life-hub-data` and `knowledge-hub-data`. Same env name. Preview unchanged. |
 | Tasks writes | **shipped** | PR #71 merged 2026-09-03 |
-| Tasks projects/areas/goals | in progress | Slice 16 — collection writes on the same Tasks store |
+| Tasks projects/areas/goals | **shipped** | PR #72 merged 2026-09-03 |
+| Teaching year/subject collections | in progress | Slice 17 — GET/POST `/api/years` and `/api/subjects` |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -368,7 +369,7 @@ Operator writes for Tasks on `life-hub2`, still behind the Life session:
 - If `NETLIFY_BLOBS_TOKEN` is set, open `tasks-hub-content` on `artasks-hub` (`c6696619-f478-4ac1-b0cd-1e4cfd3101df`) — same token as Teaching, different site id
 - No Clare, no seed/fixture copy, no `TASKS_HUB_PASSPHRASE_HASH`, no `artasks-hub` retire
 
-### Slice 16 — Tasks projects, areas, and goals (this slice)
+### Slice 16 — Tasks projects, areas, and goals (shipped, PR #72)
 
 Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 
@@ -377,9 +378,16 @@ Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 - Life Tasks rail lists project titles when bound
 - No Clare, programs, maps, seed, or `artasks-hub` retire
 
+### Slice 17 — Teaching year and subject collections (this slice)
+
+- `GET/POST /api/years` and `GET/POST /api/subjects` behind the Life session
+- Year create needs title + year_level; subject create needs title and rejects duplicates
+- Record GET/PATCH/DELETE on `/:id` already exist
+- No publish/search/AI fold, no `arteaching-hub` retire
+
 ## Next action
 
-Keep shipping. Next: Teaching years/subjects collections or Tasks programs/maps. Do not retarget `life-hub2`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
+Keep shipping. Next: Teaching search/publish or Tasks programs/maps. Do not retarget `life-hub2`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
 
 ## Open questions (Adam)
 
