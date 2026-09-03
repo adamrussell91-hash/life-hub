@@ -231,6 +231,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
         url.pathname === '/api/search' ||
         url.pathname === '/api/outcomes' ||
         url.pathname.startsWith('/api/outcomes/') ||
+        url.pathname === '/api/media/upload' ||
         (url.pathname === '/api/media' || /^\/api\/media\/[^/]+$/.test(url.pathname)) ||
         /^\/api\/(classes|units|lessons|years|subjects|scheduled-lessons)(\/|$)/.test(url.pathname)) {
       if (!readSession(request)) return unauthenticated(response);
@@ -245,6 +246,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
     }
 
     if (url.pathname === '/api/tasks' || url.pathname.startsWith('/api/tasks/') ||
+        url.pathname === '/api/clare' ||
         /^\/api\/(projects|areas|goals|programs|maps)(\/|$|\?)/.test(url.pathname)) {
       if (!readSession(request)) return unauthenticated(response);
       error(response, 503, 'tasks_blobs_unbound', 'Tasks content store is not bound.', true);
