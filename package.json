@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/prepare-web.mjs",
+    "build": "npm run build:apps && node scripts/prepare-web.mjs",
+    "build:apps": "npm run build:teaching && npm run build:knowledge && npm run build:tasks",
+    "build:teaching": "node scripts/build-spa.mjs teaching",
+    "build:knowledge": "node scripts/build-spa.mjs knowledge",
+    "build:tasks": "node scripts/build-spa.mjs tasks",
     "generate:auth": "node scripts/generate-auth-secrets.mjs",
     "prepare:web": "node scripts/prepare-web.mjs",
     "dev": "node scripts/prepare-web.mjs && node scripts/serve.mjs",
@@ -22,7 +26,14 @@
     "js-yaml": "4.3.0"
   },
   "devDependencies": {
-    "playwright": "1.61.1"
+    "@types/d3-force": "^3.0.10",
+    "d3-force": "^3.0.0",
+    "katex": "^0.16.47",
+    "playwright": "1.61.1",
+    "ts-fsrs": "^5.4.2",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.2",
+    "zod": "^3.25.76"
   },
   "engines": {
     "node": ">=22"

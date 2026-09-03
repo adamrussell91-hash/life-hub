@@ -3,21 +3,21 @@ export const HUB_SECTIONS = [
     id: 'teaching',
     title: 'Teaching',
     eyebrow: 'Classes and lessons',
-    origin: 'https://teaching-hub.adam-russell.com',
-    studentPublicPrefix: '/s/'
+    origin: '/teaching/',
+    studentPublicPrefix: '/teaching/s/'
   },
   {
     id: 'knowledge',
     title: 'Knowledge',
     eyebrow: 'Archive and research',
-    origin: 'https://knowledge-hub.adam-russell.com',
+    origin: '/knowledge/',
     studentPublicPrefix: null
   },
   {
     id: 'tasks',
     title: 'Tasks',
     eyebrow: 'Board',
-    origin: 'https://tasks-hub.adam-russell.com',
+    origin: '/tasks/',
     studentPublicPrefix: null
   }
 ];
