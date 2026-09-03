@@ -6,16 +6,8 @@ const STATUS_COPY = {
   ready: ''
 };
 
-export function renderTasksDashboard(root, { status = 'ready', tasks = [] } = {}) {
-  const statusNode = root.querySelector?.('[data-tasks="status"]');
-  const list = root.querySelector?.('#tasks-item-list');
-  if (statusNode) {
-    statusNode.textContent = STATUS_COPY[status] ?? '';
-    statusNode.hidden = !statusNode.textContent;
-  }
+function fillList(root, list, rows) {
   if (!list) return;
-
-  const rows = status === 'ready' && Array.isArray(tasks) ? tasks : [];
   list.replaceChildren();
   for (const item of rows) {
     const title = item.title || item.id;
@@ -25,4 +17,17 @@ export function renderTasksDashboard(root, { status = 'ready', tasks = [] } = {}
     list.append(row);
   }
   list.hidden = rows.length === 0;
+}
+
+export function renderTasksDashboard(root, { status = 'ready', tasks = [], projects = [] } = {}) {
+  const statusNode = root.querySelector?.('[data-tasks="status"]');
+  const taskList = root.querySelector?.('#tasks-item-list');
+  const projectList = root.querySelector?.('#tasks-project-list');
+  if (statusNode) {
+    statusNode.textContent = STATUS_COPY[status] ?? '';
+    statusNode.hidden = !statusNode.textContent;
+  }
+  const ready = status === 'ready';
+  fillList(root, taskList, ready && Array.isArray(tasks) ? tasks : []);
+  fillList(root, projectList, ready && Array.isArray(projects) ? projects : []);
 }

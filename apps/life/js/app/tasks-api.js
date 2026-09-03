@@ -13,6 +13,14 @@ export function createTasksApi(fetchImpl = fetch) {
         throw httpError('Tasks request failed', response.status, payload?.error?.code ?? 'request_failed');
       }
       return payload.data?.tasks ?? [];
+    },
+    async listProjects() {
+      const response = await fetchImpl('/api/projects');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError('Tasks request failed', response.status, payload?.error?.code ?? 'request_failed');
+      }
+      return payload.data?.projects ?? [];
     }
   };
 }
