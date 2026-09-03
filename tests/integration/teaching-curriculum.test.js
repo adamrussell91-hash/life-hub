@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
+import { createClassHandler } from '../../netlify/functions/class.mjs';
 import { createCurriculumHandler } from '../../netlify/functions/curriculum.mjs';
+import { createLessonHandler } from '../../netlify/functions/lesson.mjs';
+import { createUnitHandler } from '../../netlify/functions/unit.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -93,4 +96,39 @@ test('curriculum lists teacher classes and marks published lessons', async () =>
   }]);
   assert.deepEqual(body.data.media.map(item => item.id), ['file-2']);
   assert.equal(body.data.schedule_anchor_date, '2026-08-12');
+});
+
+test('teacher record GETs use the Life session and stay read-only', async () => {
+  const store = memoryStore({
+    'classes/class-1': { id: 'class-1', title: 'English' },
+    'units/unit-1': { id: 'unit-1', title: 'Unit' },
+    'lessons/lesson-1': { id: 'lesson-1', title: 'Draft' }
+  });
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+
+  const classRes = await createClassHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/classes/class-1' })
+  );
+  const unitRes = await createUnitHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/units/unit-1' })
+  );
+  const lessonRes = await createLessonHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/lessons/lesson-1' })
+  );
+
+  assert.equal(classRes.status, 200);
+  assert.equal((await classRes.json()).data.title, 'English');
+  assert.equal(unitRes.status, 200);
+  assert.equal((await unitRes.json()).data.title, 'Unit');
+  assert.equal(lessonRes.status, 200);
+  assert.equal((await lessonRes.json()).data.title, 'Draft');
+
+  const anon = await createLessonHandler(deps)(
+    request({ cookie: false, url: 'https://api.adam-russell.com/api/lessons/lesson-1' })
+  );
+  assert.equal(anon.status, 401);
 });
