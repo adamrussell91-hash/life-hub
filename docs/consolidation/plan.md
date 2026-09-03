@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.15 — Search corpus, schedule expand, media upload, Clare, SPA retarget. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.16 — Full Clare dump parser, briefings, toolkits, mutations. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -189,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v4.15 | Corpus, schedule expand, upload, Clare, retarget | Slice 22 shipped as PR #78; this slice |
+| Plan v4.16 | Full Clare dump / brief / toolkit / mutations | This PR |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -438,9 +438,21 @@ Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 - Knowledge stays on `knowledge-api` until those handlers exist on `life-hub2`
 - Do **not** retire `arteaching-hub` / `artasks-hub`, rotate secrets, or bind R2
 
+### Slice 24 — Full Clare dump, briefings, toolkits, mutations (this slice)
+
+The Tasks Pages app already posts `dump` / `brief` / `apply_mutations` to `https://api.adam-russell.com`. Match that shape on `life-hub2`:
+
+- `parseBrainDump` — clause split, domains, dues (Sydney), notes, meta, duplicate follow-up
+- `assembleDumpResult` — proposals, questions, notes, shatter / time-map / open-loops toolkits
+- `buildClareBriefing` — morning sweep, tomorrow, weekly reset, high-stakes
+- `POST /api/clare` `apply_mutations` for task / project / map / page_blocks (no `repo_file` writes)
+- Life Tasks rail can dump and brief against the same handler
+- Offline parser only — no Anthropic judge, no protocol markdown editor
+- Do **not** retire `artasks-hub`, rotate secrets, or bind R2
+
 ## Next action
 
-Keep shipping. Next: Knowledge API fold (do not retarget Knowledge Pages until those handlers exist). Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**. After Pages rebuilds, smoke Teaching and Tasks against `api.adam-russell.com`.
+Keep shipping. Next: Knowledge API writes (pages-save, search, quiz) on `life-hub2` — do not retarget Knowledge Pages until those handlers exist. Then Tasks templates / stall. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**. After Pages rebuilds, smoke Teaching and Tasks Clare against `api.adam-russell.com`.
 
 ## Open questions (Adam)
 

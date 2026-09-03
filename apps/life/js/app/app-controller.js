@@ -1,7 +1,7 @@
 import { getSydneyDateKey } from '../core/time.js';
 import { renderHubSection } from '../shell/render-hub-sections.js';
 import { renderKnowledgeDashboard } from '../shell/render-knowledge.js';
-import { renderTasksDashboard } from '../shell/render-tasks.js';
+import { renderClareResult, renderTasksDashboard } from '../shell/render-tasks.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { renderTeachingDashboard } from '../shell/render-teaching.js';
 import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
@@ -149,7 +149,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'more') continue;
+    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'teaching' || target === 'knowledge' || target === 'tasks' || target === 'more') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -182,6 +182,15 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="central-node"]') ?? []) {
     bind(button, 'click', () => showSection('central-node'));
   }
+  for (const button of root.querySelectorAll?.('[data-section="teaching"]') ?? []) {
+    bind(button, 'click', () => showSection('teaching'));
+  }
+  for (const button of root.querySelectorAll?.('[data-section="knowledge"]') ?? []) {
+    bind(button, 'click', () => showSection('knowledge'));
+  }
+  for (const button of root.querySelectorAll?.('[data-section="tasks"]') ?? []) {
+    bind(button, 'click', () => showSection('tasks'));
+  }
   bind(root.querySelector('#more-nav-button'), 'click', () => openMoreSheet());
   bind(root.querySelector('#more-sheet-close'), 'click', () => closeMoreSheet());
   bind(root.querySelector('#more-sheet'), 'click', event => {
@@ -207,6 +216,11 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#central-node-audit-button'), 'click', () => {
     openCentralNodeAudit();
   });
+  bind(root.querySelector('#clare-dump-form'), 'submit', event => {
+    event.preventDefault?.();
+    void submitClareDump();
+  });
+  bind(root.querySelector('#clare-brief-button'), 'click', () => void submitClareBrief());
   bind(windowTarget, 'online', () => void handleOnline());
   bind(windowTarget, 'offline', () => handleOffline());
   bind(documentTarget, 'visibilitychange', () => void handleVisibilityChange());
@@ -756,6 +770,34 @@ export function createAppController(dependencies) {
       renderTasksDashboard(root, {
         status: error?.code === 'tasks_blobs_unbound' ? 'unbound' : 'error'
       });
+    }
+  }
+
+  function clareProtocol() {
+    const value = root.querySelector('#clare-dump-protocol')?.value;
+    return value || undefined;
+  }
+
+  async function submitClareDump() {
+    if (!tasksApi?.dumpWithClare) return;
+    const text = root.querySelector('#clare-dump-text')?.value ?? '';
+    renderClareResult(root, { status: 'loading' });
+    try {
+      const dump = await tasksApi.dumpWithClare({ text, protocol_id: clareProtocol() });
+      renderClareResult(root, { status: 'ready', dump });
+    } catch {
+      renderClareResult(root, { status: 'error' });
+    }
+  }
+
+  async function submitClareBrief() {
+    if (!tasksApi?.briefWithClare) return;
+    renderClareResult(root, { status: 'loading' });
+    try {
+      const briefing = await tasksApi.briefWithClare(clareProtocol() ?? 'morning-sweep');
+      renderClareResult(root, { status: 'ready', briefing });
+    } catch {
+      renderClareResult(root, { status: 'error' });
     }
   }
 

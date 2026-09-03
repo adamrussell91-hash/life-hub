@@ -1,3 +1,11 @@
+import { dumpVoiceLine } from './clare-dump.mjs';
+import {
+  buildOpenLoopsToolkit,
+  buildShatterToolkit,
+  buildTimeMapToolkit,
+  sortOpenLoops
+} from './clare-desk.mjs';
+
 export const CLARE_DOMAINS = new Set(['teaching', 'life', 'wedding', 'health', 'other']);
 export const CLARE_CALIBRATION_PREFIX = 'clare_calibration/';
 export const CLARE_CALIBRATIONS_INDEX = 'clare_calibration/_index';
@@ -199,10 +207,84 @@ export function backlogTitles(tasks) {
     .filter(Boolean);
 }
 
-export function parseDumpLines(text, domain) {
-  return String(text ?? '')
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean)
-    .map(title => ({ title, domain: domain || 'other', kind: 'task' }));
+function proposalFromDumpItem(item, frameworks, calibration, protocolId) {
+  const proposal = buildProposal(
+    {
+      title: item.title,
+      domain: item.domain,
+      priority: item.priority,
+      due_date: item.due_date,
+      parent_project_id: item.parent_project_id,
+      protocol_id: protocolId
+    },
+    frameworks,
+    calibration
+  );
+  return {
+    ...proposal,
+    dump_kind: item.kind,
+    question: item.question
+  };
+}
+
+function isActionableDump(item) {
+  return item.kind !== 'note' && item.kind !== 'meta' && item.actionable !== false;
+}
+
+export function assembleDumpResult(
+  items,
+  frameworks,
+  calibrationFor,
+  protocolId,
+  agent = 'clare'
+) {
+  const questions = [];
+  const notes = [];
+  let working = items;
+
+  if (protocolId === 'open-loops') {
+    const loops = sortOpenLoops(items);
+    working = loops.now;
+    for (const item of loops.later) notes.push(`Later: ${item.title}`);
+    for (const item of loops.trash) notes.push(`Trash: ${item.title}`);
+  }
+
+  if (protocolId === 'shatter-start') {
+    const first = working.find(item => isActionableDump(item)) ?? working[0];
+    working = first ? [first] : [];
+  }
+
+  const proposals = [];
+  for (const item of working) {
+    if (item.kind === 'meta' || !item.actionable) continue;
+    if (item.kind === 'note') {
+      notes.push(item.title);
+      if (item.question) questions.push(item.question);
+      continue;
+    }
+    if (item.existing_title) {
+      if (item.question) questions.push(item.question);
+      continue;
+    }
+    proposals.push(proposalFromDumpItem(item, frameworks, calibrationFor(item.domain), protocolId));
+    if (item.question) questions.push(item.question);
+  }
+
+  let toolkit = null;
+  const focus = items.find(item => isActionableDump(item)) ?? items[0];
+  if (protocolId === 'shatter-start' && focus) toolkit = buildShatterToolkit(focus);
+  if (protocolId === 'time-map' && focus) {
+    toolkit = buildTimeMapToolkit(focus, proposals[0]?.proposed_minutes ?? 45);
+  }
+  if (protocolId === 'open-loops') toolkit = buildOpenLoopsToolkit(items);
+
+  return {
+    voice: dumpVoiceLine(items),
+    proposals,
+    questions,
+    notes,
+    toolkit,
+    mutations: [],
+    agent
+  };
 }
