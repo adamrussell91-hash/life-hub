@@ -13,6 +13,14 @@ export function createKnowledgeApi(fetchImpl = fetch) {
         throw httpError('Knowledge request failed', response.status, payload?.error?.code ?? 'request_failed');
       }
       return payload.data ?? [];
+    },
+    async searchPages(query) {
+      const response = await fetchImpl(`/api/knowledge/search?q=${encodeURIComponent(query)}`);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError('Knowledge request failed', response.status, payload?.error?.code ?? 'request_failed');
+      }
+      return payload.data?.hits ?? [];
     }
   };
 }

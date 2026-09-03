@@ -4,11 +4,11 @@ import {
   okResponse,
   withCors
 } from './_shared/http.mjs';
-import { listKnowledgePages, saveKnowledgePage } from './_shared/knowledge-data.mjs';
+import { getQuizStore, saveQuizRecord } from './_shared/knowledge-data.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 
-export const config = { path: '/api/knowledge/pages' };
+export const config = { path: '/api/knowledge/quiz' };
 
 function knowledgeError(error) {
   const status = Number.isInteger(error?.status) ? error.status : 502;
@@ -23,13 +23,12 @@ function knowledgeError(error) {
   return errorResponse(status, code, message, status >= 500);
 }
 
-export function createKnowledgePagesHandler(deps = {}) {
+export function createKnowledgeQuizHandler(deps = {}) {
   return createSessionOriginHandler(async (request, context) => {
     const { env } = context;
     if (request.method === 'GET') {
       try {
-        const pages = await listKnowledgePages({ env, fetchImpl: deps.fetchImpl });
-        return withCors(okResponse(200, pages), request, env);
+        return withCors(okResponse(200, await getQuizStore({ env, fetchImpl: deps.fetchImpl })), request, env);
       } catch (error) {
         return withCors(knowledgeError(error), request, env);
       }
@@ -40,7 +39,7 @@ export function createKnowledgePagesHandler(deps = {}) {
     const parsed = await readJsonObject(request);
     if (parsed.error) return withCors(parsed.error, request, env);
     try {
-      const saved = await saveKnowledgePage(parsed.value, { env, fetchImpl: deps.fetchImpl });
+      const saved = await saveQuizRecord(parsed.value, { env, fetchImpl: deps.fetchImpl });
       return withCors(okResponse(200, saved), request, env);
     } catch (error) {
       return withCors(knowledgeError(error), request, env);
@@ -48,4 +47,4 @@ export function createKnowledgePagesHandler(deps = {}) {
   }, deps);
 }
 
-export default createKnowledgePagesHandler();
+export default createKnowledgeQuizHandler();

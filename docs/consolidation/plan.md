@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.16 — Full Clare dump parser, briefings, toolkits, mutations. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.17 — Knowledge writes, Tasks templates/stall, calendar sources live. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -189,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v4.16 | Full Clare dump / brief / toolkit / mutations | This PR |
+| Plan v4.17 | Knowledge writes, templates/stall, calendar live | After Clare PR #81 |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -230,6 +230,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Teaching scheduled-lesson create | **shipped** | PR #77 merged 2026-09-03 |
 | Teaching calendar live | **shipped** | PR #78 merged 2026-09-03 |
 | Teaching search corpus + schedule expand + media upload + Clare + SPA retarget | **shipped** | PR #79 merged 2026-09-03; Teaching Pages PR teaching-hub#27; Tasks Pages PR Tasks-Hub#105 |
+| Full Clare dump / brief / toolkit / mutations | **shipped** | PR #81 merged 2026-09-03 |
 | Netlify retarget | **started** | Teaching + Tasks Pages point at `api.adam-russell.com`; `arteaching-hub` / `artasks-hub` stay live |
 
 ### Slice 01 — what shipped
@@ -438,7 +439,7 @@ Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 - Knowledge stays on `knowledge-api` until those handlers exist on `life-hub2`
 - Do **not** retire `arteaching-hub` / `artasks-hub`, rotate secrets, or bind R2
 
-### Slice 24 — Full Clare dump, briefings, toolkits, mutations (this slice)
+### Slice 24 — Full Clare dump, briefings, toolkits, mutations (shipped, PR #81)
 
 The Tasks Pages app already posts `dump` / `brief` / `apply_mutations` to `https://api.adam-russell.com`. Match that shape on `life-hub2`:
 
@@ -450,9 +451,18 @@ The Tasks Pages app already posts `dump` / `brief` / `apply_mutations` to `https
 - Offline parser only — no Anthropic judge, no protocol markdown editor
 - Do **not** retire `artasks-hub`, rotate secrets, or bind R2
 
+### Slice 25 — Knowledge writes, Tasks templates/stall, calendar live (this slice)
+
+- `POST /api/knowledge/pages` saves a page + upserts `manifest.json` on `knowledge-hub-data`
+- `GET /api/knowledge/search?q=` ranks titles, excerpts, tags, origins
+- `GET/POST /api/knowledge/quiz` and `GET /api/knowledge/quiz/:pageId`
+- `GET/POST /api/templates` and `GET/POST /api/stall` on the Tasks store
+- Life Calendar merges Knowledge page dates and Tasks due dates; those sources marked `live`
+- Do not retarget Knowledge Pages (paths are namespaced). No R2, no secret rotation, no old-site retire
+
 ## Next action
 
-Keep shipping. Next: Knowledge API writes (pages-save, search, quiz) on `life-hub2` — do not retarget Knowledge Pages until those handlers exist. Then Tasks templates / stall. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**. After Pages rebuilds, smoke Teaching and Tasks Clare against `api.adam-russell.com`.
+Keep shipping. Next: retarget Knowledge Pages once it can call `/api/knowledge/*`, or fold Clementine/capture/attachments. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**. Smoke Teaching and Tasks Clare against `api.adam-russell.com`.
 
 ## Open questions (Adam)
 
