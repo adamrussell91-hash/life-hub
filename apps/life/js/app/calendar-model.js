@@ -59,6 +59,8 @@ export function eventDetailTitle(record, body = '') {
       return record.title || 'Medical';
     case 'sleep':
       return 'Sleep';
+    case 'scheduled_lesson':
+      return record.title || 'Lesson';
     default:
       return record.type || 'Event';
   }
@@ -116,6 +118,8 @@ export function eventBrief(event) {
     }
     case 'sleep':
       return record.duration_h != null ? `${record.duration_h} h sleep` : '';
+    case 'scheduled_lesson':
+      return record.delivery_status ? `Teaching · ${record.delivery_status}` : 'Teaching';
     case 'heart':
       return record.resting_hr != null ? `RHR ${record.resting_hr}` : '';
     default:

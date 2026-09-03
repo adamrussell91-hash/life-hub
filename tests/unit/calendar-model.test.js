@@ -51,6 +51,7 @@ test('eventDetailTitle covers core types', () => {
   assert.equal(eventDetailTitle({ type: 'workout', title: 'Pump' }), 'Pump');
   assert.equal(eventDetailTitle({ type: 'skincare', routine: 'pm' }), 'Skincare · PM');
   assert.equal(eventDetailTitle({ type: 'skincare', routine: 'pm' }, 'Procedure: Laser.'), 'Laser');
+  assert.equal(eventDetailTitle({ type: 'scheduled_lesson', title: 'Working memory' }), 'Working memory');
 });
 
 test('eventsForDate returns empty for quiet days', () => {
@@ -93,6 +94,10 @@ test('eventBrief summarises each domain in one line', () => {
   assert.equal(
     eventBrief({ record: { type: 'sleep', duration_h: 7.5 } }),
     '7.5 h sleep'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'scheduled_lesson', delivery_status: 'planned' } }),
+    'Teaching · planned'
   );
 });
 
