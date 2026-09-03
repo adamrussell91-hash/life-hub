@@ -1031,6 +1031,29 @@
             <p class="metric-caption" data-tasks="status" hidden></p>
             <ul id="tasks-item-list" hidden></ul>
             <ul id="tasks-project-list" hidden></ul>
+            <form id="clare-dump-form">
+              <label class="metric-caption" for="clare-dump-text">Dump for Clare</label>
+              <textarea id="clare-dump-text" name="text" rows="4" required></textarea>
+              <label class="metric-caption" for="clare-dump-protocol">Protocol</label>
+              <select id="clare-dump-protocol">
+                <option value="">None</option>
+                <option value="morning-sweep">Morning sweep</option>
+                <option value="tomorrow-setup">Tomorrow</option>
+                <option value="weekly-reset">Weekly reset</option>
+                <option value="high-stakes">High-stakes</option>
+                <option value="shrink-first-step">Shrink first move</option>
+                <option value="shatter-start">Shatter this</option>
+                <option value="time-map">Time map</option>
+                <option value="open-loops">Open loops</option>
+              </select>
+              <div>
+                <button class="btn btn--primary" type="submit">Dump</button>
+                <button class="btn btn--secondary" type="button" id="clare-brief-button">Brief</button>
+              </div>
+            </form>
+            <p class="metric-caption" id="clare-voice" hidden></p>
+            <ul id="clare-proposals" hidden></ul>
+            <p class="metric-caption" id="clare-briefing" hidden></p>
           </article>
         </section>
       </main>

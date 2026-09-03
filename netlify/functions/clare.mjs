@@ -6,6 +6,7 @@ import {
 } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import {
+  assembleDumpResult,
   backlogTitles,
   buildProposal,
   CLARE_CALIBRATION_PREFIX,
@@ -15,10 +16,22 @@ import {
   DEFAULT_FRAMEWORKS,
   emptyCalibration,
   FRAMEWORK_PREFIX,
-  parseDumpLines,
   recordActualSample,
   recordNegotiationSample
 } from './_shared/clare.mjs';
+import { HUB_TZ } from './_shared/clare-dates.mjs';
+import { buildClareBriefing } from './_shared/clare-desk.mjs';
+import { parseBrainDump, resolveDuplicateFollowUp } from './_shared/clare-dump.mjs';
+import {
+  applyRecordPatch,
+  mutationLabel,
+  parseAgentMutations
+} from './_shared/clare-mutations.mjs';
+import {
+  CLARE_ADHD_PROTOCOLS,
+  CLARE_PROTOCOLS,
+  readProtocolId
+} from './_shared/clare-protocols.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import {
   defaultGetTasksStore,
@@ -33,6 +46,9 @@ import {
   writeIndex,
   writeTaskIndex
 } from './_shared/tasks-blobs.mjs';
+
+const PROJECT_PREFIX = 'projects/';
+const MAP_PREFIX = 'maps/';
 
 export const config = { path: '/api/clare' };
 
@@ -63,6 +79,7 @@ function createTaskFromProposal(proposal, acceptedMinutes, frameworkId, timestam
     status: 'open',
     priority: proposal.priority ?? 'medium',
     parent_project_id: proposal.parent_project_id ?? null,
+    due_date: proposal.due_date ?? null,
     framework_used: frameworkId ?? proposal.framework_id,
     estimated_duration: acceptedMinutes,
     tags: proposal.dump_kind === 'communication' ? ['clare', 'comms'] : ['clare'],
@@ -132,7 +149,11 @@ export function createClareHandler(deps = {}) {
           );
         }
         const calibrations = await listJSON(store, CLARE_CALIBRATION_PREFIX);
-        return withCors(okResponse(200, { calibrations }), request, env);
+        return withCors(okResponse(200, {
+          calibrations,
+          protocols: CLARE_PROTOCOLS,
+          adhd_protocols: CLARE_ADHD_PROTOCOLS
+        }), request, env);
       }
 
       if (request.method !== 'POST') {
@@ -167,7 +188,7 @@ export function createClareHandler(deps = {}) {
             priority: typeof body.priority === 'string' ? body.priority : 'medium',
             due_date: body.due_date ?? null,
             parent_project_id: typeof body.parent_project_id === 'string' ? body.parent_project_id : null,
-            protocol_id: typeof body.protocol_id === 'string' ? body.protocol_id : undefined,
+            protocol_id: readProtocolId(body.protocol_id),
             backlog_titles: backlogTitles(tasks)
           },
           frameworks,
@@ -178,32 +199,110 @@ export function createClareHandler(deps = {}) {
 
       if (action === 'brief') {
         const tasks = await listJSON(store, TASK_PREFIX);
-        const open = tasks.filter(task => task.status === 'open' || task.status === 'in_progress' || task.status === 'deferred');
-        return withCors(okResponse(200, {
-          protocol_id: body.protocol_id ?? null,
-          open_count: open.length,
-          tasks: open.slice(0, 12).map(task => ({ id: task.id, title: task.title, domain: task.domain, status: task.status }))
-        }), request, env);
+        return withCors(
+          okResponse(200, buildClareBriefing(tasks, readProtocolId(body.protocol_id), new Date(nowIso))),
+          request,
+          env
+        );
       }
 
       if (action === 'dump') {
         const text = typeof body.text === 'string' ? body.text : '';
-        const domain = CLARE_DOMAINS.has(body.domain) ? body.domain : 'other';
-        const [frameworks, calibration] = await Promise.all([
+        const domain = CLARE_DOMAINS.has(body.domain) ? body.domain : 'teaching';
+        const protocolId = readProtocolId(body.protocol_id);
+        const agent = typeof body.agent_slug === 'string' && body.agent_slug ? body.agent_slug : 'clare';
+        const followUp = resolveDuplicateFollowUp(text, body.recent_thread);
+        if (followUp?.action === 'leave') {
+          return withCors(okResponse(200, {
+            voice: `Leaving “${followUp.title}” as is.`,
+            proposals: [],
+            questions: [],
+            notes: [],
+            toolkit: null,
+            mutations: [],
+            agent
+          }), request, env);
+        }
+        const [frameworks, tasks, projects, calibrations] = await Promise.all([
           loadFrameworks(store),
-          loadCalibration(store, domain, nowIso)
+          listJSON(store, TASK_PREFIX),
+          listJSON(store, PROJECT_PREFIX),
+          listJSON(store, CLARE_CALIBRATION_PREFIX)
         ]);
-        const proposals = parseDumpLines(text, domain).map(item => buildProposal(
-          { title: item.title, domain: item.domain },
+        const byDomain = new Map(calibrations.map(item => [item.domain, item]));
+        const items = parseBrainDump(followUp?.action === 'make_new' ? followUp.title : text, {
+          now: new Date(nowIso),
+          timezone: HUB_TZ,
+          preferredDomain: domain,
+          tasks,
+          projects,
+          forceNewTitles: followUp?.action === 'make_new' || Boolean(body.force_new_titles)
+        });
+        return withCors(okResponse(200, assembleDumpResult(
+          items,
           frameworks,
-          calibration.sample_count > 0 ? calibration : null
-        ));
-        return withCors(okResponse(200, {
-          voice: proposals.length ? 'I pulled these out of the dump.' : 'Nothing to turn into a task yet.',
-          proposals,
-          questions: [],
-          notes: []
-        }), request, env);
+          itemDomain => {
+            const calibration = byDomain.get(itemDomain);
+            return calibration && calibration.sample_count > 0 ? calibration : null;
+          },
+          protocolId,
+          agent
+        )), request, env);
+      }
+
+      if (action === 'apply_mutations') {
+        const mutations = parseAgentMutations(body.mutations);
+        const results = [];
+        for (const mutation of mutations) {
+          try {
+            if (mutation.kind === 'task_update') {
+              const existing = await getJSON(store, taskKey(mutation.task_id));
+              if (!existing || typeof existing !== 'object') {
+                results.push({ summary: mutation.summary, ok: false, note: 'Task not found' });
+                continue;
+              }
+              await setJSON(store, taskKey(mutation.task_id), applyRecordPatch(existing, mutation.patch, nowIso));
+              results.push({ summary: mutation.summary, ok: true, note: mutationLabel(mutation) });
+              continue;
+            }
+            if (mutation.kind === 'project_update' || (mutation.kind === 'page_blocks' && mutation.entity_type === 'project')) {
+              const id = mutation.project_id ?? mutation.entity_id;
+              const existing = await getJSON(store, `${PROJECT_PREFIX}${id}`);
+              if (!existing || typeof existing !== 'object') {
+                results.push({ summary: mutation.summary, ok: false, note: 'Project not found' });
+                continue;
+              }
+              const patch = mutation.kind === 'page_blocks' ? { page_blocks: mutation.page_blocks } : mutation.patch;
+              await setJSON(store, `${PROJECT_PREFIX}${id}`, applyRecordPatch(existing, patch, nowIso));
+              results.push({ summary: mutation.summary, ok: true, note: mutationLabel(mutation) });
+              continue;
+            }
+            if (mutation.kind === 'page_blocks') {
+              const existing = await getJSON(store, taskKey(mutation.entity_id));
+              if (!existing || typeof existing !== 'object') {
+                results.push({ summary: mutation.summary, ok: false, note: 'Task not found' });
+                continue;
+              }
+              await setJSON(store, taskKey(mutation.entity_id), applyRecordPatch(existing, { page_blocks: mutation.page_blocks }, nowIso));
+              results.push({ summary: mutation.summary, ok: true, note: mutationLabel(mutation) });
+              continue;
+            }
+            if (mutation.kind === 'map_update') {
+              const existing = await getJSON(store, `${MAP_PREFIX}${mutation.map_id}`);
+              if (!existing || typeof existing !== 'object') {
+                results.push({ summary: mutation.summary, ok: false, note: 'Map not found' });
+                continue;
+              }
+              await setJSON(store, `${MAP_PREFIX}${mutation.map_id}`, applyRecordPatch(existing, mutation.patch, nowIso));
+              results.push({ summary: mutation.summary, ok: true, note: mutationLabel(mutation) });
+              continue;
+            }
+            results.push({ summary: mutation.summary, ok: false, note: 'Unsupported mutation' });
+          } catch (error) {
+            results.push({ summary: mutation.summary, ok: false, note: error.message });
+          }
+        }
+        return withCors(okResponse(200, { results }), request, env);
       }
 
       if (action === 'accept') {

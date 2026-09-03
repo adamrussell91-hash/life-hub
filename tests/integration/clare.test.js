@@ -81,7 +81,65 @@ test('Clare propose and accept stay behind the Life session and write Tasks', as
     body: { action: 'dump', text: 'Email parents\nWrite comment bank', domain: 'teaching' }
   }));
   assert.equal(dumped.status, 200);
-  assert.equal((await dumped.json()).data.proposals.length, 2);
+  const dump = (await dumped.json()).data;
+  assert.equal(dump.proposals.length, 2);
+  assert.ok(dump.voice);
+  assert.ok(Array.isArray(dump.questions));
+  assert.equal(dump.toolkit, null);
+  assert.equal(dump.agent, 'clare');
+
+  const shattered = await handler(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/clare',
+    body: {
+      action: 'dump',
+      text: 'Mark the Year 12 papers',
+      domain: 'teaching',
+      protocol_id: 'shatter-start'
+    }
+  }));
+  assert.equal(shattered.status, 200);
+  const shatter = (await shattered.json()).data;
+  assert.equal(shatter.toolkit.title, 'Task paralysis shatterer');
+  assert.equal(shatter.proposals[0].protocol_id, 'shatter-start');
+
+  const briefed = await handler(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/clare',
+    body: { action: 'brief', protocol_id: 'morning-sweep' }
+  }));
+  assert.equal(briefed.status, 200);
+  const briefing = (await briefed.json()).data;
+  assert.equal(briefing.protocol_id, 'morning-sweep');
+  assert.ok(briefing.lead);
+  assert.equal(briefing.closer, 'That is your day. Dump away.');
+
+  await store.setJSON('tasks/task_existing', {
+    id: 'task_existing',
+    title: 'Move the florist quote',
+    status: 'open',
+    domain: 'wedding',
+    due_date: '2026-08-10'
+  });
+  const mutated = await handler(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/clare',
+    body: {
+      action: 'apply_mutations',
+      mutations: [{
+        kind: 'task_update',
+        summary: 'Push the florist',
+        task_id: 'task_existing',
+        patch: { due_date: '2026-08-12', title: 'hijack', schema_version: 99 }
+      }]
+    }
+  }));
+  assert.equal(mutated.status, 200);
+  const mutationResult = (await mutated.json()).data.results[0];
+  assert.equal(mutationResult.ok, true);
+  const updated = await store.get('tasks/task_existing', { type: 'json' });
+  assert.equal(updated.due_date, '2026-08-12');
+  assert.equal(updated.schema_version, 1);
 
   const anon = await handler(request({
     cookie: false,
