@@ -12,6 +12,8 @@ import { createSubjectsHandler } from '../../netlify/functions/subjects.mjs';
 import { createUnitHandler } from '../../netlify/functions/unit.mjs';
 import { createUnitsHandler } from '../../netlify/functions/units.mjs';
 import { createYearHandler } from '../../netlify/functions/year.mjs';
+import { createLessonPublishHandler } from '../../netlify/functions/lesson-publish.mjs';
+import { createSearchHandler } from '../../netlify/functions/search.mjs';
 import { createYearsHandler } from '../../netlify/functions/years.mjs';
 
 const SECRET = 's'.repeat(32);
@@ -322,4 +324,55 @@ test('year and subject collections list and create behind the Life session', asy
     })
   );
   assert.equal(conflict.status, 409);
+});
+
+test('thin search and lesson publish stay behind the Life session', async () => {
+  const store = memoryStore({
+    'lessons/lesson_1': {
+      id: 'lesson_1',
+      type: 'lesson',
+      title: 'Working memory',
+      unit_id: 'unit_1',
+      blocks: [
+        { id: 't', visibility: 'teacher_only', block_type: 'rich_text', content: { html: 'marking notes' } },
+        { id: 's', visibility: 'student_teacher', block_type: 'rich_text', content: { html: '<p>ok</p><script>x</script>' } }
+      ]
+    },
+    'units/unit_1': { id: 'unit_1', type: 'unit', title: 'Cognition' }
+  });
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+
+  const found = await createSearchHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/search?q=memory' })
+  );
+  assert.equal(found.status, 200);
+  assert.deepEqual((await found.json()).data.hits, [
+    { type: 'lesson', id: 'lesson_1', title: 'Working memory', snippet: 'Working memory' }
+  ]);
+
+  const published = await createLessonPublishHandler(deps)(
+    request({
+      method: 'POST',
+      origin: 'https://teaching-hub.adam-russell.com',
+      url: 'https://api.adam-russell.com/api/lessons/lesson_1/publish'
+    })
+  );
+  assert.equal(published.status, 200);
+  assert.equal((await published.json()).data.student_path, '/s/lessons/lesson_1');
+
+  const snapshot = await store.get('published/lessons/lesson_1', { type: 'json' });
+  assert.equal(snapshot.lesson_id, 'lesson_1');
+  assert.equal(snapshot.blocks.length, 1);
+  assert.equal(snapshot.blocks[0].id, 's');
+  assert.doesNotMatch(snapshot.blocks[0].content.html, /script/i);
+  assert.equal((await store.get('lessons/lesson_1', { type: 'json' })).published_at, snapshot.published_at);
+
+  const anon = await createSearchHandler(deps)(
+    request({ cookie: false, url: 'https://api.adam-russell.com/api/search?q=memory' })
+  );
+  assert.equal(anon.status, 401);
 });
