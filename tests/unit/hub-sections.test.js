@@ -34,4 +34,5 @@ test('Life shell mounts hub dashboards and rail destinations', async () => {
   assert.match(html, /data-hub-open="knowledge"/);
   assert.match(html, /data-hub-open="tasks"/);
   assert.doesNotMatch(html, /teaching-api|knowledge-api|tasks-api/i);
+  assert.match(html, /id="clare-dump-form"/);
 });
