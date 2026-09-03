@@ -7,6 +7,8 @@ import { createCurriculumHandler } from '../../netlify/functions/curriculum.mjs'
 import { createLessonHandler } from '../../netlify/functions/lesson.mjs';
 import { createMediaHandler } from '../../netlify/functions/media.mjs';
 import { createMediaItemHandler } from '../../netlify/functions/media-item.mjs';
+import { createMediaUploadHandler } from '../../netlify/functions/media-upload.mjs';
+import { createScheduleUnitHandler } from '../../netlify/functions/schedule-unit.mjs';
 import { createOutcomesHandler } from '../../netlify/functions/outcomes.mjs';
 import { createLessonsHandler } from '../../netlify/functions/lessons.mjs';
 import { createScheduledLessonHandler } from '../../netlify/functions/scheduled-lesson.mjs';
@@ -43,6 +45,10 @@ function memoryStore(entries = {}) {
       map.set(key, value);
     },
     async set(key, value) {
+      if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+        map.set(key, value);
+        return;
+      }
       map.set(key, typeof value === 'string' ? JSON.parse(value) : value);
     },
     async delete(key) {
@@ -354,9 +360,15 @@ test('thin search and lesson publish stay behind the Life session', async () => 
     request({ url: 'https://api.adam-russell.com/api/search?q=memory' })
   );
   assert.equal(found.status, 200);
-  assert.deepEqual((await found.json()).data.hits, [
-    { type: 'lesson', id: 'lesson_1', title: 'Working memory', snippet: 'Working memory' }
-  ]);
+  const titleHits = (await found.json()).data.hits;
+  assert.equal(titleHits[0].id, 'lesson_1');
+  assert.equal(titleHits[0].match, 'title');
+
+  const body = await createSearchHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/search?q=marking' })
+  );
+  assert.equal(body.status, 200);
+  assert.equal((await body.json()).data.hits.some(hit => hit.match === 'body' && hit.id === 'lesson_1'), true);
 
   const published = await createLessonPublishHandler(deps)(
     request({
@@ -521,4 +533,78 @@ test('scheduled-lesson collection creates a dated row behind the Life session', 
     })
   );
   assert.equal(anon.status, 401);
+});
+
+test('schedule-unit expands a unit across meeting days behind the Life session', async () => {
+  const store = memoryStore({
+    'classes/class_1': {
+      id: 'class_1',
+      type: 'class',
+      title: '11 Psych A',
+      subject_id: 'subject_1',
+      active_unit_ids: []
+    },
+    'units/unit_1': {
+      id: 'unit_1',
+      type: 'unit',
+      title: 'Cognition',
+      subject_id: 'subject_1',
+      lesson_ids: ['lesson_1', 'lesson_2']
+    }
+  });
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+  const expanded = await createScheduleUnitHandler(deps)(
+    request({
+      method: 'POST',
+      origin: 'https://teaching-hub.adam-russell.com',
+      url: 'https://api.adam-russell.com/api/classes/class_1/schedule-unit',
+      body: { unit_id: 'unit_1', start_date: '2026-08-10', meeting_days: [1, 3] }
+    })
+  );
+  assert.equal(expanded.status, 200);
+  const payload = (await expanded.json()).data;
+  assert.equal(payload.scheduled_lessons.length, 2);
+  assert.equal(payload.scheduled_lessons[0].date, '2026-08-10');
+  assert.equal(payload.class.active_unit_ids[0], 'unit_1');
+
+  const again = await createScheduleUnitHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/classes/class_1/schedule-unit',
+      body: { unit_id: 'unit_1', start_date: '2026-08-10', meeting_days: [1, 3] }
+    })
+  );
+  assert.equal(again.status, 400);
+});
+
+test('media upload writes a public file behind the Life session', async () => {
+  const store = memoryStore();
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+  const form = new FormData();
+  form.set('file', new File(['hello'], 'notes.txt', { type: 'text/plain' }));
+  form.set('title', 'Lesson notes');
+  const uploaded = await createMediaUploadHandler(deps)(new Request(
+    'https://api.adam-russell.com/api/media/upload',
+    {
+      method: 'POST',
+      headers: {
+        cookie: `life_hub_session=${session}`,
+        origin: 'https://teaching-hub.adam-russell.com'
+      },
+      body: form
+    }
+  ));
+  assert.equal(uploaded.status, 201);
+  const media = (await uploaded.json()).data;
+  assert.match(media.id, /^media_/);
+  assert.equal(media.provider, 'direct');
+  assert.ok(await store.get(`media_files/${media.id}`));
 });

@@ -7,6 +7,7 @@ import {
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import {
   CLASS_PREFIX,
+  COMPOSITION_PREFIX,
   DRAFT_LESSON_PREFIX,
   OUTCOME_PREFIX,
   SUBJECT_PREFIX,
@@ -14,11 +15,15 @@ import {
   YEAR_PREFIX,
   listJSON
 } from './_shared/teaching-blobs.mjs';
-import { searchTeachingRecords } from './_shared/teaching-search.mjs';
+import {
+  mergeSearchHits,
+  runContentSearch,
+  searchTeachingRecords
+} from './_shared/teaching-search.mjs';
 
 export const config = { path: '/api/search' };
 
-const CORPUS = [
+const TITLE_CORPUS = [
   { prefix: DRAFT_LESSON_PREFIX, type: 'lesson' },
   { prefix: UNIT_PREFIX, type: 'unit' },
   { prefix: CLASS_PREFIX, type: 'class' },
@@ -35,10 +40,23 @@ export function createSearchHandler(deps = {}) {
     }
 
     const q = new URL(request.url).searchParams.get('q') ?? '';
-    const groups = await Promise.all(
-      CORPUS.map(async ({ prefix, type }) => searchTeachingRecords(q, await listJSON(store, prefix), type))
-    );
-    return withCors(okResponse(200, { hits: groups.flat() }), request, env);
+    const [lessons, units, compositions, ...titleGroups] = await Promise.all([
+      listJSON(store, DRAFT_LESSON_PREFIX),
+      listJSON(store, UNIT_PREFIX),
+      listJSON(store, COMPOSITION_PREFIX),
+      ...TITLE_CORPUS.map(({ prefix, type }) =>
+        listJSON(store, prefix).then(records => searchTeachingRecords(q, records, type))
+      )
+    ]);
+
+    const titleHits = titleGroups.flat();
+    const activeCompositions = compositions.filter(item => item.status === 'active' || !item.status);
+    const bodyHits = runContentSearch(q, {
+      lessons,
+      units,
+      compositions: activeCompositions
+    });
+    return withCors(okResponse(200, { hits: mergeSearchHits(titleHits, bodyHits) }), request, env);
   }, deps);
 }
 
