@@ -14,10 +14,14 @@ test('Teaching mount keeps the public Pages origin and student prefix', () => {
   assert.equal(teaching.studentPublicPrefix, '/s/');
 });
 
-test('Knowledge and Tasks mounts have no API origins yet', () => {
-  for (const section of listHubSections().filter(item => item.id !== 'teaching')) {
-    assert.equal(section.origin, null);
-  }
+test('Knowledge mount links to the existing Pages origin', () => {
+  const knowledge = listHubSections().find(section => section.id === 'knowledge');
+  assert.equal(knowledge.origin, 'https://knowledge-hub.adam-russell.com');
+});
+
+test('Tasks mount has no API origin yet', () => {
+  const tasks = listHubSections().find(section => section.id === 'tasks');
+  assert.equal(tasks.origin, null);
 });
 
 test('Life shell mounts hub dashboards and rail destinations', async () => {
@@ -27,5 +31,6 @@ test('Life shell mounts hub dashboards and rail destinations', async () => {
     assert.match(html, new RegExp(`id="${id}-dashboard"`));
   }
   assert.match(html, /data-hub-open="teaching"/);
+  assert.match(html, /data-hub-open="knowledge"/);
   assert.doesNotMatch(html, /teaching-api|knowledge-api|tasks-api/i);
 });

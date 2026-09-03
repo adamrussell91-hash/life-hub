@@ -10,7 +10,7 @@ export const HUB_SECTIONS = [
     id: 'knowledge',
     title: 'Knowledge',
     eyebrow: 'Archive and research',
-    origin: null,
+    origin: 'https://knowledge-hub.adam-russell.com',
     studentPublicPrefix: null
   },
   {

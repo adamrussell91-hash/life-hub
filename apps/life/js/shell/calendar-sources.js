@@ -15,6 +15,12 @@ export const CALENDAR_SOURCES = [
     label: 'Teaching',
     kind: 'scheduled-lessons',
     status: 'pending'
+  },
+  {
+    id: 'knowledge',
+    label: 'Knowledge',
+    kind: 'archive',
+    status: 'pending'
   }
 ];
 
