@@ -1,10 +1,10 @@
-import { createTeachingRecordGetHandler } from './_shared/teaching-record-get.mjs';
+import { createTeachingRecordHandler } from './_shared/teaching-record-get.mjs';
 import { scheduledLessonKey } from './_shared/teaching-blobs.mjs';
 
 export const config = { path: '/api/scheduled-lessons/:id' };
 
 export function createScheduledLessonHandler(deps = {}) {
-  return createTeachingRecordGetHandler({
+  return createTeachingRecordHandler({
     keyFor: scheduledLessonKey,
     notFound: 'Scheduled lesson not found'
   }, deps);

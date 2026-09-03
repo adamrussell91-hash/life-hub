@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.4 — Knowledge origin merged (PR #65). This slice: Tasks Pages origin + more Teaching GET reads. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.5 — Teaching writes + Knowledge pages API. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -189,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v4.4 | Tasks origin + Teaching schedule/year/subject GETs | Slice 11 merged 2026-09-03 as PR #65 |
+| Plan v4.5 | Teaching writes + Knowledge pages API | Slice 12 shipped as PR #66; this slice |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -217,7 +217,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Teaching public handlers | **shipped** | PR #63 merged 2026-09-03 |
 | Teaching operator curriculum | **shipped** | PR #64 merged 2026-09-03 |
 | Knowledge origin + mount | **shipped** | PR #65 merged 2026-09-03 |
-| Tasks origin + Teaching reads | in progress | Slice 12 — Tasks Pages CORS + year/subject/schedule GET |
+| Tasks origin + Teaching reads | **shipped** | PR #66 merged 2026-09-03 |
+| Teaching writes + Knowledge pages | in progress | Slice 13 — operator writes + `knowledge-hub-data` reads |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -319,17 +320,35 @@ Adam-only Teaching read path on the umbrella API, using the existing Life sessio
 - Calendar names Knowledge as `pending` (no API host strings in the registry)
 - Do **not** copy Knowledge Functions, R2/Worker bindings, or a second passphrase
 
-### Slice 12 — Tasks origin + Teaching GET reads (this slice)
+### Slice 12 — Tasks origin + Teaching GET reads (shipped, PR #66)
 
 - CORS allow-list adds Tasks Pages (`https://tasks-hub.adam-russell.com`), exact-match only
 - Tasks rail links out to that site; `artasks-hub` and `TASKS_HUB_PASSPHRASE_HASH` stay put
 - Calendar names Tasks as `pending`
 - Teaching operator GETs: `/api/years/:id`, `/api/subjects/:id`, `/api/scheduled-lessons/:id` (503 if Blobs unbound)
-- Do **not** copy Tasks Functions, Teaching writes, or rotate secrets
+
+### Slice 13 — Teaching writes + Knowledge pages (this slice)
+
+Teaching operator writes on `life-hub2`, still behind the Life session:
+
+- PUT/PATCH/DELETE on class, unit, lesson, year, subject, scheduled-lesson
+- POST `/api/classes`, `/api/units`, `/api/lessons`
+- CORS methods include PUT/PATCH/DELETE
+- 503 `blobs_unbound` if Teaching Blobs is missing
+- No Zod/version/lifecycle port; no `arteaching-hub` retire
+
+Knowledge pages API on the Life session, R2 left alone:
+
+- `GET /api/knowledge/pages` and `GET /api/knowledge/pages/:id`
+- Reads `knowledge-hub-data` only — never `GITHUB_REPOSITORY` / `life-hub-data`
+- Token reuses existing `GITHUB_TOKEN`; 503 `knowledge_repo_unbound` if missing
+- Session+origin gate does **not** load Teaching Blobs
+- Life Knowledge rail lists titles when bound
+- Do **not** bind R2, copy Knowledge auth, or rotate secrets
 
 ## Next action
 
-Keep shipping. Bind `teaching-hub-content` on `life-hub2` when ready. Next: Teaching writes or Knowledge API behind the Life session (R2 left alone).
+Keep shipping. Bind `teaching-hub-content` on `life-hub2` when ready. Confirm `GITHUB_TOKEN` can read `knowledge-hub-data`. Next: more Teaching fold or Tasks API reads.
 
 ## Open questions (Adam)
 

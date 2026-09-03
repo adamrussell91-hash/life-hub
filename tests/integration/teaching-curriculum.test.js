@@ -2,11 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createClassHandler } from '../../netlify/functions/class.mjs';
+import { createClassesHandler } from '../../netlify/functions/classes.mjs';
 import { createCurriculumHandler } from '../../netlify/functions/curriculum.mjs';
 import { createLessonHandler } from '../../netlify/functions/lesson.mjs';
+import { createLessonsHandler } from '../../netlify/functions/lessons.mjs';
 import { createScheduledLessonHandler } from '../../netlify/functions/scheduled-lesson.mjs';
 import { createSubjectHandler } from '../../netlify/functions/subject.mjs';
 import { createUnitHandler } from '../../netlify/functions/unit.mjs';
+import { createUnitsHandler } from '../../netlify/functions/units.mjs';
 import { createYearHandler } from '../../netlify/functions/year.mjs';
 
 const SECRET = 's'.repeat(32);
@@ -28,6 +31,15 @@ function memoryStore(entries = {}) {
       if (value == null) return null;
       return options.type === 'json' ? value : value;
     },
+    async setJSON(key, value) {
+      map.set(key, value);
+    },
+    async set(key, value) {
+      map.set(key, typeof value === 'string' ? JSON.parse(value) : value);
+    },
+    async delete(key) {
+      map.delete(key);
+    },
     async list({ prefix }) {
       return {
         blobs: [...map.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key }))
@@ -36,13 +48,21 @@ function memoryStore(entries = {}) {
   };
 }
 
-function request({ cookie = true, origin, url = 'https://api.adam-russell.com/api/curriculum' } = {}) {
+function request({
+  cookie = true,
+  origin,
+  url = 'https://api.adam-russell.com/api/curriculum',
+  method = 'GET',
+  body
+} = {}) {
   return new Request(url, {
-    method: 'GET',
+    method,
     headers: {
       ...(cookie ? { cookie: `life_hub_session=${session}` } : {}),
-      ...(origin ? { origin } : {})
-    }
+      ...(origin ? { origin } : {}),
+      ...(body ? { 'content-type': 'application/json' } : {})
+    },
+    ...(body ? { body: JSON.stringify(body) } : {})
   });
 }
 
@@ -101,7 +121,7 @@ test('curriculum lists teacher classes and marks published lessons', async () =>
   assert.equal(body.data.schedule_anchor_date, '2026-08-12');
 });
 
-test('teacher record GETs use the Life session and stay read-only', async () => {
+test('teacher record GETs use the Life session', async () => {
   const store = memoryStore({
     'classes/class-1': { id: 'class-1', title: 'English' },
     'units/unit-1': { id: 'unit-1', title: 'Unit' },
@@ -150,6 +170,107 @@ test('teacher record GETs use the Life session and stay read-only', async () => 
 
   const anon = await createLessonHandler(deps)(
     request({ cookie: false, url: 'https://api.adam-russell.com/api/lessons/lesson-1' })
+  );
+  assert.equal(anon.status, 401);
+});
+
+test('teacher record PATCH/DELETE use the Life session and persist to Blobs', async () => {
+  const store = memoryStore({
+    'classes/class-1': { id: 'class-1', type: 'class', title: 'English' }
+  });
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+  const patched = await createClassHandler(deps)(
+    request({
+      method: 'PATCH',
+      origin: 'https://teaching-hub.adam-russell.com',
+      url: 'https://api.adam-russell.com/api/classes/class-1',
+      body: { title: 'English Advanced', id: 'forged' }
+    })
+  );
+  assert.equal(patched.status, 200);
+  const body = await patched.json();
+  assert.equal(body.data.id, 'class-1');
+  assert.equal(body.data.title, 'English Advanced');
+  assert.equal((await store.get('classes/class-1', { type: 'json' })).title, 'English Advanced');
+  assert.equal(patched.headers.get('access-control-allow-methods')?.includes('PATCH'), true);
+
+  const removed = await createClassHandler(deps)(
+    request({
+      method: 'DELETE',
+      url: 'https://api.adam-russell.com/api/classes/class-1'
+    })
+  );
+  assert.equal(removed.status, 200);
+  assert.equal(await store.get('classes/class-1', { type: 'json' }), null);
+});
+
+test('teacher collection POSTs create records behind the Life session', async () => {
+  const store = memoryStore({
+    'years/year-1': { id: 'year-1', title: 'Year 12', subject_ids: [] },
+    'subjects/subject-1': { id: 'subject-1', title: 'English', class_ids: [], unit_ids: [] },
+    'units/unit-1': { id: 'unit-1', title: 'Unit', lesson_ids: [] }
+  });
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+
+  const createdClass = await createClassesHandler(deps)(
+    request({
+      method: 'POST',
+      origin: 'https://teaching-hub.adam-russell.com',
+      url: 'https://api.adam-russell.com/api/classes',
+      body: {
+        title: '12 English',
+        code: '12ENG',
+        academic_year: 2026,
+        year_id: 'year-1',
+        subject_id: 'subject-1'
+      }
+    })
+  );
+  assert.equal(createdClass.status, 201);
+  const classBody = await createdClass.json();
+  assert.match(classBody.data.id, /^class_/);
+  assert.equal(classBody.data.code, '12ENG');
+  assert.equal((await store.get('subjects/subject-1', { type: 'json' })).class_ids[0], classBody.data.id);
+
+  const createdUnit = await createUnitsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/units',
+      body: { title: 'Poetry', year_id: 'year-1', subject_id: 'subject-1' }
+    })
+  );
+  assert.equal(createdUnit.status, 201);
+  const unitBody = await createdUnit.json();
+  assert.match(unitBody.data.id, /^unit_/);
+
+  const createdLesson = await createLessonsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/lessons',
+      body: { title: 'Week 1', unit_id: 'unit-1' }
+    })
+  );
+  assert.equal(createdLesson.status, 201);
+  const lessonBody = await createdLesson.json();
+  assert.match(lessonBody.data.id, /^lesson_/);
+  assert.equal(lessonBody.data.sequence, 1);
+  assert.equal((await store.get('units/unit-1', { type: 'json' })).lesson_ids[0], lessonBody.data.id);
+
+  const anon = await createClassesHandler(deps)(
+    request({
+      cookie: false,
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/classes',
+      body: { title: 'Nope' }
+    })
   );
   assert.equal(anon.status, 401);
 });
