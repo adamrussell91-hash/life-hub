@@ -22,6 +22,8 @@ export function createOperatorHandler(handle, deps = {}) {
   const now = deps.now ?? Date.now;
   const loadStore = deps.getContentStore ?? defaultGetContentStore;
   const requireStore = deps.requireStore !== false;
+  const unboundCode = deps.unboundCode ?? 'blobs_unbound';
+  const unboundMessage = deps.unboundMessage ?? 'Teaching content store is not bound.';
 
   return async function operatorHandler(request, context = {}) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -52,13 +54,13 @@ export function createOperatorHandler(handle, deps = {}) {
     let store = null;
     if (requireStore) {
       try {
-        store = await loadStore();
+        store = await loadStore(env);
       } catch {
         store = null;
       }
       if (!store) {
         return withCors(
-          errorResponse(503, 'blobs_unbound', 'Teaching content store is not bound.', true),
+          errorResponse(503, unboundCode, unboundMessage, true),
           request,
           env
         );
