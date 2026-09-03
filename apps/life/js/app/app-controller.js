@@ -2,6 +2,7 @@ import { getSydneyDateKey } from '../core/time.js';
 import { renderHubSection } from '../shell/render-hub-sections.js';
 import { renderKnowledgeDashboard } from '../shell/render-knowledge.js';
 import { renderTasksDashboard } from '../shell/render-tasks.js';
+import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { renderTeachingDashboard } from '../shell/render-teaching.js';
 import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -119,6 +120,8 @@ export function createAppController(dependencies) {
   let calendarSelectedDate = null;
   let calendarViewMonth = null;
   let calendarExpandedDate = null;
+  let teachingEvents = [];
+  let teachingCalendarInFlight = null;
   let bodyRange = 'six_month';
   let bloodsRange = 'five_year';
   let mindRange = 'monthly';
@@ -404,6 +407,7 @@ export function createAppController(dependencies) {
           if (manual) setStatus('Showing your last saved view.');
         }
         painted = true;
+        void loadTeachingCalendar();
       }
     };
 
@@ -657,7 +661,10 @@ export function createAppController(dependencies) {
       renderSkincareSection();
       void refreshSkincareShelf();
     }
-    if (name === 'calendar') renderCalendarSection();
+    if (name === 'calendar') {
+      renderCalendarSection();
+      void loadTeachingCalendar();
+    }
     if (name === 'body') renderBodySection();
     if (name === 'body-bloods') renderBloodsSection();
     if (name === 'body-medical') renderMedicalSection();
@@ -676,6 +683,23 @@ export function createAppController(dependencies) {
       if (active && section !== 'more') button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     }
+  }
+
+  function loadTeachingCalendar() {
+    if (!teachingApi?.getCurriculum) return Promise.resolve();
+    if (teachingCalendarInFlight) return teachingCalendarInFlight;
+    teachingCalendarInFlight = teachingApi.getCurriculum()
+      .then(data => {
+        teachingEvents = teachingEventsFromCurriculum(data);
+      })
+      .catch(() => {
+        teachingEvents = [];
+      })
+      .finally(() => {
+        teachingCalendarInFlight = null;
+        if (currentSection === 'calendar') renderCalendarSection();
+      });
+    return teachingCalendarInFlight;
   }
 
   async function loadTeachingSection() {
@@ -854,7 +878,7 @@ export function createAppController(dependencies) {
     if (!calendarSelectedDate) calendarSelectedDate = date;
     if (!calendarViewMonth) calendarViewMonth = calendarSelectedDate.slice(0, 7);
     const model = buildCalendarModel({
-      events: latestResult.events,
+      events: [...(latestResult.events ?? []), ...teachingEvents],
       date,
       selectedDate: calendarSelectedDate,
       viewMonth: calendarViewMonth
@@ -1150,6 +1174,8 @@ export function createAppController(dependencies) {
     lifecycleVersion += 1;
     authenticated = false;
     rendered = false;
+    teachingEvents = [];
+    teachingCalendarInFlight = null;
     clearRefreshTimer();
     clearSessionExpiry();
     abortActiveRefresh(new DOMException('Session invalidated', 'AbortError'));

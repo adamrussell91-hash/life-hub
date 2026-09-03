@@ -14,6 +14,7 @@ Teacher reads and writes on `life-hub2` use the Life session cookie:
 - GET/POST `/api/outcomes` (create needs subject_id, code, title, description)
 - GET/POST `/api/media` for external/Drive links; GET/PATCH/DELETE `/api/media/:id`. Direct file upload stays on Teaching Hub.
 - GET/POST `/api/scheduled-lessons` to place one lesson on a class date. Unit-wide schedule expand stays on Teaching Hub.
+- Life Calendar reads those rows from same-origin `/api/curriculum` (no Teaching API host in the registry).
 
 Unbound `teaching-hub-content` → **503**. `@netlify/blobs` is now a life-hub dependency so `life-hub2` can open the store. Set `NETLIFY_BLOBS_TOKEN` on `life-hub2` to read the existing `arteaching-hub` store instead of an empty local one.
 
