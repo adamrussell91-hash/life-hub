@@ -64,11 +64,23 @@ export function summarizeTask(item) {
   };
 }
 
-export async function readTaskIndex(store) {
-  const index = await getJSON(store, TASKS_INDEX_KEY);
+export async function readIndex(store, key) {
+  const index = await getJSON(store, key);
   return Array.isArray(index) ? index.filter(id => typeof id === 'string') : [];
 }
 
+export async function writeIndex(store, key, ids) {
+  await setJSON(store, key, [...new Set(ids)]);
+}
+
+export async function readTaskIndex(store) {
+  return readIndex(store, TASKS_INDEX_KEY);
+}
+
 export async function writeTaskIndex(store, ids) {
-  await setJSON(store, TASKS_INDEX_KEY, [...new Set(ids)]);
+  return writeIndex(store, TASKS_INDEX_KEY, ids);
+}
+
+export function newRecordId(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
