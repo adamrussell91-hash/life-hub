@@ -229,8 +229,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Teaching outcomes/media | **shipped** | PR #76 merged 2026-09-03 |
 | Teaching scheduled-lesson create | **shipped** | PR #77 merged 2026-09-03 |
 | Teaching calendar live | **shipped** | PR #78 merged 2026-09-03 |
-| Teaching search corpus + schedule expand + media upload + Clare + SPA retarget | in progress | Slice 23 — this slice |
-| Netlify retarget | in progress | Teaching + Tasks Pages point at `api.adam-russell.com`; hub API sites stay live |
+| Teaching search corpus + schedule expand + media upload + Clare + SPA retarget | **shipped** | PR #79 merged 2026-09-03; Teaching Pages PR teaching-hub#27; Tasks Pages PR Tasks-Hub#105 |
+| Netlify retarget | **started** | Teaching + Tasks Pages point at `api.adam-russell.com`; `arteaching-hub` / `artasks-hub` stay live |
 
 ### Slice 01 — what shipped
 
@@ -428,7 +428,7 @@ Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 - Unbound Teaching store stays empty on the grid (Life days unchanged)
 - No Knowledge/Tasks calendar fold, no `arteaching-hub` retire
 
-### Slice 23 — Search corpus, schedule expand, media upload, Clare, SPA retarget (this slice)
+### Slice 23 — Search corpus, schedule expand, media upload, Clare, SPA retarget (shipped, PR #79)
 
 - `GET /api/search` also scans lesson/unit/composition blocks (`runContentSearch`)
 - `POST /api/classes/:id/schedule-unit` expands a unit across meeting days
@@ -440,7 +440,7 @@ Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 
 ## Next action
 
-Keep shipping. Next: Knowledge API fold or remaining Teaching AI jobs. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
+Keep shipping. Next: Knowledge API fold (do not retarget Knowledge Pages until those handlers exist). Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**. After Pages rebuilds, smoke Teaching and Tasks against `api.adam-russell.com`.
 
 ## Open questions (Adam)
 
