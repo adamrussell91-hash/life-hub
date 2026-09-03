@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Life Hub</title>
+    <script>
+      (function () {
+        var path = location.pathname;
+        var prefixes = ['/teaching', '/knowledge', '/tasks'];
+        for (var i = 0; i < prefixes.length; i++) {
+          var prefix = prefixes[i];
+          if (path === prefix || path.indexOf(prefix + '/') === 0) {
+            sessionStorage.setItem(
+              'life-hub-spa-redirect',
+              path + location.search + location.hash
+            );
+            location.replace(prefix + '/');
+            return;
+          }
+        }
+        location.replace('/' + location.search + location.hash);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

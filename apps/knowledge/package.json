@@ -1,0 +1,47 @@
+{
+  "name": "knowledge-hub",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && cp dist/index.html dist/404.html",
+    "test": "vitest run",
+    "test:unit": "vitest run src",
+    "test:integration": "vitest run tests/integration",
+    "test:browser": "playwright test",
+    "migrate": "tsx scripts/migrate-notion.ts",
+    "build-index": "tsx scripts/build-index.ts",
+    "upload-attachments": "tsx scripts/upload-attachments.ts",
+    "sync-research-r2": "tsx scripts/sync-research-r2.ts",
+    "curator": "tsx scripts/run-curator.ts",
+    "tidy": "tsx scripts/run-tidy.ts",
+    "tidy:backfill": "tsx scripts/run-tidy-backfill.ts",
+    "tidy:split": "tsx scripts/run-tidy-split.ts",
+    "retag": "tsx scripts/run-retag.ts",
+    "stamp-origins": "tsx scripts/stamp-origins.ts",
+    "sync-manifest": "tsx scripts/sync-manifest-from-pages.ts",
+    "research:dev": "wrangler dev --config worker/wrangler.jsonc",
+    "research:deploy": "wrangler deploy --config worker/wrangler.jsonc"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@aws-sdk/client-s3": "^3.758.0",
+    "@aws-sdk/s3-request-presigner": "^3.1109.0",
+    "@netlify/functions": "^2.8.2",
+    "d3-force": "^3.0.0",
+    "ts-fsrs": "^5.4.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.1",
+    "@types/d3-force": "^3.0.10",
+    "@types/node": "^22.13.10",
+    "jsdom": "^26.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.8",
+    "wrangler": "^4.28.0"
+  }
+}

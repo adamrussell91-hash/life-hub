@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+.netlify/
+*.log
+test-results/
+playwright-report/
+.superpowers/
+.worktrees/
+.ua/intermediate/
+.ua/diff-overlay.json
+.ua/.trash-*/

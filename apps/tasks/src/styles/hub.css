@@ -1,0 +1,198 @@
+/* Tasks Hub domain styles — chrome comes from design-kit/css. */
+
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 200;
+  padding: 0.4rem 0.7rem;
+  transform: translateY(-150%);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+.hub-canvas:focus {
+  outline: none;
+}
+
+.hub-canvas:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.hub-rail__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-px);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.hub-rail__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-px);
+}
+
+.hub-canvas,
+.hub-canvas__body {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .hub-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 100dvh;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .hub-rail {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .hub-rail__list--desktop {
+    display: none;
+  }
+
+  .hub-rail__mobile {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .hub-rail__mobile-tabs,
+  .hub-rail__mobile-items {
+    display: flex;
+    gap: var(--space-1);
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .hub-rail__mobile-tabs .hub-rail__section {
+    display: flex;
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .hub-rail__mobile-panel {
+    display: flex;
+    flex: 0 0 auto;
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+  }
+
+  .hub-rail__mobile-panel[data-open="true"] {
+    max-width: 100rem;
+    opacity: 1;
+  }
+
+  .hub-rail__mobile-panel .hub-rail__link {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+    min-height: 2.75rem;
+  }
+
+  .hub-canvas {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+    /* 16px side gutters — matches common iOS content inset; keeps tile shadows inside clip */
+    padding: var(--space-4);
+    padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hub-canvas__body {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Utility-app title (~21px, near iOS Title 3). Leave the title input alone so
+     task/project editors stay readable while editing. */
+  .page-header__title:not(.page-header__title-input) {
+    font-size: var(--text-lg);
+  }
+
+  .page-header__eyebrow {
+    font-size: var(--text-2xs);
+    margin-bottom: var(--space-1);
+  }
+
+  .page-header__supporting {
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+}
+
+.page-header__copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.page-header__title,
+.page-header__title-input {
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.page-header--cover .page-header__copy {
+  min-height: 0;
+}
+
+.page-header__title-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
+}
+
+.page-header__title-input:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 4px;
+  border-radius: var(--radius-xs);
+}

@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.21 — Blobs remount switch ready; copy onto life-hub2 then retire Function sites. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.22 — Teaching, Knowledge, and Tasks SPAs remounted under `apps/` on Life Pages. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -43,9 +43,9 @@ Exact dashboard export:
 | Project / site | Production URL | Site ID | GitHub source | Role in consolidation |
 |----------------|----------------|---------|---------------|------------------------|
 | `life-hub2` | `https://api.adam-russell.com` | `5771ee5c-0cb2-4858-b03d-2637f092050e` | `life-hub` | **Retarget / absorb target** — keep secrets; fold other hub APIs onto this site over time |
-| `artasks-hub` | `https://tasks-api.adam-russell.com` | `c6696619-f478-4ac1-b0cd-1e4cfd3101df` | `Tasks-Hub` | Fold later |
-| `arteaching-hub` | `https://teaching-api.adam-russell.com` | `899b0fd3-53b3-45a0-bbfb-0238264d9246` | `teaching-hub` | Fold later; retire site after Teaching API lands on `life-hub2` |
-| `knowledge-hub-archive` | `https://knowledge-api.adam-russell.com` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `knowledge-hub` | Fold later — **Netlify Functions API only**; not the R2 bucket (same human name; see collision note) |
+| `artasks-hub` | `https://tasks-api.adam-russell.com` | `c6696619-f478-4ac1-b0cd-1e4cfd3101df` | `Tasks-Hub` | **Disabled 2026-09-04** — store copied onto `life-hub2`; domain 404 |
+| `arteaching-hub` | `https://teaching-api.adam-russell.com` | `899b0fd3-53b3-45a0-bbfb-0238264d9246` | `teaching-hub` | **Disabled 2026-09-04** — store copied onto `life-hub2`; domain 404 |
+| `knowledge-hub-archive` | `https://knowledge-api.adam-russell.com` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `knowledge-hub` | **Disabled 2026-09-04** — Functions API only; **not** the R2 bucket |
 | `jade-melomakarona-ea20fe` | `https://jade-melomakarona-ea20fe.netlify.app` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `proxies` | **Shared OpenAI proxy** for `widgets` — not a hub; keep until consumers migrate (see below) |
 
 Created / last update (dashboard): Life Aug 2→Sep 1 2026; Tasks Aug 16→Aug 31; Teaching Aug 8→Aug 29; Knowledge Aug 13→Aug 29; proxies Mar 9→Aug 25.
@@ -231,9 +231,9 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Teaching calendar live | **shipped** | PR #78 merged 2026-09-03 |
 | Teaching search corpus + schedule expand + media upload + Clare + SPA retarget | **shipped** | PR #79 merged 2026-09-03; Teaching Pages PR teaching-hub#27; Tasks Pages PR Tasks-Hub#105 |
 | Full Clare dump / brief / toolkit / mutations | **shipped** | PR #81 merged 2026-09-03 |
-| Netlify retarget | **started** | Teaching + Tasks Pages point at `api.adam-russell.com`; `arteaching-hub` / `artasks-hub` stay live |
+| Netlify retarget | **done** | Pages point at `api.adam-russell.com`; old Function sites disabled 2026-09-04 (domains 404) |
 | Knowledge leftovers fold | **shipped** | PR #85 / knowledge-hub #101 merged 2026-09-04 |
-| Blobs remount + Function retire | **this slice** | Copy stores onto `life-hub2`, then retire `arteaching-hub` / `artasks-hub` / `knowledge-api` |
+| Blobs remount + Function retire | **set** | 2026-09-04 Job 5 — copied Teaching 135/135 and Tasks 448/448 onto `life-hub2`; `TEACHING_BLOBS_SITE_ID`/`TASKS_BLOBS_SITE_ID`=`local`; deploy `6a99edc41d38b3aed1999023` / `e881cb9`. Sites disabled, not deleted. Public lesson 200 matched source. Signed-in Tasks not checked. R2 + Worker untouched. |
 
 ### Slice 01 — what shipped
 
@@ -510,11 +510,27 @@ Old API sites are Blobs hosts, not the live Pages origin. Do not flip stores unt
 - Then retire Netlify Function sites `arteaching-hub`, `artasks-hub`, and `knowledge-hub-archive`. Do **not** delete R2 bucket `knowledge-hub-archive` or Worker `knowledge-hub-research`
 - Teaching leftovers still missing on umbrella (`/api/alchemy-lab`, compositions, trash, AI jobs, scope-sequences, export) already 404 on `api.adam-russell.com`; retiring `arteaching-hub` removes the fallback
 
+Job 5 done 2026-09-04: copies matched; remount env `local`; public lesson 200; three Function sites **disabled** (domains 404). Sites not deleted. Signed-in Tasks list not verified.
+
+### Slice 30 — Remount Teaching, Knowledge, and Tasks SPAs (this slice)
+
+The four apps are one Pages site. Source moved from the hub repos’ `origin/main` into this repo:
+
+- `apps/teaching` → `https://life-hub.adam-russell.com/teaching/`
+- `apps/knowledge` → `https://life-hub.adam-russell.com/knowledge/`
+- `apps/tasks` → `https://life-hub.adam-russell.com/tasks/`
+
+Vite `UMBRELLA_SPA=1` sets those bases. Teaching’s History router strips `/teaching`. A root `404.html` restores deep links (`/teaching/s/lessons/:id`, Knowledge/Tasks hashes). The Life rail opens same-origin paths, not the old Pages hosts.
+
+APIs stay on `life-hub2`. Functions stay in repo-root `netlify/functions/` — not copied under `apps/*/netlify`. Knowledge Worker `knowledge-hub-research` and R2 `knowledge-hub-archive` stay on Cloudflare. Do not rotate secrets, bind R2, or delete the disabled Function sites.
+
+Old custom domains (`teaching-hub`, `knowledge-hub`, `tasks-hub`) can keep serving their existing Pages deploys until DNS points here. Student lessons on this site are `/teaching/s/…` and stay unauthenticated.
+
 ## Next action
 
-Job 5: copy Blobs onto `life-hub2`, set the two site-id env keys, verify a public Teaching lesson and a signed-in Tasks list, then retire the three Function sites. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
+One repo, one API site, one Pages site. Next: signed-in smoke of the remounted SPAs, fold leftover Teaching routes (`alchemy-lab`, compositions, trash, AI jobs), or soak-then-delete the three disabled Function sites. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
 
 ## Open questions (Adam)
 
-- Fold trigger (A/B/C) for Teaching API onto `life-hub2` (Blobs binding required)
+- Delete the three disabled Netlify sites after a soak, or keep the records
 - Proxies: migrate widgets off `jade-melomakarona-ea20fe` vs harden in place
