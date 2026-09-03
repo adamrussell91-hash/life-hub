@@ -8,20 +8,20 @@ test('hub section registry names Teaching, Knowledge, and Tasks', () => {
   assert.deepEqual(ids, ['teaching', 'knowledge', 'tasks']);
 });
 
-test('Teaching mount keeps the public Pages origin and student prefix', () => {
+test('Teaching mount is the same-origin SPA and keeps the student prefix', () => {
   const teaching = listHubSections().find(section => section.id === 'teaching');
-  assert.equal(teaching.origin, 'https://teaching-hub.adam-russell.com');
-  assert.equal(teaching.studentPublicPrefix, '/s/');
+  assert.equal(teaching.origin, '/teaching/');
+  assert.equal(teaching.studentPublicPrefix, '/teaching/s/');
 });
 
-test('Knowledge mount links to the existing Pages origin', () => {
+test('Knowledge mount is the same-origin SPA', () => {
   const knowledge = listHubSections().find(section => section.id === 'knowledge');
-  assert.equal(knowledge.origin, 'https://knowledge-hub.adam-russell.com');
+  assert.equal(knowledge.origin, '/knowledge/');
 });
 
-test('Tasks mount links to the existing Pages origin', () => {
+test('Tasks mount is the same-origin SPA', () => {
   const tasks = listHubSections().find(section => section.id === 'tasks');
-  assert.equal(tasks.origin, 'https://tasks-hub.adam-russell.com');
+  assert.equal(tasks.origin, '/tasks/');
 });
 
 test('Life shell mounts hub dashboards and rail destinations', async () => {

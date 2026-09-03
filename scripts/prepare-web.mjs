@@ -1,4 +1,4 @@
-import { copyFile, cp, mkdir, readdir, rm, readFile, writeFile } from 'node:fs/promises';
+import { access, copyFile, cp, mkdir, readdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { rewritePublishedKitSpecifiers } from './lib/rewrite-published-kit-imports.mjs';
 
 const projectRoot = new URL('../', import.meta.url);
@@ -6,6 +6,7 @@ const lifeRoot = new URL('../apps/life/', import.meta.url);
 const publishRoot = new URL('../dist/', import.meta.url);
 const publishedDirectories = ['assets', 'css', 'js'];
 const publishedFiles = ['index.html', 'manifest.webmanifest', 'service-worker.js'];
+const spaApps = ['teaching', 'knowledge', 'tasks'];
 
 async function copyDesignKitStyles() {
   const kitRoot = new URL('packages/design-kit/', projectRoot);
@@ -24,6 +25,17 @@ async function copyDesignKitModules() {
     new URL('packages/design-kit/js/', publishRoot),
     { recursive: true }
   );
+}
+
+async function copyBuiltSpa(name) {
+  const from = new URL(`apps/${name}/dist/`, projectRoot);
+  try {
+    await access(from);
+  } catch {
+    return false;
+  }
+  await cp(from, new URL(`${name}/`, publishRoot), { recursive: true });
+  return true;
 }
 
 async function rewritePublishedKitImports(directory) {
@@ -60,6 +72,12 @@ export async function prepareWeb() {
   ]);
 
   await rewritePublishedKitImports(new URL('js/', publishRoot));
+
+  await Promise.all(spaApps.map(name => copyBuiltSpa(name)));
+  await copyFile(
+    new URL('scripts/pages-spa-fallback.html', projectRoot),
+    new URL('404.html', publishRoot)
+  );
 
   const vendorDirectory = new URL('vendor/', publishRoot);
   await mkdir(vendorDirectory, { recursive: true });

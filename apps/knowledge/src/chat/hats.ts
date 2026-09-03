@@ -1,0 +1,141 @@
+export type ChatHatId =
+  | "fromBook"
+  | "scoping"
+  | "synthesis"
+  | "evidence"
+  | "contested"
+  | "internalExternal"
+  | "methods"
+  | "writing";
+
+export type ChatScope = "narrow" | "standard" | "wide";
+export type ChatDepth = "single" | "verified" | "iterative" | "exhaustive";
+export type KernelPath = "quick" | "deep";
+
+export type ChatHat = {
+  id: ChatHatId;
+  label: string;
+  explain: string;
+  plan: string;
+  defaultScope: ChatScope;
+  defaultDepth: ChatDepth;
+};
+
+export const SCOPES: ChatScope[] = ["narrow", "standard", "wide"];
+export const DEPTHS: ChatDepth[] = ["single", "verified", "iterative", "exhaustive"];
+
+export const CHAT_HATS: ChatHat[] = [
+  {
+    id: "fromBook",
+    label: "From a book",
+    explain: "Look up a passage from a book on the open web and file a referenced page that turns back to the book.",
+    defaultScope: "standard",
+    defaultDepth: "single",
+    plan: "Pick the book. Capture the idea, term, or question from the page. Search the open web — not the archive — and write a referenced information page that says how this bears on the book.",
+  },
+  {
+    id: "scoping",
+    label: "Scoping",
+    explain: "Map the archive quickly to reveal clusters, exemplars, and gaps.",
+    defaultScope: "wide",
+    defaultDepth: "single",
+    plan: "Wide sweep, few bodies. Clusters + counts + one exemplar each + gaps. Cheap map, not an essay.",
+  },
+  {
+    id: "synthesis",
+    label: "Thematic synthesis",
+    explain: "Build an evidence-mapped thematic synthesis with a visible audit trail.",
+    defaultScope: "standard",
+    defaultDepth: "iterative",
+    plan: "Retrieve, read note bodies, write an evidence-mapped thematic synthesis. Always produce a central claim (relationship + mechanism + implication, at most two sentences, confidence-rated). Cluster into 3 to 7 themes with source counts and confidence. Map major claims to sources. Label direct findings versus inferences. Separate explanatory levels. End with a ranked limitations table and an explicit answer to the question. Every claim carries a markdown note link [Title](pageId). Never invent a page. Never write a raw page id.",
+  },
+  {
+    id: "evidence",
+    label: "Evidence check",
+    explain: "Test a claim against supporting, contradicting, and silent evidence.",
+    defaultScope: "narrow",
+    defaultDepth: "verified",
+    plan: "Take the claim. Search paraphrase, key entity, and negation. Classify supports / contradicts / silent. Verdict with contradictions first.",
+  },
+  {
+    id: "contested",
+    label: "Contested ground",
+    explain: "Surface the archive’s hardest disagreements before its easy overlaps.",
+    defaultScope: "narrow",
+    defaultDepth: "verified",
+    plan: "Negation is first-class. Return disagreement pairs, sorted by how hard they clash, not by relevance.",
+  },
+  {
+    id: "internalExternal",
+    label: "Internal-then-external",
+    explain: "Check archive coverage first and use outside search only when requested.",
+    defaultScope: "standard",
+    defaultDepth: "single",
+    plan: "Internal archive first plus an honest coverage read. If thin, say so. Do not search the web unless the user clicked Search outside. External hits never look like archive citations.",
+  },
+  {
+    id: "methods",
+    label: "Methods",
+    explain: "Answer a methods question from methods-tagged notes rather than content notes.",
+    defaultScope: "narrow",
+    defaultDepth: "single",
+    plan: "Filter to methods-tagged notes first, then search only inside that set. A methods question cannot be answered from a content note.",
+  },
+  {
+    id: "writing",
+    label: "Writing",
+    explain: "Help with a thesis or draft, and still answer from the archive if that is what he asked.",
+    defaultScope: "standard",
+    defaultDepth: "single",
+    plan: "Writing help when a thesis or draft is in play. Protocols in prose (reverse outline, stress test, editors) only then. If he asks a knowledge or practice question, answer it from the archive. Do not become a gatekeeper. Do not silently become Synthesis.",
+  },
+];
+
+export function hatById(id: ChatHatId): ChatHat {
+  const hat = CHAT_HATS.find(item => item.id === id);
+  if (!hat) throw new Error(`Unknown chat hat: ${id}`);
+  return hat;
+}
+
+export function isChatHatId(value: string): value is ChatHatId {
+  return CHAT_HATS.some(hat => hat.id === value);
+}
+
+export const METHODS_TAG = "Research Methods and Evidence Literacy";
+
+const K_FOR_SCOPE: Record<ChatScope, number> = { narrow: 8, standard: 16, wide: 32 };
+const ROUNDS_FOR_DEPTH: Record<ChatDepth, number> = {
+  single: 1,
+  verified: 2,
+  iterative: 5,
+  exhaustive: 5,
+};
+
+export type RetrieveSpec = {
+  k: number;
+  maxRounds: number;
+  kernel: KernelPath;
+  tags?: string[];
+  negation: boolean;
+};
+
+function kernelFor(depth: ChatDepth): KernelPath {
+  return depth === "single" ? "quick" : "deep";
+}
+
+export function resolveChatPlan(
+  hatId: ChatHatId,
+  overrides: { scope?: ChatScope; depth?: ChatDepth } = {},
+) {
+  const hat = hatById(hatId);
+  const scope = overrides.scope ?? hat.defaultScope;
+  const depth = overrides.depth ?? hat.defaultDepth;
+  const spec: RetrieveSpec = {
+    k: depth === "exhaustive" ? 48 : K_FOR_SCOPE[scope],
+    maxRounds: ROUNDS_FOR_DEPTH[depth],
+    kernel: kernelFor(depth),
+    tags: hat.id === "methods" ? [METHODS_TAG] : undefined,
+    negation: hat.id === "evidence" || hat.id === "contested",
+  };
+  return { hat, scope, depth, ...spec };
+}
