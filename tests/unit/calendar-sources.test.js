@@ -57,8 +57,9 @@ function fakeRoot() {
 
 test('shared calendar source registry names Life logged days', () => {
   const sources = listCalendarSources();
-  assert.deepEqual(sources.map(source => source.id), ['life']);
+  assert.deepEqual(sources.map(source => source.id), ['life', 'teaching']);
   assert.equal(sources[0].status, 'live');
+  assert.equal(sources[1].status, 'pending');
   assert.equal(sources.some(source => source.fetch || source.url || source.endpoint), false);
 });
 
@@ -73,6 +74,7 @@ test('source card lists Life Hub and hides the empty copy', () => {
   renderCalendarSources(root, listCalendarSources());
   assert.equal(root._empty.hidden, true);
   assert.equal(root._list.hidden, false);
-  assert.equal(root._list.children.length, 1);
+  assert.equal(root._list.children.length, 2);
   assert.equal(root._list.children[0].textContent, 'Life Hub');
+  assert.equal(root._list.children[1].textContent, 'Teaching');
 });

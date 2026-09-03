@@ -227,6 +227,13 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
       return true;
     }
 
+    if (url.pathname === '/api/curriculum') {
+      if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
+      if (!readSession(request)) return unauthenticated(response);
+      error(response, 503, 'blobs_unbound', 'Teaching content store is not bound.', true);
+      return true;
+    }
+
     error(response, 404, 'not_found', 'Not found.', false);
     return true;
   };

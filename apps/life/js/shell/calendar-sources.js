@@ -9,6 +9,12 @@ export const CALENDAR_SOURCES = [
     label: 'Life Hub',
     kind: 'logged-days',
     status: 'live'
+  },
+  {
+    id: 'teaching',
+    label: 'Teaching',
+    kind: 'scheduled-lessons',
+    status: 'pending'
   }
 ];
 
