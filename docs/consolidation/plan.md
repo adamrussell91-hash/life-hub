@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.11 — Thin Teaching search and publish. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.12 — Teaching outcomes and media links. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -189,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v4.11 | Thin Teaching search and publish | Slice 18 shipped as PR #74; this slice |
+| Plan v4.12 | Teaching outcomes and media links | Slice 19 shipped as PR #75; this slice |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -225,7 +225,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Tasks projects/areas/goals | **shipped** | PR #72 merged 2026-09-03 |
 | Teaching year/subject collections | **shipped** | PR #73 merged 2026-09-03 |
 | Tasks programs/maps | **shipped** | PR #74 merged 2026-09-03 |
-| Teaching search/publish | in progress | Slice 19 — title search + thin lesson publish |
+| Teaching search/publish | **shipped** | PR #75 merged 2026-09-03 |
+| Teaching outcomes/media | in progress | Slice 20 — outcomes + media link records |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -396,16 +397,23 @@ Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 - Indexes stay in sync; no seed from competitions.json
 - No Clare, no Zod port, no `artasks-hub` retire
 
-### Slice 19 — Thin Teaching search and publish (this slice)
+### Slice 19 — Thin Teaching search and publish (shipped, PR #75)
 
 - `GET /api/search?q=` title/code scan on years, subjects, classes, units, lessons
 - `POST /api/lessons/:id/publish` writes `published/lessons/:id` after dropping teacher-only blocks and sanitizing HTML
 - No `runContentSearch`, compositions, linked-section expand, version checkpoint, or Zod
 - No `arteaching-hub` retire
 
+### Slice 20 — Teaching outcomes and media links (this slice)
+
+- `GET/POST /api/outcomes` — create needs subject_id, code, title, description; duplicate codes 409
+- `GET/POST /api/media` for external/google_drive links; `GET/PATCH/DELETE /api/media/:id`
+- Public `GET /api/media/:id/file` stays unauthenticated
+- No upload, Drive picker, trash lifecycle, or `arteaching-hub` retire
+
 ## Next action
 
-Keep shipping. Next: Teaching outcomes/media list or Tasks frameworks. Do not retarget `life-hub2`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
+Keep shipping. Next: Teaching scheduled-lesson create or Tasks frameworks. Do not retarget `life-hub2`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
 
 ## Open questions (Adam)
 
