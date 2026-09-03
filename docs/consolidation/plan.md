@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.1 — umbrella shell merged (PR #62). Checkpoint-08 PASS. This slice: Teaching public handlers on `life-hub2` (503 if Blobs unbound).  
+> **Status:** v4.2 — Teaching public handlers merged (PR #63). Checkpoint-09 PASS. This slice: session-gated Teaching curriculum + calendar source. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -189,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v4.1 | Teaching public handlers next | Slice 08 merged 2026-09-01 as PR #62 |
+| Plan v4.2 | Teaching operator curriculum | Slice 09 merged 2026-09-03 as PR #63 |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -201,6 +201,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Claude checkpoint-06 | **PASS** | `checkpoints/checkpoint-06.md` — merge #60 |
 | Claude checkpoint-07 | **PASS** | `checkpoints/checkpoint-07.md` — merge #61 |
 | Claude checkpoint-08 | **PASS** | `checkpoints/checkpoint-08.md` — merge #62 |
+| Claude checkpoint-09 | **PASS** | `checkpoints/checkpoint-09.md` — merge #63 |
 | Deploy inventory | **filled** | See table above; `life-hub2` is absorb target |
 | Auth decision | **decided** | Retain Life Hub secrets |
 | Repo naming decision | **decided** | Reuse `life-hub`, leave as-is |
@@ -213,7 +214,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Published kit-import check | **shipped** | PR #60 merged 2026-09-01 |
 | Kit-import from-anchor | **shipped** | PR #61 merged 2026-09-01 |
 | Umbrella shell | **shipped** | PR #62 merged 2026-09-01 |
-| Teaching public handlers | in progress | Slice 09 — public handlers + 503 if Blobs unbound |
+| Teaching public handlers | **shipped** | PR #63 merged 2026-09-03 |
+| Teaching operator curriculum | in progress | Slice 10 — Life session + 503 if Blobs unbound |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -290,43 +292,26 @@ Do **not** retarget `life-hub2`, fold other hubs, or rotate secrets.
 - Public student API route table defined; not called until Teaching handlers land
 - Teaching SPA stays on Pages; no Blobs, no `arteaching-hub` retire, no secret rotation
 
-### Slice 09 — Teaching public handlers (this slice)
+### Slice 09 — Teaching public handlers (shipped, PR #63)
 
-Land the public student API on `life-hub2` without breaking production if Blobs is not bound yet:
+- Public student handlers on `life-hub2` (`published-lesson`, `published-unit`, `published-class`, `media-file`, `html-app-ai`)
+- `isPublicStudentApi()` before any session work
+- Unbound `teaching-hub-content` → **503**
+- No teacher-auth handlers, no `arteaching-hub` retire, no secret rotation
 
-- Copy only public handlers (`published-lesson`, `published-unit`, `published-class`, `media-file`, `html-app-ai`)
-- Call `isPublicStudentApi()` **before** the session gate — first thing when handlers land
-- If Blobs store `teaching-hub-content` is unbound, respond **503**, not 500
-- Do **not** copy teacher-auth handlers, retire `arteaching-hub`, rotate secrets, or retarget `life-hub2` production
+### Slice 10 — Teaching operator curriculum (this slice)
+
+Adam-only Teaching read path on the umbrella API, using the existing Life session:
+
+- `GET /api/curriculum` behind `createOperatorHandler` (origin + Life cookie, never `TEACHING_HUB_PASSPHRASE_HASH`)
+- 503 if Blobs unbound — no write-back / catalog migration
+- Teaching rail lists classes when the store is bound
+- Calendar names Teaching scheduled lessons as `pending` (no other-hub API hosts in the registry)
+- Do **not** retire `arteaching-hub`, retarget production, or copy teacher write handlers
 
 ## Next action
 
-Claude observe-only **checkpoint-09** against the Teaching public-handlers PR.
-
-Paste:
-
-```text
-You are the consolidation overseer at checkpoint-09. cwd = life-hub worktree
-~/Projects/life-hub/.worktrees/umbrella-seed-slice-01
-(not the primary checkout — that may be on an unrelated branch).
-Read and obey: CLAUDE.md, docs/consolidation/OVERSEER.md, docs/consolidation/plan.md (v4.1).
-
-Observe-only rules (hard):
-- Do NOT edit application code, move files, run destructive git, or commit.
-- You MAY create exactly one report:
-  docs/consolidation/checkpoints/checkpoint-09.md
-
-Inspect: the Teaching public-handlers PR vs main, and plan.md Slice 09 notes.
-Confirm: only public student handlers landed; isPublicStudentApi() runs before any session gate;
-unbound teaching-hub-content Blobs returns 503 not 500; teacher-auth handlers were not copied;
-no TEACHING_HUB_PASSPHRASE_HASH / teaching_hub_session; netlify.toml and secrets unchanged;
-arteaching-hub not retired; life-hub-data untouched.
-
-Write the report using the template in OVERSEER.md.
-End with: next 3 concrete steps for Cursor local agent — no patches.
-If auth, life-hub-data boundary, or public student URL safety looks wrong,
-open with DO NOT MERGE YET.
-```
+Keep shipping. Checkpoints are optional async audits, not a merge gate. Bind `teaching-hub-content` on `life-hub2` when ready so curriculum/public handlers return data instead of 503.
 
 ## Open questions (Adam)
 

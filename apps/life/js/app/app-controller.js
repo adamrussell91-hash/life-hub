@@ -1,5 +1,6 @@
 import { getSydneyDateKey } from '../core/time.js';
 import { renderHubSection } from '../shell/render-hub-sections.js';
+import { renderTeachingDashboard } from '../shell/render-teaching.js';
 import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
@@ -61,6 +62,7 @@ export function createAppController(dependencies) {
     buildSkincareModel,
     renderSkincare,
     skincareApi,
+    teachingApi,
     skincareController,
     skincareRoutines,
     getCurrentRoutineKey,
@@ -658,6 +660,7 @@ export function createAppController(dependencies) {
     if (name === 'mind') renderMindSection();
     if (name === 'central-node') renderCentralNodeSection();
     if (name === 'teaching' || name === 'knowledge' || name === 'tasks') renderHubSection(root, name);
+    if (name === 'teaching') void loadTeachingSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const section = button.dataset.section;
       const active = section === name
@@ -666,6 +669,24 @@ export function createAppController(dependencies) {
       button.classList.toggle('is-active', active);
       if (active && section !== 'more') button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
+    }
+  }
+
+  async function loadTeachingSection() {
+    if (!teachingApi?.getCurriculum) {
+      renderTeachingDashboard(root, { status: 'link-only' });
+      return;
+    }
+    renderTeachingDashboard(root, { status: 'loading' });
+    try {
+      const data = await teachingApi.getCurriculum();
+      if (currentSection !== 'teaching') return;
+      renderTeachingDashboard(root, { status: 'ready', classes: data?.classes ?? [] });
+    } catch (error) {
+      if (currentSection !== 'teaching') return;
+      renderTeachingDashboard(root, {
+        status: error?.code === 'blobs_unbound' ? 'unbound' : 'error'
+      });
     }
   }
 
