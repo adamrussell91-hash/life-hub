@@ -1,13 +1,21 @@
 export const TEACHING_CONTENT_STORE = 'teaching-hub-content';
 export const TEACHING_BLOBS_SITE_ID = '899b0fd3-53b3-45a0-bbfb-0238264d9246';
+export const UMBRELLA_BLOBS_SITE_ID = '5771ee5c-0cb2-4858-b03d-2637f092050e';
 export const TEACHING_BLOBS_SITE_ID_ENV = 'TEACHING_BLOBS_SITE_ID';
 export const TEACHING_BLOBS_TOKEN_ENV = 'NETLIFY_BLOBS_TOKEN';
 
+export function isUmbrellaBlobsHome(siteID) {
+  const id = typeof siteID === 'string' ? siteID.trim() : '';
+  return id === 'local' || id === UMBRELLA_BLOBS_SITE_ID;
+}
+
 export function teachingStoreOptions(env = process.env) {
-  const siteID = typeof env?.[TEACHING_BLOBS_SITE_ID_ENV] === 'string' && env[TEACHING_BLOBS_SITE_ID_ENV].trim()
+  const configured = typeof env?.[TEACHING_BLOBS_SITE_ID_ENV] === 'string'
     ? env[TEACHING_BLOBS_SITE_ID_ENV].trim()
-    : TEACHING_BLOBS_SITE_ID;
+    : '';
+  const siteID = configured || TEACHING_BLOBS_SITE_ID;
   const token = typeof env?.[TEACHING_BLOBS_TOKEN_ENV] === 'string' ? env[TEACHING_BLOBS_TOKEN_ENV] : '';
+  if (isUmbrellaBlobsHome(configured)) return TEACHING_CONTENT_STORE;
   if (token) return { name: TEACHING_CONTENT_STORE, siteID, token };
   return TEACHING_CONTENT_STORE;
 }

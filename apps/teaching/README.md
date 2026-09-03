@@ -16,6 +16,6 @@ Teacher reads and writes on `life-hub2` use the Life session cookie:
 - GET/POST `/api/scheduled-lessons` for one class date; POST `/api/classes/:id/schedule-unit` to expand a unit
 - Life Calendar reads those rows from same-origin `/api/curriculum` (no Teaching API host in the registry)
 
-Unbound `teaching-hub-content` → **503**. `@netlify/blobs` is now a life-hub dependency so `life-hub2` can open the store. Set `NETLIFY_BLOBS_TOKEN` on `life-hub2` to read the existing `arteaching-hub` store instead of an empty local one.
+Unbound `teaching-hub-content` → **503**. `@netlify/blobs` is a life-hub dependency. With `NETLIFY_BLOBS_TOKEN` only, Functions still read the `arteaching-hub` store. Set `TEACHING_BLOBS_SITE_ID` to `local` or the `life-hub2` site id after copying that store onto `life-hub2`.
 
-The Teaching Pages app is retargeted to `https://api.adam-russell.com`. `arteaching-hub` stays live as a fallback. Do not rotate secrets.
+The Teaching Pages app is retargeted to `https://api.adam-russell.com`. Do not rotate secrets.
