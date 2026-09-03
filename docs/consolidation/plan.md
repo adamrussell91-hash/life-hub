@@ -303,7 +303,8 @@ Do **not** retarget `life-hub2`, fold other hubs, or rotate secrets.
 
 Adam-only Teaching read path on the umbrella API, using the existing Life session:
 
-- `GET /api/curriculum` behind `createOperatorHandler` (origin + Life cookie, never `TEACHING_HUB_PASSPHRASE_HASH`)
+- `GET /api/curriculum` plus read-only `GET /api/classes/:id`, `/api/units/:id`, `/api/lessons/:id`
+- All behind `createOperatorHandler` (origin + Life cookie, never `TEACHING_HUB_PASSPHRASE_HASH`)
 - 503 if Blobs unbound — no write-back / catalog migration
 - Teaching rail lists classes when the store is bound
 - Calendar names Teaching scheduled lessons as `pending` (no other-hub API hosts in the registry)
