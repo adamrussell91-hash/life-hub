@@ -5,17 +5,26 @@ import {
   withCors
 } from './http.mjs';
 import { createOperatorHandler } from './operator-gate.mjs';
+import { listJSON } from './teaching-blobs.mjs';
 import { readJsonObject } from './teaching-record-get.mjs';
 
-export function createTeachingCollectionHandler({ create }, deps = {}) {
+export function createTeachingCollectionHandler({ create, listPrefix, listKey }, deps = {}) {
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
-    if (request.method !== 'POST') {
-      return withCors(methodNotAllowed('POST, OPTIONS'), request, env);
-    }
-    const parsed = await readJsonObject(request);
-    if (parsed.error) return withCors(parsed.error, request, env);
     try {
+      if (request.method === 'GET' && listPrefix && listKey) {
+        const items = await listJSON(store, listPrefix);
+        return withCors(okResponse(200, { [listKey]: items }), request, env);
+      }
+      if (request.method !== 'POST') {
+        return withCors(
+          methodNotAllowed(listPrefix ? 'GET, POST, OPTIONS' : 'POST, OPTIONS'),
+          request,
+          env
+        );
+      }
+      const parsed = await readJsonObject(request);
+      if (parsed.error) return withCors(parsed.error, request, env);
       const record = await create(store, parsed.value);
       return withCors(okResponse(201, record), request, env);
     } catch (error) {

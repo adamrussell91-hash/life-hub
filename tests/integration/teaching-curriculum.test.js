@@ -8,9 +8,11 @@ import { createLessonHandler } from '../../netlify/functions/lesson.mjs';
 import { createLessonsHandler } from '../../netlify/functions/lessons.mjs';
 import { createScheduledLessonHandler } from '../../netlify/functions/scheduled-lesson.mjs';
 import { createSubjectHandler } from '../../netlify/functions/subject.mjs';
+import { createSubjectsHandler } from '../../netlify/functions/subjects.mjs';
 import { createUnitHandler } from '../../netlify/functions/unit.mjs';
 import { createUnitsHandler } from '../../netlify/functions/units.mjs';
 import { createYearHandler } from '../../netlify/functions/year.mjs';
+import { createYearsHandler } from '../../netlify/functions/years.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -273,4 +275,51 @@ test('teacher collection POSTs create records behind the Life session', async ()
     })
   );
   assert.equal(anon.status, 401);
+});
+
+test('year and subject collections list and create behind the Life session', async () => {
+  const store = memoryStore();
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+
+  const yearRes = await createYearsHandler(deps)(
+    request({
+      method: 'POST',
+      origin: 'https://teaching-hub.adam-russell.com',
+      url: 'https://api.adam-russell.com/api/years',
+      body: { title: 'Year 12', year_level: 12 }
+    })
+  );
+  assert.equal(yearRes.status, 201);
+  const year = (await yearRes.json()).data;
+  assert.match(year.id, /^year_/);
+  assert.equal(year.year_level, 12);
+
+  const subjectRes = await createSubjectsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/subjects',
+      body: { title: 'English Advanced' }
+    })
+  );
+  assert.equal(subjectRes.status, 201);
+  assert.match((await subjectRes.json()).data.id, /^subject_/);
+
+  const listed = await createYearsHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/years' })
+  );
+  assert.equal(listed.status, 200);
+  assert.equal((await listed.json()).data.years[0].title, 'Year 12');
+
+  const conflict = await createSubjectsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/subjects',
+      body: { title: 'english advanced' }
+    })
+  );
+  assert.equal(conflict.status, 409);
 });
