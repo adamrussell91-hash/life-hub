@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.18 — Knowledge Pages retarget for notes, search, quiz, and Life auth. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.19 — Clementine, capture, and attachments on life-hub2. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -460,7 +460,7 @@ The Tasks Pages app already posts `dump` / `brief` / `apply_mutations` to `https
 - Life Calendar merges Knowledge page dates and Tasks due dates; those sources marked `live`
 - Do not retarget Knowledge Pages (paths are namespaced). No R2, no secret rotation, no old-site retire
 
-### Slice 26 — Knowledge Pages retarget (this slice)
+### Slice 26 — Knowledge Pages retarget (shipped, PR #83 / knowledge-hub #99)
 
 Knowledge Pages can call the namespaced handlers without colliding with Teaching `/api/search`:
 
@@ -471,9 +471,22 @@ Knowledge Pages can call the namespaced handlers without colliding with Teaching
 - Leftover Clementine, attachments, tidy, capture, curator, and podcast stay on `knowledge-api`; login also establishes that session with the same passphrase until those handlers fold
 - Do not bind R2, copy Knowledge auth, rotate secrets, or retire `knowledge-hub-archive`
 
+### Slice 27 — Clementine, capture, attachments (this slice)
+
+Session-gated leftovers on `life-hub2`, still no Cloudflare R2 binding:
+
+- `POST /api/knowledge/clementine-coach` — Life session + `ANTHROPIC_API_KEY`; optional archive via `RESEARCH_KERNEL_*`
+- `POST /api/knowledge/clementine-chat` — hat/write clock on the existing research Worker (26s); live archive fallback from `knowledge-hub-data`
+- `POST /api/knowledge/capture` — proxies `{ r2_key }` to the Worker (Worker still reads `knowledge-hub-archive`)
+- `POST /api/knowledge/attachments-sign` and `GET /api/knowledge/attachments/:pageId/:attachmentId` — S3-compatible R2 presign (`R2_*` env), not a Netlify bind
+- Knowledge Pages points those clients at the umbrella prefix; tidy, curator, and podcast stay on `knowledge-api`
+- Do not copy Knowledge auth, rotate secrets, bind the R2 bucket, or retire `knowledge-hub-archive`
+
+Copy onto `life-hub2` if missing: `RESEARCH_KERNEL_URL`, `RESEARCH_KERNEL_SHARED_SECRET`, `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. `ANTHROPIC_API_KEY` is already there.
+
 ## Next action
 
-Keep shipping. Next: fold Clementine, capture, or attachments onto `life-hub2`, or smoke Teaching and Tasks Clare against `api.adam-russell.com`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
+Keep shipping. Next: fold tidy, curator, or podcast, or smoke Teaching and Tasks Clare against `api.adam-russell.com`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**. Set the new `RESEARCH_KERNEL_*` / `R2_*` keys on `life-hub2` before production Knowledge chat/uploads work.
 
 ## Open questions (Adam)
 

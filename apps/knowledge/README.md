@@ -11,4 +11,10 @@ SPA path aliases (same handlers, Life session):
 - `GET /api/knowledge/quiz/:pageId` and `GET /api/knowledge/quiz/items/:pageId`
 - `GET /api/knowledge/auth-session`, `POST /api/knowledge/auth-login`, `POST /api/knowledge/auth-logout` — Life passphrase and `life_hub_session`, not Knowledge auth
 
-The Knowledge Pages app defaults to `https://api.adam-russell.com/api/knowledge` for notes, search, quiz, and sign-in. Clementine, attachments, tidy, capture, curator, and podcast stay on `knowledge-api` until those handlers fold. R2 bucket / Worker `knowledge-hub-archive` stay put. Do not copy Knowledge auth, bind R2, or rotate secrets.
+The Knowledge Pages app defaults to `https://api.adam-russell.com/api/knowledge` for notes, search, quiz, sign-in, Clementine, capture, and attachments.
+
+- `POST /api/knowledge/clementine-coach` and `POST /api/knowledge/clementine-chat` use the Life session. Chat write/research stay on Worker `knowledge-hub-research`.
+- `POST /api/knowledge/capture` proxies to that Worker.
+- `POST /api/knowledge/attachments-sign` and `GET /api/knowledge/attachments/:pageId/:attachmentId` presign R2 via S3 API (`R2_*`). No Cloudflare bind on Netlify.
+
+Tidy, curator, and podcast stay on `knowledge-api`. R2 bucket / Worker `knowledge-hub-archive` stay put. Do not copy Knowledge auth, bind R2, or rotate secrets.
