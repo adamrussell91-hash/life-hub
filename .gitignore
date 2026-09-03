@@ -9,6 +9,8 @@ test-results/
 playwright-report/
 /vendor/
 /dist/
+apps/*/dist/
+apps/*/.ua/
 .DS_Store
 .superpowers/brainstorm/
 .netlify/

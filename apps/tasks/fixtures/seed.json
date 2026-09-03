@@ -1,0 +1,745 @@
+{
+  "frameworks": [
+    {
+      "schema_version": 1,
+      "id": "fw_eat_the_frog",
+      "name": "Eat the Frog",
+      "best_suited_task_pattern": "High-importance task that keeps getting deprioritised",
+      "reasoning_template": "Eat the Frog, because this has been sitting untouched and keeps getting deprioritised."
+    },
+    {
+      "schema_version": 1,
+      "id": "fw_timeboxing",
+      "name": "Timeboxing",
+      "best_suited_task_pattern": "Open-ended work that expands to fill the day",
+      "reasoning_template": "Timeboxing, because this will expand forever without a hard stop."
+    },
+    {
+      "schema_version": 1,
+      "id": "fw_eisenhower",
+      "name": "Eisenhower matrix",
+      "best_suited_task_pattern": "Competing urgencies where importance is unclear",
+      "reasoning_template": "Eisenhower, because urgency and importance are fighting each other here."
+    }
+  ],
+  "excursion_templates": [
+    {
+      "schema_version": 1,
+      "id": "ext_excursion",
+      "name": "excursion template",
+      "default_lead_times": {
+        "permission_note_days": 21,
+        "staff_email_days": 21,
+        "risk_assessment_days": 42,
+        "payment_days": 28
+      },
+      "checklist_items": [
+        "Permission note drafted and sent",
+        "Staff absence email sent",
+        "Risk assessment lodged",
+        "Payment confirmed",
+        "Student list finalised"
+      ]
+    }
+  ],
+  "task_templates": [
+    {
+      "schema_version": 1,
+      "id": "tt_marking_batch",
+      "name": "Marking batch",
+      "domain": "teaching",
+      "default_fields": {
+        "title_pattern": "Marking batch",
+        "framework_used": "fw_timeboxing",
+        "estimated_duration": 90,
+        "priority": "high",
+        "tags": [
+          "marking"
+        ]
+      },
+      "created_from": null,
+      "created_at": "2026-08-01T00:00:00.000Z"
+    }
+  ],
+  "project_templates": [
+    {
+      "schema_version": 1,
+      "id": "pt_standard_term",
+      "name": "Standard term project",
+      "type": "standard",
+      "excursion_template_id": null,
+      "default_milestones": [
+        {
+          "title": "Kickoff",
+          "due_date": null,
+          "status": "open"
+        },
+        {
+          "title": "Midpoint check",
+          "due_date": null,
+          "status": "open"
+        },
+        {
+          "title": "Close",
+          "due_date": null,
+          "status": "open"
+        }
+      ],
+      "created_from": null,
+      "created_at": "2026-08-01T00:00:00.000Z"
+    }
+  ],
+  "areas": [
+    {
+      "schema_version": 1,
+      "id": "area_teaching",
+      "title": "Teaching",
+      "description": "School, curriculum, and classroom work.",
+      "tags": [],
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z"
+    },
+    {
+      "schema_version": 1,
+      "id": "area_life",
+      "title": "Life",
+      "description": "Home, health, and personal arcs.",
+      "tags": [],
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z"
+    }
+  ],
+  "goals": [
+    {
+      "schema_version": 1,
+      "id": "goal_mindworks",
+      "title": "Grow MindWorks",
+      "description": "Build and stabilise the MindWorks program across the year.",
+      "parent_area_id": "area_teaching",
+      "status": "active",
+      "tags": ["academic"],
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z"
+    },
+    {
+      "schema_version": 1,
+      "id": "goal_masters",
+      "title": "Finish Masters reading",
+      "description": "Complete the literature review arc.",
+      "parent_area_id": "area_life",
+      "status": "active",
+      "tags": ["study"],
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z"
+    }
+  ],
+  "projects": [
+    {
+      "schema_version": 1,
+      "id": "proj_mindworks",
+      "title": "MindWorks",
+      "description": "Multi-term academic initiative.",
+      "parent_goal_id": "goal_mindworks",
+      "tags": ["academic", "term-3"],
+      "arc_summary": "Build and stabilise MindWorks across the year.",
+      "type": "academic_program",
+      "milestones": [
+        {
+          "id": "ms_mw_1",
+          "project_id": "proj_mindworks",
+          "title": "Term plan locked",
+          "due_date": "2026-08-22",
+          "status": "open"
+        },
+        {
+          "id": "ms_mw_2",
+          "project_id": "proj_mindworks",
+          "title": "Showcase",
+          "due_date": "2026-11-15",
+          "status": "open"
+        }
+      ],
+      "status": "active",
+      "baseline_end_date": "2026-11-15",
+      "current_end_date": "2026-11-15",
+      "review_summary": null,
+      "stall_flagged_at": null,
+      "created_at": "2026-07-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z",
+      "competition_or_event_type": null,
+      "key_dates": null,
+      "student_group_reference": null,
+      "generated_admin_tasks": [],
+      "drafted_documents": null
+    },
+    {
+      "schema_version": 1,
+      "id": "proj_stalled_masters",
+      "title": "Masters reading notes",
+      "description": "Literature notes that stopped moving mid-year.",
+      "parent_goal_id": "goal_masters",
+      "tags": ["study"],
+      "arc_summary": "Quiet since June — seed for stall detection.",
+      "type": "standard",
+      "milestones": [
+        {
+          "id": "ms_masters_1",
+          "project_id": "proj_stalled_masters",
+          "title": "Annotated bibliography",
+          "due_date": "2026-06-30",
+          "status": "open"
+        }
+      ],
+      "status": "active",
+      "baseline_end_date": "2026-09-01",
+      "current_end_date": "2026-09-01",
+      "review_summary": null,
+      "stall_flagged_at": null,
+      "created_at": "2026-05-01T00:00:00.000Z",
+      "updated_at": "2026-06-01T00:00:00.000Z",
+      "competition_or_event_type": null,
+      "key_dates": null,
+      "student_group_reference": null,
+      "generated_admin_tasks": [],
+      "drafted_documents": null
+    },
+    {
+      "schema_version": 1,
+      "id": "proj_ex_ethics_seed",
+      "title": "Ethics Olympiad heat",
+      "description": "Seed excursion for StressFlag overlap detection.",
+      "arc_summary": "Regional heat in October.",
+      "type": "excursion",
+      "milestones": [],
+      "status": "active",
+      "baseline_end_date": "2026-10-10",
+      "current_end_date": "2026-10-10",
+      "review_summary": null,
+      "stall_flagged_at": null,
+      "created_at": "2026-07-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z",
+      "competition_or_event_type": "ext_excursion",
+      "key_dates": null,
+      "student_group_reference": "Year 10 Ethics",
+      "generated_admin_tasks": [],
+      "drafted_documents": null
+    },
+    {
+      "schema_version": 1,
+      "id": "proj_ex_davinci_seed",
+      "title": "Da Vinci Decathlon heat",
+      "description": "Seed excursion overlapping Ethics in the same fortnight.",
+      "arc_summary": "Same fortnight collision on purpose.",
+      "type": "excursion",
+      "milestones": [],
+      "status": "active",
+      "baseline_end_date": "2026-10-18",
+      "current_end_date": "2026-10-18",
+      "review_summary": null,
+      "stall_flagged_at": null,
+      "created_at": "2026-07-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z",
+      "competition_or_event_type": "ext_excursion",
+      "key_dates": null,
+      "student_group_reference": "Year 9 Da Vinci",
+      "generated_admin_tasks": [],
+      "drafted_documents": null
+    },
+    {
+      "schema_version": 1,
+      "id": "proj_close_demo",
+      "title": "Term 2 marking wrap",
+      "description": "Seed project ready for closure (all tasks done, slipped past baseline).",
+      "arc_summary": "Finished — due for retrospective.",
+      "type": "standard",
+      "milestones": [],
+      "status": "active",
+      "baseline_end_date": "2026-07-15",
+      "current_end_date": "2026-08-01",
+      "review_summary": null,
+      "stall_flagged_at": null,
+      "created_at": "2026-06-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z",
+      "competition_or_event_type": null,
+      "key_dates": null,
+      "student_group_reference": null,
+      "generated_admin_tasks": [],
+      "drafted_documents": null
+    }
+  ],
+  "tasks": [
+    {
+      "schema_version": 1,
+      "id": "task_demo_lesson_pack",
+      "title": "Finish lesson pack for Year 12",
+      "description": "Polish blocks and publish draft.",
+      "domain": "teaching",
+      "framework_used": "fw_eat_the_frog",
+      "estimated_duration": 60,
+      "actual_duration": null,
+      "due_date": "2026-08-17",
+      "created_at": "2026-08-14T00:00:00.000Z",
+      "updated_at": "2026-08-14T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "high",
+      "parent_project_id": "proj_mindworks",
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "teaching",
+        "publish"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_wedding_vendor",
+      "title": "Reply to florist quote",
+      "description": "Confirm availability for November.",
+      "domain": "wedding",
+      "framework_used": null,
+      "estimated_duration": 20,
+      "actual_duration": null,
+      "due_date": "2026-08-16",
+      "created_at": "2026-08-10T00:00:00.000Z",
+      "updated_at": "2026-08-10T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "medium",
+      "parent_project_id": null,
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "wedding"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_weekly_review",
+      "title": "Weekly teaching review",
+      "description": "Repeat every Monday — spawns the next instance when marked done.",
+      "domain": "teaching",
+      "framework_used": "fw_timeboxing",
+      "estimated_duration": 30,
+      "actual_duration": null,
+      "due_date": "2026-08-18",
+      "created_at": "2026-08-10T00:00:00.000Z",
+      "updated_at": "2026-08-10T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "medium",
+      "parent_project_id": "proj_mindworks",
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "teaching",
+        "review"
+      ],
+      "recurrence_rule": "{\"v\":1,\"frequency\":\"weekly\",\"interval\":1,\"count\":null,\"completed_count\":0,\"weekday\":1}",
+      "due_time": "09:00",
+      "remind_at": "2026-08-17T23:00:00.000Z",
+      "remind_dismissed_at": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_backlog",
+      "title": "Sort fragrance research notes",
+      "description": "Backlog — no due date yet.",
+      "domain": "life",
+      "framework_used": "fw_timeboxing",
+      "estimated_duration": 45,
+      "actual_duration": null,
+      "due_date": null,
+      "created_at": "2026-08-05T00:00:00.000Z",
+      "updated_at": "2026-08-05T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "low",
+      "parent_project_id": null,
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "fragrance"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_publish",
+      "title": "Publish Year 12 pack",
+      "description": "Blocked until lesson pack is finished.",
+      "domain": "teaching",
+      "framework_used": null,
+      "estimated_duration": 30,
+      "actual_duration": null,
+      "due_date": "2026-08-18",
+      "created_at": "2026-08-14T00:00:00.000Z",
+      "updated_at": "2026-08-14T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "blocked_since": "2026-08-14T00:00:00.000Z",
+      "priority": "high",
+      "parent_project_id": "proj_mindworks",
+      "parent_task_id": null,
+      "depends_on": [
+        "task_demo_lesson_pack"
+      ],
+      "tags": [
+        "teaching",
+        "publish"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_mw_brief",
+      "title": "Lock MindWorks term brief",
+      "description": "Align outcomes with showcase milestone.",
+      "domain": "teaching",
+      "framework_used": "fw_eisenhower",
+      "estimated_duration": 120,
+      "actual_duration": null,
+      "due_date": "2026-08-22",
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z",
+      "completed_at": null,
+      "status": "in_progress",
+      "priority": "urgent",
+      "parent_project_id": "proj_mindworks",
+      "parent_task_id": null,
+      "depends_on": [
+        "task_demo_publish"
+      ],
+      "tags": [
+        "mindworks"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_mw_rehearsal",
+      "title": "Showcase rehearsal",
+      "description": "Dry run before November showcase.",
+      "domain": "teaching",
+      "framework_used": "fw_timeboxing",
+      "estimated_duration": 180,
+      "actual_duration": null,
+      "due_date": "2026-11-08",
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "blocked_since": "2026-08-01T00:00:00.000Z",
+      "priority": "high",
+      "parent_project_id": "proj_mindworks",
+      "parent_task_id": null,
+      "depends_on": [
+        "task_demo_mw_brief"
+      ],
+      "tags": [
+        "mindworks",
+        "showcase"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_pinch_email",
+      "title": "Send parent update email",
+      "description": "Seed pinch — same day as lesson pack.",
+      "domain": "teaching",
+      "framework_used": null,
+      "estimated_duration": 25,
+      "actual_duration": null,
+      "due_date": "2026-08-17",
+      "created_at": "2026-08-14T00:00:00.000Z",
+      "updated_at": "2026-08-14T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "medium",
+      "parent_project_id": null,
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "teaching",
+        "email"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_pinch_filing",
+      "title": "File excursion permission slips",
+      "description": "Seed pinch — low-priority shrink candidate.",
+      "domain": "other",
+      "framework_used": null,
+      "estimated_duration": 40,
+      "actual_duration": null,
+      "due_date": "2026-08-17",
+      "created_at": "2026-08-14T00:00:00.000Z",
+      "updated_at": "2026-08-14T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "low",
+      "parent_project_id": null,
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "admin"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_pinch_calls",
+      "title": "Return three parent calls",
+      "description": "Seed pinch — pushes Aug 17 over the watch threshold.",
+      "domain": "teaching",
+      "framework_used": null,
+      "estimated_duration": 45,
+      "actual_duration": null,
+      "due_date": "2026-08-17",
+      "created_at": "2026-08-14T00:00:00.000Z",
+      "updated_at": "2026-08-14T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "medium",
+      "parent_project_id": null,
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "teaching"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_masters_notes",
+      "title": "Summarise three journal articles",
+      "description": "Belongs to the stalled Masters project.",
+      "domain": "teaching",
+      "framework_used": "fw_timeboxing",
+      "estimated_duration": 90,
+      "actual_duration": null,
+      "due_date": null,
+      "created_at": "2026-05-20T00:00:00.000Z",
+      "updated_at": "2026-06-01T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "low",
+      "parent_project_id": "proj_stalled_masters",
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "masters"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_overdue_a",
+      "title": "Return library textbooks",
+      "description": "Overdue seed for missed-deadline StressFlag.",
+      "domain": "teaching",
+      "framework_used": null,
+      "estimated_duration": 20,
+      "actual_duration": null,
+      "due_date": "2026-08-01",
+      "created_at": "2026-07-20T00:00:00.000Z",
+      "updated_at": "2026-07-20T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "low",
+      "parent_project_id": null,
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "admin"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_overdue_b",
+      "title": "Submit PD reflection",
+      "description": "Overdue seed for missed-deadline StressFlag.",
+      "domain": "teaching",
+      "framework_used": null,
+      "estimated_duration": 45,
+      "actual_duration": null,
+      "due_date": "2026-08-05",
+      "created_at": "2026-07-25T00:00:00.000Z",
+      "updated_at": "2026-07-25T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "medium",
+      "parent_project_id": null,
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "pd"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_overdue_c",
+      "title": "Update emergency contact form",
+      "description": "Overdue seed for missed-deadline StressFlag.",
+      "domain": "life",
+      "framework_used": null,
+      "estimated_duration": 15,
+      "actual_duration": null,
+      "due_date": "2026-08-10",
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "low",
+      "parent_project_id": null,
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "admin"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_close_done",
+      "title": "Finalise Term 2 marks",
+      "description": "Done task under closure demo project.",
+      "domain": "teaching",
+      "framework_used": null,
+      "estimated_duration": 120,
+      "actual_duration": 140,
+      "due_date": "2026-08-01",
+      "created_at": "2026-07-01T00:00:00.000Z",
+      "updated_at": "2026-08-01T00:00:00.000Z",
+      "completed_at": "2026-08-01T00:00:00.000Z",
+      "status": "done",
+      "priority": "high",
+      "parent_project_id": "proj_close_demo",
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "marking"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_outline_units",
+      "title": "Outline MindWorks units",
+      "description": "Child of the lesson pack — branch-view depth.",
+      "kind": "step",
+      "bucket": "active",
+      "step_order": 1,
+      "domain": "teaching",
+      "framework_used": null,
+      "estimated_duration": 40,
+      "actual_duration": null,
+      "due_date": "2026-08-19",
+      "created_at": "2026-08-14T00:00:00.000Z",
+      "updated_at": "2026-08-14T00:00:00.000Z",
+      "completed_at": null,
+      "status": "open",
+      "priority": "medium",
+      "parent_project_id": "proj_mindworks",
+      "parent_task_id": "task_demo_lesson_pack",
+      "depends_on": [],
+      "tags": [
+        "teaching",
+        "mindworks"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_someday_podcast",
+      "title": "Start a teaching podcast",
+      "description": "Maybe — park until there is bandwidth after Term 3.",
+      "kind": "task",
+      "bucket": "someday",
+      "step_order": 0,
+      "domain": "teaching",
+      "framework_used": null,
+      "estimated_duration": null,
+      "actual_duration": null,
+      "due_date": null,
+      "created_at": "2026-08-20T00:00:00.000Z",
+      "updated_at": "2026-08-20T00:00:00.000Z",
+      "completed_at": null,
+      "status": "deferred",
+      "priority": "low",
+      "parent_project_id": null,
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "idea"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_demo_walk_done",
+      "title": "Evening walk — done",
+      "description": "Seed completion so the constellation has a lit star.",
+      "domain": "health",
+      "framework_used": null,
+      "estimated_duration": 25,
+      "actual_duration": 25,
+      "due_date": "2026-08-15",
+      "created_at": "2026-08-14T00:00:00.000Z",
+      "updated_at": "2026-08-15T18:00:00.000Z",
+      "completed_at": "2026-08-15T18:00:00.000Z",
+      "status": "done",
+      "priority": "low",
+      "parent_project_id": null,
+      "parent_task_id": null,
+      "depends_on": [],
+      "tags": [
+        "health"
+      ],
+      "recurrence_rule": null,
+      "attachments": [],
+      "source": "manual"
+    }
+  ]
+}

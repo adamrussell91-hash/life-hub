@@ -1,0 +1,16 @@
+node_modules/
+.superpowers/
+.worktrees/
+.netlify/
+dist/
+.env
+.DS_Store
+playwright-report/
+test-results/
+*.tsbuildinfo
+.wrangler/
+migrated/pages-dry-run.json
+migrated/pages-dry-run-*.json
+migrated/lexical-corpus.json
+migrated/index.json
+migrated/data-repo/

@@ -1,0 +1,265 @@
+/* Locked left rail. Every hub uses this sheet (or chrome.css, which imports it).
+ * Do not override --rail-width. Do not restyle markers as dots or icon stacks.
+ * Spec: RAIL.md. Snippet: snippets/rail.html.
+ */
+
+.hub-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 100%;
+  padding: var(--space-5) var(--space-3);
+  background: linear-gradient(180deg, var(--depth) 0%, var(--marine) 100%);
+  color: var(--on-dark);
+}
+
+.hub-rail a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.hub-rail a:hover {
+  color: inherit;
+}
+
+/* Brand: one line, CSS uppercase. Always an <a> to that hub’s home. */
+.hub-rail__brand-block {
+  padding: var(--space-1) var(--space-3) var(--space-4);
+}
+
+.hub-rail__brand {
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  line-height: var(--leading-snug);
+  color: var(--on-dark-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+a.hub-rail__brand:hover,
+a.hub-rail__brand:focus-visible {
+  color: var(--on-dark);
+}
+
+.hub-rail__tagline {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+  line-height: var(--leading-snug);
+  color: var(--on-dark-muted);
+  opacity: 0.72;
+}
+
+/* Optional Teaching search — on-dark field, same inset as nav. */
+.hub-rail__search {
+  margin: 0 var(--space-2) var(--space-3);
+}
+
+.hub-rail__search input {
+  width: 100%;
+  min-height: 2.25rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--on-dark-line);
+  border-radius: var(--radius-sm);
+  background: var(--on-dark-hover);
+  color: var(--on-dark);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.hub-rail__search input::placeholder {
+  color: var(--on-dark-muted);
+}
+
+.hub-rail__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.hub-rail__section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin: var(--space-4) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  line-height: var(--leading-snug);
+  color: var(--on-dark-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.hub-rail__section:first-child {
+  margin-top: 0;
+}
+
+.hub-rail__section-chevron {
+  width: 1rem;
+  height: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 180ms ease;
+}
+
+.hub-rail__section[aria-expanded="true"] .hub-rail__section-chevron {
+  transform: rotate(180deg);
+}
+
+.hub-rail__section-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 220ms ease, opacity 160ms ease;
+}
+
+.hub-rail__section-panel[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.hub-rail__section-panel-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.hub-rail__mobile {
+  display: none;
+}
+
+/* Primary destinations: 18px outline icon + title-case label. */
+.hub-rail__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 2.5rem;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--on-dark-muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-snug);
+  text-align: left;
+  text-transform: none;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.hub-rail__link:hover,
+.hub-rail__link:focus-visible {
+  color: var(--on-dark);
+  background: var(--on-dark-hover);
+}
+
+.hub-rail__link[aria-current="page"],
+.hub-rail__link.is-current {
+  color: var(--on-dark);
+  background: var(--on-dark-hover);
+  font-weight: var(--weight-semibold);
+}
+
+.hub-rail__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+  display: block;
+}
+
+.hub-rail__link--plain {
+  padding-left: var(--space-3);
+}
+
+.hub-rail__status {
+  margin: auto 0 0;
+  padding: var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+  line-height: var(--leading-snug);
+  color: var(--on-dark-muted);
+}
+
+@media (max-width: 720px) {
+  .hub-rail {
+    display: none;
+  }
+
+  .hub-rail__list--desktop {
+    display: none;
+  }
+
+  .hub-rail__mobile {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .hub-rail__mobile-tabs,
+  .hub-rail__mobile-items {
+    display: flex;
+    gap: var(--space-1);
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .hub-rail__mobile-tabs::-webkit-scrollbar,
+  .hub-rail__mobile-items::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hub-rail__mobile-tabs .hub-rail__section {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .hub-rail__mobile-panel {
+    display: flex;
+    flex: 0 0 auto;
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-width 220ms ease, opacity 160ms ease;
+  }
+
+  .hub-rail__mobile-panel[data-open="true"] {
+    max-width: 100rem;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-rail__section-chevron,
+  .hub-rail__section-panel,
+  .hub-rail__mobile-panel {
+    transition: none;
+  }
+}

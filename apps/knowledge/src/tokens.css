@@ -1,0 +1,75 @@
+/* Re-export the hub design kit. Edit the kit, then run scripts/sync-to-hubs.sh. */
+@import "../design-kit/tokens.css";
+@import "../design-kit/overlays.css";
+@import "../design-kit/actions.css";
+@import "../design-kit/sign-in.css";
+@import "../design-kit/rail.css";
+
+:root {
+  --paper: var(--warm-white);
+  --blue: var(--pastel-blue);
+  --blue-ink: var(--pastel-blue-ink);
+  --sage: var(--pastel-sage);
+  --sage-ink: var(--pastel-sage-ink);
+  --gold: var(--pastel-gold);
+  --gold-ink: var(--pastel-gold-ink);
+  --peach: var(--pastel-peach);
+  --peach-ink: var(--pastel-peach-ink);
+  --lilac: var(--pastel-lilac);
+  --lilac-ink: var(--pastel-lilac-ink);
+  --faint: var(--muted);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  isolation: isolate;
+  font-family: var(--font-ui);
+  font-synthesis: none;
+  color: var(--ink);
+  background-color: var(--cotton);
+  background-image:
+    radial-gradient(760px 540px at 4% 0%, rgba(207, 223, 241, 0.62), transparent 70%),
+    radial-gradient(720px 500px at 98% 8%, rgba(237, 216, 197, 0.5), transparent 72%),
+    radial-gradient(620px 440px at 78% 92%, rgba(218, 231, 221, 0.46), transparent 72%),
+    linear-gradient(145deg, #f4f0e8, #fbf8f2 48%, #f3efe6);
+  line-height: var(--leading-normal);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(22, 55, 94, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 55, 94, 0.018) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), transparent 70%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), transparent 70%);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.glass,
+.glass-panel {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.52));
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: var(--elev-3);
+  backdrop-filter: blur(22px) saturate(115%);
+  -webkit-backdrop-filter: blur(22px) saturate(115%);
+}
