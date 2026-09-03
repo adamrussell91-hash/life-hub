@@ -1,5 +1,7 @@
 # apps/knowledge
 
-Not folded. Knowledge Netlify API (`knowledge-hub-archive`) and the R2 bucket / Worker of the same name are separate resources — do not conflate them.
+Knowledge Hub SPA stays on GitHub Pages at `https://knowledge-hub.adam-russell.com`.
 
-The Life shell mounts an empty Knowledge section. No API URLs and no R2 changes in this slice.
+The Life shell links out to that origin. CORS on `life-hub2` now allows it exactly.
+
+Netlify site `knowledge-hub-archive` and R2 bucket / Worker `knowledge-hub-archive` are still separate. Do not copy Knowledge auth or R2 bindings in this slice.
