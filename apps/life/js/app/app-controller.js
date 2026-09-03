@@ -1,5 +1,6 @@
 import { getSydneyDateKey } from '../core/time.js';
 import { renderHubSection } from '../shell/render-hub-sections.js';
+import { renderKnowledgeDashboard } from '../shell/render-knowledge.js';
 import { renderTeachingDashboard } from '../shell/render-teaching.js';
 import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -63,6 +64,7 @@ export function createAppController(dependencies) {
     renderSkincare,
     skincareApi,
     teachingApi,
+    knowledgeApi,
     skincareController,
     skincareRoutines,
     getCurrentRoutineKey,
@@ -661,6 +663,7 @@ export function createAppController(dependencies) {
     if (name === 'central-node') renderCentralNodeSection();
     if (name === 'teaching' || name === 'knowledge' || name === 'tasks') renderHubSection(root, name);
     if (name === 'teaching') void loadTeachingSection();
+    if (name === 'knowledge') void loadKnowledgeSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const section = button.dataset.section;
       const active = section === name
@@ -686,6 +689,24 @@ export function createAppController(dependencies) {
       if (currentSection !== 'teaching') return;
       renderTeachingDashboard(root, {
         status: error?.code === 'blobs_unbound' ? 'unbound' : 'error'
+      });
+    }
+  }
+
+  async function loadKnowledgeSection() {
+    if (!knowledgeApi?.listPages) {
+      renderKnowledgeDashboard(root, { status: 'link-only' });
+      return;
+    }
+    renderKnowledgeDashboard(root, { status: 'loading' });
+    try {
+      const pages = await knowledgeApi.listPages();
+      if (currentSection !== 'knowledge') return;
+      renderKnowledgeDashboard(root, { status: 'ready', pages });
+    } catch (error) {
+      if (currentSection !== 'knowledge') return;
+      renderKnowledgeDashboard(root, {
+        status: error?.code === 'knowledge_repo_unbound' ? 'unbound' : 'error'
       });
     }
   }

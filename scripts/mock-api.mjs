@@ -227,10 +227,16 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
       return true;
     }
 
-    if (url.pathname === '/api/curriculum') {
-      if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
+    if (url.pathname === '/api/curriculum' ||
+        /^\/api\/(classes|units|lessons|years|subjects|scheduled-lessons)(\/|$)/.test(url.pathname)) {
       if (!readSession(request)) return unauthenticated(response);
       error(response, 503, 'blobs_unbound', 'Teaching content store is not bound.', true);
+      return true;
+    }
+
+    if (url.pathname.startsWith('/api/knowledge/')) {
+      if (!readSession(request)) return unauthenticated(response);
+      error(response, 503, 'knowledge_repo_unbound', 'Knowledge data repository is not bound.', true);
       return true;
     }
 

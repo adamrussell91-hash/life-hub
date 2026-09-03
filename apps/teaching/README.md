@@ -4,6 +4,9 @@ Teaching Hub SPA stays on GitHub Pages at `https://teaching-hub.adam-russell.com
 
 Student URLs (`/s/lessons/*`, `/s/units/*`, `/s/classes/*`) stay public and unauthenticated. Those APIs are on `life-hub2` and skip the Adam session.
 
-`GET /api/curriculum` is the first teacher read path on `life-hub2`. It uses the Life session cookie and returns **503** if Blobs `teaching-hub-content` is not bound.
+Teacher reads and writes on `life-hub2` use the Life session cookie:
 
-Teacher writes, Blobs binding, and retiring `arteaching-hub` are later. Do not rotate secrets or retarget production in this slice.
+- GET `/api/curriculum` plus GET/PATCH/PUT/DELETE on class, unit, lesson, year, subject, and scheduled-lesson records
+- POST `/api/classes`, `/api/units`, `/api/lessons` to create records
+
+Unbound `teaching-hub-content` → **503**. Do not rotate secrets, retarget production, or retire `arteaching-hub` in this slice.
