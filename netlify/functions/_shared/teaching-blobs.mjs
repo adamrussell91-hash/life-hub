@@ -65,6 +65,34 @@ export async function getJSON(store, key) {
   return store.get(key, { type: 'json' });
 }
 
+export async function setJSON(store, key, value) {
+  if (typeof store.setJSON === 'function') return store.setJSON(key, value);
+  if (typeof store.set === 'function') return store.set(key, JSON.stringify(value));
+  throw new Error('Teaching content store cannot write.');
+}
+
+export async function deleteKey(store, key) {
+  if (typeof store.delete !== 'function') {
+    throw new Error('Teaching content store cannot delete.');
+  }
+  return store.delete(key);
+}
+
+export function slugify(title) {
+  return (
+    String(title ?? '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 80) || 'item'
+  );
+}
+
+export function newId(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export async function listJSON(store, prefix) {
   const { blobs } = await store.list({ prefix });
   const entries = await Promise.all(blobs.map(blob => getJSON(store, blob.key)));
