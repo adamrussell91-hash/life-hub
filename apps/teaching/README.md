@@ -9,4 +9,6 @@ Teacher reads and writes on `life-hub2` use the Life session cookie:
 - GET `/api/curriculum` plus GET/PATCH/PUT/DELETE on class, unit, lesson, year, subject, and scheduled-lesson records
 - POST `/api/classes`, `/api/units`, `/api/lessons` to create records
 
-Unbound `teaching-hub-content` → **503**. Do not rotate secrets, retarget production, or retire `arteaching-hub` in this slice.
+Unbound `teaching-hub-content` → **503**. `@netlify/blobs` is now a life-hub dependency so `life-hub2` can open the store. Set `NETLIFY_BLOBS_TOKEN` on `life-hub2` to read the existing `arteaching-hub` store instead of an empty local one.
+
+Do not rotate secrets, retarget production, or retire `arteaching-hub` in this slice.

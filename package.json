@@ -16,6 +16,7 @@
     "import:mind": "node scripts/import-mind-notion.mjs"
   },
   "dependencies": {
+    "@netlify/blobs": "^9.1.2",
     "js-yaml": "4.3.0"
   },
   "devDependencies": {

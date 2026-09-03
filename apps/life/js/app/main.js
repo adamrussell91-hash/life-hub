@@ -42,6 +42,7 @@ import { renderNutrition } from './render-nutrition.js';
 import { createRepositoryCache } from './repository-cache.js';
 import { createSkincareApi } from './skincare-api.js';
 import { createKnowledgeApi } from './knowledge-api.js';
+import { createTasksApi } from './tasks-api.js';
 import { createTeachingApi } from './teaching-api.js';
 import { createSkincareController } from './skincare-controller.js';
 import { buildSkincareModel } from './skincare-model.js';
@@ -92,6 +93,7 @@ const chatApi = createChatApi(fetchImpl);
 const skincareApi = createSkincareApi(fetchImpl);
 const teachingApi = createTeachingApi(fetchImpl);
 const knowledgeApi = createKnowledgeApi(fetchImpl);
+const tasksApi = createTasksApi(fetchImpl);
 
 let controller;
 let chatController;
@@ -152,6 +154,7 @@ controller = createAppController({
   skincareApi,
   teachingApi,
   knowledgeApi,
+  tasksApi,
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,
