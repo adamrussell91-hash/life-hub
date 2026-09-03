@@ -62,6 +62,7 @@ export const CLASS_PREFIX = 'classes/';
 export const SCOPE_SEQUENCE_PREFIX = 'scope_sequences/';
 export const MEDIA_PREFIX = 'media/';
 export const OUTCOME_PREFIX = 'outcomes/';
+export const COMPOSITION_PREFIX = 'templates/compositions/';
 export const DEFAULT_SCHEDULE_ANCHOR_DATE = '2026-08-12';
 
 export function scheduleAnchorKey() {
