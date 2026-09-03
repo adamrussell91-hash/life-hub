@@ -21,6 +21,12 @@ export const CALENDAR_SOURCES = [
     label: 'Knowledge',
     kind: 'archive',
     status: 'pending'
+  },
+  {
+    id: 'tasks',
+    label: 'Tasks',
+    kind: 'board',
+    status: 'pending'
   }
 ];
 

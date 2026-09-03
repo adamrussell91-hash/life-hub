@@ -89,3 +89,14 @@ test('Knowledge Pages origin is allowed on the umbrella API', async () => {
   }));
   assert.notEqual(response.status, 403);
 });
+
+test('Tasks Pages origin is allowed on the umbrella API', async () => {
+  const handler = createSessionHandler({
+    env,
+    verifySessionToken: () => ({ valid: false })
+  });
+  const response = await handler(new Request('https://api.adam-russell.com/api/session', {
+    headers: { origin: 'https://tasks-hub.adam-russell.com' }
+  }));
+  assert.notEqual(response.status, 403);
+});

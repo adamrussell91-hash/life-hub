@@ -17,7 +17,7 @@ export const HUB_SECTIONS = [
     id: 'tasks',
     title: 'Tasks',
     eyebrow: 'Board',
-    origin: null,
+    origin: 'https://tasks-hub.adam-russell.com',
     studentPublicPrefix: null
   }
 ];
