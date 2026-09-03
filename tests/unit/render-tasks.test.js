@@ -21,6 +21,7 @@ function fakeRoot() {
     querySelector(selector) {
       if (selector === '[data-tasks="status"]') return status;
       if (selector === '#tasks-item-list') return list;
+      if (selector === '#tasks-project-list') return { ...list, children: [], hidden: true, replaceChildren() {}, append() {} };
       return null;
     },
     _status: status,

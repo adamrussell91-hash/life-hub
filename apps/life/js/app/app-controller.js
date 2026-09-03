@@ -721,9 +721,12 @@ export function createAppController(dependencies) {
     }
     renderTasksDashboard(root, { status: 'loading' });
     try {
-      const tasks = await tasksApi.listTasks();
+      const [tasks, projects] = await Promise.all([
+        tasksApi.listTasks(),
+        tasksApi.listProjects?.() ?? []
+      ]);
       if (currentSection !== 'tasks') return;
-      renderTasksDashboard(root, { status: 'ready', tasks });
+      renderTasksDashboard(root, { status: 'ready', tasks, projects });
     } catch (error) {
       if (currentSection !== 'tasks') return;
       renderTasksDashboard(root, {
