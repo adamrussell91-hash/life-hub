@@ -129,7 +129,10 @@ test('Knowledge handlers never read GITHUB_REPOSITORY', async () => {
     'netlify/functions/knowledge-page.mjs',
     'netlify/functions/knowledge-search.mjs',
     'netlify/functions/knowledge-quiz.mjs',
-    'netlify/functions/knowledge-quiz-items.mjs'
+    'netlify/functions/knowledge-quiz-items.mjs',
+    'netlify/functions/knowledge-pages-save.mjs',
+    'netlify/functions/knowledge-quiz-save.mjs',
+    'netlify/functions/knowledge-quiz-items-path.mjs'
   ];
   for (const file of files) {
     const source = await readFile(new URL(`../../${file}`, import.meta.url), 'utf8');

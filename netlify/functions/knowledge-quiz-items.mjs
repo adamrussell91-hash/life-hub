@@ -9,9 +9,9 @@ import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 
 export const config = { path: '/api/knowledge/quiz/:pageId' };
 
-function readPageId(request, context = {}) {
+export function readKnowledgeQuizPageId(request, context = {}) {
   if (isSafeKnowledgePageId(context.params?.pageId)) return context.params.pageId;
-  const match = new URL(request.url).pathname.match(/\/api\/knowledge\/quiz\/([^/]+)$/);
+  const match = new URL(request.url).pathname.match(/\/api\/knowledge\/quiz\/(?:items\/)?([^/]+)$/);
   return match && isSafeKnowledgePageId(match[1]) ? match[1] : '';
 }
 
@@ -21,7 +21,7 @@ export function createKnowledgeQuizItemsHandler(deps = {}) {
     if (request.method !== 'GET') {
       return withCors(methodNotAllowed('GET, OPTIONS'), request, env);
     }
-    const pageId = readPageId(request, context);
+    const pageId = readKnowledgeQuizPageId(request, context);
     if (!pageId) {
       return withCors(errorResponse(400, 'validation_error', 'Invalid page id', false), request, env);
     }
