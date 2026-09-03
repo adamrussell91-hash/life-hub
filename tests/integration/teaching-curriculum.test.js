@@ -10,6 +10,7 @@ import { createMediaItemHandler } from '../../netlify/functions/media-item.mjs';
 import { createOutcomesHandler } from '../../netlify/functions/outcomes.mjs';
 import { createLessonsHandler } from '../../netlify/functions/lessons.mjs';
 import { createScheduledLessonHandler } from '../../netlify/functions/scheduled-lesson.mjs';
+import { createScheduledLessonsHandler } from '../../netlify/functions/scheduled-lessons.mjs';
 import { createSubjectHandler } from '../../netlify/functions/subject.mjs';
 import { createSubjectsHandler } from '../../netlify/functions/subjects.mjs';
 import { createUnitHandler } from '../../netlify/functions/unit.mjs';
@@ -465,6 +466,58 @@ test('outcomes and media collections create behind the Life session', async () =
       method: 'POST',
       url: 'https://api.adam-russell.com/api/outcomes',
       body: { subject_id: 'subject_1', code: 'X', title: 'Nope', description: 'Nope' }
+    })
+  );
+  assert.equal(anon.status, 401);
+});
+
+test('scheduled-lesson collection creates a dated row behind the Life session', async () => {
+  const store = memoryStore({
+    'classes/class_1': { id: 'class_1', type: 'class', title: '11 Psych A' },
+    'lessons/lesson_1': { id: 'lesson_1', type: 'lesson', title: 'Working memory', unit_id: 'unit_1' }
+  });
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+
+  const created = await createScheduledLessonsHandler(deps)(
+    request({
+      method: 'POST',
+      origin: 'https://teaching-hub.adam-russell.com',
+      url: 'https://api.adam-russell.com/api/scheduled-lessons',
+      body: { class_id: 'class_1', lesson_id: 'lesson_1', date: '2026-08-12' }
+    })
+  );
+  assert.equal(created.status, 201);
+  const row = (await created.json()).data;
+  assert.match(row.id, /^sched_/);
+  assert.equal(row.unit_id, 'unit_1');
+  assert.equal(row.schedule_order, 1);
+  assert.equal(row.delivery_status, 'planned');
+
+  const listed = await createScheduledLessonsHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/scheduled-lessons' })
+  );
+  assert.equal(listed.status, 200);
+  assert.equal((await listed.json()).data.scheduled_lessons[0].date, '2026-08-12');
+
+  const badDate = await createScheduledLessonsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/scheduled-lessons',
+      body: { class_id: 'class_1', lesson_id: 'lesson_1', date: '12 August' }
+    })
+  );
+  assert.equal(badDate.status, 400);
+
+  const anon = await createScheduledLessonsHandler(deps)(
+    request({
+      cookie: false,
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/scheduled-lessons',
+      body: { class_id: 'class_1', lesson_id: 'lesson_1', date: '2026-08-12' }
     })
   );
   assert.equal(anon.status, 401);
