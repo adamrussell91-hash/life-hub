@@ -19,9 +19,9 @@ test('Knowledge mount links to the existing Pages origin', () => {
   assert.equal(knowledge.origin, 'https://knowledge-hub.adam-russell.com');
 });
 
-test('Tasks mount has no API origin yet', () => {
+test('Tasks mount links to the existing Pages origin', () => {
   const tasks = listHubSections().find(section => section.id === 'tasks');
-  assert.equal(tasks.origin, null);
+  assert.equal(tasks.origin, 'https://tasks-hub.adam-russell.com');
 });
 
 test('Life shell mounts hub dashboards and rail destinations', async () => {
@@ -32,5 +32,6 @@ test('Life shell mounts hub dashboards and rail destinations', async () => {
   }
   assert.match(html, /data-hub-open="teaching"/);
   assert.match(html, /data-hub-open="knowledge"/);
+  assert.match(html, /data-hub-open="tasks"/);
   assert.doesNotMatch(html, /teaching-api|knowledge-api|tasks-api/i);
 });

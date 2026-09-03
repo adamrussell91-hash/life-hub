@@ -24,6 +24,14 @@ export function classKey(id) {
   return `classes/${id}`;
 }
 
+export function scheduledLessonKey(id) {
+  return `scheduled_lessons/${id}`;
+}
+
+export function subjectKey(id) {
+  return `subjects/${id}`;
+}
+
 export function mediaKey(id) {
   return `media/${id}`;
 }
@@ -67,7 +75,7 @@ export function readPublishedId(request, context = {}) {
   const fromContext = context.params?.id;
   if (typeof fromContext === 'string' && fromContext) return fromContext;
   const url = new URL(request.url);
-  const match = url.pathname.match(/\/(?:lessons|units|classes|media|published-lesson)\/([^/]+)(?:\/file)?$/);
+  const match = url.pathname.match(/\/(?:lessons|units|classes|media|published-lesson|scheduled-lessons|years|subjects)\/([^/]+)(?:\/file)?$/);
   if (match?.[1]) return match[1];
   return url.searchParams.get('id');
 }
