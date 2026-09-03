@@ -147,6 +147,34 @@ test('confirm throws a structured error when the write fails', async () => {
   );
 });
 
+test('send polls job events when /api/chat returns a job id instead of SSE', async () => {
+  const calls = [];
+  const chatApi = createChatApi(async (url) => {
+    calls.push(String(url));
+    if (url === '/api/chat') {
+      return Response.json({ ok: true, data: { jobId: '11111111-1111-4111-8111-111111111111' } }, { status: 202 });
+    }
+    return Response.json({
+      ok: true,
+      data: {
+        events: calls.length === 2
+          ? [{ type: 'agent', slug: 'penelope' }, { type: 'text', delta: 'Filed.' }]
+          : [],
+        status: 'done',
+        next: 2
+      }
+    });
+  }, { pollMs: 1 });
+
+  const events = [];
+  for await (const event of chatApi.send('yep go for it')) events.push(event);
+  assert.deepEqual(events, [
+    { type: 'agent', slug: 'penelope' },
+    { type: 'text', delta: 'Filed.' }
+  ]);
+  assert.ok(calls[1].startsWith('/api/chat/events?job=11111111-1111-4111-8111-111111111111'));
+});
+
 test('createChatApi requires a fetch implementation', () => {
   assert.throws(() => createChatApi(null), TypeError);
 });

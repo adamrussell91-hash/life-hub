@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { mergeMedicalFields, resolveMedicalLogCandidate, parseMedicalEventTolerant } from '../../apps/life/js/app/medical-normalize.js';
 import { verifySessionToken, serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
 import {
@@ -7,11 +7,17 @@ import {
   isConfigured,
   methodNotAllowed,
   misconfiguredResponse,
+  okResponse,
   preflightResponse,
   readUmbrellaSessionCookie,
   umbrellaSessionSecret,
   withCors
 } from './_shared/http.mjs';
+import {
+  chatJobOwnerKey,
+  defaultGetChatJobStore
+} from './_shared/chat-job-store.mjs';
+import { defaultInvokeChatBackground } from './_shared/chat-job-run.mjs';
 import { createGitHubClient, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
@@ -1702,4 +1708,84 @@ function withPrivateCache(response) {
   return new Response(response.body, { status: response.status, headers });
 }
 
-export default createChatHandler();
+export function createChatStartHandler({
+  env = process.env,
+  getStore = defaultGetChatJobStore,
+  invokeBackground = defaultInvokeChatBackground,
+  fetchImpl = fetch,
+  verifySessionToken: verify = verifySessionToken,
+  serializeExpiredSessionCookie: clearCookie = serializeExpiredSessionCookie,
+  now = Date.now,
+  ...handlerDeps
+} = {}) {
+  return async function chatStartHandler(request) {
+    if (request.method === 'OPTIONS') return preflightResponse(request, env);
+    return withCors(await start(request), request, env);
+  };
+
+  async function start(request) {
+    if (request.method !== 'POST') return withPrivateCache(methodNotAllowed('POST'));
+    const originError = guardRequestOrigin(request, env);
+    if (originError) return withPrivateCache(originError);
+    if (!isConfigured(env) || typeof env.ANTHROPIC_API_KEY !== 'string' || env.ANTHROPIC_API_KEY.length === 0) {
+      return withPrivateCache(misconfiguredResponse());
+    }
+
+    let session;
+    try {
+      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
+    } catch {
+      return withPrivateCache(misconfiguredResponse());
+    }
+    if (!session.valid) {
+      return errorResponse(401, 'unauthenticated', 'Please sign in to continue.', false, {
+        ...PRIVATE_CACHE,
+        'set-cookie': clearCookie()
+      });
+    }
+
+    const parsed = await parseRequest(request);
+    if (parsed.error) return parsed.error;
+
+    const jobBody = JSON.stringify({
+      message: parsed.message,
+      ...(parsed.history?.length ? { history: parsed.history } : {}),
+      ...(parsed.priorAgentSlug ? { priorAgentSlug: parsed.priorAgentSlug } : {}),
+      ...(parsed.auditSession ? { auditSession: parsed.auditSession } : {}),
+      ...(parsed.protocolId ? { protocolId: parsed.protocolId } : {})
+    });
+
+    let kicked = false;
+    try {
+      const jobId = randomUUID();
+      const store = await getStore();
+      await store.create(jobId, {
+        owner: chatJobOwnerKey(request.headers.get('cookie') ?? ''),
+        body: jobBody,
+        url: request.url,
+        cookie: request.headers.get('cookie') ?? '',
+        origin: request.headers.get('origin') ?? ''
+      });
+      kicked = await invokeBackground(request, jobId, env, fetchImpl);
+      if (kicked) return withPrivateCache(okResponse(202, { jobId }));
+    } catch {
+      kicked = false;
+    }
+
+    // Background job did not start — stream this turn live so chat still works.
+    return createChatHandler({
+      env,
+      fetchImpl,
+      verifySessionToken: verify,
+      serializeExpiredSessionCookie: clearCookie,
+      now,
+      ...handlerDeps
+    })(new Request(request.url, {
+      method: 'POST',
+      headers: request.headers,
+      body: jobBody
+    }));
+  }
+}
+
+export default createChatStartHandler();
