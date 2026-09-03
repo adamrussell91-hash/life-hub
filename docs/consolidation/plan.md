@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.6 — Teaching Blobs + Knowledge GitHub token live on `life-hub2` Production. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.7 — Tasks writes on the Life session. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -189,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v4.6 | Blobs bind + Tasks list reads | Slice 13 shipped as PR #67; this slice |
+| Plan v4.7 | Tasks writes on the Life session | Slice 14 shipped as PR #68; this slice |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -221,6 +221,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Teaching writes + Knowledge pages | **shipped** | PR #67 merged 2026-09-03 |
 | Blobs bind + Tasks list | **shipped** | PR #68 merged 2026-09-03; `NETLIFY_BLOBS_TOKEN` set on `life-hub2` (2026-09-03) — Teaching store reads `arteaching-hub` |
 | Knowledge GitHub token | **set** | 2026-09-03 — Production `GITHUB_TOKEN` replaced with PAT `life-hub2-data` (expires `2026-12-02`); Contents 200 on `life-hub-data` and `knowledge-hub-data`. Same env name. Preview unchanged. |
+| Tasks writes | in progress | Slice 15 — POST/PATCH/DELETE `/api/tasks`; same `NETLIFY_BLOBS_TOKEN` reads `artasks-hub` |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -356,9 +357,19 @@ Knowledge pages API on the Life session, R2 left alone:
 - `GET /api/tasks` lists titles from `tasks-hub-content` (503 `tasks_blobs_unbound` if that store is missing)
 - Do **not** copy Tasks writes, Clare, `TASKS_HUB_PASSPHRASE_HASH`, R2, or retarget production
 
+### Slice 15 — Tasks writes (this slice)
+
+Operator writes for Tasks on `life-hub2`, still behind the Life session:
+
+- `GET /api/tasks` list or `?id=` one record
+- `POST /api/tasks` (title + domain), `PATCH` / `DELETE` with `?id=`
+- Keep `tasks/_index` in sync
+- If `NETLIFY_BLOBS_TOKEN` is set, open `tasks-hub-content` on `artasks-hub` (`c6696619-f478-4ac1-b0cd-1e4cfd3101df`) — same token as Teaching, different site id
+- No Clare, no seed/fixture copy, no `TASKS_HUB_PASSPHRASE_HASH`, no `artasks-hub` retire
+
 ## Next action
 
-Ops Jobs 1–3 are done. Signed-in smoke: `GET /api/knowledge/pages` should be 200 titles, not 503. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**. Next code: Tasks writes or more Teaching fold. Do not retarget `life-hub2`.
+Keep shipping. Signed-in smoke: Knowledge pages 200, Tasks list/create against `artasks-hub` when the Blobs token is set. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**. Next: more Teaching fold or Tasks projects. Do not retarget `life-hub2`.
 
 ## Open questions (Adam)
 
