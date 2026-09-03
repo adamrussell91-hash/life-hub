@@ -245,6 +245,14 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
       return true;
     }
 
+    if (url.pathname === '/api/lesson-alchemist') {
+      if (!request.headers.get('x-alchemist-secret')) {
+        return unauthenticated(response);
+      }
+      error(response, 503, 'knowledge_repo_unbound', 'Knowledge data repository is not bound.', true);
+      return true;
+    }
+
     if (url.pathname === '/api/tasks' || url.pathname.startsWith('/api/tasks/') ||
         url.pathname === '/api/clare' ||
         /^\/api\/(projects|areas|goals|programs|maps|templates|stall)(\/|$|\?)/.test(url.pathname)) {

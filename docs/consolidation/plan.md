@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.19 — Clementine, capture, and attachments on life-hub2. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.20 — Tidy, curator, podcast, and lesson-alchemist on life-hub2. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -232,6 +232,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Teaching search corpus + schedule expand + media upload + Clare + SPA retarget | **shipped** | PR #79 merged 2026-09-03; Teaching Pages PR teaching-hub#27; Tasks Pages PR Tasks-Hub#105 |
 | Full Clare dump / brief / toolkit / mutations | **shipped** | PR #81 merged 2026-09-03 |
 | Netlify retarget | **started** | Teaching + Tasks Pages point at `api.adam-russell.com`; `arteaching-hub` / `artasks-hub` stay live |
+| Knowledge leftovers fold | **this slice** | Tidy, curator, podcast, and lesson-alchemist on `life-hub2` |
 
 ### Slice 01 — what shipped
 
@@ -482,11 +483,24 @@ Session-gated leftovers on `life-hub2`, still no Cloudflare R2 binding:
 - Knowledge Pages points those clients at the umbrella prefix; tidy, curator, and podcast stay on `knowledge-api`
 - Do not copy Knowledge auth, rotate secrets, bind the R2 bucket, or retire `knowledge-hub-archive`
 
-Copy onto `life-hub2` if missing: `RESEARCH_KERNEL_URL`, `RESEARCH_KERNEL_SHARED_SECRET`, `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. `ANTHROPIC_API_KEY` is already there.
+Kernel + R2 env set on `life-hub2` Production (Job 4b, 2026-09-04). `ANTHROPIC_API_KEY` was already there. No Cloudflare bind.
+
+### Slice 28 — Tidy, curator, podcast, lesson-alchemist (this slice)
+
+Last Knowledge Function leftovers on `life-hub2`. Worker `knowledge-hub-research` and R2 stay called over HTTPS:
+
+- `POST /api/knowledge/tidy` — Life session; Claude rewrite + save on `knowledge-hub-data`
+- `GET/POST /api/knowledge/curator` — pending queue, approve/dismiss, optional `run` dispatch to `knowledge-hub` `curator.yml` (`GITHUB_WORKFLOW_TOKEN` if the data PAT cannot dispatch)
+- `GET/POST /api/knowledge/podcast` and `/api/knowledge/podcast/*` — kernel proxy; audio via S3 presign
+- `POST /api/lesson-alchemist` — `x-alchemist-secret` only (Teaching Alchemy Lab). Raw `{ connections, mode, retrieved }`, not the Life envelope
+- Knowledge Pages points tidy/curator/podcast at the umbrella prefix
+- Do not copy Knowledge auth, bind R2, rotate secrets, or retire `knowledge-api`
+
+Copy onto `life-hub2` if missing: `ALCHEMIST_SHARED_SECRET`. Optional: `GITHUB_WORKFLOW_TOKEN` for curator **Run now**. Teaching `KNOWLEDGE_ALCHEMIST_URL` should become `https://api.adam-russell.com/api/lesson-alchemist`.
 
 ## Next action
 
-Keep shipping. Next: fold tidy, curator, or podcast, or smoke Teaching and Tasks Clare against `api.adam-russell.com`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**. Set the new `RESEARCH_KERNEL_*` / `R2_*` keys on `life-hub2` before production Knowledge chat/uploads work.
+Keep shipping. Next: remount Teaching/Tasks Blobs onto `life-hub2` so those API sites can retire, or signed-in smoke of tidy/curator/podcast/Alchemy Lab. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
 
 ## Open questions (Adam)
 
