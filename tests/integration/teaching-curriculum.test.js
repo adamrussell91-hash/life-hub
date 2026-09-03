@@ -4,7 +4,10 @@ import { createSessionToken } from '../../netlify/functions/_shared/auth-securit
 import { createClassHandler } from '../../netlify/functions/class.mjs';
 import { createCurriculumHandler } from '../../netlify/functions/curriculum.mjs';
 import { createLessonHandler } from '../../netlify/functions/lesson.mjs';
+import { createScheduledLessonHandler } from '../../netlify/functions/scheduled-lesson.mjs';
+import { createSubjectHandler } from '../../netlify/functions/subject.mjs';
 import { createUnitHandler } from '../../netlify/functions/unit.mjs';
+import { createYearHandler } from '../../netlify/functions/year.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -102,7 +105,10 @@ test('teacher record GETs use the Life session and stay read-only', async () => 
   const store = memoryStore({
     'classes/class-1': { id: 'class-1', title: 'English' },
     'units/unit-1': { id: 'unit-1', title: 'Unit' },
-    'lessons/lesson-1': { id: 'lesson-1', title: 'Draft' }
+    'lessons/lesson-1': { id: 'lesson-1', title: 'Draft' },
+    'years/year-1': { id: 'year-1', title: 'Year 12' },
+    'subjects/subject-1': { id: 'subject-1', title: 'English Advanced' },
+    'scheduled_lessons/sched-1': { id: 'sched-1', class_id: 'class-1', date: '2026-08-12' }
   });
   const deps = {
     env,
@@ -119,6 +125,15 @@ test('teacher record GETs use the Life session and stay read-only', async () => 
   const lessonRes = await createLessonHandler(deps)(
     request({ url: 'https://api.adam-russell.com/api/lessons/lesson-1' })
   );
+  const yearRes = await createYearHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/years/year-1' })
+  );
+  const subjectRes = await createSubjectHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/subjects/subject-1' })
+  );
+  const scheduledRes = await createScheduledLessonHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/scheduled-lessons/sched-1' })
+  );
 
   assert.equal(classRes.status, 200);
   assert.equal((await classRes.json()).data.title, 'English');
@@ -126,6 +141,12 @@ test('teacher record GETs use the Life session and stay read-only', async () => 
   assert.equal((await unitRes.json()).data.title, 'Unit');
   assert.equal(lessonRes.status, 200);
   assert.equal((await lessonRes.json()).data.title, 'Draft');
+  assert.equal(yearRes.status, 200);
+  assert.equal((await yearRes.json()).data.title, 'Year 12');
+  assert.equal(subjectRes.status, 200);
+  assert.equal((await subjectRes.json()).data.title, 'English Advanced');
+  assert.equal(scheduledRes.status, 200);
+  assert.equal((await scheduledRes.json()).data.date, '2026-08-12');
 
   const anon = await createLessonHandler(deps)(
     request({ cookie: false, url: 'https://api.adam-russell.com/api/lessons/lesson-1' })
