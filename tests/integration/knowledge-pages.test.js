@@ -5,6 +5,8 @@ import { createSessionToken } from '../../netlify/functions/_shared/auth-securit
 import { DEFAULT_KNOWLEDGE_DATA_REPO } from '../../netlify/functions/_shared/knowledge-data.mjs';
 import { createKnowledgePageHandler } from '../../netlify/functions/knowledge-page.mjs';
 import { createKnowledgePagesHandler } from '../../netlify/functions/knowledge-pages.mjs';
+import { createKnowledgeQuizHandler } from '../../netlify/functions/knowledge-quiz.mjs';
+import { createKnowledgeSearchHandler } from '../../netlify/functions/knowledge-search.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -124,7 +126,10 @@ test('Knowledge handlers never read GITHUB_REPOSITORY', async () => {
   const files = [
     'netlify/functions/_shared/knowledge-data.mjs',
     'netlify/functions/knowledge-pages.mjs',
-    'netlify/functions/knowledge-page.mjs'
+    'netlify/functions/knowledge-page.mjs',
+    'netlify/functions/knowledge-search.mjs',
+    'netlify/functions/knowledge-quiz.mjs',
+    'netlify/functions/knowledge-quiz-items.mjs'
   ];
   for (const file of files) {
     const source = await readFile(new URL(`../../${file}`, import.meta.url), 'utf8');
@@ -133,3 +138,103 @@ test('Knowledge handlers never read GITHUB_REPOSITORY', async () => {
     assert.doesNotMatch(source, /@netlify\/blobs/);
   }
 });
+
+function memoryGithub(initial = {}) {
+  const files = new Map(Object.entries(initial));
+  return async (url, init = {}) => {
+    const path = decodeURIComponent(String(url).split('/contents/')[1] ?? '');
+    if ((init.method ?? 'GET') === 'GET') {
+      const current = files.get(path);
+      if (!current) return new Response('missing', { status: 404 });
+      return jsonResponse({
+        sha: current.sha,
+        encoding: 'base64',
+        content: Buffer.from(current.text).toString('base64')
+      });
+    }
+    const body = JSON.parse(init.body);
+    files.set(path, { sha: 'sha2', text: Buffer.from(body.content, 'base64').toString('utf8') });
+    return jsonResponse({ content: { sha: 'sha2' } });
+  };
+}
+
+test('Knowledge page save writes page JSON and upserts the manifest', async () => {
+  const handler = createKnowledgePagesHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    fetchImpl: memoryGithub({
+      'manifest.json': { sha: 'man1', text: '[]' }
+    })
+  });
+  const response = await handler(new Request('https://api.adam-russell.com/api/knowledge/pages', {
+    method: 'POST',
+    headers: {
+      cookie: `life_hub_session=${session}`,
+      origin: 'https://knowledge-hub.adam-russell.com',
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({ title: 'New note', body: 'Hello', area: 'notes' })
+  }));
+  assert.equal(response.status, 200);
+  const saved = (await response.json()).data;
+  assert.equal(saved.title, 'New note');
+  assert.match(saved.id, /^page_hub_/);
+});
+
+test('Knowledge search ranks manifest titles behind the Life session', async () => {
+  const handler = createKnowledgeSearchHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    fetchImpl: async () => jsonResponse({
+      sha: 'a'.repeat(40),
+      encoding: 'base64',
+      content: Buffer.from(JSON.stringify([
+        { id: 'note-1', title: 'Working memory', excerpt: 'Miller', tags: ['psych'] }
+      ])).toString('base64')
+    })
+  });
+  const response = await handler(new Request('https://api.adam-russell.com/api/knowledge/search?q=memory', {
+    headers: {
+      cookie: `life_hub_session=${session}`,
+      origin: 'https://knowledge-hub.adam-russell.com'
+    }
+  }));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.hits[0].id, 'note-1');
+});
+
+test('Knowledge quiz GET and POST stay on knowledge-hub-data', async () => {
+  const fetchImpl = memoryGithub({
+    'quiz/schedule.json': {
+      sha: 'q1',
+      text: JSON.stringify({ schema_version: 1, schedule: [], edges: [], dumps: [] })
+    }
+  });
+  const handler = createKnowledgeQuizHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    fetchImpl
+  });
+  const listed = await handler(new Request('https://api.adam-russell.com/api/knowledge/quiz', {
+    headers: {
+      cookie: `life_hub_session=${session}`,
+      origin: 'https://knowledge-hub.adam-russell.com'
+    }
+  }));
+  assert.equal(listed.status, 200);
+  const saved = await handler(new Request('https://api.adam-russell.com/api/knowledge/quiz', {
+    method: 'POST',
+    headers: {
+      cookie: `life_hub_session=${session}`,
+      origin: 'https://knowledge-hub.adam-russell.com',
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      schedule: [{ page_id: 'note-1' }],
+      items: [{ page_id: 'note-1', prompt: 'What is working memory?' }]
+    })
+  }));
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).data.schedule[0].page_id, 'note-1');
+});
+

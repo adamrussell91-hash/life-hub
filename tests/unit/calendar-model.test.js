@@ -52,6 +52,8 @@ test('eventDetailTitle covers core types', () => {
   assert.equal(eventDetailTitle({ type: 'skincare', routine: 'pm' }), 'Skincare · PM');
   assert.equal(eventDetailTitle({ type: 'skincare', routine: 'pm' }, 'Procedure: Laser.'), 'Laser');
   assert.equal(eventDetailTitle({ type: 'scheduled_lesson', title: 'Working memory' }), 'Working memory');
+  assert.equal(eventDetailTitle({ type: 'task', title: 'Mark 12 English' }), 'Mark 12 English');
+  assert.equal(eventDetailTitle({ type: 'knowledge_page', title: 'Archive note' }), 'Archive note');
 });
 
 test('eventsForDate returns empty for quiet days', () => {
@@ -98,6 +100,14 @@ test('eventBrief summarises each domain in one line', () => {
   assert.equal(
     eventBrief({ record: { type: 'scheduled_lesson', delivery_status: 'planned' } }),
     'Teaching · planned'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'task', status: 'open' } }),
+    'Tasks · open'
+  );
+  assert.equal(
+    eventBrief({ record: { type: 'knowledge_page', area: 'notes' } }),
+    'Knowledge · notes'
   );
 });
 
