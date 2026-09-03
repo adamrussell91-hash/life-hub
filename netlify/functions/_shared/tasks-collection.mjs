@@ -21,9 +21,10 @@ function recordKey(prefix, id) {
   return `${prefix}${id}`;
 }
 
-function summarize(item) {
+function summarize(item, titleField = 'title') {
   const id = typeof item.id === 'string' ? item.id : '';
-  const title = typeof item.title === 'string' ? item.title : '';
+  const titled = typeof item[titleField] === 'string' ? item[titleField] : '';
+  const title = titled || (typeof item.title === 'string' ? item.title : '');
   if (!id && !title) return null;
   return {
     id,
@@ -48,6 +49,7 @@ export function createTasksCollectionHandler({
   listKey,
   idPrefix,
   notFound,
+  titleField = 'title',
   create
 }, deps = {}) {
   return createOperatorHandler(async (request, context) => {
@@ -62,7 +64,7 @@ export function createTasksCollectionHandler({
           }
           return withCors(okResponse(200, record), request, env);
         }
-        const items = (await listJSON(store, prefix)).map(summarize).filter(Boolean);
+        const items = (await listJSON(store, prefix)).map(item => summarize(item, titleField)).filter(Boolean);
         return withCors(okResponse(200, { [listKey]: items }), request, env);
       }
 
