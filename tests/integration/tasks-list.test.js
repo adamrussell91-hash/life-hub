@@ -22,6 +22,12 @@ function memoryStore(entries = {}) {
       if (value == null) return null;
       return options.type === 'json' ? value : value;
     },
+    async setJSON(key, value) {
+      map.set(key, value);
+    },
+    async delete(key) {
+      map.delete(key);
+    },
     async list({ prefix }) {
       return {
         blobs: [...map.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key }))
@@ -30,13 +36,21 @@ function memoryStore(entries = {}) {
   };
 }
 
-function request({ cookie = true, origin, url = 'https://api.adam-russell.com/api/tasks' } = {}) {
+function request({
+  cookie = true,
+  origin,
+  url = 'https://api.adam-russell.com/api/tasks',
+  method = 'GET',
+  body
+} = {}) {
   return new Request(url, {
-    method: 'GET',
+    method,
     headers: {
       ...(cookie ? { cookie: `life_hub_session=${session}` } : {}),
-      ...(origin ? { origin } : {})
-    }
+      ...(origin ? { origin } : {}),
+      ...(body ? { 'content-type': 'application/json' } : {})
+    },
+    ...(body ? { body: JSON.stringify(body) } : {})
   });
 }
 
@@ -85,4 +99,67 @@ test('Tasks list returns titles from tasks-hub-content', async () => {
     title: 'Mark 12 English',
     status: 'open'
   }]);
+});
+
+test('Tasks POST/PATCH/DELETE use the Life session and keep the index', async () => {
+  const store = memoryStore({
+    'tasks/_index': ['task-1'],
+    'tasks/task-1': { id: 'task-1', title: 'Mark 12 English', status: 'open' }
+  });
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+
+  const created = await createTasksHandler(deps)(
+    request({
+      method: 'POST',
+      origin: 'https://tasks-hub.adam-russell.com',
+      body: { title: 'Book florist', domain: 'wedding' }
+    })
+  );
+  assert.equal(created.status, 201);
+  const createdBody = await created.json();
+  assert.match(createdBody.data.id, /^task_/);
+  assert.equal(createdBody.data.domain, 'wedding');
+  assert.deepEqual(await store.get('tasks/_index', { type: 'json' }), ['task-1', createdBody.data.id]);
+
+  const patched = await createTasksHandler(deps)(
+    request({
+      method: 'PATCH',
+      url: `https://api.adam-russell.com/api/tasks?id=${createdBody.data.id}`,
+      body: { status: 'done' }
+    })
+  );
+  assert.equal(patched.status, 200);
+  const patchedBody = await patched.json();
+  assert.equal(patchedBody.data.status, 'done');
+  assert.equal(typeof patchedBody.data.completed_at, 'string');
+
+  const removed = await createTasksHandler(deps)(
+    request({
+      method: 'DELETE',
+      url: `https://api.adam-russell.com/api/tasks?id=${createdBody.data.id}`
+    })
+  );
+  assert.equal(removed.status, 200);
+  assert.equal(await store.get(`tasks/${createdBody.data.id}`, { type: 'json' }), null);
+  assert.deepEqual(await store.get('tasks/_index', { type: 'json' }), ['task-1']);
+
+  const anon = await createTasksHandler(deps)(
+    request({ cookie: false, method: 'POST', body: { title: 'Nope', domain: 'life' } })
+  );
+  assert.equal(anon.status, 401);
+});
+
+test('Tasks POST rejects a missing domain', async () => {
+  const handler = createTasksHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => memoryStore()
+  });
+  const response = await handler(request({ method: 'POST', body: { title: 'Untitled' } }));
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'validation_error');
 });
