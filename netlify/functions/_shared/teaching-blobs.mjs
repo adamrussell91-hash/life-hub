@@ -34,6 +34,19 @@ export function mediaFileKey(id) {
 
 export const PUBLISHED_LESSON_PREFIX = 'published/lessons/';
 export const SCHEDULED_LESSON_PREFIX = 'scheduled_lessons/';
+export const YEAR_PREFIX = 'years/';
+export const SUBJECT_PREFIX = 'subjects/';
+export const UNIT_PREFIX = 'units/';
+export const DRAFT_LESSON_PREFIX = 'lessons/';
+export const CLASS_PREFIX = 'classes/';
+export const SCOPE_SEQUENCE_PREFIX = 'scope_sequences/';
+export const MEDIA_PREFIX = 'media/';
+export const OUTCOME_PREFIX = 'outcomes/';
+export const DEFAULT_SCHEDULE_ANCHOR_DATE = '2026-08-12';
+
+export function scheduleAnchorKey() {
+  return 'meta/schedule_anchor_date';
+}
 
 export async function defaultGetContentStore() {
   const { getStore } = await import('@netlify/blobs');
@@ -42,6 +55,12 @@ export async function defaultGetContentStore() {
 
 export async function getJSON(store, key) {
   return store.get(key, { type: 'json' });
+}
+
+export async function listJSON(store, prefix) {
+  const { blobs } = await store.list({ prefix });
+  const entries = await Promise.all(blobs.map(blob => getJSON(store, blob.key)));
+  return entries.filter(entry => entry && typeof entry === 'object');
 }
 
 export function readPublishedId(request, context = {}) {
