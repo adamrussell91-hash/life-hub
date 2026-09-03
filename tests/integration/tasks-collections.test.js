@@ -3,6 +3,8 @@ import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createAreasHandler } from '../../netlify/functions/areas.mjs';
 import { createGoalsHandler } from '../../netlify/functions/goals.mjs';
+import { createMapsHandler } from '../../netlify/functions/maps.mjs';
+import { createProgramsHandler } from '../../netlify/functions/programs.mjs';
 import { createProjectsHandler } from '../../netlify/functions/projects.mjs';
 
 const SECRET = 's'.repeat(32);
@@ -117,6 +119,71 @@ test('projects, areas, and goals use the Life session and share the Tasks store'
 
   const anon = await createAreasHandler(deps)(
     request({ cookie: false, method: 'POST', url: 'https://api.adam-russell.com/api/areas', body: { title: 'Nope' } })
+  );
+  assert.equal(anon.status, 401);
+});
+
+test('programs and maps use the Life session and share the Tasks store', async () => {
+  const store = memoryStore();
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+
+  const createdProgram = await createProgramsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/programs',
+      body: { name: 'ICPC', types: ['Competition'], subjects: ['Coding'] }
+    })
+  );
+  assert.equal(createdProgram.status, 201);
+  const program = (await createdProgram.json()).data;
+  assert.match(program.id, /^prog_/);
+  assert.equal(program.name, 'ICPC');
+
+  const listedPrograms = await createProgramsHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/programs' })
+  );
+  assert.equal(listedPrograms.status, 200);
+  assert.equal((await listedPrograms.json()).data.programs[0].title, 'ICPC');
+
+  const createdMap = await createMapsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/maps',
+      body: { title: 'Year 11 pathways', year: 2026 }
+    })
+  );
+  assert.equal(createdMap.status, 201);
+  const map = (await createdMap.json()).data;
+  assert.match(map.id, /^map_/);
+  assert.equal(map.year, 2026);
+
+  const patched = await createMapsHandler(deps)(
+    request({
+      method: 'PATCH',
+      url: `https://api.adam-russell.com/api/maps?id=${map.id}`,
+      body: { title: 'Year 12 pathways' }
+    })
+  );
+  assert.equal(patched.status, 200);
+  assert.equal((await patched.json()).data.title, 'Year 12 pathways');
+
+  const removed = await createProgramsHandler(deps)(
+    request({ method: 'DELETE', url: `https://api.adam-russell.com/api/programs?id=${program.id}` })
+  );
+  assert.equal(removed.status, 200);
+  assert.equal(await store.get(`programs/${program.id}`, { type: 'json' }), null);
+
+  const missingName = await createProgramsHandler(deps)(
+    request({ method: 'POST', url: 'https://api.adam-russell.com/api/programs', body: { title: 'Nope' } })
+  );
+  assert.equal(missingName.status, 400);
+
+  const anon = await createMapsHandler(deps)(
+    request({ cookie: false, method: 'POST', url: 'https://api.adam-russell.com/api/maps', body: { title: 'Nope' } })
   );
   assert.equal(anon.status, 401);
 });
