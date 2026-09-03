@@ -28,6 +28,11 @@ test('operator APIs are not public student routes', () => {
   assert.equal(isPublicStudentApi('GET', '/api/knowledge/quiz/items/note-1'), false);
   assert.equal(isPublicStudentApi('GET', '/api/knowledge/auth-session'), false);
   assert.equal(isPublicStudentApi('POST', '/api/knowledge/auth-login'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/clementine-coach'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/clementine-chat'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/capture'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/attachments-sign'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/knowledge/attachments/note-1/att-1'), false);
   assert.equal(isPublicStudentApi('GET', '/api/templates'), false);
   assert.equal(isPublicStudentApi('POST', '/api/stall'), false);
 });
