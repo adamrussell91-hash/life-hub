@@ -41,6 +41,7 @@ import { renderMind } from './render-mind.js';
 import { renderNutrition } from './render-nutrition.js';
 import { createRepositoryCache } from './repository-cache.js';
 import { createSkincareApi } from './skincare-api.js';
+import { createKnowledgeApi } from './knowledge-api.js';
 import { createTeachingApi } from './teaching-api.js';
 import { createSkincareController } from './skincare-controller.js';
 import { buildSkincareModel } from './skincare-model.js';
@@ -90,6 +91,7 @@ const chatPanel = createChatPanelController({ root: document });
 const chatApi = createChatApi(fetchImpl);
 const skincareApi = createSkincareApi(fetchImpl);
 const teachingApi = createTeachingApi(fetchImpl);
+const knowledgeApi = createKnowledgeApi(fetchImpl);
 
 let controller;
 let chatController;
@@ -149,6 +151,7 @@ controller = createAppController({
   renderSkincare,
   skincareApi,
   teachingApi,
+  knowledgeApi,
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,
