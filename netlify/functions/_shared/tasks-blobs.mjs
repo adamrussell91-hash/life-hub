@@ -1,3 +1,5 @@
+import { UMBRELLA_BLOBS_SITE_ID, isUmbrellaBlobsHome } from './teaching-blobs.mjs';
+
 export const TASKS_CONTENT_STORE = 'tasks-hub-content';
 export const TASKS_BLOBS_SITE_ID = 'c6696619-f478-4ac1-b0cd-1e4cfd3101df';
 export const TASKS_BLOBS_SITE_ID_ENV = 'TASKS_BLOBS_SITE_ID';
@@ -5,11 +7,15 @@ export const TASKS_BLOBS_TOKEN_ENV = 'NETLIFY_BLOBS_TOKEN';
 export const TASK_PREFIX = 'tasks/';
 export const TASKS_INDEX_KEY = 'tasks/_index';
 
+export { UMBRELLA_BLOBS_SITE_ID };
+
 export function tasksStoreOptions(env = process.env) {
-  const siteID = typeof env?.[TASKS_BLOBS_SITE_ID_ENV] === 'string' && env[TASKS_BLOBS_SITE_ID_ENV].trim()
+  const configured = typeof env?.[TASKS_BLOBS_SITE_ID_ENV] === 'string'
     ? env[TASKS_BLOBS_SITE_ID_ENV].trim()
-    : TASKS_BLOBS_SITE_ID;
+    : '';
+  const siteID = configured || TASKS_BLOBS_SITE_ID;
   const token = typeof env?.[TASKS_BLOBS_TOKEN_ENV] === 'string' ? env[TASKS_BLOBS_TOKEN_ENV] : '';
+  if (isUmbrellaBlobsHome(configured)) return TASKS_CONTENT_STORE;
   if (token) return { name: TASKS_CONTENT_STORE, siteID, token };
   return TASKS_CONTENT_STORE;
 }

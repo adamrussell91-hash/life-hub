@@ -11,10 +11,17 @@ test('Tasks store stays on this site until a Blobs token is present', () => {
   assert.equal(tasksStoreOptions({ NETLIFY_BLOBS_TOKEN: '' }), TASKS_CONTENT_STORE);
 });
 
-test('Tasks store reads artasks-hub when a Blobs token is set', () => {
+test('Tasks store still reads artasks-hub when only the token is set', () => {
   assert.deepEqual(tasksStoreOptions({ NETLIFY_BLOBS_TOKEN: 'netlify-pat' }), {
     name: TASKS_CONTENT_STORE,
     siteID: TASKS_BLOBS_SITE_ID,
     token: 'netlify-pat'
   });
+});
+
+test('Tasks store remounts onto life-hub2 when the site id is local or umbrella', () => {
+  assert.equal(tasksStoreOptions({
+    NETLIFY_BLOBS_TOKEN: 'netlify-pat',
+    TASKS_BLOBS_SITE_ID: 'local'
+  }), TASKS_CONTENT_STORE);
 });
