@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.17 — Knowledge writes, Tasks templates/stall, calendar sources live. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.18 — Knowledge Pages retarget for notes, search, quiz, and Life auth. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -451,7 +451,7 @@ The Tasks Pages app already posts `dump` / `brief` / `apply_mutations` to `https
 - Offline parser only — no Anthropic judge, no protocol markdown editor
 - Do **not** retire `artasks-hub`, rotate secrets, or bind R2
 
-### Slice 25 — Knowledge writes, Tasks templates/stall, calendar live (this slice)
+### Slice 25 — Knowledge writes, Tasks templates/stall, calendar live (shipped, PR #82)
 
 - `POST /api/knowledge/pages` saves a page + upserts `manifest.json` on `knowledge-hub-data`
 - `GET /api/knowledge/search?q=` ranks titles, excerpts, tags, origins
@@ -460,9 +460,20 @@ The Tasks Pages app already posts `dump` / `brief` / `apply_mutations` to `https
 - Life Calendar merges Knowledge page dates and Tasks due dates; those sources marked `live`
 - Do not retarget Knowledge Pages (paths are namespaced). No R2, no secret rotation, no old-site retire
 
+### Slice 26 — Knowledge Pages retarget (this slice)
+
+Knowledge Pages can call the namespaced handlers without colliding with Teaching `/api/search`:
+
+- SPA default production base is `https://api.adam-russell.com/api/knowledge`
+- Client unwraps `{ ok, data }` and reads search `hits`
+- Aliases match the existing SPA paths: `pages-save`, `quiz-save`, `quiz/items/:pageId`
+- `auth-session` / `auth-login` / `auth-logout` are Life session wrappers (`life_hub_session`)
+- Leftover Clementine, attachments, tidy, capture, curator, and podcast stay on `knowledge-api`; login also establishes that session with the same passphrase until those handlers fold
+- Do not bind R2, copy Knowledge auth, rotate secrets, or retire `knowledge-hub-archive`
+
 ## Next action
 
-Keep shipping. Next: retarget Knowledge Pages once it can call `/api/knowledge/*`, or fold Clementine/capture/attachments. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**. Smoke Teaching and Tasks Clare against `api.adam-russell.com`.
+Keep shipping. Next: fold Clementine, capture, or attachments onto `life-hub2`, or smoke Teaching and Tasks Clare against `api.adam-russell.com`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
 
 ## Open questions (Adam)
 
