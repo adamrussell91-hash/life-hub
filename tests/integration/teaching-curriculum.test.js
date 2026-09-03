@@ -5,6 +5,9 @@ import { createClassHandler } from '../../netlify/functions/class.mjs';
 import { createClassesHandler } from '../../netlify/functions/classes.mjs';
 import { createCurriculumHandler } from '../../netlify/functions/curriculum.mjs';
 import { createLessonHandler } from '../../netlify/functions/lesson.mjs';
+import { createMediaHandler } from '../../netlify/functions/media.mjs';
+import { createMediaItemHandler } from '../../netlify/functions/media-item.mjs';
+import { createOutcomesHandler } from '../../netlify/functions/outcomes.mjs';
 import { createLessonsHandler } from '../../netlify/functions/lessons.mjs';
 import { createScheduledLessonHandler } from '../../netlify/functions/scheduled-lesson.mjs';
 import { createSubjectHandler } from '../../netlify/functions/subject.mjs';
@@ -373,6 +376,96 @@ test('thin search and lesson publish stay behind the Life session', async () => 
 
   const anon = await createSearchHandler(deps)(
     request({ cookie: false, url: 'https://api.adam-russell.com/api/search?q=memory' })
+  );
+  assert.equal(anon.status, 401);
+});
+
+test('outcomes and media collections create behind the Life session', async () => {
+  const store = memoryStore({
+    'subjects/subject_1': {
+      id: 'subject_1',
+      type: 'subject',
+      title: 'Psychology',
+      outcome_ids: []
+    }
+  });
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+
+  const createdOutcome = await createOutcomesHandler(deps)(
+    request({
+      method: 'POST',
+      origin: 'https://teaching-hub.adam-russell.com',
+      url: 'https://api.adam-russell.com/api/outcomes',
+      body: {
+        subject_id: 'subject_1',
+        code: 'PSY11-1',
+        title: 'Differentiate',
+        description: 'Differentiate psychological concepts'
+      }
+    })
+  );
+  assert.equal(createdOutcome.status, 201);
+  const outcome = (await createdOutcome.json()).data;
+  assert.match(outcome.id, /^outcome_/);
+  assert.deepEqual((await store.get('subjects/subject_1', { type: 'json' })).outcome_ids, [outcome.id]);
+
+  const conflict = await createOutcomesHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/outcomes',
+      body: {
+        subject_id: 'subject_1',
+        code: 'psy11-1',
+        title: 'Again',
+        description: 'Duplicate code'
+      }
+    })
+  );
+  assert.equal(conflict.status, 409);
+
+  const createdMedia = await createMediaHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/media',
+      body: {
+        title: 'NESA syllabus',
+        provider: 'external',
+        media_type: 'link',
+        preview_url: 'https://educationstandards.nsw.edu.au'
+      }
+    })
+  );
+  assert.equal(createdMedia.status, 201);
+  const media = (await createdMedia.json()).data;
+  assert.match(media.id, /^media_/);
+
+  const listed = await createMediaHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/media' })
+  );
+  assert.equal(listed.status, 200);
+  assert.equal((await listed.json()).data.media[0].title, 'NESA syllabus');
+
+  const patched = await createMediaItemHandler(deps)(
+    request({
+      method: 'PATCH',
+      url: `https://api.adam-russell.com/api/media/${media.id}`,
+      body: { title: 'Syllabus PDF' }
+    })
+  );
+  assert.equal(patched.status, 200);
+  assert.equal((await patched.json()).data.title, 'Syllabus PDF');
+
+  const anon = await createOutcomesHandler(deps)(
+    request({
+      cookie: false,
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/outcomes',
+      body: { subject_id: 'subject_1', code: 'X', title: 'Nope', description: 'Nope' }
+    })
   );
   assert.equal(anon.status, 401);
 });
