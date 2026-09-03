@@ -58,6 +58,7 @@ export function summarizeTask(item) {
     id,
     title,
     status: typeof item.status === 'string' ? item.status : undefined,
+    due_date: typeof item.due_date === 'string' ? item.due_date : undefined,
     project_id: typeof item.project_id === 'string'
       ? item.project_id
       : typeof item.parent_project_id === 'string' ? item.parent_project_id : undefined
