@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.20 — Tidy, curator, podcast, and lesson-alchemist on life-hub2. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.21 — Blobs remount switch ready; copy onto life-hub2 then retire Function sites. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -232,7 +232,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Teaching search corpus + schedule expand + media upload + Clare + SPA retarget | **shipped** | PR #79 merged 2026-09-03; Teaching Pages PR teaching-hub#27; Tasks Pages PR Tasks-Hub#105 |
 | Full Clare dump / brief / toolkit / mutations | **shipped** | PR #81 merged 2026-09-03 |
 | Netlify retarget | **started** | Teaching + Tasks Pages point at `api.adam-russell.com`; `arteaching-hub` / `artasks-hub` stay live |
-| Knowledge leftovers fold | **this slice** | Tidy, curator, podcast, and lesson-alchemist on `life-hub2` |
+| Knowledge leftovers fold | **shipped** | PR #85 / knowledge-hub #101 merged 2026-09-04 |
+| Blobs remount + Function retire | **this slice** | Copy stores onto `life-hub2`, then retire `arteaching-hub` / `artasks-hub` / `knowledge-api` |
 
 ### Slice 01 — what shipped
 
@@ -498,9 +499,20 @@ Last Knowledge Function leftovers on `life-hub2`. Worker `knowledge-hub-research
 
 Copy onto `life-hub2` if missing: `ALCHEMIST_SHARED_SECRET`. Optional: `GITHUB_WORKFLOW_TOKEN` for curator **Run now**. Teaching `KNOWLEDGE_ALCHEMIST_URL` should become `https://api.adam-russell.com/api/lesson-alchemist`.
 
+### Slice 29 — Remount Blobs and retire Function sites (this slice)
+
+Old API sites are Blobs hosts, not the live Pages origin. Do not flip stores until the copy exists:
+
+- `scripts/copy-hub-blobs.mjs` copies `teaching-hub-content` from `arteaching-hub` and `tasks-hub-content` from `artasks-hub` onto `life-hub2` (`5771ee5c-0cb2-4858-b03d-2637f092050e`)
+- After copy: set Production `TEACHING_BLOBS_SITE_ID` and `TASKS_BLOBS_SITE_ID` to `local` or that umbrella site id — Functions then use this-site stores
+- Until those env keys are set, the existing token still reads the old sites (safe default)
+- Knowledge Pages drops leftover `knowledge-api` login dual-write
+- Then retire Netlify Function sites `arteaching-hub`, `artasks-hub`, and `knowledge-hub-archive`. Do **not** delete R2 bucket `knowledge-hub-archive` or Worker `knowledge-hub-research`
+- Teaching leftovers still missing on umbrella (`/api/alchemy-lab`, compositions, trash, AI jobs, scope-sequences, export) already 404 on `api.adam-russell.com`; retiring `arteaching-hub` removes the fallback
+
 ## Next action
 
-Keep shipping. Next: remount Teaching/Tasks Blobs onto `life-hub2` so those API sites can retire, or signed-in smoke of tidy/curator/podcast/Alchemy Lab. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
+Job 5: copy Blobs onto `life-hub2`, set the two site-id env keys, verify a public Teaching lesson and a signed-in Tasks list, then retire the three Function sites. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
 
 ## Open questions (Adam)
 

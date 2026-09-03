@@ -2,7 +2,7 @@
 
 Tasks Hub SPA stays on GitHub Pages at `https://tasks-hub.adam-russell.com`.
 
-`GET/POST/PATCH/DELETE` for `/api/tasks`, `/api/projects`, `/api/areas`, `/api/goals`, `/api/programs`, and `/api/maps` on `life-hub2` use the Life session and Blobs store `tasks-hub-content`. If `NETLIFY_BLOBS_TOKEN` is set, that store is the existing `artasks-hub` store. Unbound → **503** `tasks_blobs_unbound`. Program create needs `name`; map create needs `title`.
+`GET/POST/PATCH/DELETE` for `/api/tasks`, `/api/projects`, `/api/areas`, `/api/goals`, `/api/programs`, and `/api/maps` on `life-hub2` use the Life session and Blobs store `tasks-hub-content`. With `NETLIFY_BLOBS_TOKEN` only, that store is still the `artasks-hub` store. Set `TASKS_BLOBS_SITE_ID` to `local` or the `life-hub2` site id after copying. Unbound → **503** `tasks_blobs_unbound`. Program create needs `name`; map create needs `title`.
 
 `GET/POST /api/clare` is the Clare loop on the same store: propose, dump (full parser + toolkits), brief (morning/tomorrow/weekly/high-stakes), accept, accept_batch, record_actual, apply_mutations. Offline parser only — no Anthropic judge on `life-hub2` yet.
 
