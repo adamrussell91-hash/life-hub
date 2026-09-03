@@ -2,7 +2,8 @@
 export const UMBRELLA_APP_ORIGINS = [
   'https://life-hub.adam-russell.com',
   'https://teaching-hub.adam-russell.com',
-  'https://knowledge-hub.adam-russell.com'
+  'https://knowledge-hub.adam-russell.com',
+  'https://tasks-hub.adam-russell.com'
 ];
 
 export function allowedRequestOrigins(env) {

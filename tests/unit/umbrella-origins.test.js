@@ -6,11 +6,12 @@ import {
   isAllowedRequestOrigin
 } from '../../netlify/functions/_shared/umbrella-origins.mjs';
 
-test('umbrella origins include Life, Teaching, and Knowledge Pages', () => {
+test('umbrella origins include Life, Teaching, Knowledge, and Tasks Pages', () => {
   assert.deepEqual(UMBRELLA_APP_ORIGINS, [
     'https://life-hub.adam-russell.com',
     'https://teaching-hub.adam-russell.com',
-    'https://knowledge-hub.adam-russell.com'
+    'https://knowledge-hub.adam-russell.com',
+    'https://tasks-hub.adam-russell.com'
   ]);
 });
 
@@ -24,4 +25,5 @@ test('foreign origins stay rejected', () => {
   assert.equal(isAllowedRequestOrigin('https://foreign.example', {}), false);
   assert.equal(isAllowedRequestOrigin('https://teaching-hub.adam-russell.com', {}), true);
   assert.equal(isAllowedRequestOrigin('https://knowledge-hub.adam-russell.com', {}), true);
+  assert.equal(isAllowedRequestOrigin('https://tasks-hub.adam-russell.com', {}), true);
 });
