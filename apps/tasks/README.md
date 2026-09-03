@@ -2,6 +2,6 @@
 
 Tasks Hub SPA stays on GitHub Pages at `https://tasks-hub.adam-russell.com`.
 
-The Life shell links out to that origin. CORS on `life-hub2` now allows it exactly.
+`GET /api/tasks` on `life-hub2` uses the Life session and reads Blobs store `tasks-hub-content` (not Teaching’s store). Unbound → **503** `tasks_blobs_unbound`.
 
-The Tasks API site `artasks-hub` (`tasks-api.adam-russell.com`) and `TASKS_HUB_PASSPHRASE_HASH` stay on that site. Do not copy Tasks Functions or rotate secrets in this slice.
+`artasks-hub` and `TASKS_HUB_PASSPHRASE_HASH` stay put. Do not rotate secrets or retarget production in this slice.

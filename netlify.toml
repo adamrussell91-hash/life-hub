@@ -11,6 +11,8 @@
 
 [functions]
 directory = "netlify/functions"
+node_bundler = "esbuild"
+external_node_modules = ["@netlify/blobs"]
 included_files = [
   "config/chadwick-protocol.md",
   "config/hyaluronica-protocol.md",

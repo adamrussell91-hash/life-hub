@@ -1,0 +1,46 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { renderTasksDashboard } from '../../apps/life/js/shell/render-tasks.js';
+
+function fakeRoot() {
+  const status = { textContent: '', hidden: false };
+  const list = {
+    hidden: false,
+    children: [],
+    replaceChildren(...nodes) {
+      this.children = [...nodes];
+    },
+    append(...nodes) {
+      this.children.push(...nodes);
+    }
+  };
+  return {
+    createElement() {
+      return { textContent: '' };
+    },
+    querySelector(selector) {
+      if (selector === '[data-tasks="status"]') return status;
+      if (selector === '#tasks-item-list') return list;
+      return null;
+    },
+    _status: status,
+    _list: list
+  };
+}
+
+test('tasks dashboard lists titles', () => {
+  const root = fakeRoot();
+  renderTasksDashboard(root, {
+    status: 'ready',
+    tasks: [{ id: 'task-1', title: 'Mark 12 English' }]
+  });
+  assert.equal(root._status.hidden, true);
+  assert.equal(root._list.children[0].textContent, 'Mark 12 English');
+});
+
+test('tasks dashboard explains an unbound content store', () => {
+  const root = fakeRoot();
+  renderTasksDashboard(root, { status: 'unbound' });
+  assert.match(root._status.textContent, /not bound/);
+  assert.equal(root._list.hidden, true);
+});

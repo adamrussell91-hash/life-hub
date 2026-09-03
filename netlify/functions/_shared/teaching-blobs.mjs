@@ -1,4 +1,16 @@
 export const TEACHING_CONTENT_STORE = 'teaching-hub-content';
+export const TEACHING_BLOBS_SITE_ID = '899b0fd3-53b3-45a0-bbfb-0238264d9246';
+export const TEACHING_BLOBS_SITE_ID_ENV = 'TEACHING_BLOBS_SITE_ID';
+export const TEACHING_BLOBS_TOKEN_ENV = 'NETLIFY_BLOBS_TOKEN';
+
+export function teachingStoreOptions(env = process.env) {
+  const siteID = typeof env?.[TEACHING_BLOBS_SITE_ID_ENV] === 'string' && env[TEACHING_BLOBS_SITE_ID_ENV].trim()
+    ? env[TEACHING_BLOBS_SITE_ID_ENV].trim()
+    : TEACHING_BLOBS_SITE_ID;
+  const token = typeof env?.[TEACHING_BLOBS_TOKEN_ENV] === 'string' ? env[TEACHING_BLOBS_TOKEN_ENV] : '';
+  if (token) return { name: TEACHING_CONTENT_STORE, siteID, token };
+  return TEACHING_CONTENT_STORE;
+}
 
 export function yearKey(id) {
   return `years/${id}`;
@@ -56,9 +68,9 @@ export function scheduleAnchorKey() {
   return 'meta/schedule_anchor_date';
 }
 
-export async function defaultGetContentStore() {
+export async function defaultGetContentStore(env = process.env) {
   const { getStore } = await import('@netlify/blobs');
-  return getStore(TEACHING_CONTENT_STORE);
+  return getStore(teachingStoreOptions(env));
 }
 
 export async function getJSON(store, key) {

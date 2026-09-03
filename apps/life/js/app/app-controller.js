@@ -1,6 +1,7 @@
 import { getSydneyDateKey } from '../core/time.js';
 import { renderHubSection } from '../shell/render-hub-sections.js';
 import { renderKnowledgeDashboard } from '../shell/render-knowledge.js';
+import { renderTasksDashboard } from '../shell/render-tasks.js';
 import { renderTeachingDashboard } from '../shell/render-teaching.js';
 import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -65,6 +66,7 @@ export function createAppController(dependencies) {
     skincareApi,
     teachingApi,
     knowledgeApi,
+    tasksApi,
     skincareController,
     skincareRoutines,
     getCurrentRoutineKey,
@@ -664,6 +666,7 @@ export function createAppController(dependencies) {
     if (name === 'teaching' || name === 'knowledge' || name === 'tasks') renderHubSection(root, name);
     if (name === 'teaching') void loadTeachingSection();
     if (name === 'knowledge') void loadKnowledgeSection();
+    if (name === 'tasks') void loadTasksSection();
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       const section = button.dataset.section;
       const active = section === name
@@ -707,6 +710,24 @@ export function createAppController(dependencies) {
       if (currentSection !== 'knowledge') return;
       renderKnowledgeDashboard(root, {
         status: error?.code === 'knowledge_repo_unbound' ? 'unbound' : 'error'
+      });
+    }
+  }
+
+  async function loadTasksSection() {
+    if (!tasksApi?.listTasks) {
+      renderTasksDashboard(root, { status: 'link-only' });
+      return;
+    }
+    renderTasksDashboard(root, { status: 'loading' });
+    try {
+      const tasks = await tasksApi.listTasks();
+      if (currentSection !== 'tasks') return;
+      renderTasksDashboard(root, { status: 'ready', tasks });
+    } catch (error) {
+      if (currentSection !== 'tasks') return;
+      renderTasksDashboard(root, {
+        status: error?.code === 'tasks_blobs_unbound' ? 'unbound' : 'error'
       });
     }
   }
