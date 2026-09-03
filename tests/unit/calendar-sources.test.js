@@ -59,7 +59,7 @@ test('shared calendar source registry names Life logged days', () => {
   const sources = listCalendarSources();
   assert.deepEqual(sources.map(source => source.id), ['life', 'teaching', 'knowledge', 'tasks']);
   assert.equal(sources[0].status, 'live');
-  assert.equal(sources[1].status, 'pending');
+  assert.equal(sources[1].status, 'live');
   assert.equal(sources[2].status, 'pending');
   assert.equal(sources[3].status, 'pending');
   assert.equal(sources.some(source => source.fetch || source.url || source.endpoint), false);

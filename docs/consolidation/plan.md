@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.13 — Teaching scheduled-lesson create. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.14 — Teaching calendar source live. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -189,7 +189,7 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 
 | Phase | State | Notes |
 |-------|--------|-------|
-| Plan v4.13 | Teaching scheduled-lesson create | Slice 20 shipped as PR #76; this slice |
+| Plan v4.14 | Teaching calendar source live | Slice 21 shipped as PR #77; this slice |
 | Claude critique #1 | done | `checkpoints/checkpoint-00-plan.md` |
 | Claude critique #2 (full) | **superseded** | Seed implemented first; seed audit is checkpoint-01 |
 | Claude critique #2 (partial) | done | `checkpoints/checkpoint-00b-plan-partial.md` |
@@ -227,7 +227,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Tasks programs/maps | **shipped** | PR #74 merged 2026-09-03 |
 | Teaching search/publish | **shipped** | PR #75 merged 2026-09-03 |
 | Teaching outcomes/media | **shipped** | PR #76 merged 2026-09-03 |
-| Teaching scheduled-lesson create | in progress | Slice 21 — GET/POST `/api/scheduled-lessons` |
+| Teaching scheduled-lesson create | **shipped** | PR #77 merged 2026-09-03 |
+| Teaching calendar live | in progress | Slice 22 — Life Calendar lists scheduled lessons |
 | Netlify retarget | not started | Target site: `life-hub2` — **do not retarget this slice** |
 
 ### Slice 01 — what shipped
@@ -412,16 +413,23 @@ Same Life session and `tasks-hub-content` / `artasks-hub` bind:
 - Public `GET /api/media/:id/file` stays unauthenticated
 - No upload, Drive picker, trash lifecycle, or `arteaching-hub` retire
 
-### Slice 21 — Teaching scheduled-lesson create (this slice)
+### Slice 21 — Teaching scheduled-lesson create (shipped, PR #77)
 
 - `GET/POST /api/scheduled-lessons` behind the Life session
 - Create needs class_id, lesson_id, and YYYY-MM-DD date; unit_id comes from the lesson when omitted
 - Record GET/PATCH/DELETE on `/:id` already exist
 - No unit-wide schedule expand, no calendar live feed, no `arteaching-hub` retire
 
+### Slice 22 — Teaching calendar source live (this slice)
+
+- Life Calendar merges scheduled lessons from same-origin `/api/curriculum`
+- Teaching source marked `live`; no hub API hosts in `calendar-sources.js`
+- Unbound Teaching store stays empty on the grid (Life days unchanged)
+- No Knowledge/Tasks calendar fold, no `arteaching-hub` retire
+
 ## Next action
 
-Keep shipping. Next: live Teaching calendar source or Tasks frameworks. Do not retarget `life-hub2`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
+Keep shipping. Next: Tasks frameworks or Knowledge page write. Do not retarget `life-hub2`. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
 
 ## Open questions (Adam)
 
