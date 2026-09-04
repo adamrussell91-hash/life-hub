@@ -3209,9 +3209,13 @@ body.is-universe-fullscreen .local-banner {
     right: 0;
     bottom: 0;
     left: 0;
-    width: auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     max-height: none;
     border-radius: 0;
+    /* Cover the bottom bar while open — same as Tasks overlay (z-index 50 > nav 30). */
+    z-index: 50;
     padding-top: max(var(--space-4), env(safe-area-inset-top, 0px));
     padding-bottom: max(var(--space-4), calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)));
     overscroll-behavior: contain;
@@ -3219,6 +3223,14 @@ body.is-universe-fullscreen .local-banner {
 
   .chat-overlay .chat-form {
     grid-template-columns: 1fr;
+  }
+
+  .chat-overlay .chat-form textarea,
+  .chat-overlay .chat-form input,
+  .chat-overlay__book input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .chat-overlay .chat-form .btn,
@@ -3230,6 +3242,7 @@ body.is-universe-fullscreen .local-banner {
 
   .chat-overlay .chat-messages {
     flex: 1;
+    min-width: 0;
   }
 
   body:has(.chat-overlay) .floating-chat-button {

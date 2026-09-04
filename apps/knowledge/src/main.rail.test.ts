@@ -110,6 +110,7 @@ describe("Knowledge Hub rail", () => {
       /\.floating-chat-button\s*\{[^}]*bottom:\s*calc\(5\.5rem \+ env\(safe-area-inset-bottom,\s*0px\)\)/
     );
     expect(css).toMatch(/\.chat-overlay\s*\{[^}]*width:\s*min\(24rem, calc\(100vw - 3rem\)\)/);
+    expect(css).toMatch(/\.chat-overlay\s*\{[^}]*z-index:\s*50/);
     expect(css).toMatch(/\.graph-stage\s*\{[^}]*min-height:\s*560px/);
     expect(css).toContain(".universe-zoom");
     expect(css).toContain(".graph-wrap.is-universe-dark");
