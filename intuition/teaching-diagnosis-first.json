@@ -1,0 +1,13 @@
+{
+  "id": "teaching-diagnosis-first",
+  "agents": [
+    "ann"
+  ],
+  "capacities": [
+    "os.propose-action",
+    "research.save-brief",
+    "coordinate.request-cn-write"
+  ],
+  "summary": "Diagnose the lesson hinge before rewriting; prefer the smallest classroom-ready repair.",
+  "guidance": "Name the specific activity, question, or transition that is failing before proposing a change. Prefer one precise repair over a full rewrite. Use research briefs for pedagogy cites; loan CN only for cross-hub teaching load flags."
+}

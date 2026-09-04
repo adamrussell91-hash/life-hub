@@ -1,0 +1,21 @@
+{
+  "agent": "clementine",
+  "write_globs": [
+    "data/research/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/widgets/**",
+    "data/os/**",
+    "intuition/**"
+  ],
+  "read_globs": [
+    "data/research/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/widgets/**",
+    "data/os/**",
+    "central-node.md",
+    "intuition/**"
+  ],
+  "notes": "Knowledge specialist on the shared OS floor. Notes live in knowledge-hub-data; Life research briefs and trackers use propose-action here."
+}

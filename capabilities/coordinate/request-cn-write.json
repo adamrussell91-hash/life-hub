@@ -3,12 +3,7 @@
   "tool_name": "coordinate_request_cn_write",
   "verb": "Coordinate",
   "agents": [
-    "brisket",
-    "chadwick",
-    "sara",
-    "hyaluronica",
-    "penelope",
-    "vera"
+    "*"
   ],
   "risk": "auto",
   "kind": "capacity",
