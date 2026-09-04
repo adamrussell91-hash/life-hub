@@ -36,6 +36,7 @@ import { resolveArchivePageId } from "./chat/noteLinks";
 import { cardSupportingText } from "./archive/cardText";
 import { archiveEmptyHtml } from "./archive/emptyList";
 import { goHome } from "./archive/goHome";
+import { paintVirtualList, virtualListWindow, type VirtualListPainted } from "./archive/virtualList";
 import { readerTopicPillsHtml } from "./archive/readerMeta";
 import {
   emptyOriginFilter,
@@ -131,6 +132,7 @@ let composeOriginKind: Origin["kind"] = "degree";
 let activePage: Page | null = null;
 let tidyBusy = false;
 let listScrollTop = 0;
+let listPainted: VirtualListPainted | null = null;
 let graphTeardown: (() => void) | null = null;
 let graphMount: GraphMount | null = null;
 let graphMode: GraphMode = "constellation";
@@ -518,24 +520,21 @@ function bindListRows(root: ParentNode) {
 
 function renderVirtualList(viewport: HTMLElement) {
   const total = visible.length;
-  const viewportHeight = viewport.clientHeight || 560;
-  const rowHeight = listRowHeight();
-  const start = Math.max(0, Math.floor(listScrollTop / rowHeight) - OVERSCAN);
-  const end = Math.min(total, Math.ceil((listScrollTop + viewportHeight) / rowHeight) + OVERSCAN);
-  const offset = start * rowHeight;
-  const windowItems = visible.slice(start, end);
-
-  viewport.innerHTML = `<div class="list-spacer" style="height:${Math.max(total * rowHeight, total ? 0 : 120)}px">
-    <div class="list-window" style="transform:translateY(${offset}px)">
-      ${
-        windowItems.map(rowHtml).join("") ||
-        archiveEmptyHtml({
-          hasArchiveNotes: entries.length > 0,
-        })
-      }
-    </div>
-  </div>`;
-  bindListRows(viewport);
+  const window = virtualListWindow({
+    total,
+    scrollTop: listScrollTop,
+    viewportHeight: viewport.clientHeight || 560,
+    rowHeight: listRowHeight(),
+    overscan: OVERSCAN,
+  });
+  const html =
+    visible.slice(window.start, window.end).map(rowHtml).join("") ||
+    archiveEmptyHtml({
+      hasArchiveNotes: entries.length > 0,
+    });
+  const previous = listPainted;
+  listPainted = paintVirtualList(viewport, { ...window, html }, listPainted);
+  if (listPainted !== previous) bindListRows(viewport);
 }
 
 function renderList() {
@@ -570,6 +569,9 @@ function renderList() {
     <p class="list-count">${visible.length.toLocaleString()} notes</p>
     <div class="cards list-viewport" aria-label="Archive list"></div>
   `);
+  // shell() remounts the viewport — drop the previous painted window so the
+  // first paint recreates spacer/window instead of assuming they still exist.
+  listPainted = null;
 
   app.querySelector<HTMLButtonElement>("[data-jump-graph]")!.onclick = () => {
     view = "graph";
