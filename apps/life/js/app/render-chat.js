@@ -264,7 +264,9 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
   const card = root.createElement('li');
-  card.className = 'record-proposal';
+  card.className = 'record-proposal confirm-card';
+  card.setAttribute('role', 'region');
+  card.setAttribute('aria-label', 'Confirm change');
   card.dataset.path = path;
 
   const isWorkout = record.type === 'workout';
@@ -343,17 +345,21 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
     card.append(warningsList);
   }
 
+  const actions = root.createElement('div');
+  actions.className = 'confirm-card__actions';
+
   const confirm = root.createElement('button');
   confirm.type = 'button';
-  confirm.className = 'record-proposal__confirm';
+  confirm.className = 'btn btn--primary record-proposal__confirm';
   confirm.textContent = plannedWorkout ? 'Start workout' : 'Confirm';
-  card.append(confirm);
 
   const discard = root.createElement('button');
   discard.type = 'button';
-  discard.className = 'record-proposal__discard';
+  discard.className = 'btn btn--ghost record-proposal__discard';
   discard.textContent = 'Discard';
-  card.append(discard);
+
+  actions.append(discard, confirm);
+  card.append(actions);
 
   list.append(card);
   list.scrollTop = list.scrollHeight;
@@ -385,7 +391,9 @@ export function appendCnPatchProposal(root, { patch }) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
   const card = root.createElement('li');
-  card.className = 'record-proposal cn-patch-proposal';
+  card.className = 'record-proposal cn-patch-proposal confirm-card';
+  card.setAttribute('role', 'region');
+  card.setAttribute('aria-label', 'Confirm change');
 
   const summary = root.createElement('p');
   summary.className = 'cn-patch-proposal__summary';
@@ -409,17 +417,21 @@ export function appendCnPatchProposal(root, { patch }) {
     card.append(detail);
   }
 
+  const actions = root.createElement('div');
+  actions.className = 'confirm-card__actions';
+
   const confirm = root.createElement('button');
   confirm.type = 'button';
-  confirm.className = 'record-proposal__confirm';
+  confirm.className = 'btn btn--primary record-proposal__confirm';
   confirm.textContent = 'Confirm';
-  card.append(confirm);
 
   const discard = root.createElement('button');
   discard.type = 'button';
-  discard.className = 'record-proposal__discard';
+  discard.className = 'btn btn--ghost record-proposal__discard';
   discard.textContent = 'Discard';
-  card.append(discard);
+
+  actions.append(discard, confirm);
+  card.append(actions);
 
   list.append(card);
   list.scrollTop = list.scrollHeight;
@@ -430,7 +442,9 @@ export function appendActionProposal(root, { proposal }) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
   const card = root.createElement('li');
-  card.className = 'record-proposal action-proposal';
+  card.className = 'record-proposal action-proposal confirm-card';
+  card.setAttribute('role', 'region');
+  card.setAttribute('aria-label', 'Confirm change');
 
   const eyebrow = root.createElement('p');
   eyebrow.className = 'record-proposal__eyebrow';
@@ -473,17 +487,21 @@ export function appendActionProposal(root, { proposal }) {
     card.append(diffs);
   }
 
+  const actions = root.createElement('div');
+  actions.className = 'confirm-card__actions';
+
   const confirm = root.createElement('button');
   confirm.type = 'button';
-  confirm.className = 'record-proposal__confirm';
+  confirm.className = 'btn btn--primary record-proposal__confirm';
   confirm.textContent = 'Confirm';
-  card.append(confirm);
 
   const discard = root.createElement('button');
   discard.type = 'button';
-  discard.className = 'record-proposal__discard';
+  discard.className = 'btn btn--ghost record-proposal__discard';
   discard.textContent = 'Discard';
-  card.append(discard);
+
+  actions.append(discard, confirm);
+  card.append(actions);
 
   list.append(card);
   list.scrollTop = list.scrollHeight;
