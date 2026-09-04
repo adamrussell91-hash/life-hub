@@ -138,7 +138,7 @@ export function renderWikiRail(host: WikiRailHost) {
     <header class="topbar page-header">
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">Self-maintaining wiki</p>
-        <h1 class="page-header__title">Wiki</h1>
+        <h1 class="page-header__title hub-kinetic">Wiki</h1>
       </div>
       ${hubUtilitiesActionsHtml()}
     </header>

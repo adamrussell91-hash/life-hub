@@ -496,11 +496,11 @@ export interface PageHeaderConfig {
 
 function restoreHeaderTitle(existing: Element): HTMLElement {
   if (existing instanceof HTMLHeadingElement && existing.tagName === 'H1') {
-    existing.className = 'page-header__title';
+    existing.className = 'page-header__title hub-kinetic';
     return existing;
   }
   const heading = document.createElement('h1');
-  heading.className = 'page-header__title';
+  heading.className = 'page-header__title hub-kinetic';
   existing.replaceWith(heading);
   return heading;
 }
@@ -549,7 +549,7 @@ export function renderPageHeader(refs: HubShellRefs, config: PageHeaderConfig): 
   eyebrow.textContent = config.eyebrow;
 
   const title = document.createElement('h1');
-  title.className = 'page-header__title';
+  title.className = 'page-header__title hub-kinetic';
   title.textContent = config.title;
 
   copy.append(eyebrow, title);
