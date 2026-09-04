@@ -1,3 +1,5 @@
+import { formatDisplayDate } from "../../design-kit/js/format-display-date.js";
+
 export type CaptureKind = "voice" | "photo" | "pdf";
 
 export function appendCaptureBlock(
@@ -18,7 +20,7 @@ export function titleFromCapture(
     .map(part => part.trim())
     .find(Boolean) ?? "";
   if (line) return line.slice(0, 80);
-  const day = (input.now ?? new Date()).toISOString().slice(0, 10);
+  const day = formatDisplayDate(input.now ?? new Date());
   const label = input.kind === "voice" ? "Voice note" : input.kind === "photo" ? "Photo note" : "PDF note";
-  return `${label} ${day}`;
+  return day ? `${label} ${day}` : label;
 }
