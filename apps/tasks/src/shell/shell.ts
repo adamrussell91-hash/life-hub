@@ -1,4 +1,4 @@
-import { appendHubSwitcher } from '../../../packages/hub-switcher.js';
+import { appendHubSwitcher } from '../../../../packages/hub-switcher.js';
 import { railIconFor, refreshIcon, signOutIcon } from '@/shell/icons';
 import { createRailDisclosureState, type RailSectionId } from '@/shell/rail-disclosure';
 
