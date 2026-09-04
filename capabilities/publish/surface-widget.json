@@ -3,13 +3,7 @@
   "tool_name": "publish_surface_widget",
   "verb": "Publish",
   "agents": [
-    "brisket",
-    "chadwick",
-    "hammond",
-    "sara",
-    "hyaluronica",
-    "penelope",
-    "vera"
+    "*"
   ],
   "risk": "confirm",
   "kind": "capacity",

@@ -3,13 +3,7 @@
   "tool_name": "track_log_progress",
   "verb": "Track",
   "agents": [
-    "brisket",
-    "chadwick",
-    "hammond",
-    "sara",
-    "hyaluronica",
-    "penelope",
-    "vera"
+    "*"
   ],
   "risk": "auto",
   "kind": "capacity",
