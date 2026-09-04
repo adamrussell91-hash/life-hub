@@ -61,8 +61,10 @@ test('hub accordion CSS uses the 0fr to 1fr height trick with an explicit column
   assert.match(css, /grid-template-columns:\s*1fr/);
   assert.match(css, /grid-template-rows:\s*0fr/);
   assert.match(css, /\.hub-panel\.is-open\s*\{[^}]*grid-template-rows:\s*1fr/s);
-  assert.match(css, /transition:\s*grid-template-rows\s+0\.2s\s+ease/);
+  assert.match(css, /transition:\s*grid-template-rows\s+0\.28s\s+cubic-bezier\(0\.4,\s*0,\s*0\.2,\s*1\)/);
   assert.match(css, /transform:\s*rotate\(180deg\)/);
+  assert.match(css, /\.hub-stack\s*\{[^}]*grid-template-columns:\s*1fr/s);
+  assert.doesNotMatch(css, /\.hub-panel-inner\s*\{[^}]*transition:\s*padding/s);
 });
 
 test('Life rail puts domains inside the Life accordion, not a flat Domains list', async () => {
@@ -128,5 +130,6 @@ test('shared hub switcher markup is an accordion, not a flat link list', () => {
   assert.match(html, /data-hub-toggle="life"/);
   assert.match(html, /class="hub-panel"/);
   assert.match(html, /data-hub-preview="tasks"/);
+  assert.match(html, /class="hub-stack"/);
   assert.match(html, /aria-current="page"/);
 });
