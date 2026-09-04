@@ -11,18 +11,38 @@ export function chatJobOwnerKey(cookie) {
   return createHash('sha256').update(typeof cookie === 'string' ? cookie : '').digest('hex').slice(0, 32);
 }
 
+function jobRecord(record, { events = [], status = 'pending' } = {}) {
+  return {
+    owner: record.owner,
+    body: record.body,
+    url: record.url,
+    cookie: record.cookie ?? '',
+    origin: record.origin ?? '',
+    events,
+    status
+  };
+}
+
 export function createMemoryChatJobStore() {
   const jobs = new Map();
   return {
     async create(jobId, record) {
+      jobs.set(jobId, jobRecord(record));
+    },
+    /**
+     * Blind snapshot write from the runner's in-memory event list.
+     * Never read-modify-write events — Netlify Blobs eventual reads were
+     * clobbering earlier text deltas (missing prefixes / mid-word cuts).
+     */
+    async put(jobId, record) {
       jobs.set(jobId, {
         owner: record.owner,
         body: record.body,
         url: record.url,
         cookie: record.cookie ?? '',
         origin: record.origin ?? '',
-        events: [],
-        status: 'pending'
+        events: Array.isArray(record.events) ? record.events : [],
+        status: record.status ?? 'running'
       });
     },
     async append(jobId, events) {
@@ -31,9 +51,10 @@ export function createMemoryChatJobStore() {
       job.events.push(...events);
       if (job.status === 'pending') job.status = 'running';
     },
-    async finish(jobId) {
+    async finish(jobId, { events } = {}) {
       const job = jobs.get(jobId);
       if (!job) return;
+      if (Array.isArray(events)) job.events = events;
       job.status = 'done';
     },
     async get(jobId) {
@@ -44,32 +65,40 @@ export function createMemoryChatJobStore() {
 
 export async function defaultGetChatJobStore() {
   const { getStore } = await import('@netlify/blobs');
-  return createBlobChatJobStore(getStore(CHAT_JOBS_STORE));
+  // Strong consistency so the browser poller sees the runner's latest snapshot.
+  return createBlobChatJobStore(getStore(CHAT_JOBS_STORE, { consistency: 'strong' }));
 }
 
 export function createBlobChatJobStore(store) {
   return {
     async create(jobId, record) {
+      await store.set(jobId, JSON.stringify(jobRecord(record)));
+    },
+    async put(jobId, record) {
       await store.set(jobId, JSON.stringify({
         owner: record.owner,
         body: record.body,
         url: record.url,
         cookie: record.cookie ?? '',
         origin: record.origin ?? '',
-        events: [],
-        status: 'pending'
+        events: Array.isArray(record.events) ? record.events : [],
+        status: record.status ?? 'running'
       }));
     },
     async append(jobId, events) {
+      // Legacy RMW path — prefer put() from chat-job-run. Kept for tests.
       const current = await readJob(store, jobId);
       if (!current) return;
       current.events = [...(current.events ?? []), ...events];
       if (current.status === 'pending') current.status = 'running';
       await store.set(jobId, JSON.stringify(current));
     },
-    async finish(jobId) {
+    async finish(jobId, { events } = {}) {
       const current = await readJob(store, jobId);
       if (!current) return;
+      // Caller must pass the full in-memory events when finishing so a stale
+      // get cannot truncate the transcript as status flips to done.
+      if (Array.isArray(events)) current.events = events;
       current.status = 'done';
       await store.set(jobId, JSON.stringify(current));
     },

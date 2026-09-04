@@ -1,5 +1,7 @@
 import { isChatJobId } from './chat-job-store.mjs';
 
+const FLUSH_EVERY_EVENTS = 8;
+
 export async function runStoredChatJob({
   jobId,
   store,
@@ -11,59 +13,120 @@ export async function runStoredChatJob({
   const job = await store.get(jobId);
   if (!job || typeof job.body !== 'string') return false;
 
+  const meta = {
+    owner: job.owner,
+    body: job.body,
+    url: job.url,
+    cookie: job.cookie ?? '',
+    origin: job.origin ?? ''
+  };
+
   const request = new Request(job.url || 'https://life.example/api/chat', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      ...(job.cookie ? { cookie: job.cookie } : {}),
-      ...(job.origin ? { origin: job.origin } : {})
+      ...(meta.cookie ? { cookie: meta.cookie } : {}),
+      ...(meta.origin ? { origin: meta.origin } : {})
     },
     body: job.body
   });
 
+  const events = [];
+
+  async function publish(status) {
+    if (typeof store.put === 'function') {
+      await store.put(jobId, { ...meta, events: events.slice(), status });
+      return;
+    }
+    // Memory-store tests that only stub append/finish.
+    if (status === 'done' && typeof store.finish === 'function') {
+      await store.finish(jobId, { events: events.slice() });
+      return;
+    }
+    if (typeof store.append === 'function' && events.length) {
+      await store.append(jobId, events.slice(events.length - 1));
+    }
+  }
+
   try {
     const response = await createHandler(handlerDeps)(request);
     if (!response?.body) {
-      await store.append(jobId, [{ type: 'error', code: 'anthropic_unavailable' }]);
-      await store.finish(jobId);
+      events.push({ type: 'error', code: 'anthropic_unavailable' });
+      await publish('done');
       return true;
     }
-    await drainSseIntoStore(response.body, store, jobId);
-    await store.finish(jobId);
+    await drainSseIntoMemory(response.body, events, async () => {
+      await publish('running');
+    });
+    const hasDone = events.some(event => event.type === 'done');
+    if (!hasDone && !events.some(event => event.type === 'error')) {
+      // Stream died mid-turn (platform kill / upstream drop). Mark it so the
+      // client can show cut-off recovery instead of treating partial text as complete.
+      events.push({ type: 'error', code: 'turn_incomplete' });
+    }
+    await publish('done');
     return true;
   } catch {
-    await store.append(jobId, [{ type: 'error', code: 'anthropic_unavailable' }]);
-    await store.finish(jobId);
+    events.push({ type: 'error', code: 'anthropic_unavailable' });
+    await publish('done');
     return true;
   }
 }
 
-async function drainSseIntoStore(body, store, jobId) {
+async function drainSseIntoMemory(body, events, onBatch) {
   const reader = body.getReader();
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  let sinceFlush = 0;
+
+  async function takeFrames({ flushTail = false } = {}) {
     let boundary;
     while ((boundary = buffer.indexOf('\n\n')) !== -1) {
       const frame = buffer.slice(0, boundary);
       buffer = buffer.slice(boundary + 2);
-      const line = frame.split('\n').find(candidate => candidate.startsWith('data:'));
-      if (!line) continue;
-      try {
-        await store.append(jobId, [JSON.parse(line.slice(5).trim())]);
-      } catch {
-        /* skip a malformed frame */
-      }
+      await pushFrame(frame);
+    }
+    // Platform kills often close the body mid-stream; still salvage a final
+    // unterminated data: line so the last text delta is not silently dropped.
+    if (flushTail && buffer.trim()) {
+      await pushFrame(buffer);
+      buffer = '';
     }
   }
+
+  async function pushFrame(frame) {
+    const line = frame.split('\n').find(candidate => candidate.startsWith('data:'));
+    if (!line) return;
+    try {
+      events.push(JSON.parse(line.slice(5).trim()));
+      sinceFlush += 1;
+      if (sinceFlush >= FLUSH_EVERY_EVENTS) {
+        sinceFlush = 0;
+        await onBatch();
+      }
+    } catch {
+      /* skip a malformed frame */
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    await takeFrames();
+  }
+  buffer += decoder.decode();
+  await takeFrames({ flushTail: true });
+  if (sinceFlush > 0) await onBatch();
 }
 
-export function chatRunUrl(request, env = {}) {
-  const base = env.URL || env.SITE_ORIGIN || request.url;
-  return new URL('/api/chat-run', base);
+/**
+ * Always invoke chat-run on the same API host that received /api/chat.
+ * Never use SITE_ORIGIN — that is GitHub Pages and has no Functions, which
+ * silently failed the background kick and fell back to the 60s live stream.
+ */
+export function chatRunUrl(request, _env = {}) {
+  return new URL('/api/chat-run', request.url);
 }
 
 export async function defaultInvokeChatBackground(request, jobId, env = {}, fetchImpl = fetch) {
