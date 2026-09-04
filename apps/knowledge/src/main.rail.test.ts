@@ -112,6 +112,7 @@ describe("Knowledge Hub rail", () => {
     expect(css).toMatch(/\.chat-overlay\s*\{[^}]*width:\s*min\(24rem, calc\(100vw - 3rem\)\)/);
     expect(css).toContain("--vv-height");
     expect(css).toContain("body:has(.chat-overlay) .hub-mobile-nav");
+    expect(css).toMatch(/\.coach\.chat \.chat__composer\s*\{[^}]*position:\s*fixed/);
     expect(css).toMatch(/\.coach\.chat \.chat__composer\s*\{[^}]*bottom:\s*calc\(5\.5rem/);
     expect(css).toMatch(/\.graph-stage\s*\{[^}]*min-height:\s*560px/);
     expect(css).toContain(".universe-zoom");
