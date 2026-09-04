@@ -1,5 +1,17 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { renderPrimaryNav, resetRailDisclosureStateForTests } from '@/shell/shell';
+
+const hubCss = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../src/styles/hub.css'),
+  'utf8'
+);
+const cardsCss = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../src/styles/cards.css'),
+  'utf8'
+);
 
 describe('primary rail navigation', () => {
   beforeEach(() => resetRailDisclosureStateForTests());
@@ -20,6 +32,27 @@ describe('primary rail navigation', () => {
     expect(host.querySelector('[data-section-toggle="plan"]')?.getAttribute('aria-expanded')).toBe(
       'false'
     );
+    expect(
+      host.querySelector('.hub-rail__list--desktop [data-section-panel="views"]')?.dataset.open
+    ).toBe('true');
+    expect(
+      host.querySelector('.hub-rail__list--desktop [data-section-panel="plan"]')?.dataset.open
+    ).toBe('false');
+  });
+
+  it('keeps the phone rail in the DOM but hidden on desktop', () => {
+    expect(hubCss).toMatch(/\.hub-rail__mobile\s*\{\s*display:\s*none;/);
+    expect(hubCss).toMatch(/\.hub-rail__section-panel\[data-open="true"\]/);
+    expect(hubCss).toMatch(/align-self:\s*start;/);
+    expect(hubCss).toMatch(/min-height:\s*100dvh;/);
+    expect(hubCss).toMatch(/\.hub-rail \.hub-row\s*\{/);
+    expect(cardsCss).toMatch(/\.hub-canvas \.hub-row\s*\{/);
+    expect(cardsCss).not.toMatch(/(?:^|\n)\.hub-row\s*\{/);
+    const host = document.createElement('div');
+    renderPrimaryNav(host, 'board');
+    expect(host.querySelector('.hub-rail__list--desktop')).not.toBeNull();
+    expect(host.querySelector('.hub-rail__mobile')).not.toBeNull();
+    expect(host.querySelectorAll('.hub-rail__link[href="#/board"]').length).toBe(2);
   });
 
   it('keeps multiple non-active sections open', () => {

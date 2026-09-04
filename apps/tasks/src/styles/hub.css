@@ -28,16 +28,41 @@
   outline-offset: 2px;
 }
 
+.hub-rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
 .hub-rail__nav {
   display: flex;
   flex-direction: column;
+  flex: 1 1 0;
   gap: var(--space-px);
   min-height: 0;
   overflow-y: auto;
 }
 
 .hub-rail__hubs {
+  flex: 0 0 auto;
   margin-top: auto;
+}
+
+/* Kit accordion rows. Cards.css .hub-row is a canvas tile — keep it off the rail. */
+.hub-rail .hub-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .hub-rail__list {
