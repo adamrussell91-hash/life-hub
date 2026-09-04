@@ -477,7 +477,7 @@ Knowledge Pages can call the namespaced handlers without colliding with Teaching
 - Leftover Clementine, attachments, tidy, capture, curator, and podcast stay on `knowledge-api`; login also establishes that session with the same passphrase until those handlers fold
 - Do not bind R2, copy Knowledge auth, rotate secrets, or retire `knowledge-hub-archive`
 
-### Slice 27 — Clementine, capture, attachments (this slice)
+### Slice 27 — Clementine, capture, attachments (shipped, PR #84)
 
 Session-gated leftovers on `life-hub2`, still no Cloudflare R2 binding:
 
@@ -490,7 +490,7 @@ Session-gated leftovers on `life-hub2`, still no Cloudflare R2 binding:
 
 Kernel + R2 env set on `life-hub2` Production (Job 4b, 2026-09-04). `ANTHROPIC_API_KEY` was already there. No Cloudflare bind.
 
-### Slice 28 — Tidy, curator, podcast, lesson-alchemist (this slice)
+### Slice 28 — Tidy, curator, podcast, lesson-alchemist (shipped, PR #85)
 
 Last Knowledge Function leftovers on `life-hub2`. Worker `knowledge-hub-research` and R2 stay called over HTTPS:
 
@@ -503,7 +503,7 @@ Last Knowledge Function leftovers on `life-hub2`. Worker `knowledge-hub-research
 
 Job 8 done 2026-09-04 (Production only, no values recorded): `ALCHEMIST_SHARED_SECRET` and `GITHUB_WORKFLOW_TOKEN` copied onto `life-hub2` (secret). `KNOWLEDGE_ALCHEMIST_URL`=`https://api.adam-russell.com/api/lesson-alchemist` (non-secret). `GITHUB_TOKEN` unchanged.
 
-### Slice 29 — Remount Blobs and retire Function sites (this slice)
+### Slice 29 — Remount Blobs and retire Function sites (shipped — Jobs 5 + 6)
 
 Old API sites are Blobs hosts, not the live Pages origin. Do not flip stores until the copy exists:
 
@@ -516,7 +516,7 @@ Old API sites are Blobs hosts, not the live Pages origin. Do not flip stores unt
 
 Job 5 done 2026-09-04: copies matched; remount env `local`; public lesson 200. Job 6 done 2026-09-04: three Function sites **deleted** (IDs absent; old API hosts 404). R2 bucket `knowledge-hub-archive` and Worker `knowledge-hub-research` untouched. `life-hub2` and `jade-melomakarona-ea20fe` remain.
 
-### Slice 30 — Remount Teaching, Knowledge, and Tasks SPAs (this slice)
+### Slice 30 — Remount Teaching, Knowledge, and Tasks SPAs (shipped, PR #87)
 
 The four apps are one Pages site. Source moved from the hub repos’ `origin/main` into this repo:
 
@@ -530,7 +530,7 @@ APIs stay on `life-hub2`. Functions stay in repo-root `netlify/functions/` — n
 
 Old custom domains (`teaching-hub`, `knowledge-hub`, `tasks-hub`) can keep serving their existing Pages deploys until DNS points here. Student lessons on this site are `/teaching/s/…` and stay unauthenticated.
 
-### Slice 31 — Leftover Teaching APIs, smoke, DNS, retire sites (this slice)
+### Slice 31 — Leftover Teaching APIs, smoke, DNS, retire sites (shipped, PR #89)
 
 Teacher UI leftovers now on `life-hub2` (Life session, Teaching Blobs):
 
@@ -554,7 +554,7 @@ Job 6 deleted Function sites `arteaching-hub`, `artasks-hub`, and Netlify `knowl
 
 Life `/api/chat` Hammond now gets a short live digest from the umbrella Tasks and Teaching stores (open tasks, class codes, upcoming scheduled lessons). Fail-open if a store is unbound. Knowledge notes stay with Clementine — this digest does not list them. No new `/api/agent` runtime.
 
-### Slice 34 — Jobs 8 + 6 (this slice)
+### Slice 34 — Jobs 8 + 6 (shipped, recorded PR #92)
 
 Job 8 before Job 6. Production on `life-hub2` only; no secret values recorded.
 
@@ -570,7 +570,7 @@ Job 6 deleted Netlify sites `arteaching-hub`, `artasks-hub`, and `knowledge-hub-
 
 ## Next action
 
-Hub API consolidation is complete. Widgets stay on `jade-melomakarona-ea20fe`. `GITHUB_TOKEN` rotation stays parked until closer to **2026-12-02**.
+Hub API consolidation is complete. Post-fold audit: `checkpoints/checkpoint-10.md` — **PASS WITH NITS**. Widgets stay on `jade-melomakarona-ea20fe`. `GITHUB_TOKEN` rotation stays parked until closer to **2026-12-02**.
 
 ## Open questions (Adam)
 
