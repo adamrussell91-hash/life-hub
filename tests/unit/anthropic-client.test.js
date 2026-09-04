@@ -254,6 +254,44 @@ test('keeps continuing pause_turn past the old 3-search cap so research can iter
   assert.ok(events.some(event => event.type === 'text' && event.delta === 'Found it.'));
 });
 
+test('continues when stop_reason is max_tokens so long replies are not left mid-sentence', async () => {
+  const first = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Mostly from that skim milk — nic' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'max_tokens' } }),
+    frame('message_stop', {})
+  ];
+  const second = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'e — calcium is solid too.' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'end_turn' } }),
+    frame('message_stop', {})
+  ];
+
+  let calls = 0;
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async () => {
+      calls += 1;
+      return sseResponse(calls === 1 ? first : second);
+    }
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'latte' }]
+  })) events.push(event);
+
+  assert.equal(calls, 2);
+  assert.deepEqual(
+    events.filter(e => e.type === 'text' || e.type === 'done').map(e => e.type === 'text' ? e.delta : e.type),
+    ['Mostly from that skim milk — nic', 'e — calcium is solid too.', 'done']
+  );
+});
+
 test('continues when stop_reason is pause_turn by re-sending assistant content as-is', async () => {
   const first = [
     frame('content_block_start', {

@@ -117,6 +117,58 @@ test('chat-run refuses a missing job id', async () => {
   assert.equal(response.status, 400);
 });
 
+test('chatRunUrl always targets the API host from the request, never SITE_ORIGIN', async () => {
+  const { chatRunUrl } = await import('../../netlify/functions/_shared/chat-job-run.mjs');
+  const request = new Request('https://api.adam-russell.com/api/chat', { method: 'POST' });
+  const url = chatRunUrl(request, {
+    URL: 'https://wrong.netlify.app',
+    SITE_ORIGIN: 'https://life-hub.adam-russell.com'
+  });
+  assert.equal(url.href, 'https://api.adam-russell.com/api/chat-run');
+});
+
+test('runStoredChatJob publishes the full event list via put (no append RMW)', async () => {
+  const store = createMemoryChatJobStore();
+  const jobId = '11111111-1111-4111-8111-111111111111';
+  await store.create(jobId, {
+    owner: 'owner',
+    body: '{"message":"hi"}',
+    url: 'https://api.example/api/chat'
+  });
+  const puts = [];
+  const originalPut = store.put.bind(store);
+  store.put = async (id, record) => {
+    puts.push(record.events.map(e => e.type));
+    return originalPut(id, record);
+  };
+  store.append = async () => {
+    throw new Error('append must not be used on the hot path');
+  };
+
+  await runStoredChatJob({
+    jobId,
+    store,
+    createHandler: () => async () => {
+      const encoder = new TextEncoder();
+      return new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"agent","slug":"brisket"}\n\n'));
+          controller.enqueue(encoder.encode('data: {"type":"text","delta":"Mostly"}\n\n'));
+          controller.enqueue(encoder.encode('data: {"type":"text","delta":" from skim"}\n\n'));
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        }
+      }), { headers: { 'content-type': 'text/event-stream' } });
+    }
+  });
+
+  const job = await store.get(jobId);
+  assert.equal(job.status, 'done');
+  assert.deepEqual(job.events.map(e => e.type), ['agent', 'text', 'text', 'done']);
+  assert.ok(puts.length >= 1);
+  assert.deepEqual(puts.at(-1), ['agent', 'text', 'text', 'done']);
+});
+
 test('events endpoint hides another session\'s job', async () => {
   const store = createMemoryChatJobStore();
   await store.create('11111111-1111-4111-8111-111111111111', {

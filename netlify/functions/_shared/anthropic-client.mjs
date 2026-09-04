@@ -106,10 +106,12 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
         }
 
         if (
-          roundState.stopReason === 'pause_turn'
+          (roundState.stopReason === 'pause_turn' || roundState.stopReason === 'max_tokens')
           && pauseContinuations < MAX_PAUSE_CONTINUATIONS
           && roundState.assistantBlocks.length > 0
         ) {
+          // Continue after pause_turn (server tools) and max_tokens so a long
+          // Vera/Brisket reply is not left mid-sentence when the token budget trips.
           pauseContinuations += 1;
           roundMessages = [
             ...roundMessages,

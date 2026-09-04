@@ -330,6 +330,8 @@ export function createChatController({
     showChatError(root, '');
     let turnSignaled = false;
     let gotUsefulOutput = false;
+    let sawDone = false;
+    let sawIncompleteTurn = false;
     let sawExerciseLibrarySaved = false;
     let sawRecordProposal = false;
     let sawGovernanceLogAppended = false;
@@ -517,10 +519,23 @@ export function createChatController({
           turnSignaled = true;
           clearWorkingBubble();
           showChatError(root, formatRejectionMessage(event.errors));
+        } else if (event.type === 'done') {
+          sawDone = true;
         } else if (event.type === 'error') {
           turnSignaled = true;
           clearWorkingBubble();
-          showChatError(root, 'Chat is unavailable right now. Please try again.');
+          if (event.code === 'turn_incomplete') {
+            sawIncompleteTurn = true;
+            if (!hiddenUser) {
+              appendMessage(root, {
+                role: 'assistant',
+                agentSlug: assistantSlug,
+                text: EMPTY_TURN_RECOVERY
+              });
+            }
+          } else {
+            showChatError(root, 'Chat is unavailable right now. Please try again.');
+          }
         } else if (event.type === 'status') {
           if (typeof event.text === 'string' && event.text.trim()) {
             rotateWorkingStatus();
@@ -564,7 +579,16 @@ export function createChatController({
         clearWorkingBubble();
         appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text: MISSING_LOG_NUDGE_TEXT });
       }
-      if (!turnSignaled) {
+      // Partial text with no done event (live 60s kill / dropped stream) is still a cut-off.
+      if (gotUsefulOutput && !sawDone && !sawIncompleteTurn && !hiddenUser) {
+        turnSignaled = true;
+        clearWorkingBubble();
+        appendMessage(root, {
+          role: 'assistant',
+          agentSlug: assistantSlug,
+          text: EMPTY_TURN_RECOVERY
+        });
+      } else if (!turnSignaled) {
         if (hiddenUser) {
           clearWorkingBubble();
         } else {
@@ -576,7 +600,7 @@ export function createChatController({
             text: EMPTY_TURN_RECOVERY
           });
         }
-      } else if (gotUsefulOutput && !hiddenUser) {
+      } else if (gotUsefulOutput && sawDone && !hiddenUser) {
         advanceAuditSession(message, { governanceLogAppended: sawGovernanceLogAppended });
       }
     } catch (error) {
