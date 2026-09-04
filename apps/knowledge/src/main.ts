@@ -1,5 +1,6 @@
 import "./tokens.css";
 import "./style.css";
+import { startHubMotion } from "../design-kit/js/hub-motion.js";
 import { bindHubAccordion, hubSwitcherHtml } from "../../../packages/hub-switcher.js";
 import type { Attachment, Origin, Page, PageManifestEntry } from "./domain/page";
 import { newHubPageId } from "./domain/page";
@@ -1567,20 +1568,6 @@ function renderLogin(message?: string) {
   hideChatOverlay();
   app.innerHTML = `<div class="sign-in">
     <form class="sign-in__card" method="post" action="#" novalidate>
-      <div class="sign-in__haze" aria-hidden="true">
-        <span class="sign-in__haze-mist"></span>
-        <span class="sign-in__bubble"></span>
-        <span class="sign-in__bubble"></span>
-        <span class="sign-in__bubble"></span>
-        <span class="sign-in__bubble"></span>
-        <span class="sign-in__bubble"></span>
-        <span class="sign-in__sparkle"></span>
-        <span class="sign-in__sparkle"></span>
-        <span class="sign-in__sparkle"></span>
-        <span class="sign-in__sparkle"></span>
-        <span class="sign-in__sparkle"></span>
-        <span class="sign-in__sparkle"></span>
-      </div>
       <p class="sign-in__brand">Knowledge Hub</p>
       <h1 class="sign-in__title">Sign in</h1>
       <div class="sign-in__field">
@@ -1660,4 +1647,5 @@ async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean 
   }
 }
 
+startHubMotion(document);
 boot();

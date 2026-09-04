@@ -5,6 +5,7 @@ import '../../design-kit/rail.css';
 import '../../design-kit/filters.css';
 import '../../design-kit/calendar.css';
 import '../../design-kit/sign-in.css';
+import '../../design-kit/motion.css';
 import '../styles/hub.css';
 import '../styles/views.css';
 import '../styles/cards.css';
@@ -13,6 +14,7 @@ import '../styles/daily-dial.css';
 import '../styles/lesson-engine.css';
 import 'katex/dist/katex.min.css';
 
+import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
 import {
   isKnownHashView,
@@ -307,5 +309,6 @@ async function boot(root: HTMLElement): Promise<void> {
 const app = document.querySelector<HTMLElement>('#app');
 if (app) {
   document.documentElement.dataset.hub = 'tasks';
+  startHubMotion(document);
   void boot(app);
 }

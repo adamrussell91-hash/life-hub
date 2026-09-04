@@ -28,22 +28,93 @@
   outline-offset: 2px;
 }
 
+.hub-rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
 .hub-rail__nav {
   display: flex;
   flex-direction: column;
+  flex: 1 1 0;
   gap: var(--space-px);
   min-height: 0;
   overflow-y: auto;
 }
 
 .hub-rail__hubs {
+  flex: 0 0 auto;
   margin-top: auto;
+}
+
+/* Kit accordion rows. Cards.css .hub-row is a canvas tile — keep it off the rail. */
+.hub-rail .hub-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .hub-rail__list {
   display: flex;
   flex-direction: column;
   gap: var(--space-px);
+}
+
+.hub-rail__mobile {
+  display: none;
+}
+
+.hub-rail__section-chevron {
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: 0.75em;
+  line-height: 1;
+  opacity: 0.7;
+  transform: rotate(-90deg);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hub-rail__section[aria-expanded="true"] .hub-rail__section-chevron {
+  transform: rotate(0deg);
+}
+
+.hub-rail__section-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 0fr;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  transition: grid-template-rows 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hub-rail__section-panel[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.hub-rail__section-panel-inner {
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-rail__section-chevron,
+  .hub-rail__section-panel {
+    transition: none;
+  }
 }
 
 .hub-canvas,
