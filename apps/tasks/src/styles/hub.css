@@ -80,6 +80,17 @@
     margin-top: 0;
   }
 
+  .hub-rail__hubs .hub-label {
+    min-height: 2rem;
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  .hub-rail__hubs .hub-rail__icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
   .hub-rail__list--desktop {
     display: none;
   }

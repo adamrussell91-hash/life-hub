@@ -6769,6 +6769,11 @@ input.scope-timeline__note-title:focus-visible {
     margin-bottom: 0;
   }
 
+  /* Keep the mobile strip short: class list stays; full search belongs on desktop. */
+  .rail-search {
+    display: none;
+  }
+
   .home-dashboard__toolbar {
     flex-wrap: wrap;
     align-items: flex-start;
