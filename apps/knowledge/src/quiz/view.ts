@@ -362,7 +362,7 @@ function renderQuiz() {
     <header class="topbar page-header">
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">${quizEyebrow()}</p>
-        <h1 class="page-header__title">Quiz</h1>
+        <h1 class="page-header__title hub-kinetic">Quiz</h1>
       </div>
       ${hubUtilitiesActionsHtml()}
     </header>

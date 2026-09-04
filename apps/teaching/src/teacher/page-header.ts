@@ -23,7 +23,7 @@ export function renderPageHeader(host: HTMLElement, config: PageHeaderConfig): H
 
     if (config.title) {
       const title = document.createElement('h1');
-      title.className = 'page-header__title';
+      title.className = 'page-header__title hub-kinetic';
       title.textContent = config.title;
       copy.append(title);
     }

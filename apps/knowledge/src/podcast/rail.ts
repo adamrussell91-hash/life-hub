@@ -579,7 +579,7 @@ export function renderPodcastRail(host: PodcastRailHost) {
     <header class="topbar page-header">
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">Professor Clementine Haig &amp; Ann O’Tation</p>
-        <h1 class="page-header__title">Podcast</h1>
+        <h1 class="page-header__title hub-kinetic">Podcast</h1>
       </div>
       ${hubUtilitiesActionsHtml()}
     </header>
