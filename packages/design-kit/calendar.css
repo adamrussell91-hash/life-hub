@@ -75,38 +75,17 @@
   cursor: pointer;
 }
 
-.calendar-view-tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 2px;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--shore) 70%, var(--warm-white));
-}
-
 .calendar-view-tabs__tab {
   margin: 0;
+  min-height: 1.85rem;
   padding: 0.2rem 0.65rem;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--font-ui);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   letter-spacing: 0.02em;
-  cursor: pointer;
 }
 
 .calendar-view-tabs__tab:hover {
   color: var(--ink);
-}
-
-.calendar-view-tabs__tab[aria-selected='true'],
-.calendar-view-tabs__tab.is-active {
-  background: var(--warm-white);
-  color: var(--ink);
-  box-shadow: var(--elev-1);
 }
 
 .icon-plus-btn {

@@ -17,5 +17,13 @@ test('remounted apps symlink design-kit to packages/design-kit', () => {
 test('Tasks loads kit CSS from the flat packages/design-kit files', async () => {
   const main = await readFile(new URL('./apps/tasks/src/app/main.ts', root), 'utf8');
   assert.match(main, /design-kit\/tokens\.css/);
+  assert.match(main, /design-kit\/filters\.css/);
   assert.doesNotMatch(main, /design-kit\/css\//);
+});
+
+test('Teaching and Knowledge load kit filters for sliding pills', async () => {
+  const teaching = await readFile(new URL('./apps/teaching/src/design/tokens.css', root), 'utf8');
+  const knowledge = await readFile(new URL('./apps/knowledge/src/tokens.css', root), 'utf8');
+  assert.match(teaching, /design-kit\/filters\.css/);
+  assert.match(knowledge, /design-kit\/filters\.css/);
 });

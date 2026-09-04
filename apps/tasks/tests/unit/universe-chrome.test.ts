@@ -22,6 +22,7 @@ describe('universe view chrome', () => {
 
   it('renders Dark and Full screen as unpressed toggles by default', () => {
     document.body.innerHTML = universeViewToolsHtml(false, false) + universeExitHtml(false);
+    expect(document.querySelector('.universe-view-tools')?.classList.contains('hub-pills--loose')).toBe(true);
     const dark = document.querySelector<HTMLButtonElement>('[data-universe-dark]')!;
     const full = document.querySelector<HTMLButtonElement>('[data-universe-fullscreen]')!;
     const exit = document.querySelector<HTMLButtonElement>('[data-universe-exit]')!;
