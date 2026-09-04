@@ -7203,6 +7203,10 @@ input.scope-timeline__note-title:focus-visible {
   z-index: 45;
 }
 
+.entity-card-expand.hub-morph-dialog__frame {
+  width: min(100%, 36rem);
+}
+
 .entity-card-expand {
   width: min(100%, 36rem);
   max-height: calc(100vh - var(--space-8));

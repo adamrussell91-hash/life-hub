@@ -97,11 +97,58 @@
   }
 }
 
+/* MorphingDialog — micro card → expanded overlay. Spring lives in JS. */
+.hub-morph-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: color-mix(in srgb, var(--depth) 35%, transparent);
+  opacity: 0;
+  transition: opacity var(--hub-motion-duration) ease;
+}
+
+.hub-morph-dialog.is-in {
+  opacity: 1;
+}
+
+.hub-morph-dialog__frame {
+  position: relative;
+  width: min(100%, 32rem);
+  max-height: calc(100vh - var(--space-8));
+  overflow: auto;
+  background: var(--hub-glass-fill, var(--paper));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-4);
+  backdrop-filter: blur(var(--hub-glass-blur, 16px)) saturate(115%);
+  -webkit-backdrop-filter: blur(var(--hub-glass-blur, 16px)) saturate(115%);
+  will-change: transform;
+}
+
+.hub-morph-dialog__close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 2;
+}
+
+.hub-morph-dialog__origin {
+  visibility: hidden;
+}
+
+.hub-morph-dialog__animating {
+  will-change: transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hub-spotlight::after,
   .hub-reveal,
   .hub-magnet,
-  .hub-list-item {
+  .hub-list-item,
+  .hub-morph-dialog {
     animation: none;
     transition: none;
     transform: none;

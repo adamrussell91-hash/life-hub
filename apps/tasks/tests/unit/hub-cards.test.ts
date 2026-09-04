@@ -96,6 +96,7 @@ describe('hub cards', () => {
     const host = document.createElement('div');
     const slot = mountTaskCard(host, task({ id: 'task_lesson', title: 'Finish lesson pack' }), {});
     expect(slot.querySelector('.hub-row__title')?.textContent).toBe('Finish lesson pack');
+    expect(slot.querySelector('.hub-row__title')?.getAttribute('data-hub-morph')).toBe('title');
     expect(slot.querySelector('.hub-chip')?.textContent).toBe('Teaching');
     expect(slot.querySelector('.priority-chip')?.textContent).toBe('high');
     expect(slot.dataset.state).toBe('compact');
@@ -104,6 +105,7 @@ describe('hub cards', () => {
     slot.querySelector('.hub-row')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(slot.dataset.state).toBe('expanded');
     expect(slot.querySelector('.hub-card__title')?.textContent).toBe('Finish lesson pack');
+    expect(slot.querySelector('.hub-card__title')?.getAttribute('data-hub-morph')).toBe('title');
     expect(slot.querySelector('.card-menu')).not.toBeNull();
     expect([...slot.querySelectorAll('button')].some((btn) => btn.textContent === 'Open page')).toBe(false);
   });
