@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
+import { createProjectsHandler } from '../../netlify/functions/projects.mjs';
 import { createReviewsHandler } from '../../netlify/functions/reviews.mjs';
 
 const SECRET = 's'.repeat(32);
@@ -131,6 +133,149 @@ test('reviews list, variance, and close write a ReviewLog on the Tasks store', a
     body: { action: 'close', project_id: 'p1', reason: 'Already done' }
   }));
   assert.equal(again.status, 400);
+});
+
+function isApiResult(value) {
+  return Boolean(value) && typeof value === 'object' && typeof value.ok === 'boolean';
+}
+
+/** Same unwrap the Tasks SPA uses: parse `{ ok, data }` then `.reviews` / close payload. */
+async function spaGet(response) {
+  const body = JSON.parse(await response.text());
+  assert.equal(isApiResult(body), true, 'SPA rejects a non-envelope body as invalid_response');
+  assert.equal(body.ok, true, body.ok === false ? body.error?.message : 'ok');
+  return body.data;
+}
+
+function reviewLogLine(review, projects) {
+  const proj = projects.find(project => project.id === review.project_id);
+  const slip =
+    review.slip_days === null || review.slip_days === undefined
+      ? ''
+      : review.slip_days === 0
+        ? ' · on baseline'
+        : review.slip_days > 0
+          ? ` · +${review.slip_days}d vs baseline`
+          : ` · ${review.slip_days}d vs baseline`;
+  return {
+    title: `${review.outcome} · ${proj?.title ?? review.project_id}`,
+    desc: `${review.reason}${slip}`
+  };
+}
+
+async function withHandlerServer(handler, run) {
+  const server = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const raw = Buffer.concat(chunks);
+    const request = new Request(`https://api.adam-russell.com${req.url}`, {
+      method: req.method,
+      headers: req.headers,
+      body: raw.length ? raw : undefined
+    });
+    const response = await handler(request);
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(Buffer.from(await response.arrayBuffer()));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  try {
+    await run(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
+test('signed-in Projects page can list reviews and close over fetch', async () => {
+  const store = memoryStore({
+    'projects/proj_tom': {
+      schema_version: 1,
+      id: 'proj_tom',
+      title: 'Tournament of Minds',
+      status: 'active',
+      type: 'excursion',
+      baseline_end_date: '2026-08-30',
+      current_end_date: '2026-08-30',
+      milestones: [
+        { id: 'ms1', title: 'Permission note drafted and sent', status: 'done' },
+        { id: 'ms2', title: 'Staff absence email sent', status: 'done' },
+        { id: 'ms3', title: 'Risk assessment lodged', status: 'done' }
+      ],
+      created_at: '2026-06-01T00:00:00.000Z',
+      updated_at: '2026-08-01T00:00:00.000Z'
+    },
+    'review_logs/rev_stall': {
+      schema_version: 1,
+      id: 'rev_stall',
+      project_id: 'proj_tom',
+      outcome: 'revived',
+      reason: 'Venue confirmed — moving again',
+      merge_into_project_id: null,
+      created_at: '2026-07-15T00:00:00.000Z'
+    }
+  });
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-16T12:00:00Z'),
+    getContentStore: async () => store
+  };
+  const reviewsHandler = createReviewsHandler(deps);
+  const projectsHandler = createProjectsHandler(deps);
+
+  const listedProjects = await spaGet(await projectsHandler(request({
+    origin: 'https://life-hub.adam-russell.com',
+    url: 'https://api.adam-russell.com/api/projects'
+  })));
+  assert.equal(listedProjects.projects[0].title, 'Tournament of Minds');
+
+  await withHandlerServer(reviewsHandler, async base => {
+    const headers = {
+      accept: 'application/json',
+      origin: 'https://life-hub.adam-russell.com',
+      cookie: `life_hub_session=${session}`
+    };
+
+    const listed = await fetch(`${base}/api/reviews`, { headers });
+    assert.equal(listed.status, 200);
+    assert.equal(listed.headers.get('access-control-allow-origin'), 'https://life-hub.adam-russell.com');
+    assert.equal(listed.headers.get('access-control-allow-credentials'), 'true');
+    const reviews = (await spaGet(listed)).reviews;
+    assert.equal(Array.isArray(reviews), true);
+    assert.equal(reviews.length, 1);
+    assert.deepEqual(reviewLogLine(reviews[0], listedProjects.projects), {
+      title: 'revived · Tournament of Minds',
+      desc: 'Venue confirmed — moving again'
+    });
+
+    const closed = await fetch(`${base}/api/reviews`, {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'close',
+        project_id: 'proj_tom',
+        reason: 'Heat done; wrap the admin trail.'
+      })
+    });
+    assert.equal(closed.status, 200);
+    const payload = await spaGet(closed);
+    assert.equal(payload.project.status, 'archived_dead');
+    assert.equal(payload.project.title, 'Tournament of Minds');
+    assert.equal(payload.project.review_summary, 'Heat done; wrap the admin trail.');
+    assert.equal(payload.review.outcome, 'closed');
+    assert.equal(payload.review.project_id, 'proj_tom');
+    assert.equal(payload.review.baseline_end_date, '2026-08-30');
+    assert.equal(typeof payload.variance.slip_days === 'number' || payload.variance.slip_days === null, true);
+
+    const after = (await spaGet(await fetch(`${base}/api/reviews`, { headers }))).reviews;
+    assert.equal(after.length, 2);
+    const closedRow = after.find(item => item.outcome === 'closed');
+    assert.deepEqual(
+      reviewLogLine(closedRow, [payload.project]),
+      reviewLogLine(payload.review, [payload.project])
+    );
+    assert.match(reviewLogLine(closedRow, [payload.project]).title, /^closed · Tournament of Minds$/);
+    assert.match(reviewLogLine(closedRow, [payload.project]).desc, /Heat done; wrap the admin trail/);
+  });
 });
 
 test('reviews reject a blank retrospective and unknown actions', async () => {
