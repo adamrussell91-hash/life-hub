@@ -319,10 +319,16 @@ export function createMorphingPopover({
       panel.style.height = `${triggerRect.height}px`;
     }
 
+    const focusFirst = () => {
+      if (!autoFocus) return;
+      firstFocusable(panel)?.focus?.();
+    };
+    focusFirst();
+
     const settle = () => {
       removeClass(panel, 'is-animating');
       addClass(panel, 'is-ready');
-      if (autoFocus) firstFocusable(panel)?.focus?.();
+      focusFirst();
       onOpen?.();
     };
 

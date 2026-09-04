@@ -49,7 +49,7 @@ test('Clare dump morphs open from Write a dump and focuses the textarea', async 
     const panel = page.locator('.morphing-popover__panel.is-floating');
     await panel.waitFor();
     await page.locator('#clare-dump-text').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('#clare-dump-text').evaluate(el => document.activeElement === el), true);
+    await page.waitForFunction(() => document.activeElement?.id === 'clare-dump-text');
     assert.match(await panel.locator('.morphing-popover__title').textContent(), /Dump for Clare/);
 
     await page.keyboard.press('Escape');
