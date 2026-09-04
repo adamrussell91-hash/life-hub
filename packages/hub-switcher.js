@@ -140,7 +140,7 @@ export function openHubAccordion(root, name) {
 }
 
 export function bindHubAccordion(root) {
-  if (!root || root.dataset.hubAccordionBound === 'true') return;
+  if (!root?.dataset || root.dataset.hubAccordionBound === 'true') return;
   root.dataset.hubAccordionBound = 'true';
   root.addEventListener('click', event => {
     const toggle = event.target.closest?.('[data-hub-toggle]');

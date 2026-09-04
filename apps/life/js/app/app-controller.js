@@ -184,7 +184,7 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="central-node"]') ?? []) {
     bind(button, 'click', () => showSection('central-node'));
   }
-  bindHubAccordion(root.querySelector('[data-hub-accordion]') ?? root);
+  bindHubAccordion(root.querySelector('[data-hub-accordion]'));
   bind(root.querySelector('#more-nav-button'), 'click', () => openMoreSheet());
   bind(root.querySelector('#more-sheet-close'), 'click', () => closeMoreSheet());
   bind(root.querySelector('#more-sheet'), 'click', event => {
