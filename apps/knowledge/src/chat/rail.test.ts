@@ -22,8 +22,8 @@ describe("Chat rail layout", () => {
     expect(rail).toContain("sittingLibrary");
     expect(rail).toContain("data-new-chat");
     expect(rail).toContain("New chat");
-    expect(rail).toContain("data-open-visualiser");
-    expect(rail).toContain("Portrait ideas");
+    expect(rail).not.toContain("data-open-visualiser");
+    expect(rail).not.toContain("Portrait ideas");
     expect(rail).toContain("coach-msg--with-portrait");
     expect(rail).toContain("portraitSrc: CLEMENTINE.avatarSrc");
     expect(rail).toContain("CLEMENTINE.avatarSrc");

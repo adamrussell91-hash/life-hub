@@ -38,6 +38,7 @@ PNG exports from Documents/`teaching hub page content icons`, renamed to palette
 | `section.png` | `section.png` |
 | `spacer.png` | `spacer.png` |
 | `timeline.png` | `timeline.png` |
+| `card_stack.png` | `card stack.png` |
 | `tabs.png` | `tabs.png` |
 | `collection.png` | `collection.png` |
 | `outcomes.png` | `outcomes.png` |

@@ -2109,8 +2109,10 @@ body.is-universe-fullscreen .local-banner {
     align-items: stretch;
   }
 
+  /* Row flex-basis (12rem) becomes height in a column — keep the title field one line. */
   .chat__book-add input,
   .chat__book-add .btn {
+    flex: 0 0 auto;
     width: 100%;
     min-height: 44px;
   }
@@ -3286,42 +3288,9 @@ body.is-universe-fullscreen .local-banner {
     display: none;
   }
 
-  body:has(.coach.chat) #kh-chat-overlay,
-  body:has(.chat-visualiser) #kh-chat-overlay {
+  body:has(.coach.chat) #kh-chat-overlay {
     display: none;
   }
-
-  .chat-visualiser {
-    grid-template-columns: 1fr;
-  }
-}
-
-.chat-visualiser {
-  display: grid;
-  grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-
-.chat-visualiser__ideas {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.chat-visualiser__explain {
-  margin: 0;
-  color: var(--ink);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
-}
-
-.chat-visualiser__frame {
-  padding: var(--space-5);
-  min-width: 0;
-}
-
-.chat-visualiser__stage {
-  pointer-events: none;
 }
 
 .chat-presence-header {
