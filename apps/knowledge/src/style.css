@@ -2087,7 +2087,9 @@ body.is-universe-fullscreen .local-banner {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* Header + bottom nav + composer clearance */
     min-height: calc(100dvh - 8.5rem);
+    padding-bottom: 11rem;
   }
 
   .coach.chat .chat__sitting {
@@ -2112,24 +2114,39 @@ body.is-universe-fullscreen .local-banner {
   }
 
   .coach.chat .chat__composer {
-    /* Clear the locked .hub-mobile-nav — sticky bottom:0 sat under the bar. */
-    position: sticky;
+    /* Fixed above .hub-mobile-nav — sticky bottom:0 sat under the bar and
+       sticky bottom:5.5rem overlapped the thread on short sittings. */
+    position: fixed;
+    left: 0;
+    right: 0;
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
     z-index: 3;
+    margin: 0;
     padding: var(--space-3);
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
     background: var(--paper);
+    box-shadow: 0 -0.75rem 1.5rem rgba(10, 21, 54, 0.06);
   }
 
   .coach.chat.chat--from-book .chat__composer,
   .coach.chat.chat--from-book .chat__note-form {
     position: static;
     z-index: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    margin: 0;
     padding: 0;
     padding-bottom: 0;
+    border-radius: var(--radius-md);
+    box-shadow: none;
   }
 
   .coach.chat.chat--from-book {
     min-height: 0;
+    padding-bottom: 0;
   }
 
   .coach.chat .chat__composer textarea,
@@ -3270,9 +3287,13 @@ body.is-universe-fullscreen .local-banner {
   .chat-presence-header {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      "portrait actions"
       "portrait eyebrow"
-      "portrait title";
+      "portrait title"
+      "actions actions";
+  }
+
+  .chat-presence-header .page-header__actions {
+    justify-content: flex-end;
   }
 }
 
