@@ -239,7 +239,8 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     canvas,
     mode: mode === 'week' ? parseCalendarMode() : mode,
     apply: (next) => {
-      const fromHash = parseCalendarAnchor(hashQuery().get('date'), today);
+      const rawDate = hashQuery().get('date');
+      const fromHash = rawDate ? parseCalendarAnchor(rawDate, today) : anchor;
       const resolved = next === 'week' ? parseCalendarMode() : next;
       if (session.mode === resolved && toDateKey(anchor) === toDateKey(fromHash)) return;
       session.mode = resolved;

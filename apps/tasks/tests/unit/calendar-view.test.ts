@@ -284,6 +284,21 @@ describe('calendar views', () => {
     expect(canvas.querySelector('.calendar-compose [aria-label="Start time"]')).not.toBeNull();
   });
 
+  it('keeps the current week when the hash drops the date', async () => {
+    location.hash = '#/week?date=2026-08-18';
+    const canvas = document.createElement('main');
+    await renderWeekView(canvas);
+    expect(canvas.querySelector('[data-date="2026-08-18"]')).not.toBeNull();
+
+    location.hash = '#/week';
+    await renderWeekView(canvas);
+
+    expect(canvas.querySelector('.canvas-status')).toBeNull();
+    expect(canvas.querySelector('[data-date="2026-08-18"]')).not.toBeNull();
+    expect(canvas.querySelector('.hub-calendar__timegrid')).not.toBeNull();
+    expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
+  });
+
   it('opens a day time grid from the Day tab without refetching', async () => {
     location.hash = '#/week?date=2026-08-17';
     const canvas = document.createElement('main');
