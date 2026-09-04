@@ -10,7 +10,9 @@ import {
   monthGrid,
   overdueItems,
   parseCalendarAnchor,
+  parseCalendarMode,
   pickSelectedDateKey,
+  visibleDays,
   visibleOverflow
 } from '@/domain/calendar';
 import { toDateKey } from '@/domain/queries';
@@ -91,6 +93,12 @@ describe('calendar domain', () => {
   it('parses a hash date as a local calendar day', () => {
     expect(toDateKey(parseCalendarAnchor('2026-08-15'))).toBe('2026-08-15');
     expect(calendarHash('month', parseCalendarAnchor('2026-08-15'))).toBe('#/month?date=2026-08-15');
+    expect(calendarHash('day', parseCalendarAnchor('2026-08-15'))).toBe(
+      '#/week?date=2026-08-15&layout=day'
+    );
+    expect(parseCalendarMode('#/week?date=2026-08-15&layout=day')).toBe('day');
+    expect(parseCalendarMode('#/week?date=2026-08-15')).toBe('week');
+    expect(visibleDays(parseCalendarAnchor('2026-08-15'), 'day')).toHaveLength(1);
   });
 
   it('collects tasks, milestones, and excursion key dates onto the same calendar', () => {

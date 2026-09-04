@@ -117,7 +117,9 @@ describe('calendar views', () => {
       task({
         id: 'task_new',
         title: String((body as { title?: string }).title ?? 'New'),
-        due_date: (body as { due_date?: string }).due_date ?? '2026-08-17'
+        due_date: (body as { due_date?: string }).due_date ?? '2026-08-17',
+        due_time: (body as { due_time?: string | null }).due_time ?? null,
+        estimated_duration: (body as { estimated_duration?: number }).estimated_duration ?? 45
       })
     );
   });
@@ -269,5 +271,94 @@ describe('calendar views', () => {
     expect(canvas.querySelectorAll('.hub-calendar__day')).toHaveLength(42);
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
     expect(location.hash).toMatch(/^#\/month/);
+  });
+
+  it('renders a week time grid with a standing compose field', async () => {
+    location.hash = '#/week?date=2026-08-17';
+    const canvas = document.createElement('main');
+    await renderWeekView(canvas);
+
+    expect(canvas.querySelector('.hub-calendar__timegrid')).not.toBeNull();
+    expect(canvas.querySelectorAll('.hub-calendar__hours')).toHaveLength(7);
+    expect(canvas.querySelector('.calendar-compose [aria-label="New task title"]')).not.toBeNull();
+    expect(canvas.querySelector('.calendar-compose [aria-label="Start time"]')).not.toBeNull();
+  });
+
+  it('opens a day time grid from the Day tab without refetching', async () => {
+    location.hash = '#/week?date=2026-08-17';
+    const canvas = document.createElement('main');
+    await renderWeekView(canvas);
+    const dayTab = [...canvas.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+      (btn) => btn.textContent === 'Day'
+    );
+    dayTab?.click();
+
+    expect(canvas.querySelector('.canvas-status')).toBeNull();
+    expect(canvas.querySelector('.hub-calendar__timegrid')?.getAttribute('data-days')).toBe('1');
+    expect(canvas.querySelectorAll('.hub-calendar__hours')).toHaveLength(1);
+    expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
+    expect(location.hash).toContain('layout=day');
+  });
+
+  it('clicking an empty hour prefills compose time and focuses the title', async () => {
+    location.hash = '#/week?date=2026-08-17&layout=day';
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderWeekView(canvas);
+
+    const hours = canvas.querySelector<HTMLElement>('.hub-calendar__hours')!;
+    hours.getBoundingClientRect = () =>
+      ({ top: 0, left: 0, bottom: 832, right: 200, width: 200, height: 832, x: 0, y: 0, toJSON() {} });
+    hours.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, clientX: 20, clientY: 156 })
+    );
+
+    const time = canvas.querySelector<HTMLInputElement>('[aria-label="Start time"]');
+    const title = canvas.querySelector<HTMLInputElement>('[aria-label="New task title"]');
+    expect(time?.value).toBe('09:00');
+    expect(document.activeElement).toBe(title);
+    canvas.remove();
+  });
+
+  it('creates a timed task from the standing compose field', async () => {
+    location.hash = '#/week?date=2026-08-17&layout=day';
+    const canvas = document.createElement('main');
+    await renderWeekView(canvas);
+
+    const form = canvas.querySelector('.calendar-compose .quick-add') as HTMLFormElement;
+    const title = form.querySelector('input[aria-label="New task title"]') as HTMLInputElement;
+    const time = form.querySelector('input[aria-label="Start time"]') as HTMLInputElement;
+    title.value = 'Gym';
+    time.value = '12:00';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await vi.waitFor(() => {
+      expect(tasksApi.createTask).toHaveBeenCalledTimes(1);
+    });
+    expect(vi.mocked(tasksApi.createTask).mock.calls[0]?.[0]).toMatchObject({
+      title: 'Gym',
+      due_date: '2026-08-17',
+      due_time: '12:00',
+      estimated_duration: 60
+    });
+  });
+
+  it('opens go-to-date from G and selects another day from the heading', async () => {
+    location.hash = '#/week?date=2026-08-17';
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderWeekView(canvas);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }));
+    expect(document.querySelector('[aria-label="Go to date"]')).not.toBeNull();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.querySelector('.calendar-command')).toBeNull();
+
+    canvas.querySelector<HTMLElement>('.hub-calendar__time-heading[data-date="2026-08-22"]')?.click();
+    expect(
+      canvas.querySelector<HTMLElement>('.hub-calendar__time-heading[data-selected="true"]')
+        ?.dataset.date
+    ).toBe('2026-08-22');
+    canvas.remove();
   });
 });
