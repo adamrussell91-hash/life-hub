@@ -76,6 +76,24 @@ test('an empty food library falls back to a plain web_search instruction', () =>
   assert.doesNotMatch(prompt, /Food Library:/);
 });
 
+
+test('Sara prompt mandates Medical Overview read tools and rejects Notion-as-store', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'sara',
+    digest: '',
+    constraints: '',
+    capacities: '- research.save-brief: Save a research brief',
+    intuition: 'Built intuition:\n- stelara-cycle: Stelara cadence'
+  });
+  assert.match(prompt, /search_medical_records/);
+  assert.match(prompt, /brief_medical_appointment/);
+  assert.match(prompt, /Medical Overview is the medical record in Life Hub/);
+  assert.match(prompt, /not Notion/);
+  assert.match(prompt, /capacities this turn/i);
+  assert.match(prompt, /stelara-cycle/);
+  assert.match(prompt, /tool-using specialist|domain read or write tool/i);
+});
+
 test('every agent prompt includes the os_propose_action open-hands mandate', () => {
   for (const slug of ['brisket', 'chadwick', 'hyaluronica', 'penelope', 'sara', 'vera', 'hammond']) {
     const prompt = buildSystemPrompt({ slug, digest: '', constraints: '' });
