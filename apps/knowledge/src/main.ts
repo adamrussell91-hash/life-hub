@@ -131,6 +131,8 @@ let composeOriginKind: Origin["kind"] = "degree";
 let activePage: Page | null = null;
 let pendingMorphOrigin: { left: number; top: number; width: number; height: number } | null = null;
 let tidyBusy = false;
+let tidyConfirmPending = false;
+const HUB_MARK_SRC = "./icons/knowledge.svg";
 let listScrollTop = 0;
 let listPainted: VirtualListPainted | null = null;
 let graphTeardown: (() => void) | null = null;
@@ -246,7 +248,10 @@ function pageHeader(
       ${portrait}
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">${eyebrow}</p>
-        <h1 class="page-header__title hub-kinetic">${title}</h1>
+        <div class="page-header__title-row">
+          <img class="hub-mark" src="${HUB_MARK_SRC}" alt="" width="32" height="32" />
+          <h1 class="page-header__title hub-kinetic">${title}</h1>
+        </div>
       </div>
       ${actions}
     </header>`;
@@ -1025,7 +1030,7 @@ function renderPage(page: Page) {
       escapeHtml(page.title),
       `<button class="btn btn--ghost reader__back" data-back type="button">← Archive</button>
         <button class="btn btn--ghost" data-edit type="button">Edit</button>
-        <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy ? "disabled" : ""}>${tidyBusy ? "Cleaning up…" : "Clean up"}</button>
+        <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyConfirmPending ? "disabled" : ""}>${tidyBusy ? "Cleaning up…" : "Clean up"}</button>
         <button class="btn btn--ghost" data-open-chat type="button">Chat</button>
         ${
           resolvedOrigins(page).find(origin => origin.kind === "book")
@@ -1034,6 +1039,19 @@ function renderPage(page: Page) {
         }`,
     )}
     <article class="reader" data-hub-morph-page>
+      ${
+        tidyConfirmPending
+          ? `<section class="confirm-card" role="region" aria-label="Confirm clean up">
+        <p class="page-header__eyebrow">Proposed write</p>
+        <h2 class="page-header__title" style="font-size: var(--text-lg)">Clean up this note</h2>
+        <p class="page-header__supporting">AI will rewrite the title, tags, and body. Review the result when it finishes.</p>
+        <div class="confirm-card__actions">
+          <button class="btn btn--ghost" data-tidy-discard type="button">Discard</button>
+          <button class="btn btn--primary" data-tidy-confirm type="button">Confirm</button>
+        </div>
+      </section>`
+          : ""
+      }
       ${originPillsHtml(resolvedOrigins(page), { openEdit: true })}
       ${readerTopicPillsHtml(topics.slice(0, 6))}
       <div class="reader__body">${renderMarkdown(page.body)}</div>
@@ -1058,8 +1076,18 @@ function renderPage(page: Page) {
     const book = resolvedOrigins(page).find(origin => origin.kind === "book");
     openBookNote(book?.label);
   });
-  app.querySelector<HTMLButtonElement>("[data-tidy]")!.onclick = async () => {
+  app.querySelector<HTMLButtonElement>("[data-tidy]")!.onclick = () => {
+    if (tidyBusy || tidyConfirmPending) return;
+    tidyConfirmPending = true;
+    render();
+  };
+  app.querySelector<HTMLButtonElement>("[data-tidy-discard]")?.addEventListener("click", () => {
+    tidyConfirmPending = false;
+    render();
+  });
+  app.querySelector<HTMLButtonElement>("[data-tidy-confirm]")?.addEventListener("click", async () => {
     if (tidyBusy) return;
+    tidyConfirmPending = false;
     tidyBusy = true;
     render();
     try {
@@ -1073,7 +1101,7 @@ function renderPage(page: Page) {
       tidyBusy = false;
       render();
     }
-  };
+  });
   app.querySelectorAll<HTMLButtonElement>("[data-open-page]").forEach(button => {
     button.onclick = () => void openPage(button.dataset.openPage!);
   });
@@ -1553,6 +1581,7 @@ function renderLogin(message?: string) {
   hideChatOverlay();
   app.innerHTML = `<div class="sign-in">
     <form class="sign-in__card" method="post" action="#" novalidate>
+      <img class="sign-in__mark" src="${HUB_MARK_SRC}" alt="" width="56" height="56" />
       <p class="sign-in__brand">Knowledge Hub</p>
       <h1 class="sign-in__title">Sign in</h1>
       <div class="sign-in__field">
