@@ -21,29 +21,6 @@ export interface SignInOptions {
   onSuccess?: (session: SessionInfo) => void;
 }
 
-const SIGN_IN_HAZE_HTML = `
-  <span class="sign-in__haze-mist"></span>
-  <span class="sign-in__bubble"></span>
-  <span class="sign-in__bubble"></span>
-  <span class="sign-in__bubble"></span>
-  <span class="sign-in__bubble"></span>
-  <span class="sign-in__bubble"></span>
-  <span class="sign-in__sparkle"></span>
-  <span class="sign-in__sparkle"></span>
-  <span class="sign-in__sparkle"></span>
-  <span class="sign-in__sparkle"></span>
-  <span class="sign-in__sparkle"></span>
-  <span class="sign-in__sparkle"></span>
-`;
-
-function createSignInHaze(): HTMLElement {
-  const haze = document.createElement('div');
-  haze.className = 'sign-in__haze';
-  haze.setAttribute('aria-hidden', 'true');
-  haze.innerHTML = SIGN_IN_HAZE_HTML;
-  return haze;
-}
-
 /** Passphrase gate from design-kit/snippets/sign-in.html + sign-in.css */
 export function renderSignIn(container: HTMLElement, options?: SignInOptions): void {
   container.replaceChildren();
@@ -93,7 +70,7 @@ export function renderSignIn(container: HTMLElement, options?: SignInOptions): v
   submit.textContent = 'Sign in';
 
   field.append(label, input);
-  form.append(createSignInHaze(), brand, title, field, error, submit);
+  form.append(brand, title, field, error, submit);
   wrapper.append(form);
   container.append(wrapper);
 

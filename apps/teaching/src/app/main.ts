@@ -1,4 +1,5 @@
 import 'katex/dist/katex.min.css';
+import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { apiGet, ApiClientError } from '@/api/client';
 import { fetchSession, logout, renderSignIn, type SessionInfo } from '@/auth/gate';
 import {
@@ -962,6 +963,8 @@ async function init(): Promise<void> {
     event.preventDefault();
     openTeacherSearch();
   });
+
+  startHubMotion(document);
 
   start((match) => {
     void handleRoute(match);
