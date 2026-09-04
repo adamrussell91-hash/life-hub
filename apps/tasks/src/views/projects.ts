@@ -36,6 +36,7 @@ import {
   createHubToolbar,
   el
 } from '@/views/hub-kit';
+import { createPlusAdd } from '@/views/plus-add';
 
 let projectQuery = '';
 let groupBy: ProjectsGroupBy = 'status';
@@ -337,6 +338,72 @@ function renderProjectBoardCard(
   return article;
 }
 
+function renderQuickAddProject(goals: Goal[], onCreated: (project: Project) => void): HTMLElement {
+  const form = el('form', 'quick-add hub-toolbar');
+  const title = createHubSearch({
+    type: 'text',
+    placeholder: 'New project title',
+    ariaLabel: 'New project title',
+    required: true
+  });
+  const type = createHubFilter({
+    key: 'Type',
+    label: 'Type',
+    defaultValue: 'standard',
+    options: [
+      { value: 'standard', label: 'Standard' },
+      { value: 'academic_program', label: 'Academic program' },
+      { value: 'excursion', label: 'Excursion' }
+    ],
+    value: 'standard'
+  });
+  const activeGoals = goals.filter((goal) => goal.status === 'active');
+  const goal = createHubFilter({
+    key: 'Goal',
+    label: 'Goal',
+    defaultValue: '',
+    options: [
+      { value: '', label: 'No goal' },
+      ...activeGoals.map((item) => ({ value: item.id, label: item.title }))
+    ],
+    value: ''
+  });
+  const submit = el('button', 'btn btn--primary', 'Add');
+  submit.type = 'submit';
+  form.append(title.el, type.el);
+  if (activeGoals.length) form.append(goal.el);
+  form.append(submit);
+  const plus = createPlusAdd({
+    ariaLabel: 'Add a project',
+    panel: form,
+    className: 'plus-add--inline'
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const nextTitle = title.input.value.trim();
+    if (!nextTitle) {
+      form.append(el('p', 'empty-state', 'Add a title.'));
+      return;
+    }
+    submit.disabled = true;
+    try {
+      const created = await tasksApi.createProject({
+        title: nextTitle,
+        type: type.getValue() || 'standard',
+        parent_goal_id: activeGoals.length ? goal.getValue() || null : null
+      });
+      title.input.value = '';
+      plus.close();
+      onCreated(created);
+    } catch (err) {
+      form.append(el('p', 'empty-state', errorMessage(err)));
+    } finally {
+      submit.disabled = false;
+    }
+  });
+  return plus.root;
+}
+
 function renderBoard(
   ctx: PulseContext,
   confirmHost: HTMLElement,
@@ -580,6 +647,19 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
     refreshPulse();
   }
 
+  function acceptProject(created: Project): void {
+    ctx.projects = [created, ...ctx.projects];
+    const card = buildProjectPulseCard(created, ctx.tasks, ctx.stallIds, ctx.now);
+    ctx.cards = [card, ...ctx.cards];
+    if (lifecycleFilter !== 'all' && card.lifecycle !== lifecycleFilter) {
+      lifecycleFilter = 'all';
+    }
+    if (projectQuery.trim() && !matchesProjectQuery(created, projectQuery)) {
+      projectQuery = '';
+    }
+    paint();
+  }
+
   const boardActions: ProjectBoardActions = { onReload: reload, onDeleted: dropProject };
 
   function paint(): void {
@@ -643,7 +723,8 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
           groupBy = id;
           paint();
         }
-      })
+      }),
+      renderQuickAddProject(ctx.goals, acceptProject)
     );
     canvas.append(toolbar);
     canvas.append(renderBoard(ctx, closureConfirmHost, boardActions));

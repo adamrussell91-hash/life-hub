@@ -24,7 +24,12 @@ function makeHost(): ChatRailHost {
     render() {
       renderChatRail(host);
     },
-    pageHeader: (eyebrow, title, extra = "") => `<header><p>${eyebrow}</p><h1>${title}</h1>${extra}</header>`,
+    pageHeader: (eyebrow, title, extra = "", opts) =>
+      `<header class="${opts?.portraitSrc ? "chat-presence-header" : ""}">${
+        opts?.portraitSrc
+          ? `<img class="chat-presence__portrait" src="${opts.portraitSrc}" alt="${opts.portraitAlt ?? ""}" width="56" height="56" />`
+          : ""
+      }<p>${eyebrow}</p><h1>${title}</h1>${extra}</header>`,
   };
   return host;
 }
@@ -51,6 +56,20 @@ describe("Knowledge chat rail protocol affordances", () => {
       expect(hat.getAttribute("aria-describedby")).toBe(tip?.id);
       expect(hat.getAttribute("title")).toBeNull();
     }
+  });
+
+  it("ships Clementine's portrait in the header and empty greeting", () => {
+    const host = makeHost();
+    host.render();
+    const headerFace = host.app.querySelector<HTMLImageElement>(".chat-presence__portrait");
+    expect(headerFace?.getAttribute("src")).toBe("/assets/agents/clementine.png");
+    expect(headerFace?.getAttribute("alt")).toBe("Professor Clementine Haig");
+    expect(host.app.textContent).toContain("Clementine");
+    const greeting = host.app.querySelector(".coach-msg--assistant.coach-msg--with-portrait");
+    expect(greeting?.querySelector(".chat-message__avatar")?.getAttribute("src")).toBe(
+      "/assets/agents/clementine.png",
+    );
+    expect(greeting?.textContent).toMatch(/Clementine/);
   });
 
   it("rotates one Clementine wait line and clears it when the reply arrives", async () => {
@@ -171,22 +190,14 @@ describe("Knowledge chat rail protocol affordances", () => {
     expect(host.app.querySelector("[data-new-chat]")).toBeTruthy();
   });
 
-  it("opens the portrait visualiser from Chat", () => {
-    const opened: string[] = [];
-    const host = makeHost();
-    host.onOpenVisualiser = () => opened.push("visualiser");
-    host.render();
-    host.app.querySelector<HTMLButtonElement>("[data-open-visualiser]")!.click();
-    expect(opened).toEqual(["visualiser"]);
-  });
-
   it("asks for the book before making a from-a-book note", () => {
     enterChatRail({ fresh: true, hat: "fromBook" });
     const host = makeHost();
     host.bookLabels = ["Make It Stick"];
     host.render();
     expect(host.app.textContent).toContain("From a book");
-    expect(host.app.textContent).toContain("The one in your hand");
+    expect(host.app.textContent).toContain("Pick a title from the archive");
+    expect(host.app.querySelector<HTMLInputElement>("#chat-book")?.placeholder).toBe("Book title");
     expect(host.app.querySelector(".chat--from-book")).toBeTruthy();
     expect(host.app.querySelector(".chat__composer")).toBeNull();
     expect(host.app.querySelector<HTMLButtonElement>("[type=submit]")?.textContent).toBe("Make note");

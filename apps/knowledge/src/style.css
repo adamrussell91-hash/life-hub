@@ -1191,6 +1191,48 @@
     var(--depth);
 }
 
+.graph-wrap.is-universe-dark .graph-toolbar__meta,
+.graph-wrap.is-universe-dark .graph-speed__label,
+.graph-wrap.is-universe-dark .graph-speed__value {
+  color: var(--on-dark-muted);
+}
+
+.graph-chrome {
+  display: contents;
+}
+
+.graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-chrome {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 6;
+  max-width: calc(100% - 2rem);
+}
+
+.graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-toolbar {
+  position: static;
+  top: auto;
+  left: auto;
+  max-width: none;
+}
+
+.graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-toolbar__meta {
+  flex: 1 0 100%;
+  order: 10;
+}
+
+.graph-wrap.is-universe-fullscreen:has([data-universe-key]) .universe-key {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+}
+
 .graph-wrap.is-universe-fullscreen {
   position: fixed;
   inset: 0;
@@ -2027,6 +2069,11 @@ body.is-universe-fullscreen .local-banner {
     border-top: 1px solid var(--line);
   }
 
+  .graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-chrome {
+    top: var(--space-2);
+    left: var(--space-2);
+  }
+
   .graph-preview {
     left: var(--space-3);
     right: var(--space-3);
@@ -2040,7 +2087,16 @@ body.is-universe-fullscreen .local-banner {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* Header clearance only — composer is fixed/out of flow, so use ::after. */
     min-height: calc(100dvh - 8.5rem);
+    padding-bottom: 0;
+  }
+
+  .coach.chat::after {
+    content: "";
+    display: block;
+    flex: 0 0 14rem;
+    order: 10;
   }
 
   .coach.chat .chat__sitting {
@@ -2053,8 +2109,10 @@ body.is-universe-fullscreen .local-banner {
     align-items: stretch;
   }
 
+  /* Row flex-basis (12rem) becomes height in a column — keep the title field one line. */
   .chat__book-add input,
   .chat__book-add .btn {
+    flex: 0 0 auto;
     width: 100%;
     min-height: 44px;
   }
@@ -2065,23 +2123,43 @@ body.is-universe-fullscreen .local-banner {
   }
 
   .coach.chat .chat__composer {
-    position: sticky;
-    bottom: 0;
+    /* Fixed above .hub-mobile-nav — sticky bottom:0 sat under the bar and
+       sticky bottom:5.5rem overlapped the thread on short sittings. */
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
     z-index: 3;
+    margin: 0;
     padding: var(--space-3);
-    padding-bottom: max(var(--space-3), calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)));
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    background: var(--paper);
+    box-shadow: 0 -0.75rem 1.5rem rgba(10, 21, 54, 0.06);
   }
 
   .coach.chat.chat--from-book .chat__composer,
   .coach.chat.chat--from-book .chat__note-form {
     position: static;
     z-index: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    margin: 0;
     padding: 0;
     padding-bottom: 0;
+    border-radius: var(--radius-md);
+    box-shadow: none;
   }
 
   .coach.chat.chat--from-book {
     min-height: 0;
+    padding-bottom: 0;
+  }
+
+  .coach.chat.chat--from-book::after {
+    display: none;
   }
 
   .coach.chat .chat__composer textarea,
@@ -2898,33 +2976,6 @@ body.is-universe-fullscreen .local-banner {
   color: var(--muted);
 }
 
-.hub-pills {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.hub-pills__btn {
-  border: 1px solid var(--line);
-  background: var(--glass);
-  border-radius: var(--radius-full);
-  padding: 0.35rem 0.75rem;
-  min-height: 2.2rem;
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.hub-pills__btn.is-active,
-.hub-pills__btn[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--wave) 45%, transparent);
-  background: color-mix(in srgb, var(--pastel-blue) 55%, #fff);
-  color: var(--pastel-blue-ink);
-  font-weight: var(--weight-semibold);
-}
-
 .agent-protocol-pills {
   margin: -0.15rem 0 0;
   overflow: visible;
@@ -2985,10 +3036,11 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .agent-picker__avatar img {
-  width: 118%;
-  height: 118%;
+  width: 100%;
+  height: 100%;
   max-width: none;
   object-fit: cover;
+  object-position: center;
   display: block;
   border-radius: 50%;
 }
@@ -3067,7 +3119,7 @@ body.is-universe-fullscreen .local-banner {
   height: 2.25rem;
   border-radius: 50%;
   object-fit: cover;
-  object-position: center 42%;
+  object-position: center;
   flex: 0 0 auto;
   background: var(--paper);
 }
@@ -3148,26 +3200,51 @@ body.is-universe-fullscreen .local-banner {
 }
 
 @media (max-width: 720px) {
+  /* Sit above the locked .hub-mobile-nav (see design-kit/MOBILE.md). */
   .floating-chat-button {
     right: max(1rem, env(safe-area-inset-right, 0px));
-    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
+  /* Fullscreen chat in the visual viewport — same frame as Tasks overlay chat. */
   .chat-overlay {
-    top: 0;
+    top: var(--vv-offset-top, 0px);
     right: 0;
-    bottom: 0;
     left: 0;
-    width: auto;
+    bottom: var(--vv-offset-bottom, 0px);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: var(--vv-height, 100dvh);
     max-height: none;
     border-radius: 0;
+    /* Cover the bottom bar while open — same as Tasks overlay (z-index 50 > nav 30). */
+    z-index: 50;
     padding-top: max(var(--space-4), env(safe-area-inset-top, 0px));
-    padding-bottom: max(var(--space-4), calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)));
+    padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
     overscroll-behavior: contain;
+  }
+
+  .chat-overlay .chat-overlay__top,
+  .chat-overlay .agent-picker,
+  .chat-overlay .agent-protocol-pills,
+  .chat-overlay .using-notes,
+  .chat-overlay .chat-form,
+  .chat-overlay__book,
+  .chat-overlay__save {
+    flex: 0 0 auto;
   }
 
   .chat-overlay .chat-form {
     grid-template-columns: 1fr;
+  }
+
+  .chat-overlay .chat-form textarea,
+  .chat-overlay .chat-form input,
+  .chat-overlay__book input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .chat-overlay .chat-form .btn,
@@ -3178,64 +3255,48 @@ body.is-universe-fullscreen .local-banner {
   }
 
   .chat-overlay .chat-messages {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .chat-overlay .agent-picker__avatar {
+    width: 2.4rem;
+    height: 2.4rem;
   }
 
   body:has(.chat-overlay) .floating-chat-button {
     display: none;
   }
 
-  body:has(.coach.chat) #kh-chat-overlay,
-  body:has(.chat-visualiser) #kh-chat-overlay {
+  body:has(.chat-overlay) .hub-mobile-nav {
     display: none;
   }
 
-  .chat-visualiser {
-    grid-template-columns: 1fr;
+  body:has(.coach.chat) #kh-chat-overlay {
+    display: none;
   }
-
-  .chat-presence-header {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      "portrait actions"
-      "portrait eyebrow"
-      "portrait title";
-  }
-}
-
-.chat-visualiser {
-  display: grid;
-  grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-
-.chat-visualiser__ideas {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.chat-visualiser__explain {
-  margin: 0;
-  color: var(--ink);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
-}
-
-.chat-visualiser__frame {
-  padding: var(--space-5);
-  min-width: 0;
-}
-
-.chat-visualiser__stage {
-  pointer-events: none;
 }
 
 .chat-presence-header {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
-    "portrait eyebrow actions"
-    "portrait title title";
+    "portrait eyebrow"
+    "portrait title"
+    "actions actions";
+}
+
+.chat-presence-header .page-header__actions {
+  justify-content: flex-end;
+}
+
+@media (min-width: 721px) {
+  .chat-presence-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "portrait eyebrow actions"
+      "portrait title title";
+  }
 }
 
 .chat-presence__portrait {
@@ -3244,7 +3305,7 @@ body.is-universe-fullscreen .local-banner {
   height: 3.5rem;
   border-radius: 50%;
   object-fit: cover;
-  object-position: center 42%;
+  object-position: center;
   background: var(--paper);
 }
 

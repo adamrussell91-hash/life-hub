@@ -133,13 +133,24 @@
   margin-top: var(--space-3);
 }
 
+.property-sections,
+.property-section,
+.property-stack {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .property-list__head,
 .property-row {
   display: grid;
-  grid-template-columns: 16rem auto;
+  /* Fluid name column — fixed 16rem overflowed phones and clip parents blocked scroll. */
+  grid-template-columns: minmax(0, 16rem) auto;
   align-items: center;
   justify-content: start;
   column-gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .property-list__head {
@@ -148,7 +159,11 @@
 
 .property-list__head--colour,
 .property-row--colour {
-  grid-template-columns: 16rem var(--space-16) auto;
+  grid-template-columns: minmax(0, 16rem) var(--space-16) auto;
+}
+
+.property-list__head-actions {
+  justify-self: start;
 }
 
 .property-row .hub-search {
@@ -160,6 +175,7 @@
 .property-swatch {
   width: var(--space-16);
   min-width: var(--space-16);
+  max-width: var(--space-16);
   padding: var(--space-1);
 }
 
@@ -185,8 +201,10 @@
 .property-row__actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin: 0;
+  min-width: 0;
 }
 
 .property-row__actions .btn {
@@ -196,6 +214,27 @@
 .property-row__move {
   width: 2.6rem;
   padding-inline: 0;
+}
+
+@media (max-width: 720px) {
+  .property-list__head,
+  .property-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .property-list__head--colour,
+  .property-row--colour {
+    grid-template-columns: minmax(0, 1fr) var(--space-16) auto;
+  }
+
+  /* Name (+ colour) on the first line; ↑ ↓ Remove on a full-width row beneath. */
+  .property-row__actions {
+    grid-column: 1 / -1;
+  }
+
+  .property-list__head-actions {
+    display: none;
+  }
 }
 
 .task-row__priority {
@@ -1932,6 +1971,12 @@
     display: none;
   }
 
+  .chat-view {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+
   .chat-view[data-chrome='engaged'] .agent-picker {
     gap: var(--space-1);
   }
@@ -1993,6 +2038,34 @@
     padding-inline: 0.7rem;
     font-size: var(--text-sm);
   }
+
+  /* Full-page Chat tab and overlay: stack composer so Send never crushes the input. */
+  .chat-view .chat-form {
+    flex: 0 0 auto;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: var(--space-2);
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .chat-view .chat-input,
+  .chat-view #chat-input {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    resize: none;
+  }
+
+  .chat-view .chat-form__tools {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
 }
 
 .chat-protocols {
@@ -2024,6 +2097,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   display: block;
   border-radius: 50%;
 }
@@ -2065,6 +2139,7 @@
   height: 2rem;
   border-radius: 50%;
   object-fit: cover;
+  object-position: center;
   flex: 0 0 auto;
   margin-top: 0.25rem;
 }
@@ -2296,7 +2371,8 @@
 @media (max-width: 720px) {
   .hub-layout[data-hub-view='clare'] .hub-canvas {
     padding: var(--space-4);
-    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+    /* Clear locked .hub-mobile-nav (MOBILE.md) — do not rely on outer shell padding alone. */
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .chat-view[data-panel-mode='overlay'] {
@@ -2306,7 +2382,8 @@
     right: 0;
     bottom: var(--vv-offset-bottom, 0px);
     width: 100%;
-    max-width: none;
+    max-width: 100%;
+    min-width: 0;
     max-height: none;
     height: var(--vv-height, 100dvh);
     padding: var(--space-3);
@@ -2360,37 +2437,14 @@
     padding-block: var(--space-1);
   }
 
-  /* Input full-width; Send on a row underneath — not beside the textarea. */
-  .chat-view[data-panel-mode='overlay'] .chat-form {
-    flex: 0 0 auto;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    gap: var(--space-2);
-  }
-
-  .chat-view[data-panel-mode='overlay'] .chat-input,
-  .chat-view[data-panel-mode='overlay'] #chat-input {
-    flex: 0 0 auto;
-    width: 100%;
-    min-width: 0;
-    resize: none;
-  }
-
-  .chat-view[data-panel-mode='overlay'] .chat-form__tools {
-    margin-left: 0;
-    width: 100%;
-    flex-wrap: nowrap;
-    justify-content: flex-end;
-  }
-
   body:has(.chat-view[data-panel-mode='overlay']:not([hidden])) .floating-chat-button {
     display: none;
   }
 
+  /* Sit above the locked .hub-mobile-nav (same clearance as Life / Knowledge). */
   .floating-chat-button {
     right: var(--space-4);
-    bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .record-proposal {

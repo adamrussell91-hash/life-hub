@@ -46,6 +46,12 @@ function collectionItems(block: Block, prefix: string, group?: string): PartialA
         label: `${event.when || `Event ${index + 1}`}: ${truncate(event.label)}`,
         group
       }));
+    case 'card_stack':
+      return block.content.cards.map((card, index) => ({
+        key: `${p}cards:${card.id}`,
+        label: `Card ${index + 1}: ${truncate(card.title) || 'Card'}`,
+        group
+      }));
     case 'gallery':
       return block.content.items.map((item, index) => ({
         key: `${p}gallery:${item.id}`,
@@ -139,6 +145,14 @@ function filterCollection(
       content: {
         ...block.content,
         events: block.content.events.filter((event) => keys.has(`${p}events:${event.id}`))
+      }
+    };
+  } else if (block.block_type === 'card_stack') {
+    next = {
+      ...block,
+      content: {
+        ...block.content,
+        cards: block.content.cards.filter((card) => keys.has(`${p}cards:${card.id}`))
       }
     };
   } else if (block.block_type === 'gallery') {

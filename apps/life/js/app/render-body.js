@@ -1,3 +1,4 @@
+import { createMorphingValuesPopover } from '../../../../packages/design-kit/js/morphing-popover.js';
 import { animateAreaReveal } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { BODY_RANGES } from './body-model.js';
@@ -455,59 +456,81 @@ function trendArrow(trend) {
 }
 
 function quickLog(root, sectionId, hooks) {
-  const form = root.createElement('div');
-  form.className = 'body-quick-log';
-
   if (sectionId === 'scale') {
-    const input = numberInput(root, 'Weight (kg)', 'weight_kg');
-    const button = logButton(root, 'Log weight');
-    button.addEventListener('click', () => {
-      const value = Number(input.value);
-      if (!Number.isFinite(value) || value <= 0) return;
-      hooks.onLogWeight?.(value);
-      input.value = '';
+    const popover = createMorphingValuesPopover({
+      root,
+      label: 'Log weight',
+      title: 'Weight',
+      supporting: 'Today’s scale reading.',
+      layoutId: 'body-log-weight',
+      triggerClass: 'body-quick-log__button',
+      className: 'body-quick-log',
+      submitLabel: 'Log weight',
+      fields: [{
+        id: 'body-weight-kg',
+        name: 'weight_kg',
+        label: 'Weight',
+        type: 'number',
+        inputMode: 'decimal',
+        step: '0.1',
+        min: '0',
+        placeholder: 'kg',
+        autoFocus: true
+      }],
+      onSubmit(values, api) {
+        const value = Number(values.weight_kg);
+        if (!Number.isFinite(value) || value <= 0) return;
+        hooks.onLogWeight?.(value);
+        api.close();
+      }
     });
-    form.append(input, button);
-    return form;
+    return popover.el;
   }
 
-  const fat = numberInput(root, 'Body fat %', 'body_fat_pct');
-  const muscle = numberInput(root, 'Muscle kg', 'skeletal_muscle_kg');
-  const button = logButton(root, 'Log composition');
-  button.addEventListener('click', () => {
-    const fields = {};
-    const fatValue = Number(fat.value);
-    const muscleValue = Number(muscle.value);
-    if (Number.isFinite(fatValue) && fatValue > 0) fields.body_fat_pct = fatValue;
-    if (Number.isFinite(muscleValue) && muscleValue > 0) fields.skeletal_muscle_kg = muscleValue;
-    if (!Object.keys(fields).length) return;
-    hooks.onLogComposition?.(fields);
-    fat.value = '';
-    muscle.value = '';
+  const popover = createMorphingValuesPopover({
+    root,
+    label: 'Log composition',
+    title: 'Composition',
+    supporting: 'Body fat and skeletal muscle.',
+    layoutId: 'body-log-composition',
+    triggerClass: 'body-quick-log__button',
+    className: 'body-quick-log',
+    submitLabel: 'Log composition',
+    fields: [
+      {
+        id: 'body-fat-pct',
+        name: 'body_fat_pct',
+        label: 'Body fat',
+        type: 'number',
+        inputMode: 'decimal',
+        step: '0.1',
+        min: '0',
+        placeholder: '%',
+        autoFocus: true
+      },
+      {
+        id: 'body-muscle-kg',
+        name: 'skeletal_muscle_kg',
+        label: 'Muscle',
+        type: 'number',
+        inputMode: 'decimal',
+        step: '0.1',
+        min: '0',
+        placeholder: 'kg'
+      }
+    ],
+    onSubmit(values, api) {
+      const fields = {};
+      const fatValue = Number(values.body_fat_pct);
+      const muscleValue = Number(values.skeletal_muscle_kg);
+      if (Number.isFinite(fatValue) && fatValue > 0) fields.body_fat_pct = fatValue;
+      if (Number.isFinite(muscleValue) && muscleValue > 0) fields.skeletal_muscle_kg = muscleValue;
+      if (!Object.keys(fields).length) return;
+      hooks.onLogComposition?.(fields);
+      api.close();
+    }
   });
-  form.append(fat, muscle, button);
-  return form;
-}
-
-function numberInput(root, placeholder, name) {
-  const input = root.createElement('input');
-  input.type = 'number';
-  input.inputMode = 'decimal';
-  input.step = '0.1';
-  input.min = '0';
-  input.placeholder = placeholder;
-  input.name = name;
-  input.className = 'body-quick-log__input';
-  input.setAttribute('aria-label', placeholder);
-  return input;
-}
-
-function logButton(root, label) {
-  const button = root.createElement('button');
-  button.type = 'button';
-  button.className = 'body-quick-log__button';
-  button.textContent = label;
-  return button;
+  return popover.el;
 }
 
 export { BODY_RANGES, RANGE_LABELS };

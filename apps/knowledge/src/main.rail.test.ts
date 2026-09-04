@@ -106,7 +106,15 @@ describe("Knowledge Hub rail", () => {
     expect(css).toContain(".hub-pills__btn");
     expect(css).toContain(".graph-preview__excerpt");
     expect(css).toMatch(/\.floating-chat-button\s*\{[^}]*background:\s*var\(--wave\)/);
+    expect(css).toMatch(
+      /\.floating-chat-button\s*\{[^}]*bottom:\s*calc\(5\.5rem \+ env\(safe-area-inset-bottom,\s*0px\)\)/
+    );
     expect(css).toMatch(/\.chat-overlay\s*\{[^}]*width:\s*min\(24rem, calc\(100vw - 3rem\)\)/);
+    expect(css).toMatch(/\.chat-overlay\s*\{[^}]*z-index:\s*50/);
+    expect(css).toContain("--vv-height");
+    expect(css).toContain("body:has(.chat-overlay) .hub-mobile-nav");
+    expect(css).toMatch(/\.coach\.chat \.chat__composer\s*\{[^}]*position:\s*fixed/);
+    expect(css).toMatch(/\.coach\.chat \.chat__composer\s*\{[^}]*bottom:\s*calc\(5\.5rem/);
     expect(css).toMatch(/\.graph-stage\s*\{[^}]*min-height:\s*560px/);
     expect(css).toContain(".universe-zoom");
     expect(css).toContain(".graph-wrap.is-universe-dark");
@@ -122,10 +130,28 @@ describe("Knowledge Hub rail", () => {
     expect(main).not.toContain('class="graph-wrap is-universe-dark"');
     expect(css).toContain("body:has(.chat-overlay) .floating-chat-button");
     expect(css).toContain("body:has(.coach.chat) #kh-chat-overlay");
-    expect(css).toContain("body:has(.chat-visualiser) #kh-chat-overlay");
     expect(css).toContain(".chat-presence__portrait");
-    expect(main).toContain("openChatVisualiser");
-    expect(main).toContain("onOpenVisualiser");
+    expect(main).toContain("portraitSrc");
+    expect(main).not.toContain("openChatVisualiser");
+    expect(main).not.toContain("onOpenVisualiser");
+    expect(main).not.toContain("Portrait ideas");
+  });
+
+  it("stacks the universe key under the version label in fullscreen so it does not cover chat", () => {
+    expect(main).toContain('class="graph-chrome"');
+    expect(main).toMatch(/<div class="graph-chrome">[\s\S]*graph-toolbar[\s\S]*universeKeyHtml[\s\S]*<\/div>/);
+    expect(css).toContain(".graph-chrome");
+    expect(css).toContain("display: contents");
+    expect(css).toContain(".graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-chrome");
+    expect(css).toContain(".graph-wrap.is-universe-fullscreen:has([data-universe-key]) .universe-key");
+    expect(css).toContain(".graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-toolbar__meta");
+    expect(css).toMatch(
+      /\.graph-wrap\.is-universe-fullscreen:has\(\[data-universe-key\]\) \.universe-key\s*\{[^}]*position:\s*relative/,
+    );
+    expect(css).toMatch(
+      /\.graph-wrap\.is-universe-fullscreen:has\(\[data-universe-key\]\) \.graph-toolbar__meta\s*\{[^}]*order:\s*10/,
+    );
+    expect(css).toContain(".graph-wrap.is-universe-dark .graph-toolbar__meta");
   });
 
   it("makes Knowledge Hub a home control", () => {
