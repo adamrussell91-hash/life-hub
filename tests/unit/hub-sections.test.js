@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { listHubSections } from '../../apps/life/js/shell/hub-sections.js';
 import { formatHubPulseCount, renderHubPulse } from '../../apps/life/js/shell/render-hub-pulse.js';
-import { hubSwitcherHtml, listUmbrellaHubs } from '../../packages/hub-switcher.js';
+import { hubSwitcherHost, hubSwitcherHtml, listUmbrellaHubs } from '../../packages/hub-switcher.js';
 
 test('hub section registry names Teaching, Knowledge, and Tasks', () => {
   const ids = listHubSections().map(section => section.id);
@@ -85,9 +85,17 @@ test('umbrella hub switcher lists Life plus the three remounted hubs', () => {
   const ids = listUmbrellaHubs().map(hub => hub.id);
   assert.deepEqual(ids, ['life', 'teaching', 'knowledge', 'tasks']);
   const html = hubSwitcherHtml('knowledge');
+  assert.match(html, /data-hub-switcher/);
   assert.match(html, /href="\/"/);
   assert.match(html, /href="\/teaching\/"/);
   assert.match(html, /href="\/knowledge\/"/);
   assert.match(html, /href="\/tasks\/"/);
   assert.match(html, /aria-current="page"/);
+});
+
+test('hub switcher host prefers the rail so it stays out of the scrolling nav', () => {
+  const rail = { classList: { contains: name => name === 'hub-rail' } };
+  const nav = { closest: selector => (selector === '.hub-rail' ? rail : null) };
+  assert.equal(hubSwitcherHost(nav), rail);
+  assert.equal(hubSwitcherHost(nav), rail);
 });

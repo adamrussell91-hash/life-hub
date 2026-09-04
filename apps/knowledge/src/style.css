@@ -46,6 +46,12 @@
   width: 100%;
 }
 
+.rail .hub-rail__hubs {
+  margin-top: auto;
+  align-self: stretch;
+  width: 100%;
+}
+
 .rail .hub-rail__section,
 .rail a.hub-rail__link {
   align-self: stretch;

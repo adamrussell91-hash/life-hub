@@ -48,7 +48,11 @@ export function hubSwitcherHtml(currentId) {
     const current = hub.id === currentId;
     return `<a class="hub-rail__link${current ? ' is-current' : ''}" href="${hub.origin}"${current ? ' aria-current="page"' : ''}><span class="nav-glyph" aria-hidden="true">${iconSvg(hub.paths)}</span><span>${hub.title}</span></a>`;
   }).join('');
-  return `<p class="hub-rail__section">Hubs</p>${links}`;
+  return `<div class="hub-rail__hubs" data-hub-switcher><p class="hub-rail__section">Hubs</p>${links}</div>`;
+}
+
+export function hubSwitcherHost(node) {
+  return node?.closest?.('.hub-rail') ?? node;
 }
 
 function createIcon(doc, paths) {
