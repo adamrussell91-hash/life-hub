@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.22 — Teaching, Knowledge, and Tasks SPAs remounted under `apps/` on Life Pages. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.23 — Leftover Teaching APIs on life-hub2; old hub hostnames redirect here. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -526,11 +526,25 @@ APIs stay on `life-hub2`. Functions stay in repo-root `netlify/functions/` — n
 
 Old custom domains (`teaching-hub`, `knowledge-hub`, `tasks-hub`) can keep serving their existing Pages deploys until DNS points here. Student lessons on this site are `/teaching/s/…` and stay unauthenticated.
 
+### Slice 31 — Leftover Teaching APIs, smoke, DNS, retire sites (this slice)
+
+Teacher UI leftovers now on `life-hub2` (Life session, Teaching Blobs):
+
+- `POST /api/alchemy-lab` — session; proxies `lessonText` to `KNOWLEDGE_ALCHEMIST_URL` or runs the same alchemist as `/api/lesson-alchemist`
+- `GET/POST /api/compositions` and `GET/PATCH/DELETE /api/compositions/:id`
+- `GET /api/trash`; `POST /api/:collection/:id/restore-from-trash`; `GET …/dependencies` (empty list)
+- `POST /api/scope-sequences` and `GET/PATCH /api/scope-sequences/:id`
+- `GET /api/export?kind=lesson|unit|archive`
+- `GET/POST /api/ai/jobs` and `GET/PATCH /api/ai/jobs/:id` — create/poll/resolve; no background runner yet
+
+DNS decision: point `teaching-hub` / `knowledge-hub` / `tasks-hub` at this product (`/teaching/`, `/knowledge/`, `/tasks/`), including student `/s/…` → `/teaching/s/…`.
+
+Disabled Function sites `arteaching-hub`, `artasks-hub`, `knowledge-hub-archive` are deleted after soak. Do **not** delete R2 `knowledge-hub-archive` or Worker `knowledge-hub-research`.
+
 ## Next action
 
-One repo, one API site, one Pages site. Next: signed-in smoke of the remounted SPAs, fold leftover Teaching routes (`alchemy-lab`, compositions, trash, AI jobs), or soak-then-delete the three disabled Function sites. Calendar: rotate `GITHUB_TOKEN` before **2026-12-02**.
+Rotate `GITHUB_TOKEN` before **2026-12-02**. Then one design-kit source, Hammond across hubs, or widgets proxy `jade-melomakarona-ea20fe`.
 
 ## Open questions (Adam)
 
-- Delete the three disabled Netlify sites after a soak, or keep the records
 - Proxies: migrate widgets off `jade-melomakarona-ea20fe` vs harden in place
