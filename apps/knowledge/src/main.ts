@@ -19,7 +19,7 @@ import {
   uploadSignedFile,
 } from "./api/client";
 import { takeSignInQuery } from "./api/loginGate";
-import { isPageHash, isVisualiserHash, pageHashForId, pageIdFromHash, visualiserHashForIdea, visualiserIdeaFromHash } from "./routing/pageHash";
+import { isPageHash, pageHashForId, pageIdFromHash } from "./routing/pageHash";
 import { runCapture } from "./api/captureClient";
 import {
   bindCaptureControls,
@@ -36,6 +36,7 @@ import { resolveArchivePageId } from "./chat/noteLinks";
 import { cardSupportingText } from "./archive/cardText";
 import { archiveEmptyHtml } from "./archive/emptyList";
 import { goHome } from "./archive/goHome";
+import { paintVirtualList, virtualListWindow, type VirtualListPainted } from "./archive/virtualList";
 import { readerTopicPillsHtml } from "./archive/readerMeta";
 import {
   emptyOriginFilter,
@@ -83,7 +84,6 @@ import { enterPodcastRail, leavePodcastRail, renderPodcastRail } from "./podcast
 import { enterQuizRail, leaveQuizRail, renderQuizRail } from "./quiz/view";
 import { mountUniversityTimeline } from "./university/timeline/mount";
 import { enterChatRail, leaveChatRail, renderChatRail } from "./chat/rail";
-import { currentVisualiserIdea, enterChatVisualiser, isPortraitIdeaId, renderChatVisualiser } from "./chat/visualiser";
 import { ensureChatOverlay, hideChatOverlay, openChatOverlay, pinChatOverlayNote } from "./chat/overlay";
 import type { GraphPreviewNote } from "./archive/graphPreview";
 import { connectedLinksHtml } from "./wiki/connectedHtml";
@@ -102,7 +102,6 @@ type View =
   | "page"
   | "compose"
   | "chat"
-  | "visualiser"
   | "podcast"
   | "quiz";
 type GraphMode = "constellation" | "showAll" | "universe";
@@ -131,6 +130,7 @@ let composeOriginKind: Origin["kind"] = "degree";
 let activePage: Page | null = null;
 let tidyBusy = false;
 let listScrollTop = 0;
+let listPainted: VirtualListPainted | null = null;
 let graphTeardown: (() => void) | null = null;
 let graphMount: GraphMount | null = null;
 let graphMode: GraphMode = "constellation";
@@ -287,25 +287,13 @@ function renderAttachments(page: Page) {
 function leaveSpecialRails() {
   if (view === "podcast") leavePodcastRail();
   if (view === "quiz") leaveQuizRail();
-  if (view === "chat" || view === "visualiser") leaveChatRail();
+  if (view === "chat") leaveChatRail();
 }
 
 function clearPageHash() {
-  if (isPageHash(location.hash) || isVisualiserHash(location.hash)) {
+  if (isPageHash(location.hash)) {
     history.replaceState(null, "", `${location.pathname}${location.search}`);
   }
-}
-
-function openChatVisualiser(nextIdea?: string) {
-  if (view === "podcast") leavePodcastRail();
-  if (view === "quiz") leaveQuizRail();
-  const idea = nextIdea && isPortraitIdeaId(nextIdea) ? nextIdea : currentVisualiserIdea();
-  enterChatVisualiser(idea);
-  view = "visualiser";
-  activePage = null;
-  const next = visualiserHashForIdea(idea);
-  if (location.hash !== next) location.hash = next;
-  render();
 }
 
 function openChatWorkplace() {
@@ -313,9 +301,6 @@ function openChatWorkplace() {
   view = "chat";
   activePage = null;
   compose = null;
-  if (isVisualiserHash(location.hash)) {
-    history.replaceState(null, "", `${location.pathname}${location.search}`);
-  }
   render();
 }
 
@@ -343,7 +328,7 @@ function openBookNote(book?: string) {
     bookContext: book ? { label: book } : undefined,
   });
   view = "chat";
-  if (isVisualiserHash(location.hash) || isPageHash(location.hash)) {
+  if (isPageHash(location.hash)) {
     history.replaceState(null, "", `${location.pathname}${location.search}`);
   }
   render();
@@ -389,7 +374,7 @@ function shell(main: string) {
         <button class="rail__btn hub-rail__link ${view === "list" && archiveIsUnfiltered() ? "is-current" : ""}" data-nav="all" type="button">${icons.archive}<span>Archive</span></button>
         <button class="rail__btn hub-rail__link ${view === "graph" ? "is-current" : ""}" data-nav="graph" type="button">${icons.graph}<span>Graph</span></button>
         <button class="rail__btn hub-rail__link ${view === "timeline" ? "is-current" : ""}" data-nav="timeline" type="button">${icons.timeline}<span>Timeline</span></button>
-        <button class="rail__btn hub-rail__link ${view === "chat" || view === "visualiser" ? "is-current" : ""}" data-nav="chat" type="button">${icons.chat}<span>Chat</span></button>
+        <button class="rail__btn hub-rail__link ${view === "chat" ? "is-current" : ""}" data-nav="chat" type="button">${icons.chat}<span>Chat</span></button>
         <button class="rail__btn hub-rail__link ${view === "podcast" ? "is-current" : ""}" data-nav="podcast" type="button">${icons.podcast}<span>Podcast</span></button>
         <button class="rail__btn hub-rail__link ${view === "quiz" ? "is-current" : ""}" data-nav="quiz" type="button">${icons.quiz}<span>Quiz</span></button>
       </nav>
@@ -527,24 +512,21 @@ function bindListRows(root: ParentNode) {
 
 function renderVirtualList(viewport: HTMLElement) {
   const total = visible.length;
-  const viewportHeight = viewport.clientHeight || 560;
-  const rowHeight = listRowHeight();
-  const start = Math.max(0, Math.floor(listScrollTop / rowHeight) - OVERSCAN);
-  const end = Math.min(total, Math.ceil((listScrollTop + viewportHeight) / rowHeight) + OVERSCAN);
-  const offset = start * rowHeight;
-  const windowItems = visible.slice(start, end);
-
-  viewport.innerHTML = `<div class="list-spacer" style="height:${Math.max(total * rowHeight, total ? 0 : 120)}px">
-    <div class="list-window" style="transform:translateY(${offset}px)">
-      ${
-        windowItems.map(rowHtml).join("") ||
-        archiveEmptyHtml({
-          hasArchiveNotes: entries.length > 0,
-        })
-      }
-    </div>
-  </div>`;
-  bindListRows(viewport);
+  const window = virtualListWindow({
+    total,
+    scrollTop: listScrollTop,
+    viewportHeight: viewport.clientHeight || 560,
+    rowHeight: listRowHeight(),
+    overscan: OVERSCAN,
+  });
+  const html =
+    visible.slice(window.start, window.end).map(rowHtml).join("") ||
+    archiveEmptyHtml({
+      hasArchiveNotes: entries.length > 0,
+    });
+  const previous = listPainted;
+  listPainted = paintVirtualList(viewport, { ...window, html }, listPainted);
+  if (listPainted !== previous) bindListRows(viewport);
 }
 
 function renderList() {
@@ -579,6 +561,9 @@ function renderList() {
     <p class="list-count">${visible.length.toLocaleString()} notes</p>
     <div class="cards list-viewport" aria-label="Archive list"></div>
   `);
+  // shell() remounts the viewport — drop the previous painted window so the
+  // first paint recreates spacer/window instead of assuming they still exist.
+  listPainted = null;
 
   app.querySelector<HTMLButtonElement>("[data-jump-graph]")!.onclick = () => {
     view = "graph";
@@ -989,11 +974,6 @@ async function openPage(id: string, title?: string) {
 }
 
 async function applyPageHash(): Promise<boolean> {
-  if (isVisualiserHash(location.hash)) {
-    const idea = visualiserIdeaFromHash(location.hash);
-    openChatVisualiser(idea ?? undefined);
-    return true;
-  }
   const id = pageIdFromHash(location.hash);
   if (!id) return false;
   try {
@@ -1477,24 +1457,9 @@ function render() {
         await refreshVisible();
         await openPage(saved.id);
       },
-      onOpenVisualiser: () => openChatVisualiser(),
       pageHeader,
       archiveNotes: archiveNotes(),
       bookLabels: originLabelsForKind(entries, "book").map(item => item.label),
-    });
-  } else if (view === "visualiser") {
-    renderChatVisualiser({
-      app,
-      shell,
-      render,
-      pageHeader,
-      onBackToChat: () => openChatWorkplace(),
-      onIdeaChange: next => {
-        const nextHash = visualiserHashForIdea(next);
-        if (location.hash !== nextHash) {
-          history.replaceState(null, "", `${location.pathname}${location.search}${nextHash}`);
-        }
-      },
     });
   } else if (view === "podcast") {
     renderPodcastRail({
@@ -1630,8 +1595,8 @@ async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean 
       window.addEventListener("hashchange", () => {
         void (async () => {
           const opened = await applyPageHash();
-          if (!opened && (view === "page" || view === "visualiser")) {
-            view = view === "visualiser" ? "chat" : "list";
+          if (!opened && view === "page") {
+            view = "list";
             activePage = null;
             render();
           }

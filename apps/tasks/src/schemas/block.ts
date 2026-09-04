@@ -33,6 +33,7 @@ export const BlockTypeSchema = z.enum([
   'section',
   'spacer',
   'timeline',
+  'card_stack',
   'tabs',
   'collection',
   'outcomes'
@@ -582,6 +583,43 @@ export const TimelineBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const CardStackTintSchema = z.enum([
+  'navy',
+  'wave',
+  'marine',
+  'depth',
+  'high-sea',
+  'lilac',
+  'sage',
+  'peach'
+]);
+export type CardStackTint = z.infer<typeof CardStackTintSchema>;
+
+export const CardStackItemSchema = z.object({
+  id: z.string().min(1),
+  number: z.string().optional(),
+  eyebrow: z.string(),
+  title: z.string(),
+  description: z.string(),
+  image_url: z.string().optional(),
+  image_alt: z.string().optional(),
+  tint: CardStackTintSchema
+});
+
+export const CardStackBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('card_stack'),
+  variant: z.string().default('medium'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    title: z.string().optional(),
+    cards: z.array(CardStackItemSchema).min(1).max(8)
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 export const CollectionSourceSchema = z.enum(['unit_lessons', 'recent_lessons']);
 
 export const CollectionBlockSchema = z.object({
@@ -694,7 +732,8 @@ export const TabChildBlockSchema = z.lazy(() =>
     ...leafBlockSchemas,
     SpacerBlockSchema,
     ColumnsBlockSchema,
-    TimelineBlockSchema
+    TimelineBlockSchema,
+    CardStackBlockSchema
   ])
 );
 
@@ -726,7 +765,8 @@ export const SectionChildBlockSchema = z.lazy(() =>
     SpacerBlockSchema,
     ColumnsBlockSchema,
     TabsBlockSchema,
-    TimelineBlockSchema
+    TimelineBlockSchema,
+    CardStackBlockSchema
   ])
 );
 
@@ -774,6 +814,7 @@ export const BlockSchema = z.lazy(() =>
       ColumnsBlockSchema,
       SectionBlockObjectSchema,
       TimelineBlockSchema,
+      CardStackBlockSchema,
       TabsBlockSchema,
       CollectionBlockSchema
     ])

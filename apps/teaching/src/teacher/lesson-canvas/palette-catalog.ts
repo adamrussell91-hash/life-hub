@@ -37,6 +37,7 @@ export const INSERT_MENU_DESCRIPTION: Record<InsertMenuValue, string> = {
   section: 'Group related blocks inside a titled container.',
   spacer: 'Add vertical whitespace between blocks on the page.',
   timeline: 'Arrange events or steps along a chronological axis.',
+  card_stack: 'Step through numbered case-study cards with image and copy.',
   tabs: 'Switch between labelled panels of content.',
   collection: 'Curate a set of related items students browse together.',
   outcomes: 'Show the outcomes tagged on this page as a readable list.',

@@ -323,9 +323,9 @@ function bookFieldHtml() {
   }
   return `<div class="chat__book chat-overlay__book">
     <label class="chat-form__label" for="overlay-chat-book">Book</label>
-    <p class="compose__hint">The one in your hand. Pick a title you already use, or type a new one.</p>
+    <p class="compose__hint">Pick a title from the archive, or type a new one.</p>
     <div class="chat__book-add">
-      <input id="overlay-chat-book" value="${escapeHtml(bookQuery)}" placeholder="Make It Stick…" autocomplete="off" list="overlay-book-list" />
+      <input id="overlay-chat-book" value="${escapeHtml(bookQuery)}" placeholder="Book title" autocomplete="off" list="overlay-book-list" />
       <datalist id="overlay-book-list">${bookLabels.map(item => `<option value="${escapeHtml(item)}"></option>`).join("")}</datalist>
       <button type="button" class="btn btn--ghost" data-set-book>Use this book</button>
     </div>

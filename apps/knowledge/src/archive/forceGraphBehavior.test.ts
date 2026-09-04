@@ -5,9 +5,15 @@ import {
   SHOW_ALL_TUNING_CONTROLS,
   SHOW_ALL_TUNING_DEFAULTS,
   SHOW_ALL_STRAND_WIDTH,
+  CONSTELLATION_SPOKE_DISTANCE,
   applyShowAllStrandStroke,
   applyForceStageResize,
   applyShowAllTuning,
+  constellationCollisionRadius,
+  constellationLinkDistance,
+  constellationLinkStrength,
+  constellationNodeCharge,
+  constellationTargetStrength,
   fitViewToNodes,
   showAllLabelVisible,
   focusViewOnNode,
@@ -342,7 +348,24 @@ describe("show all draw budget", () => {
     expect(shouldLockShowAll(SHOW_ALL_SETTLE_TICKS - 1)).toBe(false);
     expect(shouldLockShowAll(SHOW_ALL_SETTLE_TICKS)).toBe(true);
   });
+});
 
+describe("constellation leaf forces", () => {
+  it("repels and collides notes so they cannot stack on one spoke", () => {
+    expect(constellationNodeCharge(leaf)).toBeLessThan(0);
+    expect(constellationCollisionRadius(leaf)).toBeGreaterThan(0);
+    expect(constellationLinkDistance({ source: "a", target: "b", kind: "spoke", weight: 1, color: "#000" })).toBe(
+      CONSTELLATION_SPOKE_DISTANCE,
+    );
+    expect(constellationLinkStrength({ source: "a", target: "b", kind: "spoke", weight: 1, color: "#000" })).toBeGreaterThan(
+      0.5,
+    );
+    expect(constellationTargetStrength(leaf)).toBe(0);
+    expect(constellationTargetStrength(major)).toBeGreaterThan(constellationTargetStrength(leaf));
+  });
+});
+
+describe("show all strand drawing", () => {
   it("draws every Show All strand at the same solid rounded width", () => {
     expect(showAllStrandWidth()).toBe(SHOW_ALL_STRAND_WIDTH);
     expect(showAllStrandDash()).toEqual([]);

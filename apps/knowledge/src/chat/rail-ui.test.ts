@@ -190,22 +190,14 @@ describe("Knowledge chat rail protocol affordances", () => {
     expect(host.app.querySelector("[data-new-chat]")).toBeTruthy();
   });
 
-  it("opens the portrait visualiser from Chat", () => {
-    const opened: string[] = [];
-    const host = makeHost();
-    host.onOpenVisualiser = () => opened.push("visualiser");
-    host.render();
-    host.app.querySelector<HTMLButtonElement>("[data-open-visualiser]")!.click();
-    expect(opened).toEqual(["visualiser"]);
-  });
-
   it("asks for the book before making a from-a-book note", () => {
     enterChatRail({ fresh: true, hat: "fromBook" });
     const host = makeHost();
     host.bookLabels = ["Make It Stick"];
     host.render();
     expect(host.app.textContent).toContain("From a book");
-    expect(host.app.textContent).toContain("The one in your hand");
+    expect(host.app.textContent).toContain("Pick a title from the archive");
+    expect(host.app.querySelector<HTMLInputElement>("#chat-book")?.placeholder).toBe("Book title");
     expect(host.app.querySelector(".chat--from-book")).toBeTruthy();
     expect(host.app.querySelector(".chat__composer")).toBeNull();
     expect(host.app.querySelector<HTMLButtonElement>("[type=submit]")?.textContent).toBe("Make note");

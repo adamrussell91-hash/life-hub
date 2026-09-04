@@ -21,7 +21,6 @@ export type ChatRailHost = {
   render: () => void;
   onOpenPage?: (pageId: string, title?: string) => void;
   onSavedPage?: (page: Page) => Promise<void> | void;
-  onOpenVisualiser?: () => void;
   pageHeader: (
     eyebrow: string,
     title: string,
@@ -412,9 +411,9 @@ function bookFieldHtml(bookLabels: string[]) {
   const matches = filterPickerOptions(bookLabels, bookQuery);
   return `<div class="chat__book">
     <label for="chat-book">Book</label>
-    <p class="compose__hint">The one in your hand. Pick a title you already use, or type a new one.</p>
+    <p class="compose__hint">Pick a title from the archive, or type a new one.</p>
     <div class="chat__book-add">
-      <input id="chat-book" value="${escapeHtml(bookQuery)}" placeholder="Make It Stick…" autocomplete="off" list="chat-book-list" />
+      <input id="chat-book" value="${escapeHtml(bookQuery)}" placeholder="Book title" autocomplete="off" list="chat-book-list" />
       <datalist id="chat-book-list">${bookLabels.map(item => `<option value="${escapeHtml(item)}"></option>`).join("")}</datalist>
       <button type="button" class="btn btn--ghost" data-set-book>Use this book</button>
     </div>
@@ -546,8 +545,7 @@ export function renderChatRail(host: ChatRailHost) {
     ${host.pageHeader(
       CLEMENTINE.shortName,
       fromBook ? "From a book" : "Chat",
-      `<button class="btn btn--ghost" data-open-visualiser type="button">Portrait ideas</button>
-      <button class="btn btn--ghost" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
+      `<button class="btn btn--ghost" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
       { portraitSrc: CLEMENTINE.avatarSrc, portraitAlt: CLEMENTINE.name },
     )}
     <section class="coach chat${fromBook ? " chat--from-book" : ""}">
@@ -617,9 +615,6 @@ export function renderChatRail(host: ChatRailHost) {
     noteContext = undefined;
     persist();
     host.render();
-  });
-  host.app.querySelector<HTMLButtonElement>("[data-open-visualiser]")?.addEventListener("click", () => {
-    host.onOpenVisualiser?.();
   });
   host.app.querySelector<HTMLButtonElement>("[data-new-chat]")?.addEventListener("click", () => {
     if (busy || researchSessionId || writeSessionId) return;
