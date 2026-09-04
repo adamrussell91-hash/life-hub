@@ -115,6 +115,7 @@
 
 .hub-calendar__body {
   min-width: 0;
+  min-height: 20rem;
 }
 
 .hub-calendar__week {

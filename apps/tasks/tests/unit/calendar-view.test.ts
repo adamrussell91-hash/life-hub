@@ -335,6 +335,20 @@ describe('calendar views', () => {
     canvas.remove();
   });
 
+  it('keeps the day time grid when a chip opens the editor', async () => {
+    location.hash = '#/week?date=2026-08-17&layout=day';
+    const canvas = document.createElement('main');
+    await renderWeekView(canvas);
+    const chip = canvas.querySelector<HTMLButtonElement>('.event-chip');
+    expect(chip).not.toBeNull();
+    chip!.click();
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.task-editor')).not.toBeNull();
+    });
+    expect(canvas.querySelector('.hub-calendar__timegrid')).not.toBeNull();
+    expect(canvas.querySelectorAll('.hub-calendar__hours')).toHaveLength(1);
+  });
+
   it('creates a timed task from the standing compose field', async () => {
     location.hash = '#/week?date=2026-08-17&layout=day';
     const canvas = document.createElement('main');

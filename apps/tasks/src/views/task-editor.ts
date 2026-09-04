@@ -418,7 +418,9 @@ export async function renderTaskEditor(
     renderSteps(host, task, allTasks, onSaved);
   }
 
-  card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (!host.closest('.hub-calendar__rail')) {
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
 }
 
 export function renderQuickAdd(

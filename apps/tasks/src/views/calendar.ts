@@ -574,7 +574,9 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     const selected = items.find((item) => item.id === selectedItemId);
     if (selected) {
       agenda.hidden = true;
-      void openItem(selected, preview);
+      void openItem(selected, preview).finally(() => {
+        canvas.scrollTop = scrollTop;
+      });
     } else {
       preview.hidden = true;
     }
