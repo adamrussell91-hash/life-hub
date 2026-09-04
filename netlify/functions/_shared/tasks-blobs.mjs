@@ -1,3 +1,4 @@
+import { dedupeRecords, isIndexKey, listBlobKeys } from './blobs-list.mjs';
 import { UMBRELLA_BLOBS_SITE_ID, isUmbrellaBlobsHome } from './teaching-blobs.mjs';
 
 export const TASKS_CONTENT_STORE = 'tasks-hub-content';
@@ -43,9 +44,9 @@ export async function deleteKey(store, key) {
 }
 
 export async function listJSON(store, prefix) {
-  const { blobs } = await store.list({ prefix });
-  const entries = await Promise.all(blobs.map(blob => getJSON(store, blob.key)));
-  return entries.filter(entry => entry && typeof entry === 'object' && !Array.isArray(entry));
+  const keys = (await listBlobKeys(store, prefix)).filter(key => !isIndexKey(key));
+  const entries = await Promise.all(keys.map(key => getJSON(store, key)));
+  return dedupeRecords(entries);
 }
 
 export function taskKey(id) {

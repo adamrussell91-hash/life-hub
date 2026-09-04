@@ -55,7 +55,8 @@ export function createTasksHandler(deps = {}) {
           }
           return withCors(okResponse(200, task), request, env);
         }
-        const tasks = await listJSON(store, TASK_PREFIX);
+        const tasks = (await listJSON(store, TASK_PREFIX))
+          .filter(item => typeof item.id === 'string' && typeof item.title === 'string');
         return withCors(okResponse(200, { tasks }), request, env);
       }
 

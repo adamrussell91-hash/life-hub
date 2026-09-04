@@ -43,4 +43,15 @@ describe('primary rail navigation', () => {
     expect(mobile?.querySelector('.hub-rail__mobile-items [href="#/board"]')).not.toBeNull();
     expect(mobile?.querySelector('.hub-rail__mobile-items [href="#/clare"]')).not.toBeNull();
   });
+
+  it('adds a Hubs switcher that leaves Tasks for Life, Teaching, and Knowledge', () => {
+    const host = document.createElement('div');
+    renderPrimaryNav(host, 'board');
+    const hubs = host.querySelector('[data-hub-switcher]');
+    expect(hubs?.textContent).toContain('Hubs');
+    expect(hubs?.querySelector('a[href="/"]')?.textContent).toContain('Life');
+    expect(hubs?.querySelector('a[href="/teaching/"]')?.textContent).toContain('Teaching');
+    expect(hubs?.querySelector('a[href="/knowledge/"]')?.textContent).toContain('Knowledge');
+    expect(hubs?.querySelector('a[href="/tasks/"]')?.getAttribute('aria-current')).toBe('page');
+  });
 });

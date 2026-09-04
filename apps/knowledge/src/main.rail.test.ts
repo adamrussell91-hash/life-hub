@@ -133,6 +133,10 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain('href="#"');
     expect(main).toContain("function goToHome");
   });
+
+  it("links out to the other umbrella hubs from the rail", () => {
+    expect(main).toContain('hubSwitcherHtml("knowledge")');
+  });
 });
 
 describe("note reader and editor fill the canvas", () => {

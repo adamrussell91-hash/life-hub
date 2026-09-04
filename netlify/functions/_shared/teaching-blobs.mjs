@@ -1,3 +1,5 @@
+import { dedupeRecords, isIndexKey, listBlobKeys } from './blobs-list.mjs';
+
 export const TEACHING_CONTENT_STORE = 'teaching-hub-content';
 export const TEACHING_BLOBS_SITE_ID = '899b0fd3-53b3-45a0-bbfb-0238264d9246';
 export const UMBRELLA_BLOBS_SITE_ID = '5771ee5c-0cb2-4858-b03d-2637f092050e';
@@ -142,9 +144,9 @@ export function newId(prefix) {
 }
 
 export async function listJSON(store, prefix) {
-  const { blobs } = await store.list({ prefix });
-  const entries = await Promise.all(blobs.map(blob => getJSON(store, blob.key)));
-  return entries.filter(entry => entry && typeof entry === 'object');
+  const keys = (await listBlobKeys(store, prefix)).filter(key => !isIndexKey(key));
+  const entries = await Promise.all(keys.map(key => getJSON(store, key)));
+  return dedupeRecords(entries);
 }
 
 export function readPublishedId(request, context = {}) {
