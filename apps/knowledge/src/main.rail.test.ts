@@ -128,6 +128,23 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("onOpenVisualiser");
   });
 
+  it("stacks the universe key under the version label in fullscreen so it does not cover chat", () => {
+    expect(main).toContain('class="graph-chrome"');
+    expect(main).toMatch(/<div class="graph-chrome">[\s\S]*graph-toolbar[\s\S]*universeKeyHtml[\s\S]*<\/div>/);
+    expect(css).toContain(".graph-chrome");
+    expect(css).toContain("display: contents");
+    expect(css).toContain(".graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-chrome");
+    expect(css).toContain(".graph-wrap.is-universe-fullscreen:has([data-universe-key]) .universe-key");
+    expect(css).toContain(".graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-toolbar__meta");
+    expect(css).toMatch(
+      /\.graph-wrap\.is-universe-fullscreen:has\(\[data-universe-key\]\) \.universe-key\s*\{[^}]*position:\s*relative/,
+    );
+    expect(css).toMatch(
+      /\.graph-wrap\.is-universe-fullscreen:has\(\[data-universe-key\]\) \.graph-toolbar__meta\s*\{[^}]*order:\s*10/,
+    );
+    expect(css).toContain(".graph-wrap.is-universe-dark .graph-toolbar__meta");
+  });
+
   it("makes Knowledge Hub a home control", () => {
     expect(main).toContain('class="hub-rail__brand" data-home');
     expect(main).toContain('href="#"');
