@@ -186,7 +186,8 @@ describe("Knowledge chat rail protocol affordances", () => {
     host.bookLabels = ["Make It Stick"];
     host.render();
     expect(host.app.textContent).toContain("From a book");
-    expect(host.app.textContent).toContain("The one in your hand");
+    expect(host.app.textContent).toContain("Pick a title from the archive");
+    expect(host.app.querySelector<HTMLInputElement>("#chat-book")?.placeholder).toBe("Book title");
     expect(host.app.querySelector(".chat--from-book")).toBeTruthy();
     expect(host.app.querySelector(".chat__composer")).toBeNull();
     expect(host.app.querySelector<HTMLButtonElement>("[type=submit]")?.textContent).toBe("Make note");
