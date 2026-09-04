@@ -89,5 +89,11 @@ test('body fat and skeletal muscle are separate cards side by side', () => {
   assert.equal(pair.classList.contains('metric-card'), false);
   assert.match(textOf(cards[0]), /Body fat/);
   assert.match(textOf(cards[1]), /Skeletal muscle/);
-  assert.doesNotMatch(textOf(host), /Composition/);
+  assert.doesNotMatch(textOf(cards[0]), /Composition/);
+  assert.doesNotMatch(textOf(cards[1]), /Composition/);
+  const wrap = findByClass(host, 'body-composition');
+  const quickLog = findByClass(wrap, 'body-quick-log');
+  assert.ok(quickLog, 'expected a composition quick-log control');
+  assert.match(quickLog.className, /morphing-popover/);
+  assert.match(textOf(quickLog), /Log composition/);
 });

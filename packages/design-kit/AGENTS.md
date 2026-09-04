@@ -23,7 +23,8 @@ Hub marks: also read `ICONS.md`. The website tile is favicon + login + canvas ti
 9. `js/format-display-date.js` — **locked** display dates (`dd/mm/yy`)
 10. `js/mount-mobile-chrome.js` — mount the phone bar + More sheet
 11. `motion.css` + `js/hub-motion.js` — shared card sheen, fade, count-up, list stagger, magnet. Call `startHubMotion()` once from each hub.
-12. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`)
+12. `morphing-popover.css` + `js/morphing-popover.js` — trigger expands into a compact editor (blur fade, 250ms ease-out). Use for short notes, quick text, and dimension / value edits. `createMorphingNotePopover` / `createMorphingValuesPopover`, or copy `snippets/morphing-popover.html` and call `mountMorphingPopovers()`.
+13. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `morphing-popover.html`)
 
 ### Passphrase gate (mandatory)
 

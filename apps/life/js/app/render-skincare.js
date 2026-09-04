@@ -1,4 +1,8 @@
 import {
+  createMorphingNotePopover,
+  createMorphingPopover
+} from '../../../../packages/design-kit/js/morphing-popover.js';
+import {
   SKINCARE_ROUTINES,
   appendNoteChip,
   buildProductList,
@@ -552,32 +556,35 @@ function renderRoutineCard(root, key, model, {
     card.append(extras);
   }
 
-  const notesWrap = root.createElement('div');
-  notesWrap.className = 'skincare-notes';
-  const notesLabel = root.createElement('p');
-  notesLabel.className = 'metric-caption';
-  notesLabel.textContent = 'Notes';
-  const notes = root.createElement('textarea');
-  notes.rows = 2;
-  notes.placeholder = 'How does skin feel?';
-  notes.addEventListener('input', () => { state.notes = notes.value; });
-  notesWrap.append(notesLabel, notes);
-
-  const chips = root.createElement('div');
-  chips.className = 'skincare-note-chips';
-  for (const chipText of model.routines.note_chips ?? []) {
-    const chip = root.createElement('button');
-    chip.type = 'button';
-    chip.className = 'skincare-chip';
-    chip.textContent = chipText;
-    chip.addEventListener('click', () => {
-      state.notes = appendNoteChip(state.notes, chipText);
-      notes.value = state.notes;
-    });
-    chips.append(chip);
-  }
-  notesWrap.append(chips);
-  card.append(notesWrap);
+  const notesPopover = createMorphingNotePopover({
+    root,
+    label: String(state.notes ?? '').trim() ? 'Notes' : 'Add a note',
+    title: 'Notes',
+    supporting: 'How does skin feel?',
+    placeholder: 'How does skin feel?',
+    value: state.notes,
+    rows: 2,
+    className: 'skincare-notes',
+    layoutId: `skincare-notes-${key}`,
+    onChange: value => { state.notes = value; },
+    extra(body, _api, refs) {
+      const chips = root.createElement('div');
+      chips.className = 'skincare-note-chips';
+      for (const chipText of model.routines.note_chips ?? []) {
+        const chip = root.createElement('button');
+        chip.type = 'button';
+        chip.className = 'skincare-chip';
+        chip.textContent = chipText;
+        chip.addEventListener('click', () => {
+          state.notes = appendNoteChip(state.notes, chipText);
+          if (refs?.textarea) refs.textarea.value = state.notes;
+        });
+        chips.append(chip);
+      }
+      body.append(chips);
+    }
+  });
+  card.append(notesPopover.el);
 
   const done = root.createElement('button');
   done.type = 'button';
@@ -624,45 +631,58 @@ function renderProcedureCard(root, host, model, onLogProcedure) {
   title.textContent = 'Other / procedure';
   host.append(title);
 
-  const name = root.createElement('input');
-  name.type = 'text';
-  name.placeholder = 'Laser, clinic, mask night…';
-  name.className = 'skincare-procedure-title';
-  host.append(name);
+  const popover = createMorphingPopover({
+    root,
+    triggerLabel: 'Log a procedure',
+    title: 'Other / procedure',
+    supporting: 'Clinic visit, laser, mask night…',
+    layoutId: 'skincare-procedure',
+    triggerClass: 'btn btn--ghost',
+    renderContent(body, api) {
+      const name = root.createElement('input');
+      name.type = 'text';
+      name.placeholder = 'Laser, clinic, mask night…';
+      name.className = 'skincare-procedure-title';
+      name.setAttribute?.('aria-label', 'Procedure');
 
-  const notes = root.createElement('textarea');
-  notes.rows = 2;
-  notes.placeholder = 'What happened / aftercare';
-  host.append(notes);
+      const notes = root.createElement('textarea');
+      notes.className = 'morphing-popover__note';
+      notes.rows = 2;
+      notes.placeholder = 'What happened / aftercare';
+      notes.setAttribute?.('aria-label', 'Procedure notes');
 
-  const button = root.createElement('button');
-  button.type = 'button';
-  button.className = 'skincare-done';
-  button.textContent = 'Log procedure';
-  button.addEventListener('click', async () => {
-    if (button.disabled) return;
-    const priorLabel = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Logging…';
-    const procedureTitle = name.value.trim() || 'procedure';
-    const routine = model.currentRoutine === 'am' ? 'am' : 'pm';
-    try {
-      await onLogProcedure?.({
-        payload: toSkincareConfirmPayload({
-          date: model.date,
-          routine,
-          products: [procedureTitle],
-          notes: notes.value.trim(),
-          procedureTitle,
-          slug: undefined
-        })
+      const button = root.createElement('button');
+      button.type = 'button';
+      button.className = 'skincare-done';
+      button.textContent = 'Log procedure';
+      button.addEventListener('click', async () => {
+        if (button.disabled) return;
+        const priorLabel = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Logging…';
+        const procedureTitle = name.value.trim() || 'procedure';
+        const routine = model.currentRoutine === 'am' ? 'am' : 'pm';
+        try {
+          await onLogProcedure?.({
+            payload: toSkincareConfirmPayload({
+              date: model.date,
+              routine,
+              products: [procedureTitle],
+              notes: notes.value.trim(),
+              procedureTitle,
+              slug: undefined
+            })
+          });
+          api.close();
+        } catch {
+          button.textContent = priorLabel;
+          button.disabled = false;
+        }
       });
-    } catch {
-      button.textContent = priorLabel;
-      button.disabled = false;
+      body.append(name, notes, button);
     }
   });
-  host.append(button);
+  host.append(popover.el);
 }
 
 export { SKINCARE_ROUTINES, currentRoutineKey };

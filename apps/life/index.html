@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="packages/design-kit/filters.css">
   <link rel="stylesheet" href="packages/design-kit/sign-in.css">
   <link rel="stylesheet" href="packages/design-kit/motion.css">
+  <link rel="stylesheet" href="packages/design-kit/morphing-popover.css">
   <link rel="stylesheet" href="packages/design-kit/rail.css">
   <link rel="stylesheet" href="packages/design-kit/mobile.css">
   <link rel="stylesheet" href="css/app.css">
@@ -333,27 +334,40 @@
             <article class="metric-card hub-pulse-clare">
               <p class="metric-label">Dump for Clare</p>
               <p class="metric-caption">Stays on Life. Opens the same Tasks session the board uses.</p>
-              <form id="clare-dump-form">
-                <label class="sr-only" for="clare-dump-text">Dump for Clare</label>
-                <textarea id="clare-dump-text" name="text" rows="4" required></textarea>
-                <label class="metric-caption" for="clare-dump-protocol">Protocol</label>
-                <select id="clare-dump-protocol">
-                  <option value="">None</option>
-                  <option value="morning-sweep">Morning sweep</option>
-                  <option value="tomorrow-setup">Tomorrow</option>
-                  <option value="weekly-reset">Weekly reset</option>
-                  <option value="high-stakes">High-stakes</option>
-                  <option value="shrink-first-step">Shrink first move</option>
-                  <option value="shatter-start">Shatter this</option>
-                  <option value="time-map">Time map</option>
-                  <option value="open-loops">Open loops</option>
-                </select>
-                <div class="hub-pulse-clare__actions">
-                  <button class="btn btn--primary" type="submit">Dump</button>
-                  <button class="btn btn--secondary" type="button" id="clare-brief-button">Brief</button>
-                  <a class="btn btn--ghost" href="/tasks/">Open Tasks Hub</a>
+              <div class="morphing-popover" data-morphing-popover data-morphing-title="Dump for Clare" data-morphing-supporting="Stays on Life. Opens the same Tasks session the board uses.">
+                <button class="btn btn--secondary" type="button" data-morphing-trigger>
+                  <span data-morphing-label>Write a dump</span>
+                </button>
+                <div class="morphing-popover__panel" data-morphing-content hidden role="dialog" aria-label="Dump for Clare">
+                  <div class="morphing-popover__head">
+                    <h4 class="morphing-popover__title" data-morphing-label>Dump for Clare</h4>
+                    <p class="morphing-popover__supporting">Stays on Life. Opens the same Tasks session the board uses.</p>
+                  </div>
+                  <div class="morphing-popover__body" data-morphing-body>
+                    <form id="clare-dump-form">
+                      <label class="sr-only" for="clare-dump-text">Dump for Clare</label>
+                      <textarea id="clare-dump-text" name="text" rows="4" required autofocus></textarea>
+                      <label class="metric-caption" for="clare-dump-protocol">Protocol</label>
+                      <select id="clare-dump-protocol">
+                        <option value="">None</option>
+                        <option value="morning-sweep">Morning sweep</option>
+                        <option value="tomorrow-setup">Tomorrow</option>
+                        <option value="weekly-reset">Weekly reset</option>
+                        <option value="high-stakes">High-stakes</option>
+                        <option value="shrink-first-step">Shrink first move</option>
+                        <option value="shatter-start">Shatter this</option>
+                        <option value="time-map">Time map</option>
+                        <option value="open-loops">Open loops</option>
+                      </select>
+                      <div class="hub-pulse-clare__actions">
+                        <button class="btn btn--primary" type="submit">Dump</button>
+                        <button class="btn btn--secondary" type="button" id="clare-brief-button">Brief</button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
-              </form>
+              </div>
+              <a class="btn btn--ghost" href="/tasks/">Open Tasks Hub</a>
               <p class="metric-caption" id="clare-voice" hidden></p>
               <ul id="clare-proposals" hidden></ul>
               <p class="metric-caption" id="clare-briefing" hidden></p>

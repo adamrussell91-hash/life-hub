@@ -319,6 +319,10 @@ main { max-width: 76rem; margin: 0 auto; }
   gap: 0.55rem;
   align-items: center;
 }
+.hub-pulse-clare .morphing-popover {
+  display: block;
+  margin: 0.55rem 0;
+}
 
 .hero-grid { display: grid; grid-template-columns: 1.35fr 1fr 1fr; gap: var(--space-grid); }
 .hero-grid.mind-hero--support { grid-template-columns: 1fr; }
