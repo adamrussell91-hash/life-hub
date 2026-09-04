@@ -36,6 +36,10 @@
   overflow-y: auto;
 }
 
+.hub-rail__hubs {
+  margin-top: auto;
+}
+
 .hub-rail__list {
   display: flex;
   flex-direction: column;

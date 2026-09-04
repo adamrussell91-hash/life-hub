@@ -1,11 +1,10 @@
 import { getSydneyDateKey } from '../core/time.js';
-import { renderHubSection } from '../shell/render-hub-sections.js';
-import { renderKnowledgeDashboard } from '../shell/render-knowledge.js';
-import { renderClareResult, renderTasksDashboard } from '../shell/render-tasks.js';
+import { bindHubAccordion, openHubAccordion, renderHubPreview } from '../shell/hub-accordion.js';
+import { renderHubPulse } from '../shell/render-hub-pulse.js';
+import { renderClareResult } from '../shell/render-tasks.js';
 import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
 import { tasksEventsFromTasks } from '../shell/tasks-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
-import { renderTeachingDashboard } from '../shell/render-teaching.js';
 import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
@@ -31,10 +30,7 @@ const MORE_SECTIONS = new Set([
   'body',
   'mind',
   'skincare',
-  'central-node',
-  'teaching',
-  'knowledge',
-  'tasks'
+  'central-node'
 ]);
 
 function clampDateToYearMonth(date, yearMonth) {
@@ -155,7 +151,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'teaching' || target === 'knowledge' || target === 'tasks' || target === 'more') continue;
+    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'more') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -188,15 +184,7 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="central-node"]') ?? []) {
     bind(button, 'click', () => showSection('central-node'));
   }
-  for (const button of root.querySelectorAll?.('[data-section="teaching"]') ?? []) {
-    bind(button, 'click', () => showSection('teaching'));
-  }
-  for (const button of root.querySelectorAll?.('[data-section="knowledge"]') ?? []) {
-    bind(button, 'click', () => showSection('knowledge'));
-  }
-  for (const button of root.querySelectorAll?.('[data-section="tasks"]') ?? []) {
-    bind(button, 'click', () => showSection('tasks'));
-  }
+  bindHubAccordion(root.querySelector('[data-hub-accordion]') ?? root);
   bind(root.querySelector('#more-nav-button'), 'click', () => openMoreSheet());
   bind(root.querySelector('#more-sheet-close'), 'click', () => closeMoreSheet());
   bind(root.querySelector('#more-sheet'), 'click', event => {
@@ -393,6 +381,7 @@ export function createAppController(dependencies) {
         }
         const model = buildHomeModel({ ...result, date });
         renderHome(root, model);
+        if (currentSection === 'home') void loadHubPulse();
         if (currentSection === 'nutrition') renderNutritionSection();
         if (currentSection === 'fitness') renderFitnessSection();
         if (currentSection === 'skincare') renderSkincareSection();
@@ -574,10 +563,7 @@ export function createAppController(dependencies) {
     'body-bloods': { eyebrow: 'Labs', title: 'Bloods' },
     'body-medical': { eyebrow: 'History', title: 'Medical Overview' },
     mind: { eyebrow: 'Mood and themes', title: 'Mind' },
-    'central-node': { eyebrow: 'Coordination hub', title: 'Central Node' },
-    teaching: { eyebrow: 'Classes and lessons', title: 'Teaching' },
-    knowledge: { eyebrow: 'Archive and research', title: 'Knowledge' },
-    tasks: { eyebrow: 'Board', title: 'Tasks' }
+    'central-node': { eyebrow: 'Coordination hub', title: 'Central Node' }
   };
 
   function closeMoreSheet() {
@@ -633,9 +619,6 @@ export function createAppController(dependencies) {
     const medical = root.querySelector('#body-medical-dashboard');
     const mind = root.querySelector('#mind-dashboard');
     const centralNode = root.querySelector('#central-node-dashboard');
-    const teaching = root.querySelector('#teaching-dashboard');
-    const knowledge = root.querySelector('#knowledge-dashboard');
-    const tasks = root.querySelector('#tasks-dashboard');
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
     if (fitness) fitness.hidden = name !== 'fitness';
@@ -646,9 +629,6 @@ export function createAppController(dependencies) {
     if (medical) medical.hidden = name !== 'body-medical';
     if (mind) mind.hidden = name !== 'mind';
     if (centralNode) centralNode.hidden = name !== 'central-node';
-    if (teaching) teaching.hidden = name !== 'teaching';
-    if (knowledge) knowledge.hidden = name !== 'knowledge';
-    if (tasks) tasks.hidden = name !== 'tasks';
     if (chat) chat.hidden = name !== 'chat' && !chatPanel?.isOpen?.();
   }
 
@@ -690,19 +670,22 @@ export function createAppController(dependencies) {
     if (name === 'body-medical') renderMedicalSection();
     if (name === 'mind') renderMindSection();
     if (name === 'central-node') renderCentralNodeSection();
-    if (name === 'teaching' || name === 'knowledge' || name === 'tasks') renderHubSection(root, name);
-    if (name === 'teaching') void loadTeachingSection();
-    if (name === 'knowledge') void loadKnowledgeSection();
-    if (name === 'tasks') void loadTasksSection();
+    if (name === 'home') void loadHubPulse();
+    const lifeDomain = name !== 'home' && name !== 'chat';
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
+      if (button.matches?.('.hub-label, .hub-toggle')) continue;
       const section = button.dataset.section;
       const active = section === name
         || (section === 'more' && MORE_SECTIONS.has(name))
         || (section === 'body' && (name === 'body-bloods' || name === 'body-medical'));
       button.classList.toggle('is-active', active);
+      button.classList.toggle('is-current', active && button.classList.contains('hub-nav-item'));
       if (active && section !== 'more') button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     }
+    const lifeRow = root.querySelector('.hub-row[data-hub="life"]');
+    lifeRow?.classList.toggle('is-active', name !== 'chat');
+    if (lifeDomain) openHubAccordion(root.querySelector('[data-hub-accordion]') ?? root, 'life');
   }
 
   function loadHubCalendars() {
@@ -764,61 +747,59 @@ export function createAppController(dependencies) {
     return tasksCalendarInFlight;
   }
 
-  async function loadTeachingSection() {
-    if (!teachingApi?.getCurriculum) {
-      renderTeachingDashboard(root, { status: 'link-only' });
-      return;
-    }
-    renderTeachingDashboard(root, { status: 'loading' });
-    try {
-      const data = await teachingApi.getCurriculum();
-      if (currentSection !== 'teaching') return;
-      renderTeachingDashboard(root, { status: 'ready', classes: data?.classes ?? [] });
-    } catch (error) {
-      if (currentSection !== 'teaching') return;
-      renderTeachingDashboard(root, {
-        status: error?.code === 'blobs_unbound' ? 'unbound' : 'error'
-      });
-    }
-  }
-
-  async function loadKnowledgeSection() {
-    if (!knowledgeApi?.listPages) {
-      renderKnowledgeDashboard(root, { status: 'link-only' });
-      return;
-    }
-    renderKnowledgeDashboard(root, { status: 'loading' });
-    try {
-      const pages = await knowledgeApi.listPages();
-      if (currentSection !== 'knowledge') return;
-      renderKnowledgeDashboard(root, { status: 'ready', pages });
-    } catch (error) {
-      if (currentSection !== 'knowledge') return;
-      renderKnowledgeDashboard(root, {
-        status: error?.code === 'knowledge_repo_unbound' ? 'unbound' : 'error'
-      });
-    }
-  }
-
-  async function loadTasksSection() {
-    if (!tasksApi?.listTasks) {
-      renderTasksDashboard(root, { status: 'link-only' });
-      return;
-    }
-    renderTasksDashboard(root, { status: 'loading' });
-    try {
-      const [tasks, projects] = await Promise.all([
-        tasksApi.listTasks(),
-        tasksApi.listProjects?.() ?? []
-      ]);
-      if (currentSection !== 'tasks') return;
-      renderTasksDashboard(root, { status: 'ready', tasks, projects });
-    } catch (error) {
-      if (currentSection !== 'tasks') return;
-      renderTasksDashboard(root, {
-        status: error?.code === 'tasks_blobs_unbound' ? 'unbound' : 'error'
-      });
-    }
+  async function loadHubPulse() {
+    renderHubPulse(root, {
+      teaching: { status: 'loading' },
+      knowledge: { status: 'loading' },
+      tasks: { status: 'loading' }
+    });
+    const teaching = teachingApi?.getCurriculum
+      ? teachingApi.getCurriculum()
+        .then(data => {
+          const classes = data?.classes ?? [];
+          renderHubPreview(root, 'teaching', classes.map(item => item.code || item.title));
+          return { status: 'ready', count: classes.length };
+        })
+        .catch(error => {
+          renderHubPreview(root, 'teaching', ['Classes are not bound yet']);
+          return { status: error?.code === 'blobs_unbound' ? 'unbound' : 'error' };
+        })
+      : Promise.resolve({ status: 'error' });
+    const knowledge = knowledgeApi?.listPages
+      ? knowledgeApi.listPages()
+        .then(pages => {
+          const list = Array.isArray(pages) ? pages : [];
+          renderHubPreview(root, 'knowledge', list.map(item => item.title || item.id));
+          return { status: 'ready', count: list.length };
+        })
+        .catch(error => {
+          renderHubPreview(root, 'knowledge', ['Archive is not bound yet']);
+          return { status: error?.code === 'knowledge_repo_unbound' ? 'unbound' : 'error' };
+        })
+      : Promise.resolve({ status: 'error' });
+    const tasks = tasksApi?.listTasks
+      ? tasksApi.listTasks()
+        .then(list => {
+          const open = (Array.isArray(list) ? list : []).filter(item => item?.status !== 'done');
+          renderHubPreview(root, 'tasks', open.map(item => item.title));
+          return { status: 'ready', count: open.length };
+        })
+        .catch(error => {
+          renderHubPreview(root, 'tasks', ['Board is not bound yet']);
+          return { status: error?.code === 'tasks_blobs_unbound' ? 'unbound' : 'error' };
+        })
+      : Promise.resolve({ status: 'error' });
+    const [teachingPulse, knowledgePulse, tasksPulse] = await Promise.all([
+      teaching,
+      knowledge,
+      tasks
+    ]);
+    if (currentSection !== 'home') return;
+    renderHubPulse(root, {
+      teaching: teachingPulse,
+      knowledge: knowledgePulse,
+      tasks: tasksPulse
+    });
   }
 
   function clareProtocol() {

@@ -57,25 +57,84 @@
         </span>
       </header>
 
-      <nav class="rail-nav" aria-label="Primary">
+      <nav class="rail-nav" aria-label="Primary" data-hub-accordion>
         <button class="nav-item hub-rail__link is-active" type="button" data-section="home" aria-current="page">
           <span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/home.png" alt=""></span><span>Home</span>
         </button>
         <button class="nav-item hub-rail__link" type="button" data-section="chat">
           <span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/chat.png" alt=""></span><span>Chat</span>
         </button>
-        <p class="nav-label">Domains</p>
-        <button class="nav-item hub-rail__link" type="button" data-section="nutrition"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/nutrition.png" alt=""></span><span>Nutrition</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="fitness"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/fitness.png" alt=""></span><span>Fitness</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="body"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/body.png" alt=""></span><span>Body</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="mind"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/mind.png" alt=""></span><span>Mind</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/skincare.png" alt=""></span><span>Skincare</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/calendar.png" alt=""></span><span>Calendar</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/central-node.png" alt=""></span><span>Central Node</span></button>
-        <p class="nav-label">Hubs</p>
-        <button class="nav-item hub-rail__link" type="button" data-section="teaching"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span><span>Teaching</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="knowledge"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5h6.5A3.5 3.5 0 0 1 15 9v10H8.5A3.5 3.5 0 0 0 5 15.5V5.5Z"/><path d="M15 9h4v10h-4"/></svg></span><span>Knowledge</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="tasks"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h11M8 12h11M8 17h11"/><path d="m4.5 7 .8.8L7 6M4.5 12l.8.8L7 11"/></svg></span><span>Tasks</span></button>
+        <p class="hub-rail__section">Hubs</p>
+        <div class="hub-stack">
+          <div class="hub-row is-active is-open" data-hub="life">
+            <button class="hub-label" type="button" data-section="home">
+              <span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg></span>
+              <span>Life</span>
+            </button>
+            <button class="hub-toggle" type="button" data-hub-toggle="life" aria-label="Preview Life" aria-expanded="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+          <div class="hub-panel is-open" data-hub-panel="life">
+            <div class="hub-panel-inner">
+              <button class="hub-nav-item" type="button" data-section="nutrition"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/nutrition.png" alt=""></span><span>Nutrition</span></button>
+              <button class="hub-nav-item" type="button" data-section="fitness"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/fitness.png" alt=""></span><span>Fitness</span></button>
+              <button class="hub-nav-item" type="button" data-section="body"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/body.png" alt=""></span><span>Body</span></button>
+              <button class="hub-nav-item" type="button" data-section="mind"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/mind.png" alt=""></span><span>Mind</span></button>
+              <button class="hub-nav-item" type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/skincare.png" alt=""></span><span>Skincare</span></button>
+              <button class="hub-nav-item" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/calendar.png" alt=""></span><span>Calendar</span></button>
+              <button class="hub-nav-item" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/central-node.png" alt=""></span><span>Central Node</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="hub-stack">
+          <div class="hub-row" data-hub="teaching">
+            <a class="hub-label" href="/teaching/">
+              <span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span>
+              <span>Teaching</span>
+            </a>
+            <button class="hub-toggle" type="button" data-hub-toggle="teaching" aria-label="Preview Teaching" aria-expanded="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+          <div class="hub-panel" data-hub-panel="teaching">
+            <div class="hub-panel-inner" data-hub-preview="teaching">
+              <div class="hub-preview-item">Checking classes…</div>
+            </div>
+          </div>
+        </div>
+        <div class="hub-stack">
+          <div class="hub-row" data-hub="knowledge">
+            <a class="hub-label" href="/knowledge/">
+              <span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5h6.5A3.5 3.5 0 0 1 15 9v10H8.5A3.5 3.5 0 0 0 5 15.5V5.5Z"/><path d="M15 9h4v10h-4"/></svg></span>
+              <span>Knowledge</span>
+            </a>
+            <button class="hub-toggle" type="button" data-hub-toggle="knowledge" aria-label="Preview Knowledge" aria-expanded="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+          <div class="hub-panel" data-hub-panel="knowledge">
+            <div class="hub-panel-inner" data-hub-preview="knowledge">
+              <div class="hub-preview-item">Checking notes…</div>
+            </div>
+          </div>
+        </div>
+        <div class="hub-stack">
+          <div class="hub-row" data-hub="tasks">
+            <a class="hub-label" href="/tasks/">
+              <span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h11M8 12h11M8 17h11"/><path d="m4.5 7 .8.8L7 6M4.5 12l.8.8L7 11"/></svg></span>
+              <span>Tasks</span>
+            </a>
+            <button class="hub-toggle" type="button" data-hub-toggle="tasks" aria-label="Preview Tasks" aria-expanded="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+          <div class="hub-panel" data-hub-panel="tasks">
+            <div class="hub-panel-inner" data-hub-preview="tasks">
+              <div class="hub-preview-item">Checking tasks…</div>
+            </div>
+          </div>
+        </div>
       </nav>
 
       <div class="rail-footer">
@@ -254,6 +313,63 @@
               <p data-week-detail>Log a meal, workout, or diary entry and the strip will light up.</p>
             </div>
             <div class="week-strip" aria-label="This week logging coverage"></div>
+          </section>
+
+          <section class="hub-pulse" aria-labelledby="hubs-heading">
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker">Hubs</p>
+                <h2 id="hubs-heading">Open a hub</h2>
+              </div>
+            </div>
+            <div class="hub-pulse-grid">
+              <a class="metric-card hub-pulse-card" data-hub-pulse="teaching" href="/teaching/">
+                <p class="metric-label">Teaching</p>
+                <p class="metric-context">Classes and lessons</p>
+                <p class="hub-pulse-card__count" data-hub-count>—</p>
+                <p class="metric-caption" data-hub-status hidden></p>
+              </a>
+              <a class="metric-card hub-pulse-card" data-hub-pulse="knowledge" href="/knowledge/">
+                <p class="metric-label">Knowledge</p>
+                <p class="metric-context">Archive and research</p>
+                <p class="hub-pulse-card__count" data-hub-count>—</p>
+                <p class="metric-caption" data-hub-status hidden></p>
+              </a>
+              <a class="metric-card hub-pulse-card" data-hub-pulse="tasks" href="/tasks/">
+                <p class="metric-label">Tasks</p>
+                <p class="metric-context">Board</p>
+                <p class="hub-pulse-card__count" data-hub-count>—</p>
+                <p class="metric-caption" data-hub-status hidden></p>
+              </a>
+            </div>
+            <article class="metric-card hub-pulse-clare">
+              <p class="metric-label">Dump for Clare</p>
+              <p class="metric-caption">Stays on Life. Opens the same Tasks session the board uses.</p>
+              <form id="clare-dump-form">
+                <label class="sr-only" for="clare-dump-text">Dump for Clare</label>
+                <textarea id="clare-dump-text" name="text" rows="4" required></textarea>
+                <label class="metric-caption" for="clare-dump-protocol">Protocol</label>
+                <select id="clare-dump-protocol">
+                  <option value="">None</option>
+                  <option value="morning-sweep">Morning sweep</option>
+                  <option value="tomorrow-setup">Tomorrow</option>
+                  <option value="weekly-reset">Weekly reset</option>
+                  <option value="high-stakes">High-stakes</option>
+                  <option value="shrink-first-step">Shrink first move</option>
+                  <option value="shatter-start">Shatter this</option>
+                  <option value="time-map">Time map</option>
+                  <option value="open-loops">Open loops</option>
+                </select>
+                <div class="hub-pulse-clare__actions">
+                  <button class="btn btn--primary" type="submit">Dump</button>
+                  <button class="btn btn--secondary" type="button" id="clare-brief-button">Brief</button>
+                  <a class="btn btn--ghost" href="/tasks/">Open Tasks Hub</a>
+                </div>
+              </form>
+              <p class="metric-caption" id="clare-voice" hidden></p>
+              <ul id="clare-proposals" hidden></ul>
+              <p class="metric-caption" id="clare-briefing" hidden></p>
+            </article>
           </section>
         </section>
 
@@ -1006,56 +1122,6 @@
           <button id="central-node-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Hammond">💬</button>
         </section>
 
-        <section id="teaching-dashboard" class="dashboard" aria-label="Teaching" hidden>
-          <article class="metric-card">
-            <p class="metric-caption">SPA stays on GitHub Pages. Student URLs under <code>/s/</code> stay public. Teacher writes use the Life session when Blobs is bound.</p>
-            <p data-hub-open="teaching"></p>
-            <p class="metric-caption" data-teaching="status" hidden></p>
-            <ul id="teaching-class-list" hidden></ul>
-          </article>
-        </section>
-
-        <section id="knowledge-dashboard" class="dashboard" aria-label="Knowledge" hidden>
-          <article class="metric-card">
-            <p class="metric-caption">The R2 archive stays on Cloudflare. Page titles below use the Life session when the data repo is bound.</p>
-            <p data-hub-open="knowledge"></p>
-            <p class="metric-caption" data-knowledge="status" hidden></p>
-            <ul id="knowledge-page-list" hidden></ul>
-          </article>
-        </section>
-
-        <section id="tasks-dashboard" class="dashboard" aria-label="Tasks" hidden>
-          <article class="metric-card">
-            <p class="metric-caption">Board stays on GitHub Pages. Task titles below use the Life session when Blobs is bound.</p>
-            <p data-hub-open="tasks"></p>
-            <p class="metric-caption" data-tasks="status" hidden></p>
-            <ul id="tasks-item-list" hidden></ul>
-            <ul id="tasks-project-list" hidden></ul>
-            <form id="clare-dump-form">
-              <label class="metric-caption" for="clare-dump-text">Dump for Clare</label>
-              <textarea id="clare-dump-text" name="text" rows="4" required></textarea>
-              <label class="metric-caption" for="clare-dump-protocol">Protocol</label>
-              <select id="clare-dump-protocol">
-                <option value="">None</option>
-                <option value="morning-sweep">Morning sweep</option>
-                <option value="tomorrow-setup">Tomorrow</option>
-                <option value="weekly-reset">Weekly reset</option>
-                <option value="high-stakes">High-stakes</option>
-                <option value="shrink-first-step">Shrink first move</option>
-                <option value="shatter-start">Shatter this</option>
-                <option value="time-map">Time map</option>
-                <option value="open-loops">Open loops</option>
-              </select>
-              <div>
-                <button class="btn btn--primary" type="submit">Dump</button>
-                <button class="btn btn--secondary" type="button" id="clare-brief-button">Brief</button>
-              </div>
-            </form>
-            <p class="metric-caption" id="clare-voice" hidden></p>
-            <ul id="clare-proposals" hidden></ul>
-            <p class="metric-caption" id="clare-briefing" hidden></p>
-          </article>
-        </section>
       </main>
     </div>
 
@@ -1079,9 +1145,9 @@
           <button type="button" data-section="mind"><span class="nav-dot mind" aria-hidden="true"></span>Mind</button>
           <button type="button" data-section="skincare"><span class="nav-dot skincare" aria-hidden="true"></span>Skincare</button>
           <button type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true">◎</span>Central Node</button>
-          <button type="button" data-section="teaching">Teaching</button>
-          <button type="button" data-section="knowledge">Knowledge</button>
-          <button type="button" data-section="tasks">Tasks</button>
+          <a href="/teaching/">Teaching</a>
+          <a href="/knowledge/">Knowledge</a>
+          <a href="/tasks/">Tasks</a>
         </nav>
       </div>
     </dialog>

@@ -90,7 +90,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
       return true;
     }
 
-    if (url.pathname === '/api/auth') {
+    if (url.pathname === '/api/auth-login' || url.pathname === '/api/auth') {
       if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
       const body = await readJson(request);
       if (!body || typeof body.passphrase !== 'string') {
@@ -109,7 +109,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
       return true;
     }
 
-    if (url.pathname === '/api/session') {
+    if (url.pathname === '/api/auth-session' || url.pathname === '/api/session') {
       if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
       const session = readSession(request);
       if (!session) return unauthenticated(response);
@@ -239,7 +239,8 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
       return true;
     }
 
-    if (url.pathname.startsWith('/api/knowledge/')) {
+    if (url.pathname === '/api/pages' || url.pathname.startsWith('/api/pages/') ||
+        url.pathname.startsWith('/api/knowledge/')) {
       if (!readSession(request)) return unauthenticated(response);
       error(response, 503, 'knowledge_repo_unbound', 'Knowledge data repository is not bound.', true);
       return true;

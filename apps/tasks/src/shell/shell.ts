@@ -1,3 +1,4 @@
+import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
 import { railIconFor, refreshIcon, signOutIcon } from '@/shell/icons';
 import { createRailDisclosureState, type RailSectionId } from '@/shell/rail-disclosure';
 
@@ -354,6 +355,7 @@ export function renderPrimaryNav(railNav: HTMLElement, active: HubViewId): void 
   railDisclosure.syncActive(sectionIdForView(active));
   if (railNav.querySelector('.hub-rail__list') && syncRailHighlight(railNav, highlight)) {
     for (const section of NAV_SECTIONS) syncSectionDom(railNav, section.id);
+    appendHubSwitcher(hubSwitcherHost(railNav), 'tasks');
     return;
   }
 
@@ -421,6 +423,7 @@ export function renderPrimaryNav(railNav: HTMLElement, active: HubViewId): void 
   mobile.append(tabs, items);
   railNav.append(desktop, mobile);
   for (const section of NAV_SECTIONS) syncSectionDom(railNav, section.id);
+  appendHubSwitcher(hubSwitcherHost(railNav), 'tasks');
 }
 
 export interface PageHeaderConfig {

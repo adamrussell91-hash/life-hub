@@ -1,5 +1,6 @@
 import "./tokens.css";
 import "./style.css";
+import { bindHubAccordion, hubSwitcherHtml } from "../../../packages/hub-switcher.js";
 import type { Attachment, Origin, Page, PageManifestEntry } from "./domain/page";
 import { newHubPageId } from "./domain/page";
 import {
@@ -381,9 +382,11 @@ function shell(main: string) {
         <button class="rail__btn hub-rail__link ${view === "podcast" ? "is-current" : ""}" data-nav="podcast" type="button">${icons.podcast}<span>Podcast</span></button>
         <button class="rail__btn hub-rail__link ${view === "quiz" ? "is-current" : ""}" data-nav="quiz" type="button">${icons.quiz}<span>Quiz</span></button>
       </nav>
+      ${hubSwitcherHtml("knowledge")}
     </aside>
     <main class="canvas">${main}</main>
   </div>`;
+  bindHubAccordion(app);
 
   app.querySelector<HTMLAnchorElement>("[data-home]")!.onclick = event => { event.preventDefault(); goToHome(); };
 
@@ -1477,14 +1480,21 @@ function bindSignInEnter(form: HTMLFormElement) {
 
 function renderLoadError() {
   hideChatOverlay();
-  app.innerHTML = `<div class="sign-in">
-    <div class="sign-in__card">
-      <p class="sign-in__brand">Knowledge Hub</p>
-      <h1 class="sign-in__title">Couldn't load the archive</h1>
-      <p class="sign-in__error" role="alert">Signed in, but the archive did not load.</p>
-      <button class="btn btn--primary sign-in__submit" type="button" data-retry>Try again</button>
-    </div>
+  app.innerHTML = `<div class="app-shell">
+    <aside class="rail hub-rail" aria-label="Knowledge Hub">
+      <div class="hub-rail__brand-block"><a href="/" class="hub-rail__brand">Knowledge Hub</a></div>
+      ${hubSwitcherHtml("knowledge")}
+    </aside>
+    <main class="canvas">
+      <div class="sign-in__card">
+        <p class="sign-in__brand">Knowledge Hub</p>
+        <h1 class="sign-in__title">Couldn't load the archive</h1>
+        <p class="sign-in__error" role="alert">Signed in, but the archive did not load.</p>
+        <button class="btn btn--primary sign-in__submit" type="button" data-retry>Try again</button>
+      </div>
+    </main>
   </div>`;
+  bindHubAccordion(app);
   app.querySelector<HTMLButtonElement>("[data-retry]")!.onclick = () => {
     void boot({ signedIn: true });
   };
@@ -1572,17 +1582,13 @@ async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean 
       app.innerHTML = `<div class="sign-in"><div class="sign-in__card"><h1 class="sign-in__title">Local data missing</h1><p class="sign-in__supporting">Run the migrator first, then restart <code>npm run dev</code>.</p></div></div>`;
       return;
     }
-    if (options?.signedIn) {
-      const stillIn = await fetchSession().catch(() => false);
-      if (stillIn) {
-        renderLoadError();
-        return;
-      }
-      renderLogin("Unable to sign in. Please try again.");
-      return;
-    }
     if (options?.failedLoginMessage) {
       renderLogin(options.failedLoginMessage);
+      return;
+    }
+    const stillIn = options?.signedIn || await fetchSession().catch(() => false);
+    if (stillIn) {
+      renderLoadError();
       return;
     }
     const bounced = takeSignInQuery(location.href);
