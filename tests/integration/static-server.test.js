@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { execFile } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
-import { access, readFile, readdir } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { resolve, sep } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { createStaticServer } from '../../scripts/serve.mjs';
 
@@ -120,6 +121,26 @@ test('native sign-in POST to / serves the shell instead of 405', async t => {
   assert.equal(response.status, 200);
   assert.match(response.headers.get('content-type'), /^text\/html/);
   assert.match(await response.text(), /Life Hub/);
+});
+
+test('serves remounted hub directory indexes and SPA fallbacks', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'life-hub-spa-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, 'teaching'));
+  await writeFile(join(root, 'teaching', 'index.html'), '<title>Teaching Hub</title>');
+  const server = createStaticServer({ root, apiRoot: projectRoot });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const index = await fetch(`${baseUrl}/teaching/`);
+  assert.equal(index.status, 200);
+  assert.match(await index.text(), /Teaching Hub/);
+
+  const deep = await fetch(`${baseUrl}/teaching/classes/class_1`);
+  assert.equal(deep.status, 200);
+  assert.match(await deep.text(), /Teaching Hub/);
 });
 
 function readConfigurationValue(configuration, section, key) {
