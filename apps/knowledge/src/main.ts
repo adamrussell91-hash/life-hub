@@ -734,38 +734,40 @@ function renderGraph() {
       </div>`,
     )}
     <div class="${universeWrapClass(graphMode === "universe" && universeDark, graphFullscreen)}">
-      <div class="graph-toolbar glass-panel">
-        <div class="graph-modes" role="group" aria-label="Graph mode">
-          <button type="button" data-graph-mode="constellation" class="${graphMode === "constellation" ? "is-active" : ""}">Constellation</button>
-          <button type="button" data-graph-mode="showAll" class="${graphMode === "showAll" ? "is-active" : ""}">Show All</button>
-          <button type="button" data-graph-mode="universe" class="${graphMode === "universe" ? "is-active" : ""}">Universe</button>
+      <div class="graph-chrome">
+        <div class="graph-toolbar glass-panel">
+          <div class="graph-modes" role="group" aria-label="Graph mode">
+            <button type="button" data-graph-mode="constellation" class="${graphMode === "constellation" ? "is-active" : ""}">Constellation</button>
+            <button type="button" data-graph-mode="showAll" class="${graphMode === "showAll" ? "is-active" : ""}">Show All</button>
+            <button type="button" data-graph-mode="universe" class="${graphMode === "universe" ? "is-active" : ""}">Universe</button>
+          </div>
+          ${
+            graphMode === "showAll"
+              ? `<div class="graph-modes" role="group" aria-label="Show All grouping">
+                  ${SHOW_ALL_GROUPINGS.map(
+                    grouping =>
+                      `<button type="button" data-show-all-group="${grouping}" aria-pressed="${grouping === showAllGrouping}" class="${grouping === showAllGrouping ? "is-active" : ""}">${showAllGroupingLabel(grouping)}</button>`,
+                  ).join("")}
+                </div>`
+              : ""
+          }
+          <input class="graph-search" type="search" placeholder="Search keywords and notes" value="${escapeHtml(graphSearch)}" />
+          ${graphMode === "showAll" ? showAllTuningHtml() : ""}
+          ${
+            graphMode === "universe"
+              ? `<label class="graph-speed">
+                  <span class="graph-speed__label">Orbit speed</span>
+                  <input type="range" min="0" max="1" step="0.05" value="${orbitSpeed}" data-orbit-speed />
+                  <output class="graph-speed__value" data-orbit-speed-value>${orbitSpeedLabel(orbitSpeed)}</output>
+                </label>
+                ${universeViewToolsHtml(universeDark, graphFullscreen)}`
+              : graphFullscreenToolsHtml(graphFullscreen)
+          }
+          <p class="graph-toolbar__meta">${escapeHtml(graphMetaText())}</p>
         </div>
-        ${
-          graphMode === "showAll"
-            ? `<div class="graph-modes" role="group" aria-label="Show All grouping">
-                ${SHOW_ALL_GROUPINGS.map(
-                  grouping =>
-                    `<button type="button" data-show-all-group="${grouping}" aria-pressed="${grouping === showAllGrouping}" class="${grouping === showAllGrouping ? "is-active" : ""}">${showAllGroupingLabel(grouping)}</button>`,
-                ).join("")}
-              </div>`
-            : ""
-        }
-        <input class="graph-search" type="search" placeholder="Search keywords and notes" value="${escapeHtml(graphSearch)}" />
-        ${graphMode === "showAll" ? showAllTuningHtml() : ""}
-        ${
-          graphMode === "universe"
-            ? `<label class="graph-speed">
-                <span class="graph-speed__label">Orbit speed</span>
-                <input type="range" min="0" max="1" step="0.05" value="${orbitSpeed}" data-orbit-speed />
-                <output class="graph-speed__value" data-orbit-speed-value>${orbitSpeedLabel(orbitSpeed)}</output>
-              </label>
-              ${universeViewToolsHtml(universeDark, graphFullscreen)}`
-            : graphFullscreenToolsHtml(graphFullscreen)
-        }
-        <p class="graph-toolbar__meta">${escapeHtml(graphMetaText())}</p>
+        ${graphMode === "universe" ? universeKeyHtml(universeKeyOpen) : ""}
       </div>
       <div class="graph-stage"></div>
-      ${graphMode === "universe" ? universeKeyHtml(universeKeyOpen) : ""}
       ${universeExitHtml(graphFullscreen)}
     </div>
   `);
