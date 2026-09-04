@@ -254,13 +254,14 @@ describe('card stack render', () => {
     expect(el.dataset.blockType).toBe('card_stack');
     expect(el.querySelector('.block-card-stack__heading')?.textContent).toBe('Case studies');
     expect(el.querySelectorAll('.block-card-stack__card')).toHaveLength(2);
-    expect(el.querySelector('.block-card-stack__eyebrow')?.textContent).toBe('Fintech');
-    expect(el.querySelector('.block-card-stack__title')?.textContent).toBe('Faster onboarding');
-    const img = el.querySelector('.block-card-stack__image') as HTMLImageElement;
+    const active = el.querySelector('.block-card-stack__card[data-state="active"]') as HTMLElement;
+    expect(active.querySelector('.block-card-stack__eyebrow')?.textContent).toBe('Fintech');
+    expect(active.querySelector('.block-card-stack__title')?.textContent).toBe('Faster onboarding');
+    const img = active.querySelector('.block-card-stack__image') as HTMLImageElement;
     expect(img.src).toContain('https://example.com/a.png');
     expect(img.alt).toBe('Onboarding');
     expect(el.querySelector('.block-card-stack__status')?.textContent).toBe('1 / 2');
-    expect((el.querySelector('.block-card-stack__card') as HTMLElement).dataset.tint).toBe('navy');
+    expect(active.dataset.tint).toBe('navy');
     (el.querySelector('.block-card-stack__next') as HTMLButtonElement).click();
     expect(el.querySelector('.block-card-stack')?.getAttribute('data-active-index')).toBe('1');
     expect(el.querySelector('.block-card-stack__status')?.textContent).toBe('2 / 2');
