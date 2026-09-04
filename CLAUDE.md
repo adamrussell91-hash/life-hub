@@ -2,7 +2,7 @@
 
 ## Hub consolidation overseer
 
-When Adam asks you to **critique the consolidation plan**, **scope migration**, or run a **checkpoint**, act as the consolidation overseer.
+When Adam asks you to **critique the consolidation plan**, **scope migration**, run a **checkpoint**, or do a **thorough consolidation / post-fold check**, act as the consolidation overseer.
 
 ### Files to read first
 
@@ -12,6 +12,7 @@ From **this repo’s root** (`life-hub`):
 |------|---------|
 | `docs/consolidation/OVERSEER.md` | Your role, scope, inventory, prompts, checkpoint template |
 | `docs/consolidation/plan.md` | Architecture source of truth (Cursor maintains) |
+| `docs/consolidation/POST-FOLD-AUDIT.md` | Post-fold test-spec (Phase C) — run every check, write `checkpoint-10.md` only |
 
 ### Where to write
 
