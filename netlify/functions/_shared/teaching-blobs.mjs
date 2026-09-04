@@ -71,7 +71,34 @@ export const SCOPE_SEQUENCE_PREFIX = 'scope_sequences/';
 export const MEDIA_PREFIX = 'media/';
 export const OUTCOME_PREFIX = 'outcomes/';
 export const COMPOSITION_PREFIX = 'templates/compositions/';
+export const LESSON_TEMPLATE_PREFIX = 'templates/lessons/';
+export const UNIT_TEMPLATE_PREFIX = 'templates/units/';
+export const AI_JOB_PREFIX = 'ai_jobs/';
 export const DEFAULT_SCHEDULE_ANCHOR_DATE = '2026-08-12';
+
+export function compositionKey(id) {
+  return `${COMPOSITION_PREFIX}${id}`;
+}
+
+export function scopeSequenceKey(id) {
+  return `${SCOPE_SEQUENCE_PREFIX}${id}`;
+}
+
+export function lessonTemplateKey(id) {
+  return `${LESSON_TEMPLATE_PREFIX}${id}`;
+}
+
+export function unitTemplateKey(id) {
+  return `${UNIT_TEMPLATE_PREFIX}${id}`;
+}
+
+export function aiJobKey(id) {
+  return `${AI_JOB_PREFIX}${id}`;
+}
+
+export function aiJobsInboxKey() {
+  return 'meta/ai_jobs_inbox';
+}
 
 export function scheduleAnchorKey() {
   return 'meta/schedule_anchor_date';
@@ -124,7 +151,7 @@ export function readPublishedId(request, context = {}) {
   const fromContext = context.params?.id;
   if (typeof fromContext === 'string' && fromContext) return fromContext;
   const url = new URL(request.url);
-  const match = url.pathname.match(/\/(?:lessons|units|classes|media|published-lesson|scheduled-lessons|years|subjects)\/([^/]+)(?:\/file)?$/);
+  const match = url.pathname.match(/\/(?:lessons|units|classes|media|published-lesson|scheduled-lessons|years|subjects|compositions|scope-sequences|jobs|lesson-templates|unit-templates)\/([^/]+)(?:\/(?:file|restore-from-trash|dependencies))?$/);
   if (match?.[1]) return match[1];
   return url.searchParams.get('id');
 }
