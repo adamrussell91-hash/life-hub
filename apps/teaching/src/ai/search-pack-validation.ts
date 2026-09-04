@@ -144,6 +144,17 @@ function collectBlockReferences(
         );
       });
       return;
+    case 'card_stack':
+      block.content.cards.forEach((card, index) => {
+        addUrl(
+          references,
+          `${content}.cards[${index}].image_url`,
+          'image_url',
+          card.image_url,
+          block.block_type
+        );
+      });
+      return;
     case 'rich_text':
     case 'html':
     case 'html_app':
