@@ -3,13 +3,7 @@
   "tool_name": "track_close_challenge",
   "verb": "Track",
   "agents": [
-    "brisket",
-    "chadwick",
-    "hammond",
-    "sara",
-    "hyaluronica",
-    "penelope",
-    "vera"
+    "*"
   ],
   "risk": "confirm",
   "kind": "capacity",

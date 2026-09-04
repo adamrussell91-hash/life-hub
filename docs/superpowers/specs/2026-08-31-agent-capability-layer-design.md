@@ -17,6 +17,14 @@ Safety comes from:
 
 Persona voice is unchanged.
 
+## OS floor (do not per-agent patch)
+
+Shared tool-call ability is **not** a per-agent favour. Capacities marked `agents: ["*"]` are the OS floor — every slug in `config/agents.yml` inherits them automatically when you add an allowlist. Domain exclusives (food library, CN patch, etc.) stay enumerated.
+
+When you improve the floor (new remember/track/research/os shortcut), set `agents: ["*"]` once. Do not walk Ann, Clare, Clementine, Brisket… one by one.
+
+Roster growth checklist: (1) `config/agents.yml` + `agent-directory.mjs`, (2) `capabilities/allowlists/{slug}.json`, (3) optional intuition pack + protocol pills. Floor tools arrive free.
+
 ## Glossary (keep separate)
 
 | Term | Means |

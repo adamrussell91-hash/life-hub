@@ -8,9 +8,13 @@ import {
   loadCapability,
   loadRegistry,
   matchGlob,
+  OS_FLOOR_CAPABILITY_IDS,
+  osFloorIdsForAgent,
   promptOneLinersForAgent,
   resetCapabilityCaches
 } from '../../netlify/functions/_shared/capabilities/registry.mjs';
+import { readFileSync } from 'node:fs';
+import { load } from 'js-yaml';
 import {
   validateProposeActionInput,
   executeProposeActionWrites,
@@ -77,7 +81,7 @@ function mockCtx(agentSlug = 'brisket') {
 test('registry loads propose-action and Phase 1-3 shortcuts', () => {
   resetCapabilityCaches();
   const registry = loadRegistry();
-  assert.equal(registry.version, '0.4.0');
+  assert.equal(registry.version, '0.5.0');
   assert.ok(registry.capabilities['os.propose-action']);
   assert.ok(registry.capabilities['track.open-challenge']);
   assert.ok(registry.capabilities['coordinate.request-cn-write']);
@@ -98,7 +102,31 @@ test('every agent gets os.propose-action plus domain shortcuts', () => {
   assert.ok(hammond.includes('os.propose-action'));
   assert.ok(hammond.includes('publish.cn-patch'));
   assert.ok(!hammond.includes('log.entry'));
-  assert.ok(!hammond.includes('coordinate.request-cn-write'));
+  // Shared OS floor — CN loan is universal; Hammond also keeps direct CN patch.
+  assert.ok(hammond.includes('coordinate.request-cn-write'));
+});
+
+test('OS floor is identical for every agents.yml roster member', () => {
+  resetCapabilityCaches();
+  const roster = load(readFileSync(new URL('../../config/agents.yml', import.meta.url), 'utf8'));
+  const slugs = roster.agents.map(agent => agent.slug);
+  assert.ok(slugs.includes('ann') && slugs.includes('clare') && slugs.includes('clementine'));
+
+  for (const id of OS_FLOOR_CAPABILITY_IDS) {
+    assert.deepEqual(
+      loadRegistry().capabilities[id]?.agents,
+      ['*'],
+      `${id} must use agents: ["*"] so new roster members inherit it automatically`
+    );
+  }
+
+  const floors = Object.fromEntries(slugs.map(slug => [slug, osFloorIdsForAgent(slug)]));
+  const reference = floors.brisket;
+  assert.deepEqual(reference, [...OS_FLOOR_CAPABILITY_IDS]);
+  for (const slug of slugs) {
+    assert.deepEqual(floors[slug], reference, `${slug} must share the same OS floor as brisket`);
+    assert.ok(loadAllowlist(slug), `${slug} needs an allowlist`);
+  }
 });
 
 test('buildAgentTools always includes os_propose_action', () => {
@@ -513,12 +541,15 @@ test('os_list_promoted_shortcuts and os_run_promoted_shortcut replay Confirm wri
   assert.equal(missing.kind, 'error');
 });
 
-test('registry 0.4 includes promoted-shortcut runner tools', () => {
+test('registry 0.5 includes promoted-shortcut runner tools on the OS floor', () => {
   resetCapabilityCaches();
   const registry = loadRegistry();
-  assert.equal(registry.version, '0.4.0');
+  assert.equal(registry.version, '0.5.0');
   assert.ok(capabilityIdsForAgent('brisket').includes('os.run-promoted-shortcut'));
   assert.ok(capabilityIdsForAgent('brisket').includes('os.list-promoted-shortcuts'));
+  assert.ok(capabilityIdsForAgent('ann').includes('os.run-promoted-shortcut'));
+  assert.ok(capabilityIdsForAgent('clare').includes('os.list-promoted-shortcuts'));
+  assert.ok(capabilityIdsForAgent('clementine').includes('os.promote-shortcut'));
   const tools = buildAgentTools({ slug: 'brisket', message: 'run the promoted shortcut for morning weigh-in' });
   assert.ok(tools.some(tool => tool.name === 'os_run_promoted_shortcut'));
   assert.ok(isShortcutTool('os_run_promoted_shortcut'));

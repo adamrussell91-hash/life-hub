@@ -1,0 +1,21 @@
+{
+  "agent": "clare",
+  "write_globs": [
+    "data/challenges/**",
+    "data/remember/**",
+    "data/research/**",
+    "data/widgets/**",
+    "data/os/**",
+    "intuition/**"
+  ],
+  "read_globs": [
+    "data/challenges/**",
+    "data/remember/**",
+    "data/research/**",
+    "data/widgets/**",
+    "data/os/**",
+    "central-node.md",
+    "intuition/**"
+  ],
+  "notes": "Tasks specialist on the shared OS floor. Task mutations stay on the Tasks store via Clare desk; Life remember/track/research use propose-action."
+}

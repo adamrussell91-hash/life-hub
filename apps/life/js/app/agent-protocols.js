@@ -75,6 +75,39 @@ export const AGENT_PROTOCOLS = {
       { id: 'drifting', label: "Something's drifting", steer: 'Follow-on protocols — Drift', explain: 'Name a drift before it becomes a problem.' },
       { id: 'specialist', label: 'Talk to a specialist', steer: 'Specialist pattern relay', explain: 'Hand the pattern to the right specialist.' }
     ]
+  },
+  ann: {
+    firstName: 'Ann',
+    eyebrow: 'Ann can',
+    pills: [
+      { id: 'lesson-diagnosis', label: 'Lesson diagnosis', steer: 'Diagnose the lesson before prescribing changes', explain: 'Find the hinge that is failing before rewriting.' },
+      { id: 'sharpen-explanation', label: 'Sharpen an explanation', steer: 'Tighten one teaching move', explain: 'One precise classroom repair.' },
+      { id: 'check-questions', label: 'Check the questions', steer: 'Test whether questions reveal learning', explain: 'Probe the questions before adding more.' },
+      { id: 'sequence-lesson', label: 'Sequence the lesson', steer: 'Make each activity earn the next', explain: 'Order the flow so the work builds.' },
+      { id: 'reduce-overload', label: 'Reduce overload', steer: 'Cut load without thinning the thinking', explain: 'Simplify without dumbing down.' }
+    ]
+  },
+  clementine: {
+    firstName: 'Clementine',
+    eyebrow: 'Clementine can',
+    pills: [
+      { id: 'find-the-claim', label: 'Find the claim', steer: 'Locate the controlling claim', explain: 'Name what the text is actually arguing.' },
+      { id: 'cut-the-waffle', label: 'Cut the waffle', steer: 'Remove throat-clearing', explain: 'Strip hedges so the idea can breathe.' },
+      { id: 'stress-test', label: 'Stress-test it', steer: 'Probe evidence and warrant', explain: 'Find the weakest join in the argument.' },
+      { id: 'starting-block', label: 'Give me a start', steer: 'One concrete first sentence or block', explain: 'Break the blank page with one solid move.' },
+      { id: 'tighten-structure', label: 'Tighten the structure', steer: 'Make the reasoning visible', explain: 'Reorder so every part has one job.' }
+    ]
+  },
+  clare: {
+    firstName: 'Clare',
+    eyebrow: 'Clare can',
+    pills: [
+      { id: 'morning-sweep', label: 'Morning sweep', steer: 'Brief today: the one thing, then overdue, then flags', explain: 'Get the day oriented without a guilt pile.' },
+      { id: 'brain-dump', label: 'Brain dump', steer: 'Now / Later / Trash, then propose Now', explain: 'Turn the chaos into the smallest honest next move.' },
+      { id: 'shatter-start', label: 'Shatter start', steer: 'One-minute first move with a physical cue', explain: 'Unstick a frozen task.' },
+      { id: 'time-map', label: 'Time map', steer: 'Hidden setup and wrap usually double the guess', explain: 'Make the estimate honest.' },
+      { id: 'open-loops', label: 'Open loops', steer: 'Name the unfinished threads that are stealing attention', explain: 'Surface what is still open.' }
+    ]
   }
 };
 
@@ -176,6 +209,48 @@ export const AGENT_STATUS_LINES = {
     'Mapping the next move…',
     'Checking what’s running…',
     'Holding the line…'
+  ],
+  ann: [
+    'Reading the lesson closely…',
+    'Checking the teaching move…',
+    'Following the lesson sequence…',
+    'Testing the question quality…',
+    'Looking for the precise hinge…',
+    'Marking the muddy bit…',
+    'Comparing intent with activity…',
+    'Checking what pupils must notice…',
+    'Tracing the cognitive load…',
+    'Sharpening one useful note…',
+    'Keeping the repair small…',
+    'Grounding this in the classroom…'
+  ],
+  clementine: [
+    'Locating the actual claim…',
+    'Removing some throat-clearing…',
+    'Checking where the evidence lands…',
+    'Interrogating the warrant…',
+    'Finding the sentence with a spine…',
+    'Untangling the argument…',
+    'Reading for elegant structure…',
+    'Testing the weakest paragraph…',
+    'Looking past the competent summary…',
+    'Rescuing the useful idea…',
+    'Making the reasoning visible…',
+    'Cutting what does not earn its keep…'
+  ],
+  clare: [
+    'Sorting the dump…',
+    'Finding the smallest next move…',
+    'Checking the clock…',
+    'Clearing the open loops…',
+    'Naming what is actually Now…',
+    'Parking the Later pile…',
+    'Looking for the stuck point…',
+    'Mapping the hidden setup time…',
+    'Keeping this ADHD-honest…',
+    'Shrinking the first step…',
+    'Scanning overdue without the lecture…',
+    'Building one confirmable change…'
   ]
 };
 

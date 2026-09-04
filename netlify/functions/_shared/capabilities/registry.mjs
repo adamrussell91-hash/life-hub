@@ -79,6 +79,29 @@ export function resetCapabilityCaches() {
   cachedAllowlists = new Map();
 }
 
+/**
+ * Shared OS floor — every agent in config/agents.yml inherits these via agents: ["*"].
+ * Domain exclusives (food library, CN patch, etc.) stay enumerated. Add a new agent by
+ * roster + allowlist only; do not re-list them on floor capabilities.
+ */
+export const OS_FLOOR_CAPABILITY_IDS = Object.freeze([
+  'os.propose-action',
+  'remember.set-week-flag',
+  'remember.note-context',
+  'track.open-challenge',
+  'track.log-progress',
+  'track.close-challenge',
+  'coordinate.request-cn-write',
+  'research.save-brief',
+  'research.expiring-brief',
+  'publish.surface-widget',
+  'os.capability-scoreboard',
+  'intuition.edit-pack',
+  'os.promote-shortcut',
+  'os.list-promoted-shortcuts',
+  'os.run-promoted-shortcut'
+]);
+
 export function capabilityIdsForAgent(slug) {
   const registry = loadRegistry();
   const ids = [];
@@ -89,6 +112,12 @@ export function capabilityIdsForAgent(slug) {
   // Universal fallback always present even if registry is hand-edited poorly.
   if (!ids.includes('os.propose-action')) ids.unshift('os.propose-action');
   return ids;
+}
+
+/** Floor ids an agent actually receives (intersection with registry * entries). */
+export function osFloorIdsForAgent(slug) {
+  const have = new Set(capabilityIdsForAgent(slug));
+  return OS_FLOOR_CAPABILITY_IDS.filter(id => have.has(id));
 }
 
 export function promptOneLinersForAgent(slug) {

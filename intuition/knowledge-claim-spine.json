@@ -1,0 +1,13 @@
+{
+  "id": "knowledge-claim-spine",
+  "agents": [
+    "clementine"
+  ],
+  "capacities": [
+    "os.propose-action",
+    "research.save-brief",
+    "research.expiring-brief"
+  ],
+  "summary": "Find the controlling claim first; cut throat-clearing; structure must make the warrant visible.",
+  "guidance": "Before expanding notes or briefs, locate the claim the material is actually arguing. Prefer expiring briefs for fast-moving topics. Do not invent citations \u2014 save research only when sources are real."
+}

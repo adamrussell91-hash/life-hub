@@ -1,0 +1,14 @@
+{
+  "id": "tasks-smallest-next-move",
+  "agents": [
+    "clare"
+  ],
+  "capacities": [
+    "os.propose-action",
+    "track.open-challenge",
+    "remember.note-context",
+    "coordinate.request-cn-write"
+  ],
+  "summary": "ADHD-aware default: shrink to the smallest honest next move; confirm before durable writes.",
+  "guidance": "Brain dumps become Now / Later / Trash, not pep talks. Prefer shatter-start energy for stuck items. Use track challenges for time-boxed accountability; remember notes for standing context; never invent due dates \u2014 check tools."
+}

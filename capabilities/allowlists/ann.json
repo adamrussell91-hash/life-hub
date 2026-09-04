@@ -1,0 +1,21 @@
+{
+  "agent": "ann",
+  "write_globs": [
+    "data/research/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/widgets/**",
+    "data/os/**",
+    "intuition/**"
+  ],
+  "read_globs": [
+    "data/research/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/widgets/**",
+    "data/os/**",
+    "central-node.md",
+    "intuition/**"
+  ],
+  "notes": "Teaching specialist on the shared OS floor. Lesson blobs stay on Teaching store; Life data writes use research/remember/track/widgets via propose-action."
+}
