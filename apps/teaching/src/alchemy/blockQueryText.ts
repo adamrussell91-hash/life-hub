@@ -66,6 +66,12 @@ function contentStrings(block: Block): string[] {
       return ((content.cards as Array<{ front?: string; back?: string }> | undefined) ?? []).flatMap(
         (card) => [card.front ?? '', card.back ?? '']
       );
+    case 'card_stack':
+      return [
+        typeof content.title === 'string' ? content.title : '',
+        ...((content.cards as Array<{ eyebrow?: string; title?: string; description?: string }> | undefined) ??
+          []).flatMap((card) => [card.eyebrow ?? '', card.title ?? '', card.description ?? ''])
+      ];
     case 'image':
     case 'video':
     case 'audio':
