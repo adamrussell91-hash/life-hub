@@ -51,6 +51,7 @@ import { renderSkincare } from './render-skincare.js';
 import { buildCalendarModel } from './calendar-model.js';
 import { renderCalendar } from './render-calendar.js';
 import { syncRepository } from './sync-repository.js';
+import { startHubMotion } from '../../../../packages/design-kit/js/hub-motion.js';
 
 // The API lives on a different origin (Netlify Functions) from the site (GitHub
 // Pages), so every /api/* call needs the full URL and must send the session cookie
@@ -185,6 +186,7 @@ controller = createAppController({
 });
 
 controller.start();
+startHubMotion(document);
 
 const DEFAULT_AGENT_BY_SECTION = {
   nutrition: NUTRITION_AGENT_SLUG,

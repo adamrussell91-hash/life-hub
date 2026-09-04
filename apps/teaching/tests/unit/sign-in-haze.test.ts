@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { renderSignIn } from '@/auth/gate';
 
-describe('sign-in haze on the card', () => {
+describe('sign-in gate', () => {
   let host: HTMLElement;
 
   beforeEach(() => {
@@ -13,21 +13,18 @@ describe('sign-in haze on the card', () => {
     host.remove();
   });
 
-  it('places cream haze as the first child of the sign-in card', () => {
+  it('renders a clean card with the brand first and no haze', () => {
     renderSignIn(host);
 
     const card = host.querySelector('.sign-in__card');
-    const haze = host.querySelector('.sign-in__haze');
     const brand = host.querySelector('.sign-in__brand');
 
-    expect(haze).toBeTruthy();
-    expect(haze?.getAttribute('aria-hidden')).toBe('true');
-    expect(card?.firstElementChild).toBe(haze);
+    expect(host.querySelector('.sign-in__haze')).toBeNull();
+    expect(host.querySelector('.sign-in__bubble')).toBeNull();
+    expect(host.querySelector('.sign-in__sparkle')).toBeNull();
     expect(host.querySelector('.sign-in__mark')).toBeNull();
-    expect(haze?.nextElementSibling).toBe(brand);
-    expect(haze?.querySelectorAll('.sign-in__bubble')).toHaveLength(5);
-    expect(haze?.querySelectorAll('.sign-in__sparkle')).toHaveLength(6);
+    expect(card?.firstElementChild).toBe(brand);
     expect(host.querySelector('#sign-in-passphrase')).toBeTruthy();
-    expect(host.querySelector('.sign-in__brand')?.textContent).toBe('Teaching Hub');
+    expect(brand?.textContent).toBe('Teaching Hub');
   });
 });
