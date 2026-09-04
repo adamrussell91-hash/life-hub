@@ -48,3 +48,51 @@ test('blob adapter round-trips JSON jobs', async () => {
   assert.equal(job.status, 'running');
   assert.deepEqual(job.events, [{ type: 'text', delta: 'ok' }]);
 });
+
+test('blob put writes the full in-memory snapshot even when get returns a stale shorter job', async () => {
+  const jobId = '11111111-1111-4111-8111-111111111111';
+  const blobs = new Map();
+  let getCount = 0;
+  const store = createBlobChatJobStore({
+    async set(key, value) { blobs.set(key, value); },
+    async get(key, { type } = {}) {
+      getCount += 1;
+      // After the first write, pretend Blobs still returns the empty create snapshot.
+      if (getCount > 1) {
+        return {
+          owner: 'abc',
+          body: '{"message":"hi"}',
+          url: 'https://life.example/api/chat',
+          cookie: '',
+          origin: '',
+          events: [],
+          status: 'pending'
+        };
+      }
+      const raw = blobs.get(key);
+      if (raw == null) return null;
+      return type === 'json' ? JSON.parse(raw) : raw;
+    }
+  });
+  await store.create(jobId, {
+    owner: 'abc',
+    body: '{"message":"hi"}',
+    url: 'https://life.example/api/chat'
+  });
+  const events = [
+    { type: 'agent', slug: 'vera' },
+    { type: 'text', delta: 'Mostly from that skim milk — nice!)' },
+    { type: 'done' }
+  ];
+  await store.put(jobId, {
+    owner: 'abc',
+    body: '{"message":"hi"}',
+    url: 'https://life.example/api/chat',
+    events,
+    status: 'done'
+  });
+  // put must not have consulted the stale get for events — read the raw blob.
+  const written = JSON.parse(blobs.get(jobId));
+  assert.equal(written.status, 'done');
+  assert.deepEqual(written.events, events);
+});

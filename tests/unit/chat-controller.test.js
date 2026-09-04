@@ -1119,6 +1119,34 @@ test('text reply does not show empty-turn recovery', async () => {
   assert.ok(messageBubbles(root).every(b => !bubbleText(b).includes(EMPTY_TURN_RECOVERY)));
 });
 
+test('partial text without a done event shows cut-off recovery (dropped stream / 60s kill)', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Mostly from that skim milk — nic' };
+      // Stream dies — no done event (Netlify sync kill / dropped SSE).
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('large skinny latte');
+  assert.ok(messageBubbles(root).some(b => bubbleText(b).includes(EMPTY_TURN_RECOVERY)));
+});
+
+test('turn_incomplete error shows cut-off recovery even after partial text', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'vera' };
+      yield { type: 'text', delta: 'When you pic' };
+      yield { type: 'error', code: 'turn_incomplete' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('keep going');
+  assert.ok(messageBubbles(root).some(b => bubbleText(b).includes(EMPTY_TURN_RECOVERY)));
+});
+
 test('clearUnread notifies listeners that chat is read, independent of any send', () => {
   const root = new FakeDocument();
   const chatApi = { async *send() {} };
