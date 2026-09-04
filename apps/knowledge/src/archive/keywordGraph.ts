@@ -12,6 +12,8 @@ export const CONSTELLATION_PREVIEW = 4;
 /** Notes shown after opening a hub. */
 export const CONSTELLATION_EXPAND = 16;
 const LEAF_SAMPLE = CONSTELLATION_EXPAND;
+/** Hub→note spoke length / initial ring radius. Sized for EXPAND notes with leaf collision. */
+export const CONSTELLATION_SPOKE_DISTANCE = 120;
 
 function swatch(fill: string, ink: string) {
   const n = Number.parseInt(fill.slice(1), 16);
@@ -197,11 +199,16 @@ export function constellationLeafId(hubId: string, pageId: string) {
   return `leaf:${hubId}:${pageId}`;
 }
 
+/** Initial ring radius for notes around a hub — matches the spoke force distance. */
+export function constellationLeafOrbit(_noteCount: number) {
+  return CONSTELLATION_SPOKE_DISTANCE;
+}
+
 export function placeHubLeaves(hub: GraphNodeDatum, notes: PageManifestEntry[]) {
   const nodes: GraphNodeDatum[] = [];
   const links: GraphLinkDatum[] = [];
   if (!notes.length || hub.x == null || hub.y == null) return { nodes, links };
-  const radius = 58 + notes.length * 4;
+  const radius = constellationLeafOrbit(notes.length);
   notes.forEach((note, index) => {
     const angle = (Math.PI * 2 * index) / notes.length - Math.PI / 2;
     const node: GraphNodeDatum = {
