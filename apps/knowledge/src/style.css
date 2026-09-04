@@ -1788,35 +1788,62 @@ body.is-universe-fullscreen .local-banner {
 
 @media (max-width: 720px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    max-width: 100%;
+    overflow-x: clip;
   }
 
-  .rail {
-    position: sticky;
-    top: 0;
-    height: auto;
-    flex-direction: row;
-    justify-content: space-between;
-    padding: var(--space-3);
-    z-index: 5;
+  /* Locked bottom bar — hide the desktop rail on phones. */
+  .rail,
+  .rail.hub-rail {
+    display: none !important;
   }
 
-  .rail__brand {
+  .hub-rail__brand-block {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .rail__brand,
+  .hub-rail__brand {
     margin: 0;
     text-align: left;
   }
 
   .rail__nav {
     flex-direction: row;
+    flex: 1 1 auto;
     width: auto;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-end;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .rail__nav::-webkit-scrollbar {
+    display: none;
   }
 
   .rail__btn {
+    flex: 0 0 auto;
     padding: var(--space-2);
   }
 
   .rail__btn span {
     display: none;
+  }
+
+  /* Second row: compact hub links (kit flattens the accordion). */
+  .rail .hub-rail__hubs {
+    flex: 1 0 100%;
+    margin-top: 0;
+    align-self: stretch;
+    width: 100%;
+    max-width: 100%;
   }
 
   .topbar,
@@ -1828,10 +1855,14 @@ body.is-universe-fullscreen .local-banner {
       "title";
     align-items: stretch;
     row-gap: var(--space-4);
+    min-width: 0;
+    max-width: 100%;
   }
 
   .page-header__actions {
     justify-content: flex-start;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .topbar h1,
@@ -1840,12 +1871,60 @@ body.is-universe-fullscreen .local-banner {
     font-size: var(--text-xl);
   }
 
+  .toolbar {
+    min-width: 0;
+    max-width: 100%;
+    gap: var(--space-2);
+  }
+
+  .search {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .origin-filters {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .origin-filters .tag-pills {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--space-2);
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .origin-filters .tag-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .origin-filters .tag-pills > * {
+    flex: 0 0 auto;
+  }
+
   .list-viewport {
     height: min(58dvh, 760px);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .cards,
+  .card {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .canvas {
-    padding-bottom: calc(var(--space-10) + env(safe-area-inset-bottom, 0px));
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+    padding-inline: var(--space-4);
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .file {

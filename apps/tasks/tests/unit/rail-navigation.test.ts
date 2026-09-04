@@ -35,13 +35,23 @@ describe('primary rail navigation', () => {
     );
   });
 
-  it('renders section controls above destinations for mobile', () => {
-    const host = document.createElement('div');
-    renderPrimaryNav(host, 'board');
-    const mobile = host.querySelector('[data-mobile-rail]');
-    expect(mobile?.querySelector('.hub-rail__mobile-tabs [data-section-toggle="home"]')).not.toBeNull();
-    expect(mobile?.querySelector('.hub-rail__mobile-items [href="#/board"]')).not.toBeNull();
-    expect(mobile?.querySelector('.hub-rail__mobile-items [href="#/clare"]')).not.toBeNull();
+  it('mounts the locked hub mobile chrome beside the shell', () => {
+    const root = document.createElement('div');
+    const layout = document.createElement('div');
+    layout.className = 'hub-layout';
+    const railNav = document.createElement('div');
+    layout.append(railNav);
+    root.append(layout);
+    document.body.append(root);
+    renderPrimaryNav(railNav, 'board');
+    const bar = root.querySelector('.hub-mobile-nav');
+    expect(bar).not.toBeNull();
+    expect(bar?.textContent).toContain('Home');
+    expect(bar?.textContent).toContain('Chat');
+    expect(bar?.textContent).toContain('Today');
+    expect(bar?.textContent).toContain('More');
+    expect(root.querySelector('.hub-more-sheet')).not.toBeNull();
+    root.remove();
   });
 
   it('adds a Hubs switcher that leaves Tasks for Life, Teaching, and Knowledge', () => {
