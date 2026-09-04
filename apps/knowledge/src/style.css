@@ -2087,9 +2087,9 @@ body.is-universe-fullscreen .local-banner {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    /* Header + bottom nav + composer clearance */
+    /* Header + bottom nav + fixed composer clearance */
     min-height: calc(100dvh - 8.5rem);
-    padding-bottom: 11rem;
+    padding-bottom: 16rem;
   }
 
   .coach.chat .chat__sitting {
@@ -3283,18 +3283,6 @@ body.is-universe-fullscreen .local-banner {
   .chat-visualiser {
     grid-template-columns: 1fr;
   }
-
-  .chat-presence-header {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      "portrait eyebrow"
-      "portrait title"
-      "actions actions";
-  }
-
-  .chat-presence-header .page-header__actions {
-    justify-content: flex-end;
-  }
 }
 
 .chat-visualiser {
@@ -3326,10 +3314,24 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .chat-presence-header {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
-    "portrait eyebrow actions"
-    "portrait title title";
+    "portrait eyebrow"
+    "portrait title"
+    "actions actions";
+}
+
+.chat-presence-header .page-header__actions {
+  justify-content: flex-end;
+}
+
+@media (min-width: 721px) {
+  .chat-presence-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "portrait eyebrow actions"
+      "portrait title title";
+  }
 }
 
 .chat-presence__portrait {
