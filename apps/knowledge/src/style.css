@@ -2112,11 +2112,12 @@ body.is-universe-fullscreen .local-banner {
   }
 
   .coach.chat .chat__composer {
+    /* Clear the locked .hub-mobile-nav — sticky bottom:0 sat under the bar. */
     position: sticky;
-    bottom: 0;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
     z-index: 3;
     padding: var(--space-3);
-    padding-bottom: max(var(--space-3), calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)));
+    background: var(--paper);
   }
 
   .coach.chat.chat--from-book .chat__composer,
@@ -3202,17 +3203,30 @@ body.is-universe-fullscreen .local-banner {
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
+  /* Fullscreen chat in the visual viewport — same frame as Tasks overlay chat. */
   .chat-overlay {
-    top: 0;
+    top: var(--vv-offset-top, 0px);
     right: 0;
-    bottom: 0;
     left: 0;
+    bottom: var(--vv-offset-bottom, 0px);
     width: auto;
+    height: var(--vv-height, 100dvh);
     max-height: none;
     border-radius: 0;
+    z-index: 50;
     padding-top: max(var(--space-4), env(safe-area-inset-top, 0px));
-    padding-bottom: max(var(--space-4), calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)));
+    padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
     overscroll-behavior: contain;
+  }
+
+  .chat-overlay .chat-overlay__top,
+  .chat-overlay .agent-picker,
+  .chat-overlay .agent-protocol-pills,
+  .chat-overlay .using-notes,
+  .chat-overlay .chat-form,
+  .chat-overlay__book,
+  .chat-overlay__save {
+    flex: 0 0 auto;
   }
 
   .chat-overlay .chat-form {
@@ -3227,10 +3241,20 @@ body.is-universe-fullscreen .local-banner {
   }
 
   .chat-overlay .chat-messages {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .chat-overlay .agent-picker__avatar {
+    width: 2.4rem;
+    height: 2.4rem;
   }
 
   body:has(.chat-overlay) .floating-chat-button {
+    display: none;
+  }
+
+  body:has(.chat-overlay) .hub-mobile-nav {
     display: none;
   }
 

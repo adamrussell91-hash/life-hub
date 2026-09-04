@@ -30,10 +30,10 @@ function makeHost(): ChatVisualiserHost {
 describe("chat portrait visualiser", () => {
   beforeEach(() => {
     document.body.replaceChildren();
-    enterChatVisualiser("header");
+    enterChatVisualiser("together");
   });
 
-  it("keeps Now faceless and puts her portrait in the other four ideas", () => {
+  it("keeps Plain faceless and puts her portrait in the other four ideas", () => {
     expect(mockChatWorkplace("now")).not.toContain(portrait);
     expect(mockChatWorkplace("header")).toContain("chat-presence__portrait");
     expect(mockChatWorkplace("header")).not.toContain("coach-msg--with-portrait");
@@ -55,7 +55,7 @@ describe("chat portrait visualiser", () => {
     const host = makeHost();
     host.onBackToChat = () => back.push("chat");
     host.render();
-    expect(host.app.querySelector("[data-portrait-idea='header']")?.classList.contains("is-active")).toBe(true);
+    expect(host.app.querySelector("[data-portrait-idea='together']")?.classList.contains("is-active")).toBe(true);
     expect(host.app.querySelector(".chat-presence__portrait")).toBeTruthy();
     host.app.querySelector<HTMLButtonElement>("[data-portrait-idea='thread']")!.click();
     expect(host.app.querySelector("[data-portrait-idea='thread']")?.classList.contains("is-active")).toBe(true);
