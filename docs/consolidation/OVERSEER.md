@@ -97,13 +97,13 @@ Adam dashboard export 2026-09-01:
 
 | Hub / API | Site name (dashboard) | Site ID | Public Functions URL | `SITE_ORIGIN` (app origin) | Notes |
 |-----------|----------------------|---------|----------------------|----------------------------|--------|
-| Life Hub API | `life-hub2` | `5771ee5c-0cb2-4858-b03d-2637f092050e` | `https://api.adam-russell.com` | `https://life-hub.adam-russell.com` | **Absorb target** — keep secrets |
-| Teaching Hub API | `arteaching-hub` | `899b0fd3-53b3-45a0-bbfb-0238264d9246` | `https://teaching-api.adam-russell.com` | `https://teaching-hub.adam-russell.com` | Fold later |
-| Tasks Hub API | `artasks-hub` | `c6696619-f478-4ac1-b0cd-1e4cfd3101df` | `https://tasks-api.adam-russell.com` | confirm at fold | Fold later |
-| Knowledge Hub API | `knowledge-hub-archive` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `https://knowledge-api.adam-russell.com` | confirm at fold | **Netlify Functions only** — not the R2 bucket (same label; see collision note in `plan.md`) |
-| Proxies (widgets OpenAI) | `jade-melomakarona-ea20fe` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `https://jade-melomakarona-ea20fe.netlify.app` | n/a | Functions-only; root 404; consumers in `widgets`; not a hub — keep until migrate/retire |
+| Life Hub API | `life-hub2` | `5771ee5c-0cb2-4858-b03d-2637f092050e` | `https://api.adam-russell.com` | `https://life-hub.adam-russell.com` | **Absorb target** — present and enabled; all hub APIs live here |
+| Teaching Hub API | `arteaching-hub` | `899b0fd3-53b3-45a0-bbfb-0238264d9246` | `https://teaching-api.adam-russell.com` | remounted `/teaching/` | **Deleted 2026-09-04** — site ID absent; domain 404 |
+| Tasks Hub API | `artasks-hub` | `c6696619-f478-4ac1-b0cd-1e4cfd3101df` | `https://tasks-api.adam-russell.com` | remounted `/tasks/` | **Deleted 2026-09-04** — site ID absent; domain 404 |
+| Knowledge Hub API | `knowledge-hub-archive` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `https://knowledge-api.adam-russell.com` | remounted `/knowledge/` | **Deleted 2026-09-04** (Netlify site only — **not** the R2 bucket) |
+| Proxies (widgets OpenAI) | `jade-melomakarona-ea20fe` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `https://jade-melomakarona-ea20fe.netlify.app` | n/a | Present and enabled; CORS hardened (proxies #1) |
 
-**Proxies functions:** `/.netlify/functions/ai` (OpenAI chat proxy), `/.netlify/functions/generate` (HSC Paper 1). Risk: permissive CORS; `ai` accepts caller-supplied model/messages/token limits against shared OpenAI key.
+**Proxies functions:** `/.netlify/functions/ai` (OpenAI chat proxy), `/.netlify/functions/generate` (HSC Paper 1). CORS exact-match + model/`max_tokens` caps (proxies #1). Still a shared OpenAI key — migrate consumers before folding onto `life-hub2`.
 
 ### Cloudflare / R2
 
