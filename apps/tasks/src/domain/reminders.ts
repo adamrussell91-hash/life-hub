@@ -1,6 +1,7 @@
 import type { Task } from '@/schemas/task';
 import { isBoardTask } from '@/domain/hierarchy';
 import { parseDue } from '@/domain/queries';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 
 export type RemindPreset = 'none' | 'morning_of' | '1_day_before' | '1_hour_before' | 'custom';
 
@@ -97,10 +98,7 @@ export function pendingReminders(tasks: Task[], now: Date = new Date()): Pending
 
 export function formatReminderLabel(task: Task): string {
   if (task.due_date) {
-    const due = parseDue(task.due_date);
-    const duePart = due
-      ? due.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-      : task.due_date;
+    const duePart = formatDisplayDate(task.due_date);
     return `${task.title} · due ${duePart}`;
   }
   return task.title;
