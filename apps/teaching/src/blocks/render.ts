@@ -17,6 +17,10 @@ import {
   shuffleArray,
   storageKey
 } from '@/blocks/learning-activity';
+import {
+  createCardStackArticle,
+  mountCardStackControls
+} from '@/blocks/card-stack';
 import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block, type EmbedProvider } from '@/schemas/block';
 import { renderOutcomeList } from '@/outcomes/display';
 import type { PublicOutcome } from '@/curriculum/outcome-catalog';
@@ -827,6 +831,67 @@ export function renderTimelineBlock(
   }
 
   return wrapBlock(list, block, mode);
+}
+
+export function renderCardStackBlock(
+  block: Extract<Block, { block_type: 'card_stack' }>,
+  mode: RenderMode
+): HTMLElement {
+  const root = document.createElement('div');
+  root.className = mode === 'print' ? 'block-card-stack block-card-stack--print' : 'block-card-stack';
+
+  if (block.content.title?.trim()) {
+    const heading = document.createElement('h2');
+    heading.className = 'block-card-stack__heading';
+    heading.textContent = block.content.title.trim();
+    root.append(heading);
+  }
+
+  if (mode === 'print') {
+    const list = document.createElement('div');
+    list.className = 'block-card-stack__print-list';
+    block.content.cards.forEach((card, index) => {
+      list.append(createCardStackArticle(card, index));
+    });
+    root.append(list);
+    return wrapBlock(root, block, mode);
+  }
+
+  const stage = document.createElement('div');
+  stage.className = 'block-card-stack__stage';
+  const viewport = document.createElement('div');
+  viewport.className = 'block-card-stack__viewport';
+  viewport.setAttribute('aria-live', 'polite');
+
+  const cardEls = block.content.cards.map((card, index) => createCardStackArticle(card, index));
+  for (const card of [...cardEls].reverse()) {
+    viewport.append(card);
+  }
+  stage.append(viewport);
+
+  const controls = document.createElement('div');
+  controls.className = 'block-card-stack__controls';
+
+  const prev = document.createElement('button');
+  prev.type = 'button';
+  prev.className = 'btn btn--ghost block-card-stack__prev';
+  prev.textContent = 'Previous';
+
+  const status = document.createElement('p');
+  status.className = 'block-card-stack__status';
+
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'btn btn--ghost block-card-stack__next';
+  next.textContent = 'Next';
+
+  controls.append(prev, status, next);
+  root.append(stage, controls);
+  root.tabIndex = 0;
+  root.setAttribute('role', 'region');
+  root.setAttribute('aria-label', block.content.title?.trim() || 'Card stack');
+  mountCardStackControls(root, cardEls);
+  return wrapBlock(root, block, mode);
 }
 
 export function renderOutcomesBlock(
@@ -2007,6 +2072,8 @@ export function renderBlock(
       return renderSelfCheckBlock(block, mode);
     case 'timeline':
       return renderTimelineBlock(block, mode);
+    case 'card_stack':
+      return renderCardStackBlock(block, mode);
     case 'collection':
       return renderCollectionBlock(block, mode);
     case 'outcomes':

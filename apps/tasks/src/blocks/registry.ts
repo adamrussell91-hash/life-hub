@@ -27,6 +27,7 @@ import {
   createRichTextEditor,
   createSelfCheckEditor,
   createTableEditor,
+  createCardStackEditor,
   createTimelineEditor,
   createVideoEditor,
   type BlockChangeHandler,
@@ -70,6 +71,7 @@ import {
   renderSectionBlock,
   renderSpacerBlock,
   renderTableBlock,
+  renderCardStackBlock,
   renderTimelineBlock,
   renderTabsBlock,
   renderVideoBlock,
@@ -181,6 +183,10 @@ export const blockRegistry: {
     render: renderTimelineBlock,
     createEditor: createTimelineEditor
   },
+  card_stack: {
+    render: renderCardStackBlock,
+    createEditor: createCardStackEditor
+  },
   collection: {
     render: renderCollectionBlock,
     createEditor: createCollectionEditor
@@ -254,6 +260,7 @@ export {
   createSectionEditor,
   createSpacerEditor,
   createTableEditor,
+  createCardStackEditor,
   createTimelineEditor,
   createTabsEditor,
   createVideoEditor,
@@ -287,6 +294,7 @@ export {
   renderSectionBlock,
   renderSpacerBlock,
   renderTableBlock,
+  renderCardStackBlock,
   renderTimelineBlock,
   renderTabsBlock,
   renderVideoBlock
