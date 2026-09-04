@@ -544,7 +544,7 @@ export function renderChatRail(host: ChatRailHost) {
   host.shell(`
     ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · Chat needs the Netlify API (session + Anthropic). The browser never talks to the research kernel.</p>` : ""}
     ${host.pageHeader(
-      CLEMENTINE.name,
+      CLEMENTINE.shortName,
       fromBook ? "From a book" : "Chat",
       `<button class="btn btn--ghost" data-open-visualiser type="button">Portrait ideas</button>
       <button class="btn btn--ghost" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,

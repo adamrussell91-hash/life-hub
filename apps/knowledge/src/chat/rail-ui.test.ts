@@ -64,6 +64,7 @@ describe("Knowledge chat rail protocol affordances", () => {
     const headerFace = host.app.querySelector<HTMLImageElement>(".chat-presence__portrait");
     expect(headerFace?.getAttribute("src")).toBe("/assets/agents/clementine.png");
     expect(headerFace?.getAttribute("alt")).toBe("Professor Clementine Haig");
+    expect(host.app.textContent).toContain("Clementine");
     const greeting = host.app.querySelector(".coach-msg--assistant.coach-msg--with-portrait");
     expect(greeting?.querySelector(".chat-message__avatar")?.getAttribute("src")).toBe(
       "/assets/agents/clementine.png",
