@@ -4,21 +4,24 @@ export const HUB_SECTIONS = [
     title: 'Teaching',
     eyebrow: 'Classes and lessons',
     origin: '/teaching/',
-    studentPublicPrefix: '/teaching/s/'
+    studentPublicPrefix: '/teaching/s/',
+    pulse: 'classes'
   },
   {
     id: 'knowledge',
     title: 'Knowledge',
     eyebrow: 'Archive and research',
     origin: '/knowledge/',
-    studentPublicPrefix: null
+    studentPublicPrefix: null,
+    pulse: 'notes'
   },
   {
     id: 'tasks',
     title: 'Tasks',
     eyebrow: 'Board',
     origin: '/tasks/',
-    studentPublicPrefix: null
+    studentPublicPrefix: null,
+    pulse: 'tasks'
   }
 ];
 

@@ -401,6 +401,12 @@ a:hover {
   flex-direction: column;
   gap: var(--space-px);
   overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+.teacher-layout__rail > .hub-rail__hubs {
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .teacher-layout__rail-status {

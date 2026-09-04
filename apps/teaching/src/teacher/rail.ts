@@ -1,3 +1,4 @@
+import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { renderClassesNav } from '@/teacher/nav';
 import { renderPrimaryNav } from '@/teacher/primary-nav';
@@ -56,4 +57,5 @@ export function renderTeacherRail(
     activeClassId: options.activeClassId,
     onCreateClass: options.onCreateClass
   });
+  appendHubSwitcher(hubSwitcherHost(railNav), 'teaching');
 }

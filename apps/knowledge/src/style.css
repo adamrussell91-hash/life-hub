@@ -46,6 +46,22 @@
   width: 100%;
 }
 
+.rail .hub-rail__hubs {
+  margin-top: auto;
+  align-self: stretch;
+  width: 100%;
+}
+
+.rail .hub-rail__section,
+.rail a.hub-rail__link {
+  align-self: stretch;
+}
+
+.rail a.hub-rail__link span {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
 .rail__btn {
   display: grid;
   gap: 0.2rem;

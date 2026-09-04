@@ -11,6 +11,7 @@ function mockApiPlugin(): Plugin {
   return {
     name: 'teaching-hub-mock-api',
     async configureServer(server) {
+      if (process.env.VITEST) return;
       // Load via Vite SSR so `@/` aliases in mock-api's dependency graph resolve.
       // A static import here is bundled into vite.config by Node and breaks on `@/`.
       const { createMockApi } = await server.ssrLoadModule('/scripts/mock-api.ts');

@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { listHubSections } from '../../apps/life/js/shell/hub-sections.js';
+import { formatHubPulseCount, renderHubPulse } from '../../apps/life/js/shell/render-hub-pulse.js';
+import { hubSwitcherHost, hubSwitcherHtml, listUmbrellaHubs } from '../../packages/hub-switcher.js';
 
 test('hub section registry names Teaching, Knowledge, and Tasks', () => {
   const ids = listHubSections().map(section => section.id);
@@ -24,15 +26,78 @@ test('Tasks mount is the same-origin SPA', () => {
   assert.equal(tasks.origin, '/tasks/');
 });
 
-test('Life shell mounts hub dashboards and rail destinations', async () => {
+test('Life shell links out to remounted hubs instead of stub dashboards', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
-  for (const id of ['teaching', 'knowledge', 'tasks']) {
-    assert.match(html, new RegExp(`data-section="${id}"`));
-    assert.match(html, new RegExp(`id="${id}-dashboard"`));
-  }
-  assert.match(html, /data-hub-open="teaching"/);
-  assert.match(html, /data-hub-open="knowledge"/);
-  assert.match(html, /data-hub-open="tasks"/);
-  assert.doesNotMatch(html, /teaching-api|knowledge-api|tasks-api/i);
+  assert.match(html, /href="\/teaching\/"/);
+  assert.match(html, /href="\/knowledge\/"/);
+  assert.match(html, /href="\/tasks\/"/);
+  assert.match(html, /data-hub-pulse="teaching"/);
+  assert.match(html, /data-hub-pulse="knowledge"/);
+  assert.match(html, /data-hub-pulse="tasks"/);
   assert.match(html, /id="clare-dump-form"/);
+  assert.doesNotMatch(html, /id="teaching-dashboard"/);
+  assert.doesNotMatch(html, /id="knowledge-dashboard"/);
+  assert.doesNotMatch(html, /id="tasks-dashboard"/);
+  assert.doesNotMatch(html, /data-section="teaching"/);
+  assert.doesNotMatch(html, /data-section="knowledge"/);
+  assert.doesNotMatch(html, /data-section="tasks"/);
+  assert.doesNotMatch(html, /teaching-api|knowledge-api|tasks-api/i);
+});
+
+test('hub pulse cards show live counts', () => {
+  const cards = {
+    teaching: { count: { textContent: '' }, status: { textContent: '', hidden: false } },
+    knowledge: { count: { textContent: '' }, status: { textContent: '', hidden: false } },
+    tasks: { count: { textContent: '' }, status: { textContent: '', hidden: false } }
+  };
+  const root = {
+    querySelector(selector) {
+      const match = selector.match(/data-hub-pulse="(\w+)"/);
+      if (!match) return null;
+      const card = cards[match[1]];
+      return {
+        dataset: {},
+        querySelector(inner) {
+          if (inner === '[data-hub-count]') return card.count;
+          if (inner === '[data-hub-status]') return card.status;
+          return null;
+        }
+      };
+    }
+  };
+  renderHubPulse(root, {
+    teaching: { status: 'ready', count: 4 },
+    knowledge: { status: 'ready', count: 2847 },
+    tasks: { status: 'error' }
+  });
+  assert.equal(cards.teaching.count.textContent, '4 classes');
+  assert.equal(cards.knowledge.count.textContent, '2,847 notes');
+  assert.equal(cards.tasks.count.textContent, '—');
+  assert.match(cards.tasks.status.textContent, /Could not load/);
+});
+
+test('hub pulse count copy is singular for one item', () => {
+  assert.equal(formatHubPulseCount('notes', 1), '1 note');
+  assert.equal(formatHubPulseCount('tasks', 1), '1 open task');
+});
+
+test('umbrella hub switcher lists Life plus the three remounted hubs', () => {
+  const ids = listUmbrellaHubs().map(hub => hub.id);
+  assert.deepEqual(ids, ['life', 'teaching', 'knowledge', 'tasks']);
+  const html = hubSwitcherHtml('knowledge');
+  assert.match(html, /data-hub-switcher/);
+  assert.match(html, /href="\/"/);
+  assert.match(html, /href="\/teaching\/"/);
+  assert.match(html, /href="\/knowledge\/"/);
+  assert.match(html, /href="\/tasks\/"/);
+  assert.match(html, /aria-current="page"/);
+  assert.match(html, /data-hub-toggle="knowledge"/);
+  assert.match(html, /class="hub-row is-active"/);
+});
+
+test('hub switcher host prefers the rail so it stays out of the scrolling nav', () => {
+  const rail = { classList: { contains: name => name === 'hub-rail' } };
+  const nav = { closest: selector => (selector === '.hub-rail' ? rail : null) };
+  assert.equal(hubSwitcherHost(nav), rail);
+  assert.equal(hubSwitcherHost(nav), rail);
 });

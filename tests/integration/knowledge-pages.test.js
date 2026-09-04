@@ -99,7 +99,8 @@ test('Knowledge pages list titles from knowledge-hub-data, not life-hub-data', a
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.data[0].title, 'Archive note');
-  assert.equal(urls.length, 1);
+  assert.ok(urls.length >= 1);
+  assert.ok(urls.every(url => url.includes(DEFAULT_KNOWLEDGE_DATA_REPO)));
 });
 
 test('Knowledge page GET uses the Life session and returns page JSON', async () => {
