@@ -1,6 +1,7 @@
 import "./tokens.css";
 import "./style.css";
 import { startHubMotion } from "../design-kit/js/hub-motion.js";
+import { morphFromRect } from "../design-kit/js/morphing-dialog.js";
 import { bindHubAccordion, hubSwitcherHtml } from "../../../packages/hub-switcher.js";
 import type { Attachment, Origin, Page, PageManifestEntry } from "./domain/page";
 import { newHubPageId } from "./domain/page";
@@ -129,6 +130,7 @@ let composeTagOpen = false;
 let composeOriginDraft: Origin | null = null;
 let composeOriginKind: Origin["kind"] = "degree";
 let activePage: Page | null = null;
+let pendingMorphOrigin: { left: number; top: number; width: number; height: number } | null = null;
 let tidyBusy = false;
 let listScrollTop = 0;
 let graphTeardown: (() => void) | null = null;
@@ -512,7 +514,11 @@ function rowHtml(item: PageManifestEntry) {
 
 function bindListRows(root: ParentNode) {
   root.querySelectorAll<HTMLButtonElement>("[data-id]").forEach(button => {
-    button.onclick = () => void openPage(button.dataset.id!);
+    button.onclick = () => {
+      const rect = button.getBoundingClientRect();
+      pendingMorphOrigin = rect.width > 0 && rect.height > 0 ? rect : null;
+      void openPage(button.dataset.id!);
+    };
   });
 }
 
@@ -1036,7 +1042,7 @@ function renderPage(page: Page) {
             : ""
         }`,
     )}
-    <article class="reader">
+    <article class="reader" data-hub-morph-page>
       ${originPillsHtml(resolvedOrigins(page), { openEdit: true })}
       ${readerTopicPillsHtml(topics.slice(0, 6))}
       <div class="reader__body">${renderMarkdown(page.body)}</div>
@@ -1090,6 +1096,9 @@ function renderPage(page: Page) {
       }
     };
   });
+  const origin = pendingMorphOrigin;
+  pendingMorphOrigin = null;
+  if (origin) morphFromRect(origin, app.querySelector("[data-hub-morph-page]"));
 }
 
 function renderCompose(state: ComposeState) {

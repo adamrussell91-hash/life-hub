@@ -17,7 +17,7 @@ const CARD_SELECTOR = [
   '.pcard'
 ].join(',');
 
-const SPOTLIGHT_SKIP = '.confirm-card, [role="dialog"], .create-modal, .search-palette';
+const SPOTLIGHT_SKIP = '.confirm-card, [role="dialog"], .create-modal, .search-palette, .hub-morph-dialog';
 
 const MAGNET_SELECTOR = [
   '.hub-pulse-card',

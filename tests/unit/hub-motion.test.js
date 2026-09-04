@@ -21,9 +21,11 @@ test('parseCountable reads dashboard numbers and leaves dates alone', () => {
 test('Home shell loads the shared motion stylesheet and module', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const main = await readFile(new URL('../../apps/life/js/app/main.js', import.meta.url), 'utf8');
+  const motion = await readFile(new URL('../../packages/design-kit/motion.css', import.meta.url), 'utf8');
   assert.match(html, /packages\/design-kit\/motion\.css/);
   assert.match(main, /hub-motion\.js/);
   assert.match(main, /startHubMotion/);
+  assert.match(motion, /hub-morph-dialog/);
 });
 
 test('kit sign-in snippet and CSS no longer ship haze', async () => {

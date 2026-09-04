@@ -23,7 +23,8 @@ Hub marks: also read `ICONS.md`. The website tile is favicon + login + canvas ti
 9. `js/format-display-date.js` — **locked** display dates (`dd/mm/yy`)
 10. `js/mount-mobile-chrome.js` — mount the phone bar + More sheet
 11. `motion.css` + `js/hub-motion.js` — shared card sheen, fade, count-up, list stagger, magnet. Call `startHubMotion()` once from each hub.
-12. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`)
+12. `js/morphing-dialog.js` — **locked** micro → expanded card morph (spring FLIP). Overlay: `openMorphingDialog`. In-place: `runMorphTransform`. Route change: `morphFromRect`. Mark shared title / subtitle / image with `data-hub-morph`.
+13. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`)
 
 ### Passphrase gate (mandatory)
 

@@ -80,6 +80,7 @@ export function renderEntityBanner(
     if (url) {
       const img = document.createElement('img');
       img.className = 'entity-banner__image';
+      img.setAttribute('data-hub-morph', 'image');
       img.src = url;
       img.alt = coverAltText(current, titleText);
       img.style.width = '100%';
