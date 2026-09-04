@@ -52,6 +52,8 @@ describe('properties view', () => {
     expect(domainRow).not.toBeNull();
     expect(domainRow?.querySelectorAll('input[type="text"]')).toHaveLength(1);
     expect(domainRow?.querySelector('input[type="color"]')).not.toBeNull();
+    expect(domainRow?.querySelector('.property-row__actions')).not.toBeNull();
+    expect(domainRow?.querySelectorAll('.property-row__move')).toHaveLength(2);
     expect(canvas.querySelector('input[placeholder="id"]')).toBeNull();
     expect(canvas.textContent).not.toContain('technical id');
   });
