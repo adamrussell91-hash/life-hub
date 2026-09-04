@@ -24,7 +24,9 @@ Hub marks: also read `ICONS.md`. The website tile is favicon + login + canvas ti
 10. `js/mount-mobile-chrome.js` — mount the phone bar + More sheet
 11. `motion.css` + `js/hub-motion.js` — shared card sheen, fade, count-up, list stagger, magnet, opt-in kinetic text. Call `startHubMotion()` once from each hub.
 12. `js/hub-kinetic.js` — reusable word/line/character reveal (play / reset, stagger origins). Opt in with `.hub-kinetic` on canvas titles. **Not on the rail.**
-13. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`)
+13. `js/morphing-dialog.js` — **locked** micro → expanded card morph (spring FLIP). Overlay: `openMorphingDialog`. In-place: `runMorphTransform`. Route change: `morphFromRect`. Mark shared title / subtitle / image with `data-hub-morph`.
+14. `morphing-popover.css` + `js/morphing-popover.js` — trigger expands into a compact editor (blur fade, 250ms ease-out). Use for short notes, quick text, and dimension / value edits. `createMorphingNotePopover` / `createMorphingValuesPopover`, or copy `snippets/morphing-popover.html` and call `mountMorphingPopovers()`.
+15. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `morphing-popover.html`)
 
 ### Passphrase gate (mandatory)
 

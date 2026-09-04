@@ -29,6 +29,34 @@ describe('entity-card-expand', () => {
     document.body.replaceChildren();
   });
 
+  it('morphs from the trigger card into the expanded overlay', () => {
+    const card = document.createElement('div');
+    card.className = 'home-class-tile';
+    const title = document.createElement('p');
+    title.className = 'home-class-tile__title';
+    title.textContent = 'Artist of the Floating World';
+    card.append(title);
+    document.body.append(card);
+
+    openEntityCardExpand(
+      {
+        kind: 'unit',
+        id: 'unit_aotfw',
+        title: 'Artist of the Floating World',
+        media: [],
+        fullPagePath: '/units/unit_aotfw',
+        editableTitle: true
+      },
+      {},
+      { trigger: card }
+    );
+
+    expect(document.querySelector('.hub-morph-dialog')).toBeTruthy();
+    expect(document.querySelector('.entity-card-expand')?.classList.contains('hub-morph-dialog__frame')).toBe(true);
+    expect(card.classList.contains('hub-morph-dialog__origin')).toBe(true);
+    expect(title.getAttribute('data-hub-morph')).toBe('title');
+  });
+
   it('opens an expanded panel with a full-page action', async () => {
     openEntityCardExpand({
       kind: 'unit',

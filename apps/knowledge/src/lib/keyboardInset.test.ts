@@ -6,6 +6,9 @@ describe("bindKeyboardInset", () => {
     vi.resetModules();
     vi.unstubAllGlobals();
     document.documentElement.style.removeProperty("--keyboard-inset");
+    document.documentElement.style.removeProperty("--vv-offset-top");
+    document.documentElement.style.removeProperty("--vv-height");
+    document.documentElement.style.removeProperty("--vv-offset-bottom");
   });
 
   it("writes the covered viewport height onto the document", async () => {
@@ -21,6 +24,9 @@ describe("bindKeyboardInset", () => {
     const { bindKeyboardInset } = await import("./keyboardInset");
     bindKeyboardInset();
     expect(document.documentElement.style.getPropertyValue("--keyboard-inset")).toBe("280px");
+    expect(document.documentElement.style.getPropertyValue("--vv-offset-top")).toBe("20px");
+    expect(document.documentElement.style.getPropertyValue("--vv-height")).toBe("500px");
+    expect(document.documentElement.style.getPropertyValue("--vv-offset-bottom")).toBe("280px");
     expect(listeners).toHaveLength(2);
   });
 });

@@ -1,0 +1,54 @@
+<!-- Compact note / value editor. Trigger morphs into the panel.
+     Load tokens.css → overlays.css → actions.css → morphing-popover.css
+     then mountMorphingPopovers(document) or createMorphingNotePopover / createMorphingValuesPopover. -->
+
+<div class="morphing-popover" data-morphing-popover data-morphing-title="Notes" data-morphing-supporting="A short note. Done writes it.">
+  <button class="btn btn--ghost" type="button" data-morphing-trigger>
+    <span data-morphing-label>Notes</span>
+  </button>
+  <div class="morphing-popover__panel" data-morphing-content hidden role="dialog" aria-label="Notes">
+    <div class="morphing-popover__head">
+      <h4 class="morphing-popover__title" data-morphing-label>Notes</h4>
+      <p class="morphing-popover__supporting">A short note. Done writes it.</p>
+    </div>
+    <div class="morphing-popover__body" data-morphing-body>
+      <textarea class="morphing-popover__note" rows="3" placeholder="What matters…"></textarea>
+      <div class="morphing-popover__actions">
+        <button class="btn btn--primary" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="morphing-popover" data-morphing-popover data-morphing-title="Dimensions" data-morphing-supporting="Set the dimensions for the layer.">
+  <button class="btn btn--secondary" type="button" data-morphing-trigger>
+    <span data-morphing-label>Dimensions</span>
+  </button>
+  <div class="morphing-popover__panel" data-morphing-content hidden role="dialog" aria-label="Dimensions">
+    <div class="morphing-popover__head">
+      <h4 class="morphing-popover__title" data-morphing-label>Dimensions</h4>
+      <p class="morphing-popover__supporting">Set the dimensions for the layer.</p>
+    </div>
+    <div class="morphing-popover__body" data-morphing-body>
+      <label class="morphing-popover__field" for="morph-width">
+        <span>Width</span>
+        <input id="morph-width" value="100%" autofocus>
+      </label>
+      <label class="morphing-popover__field" for="morph-max-width">
+        <span>Max. width</span>
+        <input id="morph-max-width" value="300px">
+      </label>
+      <label class="morphing-popover__field" for="morph-height">
+        <span>Height</span>
+        <input id="morph-height" value="25px">
+      </label>
+      <label class="morphing-popover__field" for="morph-max-height">
+        <span>Max. height</span>
+        <input id="morph-max-height" value="none">
+      </label>
+      <div class="morphing-popover__actions">
+        <button class="btn btn--primary" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+</div>

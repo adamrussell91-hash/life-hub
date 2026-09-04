@@ -1,0 +1,142 @@
+/* Morphing popover — trigger expands into a compact note / value editor.
+ * Blur fade matches the custom transition variants (250ms ease-out).
+ * Tokens only. Load after tokens.css + overlays.css.
+ */
+
+:root {
+  --morphing-popover-duration: 250ms;
+  --morphing-popover-ease: ease-out;
+  --morphing-popover-blur: 10px;
+  --morphing-popover-width: 20rem;
+}
+
+.morphing-popover {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.morphing-popover__trigger {
+  max-width: 100%;
+}
+
+.morphing-popover.is-open > .morphing-popover__trigger {
+  visibility: hidden;
+}
+
+.morphing-popover__panel {
+  box-sizing: border-box;
+  width: min(var(--morphing-popover-width), calc(100vw - var(--space-8)));
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--hub-tile-radius, var(--radius-md));
+  background: var(--hub-glass-fill, var(--glass));
+  box-shadow: var(--hub-elev-card, var(--elev-3));
+  color: var(--ink);
+}
+
+.morphing-popover__panel[hidden] {
+  display: none !important;
+}
+
+.morphing-popover__panel.is-floating {
+  position: fixed;
+  z-index: 60;
+  margin: 0;
+  overflow: hidden;
+}
+
+.morphing-popover__head {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.morphing-popover__title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  color: var(--ink);
+}
+
+.morphing-popover__supporting {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--muted);
+}
+
+.morphing-popover__body {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.morphing-popover__panel.is-animating .morphing-popover__body {
+  opacity: 0;
+  filter: blur(var(--morphing-popover-blur));
+}
+
+.morphing-popover__panel.is-ready .morphing-popover__body {
+  opacity: 1;
+  filter: blur(0);
+  transition:
+    opacity var(--morphing-popover-duration) var(--morphing-popover-ease),
+    filter var(--morphing-popover-duration) var(--morphing-popover-ease);
+}
+
+.morphing-popover__field {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 1fr) minmax(0, 2fr);
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.morphing-popover__field > span,
+.morphing-popover__field > label {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.morphing-popover__field input,
+.morphing-popover__field textarea,
+.morphing-popover__field select,
+.morphing-popover__note,
+.morphing-popover__panel input,
+.morphing-popover__panel textarea,
+.morphing-popover__panel select {
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.morphing-popover__note {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.morphing-popover__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .morphing-popover__panel.is-animating .morphing-popover__body,
+  .morphing-popover__panel.is-ready .morphing-popover__body {
+    opacity: 1;
+    filter: none;
+    transition: none;
+  }
+}

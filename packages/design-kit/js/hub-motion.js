@@ -19,7 +19,7 @@ const CARD_SELECTOR = [
   '.pcard'
 ].join(',');
 
-const SPOTLIGHT_SKIP = '.confirm-card, [role="dialog"], .create-modal, .search-palette';
+const SPOTLIGHT_SKIP = '.confirm-card, [role="dialog"], .create-modal, .search-palette, .hub-morph-dialog';
 
 const MAGNET_SELECTOR = [
   '.hub-pulse-card',
@@ -247,6 +247,123 @@ function enhanceCount(el, reduced) {
   runCount(el, el.textContent, reduced);
 }
 
+const pillResize = new WeakMap();
+
+export function isActiveHubPill(btn) {
+  if (!btn) return false;
+  return btn.classList.contains('is-active')
+    || btn.classList.contains('is-selected')
+    || btn.getAttribute('aria-selected') === 'true'
+    || btn.getAttribute('aria-checked') === 'true'
+    || btn.getAttribute('aria-pressed') === 'true';
+}
+
+function isLoosePills(group) {
+  return group.classList.contains('hub-pills--loose')
+    || group.getAttribute('data-hub-pills') === 'loose';
+}
+
+function directChild(group, className) {
+  return [...(group.children ?? [])].find(node => node.classList?.contains(className)) ?? null;
+}
+
+export function hubPillsButtons(group) {
+  return [...(group.children ?? [])].filter(node => node.classList?.contains('hub-pills__btn'));
+}
+
+function ensurePillThumb(group) {
+  let thumb = directChild(group, 'hub-pills__thumb');
+  if (thumb) return thumb;
+  const doc = group.ownerDocument ?? document;
+  thumb = doc.createElement('span');
+  thumb.className = 'hub-pills__thumb';
+  thumb.setAttribute('aria-hidden', 'true');
+  group.insertBefore(thumb, group.firstChild);
+  return thumb;
+}
+
+/**
+ * Slide the paper thumb under the selected option. Exclusive groups only.
+ * @param {Element} group
+ * @param {{ animate?: boolean, reduced?: boolean }} [options]
+ */
+export function applyHubPillsThumb(group, options = {}) {
+  if (!group?.style?.setProperty) return null;
+  if (isLoosePills(group)) {
+    group.classList.remove('is-ready', 'is-animated');
+    directChild(group, 'hub-pills__thumb')?.remove();
+    return null;
+  }
+
+  const buttons = hubPillsButtons(group);
+  if (buttons.length < 2) {
+    group.classList.remove('is-ready', 'is-animated');
+    return null;
+  }
+
+  const active = buttons.find(isActiveHubPill);
+  if (!active) {
+    group.classList.remove('is-ready');
+    return null;
+  }
+
+  const missingThumb = !directChild(group, 'hub-pills__thumb');
+  ensurePillThumb(group);
+
+  const box = {
+    x: `${active.offsetLeft}px`,
+    y: `${active.offsetTop}px`,
+    w: `${active.offsetWidth}px`,
+    h: `${active.offsetHeight}px`
+  };
+  group.style.setProperty('--hub-pill-x', box.x);
+  group.style.setProperty('--hub-pill-y', box.y);
+  group.style.setProperty('--hub-pill-w', box.w);
+  group.style.setProperty('--hub-pill-h', box.h);
+  group.classList.add('is-ready');
+
+  const reduced = options.reduced ?? prefersReducedMotion(group);
+  const animate = options.animate !== false && !reduced && !missingThumb;
+  group.classList.toggle('is-animated', animate);
+  return box;
+}
+
+function watchPillsSize(group) {
+  if (pillResize.has(group) || typeof ResizeObserver === 'undefined') return;
+  const ro = new ResizeObserver(() => applyHubPillsThumb(group));
+  ro.observe(group);
+  pillResize.set(group, ro);
+}
+
+function enhancePills(group, reduced) {
+  if (!group?.classList?.contains('hub-pills')) return;
+  if (isLoosePills(group)) return;
+
+  if (group.dataset.hubPills !== '1') {
+    group.dataset.hubPills = '1';
+    group.addEventListener('click', () => {
+      requestAnimationFrame(() => applyHubPillsThumb(group));
+    });
+    watchPillsSize(group);
+  }
+
+  const first = !group.classList.contains('is-ready');
+  applyHubPillsThumb(group, { animate: !first, reduced });
+  if (first && !reduced) {
+    requestAnimationFrame(() => {
+      if (group.classList.contains('is-ready')) group.classList.add('is-animated');
+    });
+  }
+}
+
+function syncPillsFromTarget(target, reduced) {
+  const btn = target.closest?.('.hub-pills__btn');
+  const group = (btn?.parentElement?.classList.contains('hub-pills') ? btn.parentElement : null)
+    ?? target.closest?.('.hub-pills')
+    ?? (target.classList?.contains('hub-pills') ? target : null);
+  if (group) enhancePills(group, reduced);
+}
+
 function scan(root, reduced) {
   const scope = root.nodeType === 1 || root.nodeType === 9 || root.nodeType === 11 ? root : root.parentElement;
   if (!scope?.querySelectorAll) return;
@@ -256,11 +373,14 @@ function scan(root, reduced) {
   for (const el of scope.querySelectorAll(LIST_SELECTOR)) enhanceList(el, reduced);
   for (const el of scope.querySelectorAll(COUNT_SELECTOR)) enhanceCount(el, reduced);
   for (const el of scope.querySelectorAll(KINETIC_SELECTOR)) enhanceKinetic(el, reduced);
+  for (const el of scope.querySelectorAll('.hub-pills')) enhancePills(el, reduced);
 
   if (scope.matches?.(CARD_SELECTOR)) enhanceCard(scope, reduced);
   if (scope.matches?.(MAGNET_SELECTOR)) enhanceMagnet(scope, reduced);
   if (scope.matches?.(LIST_SELECTOR)) enhanceList(scope, reduced);
   if (scope.matches?.(KINETIC_SELECTOR)) enhanceKinetic(scope, reduced);
+  if (scope.matches?.('.hub-pills')) enhancePills(scope, reduced);
+  else syncPillsFromTarget(scope, reduced);
 }
 
 function watchKinetic(mutations, reduced) {
@@ -310,8 +430,17 @@ export function startHubMotion(root = document) {
     watchCounts(mutations, nextReduced);
     watchKinetic(mutations, nextReduced);
     for (const mutation of mutations) {
-      if (mutation.type === 'attributes' && mutation.attributeName === 'data-state') {
-        scan(mutation.target, nextReduced);
+      if (mutation.type === 'attributes') {
+        if (mutation.attributeName === 'data-state') {
+          scan(mutation.target, nextReduced);
+        }
+        if (
+          mutation.attributeName === 'aria-selected'
+          || mutation.attributeName === 'aria-pressed'
+          || mutation.attributeName === 'aria-checked'
+        ) {
+          syncPillsFromTarget(mutation.target, nextReduced);
+        }
       }
       for (const node of mutation.addedNodes) {
         if (node.nodeType === 1) scan(node, nextReduced);
@@ -324,7 +453,7 @@ export function startHubMotion(root = document) {
     childList: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['data-state']
+    attributeFilter: ['data-state', 'aria-selected', 'aria-pressed', 'aria-checked']
   });
 }
 

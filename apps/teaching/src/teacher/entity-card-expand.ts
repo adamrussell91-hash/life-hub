@@ -5,6 +5,7 @@ import { renderEntityBanner } from '@/teacher/entity-banner';
 import { getLesson } from '@/teacher/lessons-library/api';
 import { patchClass } from '@/teacher/schedule-api';
 import { patchUnit } from '@/teacher/unit-api';
+import { openMorphingDialog } from '../../design-kit/js/morphing-dialog.js';
 
 export type EntityCardKind = 'lesson' | 'unit' | 'class';
 
@@ -77,13 +78,18 @@ async function hydrateLessonCover(model: EntityCardExpandModel): Promise<Cover |
   return lesson.cover ?? null;
 }
 
+export interface OpenEntityCardExpandOptions {
+  trigger?: HTMLElement | null;
+}
+
 /**
  * Opens a glass expanded card for quick looks and light edits, with a full-page
  * escape hatch. Only one expand panel is open at a time.
  */
 export function openEntityCardExpand(
   model: EntityCardExpandModel,
-  callbacks: EntityCardExpandCallbacks = {}
+  callbacks: EntityCardExpandCallbacks = {},
+  options: OpenEntityCardExpandOptions = {}
 ): { close: () => void } {
   if (activeClose) activeClose();
 
@@ -94,10 +100,6 @@ export function openEntityCardExpand(
   let currentCover = model.cover ?? null;
   let currentEyebrow = model.eyebrow;
   const editableTitle = model.editableTitle ?? model.kind !== 'class';
-
-  const backdrop = document.createElement('div');
-  backdrop.className = 'create-modal-backdrop entity-card-expand-backdrop';
-  backdrop.dataset.entityCardExpand = 'backdrop';
 
   const dialog = document.createElement('div');
   dialog.className = 'entity-card-expand glass-panel glass-tile';
@@ -126,16 +128,19 @@ export function openEntityCardExpand(
   titleInput.type = 'text';
   titleInput.id = 'entity-card-expand-title';
   titleInput.className = 'entity-card-expand__title-input';
+  titleInput.setAttribute('data-hub-morph', 'title');
   titleInput.value = model.title;
   titleInput.setAttribute('aria-label', 'Title');
 
   const titleHeading = document.createElement('h2');
   titleHeading.id = 'entity-card-expand-title';
   titleHeading.className = 'entity-card-expand__title';
+  titleHeading.setAttribute('data-hub-morph', 'title');
   titleHeading.textContent = model.title;
 
   const meta = document.createElement('p');
   meta.className = 'entity-card-expand__meta';
+  meta.setAttribute('data-hub-morph', 'subtitle');
   if (model.metaText) meta.textContent = model.metaText;
 
   const preview = document.createElement('p');
@@ -164,8 +169,6 @@ export function openEntityCardExpand(
   body.append(errorBanner, footer);
 
   dialog.append(header, bannerHost, body);
-  backdrop.append(dialog);
-  document.body.append(backdrop);
 
   const banner = renderEntityBanner(bannerHost, {
     cover: currentCover,
@@ -217,33 +220,33 @@ export function openEntityCardExpand(
     }
   };
 
+  const session = openMorphingDialog({
+    trigger: options.trigger ?? null,
+    frame: dialog,
+    backdropClass: 'create-modal-backdrop entity-card-expand-backdrop',
+    closeButton: false,
+    labelledBy: 'entity-card-expand-title',
+    onRequestClose: () => close(),
+    onClose: () => {
+      banner.dispose();
+      if (activeClose === closeSelf) activeClose = null;
+      callbacks.onClose?.();
+    }
+  });
+  const backdrop = session.backdrop;
+  if (backdrop) backdrop.dataset.entityCardExpand = 'backdrop';
+
   const close = (): void => {
     if (disposed) return;
     disposed = true;
-    document.removeEventListener('keydown', onKeyDown);
     void saveTitle().finally(() => {
-      banner.dispose();
-      backdrop.remove();
-      if (activeClose === closeSelf) activeClose = null;
-      callbacks.onClose?.();
+      session.close();
     });
   };
 
   const closeSelf = close;
-
-  const onKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      close();
-    }
-  };
-
   activeClose = closeSelf;
 
-  document.addEventListener('keydown', onKeyDown);
-  backdrop.addEventListener('click', (event) => {
-    if (event.target === backdrop) close();
-  });
   closeBtn.addEventListener('click', () => close());
   fullPageBtn.addEventListener('click', () => {
     void saveTitle().finally(() => {
@@ -312,7 +315,7 @@ export function wireEntityCardExpand(
         click.preventDefault();
       }
     }
-    openEntityCardExpand(model, callbacks);
+    openEntityCardExpand(model, callbacks, { trigger: host });
   };
 
   const onClick = (event: MouseEvent): void => open(event);

@@ -1,4 +1,8 @@
 import {
+  createMorphingNotePopover,
+  createMorphingValuesPopover
+} from '../../../../packages/design-kit/js/morphing-popover.js';
+import {
   CABLE_TYPES,
   INTENSIFICATIONS,
   appendSet,
@@ -8,6 +12,12 @@ import {
 
 const cableLabel = value => String(value ?? 'none').replaceAll('_', ' ');
 const intensificationLabel = value => String(value ?? '').replaceAll('_', ' ');
+
+function previewNote(text) {
+  const compact = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (compact.length <= 28) return compact;
+  return `${compact.slice(0, 27).trimEnd()}…`;
+}
 
 function labeledNumber(root, { label, value, step = '1', inputMode = 'decimal', onInput }) {
   const wrap = root.createElement('label');
@@ -365,39 +375,42 @@ export function renderFitnessLogger(root, draft, {
     chip.addEventListener('click', () => onChange?.({ type: 'pain-remove', index }));
     painList.append(chip);
   });
-  const painForm = root.createElement('div');
-  painForm.className = 'fitness-logger__pain-form';
-  const painSite = root.createElement('input');
-  painSite.type = 'text';
-  painSite.placeholder = 'Pain site';
-  painSite.setAttribute('aria-label', 'Pain site');
-  const painNote = root.createElement('input');
-  painNote.type = 'text';
-  painNote.placeholder = 'Note';
-  painNote.setAttribute('aria-label', 'Pain note');
-  const painAdd = root.createElement('button');
-  painAdd.type = 'button';
-  painAdd.className = 'btn btn--secondary quiet-button';
-  painAdd.textContent = 'Add pain flag';
-  painAdd.addEventListener('click', () => {
-    onChange?.({ type: 'pain-add', site: painSite.value, note: painNote.value });
-    painSite.value = '';
-    painNote.value = '';
+  const painPopover = createMorphingValuesPopover({
+    root,
+    label: 'Add pain flag',
+    title: 'Pain flag',
+    supporting: 'Site and an optional note.',
+    layoutId: `fitness-pain-${draft.path ?? 'session'}`,
+    triggerClass: 'btn btn--secondary quiet-button',
+    className: 'fitness-logger__pain-form',
+    submitLabel: 'Add',
+    fields: [
+      { name: 'site', label: 'Site', placeholder: 'Pain site', autoFocus: true },
+      { name: 'note', label: 'Note', placeholder: 'Note' }
+    ],
+    onSubmit(values, api) {
+      onChange?.({ type: 'pain-add', site: values.site, note: values.note });
+      api.close();
+    }
   });
-  painForm.append(painSite, painNote, painAdd);
-  pain.append(painList, painForm);
+  pain.append(painList, painPopover.el);
   details.append(pain);
   host.append(details);
 
-  const notesLabel = root.createElement('label');
-  notesLabel.className = 'fitness-logger__notes';
-  notesLabel.textContent = 'Session notes';
-  const notes = root.createElement('textarea');
-  notes.rows = 3;
-  notes.value = draft.notes ?? '';
-  notes.addEventListener('input', () => onChange?.({ type: 'notes', value: notes.value }));
-  notesLabel.append(notes);
-  host.append(notesLabel);
+  const noteText = String(draft.notes ?? '').trim();
+  const notesPopover = createMorphingNotePopover({
+    root,
+    label: noteText ? previewNote(noteText) : 'Session notes',
+    title: 'Session notes',
+    supporting: 'Anything to remember from this session.',
+    placeholder: 'How did it feel?',
+    value: draft.notes ?? '',
+    rows: 3,
+    className: 'fitness-logger__notes',
+    layoutId: `fitness-notes-${draft.path ?? 'session'}`,
+    onChange: value => onChange?.({ type: 'notes', value })
+  });
+  host.append(notesPopover.el);
 
   const finish = root.createElement('button');
   finish.type = 'button';

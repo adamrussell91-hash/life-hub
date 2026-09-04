@@ -7,10 +7,13 @@ import { filterPickerOptions, optionPickerListHtml } from "../ui/optionPicker";
 import { bookContextLine, bookOrigin, normalizeBookContext, resolveBookLabel, type BookContext } from "./bookNote";
 import { CHAT_HATS, DEPTHS, SCOPES, hatById, isChatHatId, resolveChatPlan, type ChatDepth, type ChatHatId, type ChatScope } from "./hats";
 import { renderChatMarkdown, type NoteTitle } from "./noteLinks";
+import { CHAT_PERSONALITIES } from "./personalities";
 import { researchFromFindings, searchedNotesHtml, thinkingHistoryHtml } from "./sources";
 import { BOOK_NOTE_WAIT_LINES, CLEMENTINE_WAIT_LINES, appendTick, chatTick, pickClementineWaitLine } from "./ticker";
 import { briefIsSavable, briefToPage, type SavableFinding } from "./saveBrief";
 import type { ChatTurnResult } from "./chatTurn";
+
+const CLEMENTINE = CHAT_PERSONALITIES[0]!;
 
 export type ChatRailHost = {
   app: HTMLElement;
@@ -18,7 +21,12 @@ export type ChatRailHost = {
   render: () => void;
   onOpenPage?: (pageId: string, title?: string) => void;
   onSavedPage?: (page: Page) => Promise<void> | void;
-  pageHeader: (eyebrow: string, title: string, actionsInner?: string) => string;
+  pageHeader: (
+    eyebrow: string,
+    title: string,
+    actionsInner?: string,
+    opts?: { portraitSrc?: string; portraitAlt?: string },
+  ) => string;
   archiveNotes?: NoteTitle[];
   bookLabels?: string[];
 };
@@ -462,6 +470,44 @@ function noteComposerHtml(fromBook: boolean, placeholder: string) {
   </form>`;
 }
 
+function assistantPortrait() {
+  return `<img class="chat-message__avatar" src="${CLEMENTINE.avatarSrc}" alt="${escapeHtml(CLEMENTINE.name)}" width="36" height="36" />`;
+}
+
+function turnHtml(
+  turn: ChatTurn,
+  index: number,
+  opts: { lastTurn: boolean; canSave: boolean; archiveNotes?: NoteTitle[] },
+) {
+  const body =
+    turn.role === "assistant"
+      ? `<div class="coach-msg__body">${renderChatMarkdown(turn.content, turn.findings, opts.archiveNotes)}</div>`
+      : `<div class="coach-msg__body coach-msg__body--plain">${escapeHtml(turn.content)}</div>`;
+  if (turn.role === "assistant") {
+    return `<article class="coach-msg coach-msg--assistant glass-panel coach-msg--with-portrait">
+      ${assistantPortrait()}
+      <div class="coach-msg__copy">
+        <p class="coach-msg__who">${escapeHtml(CLEMENTINE.shortName)}</p>
+        ${body}
+        ${turn.archiveFailed ? `<p class="alchemist__error">Archive pull failed this turn — she continued with what she had.</p>` : ""}
+        ${turn.coverageThin ? `<p class="alchemist__mode">Coverage is thin.</p>` : ""}
+        ${
+          turn.canSearchOutside
+            ? `<button type="button" data-search-outside ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>Search outside</button>`
+            : ""
+        }
+        ${turn.ticks?.length ? thinkingHistoryHtml(turn.ticks, thinkingOpen && opts.lastTurn) : ""}
+        ${turn.findings?.length ? searchedNotesHtml(turn.findings, sourcesOpen.has(index), index) : ""}
+        ${opts.lastTurn ? saveCardHtml(opts.canSave) : ""}
+      </div>
+    </article>`;
+  }
+  return `<article class="coach-msg coach-msg--user glass-panel">
+    <p class="coach-msg__who">You</p>
+    ${body}
+  </article>`;
+}
+
 export function renderChatRail(host: ChatRailHost) {
   restore();
   bindKeyboardInset();
@@ -477,37 +523,30 @@ export function renderChatRail(host: ChatRailHost) {
   const bookLabels = host.bookLabels ?? [];
   const threadHtml = turns.length
     ? turns
-        .map((turn, index) => {
-          const lastTurn = index === turns.length - 1;
-          const body =
-            turn.role === "assistant"
-              ? `<div class="coach-msg__body">${renderChatMarkdown(turn.content, turn.findings, host.archiveNotes)}</div>`
-              : `<div class="coach-msg__body coach-msg__body--plain">${escapeHtml(turn.content)}</div>`;
-          return `<article class="coach-msg coach-msg--${turn.role} glass-panel">
-                    <p class="coach-msg__who">${turn.role === "user" ? "You" : "Clementine"}</p>
-                    ${body}
-                    ${turn.archiveFailed ? `<p class="alchemist__error">Archive pull failed this turn — she continued with what she had.</p>` : ""}
-                    ${turn.coverageThin ? `<p class="alchemist__mode">Coverage is thin.</p>` : ""}
-                    ${
-                      turn.canSearchOutside
-                        ? `<button type="button" data-search-outside ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>Search outside</button>`
-                        : ""
-                    }
-                    ${turn.role === "assistant" && turn.ticks?.length ? thinkingHistoryHtml(turn.ticks, thinkingOpen && lastTurn) : ""}
-                    ${turn.findings?.length ? searchedNotesHtml(turn.findings, sourcesOpen.has(index), index) : ""}
-                    ${lastTurn && turn.role === "assistant" ? saveCardHtml(canSave) : ""}
-                  </article>`;
-        })
+        .map((turn, index) =>
+          turnHtml(turn, index, {
+            lastTurn: index === turns.length - 1,
+            canSave,
+            archiveNotes: host.archiveNotes,
+          }),
+        )
         .join("")
     : fromBook
       ? ""
-      : `<p class="empty">${current.plan}</p>`;
+      : `<article class="coach-msg coach-msg--assistant glass-panel coach-msg--with-portrait">
+          ${assistantPortrait()}
+          <div class="coach-msg__copy">
+            <p class="coach-msg__who">${escapeHtml(CLEMENTINE.shortName)}</p>
+            <div class="coach-msg__body">${escapeHtml(current.plan)}</div>
+          </div>
+        </article>`;
   host.shell(`
     ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · Chat needs the Netlify API (session + Anthropic). The browser never talks to the research kernel.</p>` : ""}
     ${host.pageHeader(
-      "Professor Clementine Haig",
+      CLEMENTINE.shortName,
       fromBook ? "From a book" : "Chat",
       `<button class="btn btn--ghost" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
+      { portraitSrc: CLEMENTINE.avatarSrc, portraitAlt: CLEMENTINE.name },
     )}
     <section class="coach chat${fromBook ? " chat--from-book" : ""}">
       <div class="chat__sitting glass-panel">
