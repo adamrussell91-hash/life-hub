@@ -15,6 +15,11 @@ import {
   applyShowAllTuning,
   attachGraphSearch,
   canvasRadius,
+  constellationCollisionRadius,
+  constellationLinkDistance,
+  constellationLinkStrength,
+  constellationNodeCharge,
+  constellationTargetStrength,
   fitViewToNodes,
   focusViewOnNode,
   forceStageSize,
@@ -191,56 +196,24 @@ export function mountForceGraph(
         "link",
         forceLink<GraphNodeDatum, GraphLinkDatum>(simLinks)
           .id(node => node.id)
-          .distance(link => {
-            if (link.kind === "spoke") return 72;
-            if (link.kind === "orbit") return 140;
-            return 240 + Math.min(140, link.weight / 5);
-          })
-          .strength(link => {
-            if (link.kind === "spoke") return 0.65;
-            if (link.kind === "orbit") return 0.35;
-            return 0.04;
-          }),
+          .distance(constellationLinkDistance)
+          .strength(constellationLinkStrength),
       )
       .force(
         "charge",
-        forceManyBody<GraphNodeDatum>()
-          .strength(node => {
-            if (node.kind === "leaf") return 0;
-            if (node.kind === "major") return -2400;
-            if (node.kind === "minor") return -320;
-            return -28;
-          })
-          .distanceMax(1200),
+        forceManyBody<GraphNodeDatum>().strength(constellationNodeCharge).distanceMax(1200),
       )
       .force(
         "x",
-        forceX<GraphNodeDatum>(node => node.x ?? 760).strength(node => {
-          if (node.kind === "leaf") return 0;
-          if (node.kind === "major") return 0.12;
-          if (node.kind === "minor") return 0.06;
-          return 0.02;
-        }),
+        forceX<GraphNodeDatum>(node => node.x ?? 760).strength(constellationTargetStrength),
       )
       .force(
         "y",
-        forceY<GraphNodeDatum>(node => node.y ?? 560).strength(node => {
-          if (node.kind === "leaf") return 0;
-          if (node.kind === "major") return 0.12;
-          if (node.kind === "minor") return 0.06;
-          return 0.02;
-        }),
+        forceY<GraphNodeDatum>(node => node.y ?? 560).strength(constellationTargetStrength),
       )
       .force(
         "collide",
-        forceCollide<GraphNodeDatum>()
-          .radius(node => {
-            if (node.kind === "leaf") return 0;
-            if (node.kind === "major") return node.r + 44;
-            if (node.kind === "minor") return node.r + 18;
-            return node.r + 8;
-          })
-          .strength(0.95),
+        forceCollide<GraphNodeDatum>().radius(constellationCollisionRadius).strength(0.95),
       )
       .alphaDecay(0.02)
       .velocityDecay(0.4)
