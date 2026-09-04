@@ -46,7 +46,7 @@ button, input { font: inherit; }
 button {
   transition: transform 120ms ease, opacity 120ms ease, filter 120ms ease, background-color 120ms ease;
 }
-button:active:not(:disabled),
+button:active:not(:disabled):not(.hub-toggle),
 .nav-item:active,
 .mobile-nav button:active,
 .floating-chat-button:active,
@@ -171,8 +171,11 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
 
 .rail-nav {
   display: grid;
+  grid-template-columns: 1fr;
+  align-content: start;
   gap: 0.25rem;
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   overflow-x: auto;
   overflow-y: auto;

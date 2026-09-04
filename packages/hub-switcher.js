@@ -51,18 +51,20 @@ function chevronSvg() {
 
 function accordionRowHtml(hub, currentId) {
   const current = hub.id === currentId;
-  return `<div class="hub-row${current ? ' is-active' : ''}" data-hub="${hub.id}">
-    <a class="hub-label" href="${hub.origin}"${current ? ' aria-current="page"' : ''}>
-      <span class="nav-glyph" aria-hidden="true">${iconSvg(hub.paths)}</span>
-      <span>${hub.title}</span>
-    </a>
-    <button class="hub-toggle" type="button" data-hub-toggle="${hub.id}" aria-label="Preview ${hub.title}" aria-expanded="false">
-      ${chevronSvg()}
-    </button>
-  </div>
-  <div class="hub-panel" data-hub-panel="${hub.id}">
-    <div class="hub-panel-inner" data-hub-preview="${hub.id}">
-      <div class="hub-preview-item">${hub.eyebrow}</div>
+  return `<div class="hub-stack">
+    <div class="hub-row${current ? ' is-active' : ''}" data-hub="${hub.id}">
+      <a class="hub-label" href="${hub.origin}"${current ? ' aria-current="page"' : ''}>
+        <span class="nav-glyph" aria-hidden="true">${iconSvg(hub.paths)}</span>
+        <span>${hub.title}</span>
+      </a>
+      <button class="hub-toggle" type="button" data-hub-toggle="${hub.id}" aria-label="Preview ${hub.title}" aria-expanded="false">
+        ${chevronSvg()}
+      </button>
+    </div>
+    <div class="hub-panel" data-hub-panel="${hub.id}">
+      <div class="hub-panel-inner" data-hub-preview="${hub.id}">
+        <div class="hub-preview-item">${hub.eyebrow}</div>
+      </div>
     </div>
   </div>`;
 }
