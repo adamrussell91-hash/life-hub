@@ -72,7 +72,7 @@ Domain colour belongs on the **canvas** (tiles, charts, chips), not on the rail.
 
 ## Sections and shortcuts
 
-Optional `.hub-rail__section` — uppercase micro, `--text-2xs`, `--on-dark-muted` (`Domains`, `Your classes`).
+Optional `.hub-rail__section` — uppercase micro, `--text-2xs`, `--on-dark-muted` (`Domains`, `Your classes`). A `<button>` is allowed for an accordion toggle; it must stay on-dark (no native button fill).
 
 Instance shortcuts under a section (Teaching class codes) may use `.hub-rail__link.hub-rail__link--plain` (no icon). Same row height and padding. Still no dots.
 

@@ -67,6 +67,14 @@ test('hub accordion CSS uses the 0fr to 1fr height trick with an explicit column
   assert.doesNotMatch(css, /\.hub-panel-inner\s*\{[^}]*transition:\s*padding/s);
 });
 
+test('rail section labels reset native button chrome so they stay on-dark', async () => {
+  const css = await readFile(new URL('../../packages/design-kit/rail.css', import.meta.url), 'utf8');
+  assert.match(css, /\.hub-rail__section\s*\{[^}]*background:\s*transparent/s);
+  assert.match(css, /\.hub-rail__section\s*\{[^}]*border:\s*0/s);
+  assert.match(css, /\.hub-rail__section\s*\{[^}]*appearance:\s*none/s);
+  assert.match(css, /\.hub-rail__section\s*\{[^}]*color:\s*var\(--on-dark-muted\)/s);
+});
+
 test('Life rail puts domains inside the Life accordion, not a flat Domains list', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   assert.match(html, /data-hub-accordion/);
