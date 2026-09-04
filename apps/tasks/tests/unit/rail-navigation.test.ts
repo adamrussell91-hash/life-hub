@@ -39,6 +39,8 @@ describe('primary rail navigation', () => {
   it('keeps the phone rail in the DOM but hidden on desktop', () => {
     expect(hubCss).toMatch(/\.hub-rail__mobile\s*\{\s*display:\s*none;/);
     expect(hubCss).toMatch(/\.hub-rail__section-panel\[data-open="true"\]/);
+    expect(hubCss).toMatch(/align-self:\s*start;/);
+    expect(hubCss).toMatch(/min-height:\s*100dvh;/);
     const host = document.createElement('div');
     renderPrimaryNav(host, 'board');
     expect(host.querySelector('.hub-rail__list--desktop')).not.toBeNull();
