@@ -6,21 +6,34 @@ const viewsCss = readFileSync(path.resolve(process.cwd(), 'src/styles/views.css'
 
 describe('mobile overlay chat form', () => {
   it('stacks the composer as a column so Send sits under the textarea', () => {
-    const formRule = viewsCss.match(
-      /\.chat-view\[data-panel-mode='overlay'\]\s+\.chat-form\s*\{([^}]+)\}/g
+    expect(viewsCss).toMatch(
+      /\.chat-view\s+\.chat-form\s*\{[^}]*flex-direction:\s*column/
     );
-    expect(formRule?.some((rule) => /flex-direction:\s*column/.test(rule))).toBe(true);
   });
 
-  it('makes the textarea full width under the overlay form', () => {
-    expect(viewsCss).toMatch(
-      /\.chat-view\[data-panel-mode='overlay'\]\s+\.chat-input[\s\S]{0,80}width:\s*100%/
-    );
+  it('makes the textarea full width under the chat form on mobile', () => {
+    expect(viewsCss).toMatch(/\.chat-view\s+\.chat-input[\s\S]{0,120}width:\s*100%/);
+    expect(viewsCss).toMatch(/\.chat-view\s+#chat-input[\s\S]{0,120}min-width:\s*0/);
   });
 
   it('uses compact texting-sized bubbles on mobile', () => {
     expect(viewsCss).toMatch(/max-width:\s*min\(82%,\s*17\.5rem\)/);
     expect(viewsCss).toMatch(/\.chat-message__avatar\s*\{[^}]*width:\s*1\.6rem/);
+  });
+
+  it('raises the floating chat button above the locked mobile nav', () => {
+    expect(viewsCss).toMatch(
+      /\.floating-chat-button\s*\{[^}]*bottom:\s*calc\(5\.5rem\s*\+\s*env\(safe-area-inset-bottom/
+    );
+  });
+
+  it('keeps the mobile overlay edge-to-edge without 100vw overflow', () => {
+    expect(viewsCss).toMatch(
+      /\.chat-view\[data-panel-mode='overlay'\]\s*\{[^}]*width:\s*100%/
+    );
+    expect(viewsCss).toMatch(
+      /\.chat-view\[data-panel-mode='overlay'\]\s*\{[^}]*max-width:\s*100%/
+    );
   });
 });
 
@@ -44,6 +57,12 @@ describe('chat message bubbles', () => {
     );
     expect(viewsCss).toMatch(
       /\.hub-layout\[data-hub-view='clare'\]\s+\.chat-message\s*\{[^}]*max-width:\s*100%/
+    );
+  });
+
+  it('clears the mobile nav under the full-page Clare canvas', () => {
+    expect(viewsCss).toMatch(
+      /\.hub-layout\[data-hub-view='clare'\]\s+\.hub-canvas\s*\{[^}]*padding-bottom:\s*calc\(5\.5rem/
     );
   });
 });
