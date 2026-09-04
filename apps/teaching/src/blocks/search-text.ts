@@ -73,6 +73,7 @@ function extractBlock(block: Block, parts: string[]): void {
     case 'flashcards':
     case 'self_check':
     case 'timeline':
+    case 'card_stack':
     case 'accordion':
     case 'table':
     case 'chart':

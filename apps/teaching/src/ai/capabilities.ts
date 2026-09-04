@@ -126,6 +126,7 @@ const BY_TYPE: Partial<Record<Block['block_type'], AiAction[]>> = {
   accordion: ACCORDION_TABS,
   tabs: ACCORDION_TABS,
   timeline: TIMELINE,
+  card_stack: TIMELINE,
   collection: COLLECTION,
   outcomes: [],
   html: HTMLISH,
