@@ -158,6 +158,34 @@ End with: next 3 concrete steps for Cursor local agent — no patches.
 If auth, life-hub-data boundary, or public student URL safety looks wrong, open with DO NOT MERGE YET.
 ```
 
+### C — Post-fold audit (observe-only, thorough)
+
+Hub API consolidation is complete. Use this when Adam wants a sweep for leftover breakage.
+
+```text
+You are the consolidation overseer running the post-fold audit.
+
+Read and obey, in this order:
+  docs/consolidation/OVERSEER.md
+  docs/consolidation/plan.md
+  docs/consolidation/POST-FOLD-AUDIT.md
+
+Hard rules:
+- Observe-only. Do not edit application code, configs, or design-kit files.
+- Do not git add / commit / push / open PRs / delete sites / rotate tokens.
+- Do not print secret values or ask for the Life passphrase.
+- Do not treat widgets migration or GITHUB_TOKEN rotation as work to do.
+- You MAY create exactly one report: docs/consolidation/checkpoints/checkpoint-10.md
+  (next unused NN if 10 exists).
+
+Task: run every check in POST-FOLD-AUDIT.md against origin/main (pull first).
+For each check record PASS / FAIL / SKIP with evidence (command + output snippet, or file:line).
+A known product leftover is not a consolidation FAIL unless it breaks an invariant.
+
+Write the checkpoint using the template at the bottom of POST-FOLD-AUDIT.md.
+If auth, life-hub-data, Knowledge-repo targeting, or public student URL safety is wrong, verdict is DO NOT TREAT PRODUCTION AS SAFE.
+```
+
 ---
 
 ## Checkpoint report template
@@ -209,5 +237,6 @@ PASS | PASS WITH NITS | DO NOT MERGE YET
 | After Netlify/git retarget documented or done | `checkpoint-02` |
 | After first non-Life section or calendar slice lands | `checkpoint-03` |
 | Before any production cutover / DNS flip | `checkpoint-NN` with explicit merge gate |
+| After hub API fold is complete | Phase C — `POST-FOLD-AUDIT.md` → `checkpoint-10` |
 
 Adam may insert extra checkpoints anytime; always observe-only unless he explicitly widens your mandate in writing in the prompt for that turn.
