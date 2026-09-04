@@ -5,7 +5,6 @@ export type KnowledgeMobileView =
   | "graph"
   | "timeline"
   | "chat"
-  | "visualiser"
   | "podcast"
   | "quiz"
   | string;
@@ -70,7 +69,7 @@ export function syncKnowledgeMobileChrome(
         id: "chat",
         label: "Chat",
         paths: CHAT,
-        current: view === "chat" || view === "visualiser",
+        current: view === "chat",
         onSelect: nav.goChat
       }
     ],
