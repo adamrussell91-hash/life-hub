@@ -12,6 +12,7 @@ This folder is the **single working area** for merging Adam’s hubs into one co
 |------|--------|---------|
 | [`plan.md`](./plan.md) | Cursor (writes/updates) | Source of truth for architecture, migrate order, status |
 | [`OVERSEER.md`](./OVERSEER.md) | Human + Cursor (rarely) | Claude Code’s role, scope, inventory blanks, report template |
+| [`POST-FOLD-AUDIT.md`](./POST-FOLD-AUDIT.md) | Cursor | Thorough post-consolidation test-spec for Claude Code (Phase C) |
 | [`checkpoints/`](./checkpoints/) | Claude Code (reports only) | Observe-only checkpoint reports: `checkpoint-NN.md` |
 
 ## Loop
