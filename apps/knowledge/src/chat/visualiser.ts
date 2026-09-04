@@ -12,8 +12,8 @@ export type PortraitIdea = {
 export const PORTRAIT_IDEAS: PortraitIdea[] = [
   {
     id: "now",
-    label: "Now",
-    explain: "The Chat tab as it ships: her name in type, no face. Overlay already has portraits; this workplace does not.",
+    label: "Plain",
+    explain: "Name in type only, no face. Kept as a contrast — shipped Chat uses header + thread portraits like the overlay.",
   },
   {
     id: "header",
@@ -33,7 +33,7 @@ export const PORTRAIT_IDEAS: PortraitIdea[] = [
   {
     id: "together",
     label: "Together",
-    explain: "Header plus thread. Overlay language at workplace scale: she greets you in the title and speaks with a face.",
+    explain: "Shipped. Header plus thread — overlay language at workplace scale: she greets you in the title and speaks with a face.",
   },
 ];
 
@@ -55,7 +55,7 @@ const SAMPLE_USER = "What does the archive actually support on retrieval practic
 const SAMPLE_REPLY =
   "The notes jointly support spaced retrieval as a catalyst, not a teaching style. It changes what students can do later, not how a lesson looks.";
 
-let idea: PortraitIdeaId = "header";
+let idea: PortraitIdeaId = "together";
 
 export function enterChatVisualiser(next?: PortraitIdeaId) {
   if (next && isPortraitIdeaId(next)) idea = next;

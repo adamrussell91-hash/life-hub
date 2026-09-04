@@ -24,7 +24,12 @@ function makeHost(): ChatRailHost {
     render() {
       renderChatRail(host);
     },
-    pageHeader: (eyebrow, title, extra = "") => `<header><p>${eyebrow}</p><h1>${title}</h1>${extra}</header>`,
+    pageHeader: (eyebrow, title, extra = "", opts) =>
+      `<header class="${opts?.portraitSrc ? "chat-presence-header" : ""}">${
+        opts?.portraitSrc
+          ? `<img class="chat-presence__portrait" src="${opts.portraitSrc}" alt="${opts.portraitAlt ?? ""}" width="56" height="56" />`
+          : ""
+      }<p>${eyebrow}</p><h1>${title}</h1>${extra}</header>`,
   };
   return host;
 }
@@ -51,6 +56,19 @@ describe("Knowledge chat rail protocol affordances", () => {
       expect(hat.getAttribute("aria-describedby")).toBe(tip?.id);
       expect(hat.getAttribute("title")).toBeNull();
     }
+  });
+
+  it("ships Clementine's portrait in the header and empty greeting", () => {
+    const host = makeHost();
+    host.render();
+    const headerFace = host.app.querySelector<HTMLImageElement>(".chat-presence__portrait");
+    expect(headerFace?.getAttribute("src")).toBe("/assets/agents/clementine.png");
+    expect(headerFace?.getAttribute("alt")).toBe("Professor Clementine Haig");
+    const greeting = host.app.querySelector(".coach-msg--assistant.coach-msg--with-portrait");
+    expect(greeting?.querySelector(".chat-message__avatar")?.getAttribute("src")).toBe(
+      "/assets/agents/clementine.png",
+    );
+    expect(greeting?.textContent).toMatch(/Clementine/);
   });
 
   it("rotates one Clementine wait line and clears it when the reply arrives", async () => {

@@ -226,13 +226,22 @@ function cardMeta(item: PageManifestEntry) {
   return topicKeywords(item.tags)[0] ?? "";
 }
 
-function pageHeader(eyebrow: string, title: string, actionsInner = "") {
+function pageHeader(
+  eyebrow: string,
+  title: string,
+  actionsInner = "",
+  opts?: { portraitSrc?: string; portraitAlt?: string },
+) {
   const utilities = hubUtilitiesHtml();
   const actions =
     actionsInner || utilities
       ? `<div class="page-header__actions">${actionsInner}${utilities}</div>`
       : "";
-  return `<header class="topbar page-header">
+  const portrait = opts?.portraitSrc
+    ? `<img class="chat-presence__portrait" src="${escapeHtml(opts.portraitSrc)}" alt="${escapeHtml(opts.portraitAlt ?? "")}" width="56" height="56" />`
+    : "";
+  return `<header class="topbar page-header${portrait ? " chat-presence-header" : ""}">
+      ${portrait}
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">${eyebrow}</p>
         <h1 class="page-header__title">${title}</h1>
