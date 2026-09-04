@@ -125,10 +125,9 @@ describe("Knowledge Hub rail", () => {
     expect(main).not.toContain('class="graph-wrap is-universe-dark"');
     expect(css).toContain("body:has(.chat-overlay) .floating-chat-button");
     expect(css).toContain("body:has(.coach.chat) #kh-chat-overlay");
-    expect(css).toContain("body:has(.chat-visualiser) #kh-chat-overlay");
-    expect(css).toContain(".chat-presence__portrait");
-    expect(main).toContain("openChatVisualiser");
-    expect(main).toContain("onOpenVisualiser");
+    expect(main).not.toContain("openChatVisualiser");
+    expect(main).not.toContain("onOpenVisualiser");
+    expect(main).not.toContain("Portrait ideas");
   });
 
   it("stacks the universe key under the version label in fullscreen so it does not cover chat", () => {

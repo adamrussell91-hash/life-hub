@@ -18,7 +18,6 @@ export type ChatRailHost = {
   render: () => void;
   onOpenPage?: (pageId: string, title?: string) => void;
   onSavedPage?: (page: Page) => Promise<void> | void;
-  onOpenVisualiser?: () => void;
   pageHeader: (eyebrow: string, title: string, actionsInner?: string) => string;
   archiveNotes?: NoteTitle[];
   bookLabels?: string[];
@@ -508,8 +507,7 @@ export function renderChatRail(host: ChatRailHost) {
     ${host.pageHeader(
       "Professor Clementine Haig",
       fromBook ? "From a book" : "Chat",
-      `<button class="btn btn--ghost" data-open-visualiser type="button">Portrait ideas</button>
-      <button class="btn btn--ghost" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
+      `<button class="btn btn--ghost" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
     )}
     <section class="coach chat${fromBook ? " chat--from-book" : ""}">
       <div class="chat__sitting glass-panel">
@@ -578,9 +576,6 @@ export function renderChatRail(host: ChatRailHost) {
     noteContext = undefined;
     persist();
     host.render();
-  });
-  host.app.querySelector<HTMLButtonElement>("[data-open-visualiser]")?.addEventListener("click", () => {
-    host.onOpenVisualiser?.();
   });
   host.app.querySelector<HTMLButtonElement>("[data-new-chat]")?.addEventListener("click", () => {
     if (busy || researchSessionId || writeSessionId) return;
