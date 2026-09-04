@@ -343,7 +343,8 @@ main { max-width: 76rem; margin: 0 auto; }
 .progress-track--marine span { background: linear-gradient(90deg, var(--marine), var(--wave)); }
 .progress-track--calm span { background: linear-gradient(90deg, #4d7b85, #78abb2); }
 .progress-track--logging span { background: linear-gradient(90deg, var(--wave), #82a9db); }
-.metric-footer, .metric-caption { display: flex; justify-content: space-between; margin: 0.65rem 0 0; color: var(--muted); font-size: var(--text-2xs); }
+.metric-footer { display: flex; justify-content: space-between; margin: 0.65rem 0 0; color: var(--muted); font-size: var(--text-2xs); }
+.metric-caption { margin: 0.65rem 0 0; color: var(--muted); font-size: var(--text-2xs); }
 .metric-footer strong, .metric-caption strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 
 .workout-summary { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 1.5rem; margin-top: 1.7rem; }
@@ -544,10 +545,10 @@ main { max-width: 76rem; margin: 0 auto; }
 .more-sheet__close {
   min-height: 44px;
   padding: 0.45rem 0.85rem;
-  border: 0;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  color: var(--muted);
-  background: rgba(55, 111, 183, 0.08);
+  color: var(--depth);
+  background: rgba(255, 255, 255, 0.92);
   font-size: var(--text-sm);
   font-weight: 700;
   cursor: pointer;
@@ -577,18 +578,19 @@ main { max-width: 76rem; margin: 0 auto; }
 .more-sheet__nav a:active {
   background: rgba(55, 111, 183, 0.1);
 }
-.more-sheet__nav .nav-dot,
-.more-sheet__nav .nav-glyph {
-  width: 0.7rem;
-  height: 0.7rem;
-  flex: 0 0 auto;
-}
 .more-sheet__nav .nav-glyph {
   display: grid;
   place-items: center;
-  width: 1rem;
-  font-size: var(--text-base);
-  line-height: 1;
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 1.125rem;
+  color: var(--muted);
+}
+.more-sheet__nav .nav-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  display: block;
+  object-fit: contain;
 }
 
 @keyframes breathe { from { opacity: 0.58; } to { opacity: 0.86; } }
@@ -602,8 +604,11 @@ main { max-width: 76rem; margin: 0 auto; }
 @media (max-width: 48rem) {
   body { background: linear-gradient(180deg, #fbfaf5, #f3f6fa); }
   .desktop-rail { display: none; }
-  .page-frame { margin-left: 0; padding: 0 1rem calc(6.5rem + env(safe-area-inset-bottom)); }
-  .topbar { padding: 1.45rem 0 1.35rem; align-items: flex-end; }
+  .page-frame {
+    margin-left: 0;
+    padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem calc(6.5rem + env(safe-area-inset-bottom));
+  }
+  .topbar { padding: 0.85rem 0 1.1rem; align-items: flex-end; }
   .topbar .eyebrow { display: block; }
   .topbar h1 { font-size: var(--font-size-page); }
   .topbar-actions { display: grid; grid-template-columns: repeat(2, auto); justify-items: stretch; gap: 0.35rem; }
@@ -1116,6 +1121,7 @@ main { max-width: 76rem; margin: 0 auto; }
 .nutrition--fat-over [data-nutrition="fat"],
 .nutrition--fat-over .metric-value [data-value="fat"],
 .nutrition--fat-over .metric-caption [data-percent="fat"],
+.nutrition--fat-over .metric-footer [data-percent="fat"],
 .nutrition--fat-over .macro-split__copy [data-split="fat"],
 .nutrition--fat-over .macro-split__copy [data-split="fat-pct"] {
   color: #b3261e;

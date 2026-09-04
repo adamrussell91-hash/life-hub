@@ -6568,25 +6568,39 @@ input.scope-timeline__note-title:focus-visible {
   /* design-kit/rail.css hides .hub-rail at 720px — Teaching keeps a compact strip. */
   .teacher-layout__rail.hub-rail {
     display: flex !important;
+    min-height: 0;
+    height: auto;
+    max-height: none;
   }
 
   /* minmax(0, 1fr), not 1fr: a 1fr track has an implicit min-width:auto and
      would be widened by the horizontally-scrolling nav row below. */
   .teacher-layout {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   .teacher-layout__main {
-    padding-top: var(--space-10);
+    padding-top: var(--space-4);
+    min-width: 0;
+    max-width: 100%;
   }
 
   .teacher-layout__utilities {
-    top: var(--space-2);
+    top: max(var(--space-2), env(safe-area-inset-top, 0px));
     right: var(--space-3);
   }
 
   .teacher-layout__canvas {
     padding: var(--space-4) var(--space-3) var(--space-8);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .teacher-layout__rail > .hub-rail__hubs {
+    margin-top: 0;
   }
 
   .teacher-layout__context-bar {
@@ -6636,7 +6650,14 @@ input.scope-timeline__note-title:focus-visible {
   .teacher-layout__rail {
     flex-direction: column;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    padding: max(var(--space-2), env(safe-area-inset-top, 0px)) var(--space-3) var(--space-2);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
   }
 
   .teacher-layout__rail-toggle {

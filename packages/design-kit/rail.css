@@ -336,7 +336,57 @@ a.hub-rail__brand:focus-visible {
 }
 
 @media (max-width: 720px) {
+  /* Life (and any hub with a bottom nav) hide the rail. Teaching / Tasks /
+     Knowledge force it back on as a compact top strip — keep that strip short. */
   .hub-rail {
     display: none;
+    min-height: 0;
+    height: auto;
+  }
+
+  /* Hub accordion is desktop-only. On a forced-visible mobile rail, flatten to
+     a single horizontally scrolling row of hub links (no chevrons / previews). */
+  .hub-rail__hubs {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    gap: var(--space-1);
+    margin-top: 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .hub-rail__hubs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hub-rail__hubs > .hub-rail__section {
+    display: none;
+  }
+
+  .hub-rail__hubs .hub-stack {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .hub-rail__hubs .hub-toggle,
+  .hub-rail__hubs .hub-panel {
+    display: none !important;
+  }
+
+  .hub-rail__hubs .hub-row {
+    width: auto;
+  }
+
+  .hub-rail__hubs .hub-label {
+    min-height: 2.25rem;
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-2);
   }
 }
