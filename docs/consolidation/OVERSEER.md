@@ -101,9 +101,9 @@ Adam dashboard export 2026-09-01:
 | Teaching Hub API | `arteaching-hub` | `899b0fd3-53b3-45a0-bbfb-0238264d9246` | `https://teaching-api.adam-russell.com` | remounted `/teaching/` | **Deleted 2026-09-04** — site ID absent; domain 404 |
 | Tasks Hub API | `artasks-hub` | `c6696619-f478-4ac1-b0cd-1e4cfd3101df` | `https://tasks-api.adam-russell.com` | remounted `/tasks/` | **Deleted 2026-09-04** — site ID absent; domain 404 |
 | Knowledge Hub API | `knowledge-hub-archive` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `https://knowledge-api.adam-russell.com` | remounted `/knowledge/` | **Deleted 2026-09-04** (Netlify site only — **not** the R2 bucket) |
-| Proxies (widgets OpenAI) | `jade-melomakarona-ea20fe` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `https://jade-melomakarona-ea20fe.netlify.app` | n/a | Present and enabled; CORS hardened (proxies #1) |
+| Proxies (widgets OpenAI) | `jade-melomakarona-ea20fe` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `https://jade-melomakarona-ea20fe.netlify.app` | n/a | **Keep** — do not migrate or fold onto `life-hub2` |
 
-**Proxies functions:** `/.netlify/functions/ai` (OpenAI chat proxy), `/.netlify/functions/generate` (HSC Paper 1). CORS exact-match + model/`max_tokens` caps (proxies #1). Still a shared OpenAI key — migrate consumers before folding onto `life-hub2`.
+**Proxies functions:** `/.netlify/functions/ai` (OpenAI chat proxy), `/.netlify/functions/generate` (HSC Paper 1). CORS exact-match + model/`max_tokens` caps (proxies #1). Widgets stay here (Adam, 2026-09-04).
 
 ### Cloudflare / R2
 
