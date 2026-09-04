@@ -56,21 +56,6 @@ export function newTaskId() {
   return `task_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function summarizeTask(item) {
-  const id = typeof item.id === 'string' ? item.id : '';
-  const title = typeof item.title === 'string' ? item.title : '';
-  if (!id && !title) return null;
-  return {
-    id,
-    title,
-    status: typeof item.status === 'string' ? item.status : undefined,
-    due_date: typeof item.due_date === 'string' ? item.due_date : undefined,
-    project_id: typeof item.project_id === 'string'
-      ? item.project_id
-      : typeof item.parent_project_id === 'string' ? item.parent_project_id : undefined
-  };
-}
-
 export async function readIndex(store, key) {
   const index = await getJSON(store, key);
   return Array.isArray(index) ? index.filter(id => typeof id === 'string') : [];

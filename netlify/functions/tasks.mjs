@@ -14,7 +14,6 @@ import {
   newTaskId,
   readTaskIndex,
   setJSON,
-  summarizeTask,
   TASK_PREFIX,
   taskKey,
   writeTaskIndex
@@ -56,7 +55,7 @@ export function createTasksHandler(deps = {}) {
           }
           return withCors(okResponse(200, task), request, env);
         }
-        const tasks = (await listJSON(store, TASK_PREFIX)).map(summarizeTask).filter(Boolean);
+        const tasks = await listJSON(store, TASK_PREFIX);
         return withCors(okResponse(200, { tasks }), request, env);
       }
 
