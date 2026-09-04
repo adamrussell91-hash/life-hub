@@ -72,7 +72,7 @@ function portrait(className: string, size: number) {
 function mockHeader(showPortrait: boolean) {
   const copy = `<div class="page-header__copy">
       <p class="eyebrow page-header__eyebrow">Professor Clementine Haig</p>
-      <h1 class="page-header__title">Chat</h1>
+      <h1 class="page-header__title hub-kinetic">Chat</h1>
     </div>
     <div class="page-header__actions"><button class="btn btn--ghost" type="button" tabindex="-1">New chat</button></div>`;
   if (!showPortrait) {

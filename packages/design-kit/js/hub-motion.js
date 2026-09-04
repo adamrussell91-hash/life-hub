@@ -1,5 +1,7 @@
 /** Shared hub motion. Same strength on Life, Knowledge, Teaching, and Tasks. */
 
+import { enhanceKinetic, KINETIC_SELECTOR } from './hub-kinetic.js';
+
 const CARD_SELECTOR = [
   '.metric-card',
   '.week-card',
@@ -253,10 +255,24 @@ function scan(root, reduced) {
   for (const el of scope.querySelectorAll(MAGNET_SELECTOR)) enhanceMagnet(el, reduced);
   for (const el of scope.querySelectorAll(LIST_SELECTOR)) enhanceList(el, reduced);
   for (const el of scope.querySelectorAll(COUNT_SELECTOR)) enhanceCount(el, reduced);
+  for (const el of scope.querySelectorAll(KINETIC_SELECTOR)) enhanceKinetic(el, reduced);
 
   if (scope.matches?.(CARD_SELECTOR)) enhanceCard(scope, reduced);
   if (scope.matches?.(MAGNET_SELECTOR)) enhanceMagnet(scope, reduced);
   if (scope.matches?.(LIST_SELECTOR)) enhanceList(scope, reduced);
+  if (scope.matches?.(KINETIC_SELECTOR)) enhanceKinetic(scope, reduced);
+}
+
+function watchKinetic(mutations, reduced) {
+  const seen = new Set();
+  for (const mutation of mutations) {
+    const node = mutation.target;
+    const el = (node.nodeType === 1 ? node : node.parentElement)?.closest?.(KINETIC_SELECTOR);
+    if (el && !seen.has(el)) {
+      seen.add(el);
+      enhanceKinetic(el, reduced);
+    }
+  }
 }
 
 function watchCounts(mutations, reduced) {
@@ -292,6 +308,7 @@ export function startHubMotion(root = document) {
   const observer = new MutationObserver(mutations => {
     const nextReduced = prefersReducedMotion(root);
     watchCounts(mutations, nextReduced);
+    watchKinetic(mutations, nextReduced);
     for (const mutation of mutations) {
       if (mutation.type === 'attributes' && mutation.attributeName === 'data-state') {
         scan(mutation.target, nextReduced);

@@ -237,7 +237,7 @@ function pageHeader(eyebrow: string, title: string, actionsInner = "") {
   return `<header class="topbar page-header">
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">${eyebrow}</p>
-        <h1 class="page-header__title">${title}</h1>
+        <h1 class="page-header__title hub-kinetic">${title}</h1>
       </div>
       ${actions}
     </header>`;
