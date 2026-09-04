@@ -40,6 +40,9 @@ included_files = [
 [functions.lesson-alchemist]
   timeout = 26
 
+[functions.alchemy-lab]
+  timeout = 26
+
 # Chat turns start on /api/chat, run on the background function /api/chat-run
 # (15 minute cap), and the browser polls /api/chat/events. Do not put a
 # client abort on the turn — Netlify's 60s synchronous cap must not cut chat.
