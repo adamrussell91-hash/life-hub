@@ -70,7 +70,14 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    min-height: 0;
+    height: auto;
     padding-top: env(safe-area-inset-top, 0px);
+    overflow-x: clip;
+  }
+
+  .hub-rail__hubs {
+    margin-top: 0;
   }
 
   .hub-rail__list--desktop {
@@ -81,6 +88,7 @@
     display: grid;
     gap: var(--space-1);
     min-width: 0;
+    max-width: 100%;
   }
 
   .hub-rail__mobile-tabs,
@@ -88,18 +96,49 @@
     display: flex;
     gap: var(--space-1);
     min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
   }
 
+  .hub-rail__mobile-tabs::-webkit-scrollbar,
+  .hub-rail__mobile-items::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Section toggles are <button class="hub-rail__section"> — reset the browser
+     button chrome so light-on-dark pills stay readable (HOME was white-on-white). */
   .hub-rail__mobile-tabs .hub-rail__section {
-    display: flex;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
     flex: 0 0 auto;
     width: auto;
     margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--on-dark-line);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--on-dark-muted);
+    font-family: var(--font-ui);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    line-height: var(--leading-snug);
     white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .hub-rail__mobile-tabs .hub-rail__section[aria-expanded="true"] {
+    color: var(--on-dark);
+    background: var(--on-dark-hover);
+  }
+
+  .hub-rail__mobile-tabs .hub-rail__section-chevron {
+    display: none;
   }
 
   .hub-rail__mobile-panel {
