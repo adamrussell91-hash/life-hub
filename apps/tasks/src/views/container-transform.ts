@@ -1,24 +1,13 @@
-type ViewTransition = { finished: Promise<void> };
+import { runMorphTransform } from '../../design-kit/js/morphing-dialog.js';
 
-type DocumentWithVT = Document & {
-  startViewTransition?: (update: () => void) => ViewTransition;
-};
-
-/** View Transitions API wrapper from the Cotton Glass container-transform note. */
-export function runContainerTransform(update: () => void, guard?: { current: boolean }): void {
-  if (guard?.current) return;
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const doc = document as DocumentWithVT;
-  // Call on the document — extracting the method loses `this` and throws Illegal invocation.
-  if (doc.startViewTransition && !reduceMotion) {
-    if (guard) guard.current = true;
-    const transition = doc.startViewTransition(update);
-    void transition.finished.finally(() => {
-      if (guard) guard.current = false;
-    });
-    return;
-  }
-  update();
+/** Spring FLIP wrapper — same MorphingDialog motion as every other hub. */
+export function runContainerTransform(
+  update: () => void,
+  guard?: { current: boolean },
+  from?: Element | null,
+  to?: () => Element | null
+): void {
+  runMorphTransform({ from: from ?? null, update, to, guard });
 }
 
 export function cardTransitionName(id: string): string {

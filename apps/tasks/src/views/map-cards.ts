@@ -119,6 +119,7 @@ export function renderMapMicroCard(model: MapCardModel, handlers: MapCardHandler
     row.append(renderLineRail(model.lines, model.line?.id ?? null));
   }
   const title = el('p', 'hub-row__title card-title', model.label);
+  title.setAttribute('data-hub-morph', 'title');
   const chips = el('div', 'hub-chips');
   chips.append(el('span', 'hub-chip', mapItemKindLabel(model.kind)));
   const planning = el('span', statusBadgeClass(planningOf(model)), planningOf(model));
@@ -155,6 +156,7 @@ export function renderMapExpandedCard(
     el('span', statusBadgeClass(planningOf(model)), planningOf(model))
   );
   const title = el('h2', 'hub-card__title card-title', model.label);
+  title.setAttribute('data-hub-morph', 'title');
   const tags = el('div', 'task-card__tags-row');
   const chips = el('div', 'hub-chips');
   if (model.line) chips.append(el('span', 'hub-chip', `${model.line.letter} · ${model.line.name}`));
@@ -243,12 +245,18 @@ export function mountMapCard(
   }
 
   function toggle(): void {
-    runContainerTransform(() => {
-      expanded = !expanded;
-      if (expanded) handlers.onExpand?.();
-      else handlers.onCollapse?.();
-      paint();
-    }, guard);
+    const from = slot.querySelector<HTMLElement>('.hub-row, .hub-card');
+    runContainerTransform(
+      () => {
+        expanded = !expanded;
+        if (expanded) handlers.onExpand?.();
+        else handlers.onCollapse?.();
+        paint();
+      },
+      guard,
+      from,
+      () => slot.querySelector<HTMLElement>('.hub-row, .hub-card')
+    );
   }
 
   host.append(slot);

@@ -90,6 +90,10 @@ export type ProjectCardHandlers = {
   onCollapse?: (project: Project) => void;
 };
 
+function morphTarget(slot: HTMLElement): HTMLElement | null {
+  return slot.querySelector<HTMLElement>('.hub-row, .hub-card, .proj-row, .proj-card-wrap');
+}
+
 function isInteractive(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest('button, a, input, textarea, select, label'));
 }
@@ -171,6 +175,7 @@ export function renderTaskMicroCard(task: Task, handlers: TaskCardHandlers = {})
   row.dataset.taskId = task.id;
   row.dataset.cardKind = 'task';
   const title = el('p', 'hub-row__title card-title', task.title);
+  title.setAttribute('data-hub-morph', 'title');
   const chips = el('div', 'hub-chips');
   chips.append(domainChip(task.domain));
   const priority = el('span', 'priority-chip', task.priority);
@@ -194,6 +199,7 @@ export function renderTaskExpandedCard(task: Task, handlers: TaskCardHandlers = 
   const head = el('header', 'task-card__head');
   head.append(el('span', 'hub-card__eyebrow', 'Task'), el('span', statusBadgeClass(task.status), statusLabel(task.status)));
   const title = el('h2', 'hub-card__title card-title', task.title);
+  title.setAttribute('data-hub-morph', 'title');
   const tags = el('div', 'task-card__tags-row');
   const chips = el('div', 'hub-chips');
   chips.append(domainChip(task.domain));
@@ -233,6 +239,7 @@ export function renderProjectMicroCard(
     el('span', 'hub-card__eyebrow', project.type === 'excursion' ? 'Excursion' : 'Project'),
     el('p', 'hub-row__title card-title', project.title)
   );
+  main.querySelector('.hub-row__title')?.setAttribute('data-hub-morph', 'title');
   const meta = el('div', 'proj-row__meta');
   meta.append(
     el('span', statusBadgeClass(project.status), statusLabel(project.status)),
@@ -266,6 +273,7 @@ export function renderProjectExpandedCard(
     el('span', statusBadgeClass(project.status), statusLabel(project.status))
   );
   const title = el('h2', 'hub-card__title card-title', project.title);
+  title.setAttribute('data-hub-morph', 'title');
   const tags = el('div', 'task-card__tags-row');
   const chips = el('div', 'hub-chips');
   chips.append(el('span', 'hub-chip', project.type === 'excursion' ? 'excursion' : project.type));
@@ -412,10 +420,16 @@ export function mountTaskCard(
   }
 
   function toggle(): void {
-    runContainerTransform(() => {
-      expanded = !expanded;
-      paint();
-    }, guard);
+    const from = morphTarget(slot);
+    runContainerTransform(
+      () => {
+        expanded = !expanded;
+        paint();
+      },
+      guard,
+      from,
+      () => morphTarget(slot)
+    );
   }
 
   if (asListItem) {
@@ -444,16 +458,26 @@ export function mountProjectCard(
 
   function paint(): void {
     const expand = () =>
-      runContainerTransform(() => {
-        expanded = true;
-        paint();
-        slot.querySelector<HTMLButtonElement>('.card-menu')?.focus();
-      }, guard);
+      runContainerTransform(
+        () => {
+          expanded = true;
+          paint();
+          slot.querySelector<HTMLButtonElement>('.card-menu')?.focus();
+        },
+        guard,
+        morphTarget(slot),
+        () => morphTarget(slot)
+      );
     const collapse = () =>
-      runContainerTransform(() => {
-        expanded = false;
-        paint();
-      }, guard);
+      runContainerTransform(
+        () => {
+          expanded = false;
+          paint();
+        },
+        guard,
+        morphTarget(slot),
+        () => morphTarget(slot)
+      );
     const activate = () => {
       if (handlers.onActivate) handlers.onActivate(project);
       else expand();

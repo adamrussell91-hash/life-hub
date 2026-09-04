@@ -1,4 +1,5 @@
 import { formatDisplayDate } from '../core/time.js';
+import { morphFromRect } from '../../../../packages/design-kit/js/morphing-dialog.js';
 
 const AGENT_LABEL = {
   vera: 'Vera',
@@ -87,6 +88,8 @@ export function openMindThreadSheet(root, { title, rows, continueAgent, onContin
   }
 
   bindOnce(root, sheet);
+  const from = tile?.getBoundingClientRect?.();
+  if (from?.width > 0 && from?.height > 0) morphFromRect(from, sheet);
 }
 
 export function closeMindThreadSheet(root) {
