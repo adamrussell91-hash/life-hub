@@ -1191,6 +1191,48 @@
     var(--depth);
 }
 
+.graph-wrap.is-universe-dark .graph-toolbar__meta,
+.graph-wrap.is-universe-dark .graph-speed__label,
+.graph-wrap.is-universe-dark .graph-speed__value {
+  color: var(--on-dark-muted);
+}
+
+.graph-chrome {
+  display: contents;
+}
+
+.graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-chrome {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 6;
+  max-width: calc(100% - 2rem);
+}
+
+.graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-toolbar {
+  position: static;
+  top: auto;
+  left: auto;
+  max-width: none;
+}
+
+.graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-toolbar__meta {
+  flex: 1 0 100%;
+  order: 10;
+}
+
+.graph-wrap.is-universe-fullscreen:has([data-universe-key]) .universe-key {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+}
+
 .graph-wrap.is-universe-fullscreen {
   position: fixed;
   inset: 0;
@@ -2025,6 +2067,11 @@ body.is-universe-fullscreen .local-banner {
 
   .universe-zoom .btn + .btn {
     border-top: 1px solid var(--line);
+  }
+
+  .graph-wrap.is-universe-fullscreen:has([data-universe-key]) .graph-chrome {
+    top: var(--space-2);
+    left: var(--space-2);
   }
 
   .graph-preview {
