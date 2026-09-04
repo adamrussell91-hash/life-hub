@@ -725,6 +725,24 @@ test('non-hammond prompts never include hammondMindAmbient', () => {
   assert.doesNotMatch(prompt, /Ambient leak/);
 });
 
+test('hammond prompt includes hubContext when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    hubContext: 'Other hubs (live umbrella stores):\nTasks: Call Clare (life, open)'
+  });
+  assert.match(prompt, /Other hubs \(live umbrella stores\)/);
+  assert.match(prompt, /Call Clare/);
+});
+
+test('non-hammond prompts never include hubContext', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    hubContext: 'Other hubs leak: Call Clare'
+  });
+  assert.doesNotMatch(prompt, /Other hubs leak/);
+  assert.doesNotMatch(prompt, /Call Clare/);
+});
+
 test('brisket prompt never receives mind diary digest', () => {
   const prompt = buildSystemPrompt({
     slug: 'brisket',

@@ -23,6 +23,7 @@ import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
 import { buildSystemPrompt } from './_shared/persona.mjs';
+import { loadHubAgentContext } from './_shared/hub-agent-context.mjs';
 import { normalizeProtocolId, protocolSteerBlock } from '../../apps/life/js/app/agent-protocols.js';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
 import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs';
@@ -208,7 +209,8 @@ export function createChatHandler({
   serializeExpiredSessionCookie: clearCookie = serializeExpiredSessionCookie,
   createGitHubClient: createClient = createGitHubClient,
   createAnthropicClient: createAnthropic = createAnthropicClient,
-  now = Date.now
+  now = Date.now,
+  loadHubAgentContext: loadHubContext = loadHubAgentContext
 } = {}) {
   return async function chatHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -271,6 +273,9 @@ export function createChatHandler({
     const needsExerciseLibrary = slug === 'chadwick';
     const needsSkincareLibrary = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
+    const hubContextPromise = needsHammondTools
+      ? loadHubContext({ env, now: new Date(now()) })
+      : Promise.resolve('');
     const needsNutritionChallenges = slug === 'brisket';
     // Brisket writes challenge scoreboards onto Central Node; keep markdown mutable.
     const needsCentralNodeWrite = needsHammondTools || needsNutritionChallenges;
@@ -829,6 +834,7 @@ export function createChatHandler({
         const intuitionPacks = loadIntuitionFor({ agentSlug: slug });
         const intuitionPrompt = formatIntuitionForPrompt(intuitionPacks);
         const capacityOneLiners = promptOneLinersForAgent(slug);
+        const hubContext = needsHammondTools ? await hubContextPromise : '';
         const system = buildSystemPrompt({
           slug,
           digest,
@@ -868,7 +874,8 @@ export function createChatHandler({
           daysSinceLastMindSession,
           protocolSteer: protocolSteerBlock(slug, parsed.protocolId),
           intuition: intuitionPrompt,
-          capacities: capacityOneLiners
+          capacities: capacityOneLiners,
+          hubContext
         });
 
         let pendingLogRejection = null;
