@@ -8,6 +8,10 @@ const hubCss = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '../../src/styles/hub.css'),
   'utf8'
 );
+const cardsCss = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../src/styles/cards.css'),
+  'utf8'
+);
 
 describe('primary rail navigation', () => {
   beforeEach(() => resetRailDisclosureStateForTests());
@@ -41,6 +45,9 @@ describe('primary rail navigation', () => {
     expect(hubCss).toMatch(/\.hub-rail__section-panel\[data-open="true"\]/);
     expect(hubCss).toMatch(/align-self:\s*start;/);
     expect(hubCss).toMatch(/min-height:\s*100dvh;/);
+    expect(hubCss).toMatch(/\.hub-rail \.hub-row\s*\{/);
+    expect(cardsCss).toMatch(/\.hub-canvas \.hub-row\s*\{/);
+    expect(cardsCss).not.toMatch(/(?:^|\n)\.hub-row\s*\{/);
     const host = document.createElement('div');
     renderPrimaryNav(host, 'board');
     expect(host.querySelector('.hub-rail__list--desktop')).not.toBeNull();
