@@ -147,7 +147,7 @@ test('programs and maps use the Life session and share the Tasks store', async (
     request({ url: 'https://api.adam-russell.com/api/programs' })
   );
   assert.equal(listedPrograms.status, 200);
-  assert.equal((await listedPrograms.json()).data.programs[0].title, 'ICPC');
+  assert.equal((await listedPrograms.json()).data.programs[0].name, 'ICPC');
 
   const createdMap = await createMapsHandler(deps)(
     request({
@@ -186,4 +186,27 @@ test('programs and maps use the Life session and share the Tasks store', async (
     request({ cookie: false, method: 'POST', url: 'https://api.adam-russell.com/api/maps', body: { title: 'Nope' } })
   );
   assert.equal(anon.status, 401);
+});
+
+test('Projects list returns stored records including milestones', async () => {
+  const stored = {
+    id: 'proj_1',
+    title: 'Ethics Olympiad',
+    status: 'active',
+    type: 'excursion',
+    milestones: [
+      { id: 'ms_1', project_id: 'proj_1', title: 'Lodge risk', due_date: '2026-08-24', status: 'open' }
+    ]
+  };
+  const handler = createProjectsHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => memoryStore({
+      'projects/_index': ['proj_1'],
+      'projects/proj_1': stored
+    })
+  });
+  const response = await handler(request({ url: 'https://api.adam-russell.com/api/projects' }));
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data.projects, [stored]);
 });

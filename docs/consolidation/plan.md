@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.23 — Leftover Teaching APIs on life-hub2; old hub hostnames redirect here. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.24 — Tasks lists return full records; remounted apps symlink `packages/design-kit`. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -137,7 +137,7 @@ Implementation rules (once decision recorded):
 
 **Canonical remote:** `github.com/adamrussell91-hash/hub-design-kit` (local: `~/Projects/hub-design-kit`).
 
-**Mechanic:** copy-then-freeze into `packages/design-kit/` at seed; unfolder repos keep local copy until their step-5 fold.
+**Mechanic:** `packages/design-kit/` is the only committed kit in this repo. Remounted apps symlink `apps/*/design-kit` → that folder. Canonical remote remains `hub-design-kit`; `scripts/sync-to-hubs.sh` writes Life at `packages/design-kit`.
 
 ## Non-goals
 
@@ -233,7 +233,8 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Full Clare dump / brief / toolkit / mutations | **shipped** | PR #81 merged 2026-09-03 |
 | Netlify retarget | **done** | Pages point at `api.adam-russell.com`; old Function sites disabled 2026-09-04 (domains 404) |
 | Knowledge leftovers fold | **shipped** | PR #85 / knowledge-hub #101 merged 2026-09-04 |
-| Blobs remount + Function retire | **set** | 2026-09-04 Job 5 — copied Teaching 135/135 and Tasks 448/448 onto `life-hub2`; `TEACHING_BLOBS_SITE_ID`/`TASKS_BLOBS_SITE_ID`=`local`; deploy `6a99edc41d38b3aed1999023` / `e881cb9`. Sites disabled, not deleted. Public lesson 200 matched source. Signed-in Tasks not checked. R2 + Worker untouched. |
+| Blobs remount + Function retire | **set** | 2026-09-04 Job 5 — copied Teaching 135/135 and Tasks 448/448 onto `life-hub2`; `TEACHING_BLOBS_SITE_ID`/`TASKS_BLOBS_SITE_ID`=`local`; deploy `6a99edc41d38b3aed1999023` / `e881cb9`. Sites disabled, not deleted. Public lesson 200 matched source. R2 + Worker untouched. |
+| Tasks full records + one kit | **this PR** | `GET /api/tasks` and collection lists return stored records (Dashboard/Today/Backlog need `milestones`). Apps symlink `design-kit/` → `packages/design-kit`. |
 
 ### Slice 01 — what shipped
 
@@ -539,11 +540,16 @@ Teacher UI leftovers now on `life-hub2` (Life session, Teaching Blobs):
 
 DNS decision: point `teaching-hub` / `knowledge-hub` / `tasks-hub` at this product (`/teaching/`, `/knowledge/`, `/tasks/`), including student `/s/…` → `/teaching/s/…`.
 
-Disabled Function sites `arteaching-hub`, `artasks-hub`, `knowledge-hub-archive` are deleted after soak. Do **not** delete R2 `knowledge-hub-archive` or Worker `knowledge-hub-research`.
+Disabled Function sites `arteaching-hub`, `artasks-hub`, `knowledge-hub-archive` stay disabled (domains 404) until a Netlify auth token can delete them. Do **not** delete R2 `knowledge-hub-archive` or Worker `knowledge-hub-research`. `GITHUB_TOKEN` rotation is parked until closer to **2026-12-02**.
+
+### Slice 32 — Tasks records + one kit (this slice)
+
+- `GET /api/tasks`, `/api/projects`, and the other Tasks collections return the stored Blobs records. Summaries stripped `milestones` / `depends_on` / `tags` and crashed the remounted Dashboard, Today, and Backlog.
+- `apps/{teaching,knowledge,tasks}/design-kit` are symlinks to `packages/design-kit`. Tasks CSS imports the flat kit files (including `calendar.css`). `hub-design-kit` `sync-to-hubs.sh` writes Life’s kit at `packages/design-kit`.
 
 ## Next action
 
-Rotate `GITHUB_TOKEN` before **2026-12-02**. Then one design-kit source, Hammond across hubs, or widgets proxy `jade-melomakarona-ea20fe`.
+Delete the three disabled Function sites when a Netlify token is available. Confirm `ALCHEMIST_SHARED_SECRET` / optional `GITHUB_WORKFLOW_TOKEN` on `life-hub2`. Then Hammond across hubs, or widgets proxy `jade-melomakarona-ea20fe`.
 
 ## Open questions (Adam)
 

@@ -1,10 +1,10 @@
-import '../../design-kit/css/tokens.css';
-import '../../design-kit/css/overlays.css';
-import '../../design-kit/css/chrome.css';
-import '../../design-kit/css/rail.css';
-import '../../design-kit/css/filters.css';
-import '../../design-kit/css/calendar.css';
-import '../../design-kit/css/sign-in.css';
+import '../../design-kit/tokens.css';
+import '../../design-kit/overlays.css';
+import '../../design-kit/chrome.css';
+import '../../design-kit/rail.css';
+import '../../design-kit/filters.css';
+import '../../design-kit/calendar.css';
+import '../../design-kit/sign-in.css';
 import '../styles/hub.css';
 import '../styles/views.css';
 import '../styles/cards.css';
