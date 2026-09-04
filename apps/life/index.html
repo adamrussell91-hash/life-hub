@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="packages/design-kit/filters.css">
   <link rel="stylesheet" href="packages/design-kit/sign-in.css">
   <link rel="stylesheet" href="packages/design-kit/rail.css">
+  <link rel="stylesheet" href="packages/design-kit/mobile.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -1125,29 +1126,31 @@
       </main>
     </div>
 
-    <nav class="mobile-nav" aria-label="Mobile primary">
-      <button class="is-active" type="button" data-section="home" aria-current="page"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg></span>Home</button>
-      <button type="button" data-section="chat"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z"/></svg></span>Chat</button>
-      <button type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg></span>Calendar</button>
-      <button type="button" data-section="more" id="more-nav-button"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="12" r="1.15" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.15" fill="currentColor" stroke="none"/><circle cx="17.5" cy="12" r="1.15" fill="currentColor" stroke="none"/></svg></span>More</button>
+    <nav class="hub-mobile-nav" aria-label="Mobile primary" data-hub-mobile-chrome="nav">
+      <button class="is-active is-current" type="button" data-section="home" aria-current="page"><span class="hub-mobile-nav__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg></span>Home</button>
+      <button type="button" data-section="chat"><span class="hub-mobile-nav__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z"/></svg></span>Chat</button>
+      <button type="button" data-section="calendar"><span class="hub-mobile-nav__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg></span>Calendar</button>
+      <button type="button" data-section="more" id="more-nav-button" data-hub-mobile-more="true"><span class="hub-mobile-nav__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="12" r="1.15" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.15" fill="currentColor" stroke="none"/><circle cx="17.5" cy="12" r="1.15" fill="currentColor" stroke="none"/></svg></span>More</button>
     </nav>
 
-    <dialog id="more-sheet" class="more-sheet" aria-label="More sections">
-      <div class="more-sheet__panel">
-        <header class="more-sheet__head">
+    <dialog id="more-sheet" class="hub-more-sheet" aria-label="More" data-hub-mobile-chrome="sheet">
+      <div class="hub-more-sheet__panel">
+        <header class="hub-more-sheet__head">
           <h2>More</h2>
-          <button type="button" id="more-sheet-close" class="more-sheet__close" aria-label="Close">Close</button>
+          <button type="button" id="more-sheet-close" class="hub-more-sheet__close" aria-label="Close">Close</button>
         </header>
-        <nav class="more-sheet__nav" aria-label="Secondary sections">
-          <button type="button" data-section="nutrition"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/nutrition.png" alt=""></span><span>Nutrition</span></button>
-          <button type="button" data-section="fitness"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/fitness.png" alt=""></span><span>Fitness</span></button>
-          <button type="button" data-section="body"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/body.png" alt=""></span><span>Body</span></button>
-          <button type="button" data-section="mind"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/mind.png" alt=""></span><span>Mind</span></button>
-          <button type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/skincare.png" alt=""></span><span>Skincare</span></button>
-          <button type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/central-node.png" alt=""></span><span>Central Node</span></button>
-          <a href="/teaching/"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span><span>Teaching</span></a>
-          <a href="/knowledge/"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5h6.5A3.5 3.5 0 0 1 15 9v10H8.5A3.5 3.5 0 0 0 5 15.5V5.5Z"/><path d="M15 9h4v10h-4"/></svg></span><span>Knowledge</span></a>
-          <a href="/tasks/"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h11M8 12h11M8 17h11"/><path d="m4.5 7 .8.8L7 6M4.5 12l.8.8L7 11"/></svg></span><span>Tasks</span></a>
+        <nav class="hub-more-sheet__nav" aria-label="Secondary destinations">
+          <p class="hub-more-sheet__section">In this hub</p>
+          <button type="button" data-section="nutrition"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/nutrition.png" alt=""></span>Nutrition</button>
+          <button type="button" data-section="fitness"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/fitness.png" alt=""></span>Fitness</button>
+          <button type="button" data-section="body"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/body.png" alt=""></span>Body</button>
+          <button type="button" data-section="mind"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/mind.png" alt=""></span>Mind</button>
+          <button type="button" data-section="skincare"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/skincare.png" alt=""></span>Skincare</button>
+          <button type="button" data-section="central-node"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/central-node.png" alt=""></span>Central Node</button>
+          <p class="hub-more-sheet__section">Hubs</p>
+          <a href="/teaching/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span>Teaching</a>
+          <a href="/knowledge/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5h6.5A3.5 3.5 0 0 1 15 9v10H8.5A3.5 3.5 0 0 0 5 15.5V5.5Z"/><path d="M15 9h4v10h-4"/></svg></span>Knowledge</a>
+          <a href="/tasks/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h11M8 12h11M8 17h11"/><path d="m4.5 7 .8.8L7 6M4.5 12l.8.8L7 11"/></svg></span>Tasks</a>
         </nav>
       </div>
     </dialog>

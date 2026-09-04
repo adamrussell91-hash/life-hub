@@ -92,6 +92,7 @@ import { originComposeFieldHtml, originPillsHtml, parseOriginRemoveValue } from 
 import { applyTopicTags, toggleTopicTag } from "./tidy/applyTags";
 import { remainingTopicTags, topicTagPickerHtml } from "./tidy/tagPicker";
 import { filterPickerOptions, optionPickerListHtml } from "./ui/optionPicker";
+import { syncKnowledgeMobileChrome } from "./mobile-chrome";
 
 type View =
   | "list"
@@ -430,6 +431,59 @@ function shell(main: string) {
     visible = [];
     activePage = null;
     renderLogin();
+  });
+
+  syncKnowledgeMobileChrome(app, view, {
+    goArchive: () => {
+      leaveSpecialRails();
+      keywordFilter = "";
+      originFilter = emptyOriginFilter();
+      resetOriginLabelChrome();
+      resetComposeTagChrome();
+      view = "list";
+      activePage = null;
+      clearPageHash();
+      listScrollTop = 0;
+      void refreshVisible().then(render);
+    },
+    goGraph: () => {
+      leaveSpecialRails();
+      view = "graph";
+      activePage = null;
+      clearPageHash();
+      render();
+    },
+    goChat: () => {
+      leaveSpecialRails();
+      view = "chat";
+      activePage = null;
+      clearPageHash();
+      enterChatRail();
+      render();
+    },
+    goTimeline: () => {
+      leaveSpecialRails();
+      view = "timeline";
+      activePage = null;
+      clearPageHash();
+      render();
+    },
+    goPodcast: () => {
+      leaveSpecialRails();
+      view = "podcast";
+      activePage = null;
+      clearPageHash();
+      enterPodcastRail();
+      render();
+    },
+    goQuiz: () => {
+      leaveSpecialRails();
+      view = "quiz";
+      activePage = null;
+      clearPageHash();
+      enterQuizRail();
+      render();
+    }
   });
 }
 

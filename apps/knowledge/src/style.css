@@ -1789,27 +1789,15 @@ body.is-universe-fullscreen .local-banner {
 @media (max-width: 720px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     max-width: 100%;
     overflow-x: clip;
   }
 
-  .rail {
-    position: sticky;
-    top: 0;
-    height: auto;
-    min-height: 0;
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--space-2);
-    padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) var(--space-3);
-    z-index: 5;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    overflow-x: clip;
+  /* Locked bottom bar — hide the desktop rail on phones. */
+  .rail,
+  .rail.hub-rail {
+    display: none !important;
   }
 
   .hub-rail__brand-block {
@@ -1936,7 +1924,7 @@ body.is-universe-fullscreen .local-banner {
     max-width: 100%;
     overflow-x: clip;
     padding-inline: var(--space-4);
-    padding-bottom: calc(var(--space-10) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .file {

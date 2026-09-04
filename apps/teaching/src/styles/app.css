@@ -6565,19 +6565,16 @@ input.scope-timeline__note-title:focus-visible {
 /* ── Responsive teacher rail ──────────────────────────────────────────── */
 
 @media (max-width: 768px) {
-  /* design-kit/rail.css hides .hub-rail at 720px — Teaching keeps a compact strip. */
+  /* Phones use locked bottom bar (MOBILE.md). Never force the rail back on. */
   .teacher-layout__rail.hub-rail {
-    display: flex !important;
-    min-height: 0;
-    height: auto;
-    max-height: none;
+    display: none !important;
   }
 
   /* minmax(0, 1fr), not 1fr: a 1fr track has an implicit min-width:auto and
      would be widened by the horizontally-scrolling nav row below. */
   .teacher-layout {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     max-width: 100%;
     overflow-x: clip;
   }

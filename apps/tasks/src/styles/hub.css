@@ -55,25 +55,15 @@
 @media (max-width: 720px) {
   .hub-layout {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     min-height: 100dvh;
     max-width: 100%;
     overflow-x: clip;
   }
 
+  /* Locked mobile chrome hides the rail — do not restyle it into a top strip. */
   .hub-rail {
-    display: flex;
-    flex-direction: column;
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    min-height: 0;
-    height: auto;
-    padding-top: env(safe-area-inset-top, 0px);
-    overflow-x: clip;
+    display: none !important;
   }
 
   .hub-rail__hubs {
@@ -178,7 +168,7 @@
     overflow-x: clip;
     /* 16px side gutters — matches common iOS content inset; keeps tile shadows inside clip */
     padding: var(--space-4);
-    padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .hub-canvas__body {
