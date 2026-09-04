@@ -1,0 +1,119 @@
+/* Shared hub motion — CountUp, fade/reveal, spotlight sheen, list stagger, magnet.
+ * Strength is the same on every hub. Overlays still control glass density only.
+ * Respects prefers-reduced-motion.
+ */
+
+:root {
+  --hub-motion-duration: 420ms;
+  --hub-motion-count: 560ms;
+  --hub-motion-stagger: 45ms;
+  --hub-motion-spot: color-mix(in srgb, var(--wave) 14%, transparent);
+  --hub-motion-lift: 8px;
+  --hub-motion-magnet: 5px;
+}
+
+.hub-spotlight {
+  position: relative;
+  isolation: isolate;
+}
+
+.hub-spotlight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    16rem circle at var(--hub-spot-x, 50%) var(--hub-spot-y, 50%),
+    var(--hub-motion-spot),
+    transparent 70%
+  );
+  transition: opacity 180ms ease;
+}
+
+.hub-spotlight:hover::after {
+  opacity: 1;
+}
+
+.hub-reveal {
+  opacity: 0;
+  transform: translateY(var(--hub-motion-lift));
+  transition:
+    opacity var(--hub-motion-duration) ease,
+    transform var(--hub-motion-duration) ease;
+  transition-delay: var(--hub-reveal-delay, 0ms);
+}
+
+.hub-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.hub-reveal--gate {
+  transform: none;
+  transition-duration: 280ms;
+}
+
+.hub-magnet {
+  transition: translate 160ms ease;
+}
+
+.hub-count {
+  position: relative;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-count.is-ticking > :not(.hub-count__fx) {
+  color: transparent;
+}
+
+.hub-count__fx {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--depth);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.hub-list-item {
+  animation: hub-list-in var(--hub-motion-duration) ease both;
+  animation-delay: var(--hub-list-delay, 0ms);
+}
+
+@keyframes hub-list-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-spotlight::after,
+  .hub-reveal,
+  .hub-magnet,
+  .hub-list-item {
+    animation: none;
+    transition: none;
+    transform: none;
+    translate: none;
+    opacity: 1;
+  }
+
+  .hub-count.is-ticking > :not(.hub-count__fx) {
+    color: inherit;
+  }
+
+  .hub-count__fx {
+    display: none;
+  }
+}
