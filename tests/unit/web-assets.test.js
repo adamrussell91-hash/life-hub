@@ -40,7 +40,8 @@ test('Home shell exposes landmarks and named rendering regions', async () => {
 test('authenticated shell provides a semantic sign-in gate and reachable controls', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
 
-  assert.doesNotMatch(html, /class="sign-in__mark"/);
+  assert.match(html, /class="sign-in__mark"/);
+  assert.match(html, /packages\/design-kit\/icons\/life-hub\.svg/);
 
   for (const fragment of [
     'id="sign-in-view"',
@@ -67,16 +68,15 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
   assert.match(html, /id="app-shell"[^>]*hidden/);
 });
 
-test('no Life Hub tile appears on any page', async () => {
+test('Life Hub tile appears on sign-in gate and page header', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const copy = html.slice(html.indexOf('page-header__copy'), html.indexOf('page-header__actions'));
   assert.match(copy, /class="page-header__title-row"/);
   assert.match(copy, /id="page-title"/);
-  assert.doesNotMatch(html, /class="hub-mark"/);
-  assert.doesNotMatch(html, /class="sign-in__mark"/);
-  assert.doesNotMatch(html, /rel="icon"/);
-  assert.doesNotMatch(html, /apple-touch-icon/);
-  assert.doesNotMatch(html, /icons\/life-hub\.svg/);
+  assert.match(html, /class="hub-mark"/);
+  assert.match(html, /class="sign-in__mark"/);
+  assert.match(html, /rel="icon"/);
+  assert.match(html, /icons\/life-hub\.svg/);
 });
 
 test('skip link is unavailable until the authenticated shell is revealed', async () => {
