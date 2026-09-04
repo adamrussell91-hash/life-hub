@@ -158,6 +158,12 @@ function blockCaption(block: Block): string | null {
     case 'equation':
     case 'diagram':
       return read('title', 'caption', 'image_alt');
+    case 'card_stack': {
+      const heading = read('title');
+      if (heading) return heading;
+      const first = block.content.cards[0]?.title.trim();
+      return first ? truncate(first) : null;
+    }
     case 'self_check':
       return read('prompt');
     case 'cloze':
@@ -282,6 +288,21 @@ function ownIssue(block: Block): string | null {
       if (event.link_url !== undefined && event.link_url.trim().length > 0) {
         if (!isHttpUrl(event.link_url)) {
           return 'Timeline event links need a valid http(s) URL to publish';
+        }
+      }
+    }
+  }
+  if (block.block_type === 'card_stack') {
+    for (const card of block.content.cards) {
+      if (card.title.trim().length === 0) {
+        return 'Card stack cards need a title to publish';
+      }
+      if (card.image_url !== undefined && card.image_url.trim().length > 0) {
+        if (!isHttpUrl(card.image_url)) {
+          return 'Card stack images need a valid http(s) URL to publish';
+        }
+        if ((card.image_alt ?? '').trim().length === 0) {
+          return 'Card stack images need alt text to publish';
         }
       }
     }

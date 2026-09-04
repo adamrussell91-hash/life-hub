@@ -15,7 +15,19 @@ import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { parseEmbedInput } from '@/blocks/embed-url';
 import { parseVideoInput } from '@/blocks/video-url';
-import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block, type ChartSeriesColor, type EmbedProvider } from '@/schemas/block';
+import {
+  CARD_STACK_MAX_CARDS,
+  CARD_STACK_TINT_LABEL,
+  CARD_STACK_TINTS,
+  nextCardStackTint
+} from '@/blocks/card-stack';
+import {
+  DIAGRAM_IMAGE_PUBLISH_URL_ISSUE,
+  type Block,
+  type CardStackTint,
+  type ChartSeriesColor,
+  type EmbedProvider
+} from '@/schemas/block';
 import type { Media } from '@/schemas/media';
 import { openDrivePicker } from '@/teacher/drive-picker';
 import { uploadMediaFile } from '@/teacher/media-api';
@@ -1844,6 +1856,219 @@ export function createTimelineEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+type CardStackDraft = {
+  id: string;
+  number?: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  image_url?: string;
+  image_alt?: string;
+  tint: CardStackTint;
+};
+
+export function createCardStackEditor(
+  block: Extract<Block, { block_type: 'card_stack' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'card_stack' }>>,
+  getLatest: () => Extract<Block, { block_type: 'card_stack' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields';
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__card-stack-title';
+  title.value = block.content.title ?? '';
+  title.placeholder = 'Stack heading (optional)';
+  title.setAttribute('aria-label', 'Card stack heading');
+
+  const cardsContainer = document.createElement('div');
+  cardsContainer.className = 'block-editor__card-stack-items';
+
+  let cards: CardStackDraft[] = block.content.cards.map((card) => ({ ...card }));
+  let cardCounter = cards.length;
+
+  const emitChange = () => {
+    onChange({
+      ...getLatest(),
+      content: {
+        title: title.value.trim() || undefined,
+        cards: cards.map((card) => ({
+          id: card.id,
+          number: card.number?.trim() ? card.number : undefined,
+          eyebrow: card.eyebrow,
+          title: card.title,
+          description: card.description,
+          image_url: card.image_url?.trim() ? card.image_url : undefined,
+          image_alt: card.image_alt?.trim() ? card.image_alt : undefined,
+          tint: card.tint
+        }))
+      }
+    });
+  };
+
+  function renderCards(): void {
+    cardsContainer.replaceChildren();
+
+    cards.forEach((card, index) => {
+      const row = document.createElement('div');
+      row.className = 'block-editor__card-stack-item';
+
+      const number = document.createElement('input');
+      number.type = 'text';
+      number.className = 'block-editor__card-stack-number';
+      number.value = card.number ?? '';
+      number.placeholder = 'Number (optional)';
+      number.setAttribute('aria-label', `Card ${index + 1} number`);
+
+      const eyebrow = document.createElement('input');
+      eyebrow.type = 'text';
+      eyebrow.className = 'block-editor__card-stack-eyebrow';
+      eyebrow.value = card.eyebrow;
+      eyebrow.placeholder = 'Eyebrow';
+      eyebrow.setAttribute('aria-label', `Card ${index + 1} eyebrow`);
+
+      const cardTitle = document.createElement('input');
+      cardTitle.type = 'text';
+      cardTitle.className = 'block-editor__card-stack-card-title';
+      cardTitle.value = card.title;
+      cardTitle.placeholder = 'Title';
+      cardTitle.setAttribute('aria-label', `Card ${index + 1} title`);
+
+      const description = document.createElement('textarea');
+      description.className = 'block-editor__card-stack-description';
+      description.value = card.description;
+      description.rows = 3;
+      description.placeholder = 'Description';
+      description.setAttribute('aria-label', `Card ${index + 1} description`);
+
+      const imageUrl = document.createElement('input');
+      imageUrl.type = 'url';
+      imageUrl.className = 'block-editor__card-stack-image-url';
+      imageUrl.value = card.image_url ?? '';
+      imageUrl.placeholder = 'Image URL (optional)';
+      imageUrl.setAttribute('aria-label', `Card ${index + 1} image URL`);
+
+      const imageAlt = document.createElement('input');
+      imageAlt.type = 'text';
+      imageAlt.className = 'block-editor__card-stack-image-alt';
+      imageAlt.value = card.image_alt ?? '';
+      imageAlt.placeholder = 'Image alt (required if URL set)';
+      imageAlt.setAttribute('aria-label', `Card ${index + 1} image alt`);
+
+      const tint = document.createElement('select');
+      tint.className = 'block-editor__card-stack-tint';
+      tint.setAttribute('aria-label', `Card ${index + 1} tint`);
+      for (const value of CARD_STACK_TINTS) {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = CARD_STACK_TINT_LABEL[value];
+        opt.selected = card.tint === value;
+        tint.append(opt);
+      }
+
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.className = 'btn btn--ghost block-editor__card-stack-up';
+      up.textContent = 'Up';
+      up.disabled = index === 0;
+      up.addEventListener('click', () => {
+        if (index === 0) return;
+        const next = [...cards];
+        const current = next[index]!;
+        next[index] = next[index - 1]!;
+        next[index - 1] = current;
+        cards = next;
+        emitChange();
+        renderCards();
+      });
+
+      const down = document.createElement('button');
+      down.type = 'button';
+      down.className = 'btn btn--ghost block-editor__card-stack-down';
+      down.textContent = 'Down';
+      down.disabled = index >= cards.length - 1;
+      down.addEventListener('click', () => {
+        if (index >= cards.length - 1) return;
+        const next = [...cards];
+        const current = next[index]!;
+        next[index] = next[index + 1]!;
+        next[index + 1] = current;
+        cards = next;
+        emitChange();
+        renderCards();
+      });
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost block-editor__card-stack-remove';
+      remove.textContent = 'Remove';
+      remove.disabled = cards.length <= 1;
+      remove.addEventListener('click', () => {
+        if (cards.length <= 1) return;
+        cards = cards.filter((_, i) => i !== index);
+        emitChange();
+        renderCards();
+      });
+
+      const patch = (partial: Partial<CardStackDraft>) => {
+        cards[index] = { ...cards[index]!, ...partial };
+        emitChange();
+      };
+
+      number.addEventListener('input', () => patch({ number: number.value }));
+      eyebrow.addEventListener('input', () => patch({ eyebrow: eyebrow.value }));
+      cardTitle.addEventListener('input', () => patch({ title: cardTitle.value }));
+      description.addEventListener('input', () => patch({ description: description.value }));
+      imageUrl.addEventListener('input', () => patch({ image_url: imageUrl.value }));
+      imageAlt.addEventListener('input', () => patch({ image_alt: imageAlt.value }));
+      tint.addEventListener('change', () => patch({ tint: tint.value as CardStackTint }));
+
+      row.append(
+        number,
+        eyebrow,
+        cardTitle,
+        description,
+        imageUrl,
+        imageAlt,
+        tint,
+        up,
+        down,
+        remove
+      );
+      cardsContainer.append(row);
+    });
+
+    addButton.disabled = cards.length >= CARD_STACK_MAX_CARDS;
+  }
+
+  const addButton = document.createElement('button');
+  addButton.type = 'button';
+  addButton.className = 'btn btn--secondary block-editor__card-stack-add';
+  addButton.textContent = 'Add card';
+  addButton.addEventListener('click', () => {
+    if (cards.length >= CARD_STACK_MAX_CARDS) return;
+    cardCounter += 1;
+    cards = [
+      ...cards,
+      {
+        id: `${getLatest().id}_c${cardCounter}`,
+        eyebrow: '',
+        title: '',
+        description: '',
+        tint: nextCardStackTint(cards.length)
+      }
+    ];
+    emitChange();
+    renderCards();
+  });
+
+  title.addEventListener('input', () => emitChange());
+  renderCards();
+  fields.append(title, cardsContainer, addButton);
+  return editorShell(block, onChange, fields, getLatest);
+}
+
 type FlashcardDraft = {
   id: string;
   front: string;
@@ -3195,6 +3420,8 @@ export function createBlockEditor(
       return createQuestionSetEditor(block, onChange, latest as () => Extract<Block, { block_type: 'question_set' }>);
     case 'timeline':
       return createTimelineEditor(block, onChange, latest as () => Extract<Block, { block_type: 'timeline' }>);
+    case 'card_stack':
+      return createCardStackEditor(block, onChange, latest as () => Extract<Block, { block_type: 'card_stack' }>);
     case 'collection':
       return createCollectionEditor(
         block,

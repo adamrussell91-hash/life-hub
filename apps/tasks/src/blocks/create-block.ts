@@ -36,6 +36,7 @@ export const NEW_BLOCK_TYPES = [
   'section',
   'spacer',
   'timeline',
+  'card_stack',
   'tabs',
   'collection',
   'outcomes'
@@ -74,6 +75,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   section: 'Section',
   spacer: 'Spacer',
   timeline: 'Timeline',
+  card_stack: 'Card stack',
   tabs: 'Tabs',
   collection: 'Collection',
   outcomes: 'Outcomes'
@@ -131,7 +133,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Teaching',
-    types: ['accordion', 'table', 'question_set', 'timeline', 'outcomes']
+    types: ['accordion', 'table', 'question_set', 'timeline', 'card_stack', 'outcomes']
   },
   {
     label: 'Learning',
@@ -169,6 +171,7 @@ export const COLUMN_CHILD_TYPES = NEW_BLOCK_TYPES.filter(
     t !== 'columns' &&
     t !== 'section' &&
     t !== 'timeline' &&
+    t !== 'card_stack' &&
     t !== 'tabs' &&
     t !== 'collection'
 );
@@ -480,6 +483,20 @@ export function createBlock(type: NewBlockType, id: string): Block {
           ]
         }
       };
+    case 'card_stack':
+      return {
+        ...shared,
+        block_type: 'card_stack',
+        variant: 'medium',
+        content: {
+          title: '',
+          cards: [
+            { id: `${id}_c1`, eyebrow: '', title: '', description: '', tint: 'navy' },
+            { id: `${id}_c2`, eyebrow: '', title: '', description: '', tint: 'wave' },
+            { id: `${id}_c3`, eyebrow: '', title: '', description: '', tint: 'marine' }
+          ]
+        }
+      };
     case 'tabs':
       return {
         ...shared,
@@ -542,6 +559,14 @@ export function cloneBlockWithNewIds(
     cloned.content = {
       events: cloned.content.events.map((event) => ({
         ...event,
+        id: nextId()
+      }))
+    };
+  } else if (cloned.block_type === 'card_stack') {
+    cloned.content = {
+      ...cloned.content,
+      cards: cloned.content.cards.map((card) => ({
+        ...card,
         id: nextId()
       }))
     };
