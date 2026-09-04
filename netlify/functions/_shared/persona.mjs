@@ -39,7 +39,8 @@ export function buildSystemPrompt({
   daysSinceLastMindSession = null,
   protocolSteer = '',
   intuition = '',
-  capacities = ''
+  capacities = '',
+  hubContext = ''
 }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
@@ -221,6 +222,9 @@ export function buildSystemPrompt({
       : '',
     hammondMindAmbient
       ? hammondMindAmbient
+      : '',
+    hubContext
+      ? hubContext
       : '',
     'You do not propose log_entry. Coach and triage; specialists own domain logs. You still have `os_propose_action` for durable allowlisted writes Adam must Confirm, plus your Central Node / Governance shortcuts.',
     'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.'
