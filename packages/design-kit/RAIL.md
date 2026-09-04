@@ -4,6 +4,8 @@ The left rail is **the same component on every hub**. Glass/tile overlays may ch
 
 Read this before adding or restyling a rail destination. Snippet: `snippets/rail.html`. CSS: `css/rail.css` (also pulled in by `chrome.css`).
 
+**Phones:** the rail is hidden under `720px`. Use the locked bottom bar + More sheet instead (`MOBILE.md`). Do not force the rail back on as a compact top strip.
+
 ## Locked (do not reinvent)
 
 | Piece | Rule |

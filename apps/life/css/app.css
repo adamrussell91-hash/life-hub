@@ -107,6 +107,18 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
 
 .app-shell { min-height: 100vh; }
 
+@media (max-width: 720px) {
+  /* Kit rail.css also hides .hub-rail; this beats Life's base display:flex. */
+  .desktop-rail,
+  .desktop-rail.hub-rail {
+    display: none !important;
+  }
+
+  .page-frame {
+    margin-left: 0;
+  }
+}
+
 .desktop-rail {
   position: fixed;
   inset: 0 auto 0 0;
@@ -343,7 +355,8 @@ main { max-width: 76rem; margin: 0 auto; }
 .progress-track--marine span { background: linear-gradient(90deg, var(--marine), var(--wave)); }
 .progress-track--calm span { background: linear-gradient(90deg, #4d7b85, #78abb2); }
 .progress-track--logging span { background: linear-gradient(90deg, var(--wave), #82a9db); }
-.metric-footer, .metric-caption { display: flex; justify-content: space-between; margin: 0.65rem 0 0; color: var(--muted); font-size: var(--text-2xs); }
+.metric-footer { display: flex; justify-content: space-between; margin: 0.65rem 0 0; color: var(--muted); font-size: var(--text-2xs); }
+.metric-caption { margin: 0.65rem 0 0; color: var(--muted); font-size: var(--text-2xs); }
 .metric-footer strong, .metric-caption strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 
 .workout-summary { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 1.5rem; margin-top: 1.7rem; }
@@ -504,9 +517,9 @@ main { max-width: 76rem; margin: 0 auto; }
 .unavailable-panel button { min-height: 44px; margin-left: auto; padding: 0.6rem 1rem; border: 0; border-radius: 999px; color: white; background: var(--marine); cursor: pointer; }
 [data-state="loading"] .metric-card, [data-state="loading"] .week-card { animation: breathe 1.4s ease-in-out infinite alternate; }
 
-.mobile-nav { display: none; }
+/* .mobile-nav retired — use .hub-mobile-nav from design-kit/mobile.css */
 
-.more-sheet {
+.more-sheet-retired {
   margin: 0;
   padding: 0;
   border: 0;
@@ -516,11 +529,11 @@ main { max-width: 76rem; margin: 0 auto; }
   height: 100%;
   background: transparent;
 }
-.more-sheet::backdrop {
+.more-sheet-retired::backdrop {
   background: rgba(10, 21, 54, 0.35);
   backdrop-filter: blur(6px);
 }
-.more-sheet__panel {
+.more-sheet-retired__panel {
   position: fixed;
   inset: auto 0 0;
   padding: 1.1rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
@@ -528,7 +541,7 @@ main { max-width: 76rem; margin: 0 auto; }
   background: #fbfaf5;
   box-shadow: 0 -1rem 3rem rgba(10, 21, 54, 0.14);
 }
-.more-sheet__head {
+.more-sheet-retired__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -541,23 +554,23 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 700;
   color: var(--depth);
 }
-.more-sheet__close {
+.more-sheet-retired__close {
   min-height: 44px;
   padding: 0.45rem 0.85rem;
-  border: 0;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  color: var(--muted);
-  background: rgba(55, 111, 183, 0.08);
+  color: var(--depth);
+  background: rgba(255, 255, 255, 0.92);
   font-size: var(--text-sm);
   font-weight: 700;
   cursor: pointer;
 }
-.more-sheet__nav {
+.more-sheet-retired__nav {
   display: grid;
   gap: 0.35rem;
 }
-.more-sheet__nav button,
-.more-sheet__nav a {
+.more-sheet-retired__nav button,
+.more-sheet-retired__nav a {
   min-height: 48px;
   display: flex;
   align-items: center;
@@ -573,22 +586,26 @@ main { max-width: 76rem; margin: 0 auto; }
   text-decoration: none;
   cursor: pointer;
 }
-.more-sheet__nav button:active,
-.more-sheet__nav a:active {
+.more-sheet-retired__nav button:active,
+.more-sheet-retired__nav a:active {
   background: rgba(55, 111, 183, 0.1);
 }
-.more-sheet__nav .nav-dot,
-.more-sheet__nav .nav-glyph {
-  width: 0.7rem;
-  height: 0.7rem;
-  flex: 0 0 auto;
-}
-.more-sheet__nav .nav-glyph {
+.more-sheet-retired__nav .nav-glyph {
   display: grid;
   place-items: center;
-  width: 1rem;
-  font-size: var(--text-base);
-  line-height: 1;
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 1.125rem;
+  color: var(--muted);
+}
+.more-sheet-retired__nav .nav-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  display: block;
+  object-fit: contain;
+  /* Rail icons are inverted white; restore ink on the light sheet. */
+  filter: none;
+  opacity: 0.85;
 }
 
 @keyframes breathe { from { opacity: 0.58; } to { opacity: 0.86; } }
@@ -602,8 +619,11 @@ main { max-width: 76rem; margin: 0 auto; }
 @media (max-width: 48rem) {
   body { background: linear-gradient(180deg, #fbfaf5, #f3f6fa); }
   .desktop-rail { display: none; }
-  .page-frame { margin-left: 0; padding: 0 1rem calc(6.5rem + env(safe-area-inset-bottom)); }
-  .topbar { padding: 1.45rem 0 1.35rem; align-items: flex-end; }
+  .page-frame {
+    margin-left: 0;
+    padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem calc(5.5rem + env(safe-area-inset-bottom));
+  }
+  .topbar { padding: 0.85rem 0 1.1rem; align-items: flex-end; }
   .topbar .eyebrow { display: block; }
   .topbar h1 { font-size: var(--font-size-page); }
   .topbar-actions { display: grid; grid-template-columns: repeat(2, auto); justify-items: stretch; gap: 0.35rem; }
@@ -619,32 +639,7 @@ main { max-width: 76rem; margin: 0 auto; }
   .hero-metric strong { font-size: var(--font-size-tile-value); }
   .week-card { align-items: flex-start; flex-direction: column; gap: 1.2rem; }
   .week-strip { width: 100%; justify-content: space-between; }
-  .mobile-nav {
-    position: fixed;
-    z-index: 20;
-    inset: auto 0 0;
-    min-height: calc(4.65rem + env(safe-area-inset-bottom));
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    padding: 0.45rem 0.6rem env(safe-area-inset-bottom);
-    border-top: 1px solid rgba(255,255,255,0.75);
-    background: rgba(250,248,242,0.9);
-    box-shadow: 0 -1rem 3rem rgba(10,21,54,0.08);
-    backdrop-filter: blur(var(--hub-glass-blur));
-  }
-  .mobile-nav button { min-height: 44px; display: grid; place-items: center; align-content: center; gap: 0.2rem; border: 0; border-radius: 0.8rem; color: var(--muted); background: transparent; font-size: var(--text-2xs); font-weight: 700; cursor: pointer; }
-  .mobile-nav button .nav-glyph {
-    width: 1.25rem;
-    height: 1.25rem;
-    color: inherit;
-  }
-  .mobile-nav button .nav-icon {
-    width: 1.2rem;
-    height: 1.2rem;
-    filter: none;
-    opacity: 1;
-  }
-  .mobile-nav button.is-active { color: var(--depth); background: rgba(55,111,183,0.08); }
+  /* Mobile primary chrome: packages/design-kit/mobile.css (.hub-mobile-nav) */
   .warning-panel, .unavailable-panel { align-items: flex-start; flex-wrap: wrap; }
   .warning-panel ul { width: 100%; margin: 0; padding-left: 1.2rem; }
   .unavailable-panel button { margin-left: 0; }
@@ -661,7 +656,7 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 @supports not (backdrop-filter: blur(1px)) {
-  .sign-in-card, .metric-card, .week-card, .warning-panel, .unavailable-panel, .date-chip, .system-chip, .mobile-nav { background: #fff; }
+  .sign-in-card, .metric-card, .week-card, .warning-panel, .unavailable-panel, .date-chip, .system-chip, .hub-mobile-nav { background: #fff; }
 }
 
 .chat-view { display: flex; flex-direction: column; gap: 1rem; }
@@ -1116,6 +1111,7 @@ main { max-width: 76rem; margin: 0 auto; }
 .nutrition--fat-over [data-nutrition="fat"],
 .nutrition--fat-over .metric-value [data-value="fat"],
 .nutrition--fat-over .metric-caption [data-percent="fat"],
+.nutrition--fat-over .metric-footer [data-percent="fat"],
 .nutrition--fat-over .macro-split__copy [data-split="fat"],
 .nutrition--fat-over .macro-split__copy [data-split="fat-pct"] {
   color: #b3261e;
@@ -5490,7 +5486,7 @@ main { max-width: 76rem; margin: 0 auto; }
 
 /* Session-only unread indicator on every chat entry point: the floating FABs
    plus the Chat nav item in both the desktop rail and the mobile nav. */
-.nav-item, .mobile-nav button { position: relative; }
+.nav-item, .hub-mobile-nav button { position: relative; }
 
 .floating-chat-button.has-unread::after,
 [data-section="chat"].has-unread::after {

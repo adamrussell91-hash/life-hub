@@ -1,6 +1,7 @@
 import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
 import { withAppBase } from '@/app/base-path';
 import { createSkipLink } from '@/app/failure';
+import { syncTeachingMobileChrome } from '@/teacher/mobile-chrome';
 import { readTeacherRailPrefs, writeTeacherRailPrefs } from '@/teacher/rail-prefs';
 
 export interface TeacherShellRefs {
@@ -141,6 +142,8 @@ export function renderTeacherShell(
 
   layout.append(rail, main);
   root.append(createSkipLink('teacher-main'), layout);
+  // Phone chrome must mount even when curriculum load fails (rail stays empty).
+  syncTeachingMobileChrome(root, 'home');
 
   return { root, rail, railNav, main, contextBar, canvas, logoutButton };
 }
