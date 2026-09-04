@@ -49,6 +49,20 @@
 
 .hub-rail__hubs {
   flex: 0 0 auto;
+  margin-top: auto;
+}
+
+/* Kit accordion rows. Cards.css .hub-row is a canvas tile — keep it off the rail. */
+.hub-rail .hub-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .hub-rail__list {
@@ -57,35 +71,22 @@
   gap: var(--space-px);
 }
 
-/* Phone copy of the destinations — hidden until the 720px layout. */
 .hub-rail__mobile {
   display: none;
 }
 
-.hub-rail__list--desktop .hub-rail__section {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
 .hub-rail__section-chevron {
-  display: block;
-  font-size: var(--text-xs);
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: 0.75em;
   line-height: 1;
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.7;
+  transform: rotate(-90deg);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .hub-rail__section[aria-expanded="true"] .hub-rail__section-chevron {
-  transform: rotate(180deg);
+  transform: rotate(0deg);
 }
 
 .hub-rail__section-panel {
@@ -110,8 +111,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hub-rail__section-panel,
-  .hub-rail__section-chevron {
+  .hub-rail__section-chevron,
+  .hub-rail__section-panel {
     transition: none;
   }
 }
@@ -125,27 +126,30 @@
 @media (max-width: 720px) {
   .hub-layout {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     min-height: 100dvh;
     max-width: 100%;
     overflow-x: clip;
   }
 
+  /* Locked mobile chrome hides the rail — do not restyle it into a top strip. */
   .hub-rail {
-    display: flex;
-    flex-direction: column;
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    align-self: stretch;
-    height: auto;
-    max-height: none;
-    min-height: 0;
-    overflow: visible;
-    padding-top: env(safe-area-inset-top, 0px);
+    display: none !important;
+  }
+
+  .hub-rail__hubs {
+    margin-top: 0;
+  }
+
+  .hub-rail__hubs .hub-label {
+    min-height: 2rem;
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  .hub-rail__hubs .hub-rail__icon {
+    width: 1rem;
+    height: 1rem;
   }
 
   .hub-rail__list--desktop {
@@ -156,6 +160,7 @@
     display: grid;
     gap: var(--space-1);
     min-width: 0;
+    max-width: 100%;
   }
 
   .hub-rail__mobile-tabs,
@@ -163,18 +168,49 @@
     display: flex;
     gap: var(--space-1);
     min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
   }
 
+  .hub-rail__mobile-tabs::-webkit-scrollbar,
+  .hub-rail__mobile-items::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Section toggles are <button class="hub-rail__section"> — reset the browser
+     button chrome so light-on-dark pills stay readable (HOME was white-on-white). */
   .hub-rail__mobile-tabs .hub-rail__section {
-    display: flex;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
     flex: 0 0 auto;
     width: auto;
     margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--on-dark-line);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--on-dark-muted);
+    font-family: var(--font-ui);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    line-height: var(--leading-snug);
     white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .hub-rail__mobile-tabs .hub-rail__section[aria-expanded="true"] {
+    color: var(--on-dark);
+    background: var(--on-dark-hover);
+  }
+
+  .hub-rail__mobile-tabs .hub-rail__section-chevron {
+    display: none;
   }
 
   .hub-rail__mobile-panel {
@@ -203,7 +239,7 @@
     overflow-x: clip;
     /* 16px side gutters — matches common iOS content inset; keeps tile shadows inside clip */
     padding: var(--space-4);
-    padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .hub-canvas__body {

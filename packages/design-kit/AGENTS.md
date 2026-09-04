@@ -6,6 +6,8 @@ Tasks Hub agents: also read `TASKS.md` (Teaching chrome, board home, graph/chart
 
 Rail work: also read `RAIL.md`. The left rail is locked — one width, brand goes home, icon + label rows.
 
+Mobile work: also read `MOBILE.md`. Under 720px every hub uses the same bottom bar + More sheet. Do not keep the rail as a top strip.
+
 Hub marks: also read `ICONS.md`. The website tile is favicon + login + canvas title row. No login supporting copy.
 
 ## Grab these files
@@ -15,10 +17,12 @@ Hub marks: also read `ICONS.md`. The website tile is favicon + login + canvas ti
 3. `css/actions.css` — `.btn`, Wave `:focus-visible`, `.confirm-card` (import in existing hubs)
 4. `css/sign-in.css` — **locked** passphrase gate (same on every hub)
 5. `css/rail.css` — **locked** left rail (also imported by `chrome.css`)
-6. `css/chrome.css` — rail, page header, buttons, confirm cards (new hubs)
-7. `icons/` — locked hub tiles + glyphs (`ICONS.md`)
-8. `js/format-display-date.js` — **locked** display dates (`dd/mm/yy`)
-9. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`)
+6. `css/mobile.css` — **locked** phone bottom bar + More sheet (also imported by `chrome.css`)
+7. `css/chrome.css` — rail, mobile chrome, page header, buttons, confirm cards (new hubs)
+8. `icons/` — locked hub tiles + glyphs (`ICONS.md`)
+9. `js/format-display-date.js` — **locked** display dates (`dd/mm/yy`)
+10. `js/mount-mobile-chrome.js` — mount the phone bar + More sheet
+11. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`)
 
 ### Passphrase gate (mandatory)
 

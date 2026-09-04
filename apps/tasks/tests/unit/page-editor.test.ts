@@ -10,10 +10,12 @@ vi.mock('@/services/client-api', () => ({
     getTask: vi.fn(),
     listProjects: vi.fn(),
     updateTask: vi.fn(),
+    deleteTask: vi.fn(),
     getProject: vi.fn(),
     listTasks: vi.fn(),
     createTask: vi.fn(),
     updateProject: vi.fn(),
+    deleteProject: vi.fn(),
     listTemplates: vi.fn()
   }
 }));
@@ -106,6 +108,7 @@ describe('page editor', () => {
     expect(canvas.querySelector('.lesson-palette')).toBeNull();
     expect(canvas.querySelector('.page-card__back')?.textContent).toBe('← Dashboard');
     expect(canvas.querySelector('.task-card__foot .btn')).toBeNull();
+    expect(canvas.querySelector('.page-card .card-menu')).not.toBeNull();
     expect(canvas.querySelector('.page-card__title-input')).toBeNull();
 
     expect(canvas.querySelector('select')).toBeNull();
@@ -149,6 +152,27 @@ describe('page editor', () => {
     };
     expect(patch.page_blocks[0]?.block_type).toBe('heading');
     expect(patch.page_blocks[0]?.content.text).toBe('Term brief');
+  });
+
+  it('deletes the open task from the card menu and returns to the dashboard', async () => {
+    vi.mocked(tasksApi.getTask).mockResolvedValue(task());
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([project]);
+    vi.mocked(tasksApi.deleteTask).mockResolvedValue({ deleted: true });
+    window.location.hash = '#/task/task_lesson';
+
+    const canvas = document.createElement('main');
+    await renderPageEditor(canvas, { kind: 'task', id: 'task_lesson' });
+
+    canvas.querySelector<HTMLButtonElement>('.page-card .card-menu')!.click();
+    document.querySelector<HTMLButtonElement>('[data-card-menu-item="delete"]')!.click();
+
+    await vi.waitFor(() => {
+      expect(tasksApi.deleteTask).toHaveBeenCalledWith('task_lesson', {
+        agent: 'Tasks Hub',
+        reason: 'Card delete'
+      });
+      expect(window.location.hash).toBe('#/board');
+    });
   });
 
   it('lists every Teaching Hub family in the plus menu', async () => {

@@ -1,6 +1,7 @@
 import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { renderClassesNav } from '@/teacher/nav';
+import { syncTeachingMobileChrome } from '@/teacher/mobile-chrome';
 import { renderPrimaryNav } from '@/teacher/primary-nav';
 import type { TeacherSection } from '@/teacher/section';
 
@@ -58,4 +59,9 @@ export function renderTeacherRail(
     onCreateClass: options.onCreateClass
   });
   appendHubSwitcher(hubSwitcherHost(railNav), 'teaching');
+
+  const shellRoot = railNav.closest('.teacher-layout')?.parentElement ?? railNav.ownerDocument.body;
+  if (shellRoot instanceof HTMLElement) {
+    syncTeachingMobileChrome(shellRoot, options.activeSection);
+  }
 }

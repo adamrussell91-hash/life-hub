@@ -6565,28 +6565,39 @@ input.scope-timeline__note-title:focus-visible {
 /* ── Responsive teacher rail ──────────────────────────────────────────── */
 
 @media (max-width: 768px) {
-  /* design-kit/rail.css hides .hub-rail at 720px — Teaching keeps a compact strip. */
+  /* Phones use locked bottom bar (MOBILE.md). Never force the rail back on. */
   .teacher-layout__rail.hub-rail {
-    display: flex !important;
+    display: none !important;
   }
 
   /* minmax(0, 1fr), not 1fr: a 1fr track has an implicit min-width:auto and
      would be widened by the horizontally-scrolling nav row below. */
   .teacher-layout {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   .teacher-layout__main {
-    padding-top: var(--space-10);
+    padding-top: var(--space-4);
+    min-width: 0;
+    max-width: 100%;
   }
 
   .teacher-layout__utilities {
-    top: var(--space-2);
+    top: max(var(--space-2), env(safe-area-inset-top, 0px));
     right: var(--space-3);
   }
 
   .teacher-layout__canvas {
     padding: var(--space-4) var(--space-3) var(--space-8);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .teacher-layout__rail > .hub-rail__hubs {
+    margin-top: 0;
   }
 
   .teacher-layout__context-bar {
@@ -6636,7 +6647,14 @@ input.scope-timeline__note-title:focus-visible {
   .teacher-layout__rail {
     flex-direction: column;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    padding: max(var(--space-2), env(safe-area-inset-top, 0px)) var(--space-3) var(--space-2);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
   }
 
   .teacher-layout__rail-toggle {
@@ -6746,6 +6764,11 @@ input.scope-timeline__note-title:focus-visible {
 
   .rail-search {
     margin-bottom: 0;
+  }
+
+  /* Keep the mobile strip short: class list stays; full search belongs on desktop. */
+  .rail-search {
+    display: none;
   }
 
   .home-dashboard__toolbar {
