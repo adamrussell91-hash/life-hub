@@ -129,6 +129,16 @@ function readDirection(el) {
   return 'up';
 }
 
+function afterPaint(el, fn) {
+  const view = el.ownerDocument?.defaultView;
+  const raf = view?.requestAnimationFrame?.bind(view);
+  if (typeof raf === 'function') {
+    raf(() => raf(fn));
+    return;
+  }
+  fn();
+}
+
 function paintSegments(el, text, reduced) {
   const splitBy = readSplit(el);
   const staggerFrom = readStaggerFrom(el);
@@ -204,9 +214,7 @@ export function enhanceKinetic(el, reduced = false) {
   }
 
   el.classList.remove('is-in');
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => el.classList.add('is-in'));
-  });
+  afterPaint(el, () => el.classList.add('is-in'));
 }
 
 /** Replay the reveal on an already-enhanced element. */
@@ -216,9 +224,7 @@ export function playKinetic(el) {
     return;
   }
   el.classList.remove('is-in');
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => el.classList.add('is-in'));
-  });
+  afterPaint(el, () => el.classList.add('is-in'));
 }
 
 /** Move segments back to the hidden state. */
