@@ -679,7 +679,7 @@ export function createAppController(dependencies) {
         || (section === 'more' && MORE_SECTIONS.has(name))
         || (section === 'body' && (name === 'body-bloods' || name === 'body-medical'));
       button.classList.toggle('is-active', active);
-      button.classList.toggle('is-current', active && button.classList.contains('hub-nav-item'));
+      button.classList.toggle('is-current', active);
       if (active && section !== 'more') button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     }

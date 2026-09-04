@@ -67,6 +67,22 @@ test('hub accordion CSS uses the 0fr to 1fr height trick with an explicit column
   assert.doesNotMatch(css, /\.hub-panel-inner\s*\{[^}]*transition:\s*padding/s);
 });
 
+test('rail section labels reset native button chrome so they stay on-dark', async () => {
+  const css = await readFile(new URL('../../packages/design-kit/rail.css', import.meta.url), 'utf8');
+  assert.match(css, /\.hub-rail__section\s*\{[^}]*background:\s*transparent/s);
+  assert.match(css, /\.hub-rail__section\s*\{[^}]*border:\s*0/s);
+  assert.match(css, /\.hub-rail__section\s*\{[^}]*appearance:\s*none/s);
+  assert.match(css, /\.hub-rail__section\s*\{[^}]*color:\s*var\(--on-dark-muted\)/s);
+});
+
+test('mobile hides the desktop rail so every hub uses the locked bottom bar', async () => {
+  const css = await readFile(new URL('../../packages/design-kit/rail.css', import.meta.url), 'utf8');
+  assert.match(css, /@media\s*\(max-width:\s*720px\)\s*\{[\s\S]*\.hub-rail\s*\{[^}]*display:\s*none/s);
+  const mobile = await readFile(new URL('../../packages/design-kit/mobile.css', import.meta.url), 'utf8');
+  assert.match(mobile, /\.hub-mobile-nav/);
+  assert.match(mobile, /\.hub-more-sheet/);
+});
+
 test('Life rail puts domains inside the Life accordion, not a flat Domains list', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   assert.match(html, /data-hub-accordion/);

@@ -1,5 +1,17 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { renderPrimaryNav, resetRailDisclosureStateForTests } from '@/shell/shell';
+
+const hubCss = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../src/styles/hub.css'),
+  'utf8'
+);
+const cardsCss = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../src/styles/cards.css'),
+  'utf8'
+);
 
 describe('primary rail navigation', () => {
   beforeEach(() => resetRailDisclosureStateForTests());
@@ -20,6 +32,27 @@ describe('primary rail navigation', () => {
     expect(host.querySelector('[data-section-toggle="plan"]')?.getAttribute('aria-expanded')).toBe(
       'false'
     );
+    expect(
+      host.querySelector('.hub-rail__list--desktop [data-section-panel="views"]')?.dataset.open
+    ).toBe('true');
+    expect(
+      host.querySelector('.hub-rail__list--desktop [data-section-panel="plan"]')?.dataset.open
+    ).toBe('false');
+  });
+
+  it('keeps the phone rail in the DOM but hidden on desktop', () => {
+    expect(hubCss).toMatch(/\.hub-rail__mobile\s*\{\s*display:\s*none;/);
+    expect(hubCss).toMatch(/\.hub-rail__section-panel\[data-open="true"\]/);
+    expect(hubCss).toMatch(/align-self:\s*start;/);
+    expect(hubCss).toMatch(/min-height:\s*100dvh;/);
+    expect(hubCss).toMatch(/\.hub-rail \.hub-row\s*\{/);
+    expect(cardsCss).toMatch(/\.hub-canvas \.hub-row\s*\{/);
+    expect(cardsCss).not.toMatch(/(?:^|\n)\.hub-row\s*\{/);
+    const host = document.createElement('div');
+    renderPrimaryNav(host, 'board');
+    expect(host.querySelector('.hub-rail__list--desktop')).not.toBeNull();
+    expect(host.querySelector('.hub-rail__mobile')).not.toBeNull();
+    expect(host.querySelectorAll('.hub-rail__link[href="#/board"]').length).toBe(2);
   });
 
   it('keeps multiple non-active sections open', () => {
@@ -35,13 +68,23 @@ describe('primary rail navigation', () => {
     );
   });
 
-  it('renders section controls above destinations for mobile', () => {
-    const host = document.createElement('div');
-    renderPrimaryNav(host, 'board');
-    const mobile = host.querySelector('[data-mobile-rail]');
-    expect(mobile?.querySelector('.hub-rail__mobile-tabs [data-section-toggle="home"]')).not.toBeNull();
-    expect(mobile?.querySelector('.hub-rail__mobile-items [href="#/board"]')).not.toBeNull();
-    expect(mobile?.querySelector('.hub-rail__mobile-items [href="#/clare"]')).not.toBeNull();
+  it('mounts the locked hub mobile chrome beside the shell', () => {
+    const root = document.createElement('div');
+    const layout = document.createElement('div');
+    layout.className = 'hub-layout';
+    const railNav = document.createElement('div');
+    layout.append(railNav);
+    root.append(layout);
+    document.body.append(root);
+    renderPrimaryNav(railNav, 'board');
+    const bar = root.querySelector('.hub-mobile-nav');
+    expect(bar).not.toBeNull();
+    expect(bar?.textContent).toContain('Home');
+    expect(bar?.textContent).toContain('Chat');
+    expect(bar?.textContent).toContain('Today');
+    expect(bar?.textContent).toContain('More');
+    expect(root.querySelector('.hub-more-sheet')).not.toBeNull();
+    root.remove();
   });
 
   it('adds a Hubs switcher that leaves Tasks for Life, Teaching, and Knowledge', () => {

@@ -4,6 +4,8 @@ The left rail is **the same component on every hub**. Glass/tile overlays may ch
 
 Read this before adding or restyling a rail destination. Snippet: `snippets/rail.html`. CSS: `css/rail.css` (also pulled in by `chrome.css`).
 
+**Phones:** the rail is hidden under `720px`. Use the locked bottom bar + More sheet instead (`MOBILE.md`). Do not force the rail back on as a compact top strip.
+
 ## Locked (do not reinvent)
 
 | Piece | Rule |
@@ -72,7 +74,7 @@ Domain colour belongs on the **canvas** (tiles, charts, chips), not on the rail.
 
 ## Sections and shortcuts
 
-Optional `.hub-rail__section` — uppercase micro, `--text-2xs`, `--on-dark-muted` (`Domains`, `Your classes`).
+Optional `.hub-rail__section` — uppercase micro, `--text-2xs`, `--on-dark-muted` (`Domains`, `Your classes`). A `<button>` is allowed for an accordion toggle; it must stay on-dark (no native button fill).
 
 Instance shortcuts under a section (Teaching class codes) may use `.hub-rail__link.hub-rail__link--plain` (no icon). Same row height and padding. Still no dots.
 

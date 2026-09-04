@@ -1,5 +1,6 @@
 import "./tokens.css";
 import "./style.css";
+import { startHubMotion } from "../design-kit/js/hub-motion.js";
 import { bindHubAccordion, hubSwitcherHtml } from "../../../packages/hub-switcher.js";
 import type { Attachment, Origin, Page, PageManifestEntry } from "./domain/page";
 import { newHubPageId } from "./domain/page";
@@ -92,6 +93,7 @@ import { originComposeFieldHtml, originPillsHtml, parseOriginRemoveValue } from 
 import { applyTopicTags, toggleTopicTag } from "./tidy/applyTags";
 import { remainingTopicTags, topicTagPickerHtml } from "./tidy/tagPicker";
 import { filterPickerOptions, optionPickerListHtml } from "./ui/optionPicker";
+import { syncKnowledgeMobileChrome } from "./mobile-chrome";
 
 type View =
   | "list"
@@ -430,6 +432,59 @@ function shell(main: string) {
     visible = [];
     activePage = null;
     renderLogin();
+  });
+
+  syncKnowledgeMobileChrome(app, view, {
+    goArchive: () => {
+      leaveSpecialRails();
+      keywordFilter = "";
+      originFilter = emptyOriginFilter();
+      resetOriginLabelChrome();
+      resetComposeTagChrome();
+      view = "list";
+      activePage = null;
+      clearPageHash();
+      listScrollTop = 0;
+      void refreshVisible().then(render);
+    },
+    goGraph: () => {
+      leaveSpecialRails();
+      view = "graph";
+      activePage = null;
+      clearPageHash();
+      render();
+    },
+    goChat: () => {
+      leaveSpecialRails();
+      view = "chat";
+      activePage = null;
+      clearPageHash();
+      enterChatRail();
+      render();
+    },
+    goTimeline: () => {
+      leaveSpecialRails();
+      view = "timeline";
+      activePage = null;
+      clearPageHash();
+      render();
+    },
+    goPodcast: () => {
+      leaveSpecialRails();
+      view = "podcast";
+      activePage = null;
+      clearPageHash();
+      enterPodcastRail();
+      render();
+    },
+    goQuiz: () => {
+      leaveSpecialRails();
+      view = "quiz";
+      activePage = null;
+      clearPageHash();
+      enterQuizRail();
+      render();
+    }
   });
 }
 
@@ -1500,26 +1555,21 @@ function renderLoadError() {
   app.querySelector<HTMLButtonElement>("[data-retry]")!.onclick = () => {
     void boot({ signedIn: true });
   };
+  // Keep locked phone chrome even on the load-error shell.
+  syncKnowledgeMobileChrome(app, "list", {
+    goArchive: () => void boot({ signedIn: true }),
+    goGraph: () => void boot({ signedIn: true }),
+    goChat: () => void boot({ signedIn: true }),
+    goTimeline: () => void boot({ signedIn: true }),
+    goPodcast: () => void boot({ signedIn: true }),
+    goQuiz: () => void boot({ signedIn: true })
+  });
 }
 
 function renderLogin(message?: string) {
   hideChatOverlay();
   app.innerHTML = `<div class="sign-in">
     <form class="sign-in__card" method="post" action="#" novalidate>
-      <div class="sign-in__haze" aria-hidden="true">
-        <span class="sign-in__haze-mist"></span>
-        <span class="sign-in__bubble"></span>
-        <span class="sign-in__bubble"></span>
-        <span class="sign-in__bubble"></span>
-        <span class="sign-in__bubble"></span>
-        <span class="sign-in__bubble"></span>
-        <span class="sign-in__sparkle"></span>
-        <span class="sign-in__sparkle"></span>
-        <span class="sign-in__sparkle"></span>
-        <span class="sign-in__sparkle"></span>
-        <span class="sign-in__sparkle"></span>
-        <span class="sign-in__sparkle"></span>
-      </div>
       <p class="sign-in__brand">Knowledge Hub</p>
       <h1 class="sign-in__title">Sign in</h1>
       <div class="sign-in__field">
@@ -1599,4 +1649,5 @@ async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean 
   }
 }
 
+startHubMotion(document);
 boot();
