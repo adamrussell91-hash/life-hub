@@ -1,3 +1,4 @@
+import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
 import { withAppBase } from '@/app/base-path';
 import { createSkipLink } from '@/app/failure';
 import { readTeacherRailPrefs, writeTeacherRailPrefs } from '@/teacher/rail-prefs';
@@ -194,6 +195,7 @@ export function renderRailStatus(railNav: HTMLElement, text: string): void {
   status.className = 'teacher-layout__rail-status';
   status.textContent = text;
   railNav.append(status);
+  appendHubSwitcher(hubSwitcherHost(railNav), 'teaching');
 }
 
 /** Renders a lightweight status line into the canvas mount point. */

@@ -404,8 +404,9 @@ a:hover {
   flex: 1 1 auto;
 }
 
-.teacher-layout__rail-nav .hub-rail__hubs {
+.teacher-layout__rail > .hub-rail__hubs {
   margin-top: auto;
+  flex-shrink: 0;
 }
 
 .teacher-layout__rail-status {
