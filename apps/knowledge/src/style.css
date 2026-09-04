@@ -2087,9 +2087,16 @@ body.is-universe-fullscreen .local-banner {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    /* Header + bottom nav + fixed composer clearance */
+    /* Header clearance only — composer is fixed/out of flow, so use ::after. */
     min-height: calc(100dvh - 8.5rem);
-    padding-bottom: 16rem;
+    padding-bottom: 0;
+  }
+
+  .coach.chat::after {
+    content: "";
+    display: block;
+    flex: 0 0 14rem;
+    order: 10;
   }
 
   .coach.chat .chat__sitting {
@@ -2147,6 +2154,10 @@ body.is-universe-fullscreen .local-banner {
   .coach.chat.chat--from-book {
     min-height: 0;
     padding-bottom: 0;
+  }
+
+  .coach.chat.chat--from-book::after {
+    display: none;
   }
 
   .coach.chat .chat__composer textarea,
