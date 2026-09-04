@@ -1552,6 +1552,15 @@ function renderLoadError() {
   app.querySelector<HTMLButtonElement>("[data-retry]")!.onclick = () => {
     void boot({ signedIn: true });
   };
+  // Keep locked phone chrome even on the load-error shell.
+  syncKnowledgeMobileChrome(app, "list", {
+    goArchive: () => void boot({ signedIn: true }),
+    goGraph: () => void boot({ signedIn: true }),
+    goChat: () => void boot({ signedIn: true }),
+    goTimeline: () => void boot({ signedIn: true }),
+    goPodcast: () => void boot({ signedIn: true }),
+    goQuiz: () => void boot({ signedIn: true })
+  });
 }
 
 function renderLogin(message?: string) {
