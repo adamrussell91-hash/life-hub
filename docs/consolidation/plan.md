@@ -1,6 +1,6 @@
 # Hub consolidation plan
 
-> **Status:** v4.25 — Hammond reads a Tasks + Teaching digest on each Life chat turn. Checkpoints are async audits, not merge gates.  
+> **Status:** v4.26 — Old Function sites deleted; alchemist env confirmed on `life-hub2`. Checkpoints are async audits, not merge gates.  
 > **Overseer cwd:** `~/Projects/life-hub/.worktrees/umbrella-seed-slice-01` (tracks `main` / the open slice PR). Do not use the primary `life-hub` checkout — it may be on an unrelated branch with uncommitted work.
 > **Non-goal locked:** `life-hub-data` repository shape and access model do not change as part of consolidation (API keeps pointing at it).
 
@@ -42,11 +42,11 @@ Exact dashboard export:
 
 | Project / site | Production URL | Site ID | GitHub source | Role in consolidation |
 |----------------|----------------|---------|---------------|------------------------|
-| `life-hub2` | `https://api.adam-russell.com` | `5771ee5c-0cb2-4858-b03d-2637f092050e` | `life-hub` | **Retarget / absorb target** — keep secrets; fold other hub APIs onto this site over time |
-| `artasks-hub` | `https://tasks-api.adam-russell.com` | `c6696619-f478-4ac1-b0cd-1e4cfd3101df` | `Tasks-Hub` | **Disabled 2026-09-04** — store copied onto `life-hub2`; domain 404 |
-| `arteaching-hub` | `https://teaching-api.adam-russell.com` | `899b0fd3-53b3-45a0-bbfb-0238264d9246` | `teaching-hub` | **Disabled 2026-09-04** — store copied onto `life-hub2`; domain 404 |
-| `knowledge-hub-archive` | `https://knowledge-api.adam-russell.com` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `knowledge-hub` | **Disabled 2026-09-04** — Functions API only; **not** the R2 bucket |
-| `jade-melomakarona-ea20fe` | `https://jade-melomakarona-ea20fe.netlify.app` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `proxies` | **Shared OpenAI proxy** for `widgets` — not a hub; keep until consumers migrate (see below) |
+| `life-hub2` | `https://api.adam-russell.com` | `5771ee5c-0cb2-4858-b03d-2637f092050e` | `life-hub` | **Absorb target** — present and enabled; all hub APIs live here |
+| `artasks-hub` | `https://tasks-api.adam-russell.com` | `c6696619-f478-4ac1-b0cd-1e4cfd3101df` | `Tasks-Hub` | **Deleted 2026-09-04** — site ID absent; domain 404 (detached TLS) |
+| `arteaching-hub` | `https://teaching-api.adam-russell.com` | `899b0fd3-53b3-45a0-bbfb-0238264d9246` | `teaching-hub` | **Deleted 2026-09-04** — site ID absent; domain 404 (detached TLS) |
+| `knowledge-hub-archive` | `https://knowledge-api.adam-russell.com` | `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | `knowledge-hub` | **Deleted 2026-09-04** (Netlify site only — **not** the R2 bucket) |
+| `jade-melomakarona-ea20fe` | `https://jade-melomakarona-ea20fe.netlify.app` | `4d8c41e5-57b0-45a8-a607-80114a5d973a` | `proxies` | **Present and enabled** — widgets OpenAI proxy; CORS hardened (proxies #1) |
 
 Created / last update (dashboard): Life Aug 2→Sep 1 2026; Tasks Aug 16→Aug 31; Teaching Aug 8→Aug 29; Knowledge Aug 13→Aug 29; proxies Mar 9→Aug 25.
 
@@ -73,21 +73,21 @@ Same human-readable label, **two independent resources**:
 |--|----------------------------------------|-----------------------------------------------|
 | Purpose | API / Functions deploy | Binary archive / object storage |
 | Platform | Netlify | Cloudflare R2 |
-| Identity | Site ID `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` | Bucket in CF account `100c592ec8d777abf2646a08525d0cc4` |
-| URL | `https://knowledge-api.adam-russell.com` | Private S3-compatible R2 endpoint |
-| Source / contents | GitHub `knowledge-hub` → `netlify/handlers` | ~5,940 objects / 4.07 GB under `notes/`, `podcast/`, `research/`, `university/` |
-| Binding | Standalone Netlify deploy | Bound to Worker `knowledge-hub-research` as `ARCHIVE` |
+| Identity | Site ID `ff82fc91-2f4d-45b9-8c85-f5f35a8875eb` — **deleted 2026-09-04** | Bucket in CF account `100c592ec8d777abf2646a08525d0cc4` — **still present** |
+| URL | `https://knowledge-api.adam-russell.com` (404) | Private S3-compatible R2 endpoint |
+| Source / contents | GitHub `knowledge-hub` → `netlify/handlers` (API now on `life-hub2`) | ~5,940 objects / 4.07 GB under `notes/`, `podcast/`, `research/`, `university/` |
+| Binding | Deleted Netlify deploy | Bound to Worker `knowledge-hub-research` as `ARCHIVE` |
 
-Deleting, renaming, or redeploying one does **not** affect the other. Fold Knowledge Netlify API and R2/Worker as separate checklist items.
+Job 6 deleted the Netlify site only. R2 bucket and Worker are untouched. Do not delete or rename them.
 
 ### App origins (`SITE_ORIGIN` — from committed config / README)
 
 | Hub | API host | App origin (`SITE_ORIGIN`) |
 |-----|----------|----------------------------|
 | Life | `api.adam-russell.com` | `https://life-hub.adam-russell.com` |
-| Teaching | `teaching-api.adam-russell.com` | `https://teaching-hub.adam-russell.com` |
-| Tasks | `tasks-api.adam-russell.com` | confirm at fold |
-| Knowledge | `knowledge-api.adam-russell.com` | confirm at fold |
+| Teaching | `api.adam-russell.com` (old `teaching-api` 404) | remounted at `/teaching/` |
+| Tasks | `api.adam-russell.com` (old `tasks-api` 404) | remounted at `/tasks/` |
+| Knowledge | `api.adam-russell.com` (old `knowledge-api` 404) | remounted at `/knowledge/` |
 
 Same-site cookie pattern: app and API are sibling subdomains under `adam-russell.com`. Umbrella retarget of `life-hub2` must preserve Life’s pattern; folding other hubs may mean either (a) extending CORS allow-list on `life-hub2` while app origins stay separate, or (b) consolidating app hosts later — decide per fold, do not rotate secrets.
 
@@ -231,10 +231,13 @@ Knowledge fold detail: R2 `knowledge-hub-archive` and Worker `knowledge-hub-rese
 | Teaching calendar live | **shipped** | PR #78 merged 2026-09-03 |
 | Teaching search corpus + schedule expand + media upload + Clare + SPA retarget | **shipped** | PR #79 merged 2026-09-03; Teaching Pages PR teaching-hub#27; Tasks Pages PR Tasks-Hub#105 |
 | Full Clare dump / brief / toolkit / mutations | **shipped** | PR #81 merged 2026-09-03 |
-| Netlify retarget | **done** | Pages point at `api.adam-russell.com`; old Function sites disabled 2026-09-04 (domains 404) |
+| Netlify retarget | **done** | Pages point at `api.adam-russell.com`; old Function sites deleted 2026-09-04 (domains 404) |
 | Knowledge leftovers fold | **shipped** | PR #85 / knowledge-hub #101 merged 2026-09-04 |
-| Blobs remount + Function retire | **set** | 2026-09-04 Job 5 — copied Teaching 135/135 and Tasks 448/448 onto `life-hub2`; `TEACHING_BLOBS_SITE_ID`/`TASKS_BLOBS_SITE_ID`=`local`; deploy `6a99edc41d38b3aed1999023` / `e881cb9`. Sites disabled, not deleted. Public lesson 200 matched source. R2 + Worker untouched. |
-| Tasks full records + one kit | **this PR** | `GET /api/tasks` and collection lists return stored records (Dashboard/Today/Backlog need `milestones`). Apps symlink `design-kit/` → `packages/design-kit`. |
+| Blobs remount + Function retire | **done** | Job 5 copied stores + remounted `local`. Job 6 (2026-09-04) deleted `arteaching-hub`, `artasks-hub`, and Netlify `knowledge-hub-archive` (IDs confirmed absent). Old API hosts 404; `api.adam-russell.com` 200. R2 + Worker untouched. |
+| Alchemist / curator env | **done** | Job 8 (2026-09-04) — Production only: `ALCHEMIST_SHARED_SECRET` copied from `arteaching-hub`; `GITHUB_WORKFLOW_TOKEN` copied from `knowledge-hub-archive`; `KNOWLEDGE_ALCHEMIST_URL`=`https://api.adam-russell.com/api/lesson-alchemist` (non-secret). `GITHUB_TOKEN` unchanged. Redeploy `6a9a5099e6139c7e09e68b9b` / `38a4536` ready. |
+| Tasks full records + one kit | **shipped** | PR #90 merged 2026-09-04 |
+| Hammond across hubs | **shipped** | PR #91 merged 2026-09-04 |
+| Widgets proxy CORS | **shipped** | proxies #1 merged 2026-09-04 — harden in place, not folded onto `life-hub2` |
 
 ### Slice 01 — what shipped
 
@@ -498,7 +501,7 @@ Last Knowledge Function leftovers on `life-hub2`. Worker `knowledge-hub-research
 - Knowledge Pages points tidy/curator/podcast at the umbrella prefix
 - Do not copy Knowledge auth, bind R2, rotate secrets, or retire `knowledge-api`
 
-Copy onto `life-hub2` if missing: `ALCHEMIST_SHARED_SECRET`. Optional: `GITHUB_WORKFLOW_TOKEN` for curator **Run now**. Teaching `KNOWLEDGE_ALCHEMIST_URL` should become `https://api.adam-russell.com/api/lesson-alchemist`.
+Job 8 done 2026-09-04 (Production only, no values recorded): `ALCHEMIST_SHARED_SECRET` and `GITHUB_WORKFLOW_TOKEN` copied onto `life-hub2` (secret). `KNOWLEDGE_ALCHEMIST_URL`=`https://api.adam-russell.com/api/lesson-alchemist` (non-secret). `GITHUB_TOKEN` unchanged.
 
 ### Slice 29 — Remount Blobs and retire Function sites (this slice)
 
@@ -511,7 +514,7 @@ Old API sites are Blobs hosts, not the live Pages origin. Do not flip stores unt
 - Then retire Netlify Function sites `arteaching-hub`, `artasks-hub`, and `knowledge-hub-archive`. Do **not** delete R2 bucket `knowledge-hub-archive` or Worker `knowledge-hub-research`
 - Teaching leftovers still missing on umbrella (`/api/alchemy-lab`, compositions, trash, AI jobs, scope-sequences, export) already 404 on `api.adam-russell.com`; retiring `arteaching-hub` removes the fallback
 
-Job 5 done 2026-09-04: copies matched; remount env `local`; public lesson 200; three Function sites **disabled** (domains 404). Sites not deleted. Signed-in Tasks list not verified.
+Job 5 done 2026-09-04: copies matched; remount env `local`; public lesson 200. Job 6 done 2026-09-04: three Function sites **deleted** (IDs absent; old API hosts 404). R2 bucket `knowledge-hub-archive` and Worker `knowledge-hub-research` untouched. `life-hub2` and `jade-melomakarona-ea20fe` remain.
 
 ### Slice 30 — Remount Teaching, Knowledge, and Tasks SPAs (this slice)
 
@@ -523,7 +526,7 @@ The four apps are one Pages site. Source moved from the hub repos’ `origin/mai
 
 Vite `UMBRELLA_SPA=1` sets those bases. Teaching’s History router strips `/teaching`. A root `404.html` restores deep links (`/teaching/s/lessons/:id`, Knowledge/Tasks hashes). The Life rail opens same-origin paths, not the old Pages hosts.
 
-APIs stay on `life-hub2`. Functions stay in repo-root `netlify/functions/` — not copied under `apps/*/netlify`. Knowledge Worker `knowledge-hub-research` and R2 `knowledge-hub-archive` stay on Cloudflare. Do not rotate secrets, bind R2, or delete the disabled Function sites.
+APIs stay on `life-hub2`. Functions stay in repo-root `netlify/functions/` — not copied under `apps/*/netlify`. Knowledge Worker `knowledge-hub-research` and R2 `knowledge-hub-archive` stay on Cloudflare. Do not rotate secrets or bind R2. Function sites deleted in Job 6.
 
 Old custom domains (`teaching-hub`, `knowledge-hub`, `tasks-hub`) can keep serving their existing Pages deploys until DNS points here. Student lessons on this site are `/teaching/s/…` and stay unauthenticated.
 
@@ -540,21 +543,35 @@ Teacher UI leftovers now on `life-hub2` (Life session, Teaching Blobs):
 
 DNS decision: point `teaching-hub` / `knowledge-hub` / `tasks-hub` at this product (`/teaching/`, `/knowledge/`, `/tasks/`), including student `/s/…` → `/teaching/s/…`.
 
-Disabled Function sites `arteaching-hub`, `artasks-hub`, `knowledge-hub-archive` stay disabled (domains 404) until a Netlify auth token can delete them. Do **not** delete R2 `knowledge-hub-archive` or Worker `knowledge-hub-research`. `GITHUB_TOKEN` rotation is parked until closer to **2026-12-02**.
+Job 6 deleted Function sites `arteaching-hub`, `artasks-hub`, and Netlify `knowledge-hub-archive`. Old API hosts return 404 (detached TLS). Do **not** delete R2 `knowledge-hub-archive` or Worker `knowledge-hub-research`. `GITHUB_TOKEN` rotation is parked until closer to **2026-12-02**.
 
 ### Slice 32 — Tasks records + one kit (shipped, PR #90)
 
 - `GET /api/tasks`, `/api/projects`, and the other Tasks collections return the stored Blobs records. Summaries stripped `milestones` / `depends_on` / `tags` and crashed the remounted Dashboard, Today, and Backlog.
 - `apps/{teaching,knowledge,tasks}/design-kit` are symlinks to `packages/design-kit`. Tasks CSS imports the flat kit files (including `calendar.css`). `hub-design-kit` `sync-to-hubs.sh` writes Life’s kit at `packages/design-kit`.
 
-### Slice 33 — Hammond across hubs (this slice)
+### Slice 33 — Hammond across hubs (shipped, PR #91)
 
 Life `/api/chat` Hammond now gets a short live digest from the umbrella Tasks and Teaching stores (open tasks, class codes, upcoming scheduled lessons). Fail-open if a store is unbound. Knowledge notes stay with Clementine — this digest does not list them. No new `/api/agent` runtime.
 
+### Slice 34 — Jobs 8 + 6 (this slice)
+
+Job 8 before Job 6. Production on `life-hub2` only; no secret values recorded.
+
+- `ALCHEMIST_SHARED_SECRET` copied from `arteaching-hub` (secret)
+- `GITHUB_WORKFLOW_TOKEN` copied from `knowledge-hub-archive` (secret)
+- `KNOWLEDGE_ALCHEMIST_URL`=`https://api.adam-russell.com/api/lesson-alchemist` (non-secret)
+- `GITHUB_TOKEN` left unchanged
+- Redeploy connected `main`: `6a9a5099e6139c7e09e68b9b` / `38a4536` ready
+
+Production key **names** on `life-hub2`: `ALCHEMIST_SHARED_SECRET`, `ANTHROPIC_API_KEY`, `GITHUB_BRANCH`, `GITHUB_REPOSITORY`, `GITHUB_TOKEN`, `GITHUB_TOKEN_EXPIRES`, `GITHUB_WORKFLOW_TOKEN`, `KNOWLEDGE_ALCHEMIST_URL`, `LIFE_HUB_PASSPHRASE_HASH`, `NETLIFY_BLOBS_TOKEN`, `R2_ACCESS_KEY_ID`, `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_SECRET_ACCESS_KEY`, `RESEARCH_KERNEL_SHARED_SECRET`, `RESEARCH_KERNEL_URL`, `RESEND_API_KEY`, `SESSION_SECRET`, `TASKS_BLOBS_SITE_ID`, `TEACHING_BLOBS_SITE_ID`.
+
+Job 6 deleted Netlify sites `arteaching-hub`, `artasks-hub`, and `knowledge-hub-archive` (all three IDs absent). `teaching-api` / `tasks-api` / `knowledge-api` 404; `api.adam-russell.com` 200. `life-hub2` and `jade-melomakarona-ea20fe` remain enabled. No Cloudflare, R2, Worker, repo, or application-code changes.
+
 ## Next action
 
-Record Codex’s alchemist-env + Function-site delete report. Then migrate widget consumers off `jade-melomakarona-ea20fe` when ready (CORS/caps are already tightened). `GITHUB_TOKEN` rotation stays parked.
+Migrate widget consumers off `jade-melomakarona-ea20fe` when ready (CORS/caps already tightened). `GITHUB_TOKEN` rotation stays parked until closer to **2026-12-02**.
 
 ## Open questions (Adam)
 
-- Proxies: migrate widgets off `jade-melomakarona-ea20fe` vs harden in place — **hardened in place** (this pass). Migration still open.
+- Proxies: migrate widgets off `jade-melomakarona-ea20fe` vs harden in place — **hardened in place** (proxies #1). Migration still open.
