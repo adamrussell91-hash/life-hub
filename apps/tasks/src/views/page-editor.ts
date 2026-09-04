@@ -7,6 +7,8 @@ import { tasksApi } from '@/services/client-api';
 import { formatRelativeUpdated, projectProgress, statusLabel } from '@/domain/cards';
 import type { ExcursionTemplate } from '@/schemas/templates';
 import { errorMessage, renderLoadError } from '@/views/feedback';
+import { deleteProjectNow, deleteTaskNow } from '@/views/card-actions';
+import { renderCardMenu } from '@/views/card-menu';
 import { renderQuickAdd } from '@/views/task-editor';
 import { mountBlockInsert } from '@/views/block-insert';
 import { paintExcursionPage } from '@/views/excursion-timeline';
@@ -231,6 +233,18 @@ function paintTaskPage(
   foot.append(updated);
 
   card.append(head, fields, notes.el, foot);
+  card.append(
+    renderCardMenu(`${task.title} card menu`, [
+      {
+        id: 'delete',
+        label: 'Delete',
+        danger: true,
+        onSelect: () => deleteTaskNow(current, () => {
+          location.hash = '#/board';
+        }, errorHost)
+      }
+    ])
+  );
 
   const canvasHost = el('div', 'block-canvas');
   const layout = el('div', 'page-editor__layout');
@@ -344,6 +358,18 @@ function paintProjectPage(
     )
   );
   card.append(foot);
+  card.append(
+    renderCardMenu(`${project.title} card menu`, [
+      {
+        id: 'delete',
+        label: 'Delete',
+        danger: true,
+        onSelect: () => deleteProjectNow(current, () => {
+          location.hash = '#/projects';
+        }, errorHost)
+      }
+    ])
+  );
 
   const canvasHost = el('div', 'block-canvas');
   const layout = el('div', 'page-editor__layout');
