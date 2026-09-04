@@ -46,6 +46,10 @@
   gap: var(--space-px);
 }
 
+.hub-rail__mobile {
+  display: none;
+}
+
 .hub-rail__section-chevron {
   display: inline-block;
   flex-shrink: 0;
