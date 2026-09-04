@@ -38,7 +38,8 @@ export function buildSystemPrompt({
   daysSinceLastEntry = null,
   daysSinceLastMindSession = null,
   protocolSteer = '',
-  intuition = ''
+  intuition = '',
+  capacities = ''
 }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
@@ -83,8 +84,13 @@ export function buildSystemPrompt({
     agent.recordTypes.length
       ? `You may propose a log_entry tool call for these record types: ${agent.recordTypes.join(', ')}.`
       : 'You do not log structured domain records via log_entry.',
-    'You can propose any durable action via `os_propose_action`. If a shortcut exists for it (log_entry, Central Node patch, library save, etc.), prefer the shortcut. You never lack the ability to act, only the ability to act without Adam seeing the diff first. Never tell Adam you have no memory, no tracker, or no way to write something durable when `os_propose_action` can propose an allowlisted write for Confirm.'
+    'You can propose any durable action via `os_propose_action`. If a shortcut exists for it (log_entry, Central Node patch, library save, etc.), prefer the shortcut. You never lack the ability to act, only the ability to act without Adam seeing the diff first. Never tell Adam you have no memory, no tracker, or no way to write something durable when `os_propose_action` can propose an allowlisted write for Confirm.',
+    'Operate like a tool-using specialist: when a domain read or write tool exists for what Adam asked, call it in this turn before answering. Never claim Life Hub data lives in Notion, that you lack live read access to your own domain store, or that you cannot see history the tools can retrieve. Central Node is coordination context — not a substitute for calling your domain tools.'
   ].join(' ');
+
+  const capacityBlock = capacities
+    ? `Your capacities this turn (prefer these named tools; os_propose_action covers anything else allowlisted):\n${String(capacities).trim()}`
+    : '';
 
   const chadwickBlocks = slug === 'chadwick' ? [
     centralNodeLog
@@ -179,7 +185,9 @@ export function buildSystemPrompt({
       ? `Sara operating manual (follow these Life Hub rules):\n${saraProtocol}`
       : '',
     'You may propose log_entry for weight, composition, measurements, and medical when Adam clearly reports those figures or a visit. Leave meals to Brisket and workouts to Chadwick.',
-    'Medical Overview is the medical record — Central Node Upcoming Appointments are not visits on Medical Overview. New visits need Confirm; appends to a matched visit save immediately. Never say a record is saved until log_entry returns status "written" — awaiting_confirm means only a Confirm card exists. When Adam names a future maintenance dose on a new day (e.g. next Stelara on 27/10), propose a new medical visit dated that day — do not fold it into follow_up_date on a prior dose unless he explicitly asks to set the follow-up field. If the prior dose is not already on Medical Overview, log it as its own visit first. When he says log / confirm logged / save it, call log_entry in that same turn. When log_entry returns ok:false, fix the payload and call log_entry again in the same turn before telling Adam anything failed; never quote schema errors to him. Appointment briefs stay in chat. Body and medical notes should be "[figure or visit] — [compact health verdict]" so save/confirm can land Flags on Central Node.'
+    'Medical Overview is the medical record in Life Hub — not Notion. Central Node Upcoming Appointments are reminders only, not visits on Medical Overview. You own create/edit/read/interpret on Medical Overview.',
+    'When Adam asks about previous medical history, a clinician (e.g. Kate Semple), a past visit, cost, address, insurance, or an appointment brief: you MUST call `search_medical_records` and/or `brief_medical_appointment` in that same turn before answering. Never say you lack live read access to Medical Overview, that it lives at a Notion link, or that visit details were not surfaced — retrieve them with the tools. If a tool returns no match, say you checked Medical Overview and found nothing, then ask one clarifying question.',
+    'New visits need Confirm; appends to a matched visit save immediately. Never say a record is saved until log_entry returns status "written" — awaiting_confirm means only a Confirm card exists. When Adam names a future maintenance dose on a new day (e.g. next Stelara on 27/10), propose a new medical visit dated that day — do not fold it into follow_up_date on a prior dose unless he explicitly asks to set the follow-up field. If the prior dose is not already on Medical Overview, log it as its own visit first. When he says log / confirm logged / save it, call log_entry in that same turn. When log_entry returns ok:false, fix the payload and call log_entry again in the same turn before telling Adam anything failed; never quote schema errors to him. Appointment briefs stay in chat. Body and medical notes should be "[figure or visit] — [compact health verdict]" so save/confirm can land Flags on Central Node.'
   ] : [];
 
   const hammondBlocks = slug === 'hammond' ? [
@@ -224,6 +232,7 @@ export function buildSystemPrompt({
     agent.voice,
     protocolSteer,
     capability,
+    capacityBlock,
     intuitionBlock,
     ...chadwickBlocks,
     ...hyaluronicaBlocks,

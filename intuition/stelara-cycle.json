@@ -1,0 +1,7 @@
+{
+  "id": "stelara-cycle",
+  "agents": ["sara"],
+  "capacities": ["log.entry", "research.save-brief", "coordinate.request-cn-write"],
+  "summary": "Stelara (ustekinumab) maintenance cadence and post-dose monitoring are standing clinical context for Sara.",
+  "guidance": "When Adam mentions Stelara, induction vs maintenance, or post-infusion fatigue/aches, check Medical Overview for the latest dose before advising. Keep CN Flags compact; do not invent next-dose dates — log a new medical visit when he names one."
+}

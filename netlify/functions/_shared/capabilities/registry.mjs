@@ -11,6 +11,10 @@ import {
   setSkincareRoutineMembershipSchema
 } from '../skincare-library-tools.mjs';
 import { getMindSessionSchema, searchMindRecordsSchema } from '../mind-session-read.mjs';
+import {
+  searchMedicalRecordsSchema,
+  briefMedicalAppointmentSchema
+} from '../medical-overview-read.mjs';
 import { proposeCentralNodePatchSchema, appendGovernanceLogSchema } from '../hammond-tools.mjs';
 import { proposeActionToolSchema } from './propose-action.mjs';
 import { shortcutSchemas } from './shortcuts.mjs';
@@ -161,6 +165,7 @@ export function buildAgentTools({
   needsSkincareLibrary = false,
   needsHammondTools = false,
   needsVeraMindTools = false,
+  needsSaraMedicalTools = false,
   message = null
 } = {}) {
   if (typeof slug !== 'string' || !slug) throw new TypeError('slug is required');
@@ -200,6 +205,10 @@ export function buildAgentTools({
 
   if (needsVeraMindTools) {
     tools.push(getMindSessionSchema(), searchMindRecordsSchema());
+  }
+
+  if (needsSaraMedicalTools) {
+    tools.push(searchMedicalRecordsSchema(), briefMedicalAppointmentSchema());
   }
 
   if (needsSkincareLibrary) {
