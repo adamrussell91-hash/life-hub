@@ -3032,10 +3032,11 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .agent-picker__avatar img {
-  width: 118%;
-  height: 118%;
+  width: 100%;
+  height: 100%;
   max-width: none;
   object-fit: cover;
+  object-position: center;
   display: block;
   border-radius: 50%;
 }
@@ -3114,7 +3115,7 @@ body.is-universe-fullscreen .local-banner {
   height: 2.25rem;
   border-radius: 50%;
   object-fit: cover;
-  object-position: center 42%;
+  object-position: center;
   flex: 0 0 auto;
   background: var(--paper);
 }
@@ -3291,7 +3292,7 @@ body.is-universe-fullscreen .local-banner {
   height: 3.5rem;
   border-radius: 50%;
   object-fit: cover;
-  object-position: center 42%;
+  object-position: center;
   background: var(--paper);
 }
 
