@@ -21,7 +21,7 @@ export function universeWrapClass(dark: boolean, fullscreen: boolean): string {
 }
 
 export function universeViewToolsHtml(dark: boolean, fullscreen: boolean): string {
-  return `<div class="universe-view-tools hub-pills" role="group" aria-label="Universe view">
+  return `<div class="universe-view-tools hub-pills hub-pills--loose" role="group" aria-label="Universe view">
     <button type="button" class="hub-pills__btn${dark ? ' is-active' : ''}" data-universe-dark aria-pressed="${dark}">${dark ? 'Light' : 'Dark'}</button>
     <button type="button" class="hub-pills__btn${fullscreen ? ' is-active' : ''}" data-universe-fullscreen aria-pressed="${fullscreen}">${fullscreen ? 'Exit' : 'Full screen'}</button>
   </div>`;
