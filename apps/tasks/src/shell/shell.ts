@@ -1,4 +1,5 @@
 import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
+import { mountMobileChrome } from '../../../../packages/design-kit/js/mount-mobile-chrome.js';
 import { railIconFor, refreshIcon, signOutIcon } from '@/shell/icons';
 import { createRailDisclosureState, type RailSectionId } from '@/shell/rail-disclosure';
 
@@ -350,12 +351,70 @@ function sectionIdForView(view: HubViewId): RailSectionId {
   return NAV_SECTIONS.find((section) => section.items.some((item) => item.id === highlight))?.id ?? 'home';
 }
 
+
+const HOME_ICON = ['M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z'];
+const CHAT_ICON = ['M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z'];
+const TODAY_ICON = ['M8 3.5v4M16 3.5v4M4 10h16M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z'];
+
+function syncTasksMobileChrome(host: HTMLElement, active: HubViewId): void {
+  const highlight = railHighlightId(active);
+  mountMobileChrome(host, {
+    currentHub: 'tasks',
+    primary: [
+      {
+        id: 'board',
+        label: 'Home',
+        paths: HOME_ICON,
+        href: '#/board',
+        current: highlight === 'board',
+        onSelect: () => {
+          location.hash = '#/board';
+        }
+      },
+      {
+        id: 'clare',
+        label: 'Chat',
+        paths: CHAT_ICON,
+        href: '#/clare',
+        current: highlight === 'clare',
+        onSelect: () => {
+          location.hash = '#/clare';
+        }
+      },
+      {
+        id: 'day',
+        label: 'Today',
+        paths: TODAY_ICON,
+        href: '#/day',
+        current: highlight === 'day',
+        onSelect: () => {
+          location.hash = '#/day';
+        }
+      }
+    ],
+    more: NAV_SECTIONS.flatMap((section) =>
+      section.items
+        .filter((item) => !['board', 'clare', 'day'].includes(item.id))
+        .map((item) => ({
+          id: item.id,
+          label: item.label,
+          href: item.href,
+          onSelect: () => {
+            location.hash = item.href;
+          }
+        }))
+    )
+  });
+}
+
 export function renderPrimaryNav(railNav: HTMLElement, active: HubViewId): void {
   const highlight = railHighlightId(active);
   railDisclosure.syncActive(sectionIdForView(active));
   if (railNav.querySelector('.hub-rail__list') && syncRailHighlight(railNav, highlight)) {
     for (const section of NAV_SECTIONS) syncSectionDom(railNav, section.id);
     appendHubSwitcher(hubSwitcherHost(railNav), 'tasks');
+    const earlyRoot = railNav.closest('.hub-layout')?.parentElement ?? railNav.ownerDocument.body;
+    if (earlyRoot instanceof HTMLElement) syncTasksMobileChrome(earlyRoot, active);
     return;
   }
 
@@ -424,6 +483,8 @@ export function renderPrimaryNav(railNav: HTMLElement, active: HubViewId): void 
   railNav.append(desktop, mobile);
   for (const section of NAV_SECTIONS) syncSectionDom(railNav, section.id);
   appendHubSwitcher(hubSwitcherHost(railNav), 'tasks');
+  const shellRoot = railNav.closest('.hub-layout')?.parentElement ?? railNav.ownerDocument.body;
+  if (shellRoot instanceof HTMLElement) syncTasksMobileChrome(shellRoot, active);
 }
 
 export interface PageHeaderConfig {

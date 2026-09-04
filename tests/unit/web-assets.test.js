@@ -30,7 +30,7 @@ test('Home shell exposes landmarks and named rendering regions', async () => {
     'id="home-dashboard"',
     'id="app-status"',
     'aria-live="polite"',
-    'class="mobile-nav"'
+    'class="hub-mobile-nav"'
   ]) {
     assert.match(html, new RegExp(fragment));
   }

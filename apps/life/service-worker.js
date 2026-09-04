@@ -12,6 +12,8 @@ const SHELL_FILES = [
   'packages/design-kit/actions.css',
   'packages/design-kit/filters.css',
   'packages/design-kit/sign-in.css',
+  'packages/design-kit/rail.css',
+  'packages/design-kit/mobile.css',
   'js/app/main.js',
   'js/app/api-session.js',
   'js/app/app-controller.js',
