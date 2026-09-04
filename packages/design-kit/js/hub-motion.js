@@ -418,8 +418,7 @@ export function startHubMotion(root = document) {
           scan(mutation.target, nextReduced);
         }
         if (
-          mutation.attributeName === 'class'
-          || mutation.attributeName === 'aria-selected'
+          mutation.attributeName === 'aria-selected'
           || mutation.attributeName === 'aria-pressed'
           || mutation.attributeName === 'aria-checked'
         ) {
@@ -437,7 +436,7 @@ export function startHubMotion(root = document) {
     childList: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['data-state', 'class', 'aria-selected', 'aria-pressed', 'aria-checked']
+    attributeFilter: ['data-state', 'aria-selected', 'aria-pressed', 'aria-checked']
   });
 }
 
