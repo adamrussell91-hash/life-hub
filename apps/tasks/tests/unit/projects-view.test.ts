@@ -13,6 +13,7 @@ vi.mock('@/services/client-api', () => ({
     listGoals: vi.fn(),
     listReviewLogs: vi.fn(),
     closeProject: vi.fn(),
+    createProject: vi.fn(),
     deleteProject: vi.fn(),
     resolveStalledProject: vi.fn(),
     updateProject: vi.fn()
@@ -168,6 +169,81 @@ describe('projects view rebuild', () => {
     expect(legend.some((text) => text?.includes('Not started') && text.includes('1'))).toBe(true);
     expect(legend.some((text) => text?.includes('Completed') && text.includes('1'))).toBe(true);
     expect(legend.some((text) => text?.includes('Stalled') && text.includes('1'))).toBe(true);
+  });
+
+  it('puts a plus-add on the toolbar so a project can be created', async () => {
+    const canvas = document.createElement('main');
+    await renderProjectsView(canvas);
+
+    const toolbar = canvas.querySelector('.hub-toolbar');
+    expect(toolbar?.querySelector('.plus-add__btn')?.getAttribute('aria-label')).toBe('Add a project');
+    expect(canvas.querySelector('[aria-label="New project title"]')).not.toBeNull();
+    expect(canvas.querySelector('form.quick-add .btn--primary')?.textContent).toBe('Add');
+  });
+
+  it('inserts a quick-add project without remounting the page', async () => {
+    const created = project({
+      id: 'proj_new',
+      title: 'Year 12 formal',
+      type: 'standard',
+      parent_goal_id: 'goal_teach'
+    });
+    vi.mocked(tasksApi.createProject).mockResolvedValue(created);
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderProjectsView(canvas);
+    const listsBefore = vi.mocked(tasksApi.listProjects).mock.calls.length;
+
+    const form = canvas.querySelector('form.quick-add') as HTMLFormElement;
+    const title = form.querySelector<HTMLInputElement>('[aria-label="New project title"]');
+    expect(title).not.toBeNull();
+    title!.value = 'Year 12 formal';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-project-id="proj_new"] .pcard__title')?.textContent).toBe(
+        'Year 12 formal'
+      );
+    });
+    expect(tasksApi.createProject).toHaveBeenCalledWith({
+      title: 'Year 12 formal',
+      type: 'standard',
+      parent_goal_id: null
+    });
+    expect(canvas.querySelector('.canvas-status')).toBeNull();
+    expect(canvas.textContent).not.toContain('Loading…');
+    expect(vi.mocked(tasksApi.listProjects)).toHaveBeenCalledTimes(listsBefore);
+    expect(canvas.querySelector('[data-project-id="proj_go"]')).not.toBeNull();
+    const notStarted = [...canvas.querySelectorAll('.lane')].find(
+      (lane) => lane.querySelector('.lane__title')?.textContent === 'Not started'
+    );
+    expect(notStarted?.textContent).toContain('Year 12 formal');
+  });
+
+  it('clears a lifecycle filter so the new project is visible', async () => {
+    const created = project({ id: 'proj_new', title: 'Blank slate' });
+    vi.mocked(tasksApi.createProject).mockResolvedValue(created);
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderProjectsView(canvas);
+
+    const planning = [...canvas.querySelectorAll<HTMLButtonElement>('.projects-chart__slice')].find((btn) =>
+      btn.textContent?.includes('Planning')
+    );
+    planning?.click();
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.projects-chart__slice.is-active')?.textContent).toMatch(/Planning/);
+    });
+
+    const form = canvas.querySelector('form.quick-add') as HTMLFormElement;
+    form.querySelector<HTMLInputElement>('[aria-label="New project title"]')!.value = 'Blank slate';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-project-id="proj_new"]')).not.toBeNull();
+    });
+    expect(canvas.querySelector('.projects-chart__slice.is-active')).toBeNull();
+    expect(canvas.querySelector('[data-project-id="proj_plan"]')).not.toBeNull();
   });
 
   it('groups the board by status and opens a project page from a card', async () => {
