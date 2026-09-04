@@ -1898,13 +1898,25 @@ body.is-universe-fullscreen .local-banner {
   .origin-filters {
     min-width: 0;
     max-width: 100%;
+  }
+
+  .origin-filters .tag-pills {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--space-2);
+    min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
 
-  .origin-filters::-webkit-scrollbar {
+  .origin-filters .tag-pills::-webkit-scrollbar {
     display: none;
+  }
+
+  .origin-filters .tag-pills > * {
+    flex: 0 0 auto;
   }
 
   .list-viewport {

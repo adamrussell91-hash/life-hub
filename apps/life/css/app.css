@@ -591,6 +591,9 @@ main { max-width: 76rem; margin: 0 auto; }
   height: 1.125rem;
   display: block;
   object-fit: contain;
+  /* Rail icons are inverted white; restore ink on the light sheet. */
+  filter: none;
+  opacity: 0.85;
 }
 
 @keyframes breathe { from { opacity: 0.58; } to { opacity: 0.86; } }
@@ -606,7 +609,7 @@ main { max-width: 76rem; margin: 0 auto; }
   .desktop-rail { display: none; }
   .page-frame {
     margin-left: 0;
-    padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem calc(6.5rem + env(safe-area-inset-bottom));
+    padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem calc(7.75rem + env(safe-area-inset-bottom));
   }
   .topbar { padding: 0.85rem 0 1.1rem; align-items: flex-end; }
   .topbar .eyebrow { display: block; }
