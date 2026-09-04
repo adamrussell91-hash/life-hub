@@ -106,6 +106,9 @@ describe("Knowledge Hub rail", () => {
     expect(css).toContain(".hub-pills__btn");
     expect(css).toContain(".graph-preview__excerpt");
     expect(css).toMatch(/\.floating-chat-button\s*\{[^}]*background:\s*var\(--wave\)/);
+    expect(css).toMatch(
+      /\.floating-chat-button\s*\{[^}]*bottom:\s*calc\(5\.5rem \+ env\(safe-area-inset-bottom,\s*0px\)\)/
+    );
     expect(css).toMatch(/\.chat-overlay\s*\{[^}]*width:\s*min\(24rem, calc\(100vw - 3rem\)\)/);
     expect(css).toMatch(/\.graph-stage\s*\{[^}]*min-height:\s*560px/);
     expect(css).toContain(".universe-zoom");
