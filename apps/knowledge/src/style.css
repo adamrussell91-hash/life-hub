@@ -2100,8 +2100,10 @@ body.is-universe-fullscreen .local-banner {
     align-items: stretch;
   }
 
+  /* Row flex-basis (12rem) becomes height in a column — keep the title field one line. */
   .chat__book-add input,
   .chat__book-add .btn {
+    flex: 0 0 auto;
     width: 100%;
     min-height: 44px;
   }
