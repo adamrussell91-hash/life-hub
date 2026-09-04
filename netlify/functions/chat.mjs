@@ -169,6 +169,13 @@ import {
   getMindSession,
   searchMindRecords
 } from './_shared/mind-session-read.mjs';
+import {
+  selectMedicalEntries,
+  selectBloodsEntries,
+  searchMedicalRecords,
+  briefMedicalAppointmentWithFallback
+} from './_shared/medical-overview-read.mjs';
+import { promptOneLinersForAgent } from './_shared/capabilities/registry.mjs';
 import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
@@ -267,7 +274,8 @@ export function createChatHandler({
     const needsNutritionChallenges = slug === 'brisket';
     // Brisket writes challenge scoreboards onto Central Node; keep markdown mutable.
     const needsCentralNodeWrite = needsHammondTools || needsNutritionChallenges;
-    const needsBodyState = slug === 'chadwick' || slug === 'brisket';
+    const needsBodyState = slug === 'chadwick' || slug === 'brisket' || slug === 'sara';
+    const needsSaraMedical = slug === 'sara';
     const needsMindDigest = slug === 'vera' || slug === 'penelope';
     // Finalize / Vera flush must not burn the Netlify budget on mind blob
     // bodies or web_search before log_entry can fire — that was the empty-turn
@@ -394,6 +402,7 @@ export function createChatHandler({
         let daysSinceLastMindSession = null;
         let veraIntake = '';
         let mindEvents = [];
+        let medicalEvents = [];
         let repoTree = [];
         try {
           const current = await client.resolveTree();
@@ -707,6 +716,22 @@ export function createChatHandler({
               } catch { /* skip */ }
             }
           }
+          if (needsSaraMedical) {
+            const medicalEntries = selectMedicalEntries(current.tree);
+            const bloodsEntries = selectBloodsEntries(current.tree);
+            const medicalBlobs = await Promise.all([
+              ...medicalEntries.map(entry => client.readBlob(entry.sha)),
+              ...bloodsEntries.map(entry => client.readBlob(entry.sha))
+            ]);
+            const medicalFiles = [...medicalEntries, ...bloodsEntries]
+              .map((entry, index) => ({ path: entry.path, content: decodeBlob(medicalBlobs[index]) }))
+              .filter(file => file.content !== null);
+            medicalEvents = [];
+            for (const file of medicalFiles) {
+              try { medicalEvents.push(parseEventDocument(file.content, file.path, loadYaml)); }
+              catch { /* skip unreadable medical/bloods blobs */ }
+            }
+          }
           if (veraIntakeBlob) {
             veraIntake = decodeBlob(veraIntakeBlob) || '';
           }
@@ -755,6 +780,7 @@ export function createChatHandler({
           daysSinceLastMindSession = null;
           veraIntake = '';
           mindEvents = [];
+          medicalEvents = [];
           repoTree = [];
         }
 
@@ -777,6 +803,7 @@ export function createChatHandler({
             needsSkincareLibrary,
             needsHammondTools,
             needsVeraMindTools: slug === 'vera',
+            needsSaraMedicalTools: needsSaraMedical,
             message: parsed.message
           }),
           ...(needsNutritionChallenges
@@ -801,6 +828,7 @@ export function createChatHandler({
           : '';
         const intuitionPacks = loadIntuitionFor({ agentSlug: slug });
         const intuitionPrompt = formatIntuitionForPrompt(intuitionPacks);
+        const capacityOneLiners = promptOneLinersForAgent(slug);
         const system = buildSystemPrompt({
           slug,
           digest,
@@ -839,7 +867,8 @@ export function createChatHandler({
           daysSinceLastEntry,
           daysSinceLastMindSession,
           protocolSteer: protocolSteerBlock(slug, parsed.protocolId),
-          intuition: intuitionPrompt
+          intuition: intuitionPrompt,
+          capacities: capacityOneLiners
         });
 
         let pendingLogRejection = null;
@@ -928,6 +957,22 @@ export function createChatHandler({
               if (event.name === 'search_mind_records') {
                 send({ type: 'status', text: 'Searching mind records…' });
                 return JSON.stringify(searchMindRecords(mindEvents, event.input ?? {}));
+              }
+              if (event.name === 'search_medical_records') {
+                send({ type: 'status', text: 'Searching Medical Overview…' });
+                return JSON.stringify(searchMedicalRecords(medicalEvents, event.input ?? {}));
+              }
+              if (event.name === 'brief_medical_appointment') {
+                send({ type: 'status', text: 'Reading Medical Overview…' });
+                const date = typeof event.input?.date === 'string' ? event.input.date.trim() : '';
+                const result = await briefMedicalAppointmentWithFallback({
+                  date,
+                  events: medicalEvents,
+                  tree: repoTree,
+                  readBlob: async sha => decodeBlob(await client.readBlob(sha)),
+                  parseDocument: (content, path) => parseEventDocument(content, path, loadYaml)
+                });
+                return JSON.stringify(result);
               }
               if (event.name === 'search_exercise_library') {
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
