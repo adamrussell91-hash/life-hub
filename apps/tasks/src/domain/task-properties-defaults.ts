@@ -1,6 +1,6 @@
 import type { TaskPropertyConfig } from '@/schemas/task-properties';
 
-/** Token hex from design-kit/css/tokens.css — universe canvas needs resolved colours. */
+/** Token hex from packages/design-kit/tokens.css — universe canvas needs resolved colours. */
 export const DEFAULT_DOMAIN_COLORS: Record<string, { fill: string; ink: string }> = {
   teaching: { fill: '#376fb7', ink: '#17375e' },
   life: { fill: '#2f7a4f', ink: '#3c5949' },

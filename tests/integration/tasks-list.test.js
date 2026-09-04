@@ -83,22 +83,30 @@ test('Tasks list is 503 when the Tasks store is unbound', async () => {
   assert.equal((await response.json()).error.code, 'tasks_blobs_unbound');
 });
 
-test('Tasks list returns titles from tasks-hub-content', async () => {
+test('Tasks list returns stored records the remounted SPA can render', async () => {
+  const stored = {
+    id: 'task-1',
+    title: 'Mark 12 English',
+    status: 'open',
+    description: 'Year 12 scripts',
+    domain: 'teaching',
+    parent_project_id: 'proj_1',
+    tags: ['marking'],
+    depends_on: [],
+    kind: 'task',
+    bucket: 'active'
+  };
   const handler = createTasksHandler({
     env,
     now: () => Date.parse('2026-08-01T01:00:00Z'),
     getContentStore: async () => memoryStore({
       'tasks/_index': ['task-1'],
-      'tasks/task-1': { id: 'task-1', title: 'Mark 12 English', status: 'open' }
+      'tasks/task-1': stored
     })
   });
   const response = await handler(request({ origin: 'https://tasks-hub.adam-russell.com' }));
   assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).data.tasks, [{
-    id: 'task-1',
-    title: 'Mark 12 English',
-    status: 'open'
-  }]);
+  assert.deepEqual((await response.json()).data.tasks, [stored]);
 });
 
 test('Tasks POST/PATCH/DELETE use the Life session and keep the index', async () => {

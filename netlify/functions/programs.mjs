@@ -13,7 +13,6 @@ export function createProgramsHandler(deps = {}) {
     listKey: 'programs',
     idPrefix: 'prog',
     notFound: 'Program not found',
-    titleField: 'name',
     create(body, id, timestamp) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
       if (!name) {
