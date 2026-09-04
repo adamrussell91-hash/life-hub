@@ -1,5 +1,11 @@
 import { isFocusLink, isFocusNode, isSearchHot, selectionCluster } from "./graphFocus";
-import type { ArchiveGraphModel, GraphLinkDatum, GraphLinkKind, GraphNodeDatum } from "./keywordGraph";
+import {
+  CONSTELLATION_SPOKE_DISTANCE,
+  type ArchiveGraphModel,
+  type GraphLinkDatum,
+  type GraphLinkKind,
+  type GraphNodeDatum,
+} from "./keywordGraph";
 import { SHOW_ALL_SETTLE_TICKS, showAllLabelVisible } from "./showAllDraw";
 import { showAllClusterRadius } from "./showAllGraph";
 
@@ -192,6 +198,45 @@ export function attachGraphSearch(
 
 export function simulationNodes(variant: ForceGraphVariant, nodes: GraphNodeDatum[]) {
   return nodes;
+}
+
+/**
+ * Hub→note spoke length for Constellation. Sized so CONSTELLATION_EXPAND notes
+ * can sit in a ring with leaf–leaf collision instead of collapsing onto one point.
+ */
+export { CONSTELLATION_SPOKE_DISTANCE };
+
+export function constellationNodeCharge(node: GraphNodeDatum) {
+  if (node.kind === "leaf") return -100;
+  if (node.kind === "major") return -2400;
+  if (node.kind === "minor") return -320;
+  return -28;
+}
+
+export function constellationCollisionRadius(node: GraphNodeDatum) {
+  if (node.kind === "leaf") return Math.max(14, node.r + 8);
+  if (node.kind === "major") return node.r + 44;
+  if (node.kind === "minor") return node.r + 18;
+  return node.r + 8;
+}
+
+export function constellationLinkDistance(link: GraphLinkDatum) {
+  if (link.kind === "spoke") return CONSTELLATION_SPOKE_DISTANCE;
+  if (link.kind === "orbit") return 140;
+  return 240 + Math.min(140, link.weight / 5);
+}
+
+export function constellationLinkStrength(link: GraphLinkDatum) {
+  if (link.kind === "spoke") return 0.65;
+  if (link.kind === "orbit") return 0.35;
+  return 0.04;
+}
+
+export function constellationTargetStrength(node: GraphNodeDatum) {
+  if (node.kind === "leaf") return 0;
+  if (node.kind === "major") return 0.12;
+  if (node.kind === "minor") return 0.06;
+  return 0.02;
 }
 
 export function showAllLinkDistance(linkOrKind: GraphLinkKind | GraphLinkDatum) {
