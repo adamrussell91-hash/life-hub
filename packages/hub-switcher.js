@@ -32,6 +32,8 @@ export const UMBRELLA_HUBS = [
   }
 ];
 
+export const CHEVRON_PATH = 'm6 9 6 6 6-6';
+
 export function listUmbrellaHubs() {
   return UMBRELLA_HUBS.map(hub => ({ ...hub, paths: [...hub.paths] }));
 }
@@ -43,12 +45,31 @@ function iconSvg(paths, className = 'hub-rail__icon') {
   return `<svg class="${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 }
 
+function chevronSvg() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${CHEVRON_PATH}"/></svg>`;
+}
+
+function accordionRowHtml(hub, currentId) {
+  const current = hub.id === currentId;
+  return `<div class="hub-row${current ? ' is-active' : ''}" data-hub="${hub.id}">
+    <a class="hub-label" href="${hub.origin}"${current ? ' aria-current="page"' : ''}>
+      <span class="nav-glyph" aria-hidden="true">${iconSvg(hub.paths)}</span>
+      <span>${hub.title}</span>
+    </a>
+    <button class="hub-toggle" type="button" data-hub-toggle="${hub.id}" aria-label="Preview ${hub.title}" aria-expanded="false">
+      ${chevronSvg()}
+    </button>
+  </div>
+  <div class="hub-panel" data-hub-panel="${hub.id}">
+    <div class="hub-panel-inner" data-hub-preview="${hub.id}">
+      <div class="hub-preview-item">${hub.eyebrow}</div>
+    </div>
+  </div>`;
+}
+
 export function hubSwitcherHtml(currentId) {
-  const links = UMBRELLA_HUBS.map(hub => {
-    const current = hub.id === currentId;
-    return `<a class="hub-rail__link${current ? ' is-current' : ''}" href="${hub.origin}"${current ? ' aria-current="page"' : ''}><span class="nav-glyph" aria-hidden="true">${iconSvg(hub.paths)}</span><span>${hub.title}</span></a>`;
-  }).join('');
-  return `<div class="hub-rail__hubs" data-hub-switcher><p class="hub-rail__section">Hubs</p>${links}</div>`;
+  const rows = UMBRELLA_HUBS.map(hub => accordionRowHtml(hub, currentId)).join('');
+  return `<div class="hub-rail__hubs" data-hub-switcher><p class="hub-rail__section">Hubs</p>${rows}</div>`;
 }
 
 export function hubSwitcherHost(node) {
@@ -73,6 +94,84 @@ function createIcon(doc, paths) {
   return svg;
 }
 
+function createChevron(doc) {
+  const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.75');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', CHEVRON_PATH);
+  svg.append(path);
+  return svg;
+}
+
+export function toggleHubAccordion(root, name) {
+  if (!root || !name) return false;
+  const row = root.querySelector(`.hub-row[data-hub="${name}"]`);
+  const panel = root.querySelector(`.hub-panel[data-hub-panel="${name}"]`);
+  if (!row || !panel) return false;
+  const isOpen = row.classList.contains('is-open');
+  for (const openRow of root.querySelectorAll('.hub-row.is-open')) {
+    openRow.classList.remove('is-open');
+    openRow.querySelector('.hub-toggle')?.setAttribute('aria-expanded', 'false');
+  }
+  for (const openPanel of root.querySelectorAll('.hub-panel.is-open')) {
+    openPanel.classList.remove('is-open');
+  }
+  if (!isOpen) {
+    row.classList.add('is-open');
+    panel.classList.add('is-open');
+    row.querySelector('.hub-toggle')?.setAttribute('aria-expanded', 'true');
+  }
+  return !isOpen;
+}
+
+export function openHubAccordion(root, name) {
+  if (!root || !name) return;
+  const row = root.querySelector(`.hub-row[data-hub="${name}"]`);
+  if (row?.classList.contains('is-open')) return;
+  toggleHubAccordion(root, name);
+}
+
+export function bindHubAccordion(root) {
+  if (!root || root.dataset.hubAccordionBound === 'true') return;
+  root.dataset.hubAccordionBound = 'true';
+  root.addEventListener('click', event => {
+    const toggle = event.target.closest?.('[data-hub-toggle]');
+    if (!toggle || !root.contains(toggle)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    toggleHubAccordion(root, toggle.dataset.hubToggle);
+  });
+}
+
+export function renderHubPreview(root, hubId, lines) {
+  const inner = root.querySelector?.(`[data-hub-preview="${hubId}"]`);
+  if (!inner) return;
+  const rows = (Array.isArray(lines) ? lines : [])
+    .map(line => String(line ?? '').trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  inner.replaceChildren();
+  if (!rows.length) {
+    const empty = inner.ownerDocument.createElement('div');
+    empty.className = 'hub-preview-item';
+    empty.textContent = 'Nothing to preview yet';
+    inner.append(empty);
+    return;
+  }
+  for (const line of rows) {
+    const item = inner.ownerDocument.createElement('div');
+    item.className = 'hub-preview-item';
+    item.textContent = line;
+    inner.append(item);
+  }
+}
+
 export function appendHubSwitcher(parent, currentId) {
   if (!parent) return;
   const doc = parent.ownerDocument ?? document;
@@ -83,25 +182,11 @@ export function appendHubSwitcher(parent, currentId) {
     host.className = 'hub-rail__hubs';
     parent.append(host);
   }
-  host.replaceChildren();
-  const label = doc.createElement('p');
-  label.className = 'hub-rail__section';
-  label.textContent = 'Hubs';
-  host.append(label);
-  for (const hub of UMBRELLA_HUBS) {
-    const link = doc.createElement('a');
-    link.className = 'hub-rail__link';
-    link.href = hub.origin;
-    if (hub.id === currentId) {
-      link.classList.add('is-current');
-      link.setAttribute('aria-current', 'page');
-    }
-    const glyph = doc.createElement('span');
-    glyph.setAttribute('aria-hidden', 'true');
-    glyph.append(createIcon(doc, hub.paths));
-    const title = doc.createElement('span');
-    title.textContent = hub.title;
-    link.append(glyph, title);
-    host.append(link);
-  }
+  const staging = doc.createElement('div');
+  staging.innerHTML = hubSwitcherHtml(currentId);
+  const next = staging.querySelector('[data-hub-switcher]');
+  if (next) host.replaceWith(next);
+  else host.replaceChildren();
+  const live = parent.querySelector('[data-hub-switcher]') ?? host;
+  bindHubAccordion(live);
 }

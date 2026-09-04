@@ -91,6 +91,8 @@ test('umbrella hub switcher lists Life plus the three remounted hubs', () => {
   assert.match(html, /href="\/knowledge\/"/);
   assert.match(html, /href="\/tasks\/"/);
   assert.match(html, /aria-current="page"/);
+  assert.match(html, /data-hub-toggle="knowledge"/);
+  assert.match(html, /class="hub-row is-active"/);
 });
 
 test('hub switcher host prefers the rail so it stays out of the scrolling nav', () => {

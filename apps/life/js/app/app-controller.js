@@ -1,4 +1,5 @@
 import { getSydneyDateKey } from '../core/time.js';
+import { bindHubAccordion, openHubAccordion, renderHubPreview } from '../shell/hub-accordion.js';
 import { renderHubPulse } from '../shell/render-hub-pulse.js';
 import { renderClareResult } from '../shell/render-tasks.js';
 import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
@@ -183,6 +184,7 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="central-node"]') ?? []) {
     bind(button, 'click', () => showSection('central-node'));
   }
+  bindHubAccordion(root.querySelector('[data-hub-accordion]') ?? root);
   bind(root.querySelector('#more-nav-button'), 'click', () => openMoreSheet());
   bind(root.querySelector('#more-sheet-close'), 'click', () => closeMoreSheet());
   bind(root.querySelector('#more-sheet'), 'click', event => {
@@ -669,15 +671,21 @@ export function createAppController(dependencies) {
     if (name === 'mind') renderMindSection();
     if (name === 'central-node') renderCentralNodeSection();
     if (name === 'home') void loadHubPulse();
+    const lifeDomain = name !== 'home' && name !== 'chat';
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
+      if (button.matches?.('.hub-label, .hub-toggle')) continue;
       const section = button.dataset.section;
       const active = section === name
         || (section === 'more' && MORE_SECTIONS.has(name))
         || (section === 'body' && (name === 'body-bloods' || name === 'body-medical'));
       button.classList.toggle('is-active', active);
+      button.classList.toggle('is-current', active && button.classList.contains('hub-nav-item'));
       if (active && section !== 'more') button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     }
+    const lifeRow = root.querySelector('.hub-row[data-hub="life"]');
+    lifeRow?.classList.toggle('is-active', name !== 'chat');
+    if (lifeDomain) openHubAccordion(root.querySelector('[data-hub-accordion]') ?? root, 'life');
   }
 
   function loadHubCalendars() {
@@ -747,21 +755,39 @@ export function createAppController(dependencies) {
     });
     const teaching = teachingApi?.getCurriculum
       ? teachingApi.getCurriculum()
-        .then(data => ({ status: 'ready', count: (data?.classes ?? []).length }))
-        .catch(error => ({ status: error?.code === 'blobs_unbound' ? 'unbound' : 'error' }))
+        .then(data => {
+          const classes = data?.classes ?? [];
+          renderHubPreview(root, 'teaching', classes.map(item => item.code || item.title));
+          return { status: 'ready', count: classes.length };
+        })
+        .catch(error => {
+          renderHubPreview(root, 'teaching', ['Classes are not bound yet']);
+          return { status: error?.code === 'blobs_unbound' ? 'unbound' : 'error' };
+        })
       : Promise.resolve({ status: 'error' });
     const knowledge = knowledgeApi?.listPages
       ? knowledgeApi.listPages()
-        .then(pages => ({ status: 'ready', count: Array.isArray(pages) ? pages.length : 0 }))
-        .catch(error => ({ status: error?.code === 'knowledge_repo_unbound' ? 'unbound' : 'error' }))
+        .then(pages => {
+          const list = Array.isArray(pages) ? pages : [];
+          renderHubPreview(root, 'knowledge', list.map(item => item.title || item.id));
+          return { status: 'ready', count: list.length };
+        })
+        .catch(error => {
+          renderHubPreview(root, 'knowledge', ['Archive is not bound yet']);
+          return { status: error?.code === 'knowledge_repo_unbound' ? 'unbound' : 'error' };
+        })
       : Promise.resolve({ status: 'error' });
     const tasks = tasksApi?.listTasks
       ? tasksApi.listTasks()
-        .then(list => ({
-          status: 'ready',
-          count: (Array.isArray(list) ? list : []).filter(item => item?.status !== 'done').length
-        }))
-        .catch(error => ({ status: error?.code === 'tasks_blobs_unbound' ? 'unbound' : 'error' }))
+        .then(list => {
+          const open = (Array.isArray(list) ? list : []).filter(item => item?.status !== 'done');
+          renderHubPreview(root, 'tasks', open.map(item => item.title));
+          return { status: 'ready', count: open.length };
+        })
+        .catch(error => {
+          renderHubPreview(root, 'tasks', ['Board is not bound yet']);
+          return { status: error?.code === 'tasks_blobs_unbound' ? 'unbound' : 'error' };
+        })
       : Promise.resolve({ status: 'error' });
     const [teachingPulse, knowledgePulse, tasksPulse] = await Promise.all([
       teaching,
