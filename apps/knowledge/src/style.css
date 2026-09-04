@@ -3148,9 +3148,10 @@ body.is-universe-fullscreen .local-banner {
 }
 
 @media (max-width: 720px) {
+  /* Sit above the locked .hub-mobile-nav (see design-kit/MOBILE.md). */
   .floating-chat-button {
     right: max(1rem, env(safe-area-inset-right, 0px));
-    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .chat-overlay {
