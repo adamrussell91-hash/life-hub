@@ -133,13 +133,24 @@
   margin-top: var(--space-3);
 }
 
+.property-sections,
+.property-section,
+.property-stack {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .property-list__head,
 .property-row {
   display: grid;
-  grid-template-columns: 16rem auto;
+  /* Fluid name column — fixed 16rem overflowed phones and clip parents blocked scroll. */
+  grid-template-columns: minmax(0, 16rem) auto;
   align-items: center;
   justify-content: start;
   column-gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .property-list__head {
@@ -148,7 +159,11 @@
 
 .property-list__head--colour,
 .property-row--colour {
-  grid-template-columns: 16rem var(--space-16) auto;
+  grid-template-columns: minmax(0, 16rem) var(--space-16) auto;
+}
+
+.property-list__head-actions {
+  justify-self: start;
 }
 
 .property-row .hub-search {
@@ -160,6 +175,7 @@
 .property-swatch {
   width: var(--space-16);
   min-width: var(--space-16);
+  max-width: var(--space-16);
   padding: var(--space-1);
 }
 
@@ -185,8 +201,10 @@
 .property-row__actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin: 0;
+  min-width: 0;
 }
 
 .property-row__actions .btn {
@@ -196,6 +214,27 @@
 .property-row__move {
   width: 2.6rem;
   padding-inline: 0;
+}
+
+@media (max-width: 720px) {
+  .property-list__head,
+  .property-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .property-list__head--colour,
+  .property-row--colour {
+    grid-template-columns: minmax(0, 1fr) var(--space-16) auto;
+  }
+
+  /* Name (+ colour) on the first line; ↑ ↓ Remove on a full-width row beneath. */
+  .property-row__actions {
+    grid-column: 1 / -1;
+  }
+
+  .property-list__head-actions {
+    display: none;
+  }
 }
 
 .task-row__priority {
