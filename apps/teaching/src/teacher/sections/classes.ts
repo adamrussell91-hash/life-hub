@@ -293,7 +293,7 @@ export function renderClassPage(
 
   let selectedDate = today;
   let viewMonth = yearMonthFromDate(today);
-  let calendarView: ScheduleCalendarView = window.matchMedia('(max-width: 768px)').matches
+  let calendarView: ScheduleCalendarView = window.matchMedia('(max-width: 720px)').matches
     ? 'week'
     : 'month';
   let monthDelta = 0;

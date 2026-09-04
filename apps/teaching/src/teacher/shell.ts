@@ -1,8 +1,8 @@
 import { appendHubSwitcher, hubSwitcherHost } from '../../../../packages/hub-switcher.js';
 import { withAppBase } from '@/app/base-path';
 import { createSkipLink } from '@/app/failure';
+import { registerHubUtilities } from '@/teacher/hub-utilities';
 import { syncTeachingMobileChrome } from '@/teacher/mobile-chrome';
-import { readTeacherRailPrefs, writeTeacherRailPrefs } from '@/teacher/rail-prefs';
 
 export interface TeacherShellRefs {
   root: HTMLElement;
@@ -25,38 +25,6 @@ const SIGN_OUT_ICON = `
     <path d="m7 8-4 4 4 4" />
   </svg>
 `.trim();
-
-const CHEVRON_LEFT_ICON = `
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="m15 18-6-6 6-6" />
-  </svg>
-`.trim();
-
-const CHEVRON_RIGHT_ICON = `
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="m9 18 6-6-6-6" />
-  </svg>
-`.trim();
-
-const MOBILE_RAIL_QUERY = '(max-width: 768px)';
-
-function isMobileRailViewport(): boolean {
-  return window.matchMedia(MOBILE_RAIL_QUERY).matches;
-}
-
-function applyRailCollapsed(
-  layout: HTMLElement,
-  toggle: HTMLButtonElement,
-  collapsed: boolean
-): void {
-  const effectiveCollapsed = isMobileRailViewport() ? false : collapsed;
-  layout.classList.toggle('teacher-layout--rail-collapsed', effectiveCollapsed);
-  toggle.setAttribute('aria-expanded', effectiveCollapsed ? 'false' : 'true');
-  const label = effectiveCollapsed ? 'Show navigation' : 'Hide navigation';
-  toggle.setAttribute('aria-label', label);
-  toggle.title = label;
-  toggle.innerHTML = effectiveCollapsed ? CHEVRON_RIGHT_ICON : CHEVRON_LEFT_ICON;
-}
 
 /**
  * Builds the teacher chrome (rail / main / context bar / canvas) and returns
@@ -88,18 +56,7 @@ export function renderTeacherShell(
   railNav.className = 'teacher-layout__rail-nav';
   railNav.id = 'teacher-rail-nav';
 
-  const railToggle = document.createElement('button');
-  railToggle.type = 'button';
-  railToggle.className = 'hub-icon-btn teacher-layout__rail-toggle';
-  railToggle.setAttribute('aria-controls', 'teacher-rail-nav');
-  applyRailCollapsed(layout, railToggle, readTeacherRailPrefs().collapsed);
-  railToggle.addEventListener('click', () => {
-    const next = !layout.classList.contains('teacher-layout--rail-collapsed');
-    applyRailCollapsed(layout, railToggle, next);
-    writeTeacherRailPrefs({ collapsed: next });
-  });
-
-  brandRow.append(brand, railToggle);
+  brandRow.append(brand);
 
   rail.append(brandRow, railNav);
 
@@ -117,7 +74,7 @@ export function renderTeacherShell(
   let logoutButton: HTMLButtonElement | null = null;
   if (options.onLogout) {
     const utilities = document.createElement('div');
-    utilities.className = 'hub-utilities teacher-layout__utilities';
+    utilities.className = 'hub-utilities';
 
     logoutButton = document.createElement('button');
     logoutButton.type = 'button';
@@ -135,10 +92,12 @@ export function renderTeacherShell(
     });
 
     utilities.append(logoutButton);
-    main.append(utilities, contextBar, canvas);
+    registerHubUtilities(utilities);
   } else {
-    main.append(contextBar, canvas);
+    registerHubUtilities(null);
   }
+
+  main.append(contextBar, canvas);
 
   layout.append(rail, main);
   root.append(createSkipLink('teacher-main'), layout);
