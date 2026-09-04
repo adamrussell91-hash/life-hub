@@ -404,9 +404,9 @@ function bookFieldHtml(bookLabels: string[]) {
   const matches = filterPickerOptions(bookLabels, bookQuery);
   return `<div class="chat__book">
     <label for="chat-book">Book</label>
-    <p class="compose__hint">The one in your hand. Pick a title you already use, or type a new one.</p>
+    <p class="compose__hint">Pick a title from the archive, or type a new one.</p>
     <div class="chat__book-add">
-      <input id="chat-book" value="${escapeHtml(bookQuery)}" placeholder="Make It Stick…" autocomplete="off" list="chat-book-list" />
+      <input id="chat-book" value="${escapeHtml(bookQuery)}" placeholder="Book title" autocomplete="off" list="chat-book-list" />
       <datalist id="chat-book-list">${bookLabels.map(item => `<option value="${escapeHtml(item)}"></option>`).join("")}</datalist>
       <button type="button" class="btn btn--ghost" data-set-book>Use this book</button>
     </div>
