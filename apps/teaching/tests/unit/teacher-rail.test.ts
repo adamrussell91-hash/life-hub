@@ -89,4 +89,14 @@ describe('renderTeacherRail', () => {
     search.click();
     expect(onOpenSearch).toHaveBeenCalledOnce();
   });
+
+  it('adds a Hubs switcher that opens the other umbrella hubs', () => {
+    const railNav = document.createElement('div');
+    renderTeacherRail(railNav, curriculum, { activeSection: 'home' });
+    const hubs = railNav.querySelector('[data-hub-switcher]');
+    expect(hubs?.querySelector('a[href="/"]')?.textContent).toContain('Life');
+    expect(hubs?.querySelector('a[href="/knowledge/"]')?.textContent).toContain('Knowledge');
+    expect(hubs?.querySelector('a[href="/tasks/"]')?.textContent).toContain('Tasks');
+    expect(hubs?.querySelector('a[href="/teaching/"]')?.getAttribute('aria-current')).toBe('page');
+  });
 });

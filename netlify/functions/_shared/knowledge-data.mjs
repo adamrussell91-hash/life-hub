@@ -79,6 +79,56 @@ async function githubJson(url, { token, fetchImpl }) {
   }
 }
 
+function decodeBase64(content) {
+  return Buffer.from(String(content).replace(/\n/g, ''), 'base64').toString('utf8');
+}
+
+export function unwrapGithubFileText(payload, raw = '') {
+  let text = '';
+  if (payload?.encoding === 'base64' && typeof payload.content === 'string' && payload.content.replace(/\n/g, '')) {
+    text = decodeBase64(payload.content);
+  } else if (typeof raw === 'string' && raw) {
+    text = raw;
+  }
+  if (!text) return '';
+  try {
+    const parsed = JSON.parse(text);
+    if (
+      parsed
+      && typeof parsed === 'object'
+      && !Array.isArray(parsed)
+      && parsed.encoding === 'base64'
+      && typeof parsed.content === 'string'
+      && typeof parsed.sha === 'string'
+    ) {
+      return decodeBase64(parsed.content);
+    }
+  } catch {
+    // File text is not a GitHub blob wrapper.
+  }
+  return text;
+}
+
+async function readGithubPathText(repo, token, payload, fetchImpl) {
+  let text = unwrapGithubFileText(payload);
+  const size = Number(payload?.size) || 0;
+  if (payload?.sha && (!text || (size > 0 && Buffer.byteLength(text) < size))) {
+    const blob = await githubRequest(`${GITHUB_ORIGIN}/repos/${repo}/git/blobs/${payload.sha}`, {
+      token,
+      fetchImpl,
+      accept: 'application/vnd.github.raw'
+    });
+    if (!blob.ok) {
+      throw knowledgeWriteError(502, 'github_unavailable', 'Knowledge data repository is unavailable.');
+    }
+    text = unwrapGithubFileText(payload, await blob.text());
+  }
+  if (size > 0 && !text) {
+    throw knowledgeWriteError(502, 'github_unavailable', 'Knowledge data repository is unavailable.');
+  }
+  return text;
+}
+
 export async function readKnowledgeFile(file, { env, fetchImpl = fetch } = {}) {
   const { repo, token } = requireBoundRepo(env);
   const encoded = file.split('/').map(segment => encodeURIComponent(segment)).join('/');
@@ -89,31 +139,7 @@ export async function readKnowledgeFile(file, { env, fetchImpl = fetch } = {}) {
   if (typeof payload?.sha !== 'string') {
     throw knowledgeWriteError(502, 'github_unavailable', 'Knowledge data repository is unavailable.');
   }
-  let text =
-    payload.encoding === 'base64' && typeof payload.content === 'string'
-      ? Buffer.from(payload.content.replace(/\n/g, ''), 'base64').toString('utf8')
-      : '';
-  if (!text && (payload.size ?? 0) > 0) {
-    let blob;
-    try {
-      blob = await fetchImpl(`${GITHUB_ORIGIN}/repos/${repo}/git/blobs/${payload.sha}`, {
-        headers: {
-          authorization: `Bearer ${token}`,
-          accept: 'application/vnd.github.raw',
-          'user-agent': 'life-hub'
-        }
-      });
-    } catch {
-      throw knowledgeWriteError(502, 'github_unavailable', 'Knowledge data repository is unavailable.');
-    }
-    if (!blob.ok) {
-      throw knowledgeWriteError(502, 'github_unavailable', 'Knowledge data repository is unavailable.');
-    }
-    text = await blob.text();
-  }
-  if ((payload.size ?? 0) > 0 && !text) {
-    throw knowledgeWriteError(502, 'github_unavailable', 'Knowledge data repository is unavailable.');
-  }
+  const text = await readGithubPathText(repo, token, payload, fetchImpl);
   try {
     return JSON.parse(text);
   } catch {
@@ -124,8 +150,8 @@ export async function readKnowledgeFile(file, { env, fetchImpl = fetch } = {}) {
 function summarizeManifestEntry(item) {
   if (!item || typeof item !== 'object') return null;
   const id = typeof item.id === 'string' ? item.id : '';
-  const title = typeof item.title === 'string' ? item.title : '';
-  if (!id || !title) return null;
+  const title = typeof item.title === 'string' && item.title ? item.title : id;
+  if (!id) return null;
   return {
     id,
     title,
@@ -177,13 +203,13 @@ export function parseQuizItems(raw) {
   return Array.isArray(raw?.items) ? raw.items : [];
 }
 
-async function githubRequest(url, { token, fetchImpl, method = 'GET', body } = {}) {
+async function githubRequest(url, { token, fetchImpl, method = 'GET', body, accept } = {}) {
   let response;
   try {
     response = await fetchImpl(url, {
       method,
       headers: {
-        accept: 'application/vnd.github+json',
+        accept: accept || 'application/vnd.github+json',
         authorization: `Bearer ${token}`,
         'user-agent': 'life-hub',
         ...(body ? { 'content-type': 'application/json' } : {})
@@ -214,20 +240,7 @@ export async function getKnowledgeContent(file, { env, fetchImpl = fetch } = {})
   if (typeof payload?.sha !== 'string') {
     throw knowledgeWriteError(502, 'github_unavailable', 'Knowledge data repository is unavailable.');
   }
-  let text =
-    payload.encoding === 'base64' && typeof payload.content === 'string'
-      ? Buffer.from(payload.content.replace(/\n/g, ''), 'base64').toString('utf8')
-      : '';
-  if (!text && (payload.size ?? 0) > 0) {
-    const blob = await githubRequest(`${GITHUB_ORIGIN}/repos/${repo}/git/blobs/${payload.sha}`, {
-      token,
-      fetchImpl
-    });
-    if (!blob.ok) {
-      throw knowledgeWriteError(502, 'github_unavailable', 'Knowledge data repository is unavailable.');
-    }
-    text = await blob.text();
-  }
+  const text = await readGithubPathText(repo, token, payload, fetchImpl);
   return { sha: payload.sha, text };
 }
 
@@ -312,12 +325,23 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
   });
   const manifestFile = await getKnowledgeContent('manifest.json', { env, fetchImpl });
   let rows = [];
-  if (manifestFile?.text) {
-    try {
-      const raw = JSON.parse(manifestFile.text);
-      rows = Array.isArray(raw) ? raw : Array.isArray(raw?.pages) ? raw.pages : [];
-    } catch {
-      rows = [];
+  if (manifestFile) {
+    let parsed = false;
+    if (manifestFile.text) {
+      try {
+        const raw = JSON.parse(manifestFile.text);
+        rows = Array.isArray(raw) ? raw : Array.isArray(raw?.pages) ? raw.pages : [];
+        parsed = Array.isArray(rows);
+      } catch {
+        parsed = false;
+      }
+    }
+    if (!parsed) {
+      throw knowledgeWriteError(
+        502,
+        'github_unavailable',
+        'Knowledge manifest is unreadable; refusing to overwrite the archive.'
+      );
     }
   }
   const entry = {
@@ -388,6 +412,77 @@ export async function saveQuizRecord(input, { env, fetchImpl = fetch } = {}) {
   return store;
 }
 
+function parseManifestRows(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.pages)) return raw.pages;
+  return null;
+}
+
+async function listKnowledgePageIdsFromTree({ env, fetchImpl }) {
+  const { repo, token } = requireBoundRepo(env);
+  const info = await githubJson(`${GITHUB_ORIGIN}/repos/${repo}`, { token, fetchImpl });
+  const branch = typeof info?.default_branch === 'string' && info.default_branch
+    ? info.default_branch
+    : 'main';
+  const tree = await githubJson(
+    `${GITHUB_ORIGIN}/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+    { token, fetchImpl }
+  );
+  const ids = [];
+  for (const item of tree?.tree ?? []) {
+    const match = typeof item?.path === 'string' ? item.path.match(/^pages\/([^/]+)\.json$/) : null;
+    if (match && isSafeKnowledgePageId(match[1])) ids.push(match[1]);
+  }
+  return ids;
+}
+
+async function recoverManifestFromHistory({ env, fetchImpl, minCount }) {
+  const { repo, token } = requireBoundRepo(env);
+  const commits = await githubJson(
+    `${GITHUB_ORIGIN}/repos/${repo}/commits?path=${encodeURIComponent('manifest.json')}&per_page=20`,
+    { token, fetchImpl }
+  );
+  let best = [];
+  for (const commit of Array.isArray(commits) ? commits : []) {
+    const sha = typeof commit?.sha === 'string' ? commit.sha : '';
+    if (!sha) continue;
+    try {
+      const payload = await githubJson(
+        `${GITHUB_ORIGIN}/repos/${repo}/contents/manifest.json?ref=${encodeURIComponent(sha)}`,
+        { token, fetchImpl }
+      );
+      const text = await readGithubPathText(repo, token, payload, fetchImpl);
+      const rows = parseManifestRows(JSON.parse(text));
+      const summarized = (rows ?? []).map(summarizeManifestEntry).filter(Boolean);
+      if (summarized.length > best.length) best = summarized;
+      if (best.length >= minCount) break;
+    } catch {
+      // Try an older commit.
+    }
+  }
+  return best;
+}
+
+async function writeRecoveredManifest(rows, { env, fetchImpl }) {
+  const current = await getKnowledgeContent('manifest.json', { env, fetchImpl });
+  let existing = [];
+  if (current?.text) {
+    try {
+      existing = parseManifestRows(JSON.parse(current.text)) ?? [];
+    } catch {
+      existing = [];
+    }
+  }
+  if (existing.length >= rows.length) return;
+  await putWithRetry(
+    'manifest.json',
+    JSON.stringify(rows),
+    { env, fetchImpl },
+    'Restore knowledge manifest from git history',
+    current?.sha
+  );
+}
+
 export async function listKnowledgePages({ env, fetchImpl = fetch } = {}) {
   let raw;
   try {
@@ -402,11 +497,52 @@ export async function listKnowledgePages({ env, fetchImpl = fetch } = {}) {
     }
     throw error;
   }
-  const rows = Array.isArray(raw) ? raw : Array.isArray(raw?.pages) ? raw.pages : null;
+  const rows = parseManifestRows(raw);
   if (!rows) {
     throw knowledgeWriteError(502, 'github_unavailable', 'Knowledge manifest is invalid.');
   }
-  return rows.map(summarizeManifestEntry).filter(Boolean);
+  const listed = rows.map(summarizeManifestEntry).filter(Boolean);
+  // A healthy archive is never two notes. Only pay for git tree / history
+  // when the manifest looks wiped.
+  if (listed.length > 50) return listed;
+
+  let treeIds = [];
+  try {
+    treeIds = await listKnowledgePageIdsFromTree({ env, fetchImpl });
+  } catch {
+    try {
+      const recovered = await recoverManifestFromHistory({
+        env,
+        fetchImpl,
+        minCount: 50
+      });
+      if (recovered.length > listed.length) {
+        await writeRecoveredManifest(recovered, { env, fetchImpl }).catch(() => undefined);
+        return recovered;
+      }
+    } catch {
+      // Keep the readable (short) manifest.
+    }
+    return listed;
+  }
+  if (treeIds.length <= listed.length + 5) return listed;
+
+  try {
+    const recovered = await recoverManifestFromHistory({
+      env,
+      fetchImpl,
+      minCount: Math.ceil(treeIds.length * 0.5)
+    });
+    if (recovered.length > listed.length) {
+      await writeRecoveredManifest(recovered, { env, fetchImpl }).catch(() => undefined);
+      return recovered;
+    }
+  } catch {
+    // Fall through to a tree-synthesized list so the archive is not two notes.
+  }
+
+  const byId = new Map(listed.map(row => [row.id, row]));
+  return treeIds.map(id => byId.get(id) ?? summarizeManifestEntry({ id, title: id })).filter(Boolean);
 }
 
 export async function getKnowledgePage(id, { env, fetchImpl = fetch } = {}) {

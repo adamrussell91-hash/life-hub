@@ -1,5 +1,6 @@
 import "./tokens.css";
 import "./style.css";
+import { hubSwitcherHtml } from "../../../packages/hub-switcher.js";
 import type { Attachment, Origin, Page, PageManifestEntry } from "./domain/page";
 import { newHubPageId } from "./domain/page";
 import {
@@ -380,6 +381,7 @@ function shell(main: string) {
         <button class="rail__btn hub-rail__link ${view === "chat" || view === "visualiser" ? "is-current" : ""}" data-nav="chat" type="button">${icons.chat}<span>Chat</span></button>
         <button class="rail__btn hub-rail__link ${view === "podcast" ? "is-current" : ""}" data-nav="podcast" type="button">${icons.podcast}<span>Podcast</span></button>
         <button class="rail__btn hub-rail__link ${view === "quiz" ? "is-current" : ""}" data-nav="quiz" type="button">${icons.quiz}<span>Quiz</span></button>
+        ${hubSwitcherHtml("knowledge")}
       </nav>
     </aside>
     <main class="canvas">${main}</main>

@@ -1,3 +1,4 @@
+import { withAppBase } from '@/app/base-path';
 import { createSkipLink } from '@/app/failure';
 import { readTeacherRailPrefs, writeTeacherRailPrefs } from '@/teacher/rail-prefs';
 
@@ -78,7 +79,7 @@ export function renderTeacherShell(
 
   const brand = document.createElement('a');
   brand.className = 'teacher-layout__rail-brand hub-rail__brand';
-  brand.href = '/';
+  brand.href = withAppBase('/');
   brand.textContent = 'Teaching Hub';
 
   const railNav = document.createElement('div');
