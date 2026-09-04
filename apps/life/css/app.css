@@ -995,7 +995,7 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 .chat-form { display: flex; gap: 0.5rem; }
-#chat-input { flex: 1; min-height: 44px; padding: 0.6rem 0.9rem; border-radius: 0.75rem; border: 1px solid var(--line); }
+#chat-input { flex: 1; min-width: 0; min-height: 44px; padding: 0.6rem 0.9rem; border-radius: 0.75rem; border: 1px solid var(--line); }
 #chat-send {
   min-height: 44px;
   padding: 0 1.25rem;
@@ -5514,6 +5514,7 @@ main { max-width: 76rem; margin: 0 auto; }
   z-index: 25;
   inset: auto 1.5rem 6rem auto;
   width: min(24rem, calc(100vw - 3rem));
+  max-width: calc(100vw - 3rem);
   max-height: min(70vh, 40rem);
   padding: 1rem;
   border-radius: var(--radius-lg);
@@ -5521,15 +5522,76 @@ main { max-width: 76rem; margin: 0 auto; }
   border-left: 0.25rem solid var(--agent-accent, var(--wave));
   box-shadow: 0 1.4rem 3.5rem rgba(31,53,91,0.28);
   overflow: hidden;
+  min-width: 0;
 }
 
 .chat-view[data-panel-mode="overlay"] .chat-messages { max-height: 40vh; }
 
-@media (max-width: 48rem) {
-  .nutrition-grid { grid-template-columns: 1fr 1fr; }
-  .chat-view[data-panel-mode="overlay"] { inset: auto 1rem 5.5rem auto; width: calc(100vw - 2rem); }
+@media (max-width: 720px) {
+  .chat-view {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .chat-view .chat-form {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.5rem;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .chat-view #chat-input {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .chat-view #chat-send {
+    align-self: flex-end;
+  }
+
+  .chat-view[data-panel-mode="overlay"] {
+    inset: auto;
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    width: 100%;
+    max-width: 100%;
+    max-height: none;
+    height: auto;
+    padding: 1rem;
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
+    padding-bottom: 1rem;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    background: var(--warm-white);
+    /* Above canvas, below .hub-mobile-nav (z-index 30) so Chat/Home still close the panel. */
+    z-index: 25;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chat-view[data-panel-mode="overlay"] .chat-messages {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  /* Keep FAB visible as the close control (Life has no overlay Close button). */
   .floating-chat-button { right: 1rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
   .cn-audit-button { right: 4.6rem; bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 48rem) {
+  .nutrition-grid { grid-template-columns: 1fr 1fr; }
 }
 
 .prose-section { margin: 0.85rem 0 0; color: var(--ink); font-size: var(--text-sm); line-height: 1.6; }
