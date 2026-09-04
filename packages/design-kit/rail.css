@@ -336,6 +336,8 @@ a.hub-rail__brand:focus-visible {
 }
 
 @media (max-width: 720px) {
+  /* Phones use the locked bottom bar + More sheet (MOBILE.md). Never restyle
+     this rail into a top strip — that breaks cross-hub consistency. */
   .hub-rail {
     display: none;
   }

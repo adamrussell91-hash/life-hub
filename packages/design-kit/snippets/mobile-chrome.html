@@ -1,0 +1,35 @@
+<!-- Locked mobile chrome. Prefer js/mount-mobile-chrome.js at runtime.
+     Desktop rail stays; this bar is CSS-visible only under 720px. -->
+<nav class="hub-mobile-nav" aria-label="Mobile primary" data-hub-mobile-chrome="nav">
+  <a href="/" aria-current="page">
+    <span class="hub-mobile-nav__glyph" aria-hidden="true"><!-- icon --></span>
+    Home
+  </a>
+  <a href="/chat">
+    <span class="hub-mobile-nav__glyph" aria-hidden="true"><!-- icon --></span>
+    Chat
+  </a>
+  <a href="/calendar">
+    <span class="hub-mobile-nav__glyph" aria-hidden="true"><!-- icon --></span>
+    Calendar
+  </a>
+  <button type="button" data-hub-mobile-more>
+    <span class="hub-mobile-nav__glyph" aria-hidden="true"><!-- ··· --></span>
+    More
+  </button>
+</nav>
+
+<dialog class="hub-more-sheet" aria-label="More" data-hub-mobile-chrome="sheet">
+  <div class="hub-more-sheet__panel">
+    <header class="hub-more-sheet__head">
+      <h2>More</h2>
+      <button type="button" class="hub-more-sheet__close" aria-label="Close">Close</button>
+    </header>
+    <nav class="hub-more-sheet__nav" aria-label="Secondary destinations">
+      <p class="hub-more-sheet__section">In this hub</p>
+      <!-- secondary destinations -->
+      <p class="hub-more-sheet__section">Hubs</p>
+      <!-- other hubs from hub-switcher -->
+    </nav>
+  </div>
+</dialog>

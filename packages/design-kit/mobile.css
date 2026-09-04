@@ -1,0 +1,204 @@
+/* Locked mobile chrome. Desktop keeps the left rail; phones use a bottom bar
+ * + More sheet. Same structure on every hub — see MOBILE.md.
+ */
+
+.hub-mobile-nav {
+  display: none;
+}
+
+.hub-more-sheet {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  max-width: none;
+  max-height: none;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: var(--ink);
+}
+
+.hub-more-sheet::backdrop {
+  background: rgba(10, 21, 54, 0.35);
+  backdrop-filter: blur(6px);
+}
+
+.hub-more-sheet__panel {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 40;
+  padding: var(--space-5) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--warm-white, #fbfaf5);
+  box-shadow: 0 -1rem 3rem rgba(10, 21, 54, 0.14);
+  max-height: min(85dvh, 40rem);
+  overflow: auto;
+}
+
+.hub-more-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.hub-more-sheet__head h2 {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  color: var(--depth, var(--navy));
+}
+
+.hub-more-sheet__close {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--depth, var(--navy));
+  background: rgba(255, 255, 255, 0.92);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+
+.hub-more-sheet__nav {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.hub-more-sheet__section {
+  margin: var(--space-3) 0 0;
+  padding: 0 var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hub-more-sheet__section:first-child {
+  margin-top: 0;
+}
+
+.hub-more-sheet__nav a,
+.hub-more-sheet__nav button {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--depth, var(--navy));
+  background: rgba(255, 255, 255, 0.72);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.hub-more-sheet__nav a:active,
+.hub-more-sheet__nav button:active {
+  background: rgba(55, 111, 183, 0.1);
+}
+
+.hub-more-sheet__glyph {
+  display: grid;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 1.125rem;
+  color: var(--muted);
+}
+
+.hub-more-sheet__glyph svg,
+.hub-more-sheet__glyph img,
+.hub-more-sheet__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  display: block;
+  object-fit: contain;
+}
+
+@media (max-width: 720px) {
+  /* Canvas clears the fixed bottom bar. */
+  .hub-layout,
+  .hub-shell,
+  .app-shell,
+  .teacher-layout,
+  .page-frame {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hub-mobile-nav {
+    position: fixed;
+    z-index: 30;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-1);
+    min-height: calc(4.65rem + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    padding: var(--space-2) var(--space-3) env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid rgba(255, 255, 255, 0.75);
+    background: rgba(250, 248, 242, 0.92);
+    box-shadow: 0 -1rem 3rem rgba(10, 21, 54, 0.08);
+    backdrop-filter: blur(12px);
+  }
+
+  .hub-mobile-nav a,
+  .hub-mobile-nav button {
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 0.2rem;
+    margin: 0;
+    padding: var(--space-1);
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    background: transparent;
+    font-family: var(--font-ui);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-bold);
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .hub-mobile-nav a[aria-current="page"],
+  .hub-mobile-nav a.is-current,
+  .hub-mobile-nav button[aria-current="page"],
+  .hub-mobile-nav button.is-current,
+  .hub-mobile-nav button.is-active {
+    color: var(--depth, var(--navy));
+    background: rgba(55, 111, 183, 0.08);
+  }
+
+  .hub-mobile-nav__glyph {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: inherit;
+  }
+
+  .hub-mobile-nav__glyph svg,
+  .hub-mobile-nav__glyph img {
+    width: 1.25rem;
+    height: 1.25rem;
+    display: block;
+    object-fit: contain;
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .hub-mobile-nav {
+    background: #fff;
+  }
+}
