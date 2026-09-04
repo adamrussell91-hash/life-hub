@@ -1,6 +1,6 @@
 import "./tokens.css";
 import "./style.css";
-import { hubSwitcherHtml } from "../../../packages/hub-switcher.js";
+import { bindHubAccordion, hubSwitcherHtml } from "../../../packages/hub-switcher.js";
 import type { Attachment, Origin, Page, PageManifestEntry } from "./domain/page";
 import { newHubPageId } from "./domain/page";
 import {
@@ -386,6 +386,7 @@ function shell(main: string) {
     </aside>
     <main class="canvas">${main}</main>
   </div>`;
+  bindHubAccordion(app);
 
   app.querySelector<HTMLAnchorElement>("[data-home]")!.onclick = event => { event.preventDefault(); goToHome(); };
 
@@ -1493,6 +1494,7 @@ function renderLoadError() {
       </div>
     </main>
   </div>`;
+  bindHubAccordion(app);
   app.querySelector<HTMLButtonElement>("[data-retry]")!.onclick = () => {
     void boot({ signedIn: true });
   };

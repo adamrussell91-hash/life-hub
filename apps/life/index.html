@@ -57,25 +57,76 @@
         </span>
       </header>
 
-      <nav class="rail-nav" aria-label="Primary">
+      <nav class="rail-nav" aria-label="Primary" data-hub-accordion>
         <button class="nav-item hub-rail__link is-active" type="button" data-section="home" aria-current="page">
           <span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/home.png" alt=""></span><span>Home</span>
         </button>
         <button class="nav-item hub-rail__link" type="button" data-section="chat">
           <span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/chat.png" alt=""></span><span>Chat</span>
         </button>
-        <p class="nav-label">Domains</p>
-        <button class="nav-item hub-rail__link" type="button" data-section="nutrition"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/nutrition.png" alt=""></span><span>Nutrition</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="fitness"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/fitness.png" alt=""></span><span>Fitness</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="body"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/body.png" alt=""></span><span>Body</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="mind"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/mind.png" alt=""></span><span>Mind</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/skincare.png" alt=""></span><span>Skincare</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/calendar.png" alt=""></span><span>Calendar</span></button>
-        <button class="nav-item hub-rail__link" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/central-node.png" alt=""></span><span>Central Node</span></button>
-        <p class="nav-label">Hubs</p>
-        <a class="nav-item hub-rail__link" href="/teaching/"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span><span>Teaching</span></a>
-        <a class="nav-item hub-rail__link" href="/knowledge/"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5h6.5A3.5 3.5 0 0 1 15 9v10H8.5A3.5 3.5 0 0 0 5 15.5V5.5Z"/><path d="M15 9h4v10h-4"/></svg></span><span>Knowledge</span></a>
-        <a class="nav-item hub-rail__link" href="/tasks/"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h11M8 12h11M8 17h11"/><path d="m4.5 7 .8.8L7 6M4.5 12l.8.8L7 11"/></svg></span><span>Tasks</span></a>
+        <p class="hub-rail__section">Hubs</p>
+        <div class="hub-row is-active is-open" data-hub="life">
+          <button class="hub-label" type="button" data-section="home">
+            <span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg></span>
+            <span>Life</span>
+          </button>
+          <button class="hub-toggle" type="button" data-hub-toggle="life" aria-label="Preview Life" aria-expanded="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div class="hub-panel is-open" data-hub-panel="life">
+          <div class="hub-panel-inner">
+            <button class="hub-nav-item" type="button" data-section="nutrition"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/nutrition.png" alt=""></span><span>Nutrition</span></button>
+            <button class="hub-nav-item" type="button" data-section="fitness"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/fitness.png" alt=""></span><span>Fitness</span></button>
+            <button class="hub-nav-item" type="button" data-section="body"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/body.png" alt=""></span><span>Body</span></button>
+            <button class="hub-nav-item" type="button" data-section="mind"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/mind.png" alt=""></span><span>Mind</span></button>
+            <button class="hub-nav-item" type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/skincare.png" alt=""></span><span>Skincare</span></button>
+            <button class="hub-nav-item" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/calendar.png" alt=""></span><span>Calendar</span></button>
+            <button class="hub-nav-item" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/central-node.png" alt=""></span><span>Central Node</span></button>
+          </div>
+        </div>
+        <div class="hub-row" data-hub="teaching">
+          <a class="hub-label" href="/teaching/">
+            <span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span>
+            <span>Teaching</span>
+          </a>
+          <button class="hub-toggle" type="button" data-hub-toggle="teaching" aria-label="Preview Teaching" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div class="hub-panel" data-hub-panel="teaching">
+          <div class="hub-panel-inner" data-hub-preview="teaching">
+            <div class="hub-preview-item">Checking classes…</div>
+          </div>
+        </div>
+        <div class="hub-row" data-hub="knowledge">
+          <a class="hub-label" href="/knowledge/">
+            <span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5h6.5A3.5 3.5 0 0 1 15 9v10H8.5A3.5 3.5 0 0 0 5 15.5V5.5Z"/><path d="M15 9h4v10h-4"/></svg></span>
+            <span>Knowledge</span>
+          </a>
+          <button class="hub-toggle" type="button" data-hub-toggle="knowledge" aria-label="Preview Knowledge" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div class="hub-panel" data-hub-panel="knowledge">
+          <div class="hub-panel-inner" data-hub-preview="knowledge">
+            <div class="hub-preview-item">Checking notes…</div>
+          </div>
+        </div>
+        <div class="hub-row" data-hub="tasks">
+          <a class="hub-label" href="/tasks/">
+            <span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h11M8 12h11M8 17h11"/><path d="m4.5 7 .8.8L7 6M4.5 12l.8.8L7 11"/></svg></span>
+            <span>Tasks</span>
+          </a>
+          <button class="hub-toggle" type="button" data-hub-toggle="tasks" aria-label="Preview Tasks" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div class="hub-panel" data-hub-panel="tasks">
+          <div class="hub-panel-inner" data-hub-preview="tasks">
+            <div class="hub-preview-item">Checking tasks…</div>
+          </div>
+        </div>
       </nav>
 
       <div class="rail-footer">

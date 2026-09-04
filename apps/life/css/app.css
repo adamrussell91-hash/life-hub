@@ -169,7 +169,14 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
   opacity: 0.72;
 }
 
-.rail-nav { display: grid; gap: 0.25rem; }
+.rail-nav {
+  display: grid;
+  gap: 0.25rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+}
 
 .nav-item {
   width: 100%;
