@@ -29,6 +29,12 @@ describe("capture file helpers", () => {
     expect(captureContentType("photo", new File([], "x"))).toBe("image/jpeg");
     expect(captureContentType("voice", new File([], "x"))).toBe("audio/webm");
     expect(captureContentType("photo", new File([], "x", { type: "image/png" }))).toBe("image/png");
+    expect(captureContentType("voice", new File([], "", { type: "audio/webm;codecs=opus" }))).toBe(
+      "audio/webm",
+    );
+    expect(captureContentType("voice", new File([], "", { type: "audio/mp4;codecs=mp4a.40.2" }))).toBe(
+      "audio/mp4",
+    );
   });
 });
 

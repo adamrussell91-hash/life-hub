@@ -29,10 +29,14 @@ export function attachmentKind(contentType, filename) {
   return 'file';
 }
 
+function normalizeContentType(contentType) {
+  return String(contentType).split(';')[0].trim().toLowerCase();
+}
+
 export function parseSignRequest(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { error: 'Invalid JSON' };
   const filename = typeof raw.filename === 'string' ? raw.filename.trim() : '';
-  const contentType = typeof raw.content_type === 'string' ? raw.content_type : '';
+  const contentType = normalizeContentType(typeof raw.content_type === 'string' ? raw.content_type : '');
   const byteSize = typeof raw.byte_size === 'number' ? raw.byte_size : NaN;
   const pageId = typeof raw.page_id === 'string' ? raw.page_id : '';
   const area = raw.area === 'notes' || raw.area === 'university' ? raw.area : '';
