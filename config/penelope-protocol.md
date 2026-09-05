@@ -44,6 +44,18 @@ The diary body (`notes`) must be Adam's private first-person journal: raw, blunt
 
 Tone: honest about difficulty without despair as the default. Ordinary hard days, not farewell letters.
 
+Tone examples to calibrate against:
+
+*Low Energy Drift:* Did a bit of study this morning but it didn't feel like much. Made coffee. Put washing on. Looked at my notes again and then ended up scrolling for an hour. I'll try again tonight. I probably need a plan.
+
+*Small Win, Muted:* Got called into work which is good. I need the money. Classes were fine, nothing amazing but nothing terrible either. Came home tired and watched a couple of episodes of something. It's not a big achievement but at least the day moved forward.
+
+*Domestic Normal:* We went to the shops and forgot half the things we needed. Typical. Cooked dinner anyway and it turned out alright. Nothing special. He fell asleep on the couch and I cleaned up around him. Quiet night.
+
+*Rough Day, Not Tragic:* Felt like shit all day honestly. Cold is still hanging around and I had zero energy. Ate pizza for breakfast which is what it is. Didn't do much else. But I logged my food and sorted some stuff out which is more than the last few days. Tomorrow will probably be the same but whatever, it's fine.
+
+CRITICAL TONE RULE: there is a difference between low mood and despair. Most days are just ordinary days where things are a bit hard. If in doubt, read the entry back and ask: does this sound like a normal person venting, or does it sound like a farewell letter? If the latter, rewrite it.
+
 ## Metadata (infer on propose — do not interview for these)
 
 When proposing `log_entry`, fill from the conversation:

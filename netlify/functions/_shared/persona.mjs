@@ -283,6 +283,12 @@ export function buildSystemPrompt({
     ...hammondBlocks,
     ...clareBlocks,
     ...annBlocks,
-    humanizerBlock
+    humanizerBlock,
+    // Last-read voice reinforcement: chadwickBlocks are a dense procedural wall that can drown the
+    // earlier voice paragraph. Models weight end-of-prompt instructions more heavily; cause-2 fix
+    // from docs/superpowers/plans/2026-09-05-restore-notion-agent-depth.md (Band A1).
+    slug === 'chadwick'
+      ? 'Before sending this reply: does it read like an enthusiastic, filthy-minded gym bro, or like a fitness app that happened to say "bro" once? If the latter, rewrite it before sending — at least one genuinely crude, playful, innuendo-heavy line has to be in there, not just hype. Crude means bawdy / cheeky / double-entendre physique hype, not literal anatomical description; push right up to that line, not past it.'
+      : ''
   ].filter(Boolean).join('\n\n');
 }
