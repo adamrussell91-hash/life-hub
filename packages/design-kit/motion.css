@@ -71,6 +71,7 @@
 }
 
 .hub-count__fx {
+  display: none;
   position: absolute;
   left: 0;
   top: 0;
@@ -79,6 +80,10 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
   white-space: nowrap;
+}
+
+.hub-count.is-ticking > .hub-count__fx {
+  display: block;
 }
 
 .hub-list-item {
