@@ -10,6 +10,17 @@ class FakeEl {
     this.className = '';
     this.textContent = '';
     this.style = {};
+    this.classList = {
+      add: (...names) => {
+        const next = new Set(`${this.className} ${names.join(' ')}`.trim().split(/\s+/).filter(Boolean));
+        this.className = [...next].join(' ');
+      },
+      remove: (...names) => {
+        const drop = new Set(names);
+        this.className = `${this.className}`.split(/\s+/).filter(name => name && !drop.has(name)).join(' ');
+      },
+      contains: name => `${this.className}`.split(/\s+/).includes(name)
+    };
   }
 
   append(...nodes) { this.children.push(...nodes); }
@@ -219,7 +230,7 @@ test('status, working weights, and the visual week board replace empty charts', 
   assert.equal(root.ensure('#fitness-week-columns').children[0].children[0].textContent, 'This week');
   assert.equal(root.ensure('#fitness-week-columns').children[0].children[2].textContent, '400 kg');
   assert.equal(root.ensure('#fitness-week-columns').children[1].children[0].textContent, 'Last week');
-  assert.equal(root.ensure('#fitness-week-columns').children[1].children[2].textContent, '0 kg');
+  assert.equal(root.ensure('#fitness-week-columns').children[1].children[2].textContent, '—');
   assert.match(root.ensure('[data-fitness="next-planned"]').textContent, /Upper Body/);
   assert.equal(root.ensure('#fitness-loads-card').attributes.hidden, undefined);
   assert.match(root.ensure('#fitness-loads').children[0].children[1].textContent, /34 kg × 8/);
