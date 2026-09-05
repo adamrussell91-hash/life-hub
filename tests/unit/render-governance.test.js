@@ -91,3 +91,21 @@ test('renderGovernance renders dated entry blocks with status badges', () => {
   assert.match(entry.textContent, /Still Active/);
   assert.match(entry.textContent, /Stalled sleep goal/);
 });
+
+test('renderGovernance shows Chosen, Reasoning, and Revisit on decision records', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-09-05',
+    entryType: 'Capability Action',
+    title: 'Open a tracker',
+    status: 'Resolved',
+    chosen: 'Approved',
+    reasoning: 'Keep the week honest',
+    revisit: '2026-09-12',
+    body: 'Wrote the challenge file'
+  });
+  const { root, container } = fakeRoot();
+  renderGovernance(root, log, { today: '2026-09-05' });
+  assert.match(container.textContent, /Chosen: Approved/);
+  assert.match(container.textContent, /Reasoning: Keep the week honest/);
+  assert.match(container.textContent, /Revisit: 12\/09\/26/);
+});

@@ -1,5 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { isPathAllowedForAgent } from './registry.mjs';
+import { getJSON as getTasksJSON, readIndex, setJSON as setTasksJSON, writeIndex } from '../tasks-blobs.mjs';
+import { getJSON as getTeachingJSON, setJSON as setTeachingJSON } from '../teaching-blobs.mjs';
+
+const BLOB_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
+const TASKS_PROJECTS_INDEX = 'projects/_index';
 
 export const PENDING_ACTIONS_PATH = 'data/os/pending-actions.json';
 export const MAX_PENDING_ACTIONS = 30;
@@ -114,6 +119,9 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
     const diff = typeof entry.diff === 'string' ? entry.diff.trim() : '';
 
     if (!isSafePath(path)) return { ok: false, error: 'unsafe_path', detail: path };
+    if (classifyWriteTarget(path).store === 'unknown') {
+      return { ok: false, error: 'unknown_write_target', detail: path };
+    }
     if (!WRITE_MODES.includes(mode)) return { ok: false, error: 'invalid_mode', detail: mode };
     if (content == null) return { ok: false, error: 'missing_content', detail: path };
     if (content.length > MAX_WRITE_CONTENT_CHARS) {
@@ -200,21 +208,210 @@ export function findPendingActionById(list, id) {
   return base.find(entry => entry.id === id) ?? null;
 }
 
+export function classifyWriteTarget(path) {
+  const raw = typeof path === 'string' ? path.trim() : '';
+  if (!raw) return { store: 'github', path: '' };
+  if (!raw.includes(':')) return { store: 'github', path: raw };
+  const parts = raw.split(':');
+  if (parts.length !== 3) return { store: 'github', path: raw };
+  const [store, kind, id] = parts;
+  if (store === 'tasks' && kind === 'project' && BLOB_ID.test(id)) {
+    return { store: 'tasks', kind, id, key: `projects/${id}`, path: raw };
+  }
+  if (store === 'teaching' && kind === 'unit' && BLOB_ID.test(id)) {
+    return { store: 'teaching', kind, id, key: `units/${id}`, path: raw };
+  }
+  if (store === 'tasks' || store === 'teaching') {
+    return { store: 'unknown', path: raw };
+  }
+  return { store: 'github', path: raw };
+}
+
+export function snapshotGithubBases(writes, tree) {
+  const bases = {};
+  for (const write of writes ?? []) {
+    const target = classifyWriteTarget(write?.path);
+    if (target.store !== 'github') continue;
+    const entry = (tree ?? []).find(item => item.path === target.path && item.type === 'blob');
+    bases[target.path] = { sha: entry?.sha ?? null, missing: !entry };
+  }
+  return bases;
+}
+
+export async function snapshotBlobBases(writes, { tasks, teaching } = {}) {
+  const bases = {};
+  for (const write of writes ?? []) {
+    const target = classifyWriteTarget(write?.path);
+    if (target.store !== 'tasks' && target.store !== 'teaching') continue;
+    const store = target.store === 'tasks' ? tasks : teaching;
+    const record = store
+      ? await (target.store === 'tasks' ? getTasksJSON : getTeachingJSON)(store, target.key)
+      : null;
+    const missing = !record || typeof record !== 'object' || Array.isArray(record);
+    bases[target.path] = {
+      updated_at: !missing && typeof record.updated_at === 'string' ? record.updated_at : null,
+      missing
+    };
+  }
+  return bases;
+}
+
+export function detectStaleWrites(writes, bases, current) {
+  const stale = [];
+  for (const write of writes ?? []) {
+    const base = bases?.[write.path];
+    if (!base) continue;
+    const now = current?.[write.path] ?? { missing: true };
+    if (Object.prototype.hasOwnProperty.call(base, 'sha')) {
+      if ((base.sha ?? null) !== (now.sha ?? null)) stale.push(write.path);
+      continue;
+    }
+    if (Boolean(base.missing) !== Boolean(now.missing)
+      || (base.updated_at ?? null) !== (now.updated_at ?? null)) {
+      stale.push(write.path);
+    }
+  }
+  return stale;
+}
+
+export function selectAcceptedWrites(writes, accept) {
+  const list = Array.isArray(writes) ? writes : [];
+  if (accept == null) return { ok: true, accepted: list, rejected: [] };
+  if (!Array.isArray(accept)) return { ok: false, error: 'invalid_accept' };
+  const wanted = new Set(
+    accept.filter(path => typeof path === 'string' && path.trim()).map(path => path.trim())
+  );
+  const known = new Set(list.map(write => write.path));
+  for (const path of wanted) {
+    if (!known.has(path)) return { ok: false, error: 'unknown_accept_path', detail: path };
+  }
+  return {
+    ok: true,
+    accepted: list.filter(write => wanted.has(write.path)),
+    rejected: list.filter(write => !wanted.has(write.path))
+  };
+}
+
+export function decisionFieldsFromAction({
+  proposal,
+  accepted = [],
+  rejected = [],
+  reason,
+  revisit,
+  dismissed = false
+} = {}) {
+  const acceptedPaths = accepted.map(write => `\`${write.path}\``);
+  const rejectedPaths = rejected.map(write => `\`${write.path}\``);
+  let chosen = 'Approved';
+  if (dismissed) {
+    chosen = 'Rejected';
+  } else if (rejected.length && accepted.length) {
+    chosen = `Accepted ${acceptedPaths.join(', ')}; rejected ${rejectedPaths.join(', ')}`;
+  } else if (rejected.length) {
+    chosen = `Rejected ${rejectedPaths.join(', ')}`;
+  } else if (acceptedPaths.length) {
+    chosen = 'Approved';
+  }
+  const reasoning = typeof reason === 'string' && reason.trim()
+    ? reason.trim()
+    : (typeof proposal?.intent === 'string' ? proposal.intent.trim() : '');
+  const date = typeof revisit === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(revisit.trim())
+    ? revisit.trim()
+    : '';
+  return {
+    chosen,
+    ...(reasoning ? { reasoning } : {}),
+    ...(date ? { revisit: date } : {})
+  };
+}
+
+function parseBlobRecord(content) {
+  try {
+    const parsed = JSON.parse(content);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function executeBlobWrite(write, target, {
+  existing,
+  store,
+  setJSON,
+  nowIso,
+  touchIndex = false
+}) {
+  if (write.mode === 'create' && existing) {
+    return { ok: false, error: 'already_exists', detail: write.path };
+  }
+  const incoming = parseBlobRecord(write.content);
+  if (!incoming) return { ok: false, error: 'invalid_blob_content', detail: write.path };
+  const timestamp = nowIso();
+  let record = incoming;
+  if (write.mode === 'append' && existing) {
+    record = { ...existing, ...incoming };
+    record.id = existing.id;
+    record.created_at = existing.created_at;
+    if (existing.schema_version != null) record.schema_version = existing.schema_version;
+  }
+  record.id = target.id;
+  record.updated_at = timestamp;
+  if (!record.created_at) record.created_at = existing?.created_at || timestamp;
+  await setJSON(store, target.key, record);
+  if (touchIndex && write.mode === 'create') {
+    const ids = await readIndex(store, TASKS_PROJECTS_INDEX);
+    await writeIndex(store, TASKS_PROJECTS_INDEX, [...ids, target.id]);
+  }
+  return {
+    ok: true,
+    result: { path: write.path, mode: write.mode, id: target.id, updated_at: timestamp }
+  };
+}
+
 /**
- * Apply validated writes against a GitHub client.
- * `files` maps path → { sha?, content? } for existing blobs (content already decoded).
- * Returns { ok, results } or { ok: false, error, detail?, results? }.
+ * Apply validated writes against a GitHub client and optional Tasks/Teaching blob stores.
+ * `files` maps path → { sha?, content?, record? } for existing targets.
  */
-export async function executeProposeActionWrites(client, proposal, { files = {} } = {}) {
-  if (!client || typeof client.writeFile !== 'function') {
+export async function executeProposeActionWrites(client, proposal, {
+  files = {},
+  blobStores = {},
+  nowIso = () => new Date().toISOString()
+} = {}) {
+  if (!proposal?.writes?.length) return { ok: false, error: 'missing_writes' };
+
+  const needsGithub = proposal.writes.some(write => classifyWriteTarget(write.path).store === 'github');
+  if (needsGithub && (!client || typeof client.writeFile !== 'function')) {
     return { ok: false, error: 'missing_client' };
   }
-  if (!proposal?.writes?.length) return { ok: false, error: 'missing_writes' };
 
   const results = [];
   const state = { ...files };
 
   for (const write of proposal.writes) {
+    const target = classifyWriteTarget(write.path);
+    if (target.store === 'unknown') {
+      return { ok: false, error: 'unknown_write_target', detail: write.path, results };
+    }
+
+    if (target.store === 'tasks' || target.store === 'teaching') {
+      const store = blobStores[target.store];
+      if (!store) return { ok: false, error: `${target.store}_blobs_unbound`, detail: write.path, results };
+      const existing = state[write.path]?.record
+        ?? (typeof state[write.path]?.content === 'string' ? parseBlobRecord(state[write.path].content) : null);
+      const applied = await executeBlobWrite(write, target, {
+        existing,
+        store,
+        setJSON: target.store === 'tasks' ? setTasksJSON : setTeachingJSON,
+        nowIso,
+        touchIndex: target.store === 'tasks'
+      });
+      if (!applied.ok) return { ...applied, results };
+      results.push(applied.result);
+      state[write.path] = { record: { id: target.id, updated_at: applied.result.updated_at } };
+      continue;
+    }
+
     const existing = state[write.path] ?? {};
     let content = write.content;
     let sha = existing.sha;
@@ -242,3 +439,5 @@ export async function executeProposeActionWrites(client, proposal, { files = {} 
 
   return { ok: true, results };
 }
+
+export { getTasksJSON, getTeachingJSON };

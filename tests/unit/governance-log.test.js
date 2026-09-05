@@ -73,8 +73,29 @@ test('parseGovernanceEntries extracts date, type, status, title, and body', () =
     entryType: 'Drift Detection',
     title: 'Life worth enjoying',
     status: 'Still Active',
+    chosen: null,
+    reasoning: null,
+    revisit: null,
     body: 'Stalled sleep goal.'
   });
+});
+
+test('formatGovernanceEntry writes Chosen, Reasoning, and Revisit as decision fields', () => {
+  const md = formatGovernanceEntry({
+    dateKey: '2026-09-05',
+    entryType: 'Capability Action',
+    title: 'Open a tracker',
+    status: 'Resolved',
+    chosen: 'Approved',
+    reasoning: 'Keep the no-sugar week honest',
+    revisit: '2026-09-12',
+    body: 'Wrote data/challenges/no-sugar.json'
+  });
+  const [entry] = parseGovernanceEntries(md);
+  assert.equal(entry.chosen, 'Approved');
+  assert.equal(entry.reasoning, 'Keep the no-sugar week honest');
+  assert.equal(entry.revisit, '2026-09-12');
+  assert.equal(entry.body, 'Wrote data/challenges/no-sugar.json');
 });
 
 test('parseGovernanceEntries returns [] for empty log', () => {
