@@ -1,5 +1,6 @@
 import type { AgentMutation } from '@/domain/agent-mutations';
 import { sanitizeTaskPatch } from '@/domain/agent-mutations';
+import { parseDue, toDateKey, weekDays } from '@/domain/queries';
 
 export type ScheduleDiffItem = {
   taskId: string;
@@ -7,6 +8,21 @@ export type ScheduleDiffItem = {
   to: string | null;
   summary: string;
 };
+
+export type ScheduleGhostChip = {
+  dateKey: string;
+  role: 'from' | 'to';
+  taskId: string;
+  summary: string;
+};
+
+export type ScheduleGhostDay = {
+  dateKey: string;
+  weekday: string;
+  chips: ScheduleGhostChip[];
+};
+
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 /** Extract due_date moves from agent mutations for ghost calendar previews. */
 export function scheduleDiffFromMutations(mutations: AgentMutation[]): ScheduleDiffItem[] {
@@ -37,4 +53,28 @@ export function scheduleDiffFromMutation(
   const from = currentDue ?? null;
   if (from === to) return null;
   return { taskId: mutation.task_id, from, to, summary: mutation.summary };
+}
+
+/**
+ * Mini week strip for confirm-card ghosts.
+ * Anchors on the proposed `to` date when set, else `from`, else today.
+ */
+export function scheduleGhostWeek(diff: ScheduleDiffItem, today = new Date()): ScheduleGhostDay[] {
+  const anchor =
+    parseDue(diff.to) ?? parseDue(diff.from) ?? new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return weekDays(anchor).map((day, index) => {
+    const dateKey = toDateKey(day);
+    const chips: ScheduleGhostChip[] = [];
+    if (diff.from === dateKey) {
+      chips.push({ dateKey, role: 'from', taskId: diff.taskId, summary: diff.summary });
+    }
+    if (diff.to === dateKey) {
+      chips.push({ dateKey, role: 'to', taskId: diff.taskId, summary: diff.summary });
+    }
+    return {
+      dateKey,
+      weekday: WEEKDAYS[index]!,
+      chips
+    };
+  });
 }
