@@ -28,6 +28,15 @@ test('parseCountable reads dashboard numbers and leaves dates alone', () => {
   assert.equal(parseCountable('Live data ready'), null);
 });
 
+test('parseCountable does not paint IEEE float junk on gram counts', () => {
+  const noisy = parseCountable('135.10000000000002 g');
+  assert.equal(noisy.value, 135.10000000000002);
+  assert.equal(noisy.format(noisy.value), '135.1 g');
+  assert.equal(noisy.format(67.55000000000001), '67.6 g');
+  const clean = parseCountable('135.1 g');
+  assert.equal(clean.format(clean.value), '135.1 g');
+});
+
 test('count overlay is hidden after the tick so totals do not ghost', async () => {
   const css = await readFile(new URL('../../packages/design-kit/motion.css', import.meta.url), 'utf8');
   const base = css.match(/\.hub-count__fx\s*\{([^}]+)\}/);

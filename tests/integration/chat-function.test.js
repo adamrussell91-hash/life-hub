@@ -1452,11 +1452,11 @@ test('a well-formed workout proposal (5-9 exercises, warmup, cable_type, ≤2 in
               status: 'planned',
               recovery_flag_next_day: false,
               exercises: [
-                { name: 'Warmup: Light Cable Rows', sets: [{ reps: 15, weight_kg: 5, cable_type: 'concentric' }] },
-                { name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }] },
-                { name: 'Bar Curl', sets: [{ reps: 10, weight_kg: 16, cable_type: 'concentric' }] },
-                { name: 'Lat Pulldown', sets: [{ reps: 10, weight_kg: 40, cable_type: 'rowing' }] },
-                { name: 'Shoulder Press', sets: [{ reps: 10, weight_kg: 20, cable_type: 'constant_force' }] }
+                { name: 'Warmup: Light Cable Rows', sets: [{ reps: 15, weight_kg: 5, cable_type: 'concentric' }], coach_cues: { start: 'Ease in.', rest: 'Breathe.', final_set: 'Smooth finish.' } },
+                { name: 'Chest Press', sets: [{ reps: 10, weight_kg: 32, cable_type: 'concentric' }], coach_cues: { start: 'Plant feet.', rest: 'Reset scap.', final_set: 'One in the tank.' } },
+                { name: 'Bar Curl', sets: [{ reps: 10, weight_kg: 16, cable_type: 'concentric' }], coach_cues: { start: 'Elbows pinned.', rest: 'Shake it out.', final_set: 'Squeeze hard.' } },
+                { name: 'Lat Pulldown', sets: [{ reps: 10, weight_kg: 40, cable_type: 'rowing' }], coach_cues: { start: 'Tall chest.', rest: 'Long arms.', final_set: 'Pull to ribs.' } },
+                { name: 'Shoulder Press', sets: [{ reps: 10, weight_kg: 20, cable_type: 'constant_force' }], coach_cues: { start: 'Ribs down.', rest: 'Soft knees.', final_set: 'Lock clean.' } }
               ]
             }
           }
@@ -1884,7 +1884,8 @@ test('loads body state into Brisket\'s prompt too (Phase 3 extends body state be
   assert.match(receivedArgs.system, /your lane/i);
 });
 
-test('non-chadwick, non-brisket agents never receive body state in their prompt', async () => {
+test('non-chadwick, non-brisket, non-sara agents never receive body state in their prompt', async () => {
+  // Sara intentionally receives body state (clinical context). Clare must not.
   const compositionPath = 'data/body/2026/07/2026-07-29-composition.md';
   const compositionSha = 'a'.repeat(40);
   const compositionContent = [
@@ -1919,7 +1920,7 @@ test('non-chadwick, non-brisket agents never receive body state in their prompt'
     })
   });
 
-  await readSse(await handler(request({ message: 'Sara, how is my body doing?' })));
+  await readSse(await handler(request({ message: 'Clare, how is my body doing?' })));
 
   assert.doesNotMatch(receivedArgs.system, /Shoulder:waist ratio/);
   assert.doesNotMatch(receivedArgs.system, /85\.5kg/);

@@ -41,14 +41,12 @@ export function coerceChatWorkoutProposal(validation, { userMessage } = {}) {
   // Trust a completed payload that already carries finish signals or when Adam reported actuals.
   if (looksLikeWorkoutActualsReport(userMessage)) return validation;
   if (looksLikeCompletedWorkoutPayload(validation.record)) return validation;
-  // Design lock-in turns often mis-fire status:completed — demote those only.
-  if (isWorkoutLockIn(userMessage)) {
-    return {
-      ...validation,
-      record: { ...validation.record, status: 'planned' }
-    };
-  }
-  return validation;
+  // Bare completed with no finish signals is almost always a design mis-fire
+  // (Log/Save of a prescription). Demote to planned so Fitness gets a plan file.
+  return {
+    ...validation,
+    record: { ...validation.record, status: 'planned' }
+  };
 }
 
 export function claimedPlanLocked(text) {

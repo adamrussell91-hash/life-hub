@@ -361,9 +361,34 @@ export function createChatHandler({
           });
         }
 
-        // Never short-circuit Chadwick lock-in before Central Node / body / history
-        // load — streamWithChadwickPlanForce still forces a Confirm after the model
-        // (or as a late safety net) once that context is in the system prompt.
+        // Lock-in from an already-parsed plan in history: emit Confirm immediately.
+        // Skip Anthropic + GitHub so "lock it onto Fitness" stays instant. Cue-less
+        // cards are acceptable here — Adam already agreed the list in chat; the late
+        // force path still runs when lock-in needs a model pass for a fresh plan.
+        const forcedPlan = resolveForcedChadwickPlan({
+          slug,
+          userMessage: parsed.message,
+          today,
+          messages: [...parsed.history, { role: 'user', content: parsed.message }]
+        });
+        if (forcedPlan) {
+          send({ type: 'status', text: 'Locking the plan onto Fitness…' });
+          send({ type: 'text', delta: 'On Fitness — confirm to save the plan.' });
+          const validation = validateLogEntry(forcedPlan, {
+            id: `${forcedPlan.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
+            now: getSydneyTimestamp(nowInstant)
+          });
+          if (validation.valid) {
+            await persistOrProposeLogEntry({
+              client, slug, today, validation, send, userMessage: parsed.message
+            });
+          } else {
+            send({ type: 'record_rejected', errors: validation.errors });
+          }
+          send({ type: 'done' });
+          controller.close();
+          return;
+        }
 
         send({ type: 'status', text: 'Loading your logs…' });
 

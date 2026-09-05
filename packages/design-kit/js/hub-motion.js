@@ -99,7 +99,9 @@ export function parseCountable(text) {
 }
 
 function formatLike(sample, value) {
-  const decimals = (sample.split('.')[1] || '').length;
+  // Cap at 1 dp so IEEE junk like 135.10000000000002 cannot force toFixed(14)
+  // on the count-up overlay (Home fat used to paint the full float string).
+  const decimals = Math.min((sample.split('.')[1] || '').length, 1);
   const useComma = sample.includes(',');
   const abs = Math.abs(value);
   const body = decimals
