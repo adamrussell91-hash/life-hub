@@ -157,6 +157,8 @@ export function createChatController({
       selectedId: selectedProtocolId,
       onSelect: selectProtocol
     });
+    renderChatEmpty(root, slug);
+    syncChatChrome(root);
   }
 
   function applySelectAgent(slug) {

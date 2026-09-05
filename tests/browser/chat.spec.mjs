@@ -74,7 +74,7 @@ test('navigating back to Home hides the chat view again', async () => {
   await signIn(page);
   await page.locator('.desktop-rail [data-section="chat"]').click();
   await page.locator('#chat-view').waitFor({ state: 'visible' });
-  await page.locator('.desktop-rail [data-section="home"]').click();
+  await page.locator('.desktop-rail .nav-item[data-section="home"]').click();
   await page.locator('#chat-view').waitFor({ state: 'hidden' });
   assert.equal(await page.locator('#home-dashboard').isVisible(), true);
   await context.close();

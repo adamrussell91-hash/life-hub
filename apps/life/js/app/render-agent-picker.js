@@ -82,7 +82,13 @@ export function renderChatEmpty(root, slug) {
   if (!empty) return;
   const agent = avatarForSlug(slug);
   if (!agent) {
-    empty.replaceChildren?.();
+    const title = root.createElement('p');
+    title.className = 'chat-empty__name';
+    title.textContent = 'Choose who to talk to';
+    const purpose = root.createElement('p');
+    purpose.className = 'chat-empty__purpose';
+    purpose.textContent = 'Tap a personality to start.';
+    empty.replaceChildren?.(title, purpose);
     return;
   }
   const img = root.createElement('img');
