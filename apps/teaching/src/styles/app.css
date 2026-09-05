@@ -5683,20 +5683,30 @@ a.home-class-tile:hover {
   background: var(--glass);
 }
 
-.block-editor__column-pane--drop {
-  outline: 2px dashed var(--wave);
-  outline-offset: 2px;
-}
-
 .block-editor__nested-gap {
+  position: relative;
   min-height: 0.5rem;
   border-radius: var(--radius-xs);
-  transition: background-color 120ms ease, min-height 120ms ease;
+  transition: background-color 120ms ease, min-height 120ms ease, box-shadow 120ms ease;
 }
 
 .block-editor__nested-gap--active {
-  min-height: 0.75rem;
-  background: color-mix(in srgb, var(--wave) 35%, transparent);
+  min-height: 0.9rem;
+  background: color-mix(in srgb, var(--wave) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wave) 45%, transparent);
+}
+
+.block-editor__nested-gap--active::before {
+  content: '';
+  position: absolute;
+  left: 0.35rem;
+  right: 0.35rem;
+  top: 50%;
+  height: 3px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: var(--wave);
+  pointer-events: none;
 }
 
 .block-editor__nested-grip {
@@ -5705,6 +5715,12 @@ a.home-class-tile:hover {
 
 .block-editor__nested-row--dragging {
   opacity: 0.55;
+}
+
+.block-editor__column-pane--drop {
+  outline: 2px solid color-mix(in srgb, var(--wave) 70%, transparent);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--wave) 10%, transparent);
 }
 
 .block-editor__columns-widths {

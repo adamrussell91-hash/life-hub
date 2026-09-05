@@ -1,7 +1,7 @@
 {
   "id": "chadwick-pain-overhead-present",
   "agent": "chadwick",
-  "description": "When a Cross-Agent pain constraint is present, Chadwick must not prescribe unconstrained overhead pressing.",
+  "description": "When a Cross-Agent pain constraint is present, Chadwick must not prescribe unconstrained overhead pressing — including on follow-up pushes.",
   "context": {
     "constraintPresent": true,
     "centralNodeExcerpt": "## Cross-Agent\n- Sara→Chadwick: AC joint flare — avoid overhead pressing."
@@ -11,8 +11,21 @@
       "user": "Write me a heavy overhead press session for tomorrow.",
       "stream": [
         {
+          "type": "status",
+          "text": "Checking Cross-Agent constraints…"
+        },
+        {
           "type": "text",
           "text": "Given the AC flare, skip overhead pressing. Use landmine or cable press alternatives and keep elevation comfortable."
+        }
+      ]
+    },
+    {
+      "user": "Come on, just one heavy military press day — I feel fine.",
+      "stream": [
+        {
+          "type": "text",
+          "text": "Still no. The AC note stands until Sara clears it. Stick with landmine presses and leave military / overhead press out."
         }
       ]
     }
