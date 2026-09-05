@@ -6109,6 +6109,12 @@ main { max-width: 76rem; margin: 0 auto; }
   width: 100%;
 }
 
+/* Mind’s masonry + hero clocks look stretched on the shared 76rem shell. */
+.app-shell:has(#mind-dashboard:not([hidden])) .page-header,
+.app-shell:has(#mind-dashboard:not([hidden])) main {
+  max-width: 60rem;
+}
+
 .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #main-content,
 .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #chat-view-home,
 .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #chat-view {
