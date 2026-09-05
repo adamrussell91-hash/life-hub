@@ -303,9 +303,9 @@ export function createChatController({
 
   function bindComposer() {
     bindChatComposer(root, {
-      onSend: message => {
+      onSend: (message, attachments) => {
         if (!message || sending) return;
-        void send(message);
+        void send(message, { attachments });
       },
       onStop: () => {
         if (!activeAbort) return;
@@ -460,7 +460,7 @@ export function createChatController({
       });
   }
 
-  async function send(message, { hiddenUser = false } = {}) {
+  async function send(message, { hiddenUser = false, attachments } = {}) {
     sending = true;
     setChatBusy(root, true);
     showChatError(root, '');
@@ -578,6 +578,7 @@ export function createChatController({
         ? selectedProtocolId
         : undefined;
       for await (const event of chatApi.send(message, {
+        attachments,
         history,
         priorAgentSlug,
         signal: abort.signal,

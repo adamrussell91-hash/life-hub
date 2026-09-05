@@ -1,4 +1,5 @@
 import { answerPodcastQuiz, getPodcastAudioUrl, interruptPodcast } from "../api/client";
+import { mountHubAudioPlayer } from "../../design-kit/js/hub-audio-player.js";
 import { escapeHtml } from "../lib/dom";
 import {
   failCurrentLine,
@@ -296,6 +297,10 @@ export function bindPlayer(root: ParentNode, host: PlayerViewHost) {
   const turns = host.episode.turns;
   const dial = sensitivity(host.episode);
   const audio = article.querySelector<HTMLAudioElement>("[data-podcast-audio]");
+  if (audio && !audio.dataset.hubAudioMounted) {
+    audio.dataset.hubAudioMounted = "1";
+    void mountHubAudioPlayer(audio);
+  }
   if (audio) {
     audio.onended = () => {
       void apply(article, host, nextAction(state, "ended", turns, dial));

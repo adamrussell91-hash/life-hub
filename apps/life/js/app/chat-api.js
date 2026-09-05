@@ -8,7 +8,7 @@ export function createChatApi(fetchImpl = fetch, { pollMs = CHAT_EVENTS_POLL_MS 
   if (typeof fetchImpl !== 'function') throw new TypeError('Fetch is unavailable');
 
   return {
-    async *send(message, { signal, history, priorAgentSlug, auditSession, protocolId } = {}) {
+    async *send(message, { signal, history, priorAgentSlug, auditSession, protocolId, attachments } = {}) {
       const response = await fetchImpl('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -17,7 +17,8 @@ export function createChatApi(fetchImpl = fetch, { pollMs = CHAT_EVENTS_POLL_MS 
           ...(history?.length ? { history } : {}),
           ...(priorAgentSlug ? { priorAgentSlug } : {}),
           ...(protocolId ? { protocolId } : {}),
-          ...(auditSession ? { auditSession } : {})
+          ...(auditSession ? { auditSession } : {}),
+          ...(attachments?.length ? { attachments } : {})
         }),
         signal
       });

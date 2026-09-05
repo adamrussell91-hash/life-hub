@@ -1403,6 +1403,7 @@ function renderCompose(state: ComposeState) {
 
   const voice = createVoiceCapture({
     onFile: file => void ingestAndApply(file, "voice"),
+    waveformHost: app.querySelector<HTMLElement>("[data-voice-wave]"),
   });
 
   async function ingestAndApply(file: File, kind: "voice" | "photo" | "pdf") {
