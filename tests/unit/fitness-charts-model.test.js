@@ -69,6 +69,7 @@ test('one completed session fills pies and rings, not empty trend cards', () => 
   assert.ok(!charts.repRanges.some(item => String(item.colour).includes('--navy-2') || String(item.colour).includes('--high-sea)')));
   assert.ok(charts.focusChord.length >= 1);
   assert.ok(charts.libraryMap?.nodes?.length >= 2);
+  assert.ok(charts.libraryMap.edges.some(edge => edge.count >= 1));
   assert.ok(charts.regionVolume.some(item => item.key === 'chest' && item.value > 0));
   assert.ok(charts.regionVolume.some(item => item.key === 'arms' && item.value > 0));
   assert.deepEqual(charts.pushPull.map(item => item.key).sort(), ['pull', 'push']);

@@ -61,6 +61,9 @@ test('the Fitness tab renders the fixture workout and labeled analytics', async 
     assert.equal(await page.locator('#fitness-rep-card').isVisible(), true);
     assert.match(await page.locator('[data-fitness="rep-read"]').textContent(), /Hypertrophy|Strength|Endurance/);
     assert.equal(await page.locator('#fitness-region-vol-card').isVisible(), true);
+    assert.ok(await page.locator('#fitness-region-donut circle').count() >= 1);
+    assert.equal(await page.locator('#fitness-library-card').isVisible(), true);
+    assert.ok(await page.locator('#fitness-library-chart path').count() >= 1);
     assert.equal(await page.locator('#fitness-push-pull-card').isVisible(), true);
     assert.equal(await page.locator('#fitness-rest-card').isVisible(), true);
     assert.equal(await page.locator('#fitness-e1rm-card').isHidden(), true);

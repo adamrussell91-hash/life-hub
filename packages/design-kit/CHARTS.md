@@ -104,7 +104,7 @@ Use only when the data matches the type. Do not pick these for a generic count i
 | `energy-orbit` | Energy over a date window. | `buildEnergyOrbit(series, { bounds, range, previous })` | `energy-orbit.js` |
 | `mood-radial` | Mood over a date window. | `buildMoodRadial(series, { bounds, range })` | `mood-radial.js` |
 | `theme-orbit` | Theme arms from mean mood. | `buildThemeOrbit(themes)`, `THEME_ARMS`, `armForMeanMood` | `theme-orbit.js` |
-| `theme-constellation` | Theme co-occurrence map. | `buildThemeConstellation(…)`, `pairKey`, `neighborhood`, `arcFor` | `theme-constellation.js` |
+| `theme-constellation` | Theme co-occurrence map. | `buildThemeConstellation({ nodes, edges, minEdgeCount = 2, … })`, `pairKey`, `neighborhood`, `arcFor` | `theme-constellation.js` |
 | `masonry` | Tile packer (Mind). | `packMasonry(items, { columns, gap, columnWidth, flowOffset })` | `masonry.js` |
 | `range-bar` | Value on a reference span, with an optional balance tick. | `rangeBarLayout(value, refLow, refHigh, { width, padding })`, `rangeBarTick(fraction, { width, padding })` | `range-bar.js` |
 | `clinical-slots` | Closed multi-series colours. | `CLINICAL_CHART_SLOTS` | `clinical-slots.js` |
@@ -185,6 +185,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-05 | `theme-constellation` | Optional `minEdgeCount` (default 2). Fitness library map uses 1 so a same-session pair draws an edge. Caller `node.colour` is kept when set. |
 | 2026-09-05 | `range-bar` | Promoted from Bloods `rangeBarLayout` into chart-kit. Fitness uses it for push/pull and trained/rest gauges. |
 | 2026-09-05 | `polar-clock` | Added `thetaForTime` / `minutesFromTime` for training time-of-day. |
 | 2026-09-05 | Fitness | Fitness tab consumes 18 catalog forms (polar-clock, energy-orbit, mood-radial, chord, bump, stream, watchlist-heat, horizon, pie, range-bar, area-line, columns, radial-year, mood-mix, sankey, theme-constellation). No invented types. |
