@@ -227,7 +227,20 @@ export function buildSystemPrompt({
       ? hubContext
       : '',
     'You do not propose log_entry. Coach and triage; specialists own domain logs. You still have `os_propose_action` for durable allowlisted writes Adam must Confirm, plus your Central Node / Governance shortcuts.',
-    'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.'
+    'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.',
+    'Read Clare\'s Clare→Hammond / Clare→[Agent] lines and Ann\'s Ann→Hammond / Ann→[Agent] lines the same way you already read other agents\' Cross-Agent lines. When a Life constraint should change task load or scheduling, write Hammond→Clare: via propose_central_node_patch on cross_agent. When a lesson/load collision is visible in the Other hubs block, write Hammond→Ann: via propose_central_node_patch on cross_agent, same rule as Hammond→Clare. Do not invent Teaching facts beyond that block. Do not address Clementine.'
+  ] : [];
+
+  const clareBlocks = slug === 'clare' ? [
+    'Read Central Node Cross-Agent for Hammond→Clare (and any other →Clare line) before triaging a dump or proposing task writes. Those lines are live directives, not background colour.',
+    'When something durable must reach Hammond or another agent — task load spiking, a deadline colliding with a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
+    'One line, observation not instruction, Clare→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine. Do not invent Tasks or Teaching rows that are not in your own tools.'
+  ] : [];
+
+  const annBlocks = slug === 'ann' ? [
+    'Read Central Node Cross-Agent for Hammond→Ann (and any other →Ann line) before responding. Those lines are live directives, not background colour.',
+    'When something durable must reach Hammond or another agent — a lesson/load collision, a teaching deadline hitting a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
+    'One line, observation not instruction, Ann→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine.'
   ] : [];
 
   return [
@@ -244,6 +257,8 @@ export function buildSystemPrompt({
     ...veraBlocks,
     ...brisketBlocks,
     ...saraBlocks,
-    ...hammondBlocks
+    ...hammondBlocks,
+    ...clareBlocks,
+    ...annBlocks
   ].filter(Boolean).join('\n\n');
 }
