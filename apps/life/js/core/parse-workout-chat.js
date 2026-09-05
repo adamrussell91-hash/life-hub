@@ -14,20 +14,19 @@ const CABLE_PAREN = /\(\s*cable:\s*([^)]+)\)/i;
 const CABLE_TRAIL = /(?:[—–·,-]|\()\s*cable:\s*([^)\n]+)/i;
 const NAME_CUE = /\s+[—–]\s+/;
 const BETWEEN_RE = /\s*[-–—]?\s*\*?\s*between sets:?\*?\s*/i;
-const CABLE_ENUM = new Set(['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing', 'none']);
+const CABLE_ENUM = new Set(['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing']);
 
 export function normalizeCableType(value) {
   const raw = String(value ?? '').toLowerCase().replace(/[()]/g, '').trim();
-  if (!raw) return 'none';
+  if (!raw || raw.startsWith('none')) return 'constant_force';
   const slug = raw.replace(/\s+/g, '_');
   if (CABLE_ENUM.has(slug)) return slug;
-  if (slug.startsWith('none')) return 'none';
   if (slug.includes('constant')) return 'constant_force';
   if (slug.includes('concentric')) return 'concentric';
   if (slug.includes('eccentric')) return 'eccentric';
   if (slug.includes('elastic')) return 'elastic';
-  if (slug.includes('rowing')) return 'rowing';
-  return 'none';
+  if (slug.includes('rowing') || slug.includes('row')) return 'rowing';
+  return 'constant_force';
 }
 
 function cableFrom(text) {

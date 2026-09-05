@@ -443,7 +443,7 @@ test('renderChatMarkdown turns a flattened workout dump into stacked exercise ro
   assert.equal(findByClass(exercises.children[0], 'chat-workout__cue').textContent, 'legs first while you\'re fresh');
   assert.equal(findByClass(exercises.children[0], 'chat-workout__set-n').textContent, '3 sets');
   assert.equal(findByClass(exercises.children[0], 'chat-workout__set-load').textContent, '10 × 25 kg');
-  assert.equal(findByClass(exercises.children[0], 'chat-workout__set-cable').textContent, 'none');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__set-cable').textContent, 'constant force');
   assert.equal(findByClass(exercises.children[1], 'chat-workout__name').textContent, 'Bar Row');
   assert.equal(findByClass(exercises.children[1], 'chat-workout__set-cable').textContent, 'constant force');
 });

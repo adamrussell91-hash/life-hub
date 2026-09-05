@@ -6,6 +6,7 @@ import {
   createExercise,
   draftFingerprint,
   moveExercise,
+  normalizeLoggerCableType,
   optionalNumber,
   parsePainFlag,
   resolveDraft,
@@ -145,7 +146,7 @@ export function createFitnessLoggerController({
     } else if (change.type === 'set') {
       const set = draft.exercises[change.exerciseIndex]?.sets?.[change.setIndex];
       if (!set) return;
-      if (change.field === 'cable_type') set.cable_type = change.value;
+      if (change.field === 'cable_type') set.cable_type = normalizeLoggerCableType(change.value);
       else set[change.field] = Number.isFinite(change.value) ? change.value : 0;
     } else if (change.type === 'pain-add') {
       const flag = parsePainFlag(change.site, change.note);
