@@ -615,7 +615,39 @@
         </section>
 
         <section id="fitness-dashboard" class="dashboard fitness-dashboard" aria-label="Fitness" hidden>
+          <div class="fitness-bento">
           <div data-fitness="run-widget" class="hub-run"></div>
+          <article class="metric-card fitness-hero-card" aria-labelledby="fitness-hero-label">
+            <p class="metric-label" id="fitness-hero-label">Last session</p>
+            <p data-fitness="hero-empty" hidden>No session yet — ask Chadwick to plan today’s workout</p>
+            <div data-fitness-hero class="workout-plan-card">
+              <p class="workout-plan-card__day" data-fitness="hero-day"></p>
+              <h3 data-fitness="hero-title">—</h3>
+              <p class="metric-caption workout-plan-card__meta">
+                <span data-fitness="hero-duration">—</span>
+                · <span data-fitness="hero-status">—</span>
+                · <span data-fitness="hero-volume">—</span>
+              </p>
+              <div id="fitness-muscle-maps" class="fitness-muscle-strip" aria-label="Muscles trained"></div>
+              <div id="fitness-focus-tags" class="fitness-tags"></div>
+              <div data-fitness="hero-preview">
+                <div id="fitness-exercise-list" class="fitness-exercise-list workout-plan-card__exercises"></div>
+                <button type="button" class="btn btn--primary workout-plan-card__start" id="fitness-start-workout" hidden>
+                  Start workout
+                </button>
+              </div>
+              <div id="fitness-logger" class="fitness-logger" hidden></div>
+              <div id="fitness-pain-flags" class="fitness-tags"></div>
+              <p class="metric-caption" data-fitness="hero-notes"></p>
+            </div>
+          </article>
+
+          <article class="metric-card fitness-panel fitness-region-block">
+            <p class="metric-label" id="fitness-region-heading">Region strength</p>
+            <p class="metric-caption">Best set last 30 days. A signed kg is vs the previous month.</p>
+            <div id="fitness-region-grid" class="fitness-region-grid" aria-labelledby="fitness-region-heading"></div>
+          </article>
+
           <article class="metric-card fitness-board" aria-labelledby="fitness-week-heading">
             <div class="fitness-board__top">
               <p class="metric-label" id="fitness-week-heading">This week</p>
@@ -637,6 +669,22 @@
             <div id="fitness-focus-card" hidden>
               <div id="fitness-focus-strip" class="fitness-focus-strip"></div>
             </div>
+          </article>
+
+          <article id="fitness-loads-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Working weights</p>
+            <p class="metric-caption">Best set in the last 30 days</p>
+            <div id="fitness-loads" class="fitness-kv"></div>
+          </article>
+
+          <article id="fitness-recent-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Recent sessions</p>
+            <div id="fitness-recent" class="fitness-recent-list"></div>
+          </article>
+
+          <article id="fitness-comparisons-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Vs last time</p>
+            <div id="fitness-comparisons" class="fitness-comparisons"></div>
           </article>
 
           <div class="fitness-viz">
@@ -681,7 +729,7 @@
               <p class="metric-caption">Site by week. A tick marks a high-volume week.</p>
               <div id="fitness-pain-heat" class="fitness-heat"></div>
             </article>
-            <article id="fitness-horizon-card" class="metric-card fitness-panel" hidden>
+            <article id="fitness-horizon-card" class="metric-card fitness-panel fitness-tile--slim" hidden>
               <p class="metric-label">Training load</p>
               <p class="metric-caption">Weekly volume versus the previous 4 weeks. 0.8–1.3 is typical.</p>
               <svg id="fitness-horizon-chart" class="fitness-viz__svg" viewBox="0 0 320 28" role="img" aria-label="Weekly training load"></svg>
@@ -694,13 +742,13 @@
                 <svg id="fitness-region-donut" class="fitness-polar__svg" viewBox="0 0 160 160" role="img" aria-label="Region volume this month versus last"></svg>
               </div>
             </article>
-            <article id="fitness-push-pull-card" class="metric-card fitness-panel" hidden>
+            <article id="fitness-push-pull-card" class="metric-card fitness-panel fitness-tile--slim" hidden>
               <p class="metric-label">Push vs pull</p>
               <p class="metric-caption">Tick is 50/50.</p>
               <svg id="fitness-push-gauge" class="fitness-viz__svg" viewBox="0 0 240 28" role="img" aria-label="Push versus pull balance"></svg>
               <p class="metric-caption" data-fitness="push-read"></p>
             </article>
-            <article id="fitness-rest-card" class="metric-card fitness-panel" hidden>
+            <article id="fitness-rest-card" class="metric-card fitness-panel fitness-tile--slim" hidden>
               <p class="metric-label">Trained vs rest</p>
               <p class="metric-caption">Tick is your weekly session target, spread over the window.</p>
               <svg id="fitness-rest-gauge" class="fitness-viz__svg" viewBox="0 0 240 28" role="img" aria-label="Trained versus rest days"></svg>
@@ -741,56 +789,6 @@
               <p class="metric-caption">Green is above your trailing average.</p>
               <div id="fitness-efficiency-bars" class="fitness-share-list"></div>
             </article>
-          </div>
-
-          <div class="fitness-board-grid">
-          <article class="metric-card fitness-hero-card" aria-labelledby="fitness-hero-label">
-            <p class="metric-label" id="fitness-hero-label">Last session</p>
-            <p data-fitness="hero-empty" hidden>No session yet — ask Chadwick to plan today’s workout</p>
-            <div data-fitness-hero class="workout-plan-card">
-              <p class="workout-plan-card__day" data-fitness="hero-day"></p>
-              <h3 data-fitness="hero-title">—</h3>
-              <p class="metric-caption workout-plan-card__meta">
-                <span data-fitness="hero-duration">—</span>
-                · <span data-fitness="hero-status">—</span>
-                · <span data-fitness="hero-volume">—</span>
-              </p>
-              <div id="fitness-muscle-maps" class="fitness-muscle-strip" aria-label="Muscles trained"></div>
-              <div id="fitness-focus-tags" class="fitness-tags"></div>
-              <div data-fitness="hero-preview">
-                <div id="fitness-exercise-list" class="fitness-exercise-list workout-plan-card__exercises"></div>
-                <button type="button" class="btn btn--primary workout-plan-card__start" id="fitness-start-workout" hidden>
-                  Start workout
-                </button>
-              </div>
-              <div id="fitness-logger" class="fitness-logger" hidden></div>
-              <div id="fitness-pain-flags" class="fitness-tags"></div>
-              <p class="metric-caption" data-fitness="hero-notes"></p>
-            </div>
-          </article>
-
-          <div class="fitness-side-stack">
-          <article id="fitness-loads-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Working weights</p>
-            <p class="metric-caption">Best set in the last 30 days</p>
-            <div id="fitness-loads" class="fitness-kv"></div>
-          </article>
-
-          <article id="fitness-recent-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Recent sessions</p>
-            <div id="fitness-recent" class="fitness-recent-list"></div>
-          </article>
-
-          <article id="fitness-comparisons-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Vs last time</p>
-            <div id="fitness-comparisons" class="fitness-comparisons"></div>
-          </article>
-
-          <article class="metric-card fitness-panel fitness-region-block">
-            <p class="metric-label" id="fitness-region-heading">Region strength</p>
-            <p class="metric-caption">Best set last 30 days. A signed kg is vs the previous month.</p>
-            <div id="fitness-region-grid" class="fitness-region-grid" aria-labelledby="fitness-region-heading"></div>
-          </article>
           </div>
           </div>
 

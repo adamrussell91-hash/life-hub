@@ -128,6 +128,7 @@ test('planned Fitness hero shows exercise rows and Start workout until the logge
 
   renderFitness(root, baseModel(), { logger });
 
+  assert.equal(root.ensure('#fitness-hero-label').textContent, 'Current session');
   assert.equal(root.ensure('[data-fitness="hero-day"]').textContent, 'Thursday');
   assert.equal(root.ensure('[data-fitness="hero-title"]').textContent, 'Upper Body');
   const list = root.ensure('#fitness-exercise-list');
@@ -157,6 +158,7 @@ test('completed Fitness hero keeps set details and hides Start workout', () => {
   }));
 
   const list = root.ensure('#fitness-exercise-list');
+  assert.equal(root.ensure('#fitness-hero-label').textContent, 'Last session');
   assert.match(list.children[0].className, /fitness-exercise/);
   assert.match(list.children[0].children[1].children[1].textContent, /32 kg/);
   assert.equal(root.ensure('#fitness-start-workout').attributes.hidden, '');

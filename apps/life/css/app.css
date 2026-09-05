@@ -1463,13 +1463,39 @@ main { max-width: 76rem; margin: 0 auto; }
 
 #fitness-dashboard.fitness-dashboard {
   min-height: 0;
-  gap: var(--space-4);
+  gap: var(--hub-tile-gap);
 }
 #fitness-dashboard .metric-card {
   padding: var(--space-4);
 }
+.fitness-bento {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-flow: dense;
+  gap: var(--hub-tile-gap);
+  align-items: stretch;
+}
+.fitness-bento > .hub-run {
+  grid-column: 1 / -1;
+}
+.fitness-bento > .fitness-hero-card,
+.fitness-bento > .fitness-region-block {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+.fitness-bento > .fitness-board,
+.fitness-bento > .fitness-panel,
+.fitness-bento > .fitness-viz > .fitness-panel {
+  grid-column: span 2;
+}
+.fitness-bento > .fitness-tile--slim,
+.fitness-bento > .fitness-viz > .fitness-tile--slim {
+  grid-column: span 1;
+}
+.fitness-viz {
+  display: contents;
+}
 .fitness-board,
-.fitness-side-stack,
 .fitness-recent-list {
   display: grid;
   gap: var(--space-3);
@@ -1526,12 +1552,6 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.fitness-board-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
-  gap: var(--space-4);
-  align-items: start;
-}
 .fitness-kv {
   display: grid;
   gap: 0;
@@ -1578,7 +1598,7 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .fitness-hero-card .workout-plan-card__title,
 .fitness-hero-card [data-fitness="hero-title"] {
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
 }
 .fitness-hero-card .fitness-muscle-strip {
   margin: var(--space-2) 0;
@@ -1589,11 +1609,8 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-hero-card .workout-plan-card__exercises {
   margin-top: var(--space-2);
 }
-.fitness-viz {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-  align-items: start;
+.fitness-bento > .metric-card {
+  height: 100%;
 }
 #fitness-dashboard .fitness-panel { position: relative; }
 .fitness-viz__svg {
@@ -1837,28 +1854,27 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .fitness-region-block {
   display: grid;
-  gap: var(--space-2);
+  align-content: start;
+  gap: var(--space-3);
 }
 .fitness-region-grid {
   display: grid;
-  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
 }
 .fitness-region-card {
   display: grid;
-  grid-template-columns: var(--space-8) minmax(0, 1fr);
+  grid-template-columns: var(--space-10) minmax(0, 1fr);
   gap: var(--space-3);
   align-items: center;
-  padding: var(--space-2) 0;
-  border-top: 1px solid var(--line);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
-.fitness-region-card:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
 .fitness-region-card__media {
-  width: var(--space-8);
-  height: var(--space-8);
+  width: var(--space-10);
+  height: var(--space-10);
   border-radius: var(--radius-xs);
   overflow: hidden;
   background: rgba(20, 43, 81, 0.06);
@@ -5989,11 +6005,28 @@ main { max-width: 76rem; margin: 0 auto; }
 #fitness-heatmap .heatmap-tile[data-hit="true"] { background: var(--fitness-accent); }
 
 @media (max-width: 64rem) {
-  .fitness-viz { grid-template-columns: 1fr; }
+  .fitness-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fitness-bento > .fitness-hero-card,
+  .fitness-bento > .fitness-region-block {
+    grid-column: span 1;
+  }
+  .fitness-bento > .fitness-board,
+  .fitness-bento > .fitness-panel,
+  .fitness-bento > .fitness-viz > .fitness-panel {
+    grid-column: span 1;
+  }
+  .fitness-region-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 48rem) {
-  .fitness-board-grid,
-  .fitness-viz { grid-template-columns: 1fr; }
+  .fitness-bento { grid-template-columns: 1fr; }
+  .fitness-bento > .fitness-hero-card,
+  .fitness-bento > .fitness-region-block,
+  .fitness-bento > .fitness-board,
+  .fitness-bento > .fitness-panel,
+  .fitness-bento > .fitness-viz > .fitness-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
   .fitness-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .fitness-board__top { flex-direction: column; }
   .fitness-board__today { text-align: left; }
