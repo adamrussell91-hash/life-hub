@@ -70,10 +70,8 @@ export function captureFileName(kind: CaptureKind, file: File, now = new Date())
 }
 
 export function captureContentType(kind: CaptureKind, file: File) {
-  if (file.type) return file.type;
-  if (kind === "pdf") return "application/pdf";
-  if (kind === "photo") return "image/jpeg";
-  return "audio/webm";
+  const raw = file.type || (kind === "pdf" ? "application/pdf" : kind === "photo" ? "image/jpeg" : "audio/webm");
+  return raw.split(";")[0].trim().toLowerCase();
 }
 
 export type CaptureUiState = {

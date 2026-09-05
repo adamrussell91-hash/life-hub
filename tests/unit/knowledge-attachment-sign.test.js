@@ -35,6 +35,30 @@ test('attachment sign rejects oversize and unknown areas', () => {
   }).error, 'area must be notes or university');
 });
 
+test('attachment sign accepts recorded voice MIME with codec parameters', () => {
+  const parsed = parseSignRequest({
+    filename: 'voice.webm',
+    content_type: 'audio/webm;codecs=opus',
+    byte_size: 2048,
+    page_id: 'page_hub_aa',
+    area: 'notes'
+  });
+  assert.equal(parsed.error, undefined);
+  assert.equal(parsed.value.content_type, 'audio/webm');
+  assert.equal(parsed.value.attachment.kind, 'audio');
+  assert.equal(parsed.value.attachment.content_type, 'audio/webm');
+});
+
+test('attachment sign still rejects an unknown type even with parameters', () => {
+  assert.equal(parseSignRequest({
+    filename: 'note.html',
+    content_type: 'text/html;charset=utf-8',
+    byte_size: 10,
+    page_id: 'page_hub_aa',
+    area: 'notes'
+  }).error, 'content_type not allowed');
+});
+
 test('findAttachment matches by id', () => {
   assert.equal(findAttachment({
     attachments: [{ id: 'att-1', r2_key: 'notes/p/a.pdf' }]
