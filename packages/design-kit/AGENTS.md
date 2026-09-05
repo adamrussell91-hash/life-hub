@@ -10,7 +10,7 @@ Rail work: also read `RAIL.md`. The left rail is locked — one width, brand goe
 
 Mobile work: also read `MOBILE.md`. Under 720px every hub uses the same bottom bar + More sheet. Do not keep the rail as a top strip.
 
-Hub marks: also read `ICONS.md`. The website tile is favicon + login + canvas title row. No login supporting copy.
+Hub marks: also read `ICONS.md`. The website tile is favicon + login. Teaching / Knowledge / Tasks also put it on the canvas title row. **Life does not** — title is `h1` only. No login supporting copy.
 
 ## Grab these files
 
@@ -82,11 +82,11 @@ In this monorepo Teaching / Knowledge / Tasks symlink `design-kit/` → `package
 ## Locked (do not reinvent)
 
 - Colours, type scale, spacing, radius, shadows
-- Page header: uppercase eyebrow → `.page-header__title-row` (`.hub-mark` + `h1`) → optional supporting → actions on the right
+- Page header: uppercase eyebrow → `.page-header__title-row` (`h1`; Teaching / Knowledge / Tasks also prepend `.hub-mark`) → optional supporting → actions on the right. **Life: no `.hub-mark` in the title row.**
 - Left rail: `--rail-width` 15rem, depth→marine gradient, `--on-dark*` text. Same labeled rail on every hub — see `RAIL.md`
 - Rail brand: `.hub-rail__brand` — **`<a>` to hub home**, single line, CSS `text-transform: uppercase`, `--text-2xs`. Copy is `"Teaching Hub"` / `"Life Hub"` / `"Knowledge Hub"` / `"Tasks Hub"`. No stacked `<br>`, no logo, no large title-case hero. Optional `.hub-rail__tagline` only.
 - Rail items: `.hub-rail__link` = outline icon + title-case label. No coloured dots. No icon-over-label stacks. No `text-transform: uppercase` on item labels.
-- Hub mark: the **tile** from `icons/` is the website icon. Favicon, `.sign-in__mark` on the gate, and `.hub-mark` **left of the page title** in `.page-header__title-row`. Not on the rail. See `ICONS.md`. Never `display: none` the mark classes to “clean up” chrome.
+- Hub mark: the **tile** from `icons/` is the website icon. Favicon and `.sign-in__mark` on the gate. Teaching / Knowledge / Tasks also put `.hub-mark` **left of the page title**. **Life never does** — do not re-add the tile beside Home, Fitness, or any other Life heading. Not on the rail. See `ICONS.md`. Never `display: none` the sign-in mark to “clean up” chrome.
 - Chrome utilities: refresh and sign out are `.hub-icon-btn` icons in `.hub-utilities` at the **canvas top-right**. Faded `--shallow` icons — never labelled pill `.btn`s on the rail or header. Snippet: `snippets/hub-utilities.html`.
 - Buttons: `.btn` + `--primary` / `--secondary` / `--ghost` / `--decisive`
 - Agent UX: propose → **confirm card** (`.confirm-card`) → apply. Never silent writes that look like a new UI kit. Do not invent parallel proposal button skins.
@@ -121,7 +121,7 @@ When editing a hub, replace local logout/refresh chrome **and** the left rail wi
 
 1. Rail brand → `<a class="hub-rail__brand" href="…home…">`. Single line of copy `"… Hub"`; CSS uppercases it. Drop stacked `<br>` titles, logos, and large title-case rail heroes. Clicking the brand always returns to that hub’s home.
 2. Rail destinations → `.hub-rail__link` (outline icon + title-case label). Replace coloured dots. Knowledge drops the narrow icon column and uses the 15rem labeled rail.
-3. Sign out / refresh → copy `snippets/hub-utilities.html` into `.page-header__actions` (canvas top-right). Keep existing ids/data attributes if tests rely on them; change the markup to `.hub-icon-btn`. Put `.hub-mark` (that hub’s tile) in `.page-header__title-row` to the left of the `h1`. Point `<link rel="icon">` at the same tile. Drop `.sign-in__supporting` and any login purpose copy. Add `.sign-in__mark` on the gate.
+3. Sign out / refresh → copy `snippets/hub-utilities.html` into `.page-header__actions` (canvas top-right). Keep existing ids/data attributes if tests rely on them; change the markup to `.hub-icon-btn`. Teaching / Knowledge / Tasks: put `.hub-mark` in `.page-header__title-row` to the left of the `h1`. **Life: leave the title row as `h1` only — never add `.hub-mark`.** Point `<link rel="icon">` at the same tile. Drop `.sign-in__supporting` and any login purpose copy. Add `.sign-in__mark` on the gate.
 4. Delete labelled pill logout styles on the rail (`.teacher-layout__logout`, `.rail__logout`, `.hub-rail__logout`, `.quiet-button` used as Sign out/Refresh).
 5. Load `rail.css` (or `chrome.css`) and `actions.css` so `.hub-rail__*` and `.hub-icon-btn` are defined.
 6. Delete hub CSS that overrides `--rail-width`, restyles rail markers, or force-hides `.hub-mark` / `.sign-in__mark`.
@@ -132,7 +132,7 @@ When editing a hub, replace local logout/refresh chrome **and** the left rail wi
 2. `<html lang="en" data-hub="…">`
 3. Load Inter, then `tokens.css`, `overlays.css`, `chrome.css` (includes `rail.css`), then the hub’s own CSS.
 4. Start from `snippets/shell.html` + `snippets/rail.html` + `snippets/sign-in.html`.
-5. Favicon, `.sign-in__mark`, and `.hub-mark` all use that hub’s tile from `icons/`.
+5. Favicon and `.sign-in__mark` use that hub’s tile from `icons/`. Teaching / Knowledge / Tasks also use `.hub-mark` on the title row. Life does not.
 6. Hub-only CSS may add domain styles; it may not redefine `:root` colours or type, or override `--rail-width`.
 
 ## Compliance
