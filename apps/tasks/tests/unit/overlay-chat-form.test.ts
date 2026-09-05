@@ -3,21 +3,32 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const viewsCss = readFileSync(path.resolve(process.cwd(), 'src/styles/views.css'), 'utf8');
+const visualViewport = readFileSync(
+  path.resolve(process.cwd(), 'src/chat/visual-viewport.ts'),
+  'utf8'
+);
 
 describe('mobile overlay chat form', () => {
-  it('stacks the composer as a column so Send sits under the textarea', () => {
+  it('stacks the composer as a single-column grid so Send sits under the textarea', () => {
     expect(viewsCss).toMatch(
-      /\.chat-view\s+\.chat-form\s*\{[^}]*flex-direction:\s*column/
+      /\.chat-view\s+\.chat-form\s*\{[^}]*grid-template-columns:\s*1fr/
     );
   });
 
   it('makes the textarea full width under the chat form on mobile', () => {
-    expect(viewsCss).toMatch(/\.chat-view\s+\.chat-input[\s\S]{0,120}width:\s*100%/);
-    expect(viewsCss).toMatch(/\.chat-view\s+#chat-input[\s\S]{0,120}min-width:\s*0/);
+    expect(viewsCss).toMatch(/\.chat-view\s+\.chat-input[\s\S]{0,160}width:\s*100%/);
+    expect(viewsCss).toMatch(/\.chat-view\s+#chat-input[\s\S]{0,160}min-width:\s*0/);
   });
 
-  it('uses compact texting-sized bubbles on mobile', () => {
-    expect(viewsCss).toMatch(/max-width:\s*min\(82%,\s*17\.5rem\)/);
+  it('forces 16px input text so iOS Safari does not zoom and crush widths', () => {
+    expect(viewsCss).toMatch(
+      /\.chat-view\s+#chat-input[\s\S]{0,220}font-size:\s*16px/
+    );
+  });
+
+  it('uses near-full-width bubbles on mobile instead of a 17.5rem desk card', () => {
+    expect(viewsCss).toMatch(/max-width:\s*min\(92%,\s*100%\)/);
+    expect(viewsCss).not.toMatch(/max-width:\s*min\(82%,\s*17\.5rem\)/);
     expect(viewsCss).toMatch(/\.chat-message__avatar\s*\{[^}]*width:\s*1\.6rem/);
   });
 
@@ -34,6 +45,17 @@ describe('mobile overlay chat form', () => {
     expect(viewsCss).toMatch(
       /\.chat-view\[data-panel-mode='overlay'\]\s*\{[^}]*max-width:\s*100%/
     );
+  });
+
+  it('hides the locked mobile nav while the overlay chat is open', () => {
+    expect(viewsCss).toMatch(
+      /body:has\(\.chat-view\[data-panel-mode='overlay'\]:not\(\[hidden\]\)\)\s+\.hub-mobile-nav\s*\{[^}]*display:\s*none/
+    );
+  });
+
+  it('re-syncs visual viewport when the composer focuses (iOS keyboard)', () => {
+    expect(visualViewport).toMatch(/focusin/);
+    expect(visualViewport).toMatch(/scrollIntoView/);
   });
 });
 
