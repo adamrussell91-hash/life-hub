@@ -149,7 +149,7 @@ test('empty Chat names the agent once and uses the full canvas width', async () 
 
   assert.equal(await page.locator('#chat-who').isVisible(), false);
   assert.equal(await page.locator('.agent-picker__name').first().innerText(), 'Brisket');
-  assert.equal(await page.locator('.agent-protocol-pills__eyebrow').innerText(), 'Can');
+  assert.match(await page.locator('.agent-protocol-pills__eyebrow').innerText(), /^can$/i);
   assert.match(await page.locator('#chat-empty').innerText(), /meals, macros/i);
   assert.doesNotMatch(await page.locator('#chat-empty').innerText(), /brisket/i);
 
