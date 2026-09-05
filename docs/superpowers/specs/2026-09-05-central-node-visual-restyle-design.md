@@ -22,6 +22,7 @@ Make Central Node look like the same Clinical Glass analysis board Mind already 
 | Sparse charts | **Honest empty:** keep the tile; no SVG blob; one sentence of threshold + count |
 | Implementation | CSS + `render-central-node.js` / `central-node-charts.js` / `#central-node-dashboard` markup / tests. Model may grow **derived** series only (see Files) |
 | Coordination / audit code | **Do not touch** `persona.mjs`, `hammond-audit.mjs`, `hammond-audit.js`, `CROSS_AGENT_AGENT_NAMES`, chat routing, or any PR #131 mailbox/audit contract |
+| Year series cost | **Client-only.** Dashboard `events` are already in `latestResult` from the PWA sync snapshot (Cache Storage, not a CN fetch). Do **not** widen `CN_MODEL_WINDOW_DAYS` / `selectHammondEventEntries` |
 
 ### (a) Section → chart-kit mapping
 
@@ -42,7 +43,7 @@ Verified against the live model (`buildCentralNodeModel`), the markdown extracto
 
 - **`radial-year.js` `buildRadialYear()`** three times, painted as **three concentric rings** on one SVG (logging inner, exercise mid, eating outer).
 - `byDate[date]` is a hit/miss (or null), not a Mind mood string. The builder already treats `byDate` as an opaque payload (`tick.mood`). Colour hits with `CLINICAL_CHART_SLOTS` — do not reuse `--mood-*`.
-- Extend the model from 30 days to the **Sydney year of `model.date`** so the year clock is honest. Same completeness / workout / eating helpers already used for the month grids.
+- Extend the model from 30 days to the **Sydney year of `model.date`** so the year clock is honest. Same completeness / workout / eating helpers already used for the month grids. **No wider sync read:** `buildCentralNodeModel(latestResult)` already receives the app-wide event list. `loadLiveEvents` first-paints 7 days, then backfills doubling windows up to `MAX_LOOKBACK_DAYS` (3652) into Cache Storage (`life-hub-private-v2`). A year is inside that existing walk (covered by the fourth backfill window). Render only filters `latestResult.events` already in memory. Mid-backfill paints stay sparse/honest from whatever days have arrived — same as today’s 30-day grids on first paint. **Do not change** Hammond’s server reuse: `chat.mjs` feeds `buildCentralNodeModel` a separate 30-day blob set (`CN_MODEL_WINDOW_DAYS`). Walking a year of a 30-event array there is fine; widening that bound is not this spec.
 - Bloods’ FBC radial (`buildFbcRadial` in `bloods-charts.js`) is a **different** mark (allowance wedges per marker). Do not reuse it. This tile matches **Mind’s** radial-year clock, in the same Clinical Glass family Bloods already uses for colour.
 - Honest empty if `< 1` hit day in any ring.
 
