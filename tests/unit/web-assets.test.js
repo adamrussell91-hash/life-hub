@@ -174,6 +174,8 @@ test('Mind fills the shared 76rem shell; only Chat lifts the canvas width', asyn
     css,
     /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+main[\s\S]*max-width:\s*none/
   );
+  assert.match(css, /\.body-range\.hub-pills\s*\{[^}]*width:\s*100%/);
+  assert.match(css, /\.mind-board\s*\{[^}]*max-width:\s*100%/);
 });
 
 test('web app manifest is installable and uses only local icons', async () => {
