@@ -5,12 +5,11 @@ const CABLE_LABELS = {
   concentric: 'concentric',
   eccentric: 'eccentric',
   elastic: 'elastic',
-  rowing: 'rowing',
-  none: 'none (not on cables)'
+  rowing: 'rowing'
 };
 
 export function formatCableType(value) {
-  if (value == null || value === '') return '';
+  if (value == null || value === '' || value === 'none') return 'constant force';
   return CABLE_LABELS[value] ?? String(value).replaceAll('_', ' ');
 }
 

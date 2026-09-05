@@ -10,10 +10,11 @@ import {
   INTENSIFICATIONS,
   appendSet,
   finishLabel,
-  formatElapsed
+  formatElapsed,
+  normalizeLoggerCableType
 } from './fitness-logger-draft.js';
 
-const cableLabel = value => String(value ?? 'none').replaceAll('_', ' ');
+const cableLabel = value => String(normalizeLoggerCableType(value)).replaceAll('_', ' ');
 const intensificationLabel = value => String(value ?? '').replaceAll('_', ' ');
 
 function previewNote(text) {
@@ -216,15 +217,16 @@ function buildExerciseEditor(root, exercise, exerciseIndex, {
     });
 
     const cable = root.createElement('select');
+    const selectedCable = normalizeLoggerCableType(set.cable_type);
     for (const option of CABLE_TYPES) {
       const el = root.createElement('option');
       el.value = option;
       el.textContent = cableLabel(option);
-      if (option === set.cable_type) el.selected = true;
+      if (option === selectedCable) el.selected = true;
       cable.append(el);
     }
     cable.addEventListener('change', () => {
-      onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'cable_type', value: cable.value });
+      onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'cable_type', value: normalizeLoggerCableType(cable.value) });
     });
 
     row.append(number, weight, reps, cable);
