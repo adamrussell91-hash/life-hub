@@ -39,6 +39,8 @@ test('DOMAIN_PATH matches only the 5 recognised Life Hub domains', () => {
   assert.ok(DOMAIN_PATH.test('data/skincare/2026/08/2026-08-01-am.md'));
   assert.ok(!DOMAIN_PATH.test('data/sleep/2026/08/2026-08-01-note.md'));
   assert.ok(!DOMAIN_PATH.test('data/heart/2026/08/2026-08-01-note.md'));
+  assert.ok(!DOMAIN_PATH.test('data/tasks/2026/08/2026-08-01-marking.md'));
+  assert.ok(!DOMAIN_PATH.test('scheduled_lessons/2026-08-01-11psycha.md'));
 });
 
 test('summarizes a 90-day gap and a current gap for a domain (happy path / domain detail)', () => {

@@ -36,7 +36,9 @@
     "publish.cn-patch": {
       "file": "publish/cn-patch.json",
       "agents": [
-        "hammond"
+        "hammond",
+        "clare",
+        "ann"
       ],
       "risk": "confirm",
       "surfaces": [

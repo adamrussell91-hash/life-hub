@@ -1,6 +1,7 @@
 {
   "agent": "ann",
   "write_globs": [
+    "central-node.md",
     "data/research/**",
     "data/challenges/**",
     "data/remember/**",

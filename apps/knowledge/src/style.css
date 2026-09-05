@@ -2067,8 +2067,11 @@ body.is-universe-fullscreen .local-banner {
     order: 10;
   }
 
-  .coach.chat .chat__sitting {
+  .coach.chat .hub-scroll-hide {
     order: -2;
+  }
+
+  .coach.chat .chat__sitting {
     padding: var(--space-3);
   }
 
@@ -3194,6 +3197,7 @@ body.is-universe-fullscreen .local-banner {
   }
 
   .chat-overlay .chat-overlay__top,
+  .chat-overlay .hub-scroll-hide,
   .chat-overlay .agent-picker,
   .chat-overlay .agent-protocol-pills,
   .chat-overlay .using-notes,

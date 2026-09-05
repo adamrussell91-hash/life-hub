@@ -77,6 +77,26 @@ test('POST /api/chat returns a job id and the turn is polled from /api/chat/even
   assert.deepEqual(payload.data.events.map(event => event.type), ['agent', 'text', 'done']);
 });
 
+test('Hammond CN audit, Clare, and Ann turns enqueue on /api/chat 202', async () => {
+  for (const message of [
+    'Hammond, run a Central Node audit',
+    'Clare, flag the collision',
+    "Ann, flag Thursday's double period"
+  ]) {
+    const store = createMemoryChatJobStore();
+    const start = createChatStartHandler({
+      env: validEnv,
+      now: () => Date.parse('2026-08-01T06:00:00Z'),
+      getStore: async () => store,
+      invokeBackground: async () => true
+    });
+    const started = await start(startRequest({ message }));
+    assert.equal(started.status, 202, message);
+    const { data } = await started.json();
+    assert.match(data.jobId, /^[0-9a-f-]{36}$/i, message);
+  }
+});
+
 test('POST /api/chat streams live when the background job cannot start', async () => {
   const start = createChatStartHandler({
     env: validEnv,

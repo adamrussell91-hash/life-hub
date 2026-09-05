@@ -249,7 +249,7 @@ export function buildAgentTools({
     );
   }
 
-  if (has('publish.cn-patch') && needsHammondTools) {
+  if (has('publish.cn-patch') && (needsHammondTools || slug === 'clare' || slug === 'ann')) {
     tools.push(proposeCentralNodePatchSchema());
   }
   if (has('publish.governance-log-entry') && needsHammondTools) {

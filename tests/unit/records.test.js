@@ -509,10 +509,24 @@ test('mind_session rejects a cross_agent_note with no arrow', () => {
   assert.ok(errors.some(e => /Sender→Recipient/.test(e)));
 });
 
-test('mind_session rejects a cross_agent_note addressed to Ann', () => {
-  const errors = validateRecord({
+test('mind_session accepts a well-formed Vera→Ann cross_agent_note now that Ann is implemented', () => {
+  assert.equal(validateRecord({
     ...mindSessionBase,
     cross_agent_note: 'Vera→Ann: teaching handoff.'
+  }).length, 0);
+});
+
+test('mind_session accepts a well-formed Vera→Clare cross_agent_note', () => {
+  assert.equal(validateRecord({
+    ...mindSessionBase,
+    cross_agent_note: 'Vera→Clare: load is colliding with rest.'
+  }).length, 0);
+});
+
+test('mind_session still rejects a cross_agent_note addressed to Clementine', () => {
+  const errors = validateRecord({
+    ...mindSessionBase,
+    cross_agent_note: 'Vera→Clementine: wiki note.'
   });
   assert.ok(errors.some(e => /implemented agent names/.test(e)));
 });

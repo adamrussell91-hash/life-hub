@@ -240,6 +240,8 @@ test('renderMedical wraps an episode band and shows a Maps link in the sheet', (
   const link = sheet.querySelector('a');
   assert.ok(link);
   assert.match(link.href, /google\.com\/maps/);
+  assert.match(sheet.textContent, /View on Map/);
+  assert.ok(sheet.querySelector('.view-on-map'));
 });
 
 test('renderMedical shows lab chips on a lab card', () => {

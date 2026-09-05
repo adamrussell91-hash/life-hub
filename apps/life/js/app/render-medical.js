@@ -1,5 +1,6 @@
 import { formatDisplayDate } from '../core/time.js';
 import { createHubFilter } from '../../../../packages/design-kit/js/hub-filter-menu.js';
+import { createViewOnMap } from '../../../../packages/design-kit/js/view-on-map.js';
 
 const filterCache = new WeakMap();
 
@@ -317,14 +318,27 @@ function renderSheet(root, model, hooks) {
   addLine(root, host, 'Insurance', visit.insurance_status);
 
   if (visit.location_kind === 'place' && visit.mapsUrl) {
-    const link = root.createElement('a');
-    link.className = 'medical-sheet__map';
-    link.href = visit.mapsUrl;
-    link.setAttribute('href', visit.mapsUrl);
-    link.target = '_blank';
-    link.rel = 'noreferrer';
-    link.textContent = visit.location;
-    host.append(link);
+    const map = createViewOnMap({
+      locationName: visit.location,
+      address: visit.location,
+      mapsUrl: visit.mapsUrl,
+      locationKind: visit.location_kind,
+      createElement: tag => root.createElement(tag),
+      document: globalThis.document
+    });
+    if (map) {
+      map.place.className = [map.place.className, 'medical-sheet__map'].filter(Boolean).join(' ');
+      host.append(map.el);
+    } else {
+      const link = root.createElement('a');
+      link.className = 'medical-sheet__map';
+      link.href = visit.mapsUrl;
+      link.setAttribute('href', visit.mapsUrl);
+      link.target = '_blank';
+      link.rel = 'noreferrer';
+      link.textContent = visit.location;
+      host.append(link);
+    }
   } else if (visit.location) {
     addLine(root, host, 'Location', visit.location);
   }
