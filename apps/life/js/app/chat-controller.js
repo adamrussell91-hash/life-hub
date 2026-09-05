@@ -4,11 +4,14 @@ import {
   appendCnPatchProposal,
   appendRecordProposal,
   appendRecordSaved,
+  isChatPinned,
   renderChatMarkdown,
   setChatBusy,
   showChatError
 } from './render-chat.js';
-import { applyAgentAvatarToBubble, renderAgentHero, renderAgentPicker } from './render-agent-picker.js';
+import { applyAgentAvatarToBubble, renderAgentHero, renderAgentPicker, renderChatEmpty } from './render-agent-picker.js';
+import { bindChatComposer } from './chat-composer.js';
+import { syncChatChrome, toggleChatChrome } from './chat-chrome.js';
 import { renderProtocolPills } from './render-protocol-pills.js';
 import { findProtocol, isAgentStatusLine, pickStatusLine } from './agent-protocols.js';
 import { isHammondAuditTrigger, nextAuditPhase } from './hammond-audit.js';
@@ -69,6 +72,7 @@ export function createChatController({
   let pinnedAgentSlug = null;
   let selectedProtocolId = null;
   let activeAbort = null;
+  let stickToBottom = true;
   let auditSession = resumeAuditSession(storage);
   let savedMindSessionThisThread = false;
   let flushAttempted = false;
@@ -153,6 +157,8 @@ export function createChatController({
       selectedId: selectedProtocolId,
       onSelect: selectProtocol
     });
+    renderChatEmpty(root, slug);
+    syncChatChrome(root);
   }
 
   function applySelectAgent(slug) {
@@ -207,6 +213,8 @@ export function createChatController({
 
   function applyAgentAccent(slug) {
     renderAgentHero(root, slug);
+    renderChatEmpty(root, slug);
+    syncChatChrome(root);
     if (!slug || typeof agentColour !== 'function') return;
     const panel = root.querySelector('#chat-view');
     if (!panel?.style?.setProperty) return;
@@ -272,20 +280,60 @@ export function createChatController({
     const slug = stickyAgentSlug();
     if (slug) applyAgentAccent(slug);
     paintRoster();
+    syncChatChrome(root);
     clearUnread();
   }
 
-  function bindForm() {
-    const form = root.querySelector('#chat-form');
-    if (!form || form.dataset.bound === '1') return;
-    form.dataset.bound = '1';
-    form.addEventListener('submit', event => {
-      event.preventDefault();
-      const input = root.querySelector('#chat-input');
-      const message = input?.value.trim();
-      if (!message || sending) return;
-      input.value = '';
-      void send(message);
+  function bindComposer() {
+    bindChatComposer(root, {
+      onSend: message => {
+        if (!message || sending) return;
+        void send(message);
+      },
+      onStop: () => {
+        if (!activeAbort) return;
+        try {
+          activeAbort.abort('stop');
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+  }
+
+  function bindTools() {
+    const button = root.querySelector('#chat-tools');
+    if (!button || button.dataset.bound === '1') return;
+    button.dataset.bound = '1';
+    button.addEventListener('click', () => toggleChatChrome(root));
+  }
+
+  function bindScrollLock() {
+    const list = root.querySelector('#chat-messages');
+    if (!list || list.dataset.scrollBound === '1') return;
+    list.dataset.scrollBound = '1';
+    list.addEventListener?.('scroll', () => {
+      stickToBottom = isChatPinned(list);
+    });
+  }
+
+  function bindMessageActions() {
+    const list = root.querySelector('#chat-messages');
+    if (!list || list.dataset.actionsBound === '1') return;
+    list.dataset.actionsBound = '1';
+    list.addEventListener('click', event => {
+      const button = event.target?.closest?.('[data-chat-action]');
+      if (!button) return;
+      const item = button.closest?.('.chat-message');
+      const body = item?.querySelector?.('.chat-message__body');
+      const text = (body?.innerText ?? body?.textContent ?? '').trim();
+      if (button.dataset.chatAction === 'copy') {
+        void globalThis.navigator?.clipboard?.writeText?.(text);
+        return;
+      }
+      if (button.dataset.chatAction === 'retry' && text && !sending) {
+        void send(text);
+      }
     });
   }
 
@@ -352,10 +400,12 @@ export function createChatController({
     let assistantBuffer = '';
     let assistantFullText = '';
     let statusLine = pickStatusLine(assistantSlug);
+    stickToBottom = true;
     let workingBubble = appendMessage(root, {
       role: 'assistant',
       agentSlug: assistantSlug,
-      text: statusLine
+      text: statusLine,
+      actions: false
     });
     addStatusClass(workingBubble);
     const abort = new AbortController();
@@ -373,7 +423,7 @@ export function createChatController({
     function setWorkingStatus(text) {
       statusLine = text;
       if (!workingBubble) {
-        workingBubble = appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text });
+        workingBubble = appendMessage(root, { role: 'assistant', agentSlug: assistantSlug, text, actions: false });
       } else {
         const body = workingBubble.querySelector?.('.chat-message__body') ?? workingBubble;
         body.textContent = text;
@@ -418,7 +468,7 @@ export function createChatController({
 
     function scrollChatToBottom() {
       const list = root.querySelector('#chat-messages');
-      if (list) list.scrollTop = list.scrollHeight;
+      if (list && stickToBottom) list.scrollTop = list.scrollHeight;
     }
 
     try {
@@ -608,7 +658,7 @@ export function createChatController({
       clearWorkingBubble();
       const abortedForNewChat = abort.signal.reason === 'new-chat';
       if (error?.name === 'AbortError') {
-        if (!abortedForNewChat) {
+        if (!abortedForNewChat && abort.signal.reason !== 'stop') {
           showChatError(root, 'That search took too long. Try again in a moment.');
         }
       } else {
@@ -761,8 +811,11 @@ export function createChatController({
     return send('central node audit');
   }
 
-  bindForm();
+  bindComposer();
   bindNewChat();
+  bindTools();
+  bindScrollLock();
+  bindMessageActions();
   {
     const slug = stickyAgentSlug() ?? null;
     if (slug) applyAgentAccent(slug);

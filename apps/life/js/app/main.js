@@ -18,6 +18,7 @@ import { buildCentralNodeModel } from './central-node-model.js';
 import { createChatApi } from './chat-api.js';
 import { createChatController } from './chat-controller.js';
 import { createChatPanelController } from './chat-panel.js';
+import { attachVisualViewportInset } from './visual-viewport.js';
 import { API_BASE_URL } from './config.js';
 import { createFitnessLoggerController } from './fitness-logger-controller.js';
 import { createFitnessTemplateLibrary } from './fitness-template-library.js';
@@ -259,6 +260,7 @@ chatController = createChatController({
   isChatVisible: () => chatPanel.isOpen() || controller.getCurrentSection?.() === 'chat',
   onUnreadChange: unread => setChatUnread(document, unread)
 });
+attachVisualViewportInset();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js').catch(() => undefined);
