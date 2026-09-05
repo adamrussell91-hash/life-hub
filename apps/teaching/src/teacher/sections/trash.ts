@@ -195,6 +195,9 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
         );
         renderRows(currentRows);
         setStatus(`Deleted “${row.title}”.`);
+        void import('../../../design-kit/js/hub-feedback.js').then(({ showHubToast }) => {
+          showHubToast(`Deleted “${row.title}”`, { tone: 'danger' });
+        });
         void permanentDelete(row.type, row.id).catch((error: unknown) => {
           const deps = dependenciesFromError(error);
           if (deps.length > 0) {

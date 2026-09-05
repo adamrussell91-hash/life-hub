@@ -116,8 +116,7 @@ describe('mountPublicLinkControl', () => {
     const copy = [...host.querySelectorAll('button')].find((btn) => btn.textContent === 'Copy');
     expect(copy).toBeTruthy();
     copy!.click();
-    await Promise.resolve();
-    expect(writeText).toHaveBeenCalled();
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
     expect(host.querySelector('a')?.getAttribute('href')).toBe('/s/lessons/lesson_1');
     handle.dispose();
   });
