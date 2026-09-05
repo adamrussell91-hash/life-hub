@@ -81,6 +81,14 @@ describe('render-chat', () => {
     expect(card.querySelector('.record-proposal__confirm')).toBeNull();
   });
 
+  it('renders a status row without a generic loader', () => {
+    const root = chatRoot();
+    appendMessage(root, { role: 'status', text: 'Untangling the moving parts…' });
+    const row = root.querySelector('.chat-message--status');
+    expect(row?.textContent).toBe('Untangling the moving parts…');
+    expect(root.querySelector('.typing-indicator, .hub-loader')).toBeNull();
+  });
+
   it('marks the floating button unread', () => {
     const root = chatRoot();
     setChatUnread(root, true);

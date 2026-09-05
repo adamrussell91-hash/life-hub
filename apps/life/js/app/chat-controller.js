@@ -42,12 +42,17 @@ function addStatusClass(element) {
   if (!element) return;
   if (element.classList?.add) {
     element.classList.add(STATUS_BUBBLE_CLASS);
-    return;
+  } else {
+    const classes = (element.className ?? '').split(/\s+/).filter(Boolean);
+    if (!classes.includes(STATUS_BUBBLE_CLASS)) {
+      classes.push(STATUS_BUBBLE_CLASS);
+      element.className = classes.join(' ');
+    }
   }
-  const classes = (element.className ?? '').split(/\s+/).filter(Boolean);
-  if (!classes.includes(STATUS_BUBBLE_CLASS)) {
-    classes.push(STATUS_BUBBLE_CLASS);
-    element.className = classes.join(' ');
+  const body = element.querySelector?.('.chat-message__body') ?? element;
+  if (body?.setAttribute) {
+    body.setAttribute('role', 'status');
+    body.setAttribute('aria-live', 'polite');
   }
 }
 
