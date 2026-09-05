@@ -176,3 +176,31 @@ test('coerceChatWorkoutProposal forces designed sessions to planned unless Adam 
   }, { userMessage: 'skipped today' });
   assert.equal(skipped.record.status, 'skipped');
 });
+
+test('coerceChatWorkoutProposal keeps completed when notes or pain_flags already look finished', () => {
+  const withNotes = coerceChatWorkoutProposal({
+    valid: true,
+    record: {
+      type: 'workout',
+      title: 'Guns',
+      status: 'completed',
+      date: '2026-09-05',
+      notes: 'Guns — AC clear, matched loads',
+      exercises: [{ name: 'Bar Curl', sets: [{ reps: 10, weight_kg: 20 }] }]
+    }
+  }, { userMessage: 'Log' });
+  assert.equal(withNotes.record.status, 'completed');
+
+  const withPain = coerceChatWorkoutProposal({
+    valid: true,
+    record: {
+      type: 'workout',
+      title: 'Chest',
+      status: 'completed',
+      date: '2026-09-05',
+      pain_flags: [{ site: 'right AC', note: 'twinge' }],
+      exercises: [{ name: 'Press', sets: [{ reps: 10, weight_kg: 30 }] }]
+    }
+  }, { userMessage: 'save workout' });
+  assert.equal(withPain.record.status, 'completed');
+});

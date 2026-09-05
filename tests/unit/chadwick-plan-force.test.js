@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHADWICK_FORCE_PLAN_NUDGE, streamWithChadwickPlanForce } from '../../netlify/functions/_shared/chadwick-plan-force.mjs';
+import {
+  CHADWICK_FORCE_PLAN_NUDGE,
+  streamWithChadwickPlanForce
+} from '../../netlify/functions/_shared/chadwick-plan-force.mjs';
 
 async function collect(iterable) {
   const events = [];
@@ -26,7 +29,7 @@ test('does not start a second round for non-Chadwick agents', async () => {
   assert.equal(events.some(event => event.type === 'status'), false);
 });
 
-test('lock-in with a parseable history plan emits log_entry without calling the model', async () => {
+test('lock-in always gives the model the first pass, then late-forces log_entry from history', async () => {
   const calls = [];
   const anthropic = {
     async *streamMessage(args) {
@@ -45,7 +48,7 @@ test('lock-in with a parseable history plan emits log_entry without calling the 
     ]
   }));
 
-  assert.equal(calls.length, 0, 'must not wait on Anthropic when the plan is already in history');
+  assert.equal(calls.length, 1, 'model must run once with full context before late force');
   assert.ok(events.some(event => event.type === 'status' && /Locking the plan onto Fitness/i.test(event.text)));
   assert.ok(events.some(event => event.type === 'text' && /On Fitness/i.test(event.delta)));
   const proposal = events.find(event => event.type === 'tool_call' && event.name === 'log_entry');
@@ -53,12 +56,14 @@ test('lock-in with a parseable history plan emits log_entry without calling the 
   assert.equal(proposal.input.fields.status, 'planned');
   assert.equal(proposal.input.fields.exercises.length, 3);
   assert.equal(proposal.input.fields.exercises[0].name, 'Bar Press');
+  assert.equal(proposal.input.notes ?? '', '');
 });
 
-test('make the workout and is it ready to go emit the same card without the model', async () => {
+test('make the workout late-forces a Confirm after the model pass', async () => {
   const anthropic = {
     async *streamMessage() {
-      throw new Error('Anthropic must not run on lock-in follow-ups');
+      yield { type: 'text', delta: 'On it.' };
+      yield { type: 'done' };
     }
   };
   const history = [
@@ -116,10 +121,11 @@ test('forces a second Anthropic round when lock-in has no parseable plan', async
   assert.ok(events.some(event => event.type === 'tool_call' && event.name === 'log_entry'));
 });
 
-test('superset pairing with lock-in complaint emits log_entry without calling the model', async () => {
+test('superset pairing late-forces log_entry after the model pass', async () => {
   const anthropic = {
     async *streamMessage() {
-      throw new Error('Anthropic must not run when superset plan is in history');
+      yield { type: 'text', delta: 'Got it.' };
+      yield { type: 'done' };
     }
   };
   const pairingPlan = [

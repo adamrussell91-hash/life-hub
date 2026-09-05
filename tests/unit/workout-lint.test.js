@@ -6,6 +6,7 @@ function exercise(name, overrides = {}) {
   return {
     name,
     sets: [{ reps: 10, weight_kg: 20, cable_type: 'constant_force' }],
+    coach_cues: { start: 'Set up.', rest: 'Breathe.', final_set: 'Leave 1.', },
     ...overrides
   };
 }
@@ -154,4 +155,24 @@ test('lintWorkoutProposal flags a generic Planned session title on a finished lo
   const session = warmupSession([], { title: 'Planned session', status: 'completed' });
   const warnings = lintWorkoutProposal(session);
   assert.ok(warnings.some(w => /title|Planned session/i.test(w)), JSON.stringify(warnings));
+});
+
+test('lintWorkoutProposal flags planned exercises missing coach_cues', () => {
+  const session = warmupSession([], {
+    exercises: [
+      exercise('Warmup: Light Cable Rows', { coach_cues: undefined }),
+      exercise('Chest Press', { coach_cues: undefined }),
+      exercise('Bar Curl', { coach_cues: undefined }),
+      exercise('Lat Pulldown', { coach_cues: undefined }),
+      exercise('Shoulder Press', { coach_cues: undefined })
+    ]
+  });
+  const warnings = lintWorkoutProposal(session);
+  assert.ok(warnings.some(w => /coach_cues/i.test(w)), JSON.stringify(warnings));
+});
+
+test('lintWorkoutProposal flags too many focuses on a workout_30 day', () => {
+  const session = warmupSession([], { day_type: 'workout_30', focus: ['chest', 'back', 'arms'] });
+  const warnings = lintWorkoutProposal(session);
+  assert.ok(warnings.some(w => /focus/i.test(w)), JSON.stringify(warnings));
 });

@@ -6,7 +6,7 @@ import { parseWorkoutChat, setsAreIdentical } from '../core/parse-workout-chat.j
 import { formatDisplayDate } from '../core/time.js';
 import { syncChatChrome } from './chat-chrome.js';
 
-const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'pain_flags', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
+const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
 const WORKOUT_HEADER_FIELDS = new Set(['title', 'session_kind', 'day_type', 'status', 'duration_min']);
 const UNREAD_SELECTOR = '.floating-chat-button, [data-section="chat"]';
 const UNREAD_CLASS = 'has-unread';
@@ -449,6 +449,37 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
       fields.append(dt, dd);
       inputs[key] = input;
     }
+  } else if (isWorkout) {
+    // Planned cards used to hide day_type/duration/status — Adam could not fix a wrong window.
+    for (const key of ['day_type', 'duration_min', 'status']) {
+      if (displayRecord[key] == null || displayRecord[key] === '') continue;
+      const dt = root.createElement('dt');
+      dt.textContent = humanizeFieldLabel(key);
+      const dd = root.createElement('dd');
+      const input = root.createElement('input');
+      input.value = String(displayRecord[key] ?? '');
+      input.dataset.field = key;
+      dd.append(input);
+      fields.append(dt, dd);
+      inputs[key] = input;
+    }
+  }
+  if (isWorkout && Array.isArray(record.pain_flags) && record.pain_flags.length > 0) {
+    const dt = root.createElement('dt');
+    dt.textContent = 'Pain flags';
+    const dd = root.createElement('dd');
+    dd.className = 'record-proposal__pain-flags';
+    for (const flag of record.pain_flags) {
+      if (!flag || typeof flag !== 'object') continue;
+      const site = typeof flag.site === 'string' ? flag.site.trim() : '';
+      if (!site) continue;
+      const note = typeof flag.note === 'string' && flag.note.trim() ? flag.note.trim() : '';
+      const pill = root.createElement('span');
+      pill.className = 'fitness-tag';
+      pill.textContent = note ? `${site} — ${note}` : site;
+      dd.append(pill);
+    }
+    fields.append(dt, dd);
   }
   appendNotesField(root, fields, inputs, notes);
   card.append(fields);

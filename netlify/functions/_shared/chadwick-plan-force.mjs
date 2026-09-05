@@ -49,20 +49,9 @@ export async function* streamWithChadwickPlanForce(anthropic, {
   today,
   ...streamOpts
 } = {}) {
-  const early = resolveForcedChadwickPlan({
-    slug,
-    userMessage,
-    today,
-    messages: streamOpts.messages,
-    assistantText: '',
-    sawLogEntry: false
-  });
-  if (early) {
-    for (const event of forcedPlanEvents(early)) yield event;
-    yield { type: 'done' };
-    return;
-  }
-
+  // Always give the model the first pass with full Central Node / history /
+  // body context already in the system prompt. Mechanical early force used to
+  // skip that load and emit cue-less "Planned session" cards blind to EP/pain.
   let assistantText = '';
   let sawLogEntry = false;
 

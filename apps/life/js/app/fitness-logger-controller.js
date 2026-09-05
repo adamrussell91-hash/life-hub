@@ -128,6 +128,8 @@ export function createFitnessLoggerController({
     } else if (change.type === 'session') {
       if (change.field === 'recovery_flag_next_day') {
         draft.recovery_flag_next_day = Boolean(change.value);
+      } else if (change.field === 'day_type') {
+        draft.day_type = change.value;
       } else if (['avg_hr', 'calories_kcal', 'distance_km', 'duration_min'].includes(change.field)) {
         draft[change.field] = optionalNumber(change.value);
       } else {
