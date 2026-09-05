@@ -1,4 +1,5 @@
 import { assembleClementinePrompt } from './knowledge-prompts.mjs';
+import { formatKnowledgeQualityBlock } from './load-humanizer.mjs';
 import { knowledgeKernelFetch } from './knowledge-kernel.mjs';
 import { parseResearchResult } from './knowledge-research.mjs';
 
@@ -71,7 +72,8 @@ export async function runCoachTurn({
       workingThesis ? `Working thesis:\n${workingThesis}` : '',
       draft ? `Draft excerpt:\n${draft}` : '',
       query ? `Latest question:\n${query}` : ''
-    ].filter(Boolean).join('\n\n')
+    ].filter(Boolean).join('\n\n'),
+    quality: formatKnowledgeQualityBlock()
   });
   const reply = await complete(system, messages);
   return { reply, research, archiveFailed };

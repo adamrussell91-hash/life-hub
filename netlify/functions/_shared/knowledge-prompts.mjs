@@ -14,10 +14,10 @@ export function loadKnowledgePrompt(name, cwd = process.cwd()) {
   }
 }
 
-export function assembleClementinePrompt({ voice, job, surface, payload }) {
+export function assembleClementinePrompt({ voice, job, surface, payload, quality }) {
   if (!String(voice ?? '').trim()) throw new Error('Prompt file missing: clementine-voice.md');
   if (!String(job ?? '').trim()) throw new Error('Prompt file missing: job');
-  return [voice, job, surface, payload]
+  return [voice, job, surface, payload, quality]
     .map(part => String(part ?? '').trim())
     .filter(Boolean)
     .join('\n\n');

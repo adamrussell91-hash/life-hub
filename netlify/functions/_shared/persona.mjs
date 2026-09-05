@@ -1,4 +1,9 @@
 import { AGENTS, ROUTER_SLUG, findAgent } from './agent-directory.mjs';
+import {
+  formatWritingSampleBlock,
+  loadHumanizerGuidance,
+  loadPersonalityWritingSample
+} from './load-humanizer.mjs';
 
 export function buildSystemPrompt({
   slug,
@@ -41,7 +46,9 @@ export function buildSystemPrompt({
   protocolSteer = '',
   intuition = '',
   capacities = '',
-  hubContext = ''
+  hubContext = '',
+  writingSample,
+  humanizerGuidance
 }) {
   const agent = findAgent(slug);
   if (!agent && slug !== ROUTER_SLUG) throw new TypeError(`Unknown agent slug: ${slug}`);
@@ -68,14 +75,22 @@ export function buildSystemPrompt({
     constraints ? `Standing medical and dietary constraints:\n${constraints}` : ''
   ].filter(Boolean).join('\n\n');
 
+  const sampleBlock = formatWritingSampleBlock(
+    writingSample === undefined ? loadPersonalityWritingSample(slug) : writingSample
+  );
+  const humanizerBlock = humanizerGuidance === undefined
+    ? loadHumanizerGuidance()
+    : String(humanizerGuidance ?? '').trim();
+
   if (slug === ROUTER_SLUG) {
     const roster = AGENTS.map(candidate => `- ${candidate.name} (${candidate.domain ?? 'general'})`).join('\n');
     return [
       shared,
       'No specific agent was named in this message. Infer the right one from what Adam describes (for example a workout implies Chadwick) and respond as that agent immediately, fully in their voice from your very first word.',
       `Available agents:\n${roster}`,
-      'Never narrate or announce this inference. Do not say things like "I\'ll be Brisket now", "this sounds like a job for Chadwick", or anything that names the routing decision, the word "router", or the act of choosing an agent — Adam must never see the handoff happen, only the resulting in-character response. If the domain is genuinely ambiguous between two agents, ask one brief, in-character clarifying question as whichever agent is the closer fit, rather than surfacing the ambiguity mechanically.'
-    ].join('\n\n');
+      'Never narrate or announce this inference. Do not say things like "I\'ll be Brisket now", "this sounds like a job for Chadwick", or anything that names the routing decision, the word "router", or the act of choosing an agent — Adam must never see the handoff happen, only the resulting in-character response. If the domain is genuinely ambiguous between two agents, ask one brief, in-character clarifying question as whichever agent is the closer fit, rather than surfacing the ambiguity mechanically.',
+      humanizerBlock
+    ].filter(Boolean).join('\n\n');
   }
 
   const intuitionBlock = intuition
@@ -254,6 +269,7 @@ export function buildSystemPrompt({
     shared,
     `You are ${agent.name}, Adam's ${agent.domain ?? 'general'} agent.`,
     agent.voice,
+    sampleBlock,
     protocolSteer,
     capability,
     capacityBlock,
@@ -266,6 +282,7 @@ export function buildSystemPrompt({
     ...saraBlocks,
     ...hammondBlocks,
     ...clareBlocks,
-    ...annBlocks
+    ...annBlocks,
+    humanizerBlock
   ].filter(Boolean).join('\n\n');
 }
