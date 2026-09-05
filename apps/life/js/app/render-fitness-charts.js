@@ -958,6 +958,11 @@ function renderLibrary(root, map) {
     glyph.setAttribute('text-anchor', 'middle');
     glyph.setAttribute('pointer-events', 'none');
     glyph.textContent = String(node.key ?? '?').charAt(0);
+    const hit = createSvg(root, 'circle');
+    hit.setAttribute('class', 'mind-constellation__hit');
+    hit.setAttribute('cx', String(node.x));
+    hit.setAttribute('cy', String(node.y));
+    hit.setAttribute('r', String(Math.max((node.r ?? 6) + 10, 18)));
     const label = createSvg(root, 'text');
     label.setAttribute('class', 'mind-constellation__label');
     label.setAttribute('x', String(node.x));
@@ -965,7 +970,7 @@ function renderLibrary(root, map) {
     label.setAttribute('text-anchor', 'middle');
     label.setAttribute('pointer-events', 'none');
     label.textContent = node.key;
-    group.append(halo, dot, glyph, label);
+    group.append(halo, dot, glyph, hit, label);
     bindTip(group, tip, `${node.key} · ${node.count ?? 0} sessions`);
     svg.append(group);
   }

@@ -1621,7 +1621,8 @@ main { max-width: 76rem; margin: 0 auto; }
 #fitness-dashboard .fitness-viz .mind-energy-dot,
 #fitness-dashboard .fitness-viz .mind-mood-mix__seg,
 #fitness-dashboard .fitness-viz .mind-constellation__star,
-#fitness-dashboard .fitness-viz .mind-constellation__edge {
+#fitness-dashboard .fitness-viz .mind-constellation__edge,
+#fitness-dashboard .fitness-viz .mind-constellation__hit {
   pointer-events: auto;
   cursor: pointer;
 }
