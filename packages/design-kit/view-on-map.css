@@ -78,6 +78,20 @@
   border-radius: var(--radius-xl);
 }
 
+.view-on-map__dialog .hub-morph-dialog__close {
+  width: 2.5rem;
+  height: 2.5rem;
+  background: var(--paper);
+  color: var(--muted);
+  box-shadow: var(--elev-2);
+}
+
+.view-on-map__dialog .hub-morph-dialog__close:hover,
+.view-on-map__dialog .hub-morph-dialog__close:focus-visible {
+  background: var(--cotton);
+  color: var(--ink);
+}
+
 .view-on-map__media {
   position: absolute;
   inset: 0;
@@ -124,18 +138,6 @@
   border-top-color: var(--wave);
   border-radius: var(--radius-full);
   animation: view-on-map-spin 0.7s linear infinite;
-}
-
-.view-on-map__caption {
-  position: absolute;
-  left: var(--space-4);
-  right: var(--space-12);
-  bottom: var(--space-4);
-  margin: 0;
-  color: var(--ink);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  pointer-events: none;
 }
 
 @keyframes view-on-map-spin {
