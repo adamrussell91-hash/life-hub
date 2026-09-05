@@ -125,7 +125,7 @@ export function paintChartOrEmpty(root, host, svg, { need, have, unit }) {
     empty.className = 'cn-honest-empty mind-honest-empty metric-caption';
   }
   if (svg && typeof svg.after === 'function') svg.after(empty);
-  else if (!(host?.children ?? []).includes(empty)) host.append(empty);
+  else if (!children.includes(empty)) host.append(empty);
   empty.hidden = false;
   empty.textContent = `Need ${threshold} ${unit}. ${count} so far.`;
   return false;
@@ -265,7 +265,8 @@ function renderChordTile(root, model) {
   const details = model.crossAgent?.details ?? [];
   const linesFor = (sourceKey, targetKey) => details
     .filter(row => targetKey
-      ? row.themeA === sourceKey && row.themeB === targetKey
+      ? (row.themeA === sourceKey && row.themeB === targetKey)
+        || (row.themeA === targetKey && row.themeB === sourceKey)
       : row.themeA === sourceKey || row.themeB === sourceKey)
     .flatMap(row => row.lines);
   const show = (text) => { if (caption) caption.textContent = text; };

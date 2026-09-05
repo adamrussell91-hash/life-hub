@@ -528,6 +528,17 @@ test('renderCentralNode paints open-item heat and captions ageDays', () => {
   assert.match(host.textContent, /29d open/);
 });
 
+function htmlCollectionLike(items = []) {
+  const collection = { length: items.length };
+  items.forEach((item, index) => {
+    collection[index] = item;
+  });
+  collection[Symbol.iterator] = function* () {
+    for (let i = 0; i < this.length; i++) yield this[i];
+  };
+  return collection;
+}
+
 test('renderCentralNode honest-empties governance heat when nothing is open', () => {
   const root = fakeCentralNodeRoot();
   renderCentralNode(root, baseModel({ governanceHeat: [], governanceOpen: [] }));
@@ -535,6 +546,21 @@ test('renderCentralNode honest-empties governance heat when nothing is open', ()
     String(node.className).includes('cn-honest-empty')
   );
   assert.match(empty.textContent, /Need 1 open items/);
+});
+
+test('paintChartOrEmpty appends honest empty when host.children lacks includes', async () => {
+  const { paintChartOrEmpty } = await import('../../apps/life/js/app/render-central-node.js');
+  const root = fakeCentralNodeRoot();
+  const host = root.createElement('div');
+  const appended = [];
+  host.children = htmlCollectionLike([]);
+  host.append = (...nodes) => {
+    for (const node of nodes) appended.push(node);
+  };
+  const qualifies = paintChartOrEmpty(root, host, null, { need: 1, have: 0, unit: 'open items' });
+  assert.equal(qualifies, false);
+  assert.equal(appended.length, 1);
+  assert.match(appended[0].textContent, /Need 1 open items/);
 });
 
 test('renderCentralNode caps visible heat rows at 5', () => {
@@ -601,6 +627,30 @@ test('empty protein week honest-empties with no horizon rects', () => {
   assert.equal(empty.textContent, 'Need 1 protein days. 0 so far.');
   assert.equal(svg.hidden, true);
   assert.equal(svg.children.filter(node => node.tagName === 'rect').length, 0);
+});
+
+test('chord ribbon focus matches detail stored in reverse theme order', () => {
+  const root = fakeCentralNodeRoot();
+  const details = [
+    { themeA: 'Chadwick', themeB: 'Sara', lines: ['Chadwick→Sara: AC flag.'] },
+    { themeA: 'Hammond', themeB: 'Ann', lines: ['Hammond→Ann: teaching handoff.'] },
+    { themeA: 'Vera', themeB: 'Penelope', lines: ['Vera→Penelope: weekend framed as escape.'] }
+  ];
+  renderCentralNode(root, baseModel({
+    crossAgent: {
+      edges: [
+        { themeA: 'Sara', themeB: 'Chadwick', count: 1 },
+        { themeA: 'Hammond', themeB: 'Ann', count: 1 },
+        { themeA: 'Vera', themeB: 'Penelope', count: 1 }
+      ],
+      details
+    }
+  }));
+  const svg = root.querySelector('#central-node-chord');
+  const caption = root.querySelector('[data-cn="chord-detail"]');
+  const ribbon = svg.children.find(node => node.getAttribute('data-role') === 'ribbon');
+  ribbon._listeners.focus[0]();
+  assert.match(caption.textContent, /Chadwick→Sara: AC flag/);
 });
 
 test('chord ribbon focus shows that pair’s line, not every line for the source', () => {
