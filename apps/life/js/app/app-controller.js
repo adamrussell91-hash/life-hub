@@ -11,6 +11,7 @@ import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
 import { renderFitnessSurfaceWidgets, renderNutritionSurfaceWidgets } from './render-surface-widgets.js';
 import { readHubCompose } from '../../../../packages/design-kit/js/hub-compose.js';
+import { packCnBoard } from './render-central-node.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
 const LAST_SUCCESS_KEY = 'life-hub:last-success';
@@ -90,6 +91,7 @@ export function createAppController(dependencies) {
     buildCentralNodeModel,
     renderCentralNode,
     renderGovernance,
+    packCnBoard: packCnBoardFn,
     agentColour,
     chatPanel,
     chatClearUnread,
@@ -1129,6 +1131,7 @@ export function createAppController(dependencies) {
     if (!latestResult || !buildCentralNodeModel || !renderCentralNode) return;
     renderCentralNode(root, buildCentralNodeModel(latestResult), { quiet: syncQuiet });
     renderGovernance?.(root, latestResult.governanceLogMarkdown);
+    (packCnBoardFn ?? packCnBoard)(root);
     const button = root.querySelector('#central-node-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
   }
