@@ -78,10 +78,11 @@ function renderRunWidget(root, model) {
     createRunWidget({ root, wrap: host, distance: sessionKm, unit: 'km', label: 'Last session' });
     return;
   }
+  const perWeek = Number(model.longTerm?.workoutsPerWeek) || 0;
   createRunWidget({
     root,
     wrap: host,
-    distance: Number(model.longTerm?.workoutsPerWeek) || 0,
+    distance: Math.round(perWeek * 10) / 10,
     unit: '/ week',
     label: 'Workouts'
   });

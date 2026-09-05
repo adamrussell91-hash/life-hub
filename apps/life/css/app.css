@@ -1502,13 +1502,54 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-hero-card .workout-plan-card__exercises {
   margin-top: var(--space-2);
 }
-.fitness-tallies,
-.fitness-breakdowns {
+.fitness-viz {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
 }
-.fitness-tallies { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.fitness-breakdowns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fitness-viz__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  margin-top: var(--space-2);
+}
+.fitness-viz__svg--orbit { max-height: 22rem; }
+.fitness-viz__ring {
+  fill: none;
+  stroke: var(--shore);
+  stroke-width: 1;
+}
+.fitness-viz__track { fill: var(--shore); }
+.fitness-viz__band { fill: color-mix(in srgb, var(--success) 18%, transparent); }
+.fitness-viz__label {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.fitness-heat { display: grid; gap: var(--space-2); }
+.fitness-heat-row {
+  display: grid;
+  grid-template-columns: 6rem repeat(8, minmax(0, 1fr));
+  gap: var(--space-1);
+  align-items: center;
+}
+.fitness-heat-cell {
+  aspect-ratio: 1;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--wave) var(--mix, 0%), var(--shore));
+}
+.fitness-heat-cell[data-spiked="true"] { box-shadow: inset 0 0 0 2px var(--high-sea-ink); }
+.fitness-spark-row {
+  display: grid;
+  grid-template-columns: 7rem auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+.fitness-spark-row:first-child { border-top: 0; }
+.fitness-spark { width: 100%; height: 1.75rem; }
+.fitness-share-row__track i[data-tone="up"] { background: var(--success); }
+.fitness-e1rm-band { display: grid; gap: var(--space-2); }
 #fitness-dashboard .metric-value {
   margin: 0;
   display: grid;
@@ -5783,12 +5824,11 @@ main { max-width: 76rem; margin: 0 auto; }
 #fitness-heatmap .heatmap-tile[data-hit="true"] { background: var(--fitness-accent); }
 
 @media (max-width: 64rem) {
-  .fitness-breakdowns { grid-template-columns: 1fr; }
+  .fitness-viz { grid-template-columns: 1fr; }
 }
 @media (max-width: 48rem) {
   .fitness-board-grid,
-  .fitness-tallies,
-  .fitness-breakdowns { grid-template-columns: 1fr; }
+  .fitness-viz { grid-template-columns: 1fr; }
   .fitness-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .fitness-board__top { flex-direction: column; }
   .fitness-board__today { text-align: left; }
