@@ -190,8 +190,11 @@ function paintScheduleGhostWeek(host: HTMLElement, diff: ScheduleDiffItem): void
       node.className = `event-chip schedule-diff__chip schedule-diff__chip--${chip.role}`;
       node.dataset.taskId = chip.taskId;
       node.dataset.role = chip.role;
-      node.title = chip.summary;
-      node.textContent = chip.role === 'from' ? 'from' : 'to';
+      node.title = `${chip.role}: ${chip.summary}`;
+      const label = chip.summary.trim();
+      node.textContent = label
+        ? `${chip.role === 'from' ? '←' : '→'} ${label.length > 16 ? `${label.slice(0, 15)}…` : label}`
+        : chip.role;
       col.append(node);
     }
     host.append(col);

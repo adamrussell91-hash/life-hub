@@ -535,7 +535,7 @@ function shell(main: string) {
       };
       if (special[next]) {
         leaveSpecialRails();
-        if (next === "graph") graphSearch = query.trim();
+        if (next === "graph") graphSearch = (query.trim() || keywordFilter).trim();
         view = special[next];
         activePage = null;
         clearPageHash();
@@ -721,7 +721,7 @@ function renderList() {
     }
   }
   app.querySelector<HTMLButtonElement>("[data-jump-graph]")!.onclick = () => {
-    graphSearch = query.trim();
+    graphSearch = (query.trim() || keywordFilter).trim();
     view = "graph";
     render();
   };
