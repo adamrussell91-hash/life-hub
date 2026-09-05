@@ -142,18 +142,31 @@ export function resolveCalendarDayClick(expandedDate, clickedDate) {
   return { selectedDate: clickedDate, expandedDate: clickedDate };
 }
 
+function eventDurationMin(record) {
+  if (record?.type === 'workout' && record.duration_min != null) return Number(record.duration_min);
+  if (record?.type === 'sleep' && record.duration_h != null) return Number(record.duration_h) * 60;
+  return 60;
+}
+
 export function eventsForDate(events, date) {
   return (events ?? [])
     .filter(event => event?.record?.date === date)
     .map(event => ({
+      id: event.record.id ?? event.path,
       path: event.path,
       type: event.record.type,
+      time: event.record.time ?? null,
+      durationMin: eventDurationMin(event.record),
       title: eventDetailTitle(event.record, event.body),
       brief: eventBrief(event),
       snippet: String(event.body ?? '').trim().slice(0, 160),
       categories: buildCalendarMarkers([event])[date] ?? []
     }))
-    .sort((a, b) => a.type.localeCompare(b.type) || a.title.localeCompare(b.title));
+    .sort((a, b) => {
+      const timeA = a.time ?? '99:99';
+      const timeB = b.time ?? '99:99';
+      return timeA.localeCompare(timeB) || a.type.localeCompare(b.type) || a.title.localeCompare(b.title);
+    });
 }
 
 export function buildCalendarModel({
@@ -166,20 +179,26 @@ export function buildCalendarModel({
   const selected = selectedDate && isCalendarDate(selectedDate) ? selectedDate : date;
   const month = viewMonth && /^\d{4}-\d{2}$/.test(viewMonth) ? viewMonth : yearMonthFromDate(selected);
   const markers = buildCalendarMarkers(events ?? []);
-  const weekStart = getSydneyWeekStart(date);
+  const weekStart = getSydneyWeekStart(selected);
   const weekDates = enumerateDateKeys(weekStart, addCalendarDays(weekStart, 6));
   const { start, end } = monthGridRange(month);
   const monthDates = enumerateDateKeys(start, end);
+  const eventsByDate = Object.fromEntries(
+    weekDates.concat(monthDates).filter((day, index, all) => all.indexOf(day) === index)
+      .map(day => [day, eventsForDate(events, day)])
+  );
 
   return {
     date,
     selectedDate: selected,
     viewMonth: month,
     monthLabel: monthLabel(month),
+    weekStart,
     weekDays: weekDates.map(day => ({
       date: day,
       letter: weekdayLetter(day),
       categories: markers[day] ?? [],
+      events: eventsByDate[day] ?? [],
       isToday: day === date,
       isSelected: day === selected
     })),
@@ -187,10 +206,12 @@ export function buildCalendarModel({
       date: day,
       day: Number(day.slice(8, 10)),
       categories: markers[day] ?? [],
+      events: eventsByDate[day] ?? [],
       inMonth: day.startsWith(month),
       isToday: day === date,
       isSelected: day === selected
     })),
-    dayEvents: eventsForDate(events, selected)
+    dayEvents: eventsByDate[selected] ?? eventsForDate(events, selected),
+    eventsByDate
   };
 }

@@ -162,6 +162,7 @@ controller = createAppController({
   getCurrentRoutineKey: currentRoutineKey,
   buildCalendarModel,
   renderCalendar,
+  chatApi,
   buildBodyModel,
   renderBody,
   bodyController,

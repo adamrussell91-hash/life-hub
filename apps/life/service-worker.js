@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v122';
+const CACHE_NAME = 'life-hub-shell-v123';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -15,8 +15,11 @@ const SHELL_FILES = [
   'packages/design-kit/motion.css',
   'packages/design-kit/morphing-popover.css',
   'packages/design-kit/adaptive-slider.css',
+  'packages/design-kit/view-on-map.css',
   'packages/design-kit/rail.css',
   'packages/design-kit/mobile.css',
+  'packages/design-kit/calendar.css',
+  'packages/design-kit/js/time-grid.js',
   'js/app/main.js',
   'js/app/api-session.js',
   'js/app/app-controller.js',
@@ -34,10 +37,13 @@ const SHELL_FILES = [
   'packages/design-kit/js/hub-kinetic.js',
   'packages/design-kit/js/morphing-popover.js',
   'packages/design-kit/js/adaptive-slider.js',
+  'packages/design-kit/js/morphing-dialog.js',
+  'packages/design-kit/js/view-on-map.js',
   'js/app/bloods-explainers.js',
   'js/app/bloods-charts.js',
   'js/app/bloods-charts-layout.js',
   'js/app/calendar-model.js',
+  'js/app/calendar-write.js',
   'js/app/central-node-charts.js',
   'js/app/central-node-model.js',
   'js/app/chart-kit/animate.js',

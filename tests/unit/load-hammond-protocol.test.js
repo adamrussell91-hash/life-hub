@@ -44,3 +44,10 @@ test('protocol makes Hammond the relay for longitudinal patterns specialists can
   assert.match(text, /Hammond→Brisket|relaying to Brisket|worth relaying to Brisket/i);
   assert.match(text, /Pattern confidence/);
 });
+
+test('protocol treats Clare and Ann as reachable relay targets', () => {
+  const text = loadHammondProtocol();
+  assert.doesNotMatch(text, /Never address a relay to Ann O'Tation or Clare DeMind/);
+  assert.match(text, /Hammond→Clare/);
+  assert.match(text, /Hammond→Ann/);
+});

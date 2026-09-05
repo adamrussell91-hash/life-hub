@@ -28,6 +28,7 @@ import {
   optionList
 } from '@/views/hub-kit';
 import { createPlusButton } from '@/views/plus-add';
+import { createViewOnMap, isMappablePlace } from '../../design-kit/js/view-on-map.js';
 
 type CatalogView = 'cards' | 'table';
 
@@ -298,6 +299,14 @@ function renderDetail(
   ].filter((row): row is HTMLElement => Boolean(row));
   for (const row of rows) dl.append(row);
   card.append(dl);
+
+  if (isMappablePlace(program.location)) {
+    const map = createViewOnMap({
+      locationName: program.location,
+      address: program.location
+    });
+    if (map) card.append(map.el);
+  }
 
   const actions = el('div', 'catalog-detail__actions');
   if (program.registration_link) {
