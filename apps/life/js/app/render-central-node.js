@@ -4,7 +4,8 @@ import { buildHorizonBands } from './chart-kit/horizon.js';
 import { packMasonry } from './chart-kit/masonry.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
 import { buildThemeTopography } from './chart-kit/stream.js';
-import { buildCompletionRing, hitMapFromSeries, scanTrendBlocks, weekHorizonMetrics } from './central-node-charts.js';
+import { buildChordLayout } from './chart-kit/chord-layout.js';
+import { buildCompletionRing, focusCrossAgentEdges, hitMapFromSeries, scanTrendBlocks, weekHorizonMetrics } from './central-node-charts.js';
 import { renderInlineMarkdown } from './render-chat.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
@@ -50,6 +51,7 @@ export function renderCentralNode(root, model) {
   renderRadialYear(root, model);
   renderStreamTile(root, model);
   renderTrendScan(root, model);
+  renderChordTile(root, model);
   packCnBoard(root);
   root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
 }
@@ -232,6 +234,89 @@ function renderTrendScan(root, model) {
         packCnBoard(root);
       });
     }
+  }
+}
+
+function renderChordTile(root, model) {
+  const svg = root.querySelector('#central-node-chord');
+  const tile = root.querySelector('#cn-tile-cross-agent') ?? svg?.parentNode;
+  const caption = root.querySelector('[data-cn="chord-detail"]');
+  if (!svg || !tile) return;
+  const focused = focusCrossAgentEdges(model.crossAgent?.edges ?? []);
+  if (!paintChartOrEmpty(root, tile, svg, { need: 3, have: focused.length, unit: 'paired handoffs' })) {
+    if (caption) caption.textContent = '';
+    return;
+  }
+  const prose = root.querySelector('[data-central-node="cross-agent"]');
+  if (prose) {
+    prose.textContent = '';
+    prose.setAttribute('hidden', '');
+  }
+  svg.replaceChildren();
+  const layout = buildChordLayout(focused);
+  const colourByKey = new Map(
+    (layout.arcs ?? []).map((arc, index) => [arc.key, CLINICAL_CHART_SLOTS[index % CLINICAL_CHART_SLOTS.length]])
+  );
+  const details = model.crossAgent?.details ?? [];
+  const linesFor = (agent) => details
+    .filter(row => row.themeA === agent || row.themeB === agent)
+    .flatMap(row => row.lines);
+  const show = (text) => { if (caption) caption.textContent = text; };
+  show(details.at(-1)?.lines?.[0] ?? '');
+  const cx = 180;
+  const cy = 180;
+  const radius = 120;
+  for (const arc of layout.arcs ?? []) {
+    const colour = colourByKey.get(arc.key) ?? CLINICAL_CHART_SLOTS[0];
+    const path = createSvg(root, 'path');
+    const x0 = cx + radius * Math.cos(arc.startAngle - Math.PI / 2);
+    const y0 = cy + radius * Math.sin(arc.startAngle - Math.PI / 2);
+    const x1 = cx + radius * Math.cos(arc.endAngle - Math.PI / 2);
+    const y1 = cy + radius * Math.sin(arc.endAngle - Math.PI / 2);
+    const large = arc.endAngle - arc.startAngle > Math.PI ? 1 : 0;
+    path.setAttribute('d', `M${x0},${y0} A${radius},${radius},0,${large},1,${x1},${y1}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', colour);
+    path.setAttribute('stroke-width', '10');
+    path.setAttribute('data-role', 'arc');
+    path.setAttribute('data-theme', arc.key);
+    path.setAttribute('tabindex', '0');
+    const focus = () => show(linesFor(arc.key).join(' '));
+    path.addEventListener('focus', focus);
+    path.addEventListener('mouseenter', focus);
+    svg.append(path);
+    const mid = (arc.startAngle + arc.endAngle) / 2;
+    const label = createSvg(root, 'text');
+    label.setAttribute('x', String(cx + (radius + 22) * Math.cos(mid - Math.PI / 2)));
+    label.setAttribute('y', String(cy + (radius + 22) * Math.sin(mid - Math.PI / 2) + 4));
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('class', 'mind-chart-label');
+    label.textContent = arc.key;
+    svg.append(label);
+  }
+  for (const ribbon of layout.ribbons ?? []) {
+    const source = ribbon.source ?? {};
+    const target = ribbon.target ?? {};
+    const start = ((source.startAngle ?? 0) + (source.endAngle ?? 0)) / 2;
+    const end = ((target.startAngle ?? 0) + (target.endAngle ?? 0)) / 2;
+    const x0 = cx + (radius - 10) * Math.cos(start - Math.PI / 2);
+    const y0 = cy + (radius - 10) * Math.sin(start - Math.PI / 2);
+    const x1 = cx + (radius - 10) * Math.cos(end - Math.PI / 2);
+    const y1 = cy + (radius - 10) * Math.sin(end - Math.PI / 2);
+    const sourceKey = layout.themes?.[source.index] ?? layout.arcs?.[source.index]?.key;
+    const colour = colourByKey.get(sourceKey) ?? CLINICAL_CHART_SLOTS[0];
+    const path = createSvg(root, 'path');
+    path.setAttribute('d', `M${x0},${y0} Q${cx},${cy} ${x1},${y1}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', `color-mix(in srgb, ${colour} 55%, transparent)`);
+    path.setAttribute('stroke-width', String(Math.max(2, Math.min(14, Number(ribbon.value) || 2))));
+    path.setAttribute('data-role', 'ribbon');
+    if (sourceKey) path.setAttribute('data-theme', sourceKey);
+    path.setAttribute('tabindex', '0');
+    const focus = () => show(linesFor(sourceKey).join(' '));
+    path.addEventListener('focus', focus);
+    path.addEventListener('mouseenter', focus);
+    svg.append(path);
   }
 }
 
