@@ -1,17 +1,21 @@
-/** Adaptive slider — vanilla port of the spring range control.
- * Tokens only. Same strength on every hub. Respects prefers-reduced-motion.
+/** Adaptive slider — shared spring range control for every hub.
+ * The motion is the primitive. Label, unit, and range are per use.
+ * Tokens only. Respects prefers-reduced-motion.
  *
  * Markup: snippets/adaptive-slider.html
- * Mount: mountAdaptiveSliders() or createAdaptiveSlider()
+ * startHubMotion() mounts `.hub-slider` / `[data-adaptive-slider]`.
  */
 
-import { prefersReducedMotion } from './hub-motion.js';
-
-export const DEFAULT_MIN = 50;
-export const DEFAULT_MAX = 350;
-export const DEFAULT_STEP = 25;
-export const DEFAULT_VALUE = 200;
+export const DEFAULT_MIN = 0;
+export const DEFAULT_MAX = 100;
+export const DEFAULT_STEP = 1;
+export const DEFAULT_VALUE = 50;
 export const DEFAULT_DOTS = 6;
+
+function prefersReducedMotion(root = globalThis.document) {
+  const view = root?.defaultView ?? globalThis;
+  return Boolean(view.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
+}
 
 const mounted = new WeakMap();
 
@@ -176,7 +180,7 @@ function buildSlider(doc, options) {
   const input = doc.createElement('input');
   input.className = 'hub-slider__input';
   input.type = 'range';
-  input.title = options.label;
+  input.title = options.label || 'Value';
 
   const thumb = doc.createElement('div');
   thumb.className = 'hub-slider__thumb';
@@ -245,7 +249,7 @@ function enhanceExisting(el, options) {
     track.append(input);
   }
   input.classList?.add?.('hub-slider__input');
-  input.title = options.label;
+  input.title = options.label || 'Value';
 
   if (!track.querySelector?.('.hub-slider__thumb')) {
     const thumb = doc.createElement('div');
@@ -286,7 +290,9 @@ function bindSlider(parts, options) {
     input?.setAttribute?.('aria-valuemin', String(state.min));
     input?.setAttribute?.('aria-valuemax', String(state.max));
     input?.setAttribute?.('aria-valuenow', String(state.value));
-    input?.setAttribute?.('aria-label', `${label?.textContent || options.label || 'Value'}, ${options.unit || 'kcal'}`);
+    const name = label?.textContent || options.label || 'Value';
+    const unit = options.unit ? `, ${options.unit}` : '';
+    input?.setAttribute?.('aria-label', `${name}${unit}`);
   };
 
   const paint = () => {
@@ -382,8 +388,8 @@ function bindSlider(parts, options) {
  */
 export function createAdaptiveSlider(options = {}) {
   const doc = ownerDoc(options.root);
-  const label = options.label ?? 'Calories';
-  const unit = options.unit ?? 'kcal';
+  const label = options.label ?? '';
+  const unit = options.unit ?? '';
   const parts = options.el
     ? enhanceExisting(options.el, { label, unit })
     : buildSlider(doc, { ...options, label, unit });
@@ -400,10 +406,10 @@ export function mountAdaptiveSlider(el, options = {}) {
   if (existing) return existing;
   const label = el.getAttribute('data-slider-label')
     || el.querySelector?.('.hub-slider__label')?.textContent?.trim()
-    || 'Calories';
+    || '';
   const unit = el.getAttribute('data-slider-unit')
     || el.querySelector?.('.hub-slider__unit')?.textContent?.trim()
-    || 'kcal';
+    || '';
   return createAdaptiveSlider({
     el,
     label,

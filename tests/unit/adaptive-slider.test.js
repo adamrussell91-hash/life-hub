@@ -285,15 +285,19 @@ test('kit CSS uses tokens and chrome imports the sheet', async () => {
   assert.doesNotMatch(css, /#10B981|#FE55B7|#D946EF|#4946FF|#FEB101|#FEFEFE/i);
 });
 
-test('Life Hub does not treat daily energy as a slider', async () => {
+test('Life Hub loads the slider kit without binding daily energy', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
-  const main = await readFile(new URL('../../apps/life/js/app/main.js', import.meta.url), 'utf8');
   const nutrition = await readFile(new URL('../../apps/life/js/app/render-nutrition.js', import.meta.url), 'utf8');
+  const worker = await readFile(new URL('../../apps/life/service-worker.js', import.meta.url), 'utf8');
   const agents = await readFile(new URL('../../packages/design-kit/AGENTS.md', import.meta.url), 'utf8');
+  const snippet = await readFile(new URL('../../packages/design-kit/snippets/adaptive-slider.html', import.meta.url), 'utf8');
 
+  assert.match(html, /packages\/design-kit\/adaptive-slider\.css/);
   assert.doesNotMatch(html, /nutrition-energy-slider/);
-  assert.doesNotMatch(html, /data-adaptive-slider/);
-  assert.doesNotMatch(main, /mountAdaptiveSliders/);
   assert.doesNotMatch(nutrition, /adaptive-slider/);
-  assert.match(agents, /Not a display for computed logs/);
+  assert.match(worker, /packages\/design-kit\/adaptive-slider\.css/);
+  assert.match(worker, /packages\/design-kit\/js\/adaptive-slider\.js/);
+  assert.match(agents, /shared sliding control for every hub/);
+  assert.match(snippet, /The motion is the primitive/);
+  assert.doesNotMatch(snippet, /Calories|Meal/);
 });
