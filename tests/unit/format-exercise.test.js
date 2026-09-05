@@ -32,7 +32,7 @@ test('formatExerciseSets labels weight, reps, and cable type per set', () => {
   );
   assert.equal(
     formatExerciseSets({ sets: [{ weight_kg: 20, reps: 12, cable_type: 'none' }] }),
-    'Set 1: 20 kg × 12 reps · cable: none (not on cables)'
+    'Set 1: 20 kg × 12 reps · cable: constant force'
   );
   assert.equal(formatExerciseSets({ sets: [] }), '');
   assert.equal(formatExerciseSets({}), '');
@@ -40,6 +40,8 @@ test('formatExerciseSets labels weight, reps, and cable type per set', () => {
 
 test('formatCableType and humanizeFieldLabel stay readable', () => {
   assert.equal(formatCableType('constant_force'), 'constant force');
+  assert.equal(formatCableType('none'), 'constant force');
+  assert.equal(formatCableType(null), 'constant force');
   assert.equal(humanizeFieldLabel('session_kind'), 'Session kind');
   assert.equal(humanizeFieldLabel('day_type'), 'Day type');
 });

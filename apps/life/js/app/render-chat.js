@@ -209,7 +209,7 @@ export function renderInlineMarkdown(root, container, text, { multiline = false 
 function formatChatCable(cable) {
   if (!cable) return '';
   const lower = cable.toLowerCase();
-  if (lower === 'none' || lower.startsWith('none ')) return 'none';
+  if (lower === 'none' || lower.startsWith('none ')) return 'constant force';
   return cable;
 }
 
