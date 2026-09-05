@@ -149,6 +149,10 @@
   max-width: min(22rem, calc(100vw - 1.5rem));
 }
 
+.new-note .hub-menu__opt {
+  align-items: flex-start;
+}
+
 .new-note__opt {
   display: flex;
   flex-direction: column;
