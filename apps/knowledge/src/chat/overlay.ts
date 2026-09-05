@@ -415,8 +415,12 @@ function overlayHtml() {
           </button>
         </div>
       </div>
-      ${pickerHtml()}
-      ${protocolPillsHtml(personality, selectedProtocolId)}
+      <div class="hub-scroll-hide" data-hub-scroll-hide data-hub-scroll-scroller=".chat-messages">
+        <div class="hub-scroll-hide__inner">
+          ${pickerHtml()}
+          ${protocolPillsHtml(personality, selectedProtocolId)}
+        </div>
+      </div>
       ${
         notes.length
           ? `<div class="using-notes" aria-label="Notes in play">${notes

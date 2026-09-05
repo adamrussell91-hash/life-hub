@@ -24,11 +24,12 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
 8. `icons/` — locked hub tiles + glyphs (`ICONS.md`)
 9. `js/format-display-date.js` — **locked** display dates (`dd/mm/yy`)
 10. `js/mount-mobile-chrome.js` — mount the phone bar + More sheet
-11. `motion.css` + `js/hub-motion.js` — shared card sheen, fade, count-up, list stagger, magnet, opt-in kinetic text. Call `startHubMotion()` once from each hub.
+11. `motion.css` + `js/hub-motion.js` — shared card sheen, fade, count-up, list stagger, magnet, opt-in kinetic text, opt-in scroll-hide chrome. Call `startHubMotion()` once from each hub.
 12. `js/hub-kinetic.js` — reusable word/line/character reveal (play / reset, stagger origins). Opt in with `.hub-kinetic` on canvas titles. **Not on the rail.**
+    Scroll-hide: mark chrome with `[data-hub-scroll-hide]` (see `snippets/hub-scroll-hide.html`). Typical: chat agent pickers, protocol pills, and sitting toolbars above a transcript. Do not hide refresh / sign-out utilities.
 13. `js/morphing-dialog.js` — **locked** micro → expanded card morph (spring FLIP). Overlay: `openMorphingDialog`. In-place: `runMorphTransform`. Route change: `morphFromRect`. Mark shared title / subtitle / image with `data-hub-morph`.
 14. `morphing-popover.css` + `js/morphing-popover.js` — trigger expands into a compact editor (blur fade, 250ms ease-out). Use for short notes, quick text, and dimension / value edits. `createMorphingNotePopover` / `createMorphingValuesPopover`, or copy `snippets/morphing-popover.html` and call `mountMorphingPopovers()`.
-15. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `morphing-popover.html`)
+15. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `hub-scroll-hide.html`, `morphing-popover.html`)
 16. `view-on-map.css` + `js/view-on-map.js` — compact **View on Map** pill that morphs into an embedded Google Map. Use on place-backed cards (medical visits, program venues). Not on task cards without an address. `createViewOnMap({ address, locationName })`.
 
 ### Passphrase gate (mandatory)

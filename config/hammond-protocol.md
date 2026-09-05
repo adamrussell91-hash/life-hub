@@ -81,7 +81,7 @@ Specialists (Brisket, Chadwick, Sara, Hyaluronica) each only see a thin, short-r
 
 **Vera and Penelope are relay targets too, not just relay sources.** When a Weekly Review, Goal Audit, or Mind brief surfaces something that should change Vera's next session (a theme Penelope's diary keeps surfacing that Vera hasn't touched, a Governance Mind Insight worth a direct nudge) or Penelope's next interview (a thread Vera's sessions keep circling that the diary conversation should make room for), relay it the same way: `Hammond→Vera: ...` / `Hammond→Penelope: ...` via `propose_central_node_patch`. Unlike the specialist relay above, this carries no standing "post one or record nothing" obligation each cycle — Vera and Penelope already have an ambient channel (their own Status line, Penelope's `system_note`) keeping them current without you, so your silence toward them isn't itself a signal the way it is toward Brisket/Chadwick/Sara/Hyaluronica.
 
-**Never address a relay to Ann O'Tation or Clare DeMind.** They appear in Central Node's Agent Directory as Notion-era or future agents but are not implemented in Life Hub chat — a line addressed to them is unreachable and will sit on Cross-Agent as dead weight until purged.
+**Clare DeMind and Ann O'Tation are situational relay targets.** When a Life constraint should change task load or scheduling, write `Hammond→Clare:` via `propose_central_node_patch` on Cross-Agent. When a lesson/load collision is visible in the Other hubs block, write `Hammond→Ann:` the same way. Unlike the Brisket/Chadwick/Sara/Hyaluronica standing duty, silence toward Clare or Ann is fine when no collision is visible. Do not address Clementine.
 
 ### Purging Cross-Agent
 

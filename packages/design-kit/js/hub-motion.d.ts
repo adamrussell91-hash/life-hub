@@ -1,4 +1,23 @@
+export const DEFAULT_SCROLL_HIDE_THRESHOLD: number;
+
 export function prefersReducedMotion(root?: Document | ParentNode): boolean;
+
+export function nextScrollHideState(input: {
+  current: number;
+  previous?: number;
+  threshold?: number;
+  hidden?: boolean;
+}): boolean;
+
+export function resolveScrollHideScroller(
+  el: Element,
+  root?: Document | ParentNode
+): EventTarget;
+
+export function applyHubScrollHide(
+  el: Element,
+  scroll?: { current: number; previous?: number; threshold?: number }
+): boolean;
 
 export function parseCountable(text: string | null | undefined): {
   value: number;

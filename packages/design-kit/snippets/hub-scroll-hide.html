@@ -1,0 +1,14 @@
+<!-- Scroll-hide chrome. startHubMotion() watches [data-hub-scroll-hide].
+     Hide on scroll down past the threshold; reveal on scroll up.
+     Point data-hub-scroll-scroller at an overflow list (chat messages),
+     or omit it to watch the window. Do not put this on the rail. -->
+<div
+  class="hub-scroll-hide"
+  data-hub-scroll-hide
+  data-hub-scroll-scroller="#chat-messages"
+  data-hub-scroll-threshold="80"
+>
+  <div class="hub-scroll-hide__inner">
+    <div id="agent-picker" class="agent-picker" aria-label="Choose who to talk to"></div>
+  </div>
+</div>

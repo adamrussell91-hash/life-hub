@@ -36,6 +36,14 @@ const LIST_SELECTOR = [
   '[data-hub-list]'
 ].join(',');
 
+const SCROLL_HIDE_SELECTOR = '[data-hub-scroll-hide]';
+const SCROLL_HIDE_HOST = '.chat-view, .chat-overlay, .coach.chat, [data-hub-scroll-root]';
+
+/** Hide after this much downward travel unless the element sets data-hub-scroll-threshold. */
+export const DEFAULT_SCROLL_HIDE_THRESHOLD = 80;
+
+const scrollHideState = new WeakMap();
+
 const COUNT_SELECTOR = [
   '[data-value]',
   '[data-hub-count]',
@@ -356,6 +364,152 @@ function enhancePills(group, reduced) {
   }
 }
 
+/**
+ * Same rule as the Motion scroll-hide header: tuck away on scroll down
+ * past a threshold, come back on scroll up or when back near the top.
+ * @param {{ current: number, previous?: number, threshold?: number, hidden?: boolean }} input
+ */
+export function nextScrollHideState({
+  current,
+  previous = 0,
+  threshold = DEFAULT_SCROLL_HIDE_THRESHOLD,
+  hidden = false
+}) {
+  const y = Number(current);
+  const last = Number(previous);
+  const floor = Number(threshold);
+  if (!Number.isFinite(y)) return Boolean(hidden);
+  if (y <= (Number.isFinite(floor) ? floor : DEFAULT_SCROLL_HIDE_THRESHOLD)) return false;
+  if (Number.isFinite(last) && y > last) return true;
+  if (Number.isFinite(last) && y < last) return false;
+  return Boolean(hidden);
+}
+
+function scrollTopOf(scroller) {
+  if (!scroller) return 0;
+  if (scroller === globalThis || scroller === globalThis.window) {
+    return Number(scroller.scrollY ?? scroller.pageYOffset ?? 0);
+  }
+  if (scroller === globalThis.document || scroller === document) {
+    return Number(globalThis.scrollY ?? document.documentElement?.scrollTop ?? 0);
+  }
+  if (typeof scroller.scrollY === 'number' && scroller.document) {
+    return scroller.scrollY;
+  }
+  return Number(scroller.scrollTop ?? 0);
+}
+
+function scrollerOverflows(scroller) {
+  if (!scroller) return false;
+  if (scroller === globalThis || scroller === globalThis.window || scroller === document) {
+    const view = scroller.document?.defaultView ?? globalThis;
+    const root = (scroller.document ?? document).documentElement;
+    return (root?.scrollHeight ?? 0) > (view.innerHeight ?? 0) + 8;
+  }
+  return (scroller.scrollHeight ?? 0) > (scroller.clientHeight ?? 0) + 8;
+}
+
+export function resolveScrollHideScroller(el, root = el?.getRootNode?.() ?? document) {
+  if (!el) return globalThis;
+  const sel = el.getAttribute?.('data-hub-scroll-scroller');
+  if (!sel) return el.ownerDocument?.defaultView ?? globalThis;
+  const scope = el.closest?.(SCROLL_HIDE_HOST) ?? (root.querySelectorAll ? root : document);
+  return scope.querySelector?.(sel)
+    ?? (root.querySelector?.(sel) ?? document.querySelector?.(sel))
+    ?? el.ownerDocument?.defaultView
+    ?? globalThis;
+}
+
+function readThreshold(el) {
+  const raw = Number(el.getAttribute?.('data-hub-scroll-threshold'));
+  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_SCROLL_HIDE_THRESHOLD;
+}
+
+/**
+ * Apply hidden/revealed chrome. Used by the scroll listener and tests.
+ * @param {Element} el
+ * @param {{ current: number, previous?: number, threshold?: number }} [scroll]
+ */
+export function applyHubScrollHide(el, scroll = {}) {
+  if (!el?.classList) return false;
+  el.classList.add('hub-scroll-hide');
+  const hidden = nextScrollHideState({
+    current: scroll.current,
+    previous: scroll.previous,
+    threshold: scroll.threshold ?? readThreshold(el),
+    hidden: el.classList.contains('is-hidden')
+  });
+  el.classList.toggle('is-hidden', hidden);
+  el.toggleAttribute?.('inert', hidden);
+  if (hidden) el.setAttribute?.('aria-hidden', 'true');
+  else el.removeAttribute?.('aria-hidden');
+  return hidden;
+}
+
+function listenTarget(scroller) {
+  if (!scroller || scroller === document) return globalThis;
+  return scroller;
+}
+
+function bindScrollHide(el) {
+  const scroller = resolveScrollHideScroller(el);
+  let state = scrollHideState.get(el);
+  if (state?.scroller === scroller && state.onScroll) return state;
+
+  if (state?.onScroll && state.scroller) {
+    listenTarget(state.scroller).removeEventListener?.('scroll', state.onScroll);
+  }
+
+  const onScroll = () => {
+    if (!el.isConnected) {
+      listenTarget(scroller).removeEventListener?.('scroll', onScroll);
+      return;
+    }
+    const live = resolveScrollHideScroller(el);
+    const current = scrollTopOf(live);
+    const previous = scrollHideState.get(el)?.y ?? current;
+    if (!scrollerOverflows(live)) {
+      applyHubScrollHide(el, { current: 0, previous: 0 });
+      const next = scrollHideState.get(el);
+      if (next) next.y = current;
+      return;
+    }
+    applyHubScrollHide(el, { current, previous });
+    const next = scrollHideState.get(el);
+    if (next) next.y = current;
+  };
+
+  state = { scroller, y: scrollTopOf(scroller), onScroll };
+  scrollHideState.set(el, state);
+  listenTarget(scroller).addEventListener?.('scroll', onScroll, { passive: true });
+  return state;
+}
+
+function ensureScrollHideInner(el) {
+  if (el.querySelector?.(':scope > .hub-scroll-hide__inner')) return;
+  const doc = el.ownerDocument ?? globalThis.document;
+  if (!doc?.createElement) return;
+  const inner = doc.createElement('div');
+  inner.className = 'hub-scroll-hide__inner';
+  while (el.firstChild) inner.append(el.firstChild);
+  el.append(inner);
+}
+
+function enhanceScrollHide(el) {
+  if (!el?.classList) return;
+  el.classList.add('hub-scroll-hide');
+  ensureScrollHideInner(el);
+  if (el.dataset.hubScrollHideReady !== '1') {
+    el.dataset.hubScrollHideReady = '1';
+    el.addEventListener?.('focusin', () => {
+      applyHubScrollHide(el, { current: 0, previous: 0 });
+      const state = scrollHideState.get(el);
+      if (state) state.y = 0;
+    });
+  }
+  bindScrollHide(el);
+}
+
 function syncPillsFromTarget(target, reduced) {
   const btn = target.closest?.('.hub-pills__btn');
   const group = (btn?.parentElement?.classList.contains('hub-pills') ? btn.parentElement : null)
@@ -374,6 +528,7 @@ function scan(root, reduced) {
   for (const el of scope.querySelectorAll(COUNT_SELECTOR)) enhanceCount(el, reduced);
   for (const el of scope.querySelectorAll(KINETIC_SELECTOR)) enhanceKinetic(el, reduced);
   for (const el of scope.querySelectorAll('.hub-pills')) enhancePills(el, reduced);
+  for (const el of scope.querySelectorAll(SCROLL_HIDE_SELECTOR)) enhanceScrollHide(el);
 
   if (scope.matches?.(CARD_SELECTOR)) enhanceCard(scope, reduced);
   if (scope.matches?.(MAGNET_SELECTOR)) enhanceMagnet(scope, reduced);
@@ -381,6 +536,7 @@ function scan(root, reduced) {
   if (scope.matches?.(KINETIC_SELECTOR)) enhanceKinetic(scope, reduced);
   if (scope.matches?.('.hub-pills')) enhancePills(scope, reduced);
   else syncPillsFromTarget(scope, reduced);
+  if (scope.matches?.(SCROLL_HIDE_SELECTOR)) enhanceScrollHide(scope);
 }
 
 function watchKinetic(mutations, reduced) {
