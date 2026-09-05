@@ -396,6 +396,7 @@ Confirm:
 - `capabilities/allowlists/clare.json` — write `central-node.md`  
 - `capabilities/allowlists/ann.json` — write `central-node.md`  
 - `netlify/functions/_shared/capabilities/registry.mjs` — register patch schema for Clare and Ann without widening `needsHammondTools`  
+- `netlify/functions/chat.mjs` — call `assertAgentMayApplyCentralNodePatch` at the existing apply site; set `needsCentralNodeWrite` for `clare` / `ann` so auto Cross-Agent lines can persist. Do **not** change `needsHammondTools` / `hubContextPromise` gating.  
 - `netlify/functions/_shared/hammond-tools.mjs` — export `assertAgentMayApplyCentralNodePatch(slug, patch)` (Clare: `cross_agent` + `append_line` + `Clare→` sender only; Ann: same with `Ann→`; Hammond: unchanged) and call it from the existing patch-apply site so the rule cannot drift from the schema.  
 - `apps/life/js/core/validate.js` — `CROSS_AGENT_AGENT_NAMES` += `Clare` and `Ann` (not Clementine)  
 - `netlify/functions/_shared/hammond-audit.mjs` — `stale_drift` / `open_loops` / `lock` contract prose  
@@ -404,7 +405,7 @@ Confirm:
 - `tests/unit/hub-agent-context.test.js` — only if formatter metadata changes  
 - `tests/unit/hammond-tools.test.js` — Clare and Ann restricted-patch tests (mirror each other)
 
-**Do not expect changes to:** `hammond-digest.mjs`, `chat.mjs` `needsHammondTools` / `hubContextPromise` gating, `netlify.toml` timeouts, `knowledge-clementine-chat.mjs`, `lesson-alchemist.mjs`, `clare.mjs` (`/api/clare`), `chat-run.mjs` / `chat-job-run.mjs` (already the correct path).
+**Do not expect changes to:** `hammond-digest.mjs`, `chat.mjs` `needsHammondTools` / `hubContextPromise` gating (the Clare/Ann write flag is `needsCentralNodeWrite`, a different gate), `netlify.toml` timeouts, `knowledge-clementine-chat.mjs`, `lesson-alchemist.mjs`, `clare.mjs` (`/api/clare`), `chat-run.mjs` / `chat-job-run.mjs` (already the correct path).
 
 ---
 
