@@ -2,7 +2,6 @@ import { fillExercisePlanList } from './render-workout-plan.js';
 import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
 import { formatDisplayDate, formatWeekday } from '../core/time.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
-import { animateColumnGrow } from './chart-kit/animate.js';
 import { buildColumns } from './chart-kit/columns.js';
 import { renderFitnessCharts } from './render-fitness-charts.js';
 import { createRunWidget } from '../../../../packages/design-kit/js/hub-surfaces.js';
@@ -197,7 +196,6 @@ function renderStatus(root, model) {
         fill.style = fill.style ?? {};
         fill.style['--bar'] = `${bar.heightPct}%`;
       }
-      animateColumnGrow(fill, bar.heightPct);
       track.append(fill);
       const value = root.createElement('span');
       value.textContent = formatKg(bar.value);

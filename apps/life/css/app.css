@@ -1633,25 +1633,24 @@ main { max-width: 76rem; margin: 0 auto; }
   width: min(100%, 11rem);
   max-width: 11rem;
 }
-#fitness-dashboard .fitness-polar--clock [data-role="angle-label"],
-#fitness-dashboard .fitness-polar--clock [data-role="grid-label"],
+#fitness-dashboard .fitness-polar [data-role="angle-label"],
+#fitness-dashboard .fitness-polar [data-role="grid-label"],
+#fitness-dashboard .fitness-polar [data-role="orbit-label"],
+#fitness-dashboard .fitness-polar [data-role="leader-label"],
 #fitness-dashboard #fitness-clock-chart [data-role="angle-label"],
 #fitness-dashboard #fitness-clock-chart [data-role="grid-label"],
-#fitness-dashboard #fitness-year-chart [data-role="angle-label"] {
-  font-size: 16px;
-  font-weight: 600;
-  fill: var(--chart-label, var(--muted));
-}
+#fitness-dashboard #fitness-year-chart [data-role="angle-label"],
 #fitness-dashboard #fitness-e1rm-radial-chart [data-role="angle-label"],
 #fitness-dashboard #fitness-e1rm-radial-chart [data-role="grid-label"] {
-  font-size: 28px;
+  font-size: var(--text-2xs);
   font-weight: 600;
   fill: var(--chart-label, var(--muted));
 }
-#fitness-dashboard .fitness-polar--orbit [data-role="angle-label"],
-#fitness-dashboard .fitness-polar--orbit [data-role="orbit-label"] {
-  font-size: 32px;
-  font-weight: 600;
+#fitness-dashboard .fitness-polar [data-role="leader"] {
+  stroke: var(--muted);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
 }
 #fitness-dashboard #fitness-chord-chart .mind-chart-label {
   font-size: 16px;
@@ -1813,6 +1812,10 @@ main { max-width: 76rem; margin: 0 auto; }
   height: 100%;
   border-radius: inherit;
   background: var(--wave);
+  transition: width 700ms cubic-bezier(.2, .8, .2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fitness-share-row__track i { transition: none; }
 }
 .fitness-split-head {
   display: flex;
@@ -6849,7 +6852,7 @@ main { max-width: 76rem; margin: 0 auto; }
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 .hub-voice-wave,
