@@ -2,6 +2,7 @@ import {
   appendMessage,
   appendActionProposal,
   appendChoiceCard,
+  appendPlanStatusCard,
   appendCnPatchProposal,
   appendRecordProposal,
   appendRecordSaved,
@@ -645,6 +646,14 @@ export function createChatController({
           endTextTurn();
           const proposal = appendActionProposal(root, { proposal: event.proposal });
           bindActionProposal(proposal, event.proposal, event.id ?? null);
+        } else if (event.type === 'plan_status') {
+          turnSignaled = true;
+          appendPlanStatusCard(root, {
+            id: event.id,
+            heading: event.heading,
+            steps: Array.isArray(event.steps) ? event.steps : [],
+            current: Number.isFinite(event.current) ? event.current : 0
+          });
         } else if (event.type === 'choice') {
           turnSignaled = true;
           gotUsefulOutput = true;

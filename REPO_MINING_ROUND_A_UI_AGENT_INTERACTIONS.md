@@ -358,14 +358,15 @@ Scores are 0–5 averages across: usefulness, UX impact, functionality, cross-hu
 
 4. **`positionHubFloating`** — prototype on `hub-filter-menu.js` + Tasks `card-menu.ts`; measure gzip; then Teaching schedule-overflow.
 5. **Focus-trap** — morphing dialog first; then command palette.
-6. **`choice_proposal`** — Tasks Clare one workflow (e.g. triage Now/Later/Trash).
+6. ~~**`choice_proposal`** — Tasks Clare one workflow (e.g. triage Now/Later/Trash).~~ Done in follow-up (`choice` SSE on open-loops + Tasks choice card).
 7. **Citation cards** for Life web-search + Knowledge sources.
 8. **Turn top-anchor** on Life long replies.
 
 ### Later / deferred
 
-9. CN diff enrichment; plan status; chart tip Floating UI.
-10. Quieter message action chrome.
+9. ~~CN diff enrichment; plan status; chart tip Floating UI.~~ Done in follow-up (CN confirm diffs, `plan_status` SSE + plan card, fitness tip via `positionHubFloating`).
+10. ~~Quieter message action chrome.~~ Done in follow-up (mobile latest/focus-within gating).
+11. Knowledge archive citations stay on `.chat__source` / pageId openers (not forced into URL-only sources cards).
 
 ### Done in follow-up passes
 

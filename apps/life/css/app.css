@@ -823,6 +823,12 @@ main { max-width: 76rem; margin: 0 auto; }
 
 @media (hover: none), (max-width: 720px) {
   .chat-message__actions {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .chat-message:focus-within .chat-message__actions,
+  .chat-message--latest .chat-message__actions {
     opacity: 1;
     visibility: visible;
   }

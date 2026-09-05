@@ -19,6 +19,8 @@ import { syncChatChrome, toggleChatChrome } from '@/chat/chat-chrome';
 import {
   appendMessage,
   appendSavedCard,
+  appendChoiceCard,
+  appendPlanStatusCard,
   renderInlineMarkdown,
   setChatBusy,
   setChatUnread,
@@ -474,6 +476,32 @@ export function createClareChatController({
             const list = root.querySelector('#chat-messages');
             if (list) list.scrollTop = list.scrollHeight;
           }
+          continue;
+        }
+        if (event.type === 'plan_status') {
+          appendPlanStatusCard(root, {
+            id: event.id,
+            heading: event.heading,
+            steps: Array.isArray(event.steps) ? event.steps : [],
+            current: Number.isFinite(event.current) ? Number(event.current) : 0
+          });
+          continue;
+        }
+        if (event.type === 'choice') {
+          stopWait();
+          appendChoiceCard(root, {
+            title: event.title,
+            hint: event.hint,
+            choices: Array.isArray(event.choices) ? event.choices : [],
+            multi: Boolean(event.multi),
+            confirmLabel: event.confirmLabel,
+            onConfirm: (picks) => {
+              const labels = picks.map((pick) => pick.label).filter(Boolean);
+              if (!labels.length) return;
+              void send(labels.join(', '));
+            },
+            onDismiss: () => {}
+          });
           continue;
         }
         if (event.type === 'dump_result' && event.result) {
