@@ -142,8 +142,7 @@
 }
 
 .new-note__menu {
-  right: 0;
-  top: calc(100% + 0.4rem);
+  /* Geometry from positionHubFloating — do not set top/right here. */
   min-width: 16.5rem;
   width: max-content;
   max-width: min(22rem, calc(100vw - 1.5rem));

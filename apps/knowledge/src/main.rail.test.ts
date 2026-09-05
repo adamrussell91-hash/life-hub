@@ -77,8 +77,12 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("function openCompose");
     expect(main).toContain('hat: "makeNote"');
     expect(main).toContain("compose__savebar");
+    expect(main).toContain("positionHubFloating");
+    expect(main).toContain("autoUpdateHubFloating");
     expect(css).toContain(".new-note");
     expect(css).toContain(".new-note__menu");
+    expect(css).not.toMatch(/\.new-note__menu\s*\{[^}]*\btop\s*:/);
+    expect(css).not.toMatch(/\.new-note__menu\s*\{[^}]*\bright\s*:/);
     expect(css).toContain(".chat__composer");
     expect(css).toContain("--keyboard-inset");
     expect(css).toContain(".chat__hats");

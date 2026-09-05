@@ -2,6 +2,7 @@ import "./tokens.css";
 import "./style.css";
 import { startHubMotion } from "../design-kit/js/hub-motion.js";
 import { openHubCommandSearch } from "../design-kit/js/hub-command-search.js";
+import { autoUpdateHubFloating, positionHubFloating } from "../design-kit/js/hub-floating.js";
 import { createJournalNav, createPinList } from "../design-kit/js/hub-surfaces.js";
 import { morphFromRect } from "../design-kit/js/morphing-dialog.js";
 import { bindHubAccordion, hubSwitcherHtml } from "../../../packages/hub-switcher.js";
@@ -413,12 +414,15 @@ function newNoteMenuHtml(bookLabel?: string) {
   </div>`;
 }
 
+const NEW_NOTE_FLOATING = { placement: "bottom-start" as const, offset: 6, padding: 12 };
+
 function bindNewNoteMenu(root: ParentNode, bookLabel?: string) {
   const toggle = root.querySelector<HTMLButtonElement>("[data-new-note-menu]");
   const menu = root.querySelector<HTMLElement>(".new-note__menu");
   if (!toggle || !menu) return;
 
   let docBound = false;
+  let stopFloating: (() => void) | undefined;
   const onDocClick = (event: MouseEvent) => {
     if (!(event.target instanceof Node) || menu.contains(event.target) || toggle.contains(event.target)) return;
     close();
@@ -440,6 +444,8 @@ function bindNewNoteMenu(root: ParentNode, bookLabel?: string) {
     docBound = true;
   };
   const close = () => {
+    stopFloating?.();
+    stopFloating = undefined;
     menu.hidden = true;
     menu.classList.remove("is-open");
     toggle.setAttribute("aria-expanded", "false");
@@ -449,6 +455,9 @@ function bindNewNoteMenu(root: ParentNode, bookLabel?: string) {
     menu.hidden = false;
     menu.classList.add("is-open");
     toggle.setAttribute("aria-expanded", "true");
+    // Kit .hub-menu is position:fixed; CSS top/right alone lands off-screen on phones.
+    void positionHubFloating(toggle, menu, NEW_NOTE_FLOATING);
+    stopFloating = autoUpdateHubFloating(toggle, menu, NEW_NOTE_FLOATING);
     queueMicrotask(bindDoc);
   };
 
