@@ -47,23 +47,25 @@ test('the Central Node tab renders its markdown sections and logging-completion 
     assert.equal(await page.locator('#home-dashboard').isHidden(), true);
 
     assert.match(await page.locator('[data-central-node="todays-status"]').textContent(), /streak 1/);
-    assert.match(await page.locator('[data-central-node="cross-agent"]').textContent(), /Chadwick.*Brisket/);
+    assert.equal(await page.locator('#central-node-chord').count(), 1);
+    assert.equal(await page.locator('#cn-tile-cross-agent').count(), 1);
     assert.equal(await page.locator('[data-value="completion-ring-label"]').textContent(), '3 of 5');
     assert.equal(await page.locator('[data-live-complete="nutrition"]').count(), 1);
     assert.match(await page.locator('[data-live-snapshot]').textContent(), /Protein/);
-    assert.equal(await page.locator('#central-node-week-chart [data-role="last-point"]').count(), 0);
+    assert.equal(await page.locator('#cn-board').count(), 1);
+    assert.equal(await page.locator('#cn-tile-status').count(), 1);
+    assert.equal(await page.locator('#central-node-week-chart').count(), 0);
+    assert.equal(await page.locator('#central-node-logging-heatmap').count(), 0);
+    assert.equal(await page.locator('#central-node-exercise-heatmap').count(), 0);
+    assert.equal(await page.locator('#central-node-eating-heatmap').count(), 0);
+    assert.equal(await page.locator('#central-node-week-horizon').count(), 1);
+    assert.equal(await page.locator('#central-node-radial-year').count(), 1);
+    assert.equal(await page.locator('#central-node-audit-button').count(), 1);
+    assert.equal(await page.locator('#central-node-chat-button').count(), 1);
 
     const constraintsPanel = page.locator('.constraints-card');
     assert.equal(await constraintsPanel.getAttribute('open'), null);
     assert.match(await page.locator('[data-central-node="constraints"] li').first().textContent(), /Test condition/);
-
-    const loggingHeatmap = page.locator('#central-node-logging-heatmap .heatmap-tile');
-    assert.equal(await loggingHeatmap.count(), 30);
-    const exerciseHeatmap = page.locator('#central-node-exercise-heatmap .heatmap-tile');
-    assert.equal(await exerciseHeatmap.count(), 30);
-    assert.equal(await page.locator('#central-node-exercise-heatmap .heatmap-tile[data-hit="true"]').count(), 1);
-    const eatingHeatmap = page.locator('#central-node-eating-heatmap .heatmap-tile');
-    assert.equal(await eatingHeatmap.count(), 30);
 
     // Absent governance-log.md in the shared fixture → empty-state card, not an error.
     assert.equal(await page.locator('[data-central-node="governance-log"]').count(), 1);
@@ -94,6 +96,23 @@ test('the floating chat button opens the shared chat panel themed in Hammond\'s 
 
     await page.locator('#central-node-chat-button').click();
     await page.locator('#chat-view').waitFor({ state: 'hidden' });
+  } finally {
+    await context.close();
+  }
+});
+
+test('Central Node board does not overflow at 390 px', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await signIn(page);
+    await page.locator('#more-nav-button').click();
+    await page.locator('.hub-more-sheet [data-section="central-node"]').click();
+    await page.locator('#central-node-dashboard').waitFor({ state: 'visible' });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    assert.equal(overflow, false);
+    assert.equal(await page.locator('#central-node-audit-button').isVisible(), true);
+    assert.equal(await page.locator('#central-node-chat-button').isVisible(), true);
   } finally {
     await context.close();
   }

@@ -9,8 +9,14 @@ import {
   extractTodaysStatus
 } from '../core/constraints.js';
 import { dedupeRecentActions } from '../core/central-node-write.js';
+import { openGovernanceEntries } from '../core/governance-log.js';
 import { getDayTargets } from '../core/targets.js';
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
+import {
+  buildDomainWeekly,
+  buildGovernanceHeatSeries,
+  parseCrossAgentEdges
+} from './central-node-charts.js';
 
 const WEEK_DAYS = 7;
 const MONTH_DAYS = 30;
@@ -34,7 +40,13 @@ function eatingTargetsForDay(events, date, targetsConfig) {
   return { date, hitEatingTargets: hitProtein && underFatCeiling };
 }
 
-export function buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdown, date }) {
+export function buildCentralNodeModel({
+  events,
+  targetsConfig,
+  centralNodeMarkdown,
+  date,
+  governanceLogMarkdown
+}) {
   if (!date) throw new RangeError('Central Node display date is unavailable');
   const markdown = centralNodeMarkdown ?? '';
 
@@ -48,6 +60,22 @@ export function buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdo
   });
   const exerciseMonth = monthDates.map(day => ({ date: day, completed: workoutCompleted(events, day) }));
   const eatingMonth = monthDates.map(day => eatingTargetsForDay(events, day, targetsConfig));
+
+  const yearStart = `${date.slice(0, 4)}-01-01`;
+  const yearDates = enumerateDateKeys(yearStart, date);
+  const loggingYear = yearDates.map(day => {
+    const completeness = getLoggingCompleteness(events, day);
+    return { date: day, complete: completeness.complete === completeness.total };
+  });
+  const exerciseYear = yearDates.map(day => ({ date: day, completed: workoutCompleted(events, day) }));
+  const eatingYear = yearDates.map(day => eatingTargetsForDay(events, day, targetsConfig));
+  const domainWeekly = buildDomainWeekly(events, date);
+  const crossAgent = parseCrossAgentEdges(extractCrossAgentCoordination(markdown));
+  const governanceOpen = openGovernanceEntries(
+    typeof governanceLogMarkdown === 'string' ? governanceLogMarkdown : '',
+    date
+  );
+  const governanceHeat = buildGovernanceHeatSeries(governanceOpen, date);
 
   const nutrition = aggregateNutrition(events, date);
   const completeness = getLoggingCompleteness(events, date);
@@ -75,6 +103,13 @@ export function buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdo
     week,
     loggingMonth,
     exerciseMonth,
-    eatingMonth
+    eatingMonth,
+    loggingYear,
+    exerciseYear,
+    eatingYear,
+    domainWeekly,
+    crossAgent,
+    governanceOpen,
+    governanceHeat
   };
 }

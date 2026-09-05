@@ -158,9 +158,55 @@ test('signs in and renders the approved Home values at desktop width', async () 
   });
   assert.equal(await page.locator('[data-ring="protein"]').count(), 1);
   assert.equal(await page.locator('[data-progress="protein"]').count(), 0);
+
+  await page.waitForFunction(() => {
+    const total = document.querySelector('[data-value="logging"]');
+    if (!total || !/\d+ of \d+/.test(total.textContent || '')) return false;
+    const wrap = total.closest('.hub-count');
+    return Boolean(wrap && !wrap.classList.contains('is-ticking') && wrap.querySelector('.hub-count__fx'));
+  });
+  const loggingOverlay = await page.evaluate(() => {
+    const total = document.querySelector('[data-value="logging"]');
+    const wrap = total?.closest('.hub-count');
+    const fx = wrap?.querySelector('.hub-count__fx');
+    return {
+      text: total?.textContent,
+      ticking: Boolean(wrap?.classList.contains('is-ticking')),
+      hasFx: Boolean(fx),
+      fxDisplay: fx ? getComputedStyle(fx).display : 'missing'
+    };
+  });
+  assert.equal(loggingOverlay.text, '3 of 5');
+  assert.equal(loggingOverlay.ticking, false);
+  assert.equal(loggingOverlay.hasFx, true);
+  assert.equal(loggingOverlay.fxDisplay, 'none');
   assert.match(await page.evaluate(() => sessionStorage.getItem('life-hub:session-expiry')), /^2026-/);
   assert.equal(await page.locator('#sign-in-view').isHidden(), true);
   await assertNoSecretResponses();
+  await context.close();
+});
+
+test('home cards do not grow a cursor-follow spotlight sheen', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  const card = page.locator('.metric-card').first();
+  await card.waitFor();
+  const box = await card.boundingBox();
+  assert.ok(box, 'expected a Home metric card');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+  const sheen = await card.evaluate(el => ({
+    spotlight: el.classList.contains('hub-spotlight'),
+    spotX: el.style.getPropertyValue('--hub-spot-x'),
+    spotY: el.style.getPropertyValue('--hub-spot-y'),
+    afterImage: getComputedStyle(el, '::after').backgroundImage
+  }));
+  assert.equal(sheen.spotlight, false);
+  assert.equal(sheen.spotX, '');
+  assert.equal(sheen.spotY, '');
+  assert.equal(sheen.afterImage, 'none');
   await context.close();
 });
 

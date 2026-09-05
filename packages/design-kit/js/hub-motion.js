@@ -26,7 +26,7 @@ const CARD_SELECTOR = [
   '.pcard'
 ].join(',');
 
-const SPOTLIGHT_SKIP = '.confirm-card, [role="dialog"], .create-modal, .search-palette, .hub-morph-dialog';
+const CARD_SKIP = '.confirm-card, [role="dialog"], .create-modal, .search-palette, .hub-morph-dialog';
 
 const MAGNET_SELECTOR = [
   '.hub-pulse-card',
@@ -187,23 +187,10 @@ function revealDelay(el) {
 function enhanceCard(el, reduced) {
   if (el.dataset.hubMotionCard === '1') return;
   if (el.closest('[data-state="loading"]')) return;
-  if (el.closest(SPOTLIGHT_SKIP) && !el.matches('.sign-in__card')) return;
+  if (el.closest(CARD_SKIP) && !el.matches('.sign-in__card')) return;
   el.dataset.hubMotionCard = '1';
 
   const isGate = el.classList.contains('sign-in__card');
-  if (!isGate && !el.closest(SPOTLIGHT_SKIP)) {
-    el.classList.add('hub-spotlight');
-    if (!reduced) {
-      el.addEventListener('pointermove', event => {
-        const box = el.getBoundingClientRect();
-        const x = ((event.clientX - box.left) / box.width) * 100;
-        const y = ((event.clientY - box.top) / box.height) * 100;
-        el.style.setProperty('--hub-spot-x', `${x}%`);
-        el.style.setProperty('--hub-spot-y', `${y}%`);
-      });
-    }
-  }
-
   el.classList.add('hub-reveal');
   if (isGate) el.classList.add('hub-reveal--gate');
   if (!reduced) el.style.setProperty('--hub-reveal-delay', `${revealDelay(el)}ms`);
