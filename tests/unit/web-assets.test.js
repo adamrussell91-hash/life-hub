@@ -162,16 +162,17 @@ test('full-page Chat uses the canvas width and hides the Talking to chip while e
   );
 });
 
-test('Mind keeps a tighter canvas than the shared 76rem shell', async () => {
+test('Mind fills the shared 76rem shell; only Chat lifts the canvas width', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
-  assert.match(
+  assert.match(css, /main\s*\{\s*max-width:\s*76rem/);
+  assert.doesNotMatch(
     css,
-    /:has\(#mind-dashboard:not\(\[hidden\]\)\)\s+\.page-header[\s\S]*max-width:\s*60rem/
+    /:has\(#mind-dashboard:not\(\[hidden\]\)\)[^{]*\{[^}]*max-width:\s*(?:none|\d+rem)/
   );
   assert.match(
     css,
-    /:has\(#mind-dashboard:not\(\[hidden\]\)\)\s+main[\s\S]*max-width:\s*60rem/
+    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+main[\s\S]*max-width:\s*none/
   );
 });
 
