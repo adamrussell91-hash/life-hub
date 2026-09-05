@@ -138,6 +138,10 @@
   width: 100%;
 }
 
+.morphing-popover__choices.hub-pills--loose {
+  justify-content: flex-start;
+}
+
 .morphing-popover__trigger.hub-chip {
   cursor: pointer;
 }

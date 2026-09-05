@@ -707,7 +707,10 @@ export function createMorphingClosedFieldPopover({
     },
     renderContent(body, api) {
       group = root.createElement('div');
-      group.className = 'hub-pills morphing-popover__choices';
+      group.className =
+        list.length > 4
+          ? 'hub-pills hub-pills--loose morphing-popover__choices'
+          : 'hub-pills morphing-popover__choices';
       group.setAttribute?.('role', 'radiogroup');
       group.setAttribute?.('aria-label', title);
       buttons = list.map(option => {

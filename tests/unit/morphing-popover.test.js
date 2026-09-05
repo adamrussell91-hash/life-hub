@@ -191,6 +191,26 @@ test('only one morphing popover stays open', () => {
   assert.equal(second.isOpen(), true);
 });
 
+test('closed-field popover wraps long closed lists as loose pills', () => {
+  const root = new FakeDoc();
+  const popover = createMorphingClosedFieldPopover({
+    root,
+    title: 'Domain',
+    value: 'teaching',
+    options: [
+      { value: 'teaching', label: 'Teaching' },
+      { value: 'life', label: 'Life' },
+      { value: 'wedding', label: 'Wedding' },
+      { value: 'health', label: 'Health' },
+      { value: 'other', label: 'Other' }
+    ]
+  });
+  const group = descendants(popover.content).find((node) =>
+    String(node.className || '').includes('morphing-popover__choices')
+  );
+  assert.match(group.className, /hub-pills--loose/);
+});
+
 test('closed-field popover stages a pill then Save commits it', () => {
   const root = new FakeDoc();
   let saved = null;
