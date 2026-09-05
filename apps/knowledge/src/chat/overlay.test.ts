@@ -32,6 +32,9 @@ describe("chat overlay", () => {
     const portraits = [...document.querySelectorAll<HTMLImageElement>(".agent-picker__avatar img")].map(img => img.getAttribute("src"));
     expect(portraits).toEqual(["/assets/agents/clementine.png", "/assets/agents/ann.png"]);
     expect(document.querySelector(".chat-overlay")).toBeTruthy();
+    const hide = document.querySelector("[data-hub-scroll-hide]");
+    expect(hide?.contains(document.querySelector(".agent-picker"))).toBe(true);
+    expect(hide?.getAttribute("data-hub-scroll-scroller")).toBe(".chat-messages");
   });
 
   it("renders protocol bubbles for the active agent", () => {

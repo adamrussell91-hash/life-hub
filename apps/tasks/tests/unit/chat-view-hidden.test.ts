@@ -13,6 +13,9 @@ describe('parked Clare chat', () => {
     expect(view.hidden).toBe(true);
     expect(view.classList.contains('chat-view')).toBe(true);
     expect(view.querySelector('#chat-domain')).toBeNull();
+    const hide = view.querySelector('[data-hub-scroll-hide]');
+    expect(hide?.querySelector('#agent-picker')).toBeTruthy();
+    expect(hide?.getAttribute('data-hub-scroll-scroller')).toBe('#chat-messages');
     expect(view.querySelector('.chat-form__tools .hub-filter')).toBeNull();
   });
 
