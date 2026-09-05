@@ -1,0 +1,106 @@
+---
+description: Project guardrails for Ponytail. Simplicity must preserve explicit product requirements.
+globs:
+alwaysApply: true
+---
+
+# Ponytail project guardrails
+
+Ponytail is active in this repository.
+
+Use Ponytail to reduce unnecessary implementation. Never use Ponytail to reduce explicit product requirements.
+
+Apply priorities in this order:
+
+1. The user's current request and explicit acceptance criteria.
+2. Repository instructions, AGENTS.md, TASKS.md, design instructions, and the design kit.
+3. Security, privacy, authentication, authorisation, accessibility, data integrity, persistence, error handling, API contracts, deployment contracts, and required browser behaviour.
+4. Existing architecture and established repository patterns when they remain appropriate.
+5. Ponytail simplicity.
+
+Simplicity means the smallest correct implementation of the requested product.
+
+Simplicity does not mean the smallest amount of code regardless of behaviour.
+
+Before writing code:
+
+1. Understand the requested behaviour fully.
+2. Trace the existing implementation and the real data flow.
+3. Search the repository for an existing component, helper, utility, pattern, service, endpoint, or style before creating a new one.
+4. Check whether the platform or standard library already satisfies the exact requirement.
+5. Check whether an already installed dependency satisfies the exact requirement.
+6. Prefer reuse over duplication.
+7. Prefer deletion over addition only when deletion preserves every required behaviour.
+8. Add new code only after the earlier options fail.
+
+Never simplify away:
+
+1. Explicit visual requirements.
+2. Explicit interaction requirements.
+3. Responsive behaviour.
+4. Accessibility requirements.
+5. Security controls.
+6. Input validation at trust boundaries.
+7. Authentication or authorisation behaviour.
+8. Data integrity protections.
+9. Persistence requirements.
+10. Required error handling.
+11. External API contracts.
+12. Deployment behaviour.
+13. Environment variable contracts.
+14. Tests protecting important behaviour.
+15. Any feature explicitly requested by the user.
+
+The repository design kit is authoritative for visual and interaction requirements when the task falls within its scope.
+
+Do not replace a deliberately specified custom interface with a simpler native control solely because the native control uses less code.
+
+Use a native control when it satisfies the actual design, behaviour, accessibility, and browser requirements.
+
+Do not introduce a new dependency when existing code, the platform, the standard library, or an installed dependency already solves the problem cleanly.
+
+Do not create abstractions for hypothetical future use.
+
+Do not create wrappers around stable platform APIs without a current requirement.
+
+Do not split a small change across extra files without a concrete reason.
+
+Do not create duplicate helpers with slightly different names.
+
+Do not create a new component when an existing component already owns the behaviour.
+
+For bug fixes, find the root cause. Trace every relevant caller before patching a symptom.
+
+For refactors, preserve behaviour first. Reduce complexity second.
+
+For generated code, prefer the smallest readable implementation. Do not compress code into clever forms that make maintenance harder.
+
+When two solutions are equally correct, prefer the one with:
+
+1. Fewer moving parts.
+2. Fewer dependencies.
+3. Fewer files.
+4. Less duplicated logic.
+5. A smaller public surface.
+6. Clearer ownership.
+7. Easier testing.
+8. Easier deletion later.
+
+Do not treat line count as the only measure of simplicity.
+
+When a deliberate simplification creates a known technical ceiling, document the ceiling and the upgrade path in a concise `ponytail:` comment.
+
+Nontrivial new logic must leave behind the smallest useful verification. Reuse the repository's existing testing approach. Do not add a testing framework solely for one change.
+
+Before finishing any implementation, ask:
+
+1. Did I build something already present elsewhere in the repository?
+2. Did I add a dependency unnecessarily?
+3. Did I add an abstraction without a current requirement?
+4. Did I add more files than needed?
+5. Did I duplicate logic?
+6. Did I change behaviour outside the task?
+7. Did I weaken design fidelity, accessibility, security, validation, persistence, or error handling?
+8. Is there a smaller implementation that preserves every requirement?
+
+If the answer to the final question is yes, simplify before finishing.
