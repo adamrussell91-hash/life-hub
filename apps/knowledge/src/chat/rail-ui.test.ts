@@ -48,7 +48,7 @@ describe("Knowledge chat rail protocol affordances", () => {
     host.render();
 
     const hats = [...host.app.querySelectorAll<HTMLButtonElement>("[data-hat]")];
-    expect(hats).toHaveLength(8);
+    expect(hats).toHaveLength(9);
     for (const hat of hats) {
       const tip = hat.querySelector<HTMLElement>(".agent-protocol-pills__tip");
       expect(tip?.getAttribute("role")).toBe("tooltip");
@@ -285,6 +285,48 @@ Effortful retrieval is the load-bearing claim. The archive supports Bjork here a
     expect(savePageMock.mock.calls[0]?.[0]?.origins).toEqual([{ kind: "book", label: "Make It Stick" }]);
     expect(tidyPageMock).toHaveBeenCalled();
     expect(host.app.textContent).toContain("Economists and the rule of law");
+  });
+
+  it("files a standalone Ask Clementine page with no origin and still runs tidy for tags", async () => {
+    const { savePage, tidyPage } = await import("../api/client");
+    const savePageMock = vi.mocked(savePage);
+    const tidyPageMock = vi.mocked(tidyPage);
+    savePageMock.mockResolvedValue({
+      id: "page_hub_loose",
+      title: "Desirable difficulties",
+      area: "notes",
+      tags: [],
+      body: "x",
+      connected: [],
+      attachments: [],
+      source: "hub",
+      created_at: "2026-08-27T00:00:00.000Z",
+      updated_at: "2026-08-27T00:00:00.000Z",
+      schema_version: 1,
+    });
+    tidyPageMock.mockResolvedValue(undefined as never);
+    const reply = `## Desirable difficulties
+
+Effortful retrieval strengthens later recall. Named sources support the classroom habit without needing a notebook or unit stamp. The page should stay origin-free so it can live among tags without pretending it belongs to a degree or a notebook cover.`;
+    runChatMock.mockResolvedValue({ status: "done", reply });
+    enterChatRail({ fresh: true, hat: "makeNote" });
+    const host = makeHost();
+    host.render();
+    expect(host.app.textContent).toContain("Ask Clementine");
+    expect(host.app.querySelector(".chat--from-book")).toBeTruthy();
+    expect(host.app.querySelector("#chat-book")).toBeNull();
+    expect(host.app.querySelector("[type=submit]")?.textContent).toBe("Research");
+    const field = host.app.querySelector<HTMLTextAreaElement>("#chat-input")!;
+    field.value = "desirable difficulties as a classroom habit";
+    host.app.querySelector<HTMLFormElement>("form")!.dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
+    await vi.waitFor(() => expect(runChatMock).toHaveBeenCalled());
+    expect(runChatMock.mock.calls[0]?.[0]?.hat).toBe("makeNote");
+    await vi.waitFor(() => expect(savePageMock).toHaveBeenCalled());
+    expect(savePageMock.mock.calls[0]?.[0]?.origins).toBeUndefined();
+    expect(tidyPageMock).toHaveBeenCalled();
+    expect(host.app.textContent).toContain("Desirable difficulties");
   });
 
   it("files a researched page under the book with a confirm card", async () => {

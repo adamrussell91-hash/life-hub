@@ -25,6 +25,11 @@ describe("loadPromptFile", () => {
     expect(loadPromptFile("clementine-book-note.md")).toContain("How this bears on the book");
   });
 
+  it("loads the make-a-note protocol from prompts/", () => {
+    expect(loadPromptFile("clementine-make-note.md")).toContain("Make a note protocol");
+    expect(loadPromptFile("clementine-make-note.md")).toContain("Do not invent an origin");
+  });
+
   it("throws when the file is absent", () => {
     expect(() => loadPromptFile("clementine-missing.md")).toThrow(/clementine-missing\.md/);
   });

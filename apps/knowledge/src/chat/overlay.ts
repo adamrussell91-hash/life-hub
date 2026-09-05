@@ -135,6 +135,14 @@ function fromBookSelected() {
   return personality === "clementine" && selectedProtocolId === "fromBook";
 }
 
+function makeNoteSelected() {
+  return personality === "clementine" && selectedProtocolId === "makeNote";
+}
+
+function webFileNoteSelected() {
+  return fromBookSelected() || makeNoteSelected();
+}
+
 function setBook(label: string, locus = bookContext?.locus ?? "") {
   bookContext = normalizeBookContext({
     label: resolveBookLabel(label, currentHost?.bookLabels ?? []),
@@ -193,7 +201,7 @@ async function send(outgoingOverride?: string) {
   if (!researchSessionId && !writeSessionId) {
     turns = history;
     input = "";
-    if (fromBookSelected()) fileAfterDone = true;
+    if (webFileNoteSelected()) fileAfterDone = true;
   }
   busy = true;
   error = "";
@@ -212,7 +220,7 @@ async function send(outgoingOverride?: string) {
       writeSessionId: writeSessionId || undefined,
     });
     applyResult(history, result);
-    if (fileAfterDone && result.status === "done" && fromBookSelected()) {
+    if (fileAfterDone && result.status === "done" && webFileNoteSelected()) {
       fileAfterDone = false;
       busy = false;
       persist();
@@ -279,7 +287,7 @@ async function saveBrief() {
   saveBusy = true;
   paint();
   try {
-    const origin = bookOrigin(bookContext);
+    const origin = fromBookSelected() ? bookOrigin(bookContext) : undefined;
     const page = briefToPage({
       reply: last.content,
       findings: last.findings ?? [],
@@ -294,7 +302,13 @@ async function saveBrief() {
       /* page exists; tags can wait */
     }
     savedBrief = true;
-    showToast(fromBookSelected() ? "Added to the archive" : "Saved as a new page");
+    showToast(
+      fromBookSelected()
+        ? "Added to the archive"
+        : makeNoteSelected()
+          ? "Added to the archive · tags coming from tidy"
+          : "Saved as a new page",
+    );
     await currentHost.onSavedPage?.(saved);
   } catch (caught) {
     showToast(caught instanceof Error ? caught.message : "Save failed");
@@ -346,6 +360,16 @@ function saveCardHtml() {
       </div>
     </section>`;
   }
+  if (makeNoteSelected()) {
+    return `<section class="confirm-card" role="region" aria-label="Add to archive">
+      <p class="page-header__eyebrow">Add to archive</p>
+      <h2 class="page-header__title" style="font-size: var(--text-lg)">File this page</h2>
+      <p class="page-header__supporting">Standalone page — tags from tidy, no notebook or uni stamp.</p>
+      <div class="confirm-card__actions">
+        <button class="btn btn--primary" type="button" data-save-brief ${saveBusy || busy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Add to archive"}</button>
+      </div>
+    </section>`;
+  }
   return `<div class="chat-overlay__save">
     <button class="btn btn--secondary" type="button" data-save-brief ${saveBusy || busy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Save as new page"}</button>
   </div>`;
@@ -365,9 +389,19 @@ function pickerHtml() {
 function overlayHtml() {
   const who = currentPersonality();
   const fromBook = fromBookSelected();
+  const makeNote = makeNoteSelected();
+  const fileNote = webFileNoteSelected();
   const empty = fromBook
     ? "Pick the book in your hand, then type the idea, term, or question from the page."
-    : "Ask about the archive, or pin a graph note and I’ll work from that.";
+    : makeNote
+      ? "Name the topic, question, or thinking process. She researches the open web and files a tagged page with no notebook or uni stamp."
+      : "Ask about the archive, or pin a graph note and I’ll work from that.";
+  const inputLabel = fromBook ? "Note from the page" : makeNote ? "What should she research?" : "Message";
+  const placeholder = fromBook
+    ? "The idea, term, or question from the page…"
+    : makeNote
+      ? "The topic, question, or thinking process to research…"
+      : `Ask ${escapeHtml(who.shortName)}…`;
   return `
     <section class="chat-overlay" aria-label="Chat">
       <div class="chat-overlay__top">
@@ -431,9 +465,9 @@ function overlayHtml() {
       ${saveCardHtml()}
       ${bookFieldHtml()}
       <form class="chat-form">
-        <label class="chat-form__label" for="overlay-chat-input">${fromBook ? "Note from the page" : "Message"}</label>
-        <textarea id="overlay-chat-input" rows="3" placeholder="${fromBook ? "The idea, term, or question from the page…" : `Ask ${escapeHtml(who.shortName)}…`}" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
-        <button class="btn btn--primary" type="submit" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${busy || writeSessionId || researchSessionId ? "…" : fromBook ? "Make note" : "Send"}</button>
+        <label class="chat-form__label" for="overlay-chat-input">${inputLabel}</label>
+        <textarea id="overlay-chat-input" rows="3" placeholder="${placeholder}" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
+        <button class="btn btn--primary" type="submit" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${busy || writeSessionId || researchSessionId ? "…" : fromBook ? "Make note" : makeNote ? "Research" : "Send"}</button>
       </form>
     </section>
   `;

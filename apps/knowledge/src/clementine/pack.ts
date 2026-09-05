@@ -8,6 +8,7 @@ import ANNOTATION_VOICE from "../../prompts/annotation-voice.md";
 import TIDY from "../../prompts/tidy.md";
 import THEMATIC_SYNTHESIS from "../../prompts/clementine-thematic-synthesis.md";
 import BOOK_NOTE from "../../prompts/clementine-book-note.md";
+import MAKE_NOTE from "../../prompts/clementine-make-note.md";
 
 function requirePrompt(name: string, text: string): string {
   if (!text.trim()) throw new Error(`Prompt file missing: ${name}`);
@@ -24,3 +25,4 @@ export const annotationVoice = requirePrompt("annotation-voice.md", ANNOTATION_V
 export const tidy = requirePrompt("tidy.md", TIDY);
 export const thematicSynthesis = requirePrompt("clementine-thematic-synthesis.md", THEMATIC_SYNTHESIS);
 export const bookNote = requirePrompt("clementine-book-note.md", BOOK_NOTE);
+export const makeNote = requirePrompt("clementine-make-note.md", MAKE_NOTE);
