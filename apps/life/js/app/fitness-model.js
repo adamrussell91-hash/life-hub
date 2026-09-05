@@ -35,8 +35,12 @@ const REGION_NAME_PATTERNS = [
   ['back', /\b(row|pull[\s-]?up|pullup|lat|pulldown)\b/i]
 ];
 
+export function canonicalExerciseName(name) {
+  return String(name ?? '').replace(/\s+set\s+\d+\s*$/i, '').trim();
+}
+
 export function normalizeExerciseName(name) {
-  return String(name ?? '').trim().toLowerCase();
+  return canonicalExerciseName(name).toLowerCase();
 }
 
 export function estimateOneRepMax(weightKg, reps) {
@@ -150,16 +154,35 @@ function buildComparisons(hero, events) {
     .filter(record => record.status === 'completed' && record.date < hero.date)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  return hero.exercises.map(exercise => {
-    const name = exercise.name;
-    const key = normalizeExerciseName(name);
+  const grouped = new Map();
+  for (const exercise of hero.exercises) {
+    const display = canonicalExerciseName(exercise.name) || String(exercise.name ?? '').trim();
+    const key = normalizeExerciseName(display);
+    if (!key) continue;
     const currentBest = bestSet(exercise);
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { name: display, currentBest });
+      continue;
+    }
+    if (currentBest && (!existing.currentBest || currentBest.e1rm > existing.currentBest.e1rm)) {
+      existing.currentBest = currentBest;
+    }
+  }
+
+  return [...grouped.values()].map(({ name, currentBest }) => {
+    const key = normalizeExerciseName(name);
 
     let previousBest = null;
     for (const session of prior) {
-      const match = (session.exercises ?? []).find(ex => normalizeExerciseName(ex.name) === key);
-      if (!match) continue;
-      previousBest = bestSet(match);
+      let sessionBest = null;
+      for (const candidate of session.exercises ?? []) {
+        if (normalizeExerciseName(candidate.name) !== key) continue;
+        const set = bestSet(candidate);
+        if (set && (!sessionBest || set.e1rm > sessionBest.e1rm)) sessionBest = set;
+      }
+      if (!sessionBest) continue;
+      previousBest = sessionBest;
       break;
     }
 
@@ -176,12 +199,16 @@ function buildComparisons(hero, events) {
 
     const firstLogged = historicalBestE1rm == null;
     const isPr = !firstLogged && currentBest != null && currentBest.e1rm > historicalBestE1rm;
+    const weightDeltaKg = currentBest && previousBest
+      ? Number(currentBest.weight_kg) - Number(previousBest.weight_kg)
+      : null;
     return {
       name,
       currentBest,
       previousBest,
       e1rm: currentBest?.e1rm ?? null,
       previousE1rm: previousBest?.e1rm ?? null,
+      weightDeltaKg: Number.isFinite(weightDeltaKg) ? weightDeltaKg : null,
       isPr: Boolean(isPr),
       firstLogged
     };
@@ -374,6 +401,8 @@ export function buildFitnessModel({ events, date, libraryByName = null }) {
       isToday: day === date
     })),
     heroSession,
+    weekCompletedCount: weekDates.filter(day => completedOn(workoutEvts, day)).length,
+    weekTarget: WORKOUT_TARGET_PER_WEEK,
     weekVolume: weekDates.map(day => ({
       date: day,
       volume: workoutEvts
