@@ -1,4 +1,5 @@
 import { applyRingTarget } from './chart-kit/apply-ring.js';
+import { formatGrams } from '../core/aggregate.js';
 import { formatDisplayDate } from '../core/time.js';
 
 const DAY_TYPE_LABELS = {
@@ -28,10 +29,10 @@ export function renderHome(root, model) {
   setText(root, '[data-value="date"]', formatDate(model.date));
   setText(root, '[data-value="calories"]', model.nutrition.calories.toLocaleString('en-AU'));
   setText(root, '[data-target="calories"]', `of ${model.targets.calories.toLocaleString('en-AU')} kcal`);
-  setText(root, '[data-value="protein"]', `${model.nutrition.protein_g} g`);
-  setText(root, '[data-target="protein"]', `/ ${model.targets.protein_g} g`);
-  setText(root, '[data-value="fat"]', `${model.nutrition.fat_g} g`);
-  setText(root, '[data-target="fat"]', `/ ${model.targets.fat_ceiling_g} g`);
+  setText(root, '[data-value="protein"]', `${formatGrams(model.nutrition.protein_g)} g`);
+  setText(root, '[data-target="protein"]', `/ ${formatGrams(model.targets.protein_g)} g`);
+  setText(root, '[data-value="fat"]', `${formatGrams(model.nutrition.fat_g)} g`);
+  setText(root, '[data-target="fat"]', `/ ${formatGrams(model.targets.fat_ceiling_g)} g`);
   setText(root, '[data-value="workout"]', DAY_TYPE_LABELS[model.dayType] ?? 'Movement day');
   setText(root, '[data-value="workout-state"]', model.dayType === 'movement' ? 'No completed session' : 'Completed');
   setText(root, '[data-value="streak"]', model.workoutStreak);
