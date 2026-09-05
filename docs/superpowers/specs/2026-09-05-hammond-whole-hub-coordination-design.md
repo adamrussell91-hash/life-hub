@@ -391,7 +391,7 @@ Confirm:
 - `netlify/functions/_shared/persona.mjs` — `clareBlocks` + `annBlocks`; one `hammondBlocks` instruction covering both  
 - `tests/unit/persona.test.js` — Clare and Ann assembly tests above  
 - `config/hammond-protocol.md` — drop “never address Clare/Ann”; Clare and Ann situational relay  
-- `central-node.md` — Agent Directory bullets for Clare and Ann (this repo’s seed / `included_files` copy). If live CN in `life-hub-data` has drifted, update that copy in a follow-up commit there — do not block this pass on the data repo.  
+- `central-node.md` — Agent Directory bullets for Clare and Ann (this repo’s seed / `included_files` copy). If live CN in `life-hub-data` has drifted, update that copy in a follow-up commit there — do not block this pass on the data repo. Cursor brief: `docs/superpowers/specs/2026-09-05-life-hub-data-clare-ann-directory-cursor.md`.  
 - `capabilities/publish/cn-patch.json` — add `clare` and `ann`  
 - `capabilities/allowlists/clare.json` — write `central-node.md`  
 - `capabilities/allowlists/ann.json` — write `central-node.md`  
@@ -424,6 +424,7 @@ Confirm:
 
 ## Follow-ups (later, not this build)
 
+- Live `life-hub-data` Agent Directory Clare/Ann bullets — Cursor brief ready: `2026-09-05-life-hub-data-clare-ann-directory-cursor.md`. Not blocked on this `life-hub` PR.
 - Clementine / Knowledge umbrella snapshot — only after a dedicated spec, and only via a `hub-agent-context`-style direct store read, never via `knowledge-clementine-chat`.
 - Optional second presence-scan for a Tasks/Teaching strip on the CN tab (still not a `DOMAIN_PATH` widen).
 - Teaching `/api/clare`-equivalent or Tasks `/api/clare` growing CN writes — only after that loop is on `/api/chat` → `/api/chat-run`.
