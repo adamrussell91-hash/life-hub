@@ -43,6 +43,7 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("<span>Notebooks</span>");
     expect(main).toContain("renderNotebooks");
     expect(main).toContain("notebooksGridHtml");
+    expect(main).toContain('id: "notebooks", label: "Notebooks"');
     expect(css).toContain(".nb-grid");
     expect(css).toContain("aspect-ratio: 3 / 2");
     expect(css).toContain(".nb-open__notes");

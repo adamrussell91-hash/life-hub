@@ -1970,6 +1970,7 @@ document.addEventListener("keydown", event => {
       heading: "Go to",
       items: [
         { id: "all", label: "Archive", hint: "Notes", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=all]")?.click() },
+        { id: "notebooks", label: "Notebooks", hint: "Covers", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=notebooks]")?.click() },
         { id: "graph", label: "Graph", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=graph]")?.click() },
         { id: "timeline", label: "Timeline", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=timeline]")?.click() },
         { id: "chat", label: "Chat", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=chat]")?.click() },
