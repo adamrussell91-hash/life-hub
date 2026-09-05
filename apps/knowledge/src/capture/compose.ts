@@ -1,7 +1,34 @@
+import { compressAndStripExif } from "../../design-kit/js/hub-image-pipeline.js";
+import {
+  classifyClipboardData,
+  classifyDropEvent,
+  classifyPasteEvent,
+} from "../../design-kit/js/hub-rich-paste.js";
 import { appendCaptureBlock, titleFromCapture, type CaptureKind } from "./appendBlock";
 
 export { appendCaptureBlock, titleFromCapture };
 export type { CaptureKind };
+
+/** Compress phone photos before R2 upload; strip EXIF GPS by re-encoding. */
+export async function prepareCaptureImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  try {
+    const result = await compressAndStripExif(file, {
+      maxWidth: 1920,
+      maxHeight: 1920,
+      quality: 0.82,
+      mimeType: "image/jpeg",
+    });
+    if (result.skipped) return file;
+    const base = file.name.replace(/\.[^.]+$/, "") || "photo";
+    return new File([result.blob], `${base}.jpg`, {
+      type: result.blob.type || "image/jpeg",
+      lastModified: file.lastModified,
+    });
+  } catch {
+    return file;
+  }
+}
 
 export const MAX_CAPTURE_BYTES = 20 * 1024 * 1024;
 
@@ -99,9 +126,10 @@ export async function ingestCaptureFile(
   }
   let attachment: SignedCapture["attachment"] | undefined;
   try {
-    const contentType = captureContentType(input.kind, input.file);
-    const filename = captureFileName(input.kind, input.file);
-    const named = new File([input.file], filename, { type: contentType });
+    const uploadFile = input.kind === "photo" ? await prepareCaptureImage(input.file) : input.file;
+    const contentType = captureContentType(input.kind, uploadFile);
+    const filename = captureFileName(input.kind, uploadFile);
+    const named = new File([uploadFile], filename, { type: contentType });
     const signed = await deps.signAttachment({
       filename,
       content_type: contentType,
@@ -132,6 +160,37 @@ export async function ingestCaptureFile(
   }
 }
 
+function routeIngestPayload(
+  payload: ReturnType<typeof classifyClipboardData>,
+  opts: {
+    onPhoto: (file: File) => void;
+    onPdf: (file: File) => void;
+    onPaste?: (text: string) => void;
+  },
+): boolean {
+  if (payload.kind === "image" && payload.files?.[0]) {
+    opts.onPhoto(payload.files[0]);
+    return true;
+  }
+  if (payload.kind === "file" && payload.files?.[0]) {
+    const file = payload.files[0];
+    if (payload.subtype === "pdf" || file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+      opts.onPdf(file);
+      return true;
+    }
+    return false;
+  }
+  if (payload.kind === "url" && payload.url) {
+    opts.onPaste?.(payload.url);
+    return true;
+  }
+  if ((payload.kind === "text" || payload.kind === "html") && payload.text) {
+    opts.onPaste?.(payload.text);
+    return true;
+  }
+  return false;
+}
+
 export function bindCaptureControls(
   root: ParentNode,
   opts: {
@@ -150,8 +209,32 @@ export function bindCaptureControls(
   if (paste) {
     paste.onclick = async () => {
       opts.syncFields();
+      // Prefer clipboard items (images) when the browser allows it.
+      try {
+        const items = await navigator.clipboard?.read?.();
+        if (items?.length) {
+          for (const item of items) {
+            const imageType = item.types.find(type => type.startsWith("image/"));
+            if (imageType) {
+              const blob = await item.getType(imageType);
+              const ext = imageType.split("/")[1] || "png";
+              opts.onPhoto(new File([blob], `paste.${ext}`, { type: imageType }));
+              return;
+            }
+          }
+          if (items[0]?.types.includes("text/plain")) {
+            const text = await (await items[0].getType("text/plain")).text();
+            if (text) {
+              routeIngestPayload(classifyClipboardData(textDataTransfer(text)), opts);
+              return;
+            }
+          }
+        }
+      } catch {
+        // Fall through to readText — image permission may be denied.
+      }
       const text = await navigator.clipboard?.readText?.();
-      if (text) opts.onPaste?.(text);
+      if (text) routeIngestPayload(classifyClipboardData(textDataTransfer(text)), opts);
     };
   }
   root.querySelector<HTMLButtonElement>("[data-capture-photo]")!.onclick = () => {
@@ -170,6 +253,45 @@ export function bindCaptureControls(
     const file = (event.target as HTMLInputElement).files?.[0];
     if (file) opts.onPdf(file);
   };
+
+  const dropHost =
+    root.querySelector<HTMLElement>("[data-hub-capture]") ??
+    (root instanceof HTMLElement ? root : null);
+  if (dropHost) {
+    dropHost.addEventListener("dragover", event => {
+      if (!event.dataTransfer?.types.includes("Files")) return;
+      event.preventDefault();
+      dropHost.classList.add("is-drop-target");
+    });
+    dropHost.addEventListener("dragleave", () => {
+      dropHost.classList.remove("is-drop-target");
+    });
+    dropHost.addEventListener("drop", event => {
+      dropHost.classList.remove("is-drop-target");
+      if (!event.dataTransfer?.files?.length) return;
+      event.preventDefault();
+      opts.syncFields();
+      routeIngestPayload(classifyDropEvent(event), opts);
+    });
+  }
+
+  const pasteHost =
+    (root instanceof HTMLElement ? root : null)?.querySelector?.<HTMLElement>("#compose-body-host") ??
+    (root instanceof HTMLElement ? root : null);
+  pasteHost?.addEventListener("paste", event => {
+    const payload = classifyPasteEvent(event);
+    if (payload.kind === "image" || payload.kind === "file") {
+      event.preventDefault();
+      opts.syncFields();
+      routeIngestPayload(payload, opts);
+    }
+  });
+}
+
+function textDataTransfer(text: string): DataTransfer {
+  const dt = new DataTransfer();
+  dt.setData("text/plain", text);
+  return dt;
 }
 
 export type VoiceCaptureHandle = {

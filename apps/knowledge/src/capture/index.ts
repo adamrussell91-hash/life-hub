@@ -8,6 +8,7 @@ export {
   captureFileName,
   createVoiceCapture,
   ingestCaptureFile,
+  prepareCaptureImage,
   recorderMime,
   type CaptureIngestDeps,
   type CaptureIngestInput,

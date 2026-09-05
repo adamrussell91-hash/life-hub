@@ -5,6 +5,7 @@ import {
   captureFieldHtml,
   captureFileName,
   ingestCaptureFile,
+  prepareCaptureImage,
 } from "./compose";
 
 describe("capture file helpers", () => {
@@ -129,5 +130,13 @@ describe("ingestCaptureFile", () => {
     );
     expect(result.ok).toBe(false);
     expect(signAttachment).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("prepareCaptureImage", () => {
+  it("returns non-images unchanged", async () => {
+    const file = new File(["x"], "notes.pdf", { type: "application/pdf" });
+    await expect(prepareCaptureImage(file)).resolves.toBe(file);
   });
 });

@@ -2521,6 +2521,14 @@ body.is-universe-fullscreen .local-banner {
   .quiz-card__compare { grid-template-columns: 1fr; }
 }
 
+
+.compose__capture.is-drop-target {
+  outline: 2px dashed var(--wave, #4a7bb5);
+  outline-offset: 4px;
+  border-radius: var(--radius-md, 0.75rem);
+  background: color-mix(in srgb, var(--foam, #faf8f2) 70%, var(--wave, #4a7bb5));
+}
+
 .compose__capture {
   display: flex;
   flex-wrap: wrap;
