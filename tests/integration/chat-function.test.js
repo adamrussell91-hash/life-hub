@@ -78,8 +78,39 @@ test('streams an agent event, text, and a validated record proposal for a routed
   assert.deepEqual(events[1], { type: 'text', delta: 'Logging it now.' });
   assert.equal(events[2].type, 'record_proposal');
   assert.equal(events[2].record.type, 'workout');
-  assert.equal(events[2].path, 'data/fitness/2026/08/2026-08-01-workout-1600.md');
+  assert.equal(events[2].record.status, 'planned');
+  assert.equal(events[2].path, 'data/fitness/2026/08/2026-08-01-workout-planned.md');
   assert.deepEqual(events[3], { type: 'done' });
+});
+
+test('Chadwick actuals stay completed on a dated workout file', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([
+        { type: 'text', delta: 'Logged what you actually lifted.' },
+        { type: 'tool_call', id: 'call_1', name: 'log_entry', input: {
+          type: 'workout', date: '2026-08-01', fields: {
+            title: 'Squat Session', session_kind: 'strength',
+            day_type: 'workout_30', status: 'completed', duration_min: 30,
+            exercises: [{ name: 'Squat', sets: [{ reps: 10, weight_kg: 40, cable_type: 'concentric' }] }]
+          }
+        } },
+        { type: 'done' }
+      ])
+    })
+  });
+
+  const response = await handler(request({
+    message: 'Chadwick, I just finished — here is what I actually lifted'
+  }));
+  const events = contentEvents(await readSse(response));
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal);
+  assert.equal(proposal.record.status, 'completed');
+  assert.equal(proposal.path, 'data/fitness/2026/08/2026-08-01-workout-1600.md');
 });
 
 test('every agent gets web_search with no max_uses cap', async () => {
@@ -1654,6 +1685,97 @@ test('reports days since last session from the exercise library\'s last_performe
   assert.match(receivedArgs.system, /3 days since/i);
   assert.match(receivedArgs.system, /smaller default offer|honor that shape/i);
   assert.equal(blobFetches.length, 1, 'the library blob should only be fetched once -- no extra reads for adherence');
+});
+
+test('Chadwick prompt and tools can read the last completed workout file, not just library last_performed', async () => {
+  const libraryPath = 'data/exercise-library.json';
+  const librarySha = 'f'.repeat(40);
+  const libraryContent = JSON.stringify([
+    { name: 'Bar Press', target_area: 'Chest', last_performed: '2026-07-29' }
+  ]);
+  const workoutPath = 'data/fitness/2026/08/2026-08-01-workout-1628.md';
+  const workoutSha = 'a'.repeat(40);
+  const workoutContent = [
+    '---',
+    'schema_version: 1',
+    'id: "workout-2026-08-01-5d77e7"',
+    'type: workout',
+    'date: 2026-08-01',
+    'time: "16:28"',
+    'created_at: 2026-08-01T18:26:45+10:00',
+    'updated_at: 2026-08-01T18:26:45+10:00',
+    'source: chat',
+    'title: Planned session',
+    'session_kind: strength',
+    'day_type: workout_30',
+    'status: completed',
+    'duration_min: 30',
+    'exercises:',
+    '  - name: Bar Press',
+    '    sets:',
+    '      - { reps: 10, weight_kg: 40, cable_type: constant_force }',
+    '  - name: Cable Curl',
+    '    sets:',
+    '      - { reps: 8, weight_kg: 37, cable_type: constant_force }',
+    '---',
+    'TRUE superset alternation'
+  ].join('\n');
+  let receivedArgs;
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: libraryPath, type: 'blob', sha: librarySha, size: 100 },
+          { path: workoutPath, type: 'blob', sha: workoutSha, size: 400 }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${librarySha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(libraryContent, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${workoutSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(workoutContent, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-05T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Chadwick, when did I last train and what was it?' })));
+
+  assert.match(receivedArgs.system, /4 days since/i);
+  assert.match(receivedArgs.system, /Recent sessions/);
+  assert.match(receivedArgs.system, /2026-08-01/);
+  assert.match(receivedArgs.system, /Planned session/);
+  assert.match(receivedArgs.system, /Bar Press/);
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'get_last_workout'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_workout_records'));
+  const last = JSON.parse(await receivedArgs.executeTools({
+    name: 'get_last_workout',
+    id: 'call_last',
+    input: {}
+  }));
+  assert.equal(last.found, true);
+  assert.equal(last.session.title, 'Planned session');
+  assert.equal(last.session.date, '2026-08-01');
+  const search = JSON.parse(await receivedArgs.executeTools({
+    name: 'search_workout_records',
+    id: 'call_search',
+    input: { query: 'planned' }
+  }));
+  assert.equal(search.count, 1);
 });
 
 test('loads latest body composition/measurements into Chadwick\'s prompt via a bounded read (not a full history scan)', async () => {

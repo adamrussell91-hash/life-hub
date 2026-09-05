@@ -40,6 +40,15 @@ test('Brisket’s pills match the approved user-facing protocols', () => {
   );
 });
 
+test('Chadwick’s pills separate saving a plan from logging actuals', () => {
+  assert.deepEqual(
+    protocolsForSlug('chadwick').pills.map(pill => pill.label),
+    ['Save plan', 'Log actuals', 'Missed a day', "How's the program", 'Form / safety']
+  );
+  assert.match(findProtocol('chadwick', 'next-session').steer, /status planned/i);
+  assert.match(findProtocol('chadwick', 'log-session').steer, /actuals/i);
+});
+
 test('findProtocol only resolves ids that belong to that agent', () => {
   assert.equal(findProtocol('brisket', 'log-meal')?.label, 'Log a meal');
   assert.equal(findProtocol('chadwick', 'log-meal'), null);

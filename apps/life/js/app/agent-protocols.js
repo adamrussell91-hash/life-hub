@@ -16,8 +16,8 @@ export const AGENT_PROTOCOLS = {
     firstName: 'Chadwick',
     eyebrow: 'Chadwick can',
     pills: [
-      { id: 'log-session', label: 'Log a session', steer: 'Logging protocol — status completed', explain: 'Write down what you actually lifted.' },
-      { id: 'next-session', label: 'Next session', steer: 'Logging protocol — status planned; design today’s session', explain: 'Build today’s planned workout.' },
+      { id: 'next-session', label: 'Save plan', steer: 'Logging protocol — status planned; design today’s session and put it on Fitness. Do not mark it completed.', explain: 'Build today’s workout and park it on Fitness.' },
+      { id: 'log-session', label: 'Log actuals', steer: 'Logging protocol — status completed; log actuals for what Adam already lifted.', explain: 'Write down the session he already finished.' },
       { id: 'missed-day', label: 'Missed a day', steer: 'Adherence (2+ missed days → lower the bar)', explain: 'Get moving again without running the full program.' },
       { id: 'program-check', label: "How's the program", steer: 'Rotation, deload, and aesthetic bias', explain: 'Check rotation, deload, and whether the plan still fits.' },
       { id: 'form-safety', label: 'Form / safety', steer: 'Safety', explain: 'Flag pain or form before you push.' }

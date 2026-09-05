@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   claimedPlanLocked,
+  coerceChatWorkoutProposal,
   isWorkoutLockIn,
+  looksLikeWorkoutActualsReport,
   looksLikeWorkoutPlan,
   shouldForceChadwickPlanProposal,
   shouldNudgeUnsavedWorkoutPlan
@@ -26,6 +28,11 @@ test('isWorkoutLockIn matches the phrases Adam actually used', () => {
   assert.equal(isWorkoutLockIn('is it ready to go?'), true);
   assert.equal(isWorkoutLockIn('ready to go'), true);
   assert.equal(isWorkoutLockIn('start the workout'), true);
+  assert.equal(isWorkoutLockIn('log'), true);
+  assert.equal(isWorkoutLockIn('Log!'), true);
+  assert.equal(isWorkoutLockIn('log this'), true);
+  assert.equal(isWorkoutLockIn('save workout'), true);
+  assert.equal(isWorkoutLockIn('save the workout'), true);
   assert.equal(isWorkoutLockIn('are the weights a little below my normal?'), false);
   assert.equal(isWorkoutLockIn('option b'), false);
 });
@@ -123,4 +130,49 @@ test('shouldNudgeUnsavedWorkoutPlan is Chadwick-only and skips once a Confirm ca
     sawRecordProposal: false,
     sawExerciseLibrarySaved: true
   }), true);
+});
+
+function workoutValidation(status) {
+  return {
+    valid: true,
+    notes: '',
+    record: {
+      type: 'workout',
+      title: 'The Full Send',
+      status,
+      date: '2026-09-05',
+      exercises: [{ name: 'Bar Squat', sets: [{ reps: 10, weight_kg: 30 }] }]
+    }
+  };
+}
+
+test('looksLikeWorkoutActualsReport is only for a session Adam already finished', () => {
+  assert.equal(looksLikeWorkoutActualsReport('I just finished the session'), true);
+  assert.equal(looksLikeWorkoutActualsReport('here is what I actually lifted'), true);
+  assert.equal(looksLikeWorkoutActualsReport('log actuals'), true);
+  assert.equal(looksLikeWorkoutActualsReport('log'), false);
+  assert.equal(looksLikeWorkoutActualsReport('save workout'), false);
+  assert.equal(looksLikeWorkoutActualsReport('Logging protocol — status completed'), false);
+});
+
+test('coerceChatWorkoutProposal forces designed sessions to planned unless Adam reported actuals', () => {
+  const designed = coerceChatWorkoutProposal(workoutValidation('completed'), { userMessage: 'save workout' });
+  assert.equal(designed.record.status, 'planned');
+
+  const logged = coerceChatWorkoutProposal(workoutValidation('completed'), { userMessage: 'Log' });
+  assert.equal(logged.record.status, 'planned');
+
+  const alreadyPlanned = coerceChatWorkoutProposal(workoutValidation('planned'), { userMessage: 'lock it in' });
+  assert.equal(alreadyPlanned.record.status, 'planned');
+
+  const actuals = coerceChatWorkoutProposal(workoutValidation('completed'), {
+    userMessage: 'I just finished — here is what I actually lifted'
+  });
+  assert.equal(actuals.record.status, 'completed');
+
+  const skipped = coerceChatWorkoutProposal({
+    valid: true,
+    record: { type: 'workout', status: 'skipped', date: '2026-09-05' }
+  }, { userMessage: 'skipped today' });
+  assert.equal(skipped.record.status, 'skipped');
 });

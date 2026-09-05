@@ -3,6 +3,7 @@ import { validateRecord } from '../../../apps/life/js/core/validate.js';
 import { isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { buildMedicalSlug } from '../../../apps/life/js/app/medical-model.js';
 import { coerceCalendarDate, normalizeMedicalFields } from '../../../apps/life/js/app/medical-normalize.js';
+import { collapseSetSplitExercises } from './workout-history.mjs';
 
 const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare', 'mind_session', 'medical'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -257,9 +258,12 @@ export function buildCanonicalPath({ type, date, slug }) {
   return `data/${domain}/${year}/${month}/${date}-${slug}.md`;
 }
 
+export const PLANNED_WORKOUT_SLUG = 'workout-planned';
+
 /**
  * Stable path slug for a validated record.
  * Meals use slot-only slugs so same-day corrections overwrite the same file.
+ * Planned workouts stay on one file per day so amend/save updates the same plan.
  */
 export function buildRecordSlug(record) {
   if (!record || typeof record !== 'object') throw new TypeError('record is required');
@@ -269,6 +273,7 @@ export function buildRecordSlug(record) {
     }
     return record.meal;
   }
+  if (record.type === 'workout' && record.status === 'planned') return PLANNED_WORKOUT_SLUG;
   if (record.type === 'mind_session') return 'session';
   if (record.type === 'medical') return buildMedicalSlug(record.title, record.time);
   const label = record.type === 'skincare' ? record.routine : record.type;
@@ -313,7 +318,9 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
   const today = now.slice(0, 10);
   const normalizedFields = type === 'medical'
     ? normalizeMedicalFields(fields, { notes, today })
-    : fields;
+    : type === 'workout' && Array.isArray(fields.exercises)
+      ? { ...fields, exercises: collapseSetSplitExercises(fields.exercises) }
+      : fields;
   const resolvedDate = type === 'medical'
     ? (coerceCalendarDate(date, { today }) ?? date)
     : date;

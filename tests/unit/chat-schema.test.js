@@ -21,9 +21,22 @@ test('meal slugs are slot-only so same-day corrections overwrite', () => {
 });
 
 test('non-meal slugs still include time when present', () => {
-  assert.equal(buildRecordSlug({ type: 'workout', time: '07:30' }), 'workout-0730');
+  assert.equal(buildRecordSlug({ type: 'workout', time: '07:30', status: 'completed' }), 'workout-0730');
   assert.equal(buildRecordSlug({ type: 'skincare', routine: 'am', time: '08:00' }), 'am-0800');
   assert.equal(buildRecordSlug({ type: 'diary', time: '21:15' }), 'diary-2115');
+});
+
+test('planned workouts use a stable slug so the same day keeps one plan file', () => {
+  assert.equal(buildRecordSlug({ type: 'workout', time: '16:07', status: 'planned' }), 'workout-planned');
+  assert.equal(buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned' }), 'workout-planned');
+  assert.equal(
+    buildCanonicalPath({
+      type: 'workout',
+      date: '2026-09-05',
+      slug: buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned' })
+    }),
+    'data/fitness/2026/09/2026-09-05-workout-planned.md'
+  );
 });
 
 test('rejects an unknown type, invalid date, or invalid slug', () => {
@@ -209,6 +222,29 @@ test('the workout whitelist accepts every field validateWorkout actually recogni
   }, { id: 'workout-1', now: '2026-08-01T07:45:00+10:00' });
 
   assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+
+test('validateLogEntry collapses Bar Press set N rows into one Bar Press before save', () => {
+  const result = validateLogEntry({
+    type: 'workout',
+    date: '2026-09-01',
+    fields: {
+      title: 'Planned session',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'completed',
+      exercises: [
+        { name: 'Bar Press set 1', sets: [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }] },
+        { name: 'Curl set 1', sets: [{ reps: 8, weight_kg: 37, cable_type: 'constant_force' }] },
+        { name: 'Bar Press set 2', sets: [{ reps: 8, weight_kg: 34, cable_type: 'constant_force' }] },
+        { name: 'Curl set 2', sets: [{ reps: 10, weight_kg: 37, cable_type: 'constant_force' }] }
+      ]
+    }
+  }, { id: 'workout-2026-09-01-1', now: '2026-09-01T18:26:45+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.deepEqual(result.record.exercises.map(exercise => exercise.name), ['Bar Press', 'Curl']);
+  assert.equal(result.record.exercises[0].sets.length, 2);
 });
 
 test('the workout tool schema advertises coach_cues on each exercise so Chadwick knows to populate it', () => {

@@ -140,3 +140,18 @@ test('lintWorkoutProposal can return multiple warnings at once', () => {
   const warnings = lintWorkoutProposal(session);
   assert.ok(warnings.length >= 2, JSON.stringify(warnings));
 });
+
+test('lintWorkoutProposal flags exploded set-N exercise names', () => {
+  const session = warmupSession([
+    exercise('Bar Press set 1'),
+    exercise('Bar Press set 2')
+  ]);
+  const warnings = lintWorkoutProposal(session);
+  assert.ok(warnings.some(w => /set\s*\d|one row per exercise/i.test(w)), JSON.stringify(warnings));
+});
+
+test('lintWorkoutProposal flags a generic Planned session title on a finished log', () => {
+  const session = warmupSession([], { title: 'Planned session', status: 'completed' });
+  const warnings = lintWorkoutProposal(session);
+  assert.ok(warnings.some(w => /title|Planned session/i.test(w)), JSON.stringify(warnings));
+});
