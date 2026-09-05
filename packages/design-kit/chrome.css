@@ -4,6 +4,7 @@
 @import url("./hub-compose.css");
 @import url("./adaptive-slider.css");
 @import url("./card-swipe.css");
+@import url("./hub-interactions.css");
 @import url("./mobile.css");
 
 /* Shared chrome for new hubs. Existing hubs already implement these patterns
