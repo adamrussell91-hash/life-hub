@@ -44,6 +44,47 @@ function samePaintedWindow(previous: VirtualListPainted | null, paint: VirtualLi
   );
 }
 
+function parseWindowRows(html: string) {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  return [...template.content.children];
+}
+
+/**
+ * Slide the painted window without tearing down notes that are still in range.
+ * Replacing those nodes retriggers hub-reveal (opacity 0) and the list flickers.
+ */
+function reconcileListWindow(windowEl: HTMLElement, html: string) {
+  const nextRows = parseWindowRows(html);
+  const nextIds = nextRows.map(row => row.getAttribute("data-id"));
+  if (!nextRows.length || nextIds.some(id => !id)) {
+    windowEl.replaceChildren(...nextRows);
+    return;
+  }
+
+  const prevById = new Map(
+    [...windowEl.children]
+      .filter(el => el.getAttribute("data-id"))
+      .map(el => [el.getAttribute("data-id")!, el]),
+  );
+  const nextIdSet = new Set(nextIds as string[]);
+  for (const [id, el] of prevById) {
+    if (!nextIdSet.has(id)) el.remove();
+  }
+
+  let cursor: ChildNode | null = windowEl.firstChild;
+  for (const row of nextRows) {
+    const existing = prevById.get(row.getAttribute("data-id")!);
+    if (existing) {
+      if (cursor !== existing) windowEl.insertBefore(existing, cursor);
+      cursor = existing.nextSibling;
+      continue;
+    }
+    windowEl.insertBefore(row, cursor);
+    cursor = row.nextSibling;
+  }
+}
+
 /**
  * Paint a virtual list into a scroll viewport.
  *
@@ -72,7 +113,7 @@ export function paintVirtualList(
   if (spacer && windowEl) {
     spacer.style.height = `${paint.spacerHeight}px`;
     windowEl.style.transform = `translateY(${paint.offset}px)`;
-    windowEl.innerHTML = paint.html;
+    reconcileListWindow(windowEl, paint.html);
     return next;
   }
 
