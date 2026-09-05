@@ -2,11 +2,20 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
-**Date:** 2026-09-05 (v2 — revised after a Cursor review of v1; see "What changed from v1" below)
+**Date:** 2026-09-05 (v3 — revised after a second Cursor review, of v2; see "What changed from v2" below, and "What changed from v1" further down for the first round)
 **Repo:** this monorepo (`life-hub`) — touches `apps/life`, `apps/tasks`, and `apps/teaching`
 **Requested by:** Adam.
 
 ---
+
+## What changed from v2, and why
+
+A second Cursor review caught four more real problems, all now fixed in place below (not repeated here — see the sections themselves):
+
+1. **B3 (Sara) had a quiet Pass 2 hole of its own.** v2 implied she already had enough visibility for the bone/iron/exercise cross-references. She doesn't — confirmed by reading `chat.mjs`'s gates directly: `needsNutritionChallenges` is `slug === 'brisket'` only, `needsWorkoutHistory` is `slug === 'chadwick'` only. She does already get `bodyState` (that part was true). B3 now names exactly which claims were half-true and forces an explicit Option 1 (new bounded read) vs Option 2 (restrict wording) choice before shipping.
+2. **B2's procedure-detection signal was a guess, and the real one already exists in this codebase.** Clinic procedures aren't a shelf "Other" category — they're skincare log entries whose `body` starts with `Procedure:`, a signal `apps/tasks/src/domain/clare-protocols.ts` already uses correctly today. B2 now points at that exact precedent instead of inventing a new, wrong one.
+3. **Two v1 items had quietly disappeared in v2 without a deferral note** — Hyaluronica's New Medication Protocol and nutrition→skin weekly check, and Sara's explicit "never hardcode a stale 2026 date" reminder. Restored below with sees/writes/today lines rather than left to be "rediscovered" as gaps by whoever implements this next.
+4. **B4 needed a reconcile table before any code gets written**, mapping Notion's 7 ADHD tools onto the 3 `ClareToolkitId`s that already exist (`shatter-start`, `time-map`, `open-loops`) so the restore produces 4 new IDs plus 3 fuller specs on existing IDs — not 7 new pills sitting next to near-duplicates. Table added to B4.
 
 ## What changed from v1, and why
 
@@ -101,7 +110,7 @@ If reopened:
 
 **sees today:** `hyaluronicaProtocol` text and `skincareRoutines` (current AM/PM membership only) — confirmed by reading `persona.mjs`'s `hyaluronicaBlocks`. No recent-procedure or upcoming-procedure signal reaches her prompt at all today. She has no tool to query her own skincare log history by category/date either (only `search_skincare_library`, `save_skincare_library_entry`, `set_skincare_routine_membership`, `list_skincare_routines` — none of these answer "was there a procedure logged in the last 14 days").
 **writes:** n/a — this is a read-only override gate.
-**today: missing — needs code.** Build a new bounded selector, same shape as the existing `selectLatestBodyEntries` pattern in `chat.mjs` (mirror it, don't reinvent the read pattern): scan `data/skincare/**` for entries where the routine/category is the "Other" card (procedures/clinic visits/sheet masks — confirm the exact field name the skincare schema uses for this in `apps/life/js/core/validate.js`'s `validateSkincare` before writing the selector), bounded to a 21-day-back window (covers the 14-day post-treatment window with margin) plus a check of Constraints & Priorities text for any explicitly-noted upcoming appointment within 7 days. Format as a new `treatmentState` prompt block (`persona.mjs`, `hyaluronicaBlocks`) surfacing: most recent procedure type + date if within 14 days, upcoming procedure if flagged in Constraints within 7 days, else "no active treatment window." Then restore the protocol text:
+**today: missing — needs code, and the detection signal must be the real one, not a guess.** A prior draft of this plan assumed procedures were flagged by a shelf/library "Other" category — wrong, and it would both miss real treatment windows and false-positive on ordinary "Other" shelf products. The actual, already-established signal in this codebase is: a skincare log entry (`record.type === 'skincare'`) whose `body` text starts with the literal string `Procedure:`. This exact filter already exists and is proven correct — `apps/tasks/src/domain/clare-protocols.ts` uses it today (`String(entry.body ?? '').startsWith('Procedure:')`) to separate procedure logs from routine AM/PM logs when computing Clare's cross-hub digest. Build Hyaluronica's selector against that same signal, not a new invention: scan `data/skincare/**` for entries matching it, bounded to a 21-day-back window (covers the 14-day post-treatment window with margin), plus a check of Constraints & Priorities text for any explicitly-noted upcoming appointment within 7 days. Format as a new `treatmentState` prompt block (`persona.mjs`, `hyaluronicaBlocks`) surfacing: most recent procedure type + date if within 14 days, upcoming procedure if flagged in Constraints within 7 days, else "no active treatment window." Then restore the protocol text:
 
 > When a procedure is flagged as recent (within 14 days) or upcoming (within 7 days), shift into treatment-aware advice mode: routine optimisation pauses unless clearly safe and relevant. Advice prioritises protection, recovery, compatibility, and avoidance of contraindicated products over new suggestions. This applies equally to laser, peels, injectables, or any other procedure — not just laser.
 >
@@ -111,15 +120,25 @@ Also restore the **Ingredient Compatibility** check as pure prompt text (no new 
 
 > Before recommending a new ingredient, check it against the active stack already in use. Known interactions: vitamin C and a retinoid — don't layer same evening, morning + SPF is fine; niacinamide — generally safe, can reduce retinoid irritation; AHA/BHA and a retinoid — alternate nights, not the same evening; benzoyl peroxide can deactivate a retinoid — separate occasions; check photosensitivity given Sydney's UV.
 
-**Test:** a fixture with a skincare "Other" entry dated 3 days ago should produce `treatmentState` text naming it; a fixture with no such entry in the window should produce the "no active window" text; confirm the selector never fires for a non-Hyaluronica turn.
+**Test:** a fixture with a skincare entry whose body starts `Procedure:` dated 3 days ago should produce `treatmentState` text naming it; a fixture with an ordinary (non-`Procedure:`) "Other"-style entry in the same window should **not** trigger the override (this is the specific false-positive case the wrong signal would have caused); a fixture with no procedure entry in the window should produce the "no active window" text; confirm the selector never fires for a non-Hyaluronica turn.
+
+**Also restore from v1's source material, not carried into the first draft of this section — do this now rather than let it quietly vanish a second time:**
+
+- **New Medication Protocol** — mostly Band A, not Band B: Hyaluronica already sees Constraints & Priorities text (shared block, every agent) and already has `web_search` per her existing protocol file. No new code needed, just the proactive instruction: *"If Constraints & Priorities shows a new medication (a fresh entry, a dose change, a new corticosteroid course), assess skin implications before anything else this turn — don't wait to be asked. Search for the medication's skin side effects and skincare interactions. Watch categories: immunosuppressants (infection risk, photosensitivity, acne/rosacea flares), corticosteroids/taper (barrier thinning, reduced healing — heightened monitoring for 4 weeks after a course ends), antibiotics (microbiome disruption, photosensitivity), new supplements (high-dose B vitamins can trigger acne, large-dose zinc can cause dryness)."* **Verify before shipping:** confirm Hyaluronica's `web_search` tool registration isn't gated behind something that excludes her (grep the tool-building site in `chat.mjs`, don't assume from the protocol file alone).
+- **Nutrition-to-skin weekly check** — genuinely Band B, and its exact scope needs one verification step first: every agent already receives a shared `digest` block (`persona.mjs` line 67, "Recent context") built from `summarizeRecentHistory` in `digest.mjs`. **Before writing any new code, read `digest.mjs` to confirm what window and what granularity it actually covers for nutrition** (the Hammond closed-loop plan's own fact table describes the *default* digest window as today+yesterday only, which would not be enough for a genuine 7-day protein/fat/calcium trend). If it's today/yesterday only, this needs a new bounded 7-day nutrition read for Hyaluronica specifically (mirror the shape of the existing `bodyState`/`workoutTemplates` selectors already gated per-slug in `chat.mjs`), formatted as weekly averages for calcium, protein, and fat/omega-3s. Then restore: *"At least once a week, check calcium (bone-skin axis), protein (collagen synthesis), and fat/omega-3s (barrier lipids) against the past 7 days. If consistently low, flag it with a skin-specific framing (e.g. 'babe your omega-3s have been basically nonexistent this week and your barrier is going to feel it') and suggest a fix."*
 
 ---
 
 ### B3. Sara — Bone/Iron/Taper protocols (`apps/life`)
 
-**sees today:** `saraProtocol` text plus four generic instruction strings in `saraBlocks` (medical logging rules, Medical Overview ownership, the instruction to call `search_medical_records`/`brief_medical_appointment` **when Adam asks** about history). Constraints & Priorities text (shared block, every agent gets it) is already visible to her every turn.
+**sees today, confirmed by reading `chat.mjs`'s per-slug gates directly:** `saraProtocol` text, Constraints & Priorities (shared, every agent), the `search_medical_records`/`brief_medical_appointment` tools (used **when Adam asks**, not proactively), and — this matters, it's easy to assume otherwise — `bodyState` (`needsBodyState` includes `slug === 'sara'`, so she already gets composition/measurement records every turn). **What she does not get:** any nutrition digest (`needsNutritionChallenges` is `slug === 'brisket'` only — Sara gets nothing from the meal log) or workout/exercise history as a first-class block (`needsWorkoutHistory` is `slug === 'chadwick'` only). So "monitor calcium intake," "iron-rich food intake," and "cross-reference Chadwick's exercise log" are only half-true as protocol-only restores — she can ask about them via tools when Adam raises them, but nothing proactively surfaces them the way `bodyState` does.
 **writes:** existing `log_entry` (medical/weight/composition/measurements) — no change needed.
-**today: mostly fixable as protocol text, using tools that already exist** — this one doesn't need new code, because the trigger condition (Constraints mentioning osteopenia/a taper/a recent infusion) is already in her prompt, and the fetch mechanism (`search_medical_records`, `brief_medical_appointment`) is already wired. What's missing is a proactive instruction to use them without being asked. Restore, as new sections in `sara-protocol.md`:
+**today: two of the three protocols below are fixable as protocol text using what already exists (osteopenia monitoring can lean on `bodyState`, which is already there); the nutrition/exercise cross-references genuinely cannot be honest as written without one of two fixes:**
+
+- **Option 1 (code):** a small bounded read, gated `slug === 'sara'` and further gated on Constraints actually showing bone/iron/taper is active (don't fetch this every Sara turn regardless of relevance — same discipline as the rest of this codebase's bounded-read gates), pulling a 7-day nutrition summary (protein, calcium) and Chadwick's recent exercise-completion signal, formatted the same way `bodyState` already is.
+- **Option 2 (wording only, ships today, no code):** don't claim she can "monitor" or "cross-reference" these continuously — restrict the protocol to what she can actually do: ask Adam directly when the topic comes up, or read whatever the shared `digest` block happens to already carry (verify what that includes before relying on it, per B2's digest.mjs note above).
+
+**Pick one explicitly before shipping this section — do not restore wording that implies Option 1's visibility while only building Option 2's plumbing.** Restore, as new sections in `sara-protocol.md`, calibrated to whichever option is chosen:
 
 > **Bone Health Protocol.** If Constraints & Priorities mentions osteopenia, low bone density, or a corticosteroid course: call `search_medical_records` for the most recent relevant labs/DEXA before answering, don't wait to be asked. Monitor calcium intake (~1000mg/day non-dairy target), Vitamin D status, weight-bearing exercise frequency (coordinate with Chadwick), and any new back pain flag. Include a calcium status line in any weekly health brief while this is active.
 >
@@ -127,7 +146,9 @@ Also restore the **Ingredient Compatibility** check as pure prompt text (no new 
 >
 > **Steroid/Taper Protocol.** If Constraints shows an active corticosteroid taper: watch for returning Crohn's symptoms (flag any immediately for GP/gastro contact), fatigue/adrenal-fatigue-like symptoms, skin changes (coordinate with Hyaluronica), and mood changes (coordinate with Vera). Treat the 4 weeks after full cessation as a clinical inflection point needing heightened monitoring across all of the above, not a return to baseline.
 
-**Verification, not new code:** confirm `search_medical_records`/`brief_medical_appointment` are actually registered as tools for `slug === 'sara'` unconditionally (not gated behind some other flag) before assuming this works — grep the tool-registration site in `chat.mjs`.
+**Standing reminder, carried forward from v1 and worth restating explicitly so it doesn't get silently dropped again: none of the three protocols above may hardcode a specific date, dose, or lab value from Notion** (the original Notion text had a real 6 March 2026 infusion date, a real 3 April 2026 taper schedule, a real 48 nmol/L Vitamin D reading — all stale now). Every trigger condition above must read "if Constraints & Priorities currently shows X," resolved from live data at prompt-build time, never a frozen string. This is the same discipline the existing "flare/calprotectin" line in the current file already gets right — use it as the template.
+
+**Verification, not new code (for the parts of this section that don't need Option 1):** confirm `search_medical_records`/`brief_medical_appointment` are actually registered as tools for `slug === 'sara'` unconditionally (not gated behind some other flag) before assuming this works — grep the tool-registration site in `chat.mjs`.
 
 ---
 
@@ -147,15 +168,27 @@ Restore the sprint table additions:
 
 Appointment Prep sequence: pull the appointment record, related tasks/notes/pending items, offer to create prep tasks. Comms Follow-Up sequence: pull everything with a follow-up date at or past due, present in priority order, offer to create/update/resolve each, flag anything 7+ days overdue explicitly. **Both of these are real Tasks-Hub domain queries against Clare's own store — implement as actual protocol IDs with backing code, the same shape as the existing `morning-sweep`/`weekly-reset` entries, not markdown alone.**
 
-Restore all 7 ADHD tools as named, triggerable protocol IDs (the current file's "Shatter this, Time map, Open loops" are 3 of these, condensed — reconcile rather than duplicate):
+**Reconcile map — pin this before writing any code, so the restore doesn't produce near-duplicate pills sitting next to the originals.** `apps/tasks/src/domain/clare-protocols.ts` defines `ClareToolkitId = 'shatter-start' | 'time-map' | 'open-loops'` today — confirmed by reading the file directly. Map Notion's 7 named tools onto that:
 
-> 1. **Task Paralysis Shatterer** — "I am staring at [Task] and can't start." Break into under-a-minute steps, give only the first, include a physical start cue.
-> 2. **Dopamine Menu Architect** — "I am feeling under-stimulated, create a Dopamine Menu." Three lists: 5-min Appetizers, 20-min Entrees, 10-min Sides.
-> 3. **Body Doubling Simulator** — "Act as my virtual body double for 30 minutes." Ask what "done" looks like, run 30 minutes with check-ins every 10.
-> 4. **Context Switching Guide** — "I just finished [A], need to start [B]." 3-minute palate-cleanser with a start/end cue, name the first step of B.
-> 5. **Interest-Based Filter** — "Boring task: [X]. My hyperfixation: [Y]." Gamify X as a quest using Y, 3–5 stages with visible completion checks.
-> 6. **Time Blindness Auditor** — "I think [Project] takes 20 minutes but it's usually 2 hours." Time map: 3 hidden sub-tasks usually missed, a realistic budget.
-> 7. **Executive Function Externaliser** — "Brain full of open loops, dumping below." Now/Later/Trash, one-sentence next step for Now only.
+| Notion tool | Existing ID? | Action |
+|---|---|---|
+| Task Paralysis Shatterer | `shatter-start` | **Alias, don't duplicate.** Same tool, restore the fuller trigger/output spec below onto the existing ID. |
+| Time Blindness Auditor | `time-map` | **Alias, don't duplicate.** Same tool, restore the fuller spec onto the existing ID. |
+| Executive Function Externaliser | `open-loops` | **Alias, don't duplicate.** Same tool, restore the fuller spec onto the existing ID. |
+| Dopamine Menu Architect | none | **Net new.** Suggested ID: `dopamine-menu`. |
+| Body Doubling Simulator | none | **Net new.** Suggested ID: `body-double`. |
+| Context Switching Guide | none | **Net new.** Suggested ID: `context-switch`. |
+| Interest-Based Filter | none | **Net new.** Suggested ID: `interest-filter`. |
+
+So: restore the full trigger/output spec for all 7 below, but implement it as **3 existing IDs getting a fuller spec + 4 genuinely new IDs** — not 7 new pills, and not a second "Time Blindness Auditor" sitting next to "Time map."
+
+> 1. **Task Paralysis Shatterer** (`shatter-start`) — "I am staring at [Task] and can't start." Break into under-a-minute steps, give only the first, include a physical start cue.
+> 2. **Dopamine Menu Architect** (`dopamine-menu`, new) — "I am feeling under-stimulated, create a Dopamine Menu." Three lists: 5-min Appetizers, 20-min Entrees, 10-min Sides.
+> 3. **Body Doubling Simulator** (`body-double`, new) — "Act as my virtual body double for 30 minutes." Ask what "done" looks like, run 30 minutes with check-ins every 10.
+> 4. **Context Switching Guide** (`context-switch`, new) — "I just finished [A], need to start [B]." 3-minute palate-cleanser with a start/end cue, name the first step of B.
+> 5. **Interest-Based Filter** (`interest-filter`, new) — "Boring task: [X]. My hyperfixation: [Y]." Gamify X as a quest using Y, 3–5 stages with visible completion checks.
+> 6. **Time Blindness Auditor** (`time-map`) — "I think [Project] takes 20 minutes but it's usually 2 hours." Time map: 3 hidden sub-tasks usually missed, a realistic budget.
+> 7. **Executive Function Externaliser** (`open-loops`) — "Brain full of open loops, dumping below." Now/Later/Trash, one-sentence next step for Now only.
 
 Restore the Predictive Layer *only once its signals are real* (see above) — do not ship the prose ("high-load day + no meals logged → note to Brisket") ahead of the data existing, that's the exact mistake this revision is correcting.
 
