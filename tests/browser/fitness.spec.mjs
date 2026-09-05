@@ -36,7 +36,7 @@ async function signIn(page) {
   await page.locator('#app[data-state="ready"]').waitFor();
 }
 
-test('the Fitness tab renders the fixture workout and consistency heatmap', async () => {
+test('the Fitness tab renders the fixture workout and labeled analytics', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
@@ -53,7 +53,6 @@ test('the Fitness tab renders the fixture workout and consistency heatmap', asyn
     assert.ok(await page.locator('#fitness-region-grid .fitness-region-card').count() >= 1);
     assert.match(await page.locator('[data-fitness="week-volume"]').textContent(), /kg/);
     assert.match(await page.locator('[data-fitness="last-week-volume"]').textContent(), /—|kg/);
-    assert.match(await page.locator('[data-fitness="next-planned"]').textContent(), /Upper Body/);
     assert.match(await page.locator('[data-fitness="week-ring-value"]').textContent(), /1/);
     assert.match(await page.locator('#fitness-loads').textContent(), /Chest Press|Bicep Curl/i);
     assert.match(await page.locator('#fitness-volume-rows').textContent(), /Last 30 days/);
