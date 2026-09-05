@@ -1,8 +1,8 @@
-import { animateAreaReveal } from './chart-kit/animate.js';
-import { buildAreaLine } from './chart-kit/area-line.js';
 import { fillExercisePlanList } from './render-workout-plan.js';
 import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
 import { formatDisplayDate, formatWeekday } from '../core/time.js';
+
+const VOLUME_BAR_WEEKS = 12;
 
 const DAY_TYPE_LABELS = {
   movement: 'Movement day',
@@ -46,18 +46,7 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
   setText(root, '[data-fitness="streak"]', model.streak);
   setText(root, '[data-fitness="day-type"]', DAY_TYPE_LABELS[model.dayType] ?? model.dayType ?? '—');
 
-  const dots = root.querySelector('#fitness-week-dots');
-  if (dots) {
-    dots.replaceChildren();
-    for (const day of model.weekDots) {
-      const el = root.createElement('span');
-      el.dataset.hit = String(day.completed);
-      if (day.isToday) el.dataset.today = 'true';
-      el.title = formatDisplayDate(day.date);
-      dots.append(el);
-    }
-  }
-
+  renderWeekBoard(root, model);
   renderLongTerm(root, model.longTerm);
   renderRegions(root, model.regions);
 
@@ -152,37 +141,88 @@ export function renderTemplateRail(root, templatesState, { libraryByName, onSele
   }
 }
 
+function renderWeekBoard(root, model) {
+  const done = Number.isFinite(model.weekCompletedCount) ? model.weekCompletedCount : 0;
+  const target = Number.isFinite(model.weekTarget) && model.weekTarget > 0 ? model.weekTarget : 4;
+  setText(root, '[data-fitness="week-done"]', String(done));
+  setText(root, '[data-fitness="week-target"]', String(target));
+
+  const volumeByDate = new Map((model.weekVolume ?? []).map(day => [day.date, day.volume]));
+  const maxVolume = Math.max(0, ...volumeByDate.values());
+  const days = root.querySelector('#fitness-week-days');
+  if (days) {
+    days.replaceChildren();
+    for (const day of model.weekDots ?? []) {
+      const cell = root.createElement('div');
+      cell.className = 'fitness-week-day';
+      cell.dataset.hit = String(Boolean(day.completed));
+      if (day.isToday) cell.dataset.today = 'true';
+      cell.title = formatDisplayDate(day.date);
+
+      const name = root.createElement('span');
+      name.className = 'fitness-week-day__name';
+      name.textContent = (formatWeekday(day.date) || '').slice(0, 2);
+
+      const bar = root.createElement('span');
+      bar.className = 'fitness-week-day__bar';
+      const fill = root.createElement('i');
+      const volume = volumeByDate.get(day.date) ?? 0;
+      const pct = maxVolume > 0 ? Math.max(8, Math.round((volume / maxVolume) * 100)) : 8;
+      fill.style = fill.style ?? {};
+      if (typeof fill.style.setProperty === 'function') {
+        fill.style.setProperty('--bar', day.completed ? `${pct}%` : '8%');
+      } else {
+        fill.style['--bar'] = day.completed ? `${pct}%` : '8%';
+      }
+      bar.append(fill);
+
+      cell.append(name, bar);
+      days.append(cell);
+    }
+  }
+
+  const track = root.querySelector('#fitness-quota-track');
+  if (track) {
+    track.replaceChildren();
+    track.setAttribute('role', 'progressbar');
+    track.setAttribute('aria-valuemin', '0');
+    track.setAttribute('aria-valuemax', String(target));
+    track.setAttribute('aria-valuenow', String(done));
+    for (let i = 0; i < target; i++) {
+      const slot = root.createElement('span');
+      slot.dataset.filled = String(i < done);
+      track.append(slot);
+    }
+  }
+}
+
 function renderLongTerm(root, longTerm) {
   const data = longTerm ?? {};
-  setText(root, '[data-fitness="volume-delta"]', formatSignedPct(data.volumeDeltaPct));
+  const delta = formatSignedPct(data.volumeDeltaPct);
+  setText(root, '[data-fitness="volume-delta"]', delta);
   setText(root, '[data-fitness="workouts-week"]', formatWorkoutsPerWeek(data.workoutsPerWeek));
-  setText(
-    root,
-    '[data-fitness="adherence"]',
-    data.adherencePct == null || !Number.isFinite(data.adherencePct)
-      ? '—'
-      : `${Math.round(data.adherencePct)}%`
-  );
-  setText(root, '[data-fitness="strength-delta"]', formatSignedPct(data.strengthDeltaPct));
+  setHidden(root.querySelector('[data-fitness="volume-delta-wrap"]'), delta === '—');
 
-  const svg = root.querySelector('#fitness-volume-sparkline');
-  if (!svg) return;
-  const area = svg.querySelector('[data-role="area"]');
-  const line = svg.querySelector('[data-role="line"]');
-  const series = (data.weeklyVolume ?? []).map(week => ({
-    date: week.weekStart,
-    value: week.value
-  }));
-  if (!series.length) {
-    if (area) area.setAttribute('d', '');
-    if (line) line.setAttribute('d', '');
-    svg.classList?.remove?.('chart-animating', 'chart-static');
-    return;
+  const host = root.querySelector('#fitness-volume-bars');
+  if (!host) return;
+  host.replaceChildren();
+  const series = (data.weeklyVolume ?? []).slice(-VOLUME_BAR_WEEKS);
+  const max = Math.max(0, ...series.map(week => Number(week.value) || 0));
+  for (const week of series) {
+    const bar = root.createElement('span');
+    bar.className = 'fitness-volume-bar';
+    const value = Number(week.value) || 0;
+    const pct = max > 0 ? Math.max(value > 0 ? 12 : 6, Math.round((value / max) * 100)) : 6;
+    bar.dataset.hasValue = String(value > 0);
+    bar.title = `${formatDisplayDate(week.weekStart)} · ${formatKg(value)}`;
+    bar.style = bar.style ?? {};
+    if (typeof bar.style.setProperty === 'function') {
+      bar.style.setProperty('--bar', `${pct}%`);
+    } else {
+      bar.style['--bar'] = `${pct}%`;
+    }
+    host.append(bar);
   }
-  const chart = buildAreaLine(series, { height: 72, padding: 8 });
-  if (area) area.setAttribute('d', chart.areaPath || '');
-  if (line) line.setAttribute('d', chart.linePath || '');
-  queueMicrotask(() => animateAreaReveal(svg));
 }
 
 function renderRegions(root, regions) {
@@ -325,16 +365,13 @@ function renderHero(root, session, { logger, libraryByName } = {}) {
 
 function renderFocusStrip(root, focusHits) {
   const strip = root.querySelector('#fitness-focus-strip');
+  const card = root.querySelector('#fitness-focus-card');
   if (!strip) return;
   strip.replaceChildren();
-  if (!focusHits.length) {
-    const empty = root.createElement('p');
-    empty.className = 'metric-caption';
-    empty.textContent = 'No focus tags this week';
-    strip.append(empty);
-    return;
-  }
-  for (const hit of focusHits) {
+  const hits = Array.isArray(focusHits) ? focusHits : [];
+  setHidden(card, hits.length === 0);
+  if (!hits.length) return;
+  for (const hit of hits) {
     const pill = root.createElement('span');
     pill.className = 'fitness-focus-pill';
     const label = root.createElement('strong');
@@ -348,37 +385,31 @@ function renderFocusStrip(root, focusHits) {
 
 function renderComparisons(root, comparisons) {
   const host = root.querySelector('#fitness-comparisons');
+  const card = root.querySelector('#fitness-comparisons-card');
   if (!host) return;
   host.replaceChildren();
-  if (!comparisons.length) {
-    const empty = root.createElement('p');
-    empty.className = 'metric-caption';
-    empty.textContent = 'No exercises to compare yet';
-    host.append(empty);
-    return;
-  }
-  for (const row of comparisons) {
+  const rows = (comparisons ?? []).filter(row => !row.firstLogged && row.previousBest);
+  setHidden(card, rows.length === 0);
+  if (!rows.length) return;
+  for (const row of rows) {
     const item = root.createElement('div');
     item.className = 'fitness-compare-row';
     const name = root.createElement('strong');
     name.textContent = row.name ?? 'Exercise';
     const detail = root.createElement('p');
-    if (row.firstLogged) {
-      detail.textContent = `${formatLoad(row.currentBest)} · first logged`;
-    } else {
-      detail.textContent = `${formatLoad(row.currentBest)} vs ${formatLoad(row.previousBest)}`;
-    }
+    detail.textContent = `${formatLoad(row.currentBest)} vs ${formatLoad(row.previousBest)}`;
     item.append(name, detail);
     if (row.isPr) {
       const badge = root.createElement('span');
       badge.className = 'pr-badge';
       badge.textContent = 'PR';
       item.append(badge);
-    } else if (row.firstLogged) {
-      const first = root.createElement('span');
-      first.className = 'fitness-first-logged';
-      first.textContent = 'New';
-      item.append(first);
+    } else if (row.weightDeltaKg != null && Number.isFinite(row.weightDeltaKg) && row.weightDeltaKg !== 0) {
+      const delta = root.createElement('span');
+      delta.className = 'fitness-compare-delta';
+      delta.dataset.colour = row.weightDeltaKg > 0 ? 'green' : 'red';
+      delta.textContent = formatSignedKg(row.weightDeltaKg);
+      item.append(delta);
     }
     host.append(item);
   }
@@ -393,7 +424,10 @@ function renderHeatmap(root, month) {
   const grid = root.querySelector('#fitness-heatmap');
   if (!grid) return;
   grid.replaceChildren();
-  for (const day of month) {
+  const days = month ?? [];
+  const hits = days.filter(day => day.completed).length;
+  setText(root, '[data-fitness="month-hits"]', String(hits));
+  for (const day of days) {
     const tile = root.createElement('span');
     tile.className = 'heatmap-tile';
     tile.dataset.hit = String(day.completed);

@@ -597,36 +597,41 @@
         </section>
 
         <section id="fitness-dashboard" class="dashboard" aria-label="Fitness" hidden>
-          <div class="fitness-long-term-trio" aria-label="Long-term training trends">
-            <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-volume-label">
-              <p class="metric-label" id="fitness-volume-label">Weekly volume</p>
-              <p class="metric-value"><strong data-fitness="volume-delta">—</strong><span> vs earlier half</span></p>
-              <svg id="fitness-volume-sparkline" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Weekly training volume over 26 weeks">
-                <path data-role="area" d=""></path>
-                <path data-role="line" d=""></path>
-              </svg>
-            </article>
-            <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-workouts-label">
-              <p class="metric-label" id="fitness-workouts-label">Workouts / week</p>
-              <p class="metric-value"><strong data-fitness="workouts-week">—</strong></p>
-              <p class="metric-caption">Adherence <strong data-fitness="adherence">—</strong></p>
-            </article>
-            <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-strength-label">
-              <p class="metric-label" id="fitness-strength-label">Strength Δ</p>
-              <p class="metric-value"><strong data-fitness="strength-delta">—</strong></p>
-              <p class="metric-caption">Best-set trend across regions</p>
-            </article>
-          </div>
-
-          <article class="metric-card fitness-streak-card fitness-streak-card--quiet">
-            <div class="fitness-streak-strip">
+          <article class="metric-card fitness-week-board" aria-labelledby="fitness-week-heading">
+            <div class="fitness-week-board__head">
               <div>
-                <p class="metric-label">Streak</p>
-                <p class="metric-value metric-value--compact"><strong data-fitness="streak">—</strong><span> day streak</span></p>
+                <p class="metric-label" id="fitness-week-heading">This week</p>
+                <p class="metric-value metric-value--compact">
+                  <strong data-fitness="week-done">—</strong>
+                  <span> of </span>
+                  <span data-fitness="week-target">4</span>
+                  <span> sessions</span>
+                </p>
               </div>
-              <p class="fitness-day-type" data-fitness="day-type">—</p>
-              <div id="fitness-week-dots" class="fitness-week-dots" aria-label="Last 7 days of sessions"></div>
+              <div class="fitness-week-board__meta">
+                <p class="metric-caption"><strong data-fitness="streak">—</strong> day streak</p>
+                <p class="fitness-day-type" data-fitness="day-type">—</p>
+              </div>
             </div>
+            <div id="fitness-week-days" class="fitness-week-days" aria-label="Last 7 days of sessions"></div>
+            <div class="fitness-quota">
+              <div id="fitness-quota-track" class="fitness-quota__track" aria-label="Weekly session target"></div>
+              <p class="metric-caption">Target 4 / week · <span data-fitness="workouts-week">—</span> average</p>
+            </div>
+            <div id="fitness-focus-card" hidden>
+              <p class="metric-label">Focus</p>
+              <div id="fitness-focus-strip" class="fitness-focus-strip"></div>
+            </div>
+          </article>
+
+          <article class="metric-card fitness-trend-card" aria-labelledby="fitness-volume-label">
+            <div class="fitness-trend-card__head">
+              <p class="metric-label" id="fitness-volume-label">Weekly volume</p>
+              <p class="metric-caption" data-fitness="volume-delta-wrap" hidden>
+                <strong data-fitness="volume-delta">—</strong> vs earlier half
+              </p>
+            </div>
+            <div id="fitness-volume-bars" class="fitness-volume-bars" role="img" aria-label="Weekly training volume, last 12 weeks"></div>
           </article>
 
           <article class="metric-card fitness-hero-card" aria-labelledby="fitness-hero-label">
@@ -689,19 +694,17 @@
             <div id="fitness-region-grid" class="fitness-region-grid" aria-labelledby="fitness-region-heading"></div>
           </div>
 
-          <article class="metric-card">
-            <p class="metric-label">Focus this week</p>
-            <div id="fitness-focus-strip" class="fitness-focus-strip"></div>
-          </article>
-
-          <article class="metric-card">
+          <article id="fitness-comparisons-card" class="metric-card" hidden>
             <p class="metric-label">Vs last time</p>
             <div id="fitness-comparisons" class="fitness-comparisons"></div>
           </article>
 
-          <article class="metric-card chart-card">
-            <p class="metric-label">30-day consistency</p>
-            <div id="fitness-heatmap" class="heatmap-grid" aria-label="Completed workouts last 30 days"></div>
+          <article class="metric-card fitness-consistency-card">
+            <div class="fitness-consistency-card__head">
+              <p class="metric-label">30-day consistency</p>
+              <p class="metric-caption"><strong data-fitness="month-hits">—</strong> sessions</p>
+            </div>
+            <div id="fitness-heatmap" class="heatmap-grid heatmap-grid--compact" aria-label="Completed workouts last 30 days"></div>
           </article>
 
           <button id="fitness-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Chadwick">💬</button>

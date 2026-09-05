@@ -5,6 +5,7 @@ import {
   estimateOneRepMax,
   sessionVolume,
   normalizeExerciseName,
+  canonicalExerciseName,
   REGION_KEYS,
   resolveExerciseRegion
 } from '../../apps/life/js/app/fitness-model.js';
@@ -40,6 +41,41 @@ test('sessionVolume sums reps * weight for valid sets only', () => {
 
 test('normalizeExerciseName trims and lowercases', () => {
   assert.equal(normalizeExerciseName('  Chest Press '), 'chest press');
+});
+
+test('canonicalExerciseName strips trailing set numbers so logged sets collapse', () => {
+  assert.equal(canonicalExerciseName('Bar Press set 1'), 'Bar Press');
+  assert.equal(canonicalExerciseName('Bar Press set 12'), 'Bar Press');
+  assert.equal(normalizeExerciseName('Bar Press set 2'), 'bar press');
+});
+
+test('comparisons collapse set-suffixed names and expose a kg delta', () => {
+  const model = buildFitnessModel({
+    events: events([
+      workout({
+        date: '2026-07-20',
+        exercises: [
+          { name: 'Bar Press set 1', sets: [{ reps: 10, weight_kg: 28 }] },
+          { name: 'Bar Press set 2', sets: [{ reps: 8, weight_kg: 30 }] }
+        ]
+      }),
+      workout({
+        date: '2026-07-30',
+        exercises: [
+          { name: 'Bar Press set 1', sets: [{ reps: 10, weight_kg: 30 }] },
+          { name: 'Bar Press set 2', sets: [{ reps: 8, weight_kg: 32 }] },
+          { name: 'Bar Press set 3', sets: [{ reps: 8, weight_kg: 32 }] }
+        ]
+      })
+    ]),
+    date: '2026-07-30'
+  });
+  assert.equal(model.comparisons.length, 1);
+  assert.equal(model.comparisons[0].name, 'Bar Press');
+  assert.equal(model.comparisons[0].firstLogged, false);
+  assert.equal(model.comparisons[0].weightDeltaKg, 2);
+  assert.equal(model.weekCompletedCount, 1);
+  assert.equal(model.weekTarget, 4);
 });
 
 test('hero prefers today planned over older completed', () => {
