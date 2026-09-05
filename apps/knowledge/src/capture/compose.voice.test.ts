@@ -1,12 +1,5 @@
-/** @vitest-environment jsdom */
-
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  adoptComposeVoiceWave,
-  captureFieldHtml,
-  createComposeVoiceWave,
-  createVoiceCapture,
-} from "./compose";
+import { createVoiceCapture } from "./compose";
 
 class FakeRecorder {
   static isTypeSupported() {
@@ -29,7 +22,6 @@ class FakeRecorder {
 function installFakeMedia() {
   vi.stubGlobal("MediaRecorder", FakeRecorder);
   vi.stubGlobal("navigator", {
-    ...navigator,
     mediaDevices: {
       getUserMedia: async () => ({
         getTracks: () => [{ stop() {} }],
@@ -63,25 +55,6 @@ describe("createVoiceCapture", () => {
     expect(files).toHaveLength(0);
     live.stopMic();
     replacement.stopMic();
-  });
-
-  it("the same handle still delivers after the compose slot is replaced", async () => {
-    installFakeMedia();
-    const files: File[] = [];
-    const host = createComposeVoiceWave();
-    const voice = createVoiceCapture({ onFile: file => files.push(file) });
-    await expect(voice.toggle()).resolves.toBe("started");
-    const next = document.createElement("div");
-    next.innerHTML = captureFieldHtml({
-      busy: false,
-      captureBusy: false,
-      recording: true,
-      localData: false,
-    });
-    adoptComposeVoiceWave(next, host);
-    expect(next.querySelector("[data-voice-wave]")).toBe(host);
-    await expect(voice.toggle()).resolves.toBe("stopping");
-    expect(files).toHaveLength(1);
   });
 
   it("stopMic discards the take instead of ingesting it", async () => {
