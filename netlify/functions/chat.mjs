@@ -34,6 +34,7 @@ import { loadBrisketProtocol } from './_shared/load-brisket-protocol.mjs';
 import { loadSaraProtocol } from './_shared/load-sara-protocol.mjs';
 import { loadHammondProtocol } from './_shared/load-hammond-protocol.mjs';
 import {
+import { buildUserContent, normalizeChatAttachments } from '../../packages/design-kit/js/hub-chat-attachments.js';
   normalizeAuditSession,
   buildHammondAuditContract,
   startAuditSessionFromMessage,
@@ -369,7 +370,7 @@ export function createChatHandler({
           slug,
           userMessage: parsed.message,
           today,
-          messages: [...parsed.history, { role: 'user', content: parsed.message }]
+          messages: [...parsed.history, { role: 'user', content: parsed.userContent ?? parsed.message }]
         });
         if (forcedPlan) {
           send({ type: 'status', text: 'Locking the plan onto Fitness…' });
@@ -1074,7 +1075,7 @@ export function createChatHandler({
             userMessage: parsed.message,
             today,
             system,
-            messages: [...parsed.history, { role: 'user', content: parsed.message }],
+            messages: [...parsed.history, { role: 'user', content: parsed.userContent ?? parsed.message }],
             tools,
             signal: request.signal,
             executeTools: async event => {
@@ -1799,8 +1800,11 @@ async function parseRequest(request) {
   if (!body || typeof body.message !== 'string' || body.message.trim().length === 0 || body.message.length > MAX_MESSAGE_LENGTH) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid chat message.', false, PRIVATE_CACHE) };
   }
+  const attachments = normalizeChatAttachments(body.attachments);
   return {
     message: body.message,
+    attachments,
+    userContent: buildUserContent(body.message, attachments),
     history: sanitizeHistory(body.history),
     priorAgentSlug: typeof body.priorAgentSlug === 'string' ? body.priorAgentSlug : undefined,
     auditSession: normalizeAuditSession(body.auditSession),

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en-AU" data-hub="life">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A1536">
+  <title>Life Hub · Capture Inbox</title>
+  <link rel="icon" href="packages/design-kit/icons/life-hub.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="packages/design-kit/tokens.css">
+  <link rel="stylesheet" href="packages/design-kit/actions.css">
+  <link rel="stylesheet" href="packages/design-kit/sign-in.css">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .capture-inbox {
+      max-width: 36rem;
+      margin: 0 auto;
+      padding: 1.5rem 1.25rem 3rem;
+    }
+    .capture-inbox h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.35rem;
+    }
+    .capture-inbox__lede {
+      margin: 0 0 1.25rem;
+      opacity: 0.8;
+    }
+    .capture-inbox__card {
+      display: grid;
+      gap: 0.75rem;
+      padding: 1rem 1.1rem;
+      border-radius: 0.85rem;
+      background: var(--surface-2, #fff);
+      box-shadow: 0 8px 24px rgba(10, 21, 54, 0.08);
+    }
+    .capture-inbox__meta {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+    .capture-inbox__files {
+      margin: 0;
+      padding-left: 1.1rem;
+    }
+    .capture-inbox__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .capture-inbox__empty {
+      margin: 0;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <main class="capture-inbox" id="capture-inbox">
+    <p class="sign-in__brand">Life Hub</p>
+    <h1>Capture Inbox</h1>
+    <p class="capture-inbox__lede">Shared from another app. Review, then route — nothing is written automatically.</p>
+    <section class="capture-inbox__card" id="capture-inbox-card" aria-live="polite">
+      <p class="capture-inbox__empty">Waiting for a share…</p>
+    </section>
+  </main>
+  <script type="module" src="js/app/capture-inbox.js"></script>
+</body>
+</html>

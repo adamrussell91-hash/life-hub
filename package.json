@@ -20,6 +20,7 @@
     "import:mind": "node scripts/import-mind-notion.mjs"
   },
   "dependencies": {
+    "@annotorious/annotorious": "^3.8.10",
     "@atlaskit/pragmatic-drag-and-drop": "^3.1.0",
     "@aws-sdk/client-s3": "^3.758.0",
     "@aws-sdk/s3-request-presigner": "^3.758.0",
@@ -29,12 +30,16 @@
     "@tiptap/markdown": "^3.31.3",
     "@tiptap/pm": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
+    "@uppy/core": "^4.5.3",
     "heic-to": "^1.1.2",
     "js-yaml": "4.3.0",
     "jscanify": "^1.4.0",
+    "maplibre-gl": "^5.24.0",
+    "media-chrome": "^4.19.2",
     "minisearch": "^7.2.0",
     "pdfjs-dist": "^5.4.296",
-    "photoswipe": "^5.4.4"
+    "photoswipe": "^5.4.4",
+    "wavesurfer.js": "^7.12.11"
   },
   "devDependencies": {
     "@types/d3-force": "^3.0.10",
