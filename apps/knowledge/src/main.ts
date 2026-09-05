@@ -3,6 +3,10 @@ import "./style.css";
 import { startHubMotion } from "../design-kit/js/hub-motion.js";
 import { openHubCommandSearch } from "../design-kit/js/hub-command-search.js";
 import { autoUpdateHubFloating, positionHubFloating } from "../design-kit/js/hub-floating.js";
+import {
+  formatPdfHighlightMarkdown,
+  openHubPdfViewer,
+} from "../design-kit/js/hub-pdf-viewer.js";
 import { createJournalNav, createPinList } from "../design-kit/js/hub-surfaces.js";
 import { morphFromRect } from "../design-kit/js/morphing-dialog.js";
 import { bindHubAccordion, hubSwitcherHtml } from "../../../packages/hub-switcher.js";
@@ -1275,7 +1279,33 @@ function renderPage(page: Page) {
   app.querySelectorAll<HTMLButtonElement>("[data-attachment]").forEach(button => {
     button.onclick = async () => {
       try {
-        const { url } = await getAttachmentUrl(page.id, button.dataset.attachment!);
+        const attachmentId = button.dataset.attachment!;
+        const attachment = page.attachments.find(item => item.id === attachmentId);
+        const { url } = await getAttachmentUrl(page.id, attachmentId);
+        if (attachment?.kind === "pdf") {
+          await openHubPdfViewer({
+            src: url,
+            title: attachment.filename,
+            attachmentId: attachment.id,
+            onHighlight: async highlight => {
+              const current = activePage;
+              if (!current || current.id !== page.id) return;
+              const block = formatPdfHighlightMarkdown(highlight);
+              if (!block.trim()) return;
+              const saved = await savePage({
+                ...current,
+                body: `${current.body || ""}${block}`,
+                updated_at: new Date().toISOString(),
+              });
+              activePage = saved;
+              Object.assign(page, saved);
+              const bodyEl = app.querySelector(".reader__body");
+              if (bodyEl) bodyEl.innerHTML = renderMarkdown(saved.body);
+              showToast("Highlight saved");
+            },
+          });
+          return;
+        }
         window.location.assign(url);
       } catch (error) {
         showToast(error instanceof Error ? error.message : "Download unavailable");
