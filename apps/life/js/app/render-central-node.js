@@ -1,6 +1,7 @@
 import { animateRingFill } from './chart-kit/animate.js';
+import { buildHorizonBands } from './chart-kit/horizon.js';
 import { packMasonry } from './chart-kit/masonry.js';
-import { buildCompletionRing } from './central-node-charts.js';
+import { buildCompletionRing, weekHorizonMetrics } from './central-node-charts.js';
 import { renderInlineMarkdown } from './render-chat.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
@@ -42,6 +43,7 @@ export function renderCentralNode(root, model) {
   renderLiveStatus(root, model.liveStatus);
   renderCompletionRing(root, model.completeness);
   bindCnBoard(root);
+  renderWeekHorizon(root, model);
   packCnBoard(root);
   root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
 }
@@ -116,6 +118,30 @@ export function paintChartOrEmpty(root, host, svg, { need, have, unit }) {
   empty.hidden = false;
   empty.textContent = `Need ${threshold} ${unit}. ${count} so far.`;
   return false;
+}
+
+function renderWeekHorizon(root, model) {
+  const svg = root.querySelector('#central-node-week-horizon');
+  const tile = root.querySelector('#cn-tile-week') ?? svg?.parentNode;
+  if (!svg || !tile) return;
+  const week = model.week ?? [];
+  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: week.length, unit: 'protein days' })) return;
+  const bands = buildHorizonBands(weekHorizonMetrics(week), { width: 320, height: 24 });
+  svg.replaceChildren();
+  svg.setAttribute('viewBox', '0 0 320 24');
+  for (const band of bands) {
+    for (const rect of band.rects) {
+      const node = createSvg(root, 'rect');
+      node.setAttribute('x', String(rect.x));
+      node.setAttribute('y', String(rect.y));
+      node.setAttribute('width', String(rect.width));
+      node.setAttribute('height', String(rect.height));
+      node.setAttribute('fill', 'var(--wave)');
+      node.setAttribute('opacity', String(rect.opacity));
+      node.setAttribute('title', `${rect.date} · ${rect.value} g`);
+      svg.append(node);
+    }
+  }
 }
 
 function renderLiveStatus(root, liveStatus) {
