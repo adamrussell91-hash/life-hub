@@ -8,7 +8,7 @@
 
 | Hub | Overall | Notes |
 |-----|---------|-------|
-| Life | **Pass** (chrome) | Marks, favicon, confirm-card actions, display dates fixed. Product chart hex retained as domain colour. |
+| Life | **Pass** (chrome) | Favicon + sign-in mark only. No `.hub-mark` beside page titles (locked; do not re-add). Confirm-card actions, display dates fixed. Product chart hex retained as domain colour. |
 | Teaching | **Pass** (chrome) | Marks unhidden; title-row mark; labeled rail only; utilities in header actions; 720px breakpoint; confirm-card replaces `window.confirm`. |
 | Knowledge | **Pass** (chrome) | Marks on gate + title-row; capture titles `dd/mm/yy`; tidy confirm-card; primary `.btn` on quiz/podcast submits. |
 | Tasks | **Pass** (chrome) | Marks on gate + title-row; reminder labels via `formatDisplayDate`; dead mobile-rail CSS removed. |
@@ -50,7 +50,7 @@ Category 9 stays Partial on purpose: product viz / map / dump / agent brand colo
 - Flat path docs; `prepare-web` publishes `icons/`
 
 ### Life
-- Favicon + `.sign-in__mark` + `.hub-mark` in `.page-header__title-row`
+- Favicon + `.sign-in__mark` on the gate. **No** `.hub-mark` in `.page-header__title-row` (Adam; #26). Do not “fix” this.
 - Proposals use `.confirm-card` + `.btn.btn--primary` / `.btn.btn--ghost`
 - Mind / fitness display dates via `formatDisplayDate`
 - Removed dead brand-mark / nav-dot chrome CSS

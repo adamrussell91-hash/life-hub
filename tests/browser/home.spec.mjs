@@ -210,7 +210,7 @@ test('home cards do not grow a cursor-follow spotlight sheen', async () => {
   await context.close();
 });
 
-test('the Life Hub tile appears on sign-in and every signed-in page', async () => {
+test('the Life Hub tile does not sit beside any page title', async () => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
   try {
@@ -233,9 +233,10 @@ test('the Life Hub tile appears on sign-in and every signed-in page', async () =
       ['central-node', 'Central Node']
     ];
     for (const [section, title] of sections) {
-      await page.locator(`.desktop-rail .nav-item[data-section="${section}"]`).click();
+      await page.locator(`.desktop-rail button[data-section="${section}"]`).first().click();
       await page.locator('#page-title', { hasText: title }).waitFor();
-      assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 1, section);
+      assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 0, section);
+      assert.equal(await page.locator('.hub-mark').count(), 0, section);
     }
   } finally {
     await context.close();

@@ -74,18 +74,12 @@ function renderRunWidget(root, model) {
   if (!host) return;
   host.replaceChildren();
   const sessionKm = Number(model.heroSession?.distance_km);
-  if (Number.isFinite(sessionKm) && sessionKm > 0) {
-    createRunWidget({ root, wrap: host, distance: sessionKm, unit: 'km', label: 'Last session' });
+  if (!(Number.isFinite(sessionKm) && sessionKm > 0)) {
+    host.setAttribute('hidden', '');
     return;
   }
-  const perWeek = Number(model.longTerm?.workoutsPerWeek) || 0;
-  createRunWidget({
-    root,
-    wrap: host,
-    distance: Math.round(perWeek * 10) / 10,
-    unit: '/ week',
-    label: 'Workouts'
-  });
+  host.removeAttribute('hidden');
+  createRunWidget({ root, wrap: host, distance: sessionKm, unit: 'km', label: 'Last session' });
 }
 
 export function renderMuscleStrip(container, keys) {

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { tasksApi } from '@/services/client-api';
+import { CHAT_AGENTS } from '@/chat/agents';
+import { collectRecentThread, STATUS_ROTATE_MS } from '@/chat/clare-controller';
 import { renderClareView } from '@/views/clare';
 import type { FrameworkEntry } from '@/schemas/templates';
 import type { ClareProposal } from '@/domain/clare';
@@ -135,10 +137,20 @@ describe('Clare protocol controls', () => {
     expect(first).toBeTruthy();
     expect(first).not.toMatch(/thinking|working/i);
 
+    expect(canvas.querySelectorAll('.chat-message--status')).toHaveLength(1);
+    expect(canvas.querySelector('.chat-message--status')?.getAttribute('role')).toBe('status');
+    expect(canvas.querySelector('.chat-message--status')?.getAttribute('aria-live')).toBe('polite');
+    expect(collectRecentThread(canvas).some((entry) => entry.text === first)).toBe(false);
+
     await vi.advanceTimersByTimeAsync(1800);
+    expect(canvas.querySelector('.chat-message--status')?.textContent).toBe(first);
+    expect(canvas.querySelectorAll('.chat-message--status')).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(STATUS_ROTATE_MS - 1800);
     const second = canvas.querySelector('.chat-message--status')?.textContent;
     expect(second).toBeTruthy();
     expect(second).not.toBe(first);
+    expect(canvas.querySelectorAll('.chat-message--status')).toHaveLength(1);
 
     pending.resolve({
       voice: 'Right — one thing, and it actually has a shape. Here is my take.',
@@ -267,5 +279,65 @@ describe('Clare protocol controls', () => {
     await vi.waitFor(() => expect(canvas.textContent).toContain('Ethics and Da Vinci overlap'));
     const avatars = [...canvas.querySelectorAll<HTMLImageElement>('.chat-message--assistant .chat-message__avatar')];
     expect(avatars.at(-1)?.getAttribute('src')).toBe('/assets/agents/hammond.jpg');
+  });
+
+  it('removes the status bubble on failure and new chat', async () => {
+    vi.useFakeTimers();
+    vi.mocked(tasksApi.processDumpWithClare).mockRejectedValueOnce(new Error('Clare could not reply.'));
+    const canvas = document.createElement('main');
+    await renderClareView(canvas);
+    const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
+    dump.value = 'Park this';
+    canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
+      new Event('submit', { bubbles: true, cancelable: true })
+    );
+    await vi.waitFor(() => expect(canvas.querySelector('.chat-error, #chat-error')?.textContent).toMatch(/could not reply/i));
+    expect(canvas.querySelector('.chat-message--status')).toBeNull();
+    expect(canvas.querySelector('.hub-loader, .typing-indicator')).toBeNull();
+
+    const pending = deferred<import('@/domain/clare').ClareDumpResult>();
+    vi.mocked(tasksApi.processDumpWithClare).mockReturnValue(pending.promise);
+    dump.value = 'Again';
+    canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
+      new Event('submit', { bubbles: true, cancelable: true })
+    );
+    await vi.waitFor(() => expect(canvas.querySelector('.chat-message--status')).toBeTruthy());
+    canvas.querySelector<HTMLButtonElement>('#chat-new')!.click();
+    await vi.waitFor(() => expect(tasksApi.briefWithClare).toHaveBeenCalled());
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    expect(canvas.querySelector('.chat-message--status')).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('uses the newly selected agent wait lines after switching', async () => {
+    vi.useFakeTimers();
+    const pending = deferred<import('@/domain/clare').ClareDumpResult>();
+    vi.mocked(tasksApi.processDumpWithClare).mockReturnValue(pending.promise);
+    const canvas = document.createElement('main');
+    await renderClareView(canvas);
+    canvas.querySelector<HTMLButtonElement>('[data-agent-slug="vera"]')!.click();
+    const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
+    dump.value = 'Hold this';
+    canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
+      new Event('submit', { bubbles: true, cancelable: true })
+    );
+    await vi.waitFor(() => expect(canvas.querySelector('.chat-message--status')).toBeTruthy());
+    const line = canvas.querySelector('.chat-message--status')?.textContent ?? '';
+    expect(CHAT_AGENTS.find((agent) => agent.slug === 'vera')?.waitLines).toContain(line);
+    expect(CHAT_AGENTS.find((agent) => agent.slug === 'clare')?.waitLines).not.toContain(line);
+    pending.resolve({
+      voice: 'Sit with the pattern.',
+      proposals: [],
+      questions: [],
+      notes: [],
+      toolkit: null,
+      mutations: [],
+      agent: 'vera'
+    });
+    await vi.runOnlyPendingTimersAsync();
+    await Promise.resolve();
+    expect(canvas.querySelector('.chat-message--status')).toBeNull();
+    vi.useRealTimers();
   });
 });

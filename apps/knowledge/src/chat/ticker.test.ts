@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { appendTick, chatTick } from "./ticker";
+import {
+  ANN_WAIT_LINES,
+  CLEMENTINE_WAIT_LINES,
+  appendTick,
+  chatTick,
+  pickAgentWaitLine,
+  pickClementineWaitLine,
+} from "./ticker";
 
 describe("chatTick", () => {
   it("names the sitting when search starts", () => {
@@ -84,6 +91,28 @@ describe("chatTick", () => {
         waitLine: "Turning the page back to the book…",
       }),
     ).toBe("Turning the page back to the book… — drafting the note from the open web");
+  });
+});
+
+describe("pickAgentWaitLine", () => {
+  it("gives Ann a non-empty Knowledge Hub status pool", () => {
+    expect(ANN_WAIT_LINES.length).toBeGreaterThan(0);
+    expect(ANN_WAIT_LINES.every(line => line.includes("…"))).toBe(true);
+    expect(ANN_WAIT_LINES).toContain("Looking for the turn…");
+    expect(ANN_WAIT_LINES).toContain("Putting a margin note beside this…");
+  });
+
+  it("returns Clementine lines for Clementine and Ann lines for Ann", () => {
+    expect(CLEMENTINE_WAIT_LINES).toContain(pickAgentWaitLine("clementine", { random: () => 0 }));
+    expect(ANN_WAIT_LINES).toContain(pickAgentWaitLine("ann", { random: () => 0 }));
+    expect(pickClementineWaitLine({ random: () => 0 })).toBe(CLEMENTINE_WAIT_LINES[0]);
+  });
+
+  it("avoids immediate repetition when another option exists", () => {
+    const first = pickAgentWaitLine("ann", { random: () => 0 });
+    const second = pickAgentWaitLine("ann", { exclude: first, random: () => 0 });
+    expect(second).not.toBe(first);
+    expect(ANN_WAIT_LINES).toContain(second);
   });
 });
 

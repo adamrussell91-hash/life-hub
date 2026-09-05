@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runChat, savePage } from "../api/client";
+import { ANN_WAIT_LINES, CLEMENTINE_WAIT_LINES, STATUS_ROTATE_MS } from "./ticker";
 import { ensureChatOverlay, hideChatOverlay, openChatOverlay } from "./overlay";
 
 vi.mock("../api/client", () => ({
@@ -283,5 +284,196 @@ Effortful retrieval is the load-bearing claim. The archive supports Bjork here a
     list!.scrollTop = 40;
     list!.dispatchEvent(new Event("scroll"));
     expect(hide!.classList.contains("is-hidden")).toBe(false);
+  });
+});
+
+function openFreshOverlay(personality: "clementine" | "ann" = "clementine") {
+  sessionStorage.setItem(
+    "knowledge-hub-overlay-chat-v1",
+    JSON.stringify({
+      personality,
+      open: true,
+      input: "",
+      turns: [],
+    }),
+  );
+  ensureChatOverlay({ visible: true });
+}
+
+function storedTurns() {
+  const raw = sessionStorage.getItem("knowledge-hub-overlay-chat-v1");
+  return raw ? (JSON.parse(raw) as { turns?: Array<{ role: string; content: string }> }).turns ?? [] : [];
+}
+
+function statusNodes() {
+  return [...document.querySelectorAll(".chat-message--status")];
+}
+
+function submitOverlay(text: string) {
+  const field = document.querySelector<HTMLTextAreaElement>("#overlay-chat-input")!;
+  field.value = text;
+  field.dispatchEvent(new Event("input"));
+  document.querySelector<HTMLFormElement>(".chat-form")!.dispatchEvent(
+    new Event("submit", { bubbles: true, cancelable: true }),
+  );
+}
+
+const sampleResearch = {
+  query: "desirable difficulties",
+  round: 2,
+  status: "running" as const,
+  findings: [
+    {
+      pageId: "page_1",
+      title: "Make It Stick",
+      sourceUrl: "https://example.com",
+      excerpt: "retrieval",
+      stance: "supports" as const,
+      analysis: "",
+    },
+  ],
+  gaps: [],
+  followUpQueries: ["spacing"],
+};
+
+describe("overlay working status", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    sessionStorage.clear();
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    hideChatOverlay();
+  });
+
+  afterEach(() => {
+    hideChatOverlay();
+    vi.useRealTimers();
+  });
+
+  it("shows a temporary Clementine status immediately after send and keeps it out of turns", async () => {
+    runChatMock.mockImplementation(() => new Promise(() => undefined));
+    openFreshOverlay();
+    submitOverlay("How do these notes connect?");
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(statusNodes()).toHaveLength(1);
+    const line = statusNodes()[0]?.textContent ?? "";
+    expect(CLEMENTINE_WAIT_LINES.some(item => line.includes(item))).toBe(true);
+    expect(document.querySelector("[type=submit]")?.textContent).toBe("Send");
+    expect(document.querySelectorAll(".chat-message--status")).toHaveLength(1);
+
+    const turns = storedTurns();
+    expect(turns).toEqual([{ role: "user", content: "How do these notes connect?" }]);
+    expect(turns.some(turn => CLEMENTINE_WAIT_LINES.includes(turn.content))).toBe(false);
+  });
+
+  it("uses Ann's local status vocabulary after switching personality", async () => {
+    runChatMock.mockImplementation(() => new Promise(() => undefined));
+    openFreshOverlay("ann");
+    submitOverlay("Where is the hinge?");
+    await vi.advanceTimersByTimeAsync(0);
+
+    const line = statusNodes()[0]?.textContent ?? "";
+    expect(ANN_WAIT_LINES.some(item => line.includes(item))).toBe(true);
+    expect(CLEMENTINE_WAIT_LINES.some(item => line.includes(item))).toBe(false);
+  });
+
+  it("updates the same temporary status for researching and writing", async () => {
+    runChatMock
+      .mockResolvedValueOnce({
+        status: "researching",
+        researchSessionId: "res_1",
+        research: sampleResearch,
+      })
+      .mockResolvedValueOnce({
+        status: "writing",
+        writeSessionId: "write_1",
+        research: sampleResearch,
+      });
+    openFreshOverlay();
+    submitOverlay("Map the argument");
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(statusNodes()).toHaveLength(1);
+    expect(statusNodes()[0]?.textContent).toMatch(/round 2/);
+    expect(storedTurns()).toEqual([{ role: "user", content: "Map the argument" }]);
+
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(statusNodes()).toHaveLength(1);
+    expect(statusNodes()[0]?.textContent).toMatch(/archive note/);
+    expect(storedTurns().filter(turn => turn.role === "assistant")).toHaveLength(0);
+  });
+
+  it("does not churn the visible line on a two-second poll of the same phase", async () => {
+    runChatMock.mockResolvedValue({
+      status: "researching",
+      researchSessionId: "res_1",
+      research: sampleResearch,
+    });
+    openFreshOverlay();
+    submitOverlay("Keep looking");
+    await vi.advanceTimersByTimeAsync(0);
+    const first = statusNodes()[0]?.textContent;
+
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(statusNodes()).toHaveLength(1);
+    expect(statusNodes()[0]?.textContent).toBe(first);
+  });
+
+  it("rotates the personality line after a prolonged unchanged phase", async () => {
+    runChatMock.mockResolvedValue({
+      status: "researching",
+      researchSessionId: "res_1",
+      research: sampleResearch,
+    });
+    openFreshOverlay();
+    submitOverlay("Keep looking");
+    await vi.advanceTimersByTimeAsync(0);
+    const first = statusNodes()[0]?.textContent;
+
+    await vi.advanceTimersByTimeAsync(STATUS_ROTATE_MS);
+    expect(statusNodes()).toHaveLength(1);
+    expect(statusNodes()[0]?.textContent).not.toBe(first);
+    expect(CLEMENTINE_WAIT_LINES.some(item => (statusNodes()[0]?.textContent ?? "").includes(item))).toBe(true);
+  });
+
+  it("clears temporary status on done and error", async () => {
+    runChatMock.mockResolvedValueOnce({
+      status: "done",
+      reply: "The hinge is retrieval practice.",
+    });
+    openFreshOverlay();
+    submitOverlay("What is the hinge?");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statusNodes()).toHaveLength(0);
+    expect(document.body.textContent).toContain("The hinge is retrieval practice.");
+    expect(storedTurns().some(turn => turn.role === "assistant")).toBe(true);
+
+    runChatMock.mockRejectedValueOnce(new Error("Chat failed"));
+    submitOverlay("Try again");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statusNodes()).toHaveLength(0);
+    expect(document.body.textContent).toContain("Chat failed");
+  });
+
+  it("clears temporary status and timers on personality change and new chat", async () => {
+    runChatMock.mockImplementation(() => new Promise(() => undefined));
+    openFreshOverlay();
+    submitOverlay("Still working");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statusNodes()).toHaveLength(1);
+
+    document.querySelector<HTMLButtonElement>('[data-personality="ann"]')!.click();
+    expect(statusNodes()).toHaveLength(0);
+    expect(storedTurns()).toEqual([]);
+
+    runChatMock.mockResolvedValueOnce({ status: "done", reply: "A finished note." });
+    submitOverlay("Finish");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statusNodes()).toHaveLength(0);
+    expect(document.body.textContent).toContain("A finished note.");
+    document.querySelector<HTMLButtonElement>("[data-new-chat]")!.click();
+    expect(statusNodes()).toHaveLength(0);
+    expect(storedTurns()).toEqual([]);
   });
 });

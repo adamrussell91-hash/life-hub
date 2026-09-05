@@ -68,15 +68,29 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
   assert.match(html, /id="app-shell"[^>]*hidden/);
 });
 
-test('Life Hub tile appears on sign-in gate and page header', async () => {
+test('Life Hub tile is favicon and sign-in only, never beside the page title', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const copy = html.slice(html.indexOf('page-header__copy'), html.indexOf('page-header__actions'));
   assert.match(copy, /class="page-header__title-row"/);
   assert.match(copy, /id="page-title"/);
-  assert.match(html, /class="hub-mark"/);
+  assert.doesNotMatch(copy, /class="hub-mark"/);
+  assert.doesNotMatch(html, /class="hub-mark"/);
   assert.match(html, /class="sign-in__mark"/);
   assert.match(html, /rel="icon"/);
   assert.match(html, /icons\/life-hub\.svg/);
+});
+
+test('Life chrome does not revive retired rail marks, gate copy, or the calorie slider', async () => {
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /class="brand-mark"/);
+  assert.doesNotMatch(html, /class="nav-dot"/);
+  assert.doesNotMatch(html, /sign-in__supporting/);
+  assert.doesNotMatch(html, /apple-touch-icon/);
+  assert.doesNotMatch(html, /nutrition-energy-slider/);
+  assert.doesNotMatch(css, /\.brand-mark\b/);
+  assert.doesNotMatch(css, /\.nav-dot\b/);
+  assert.doesNotMatch(css, /hub-spotlight/);
 });
 
 test('skip link is unavailable until the authenticated shell is revealed', async () => {

@@ -14,7 +14,10 @@ apps/*/.ua/
 .DS_Store
 .superpowers/brainstorm/
 .netlify/
-.cursor/
+# Cursor local debug logs. Track shared project rules only.
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 
 # Production records live in the private data repo, never this public repo.
 /data/mind/
