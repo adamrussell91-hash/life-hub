@@ -271,7 +271,8 @@
     color: inherit;
   }
 
-  .hub-count__fx {
+  .hub-count__fx,
+  .hub-count.is-ticking > .hub-count__fx {
     display: none;
   }
 }

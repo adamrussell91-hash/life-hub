@@ -88,9 +88,20 @@ test('logging completeness shows one count after the tick, not a ghosted overlay
   await page.goto(baseUrl);
   await page.waitForFunction(() => {
     const total = document.querySelector('[data-value="logging"]');
+    const wrap = total?.closest('.hub-count');
+    return total?.textContent === '1 of 5' && wrap?.classList.contains('is-ticking');
+  });
+  const duringTick = await page.evaluate(() => {
+    const fx = document.querySelector('.hub-count__fx');
+    return fx ? getComputedStyle(fx).display : 'missing';
+  });
+  assert.equal(duringTick, 'block');
+
+  await page.waitForFunction(() => {
+    const total = document.querySelector('[data-value="logging"]');
     if (total?.textContent !== '1 of 5') return false;
     const wrap = total.closest('.hub-count');
-    return wrap && !wrap.classList.contains('is-ticking');
+    return Boolean(wrap && !wrap.classList.contains('is-ticking') && wrap.querySelector('.hub-count__fx'));
   });
 
   const overlay = await page.evaluate(() => {
@@ -100,13 +111,14 @@ test('logging completeness shows one count after the tick, not a ghosted overlay
     return {
       text: total.textContent,
       ticking: wrap.classList.contains('is-ticking'),
-      fxDisplay: fx ? getComputedStyle(fx).display : 'none',
-      fxText: fx?.textContent ?? ''
+      hasFx: Boolean(fx),
+      fxDisplay: fx ? getComputedStyle(fx).display : 'missing'
     };
   });
 
   assert.equal(overlay.text, '1 of 5');
   assert.equal(overlay.ticking, false);
+  assert.equal(overlay.hasFx, true);
   assert.equal(overlay.fxDisplay, 'none');
 
   await context.close();
