@@ -6,7 +6,7 @@ import {
   type CalendarFilters
 } from '@/domain/calendar';
 import {
-  DIAL_LEGEND,
+  dialLegendForDomains,
   assignLanes,
   closestOccupiedHour,
   eventsFromTasks,
@@ -30,6 +30,7 @@ import {
   toDateKey,
   weekDays
 } from '@/domain/queries';
+import { getTaskPropertiesSync } from '@/services/task-properties';
 import { createHubPills, el } from '@/views/hub-kit';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -47,7 +48,9 @@ const LANE_START = BAND_IN + 9;
 const TASK_GAP = 1.2;
 const LEADER_ELBOW_R = 150;
 const LEADER_STUB = 12;
-const LEADER_CHIP_W = 92;
+/** Wide enough that scaled-down mobile dials still show a readable title. */
+const LEADER_CHIP_W = 148;
+const DIAL_VIEWBOX = '-40 0 600 520';
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 const TINT_INK: Record<DialTint, string> = {
@@ -378,7 +381,7 @@ function mountDayRing(
 ): { destroy: () => void; positionHand: () => void } {
   const occupancy = hourOccupancy(events);
   const clock = hubClockParts(now, timeZone);
-  const svg = svgEl('svg', { viewBox: '0 0 520 520', 'aria-hidden': 'true' });
+  const svg = svgEl('svg', { viewBox: DIAL_VIEWBOX, 'aria-hidden': 'true' });
   svg.append(svgEl('circle', { class: 'daily-dial__rim', cx: CX, cy: CY, r: 146 }));
   const spokes = svgEl('g');
   const bars = svgEl('g');
@@ -540,7 +543,7 @@ function mountWeekRing(
   tasks: Task[],
   onOpen?: (task: Task) => void
 ): { destroy: () => void } {
-  const svg = svgEl('svg', { viewBox: '0 0 520 520', 'aria-hidden': 'true' });
+  const svg = svgEl('svg', { viewBox: DIAL_VIEWBOX, 'aria-hidden': 'true' });
   svg.append(svgEl('circle', { class: 'daily-dial__rim', cx: CX, cy: CY, r: 146 }));
   const spokes = svgEl('g');
   const bars = svgEl('g');
@@ -681,7 +684,7 @@ export function mountDailyDial(host: HTMLElement, options: DailyDialOptions): Da
     : 'No timed work on the dial today.';
 
   const legend = el('div', 'daily-dial__legend');
-  for (const item of DIAL_LEGEND) {
+  for (const item of dialLegendForDomains(getTaskPropertiesSync().domains)) {
     const row = el('span', 'daily-dial__legend-item');
     const dot = el('span', 'daily-dial__legend-dot');
     dot.dataset.tint = item.tint;
