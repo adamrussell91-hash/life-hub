@@ -36,6 +36,7 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
 17. `adaptive-slider.css` + `js/adaptive-slider.js` — shared sliding control for every hub (spring fill, thumb, digit pop). The motion is the primitive; pass label / unit / min / max / step per use. Token bands only. `startHubMotion()` mounts `.hub-slider`. Do not invent a second range skin. Not a display for computed logs.
 18. `view-on-map.css` + `js/view-on-map.js` — compact **View on Map** pill that morphs into an embedded Google Map. Use on place-backed cards (medical visits, program venues). Not on task cards without an address. `createViewOnMap({ address, locationName })`.
 19. `hub-interactions.css` + `js/hub-feedback.js` — shared toast, copy-confirm, timed undo. `showHubToast`, `showCopyConfirm`, `offerTimedUndo`. User-initiated feedback only — agent writes still use `.confirm-card`.
+    Chat reply typography lives in `chat-prose.css` (imported by `hub-interactions.css`). Headings, lists, quotes, code, tables on `.chat-message__body` / `.coach-msg__body`. Do not invent a second chat-prose sheet.
 20. `js/hub-ai-bar.js` — contextual AI bar + agent select. `createContextualAiBar`, `createSelectAiAgent`.
 21. `js/hub-inline-edit.js` / `js/hub-create-disclosure.js` / `js/hub-capture.js` — stay-in-place edit, chips/tags, create-pill grid, voice + paste.
 22. `js/hub-command-search.js` — shared command palette. Teaching keeps `.search-palette` markup; call `enhanceSearchPalette` on that panel. Other hubs use `openHubCommandSearch`.
