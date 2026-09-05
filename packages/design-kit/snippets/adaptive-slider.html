@@ -1,4 +1,6 @@
 <!-- Adaptive slider. Spring fill + thumb, digit pop, token bands.
+     A picker for a value the user is choosing (meal estimate, target, portion).
+     Do not bind it to a computed daily log.
      Load tokens.css → overlays.css → adaptive-slider.css (or chrome.css)
      then mountAdaptiveSliders(document) or createAdaptiveSlider().
 
@@ -11,14 +13,14 @@
 <div
   class="hub-slider"
   data-adaptive-slider
-  data-slider-label="Calories"
+  data-slider-label="Meal"
   data-slider-unit="kcal"
   data-slider-min="100"
   data-slider-max="800"
   data-slider-step="50"
   data-slider-value="300"
 >
-  <p class="hub-slider__label">Calories</p>
+  <p class="hub-slider__label">Meal</p>
   <div class="hub-slider__value">
     <span class="hub-slider__digits" data-slider-digits>300</span>
     <span class="hub-slider__unit">kcal</span>
@@ -26,7 +28,7 @@
   <div class="hub-slider__track">
     <div class="hub-slider__dots" aria-hidden="true"></div>
     <div class="hub-slider__fill" aria-hidden="true"></div>
-    <input class="hub-slider__input" type="range" min="100" max="800" step="50" value="300" title="Calories">
+    <input class="hub-slider__input" type="range" min="100" max="800" step="50" value="300" title="Meal">
     <div class="hub-slider__thumb" aria-hidden="true">
       <div class="hub-slider__knob"></div>
     </div>

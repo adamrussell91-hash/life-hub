@@ -18,7 +18,6 @@
   <link rel="stylesheet" href="packages/design-kit/sign-in.css">
   <link rel="stylesheet" href="packages/design-kit/motion.css">
   <link rel="stylesheet" href="packages/design-kit/morphing-popover.css">
-  <link rel="stylesheet" href="packages/design-kit/adaptive-slider.css">
   <link rel="stylesheet" href="packages/design-kit/rail.css">
   <link rel="stylesheet" href="packages/design-kit/mobile.css">
   <link rel="stylesheet" href="css/app.css">
@@ -398,35 +397,6 @@
         </div>
 
         <section id="nutrition-dashboard" class="dashboard" aria-label="Nutrition" hidden>
-          <article class="metric-card hub-slider-card" aria-labelledby="nutrition-energy-slider-label">
-            <div
-              class="hub-slider"
-              id="nutrition-energy-slider"
-              data-adaptive-slider
-              data-slider-label="Calories"
-              data-slider-unit="kcal"
-              data-slider-min="0"
-              data-slider-max="2500"
-              data-slider-step="50"
-              data-slider-value="0"
-            >
-              <p class="hub-slider__label" id="nutrition-energy-slider-label">Calories</p>
-              <div class="hub-slider__value">
-                <span class="hub-slider__digits" data-slider-digits>0</span>
-                <span class="hub-slider__unit">kcal</span>
-              </div>
-              <div class="hub-slider__track">
-                <div class="hub-slider__dots" aria-hidden="true"></div>
-                <div class="hub-slider__fill" aria-hidden="true"></div>
-                <input class="hub-slider__input" type="range" min="0" max="2500" step="50" value="0" title="Calories">
-                <div class="hub-slider__thumb" aria-hidden="true">
-                  <div class="hub-slider__knob"></div>
-                </div>
-              </div>
-            </div>
-            <p class="metric-caption">Today's logged energy against the daily target.</p>
-          </article>
-
           <article class="metric-card chart-card macro-split-card" aria-labelledby="macro-split-label">
             <div class="metric-heading">
               <p class="metric-label" id="macro-split-label">Macro split</p>
