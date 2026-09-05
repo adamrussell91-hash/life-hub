@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
+  createMorphingClosedFieldPopover,
   createMorphingNotePopover,
   createMorphingPopover,
   createMorphingValuesPopover,
+  mountMorphingPopover,
   resetMorphingPopoverForTests
 } from '../../packages/design-kit/js/morphing-popover.js';
 
@@ -187,4 +189,109 @@ test('only one morphing popover stays open', () => {
   second.open();
   assert.equal(first.isOpen(), false);
   assert.equal(second.isOpen(), true);
+});
+
+test('closed-field popover stages a pill then Save commits it', () => {
+  const root = new FakeDoc();
+  let saved = null;
+  const popover = createMorphingClosedFieldPopover({
+    root,
+    title: 'Status',
+    value: 'in_progress',
+    options: [
+      { value: 'open', label: 'Open' },
+      { value: 'in_progress', label: 'In progress' },
+      { value: 'done', label: 'Done' }
+    ],
+    onSave(value) {
+      saved = value;
+    }
+  });
+
+  assert.match(popover.el.className, /morphing-popover--closed-field/);
+  assert.equal(popover.getValue(), 'in_progress');
+  popover.trigger.click();
+
+  const done = descendants(popover.content).find(node => node.textContent === 'Done');
+  assert.ok(done, 'Done option should exist');
+  done.click();
+  assert.equal(popover.getDraft(), 'done');
+  assert.equal(popover.getValue(), 'in_progress');
+
+  const save = descendants(popover.content).find(node => node.textContent === 'Save');
+  save.click();
+  assert.equal(saved, 'done');
+  assert.equal(popover.getValue(), 'done');
+  assert.equal(popover.isOpen(), false);
+  const triggerLabel = popover.trigger.querySelector('[data-morphing-label]');
+  assert.equal(triggerLabel.textContent, 'Done');
+});
+
+test('closed-field popover discards a staged pick on Discard', () => {
+  const root = new FakeDoc();
+  let saved = null;
+  const popover = createMorphingClosedFieldPopover({
+    root,
+    title: 'Priority',
+    value: 'medium',
+    options: [
+      { value: 'low', label: 'Low' },
+      { value: 'medium', label: 'Medium' },
+      { value: 'high', label: 'High' }
+    ],
+    onSave(value) {
+      saved = value;
+    }
+  });
+
+  popover.trigger.click();
+  descendants(popover.content).find(node => node.textContent === 'High').click();
+  descendants(popover.content).find(node => node.textContent === 'Discard').click();
+  assert.equal(saved, null);
+  assert.equal(popover.getValue(), 'medium');
+  assert.equal(popover.getDraft(), 'medium');
+});
+
+test('mount wires a closed-field chip from data attributes', () => {
+  const root = new FakeDoc();
+  const wrap = root.createElement('div');
+  wrap.className = 'morphing-popover';
+  wrap.dataset.morphingKind = 'closed-field';
+  wrap.dataset.morphingTitle = 'Status';
+  wrap.dataset.morphingValue = 'open';
+  wrap.dataset.morphingOptions = JSON.stringify([
+    { value: 'open', label: 'Open' },
+    { value: 'done', label: 'Done' }
+  ]);
+  const trigger = root.createElement('button');
+  trigger.dataset.morphingTrigger = '1';
+  const label = root.createElement('span');
+  label.dataset.morphingLabel = 'status';
+  label.textContent = 'Open';
+  trigger.append(label);
+  wrap.append(trigger);
+
+  let saved = null;
+  const popover = mountMorphingPopover(wrap, {
+    root,
+    onSave(value) {
+      saved = value;
+    }
+  });
+
+  assert.ok(popover);
+  popover.trigger.click();
+  descendants(popover.content).find(node => node.textContent === 'Done').click();
+  descendants(popover.content).find(node => node.textContent === 'Save').click();
+  assert.equal(saved, 'done');
+});
+
+test('closed-field snippet and kit docs name the factory', async () => {
+  const html = await readFile(new URL('../../packages/design-kit/snippets/morphing-popover.html', import.meta.url), 'utf8');
+  const agents = await readFile(new URL('../../packages/design-kit/AGENTS.md', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../../packages/design-kit/morphing-popover.css', import.meta.url), 'utf8');
+  assert.match(html, /data-morphing-kind="closed-field"/);
+  assert.match(html, /createMorphingClosedFieldPopover/);
+  assert.match(agents, /createMorphingClosedFieldPopover/);
+  assert.match(css, /morphing-popover__choices/);
 });
