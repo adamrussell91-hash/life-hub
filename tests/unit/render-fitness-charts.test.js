@@ -12,6 +12,7 @@ class Node {
     this.textContent = '';
     this.hidden = false;
     this.style = { setProperty(key, value) { this[key] = value; } };
+    this.classList = { add() {}, remove() {}, contains() { return false; } };
   }
 
   append(...nodes) { this.children.push(...nodes); }

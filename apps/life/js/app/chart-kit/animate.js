@@ -31,7 +31,7 @@ export function animateRingFill(circle, { circumference, dashoffset }, options =
 export function animateAreaReveal(svg, options = {}) {
   if (!svg) return;
   const reduced = motionIsQuiet(svg, options);
-  svg.classList.remove('chart-animating', 'chart-static');
+  svg.classList?.remove?.('chart-animating', 'chart-static');
 
   const line = svg.querySelector('[data-role="line"]');
   if (line) {
@@ -48,7 +48,7 @@ export function animateAreaReveal(svg, options = {}) {
     }
   }
 
-  svg.classList.add(reduced ? 'chart-static' : 'chart-animating');
+  svg.classList?.add?.(reduced ? 'chart-static' : 'chart-animating');
 
   if (!reduced && line && typeof line.addEventListener === 'function') {
     const onEnd = event => {
@@ -71,7 +71,7 @@ export function animateColumnGrow(element, heightPct, options = {}) {
   }
   element.style.transition = 'none';
   element.style.height = '0%';
-  void element.getBoundingClientRect();
+  if (typeof element.getBoundingClientRect === 'function') void element.getBoundingClientRect();
   element.style.transition = 'height 700ms cubic-bezier(.2,.8,.2,1)';
   element.style.height = `${heightPct}%`;
 }
