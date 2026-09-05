@@ -235,10 +235,12 @@ describe('mountAiPanel', () => {
     submitMessage(mounted.host, 'Build a dual coding lesson');
 
     await vi.waitFor(() => {
-      expect(mounted.host.textContent).toContain('Checking the teaching move…');
+      expect(mounted.host.textContent).toContain('Reading the lesson closely…');
       expect(mounted.host.textContent).not.toContain('Searching the web…');
       expect(pollAiJobMock).toHaveBeenCalledTimes(2);
     });
+    expect(mounted.host.querySelector('[role="status"]')?.getAttribute('aria-live')).toBe('polite');
+    expect(mounted.host.textContent).not.toContain('Checking the teaching move…');
     finishPoll(
       workingJob({
         agent: 'ann',
@@ -704,5 +706,91 @@ describe('mountAiPanel', () => {
     handle = remounted.handle;
     expect(remounted.host.textContent).not.toContain('Aborted');
     expect(localStorage.getItem('teaching_hub_ai_transcript_lesson_1') ?? '').not.toContain('Aborted');
+  });
+
+  it('keeps the same wait line across one-second polls and rotates later', async () => {
+    vi.useFakeTimers();
+    writeLastAgentSlug('ann');
+    pollAiJobMock.mockReset();
+    pollAiJobMock.mockResolvedValue(workingJob({ agent: 'ann', phase: 'searching' }));
+    const mounted = mountPanel({ random: () => 0 });
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Review this lesson');
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mounted.host.textContent).toContain('Reading the lesson closely…');
+    const first = mounted.host.querySelector('[role="status"]')?.textContent;
+    expect(first).toBe('Reading the lesson closely…');
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(mounted.host.querySelector('[role="status"]')?.textContent).toBe(first);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(mounted.host.querySelector('[role="status"]')?.textContent).toBe('Checking the teaching move…');
+    vi.useRealTimers();
+  });
+
+  it('does not persist decorative status as a finished assistant reply', async () => {
+    let finishPoll: (job: AiJob) => void = () => undefined;
+    pollAiJobMock.mockReset();
+    pollAiJobMock.mockImplementationOnce(
+      () =>
+        new Promise<AiJob>((resolve) => {
+          finishPoll = resolve;
+        })
+    );
+    const mounted = mountPanel({ random: () => 0 });
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Build a lesson');
+    await vi.waitFor(() => expect(startAiJobMock).toHaveBeenCalled());
+    const raw = localStorage.getItem('teaching_hub_ai_transcript_lesson_1') ?? '';
+    expect(raw).not.toContain('Reading the lesson closely…');
+    expect(raw).not.toContain('"status"');
+
+    finishPoll(workingJob({ agent: 'ann', status: 'done', response: 'Here is the lesson.' }));
+    await vi.waitFor(() => expect(mounted.host.textContent).toContain('Here is the lesson.'));
+    const doneRaw = localStorage.getItem('teaching_hub_ai_transcript_lesson_1') ?? '';
+    expect(doneRaw).toContain('Here is the lesson.');
+    expect(doneRaw).not.toContain('Reading the lesson closely…');
+  });
+
+  it('reconstructs a current wait line when an outstanding job is resumed', async () => {
+    localStorage.setItem(
+      'teaching_hub_ai_transcript_lesson_1',
+      JSON.stringify([
+        { id: 'm_user', role: 'user', text: 'Build a lesson' },
+        { id: 'm_asst', role: 'assistant', agent: 'ann', text: '', jobId: 'job_1' }
+      ])
+    );
+    listAiJobsMock.mockResolvedValue({
+      jobs: [
+        {
+          id: 'job_1',
+          lesson_id: 'lesson_1',
+          lesson_title: 'Othello',
+          agent: 'ann',
+          status: 'working',
+          created_at: SNAPSHOT,
+          message: 'Build a lesson'
+        }
+      ]
+    });
+    pollAiJobMock.mockResolvedValue(workingJob({ agent: 'ann' }));
+    const mounted = mountPanel({ random: () => 0 });
+    handle = mounted.handle;
+    await vi.waitFor(() => expect(mounted.host.textContent).toMatch(/Reading the lesson closely…/));
+    expect(mounted.host.querySelectorAll('.ai-panel__msg--assistant')).toHaveLength(1);
+    expect(mounted.host.textContent).toContain('Build a lesson');
+  });
+
+  it('clears temporary status on failure', async () => {
+    pollAiJobMock.mockReset();
+    pollAiJobMock.mockResolvedValue(workingJob({ agent: 'ann', status: 'error', error: 'AI job failed' }));
+    const mounted = mountPanel({ random: () => 0 });
+    handle = mounted.handle;
+    submitMessage(mounted.host, 'Build a lesson');
+    await vi.waitFor(() => expect(mounted.host.textContent).toContain('AI job failed'));
+    expect(mounted.host.querySelector('[role="status"]')).toBeNull();
+    expect(mounted.host.textContent).not.toContain('Reading the lesson closely…');
   });
 });
