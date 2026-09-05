@@ -1,4 +1,22 @@
+import { animateAreaReveal } from './chart-kit/animate.js';
+import { buildAreaLine, straightLinePath } from './chart-kit/area-line.js';
+import { buildBumpChart } from './chart-kit/bump.js';
+import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
+import { buildChordLayout } from './chart-kit/chord-layout.js';
 import { buildColumns } from './chart-kit/columns.js';
+import { buildEnergyOrbit } from './chart-kit/energy-orbit.js';
+import { buildHorizonBands } from './chart-kit/horizon.js';
+import { buildMoodMixDonut } from './chart-kit/mood-mix.js';
+import { buildMoodRadial } from './chart-kit/mood-radial.js';
+import { buildDistributionPie } from './chart-kit/pie.js';
+import { polar, thetaForDate, thetaForTime } from './chart-kit/polar-clock.js';
+import { rangeBarLayout, rangeBarTick } from './chart-kit/range-bar.js';
+import { buildRadialYear } from './chart-kit/radial-year.js';
+import { REGION_COLOURS } from './fitness-charts-model.js';
+import { buildSankeyFlow } from './chart-kit/sankey-flow.js';
+import { buildStreamPaths } from './chart-kit/stream.js';
+import { buildThemeConstellation } from './chart-kit/theme-constellation.js';
+import { buildWatchlistHeat } from './chart-kit/watchlist-heat.js';
 import { formatDisplayDate } from '../core/time.js';
 
 const setText = (root, selector, value) => {
@@ -12,90 +30,599 @@ function setHidden(element, hidden) {
   else element.removeAttribute('hidden');
 }
 
+function showCard(root, selector, ready) {
+  const card = root.querySelector(selector);
+  setHidden(card, !ready);
+  return ready ? card : null;
+}
+
+function createSvg(root, name) {
+  if (typeof root.createElementNS === 'function') {
+    return root.createElementNS('http://www.w3.org/2000/svg', name);
+  }
+  return null;
+}
+
+function clearSvg(svg) {
+  svg?.replaceChildren?.();
+}
+
 function formatKg(kg) {
-  if (kg == null || !Number.isFinite(kg) || kg <= 0) return '—';
+  if (kg == null || !Number.isFinite(kg)) return '—';
   const text = Number.isInteger(kg) ? kg.toLocaleString('en-AU') : kg.toFixed(1);
   return `${text} kg`;
 }
 
-function formatSigned(value, unit) {
-  if (value == null || !Number.isFinite(value) || value === 0) return 'same';
-  const sign = value > 0 ? '+' : '−';
-  const mag = Math.abs(value);
-  const text = Number.isInteger(mag) ? String(mag) : mag.toFixed(1);
-  return unit ? `${sign}${text} ${unit}` : `${sign}${text}`;
+function setWidth(el, pct) {
+  if (!el) return;
+  el.style = el.style ?? {};
+  if (typeof el.style.setProperty === 'function') el.style.setProperty('--bar', `${pct}%`);
+  else el.style['--bar'] = `${pct}%`;
 }
 
-function formatReading(value, unit) {
-  if (value == null || !Number.isFinite(value)) return '—';
-  const text = Number.isInteger(value) ? String(value) : value.toFixed(1);
-  return unit ? `${text} ${unit}` : text;
-}
-
-function setBarWidth(fill, pct) {
-  const width = `${Math.max(8, pct)}%`;
-  fill.style = fill.style ?? {};
-  if (typeof fill.style.setProperty === 'function') fill.style.setProperty('--bar', width);
-  else fill.style['--bar'] = width;
-}
-
-function renderPips(root, selector, { value = 0, target = 0 } = {}) {
-  const host = root.querySelector(selector);
-  if (!host || typeof root.createElement !== 'function') return;
-  host.replaceChildren();
-  const slots = Math.max(0, Number(target) || 0);
-  const filled = Math.max(0, Number(value) || 0);
-  for (let index = 0; index < slots; index += 1) {
-    const pip = root.createElement('span');
-    pip.className = 'fitness-pip';
-    pip.dataset.filled = index < filled ? 'true' : 'false';
-    host.append(pip);
+function renderClock(root, points) {
+  const card = showCard(root, '#fitness-clock-card', points?.length >= 2);
+  const svg = root.querySelector('#fitness-clock-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  clearSvg(svg);
+  const size = 220;
+  const cx = 110;
+  const cy = 110;
+  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+  const rim = createSvg(root, 'circle');
+  rim.setAttribute('cx', String(cx));
+  rim.setAttribute('cy', String(cy));
+  rim.setAttribute('r', '86');
+  rim.setAttribute('class', 'fitness-viz__ring');
+  svg.append(rim);
+  for (const point of points) {
+    const theta = thetaForTime(point.time);
+    if (theta == null) continue;
+    const radius = 36 + point.recency * 48;
+    const { x, y } = polar(cx, cy, radius, theta);
+    const dot = createSvg(root, 'circle');
+    dot.setAttribute('cx', String(x));
+    dot.setAttribute('cy', String(y));
+    dot.setAttribute('r', '5');
+    dot.setAttribute('fill', point.colour);
+    svg.append(dot);
   }
 }
 
-function renderMonthPips(root, marks) {
-  const host = root.querySelector('[data-fitness="month-pips"]');
-  const card = root.querySelector('#fitness-rest-card');
-  const empty = root.querySelector('[data-fitness-empty="rest"]');
-  if (!host) return;
-  host.replaceChildren();
-  if (!marks?.length) {
+function renderOrbit(root, days) {
+  const trained = (days ?? []).filter(day => day.volume > 0);
+  const card = showCard(root, '#fitness-orbit-card', trained.length >= 2);
+  const svg = root.querySelector('#fitness-orbit-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const series = trained.map(day => ({
+    date: day.date,
+    energy: day.volume > 0 ? 'medium' : 'low'
+  }));
+  const from = days[0]?.date;
+  const to = days.at(-1)?.date;
+  const chart = buildEnergyOrbit(series, { bounds: { from, to }, range: 'monthly' });
+  clearSvg(svg);
+  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+  svg.setAttribute('class', 'fitness-viz__svg fitness-viz__svg--orbit');
+  for (const ring of chart.rings ?? []) {
+    const circle = createSvg(root, 'circle');
+    circle.setAttribute('cx', String(chart.cx));
+    circle.setAttribute('cy', String(chart.cy));
+    circle.setAttribute('r', String(ring.radius));
+    circle.setAttribute('class', 'fitness-viz__ring');
+    svg.append(circle);
+  }
+  const maxVol = Math.max(1, ...days.map(day => day.volume));
+  for (const day of trained) {
+    const theta = thetaForDate(day.date, { from, to }, 'monthly');
+    const radius = 40 + (day.volume / maxVol) * 90;
+    const { x, y } = polar(chart.cx, chart.cy, radius, theta);
+    const dot = createSvg(root, 'circle');
+    dot.setAttribute('cx', String(x));
+    dot.setAttribute('cy', String(y));
+    dot.setAttribute('r', String(4 + (day.volume / maxVol) * 4));
+    dot.setAttribute('fill', day.colour);
+    svg.append(dot);
+  }
+}
+
+function renderE1rmRadial(root, points) {
+  const card = showCard(root, '#fitness-e1rm-radial-card', points?.length >= 2);
+  const svg = root.querySelector('#fitness-e1rm-radial-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const series = points.map(point => ({ date: point.date, value: Math.max(1, Math.round(point.pct / 10)) }));
+  const dates = points.map(point => point.date).sort();
+  const chart = buildMoodRadial(series, { bounds: { from: dates[0], to: dates.at(-1) }, range: 'monthly' });
+  clearSvg(svg);
+  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+  for (const ring of chart.rings ?? []) {
+    const circle = createSvg(root, 'circle');
+    circle.setAttribute('cx', String(chart.cx));
+    circle.setAttribute('cy', String(chart.cy));
+    circle.setAttribute('r', String(ring.radius));
+    circle.setAttribute('class', 'fitness-viz__ring');
+    svg.append(circle);
+  }
+  chart.points.forEach((point, index) => {
+    const source = points[index];
+    const dot = createSvg(root, 'circle');
+    dot.setAttribute('cx', String(point.x));
+    dot.setAttribute('cy', String(point.y));
+    dot.setAttribute('r', '5');
+    dot.setAttribute('fill', source?.colour ?? CLINICAL_CHART_SLOTS[0]);
+    svg.append(dot);
+  });
+}
+
+function renderChord(root, edges) {
+  const card = showCard(root, '#fitness-chord-card', edges?.length >= 1);
+  const svg = root.querySelector('#fitness-chord-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const layout = buildChordLayout(edges);
+  clearSvg(svg);
+  svg.setAttribute('viewBox', '0 0 360 360');
+  const cx = 180;
+  const cy = 180;
+  const radius = 120;
+  const colourByKey = new Map((layout.arcs ?? []).map((arc, index) => [
+    arc.key,
+    REGION_COLOURS[arc.key] ?? CLINICAL_CHART_SLOTS[index % CLINICAL_CHART_SLOTS.length]
+  ]));
+  for (const arc of layout.arcs ?? []) {
+    const path = createSvg(root, 'path');
+    const x0 = cx + radius * Math.cos(arc.startAngle - Math.PI / 2);
+    const y0 = cy + radius * Math.sin(arc.startAngle - Math.PI / 2);
+    const x1 = cx + radius * Math.cos(arc.endAngle - Math.PI / 2);
+    const y1 = cy + radius * Math.sin(arc.endAngle - Math.PI / 2);
+    const large = arc.endAngle - arc.startAngle > Math.PI ? 1 : 0;
+    path.setAttribute('d', `M${x0},${y0} A${radius},${radius},0,${large},1,${x1},${y1}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', colourByKey.get(arc.key));
+    path.setAttribute('stroke-width', '10');
+    svg.append(path);
+  }
+  for (const ribbon of layout.ribbons ?? []) {
+    const source = ribbon.source ?? {};
+    const target = ribbon.target ?? {};
+    const start = ((source.startAngle ?? 0) + (source.endAngle ?? 0)) / 2;
+    const end = ((target.startAngle ?? 0) + (target.endAngle ?? 0)) / 2;
+    const path = createSvg(root, 'path');
+    path.setAttribute('d', `M${cx + 110 * Math.cos(start - Math.PI / 2)},${cy + 110 * Math.sin(start - Math.PI / 2)} Q${cx},${cy} ${cx + 110 * Math.cos(end - Math.PI / 2)},${cy + 110 * Math.sin(end - Math.PI / 2)}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'var(--wave)');
+    path.setAttribute('stroke-width', String(Math.max(2, Number(ribbon.value) || 2)));
+    path.setAttribute('opacity', '0.45');
+    svg.append(path);
+  }
+}
+
+function renderBump(root, ranks) {
+  const card = showCard(root, '#fitness-bump-card', ranks?.length >= 2);
+  const svg = root.querySelector('#fitness-bump-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const themes = [...new Set(ranks.flatMap(row => Object.keys(row.rankByTheme)))];
+  const chart = buildBumpChart({ ranks, themes });
+  if (chart.empty) {
     setHidden(card, true);
     return;
   }
-  const trained = marks.filter(day => day.trained).length;
-  if (trained === 0) {
+  clearSvg(svg);
+  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+  for (const line of chart.lines ?? []) {
+    const path = createSvg(root, 'path');
+    path.setAttribute('d', line.d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', line.colour);
+    path.setAttribute('stroke-width', '2');
+    svg.append(path);
+    const label = createSvg(root, 'text');
+    const last = line.points.at(-1);
+    label.setAttribute('x', String((last?.x ?? 0) + 8));
+    label.setAttribute('y', String(line.labelY));
+    label.setAttribute('class', 'fitness-viz__label');
+    label.textContent = line.key;
+    svg.append(label);
+  }
+}
+
+function renderStream(root, weekly) {
+  const card = showCard(root, '#fitness-stream-card', Boolean(weekly?.series?.length >= 2));
+  const svg = root.querySelector('#fitness-stream-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const chart = buildStreamPaths(weekly, { width: 320, height: 120, padding: 8 });
+  if (chart.empty) {
     setHidden(card, true);
     return;
   }
-  setHidden(card, false);
-  setHidden(empty, true);
-  for (const day of marks) {
-    const pip = root.createElement('span');
-    pip.className = 'fitness-month-pip';
-    pip.dataset.hit = day.trained ? 'true' : 'false';
-    pip.title = formatDisplayDate(day.date);
-    host.append(pip);
-  }
-  setText(root, '[data-fitness="rest-summary"]', `${trained} trained · ${marks.length - trained} rest`);
+  clearSvg(svg);
+  svg.setAttribute('viewBox', `0 0 ${chart.width ?? 320} ${chart.height ?? 120}`);
+  (chart.bands ?? []).forEach((band, index) => {
+    const path = createSvg(root, 'path');
+    path.setAttribute('d', band.d);
+    path.setAttribute('fill', REGION_COLOURS[band.key] ?? CLINICAL_CHART_SLOTS[index]);
+    path.setAttribute('opacity', '0.7');
+    svg.append(path);
+  });
 }
 
-function renderShareList(root, { card, host, empty, items, formatValue }) {
-  const cardEl = root.querySelector(card);
-  const list = root.querySelector(host);
-  const emptyEl = root.querySelector(empty);
-  if (!list) return;
-  list.replaceChildren();
-  if (!items?.length) {
-    setHidden(cardEl, true);
+function renderPainHeat(root, series) {
+  const card = showCard(root, '#fitness-pain-card', series?.length >= 1);
+  const host = root.querySelector('#fitness-pain-heat');
+  if (!card || !host) return;
+  const heat = buildWatchlistHeat(series);
+  host.replaceChildren();
+  if (heat.empty) {
+    setHidden(card, true);
     return;
   }
-  setHidden(cardEl, false);
-  setHidden(emptyEl, true);
-  const chart = buildColumns(items.map(item => ({
-    key: item.key,
-    label: item.label,
-    value: item.value
+  for (const row of heat.rows) {
+    const line = root.createElement('div');
+    line.className = 'fitness-heat-row';
+    const name = root.createElement('strong');
+    name.textContent = row.term;
+    line.append(name);
+    for (const cell of row.cells) {
+      const mark = root.createElement('span');
+      mark.className = 'fitness-heat-cell';
+      mark.dataset.spiked = cell.spiked ? 'true' : 'false';
+      mark.style = mark.style ?? {};
+      const mix = `${cell.mix ?? 0}%`;
+      if (typeof mark.style.setProperty === 'function') mark.style.setProperty('--mix', mix);
+      else mark.style['--mix'] = mix;
+      line.append(mark);
+    }
+    host.append(line);
+  }
+}
+
+function renderHorizon(root, metrics) {
+  const card = showCard(root, '#fitness-horizon-card', metrics?.length >= 1);
+  const svg = root.querySelector('#fitness-horizon-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const chart = buildHorizonBands(metrics, { width: 320, height: 28 });
+  clearSvg(svg);
+  svg.setAttribute('viewBox', '0 0 320 28');
+  for (const band of chart) {
+    for (const rect of band.rects) {
+      const node = createSvg(root, 'rect');
+      node.setAttribute('x', String(rect.x));
+      node.setAttribute('y', String(rect.y));
+      node.setAttribute('width', String(rect.width));
+      node.setAttribute('height', String(rect.height));
+      node.setAttribute('fill', 'var(--wave)');
+      node.setAttribute('opacity', String(Math.max(0.12, rect.opacity)));
+      svg.append(node);
+    }
+  }
+}
+
+function renderTwoRing(root, current, prior) {
+  const card = showCard(root, '#fitness-region-vol-card', current?.length >= 1);
+  const svg = root.querySelector('#fitness-region-donut');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const outer = buildDistributionPie(current, { size: 120 });
+  const inner = buildDistributionPie(prior ?? [], { size: 72 });
+  clearSvg(svg);
+  svg.setAttribute('viewBox', '0 0 120 120');
+  const group = createSvg(root, 'g');
+  group.setAttribute('transform', 'translate(24 24) scale(0.6)');
+  for (const slice of outer.slices) {
+    const path = createSvg(root, 'path');
+    path.setAttribute('d', slice.path);
+    path.setAttribute('fill', slice.colour);
+    path.setAttribute('transform', 'translate(24 24)');
+    svg.append(path);
+  }
+  if (!inner.empty) {
+    for (const slice of inner.slices) {
+      const path = createSvg(root, 'path');
+      path.setAttribute('d', slice.path);
+      path.setAttribute('fill', slice.colour);
+      path.setAttribute('opacity', '0.55');
+      path.setAttribute('transform', 'translate(24 24)');
+      svg.append(path);
+    }
+  }
+  svg.append(group);
+}
+
+function renderGauge(root, cardSelector, svgSelector, value, target, label) {
+  const ready = Number.isFinite(value);
+  const card = showCard(root, cardSelector, ready);
+  if (label) setText(root, label.selector, ready ? label.text : '');
+  const svg = root.querySelector(svgSelector);
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const layout = rangeBarLayout(value, 0, 1, { width: 240, padding: 12 });
+  const tick = rangeBarTick(target, { width: 240, padding: 12 });
+  clearSvg(svg);
+  svg.setAttribute('viewBox', '0 0 240 28');
+  const track = createSvg(root, 'rect');
+  track.setAttribute('x', '12');
+  track.setAttribute('y', '10');
+  track.setAttribute('width', '216');
+  track.setAttribute('height', '8');
+  track.setAttribute('rx', '4');
+  track.setAttribute('class', 'fitness-viz__track');
+  const fill = createSvg(root, 'rect');
+  fill.setAttribute('x', '12');
+  fill.setAttribute('y', '10');
+  fill.setAttribute('width', String(Math.max(4, layout.fraction * 216)));
+  fill.setAttribute('height', '8');
+  fill.setAttribute('rx', '4');
+  fill.setAttribute('fill', 'var(--wave)');
+  const mark = createSvg(root, 'line');
+  mark.setAttribute('x1', String(tick));
+  mark.setAttribute('x2', String(tick));
+  mark.setAttribute('y1', '6');
+  mark.setAttribute('y2', '22');
+  mark.setAttribute('stroke', 'var(--high-sea-ink)');
+  mark.setAttribute('stroke-width', '2');
+  svg.append(track, fill, mark);
+  if (label) setText(root, label.selector, label.text);
+}
+
+function renderE1rmBands(root, lifts) {
+  const card = showCard(root, '#fitness-e1rm-card', lifts?.length >= 1);
+  const host = root.querySelector('#fitness-e1rm-list');
+  if (!card || !host) return;
+  host.replaceChildren();
+  for (const lift of lifts) {
+    const block = root.createElement('div');
+    block.className = 'fitness-e1rm-band';
+    const title = root.createElement('p');
+    title.className = 'metric-caption';
+    title.textContent = `${lift.name} · ${lift.current.toFixed(1)} kg`;
+    block.append(title);
+    if (typeof root.createElementNS === 'function') {
+      const svg = createSvg(root, 'svg');
+      svg.setAttribute('class', 'line-chart line-chart--dense');
+      const chart = buildAreaLine(lift.series, {
+        width: 320,
+        height: 56,
+        padding: 10,
+        paddingBottom: 8,
+        yDomain: 'fixed',
+        min: lift.bandLow,
+        max: lift.bandHigh
+      });
+      svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+      const band = createSvg(root, 'rect');
+      band.setAttribute('x', '10');
+      band.setAttribute('y', String(chart.scaleY(lift.bandHigh)));
+      band.setAttribute('width', '300');
+      band.setAttribute('height', String(Math.max(4, chart.scaleY(lift.bandLow) - chart.scaleY(lift.bandHigh))));
+      band.setAttribute('class', 'fitness-viz__band');
+      const line = createSvg(root, 'path');
+      line.setAttribute('data-role', 'line');
+      line.setAttribute('d', straightLinePath(chart.points));
+      line.setAttribute('fill', 'none');
+      line.setAttribute('stroke', lift.tone === 'up' ? 'var(--success)' : lift.tone === 'down' ? 'var(--danger)' : 'var(--wave)');
+      svg.append(band, line);
+      block.append(svg);
+      animateAreaReveal(svg);
+    }
+    host.append(block);
+  }
+}
+
+function renderPill(root, gauge) {
+  const card = showCard(root, '#fitness-pill-card', Boolean(gauge));
+  const svg = root.querySelector('#fitness-pill-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const pct = Math.min(1.6, Math.max(0, gauge.pct / 100));
+  clearSvg(svg);
+  svg.setAttribute('viewBox', '0 0 48 120');
+  const track = createSvg(root, 'rect');
+  track.setAttribute('x', '16');
+  track.setAttribute('y', '8');
+  track.setAttribute('width', '16');
+  track.setAttribute('height', '104');
+  track.setAttribute('rx', '8');
+  track.setAttribute('class', 'fitness-viz__track');
+  const fillH = Math.min(104, pct * 65);
+  const fill = createSvg(root, 'rect');
+  fill.setAttribute('x', '16');
+  fill.setAttribute('y', String(112 - fillH));
+  fill.setAttribute('width', '16');
+  fill.setAttribute('height', String(fillH));
+  fill.setAttribute('rx', '8');
+  fill.setAttribute('fill', pct > 1 ? 'var(--success)' : 'var(--wave)');
+  const tick = createSvg(root, 'line');
+  tick.setAttribute('x1', '12');
+  tick.setAttribute('x2', '36');
+  tick.setAttribute('y1', '47');
+  tick.setAttribute('y2', '47');
+  tick.setAttribute('stroke', 'var(--high-sea-ink)');
+  svg.append(track, fill, tick);
+  setText(root, '[data-fitness="pill-read"]', `${Math.round(gauge.pct)}% of 8-week average`);
+}
+
+function renderYear(root, { year, dots }) {
+  const card = showCard(root, '#fitness-year-card', dots?.length >= 2);
+  const svg = root.querySelector('#fitness-year-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const ticks = buildRadialYear({ year, byDate: Object.fromEntries(dots.map(dot => [dot.date, dot])) });
+  clearSvg(svg);
+  svg.setAttribute('viewBox', '0 0 240 240');
+  const cx = 120;
+  const cy = 120;
+  const maxVol = Math.max(1, ...dots.map(dot => dot.volume));
+  for (const tick of ticks) {
+    const hit = tick.mood;
+    if (!hit) continue;
+    const r = 48 + (hit.volume / maxVol) * 52;
+    const x = cx + r * Math.cos(tick.angle);
+    const y = cy + r * Math.sin(tick.angle);
+    const dot = createSvg(root, 'circle');
+    dot.setAttribute('cx', String(x));
+    dot.setAttribute('cy', String(y));
+    dot.setAttribute('r', String(2.4 + (hit.volume / maxVol) * 2.6));
+    dot.setAttribute('fill', hit.colour);
+    svg.append(dot);
+  }
+}
+
+function renderRepMix(root, items, read) {
+  const card = showCard(root, '#fitness-rep-card', items?.length >= 1);
+  const svg = root.querySelector('#fitness-rep-mix');
+  if (!card) return;
+  const donut = buildMoodMixDonut(items, { size: 160, radius: 58, gap: 5 });
+  setText(root, '[data-fitness="rep-read"]', read ?? '');
+  if (!svg || typeof root.createElementNS !== 'function') return;
+  clearSvg(svg);
+  svg.setAttribute('viewBox', `0 0 ${donut.size} ${donut.size}`);
+  for (const segment of donut.segments) {
+    if (!segment.visible) continue;
+    const circle = createSvg(root, 'circle');
+    circle.setAttribute('cx', String(donut.center));
+    circle.setAttribute('cy', String(donut.center));
+    circle.setAttribute('r', String(donut.radius));
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', segment.colour);
+    circle.setAttribute('stroke-width', '14');
+    circle.setAttribute('stroke-dasharray', segment.dasharray);
+    circle.setAttribute('stroke-dashoffset', String(segment.dashoffset));
+    circle.setAttribute('transform', `rotate(-90 ${donut.center} ${donut.center})`);
+    svg.append(circle);
+  }
+}
+
+function renderSankey(root, flows) {
+  const card = showCard(root, '#fitness-sankey-card', flows?.length >= 1);
+  const svg = root.querySelector('#fitness-sankey-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const chart = buildSankeyFlow(flows, { width: 320, height: 140 });
+  if (!chart.nodes.length) {
+    setHidden(card, true);
+    return;
+  }
+  clearSvg(svg);
+  svg.setAttribute('viewBox', '0 0 320 140');
+  for (const link of chart.links) {
+    const path = createSvg(root, 'path');
+    const x0 = link.x0 ?? 20;
+    const x1 = link.x1 ?? 300;
+    const y0 = link.y0 ?? 20;
+    const y1 = link.y1 ?? 20;
+    path.setAttribute('d', `M${x0},${y0} C${(x0 + x1) / 2},${y0} ${(x0 + x1) / 2},${y1} ${x1},${y1}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'var(--wave)');
+    path.setAttribute('stroke-width', String(Math.max(2, link.width ?? 4)));
+    path.setAttribute('opacity', '0.45');
+    svg.append(path);
+  }
+  for (const node of chart.nodes) {
+    const rect = createSvg(root, 'rect');
+    rect.setAttribute('x', String(node.x0));
+    rect.setAttribute('y', String(node.y0));
+    rect.setAttribute('width', String(Math.max(4, node.x1 - node.x0)));
+    rect.setAttribute('height', String(Math.max(8, node.y1 - node.y0)));
+    rect.setAttribute('fill', 'var(--marine)');
+    svg.append(rect);
+  }
+}
+
+function renderLibrary(root, map) {
+  const card = showCard(root, '#fitness-library-card', Boolean(map?.nodes?.length >= 2));
+  const svg = root.querySelector('#fitness-library-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const chart = buildThemeConstellation({
+    nodes: map.nodes,
+    edges: map.edges
+  });
+  if (chart.empty) {
+    setHidden(card, true);
+    return;
+  }
+  clearSvg(svg);
+  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+  for (const edge of chart.edges ?? []) {
+    const path = createSvg(root, 'path');
+    path.setAttribute('d', edge.d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'var(--wave)');
+    path.setAttribute('stroke-width', String(edge.strokeWidth ?? 1.5));
+    path.setAttribute('opacity', String(edge.opacity ?? 0.4));
+    svg.append(path);
+  }
+  for (const node of chart.nodes ?? []) {
+    const dot = createSvg(root, 'circle');
+    dot.setAttribute('cx', String(node.x));
+    dot.setAttribute('cy', String(node.y));
+    dot.setAttribute('r', String(node.r ?? 6));
+    dot.setAttribute('fill', node.colour ?? CLINICAL_CHART_SLOTS[0]);
+    svg.append(dot);
+    const label = createSvg(root, 'text');
+    label.setAttribute('x', String(node.x));
+    label.setAttribute('y', String(node.y + (node.r ?? 6) + 12));
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('class', 'fitness-viz__label');
+    label.textContent = node.key;
+    svg.append(label);
+  }
+}
+
+function renderSparks(root, readings, seriesMap) {
+  const rows = (readings ?? []).filter(row => seriesMap[row.key]?.length >= 2);
+  const card = showCard(root, '#fitness-readings-card', rows.length >= 1);
+  const host = root.querySelector('#fitness-readings');
+  if (!card || !host) return;
+  host.replaceChildren();
+  for (const row of rows) {
+    const series = seriesMap[row.key];
+    const avg = series.reduce((sum, point) => sum + point.value, 0) / series.length;
+    const item = root.createElement('div');
+    item.className = 'fitness-spark-row';
+    const name = root.createElement('strong');
+    name.textContent = row.label;
+    const value = root.createElement('span');
+    value.textContent = `${Number.isInteger(row.current) ? row.current : row.current.toFixed(1)} ${row.unit}`;
+    item.append(name, value);
+    if (typeof root.createElementNS === 'function') {
+      const svg = createSvg(root, 'svg');
+      const chart = buildAreaLine(series, {
+        width: 160,
+        height: 28,
+        padding: 4,
+        paddingBottom: 4,
+        yDomain: 'padded',
+        guideValue: avg
+      });
+      svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+      svg.setAttribute('class', 'fitness-spark');
+      const line = createSvg(root, 'path');
+      line.setAttribute('data-role', 'line');
+      line.setAttribute('d', chart.linePath);
+      line.setAttribute('fill', 'none');
+      line.setAttribute('stroke', 'var(--wave)');
+      if (chart.guideY != null) {
+        const tick = createSvg(root, 'line');
+        tick.setAttribute('x1', '4');
+        tick.setAttribute('x2', '156');
+        tick.setAttribute('y1', String(chart.guideY));
+        tick.setAttribute('y2', String(chart.guideY));
+        tick.setAttribute('stroke', 'var(--high-sea-ink)');
+        tick.setAttribute('stroke-dasharray', '3 3');
+        svg.append(tick);
+      }
+      svg.append(line);
+      item.append(svg);
+      animateAreaReveal(svg);
+    }
+    host.append(item);
+  }
+}
+
+function renderEfficiency(root, weeks) {
+  const card = showCard(root, '#fitness-efficiency-card', weeks?.length >= 2);
+  const host = root.querySelector('#fitness-efficiency-bars');
+  if (!card || !host) return;
+  host.replaceChildren();
+  const avg = weeks.reduce((sum, week) => sum + week.value, 0) / weeks.length;
+  const chart = buildColumns(weeks.map(week => ({
+    key: week.weekStart,
+    label: `w/c ${formatDisplayDate(week.weekStart)}`,
+    value: week.value
   })));
   for (const bar of chart.bars) {
     const row = root.createElement('div');
@@ -105,121 +632,8 @@ function renderShareList(root, { card, host, empty, items, formatValue }) {
     const track = root.createElement('span');
     track.className = 'fitness-share-row__track';
     const fill = root.createElement('i');
-    setBarWidth(fill, bar.heightPct);
-    track.append(fill);
-    const value = root.createElement('span');
-    value.textContent = formatValue(bar.value);
-    row.append(label, track, value);
-    list.append(row);
-  }
-}
-
-function renderPushPull(root, items) {
-  const card = root.querySelector('#fitness-push-pull-card');
-  const empty = root.querySelector('[data-fitness-empty="push-pull"]');
-  const bar = root.querySelector('[data-fitness="push-pull-bar"]');
-  if (!items?.length) {
-    setHidden(card, true);
-    return;
-  }
-  setHidden(card, false);
-  setHidden(empty, true);
-  const push = items.find(item => item.key === 'push')?.value ?? 0;
-  const pull = items.find(item => item.key === 'pull')?.value ?? 0;
-  const total = push + pull;
-  setText(root, '[data-fitness="push-kg"]', formatKg(push));
-  setText(root, '[data-fitness="pull-kg"]', formatKg(pull));
-  if (bar && typeof root.createElement === 'function') {
-    bar.replaceChildren();
-    if (total > 0) {
-      const pushFill = root.createElement('i');
-      pushFill.className = 'fitness-split__push';
-      setBarWidth(pushFill, (push / total) * 100);
-      const pullFill = root.createElement('i');
-      pullFill.className = 'fitness-split__pull';
-      setBarWidth(pullFill, (pull / total) * 100);
-      bar.append(pushFill, pullFill);
-    }
-  }
-}
-
-function renderRecovery(root, flags) {
-  const list = root.querySelector('#fitness-recovery-list');
-  const rows = flags ?? [];
-  setText(root, '[data-fitness="recovery-count"]', String(rows.length));
-  if (!list) return;
-  list.replaceChildren();
-  if (!rows.length) {
-    const empty = root.createElement('p');
-    empty.className = 'metric-caption';
-    empty.textContent = 'None added this window';
-    list.append(empty);
-    return;
-  }
-  for (const flag of rows) {
-    const item = root.createElement('div');
-    item.className = 'fitness-kv-row';
-    const name = root.createElement('strong');
-    name.textContent = flag.title;
-    const date = root.createElement('span');
-    date.textContent = formatDisplayDate(flag.date);
-    item.append(name, date);
-    list.append(item);
-  }
-}
-
-function renderE1rm(root, trends) {
-  const card = root.querySelector('#fitness-e1rm-card');
-  const host = root.querySelector('#fitness-e1rm-list');
-  if (!host) return;
-  host.replaceChildren();
-  if (!trends?.length) {
-    setHidden(card, true);
-    return;
-  }
-  setHidden(card, false);
-  for (const lift of trends) {
-    const item = root.createElement('div');
-    item.className = 'fitness-kv-row fitness-kv-row--triple';
-    const name = root.createElement('strong');
-    name.textContent = lift.name;
-    const current = root.createElement('span');
-    current.textContent = `${lift.current.toFixed(1)} kg`;
-    const delta = root.createElement('span');
-    delta.className = 'fitness-delta';
-    delta.dataset.colour = lift.delta > 0 ? 'up' : lift.delta < 0 ? 'down' : 'same';
-    delta.textContent = formatSigned(lift.delta, 'kg');
-    item.append(name, current, delta);
-    host.append(item);
-  }
-}
-
-function renderEfficiency(root, weeks) {
-  const card = root.querySelector('#fitness-efficiency-card');
-  const host = root.querySelector('#fitness-efficiency-bars');
-  if (!host) return;
-  host.replaceChildren();
-  if (!weeks?.length) {
-    setHidden(card, true);
-    return;
-  }
-  setHidden(card, false);
-  const chart = buildColumns(
-    weeks.map(week => ({
-      key: week.weekStart,
-      label: `w/c ${formatDisplayDate(week.weekStart)}`,
-      value: week.value
-    }))
-  );
-  for (const bar of chart.bars) {
-    const row = root.createElement('div');
-    row.className = 'fitness-share-row';
-    const label = root.createElement('strong');
-    label.textContent = bar.label;
-    const track = root.createElement('span');
-    track.className = 'fitness-share-row__track';
-    const fill = root.createElement('i');
-    setBarWidth(fill, bar.heightPct);
+    fill.dataset.tone = bar.value >= avg ? 'up' : 'same';
+    setWidth(fill, bar.heightPct);
     track.append(fill);
     const value = root.createElement('span');
     value.textContent = `${bar.value.toFixed(1)} kg/set`;
@@ -228,95 +642,43 @@ function renderEfficiency(root, weeks) {
   }
 }
 
-function renderReadings(root, readings) {
-  const card = root.querySelector('#fitness-readings-card');
-  const host = root.querySelector('#fitness-readings');
-  if (!host) return;
-  host.replaceChildren();
-  if (!readings?.length) {
-    setHidden(card, true);
-    return;
-  }
-  setHidden(card, false);
-  for (const row of readings) {
-    const item = root.createElement('div');
-    item.className = 'fitness-kv-row fitness-kv-row--triple';
-    const name = root.createElement('strong');
-    name.textContent = row.label;
-    const current = root.createElement('span');
-    current.textContent = formatReading(row.current, row.unit);
-    const delta = root.createElement('span');
-    delta.className = 'fitness-delta';
-    delta.dataset.colour = row.delta > 0 ? 'up' : row.delta < 0 ? 'down' : 'same';
-    delta.textContent = formatSigned(row.delta, row.unit);
-    item.append(name, current, delta);
-    host.append(item);
-  }
-}
-
-function renderPain(root, rows) {
-  const card = root.querySelector('#fitness-pain-card');
-  const host = root.querySelector('#fitness-pain-list');
-  if (!host) return;
-  host.replaceChildren();
-  if (!rows?.length) {
-    setHidden(card, true);
-    return;
-  }
-  setHidden(card, false);
-  for (const row of rows) {
-    const item = root.createElement('div');
-    item.className = 'fitness-kv-row';
-    const name = root.createElement('strong');
-    name.textContent = row.site;
-    const count = root.createElement('span');
-    count.textContent = `${row.count} session${row.count === 1 ? '' : 's'}`;
-    item.append(name, count);
-    host.append(item);
-  }
-}
-
-function missedDetail(skips) {
-  const skipped = skips.skipped ?? 0;
-  const pastDue = skips.pastDue ?? 0;
-  if (!skips.missed) return 'None this window';
-  const parts = [];
-  if (skipped) parts.push(`${skipped} skipped`);
-  if (pastDue) parts.push(`${pastDue} left planned`);
-  return parts.join(' · ') || `${skips.missed} missed`;
-}
-
 export function renderFitnessCharts(root, charts = {}) {
   setText(root, '[data-fitness="longest-streak"]', String(charts.longestStreak ?? 0));
 
-  const week = charts.weekRing ?? { value: 0, target: 4 };
-  renderPips(root, '[data-fitness="week-pips"]', week);
-  setText(root, '[data-fitness="week-ring-value"]', String(week.value));
-  setText(root, '[data-fitness="week-ring-target"]', `/ ${week.target}`);
-
-  const skips = charts.skipRing ?? { missed: 0, skipped: 0, pastDue: 0 };
-  setText(root, '[data-fitness="missed-count"]', String(skips.missed ?? 0));
-  setText(root, '[data-fitness="missed-detail"]', missedDetail(skips));
-
-  renderRecovery(root, charts.recoveryFlags ?? []);
-  renderMonthPips(root, charts.trainedMarks);
-  renderShareList(root, {
-    card: '#fitness-rep-card',
-    host: '#fitness-rep-bars',
-    empty: '[data-fitness-empty="reps"]',
-    items: charts.repRanges ?? [],
-    formatValue: value => `${value} set${value === 1 ? '' : 's'}`
+  renderClock(root, charts.clockPoints);
+  renderOrbit(root, charts.orbitDays);
+  renderE1rmRadial(root, charts.e1rmRadial);
+  renderChord(root, charts.focusChord);
+  renderBump(root, charts.bumpRanks);
+  renderStream(root, charts.regionStream);
+  renderPainHeat(root, charts.painHeat);
+  renderHorizon(root, charts.loadHorizon);
+  renderTwoRing(root, charts.regionVolume, charts.regionVolumePrior);
+  const push = charts.pushPull?.find(item => item.key === 'push')?.value ?? 0;
+  const pull = charts.pushPull?.find(item => item.key === 'pull')?.value ?? 0;
+  const pushTotal = push + pull;
+  renderGauge(root, '#fitness-push-pull-card', '#fitness-push-gauge', pushTotal ? push / pushTotal : null, 0.5, {
+    selector: '[data-fitness="push-read"]',
+    text: pushTotal ? `${formatKg(push)} push · ${formatKg(pull)} pull` : ''
   });
-  renderShareList(root, {
-    card: '#fitness-region-vol-card',
-    host: '#fitness-region-vol-bars',
-    empty: '[data-fitness-empty="region-vol"]',
-    items: charts.regionVolume ?? [],
-    formatValue: formatKg
+  const trained = charts.restCounts?.trained;
+  const days = charts.restCounts?.days || 30;
+  const weekTarget = charts.weekTarget ?? 4;
+  renderGauge(root, '#fitness-rest-card', '#fitness-rest-gauge', Number.isFinite(trained) && trained > 0 ? trained / days : null, weekTarget / 7, {
+    selector: '[data-fitness="rest-read"]',
+    text: Number.isFinite(trained) ? `${trained} trained / ${days} days` : ''
   });
-  renderPushPull(root, charts.pushPull ?? []);
-  renderE1rm(root, charts.e1rmTrends);
+  renderE1rmBands(root, charts.e1rmBands);
+  renderPill(root, charts.sessionGauge);
+  renderYear(root, { year: charts.year, dots: charts.yearDots });
+  renderRepMix(root, charts.repRanges, charts.repRead);
+  renderSankey(root, charts.sankeyFlows);
+  renderLibrary(root, charts.libraryMap);
+  renderSparks(root, charts.sessionReadings, {
+    duration: charts.durationSeries,
+    distance: charts.distanceSeries,
+    pace: charts.paceSeries,
+    hr: charts.hrSeries
+  });
   renderEfficiency(root, charts.volumePerSetWeeks);
-  renderReadings(root, charts.sessionReadings);
-  renderPain(root, charts.painBySite);
 }

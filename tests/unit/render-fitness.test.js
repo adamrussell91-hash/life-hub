@@ -233,7 +233,7 @@ test('status, working weights, and labeled volume rows replace empty charts', ()
   assert.equal(root.ensure('#fitness-comparisons').children[0].children[2].textContent, 'PR');
 });
 
-test('breakdown bars unhide and empty comparison cards stay hidden', () => {
+test('kit charts unhide when their own data is ready and stay hidden otherwise', () => {
   const root = fitnessRoot();
   renderFitness(root, baseModel({
     heroSession: null,
@@ -241,92 +241,52 @@ test('breakdown bars unhide and empty comparison cards stay hidden', () => {
       longestStreak: 1,
       uniqueLifts: 2,
       volumePerSetKg: 200,
-      weekRing: { value: 1, target: 4 },
-      skipRing: { value: 0, target: 1, missed: 0, scheduled: 1, completed: 1, skipped: 0, pastDue: 0 },
-      recoveryRing: { value: 0, target: 1, flagged: 0, completed: 1 },
-      recoveryFlags: [],
-      restRatio: [{ key: 'trained', label: 'Trained', value: 1, colour: 'var(--wave)' }],
+      weekTarget: 4,
       restCounts: { trained: 1, rest: 29, days: 30 },
-      trainedMarks: [{ date: '2026-07-30', trained: true }],
       repRanges: [{ key: '9-12', label: '9–12 reps', value: 2, colour: 'var(--wave)' }],
+      repRead: 'Mostly Hypertrophy',
       regionVolume: [{ key: 'chest', label: 'Chest', value: 400, colour: 'var(--wave)' }],
+      regionVolumePrior: [],
       pushPull: [
-        { key: 'push', label: 'Push', value: 400, colour: 'var(--wave)' },
-        { key: 'pull', label: 'Pull', value: 200, colour: 'var(--high-sea)' }
+        { key: 'push', label: 'Push', value: 400 },
+        { key: 'pull', label: 'Pull', value: 200 }
       ],
-      e1rmTrends: [],
+      clockPoints: [],
+      orbitDays: [],
+      e1rmRadial: [],
+      focusChord: [{ themeA: 'chest', themeB: 'arms', count: 1 }],
+      bumpRanks: [],
+      regionStream: null,
+      painHeat: [],
+      loadHorizon: [],
+      e1rmBands: [],
+      sessionGauge: null,
+      yearDots: [],
+      sankeyFlows: [],
+      libraryMap: {
+        nodes: [{ key: 'Chest Press', count: 2 }, { key: 'Curl', count: 1 }],
+        edges: [{ themeA: 'Chest Press', themeB: 'Curl', count: 1 }]
+      },
       volumePerSetWeeks: [],
       durationSeries: [],
       distanceSeries: [],
       paceSeries: [],
       hrSeries: [],
-      sessionReadings: [],
-      painBySite: []
+      sessionReadings: []
     }
   }));
-  assert.equal(root.ensure('[data-fitness="week-ring-value"]').textContent, '1');
-  assert.equal(root.ensure('[data-fitness="week-pips"]').children.length, 4);
-  assert.equal(root.ensure('[data-fitness="week-pips"]').children[0].dataset.filled, 'true');
-  assert.equal(root.ensure('[data-fitness="missed-count"]').textContent, '0');
-  assert.equal(root.ensure('[data-fitness="recovery-count"]').textContent, '0');
   assert.equal(root.ensure('[data-fitness="longest-streak"]').textContent, '1');
   assert.equal(root.ensure('#fitness-rep-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-rep-bars').children.length, 1);
+  assert.equal(root.ensure('[data-fitness="rep-read"]').textContent, 'Mostly Hypertrophy');
   assert.equal(root.ensure('#fitness-region-vol-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-push-pull-card').attributes.hidden, undefined);
-  assert.match(root.ensure('[data-fitness="push-kg"]').textContent, /400/);
-  assert.match(root.ensure('[data-fitness="pull-kg"]').textContent, /200/);
+  assert.match(root.ensure('[data-fitness="push-read"]').textContent, /push/);
+  assert.equal(root.ensure('#fitness-rest-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-chord-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-library-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-e1rm-card').attributes.hidden, '');
   assert.equal(root.ensure('#fitness-readings-card').attributes.hidden, '');
-  assert.equal(root.ensure('#fitness-pain-card').attributes.hidden, '');
-});
-
-test('recovery flags and e1RM render as tallies and deltas, not charts', () => {
-  const root = fitnessRoot();
-  renderFitness(root, baseModel({
-    heroSession: null,
-    charts: {
-      longestStreak: 2,
-      uniqueLifts: 1,
-      volumePerSetKg: 200,
-      weekRing: { value: 1, target: 4 },
-      skipRing: { value: 2, target: 3, missed: 2, scheduled: 3, completed: 1, skipped: 1, pastDue: 1 },
-      recoveryRing: { value: 1, target: 1, flagged: 1, completed: 1 },
-      recoveryFlags: [{ date: '2026-07-30', title: 'Chest and Curls' }],
-      restCounts: { trained: 2, rest: 28, days: 30 },
-      trainedMarks: [],
-      repRanges: [],
-      regionVolume: [],
-      pushPull: [],
-      e1rmTrends: [{
-        name: 'Chest Press',
-        current: 45.3,
-        previous: 40,
-        delta: 5.3,
-        series: [{ date: '2026-07-20', value: 40 }, { date: '2026-07-30', value: 45.3 }]
-      }],
-      volumePerSetWeeks: [{ weekStart: '2026-07-27', value: 200 }],
-      durationSeries: [],
-      distanceSeries: [],
-      paceSeries: [],
-      hrSeries: [],
-      sessionReadings: [
-        { key: 'hr', label: 'Heart rate', unit: 'bpm', current: 116, previous: 113, delta: 3 }
-      ],
-      painBySite: []
-    }
-  }));
-  assert.equal(root.ensure('[data-fitness="recovery-count"]').textContent, '1');
-  assert.match(root.ensure('#fitness-recovery-list').children[0].children[0].textContent, /Chest and Curls/);
-  assert.equal(root.ensure('[data-fitness="missed-count"]').textContent, '2');
-  assert.match(root.ensure('[data-fitness="missed-detail"]').textContent, /skipped/);
-  assert.equal(root.ensure('#fitness-e1rm-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-e1rm-list').children[0].children[0].textContent, 'Chest Press');
-  assert.match(root.ensure('#fitness-e1rm-list').children[0].children[1].textContent, /45\.3 kg/);
-  assert.match(root.ensure('#fitness-e1rm-list').children[0].children[2].textContent, /\+5\.3/);
-  assert.equal(root.ensure('#fitness-readings-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-readings').children[0].children[0].textContent, 'Heart rate');
-  assert.match(root.ensure('#fitness-readings').children[0].children[1].textContent, /116 bpm/);
+  assert.equal(root.ensure('#fitness-clock-card').attributes.hidden, '');
 });
 
 test('region cards prefer the 30-day delta when both current and delta exist', () => {
