@@ -61,7 +61,9 @@ function syncComposer(root: ParentNode, slug: ChatAgentSlug): void {
   if (skip) skip.hidden = slug !== 'clare';
 }
 
-function collectRecentThread(
+export const STATUS_ROTATE_MS = 5000;
+
+export function collectRecentThread(
   root: ParentNode
 ): Array<{ role: 'user' | 'assistant'; text: string }> {
   const list = root.querySelector('#chat-messages');
@@ -360,6 +362,8 @@ export function createClareChatController({
     }
     statusBubble = appendMessage(root, { role: 'status', text: line });
     statusBubble?.classList.add('canvas-status');
+    statusBubble?.setAttribute('role', 'status');
+    statusBubble?.setAttribute('aria-live', 'polite');
   }
 
   async function withWait<T>(work: () => Promise<T>): Promise<T | undefined> {
@@ -368,7 +372,7 @@ export function createClareChatController({
     setChatBusy(root, true);
     waitIndex = 0;
     showWaitLine();
-    waitTimer = window.setInterval(showWaitLine, 1800);
+    waitTimer = window.setInterval(showWaitLine, STATUS_ROTATE_MS);
     try {
       const result = await work();
       if (mine !== turn) return undefined;

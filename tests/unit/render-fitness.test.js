@@ -289,6 +289,44 @@ test('kit charts unhide when their own data is ready and stay hidden otherwise',
   assert.equal(root.ensure('#fitness-clock-card').attributes.hidden, '');
 });
 
+function widgetText(el) {
+  return [el.textContent, ...(el.children ?? []).map(widgetText)].join(' ');
+}
+
+test('Fitness run widget stays empty instead of reviving the old Workouts / week KPI', () => {
+  const root = fitnessRoot();
+  renderFitness(root, {
+    streak: 0,
+    dayType: 'movement',
+    weekDots: [],
+    longTerm: { ...emptyLongTerm, workoutsPerWeek: 1.5 },
+    regions: [],
+    heroSession: null,
+    focusHits: [],
+    comparisons: [],
+    month: []
+  });
+
+  const host = root.ensure('[data-fitness="run-widget"]');
+  assert.equal(host.attributes.hidden, '');
+  assert.equal(host.children.length, 0);
+  assert.doesNotMatch(widgetText(host), /Workouts/);
+  assert.doesNotMatch(widgetText(host), /\/ week/);
+});
+
+test('Fitness run widget shows last-session distance only when a walk or run was logged', () => {
+  const root = fitnessRoot();
+  renderFitness(root, baseModel({
+    heroSession: heroSession({ distance_km: 4.2, title: 'Walk' })
+  }));
+
+  const host = root.ensure('[data-fitness="run-widget"]');
+  assert.equal(host.attributes.hidden, undefined);
+  assert.match(widgetText(host), /Last session/);
+  assert.match(widgetText(host), /4\.2 km/);
+  assert.doesNotMatch(widgetText(host), /Workouts/);
+});
+
 test('region cards prefer the 30-day delta when both current and delta exist', () => {
   const root = fitnessRoot();
   renderFitness(root, {

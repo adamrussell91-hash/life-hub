@@ -25,9 +25,11 @@ Read this before adding a favicon, a sign-in mark, or a header glyph.
 |-------|------|--------|------|
 | Browser tab / home screen | Tile | `<link rel="icon" href="…/icons/<hub>.svg" type="image/svg+xml">` | browser |
 | Sign-in card | Tile | `<img class="sign-in__mark" src="…/icons/<hub>.svg" alt="" width="56" height="56">` | `3.5rem` |
-| Signed-in canvas, **top-left** with the title | Tile | `<img class="hub-mark" …>` first child of `.page-header__title-row`, left of `h1.page-header__title` | `2rem` |
+| Signed-in canvas, **top-left** with the title | Tile | Teaching, Knowledge, Tasks: `<img class="hub-mark" …>` first child of `.page-header__title-row`, left of `h1.page-header__title`. **Life: never.** Title row is the `h1` only. | `2rem` |
 
 `alt=""` — the brand text / page title already names the hub.
+
+**Life Hub exception (locked):** do not put `.hub-mark` next to any Life page title. The tile is favicon + sign-in only. A later “kit compliance” pass must not re-add it — Adam removed it in #26 and it must stay gone.
 
 ## Sign-in
 
@@ -44,4 +46,5 @@ The left rail brand stays a text `<a class="hub-rail__brand">` to home. The hub 
 - Invent a seventh mark or recolour arcs
 - Use the glyph as the favicon or login mark on the light wash
 - Place the tile on the rail
+- Place the tile beside a Life Hub page title (favicon + sign-in only)
 - Add descriptive copy under the login mark

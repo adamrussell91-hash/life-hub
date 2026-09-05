@@ -1,5 +1,8 @@
 export type ChatTickPhase = "searching" | "library" | "round" | "writing" | "failed";
 
+/** Human-facing fallback rotation while a phase is unchanged. Polling stays independent. */
+export const STATUS_ROTATE_MS = 5000;
+
 export type ChatTickInput = {
   phase: ChatTickPhase;
   hatLabel: string;
@@ -36,6 +39,37 @@ export const BOOK_NOTE_WAIT_LINES = [
   "Pulling the definition into focus…",
   "Turning the page back to the book…",
 ];
+
+export const ANN_WAIT_LINES = [
+  "Reading the sentence again…",
+  "Looking for the turn…",
+  "Checking the pacing…",
+  "Following the subtext…",
+  "Marking the pressure point…",
+  "Testing the line that matters…",
+  "Reading what the note does not say…",
+  "Finding the hinge…",
+  "Checking the rhythm…",
+  "Putting a margin note beside this…",
+  "Seeing where the argument shifts…",
+  "Trimming the competent reading…",
+];
+
+export function waitPoolForPersonality(
+  personalityId: string,
+  { webResearch = false }: { webResearch?: boolean } = {},
+): readonly string[] {
+  if (personalityId === "ann") return ANN_WAIT_LINES;
+  return webResearch ? BOOK_NOTE_WAIT_LINES : CLEMENTINE_WAIT_LINES;
+}
+
+export function pickAgentWaitLine(
+  personalityId: string,
+  options: { exclude?: string; pool?: readonly string[]; random?: () => number; webResearch?: boolean } = {},
+): string {
+  const pool = options.pool ?? waitPoolForPersonality(personalityId, { webResearch: options.webResearch });
+  return pickClementineWaitLine({ exclude: options.exclude, pool, random: options.random });
+}
 
 export function pickClementineWaitLine(
   {
