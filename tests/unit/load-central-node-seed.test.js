@@ -16,6 +16,12 @@ test('seed Agent Directory no longer carries the vestigial Clare DeMind / Ann O\
   assert.doesNotMatch(directorySection, /Ann O'Tation/);
 });
 
+test('seed central node contains no Notion references or Notion URLs', () => {
+  const text = loadCentralNodeSeed();
+  assert.doesNotMatch(text, /notion/i);
+  assert.doesNotMatch(text, /app\.notion\.com/i);
+});
+
 test('returns an empty string when the seed file cannot be read', () => {
   const text = loadCentralNodeSeed({
     readFileSyncImpl: () => {
