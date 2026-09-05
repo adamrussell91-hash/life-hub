@@ -1,5 +1,12 @@
 export const CHAT_HATS = [
   {
+    id: 'makeNote',
+    label: 'Make a note',
+    defaultScope: 'standard',
+    defaultDepth: 'single',
+    plan: 'Capture the topic, question, or thinking process. Search the open web — not the archive — and write a referenced information page. Do not stamp it under a notebook, unit, degree, or book. Tags come after filing.'
+  },
+  {
     id: 'fromBook',
     label: 'From a book',
     defaultScope: 'standard',
@@ -100,7 +107,7 @@ export function resolveChatPlan(hatId, overrides = {}) {
 
 export function writeMaxTokens(input) {
   if (input.hat === 'synthesis') return 4000;
-  if (input.hat === 'fromBook') return 3500;
+  if (input.hat === 'fromBook' || input.hat === 'makeNote') return 3500;
   return resolveChatPlan(input.hat, input).kernel === 'deep' ? 2000 : 1200;
 }
 

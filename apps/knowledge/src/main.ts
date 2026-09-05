@@ -341,6 +341,21 @@ function openBookNote(book?: string) {
   render();
 }
 
+function openMakeNote() {
+  leaveSpecialRails();
+  compose = null;
+  activePage = null;
+  enterChatRail({
+    fresh: true,
+    hat: "makeNote",
+  });
+  view = "chat";
+  if (isPageHash(location.hash)) {
+    history.replaceState(null, "", `${location.pathname}${location.search}`);
+  }
+  render();
+}
+
 function resetOriginLabelChrome() {
   originLabelQuery = "";
   originLabelOpen = false;
@@ -549,9 +564,11 @@ function renderList() {
       `${
         originFilter.kind === "book" && originFilter.label
           ? `<button class="btn" data-from-book type="button">Note from this book</button>
-             <button class="btn btn--ghost" data-new-note type="button">New note</button>`
-          : `<button class="btn" data-new-note type="button">New note</button>
-             <button class="btn btn--ghost" data-from-book type="button">From a book</button>`
+             <button class="btn btn--ghost" data-make-note type="button">Make a note</button>
+             <button class="btn btn--ghost" data-new-note type="button">Blank note</button>`
+          : `<button class="btn" data-make-note type="button">Make a note</button>
+             <button class="btn btn--ghost" data-from-book type="button">From a book</button>
+             <button class="btn btn--ghost" data-new-note type="button">Blank note</button>`
       }
         <div class="viewbar">
           <button class="viewbar__btn is-active" type="button">List</button>
@@ -582,6 +599,9 @@ function renderList() {
   };
   app.querySelector<HTMLButtonElement>("[data-new-note]")!.onclick = () => {
     openCompose();
+  };
+  app.querySelector<HTMLButtonElement>("[data-make-note]")!.onclick = () => {
+    openMakeNote();
   };
   app.querySelector<HTMLButtonElement>("[data-from-book]")!.onclick = () => {
     openBookNote(originFilter.kind === "book" ? originFilter.label : undefined);

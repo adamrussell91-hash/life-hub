@@ -4,11 +4,12 @@ import { ResearchResultSchema, type ResearchResult } from "../research/schema";
 import { compactArchiveNote, compactSittingNote, compactSynthesisNote } from "./archiveNote";
 import { coverageFromResearch, type CoverageRead } from "./coverage";
 import { protocolSteerBlock } from "./agentProtocols";
-import { resolveChatPlan, type ChatDepth, type ChatHatId, type ChatScope } from "./hats";
+import { resolveChatPlan, isWebFileNoteHat, type ChatDepth, type ChatHatId, type ChatScope } from "./hats";
 import type { ChatPersonalityId } from "./personalities";
 import { corpusAuditFromResearch, formatCorpusAudit, SYNTHESIS_WRITE_TOKENS, thematicSynthesisProtocol } from "./synthesisProtocol";
-import { BOOK_NOTE_WRITE_TOKENS, bookContextLine, selectBestFindings, type BookContext } from "./bookNote";
+import { BOOK_NOTE_WRITE_TOKENS, MAKE_NOTE_WRITE_TOKENS, bookContextLine, selectBestFindings, type BookContext } from "./bookNote";
 import { bookNoteProtocol } from "./bookNoteProtocol";
+import { makeNoteProtocol } from "./makeNoteProtocol";
 import type { ChatMessage } from "./messages";
 import type { ChatWriteState } from "./writeHttp";
 
@@ -275,6 +276,14 @@ function isBookNote(input: Pick<ChatTurnInput, "hat">) {
   return input.hat === "fromBook";
 }
 
+function isMakeNote(input: Pick<ChatTurnInput, "hat">) {
+  return input.hat === "makeNote";
+}
+
+function isWebFileNote(input: Pick<ChatTurnInput, "hat">) {
+  return isWebFileNoteHat(input.hat);
+}
+
 function researchForWrite(input: ChatTurnInput, archive: ArchivePack): ArchivePack {
   if (!isBookNote(input) || !archive.research?.findings.length) return archive;
   const findings = selectBestFindings(archive.research.findings);
@@ -285,10 +294,10 @@ function researchForWrite(input: ChatTurnInput, archive: ArchivePack): ArchivePa
 }
 
 function writeArchiveNote(input: ChatTurnInput, archive: ArchivePack): string {
-  if (isBookNote(input) && !archive.research?.findings.length) return archive.note;
+  if (isWebFileNote(input) && !archive.research?.findings.length) return archive.note;
   if (archive.archiveFailed && !archive.research?.findings.length) return archive.note;
   if (!archive.research) return archive.note;
-  const rich = isSynthesis(input) || isBookNote(input);
+  const rich = isSynthesis(input) || isWebFileNote(input);
   const packed = archive.sitting
     ? compactSittingNote(archive.research, rich)
     : rich
@@ -306,10 +315,12 @@ function assembledSystem(input: ChatTurnInput, archive: ArchivePack) {
     ? `\n${thematicSynthesisProtocol()}`
     : isBookNote(input)
       ? `\n${bookNoteProtocol()}`
-      : "";
+      : isMakeNote(input)
+        ? `\n${makeNoteProtocol()}`
+        : "";
   const steer =
     input.personality && input.protocolId ? `\n${protocolSteerBlock(input.personality, input.protocolId)}` : "";
-  const grounding = isBookNote(input)
+  const grounding = isWebFileNote(input)
     ? RESEARCH_THE_OPEN_WEB
     : `${ANSWER_FROM_ARCHIVE}\n${CITE_NOTES_AS_LINKS}\n${NOTE_EDIT_PROTOCOL}`;
   return {
@@ -338,6 +349,7 @@ function assembledSystem(input: ChatTurnInput, archive: ArchivePack) {
 export function writeMaxTokens(input: Pick<ChatTurnInput, "hat" | "scope" | "depth">) {
   if (input.hat === "synthesis") return SYNTHESIS_WRITE_TOKENS;
   if (input.hat === "fromBook") return BOOK_NOTE_WRITE_TOKENS;
+  if (input.hat === "makeNote") return MAKE_NOTE_WRITE_TOKENS;
   const plan = resolveChatPlan(input.hat, { scope: input.scope, depth: input.depth });
   return plan.kernel === "deep" ? 2000 : 1200;
 }
@@ -345,7 +357,7 @@ export function writeMaxTokens(input: Pick<ChatTurnInput, "hat" | "scope" | "dep
 async function startWrite(input: ChatTurnInput, archive: ArchivePack): Promise<ChatTurnResult> {
   const prepared = researchForWrite(input, archive);
   const { system, coverage } = assembledSystem(input, prepared);
-  const webSearch = isBookNote(input);
+  const webSearch = isWebFileNote(input);
   if (input.write) {
     const started = await input.write.start({
       system,
@@ -436,7 +448,7 @@ export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult>
   if (input.writeSessionId) {
     return pollWrite(input);
   }
-  if (isBookNote(input) && !input.compose) {
+  if (isWebFileNote(input) && !input.compose) {
     return startWrite(input, { note: "" });
   }
   if (input.compose) {

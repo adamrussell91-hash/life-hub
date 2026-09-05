@@ -5,7 +5,18 @@ import { escapeHtml, showToast } from "../lib/dom";
 import { bindKeyboardInset } from "../lib/keyboardInset";
 import { filterPickerOptions, optionPickerListHtml } from "../ui/optionPicker";
 import { bookContextLine, bookOrigin, normalizeBookContext, resolveBookLabel, type BookContext } from "./bookNote";
-import { CHAT_HATS, DEPTHS, SCOPES, hatById, isChatHatId, resolveChatPlan, type ChatDepth, type ChatHatId, type ChatScope } from "./hats";
+import {
+  CHAT_HATS,
+  DEPTHS,
+  SCOPES,
+  hatById,
+  isChatHatId,
+  isWebFileNoteHat,
+  resolveChatPlan,
+  type ChatDepth,
+  type ChatHatId,
+  type ChatScope,
+} from "./hats";
 import { renderChatMarkdown, type NoteTitle } from "./noteLinks";
 import { CHAT_PERSONALITIES } from "./personalities";
 import { researchFromFindings, searchedNotesHtml, thinkingHistoryHtml } from "./sources";
@@ -197,7 +208,7 @@ function sitting() {
 }
 
 function waitPool() {
-  return hat === "fromBook" ? BOOK_NOTE_WAIT_LINES : CLEMENTINE_WAIT_LINES;
+  return isWebFileNoteHat(hat) ? BOOK_NOTE_WAIT_LINES : CLEMENTINE_WAIT_LINES;
 }
 
 function pushTick(
@@ -205,7 +216,7 @@ function pushTick(
   research?: { findings?: unknown[]; followUpQueries?: string[]; round?: number },
 ) {
   const plan = sitting();
-  const webResearch = hat === "fromBook";
+  const webResearch = isWebFileNoteHat(hat);
   waitLine = pickClementineWaitLine({ exclude: ticks.length ? waitLine : undefined, pool: waitPool() });
   ticks = appendTick(
     ticks,
@@ -283,7 +294,7 @@ async function send(host: ChatRailHost, extras: { searchOutside?: boolean } = {}
   if (!extras.searchOutside && !researchSessionId && !writeSessionId) {
     turns = history;
     input = "";
-    if (hat === "fromBook") fileAfterDone = true;
+    if (isWebFileNoteHat(hat)) fileAfterDone = true;
   }
   busy = true;
   error = "";
@@ -322,7 +333,7 @@ async function send(host: ChatRailHost, extras: { searchOutside?: boolean } = {}
       },
     );
     applyResult(history, result);
-    if (fileAfterDone && result.status === "done" && hat === "fromBook") {
+    if (fileAfterDone && result.status === "done" && isWebFileNoteHat(hat)) {
       fileAfterDone = false;
       busy = false;
       persist();
@@ -367,7 +378,7 @@ async function saveBrief(host: ChatRailHost) {
   saveBusy = true;
   host.render();
   try {
-    const origin = bookOrigin(bookContext);
+    const origin = hat === "fromBook" ? bookOrigin(bookContext) : undefined;
     const page = briefToPage({
       reply: last.content,
       findings: last.findings ?? [],
@@ -382,7 +393,13 @@ async function saveBrief(host: ChatRailHost) {
       /* page exists; tags can wait */
     }
     savedBrief = true;
-    showToast(origin ? `Added to the archive under ${origin.label}` : "Saved as a new page");
+    showToast(
+      origin
+        ? `Added to the archive under ${origin.label}`
+        : hat === "makeNote"
+          ? "Added to the archive · tags coming from tidy"
+          : "Saved as a new page",
+    );
     await host.onSavedPage?.(saved);
   } catch (caught) {
     showToast(caught instanceof Error ? caught.message : "Save failed");
@@ -447,20 +464,33 @@ function saveCardHtml(canSave: boolean) {
       </div>
     </section>`;
   }
+  if (hat === "makeNote") {
+    if (saveBusy) {
+      return `<p class="alchemist__mode">Filing into the archive…</p>`;
+    }
+    return `<section class="confirm-card" role="region" aria-label="Add to archive">
+      <p class="page-header__eyebrow">Add to archive</p>
+      <h2 class="page-header__title" style="font-size: var(--text-lg)">File this page</h2>
+      <p class="page-header__supporting">Standalone page — tags from tidy, no notebook or uni stamp.</p>
+      <div class="confirm-card__actions">
+        <button class="btn btn--primary" type="button" data-save-brief>Add to archive</button>
+      </div>
+    </section>`;
+  }
   return `<div class="alchemist__actions chat__save-row">
     <button class="btn btn--secondary" type="button" data-save-brief ${saveBusy ? "disabled" : ""}>${saveBusy ? "Saving…" : "Save as new page"}</button>
   </div>`;
 }
 
-function noteComposerHtml(fromBook: boolean, placeholder: string) {
+function noteComposerHtml(fileNote: boolean, placeholder: string, label: string) {
   const submitLabel = busy || researchSessionId || writeSessionId
     ? escapeHtml(waitLine)
-    : fromBook
+    : fileNote
       ? "Make note"
       : "Send";
-  return `<form class="coach__form ${fromBook ? "chat__note-form" : "glass-panel chat__composer"}" novalidate>
-    <label for="chat-input">${fromBook ? "Note from the page" : "Message"}</label>
-    <textarea id="chat-input" rows="${fromBook ? 4 : 3}" placeholder="${escapeHtml(placeholder)}" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
+  return `<form class="coach__form ${fileNote ? "chat__note-form" : "glass-panel chat__composer"}" novalidate>
+    <label for="chat-input">${escapeHtml(label)}</label>
+    <textarea id="chat-input" rows="${fileNote ? 4 : 3}" placeholder="${escapeHtml(placeholder)}" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
     <div class="alchemist__actions">
       <button class="btn btn--primary" type="submit" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${submitLabel}</button>
     </div>
@@ -517,9 +547,14 @@ export function renderChatRail(host: ChatRailHost) {
   const canSave = Boolean(last && briefIsSavable(last.content));
   const writing = hat === "writing";
   const fromBook = hat === "fromBook";
+  const makeNote = hat === "makeNote";
+  const fileNote = isWebFileNoteHat(hat);
   const placeholder = fromBook
     ? "The idea, term, or question from the page…"
-    : "Ask about the archive…";
+    : makeNote
+      ? "The topic, question, or thinking process to research…"
+      : "Ask about the archive…";
+  const inputLabel = fromBook ? "Note from the page" : makeNote ? "What should she research?" : "Message";
   const bookLabels = host.bookLabels ?? [];
   const threadHtml = turns.length
     ? turns
@@ -531,7 +566,7 @@ export function renderChatRail(host: ChatRailHost) {
           }),
         )
         .join("")
-    : fromBook
+    : fileNote
       ? ""
       : `<article class="coach-msg coach-msg--assistant glass-panel coach-msg--with-portrait">
           ${assistantPortrait()}
@@ -544,11 +579,11 @@ export function renderChatRail(host: ChatRailHost) {
     ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · Chat needs the Netlify API (session + Anthropic). The browser never talks to the research kernel.</p>` : ""}
     ${host.pageHeader(
       CLEMENTINE.shortName,
-      fromBook ? "From a book" : "Chat",
+      fromBook ? "From a book" : makeNote ? "Make a note" : "Chat",
       `<button class="btn btn--ghost" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
       { portraitSrc: CLEMENTINE.avatarSrc, portraitAlt: CLEMENTINE.name },
     )}
-    <section class="coach chat${fromBook ? " chat--from-book" : ""}">
+    <section class="coach chat${fileNote ? " chat--from-book" : ""}">
       <div class="chat__sitting glass-panel">
         <div class="graph-modes chat__hats" role="group" aria-label="Chat hats">
           ${CHAT_HATS.map(
@@ -562,7 +597,7 @@ export function renderChatRail(host: ChatRailHost) {
             : ""
         }
         ${bookFieldHtml(bookLabels)}
-        ${fromBook ? noteComposerHtml(true, placeholder) : ""}
+        ${fileNote ? noteComposerHtml(true, placeholder, inputLabel) : ""}
         <button type="button" class="chat__dials-toggle" data-toggle-dials>${showDials ? "Hide scope and depth" : "Adjust scope and depth"}</button>
         ${
           showDials
@@ -590,7 +625,7 @@ export function renderChatRail(host: ChatRailHost) {
       <div class="coach__thread" aria-live="polite">
         ${threadHtml}
       </div>
-      ${fromBook ? "" : noteComposerHtml(false, placeholder)}
+      ${fileNote ? "" : noteComposerHtml(false, placeholder, inputLabel)}
     </section>
   `);
 

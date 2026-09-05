@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { CHAT_HATS, hatById, resolveChatPlan } from "./hats";
 
 describe("chat hats", () => {
-  it("ships eight hats including From a book and no Consolidation", () => {
+  it("ships nine hats including Make a note and From a book and no Consolidation", () => {
     expect(CHAT_HATS.map(hat => hat.id)).toEqual([
+      "makeNote",
       "fromBook",
       "scoping",
       "synthesis",
@@ -71,5 +72,16 @@ describe("chat hats", () => {
     expect(hatById("fromBook").plan).toMatch(/bears on the book/i);
     expect(hatById("fromBook").plan).toMatch(/open web/i);
     expect(hatById("fromBook").plan).toMatch(/not the archive/i);
+    expect(resolveChatPlan("makeNote")).toMatchObject({
+      scope: "standard",
+      depth: "single",
+      kernel: "quick",
+      k: 16,
+      maxRounds: 1,
+    });
+    expect(hatById("makeNote").plan).toMatch(/open web/i);
+    expect(hatById("makeNote").plan).toMatch(/not the archive/i);
+    expect(hatById("makeNote").plan).toMatch(/no notebook|Do not stamp/i);
+    expect(hatById("makeNote").explain).toMatch(/no notebook/i);
   });
 });
