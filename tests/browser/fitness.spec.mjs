@@ -46,9 +46,26 @@ test('the Fitness tab renders the fixture workout and labeled analytics', async 
     await page.locator('#fitness-dashboard').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#home-dashboard').isHidden(), true);
 
+    assert.equal(await page.locator('#fitness-hero-label').textContent(), 'Last session');
     assert.equal(await page.locator('[data-fitness="hero-title"]').textContent(), 'Chest and Curls');
     assert.equal(await page.locator('[data-fitness="hero-duration"]').textContent(), '26 min');
     assert.equal(await page.locator('[data-fitness="hero-status"]').textContent(), 'completed');
+    const topTiles = await page.evaluate(() => {
+      const hero = document.querySelector('.fitness-hero-card').getBoundingClientRect();
+      const region = document.querySelector('.fitness-region-block').getBoundingClientRect();
+      const week = document.querySelector('.fitness-board').getBoundingClientRect();
+      return {
+        heroTop: hero.top,
+        regionTop: region.top,
+        weekTop: week.top,
+        heroRight: hero.right,
+        regionLeft: region.left
+      };
+    });
+    assert.ok(topTiles.heroTop < topTiles.weekTop, 'last session should sit above this week');
+    assert.ok(topTiles.regionTop < topTiles.weekTop, 'region strength should sit above this week');
+    assert.ok(topTiles.heroRight <= topTiles.regionLeft + 1, 'last session and region strength should sit side by side');
+    assert.ok(Math.abs(topTiles.heroTop - topTiles.regionTop) < 8, 'last session and region strength should share the top row');
     assert.match(await page.locator('[data-fitness="streak"]').textContent(), /\d+/);
     assert.ok(await page.locator('#fitness-region-grid .fitness-region-card').count() >= 1);
     assert.ok(await page.locator('[data-fitness="week-strip"] span').count() >= 1);
@@ -63,10 +80,9 @@ test('the Fitness tab renders the fixture workout and labeled analytics', async 
     assert.equal(await page.locator('#fitness-region-vol-card').isVisible(), true);
     assert.ok(await page.locator('#fitness-region-donut circle').count() >= 1);
     assert.ok(await page.locator('#fitness-region-vol-card .mind-chart-legend').count() >= 1);
-    assert.equal(await page.locator('#fitness-library-card').isVisible(), true);
-    assert.ok(await page.locator('#fitness-library-chart .mind-constellation__label').count() >= 1);
-    await page.locator('#fitness-library-chart [data-role="star"]').first().focus();
-    assert.match(await page.locator('#fitness-library-card [data-role="fitness-tip"]').textContent(), /session/i);
+    assert.equal(await page.locator('#fitness-chord-card').count(), 0);
+    assert.equal(await page.locator('#fitness-sankey-card').count(), 0);
+    assert.equal(await page.locator('#fitness-library-card').count(), 0);
     assert.equal(await page.locator('#fitness-push-pull-card').isVisible(), true);
     assert.equal(await page.locator('#fitness-rest-card').isVisible(), true);
     assert.equal(await page.locator('#fitness-e1rm-card').isHidden(), true);

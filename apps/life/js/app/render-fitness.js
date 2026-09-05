@@ -328,6 +328,7 @@ function setHidden(element, hidden) {
 }
 
 function renderHero(root, session, { logger, libraryByName } = {}) {
+  setText(root, '#fitness-hero-label', session.status === 'planned' ? 'Current session' : 'Last session');
   setText(root, '[data-fitness="hero-day"]', formatWeekday(session.date) || '');
   setText(root, '[data-fitness="hero-title"]', session.title ?? 'Session');
   setText(root, '[data-fitness="hero-duration"]', session.duration_min != null ? `${session.duration_min} min` : '—');

@@ -128,6 +128,7 @@ test('planned Fitness hero shows exercise rows and Start workout until the logge
 
   renderFitness(root, baseModel(), { logger });
 
+  assert.equal(root.ensure('#fitness-hero-label').textContent, 'Current session');
   assert.equal(root.ensure('[data-fitness="hero-day"]').textContent, 'Thursday');
   assert.equal(root.ensure('[data-fitness="hero-title"]').textContent, 'Upper Body');
   const list = root.ensure('#fitness-exercise-list');
@@ -157,6 +158,7 @@ test('completed Fitness hero keeps set details and hides Start workout', () => {
   }));
 
   const list = root.ensure('#fitness-exercise-list');
+  assert.equal(root.ensure('#fitness-hero-label').textContent, 'Last session');
   assert.match(list.children[0].className, /fitness-exercise/);
   assert.match(list.children[0].children[1].children[1].textContent, /32 kg/);
   assert.equal(root.ensure('#fitness-start-workout').attributes.hidden, '');
@@ -279,7 +281,6 @@ test('kit charts unhide when their own data is ready and stay hidden otherwise',
       clockPoints: [],
       orbitDays: [],
       e1rmRadial: [],
-      focusChord: [{ themeA: 'chest', themeB: 'arms', count: 1 }],
       bumpRanks: [],
       regionStream: null,
       painHeat: [],
@@ -287,11 +288,6 @@ test('kit charts unhide when their own data is ready and stay hidden otherwise',
       e1rmBands: [],
       sessionGauge: null,
       yearDots: [],
-      sankeyFlows: [],
-      libraryMap: {
-        nodes: [{ key: 'Chest Press', count: 2 }, { key: 'Curl', count: 1 }],
-        edges: [{ themeA: 'Chest Press', themeB: 'Curl', count: 1 }]
-      },
       volumePerSetWeeks: [],
       durationSeries: [],
       distanceSeries: [],
@@ -307,8 +303,6 @@ test('kit charts unhide when their own data is ready and stay hidden otherwise',
   assert.equal(root.ensure('#fitness-push-pull-card').attributes.hidden, undefined);
   assert.match(root.ensure('[data-fitness="push-read"]').textContent, /push/);
   assert.equal(root.ensure('#fitness-rest-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-chord-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-library-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-e1rm-card').attributes.hidden, '');
   assert.equal(root.ensure('#fitness-readings-card').attributes.hidden, '');
   assert.equal(root.ensure('#fitness-clock-card').attributes.hidden, '');
