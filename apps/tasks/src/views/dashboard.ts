@@ -62,7 +62,15 @@ function appendTaskCard(
       await handlers.onChanged();
     }),
     onDelete: (current) => deleteTaskNow(current, handlers.onRemoved, confirmHost),
-    onEdit: (current) => void renderTaskEditor(confirmHost, current, projects, () => void handlers.onChanged())
+    onEdit: (current) => void renderTaskEditor(confirmHost, current, projects, () => void handlers.onChanged()),
+    onPatch: (current, patch) => {
+      void tasksApi.updateTask(current.id, patch).then(
+        () => void handlers.onChanged(),
+        (err: unknown) => {
+          confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not save')));
+        }
+      );
+    }
   });
 }
 

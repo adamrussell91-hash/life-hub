@@ -20,7 +20,7 @@ Flat freeze (no `css/` subfolder):
 | `actions.css` / `chrome.css` | Buttons, utilities, confirm cards; chrome bundles rail + mobile + motion |
 | `sign-in.css` + `snippets/sign-in.html` | Locked passphrase gate (**tile required**, no supporting copy) |
 | `rail.css` / `mobile.css` | Locked left rail + phone bottom bar |
-| `motion.css`, `morphing-popover.css`, `hub-compose.css`, `adaptive-slider.css`, `js/*` | Shared motion / morph / compose / slider / date / mobile mount |
+| `motion.css`, `morphing-popover.css`, `hub-compose.css`, `adaptive-slider.css`, `js/*` | Shared motion / morph / compose / slider / date / mobile mount. Closed-field chips: `createMorphingClosedFieldPopover` |
 | `icons/` | Hub tiles + glyphs |
 | `AGENTS.md`, `RAIL.md`, `MOBILE.md`, `ICONS.md`, `TASKS.md` | Locked rules |
 
