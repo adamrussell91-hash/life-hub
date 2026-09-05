@@ -69,7 +69,7 @@ describe('daily dial view', () => {
     expect(host.querySelector('.daily-dial')).not.toBeNull();
     expect(host.querySelector('.glass-panel')).not.toBeNull();
     expect(host.querySelector('.hub-pills')).not.toBeNull();
-    expect(host.textContent).toContain('Tap an hour to open it up');
+    expect(host.textContent).toContain('Tap an hour to schedule');
     expect(host.querySelector('.daily-dial__label--focused')?.textContent).toBe('9 AM');
     expect(host.querySelector('.daily-dial__chip-title')?.textContent).toBe('Standup');
     handle.destroy();

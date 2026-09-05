@@ -23,6 +23,7 @@ import {
   createHubTextarea,
   domainFilterOptions,
   el,
+  labeledField,
   optionList,
   priorityFilterOptions
 } from '@/views/hub-kit';
@@ -461,8 +462,16 @@ export function renderQuickAdd(
   });
   const submit = el('button', 'btn btn--primary', 'Add');
   submit.type = 'submit';
-  if (options.dueDate) form.append(title.el, due.el, time.el, domain.el, submit);
-  else form.append(title.el, domain.el, submit);
+  if (options.dueDate) {
+    const when = el('div', 'quick-add__when');
+    when.append(
+      labeledField('Date', due.el, 'quick-add__when-field'),
+      labeledField('Time', time.el, 'quick-add__when-field')
+    );
+    form.append(title.el, when, domain.el, submit);
+  } else {
+    form.append(title.el, domain.el, submit);
+  }
   const plus = options.standing
     ? null
     : createPlusAdd({
@@ -490,8 +499,10 @@ export function renderQuickAdd(
         bucket: 'active'
       };
       if (options.dueDate) {
-        const nextDue = due.input.value.trim();
-        if (nextDue) body.due_date = nextDue;
+        // Never drop a dated compose to backlog because iOS "Reset" cleared the date.
+        const nextDue = due.input.value.trim() || options.dueDate;
+        due.input.value = nextDue;
+        body.due_date = nextDue;
         const nextTime = time.input.value.trim();
         if (nextTime) {
           body.due_time = nextTime;

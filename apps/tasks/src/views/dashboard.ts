@@ -6,14 +6,18 @@ import {
   hubCalendarDate,
   preferredDomains,
   searchEntities,
+  snapHubDueTime,
   toDateKey
 } from '@/domain/queries';
+import { parseDueTimeHours } from '@/domain/daily-dial';
+import { hoursToDueTime } from '@/domain/time-grid';
 import { tasksApi } from '@/services/client-api';
 import type { TaskTemplate, ProjectTemplate, ExcursionTemplate } from '@/schemas/templates';
 import { renderPressureStrips } from '@/views/pinch-strip';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
 import { renderQuickAdd, renderTaskEditor } from '@/views/task-editor';
+import { openPlusAdd } from '@/views/plus-add';
 import { deleteProjectNow, deleteTaskNow } from '@/views/card-actions';
 import { mountProjectCard, mountTaskCard, removeMountedProjectCard, removeMountedTaskCard } from '@/views/hub-cards';
 import { projectPageHash } from '@/domain/cards';
@@ -159,6 +163,7 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
   let tasks: Task[];
   let projects: Project[];
   let liveDial: DailyDialHandle | null = null;
+  let dialFocusHour: number | null = null;
   try {
     [tasks, projects] = await Promise.all([tasksApi.listTasks(), tasksApi.listProjects()]);
   } catch (err) {
@@ -170,6 +175,8 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
     liveDial?.destroy();
     liveDial = null;
     const today = hubCalendarDate();
+    const todayKey = toDateKey(today);
+    const defaultDueTime = snapHubDueTime();
     const list = adaptiveTodayTasks(tasks, today).filter((t) => {
       if (dayDomain !== 'all' && t.domain !== dayDomain) return false;
       if (dayPriority !== 'all' && t.priority !== dayPriority) return false;
@@ -218,6 +225,14 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
     const dialHost = el('div', 'daily-dial-host');
     canvas.append(dialHost);
 
+    function seedComposeAtHour(hour: number): void {
+      dialFocusHour = hour;
+      openPlusAdd(canvas);
+      const time = canvas.querySelector<HTMLInputElement>('input[aria-label="Start time"]');
+      if (time) time.value = hoursToDueTime(hour);
+      canvas.querySelector<HTMLInputElement>('input[aria-label="New task title"]')?.focus();
+    }
+
     function remountDial(): void {
       liveDial?.destroy();
       liveDial = mountDailyDial(dialHost, {
@@ -225,12 +240,14 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
         projects,
         date: today,
         filters: { domain: dayDomain, priority: dayPriority },
+        focusHour: dialFocusHour,
         onOpen: (task) => {
           void renderTaskEditor(confirmHost, task, projects, async () => {
             tasks = await tasksApi.listTasks().catch(() => tasks);
             paint();
           });
-        }
+        },
+        onHourSelect: seedComposeAtHour
       });
     }
 
@@ -250,35 +267,13 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
       renderQuickAdd(
         (created) => {
           upsertTask(tasks, created);
-          const empty = canvas.querySelector('.empty-state');
-          empty?.remove();
-          let stack = canvas.querySelector<HTMLElement>('.task-stack');
-          if (!stack) {
-            stack = el('div', 'task-stack');
-            canvas.append(stack);
-          }
-          if (stack.querySelector(`[data-task-id="${created.id}"]`)) return;
-          if (adaptiveTodayTasks([created], today).length) {
-            appendTaskCard(
-              stack,
-              created,
-              confirmHost,
-              {
-                onRemoved: () => afterDayMutation(created.id),
-                onChanged: async () => {
-                  tasks = await tasksApi.listTasks().catch(() => tasks);
-                  paint();
-                }
-              },
-              projects
-            );
-            remountDial();
-            return;
-          }
+          const start = parseDueTimeHours(created.due_time);
+          dialFocusHour = start != null ? Math.floor(start) : dialFocusHour;
+          // Full in-memory repaint so the dial + list show the new task immediately.
           paint();
         },
         null,
-        { dueDate: toDateKey(today) }
+        { dueDate: todayKey, dueTime: defaultDueTime }
       )
     );
     canvas.append(confirmHost);

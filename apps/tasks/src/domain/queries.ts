@@ -83,6 +83,13 @@ export type HubClockParts = {
   dateKey: string;
 };
 
+/** Next whole hour on Adam's clock — default start time for Today quick-add. */
+export function snapHubDueTime(date: Date = new Date(), timeZone: string = HUB_TZ): string {
+  const { hour, minute } = hubClockParts(date, timeZone);
+  const next = minute === 0 ? hour : (hour + 1) % 24;
+  return `${pad2(next)}:00`;
+}
+
 /** Wall-clock parts in the hub timezone — used by the Today dial now-hand. */
 export function hubClockParts(date: Date = new Date(), timeZone: string = HUB_TZ): HubClockParts {
   const parts = Object.fromEntries(

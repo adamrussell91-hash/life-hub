@@ -72,7 +72,7 @@ describe('Today view mutations', () => {
   });
 
   it('shows a newly added Today task without a second list fetch', async () => {
-    const created = task({ id: 'task_today', title: 'Instant today' });
+    const created = task({ id: 'task_today', title: 'Instant today', due_time: '11:00' });
     vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
     vi.mocked(tasksApi.createTask).mockResolvedValue(created);
 
@@ -83,6 +83,9 @@ describe('Today view mutations', () => {
 
     const form = canvas.querySelector('form.quick-add') as HTMLFormElement;
     const title = form.querySelector('input[aria-label="New task title"]') as HTMLInputElement;
+    const time = form.querySelector('input[aria-label="Start time"]') as HTMLInputElement;
+    expect(time).not.toBeNull();
+    expect(time.value).toMatch(/^\d{2}:\d{2}$/);
     title.value = 'Instant today';
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
@@ -90,11 +93,31 @@ describe('Today view mutations', () => {
       expect(canvas.textContent).toContain('Instant today');
     });
     expect(canvas.querySelector('.canvas-status')).toBeNull();
+    expect(canvas.querySelector('.daily-dial')).not.toBeNull();
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(tasksApi.createTask).mock.calls[0]?.[0]).toMatchObject({
       title: 'Instant today',
-      due_date: toDateKey(hubCalendarDate())
+      due_date: toDateKey(hubCalendarDate()),
+      due_time: time.value,
+      estimated_duration: 60
     });
+  });
+
+  it('seeds start time when an hour on the dial is tapped', async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderDayView(canvas);
+
+    const hit = canvas.querySelector<SVGElement>('.daily-dial__hit');
+    expect(hit).not.toBeNull();
+    hit!.dispatchEvent(new Event('click', { bubbles: true }));
+
+    const time = canvas.querySelector<HTMLInputElement>('input[aria-label="Start time"]');
+    const title = canvas.querySelector<HTMLInputElement>('input[aria-label="New task title"]');
+    expect(canvas.querySelector<HTMLElement>('.plus-add__panel')?.hidden).toBe(false);
+    expect(time?.value).toMatch(/^\d{2}:00$/);
+    expect(document.activeElement).toBe(title);
   });
 
   it('renders the daily dial on Today', async () => {
