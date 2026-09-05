@@ -1,4 +1,5 @@
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/api/client';
+import { ApiClientError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/api/client';
+import { getApiBaseUrl } from '@/api/config';
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import {
@@ -19,6 +20,36 @@ import type {
 } from '@/schemas/templates';
 
 /** Browser client that mirrors the shared TasksStore surface (Clare will use the same server store). */
+
+async function* readClareDumpSse(body: ReadableStream<Uint8Array>): AsyncGenerator<
+  | { type: 'status'; text?: string }
+  | { type: 'text'; delta: string }
+  | { type: 'dump_result'; result: import('@/domain/clare').ClareDumpResult }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
+> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let boundary;
+    while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+      const frame = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const line = frame.split('\n').find((candidate) => candidate.startsWith('data:'));
+      if (!line) continue;
+      try {
+        yield JSON.parse(line.slice(5).trim());
+      } catch {
+        // Skip malformed frames.
+      }
+    }
+  }
+}
+
 export const tasksApi = {
   listTasks: () => apiGet<{ tasks: Task[] }>('/api/tasks').then((r) => mergeListedTasks(r.tasks)),
   getTask: (id: string) =>
@@ -117,6 +148,46 @@ export const tasksApi = {
     agent_slug?: import('@/domain/agent-protocol').AgentProtocolSlug;
   }) =>
     apiPost<import('@/domain/clare').ClareDumpResult>('/api/clare', { action: 'dump', ...body }),
+
+  streamDumpWithClare: async function* (body: {
+    text: string;
+    domain?: string;
+    protocol_id?: import('@/domain/clare-protocols').ClareProtocolId;
+    recent_thread?: Array<{ role: 'user' | 'assistant'; text: string }>;
+    agent_slug?: import('@/domain/agent-protocol').AgentProtocolSlug;
+  }) {
+    const url = `${getApiBaseUrl()}/api/clare`;
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          Accept: 'text/event-stream',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'dump_stream', ...body })
+      });
+    } catch (cause) {
+      const raw = cause instanceof Error ? cause.message : 'Network request failed';
+      throw new ApiClientError({ code: 'network_error', message: raw });
+    }
+    if (!response.ok) {
+      let message = `Dump stream failed (HTTP ${response.status})`;
+      try {
+        const payload = await response.json();
+        if (payload?.error?.message) message = payload.error.message;
+      } catch {
+        /* ignore */
+      }
+      throw new ApiClientError({ code: 'request_failed', message }, response.status);
+    }
+    if (!response.body) {
+      throw new ApiClientError({ code: 'invalid_response', message: 'Dump stream had no body' }, response.status);
+    }
+    yield* readClareDumpSse(response.body);
+  },
 
   applyAgentMutations: (mutations: import('@/domain/agent-mutations').AgentMutation[]) =>
     apiPost<{ results: Array<{ summary: string; ok: boolean; note: string }> }>('/api/clare', {

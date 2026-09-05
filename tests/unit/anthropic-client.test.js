@@ -292,6 +292,75 @@ test('continues when stop_reason is max_tokens so long replies are not left mid-
   );
 });
 
+
+test('emits sources from web_search_tool_result with title and url', async () => {
+  const frames = [
+    frame('content_block_start', {
+      index: 0,
+      content_block: { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search' }
+    }),
+    frame('content_block_delta', {
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: '{"query":"McChicken nutrition AU"}' }
+    }),
+    frame('content_block_stop', { index: 0 }),
+    frame('content_block_start', {
+      index: 1,
+      content_block: {
+        type: 'web_search_tool_result',
+        tool_use_id: 'srvtoolu_1',
+        content: [
+          {
+            type: 'web_search_result',
+            url: 'https://example.com/mcchicken',
+            title: 'McChicken nutrition',
+            page_age: 'May 2026'
+          },
+          {
+            type: 'web_search_result',
+            url: 'https://example.com/calories',
+            title: 'Fast food calories'
+          }
+        ]
+      }
+    }),
+    frame('content_block_start', { index: 2, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 2, delta: { type: 'text_delta', text: 'About 400 kcal.' } }),
+    frame('content_block_stop', { index: 2 }),
+    frame('message_delta', { delta: { stop_reason: 'end_turn' } }),
+    frame('message_stop', {})
+  ];
+
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async () => sseResponse(frames)
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'mcchicken calories' }],
+    tools: [{ type: 'web_search_20250305', name: 'web_search' }]
+  })) events.push(event);
+
+  assert.deepEqual(
+    events.filter(e => e.type === 'search' || e.type === 'sources' || e.type === 'text' || e.type === 'done'),
+    [
+      { type: 'search', query: 'McChicken nutrition AU' },
+      {
+        type: 'sources',
+        heading: 'Sources',
+        sources: [
+          { title: 'McChicken nutrition', url: 'https://example.com/mcchicken', snippet: 'May 2026' },
+          { title: 'Fast food calories', url: 'https://example.com/calories' }
+        ]
+      },
+      { type: 'text', delta: 'About 400 kcal.' },
+      { type: 'done' }
+    ]
+  );
+});
+
 test('continues when stop_reason is pause_turn by re-sending assistant content as-is', async () => {
   const first = [
     frame('content_block_start', {

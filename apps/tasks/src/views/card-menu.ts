@@ -1,6 +1,7 @@
 /** Overflow menu for Cotton Glass cards. Uses kit `.hub-menu` chrome. */
 
 import { autoUpdateHubFloating, positionHubFloating } from '../../../../packages/design-kit/js/hub-floating.js';
+import { findTypeaheadMatch } from '../../../../packages/design-kit/js/hub-filter-menu.js';
 
 export type CardMenuItem = {
   id: string;
@@ -84,6 +85,8 @@ function openItems(btn: HTMLButtonElement, items: CardMenuItem[], ariaLabel: str
   };
   openMenu = { menu, btn, close, stopFloating };
 
+  let typeaheadBuffer = '';
+  let typeaheadTimer = 0;
   menu.addEventListener('keydown', (event) => {
     const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
     if (event.key === 'ArrowDown') {
@@ -100,6 +103,26 @@ function openItems(btn: HTMLButtonElement, items: CardMenuItem[], ariaLabel: str
       buttons[buttons.length - 1]?.focus();
     } else if (event.key === 'Escape' || event.key === 'Tab') {
       closeCardMenu(true);
+    } else if (
+      event.key.length === 1
+      && !event.ctrlKey
+      && !event.metaKey
+      && !event.altKey
+    ) {
+      typeaheadBuffer += event.key;
+      if (typeaheadTimer) clearTimeout(typeaheadTimer);
+      typeaheadTimer = window.setTimeout(() => {
+        typeaheadBuffer = '';
+        typeaheadTimer = 0;
+      }, 500);
+      const match = findTypeaheadMatch(
+        buttons.map((item) => item.textContent ?? ''),
+        typeaheadBuffer
+      );
+      if (match >= 0) {
+        event.preventDefault();
+        buttons[match]?.focus();
+      }
     }
   });
 

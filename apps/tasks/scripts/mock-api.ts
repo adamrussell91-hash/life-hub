@@ -332,24 +332,40 @@ export function createMockApi({ seed }: MockApiOptions) {
             })
           });
         }
-        if (b.action === 'dump') {
-          return json(200, {
-            ok: true,
-            data: await s.processDumpWithClare({
-              text: String(b.text ?? ''),
-              domain: b.domain === undefined ? undefined : (b.domain as 'teaching'),
-              protocol_id:
-                b.protocol_id === undefined
-                  ? undefined
-                  : (String(b.protocol_id) as import('../src/domain/clare-protocols').ClareProtocolId),
-              recent_thread: Array.isArray(b.recent_thread)
-                ? (b.recent_thread as Array<{ role: 'user' | 'assistant'; text: string }>)
-                : undefined,
-              agent_slug:
-                b.agent_slug === undefined
-                  ? undefined
-                  : (String(b.agent_slug) as import('../src/domain/agent-protocol').AgentProtocolSlug)
-            })
+        if (b.action === 'dump' || b.action === 'dump_stream') {
+          const dump = await s.processDumpWithClare({
+            text: String(b.text ?? ''),
+            domain: b.domain === undefined ? undefined : (b.domain as 'teaching'),
+            protocol_id:
+              b.protocol_id === undefined
+                ? undefined
+                : (String(b.protocol_id) as import('../src/domain/clare-protocols').ClareProtocolId),
+            recent_thread: Array.isArray(b.recent_thread)
+              ? (b.recent_thread as Array<{ role: 'user' | 'assistant'; text: string }>)
+              : undefined,
+            agent_slug:
+              b.agent_slug === undefined
+                ? undefined
+                : (String(b.agent_slug) as import('../src/domain/agent-protocol').AgentProtocolSlug)
+          });
+          if (b.action === 'dump') {
+            return json(200, { ok: true, data: dump });
+          }
+          const voice = typeof dump.voice === 'string' ? dump.voice : '';
+          const mid = Math.max(1, Math.ceil(voice.length / 2));
+          const events = [
+            { type: 'status', text: 'Sorting the dump…' },
+            ...(voice ? [{ type: 'text', delta: voice.slice(0, mid) }, { type: 'text', delta: voice.slice(mid) }] : []),
+            { type: 'dump_result', result: dump },
+            { type: 'done' }
+          ];
+          const body = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join('');
+          return new Response(body, {
+            status: 200,
+            headers: {
+              'content-type': 'text/event-stream; charset=utf-8',
+              'cache-control': 'no-store'
+            }
           });
         }
         if (b.action === 'apply_mutations') {

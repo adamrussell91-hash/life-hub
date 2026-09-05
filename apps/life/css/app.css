@@ -881,6 +881,26 @@ main { max-width: 76rem; margin: 0 auto; }
   display: none !important;
 }
 
+.chat-turn-spacer {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.confirm-card--receipt,
+.record-proposal.confirm-card--receipt {
+  opacity: 0.96;
+}
+
+.confirm-card__receipt {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
 .record-proposal {
   padding: 1rem 1.2rem;
   border-radius: var(--radius-md);

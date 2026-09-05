@@ -131,6 +131,79 @@ async function acceptOne(store, { proposal, accepted_minutes, framework_id }, no
   return { task, negotiation, calibration };
 }
 
+
+async function computeDumpResult(store, body, nowIso) {
+  const text = typeof body.text === 'string' ? body.text : '';
+  const domain = CLARE_DOMAINS.has(body.domain) ? body.domain : 'teaching';
+  const protocolId = readProtocolId(body.protocol_id);
+  const agent = typeof body.agent_slug === 'string' && body.agent_slug ? body.agent_slug : 'clare';
+  const followUp = resolveDuplicateFollowUp(text, body.recent_thread);
+  if (followUp?.action === 'leave') {
+    return {
+      voice: `Leaving “${followUp.title}” as is.`,
+      proposals: [],
+      questions: [],
+      notes: [],
+      toolkit: null,
+      mutations: [],
+      agent
+    };
+  }
+  const [frameworks, tasks, projects, calibrations] = await Promise.all([
+    loadFrameworks(store),
+    listJSON(store, TASK_PREFIX),
+    listJSON(store, PROJECT_PREFIX),
+    listJSON(store, CLARE_CALIBRATION_PREFIX)
+  ]);
+  const byDomain = new Map(calibrations.map(item => [item.domain, item]));
+  const items = parseBrainDump(followUp?.action === 'make_new' ? followUp.title : text, {
+    now: new Date(nowIso),
+    timezone: HUB_TZ,
+    preferredDomain: domain,
+    tasks,
+    projects,
+    forceNewTitles: followUp?.action === 'make_new' || Boolean(body.force_new_titles)
+  });
+  return assembleDumpResult(
+    items,
+    frameworks,
+    itemDomain => {
+      const calibration = byDomain.get(itemDomain);
+      return calibration && calibration.sample_count > 0 ? calibration : null;
+    },
+    protocolId,
+    agent
+  );
+}
+
+function chunkVoice(text, size = 28) {
+  const value = typeof text === 'string' ? text : '';
+  if (!value) return [];
+  const chunks = [];
+  let i = 0;
+  while (i < value.length) {
+    let end = Math.min(i + size, value.length);
+    if (end < value.length) {
+      const space = value.lastIndexOf(' ', end);
+      if (space > i + 8) end = space + 1;
+    }
+    chunks.push(value.slice(i, end));
+    i = end;
+  }
+  return chunks;
+}
+
+function sseResponse(stream) {
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-store',
+      connection: 'keep-alive'
+    }
+  });
+}
+
 export function createClareHandler(deps = {}) {
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
@@ -206,48 +279,41 @@ export function createClareHandler(deps = {}) {
         );
       }
 
-      if (action === 'dump') {
-        const text = typeof body.text === 'string' ? body.text : '';
-        const domain = CLARE_DOMAINS.has(body.domain) ? body.domain : 'teaching';
-        const protocolId = readProtocolId(body.protocol_id);
-        const agent = typeof body.agent_slug === 'string' && body.agent_slug ? body.agent_slug : 'clare';
-        const followUp = resolveDuplicateFollowUp(text, body.recent_thread);
-        if (followUp?.action === 'leave') {
-          return withCors(okResponse(200, {
-            voice: `Leaving “${followUp.title}” as is.`,
-            proposals: [],
-            questions: [],
-            notes: [],
-            toolkit: null,
-            mutations: [],
-            agent
-          }), request, env);
+      if (action === 'dump' || action === 'dump_stream') {
+        const result = await computeDumpResult(store, body, nowIso);
+        if (action === 'dump') {
+          return withCors(okResponse(200, result), request, env);
         }
-        const [frameworks, tasks, projects, calibrations] = await Promise.all([
-          loadFrameworks(store),
-          listJSON(store, TASK_PREFIX),
-          listJSON(store, PROJECT_PREFIX),
-          listJSON(store, CLARE_CALIBRATION_PREFIX)
-        ]);
-        const byDomain = new Map(calibrations.map(item => [item.domain, item]));
-        const items = parseBrainDump(followUp?.action === 'make_new' ? followUp.title : text, {
-          now: new Date(nowIso),
-          timezone: HUB_TZ,
-          preferredDomain: domain,
-          tasks,
-          projects,
-          forceNewTitles: followUp?.action === 'make_new' || Boolean(body.force_new_titles)
+
+        const stream = new ReadableStream({
+          async start(controller) {
+            const encoder = new TextEncoder();
+            const send = event => {
+              try {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+              } catch {
+                /* Client disconnected. */
+              }
+            };
+            try {
+              send({ type: 'status', text: 'Sorting the dump…' });
+              const voice = typeof result.voice === 'string' ? result.voice : '';
+              for (const delta of chunkVoice(voice)) {
+                send({ type: 'text', delta });
+              }
+              send({ type: 'dump_result', result });
+              send({ type: 'done' });
+            } catch (error) {
+              send({
+                type: 'error',
+                message: error instanceof Error ? error.message : 'Dump stream failed'
+              });
+            } finally {
+              controller.close();
+            }
+          }
         });
-        return withCors(okResponse(200, assembleDumpResult(
-          items,
-          frameworks,
-          itemDomain => {
-            const calibration = byDomain.get(itemDomain);
-            return calibration && calibration.sample_count > 0 ? calibration : null;
-          },
-          protocolId,
-          agent
-        )), request, env);
+        return withCors(sseResponse(stream), request, env);
       }
 
       if (action === 'apply_mutations') {

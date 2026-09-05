@@ -12,7 +12,7 @@ vi.mock('@/services/client-api', () => ({
     listTemplates: vi.fn(),
     listClareCalibrations: vi.fn(),
     briefWithClare: vi.fn(),
-    processDumpWithClare: vi.fn(),
+    streamDumpWithClare: vi.fn(),
     proposeWithClare: vi.fn(),
     acceptClareProposal: vi.fn(),
     acceptClareBatch: vi.fn(),
@@ -72,6 +72,26 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+
+async function* dumpStreamFromResult(result: import('@/domain/clare').ClareDumpResult) {
+  yield { type: 'status' as const, text: 'Sorting the dump…' };
+  if (result.voice) yield { type: 'text' as const, delta: result.voice };
+  yield { type: 'dump_result' as const, result };
+  yield { type: 'done' as const };
+}
+
+function pendingDumpStream() {
+  let resolve!: (result: import('@/domain/clare').ClareDumpResult) => void;
+  const promise = new Promise<import('@/domain/clare').ClareDumpResult>((done) => {
+    resolve = done;
+  });
+  async function* stream() {
+    const result = await promise;
+    yield* dumpStreamFromResult(result);
+  }
+  return { stream: stream(), resolve };
+}
+
 describe('Clare protocol controls', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -121,16 +141,16 @@ describe('Clare protocol controls', () => {
 
   it('sends the selected protocol through Clare and rotates wait copy until the result arrives', async () => {
     vi.useFakeTimers();
-    const pending = deferred<import('@/domain/clare').ClareDumpResult>();
-    vi.mocked(tasksApi.processDumpWithClare).mockReturnValue(pending.promise);
+    const pendingStream = pendingDumpStream();
+    vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(pendingStream.stream);
     const canvas = document.createElement('main');
     await renderClareView(canvas);
     const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
     dump.value = proposal.title;
 
     canvas.querySelector<HTMLButtonElement>('[data-protocol-id="shrink-first-step"]')!.click();
-    await vi.waitFor(() => expect(tasksApi.processDumpWithClare).toHaveBeenCalledTimes(1));
-    expect(tasksApi.processDumpWithClare).toHaveBeenCalledWith(
+    await vi.waitFor(() => expect(tasksApi.streamDumpWithClare).toHaveBeenCalledTimes(1));
+    expect(tasksApi.streamDumpWithClare).toHaveBeenCalledWith(
       expect.objectContaining({ protocol_id: 'shrink-first-step', text: proposal.title })
     );
     const first = canvas.querySelector('.chat-message--status')?.textContent;
@@ -152,7 +172,7 @@ describe('Clare protocol controls', () => {
     expect(second).not.toBe(first);
     expect(canvas.querySelectorAll('.chat-message--status')).toHaveLength(1);
 
-    pending.resolve({
+    pendingStream.resolve({
       voice: 'Right — one thing, and it actually has a shape. Here is my take.',
       proposals: [proposal],
       questions: [],
@@ -171,7 +191,7 @@ describe('Clare protocol controls', () => {
   });
 
   it('shows Saving… on Confirm then Saved. after the write', async () => {
-    vi.mocked(tasksApi.processDumpWithClare).mockResolvedValue({
+    vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(dumpStreamFromResult({
       voice: 'Right — one thing, and it actually has a shape. Here is my take.',
       proposals: [proposal],
       questions: [],
@@ -179,7 +199,7 @@ describe('Clare protocol controls', () => {
       toolkit: null,
       mutations: [],
       agent: 'clare'
-    });
+    }))
     const pending = deferred<unknown>();
     vi.mocked(tasksApi.acceptClareBatch).mockReturnValue(pending.promise as Promise<never>);
     const canvas = document.createElement('main');
@@ -189,7 +209,7 @@ describe('Clare protocol controls', () => {
     canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
       new Event('submit', { bubbles: true, cancelable: true })
     );
-    await vi.waitFor(() => expect(tasksApi.processDumpWithClare).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(tasksApi.streamDumpWithClare).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(canvas.querySelector('.record-proposal__confirm')).not.toBeNull());
 
     expect(canvas.querySelector('.record-proposal .page-header__title')?.textContent).toBe(proposal.title);
@@ -206,8 +226,8 @@ describe('Clare protocol controls', () => {
   });
 
   it('drops a dump that finishes after New chat', async () => {
-    const pending = deferred<import('@/domain/clare').ClareDumpResult>();
-    vi.mocked(tasksApi.processDumpWithClare).mockReturnValue(pending.promise);
+    const pendingStream = pendingDumpStream();
+    vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(pendingStream.stream);
     const canvas = document.createElement('main');
     await renderClareView(canvas);
     const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
@@ -215,10 +235,10 @@ describe('Clare protocol controls', () => {
     canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
       new Event('submit', { bubbles: true, cancelable: true })
     );
-    await vi.waitFor(() => expect(tasksApi.processDumpWithClare).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(tasksApi.streamDumpWithClare).toHaveBeenCalledTimes(1));
 
     canvas.querySelector<HTMLButtonElement>('#chat-new')!.click();
-    pending.resolve({
+    pendingStream.resolve({
       voice: 'Stale dump that should not land.',
       proposals: [proposal],
       questions: [],
@@ -249,7 +269,7 @@ describe('Clare protocol controls', () => {
   });
 
   it('switches the picker to Hammond and chats through the shared agent path', async () => {
-    vi.mocked(tasksApi.processDumpWithClare).mockResolvedValue({
+    vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(dumpStreamFromResult({
       voice: 'Ethics and Da Vinci overlap in the same fortnight. That is the board.',
       proposals: [],
       questions: [],
@@ -257,7 +277,7 @@ describe('Clare protocol controls', () => {
       toolkit: null,
       mutations: [],
       agent: 'hammond'
-    });
+    }))
     const canvas = document.createElement('main');
     await renderClareView(canvas);
 
@@ -272,7 +292,7 @@ describe('Clare protocol controls', () => {
 
     canvas.querySelector<HTMLButtonElement>('[data-protocol-id="whats-running"]')!.click();
     await vi.waitFor(() =>
-      expect(tasksApi.processDumpWithClare).toHaveBeenCalledWith(
+      expect(tasksApi.streamDumpWithClare).toHaveBeenCalledWith(
         expect.objectContaining({ agent_slug: 'hammond' })
       )
     );
@@ -283,7 +303,7 @@ describe('Clare protocol controls', () => {
 
   it('removes the status bubble on failure and new chat', async () => {
     vi.useFakeTimers();
-    vi.mocked(tasksApi.processDumpWithClare).mockRejectedValueOnce(new Error('Clare could not reply.'));
+    vi.mocked(tasksApi.streamDumpWithClare).mockImplementation(async function* () { throw new Error('Clare could not reply.'); });
     const canvas = document.createElement('main');
     await renderClareView(canvas);
     const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
@@ -295,8 +315,8 @@ describe('Clare protocol controls', () => {
     expect(canvas.querySelector('.chat-message--status')).toBeNull();
     expect(canvas.querySelector('.hub-loader, .typing-indicator')).toBeNull();
 
-    const pending = deferred<import('@/domain/clare').ClareDumpResult>();
-    vi.mocked(tasksApi.processDumpWithClare).mockReturnValue(pending.promise);
+    const pendingStream = pendingDumpStream();
+    vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(pendingStream.stream);
     dump.value = 'Again';
     canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
       new Event('submit', { bubbles: true, cancelable: true })
@@ -312,8 +332,8 @@ describe('Clare protocol controls', () => {
 
   it('uses the newly selected agent wait lines after switching', async () => {
     vi.useFakeTimers();
-    const pending = deferred<import('@/domain/clare').ClareDumpResult>();
-    vi.mocked(tasksApi.processDumpWithClare).mockReturnValue(pending.promise);
+    const pendingStream = pendingDumpStream();
+    vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(pendingStream.stream);
     const canvas = document.createElement('main');
     await renderClareView(canvas);
     canvas.querySelector<HTMLButtonElement>('[data-agent-slug="vera"]')!.click();
@@ -326,7 +346,7 @@ describe('Clare protocol controls', () => {
     const line = canvas.querySelector('.chat-message--status')?.textContent ?? '';
     expect(CHAT_AGENTS.find((agent) => agent.slug === 'vera')?.waitLines).toContain(line);
     expect(CHAT_AGENTS.find((agent) => agent.slug === 'clare')?.waitLines).not.toContain(line);
-    pending.resolve({
+    pendingStream.resolve({
       voice: 'Sit with the pattern.',
       proposals: [],
       questions: [],
