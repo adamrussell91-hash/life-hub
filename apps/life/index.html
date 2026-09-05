@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="packages/design-kit/morphing-popover.css">
   <link rel="stylesheet" href="packages/design-kit/rail.css">
   <link rel="stylesheet" href="packages/design-kit/mobile.css">
+  <link rel="stylesheet" href="packages/design-kit/calendar.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -714,27 +715,7 @@
         </section>
 
         <section id="calendar-dashboard" class="dashboard" aria-label="Calendar" hidden>
-          <article class="metric-card">
-            <p class="metric-label">This week</p>
-            <div id="calendar-week-strip" class="calendar-week-strip" aria-label="Current week"></div>
-          </article>
-
-          <article class="metric-card">
-            <div class="calendar-month-nav">
-              <button type="button" class="btn btn--secondary quiet-button" data-calendar="prev-month" aria-label="Previous month">‹</button>
-              <p class="metric-label" data-calendar="month-label">—</p>
-              <button type="button" class="btn btn--secondary quiet-button" data-calendar="next-month" aria-label="Next month">›</button>
-            </div>
-            <div id="calendar-month-grid" class="calendar-month-grid" aria-label="Month grid"></div>
-          </article>
-
-          <article class="metric-card" id="calendar-day-detail" aria-live="polite"></article>
-
-          <article class="metric-card" id="calendar-source-registry" aria-label="Shared calendar sources">
-            <p class="metric-label">Shared sources</p>
-            <p class="metric-caption" data-calendar="sources-empty">No shared sources yet.</p>
-            <ul id="calendar-source-list" hidden></ul>
-          </article>
+          <div id="life-calendar-host"></div>
         </section>
 
         <section id="body-dashboard" class="dashboard" aria-label="Body" hidden>

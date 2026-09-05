@@ -1329,9 +1329,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const record = body as Record<string, unknown>;
     const hasDate = record.date !== undefined;
     const hasDirection = record.direction !== undefined;
+    const hasStartTime = record.start_time !== undefined;
 
-    if (!hasDate && !hasDirection) {
-      return errorResponse(400, 'validation_error', 'Provide date and/or direction');
+    if (!hasDate && !hasDirection && !hasStartTime) {
+      return errorResponse(400, 'validation_error', 'Provide date, start_time, and/or direction');
     }
 
     let date: string | undefined;
@@ -1359,6 +1360,15 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
 
     if (date !== undefined) {
       result = { ...result, date, updated_at: nowIso };
+      toPersist.set(id, result);
+    }
+
+    if (hasStartTime) {
+      const startTime = record.start_time;
+      if (startTime !== null && (typeof startTime !== 'string' || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(startTime))) {
+        return errorResponse(400, 'validation_error', 'start_time must be HH:MM');
+      }
+      result = { ...result, start_time: startTime as string | null, updated_at: nowIso };
       toPersist.set(id, result);
     }
 
@@ -1397,6 +1407,74 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     }
 
     return okResponse(200, validated.data);
+  }
+
+  function handlePostScheduledLesson(
+    cookie: string | null | undefined,
+    body: unknown
+  ): MockResponse {
+    const session = getSession(cookie);
+    if (!session.authenticated) return unauthorizedResponse();
+    if (typeof body !== 'object' || body === null) {
+      return errorResponse(400, 'validation_error', 'Request body must be a JSON object');
+    }
+    const record = body as Record<string, unknown>;
+    const class_id = typeof record.class_id === 'string' ? record.class_id.trim() : '';
+    const lesson_id = typeof record.lesson_id === 'string' ? record.lesson_id.trim() : '';
+    const date = typeof record.date === 'string' ? record.date.trim() : '';
+    if (!class_id || !lesson_id || !DATE_RE.test(date)) {
+      return errorResponse(400, 'validation_error', 'class_id, lesson_id, and date (YYYY-MM-DD) are required');
+    }
+    const cls = store.getJSON(classKey(class_id));
+    if (!cls) return notFoundResponse('Class not found');
+    const lesson = store.getJSON<{ unit_id?: string }>(draftLessonKey(lesson_id));
+    if (!lesson) return notFoundResponse('Lesson not found');
+    const unit_id =
+      typeof record.unit_id === 'string' && record.unit_id.trim()
+        ? record.unit_id.trim()
+        : typeof lesson.unit_id === 'string'
+          ? lesson.unit_id
+          : '';
+    if (!unit_id) {
+      return errorResponse(400, 'validation_error', 'unit_id is required');
+    }
+    let start_time: string | undefined;
+    if (record.start_time != null) {
+      if (typeof record.start_time !== 'string' || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(record.start_time)) {
+        return errorResponse(400, 'validation_error', 'start_time must be HH:MM');
+      }
+      start_time = record.start_time;
+    }
+    const existing = store
+      .listKeys('scheduled_lessons/')
+      .map((key) => store.getJSON<ScheduledLesson>(key))
+      .filter((entry): entry is ScheduledLesson => entry != null && entry.class_id === class_id);
+    let maxOrder = 0;
+    for (const item of existing) {
+      if (item.schedule_order > maxOrder) maxOrder = item.schedule_order;
+    }
+    const nowIso = new Date().toISOString();
+    const created: ScheduledLesson = {
+      id: newId('sched'),
+      type: 'scheduled_lesson',
+      class_id,
+      lesson_id,
+      unit_id,
+      date,
+      ...(start_time ? { start_time } : {}),
+      schedule_order: maxOrder + 1,
+      delivery_status: 'planned',
+      created_at: nowIso,
+      updated_at: nowIso,
+      schema_version: 1
+    };
+    const validated = ScheduledLessonSchema.safeParse(created);
+    if (!validated.success) {
+      return errorResponse(400, 'validation_error', 'Scheduled lesson data is invalid');
+    }
+    store.setJSON(scheduledLessonKey(validated.data.id), validated.data);
+    seedIds.scheduled_lessons.push(validated.data.id);
+    return okResponse(201, validated.data);
   }
 
   async function handlePatchClass(
@@ -3685,6 +3763,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const scopeSequencePatchMatch = SCOPE_SEQUENCE_PATCH_RE.exec(path);
     if (scopeSequencePatchMatch && method === 'PATCH') {
       return handlePatchScopeSequence(cookie, scopeSequencePatchMatch[1], body);
+    }
+
+    if (method === 'POST' && path === '/api/scheduled-lessons') {
+      return handlePostScheduledLesson(cookie, body);
     }
 
     const scheduledLessonMatch = SCHEDULED_LESSON_RE.exec(path);

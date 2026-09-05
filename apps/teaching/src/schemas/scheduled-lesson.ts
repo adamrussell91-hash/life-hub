@@ -16,6 +16,11 @@ export const ScheduledLessonSchema = z.object({
   lesson_id: z.string().min(1),
   unit_id: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  start_time: z
+    .string()
+    .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)
+    .nullable()
+    .optional(),
   schedule_order: z.number().int(),
   delivery_status: DeliveryStatusSchema,
   created_at: IsoDateSchema,
