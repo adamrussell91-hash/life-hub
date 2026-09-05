@@ -89,10 +89,18 @@ export function parseCalendarAnchor(raw: string | null | undefined, fallback = n
   return parsed ? startOfDay(parsed) : startOfDay(fallback);
 }
 
-export function calendarHash(view: CalendarMode, anchor: Date): string {
+export function calendarHash(view: CalendarMode, anchor: Date, hash = typeof location === 'undefined' ? '' : location.hash): string {
   const date = toDateKey(anchor);
-  if (view === 'day') return `#/week?date=${date}&layout=day`;
-  return `#/${view}?date=${date}`;
+  const query = new URLSearchParams(hash.split('?')[1] ?? '');
+  query.set('date', date);
+  if (view === 'day') {
+    query.set('layout', 'day');
+    const qs = query.toString();
+    return `#/week?${qs}`;
+  }
+  query.delete('layout');
+  const qs = query.toString();
+  return `#/${view}?${qs}`;
 }
 
 export function parseCalendarMode(hash = typeof location === 'undefined' ? '' : location.hash): CalendarMode {

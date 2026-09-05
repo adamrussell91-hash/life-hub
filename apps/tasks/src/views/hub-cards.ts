@@ -17,6 +17,7 @@ import { createMorphingClosedFieldPopover } from '../../design-kit/js/morphing-p
 import { cardTransitionName, runContainerTransform } from '@/views/container-transform';
 import { closeCardMenu, renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import { domainFilterOptions, priorityFilterOptions, statusFilterOptions } from '@/views/hub-kit';
+import { getFocus, isFocusedTaskId, setFocus } from '@/domain/focus';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -496,6 +497,7 @@ export function mountTaskCard(
       expanded ? renderTaskExpandedCard(task, cardHandlers()) : renderTaskMicroCard(task, cardHandlers())
     );
     slot.dataset.state = expanded ? 'expanded' : 'compact';
+    slot.classList.toggle('is-focused', isFocusedTaskId(task.id));
     if (asListItem) {
       slot.setAttribute('aria-expanded', expanded ? 'true' : 'false');
       slot.setAttribute('aria-label', `${task.title} task card`);
@@ -525,6 +527,7 @@ export function mountTaskCard(
     runContainerTransform(
       () => {
         expanded = !expanded;
+        if (expanded) setFocus({ type: 'task', id: task.id });
         paint();
       },
       guard,
@@ -580,6 +583,7 @@ export function mountProjectCard(
         () => morphTarget(slot)
       );
     const activate = () => {
+      setFocus({ type: 'project', id: project.id });
       if (handlers.onActivate) handlers.onActivate(project);
       else expand();
     };
@@ -593,6 +597,8 @@ export function mountProjectCard(
       expanded ? renderProjectExpandedCard(project, tasks, next) : renderProjectMicroCard(project, tasks, next)
     );
     slot.dataset.state = expanded ? 'expanded' : 'compact';
+    const focus = getFocus();
+    slot.classList.toggle('is-focused', focus?.type === 'project' && focus.id === project.id);
     if (!expanded) {
       const row = slot.querySelector<HTMLElement>('.proj-row');
       row?.addEventListener('click', (event) => {

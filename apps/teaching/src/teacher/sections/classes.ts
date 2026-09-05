@@ -344,6 +344,7 @@ export function renderClassPage(
         openLessonOverflow(cls, classScheduled, scheduledId, anchor, options, errorBanner);
       },
       classId: cls.id,
+      subjectId: cls.subject_id,
       lessons: curriculum.lessons
         .filter((lesson) => {
           const unit = unitsById.get(lesson.unit_id);

@@ -48,6 +48,8 @@ export interface RenderClassCalendarOptions {
   lessons?: CalendarLessonOption[];
   classes?: CalendarClassOption[];
   classId?: string;
+  /** Subject for scope-and-sequence deep links. */
+  subjectId?: string;
   composeDraft?: { date: string; startTime: string | null };
   selectedScheduledId?: string | null;
   onComposeLesson?: (draft: {
@@ -71,6 +73,7 @@ type CalendarHandlers = {
   onLessonOverflow?: (scheduledId: string, anchor: HTMLElement) => void;
   onComposeLesson?: RenderClassCalendarOptions['onComposeLesson'];
   onRescheduleLesson?: RenderClassCalendarOptions['onRescheduleLesson'];
+  subjectId?: string;
   today: string;
   selectedDate: string;
   view: ScheduleCalendarView;
@@ -110,7 +113,8 @@ export function renderClassCalendar(
     composeDraft,
     selectedScheduledId,
     onComposeLesson,
-    onRescheduleLesson
+    onRescheduleLesson,
+    subjectId
   }: RenderClassCalendarOptions
 ): void {
   let root = host.querySelector<HTMLElement>(':scope > .class-calendar');
@@ -194,6 +198,7 @@ export function renderClassCalendar(
     onLessonOverflow,
     onComposeLesson,
     onRescheduleLesson,
+    subjectId,
     today: model.today,
     selectedDate: model.selectedDate,
     view
@@ -705,6 +710,15 @@ function renderDayDetail(
       open.textContent = 'Open lesson';
       wireSpaLink(open, root);
       detail.append(open);
+    }
+    const subjectId = handlersByRoot.get(root)?.subjectId;
+    if (subjectId && selected.unitId) {
+      const scope = document.createElement('a');
+      scope.className = 'btn btn--ghost';
+      scope.href = `/scope-sequences/${encodeURIComponent(subjectId)}?selectUnit=${encodeURIComponent(selected.unitId)}`;
+      scope.textContent = 'In year sequence';
+      wireSpaLink(scope, root);
+      detail.append(scope);
     }
     return;
   }

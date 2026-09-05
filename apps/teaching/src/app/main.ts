@@ -642,12 +642,14 @@ function renderTeacherScopeSequenceRoute(subjectId: string, token: number): void
   renderRailStatus(refs.railNav, 'Loading curriculum…');
   renderCanvasStatus(refs.canvas, 'Loading…');
 
-  const selectedNoteId =
-    new URLSearchParams(window.location.search).get('selectNote') ?? undefined;
+  const params = new URLSearchParams(window.location.search);
+  const selectedNoteId = params.get('selectNote') ?? undefined;
+  const selectedUnitId = params.get('selectUnit') ?? undefined;
 
   void loadNavAndHandleErrors(refs, token, 'scope-sequences', undefined, (curriculum) => {
     renderScopeTimelineEditor(refs.canvas, curriculum, subjectId, {
-      selectedNoteId
+      selectedNoteId,
+      selectedUnitId
     });
   });
 }

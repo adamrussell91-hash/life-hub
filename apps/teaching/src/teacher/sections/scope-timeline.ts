@@ -26,6 +26,8 @@ export interface ScopeTimelineEditorOptions {
   onPatched?: (scope: ScopeSequence) => void;
   /** When set, select this timeline note in the inspector on first paint. */
   selectedNoteId?: string;
+  /** When set, select the timeline item for this unit id on first paint. */
+  selectedUnitId?: string;
 }
 
 const UNIT_SPAN = 4;
@@ -1156,11 +1158,24 @@ export function renderScopeTimelineEditor(
   paintView();
 
   const initialNoteId = options?.selectedNoteId;
+  const initialUnitId = options?.selectedUnitId;
   if (
     initialNoteId &&
     scope.timeline_items.some((item) => item.id === initialNoteId && item.kind === 'note')
   ) {
     setSelection(initialNoteId);
+  } else if (initialUnitId) {
+    const unitItem = scope.timeline_items.find(
+      (item) => item.kind === 'unit' && item.unit_id === initialUnitId
+    );
+    if (unitItem) {
+      setSelection(unitItem.id);
+      const unit = unitItem.kind === 'unit' ? unitsById.get(unitItem.unit_id) : undefined;
+      const span = resolveItemSpan(unitItem, scope.terms, scope.academic_year, unit);
+      if (span.start) scrollToYmd(span.start);
+    } else {
+      inspector.hidden = true;
+    }
   } else {
     inspector.hidden = true;
   }

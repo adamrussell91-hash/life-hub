@@ -37,6 +37,7 @@ import { renderBoardView } from '@/views/board';
 import { renderGraphView } from '@/views/graph';
 import { renderMapsView } from '@/views/maps';
 import { renderGanttView } from '@/views/gantt';
+import { renderTimelineView } from '@/views/timeline';
 import { renderOrbitView } from '@/views/orbit';
 import { renderUniverseView } from '@/views/universe';
 import { renderBranchView } from '@/views/branch';
@@ -64,6 +65,7 @@ import { renderReminderStrip } from '@/views/reminder-strip';
 import { loadTaskProperties } from '@/services/task-properties';
 import { tasksApi } from '@/services/client-api';
 import { mapsOrSeed } from '@/domain/maps';
+import { getFocus, hydrateFocusFromHash, mergeFocusIntoHash } from '@/domain/focus';
 
 function renderNotFound(canvas: HTMLElement, hash: string): void {
   canvas.replaceChildren();
@@ -96,6 +98,8 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       return renderMapsView(canvas);
     case 'gantt':
       return renderGanttView(canvas);
+    case 'timeline':
+      return renderTimelineView(canvas);
     case 'orbit':
       return renderOrbitView(canvas);
     case 'universe':
@@ -260,6 +264,9 @@ async function bootApp(root: HTMLElement): Promise<void> {
     clare.sync(view);
     try {
       if (!soft) await renderReminderStrip(shell.reminderHost, () => void paint({ force: true }));
+      hydrateFocusFromHash();
+      // Sidebar links are bare `#/week` etc. — re-attach focus so multi-rep selection survives.
+      mergeFocusIntoHash(getFocus());
       await renderActiveView(view, shell.canvas);
       lastView = view;
     } catch (err) {

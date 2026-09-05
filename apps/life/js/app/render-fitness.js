@@ -248,6 +248,7 @@ function renderRecentSessions(root, sessions) {
   for (const session of rows) {
     const item = root.createElement('div');
     item.className = 'fitness-recent-row';
+    if (session.date) item.dataset.date = session.date;
     const title = root.createElement('strong');
     title.textContent = session.title ?? 'Session';
     const meta = root.createElement('p');
