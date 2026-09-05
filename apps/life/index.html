@@ -656,138 +656,75 @@
             </div>
           </article>
 
-          <div class="fitness-rings">
+          <div class="fitness-tallies">
             <article class="metric-card fitness-panel">
               <p class="metric-label">Week target</p>
-              <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-fitness-ring="week" viewBox="0 0 56 56" role="img" aria-label="Sessions this week versus target">
-                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                </svg>
-                <p class="metric-value"><strong data-fitness="week-ring-value">—</strong><span data-fitness="week-ring-target">/ 4</span></p>
-              </div>
+              <p class="metric-caption">Sessions to fill this week</p>
+              <div class="fitness-pips" data-fitness="week-pips" role="img" aria-label="Sessions this week versus target"></div>
+              <p class="metric-value"><strong data-fitness="week-ring-value">—</strong><span data-fitness="week-ring-target">/ 4</span></p>
             </article>
             <article class="metric-card fitness-panel">
               <p class="metric-label">Missed sessions</p>
-              <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-fitness-ring="skip" viewBox="0 0 56 56" role="img" aria-label="Missed or skipped sessions">
-                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                </svg>
-                <p class="metric-value"><strong data-fitness="skip-ring-value">—</strong><span data-fitness="skip-ring-target">missed</span></p>
-              </div>
+              <p class="metric-caption">Skipped or left planned</p>
+              <p class="metric-value metric-value--tally"><strong data-fitness="missed-count">0</strong></p>
+              <p class="metric-caption" data-fitness="missed-detail">None this window</p>
             </article>
             <article class="metric-card fitness-panel">
               <p class="metric-label">Recovery flags</p>
-              <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-fitness-ring="recovery" viewBox="0 0 56 56" role="img" aria-label="Sessions flagged for next-day recovery">
-                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                </svg>
-                <p class="metric-value"><strong data-fitness="recovery-ring-value">—</strong><span data-fitness="recovery-ring-target">flagged</span></p>
-              </div>
+              <p class="metric-caption">Added after a session — not a target</p>
+              <p class="metric-value metric-value--tally"><strong data-fitness="recovery-count">0</strong></p>
+              <div id="fitness-recovery-list" class="fitness-kv"></div>
             </article>
           </div>
 
-          <div class="fitness-pies">
+          <div class="fitness-breakdowns">
             <article id="fitness-rep-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Rep ranges</p>
               <p class="metric-caption">Sets in the last 30 days</p>
               <p data-fitness-empty="reps" class="metric-caption" hidden>No sets logged.</p>
-              <div class="meal-protein-pie-wrap">
-                <svg id="fitness-rep-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Rep range distribution">
-                  <g data-role="slices"></g>
-                </svg>
-                <ul id="fitness-rep-legend" class="meal-protein-legend"></ul>
-              </div>
+              <div id="fitness-rep-bars" class="fitness-share-list"></div>
             </article>
             <article id="fitness-region-vol-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Volume by region</p>
               <p class="metric-caption">Kilograms moved — last 30 days</p>
               <p data-fitness-empty="region-vol" class="metric-caption" hidden>No region volume yet.</p>
-              <div class="meal-protein-pie-wrap">
-                <svg id="fitness-region-vol-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Volume by muscle region">
-                  <g data-role="slices"></g>
-                </svg>
-                <ul id="fitness-region-vol-legend" class="meal-protein-legend"></ul>
-              </div>
+              <div id="fitness-region-vol-bars" class="fitness-share-list"></div>
             </article>
             <article id="fitness-push-pull-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Push vs pull</p>
               <p class="metric-caption">Volume from press/push vs row/pull/curl</p>
               <p data-fitness-empty="push-pull" class="metric-caption" hidden>No push or pull volume yet.</p>
-              <div class="meal-protein-pie-wrap">
-                <svg id="fitness-push-pull-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Push versus pull volume">
-                  <g data-role="slices"></g>
-                </svg>
-                <ul id="fitness-push-pull-legend" class="meal-protein-legend"></ul>
+              <div class="fitness-split-head">
+                <p>Push <strong data-fitness="push-kg">—</strong></p>
+                <p>Pull <strong data-fitness="pull-kg">—</strong></p>
               </div>
+              <div class="fitness-split" data-fitness="push-pull-bar" role="img" aria-label="Push versus pull volume"></div>
             </article>
             <article id="fitness-rest-card" class="metric-card fitness-panel" hidden>
-              <p class="metric-label">Trained vs rest</p>
-              <p class="metric-caption">Last 30 days</p>
+              <p class="metric-label">Trained days</p>
+              <p class="metric-caption">Last 30 days — each mark is a day</p>
               <p data-fitness-empty="rest" class="metric-caption" hidden>No days in range.</p>
-              <div class="meal-protein-pie-wrap">
-                <svg id="fitness-rest-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Trained versus rest days">
-                  <g data-role="slices"></g>
-                </svg>
-                <ul id="fitness-rest-legend" class="meal-protein-legend"></ul>
-              </div>
+              <div class="fitness-month-pips" data-fitness="month-pips"></div>
+              <p class="metric-caption" data-fitness="rest-summary"></p>
             </article>
           </div>
 
           <article id="fitness-e1rm-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">e1RM trend</p>
-            <p class="metric-caption">Estimated 1RM — lifts with two or more logged days</p>
-            <div id="fitness-e1rm-list"></div>
+            <p class="metric-label">Estimated 1RM</p>
+            <p class="metric-caption">Latest versus the first logged day in this window</p>
+            <div id="fitness-e1rm-list" class="fitness-kv"></div>
           </article>
 
           <article id="fitness-efficiency-card" class="metric-card fitness-panel" hidden>
             <p class="metric-label">Volume per set</p>
             <p class="metric-caption">Kilograms moved ÷ sets, by week</p>
-            <div id="fitness-efficiency-bars"></div>
+            <div id="fitness-efficiency-bars" class="fitness-share-list"></div>
           </article>
 
-          <article id="fitness-duration-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Session duration</p>
-            <svg id="fitness-duration-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Session duration">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <g data-role="value-labels"></g>
-              <g data-role="day-labels"></g>
-            </svg>
-          </article>
-
-          <article id="fitness-distance-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Distance</p>
-            <p class="metric-caption">Kilometres from logged walks</p>
-            <svg id="fitness-distance-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Distance">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <g data-role="value-labels"></g>
-              <g data-role="day-labels"></g>
-            </svg>
-          </article>
-
-          <article id="fitness-pace-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Pace</p>
-            <p class="metric-caption">Minutes per kilometre</p>
-            <svg id="fitness-pace-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pace">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <g data-role="value-labels"></g>
-              <g data-role="day-labels"></g>
-            </svg>
-          </article>
-
-          <article id="fitness-hr-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Average heart rate</p>
-            <svg id="fitness-hr-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Average heart rate">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <g data-role="value-labels"></g>
-              <g data-role="day-labels"></g>
-            </svg>
+          <article id="fitness-readings-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Latest versus last</p>
+            <p class="metric-caption">Duration, distance, pace, and heart rate — change only</p>
+            <div id="fitness-readings" class="fitness-kv"></div>
           </article>
 
           <article id="fitness-pain-card" class="metric-card fitness-panel" hidden>

@@ -1,7 +1,4 @@
-import { applyRingTarget } from './chart-kit/apply-ring.js';
-import { buildAreaLine } from './chart-kit/area-line.js';
 import { buildColumns } from './chart-kit/columns.js';
-import { buildDistributionPie } from './chart-kit/pie.js';
 import { formatDisplayDate } from '../core/time.js';
 
 const setText = (root, selector, value) => {
@@ -21,141 +18,153 @@ function formatKg(kg) {
   return `${text} kg`;
 }
 
-function createSvg(root, name) {
-  if (typeof root.createElementNS === 'function') {
-    return root.createElementNS('http://www.w3.org/2000/svg', name);
+function formatSigned(value, unit) {
+  if (value == null || !Number.isFinite(value) || value === 0) return 'same';
+  const sign = value > 0 ? '+' : '−';
+  const mag = Math.abs(value);
+  const text = Number.isInteger(mag) ? String(mag) : mag.toFixed(1);
+  return unit ? `${sign}${text} ${unit}` : `${sign}${text}`;
+}
+
+function formatReading(value, unit) {
+  if (value == null || !Number.isFinite(value)) return '—';
+  const text = Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return unit ? `${text} ${unit}` : text;
+}
+
+function setBarWidth(fill, pct) {
+  const width = `${Math.max(8, pct)}%`;
+  fill.style = fill.style ?? {};
+  if (typeof fill.style.setProperty === 'function') fill.style.setProperty('--bar', width);
+  else fill.style['--bar'] = width;
+}
+
+function renderPips(root, selector, { value = 0, target = 0 } = {}) {
+  const host = root.querySelector(selector);
+  if (!host || typeof root.createElement !== 'function') return;
+  host.replaceChildren();
+  const slots = Math.max(0, Number(target) || 0);
+  const filled = Math.max(0, Number(value) || 0);
+  for (let index = 0; index < slots; index += 1) {
+    const pip = root.createElement('span');
+    pip.className = 'fitness-pip';
+    pip.dataset.filled = index < filled ? 'true' : 'false';
+    host.append(pip);
   }
-  return null;
 }
 
-function renderRing(root, key, { value, target }, label) {
-  const svg = root.querySelector(`[data-fitness-ring="${key}"]`);
-  applyRingTarget(svg, { value, target }, { size: 56, strokeWidth: 6 });
-  setText(root, `[data-fitness="${key}-ring-value"]`, String(value));
-  setText(root, `[data-fitness="${key}-ring-target"]`, label);
-}
-
-function renderPie(root, { card, svg, legend, empty, items, unit }) {
-  const host = root.querySelector(svg);
-  const sliceGroup = host?.querySelector?.('[data-role="slices"]');
-  const legendEl = root.querySelector(legend);
-  const emptyEl = root.querySelector(empty);
-  const cardEl = root.querySelector(card);
-  const pie = buildDistributionPie(items, { size: 72 });
-  sliceGroup?.replaceChildren?.();
-  legendEl?.replaceChildren?.();
-  if (pie.empty) {
-    setHidden(cardEl, true);
+function renderMonthPips(root, marks) {
+  const host = root.querySelector('[data-fitness="month-pips"]');
+  const card = root.querySelector('#fitness-rest-card');
+  const empty = root.querySelector('[data-fitness-empty="rest"]');
+  if (!host) return;
+  host.replaceChildren();
+  if (!marks?.length) {
+    setHidden(card, true);
     return;
   }
-  setHidden(cardEl, false);
-  setHidden(host, false);
-  setHidden(emptyEl, true);
-  if (sliceGroup && typeof root.createElementNS === 'function') {
-    for (const slice of pie.slices) {
-      const path = createSvg(root, 'path');
-      if (!path) break;
-      path.setAttribute('d', slice.path);
-      path.setAttribute('fill', slice.colour);
-      sliceGroup.append(path);
-    }
-  }
-  if (!legendEl || typeof root.createElement !== 'function') return;
-  for (const slice of pie.slices) {
-    const item = root.createElement('li');
-    const swatch = root.createElement('span');
-    swatch.className = 'meal-protein-legend__swatch';
-    swatch.style = swatch.style ?? {};
-    if (typeof swatch.style.setProperty === 'function') swatch.style.setProperty('background', slice.colour);
-    else swatch.style.background = slice.colour;
-    const label = root.createElement('span');
-    const amount = unit === 'days'
-      ? `${slice.value} day${slice.value === 1 ? '' : 's'}`
-      : unit === 'sets'
-        ? `${slice.value} set${slice.value === 1 ? '' : 's'}`
-        : formatKg(slice.value);
-    label.textContent = `${slice.label} · ${amount}`;
-    item.append(swatch, label);
-    legendEl.append(item);
-  }
-}
-
-function renderAreaCard(root, cardSelector, svgSelector, series, { ariaLabel } = {}) {
-  const card = root.querySelector(cardSelector);
-  const svg = root.querySelector(svgSelector);
-  if (!card || !svg) return;
-  if (!series?.length) {
+  const trained = marks.filter(day => day.trained).length;
+  if (trained === 0) {
     setHidden(card, true);
     return;
   }
   setHidden(card, false);
-  const chart = buildAreaLine(series, { width: 320, height: 72, padding: 10, paddingBottom: 16 });
-  svg.setAttribute?.('viewBox', `0 0 ${chart.width} ${chart.height}`);
-  svg.setAttribute?.('preserveAspectRatio', 'xMidYMid meet');
-  if (ariaLabel) svg.setAttribute?.('aria-label', ariaLabel);
-  const line = svg.querySelector?.('[data-role="line"]');
-  const area = svg.querySelector?.('[data-role="area"]');
-  if (line) {
-    if (line.tagName?.toLowerCase?.() === 'path' || line.setAttribute) line.setAttribute('d', chart.linePath);
+  setHidden(empty, true);
+  for (const day of marks) {
+    const pip = root.createElement('span');
+    pip.className = 'fitness-month-pip';
+    pip.dataset.hit = day.trained ? 'true' : 'false';
+    pip.title = formatDisplayDate(day.date);
+    host.append(pip);
   }
-  if (area) area.setAttribute?.('d', chart.areaPath);
-  const labels = svg.querySelector?.('[data-role="day-labels"]');
-  labels?.replaceChildren?.();
-  if (labels && typeof root.createElementNS === 'function') {
-    for (const point of chart.points) {
-      const text = createSvg(root, 'text');
-      if (!text) break;
-      text.setAttribute('x', String(point.x));
-      text.setAttribute('y', String(chart.height - 2));
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('class', 'chart-day-label');
-      text.textContent = formatDisplayDate(point.date).slice(0, 5);
-      labels.append(text);
-    }
+  setText(root, '[data-fitness="rest-summary"]', `${trained} trained · ${marks.length - trained} rest`);
+}
+
+function renderShareList(root, { card, host, empty, items, formatValue }) {
+  const cardEl = root.querySelector(card);
+  const list = root.querySelector(host);
+  const emptyEl = root.querySelector(empty);
+  if (!list) return;
+  list.replaceChildren();
+  if (!items?.length) {
+    setHidden(cardEl, true);
+    return;
   }
-  const values = svg.querySelector?.('[data-role="value-labels"]');
-  values?.replaceChildren?.();
-  if (values && typeof root.createElementNS === 'function') {
-    for (const point of chart.points) {
-      const text = createSvg(root, 'text');
-      if (!text) break;
-      text.setAttribute('x', String(point.x));
-      text.setAttribute('y', String(Math.max(9, point.y - 5)));
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('class', 'chart-value-label');
-      text.textContent = Number.isInteger(point.value) ? String(point.value) : point.value.toFixed(1);
-      values.append(text);
+  setHidden(cardEl, false);
+  setHidden(emptyEl, true);
+  const chart = buildColumns(items.map(item => ({
+    key: item.key,
+    label: item.label,
+    value: item.value
+  })));
+  for (const bar of chart.bars) {
+    const row = root.createElement('div');
+    row.className = 'fitness-share-row';
+    const label = root.createElement('strong');
+    label.textContent = bar.label;
+    const track = root.createElement('span');
+    track.className = 'fitness-share-row__track';
+    const fill = root.createElement('i');
+    setBarWidth(fill, bar.heightPct);
+    track.append(fill);
+    const value = root.createElement('span');
+    value.textContent = formatValue(bar.value);
+    row.append(label, track, value);
+    list.append(row);
+  }
+}
+
+function renderPushPull(root, items) {
+  const card = root.querySelector('#fitness-push-pull-card');
+  const empty = root.querySelector('[data-fitness-empty="push-pull"]');
+  const bar = root.querySelector('[data-fitness="push-pull-bar"]');
+  if (!items?.length) {
+    setHidden(card, true);
+    return;
+  }
+  setHidden(card, false);
+  setHidden(empty, true);
+  const push = items.find(item => item.key === 'push')?.value ?? 0;
+  const pull = items.find(item => item.key === 'pull')?.value ?? 0;
+  const total = push + pull;
+  setText(root, '[data-fitness="push-kg"]', formatKg(push));
+  setText(root, '[data-fitness="pull-kg"]', formatKg(pull));
+  if (bar && typeof root.createElement === 'function') {
+    bar.replaceChildren();
+    if (total > 0) {
+      const pushFill = root.createElement('i');
+      pushFill.className = 'fitness-split__push';
+      setBarWidth(pushFill, (push / total) * 100);
+      const pullFill = root.createElement('i');
+      pullFill.className = 'fitness-split__pull';
+      setBarWidth(pullFill, (pull / total) * 100);
+      bar.append(pushFill, pullFill);
     }
   }
 }
 
-function fillAreaSvg(root, svg, series) {
-  const chart = buildAreaLine(series, { width: 320, height: 72, padding: 10, paddingBottom: 16 });
-  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
-  const line = svg.querySelector('[data-role="line"]');
-  const area = svg.querySelector('[data-role="area"]');
-  line?.setAttribute('d', chart.linePath);
-  area?.setAttribute('d', chart.areaPath);
-  const labels = svg.querySelector('[data-role="day-labels"]');
-  labels?.replaceChildren?.();
-  const values = svg.querySelector('[data-role="value-labels"]');
-  values?.replaceChildren?.();
-  if (typeof root.createElementNS !== 'function') return;
-  for (const point of chart.points) {
-    const day = createSvg(root, 'text');
-    day.setAttribute('x', String(point.x));
-    day.setAttribute('y', String(chart.height - 2));
-    day.setAttribute('text-anchor', 'middle');
-    day.setAttribute('class', 'chart-day-label');
-    day.textContent = formatDisplayDate(point.date).slice(0, 5);
-    labels?.append(day);
-    const value = createSvg(root, 'text');
-    value.setAttribute('x', String(point.x));
-    value.setAttribute('y', String(Math.max(9, point.y - 5)));
-    value.setAttribute('text-anchor', 'middle');
-    value.setAttribute('class', 'chart-value-label');
-    value.textContent = Number.isInteger(point.value) ? String(point.value) : point.value.toFixed(1);
-    values?.append(value);
+function renderRecovery(root, flags) {
+  const list = root.querySelector('#fitness-recovery-list');
+  const rows = flags ?? [];
+  setText(root, '[data-fitness="recovery-count"]', String(rows.length));
+  if (!list) return;
+  list.replaceChildren();
+  if (!rows.length) {
+    const empty = root.createElement('p');
+    empty.className = 'metric-caption';
+    empty.textContent = 'None added this window';
+    list.append(empty);
+    return;
+  }
+  for (const flag of rows) {
+    const item = root.createElement('div');
+    item.className = 'fitness-kv-row';
+    const name = root.createElement('strong');
+    name.textContent = flag.title;
+    const date = root.createElement('span');
+    date.textContent = formatDisplayDate(flag.date);
+    item.append(name, date);
+    list.append(item);
   }
 }
 
@@ -170,34 +179,18 @@ function renderE1rm(root, trends) {
   }
   setHidden(card, false);
   for (const lift of trends) {
-    const block = root.createElement('div');
-    block.className = 'fitness-e1rm';
-    const title = root.createElement('p');
-    title.className = 'metric-label';
-    const last = lift.series.at(-1);
-    title.textContent = `${lift.name} · ${last.value.toFixed(1)} kg e1RM`;
-    block.append(title);
-    if (typeof root.createElementNS === 'function') {
-      const svg = createSvg(root, 'svg');
-      svg.setAttribute('class', 'line-chart line-chart--dense');
-      svg.setAttribute('viewBox', '0 0 320 72');
-      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-      svg.setAttribute('role', 'img');
-      svg.setAttribute('aria-label', `${lift.name} estimated 1RM`);
-      for (const role of ['area', 'line']) {
-        const path = createSvg(root, 'path');
-        path.setAttribute('data-role', role);
-        svg.append(path);
-      }
-      const valueGroup = createSvg(root, 'g');
-      valueGroup.setAttribute('data-role', 'value-labels');
-      const dayGroup = createSvg(root, 'g');
-      dayGroup.setAttribute('data-role', 'day-labels');
-      svg.append(valueGroup, dayGroup);
-      block.append(svg);
-      fillAreaSvg(root, svg, lift.series);
-    }
-    host.append(block);
+    const item = root.createElement('div');
+    item.className = 'fitness-kv-row fitness-kv-row--triple';
+    const name = root.createElement('strong');
+    name.textContent = lift.name;
+    const current = root.createElement('span');
+    current.textContent = `${lift.current.toFixed(1)} kg`;
+    const delta = root.createElement('span');
+    delta.className = 'fitness-delta';
+    delta.dataset.colour = lift.delta > 0 ? 'up' : lift.delta < 0 ? 'down' : 'same';
+    delta.textContent = formatSigned(lift.delta, 'kg');
+    item.append(name, current, delta);
+    host.append(item);
   }
 }
 
@@ -220,20 +213,44 @@ function renderEfficiency(root, weeks) {
   );
   for (const bar of chart.bars) {
     const row = root.createElement('div');
-    row.className = 'fitness-col-row';
+    row.className = 'fitness-share-row';
     const label = root.createElement('strong');
     label.textContent = bar.label;
     const track = root.createElement('span');
-    track.className = 'fitness-col-row__track';
+    track.className = 'fitness-share-row__track';
     const fill = root.createElement('i');
-    fill.style = fill.style ?? {};
-    if (typeof fill.style.setProperty === 'function') fill.style.setProperty('--bar', `${Math.max(8, bar.heightPct)}%`);
-    else fill.style['--bar'] = `${Math.max(8, bar.heightPct)}%`;
+    setBarWidth(fill, bar.heightPct);
     track.append(fill);
     const value = root.createElement('span');
     value.textContent = `${bar.value.toFixed(1)} kg/set`;
     row.append(label, track, value);
     host.append(row);
+  }
+}
+
+function renderReadings(root, readings) {
+  const card = root.querySelector('#fitness-readings-card');
+  const host = root.querySelector('#fitness-readings');
+  if (!host) return;
+  host.replaceChildren();
+  if (!readings?.length) {
+    setHidden(card, true);
+    return;
+  }
+  setHidden(card, false);
+  for (const row of readings) {
+    const item = root.createElement('div');
+    item.className = 'fitness-kv-row fitness-kv-row--triple';
+    const name = root.createElement('strong');
+    name.textContent = row.label;
+    const current = root.createElement('span');
+    current.textContent = formatReading(row.current, row.unit);
+    const delta = root.createElement('span');
+    delta.className = 'fitness-delta';
+    delta.dataset.colour = row.delta > 0 ? 'up' : row.delta < 0 ? 'down' : 'same';
+    delta.textContent = formatSigned(row.delta, row.unit);
+    item.append(name, current, delta);
+    host.append(item);
   }
 }
 
@@ -259,61 +276,47 @@ function renderPain(root, rows) {
   }
 }
 
+function missedDetail(skips) {
+  const skipped = skips.skipped ?? 0;
+  const pastDue = skips.pastDue ?? 0;
+  if (!skips.missed) return 'None this window';
+  const parts = [];
+  if (skipped) parts.push(`${skipped} skipped`);
+  if (pastDue) parts.push(`${pastDue} left planned`);
+  return parts.join(' · ') || `${skips.missed} missed`;
+}
+
 export function renderFitnessCharts(root, charts = {}) {
   setText(root, '[data-fitness="longest-streak"]', String(charts.longestStreak ?? 0));
 
-  renderRing(root, 'week', charts.weekRing ?? { value: 0, target: 4 }, `/ ${charts.weekRing?.target ?? 4}`);
-  const skips = charts.skipRing ?? { value: 0, target: 1, missed: 0, scheduled: 0 };
-  renderRing(root, 'skip', skips, `missed / ${skips.scheduled} scheduled`);
-  const recovery = charts.recoveryRing ?? { value: 0, target: 1, flagged: 0, completed: 0 };
-  renderRing(root, 'recovery', recovery, `flagged / ${recovery.completed}`);
+  const week = charts.weekRing ?? { value: 0, target: 4 };
+  renderPips(root, '[data-fitness="week-pips"]', week);
+  setText(root, '[data-fitness="week-ring-value"]', String(week.value));
+  setText(root, '[data-fitness="week-ring-target"]', `/ ${week.target}`);
 
-  renderPie(root, {
+  const skips = charts.skipRing ?? { missed: 0, skipped: 0, pastDue: 0 };
+  setText(root, '[data-fitness="missed-count"]', String(skips.missed ?? 0));
+  setText(root, '[data-fitness="missed-detail"]', missedDetail(skips));
+
+  renderRecovery(root, charts.recoveryFlags ?? []);
+  renderMonthPips(root, charts.trainedMarks);
+  renderShareList(root, {
     card: '#fitness-rep-card',
-    svg: '#fitness-rep-pie',
-    legend: '#fitness-rep-legend',
+    host: '#fitness-rep-bars',
     empty: '[data-fitness-empty="reps"]',
     items: charts.repRanges ?? [],
-    unit: 'sets'
+    formatValue: value => `${value} set${value === 1 ? '' : 's'}`
   });
-  renderPie(root, {
+  renderShareList(root, {
     card: '#fitness-region-vol-card',
-    svg: '#fitness-region-vol-pie',
-    legend: '#fitness-region-vol-legend',
+    host: '#fitness-region-vol-bars',
     empty: '[data-fitness-empty="region-vol"]',
     items: charts.regionVolume ?? [],
-    unit: 'kg'
+    formatValue: formatKg
   });
-  renderPie(root, {
-    card: '#fitness-push-pull-card',
-    svg: '#fitness-push-pull-pie',
-    legend: '#fitness-push-pull-legend',
-    empty: '[data-fitness-empty="push-pull"]',
-    items: charts.pushPull ?? [],
-    unit: 'kg'
-  });
-  renderPie(root, {
-    card: '#fitness-rest-card',
-    svg: '#fitness-rest-pie',
-    legend: '#fitness-rest-legend',
-    empty: '[data-fitness-empty="rest"]',
-    items: charts.restRatio ?? [],
-    unit: 'days'
-  });
-
+  renderPushPull(root, charts.pushPull ?? []);
   renderE1rm(root, charts.e1rmTrends);
   renderEfficiency(root, charts.volumePerSetWeeks);
-  renderAreaCard(root, '#fitness-duration-card', '#fitness-duration-chart', charts.durationSeries, {
-    ariaLabel: 'Session duration'
-  });
-  renderAreaCard(root, '#fitness-distance-card', '#fitness-distance-chart', charts.distanceSeries, {
-    ariaLabel: 'Distance'
-  });
-  renderAreaCard(root, '#fitness-pace-card', '#fitness-pace-chart', charts.paceSeries, {
-    ariaLabel: 'Pace minutes per kilometre'
-  });
-  renderAreaCard(root, '#fitness-hr-card', '#fitness-hr-chart', charts.hrSeries, {
-    ariaLabel: 'Average heart rate'
-  });
+  renderReadings(root, charts.sessionReadings);
   renderPain(root, charts.painBySite);
 }
