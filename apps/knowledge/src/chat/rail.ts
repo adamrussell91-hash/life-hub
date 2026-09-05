@@ -583,14 +583,16 @@ export function renderChatRail(host: ChatRailHost) {
       { portraitSrc: CLEMENTINE.avatarSrc, portraitAlt: CLEMENTINE.name },
     )}
     <section class="coach chat${fileNote ? " chat--from-book" : ""}">
-      <div class="hub-scroll-hide" data-hub-scroll-hide>
-        <div class="hub-scroll-hide__inner">
       <div class="chat__sitting glass-panel">
-        <div class="graph-modes chat__hats" role="group" aria-label="Chat hats">
-          ${CHAT_HATS.map(
-            item =>
-              `<button type="button" data-hat="${item.id}" class="${hat === item.id ? "is-active" : ""}" aria-describedby="chat-hat-tip-${item.id}"><span>${escapeHtml(item.label)}</span><span class="agent-protocol-pills__tip" id="chat-hat-tip-${item.id}" role="tooltip">${escapeHtml(item.explain)}</span></button>`,
-          ).join("")}
+        <div class="hub-scroll-hide" data-hub-scroll-hide>
+          <div class="hub-scroll-hide__inner">
+            <div class="graph-modes chat__hats" role="group" aria-label="Chat hats">
+              ${CHAT_HATS.map(
+                item =>
+                  `<button type="button" data-hat="${item.id}" class="${hat === item.id ? "is-active" : ""}" aria-describedby="chat-hat-tip-${item.id}"><span>${escapeHtml(item.label)}</span><span class="agent-protocol-pills__tip" id="chat-hat-tip-${item.id}" role="tooltip">${escapeHtml(item.explain)}</span></button>`,
+              ).join("")}
+            </div>
+          </div>
         </div>
         ${
           noteContext
@@ -622,8 +624,6 @@ export function renderChatRail(host: ChatRailHost) {
                <textarea id="chat-draft" rows="6" placeholder="Paste a section…">${escapeHtml(draft)}</textarea>`
             : ""
         }
-      </div>
-        </div>
       </div>
       <div class="coach__thread" aria-live="polite">
         ${threadHtml}
