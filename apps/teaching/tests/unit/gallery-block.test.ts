@@ -1,7 +1,25 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BlockSchema, type Block } from '@/schemas/block';
 import { createBlock, cloneBlockWithNewIds, COLUMN_CHILD_TYPES, TAB_CHILD_TYPES } from '@/blocks/create-block';
 import { createGalleryEditor, renderGalleryBlock } from '@/blocks/registry';
+import { openHubMediaViewer } from '../../design-kit/js/hub-media-viewer.js';
+
+vi.mock('../../design-kit/js/hub-media-viewer.js', () => ({
+  openHubMediaViewer: vi.fn(async (_items: unknown, opts?: { onClose?: () => void }) => {
+    document.body.querySelectorAll('.pswp').forEach((node) => node.remove());
+    const root = document.createElement('div');
+    root.className = 'pswp';
+    document.body.append(root);
+    return {
+      close() {
+        root.remove();
+        opts?.onClose?.();
+      }
+    };
+  })
+}));
+
+const openViewer = vi.mocked(openHubMediaViewer);
 
 const timestamps = {
   created_at: '2026-01-01T00:00:00.000Z',
@@ -265,63 +283,41 @@ describe('renderGalleryBlock', () => {
     expect(el.querySelectorAll('.block-gallery__item').length).toBe(2);
   });
 
-  it('opens and closes lightbox', () => {
+  it('opens PhotoSwipe via the shared media viewer', async () => {
+    openViewer.mockClear();
     const el = renderGalleryBlock(sampleGallery('grid', 2), 'student');
     const imgBtn = el.querySelector('.block-gallery__open') as HTMLButtonElement;
     imgBtn.click();
-    const dialog = document.body.querySelector('.block-gallery-lightbox') as HTMLElement;
-    expect(dialog).toBeTruthy();
-    expect(dialog.getAttribute('role')).toBe('dialog');
-    (dialog.querySelector('.block-gallery-lightbox__close') as HTMLButtonElement).click();
-    expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
+    await vi.waitFor(() => {
+      expect(openViewer).toHaveBeenCalled();
+      expect(document.body.querySelector('.pswp')).toBeTruthy();
+    });
+    const handle = await openViewer.mock.results.at(-1)?.value;
+    handle.close();
+    expect(document.body.querySelector('.pswp')).toBeNull();
   });
 
-  it('Escape closes lightbox', () => {
-    const el = renderGalleryBlock(sampleGallery('grid', 2), 'student');
-    (el.querySelector('.block-gallery__open') as HTMLButtonElement).click();
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
-  });
-
-  it('replacing lightbox cleans up the previous escape handler', () => {
+  it('opens at the clicked image index', async () => {
+    openViewer.mockClear();
     const el = renderGalleryBlock(sampleGallery('grid', 2), 'student');
     const buttons = el.querySelectorAll('.block-gallery__open') as NodeListOf<HTMLButtonElement>;
-
-    buttons[0]!.click();
-    expect(document.body.querySelectorAll('.block-gallery-lightbox')).toHaveLength(1);
-
     buttons[1]!.click();
-    expect(document.body.querySelectorAll('.block-gallery-lightbox')).toHaveLength(1);
-
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
-
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
+    await vi.waitFor(() => expect(openViewer).toHaveBeenCalled());
+    expect(openViewer.mock.calls.at(-1)?.[1]).toMatchObject({ index: 1 });
+    const handle = await openViewer.mock.results.at(-1)?.value;
+    handle.close();
   });
 
-  it('closing lightbox restores focus to the open button', () => {
+  it('closing the viewer restores focus to the open button', async () => {
+    openViewer.mockClear();
     const el = renderGalleryBlock(sampleGallery('grid', 2), 'student');
     document.body.append(el);
     const imgBtn = el.querySelector('.block-gallery__open') as HTMLButtonElement;
     imgBtn.focus();
     imgBtn.click();
-
-    const dialog = document.body.querySelector('.block-gallery-lightbox') as HTMLElement;
-    (dialog.querySelector('.block-gallery-lightbox__close') as HTMLButtonElement).click();
-    expect(document.activeElement).toBe(imgBtn);
-    el.remove();
-  });
-
-  it('Escape restores focus to the open button', () => {
-    const el = renderGalleryBlock(sampleGallery('grid', 2), 'student');
-    document.body.append(el);
-    const imgBtn = el.querySelector('.block-gallery__open') as HTMLButtonElement;
-    imgBtn.focus();
-    imgBtn.click();
-
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(document.body.querySelector('.block-gallery-lightbox')).toBeNull();
+    await vi.waitFor(() => expect(openViewer).toHaveBeenCalled());
+    const handle = await openViewer.mock.results.at(-1)?.value;
+    handle.close();
     expect(document.activeElement).toBe(imgBtn);
     el.remove();
   });

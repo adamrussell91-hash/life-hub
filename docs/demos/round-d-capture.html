@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en" data-hub="life">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Round D — Capture / Rich Paste / Ingest</title>
+  <link rel="stylesheet" href="../../packages/design-kit/tokens.css" />
+  <link rel="stylesheet" href="../../packages/design-kit/actions.css" />
+  <style>
+    body { margin: 0; font-family: Inter, system-ui, sans-serif; background: var(--foam, #faf8f2); color: var(--depth, #0a1536); }
+    main { max-width: 52rem; margin: 0 auto; padding: 1.5rem; }
+    h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
+    .lede { opacity: .8; margin-bottom: 1.25rem; }
+    .drop {
+      border: 2px dashed color-mix(in srgb, var(--wave, #4a7bb5) 55%, transparent);
+      border-radius: 1rem; padding: 2rem; text-align: center; background: #fff;
+      min-height: 8rem; display: grid; place-items: center; gap: .5rem;
+    }
+    .drop.is-hot { border-color: var(--high-sea, #e07a3d); background: color-mix(in srgb, var(--sand, #f0e6d8) 40%, #fff); }
+    .row { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+    .out {
+      white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: .85rem;
+      background: #fff; border-radius: .75rem; padding: 1rem; border: 1px solid #e6e0d4;
+    }
+    .sheet {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: .5rem; margin-top: 1rem;
+    }
+    .sheet button { min-height: 3.5rem; }
+    label.field { display: grid; gap: .35rem; margin: 1rem 0; }
+    textarea { min-height: 5rem; padding: .75rem; border-radius: .5rem; border: 1px solid #ccc; font: inherit; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow" style="text-transform:uppercase;letter-spacing:.08em;font-size:.7rem;opacity:.7">Round D prototype</p>
+    <h1>Capture sheet + rich paste / drop</h1>
+    <p class="lede">Classifies clipboard and drag/drop without uploading. Soft-routes to a hub action. Life Hub owns the chrome.</p>
+
+    <div id="drop" class="drop" tabindex="0">
+      <strong>Drop files, images, or URLs here</strong>
+      <span>or paste into the field below</span>
+    </div>
+
+    <label class="field">
+      Paste here
+      <textarea id="paste" placeholder="Paste a URL, screenshot, table, or text…"></textarea>
+    </label>
+
+    <div class="row">
+      <button type="button" class="btn btn--primary" id="read-clip">Read clipboard text</button>
+      <button type="button" class="btn btn--ghost" id="clear">Clear</button>
+    </div>
+
+    <h2 style="font-size:1.1rem">Mobile capture sheet (concept)</h2>
+    <div class="sheet" id="sheet">
+      <button type="button" class="btn btn--secondary" data-cap="text">Text</button>
+      <button type="button" class="btn btn--secondary" data-cap="task">Task</button>
+      <button type="button" class="btn btn--secondary" data-cap="photo">Photo</button>
+      <button type="button" class="btn btn--secondary" data-cap="voice">Voice</button>
+      <button type="button" class="btn btn--secondary" data-cap="file">File</button>
+      <button type="button" class="btn btn--secondary" data-cap="link">Link</button>
+      <button type="button" class="btn btn--secondary" data-cap="place">Place</button>
+      <button type="button" class="btn btn--secondary" data-cap="scan">Scan</button>
+    </div>
+
+    <h2 style="font-size:1.1rem;margin-top:1.5rem">Classification</h2>
+    <pre class="out" id="out">Waiting…</pre>
+  </main>
+  <script type="module">
+    import {
+      classifyClipboardData,
+      classifyPasteEvent,
+      classifyDropEvent,
+      suggestIngestTarget
+    } from '../../packages/design-kit/js/hub-rich-paste.js';
+
+    const out = document.getElementById('out');
+    const drop = document.getElementById('drop');
+    const paste = document.getElementById('paste');
+
+    function show(payload, hub = 'knowledge') {
+      const suggestion = suggestIngestTarget(payload, { currentHub: hub });
+      const serial = {
+        kind: payload.kind,
+        subtype: payload.subtype,
+        url: payload.url,
+        text: payload.text?.slice(0, 200),
+        html: payload.html ? `[html ${payload.html.length} chars]` : undefined,
+        files: payload.files?.map((f) => ({ name: f.name, type: f.type, size: f.size })),
+        suggestion
+      };
+      out.textContent = JSON.stringify(serial, null, 2);
+    }
+
+    paste.addEventListener('paste', (event) => {
+      event.preventDefault();
+      const payload = classifyPasteEvent(event);
+      if (payload.kind === 'text' || payload.kind === 'url') {
+        paste.value = payload.text || payload.url || '';
+      } else {
+        paste.value = `[${payload.kind}]`;
+      }
+      show(payload);
+    });
+
+    ;['dragenter', 'dragover'].forEach((name) => {
+      drop.addEventListener(name, (e) => { e.preventDefault(); drop.classList.add('is-hot'); });
+    });
+    ;['dragleave', 'drop'].forEach((name) => {
+      drop.addEventListener(name, (e) => { e.preventDefault(); drop.classList.remove('is-hot'); });
+    });
+    drop.addEventListener('drop', (e) => show(classifyDropEvent(e)));
+
+    document.getElementById('read-clip').onclick = async () => {
+      const text = await navigator.clipboard?.readText?.();
+      const dt = new DataTransfer();
+      if (text) dt.setData('text/plain', text);
+      show(classifyClipboardData(dt));
+      if (text) paste.value = text;
+    };
+    document.getElementById('clear').onclick = () => {
+      paste.value = '';
+      out.textContent = 'Waiting…';
+    };
+
+    document.getElementById('sheet').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-cap]');
+      if (!btn) return;
+      out.textContent = JSON.stringify({
+        captureSheet: btn.dataset.cap,
+        note: 'Concept only — routes into hub-specific capture after confirmation',
+        mobile: { taps: '1 to open sheet + 1 to choose modality', oneHanded: true }
+      }, null, 2);
+    });
+  </script>
+</body>
+</html>
