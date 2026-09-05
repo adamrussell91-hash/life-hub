@@ -24,7 +24,7 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
 8. `icons/` — locked hub tiles + glyphs (`ICONS.md`)
 9. `js/format-display-date.js` — **locked** display dates (`dd/mm/yy`)
 10. `js/mount-mobile-chrome.js` — mount the phone bar + More sheet
-11. `motion.css` + `js/hub-motion.js` — shared card sheen, fade, count-up, list stagger, magnet, opt-in kinetic text, opt-in scroll-hide chrome. Call `startHubMotion()` once from each hub.
+11. `motion.css` + `js/hub-motion.js` — shared fade, count-up, list stagger, magnet, opt-in kinetic text, opt-in scroll-hide chrome. Call `startHubMotion()` once from each hub.
 12. `js/hub-kinetic.js` — reusable word/line/character reveal (play / reset, stagger origins). Opt in with `.hub-kinetic` on canvas titles. **Not on the rail.**
     Scroll-hide: mark chrome with `[data-hub-scroll-hide]` (see `snippets/hub-scroll-hide.html`). Typical: chat agent pickers, protocol pills, and sitting toolbars above a transcript. Do not hide refresh / sign-out utilities.
 13. `js/morphing-dialog.js` — **locked** micro → expanded card morph (spring FLIP). Overlay: `openMorphingDialog`. In-place: `runMorphTransform`. Route change: `morphFromRect`. Mark shared title / subtitle / image with `data-hub-morph`.
