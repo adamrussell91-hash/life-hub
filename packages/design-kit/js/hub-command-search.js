@@ -1,5 +1,7 @@
 /** Shared command palette. Tokens only. Does not replace Teaching's search-palette markup. */
 
+import { buildHubEntityIndex, filterCommandGroups } from './hub-entity-search.js';
+
 function ownerDoc(root) {
   return root?.ownerDocument ?? root ?? globalThis.document;
 }
@@ -7,10 +9,6 @@ function ownerDoc(root) {
 function addClass(el, name) {
   if (el.classList?.add) el.classList.add(name);
   else el.className = `${el.className || ''} ${name}`.trim();
-}
-
-function textOf(value) {
-  return String(value ?? '').trim().toLowerCase();
 }
 
 /** @type {{ close: () => void } | null} */
@@ -51,6 +49,16 @@ export function openHubCommandSearch(options = {}) {
   addClass(list, 'search-palette__list');
 
   const groups = options.groups ?? [];
+  const entityIndex = buildHubEntityIndex(
+    groups.flatMap((group, groupIndex) =>
+      (group.items ?? []).map((item, itemIndex) => ({
+        id: String(item.id ?? `${groupIndex}:${itemIndex}`),
+        label: item.label,
+        hint: item.hint,
+        groupId: String(groupIndex)
+      }))
+    )
+  );
   let active = 0;
 
   const visibleItems = () => [...(list.querySelectorAll?.('.hub-command__row') ?? [])];
@@ -61,12 +69,12 @@ export function openHubCommandSearch(options = {}) {
   };
 
   const render = (query = '') => {
-    const needle = textOf(query);
     list.replaceChildren?.();
     if (!list.replaceChildren) list.textContent = '';
     let index = 0;
-    for (const group of groups) {
-      const items = group.items.filter((item) => !needle || textOf(item.label).includes(needle) || textOf(item.hint).includes(needle));
+    const visibleGroups = filterCommandGroups(groups, query, { index: entityIndex });
+    for (const group of visibleGroups) {
+      const items = group.items ?? [];
       if (!items.length) continue;
       const heading = doc.createElement('p');
       addClass(heading, 'hub-command__heading');

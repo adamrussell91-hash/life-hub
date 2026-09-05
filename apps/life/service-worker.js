@@ -51,6 +51,8 @@ const SHELL_FILES = [
   'packages/design-kit/js/hub-create-disclosure.js',
   'packages/design-kit/js/hub-capture.js',
   'packages/design-kit/js/hub-command-search.js',
+  'packages/design-kit/js/hub-entity-search.js',
+  'packages/design-kit/js/vendor/minisearch.js',
   'packages/design-kit/js/hub-surfaces.js',
   'js/app/bloods-explainers.js',
   'js/app/bloods-charts.js',
