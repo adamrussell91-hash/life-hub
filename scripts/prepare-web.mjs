@@ -27,6 +27,14 @@ async function copyDesignKitModules() {
   );
 }
 
+async function copyDesignKitIcons() {
+  await cp(
+    new URL('packages/design-kit/icons/', projectRoot),
+    new URL('packages/design-kit/icons/', publishRoot),
+    { recursive: true }
+  );
+}
+
 async function copyBuiltSpa(name) {
   const from = new URL(`apps/${name}/dist/`, projectRoot);
   try {
@@ -68,7 +76,8 @@ export async function prepareWeb() {
       new URL(file, publishRoot)
     )),
     copyDesignKitStyles(),
-    copyDesignKitModules()
+    copyDesignKitModules(),
+    copyDesignKitIcons()
   ]);
 
   await rewritePublishedKitImports(new URL('js/', publishRoot));

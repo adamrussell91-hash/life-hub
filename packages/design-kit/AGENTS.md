@@ -12,13 +12,15 @@ Hub marks: also read `ICONS.md`. The website tile is favicon + login + canvas ti
 
 ## Grab these files
 
-1. `css/tokens.css` — closed palette, type, space, radius, elevation
-2. `css/overlays.css` — the only per-hub differences (glass / tile density)
-3. `css/actions.css` — `.btn`, Wave `:focus-visible`, `.confirm-card` (import in existing hubs)
-4. `css/sign-in.css` — **locked** passphrase gate (same on every hub)
-5. `css/rail.css` — **locked** left rail (also imported by `chrome.css`)
-6. `css/mobile.css` — **locked** phone bottom bar + More sheet (also imported by `chrome.css`)
-7. `css/chrome.css` — rail, mobile chrome, page header, buttons, confirm cards (new hubs)
+This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
+
+1. `tokens.css` — closed palette, type, space, radius, elevation
+2. `overlays.css` — the only per-hub differences (glass / tile density)
+3. `actions.css` — `.btn`, Wave `:focus-visible`, `.confirm-card` (import in existing hubs)
+4. `sign-in.css` — **locked** passphrase gate (same on every hub)
+5. `rail.css` — **locked** left rail (also imported by `chrome.css`)
+6. `mobile.css` — **locked** phone bottom bar + More sheet (also imported by `chrome.css`)
+7. `chrome.css` — rail, mobile chrome, page header, buttons, confirm cards (new hubs)
 8. `icons/` — locked hub tiles + glyphs (`ICONS.md`)
 9. `js/format-display-date.js` — **locked** display dates (`dd/mm/yy`)
 10. `js/mount-mobile-chrome.js` — mount the phone bar + More sheet
@@ -30,7 +32,7 @@ Hub marks: also read `ICONS.md`. The website tile is favicon + login + canvas ti
 
 ### Passphrase gate (mandatory)
 
-Every hub’s front loading / password page uses `snippets/sign-in.html` + `css/sign-in.css` + `.btn` from `actions.css`. Do not invent a parallel login layout.
+Every hub’s front loading / password page uses `snippets/sign-in.html` + `sign-in.css` + `.btn` from `actions.css`. Do not invent a parallel login layout.
 
 | Locked | Per-hub only |
 |--------|----------------|
@@ -49,7 +51,7 @@ Every hub shows calendar days as **`dd/mm/yy`** via `js/format-display-date.js`.
 
 ### Left rail (mandatory)
 
-Every hub uses `snippets/rail.html` + `css/rail.css`. Full rules: `RAIL.md`.
+Every hub uses `snippets/rail.html` + `rail.css`. Full rules: `RAIL.md`.
 
 | Locked | Per-hub only |
 |--------|----------------|
@@ -62,19 +64,19 @@ No per-hub rail width, no stacked wordmark, no logo on the brand, no mixing dots
 
 Canonical repo: `/Users/adamrussell/Projects/hub-design-kit`  
 GitHub: https://github.com/adamrussell91-hash/hub-design-kit  
-Each hub also has a copy at `design-kit/` so this workspace can see it.
+In this monorepo Teaching / Knowledge / Tasks symlink `design-kit/` → `packages/design-kit`. Life loads `packages/design-kit/` directly.
 
 ## Locked (do not reinvent)
 
 - Colours, type scale, spacing, radius, shadows
-- Page header: uppercase eyebrow → `h1` title → optional supporting → actions on the right
+- Page header: uppercase eyebrow → `.page-header__title-row` (`.hub-mark` + `h1`) → optional supporting → actions on the right
 - Left rail: `--rail-width` 15rem, depth→marine gradient, `--on-dark*` text. Same labeled rail on every hub — see `RAIL.md`
 - Rail brand: `.hub-rail__brand` — **`<a>` to hub home**, single line, CSS `text-transform: uppercase`, `--text-2xs`. Copy is `"Teaching Hub"` / `"Life Hub"` / `"Knowledge Hub"` / `"Tasks Hub"`. No stacked `<br>`, no logo, no large title-case hero. Optional `.hub-rail__tagline` only.
 - Rail items: `.hub-rail__link` = outline icon + title-case label. No coloured dots. No icon-over-label stacks. No `text-transform: uppercase` on item labels.
-- Hub mark: the **tile** from `icons/` is the website icon. Favicon, `.sign-in__mark` on the gate, and `.hub-mark` **left of the page title** in `.page-header__title-row`. Not on the rail. See `ICONS.md`.
+- Hub mark: the **tile** from `icons/` is the website icon. Favicon, `.sign-in__mark` on the gate, and `.hub-mark` **left of the page title** in `.page-header__title-row`. Not on the rail. See `ICONS.md`. Never `display: none` the mark classes to “clean up” chrome.
 - Chrome utilities: refresh and sign out are `.hub-icon-btn` icons in `.hub-utilities` at the **canvas top-right**. Faded `--shallow` icons — never labelled pill `.btn`s on the rail or header. Snippet: `snippets/hub-utilities.html`.
 - Buttons: `.btn` + `--primary` / `--secondary` / `--ghost` / `--decisive`
-- Agent UX: propose → **confirm card** → apply. Never silent writes that look like a new UI kit
+- Agent UX: propose → **confirm card** (`.confirm-card`) → apply. Never silent writes that look like a new UI kit. Do not invent parallel proposal button skins.
 - Inter 400/500/600/700 only
 
 ## Allowed differences (`data-hub` on `<html>`)
@@ -96,26 +98,30 @@ Product UI (graphs, lesson blocks, bloods) stays in the hub. Chrome does not.
 - Do not copy hex from an old screenshot. Use tokens.
 - Do not start a new palette, font, or button style “just for this page”.
 - High Sea (`--high-sea`) is accent / decisive, not body text on orange, not focus rings (focus is Wave).
-- After changing this kit, run `scripts/sync-to-hubs.sh` so hub copies update.
+- After changing this kit, hub trees that symlink `design-kit/` → `packages/design-kit` pick up changes automatically. Life consumes the same tree via `packages/design-kit/…` URLs; `scripts/prepare-web.mjs` remounts CSS, JS, and `icons/` into `dist/packages/design-kit/`.
 - **Never store repos or data under `~/Documents` or `~/Desktop` (iCloud).** Code lives in `~/Projects/<name>` or `~/Teaching Hub`. Archives/media go to Cloudflare R2. If this workspace is under Documents, stop and relocate.
 - **Hub sites must never need iCloud or any local Mac file to work.** Source is GitHub; runtime data is Cloudflare (Workers, R2, KV, D1). Do not add a required local-file fallback.
 
 ## Adopt in existing hubs
 
-When editing a hub, replace local logout/refresh chrome **and** the left rail with the kit pattern (after sync):
+When editing a hub, replace local logout/refresh chrome **and** the left rail with the kit pattern:
 
 1. Rail brand → `<a class="hub-rail__brand" href="…home…">`. Single line of copy `"… Hub"`; CSS uppercases it. Drop stacked `<br>` titles, logos, and large title-case rail heroes. Clicking the brand always returns to that hub’s home.
 2. Rail destinations → `.hub-rail__link` (outline icon + title-case label). Replace coloured dots. Knowledge drops the narrow icon column and uses the 15rem labeled rail.
-3. Sign out / refresh → copy `snippets/hub-utilities.html` into `.page-header__actions` (canvas top-right). Keep existing ids/data attributes if tests rely on them; change the markup to `.hub-icon-btn`. Put `.hub-mark` (that hub’s tile) in `.page-header__title-row` to the left of the `h1`. Point `<link rel="icon">` at the same tile. Drop `.sign-in__supporting` and any login purpose copy.
+3. Sign out / refresh → copy `snippets/hub-utilities.html` into `.page-header__actions` (canvas top-right). Keep existing ids/data attributes if tests rely on them; change the markup to `.hub-icon-btn`. Put `.hub-mark` (that hub’s tile) in `.page-header__title-row` to the left of the `h1`. Point `<link rel="icon">` at the same tile. Drop `.sign-in__supporting` and any login purpose copy. Add `.sign-in__mark` on the gate.
 4. Delete labelled pill logout styles on the rail (`.teacher-layout__logout`, `.rail__logout`, `.hub-rail__logout`, `.quiet-button` used as Sign out/Refresh).
 5. Load `rail.css` (or `chrome.css`) and `actions.css` so `.hub-rail__*` and `.hub-icon-btn` are defined.
-6. Delete hub CSS that overrides `--rail-width` or restyles rail markers.
+6. Delete hub CSS that overrides `--rail-width`, restyles rail markers, or force-hides `.hub-mark` / `.sign-in__mark`.
 
 ## New hub checklist
 
-1. Copy `design-kit/` into the new repo (or run the sync script after adding the path).
+1. Symlink or copy `packages/design-kit` as `design-kit/` in the hub app.
 2. `<html lang="en" data-hub="…">`
 3. Load Inter, then `tokens.css`, `overlays.css`, `chrome.css` (includes `rail.css`), then the hub’s own CSS.
 4. Start from `snippets/shell.html` + `snippets/rail.html` + `snippets/sign-in.html`.
 5. Favicon, `.sign-in__mark`, and `.hub-mark` all use that hub’s tile from `icons/`.
 6. Hub-only CSS may add domain styles; it may not redefine `:root` colours or type, or override `--rail-width`.
+
+## Compliance
+
+Full cross-hub audit: `docs/design-kit-compliance.md`.

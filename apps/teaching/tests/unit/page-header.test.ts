@@ -14,10 +14,13 @@ describe('renderPageHeader', () => {
       actions: [save]
     });
     expect(host.querySelector('.page-header__eyebrow')?.textContent).toBe('Year 10 English');
+    expect(host.querySelector('.page-header__title-row')).not.toBeNull();
     expect(host.querySelector('.page-header__title')?.textContent).toBe('Class home');
     expect(host.querySelector('.page-header__supporting')?.textContent).toContain('unit sequence');
     expect(host.querySelector('.page-header__actions')?.contains(save)).toBe(true);
-    expect(host.querySelector('.hub-mark')).toBeNull();
+    const mark = host.querySelector('.hub-mark');
+    expect(mark).toBeInstanceOf(HTMLImageElement);
+    expect((mark as HTMLImageElement).src).toContain('/icons/teaching.svg');
   });
 
   it('omits supporting when not provided', () => {

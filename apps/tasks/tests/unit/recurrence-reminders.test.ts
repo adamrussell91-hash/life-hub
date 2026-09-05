@@ -9,6 +9,7 @@ import {
   serializeRecurrenceRule
 } from '@/domain/recurrence';
 import {
+  formatReminderLabel,
   inferRemindPreset,
   isReminderPending,
   pendingReminders,
@@ -90,5 +91,11 @@ describe('reminders', () => {
     expect(isReminderPending(due, now)).toBe(true);
     expect(isReminderPending(dismissed, now)).toBe(false);
     expect(pendingReminders([due, dismissed], now).map((item) => item.task.id)).toEqual(['a']);
+  });
+
+  it('formats reminder labels with display dates', () => {
+    const label = formatReminderLabel(task({ id: 'c', title: 'Pack', due_date: '2026-08-20' }));
+    expect(label).toBe('Pack · due 20/08/26');
+    expect(label).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 });

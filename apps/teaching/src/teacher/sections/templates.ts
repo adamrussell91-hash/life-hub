@@ -201,7 +201,7 @@ export function renderTemplatesPage(
             label: 'Archive',
             onSelect: () => {
               const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
-              confirmAndArchive(type, row.id, row.title, () => {
+              void confirmAndArchive(type, row.id, row.title, () => {
                 if (tab === 'lessons') {
                   lessonRows = lessonRows.filter((entry) => entry.id !== row.id);
                 } else {
@@ -217,7 +217,7 @@ export function renderTemplatesPage(
             danger: true,
             onSelect: () => {
               const type = tab === 'lessons' ? 'lesson_template' : 'unit_template';
-              confirmAndTrash(type, row.id, row.title, () => {
+              void confirmAndTrash(type, row.id, row.title, () => {
                 if (tab === 'lessons') {
                   lessonRows = lessonRows.filter((entry) => entry.id !== row.id);
                 } else {
