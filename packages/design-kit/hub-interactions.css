@@ -109,10 +109,40 @@
   outline: none;
 }
 
+/* Conversation composer: always-open field + send, not the compact Ask chip. */
+.hub-ai-bar--thread {
+  align-items: flex-end;
+  border-radius: var(--radius-lg);
+}
+
+.hub-ai-bar--thread .hub-ai-bar__field {
+  display: block;
+}
+
+.hub-ai-bar--thread .hub-ai-bar__tools {
+  display: inline-flex;
+  align-items: flex-end;
+}
+
+.hub-ai-bar--thread .hub-ai-bar__input {
+  min-height: 2.5rem;
+  max-height: 10rem;
+  padding: var(--space-2) var(--space-3);
+  resize: none;
+  line-height: 1.45;
+}
+
 .hub-ai-agent {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-2);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.hub-ai-agent::-webkit-scrollbar {
+  display: none;
 }
 
 .hub-ai-agent__btn {
@@ -135,6 +165,65 @@
   border-color: var(--wave);
   background: var(--pastel-blue);
   color: var(--pastel-blue-ink);
+}
+
+.hub-ai-agent--portraits {
+  align-items: flex-start;
+  padding-bottom: var(--space-1);
+}
+
+.hub-ai-agent--portraits .hub-ai-agent__btn,
+.hub-ai-agent--portraits .agent-picker__avatar {
+  flex: 0 0 auto;
+  flex-direction: column;
+  width: auto;
+  min-width: 3.25rem;
+  height: auto;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
+.hub-ai-agent--portraits .agent-picker__avatar img {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.hub-ai-agent--portraits .agent-picker__name {
+  max-width: 4.5rem;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-ai-agent--portraits .agent-picker__avatar.is-active {
+  border-color: var(--agent-colour, var(--wave));
+  background: color-mix(in srgb, var(--agent-colour, var(--wave)) 12%, transparent);
+}
+
+.hub-ai-agent--portraits .agent-picker__avatar.is-active .agent-picker__name {
+  color: var(--ink);
+}
+
+@media (max-width: 720px) {
+  .hub-ai-bar--thread .hub-ai-bar__input,
+  .chat-view .hub-ai-bar__input {
+    font-size: 16px;
+  }
+
+  .hub-ai-agent--portraits .agent-picker__avatar {
+    min-width: 2.75rem;
+  }
+
+  .hub-ai-agent--portraits .agent-picker__avatar img {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
 }
 
 .hub-inline-edit {

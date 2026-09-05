@@ -21,7 +21,7 @@ export function renderAgentPicker(
       for (const agent of CHAT_AGENTS) {
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = 'agent-picker__avatar';
+        button.className = 'agent-picker__avatar hub-ai-agent__btn';
         button.dataset.agentSlug = agent.slug;
         button.style.setProperty('--agent-colour', agent.colour);
         button.setAttribute('role', 'option');
@@ -33,7 +33,10 @@ export function renderAgentPicker(
         img.width = 64;
         img.height = 64;
         img.decoding = 'async';
-        button.append(img);
+        const name = document.createElement('span');
+        name.className = 'agent-picker__name';
+        name.textContent = agent.firstName;
+        button.append(img, name);
         button.addEventListener('click', () => onSelect?.(agent.slug));
         host.append(button);
       }

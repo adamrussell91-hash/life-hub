@@ -4,6 +4,7 @@ import { showEphemeralMessage } from './ephemeral-message.js';
 import { appendWorkoutPlanCard } from './render-workout-plan.js';
 import { parseWorkoutChat, setsAreIdentical } from '../core/parse-workout-chat.js';
 import { formatDisplayDate } from '../core/time.js';
+import { syncChatChrome } from './chat-chrome.js';
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'pain_flags', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
 const WORKOUT_HEADER_FIELDS = new Set(['title', 'session_kind', 'day_type', 'status', 'duration_min']);
@@ -36,9 +37,22 @@ export function setChatUnread(root, unread) {
   }
 }
 
-export function appendMessage(root, { role, agentSlug, text = '' }) {
+const STICK_PX = 80;
+
+export function isChatPinned(list) {
+  if (!list) return true;
+  const height = list.clientHeight || 0;
+  return list.scrollHeight - (list.scrollTop || 0) - height < STICK_PX;
+}
+
+export function scrollChatIfPinned(list, pinned = true) {
+  if (list && pinned) list.scrollTop = list.scrollHeight;
+}
+
+export function appendMessage(root, { role, agentSlug, text = '', actions = true } = {}) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
+  const pinned = isChatPinned(list);
   const item = root.createElement('li');
   item.className = `chat-message chat-message--${role}`;
   if (agentSlug) {
@@ -49,9 +63,32 @@ export function appendMessage(root, { role, agentSlug, text = '' }) {
   body.className = 'chat-message__body';
   body.textContent = text;
   item.append(body);
+  if (actions !== false) appendMessageActions(root, item, role);
   list.append(item);
-  list.scrollTop = list.scrollHeight;
+  scrollChatIfPinned(list, pinned);
+  syncChatChrome(root);
   return item;
+}
+
+function appendMessageActions(root, item, role) {
+  if (role !== 'user' && role !== 'assistant') return;
+  const actions = root.createElement('div');
+  actions.className = 'chat-message__actions';
+  const copy = root.createElement('button');
+  copy.type = 'button';
+  copy.className = 'chat-message__action';
+  copy.dataset.chatAction = 'copy';
+  copy.textContent = 'Copy';
+  actions.append(copy);
+  if (role === 'user') {
+    const retry = root.createElement('button');
+    retry.type = 'button';
+    retry.className = 'chat-message__action';
+    retry.dataset.chatAction = 'retry';
+    retry.textContent = 'Retry';
+    actions.append(retry);
+  }
+  item.append(actions);
 }
 
 export function appendRecordSaved(root, { summary, agentSlug }) {
@@ -85,9 +122,63 @@ export function renderInlineMarkdown(root, container, text, { multiline = false 
 
   let currentList = null;
   let currentListType = null;
+  let inFence = false;
+  let fenceLang = '';
+  let fenceLines = [];
   for (const rawLine of lines) {
+    const fence = rawLine.trim().startsWith('```');
+    if (fence) {
+      currentList = null;
+      currentListType = null;
+      if (!inFence) {
+        inFence = true;
+        fenceLang = rawLine.trim().slice(3).trim();
+        fenceLines = [];
+      } else {
+        appendCodeBlock(root, container, fenceLines.join('\n'), fenceLang);
+        inFence = false;
+        fenceLang = '';
+        fenceLines = [];
+      }
+      continue;
+    }
+    if (inFence) {
+      fenceLines.push(rawLine);
+      continue;
+    }
+
     const line = rawLine.trim();
     if (line === '') continue;
+    if (line === '---') {
+      currentList = null;
+      currentListType = null;
+      container.append(root.createElement('hr'));
+      continue;
+    }
+    const heading = /^(#{1,3})\s+(.+)$/.exec(line);
+    if (heading) {
+      currentList = null;
+      currentListType = null;
+      const node = root.createElement(`h${heading[1].length + 2}`);
+      node.className = `chat-md-h${heading[1].length}`;
+      appendInlineSegments(root, node, heading[2]);
+      container.append(node);
+      continue;
+    }
+    if (line.startsWith('> ')) {
+      currentList = null;
+      currentListType = null;
+      const quote = root.createElement('blockquote');
+      appendInlineSegments(root, quote, line.slice(2));
+      container.append(quote);
+      continue;
+    }
+    if (line.includes('|') && line.split('|').length >= 3) {
+      currentList = null;
+      currentListType = null;
+      appendTableRow(root, container, line);
+      continue;
+    }
     const bullet = line.startsWith('- ') ? { type: 'ul', text: line.slice(2) } : null;
     const numbered = bullet ? null : /^(\d+)[\.)]\s+(.*)$/.exec(line);
     const listItem = bullet ?? (numbered ? { type: 'ol', text: numbered[2], start: Number(numbered[1]) } : null);
@@ -112,6 +203,7 @@ export function renderInlineMarkdown(root, container, text, { multiline = false 
       container.append(paragraph);
     }
   }
+  if (inFence) appendCodeBlock(root, container, fenceLines.join('\n'), fenceLang);
 }
 
 function formatChatCable(cable) {
@@ -239,13 +331,67 @@ export function renderChatMarkdown(root, container, text) {
 }
 
 function appendInlineSegments(root, container, text) {
-  const segments = text.split(/(\*\*[^*\n]+\*\*)/g).filter(Boolean);
+  const segments = text.split(/(\*\*[^*\n]+\*\*|`[^`\n]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g).filter(Boolean);
   for (const segment of segments) {
-    const isBold = segment.startsWith('**') && segment.endsWith('**') && segment.length > 4;
-    const node = root.createElement(isBold ? 'strong' : 'span');
-    node.textContent = isBold ? segment.slice(2, -2) : segment;
+    if (segment.startsWith('**') && segment.endsWith('**') && segment.length > 4) {
+      const node = root.createElement('strong');
+      node.textContent = segment.slice(2, -2);
+      container.append(node);
+      continue;
+    }
+    if (segment.startsWith('`') && segment.endsWith('`') && segment.length > 2) {
+      const node = root.createElement('code');
+      node.textContent = segment.slice(1, -1);
+      container.append(node);
+      continue;
+    }
+    const link = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(segment);
+    if (link) {
+      const node = root.createElement('a');
+      node.href = link[2];
+      node.textContent = link[1];
+      node.target = '_blank';
+      node.rel = 'noopener noreferrer';
+      container.append(node);
+      continue;
+    }
+    const node = root.createElement('span');
+    node.textContent = segment;
     container.append(node);
   }
+}
+
+function appendCodeBlock(root, container, code, lang) {
+  const pre = root.createElement('pre');
+  pre.className = 'chat-code';
+  if (lang) pre.dataset.lang = lang;
+  const node = root.createElement('code');
+  node.textContent = code;
+  pre.append(node);
+  container.append(pre);
+}
+
+function appendTableRow(root, container, line) {
+  const cells = line.split('|').map(cell => cell.trim()).filter((cell, index, all) => {
+    if (index === 0 && cell === '') return false;
+    if (index === all.length - 1 && cell === '') return false;
+    return true;
+  });
+  if (!cells.length || cells.every(cell => /^:?-+:?$/.test(cell))) return;
+  let table = container.lastChild ?? container.children?.[container.children.length - 1] ?? null;
+  if (!table || table.tagName !== 'table') {
+    table = root.createElement('table');
+    table.className = 'chat-table';
+    container.append(table);
+  }
+  const isHeader = table.children.length === 0;
+  const row = root.createElement('tr');
+  for (const cell of cells) {
+    const td = root.createElement(isHeader ? 'th' : 'td');
+    appendInlineSegments(root, td, cell);
+    row.append(td);
+  }
+  table.append(row);
 }
 
 function appendNotesField(root, fields, inputs, notes) {
@@ -511,8 +657,16 @@ export function appendActionProposal(root, { proposal }) {
 export function setChatBusy(root, busy) {
   const input = root.querySelector('#chat-input');
   const button = root.querySelector('#chat-send');
+  const stop = root.querySelector('#chat-stop');
   if (input) input.disabled = busy;
-  if (button) button.disabled = busy;
+  if (button) {
+    button.disabled = busy;
+    button.hidden = Boolean(busy && stop);
+  }
+  if (stop) {
+    stop.hidden = !busy;
+    stop.disabled = !busy;
+  }
 }
 
 export function showChatError(root, message) {
