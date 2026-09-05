@@ -8,6 +8,7 @@
 @import "../design-kit/motion.css";
 @import "../design-kit/rail.css";
 @import "../design-kit/mobile.css";
+@import "../design-kit/hub-compose.css";
 
 :root {
   --paper: var(--warm-white);

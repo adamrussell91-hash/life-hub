@@ -28,6 +28,19 @@ test('Teaching and Knowledge load kit filters for sliding pills', async () => {
   assert.match(knowledge, /design-kit\/filters\.css/);
 });
 
+test('every hub loads the shared hub-compose stylesheet', async () => {
+  const chrome = await readFile(new URL('./packages/design-kit/chrome.css', root), 'utf8');
+  const life = await readFile(new URL('./apps/life/index.html', root), 'utf8');
+  const teaching = await readFile(new URL('./apps/teaching/src/design/tokens.css', root), 'utf8');
+  const knowledge = await readFile(new URL('./apps/knowledge/src/tokens.css', root), 'utf8');
+  const tasks = await readFile(new URL('./apps/tasks/src/app/main.ts', root), 'utf8');
+  assert.match(chrome, /hub-compose\.css/);
+  assert.match(life, /hub-compose\.css/);
+  assert.match(teaching, /hub-compose\.css/);
+  assert.match(knowledge, /hub-compose\.css/);
+  assert.match(tasks, /design-kit\/chrome\.css/);
+});
+
 test('every hub loads the shared adaptive slider stylesheet', async () => {
   const teaching = await readFile(new URL('./apps/teaching/src/design/tokens.css', root), 'utf8');
   const knowledge = await readFile(new URL('./apps/knowledge/src/tokens.css', root), 'utf8');

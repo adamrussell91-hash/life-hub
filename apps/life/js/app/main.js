@@ -189,11 +189,7 @@ controller = createAppController({
 
 controller.start();
 startHubMotion(document);
-for (const popover of mountMorphingPopovers(document)) {
-  popover.content.querySelector('#clare-dump-form')?.addEventListener('submit', () => {
-    queueMicrotask(() => popover.close({ restoreFocus: false }));
-  });
-}
+mountMorphingPopovers(document);
 
 const DEFAULT_AGENT_BY_SECTION = {
   nutrition: NUTRITION_AGENT_SLUG,
