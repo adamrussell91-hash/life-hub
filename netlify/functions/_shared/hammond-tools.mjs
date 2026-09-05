@@ -96,6 +96,21 @@ export function appendGovernanceLogSchema() {
   };
 }
 
+const SPECIALIST_CN_SENDERS = {
+  clare: 'Clare',
+  ann: 'Ann'
+};
+
+export function assertAgentMayApplyCentralNodePatch(slug, patch) {
+  if (slug === 'hammond') return true;
+  const sender = SPECIALIST_CN_SENDERS[slug];
+  if (!sender || !patch || typeof patch !== 'object') return false;
+  if (patch.section !== 'cross_agent' || patch.op !== 'append_line') return false;
+  const text = typeof patch.payload?.text === 'string' ? patch.payload.text.trim() : '';
+  const line = text.replace(/^-\s*/, '');
+  return line.startsWith(`${sender}\u2192`);
+}
+
 export function validateCentralNodePatchInput(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
   const { section, op, payload } = input;

@@ -540,19 +540,13 @@ test('hammond protocol no longer mentions Sterling', () => {
   assert.match(protocol, /6\. Comfort \/ convenience/);
 });
 
-test('seed central-node.md Agent Directory no longer lists the vestigial Clare DeMind / Ann O\'Tation entries', () => {
+test('seed central-node.md Agent Directory lists live Clare and Ann, not Clementine', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
   const cn = readFileSync(join(root, 'central-node.md'), 'utf8');
   const directorySection = cn.slice(cn.indexOf('## 🤖 Agent Directory'), cn.indexOf('## 🔴 Current Constraints'));
-  // Phase 34 deliberately preserved these Notion-era entries; a later cleanup
-  // (with explicit sign-off) removed them from the Agent Directory since they
-  // have zero code presence anywhere and every specialist protocol already
-  // disclaims them as unreachable. Historical "Clare DeMind: ..." lines still
-  // appear in the Recent Agent Actions demo content further down -- that's
-  // realistic seed data, not a claim she's a live agent, so this check is
-  // scoped to the directory listing only.
-  assert.doesNotMatch(directorySection, /Clare DeMind/);
-  assert.doesNotMatch(directorySection, /Ann O'Tation/);
+  assert.match(directorySection, /Clare DeMind \(Tasks Agent\)/);
+  assert.match(directorySection, /Ann O'Tation \(Teaching Agent\)/);
+  assert.doesNotMatch(directorySection, /Clementine/);
   assert.ok(cn.length > 1000);
   assert.equal(createHash('sha256').update(cn).digest('hex').length, 64);
 });
