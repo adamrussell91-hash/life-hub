@@ -572,7 +572,7 @@ Job 6 deleted Netlify sites `arteaching-hub`, `artasks-hub`, and `knowledge-hub-
 
 Hub API consolidation is complete. Post-fold audit: `checkpoints/checkpoint-10.md` — **PASS WITH NITS**. Widgets stay on `jade-melomakarona-ea20fe`. `GITHUB_TOKEN` rotation stays parked until closer to **2026-12-02**.
 
-Post-fold product leftover (2026-09-04): Tasks Projects called `GET/POST /api/reviews` (review log + close) after `artasks-hub` was deleted. That path was not in the Slice 25 fold list and 404'd as Netlify HTML (browser reports CORS/network). Handler now lives on `life-hub2`. `/api/capacity` and `/api/stress-flags` are still missing if those views are used.
+Post-fold product leftovers (2026-09-04 / 2026-09-05): after `artasks-hub` was deleted, Tasks SPA routes that were never on the Slice 25 fold list 404'd as Netlify HTML (browser reports CORS/network). Fixed on `life-hub2`: `GET/POST /api/reviews`, `GET/PUT /api/task-properties`. Still missing if those views are used: `/api/capacity`, `/api/stress-flags`.
 
 ## Open questions (Adam)
 
