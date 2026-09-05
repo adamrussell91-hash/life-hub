@@ -170,6 +170,11 @@ test('kit sign-in snippet and CSS no longer ship haze', async () => {
   }
 });
 
+test('virtual list windows are not faded in on insert', async () => {
+  const motion = await readFile(new URL('../../packages/design-kit/js/hub-motion.js', import.meta.url), 'utf8');
+  assert.match(motion, /list-window, \.virtual-list__window/);
+});
+
 test('kit motion no longer ships a cursor-follow spotlight sheen', async () => {
   const css = await readFile(new URL('../../packages/design-kit/motion.css', import.meta.url), 'utf8');
   const motion = await readFile(new URL('../../packages/design-kit/js/hub-motion.js', import.meta.url), 'utf8');

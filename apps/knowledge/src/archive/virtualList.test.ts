@@ -108,4 +108,49 @@ describe("paintVirtualList", () => {
     expect(again).toBe(painted);
     expect(windowEl.innerHTML).toBe("<button>stale</button>");
   });
+
+  function rows(from: number, to: number) {
+    return Array.from({ length: to - from }, (_, i) => {
+      const id = String(from + i);
+      return `<button class="card" type="button" data-id="${id}">Note ${id}</button>`;
+    }).join("");
+  }
+
+  it("keeps overlapping note nodes when the window slides by one row", () => {
+    const { viewport } = scrollHost();
+    const first = paintVirtualList(viewport, paint(rows(0, 8), 0, 8, 0), null);
+    const kept = viewport.querySelector("[data-id='3']");
+    expect(kept).toBeTruthy();
+
+    paintVirtualList(viewport, paint(rows(1, 9), 1, 9, 68), first);
+
+    expect(viewport.querySelector("[data-id='3']")).toBe(kept);
+    expect(viewport.querySelector("[data-id='0']")).toBeNull();
+    expect(viewport.querySelector("[data-id='8']")?.textContent).toBe("Note 8");
+  });
+
+  it("does not fade already-visible notes when hub motion sees the slide", async () => {
+    const { resetHubMotionForTests, startHubMotion } = await import("../../design-kit/js/hub-motion.js");
+    resetHubMotionForTests();
+    document.body.replaceChildren();
+    const { viewport } = scrollHost();
+    document.body.append(viewport);
+
+    const first = paintVirtualList(viewport, paint(rows(0, 8), 0, 8, 0), null);
+    startHubMotion(document);
+    await Promise.resolve();
+
+    const visible = viewport.querySelector<HTMLElement>("[data-id='3']")!;
+    visible.classList.add("hub-reveal", "is-in");
+    visible.dataset.hubMotionCard = "1";
+
+    paintVirtualList(viewport, paint(rows(1, 9), 1, 9, 68), first);
+    await Promise.resolve();
+
+    const after = viewport.querySelector<HTMLElement>("[data-id='3']")!;
+    const fadedOut = after.classList.contains("hub-reveal") && !after.classList.contains("is-in");
+    expect(fadedOut).toBe(false);
+    document.body.replaceChildren();
+    resetHubMotionForTests();
+  });
 });
