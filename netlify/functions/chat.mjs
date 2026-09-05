@@ -162,6 +162,17 @@ import {
   summarizeTemplatesFromContents
 } from './_shared/workout-templates.mjs';
 import { selectLatestBodyEntries, formatBodyStateForPrompt } from './_shared/body-state.mjs';
+import {
+  selectRecentSkincareEntries,
+  selectRecentNutritionEntries,
+  formatTreatmentStateForPrompt,
+  formatNutritionSkinWeekForPrompt,
+  isProcedureBody
+} from './_shared/treatment-state.mjs';
+import {
+  constraintsNeedClinicalContext,
+  formatSaraClinicalContextForPrompt
+} from './_shared/sara-clinical-context.mjs';
 import { selectHammondFitnessEntries, selectHammondEventEntries, summarizeHammondDigest, formatCentralNodeModelForPrompt, getWindowStart, getCnModelWindowStart } from './_shared/hammond-digest.mjs';
 import {
   getMindDigestWindowStart,
@@ -282,8 +293,10 @@ export function createChatHandler({
     const needsFoodLibrary = Boolean(allowedTypes?.includes('meal'));
     const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
     const needsExerciseLibrary = slug === 'chadwick';
-    const needsWorkoutHistory = slug === 'chadwick';
+    const needsSaraClinicalContext = slug === 'sara';
+    const needsWorkoutHistory = slug === 'chadwick' || needsSaraClinicalContext;
     const needsSkincareLibrary = slug === 'hyaluronica';
+    const needsTreatmentContext = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
     const hubContextPromise = needsHammondTools
       ? loadHubContext({ env, now: new Date(now()) })
@@ -392,6 +405,9 @@ export function createChatHandler({
         let lastWorkouts = '';
         let workoutRecords = [];
         let bodyState = '';
+        let treatmentState = '';
+        let nutritionSkinWeek = '';
+        let saraClinicalContext = '';
         let sessionAdherenceDays = null;
         let mindDiaryDigest = '';
         let hammondDiaryDigest = '';
@@ -463,6 +479,12 @@ export function createChatHandler({
           const bodyEntries = needsBodyState
             ? selectLatestBodyEntries(current.tree, { limit: 2 })
             : { composition: [], measurements: [] };
+          const skincareLookbackEntries = needsTreatmentContext
+            ? selectRecentSkincareEntries(current.tree, { today })
+            : [];
+          const nutritionWeekEntries = (needsTreatmentContext || needsSaraClinicalContext)
+            ? selectRecentNutritionEntries(current.tree, { today })
+            : [];
           // Hammond's 90-day fitness reads: bounded to the wider hammondFrom window,
           // never a full-history scan -- see hammond-digest.mjs.
           const hammondFitnessEntries = needsHammondTools
@@ -502,6 +524,8 @@ export function createChatHandler({
             chadwickWorkoutBlobs,
             compositionBlobs,
             measurementBlobs,
+            skincareLookbackBlobs,
+            nutritionWeekBlobs,
             hammondFitnessBlobs,
             hammondCnBlobs,
             mindBlobs,
@@ -523,6 +547,8 @@ export function createChatHandler({
             Promise.all(chadwickWorkoutEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.composition.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha))),
+            Promise.all(skincareLookbackEntries.map(entry => client.readBlob(entry.sha))),
+            Promise.all(nutritionWeekEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondCnEntries.map(entry => client.readBlob(entry.sha))),
             // Thin mind turns: keep path list for days-since; skip body reads.
@@ -651,6 +677,59 @@ export function createChatHandler({
             const measurementRecords = parseBodyRecords(bodyEntries.measurements, measurementBlobs);
             const targetRatio = loadPhysiqueTarget().shoulder_waist_ratio;
             bodyState = formatBodyStateForPrompt({ compositionRecords, measurementRecords, targetRatio });
+          }
+
+          if (needsTreatmentContext) {
+            const skincareEvents = [];
+            for (let index = 0; index < skincareLookbackEntries.length; index += 1) {
+              const content = decodeBlob(skincareLookbackBlobs[index]);
+              if (content === null) continue;
+              try {
+                const parsed = parseEventDocument(content, skincareLookbackEntries[index].path, loadYaml);
+                skincareEvents.push({ ...parsed, path: skincareLookbackEntries[index].path });
+              } catch {
+                // Skip unreadable skincare logs rather than breaking the turn.
+              }
+            }
+            const procedureEvents = skincareEvents.filter(event => isProcedureBody(event.body));
+            treatmentState = formatTreatmentStateForPrompt({
+              procedureEvents,
+              constraintsText: constraints,
+              today
+            });
+
+            const mealRecords = [];
+            for (let index = 0; index < nutritionWeekEntries.length; index += 1) {
+              const content = decodeBlob(nutritionWeekBlobs[index]);
+              if (content === null) continue;
+              try {
+                const { record } = parseEventDocument(content, nutritionWeekEntries[index].path, loadYaml);
+                if (record) mealRecords.push(record);
+              } catch {
+                // Skip unreadable meal logs rather than breaking the turn.
+              }
+            }
+            nutritionSkinWeek = formatNutritionSkinWeekForPrompt({ mealRecords, today });
+          }
+
+          if (needsSaraClinicalContext) {
+            const mealRecords = [];
+            for (let index = 0; index < nutritionWeekEntries.length; index += 1) {
+              const content = decodeBlob(nutritionWeekBlobs[index]);
+              if (content === null) continue;
+              try {
+                const { record } = parseEventDocument(content, nutritionWeekEntries[index].path, loadYaml);
+                if (record) mealRecords.push(record);
+              } catch {
+                // Skip unreadable meal logs rather than breaking the turn.
+              }
+            }
+            saraClinicalContext = formatSaraClinicalContextForPrompt({
+              constraintsText: constraints,
+              mealRecords,
+              workoutRecords,
+              today
+            });
           }
 
           if (needsHammondTools) {
@@ -790,6 +869,9 @@ export function createChatHandler({
           lastWorkouts = '';
           workoutRecords = [];
           bodyState = '';
+          treatmentState = '';
+          nutritionSkinWeek = '';
+          saraClinicalContext = '';
           sessionAdherenceDays = null;
           mindDiaryDigest = '';
           mindSessionDigest = '';
@@ -877,6 +959,9 @@ export function createChatHandler({
           lastWorkouts,
           exerciseLibrary,
           skincareRoutines,
+          treatmentState,
+          nutritionSkinWeek,
+          saraClinicalContext,
           bodyState,
           daysSinceLastSession: sessionAdherenceDays,
           mindDiaryDigest,

@@ -8,6 +8,10 @@ import { dumpVoiceLine, duplicateOnBoardQuestion } from '@/domain/clare-dump';
 import type { AgentMutation } from '@/domain/agent-mutations';
 import type { AgentProtocolSlug } from '@/domain/agent-protocol';
 import {
+  buildBodyDoubleToolkit,
+  buildContextSwitchToolkit,
+  buildDopamineMenuToolkit,
+  buildInterestFilterToolkit,
   buildOpenLoopsToolkit,
   buildShatterToolkit,
   buildTimeMapToolkit,
@@ -425,6 +429,10 @@ export function assembleDumpResult(
     toolkit = buildTimeMapToolkit(focus, minutes);
   }
   if (protocolId === 'open-loops') toolkit = buildOpenLoopsToolkit(items);
+  if (protocolId === 'dopamine-menu') toolkit = buildDopamineMenuToolkit(focus);
+  if (protocolId === 'body-double' && focus) toolkit = buildBodyDoubleToolkit(focus);
+  if (protocolId === 'context-switch' && focus) toolkit = buildContextSwitchToolkit(focus);
+  if (protocolId === 'interest-filter' && focus) toolkit = buildInterestFilterToolkit(focus);
 
   return {
     voice: dumpVoiceLine(items),
@@ -492,6 +500,10 @@ export function assembleJudgedDumpResult(
     toolkit = buildTimeMapToolkit(focus, minutes);
   }
   if (protocolId === 'open-loops') toolkit = buildOpenLoopsToolkit(rows);
+  if (protocolId === 'dopamine-menu') toolkit = buildDopamineMenuToolkit(focus);
+  if (protocolId === 'body-double' && focus) toolkit = buildBodyDoubleToolkit(focus);
+  if (protocolId === 'context-switch' && focus) toolkit = buildContextSwitchToolkit(focus);
+  if (protocolId === 'interest-filter' && focus) toolkit = buildInterestFilterToolkit(focus);
 
   const fallbackVoice = !rows.length && !mutations.length
     ? 'Got it — what do you want to do next?'
