@@ -269,7 +269,7 @@ export function renderResourcesIndex(
           label: 'Archive',
           onSelect: () => {
             setStatus(null);
-            confirmAndArchive('media', entry.id, entry.title, () => {
+            void confirmAndArchive('media', entry.id, entry.title, () => {
               void options?.refresh?.();
             });
           }
@@ -279,7 +279,7 @@ export function renderResourcesIndex(
           danger: true,
           onSelect: () => {
             setStatus(null);
-            confirmAndTrash('media', entry.id, entry.title, () => {
+            void confirmAndTrash('media', entry.id, entry.title, () => {
               void options?.refresh?.();
             });
           }

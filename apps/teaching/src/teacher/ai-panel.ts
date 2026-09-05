@@ -1,3 +1,4 @@
+import { askConfirmCard } from '@/teacher/confirm-dialog';
 import {
   AGENTS,
   agentColour,
@@ -370,9 +371,16 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
         options.onStaleAccept(apply);
         return;
       }
-      if (!window.confirm('The lesson has changed since this proposal was made. Apply it anyway?')) {
-        return;
-      }
+      void askConfirmCard({
+        eyebrow: 'Stale proposal',
+        title: 'The lesson has changed since this proposal was made.',
+        supporting: 'Apply it anyway?',
+        confirmLabel: 'Apply anyway',
+        discardLabel: 'Cancel'
+      }).then((ok) => {
+        if (ok) apply();
+      });
+      return;
     }
     applyPendingProposal(msg, proposal);
   }

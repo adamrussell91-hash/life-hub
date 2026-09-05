@@ -139,7 +139,7 @@ export function renderClassesIndex(
           {
             label: 'Archive',
             onSelect: () => {
-              confirmAndArchive('class', cls.id, cls.code || cls.title, () => {
+              void confirmAndArchive('class', cls.id, cls.code || cls.title, () => {
                 void options.onMutated?.();
               });
             }
@@ -148,7 +148,7 @@ export function renderClassesIndex(
             label: 'Move to trash',
             danger: true,
             onSelect: () => {
-              confirmAndTrash('class', cls.id, cls.code || cls.title, () => {
+              void confirmAndTrash('class', cls.id, cls.code || cls.title, () => {
                 void options.onMutated?.();
               });
             }
@@ -219,7 +219,7 @@ export function renderClassPage(
       {
         label: 'Archive',
         onSelect: () => {
-          confirmAndArchive('class', pageClass.id, pageClass.code || pageClass.title, () => {
+          void confirmAndArchive('class', pageClass.id, pageClass.code || pageClass.title, () => {
             navigate('/classes');
           });
         }
@@ -228,7 +228,7 @@ export function renderClassPage(
         label: 'Move to trash',
         danger: true,
         onSelect: () => {
-          confirmAndTrash('class', pageClass.id, pageClass.code || pageClass.title, () => {
+          void confirmAndTrash('class', pageClass.id, pageClass.code || pageClass.title, () => {
             navigate('/classes');
           });
         }
@@ -293,7 +293,7 @@ export function renderClassPage(
 
   let selectedDate = today;
   let viewMonth = yearMonthFromDate(today);
-  let calendarView: ScheduleCalendarView = window.matchMedia('(max-width: 768px)').matches
+  let calendarView: ScheduleCalendarView = window.matchMedia('(max-width: 720px)').matches
     ? 'week'
     : 'month';
   let monthDelta = 0;

@@ -1,8 +1,23 @@
+import { withAppBase } from '@/app/base-path';
+import { appendHubUtilitiesToActions } from '@/teacher/hub-utilities';
+
+const HUB_MARK_SRC = withAppBase('/icons/teaching.svg');
+
 export interface PageHeaderConfig {
   eyebrow?: string;
   title?: string;
   supporting?: string;
   actions?: HTMLElement[];
+}
+
+function createHubMark(): HTMLImageElement {
+  const mark = document.createElement('img');
+  mark.className = 'hub-mark';
+  mark.src = HUB_MARK_SRC;
+  mark.alt = '';
+  mark.width = 32;
+  mark.height = 32;
+  return mark;
 }
 
 export function renderPageHeader(host: HTMLElement, config: PageHeaderConfig): HTMLElement {
@@ -22,10 +37,15 @@ export function renderPageHeader(host: HTMLElement, config: PageHeaderConfig): H
     }
 
     if (config.title) {
+      const titleRow = document.createElement('div');
+      titleRow.className = 'page-header__title-row';
+      titleRow.append(createHubMark());
+
       const title = document.createElement('h1');
       title.className = 'page-header__title hub-kinetic';
       title.textContent = config.title;
-      copy.append(title);
+      titleRow.append(title);
+      copy.append(titleRow);
     }
 
     if (config.supporting) {
@@ -40,13 +60,29 @@ export function renderPageHeader(host: HTMLElement, config: PageHeaderConfig): H
     header.classList.add('page-header--actions-only');
   }
 
+  const actions = document.createElement('div');
+  actions.className = 'page-header__actions';
   if (config.actions && config.actions.length > 0) {
-    const actions = document.createElement('div');
-    actions.className = 'page-header__actions';
     actions.append(...config.actions);
+  }
+  appendHubUtilitiesToActions(actions);
+  if (actions.childElementCount > 0) {
     header.append(actions);
   }
 
+  host.prepend(header);
+  return header;
+}
+
+/** Actions-only header for pages without copy (e.g. home dashboard chrome). */
+export function renderPageHeaderUtilities(host: HTMLElement): HTMLElement | null {
+  const header = document.createElement('header');
+  header.className = 'page-header page-header--actions-only';
+  const actions = document.createElement('div');
+  actions.className = 'page-header__actions';
+  appendHubUtilitiesToActions(actions);
+  if (actions.childElementCount === 0) return null;
+  header.append(actions);
   host.prepend(header);
   return header;
 }

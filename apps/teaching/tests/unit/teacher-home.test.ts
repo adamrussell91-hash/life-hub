@@ -182,12 +182,12 @@ describe('teacher home dashboard', () => {
 
     const todayCol = canvas.querySelector('.class-calendar__week-day[data-today="true"]');
     expect(todayCol?.getAttribute('data-date')).toBe('2026-08-12');
-    expect(todayCol?.querySelector('.class-calendar__day-num')?.textContent).toBe('12');
+    expect(todayCol?.querySelector('.class-calendar__day-num')?.textContent).toBe('12/08/26');
 
     const dayNumbers = [
       ...canvas.querySelectorAll('.class-calendar__week-day .class-calendar__day-num')
     ].map((el) => el.textContent);
-    expect(dayNumbers).toEqual(['10', '11', '12', '13', '14']);
+    expect(dayNumbers).toEqual(['10/08/26', '11/08/26', '12/08/26', '13/08/26', '14/08/26']);
 
     const lessonLink = canvas.querySelector<HTMLAnchorElement>(
       'a.event-chip[href="/lessons/lesson_aotfw_008"]'

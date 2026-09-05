@@ -592,7 +592,7 @@ export function renderPodcastRail(host: PodcastRailHost) {
         </fieldset>
         ${commissionFields(host.tags)}
         <div class="alchemist__actions">
-          <button type="submit" ${busy ? "disabled" : ""}>${busy ? escapeHtml(statusNote || ANN_PODCAST_WAIT_LINES[0]!) : "Generate"}</button>
+          <button class="btn btn--primary" type="submit" ${busy ? "disabled" : ""}>${busy ? escapeHtml(statusNote || ANN_PODCAST_WAIT_LINES[0]!) : "Generate"}</button>
         </div>
         ${podcastError ? `<p class="alchemist__error">${escapeHtml(podcastError)}</p>` : ""}
       </form>

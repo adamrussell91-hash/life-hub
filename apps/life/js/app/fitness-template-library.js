@@ -2,7 +2,7 @@ import { formatExerciseSets, formatExerciseTitle } from './format-exercise.js';
 import { buildLibraryByName, resolveMuscleMapKeys } from './muscle-maps.js';
 import { renderMuscleStrip } from './render-fitness.js';
 import { buildPlannedCandidateFromTemplate } from './template-to-planned.js';
-import { getSydneyDateKey, getSydneyTimestamp } from '../core/time.js';
+import { formatDisplayDate, getSydneyDateKey, getSydneyTimestamp } from '../core/time.js';
 
 export function createFitnessTemplateLibrary({
   root,
@@ -98,7 +98,7 @@ export function createFitnessTemplateLibrary({
     if (note) {
       note.textContent = completedToday
         ? 'A completed session is already on today’s hero.'
-        : (template.source_session_date ? `Last actuals ${template.source_session_date}` : '');
+        : (template.source_session_date ? `Last actuals ${formatDisplayDate(template.source_session_date)}` : '');
     }
 
     if (typeof dialog.showModal === 'function') dialog.showModal();

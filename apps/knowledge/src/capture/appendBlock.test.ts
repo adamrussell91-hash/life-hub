@@ -30,13 +30,13 @@ describe("titleFromCapture", () => {
 
   it("falls back to a dated kind label when extract is empty", () => {
     expect(titleFromCapture("   ", { kind: "voice", text: "", now: new Date("2026-08-15T00:00:00.000Z") })).toBe(
-      "Voice note 2026-08-15",
+      "Voice note 15/08/26",
     );
     expect(titleFromCapture("", { kind: "photo", text: "\n", now: new Date("2026-08-15T00:00:00.000Z") })).toBe(
-      "Photo note 2026-08-15",
+      "Photo note 15/08/26",
     );
     expect(titleFromCapture("", { kind: "pdf", text: "", now: new Date("2026-08-15T00:00:00.000Z") })).toBe(
-      "PDF note 2026-08-15",
+      "PDF note 15/08/26",
     );
   });
 

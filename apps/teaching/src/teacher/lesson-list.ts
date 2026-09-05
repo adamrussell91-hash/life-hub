@@ -80,7 +80,7 @@ export function renderLessonList(
         {
           label: 'Archive',
           onSelect: () => {
-            confirmAndArchive('lesson', lesson.id, lesson.title, () => {
+            void confirmAndArchive('lesson', lesson.id, lesson.title, () => {
               void options.onMutated?.();
             });
           }
@@ -89,7 +89,7 @@ export function renderLessonList(
           label: 'Move to trash',
           danger: true,
           onSelect: () => {
-            confirmAndTrash('lesson', lesson.id, lesson.title, () => {
+            void confirmAndTrash('lesson', lesson.id, lesson.title, () => {
               void options.onMutated?.();
             });
           }

@@ -744,14 +744,6 @@ function paintLegend(root, host, items) {
   }
 }
 
-const CHART_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatChartDay(dateKey) {
-  if (!isCalendarDate(dateKey)) return '';
-  const [, month, day] = dateKey.split('-');
-  return `${Number(day)} ${CHART_MONTHS[Number(month) - 1]}`;
-}
-
 function renderMoodChart(root, series, bounds, range) {
   const svg = root.querySelector('#mind-mood-chart');
   if (!svg) return;
@@ -834,7 +826,7 @@ function renderMoodChart(root, series, bounds, range) {
     dot.style.animationDelay = `${Math.min(index * 25, 400)}ms`;
     const title = createSvg(root, 'title');
     const energy = point.energy ? ` · ${point.energy} energy` : '';
-    title.textContent = `${formatChartDay(point.date)} — ${point.mood ?? 'score'} ${point.value}/10${energy}`;
+    title.textContent = `${formatDisplayDate(point.date)} — ${point.mood ?? 'score'} ${point.value}/10${energy}`;
     dot.append(title);
     nodes.push(dot);
   });
@@ -1204,13 +1196,13 @@ function renderEnergyOrbit(root, model) {
     dot.setAttribute('data-energy', point.energy);
     dot.setAttribute('tabindex', '0');
     dot.setAttribute('role', 'button');
-    dot.setAttribute('aria-label', `${formatChartDay(point.date)} — ${point.energy} energy`);
+    dot.setAttribute('aria-label', `${formatDisplayDate(point.date)} — ${point.energy} energy`);
     if (!quietMotion(root)) dot.style.animationDelay = `${Math.min(index * 18, 400)}ms`;
     const title = createSvg(root, 'title');
-    title.textContent = `${formatChartDay(point.date)} — ${point.energy} energy`;
+    title.textContent = `${formatDisplayDate(point.date)} — ${point.energy} energy`;
     dot.append(title);
     const open = () => openMindThreadSheet(root, {
-      title: `${formatChartDay(point.date)} · ${point.energy} energy`,
+      title: `${formatDisplayDate(point.date)} · ${point.energy} energy`,
       rows: [{
         date: point.date,
         title: `${point.energy} energy`,
@@ -2349,7 +2341,7 @@ function renderRadialTile(root, model) {
     line.setAttribute('stroke-width', '2.4');
     line.setAttribute('stroke-linecap', 'round');
     bindMark(line, root, {
-      title: tick.date,
+      title: formatDisplayDate(tick.date),
       rows: dateRows(model, tick.date)
     });
     svg.append(line);
@@ -2419,9 +2411,9 @@ function paintGroupedBars(root, host, chart, model) {
     energy.style.height = `${column.energy?.height ?? 0}px`;
     energy.style.background = column.energy ? (ENERGY_TOKEN[column.energy.key] ?? 'var(--marine)') : 'transparent';
     group.append(mood, energy);
-    group.setAttribute('aria-label', `${column.date} mood ${column.mood?.key ?? '—'} energy ${column.energy?.key ?? '—'}`);
+    group.setAttribute('aria-label', `${formatDisplayDate(column.date)} mood ${column.mood?.key ?? '—'} energy ${column.energy?.key ?? '—'}`);
     bindMark(group, root, {
-      title: column.date,
+      title: formatDisplayDate(column.date),
       rows: dateRows(model, column.date),
       continueAgent: 'penelope'
     });
@@ -2503,7 +2495,7 @@ function paintMetricStrip(root, host, chart, model) {
       hit.setAttribute('fill', 'transparent');
       hit.setAttribute('tabindex', '0');
       hit.setAttribute('role', 'button');
-      hit.setAttribute('aria-label', `${band.label} ${formatChartDay(tick.date)}`);
+      hit.setAttribute('aria-label', `${band.label} ${formatDisplayDate(tick.date)}`);
       const line = createSvg(root, 'rect');
       line.setAttribute('data-role', 'tick');
       line.setAttribute('x', String(tick.x));
@@ -2515,7 +2507,7 @@ function paintMetricStrip(root, host, chart, model) {
       line.setAttribute('opacity', String(tick.opacity));
       line.setAttribute('pointer-events', 'none');
       bindMark(hit, root, {
-        title: formatChartDay(tick.date),
+        title: formatDisplayDate(tick.date),
         rows: dateRows(model, tick.date),
         continueAgent: 'penelope'
       });
@@ -2579,7 +2571,7 @@ function bindMetricStripHover(host, chart) {
       tip.hidden = true;
       return;
     }
-    const bits = [formatChartDay(date)];
+    const bits = [formatDisplayDate(date)];
     for (const band of live.bands) {
       const tick = band.ticks.find(item => item.date === date);
       if (!tick) continue;
@@ -2717,14 +2709,14 @@ function paintWatchlistHeat(root, host, chart, model) {
       button.dataset.index = String(index);
       button.dataset.term = row.term;
       button.dataset.count = String(cell.count);
-      button.setAttribute('aria-label', `${row.term}, week of ${chart.axis[index]?.label ?? cell.date}: ${cell.count} ${cell.count === 1 ? 'mention' : 'mentions'}`);
+      button.setAttribute('aria-label', `${row.term}, week of ${chart.axis[index]?.label ?? formatDisplayDate(cell.date)}: ${cell.count} ${cell.count === 1 ? 'mention' : 'mentions'}`);
       if (!cell.zero) {
         button.style.background = `color-mix(in srgb, ${row.colour} ${Math.round(cell.mix)}%, var(--warm-white))`;
       }
       const weekTo = addCalendarDays(cell.date, 6);
       const to = model.bounds?.to && weekTo > model.bounds.to ? model.bounds.to : weekTo;
       bindMark(button, root, {
-        title: `${row.term} · ${chart.axis[index]?.label ?? cell.date}`,
+        title: `${row.term} · ${chart.axis[index]?.label ?? formatDisplayDate(cell.date)}`,
         rows: entriesForWatchlistTerm(model.diary ?? [], model.sessions ?? [], row.term, {
           from: cell.date,
           to
@@ -2908,7 +2900,7 @@ function renderWaffleTile(root, model) {
     if (cell.mood) button.setAttribute('data-mood', cell.mood);
     button.setAttribute('title', `${formatDisplayDate(cell.date)} ${cell.mood ?? ''}`.trim());
     bindMark(button, root, {
-      title: cell.date,
+      title: formatDisplayDate(cell.date),
       rows: dateRows(model, cell.date)
     });
     host.append(button);

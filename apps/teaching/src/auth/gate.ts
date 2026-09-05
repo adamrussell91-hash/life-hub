@@ -1,4 +1,5 @@
 import { apiGet, apiPost, ApiClientError } from '@/api/client';
+import { withAppBase } from '@/app/base-path';
 
 export interface SessionInfo {
   authenticated: boolean;
@@ -21,6 +22,8 @@ export interface SignInOptions {
   onSuccess?: (session: SessionInfo) => void;
 }
 
+const SIGN_IN_MARK_SRC = withAppBase('/icons/teaching.svg');
+
 /** Passphrase gate from design-kit/snippets/sign-in.html + sign-in.css */
 export function renderSignIn(container: HTMLElement, options?: SignInOptions): void {
   container.replaceChildren();
@@ -31,6 +34,13 @@ export function renderSignIn(container: HTMLElement, options?: SignInOptions): v
   const form = document.createElement('form');
   form.className = 'sign-in__card';
   form.noValidate = true;
+
+  const mark = document.createElement('img');
+  mark.className = 'sign-in__mark';
+  mark.src = SIGN_IN_MARK_SRC;
+  mark.alt = '';
+  mark.width = 56;
+  mark.height = 56;
 
   const brand = document.createElement('p');
   brand.className = 'sign-in__brand';
@@ -70,7 +80,7 @@ export function renderSignIn(container: HTMLElement, options?: SignInOptions): v
   submit.textContent = 'Sign in';
 
   field.append(label, input);
-  form.append(brand, title, field, error, submit);
+  form.append(mark, brand, title, field, error, submit);
   wrapper.append(form);
   container.append(wrapper);
 

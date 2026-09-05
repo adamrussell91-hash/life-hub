@@ -13,6 +13,11 @@ class FakeElement {
     this.parent = null;
     this.scrollTop = 0;
     this.scrollHeight = 0;
+    this.attributes = new Map();
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
   }
 
   append(...nodes) {
@@ -323,6 +328,9 @@ test('appendCnPatchProposal renders summary, section/op, affected detail, and Co
   );
   assert.equal(confirm.textContent, 'Confirm');
   assert.equal(discard.textContent, 'Discard');
+  assert.match(card.className, /confirm-card/);
+  assert.match(confirm.className, /btn--primary/);
+  assert.match(discard.className, /btn--ghost/);
   assert.equal(root.querySelector('#chat-messages').children.includes(card), true);
 });
 

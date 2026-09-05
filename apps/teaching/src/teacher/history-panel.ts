@@ -7,6 +7,7 @@ import {
   listVersions,
   restoreVersion
 } from '@/teacher/version-api';
+import { askConfirmCard } from '@/teacher/confirm-dialog';
 
 export const RESTORE_CONFIRM_MESSAGE =
   'Restores editable content only. Students keep the current published version until you republish.';
@@ -291,7 +292,14 @@ export function mountHistoryPanel(options: HistoryPanelOptions): HistoryPanelHan
       restoreButton.addEventListener('click', () => {
         void (async () => {
           if (busy) return;
-          if (!window.confirm(RESTORE_CONFIRM_MESSAGE)) return;
+          const ok = await askConfirmCard({
+            eyebrow: 'Restore',
+            title: 'Restore this revision?',
+            supporting: RESTORE_CONFIRM_MESSAGE,
+            confirmLabel: 'Restore',
+            discardLabel: 'Cancel'
+          });
+          if (!ok) return;
           setBusy(true);
           setStatus(`Restoring revision ${entry.revision}…`);
           try {

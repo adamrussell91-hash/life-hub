@@ -11,6 +11,7 @@ import {
   renderClassCalendar,
   type ScheduleCalendarView
 } from '@/teacher/class-calendar';
+import { renderPageHeaderUtilities } from '@/teacher/page-header';
 import { openBlankLesson } from '@/teacher/create/blank-lesson';
 import { mountCreateControl } from '@/teacher/create/control';
 import { openCreateModal } from '@/teacher/create/modal';
@@ -37,6 +38,8 @@ export function renderTeacherHome(
   options: TeacherHomeOptions = {}
 ): { dispose: () => void } {
   canvas.replaceChildren();
+
+  renderPageHeaderUtilities(canvas);
 
   const classesById = new Map(curriculum.classes.map((cls) => [cls.id, cls]));
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));

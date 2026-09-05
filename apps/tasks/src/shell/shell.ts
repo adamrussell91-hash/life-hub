@@ -494,6 +494,25 @@ export interface PageHeaderConfig {
   actions?: HTMLElement | null;
 }
 
+const TASKS_HUB_TILE = '/icons/tasks.svg';
+
+function createHubMark(): HTMLImageElement {
+  const mark = document.createElement('img');
+  mark.className = 'hub-mark';
+  mark.src = TASKS_HUB_TILE;
+  mark.alt = '';
+  mark.width = 32;
+  mark.height = 32;
+  return mark;
+}
+
+function createTitleRow(title: HTMLElement): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'page-header__title-row';
+  row.append(createHubMark(), title);
+  return row;
+}
+
 function restoreHeaderTitle(existing: Element): HTMLElement {
   if (existing instanceof HTMLHeadingElement && existing.tagName === 'H1') {
     existing.className = 'page-header__title hub-kinetic';
@@ -508,14 +527,18 @@ function restoreHeaderTitle(existing: Element): HTMLElement {
 function syncPageHeaderCopy(refs: HubShellRefs, config: PageHeaderConfig): boolean {
   const copy = refs.pageHeader.querySelector('.page-header__copy');
   const eyebrow = copy?.querySelector('.page-header__eyebrow');
-  const existingTitle = copy?.querySelector('.page-header__title');
-  if (!copy || !eyebrow || !existingTitle || !refs.pageHeader.contains(refs.headerActions)) {
+  const titleRow = copy?.querySelector('.page-header__title-row');
+  const existingTitle = titleRow?.querySelector('.page-header__title');
+  if (!copy || !eyebrow || !titleRow || !existingTitle || !refs.pageHeader.contains(refs.headerActions)) {
     return false;
   }
 
   eyebrow.textContent = config.eyebrow;
   const title = restoreHeaderTitle(existingTitle);
   title.textContent = config.title;
+  if (!titleRow.querySelector('.hub-mark')) {
+    titleRow.insertBefore(createHubMark(), title);
+  }
   let supporting = copy.querySelector('.page-header__supporting');
   if (config.supporting) {
     if (!supporting) {
@@ -552,7 +575,7 @@ export function renderPageHeader(refs: HubShellRefs, config: PageHeaderConfig): 
   title.className = 'page-header__title hub-kinetic';
   title.textContent = config.title;
 
-  copy.append(eyebrow, title);
+  copy.append(eyebrow, createTitleRow(title));
   if (config.supporting) {
     const supporting = document.createElement('p');
     supporting.className = 'page-header__supporting';

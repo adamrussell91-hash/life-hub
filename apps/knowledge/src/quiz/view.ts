@@ -402,7 +402,7 @@ function renderQuiz() {
         }
         ${quizMode === "sprint" ? `<label class="alchemist__mode"><input type="checkbox" data-quiz-cram ${quizCram ? "checked" : ""} /> Ignore due dates</label>` : ""}
         <div class="alchemist__actions">
-          <button type="submit" ${quizBusy ? "disabled" : ""}>${quizBusy ? "Preparing…" : quizMode === "hqe" ? "Start HQE" : quizMode === "why" ? "Start Why/How" : quizMode === "cloze" ? "Start cloze" : quizMode === "exam" ? "Start exam" : "Start sprint"}</button>
+          <button class="btn btn--primary" type="submit" ${quizBusy ? "disabled" : ""}>${quizBusy ? "Preparing…" : quizMode === "hqe" ? "Start HQE" : quizMode === "why" ? "Start Why/How" : quizMode === "cloze" ? "Start cloze" : quizMode === "exam" ? "Start exam" : "Start sprint"}</button>
         </div>
         ${quizError ? `<p class="alchemist__error">${escapeHtml(quizError)}</p>` : ""}
       </form>
@@ -437,7 +437,7 @@ function renderQuiz() {
             : ""
         }
         <div class="alchemist__actions">
-          <button type="submit">${quizMode === "sortDump" ? "Peek, then dump" : "Start dump"}</button>
+          <button class="btn btn--primary" type="submit">${quizMode === "sortDump" ? "Peek, then dump" : "Start dump"}</button>
         </div>
         ${quizError ? `<p class="alchemist__error">${escapeHtml(quizError)}</p>` : ""}
       </form>

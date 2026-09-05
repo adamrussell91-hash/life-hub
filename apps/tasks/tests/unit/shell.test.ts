@@ -67,6 +67,7 @@ describe('hub shell chrome', () => {
     const actions = [...refs.headerActions.children].map((el) => el.className);
     expect(actions[0]).toContain('btn');
     expect(actions.at(-1)).toBe('hub-utilities');
+    expect(refs.pageHeader.querySelector('.page-header__title-row .hub-mark')).not.toBeNull();
     expect(refs.headerActions.querySelector('.hub-mark')).toBeNull();
     expect(refs.logoutButton?.getAttribute('aria-label')).toBe('Sign out');
   });

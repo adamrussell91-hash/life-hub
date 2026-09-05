@@ -5,7 +5,7 @@
 
 /* Shared chrome for new hubs. Existing hubs already implement these patterns
    under local class names — copy structure from snippets/, map to tokens,
-   do not invent a parallel button or header system. Rail: css/rail.css (RAIL.md).
+   do not invent a parallel button or header system. Rail: rail.css (RAIL.md).
  */
 
 *,

@@ -1,8 +1,10 @@
 /* Shared passphrase gate — locked across every hub.
  *
  * Markup: snippets/sign-in.html
- * Do not restyle per hub. Only the brand eyebrow + one supporting line change.
- * No hub tile / .sign-in__mark. Enter submits (form submit, not click-only).
+ * Do not restyle per hub. Only the brand eyebrow text changes.
+ * Required: hub tile via .sign-in__mark (see ICONS.md).
+ * Forbidden: supporting / purpose / privacy copy.
+ * Enter submits (form submit, not click-only).
  * Glass density overlays do not apply here.
  */
 
@@ -42,6 +44,15 @@
   -webkit-backdrop-filter: blur(var(--sign-in-glass-blur));
 }
 
+/* Website tile — same asset as favicon + .hub-mark (ICONS.md). */
+.sign-in__mark {
+  display: block;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0;
+  border-radius: var(--radius-md);
+}
+
 .sign-in__brand {
   margin: 0;
   font-family: var(--font-ui);
@@ -60,6 +71,12 @@
   line-height: 1.2;
   letter-spacing: var(--tracking-tight);
   color: var(--depth);
+}
+
+/* Supporting / purpose lines are forbidden on the gate. Keep the class
+   unstyled and unused so hubs cannot revive login marketing copy. */
+.sign-in__supporting {
+  display: none !important;
 }
 
 .sign-in__form {
