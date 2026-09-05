@@ -1171,82 +1171,94 @@
 
         <section id="central-node-dashboard" class="dashboard" aria-label="Central Node" hidden>
           <div data-central-node="progress" class="hub-progress"></div>
-          <article class="metric-card status-card" aria-labelledby="todays-status-label">
-            <p class="metric-label" id="todays-status-label">Today's Status</p>
-            <div class="status-hybrid">
-              <div class="completion-ring-wrap">
-                <svg id="central-node-completion-ring" class="completion-ring" viewBox="0 0 72 72" role="img" aria-label="Logging completeness ring">
-                  <circle data-role="track" class="completion-ring-track" fill="none"></circle>
-                  <circle data-role="fill" class="completion-ring-fill" fill="none"></circle>
-                </svg>
-                <span data-value="completion-ring-label" class="completion-ring-label">— of —</span>
+          <div id="cn-board" class="cn-board">
+            <article id="cn-tile-status" class="metric-card cn-tile" data-cn-span="2" aria-labelledby="todays-status-label">
+              <p class="cn-tile__question">Has today been logged?</p>
+              <p class="metric-label" id="todays-status-label">Today's Status</p>
+              <div class="status-hybrid">
+                <div class="completion-ring-wrap">
+                  <svg id="central-node-completion-ring" class="completion-ring" viewBox="0 0 72 72" role="img" aria-label="Logging completeness ring">
+                    <circle data-role="track" class="completion-ring-track" fill="none"></circle>
+                    <circle data-role="fill" class="completion-ring-fill" fill="none"></circle>
+                  </svg>
+                  <span data-value="completion-ring-label" class="completion-ring-label">— of —</span>
+                </div>
+                <div class="status-live" aria-label="Live logging checklist">
+                  <ul class="status-checklist">
+                    <li data-live-complete="nutrition">Nutrition</li>
+                    <li data-live-complete="fitness">Fitness</li>
+                    <li data-live-complete="diary">Diary</li>
+                    <li data-live-complete="body">Body</li>
+                    <li data-live-complete="skincare">Skincare</li>
+                  </ul>
+                  <p class="status-snapshot" data-live-snapshot>—</p>
+                </div>
+                <div data-central-node="todays-status" class="prose-section status-prose"></div>
               </div>
-              <div class="status-live" aria-label="Live logging checklist">
-                <ul class="status-checklist">
-                  <li data-live-complete="nutrition">Nutrition</li>
-                  <li data-live-complete="fitness">Fitness</li>
-                  <li data-live-complete="diary">Diary</li>
-                  <li data-live-complete="body">Body</li>
-                  <li data-live-complete="skincare">Skincare</li>
-                </ul>
-                <p class="status-snapshot" data-live-snapshot>—</p>
-              </div>
-              <div data-central-node="todays-status" class="prose-section status-prose"></div>
-            </div>
-          </article>
+            </article>
 
-          <article class="metric-card chart-card" aria-labelledby="central-node-week-label">
-            <p class="metric-label" id="central-node-week-label">Protein this week</p>
-            <svg id="central-node-week-chart" class="line-chart" viewBox="0 0 320 140" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Protein grams over the last 7 days">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <path data-role="rolling" d="" hidden></path>
-              <g data-role="day-labels"></g>
-            </svg>
-            <p class="metric-caption" data-central-node="rolling-caption">Dotted = 3-day average</p>
-            <div data-central-node="this-week" class="prose-section"></div>
-          </article>
+            <article id="cn-tile-week" class="metric-card cn-tile" aria-labelledby="central-node-week-label">
+              <p class="cn-tile__question">How is protein moving?</p>
+              <p class="metric-label" id="central-node-week-label">This Week</p>
+              <p class="cn-tile__legend">Each cell is a day. Darker is more protein.</p>
+              <svg id="central-node-week-horizon" class="cn-horizon" viewBox="0 0 320 24" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Protein grams over the last 7 days"></svg>
+              <div data-central-node="this-week" class="prose-section"></div>
+            </article>
 
-          <article class="metric-card chart-card" aria-labelledby="central-node-month-label">
-            <p class="metric-label" id="central-node-month-label">This Month</p>
-            <div data-central-node="this-month" class="prose-section"></div>
-            <div id="central-node-logging-heatmap" class="heatmap-grid" aria-label="Whether all 5 categories were logged, last 30 days"></div>
-          </article>
+            <article id="cn-tile-month" class="metric-card cn-tile" aria-labelledby="central-node-month-label">
+              <p class="cn-tile__question">What's on the month?</p>
+              <p class="metric-label" id="central-node-month-label">This Month</p>
+              <div data-central-node="this-month" class="prose-section"></div>
+            </article>
 
-          <article class="metric-card chart-card" aria-labelledby="central-node-trends-label">
-            <p class="metric-label" id="central-node-trends-label">Long-Term Trends</p>
-            <div data-central-node="long-term-trends" class="prose-section"></div>
-            <div class="trend-pair">
-              <div>
-                <h3>Exercise consistency</h3>
-                <div id="central-node-exercise-heatmap" class="heatmap-grid" aria-label="Whether a workout was completed, last 30 days"></div>
-              </div>
-              <div>
-                <h3>Eating target consistency</h3>
-                <div id="central-node-eating-heatmap" class="heatmap-grid" aria-label="Whether the protein target and fat ceiling were both met, last 30 days"></div>
-              </div>
-            </div>
-          </article>
+            <article id="cn-tile-trends" class="metric-card cn-tile" data-cn-span="2" aria-labelledby="central-node-trends-label">
+              <p class="cn-tile__question">Where is attention going?</p>
+              <p class="metric-label" id="central-node-trends-label">Long-Term Trends</p>
+              <p class="cn-tile__legend">Ribbon thickness is logging volume that week.</p>
+              <svg id="central-node-stream" class="cn-stream" viewBox="0 0 960 480" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Weekly logging volume by Life domain"></svg>
+              <div data-role="trend-scan"></div>
+              <button type="button" data-role="trend-more" hidden>More</button>
+              <div data-central-node="long-term-trends" class="prose-section" hidden></div>
+            </article>
 
-          <article class="metric-card" aria-labelledby="central-node-governance-label">
-            <p class="metric-label" id="central-node-governance-label">Governance Log</p>
-            <div data-central-node="governance-log" class="prose-section"></div>
-          </article>
+            <article id="cn-tile-radial" class="metric-card cn-tile" aria-labelledby="central-node-radial-label">
+              <p class="cn-tile__question">Who showed up this year?</p>
+              <p class="metric-label" id="central-node-radial-label">Year consistency</p>
+              <p class="cn-tile__legend">Inner logging · mid exercise · outer eating.</p>
+              <svg id="central-node-radial-year" class="cn-radial-year" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Logging, exercise, and eating hits around the year"></svg>
+            </article>
 
-          <article class="metric-card" aria-labelledby="central-node-cross-agent-label">
-            <p class="metric-label" id="central-node-cross-agent-label">Cross-Agent Coordination</p>
-            <div data-central-node="cross-agent" class="prose-section"></div>
-          </article>
+            <article id="cn-tile-governance" class="metric-card cn-tile" aria-labelledby="central-node-governance-label">
+              <p class="cn-tile__question">What's still open?</p>
+              <p class="metric-label" id="central-node-governance-label">Governance Log</p>
+              <p class="cn-tile__legend">Each row is an open item. Heat runs for every week it has already been open.</p>
+              <div id="central-node-governance-heat" class="cn-watchlist-heat" aria-label="Open governance item aging"></div>
+              <div data-central-node="governance-log" class="prose-section"></div>
+            </article>
 
-          <article class="metric-card" aria-labelledby="central-node-recent-actions-label">
-            <p class="metric-label" id="central-node-recent-actions-label">Recent Agent Actions</p>
-            <div data-central-node="recent-actions" class="prose-section"></div>
-          </article>
+            <article id="cn-tile-cross-agent" class="metric-card cn-tile" aria-labelledby="central-node-cross-agent-label">
+              <p class="cn-tile__question">Who is handing off to whom?</p>
+              <p class="metric-label" id="central-node-cross-agent-label">Cross-Agent Coordination</p>
+              <p class="cn-tile__legend">Arc is an agent. Ribbon is a handoff. Focus a mark to read the lines.</p>
+              <svg id="central-node-chord" class="cn-chord" viewBox="0 0 360 360" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Who hands off to whom"></svg>
+              <p class="metric-caption" data-cn="chord-detail"></p>
+              <div data-central-node="cross-agent" class="prose-section" hidden></div>
+            </article>
 
-          <details class="metric-card constraints-card">
-            <summary>Constraints &amp; Priorities</summary>
-            <div data-central-node="constraints" class="prose-section"></div>
-          </details>
+            <article id="cn-tile-actions" class="metric-card cn-tile" aria-labelledby="central-node-recent-actions-label">
+              <p class="cn-tile__question">What just happened?</p>
+              <p class="metric-label" id="central-node-recent-actions-label">Recent Agent Actions</p>
+              <div data-central-node="recent-actions" class="prose-section"></div>
+            </article>
+
+            <details id="cn-tile-constraints" class="metric-card cn-tile constraints-card">
+              <summary>
+                <span class="cn-tile__question">What still binds?</span>
+                <span class="metric-label">Constraints &amp; Priorities</span>
+              </summary>
+              <div data-central-node="constraints" class="prose-section"></div>
+            </details>
+          </div>
 
           <button id="central-node-audit-button" class="cn-audit-button" type="button">Run audit</button>
           <button id="central-node-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Hammond">💬</button>

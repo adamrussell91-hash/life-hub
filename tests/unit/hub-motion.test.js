@@ -28,6 +28,17 @@ test('parseCountable reads dashboard numbers and leaves dates alone', () => {
   assert.equal(parseCountable('Live data ready'), null);
 });
 
+test('count overlay is hidden after the tick so totals do not ghost', async () => {
+  const css = await readFile(new URL('../../packages/design-kit/motion.css', import.meta.url), 'utf8');
+  const base = css.match(/\.hub-count__fx\s*\{([^}]+)\}/);
+  assert.ok(base, 'expected a .hub-count__fx rule');
+  assert.match(base[1], /display:\s*none/, 'overlay must stay hidden once the tick ends');
+
+  const ticking = css.match(/\.hub-count\.is-ticking\s*>\s*\.hub-count__fx\s*\{([^}]+)\}/);
+  assert.ok(ticking, 'expected the overlay to show only while .is-ticking');
+  assert.match(ticking[1], /display:\s*(?:block|inline-block)/);
+});
+
 test('Home shell loads the shared motion stylesheet and module', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const main = await readFile(new URL('../../apps/life/js/app/main.js', import.meta.url), 'utf8');
@@ -147,5 +158,19 @@ test('kit sign-in snippet and CSS no longer ship haze', async () => {
     assert.doesNotMatch(source, /sign-in__haze/);
     assert.doesNotMatch(source, /sign-in__bubble/);
     assert.doesNotMatch(source, /sign-in__sparkle/);
+  }
+});
+
+test('kit motion no longer ships a cursor-follow spotlight sheen', async () => {
+  const css = await readFile(new URL('../../packages/design-kit/motion.css', import.meta.url), 'utf8');
+  const motion = await readFile(new URL('../../packages/design-kit/js/hub-motion.js', import.meta.url), 'utf8');
+  const agents = await readFile(new URL('../../packages/design-kit/AGENTS.md', import.meta.url), 'utf8');
+
+  for (const source of [css, motion, agents]) {
+    assert.doesNotMatch(source, /hub-spotlight/);
+    assert.doesNotMatch(source, /hub-spot-x/);
+    assert.doesNotMatch(source, /hub-motion-spot/);
+    assert.doesNotMatch(source, /spotlight sheen/);
+    assert.doesNotMatch(source, /card sheen/);
   }
 });

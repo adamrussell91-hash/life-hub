@@ -1,5 +1,5 @@
-/* Shared hub motion — CountUp, fade/reveal, spotlight sheen, list stagger,
- * magnet, opt-in kinetic text. Strength is the same on every hub. Overlays
+/* Shared hub motion — CountUp, fade/reveal, list stagger, magnet,
+ * opt-in kinetic text. Strength is the same on every hub. Overlays
  * still control glass density only. Respects prefers-reduced-motion.
  */
 
@@ -7,34 +7,8 @@
   --hub-motion-duration: 420ms;
   --hub-motion-count: 560ms;
   --hub-motion-stagger: 45ms;
-  --hub-motion-spot: color-mix(in srgb, var(--wave) 14%, transparent);
   --hub-motion-lift: 8px;
   --hub-motion-magnet: 5px;
-}
-
-.hub-spotlight {
-  position: relative;
-  isolation: isolate;
-}
-
-.hub-spotlight::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0;
-  background: radial-gradient(
-    16rem circle at var(--hub-spot-x, 50%) var(--hub-spot-y, 50%),
-    var(--hub-motion-spot),
-    transparent 70%
-  );
-  transition: opacity 180ms ease;
-}
-
-.hub-spotlight:hover::after {
-  opacity: 1;
 }
 
 .hub-reveal {
@@ -71,6 +45,7 @@
 }
 
 .hub-count__fx {
+  display: none;
   position: absolute;
   left: 0;
   top: 0;
@@ -79,6 +54,10 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
   white-space: nowrap;
+}
+
+.hub-count.is-ticking > .hub-count__fx {
+  display: block;
 }
 
 .hub-list-item {
@@ -245,7 +224,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hub-spotlight::after,
   .hub-reveal,
   .hub-magnet,
   .hub-list-item,
@@ -266,7 +244,8 @@
     color: inherit;
   }
 
-  .hub-count__fx {
+  .hub-count__fx,
+  .hub-count.is-ticking > .hub-count__fx {
     display: none;
   }
 }

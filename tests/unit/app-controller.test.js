@@ -329,6 +329,11 @@ function harness(options = {}) {
       calls.centralNodeRenders = (calls.centralNodeRenders ?? 0) + 1;
       documentRoot.querySelector('#central-node-dashboard').hidden = false;
     },
+    renderGovernance(...args) {
+      calls.governanceRenders = (calls.governanceRenders ?? 0) + 1;
+      options.renderGovernance?.(...args);
+    },
+    packCnBoard: options.packCnBoard,
     agentColour: (agentsConfig, slug) => `#colour-for-${slug}`,
     chatClearUnread: () => {
       calls.chatClearUnreads = (calls.chatClearUnreads ?? 0) + 1;
@@ -1084,6 +1089,17 @@ test('clicking the Central Node nav item shows the dashboard and builds/renders 
   assert.equal(state.root.querySelector('#home-dashboard').hidden, true);
   assert.equal(state.calls.centralNodeRenders, 1);
   assert.equal(state.controller.getCurrentSection(), 'central-node');
+});
+
+test('packs the central node board after rendering governance', async () => {
+  const order = [];
+  const state = harness({
+    renderGovernance() { order.push('governance'); },
+    packCnBoard() { order.push('pack'); }
+  });
+  await state.controller.start();
+  state.root.centralNodeNavigation.dispatchEvent(new Event('click'));
+  assert.deepEqual(order, ['governance', 'pack']);
 });
 
 test('the Central Node floating chat button opens the chat panel into its section, themed with Hammond\'s colour', async () => {
