@@ -1,0 +1,155 @@
+---
+description: First-pass correctness. Prove the requested outcome through the real path before claiming the work is done.
+globs:
+alwaysApply: true
+---
+
+# First-pass correctness
+
+Working software is the acceptance criterion.
+
+A task is not complete because the code compiles, the diff looks sensible, or one unit test passes.
+
+Understand the requested outcome, trace the actual system involved, implement the smallest correct change, then personally exercise the result through the real path before claiming it works.
+
+Ponytail still applies. This rule does not ask for more tests, more files, or more process. It forbids treating a plausible diff as done.
+
+## Implement outcomes, not plausible diffs
+
+Before editing, determine what the user will actually do to observe success.
+
+For non-trivial work, identify the entry point, the affected runtime path, the state or data involved, the observable result, and the contracts that must remain intact.
+
+Do not implement from the named file alone if behaviour crosses files, modules, APIs, storage, routing, state, or UI. Trace the actual path far enough to understand it.
+
+## Inspect before inventing
+
+Before creating a component, helper, API, state mechanism, parser, CSS convention, or abstraction:
+
+1. Search for the existing equivalent.
+2. Find a nearby working example when one exists.
+3. Follow the established pattern unless the task requires changing it.
+
+For UI, inspect the real design-kit implementation and a working comparable surface. For API or data, inspect caller and callee plus a working route. For state, inspect creation, transformation, persistence, restoration, and rendering.
+
+Do not guess contracts that can be read.
+
+## Validate boundaries
+
+First-pass failures cluster at boundaries. Check those the task touches, as applicable:
+
+- browser ↔ UI state
+- UI ↔ event handlers
+- module ↔ module
+- frontend ↔ API
+- API ↔ auth/session
+- API ↔ life-hub-data
+- parser ↔ real payload
+- route ↔ direct navigation
+- desktop ↔ mobile
+- initial load ↔ refresh/remount
+- empty ↔ populated
+- success ↔ error
+- read ↔ write confirmation
+- build-time ↔ runtime
+- GitHub Pages ↔ Netlify Functions
+
+Do not assume matching names imply matching shapes. Read real values, schemas, fixtures, callers, or responses.
+
+## Exercise the real user path
+
+For every non-trivial implementation, verify at the highest practical fidelity:
+
+1. Existing browser or E2E test covering the real behaviour.
+2. Existing integration test across the boundary.
+3. Runnable app with the affected path exercised directly.
+4. Focused executable reproduction or check if those are unavailable.
+5. Unit test only when behaviour genuinely lives at a unit seam.
+
+A unit test is not sufficient evidence for a browser interaction that can be exercised in the browser. A successful build is not sufficient evidence for runtime behaviour. Static inspection is not sufficient evidence for interaction. A mocked happy path is not sufficient for a real integration when the real integration can reasonably be exercised.
+
+## Test the exact requested outcome
+
+Do not substitute an adjacent test.
+
+- Button should act → click it.
+- Page should load → navigate to it.
+- Value should persist → change it, reload or remount, confirm it remains.
+- Mobile should work → exercise the relevant mobile viewport.
+- API flow should work → exercise the caller through the API boundary where practical.
+- Confirmation flow should work → perform the entire flow.
+- Visual alignment or visibility → inspect the rendered result, not only CSS.
+
+The verification target is the user's observable outcome.
+
+## Check the obvious neighbour
+
+For non-trivial behavioural changes, verify the happy path and the most obvious adjacent failure or regression. Examples: successful and failed write; populated and empty; signed-in and unauthorised if auth was touched; desktop and relevant mobile if responsive UI was touched; initial action and refresh if persistence was touched.
+
+Do not manufacture an exhaustive matrix. This is minimal sanity around the changed contract.
+
+## Ban "should work" as completion evidence
+
+Never use "this should work", "this ought to fix it", "looks correct", or "likely resolved" as the completion standard when the result can be run.
+
+Run it.
+
+Report behaviour as verified only when the relevant check actually passed. If the environment genuinely prevents verification, state exactly what was not verified, why, what evidence was verified instead, and what remains risky. Inability to test does not become confidence.
+
+## First failure triggers diagnosis, not patch roulette
+
+If the implementation fails its first real verification, stop speculative patching.
+
+For non-trivial failures, invoke `diagnosing-bugs`.
+
+Do not enter: edit → hope → rerun → edit → hope → rerun.
+
+Use: reproduce → minimise → hypothesise → instrument → fix → rerun the original path → regression check.
+
+A failed implementation means an assumption was wrong. Find it. Do not stack compensating patches.
+
+## Preserve surrounding behaviour
+
+Before changing a shared surface, identify what already works around it. After the change, the requested behaviour must work without breaking the established nearby contract, especially shared chat or runtime, design-kit components, routing, auth/session, confirmations, transforms, shared APIs, responsive chrome, and persistence.
+
+Do not special-case one path in a way that breaks the general mechanism.
+
+## No hidden fallback that masks failure
+
+Do not fake success by swallowing errors, serving placeholder or stale data, bypassing validation, auth, or confirmation, hardcoding a one-off result, catching without handling, or weakening tests. Fallbacks must be intentional product behaviour.
+
+## Appropriate evidence, not verification bureaucracy
+
+For trivial work, use trivial verification. Do not create Playwright infrastructure for a typo, add a test framework, create a verification document per task, or leave permanent one-off harnesses without lasting value.
+
+## Definition of done
+
+For non-trivial implementation work, do not call the task complete until:
+
+1. The requested observable outcome is understood.
+2. Relevant existing patterns were inspected.
+3. The runtime or data path was traced enough to avoid guessing.
+4. The smallest correct implementation was made.
+5. Relevant repository checks pass.
+6. The actual user path was exercised at the highest practical fidelity.
+7. The requested outcome was observed.
+8. The most obvious neighbouring regression was checked.
+9. Temporary instrumentation and harnesses were removed.
+10. No errors were hidden to manufacture success.
+11. No unrelated cleanup or architecture work was added.
+12. The final report distinguishes verified from unverified behaviour.
+
+If 6 or 7 cannot be completed due to a genuine environment limitation, report not fully verified, not "done."
+
+For AI-agent work, this expands to `.cursor/rules/agent-context-integrity.mdc`. An agent feature is not complete because data saved, retrieval returned it, an API returned 200, a prompt contained a field, or a model returned text.
+
+## Final implementation reports
+
+Keep them short and evidential:
+
+- Verified: [exact user path]
+- Checks: [commands or tests actually run]
+- Result: [observable result]
+- Not verified: [only when genuinely not exercised]
+
+Do not claim success from code inspection alone.

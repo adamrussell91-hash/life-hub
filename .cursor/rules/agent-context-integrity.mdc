@@ -1,0 +1,151 @@
+---
+description: AI agent context integrity. Intended information must reach the correct agent through the real path and change behaviour.
+globs:
+alwaysApply: true
+---
+
+# AI agent context integrity
+
+Life Hub agent workflows can look technically healthy while being behaviourally broken. A flag can save, an endpoint can return 200, a model can respond, and the agent may never have received or used the information that was supposed to shape its answer.
+
+For any change involving personality agents, memory, flags, retrieved context, user state, diary or context data, tool results, preferences, instructions, or other model inputs, end-to-end context integrity is part of correctness.
+
+This sits beside first-pass correctness. It does not replace it.
+
+## Trace context all the way to the model
+
+For every relevant context item, trace:
+
+source → write/storage → retrieval → filtering/selection → context assembly → serialization → final model request → model behaviour
+
+Do not stop because the value exists in storage, appears in an API response, or exists in an intermediate JavaScript object.
+
+If the feature says Chadwick should know about a pain flag, prove that the pain flag reaches Chadwick's actual model request.
+
+## Verify four separate contracts
+
+Every agent-context feature must satisfy:
+
+1. **Availability** — the intended information was stored or retrieved and is available where context is assembled.
+2. **Delivery** — the intended information is present in the final context or request sent down the relevant agent or model path.
+3. **Interpretation** — the applicable instructions make clear what the information means and how it should affect the agent. Dumping an opaque field into context is not enough.
+4. **Behaviour** — the resulting agent behaviour shows the information was taken into account when it is relevant.
+
+Do not collapse these into one test.
+
+A 200 response proves transport success only.
+
+`prompt contains painFlag` proves delivery, not interpretation or behaviour.
+
+## Verify the actual personality path
+
+Do not assume all personalities share the same context pipeline.
+
+For a change affecting a named agent:
+
+1. Trace that agent's actual route.
+2. Trace its personality and system instructions.
+3. Trace shared and agent-specific context assembly.
+4. Trace model or provider selection.
+5. Trace tool or retrieval augmentation.
+6. Inspect the final request boundary.
+7. Exercise the named personality itself.
+
+A passing test for Clare does not prove Chadwick receives the same context.
+
+A passing generic-agent test does not prove a personality-specific branch works.
+
+## Context precedence is part of correctness
+
+Presence alone is insufficient.
+
+Inspect whether relevant context is overridden by later instructions, buried behind conflicting system or personality rules, transformed into an ambiguous form, labelled incorrectly, filtered out by relevance logic, truncated, deduplicated incorrectly, attached to the wrong role or message, sent only on some model or provider paths, or omitted during streaming or tool-continuation turns.
+
+Where instruction precedence matters, verify that the intended priority is preserved.
+
+## Multi-turn and tool-call continuity
+
+When the feature is expected to survive across turns or tool calls, verify that it does.
+
+As applicable, test: initial user turn → context assembly → model or tool call → tool result → continuation model call → final response.
+
+Do not prove context exists on the first request and assume it survives the continuation.
+
+If a flag should affect later messages, exercise a later message.
+
+## Test semantic behaviour without brittle exact prose
+
+Do not assert exact generated sentences unless exact wording is itself the requirement.
+
+Use deterministic prompt and context tests for availability, delivery, precedence, routing, and serialization.
+
+For behaviour, use the strongest practical semantic acceptance check.
+
+A behavioural fixture should establish a context condition with an obvious intended consequence and verify that the response respects that consequence.
+
+Example:
+
+- Given: Chadwick receives an active pain flag relevant to the user's proposed activity.
+- Not sufficient: Chadwick returns a response.
+- Not sufficient: the final prompt contains the words "pain flag".
+- Required: Chadwick's response does not proceed as though the flag does not exist, and it incorporates the constraint according to Chadwick's defined role.
+
+Do not overfit to one sentence or phrase.
+
+## Negative controls
+
+For important agent-context features, include a minimal negative or control case where practical.
+
+Example: with the relevant pain flag, agent behaviour reflects the constraint; without it, the agent is not falsely told that the constraint exists.
+
+This catches hardcoded behaviour and accidental always-on context.
+
+Do not build giant evaluation suites for every flag.
+
+## No silent context loss
+
+Do not silently drop context because a field is undefined on one path, a serializer only handles older fields, a filter does not recognise the new type, a token-budget reducer removes it, a model-specific adapter uses another shape, a tool continuation rebuilds context differently, a personality override replaces rather than composes shared context, or a fallback model path has a separate prompt builder.
+
+If context is intentionally excluded, that must be explicit product logic.
+
+## No fake agent correctness
+
+Do not make an agent test pass by hardcoding the expected response, special-casing the fixture, asserting only HTTP or model success, asserting only storage or retrieval success, asserting only prompt inclusion, mocking away the exact context boundary under test, weakening personality behaviour, removing conflicting context instead of fixing precedence, or bypassing the real agent route.
+
+Test the contract at the layer where it can actually fail.
+
+## Observability for agent pipelines
+
+When debugging agent context, make invisible state inspectable using existing safe mechanisms or temporary instrumentation.
+
+Be able to answer: what was retrieved; what was filtered out and why; what context block was assembled; which personality instructions were active; which model or provider path ran; what was actually sent at the final model boundary; what changed across tool continuations; which relevant context should have affected the answer.
+
+Never expose secrets, credentials, private tokens, or unnecessary sensitive content in logs.
+
+Remove temporary instrumentation after verification unless it has durable diagnostic value.
+
+## Agent workflow definition of done
+
+For any non-trivial agent-context change, completion requires evidence for all applicable stages:
+
+stored/available → retrieved → selected → assembled → delivered to the correct agent/model path → precedence correct → behaviour reflects it
+
+If any stage is not verified, report the feature as not fully verified.
+
+## Regression principle
+
+When an agent-context bug is found, leave a regression check at the narrowest useful seam so the same class of context loss cannot silently return.
+
+Prefer deterministic checks for routing and context assembly plus one focused behavioural acceptance check where practical.
+
+Do not create a huge AI-evaluation framework unless separately approved.
+
+## Agent failure triggers diagnosing-bugs
+
+If the agent ignores context during verification, do not immediately add stronger prompt wording.
+
+First determine where the contract failed: unavailable data, wrong retrieval, wrong filtering, wrong assembly, wrong serialization, wrong personality or model path, wrong precedence, context lost on a continuation, or delivery correct but interpretation inadequate.
+
+For non-trivial failures, invoke `diagnosing-bugs`.
+
+Prompt strengthening is a fix only when evidence shows prompt interpretation is the failed seam.
