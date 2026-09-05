@@ -104,6 +104,24 @@ test('every agent gets os.propose-action plus domain shortcuts', () => {
   assert.ok(!hammond.includes('log.entry'));
   // Shared OS floor — CN loan is universal; Hammond also keeps direct CN patch.
   assert.ok(hammond.includes('coordinate.request-cn-write'));
+
+  assert.ok(capabilityIdsForAgent('clare').includes('publish.cn-patch'));
+  assert.ok(capabilityIdsForAgent('ann').includes('publish.cn-patch'));
+  assert.ok(!capabilityIdsForAgent('clementine').includes('publish.cn-patch'));
+});
+
+test('buildAgentTools registers CN patch for clare and ann without needsHammondTools', () => {
+  resetCapabilityCaches();
+  const clare = buildAgentTools({ slug: 'clare' });
+  assert.ok(clare.some(tool => tool.name === 'propose_central_node_patch'));
+  assert.ok(!clare.some(tool => tool.name === 'append_governance_log'));
+
+  const ann = buildAgentTools({ slug: 'ann' });
+  assert.ok(ann.some(tool => tool.name === 'propose_central_node_patch'));
+  assert.ok(!ann.some(tool => tool.name === 'append_governance_log'));
+
+  const brisket = buildAgentTools({ slug: 'brisket', allowedTypes: ['meal'] });
+  assert.ok(!brisket.some(tool => tool.name === 'propose_central_node_patch'));
 });
 
 test('OS floor is identical for every agents.yml roster member', () => {

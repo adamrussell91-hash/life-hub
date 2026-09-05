@@ -93,7 +93,8 @@ import {
   validateCentralNodePatchInput,
   validateGovernanceLogAppendInput,
   classifyCentralNodePatchRisk,
-  applyCentralNodePatch
+  applyCentralNodePatch,
+  assertAgentMayApplyCentralNodePatch
 } from './_shared/hammond-tools.mjs';
 import {
   PENDING_CN_PATCHES_PATH,
@@ -278,7 +279,10 @@ export function createChatHandler({
       : Promise.resolve('');
     const needsNutritionChallenges = slug === 'brisket';
     // Brisket writes challenge scoreboards onto Central Node; keep markdown mutable.
-    const needsCentralNodeWrite = needsHammondTools || needsNutritionChallenges;
+    const needsCentralNodeWrite = needsHammondTools
+      || needsNutritionChallenges
+      || slug === 'clare'
+      || slug === 'ann';
     const needsBodyState = slug === 'chadwick' || slug === 'brisket' || slug === 'sara';
     const needsSaraMedical = slug === 'sara';
     const needsMindDigest = slug === 'vera' || slug === 'penelope';
@@ -1305,6 +1309,9 @@ export function createChatHandler({
                 if (!patch) {
                   return JSON.stringify({ ok: false, error: 'invalid_patch' });
                 }
+                if (!assertAgentMayApplyCentralNodePatch(slug, patch)) {
+                  return JSON.stringify({ ok: false, error: 'patch_not_allowed' });
+                }
                 const risk = classifyCentralNodePatchRisk(patch);
                 if (risk === 'confirm') {
                   // Anthropic client swallows tool_call when executeTools returns
@@ -1443,7 +1450,7 @@ export function createChatHandler({
               }
             } else if (event.type === 'tool_call' && event.name === 'propose_central_node_patch') {
               const patch = validateCentralNodePatchInput(event.input);
-              if (patch && classifyCentralNodePatchRisk(patch) === 'confirm') {
+              if (patch && assertAgentMayApplyCentralNodePatch(slug, patch) && classifyCentralNodePatchRisk(patch) === 'confirm') {
                 await proposeCentralNodePatch(patch);
               } else {
                 send(event);
