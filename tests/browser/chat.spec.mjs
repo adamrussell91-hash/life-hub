@@ -163,6 +163,10 @@ test('mobile Chat tab and overlay keep send beside the field', async () => {
   assert.equal(await view.getAttribute('data-panel-mode'), 'overlay');
   assert.equal(await page.locator('#chat-close').isVisible(), true);
   assert.match(await page.locator('#chat-who').innerText(), /Brisket/i);
+  const whoBox = await page.locator('#chat-who').boundingBox();
+  const closeBox = await page.locator('#chat-close').boundingBox();
+  assert.ok(whoBox && closeBox);
+  assert.ok(Math.abs(closeBox.y - whoBox.y) < 36, 'Close stays on the overlay toolbar row');
 
   inputBox = await page.locator('#chat-input').boundingBox();
   sendBox = await page.locator('#chat-send').boundingBox();

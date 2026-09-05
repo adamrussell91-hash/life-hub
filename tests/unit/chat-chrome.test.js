@@ -74,7 +74,8 @@ test('toggleChatChrome reveals protocol trays', () => {
   syncChatChrome(view);
   toggleChatChrome(view);
   assert.equal(view.dataset.chromeExpanded, 'true');
-  assert.equal(view.querySelector('#chat-tools').textContent, 'Hide tools');
+  assert.equal(view.querySelector('#chat-tools').textContent, 'Tools');
+  assert.equal(view.querySelector('#chat-tools').getAttribute('aria-expanded'), 'true');
   toggleChatChrome(view);
   assert.equal(view.dataset.chromeExpanded, undefined);
 });

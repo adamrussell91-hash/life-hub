@@ -18,7 +18,7 @@ export function syncChatChrome(root) {
     tools.hidden = !engaged;
     const expanded = view.dataset?.chromeExpanded === 'true';
     tools.setAttribute?.('aria-expanded', String(expanded));
-    tools.textContent = expanded ? 'Hide tools' : 'Tools';
+    tools.textContent = 'Tools';
   }
 
   syncChatEmpty(view);
