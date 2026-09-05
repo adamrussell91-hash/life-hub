@@ -2,7 +2,7 @@
 
 Read `AGENTS.md` first. This file is the extra brief for **Tasks Hub only**. It does not unlock a new palette, type scale, rail, or button system.
 
-Chrome is Teaching. Product surfaces (board, graph, charts) stay in the hub. Data models and persistence are out of scope here.
+Chrome is Teaching. Board / Graph / Charts are Tasks surfaces; their **look** comes from `CHARTS.md`, not a Tasks-only viz kit. Data models and persistence are out of scope here.
 
 Canonical kit: `/Users/adamrussell/Projects/hub-design-kit`  
 Tasks Hub: `/Users/adamrussell/Projects/tasks-hub`
@@ -31,28 +31,9 @@ Agent writes: propose → **confirm card** → apply.
 
 Status colour uses existing tokens only: Wave, Marine, Depth, pastel chips. High Sea is accent / decisive, never body text on orange, never focus rings.
 
-## Borrow — do not redraw
+## Charts and graphs
 
-Copy interaction and rendering from hubs that already have it. Restyle with kit tokens if a copied stylesheet hard-codes hex. Do not invent a Tasks graph library or a new chart look.
-
-**Graphs (Knowledge Hub)**
-
-- Force layout: `src/archive/forceGraph.ts`
-- Focus / search / selection colouring: `src/archive/graphFocus.ts`
-- Model shape (adapt nodes/edges; do not keep note/keyword semantics): `src/archive/keywordGraph.ts`
-
-Use Knowledge’s habits: search field, select a node, preview card. Universe / fake-sun modes are Knowledge product, not a Tasks requirement.
-
-Path: `/Users/adamrussell/Projects/knowledge-hub`
-
-**Charts (Life Hub)**
-
-- Kit root: `js/app/chart-kit/`
-- Prefer **ring**, **columns**, **area-line** for board metrics. Reach for heatmap / pie / sankey / etc. only when the same chart type already exists there and fits the data.
-
-Path: `/Users/adamrussell/Projects/life-hub`
-
-Graph and chart CSS belongs in the hub (or a copy of those modules). Do not add viz packages to this design-kit repo in this pass.
+Read `CHARTS.md`. That is the library. Do not invent a Tasks graph kit or a new chart look. Do not open Life or Knowledge unless `CHARTS.md` names a specific module.
 
 ## Hard rules
 

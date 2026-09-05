@@ -1,234 +1,190 @@
-# Charts and graphs — current paths and borrow rules
+# Charts and graphs — design-kit library
 
-Copy-paste brief. Checked against `life-hub` `origin/main` at `c9719fc` (5 Sep 2026).
+**Read this file. Do not hunt Life, Knowledge, Tasks, Teaching, or old specs for a chart or graph look.**
 
-The design kit does **not** ship chart or graph components. Product viz stays in the hubs. Borrow Life charts and Knowledge graphs. Restyle with kit tokens. Do not invent a new look. Do not add viz packages to this kit.
+This is the one source of truth for hub charts and graphs. Same job as `tokens.css` for colour and `RAIL.md` for the rail: a closed library. Pick a type from the catalog. Import from the implementation root listed. If the type is not here, do not invent one.
 
----
-
-## Where the instructions live
-
-Canonical kit on Adam’s Mac: `/Users/adamrussell/Projects/hub-design-kit`  
-Live SoT in this monorepo: `packages/design-kit/`  
-GitHub `hub-design-kit` repo named in older docs is not reachable (404). Use the in-repo kit.
-
-| File | Role |
-|------|------|
-| `packages/design-kit/AGENTS.md` | Read first. Tasks agents also read `TASKS.md`. **“Product UI (graphs, lesson blocks, bloods) stays in the hub. Chrome does not.”** |
-| `packages/design-kit/TASKS.md` | Borrow brief (full text below). Chrome = Teaching. Board / Graph / Charts stay in the hub. |
-| `packages/design-kit/RAIL.md` | Graph is a **rail page**, not a shortcut: icon + “Graph” label. Domain colour on the **canvas** (tiles, charts, chips), not the rail. |
-| `packages/design-kit/MOBILE.md` | Knowledge phone destinations include Graph. |
-| `packages/design-kit/README.md` | Kit inventory. Charts/graphs are not listed. |
-| `packages/design-kit/tokens.css` | Closed colours charts must use. |
-| `packages/design-kit/snippets/rail.html` | Only Graph **chrome** in the kit: icon + “Graph” link. |
-| `docs/design-kit-compliance.md` | Remaining hex in charts is allowed as domain UI. |
-
-`AGENTS.md` grab-list has no chart CSS/JS. Latest kit additions (toast, AI bar, inline edit, command search, surfaces) are not viz.
+Implementation still lives in one root per family (Life chart-kit, Knowledge archive graph). Those roots are the library code. This file is the catalog, the rules, and the log. When a type is added, changed, or retired, update **this file in the same PR**.
 
 ---
 
-## Paths (standalone Mac vs this monorepo)
+## Agent rule
 
-`TASKS.md` still uses standalone-repo paths. In the monorepo they live under `apps/`.
+1. Open `packages/design-kit/CHARTS.md` (this file).
+2. Choose a catalog id.
+3. Import the listed export from the listed root.
+4. Use kit tokens (`tokens.css`). Clinical series: `CLINICAL_CHART_SLOTS`.
+5. Stop.
 
-| What | `TASKS.md` / Mac path | Monorepo path |
-|------|------------------------|---------------|
-| Design kit | `/Users/adamrussell/Projects/hub-design-kit` | `packages/design-kit/` |
-| Life Hub | `/Users/adamrussell/Projects/life-hub` | `apps/life/` |
-| Life charts | `js/app/chart-kit/` | `apps/life/js/app/chart-kit/` |
-| Knowledge Hub | `/Users/adamrussell/Projects/knowledge-hub` | `apps/knowledge/` |
-| Knowledge graphs | `src/archive/forceGraph.ts` etc. | `apps/knowledge/src/archive/` |
-| Tasks Hub | `/Users/adamrussell/Projects/tasks-hub` | `apps/tasks/` |
+Do not open `TASKS.md` for viz. Do not copy hex from a screenshot. Do not start a second chart library in a hub.
 
-Teaching / Knowledge / Tasks symlink `design-kit/` → `packages/design-kit`. Life loads `packages/design-kit/` directly.
+New type? Add the module under the implementation root **and** a row + log entry here. Same PR. Otherwise it does not exist.
 
 ---
 
-## Borrow — do not redraw
+## Implementation roots
 
-Copy interaction and rendering from hubs that already have it. Restyle with kit tokens if a copied stylesheet hard-codes hex. Do not invent a Tasks graph library or a new chart look.
+| Family | Root | Use |
+|--------|------|-----|
+| **Charts** | `apps/life/js/app/chart-kit/` | Geometry + motion. Prefer ring, columns, area-line. |
+| **Graphs** | `apps/knowledge/src/archive/` | Force canvas, focus/search colour, node/edge model, preview card. |
 
-### Graphs (Knowledge Hub)
+Hub copies (`apps/tasks/src/chart-kit/`, `apps/tasks/src/blocks/*graph*`, `apps/teaching/src/blocks/*graph*`) are **consumers**. Restyle with tokens if they still hard-code hex. Do not treat them as a second library.
 
-- Force layout: `src/archive/forceGraph.ts` → `apps/knowledge/src/archive/forceGraph.ts`
-- Focus / search / selection colouring: `src/archive/graphFocus.ts` → `apps/knowledge/src/archive/graphFocus.ts`
-- Model shape (adapt nodes/edges; do not keep note/keyword semantics): `src/archive/keywordGraph.ts` → `apps/knowledge/src/archive/keywordGraph.ts`
-
-Keep Knowledge habits: search field, select a node, preview card.
-
-Universe / fake-sun modes are Knowledge product, not a Tasks requirement.
-
-### Charts (Life Hub)
-
-- Kit root: `js/app/chart-kit/` → `apps/life/js/app/chart-kit/`
-- Prefer **ring**, **columns**, **area-line** for board metrics.
-- Reach for heatmap / pie / sankey / etc. only when the same chart type already exists there and fits the data.
-
-Graph and chart CSS belongs in the hub (or a copy of those modules). Do not add viz packages to this design-kit repo.
-
-### Colour
-
-Status colour uses existing tokens only: Wave, Marine, Depth, pastel chips.
-
-- High Sea (`--high-sea`) is accent / decisive only.
-- Never body text on orange.
-- Never focus rings (focus is Wave).
-- Charts use `--high-sea-ink`, not `--high-sea`.
-
-Closed clinical series (`apps/life/js/app/chart-kit/clinical-slots.js`):
-
-```text
---wave
---marine
---success
---danger
---high-sea-ink
---pastel-sage-ink
---pastel-peach-ink
---muted
-```
-
-Colour write-ups: `docs/superpowers/specs/2026-07-31-life-hub-design.md` (Charts) and `docs/superpowers/specs/2026-08-16-mind-visual-restyle-design.md`.
+Standalone Mac paths (same files): Life `js/app/chart-kit/`, Knowledge `src/archive/`.
 
 ---
 
-## Tasks Hub surfaces (from `TASKS.md`)
+## Locked look
 
-| Surface | Role |
-|---------|------|
-| **Board** | Home. Task / project / excursion cards as Teaching tiles. |
-| **Graph** | A rail page, not home. Two modes: **blockers** (task nodes, blocked-by edges) and **workstreams** (clustered projects / areas). |
-| **Charts** | Blocks on the board (counts, trends). Not a third chrome system. |
-
-Shell: `<html lang="en" data-hub="tasks">` — clones Teaching glass/tiles. Rail brand returns to the board.
-
----
-
-## Life chart-kit inventory
-
-Root: `apps/life/js/app/chart-kit/`
-
-### Prefer first
-
-| File | Type |
-|------|------|
-| `ring.js` | Progress / target rings (`buildRingTarget`) |
-| `apply-ring.js` | Apply ring geometry to the DOM |
-| `columns.js` | Column / bar (`buildColumns`) |
-| `area-line.js` | Area + line (`buildAreaLine`) |
-| `animate.js` | Load animation + `prefers-reduced-motion` |
-
-### Also in the kit (only if the type already exists and fits)
-
-| File | Type |
-|------|------|
-| `pie.js` | Pie (`buildDistributionPie`, `buildMealProteinPie`) |
-| `mood-mix.js` | Mood mix donut |
-| `heatmap.js` | Heat row |
-| `watchlist-heat.js` | Watchlist heat |
-| `stream.js` | Stream / theme topography |
-| `sankey-flow.js` | Sankey |
-| `chord-layout.js` | Chord |
-| `bump.js` | Bump / ranking lines |
-| `horizon.js` | Horizon bands, metric strip, grouped bars |
-| `radial-year.js` | Radial year |
-| `polar-clock.js` | Polar clock |
-| `energy-orbit.js` | Energy orbit |
-| `mood-radial.js` | Mood radial |
-| `theme-orbit.js` | Theme orbit |
-| `theme-constellation.js` | Theme constellation |
-| `masonry.js` | Column packer |
-| `d3-layout.js` | d3 wrapper |
-| `clinical-slots.js` | Closed clinical colour slots |
-| `vendor/` | Vendored d3-shape, d3-sankey, d3-chord, d3-force (no CDN) |
-
-### Life consumers (not the kit)
-
-| File | Notes |
+| Rule | Detail |
 |------|--------|
-| `apps/life/js/app/nutrition-charts.js` | Nutrition |
-| `apps/life/js/app/bloods-charts.js` | Bloods |
-| `apps/life/js/app/bloods-charts-layout.js` | Bloods layout |
-| `apps/life/js/app/central-node-charts.js` | Central Node |
-| `apps/life/js/app/fitness-charts-model.js` | Fitness model |
-| `apps/life/js/app/render-fitness-charts.js` | Fitness week board (rings, pies, gated trends, volume bars) |
-| `apps/life/js/app/render-home.js` | Home rings |
-| `apps/life/js/app/render-nutrition.js` | Nutrition canvas |
-| `apps/life/js/app/render-mind.js` | Mind tiles |
-| `apps/life/js/app/render-skincare.js` | Skincare |
-| `apps/life/js/app/render-body.js` | Body |
-| `apps/life/js/app/render-bloods.js` | Bloods canvas |
-| `apps/life/js/app/render-central-node.js` | Central Node canvas |
+| Tokens only | `tokens.css`. Nearest token if something is missing. No new CSS variables unless you are editing the kit. |
+| Clinical series | `--wave`, `--marine`, `--success`, `--danger`, `--high-sea-ink`, `--pastel-sage-ink`, `--pastel-peach-ink`, `--muted` (`clinical-slots.js`) |
+| High Sea | `--high-sea` is accent / decisive only. Charts use `--high-sea-ink`. Never body text on orange. Never focus rings (focus is Wave). |
+| Motion | `animate.js`. Honour `prefers-reduced-motion`. Quiet ancestor: `[data-sync-quiet]`. |
+| Dates | Axis / labels that are calendar days: `dd/mm/yy` via `js/format-display-date.js`. |
+| Rail | Graph is a **page** (icon + “Graph”), not a shortcut. Domain colour on the canvas, never the rail. Snippet: `snippets/rail.html`. |
+| Chrome | Charts and graphs sit on hub tiles / glass. They are not a third chrome system. |
 
 ---
 
-## Knowledge graph inventory
+## Charts — prefer these
 
-Borrow these first (`TASKS.md`):
+Default for board metrics, counts, targets, trends.
 
-- `apps/knowledge/src/archive/forceGraph.ts`
-- `apps/knowledge/src/archive/graphFocus.ts`
-- `apps/knowledge/src/archive/keywordGraph.ts`
+### `ring` — progress against a target
 
-Related Knowledge product (not required for Tasks):
+- **When:** One value vs one target (macros, completion, streak toward a goal).
+- **Root:** `apps/life/js/app/chart-kit/ring.js`
+- **API:** `buildRingTarget({ value, target }, { size = 64, strokeWidth = 8 })` → `{ size, strokeWidth, center, radius, circumference, fraction, dashoffset, value, target }`. Fraction is capped at 1.
+- **DOM:** `applyRingTarget(svg, { value, target }, options)` in `apply-ring.js`. SVG needs `[data-role="track"]` and `[data-role="fill"]` circles. Fills with `animateRingFill`.
+- **Used on:** Home macros, Nutrition rings, Fitness labeled rings, Central Node completion, Tasks board copies.
 
-- `forceGraphBehavior.ts` — interaction
-- `graphPreview.ts` — preview card
-- `graphMetrics.ts` — layout metrics
-- `showAllGraph.ts`, `showAllDraw.ts`, `showAllEdges.ts`, `showAllSimulation.ts`, `showAllCommunities.ts`, `showAllScope.ts`, `showAllTransition.ts`
-- `solarModel.ts`, `solarView.ts`
-- `universeChrome.ts`, `universeKey.ts`
-- `constellationSimulation.ts`
+### `columns` — counts / comparison
 
-Docs:
+- **When:** A short set of labeled magnitudes (week volume, status counts, grouped totals).
+- **Root:** `apps/life/js/app/chart-kit/columns.js`
+- **API:** `buildColumns(items, { height = 96 })` where `items` are `{ key, label, value }`. Returns `{ height, bars: [{ key, label, value, heightPct }] }`.
+- **Motion:** `animateColumnGrow(element, heightPct)`.
+- **Used on:** Fitness volume, soft-medical columns, Tasks board, Central Node week bars.
 
-- `apps/knowledge/docs/GRAPH_LAYOUT_BRIEF.md`
-- `apps/knowledge/docs/GRAPH_LAYOUT_METRICS.md`
+### `area-line` — trend over a series
 
----
+- **When:** A time series (labs, weight, rolling intake). Irregular events: `straightLinePath`. Continuous signal: `smoothLinePath`.
+- **Root:** `apps/life/js/app/chart-kit/area-line.js`
+- **API:** `buildAreaLine(series, { width = 320, height = 120, padding = 12, paddingBottom, valueKey = 'value', rollingAverage = 0, guideValue, yDomain = 'zero' \| 'padded' \| 'fixed', includeValues, min, max })`. Also `smoothLinePath`, `straightLinePath`, `smoothAreaPath`.
+- **Motion:** `animateAreaReveal(svg)` — SVG `[data-role="line"]`.
+- **Used on:** Nutrition, Bloods, Body, Central Node.
 
-## Hub copies (product, not kit primitives)
+### `animate` — shared motion
 
-### Tasks
-
-- `apps/tasks/src/chart-kit/ring.ts`
-- `apps/tasks/src/chart-kit/apply-ring.ts`
-- `apps/tasks/src/chart-kit/columns.ts`
-- `apps/tasks/src/chart-kit/animate.ts`
-- `apps/tasks/src/blocks/chart-svg.ts`
-- `apps/tasks/src/blocks/graph-svg.ts`
-- `apps/tasks/src/blocks/graph-layout.ts`
-- `apps/tasks/src/views/graph.ts`
-- `apps/tasks/src/views/project-portfolio-chart.ts`
-
-### Teaching
-
-- `apps/teaching/src/blocks/chart-svg.ts`
-- `apps/teaching/src/blocks/graph-svg.ts`
-- `apps/teaching/src/blocks/graph-layout.ts`
-- `apps/teaching/src/blocks/graph-maker/graph-maker-engine.js`
-- `apps/teaching/src/blocks/graph-maker/content-adapters.ts`
-- `apps/teaching/src/blocks/graph-maker/mount.ts`
+- **Root:** `apps/life/js/app/chart-kit/animate.js`
+- **API:** `prefersReducedMotion()`, `animateRingFill(circle, { circumference, dashoffset })`, `animateAreaReveal(svg)`, `animateColumnGrow(element, heightPct)`.
 
 ---
 
-## Rail Graph chrome (only viz markup in the kit)
+## Charts — also in the library
 
-`packages/design-kit/snippets/rail.html` — `.hub-rail__link` to `/graph`, 18px outline icon (three nodes + edges) + title-case “Graph”.
+Use only when the data matches the type. Do not pick these for a generic count if ring / columns / area-line will do.
 
-Rules from `RAIL.md`:
-
-- Graph is a page, so it gets an icon. Not a shortcut.
-- No coloured dots or domain swatches on the rail.
-- Domain colour belongs on the canvas.
+| Id | When | Export | File |
+|----|------|--------|------|
+| `pie` | Parts of a whole (distribution, meal protein). | `buildDistributionPie(items, { size = 72 })`, `buildMealProteinPie(meals, { size })` | `pie.js` |
+| `mood-mix` | Mood mix donut. | `buildMoodMixDonut(items, { size, radius, gap })` | `mood-mix.js` |
+| `heatmap` | Day-hit row (consistency). | `buildHeatmapRow({ from, to, today, hitDates })` | `heatmap.js` |
+| `watchlist-heat` | Watchlist intensity. | `buildWatchlistHeat(series)`, `WATCHLIST_SLOTS`, `watchlistDelta` | `watchlist-heat.js` |
+| `stream` | Stacked theme flow over weeks. | `buildStreamPaths(weekly, { width, height, padding })`, `buildThemeTopography(weekly)` | `stream.js` |
+| `sankey` | Transition flows. | `buildSankeyFlow(transitions, { width, height })` | `sankey-flow.js` |
+| `chord` | Co-occurrence. | `buildChordLayout(cooccurrence)` | `chord-layout.js` |
+| `bump` | Rank over time. | `buildBumpChart(…)` / `buildBumpLines(ranks, themes, { width, height })` | `bump.js` |
+| `horizon` | Compact multi-metric bands / strip / grouped bars. | `buildHorizonBands`, `buildMetricStrip`, `buildGroupedMetricBars`, `moodLevelFromScore` | `horizon.js` |
+| `radial-year` | Year of daily hits. | `buildRadialYear({ year, byDate })` | `radial-year.js` |
+| `polar-clock` | Date → angle helpers for polar charts. | `thetaForDate`, `polar`, `windowDays`, `MONTHS`, … | `polar-clock.js` |
+| `energy-orbit` | Energy over a date window. | `buildEnergyOrbit(series, { bounds, range, previous })` | `energy-orbit.js` |
+| `mood-radial` | Mood over a date window. | `buildMoodRadial(series, { bounds, range })` | `mood-radial.js` |
+| `theme-orbit` | Theme arms from mean mood. | `buildThemeOrbit(themes)`, `THEME_ARMS`, `armForMeanMood` | `theme-orbit.js` |
+| `theme-constellation` | Theme co-occurrence map. | `buildThemeConstellation(…)`, `pairKey`, `neighborhood`, `arcFor` | `theme-constellation.js` |
+| `masonry` | Tile packer (Mind). | `packMasonry(items, { columns, gap, columnWidth, flowOffset })` | `masonry.js` |
+| `clinical-slots` | Closed multi-series colours. | `CLINICAL_CHART_SLOTS` | `clinical-slots.js` |
+| `d3-layout` | Vendored d3-shape / sankey / chord / force. No CDN. | `d3api()`, `stack`, `sankey`, `chord`, `forceSimulation` | `d3-layout.js`, `vendor/` |
 
 ---
 
-## Hard rules (do not skip)
+## Graphs — library (copy these habits)
 
-- Do not fork `--rail-width`. Every hub uses the 15rem labeled rail.
-- Tasks keeps Teaching frost. Do not flatten glass to Knowledge/Life.
-- If a size or colour is missing, pick the nearest token. Do not add a CSS variable unless you are editing the kit on purpose.
-- Do not start a new palette, font, or button style for a chart page.
-- Agent writes: propose → **confirm card** → apply.
-- Display dates: `dd/mm/yy` via `js/format-display-date.js`.
+Default for a hub Graph **page**: search, select a node, preview card. Two Tasks modes (blockers / workstreams) reuse this look with a different model.
+
+### `force-graph` — canvas layout + interaction
+
+- **When:** A node/edge page (Knowledge archive, Tasks blockers / workstreams).
+- **Root:** `apps/knowledge/src/archive/forceGraph.ts`
+- **API:** `mountForceGraph(host, model, handlers, options) → GraphMount`. Options: `{ variant, search, excerptFor }`. Handlers: `{ onNoteSelect }`.
+- **Behaviour helper:** `forceGraphBehavior.ts` (stage size, search attach, click/hover, show-all tuning). Do not rewrite force physics.
+
+### `graph-focus` — search and selection colour
+
+- **When:** Colouring the graph from a query or a selected node.
+- **Root:** `apps/knowledge/src/archive/graphFocus.ts`
+- **API:** `nodeMatchesQuery`, `searchCluster`, `selectionCluster`, `isFocusLink`, `isFocusNode`, `isSearchHot`.
+
+### `graph-model` — nodes and edges
+
+- **When:** Building the model you pass to `mountForceGraph`. Adapt kinds; drop note/keyword semantics if the hub is not Knowledge.
+- **Root:** `apps/knowledge/src/archive/keywordGraph.ts`
+- **API:** `buildArchiveGraph(entries) → ArchiveGraphModel`. Types: `GraphNodeDatum`, `GraphLinkDatum`, `GraphNodeKind` (`major` \| `minor` \| `leaf`), `GraphLinkKind` (`backbone` \| `orbit` \| `spoke` \| `overlap`). Constellation helpers: `applyConstellationHubClick`, `collapseConstellation`, `placeHubLeaves`.
+
+### `graph-preview` — selected-node card
+
+- **When:** The side card after a node click.
+- **Root:** `apps/knowledge/src/archive/graphPreview.ts`
+- **API:** `mountGraphPreview(host, handlers)`.
+
+---
+
+## Graphs — Knowledge product only
+
+Do **not** copy these onto Tasks or Teaching unless you add them to the library section above and log it.
+
+- Show-all: `showAllGraph.ts`, `showAllDraw.ts`, `showAllEdges.ts`, `showAllSimulation.ts`, `showAllCommunities.ts`, `showAllScope.ts`, `showAllTransition.ts`
+- Universe / solar: `solarModel.ts`, `solarView.ts`, `universeChrome.ts`, `universeKey.ts`
+- Layout notes (Knowledge): `apps/knowledge/docs/GRAPH_LAYOUT_BRIEF.md`, `GRAPH_LAYOUT_METRICS.md`
+
+---
+
+## Where each hub consumes the library
+
+Consumers are not a second catalog. Open them only to wire data, not to restyle.
+
+| Hub | Charts | Graphs |
+|-----|--------|--------|
+| Life | `nutrition-charts.js`, `bloods-charts.js`, `central-node-charts.js`, `fitness-charts-model.js`, `render-fitness-charts.js`, `render-home.js`, `render-nutrition.js`, `render-mind.js`, `render-skincare.js`, `render-body.js`, `render-bloods.js`, `render-central-node.js` (all under `apps/life/js/app/`) | — |
+| Knowledge | — | `apps/knowledge/src/archive/` (library root) |
+| Tasks | `apps/tasks/src/chart-kit/{ring,apply-ring,columns,animate}.ts`, `blocks/chart-svg.ts`, `views/project-portfolio-chart.ts` | `apps/tasks/src/views/graph.ts`, `blocks/graph-svg.ts`, `blocks/graph-layout.ts` — blockers + workstreams |
+| Teaching | `apps/teaching/src/blocks/chart-svg.ts` | `blocks/graph-svg.ts`, `graph-layout.ts`, `graph-maker/` |
+
+Tasks Graph is a rail page, not home. Charts on Tasks are board blocks (counts, trends).
+
+---
+
+## How to add or change a type
+
+1. Edit the module under the implementation root (or add one file there).
+2. Add or edit the row in this file (id, when, export, path).
+3. Append a **Log** line below (date, id, what changed).
+4. Same PR. If it is not in this file, the next agent must not use it.
+
+Retire a type by marking the row **retired** and logging it. Leave the id so nobody reintroduces a look-alike.
+
+---
+
+## Log
+
+Newest first. This is the running record of the library.
+
+| Date | Id | Change |
+|------|----|--------|
+| 2026-09-05 | library | `CHARTS.md` is the design-kit source of truth. Agents stop being sent to Life / Knowledge / TASKS.md for viz. Implementation roots unchanged. |
+| 2026-09-05 | `ring` `pie` `columns` | Fitness week board consumes labeled rings, pies, gated trends, denser volume bars. No new types. |
+| 2026-09-01 | chart-kit | Life chart-kit remounted to `apps/life/js/app/chart-kit/` in the monorepo. Catalog ids already in that tree: ring, columns, area-line, pie, heatmap, stream, sankey, chord, bump, horizon, radial-year, polar-clock, energy-orbit, mood-radial, mood-mix, theme-orbit, theme-constellation, watchlist-heat, masonry, clinical-slots, animate. |
+| 2026-09-01 | `force-graph` `graph-focus` `graph-model` | Knowledge archive graph is the graph library. Universe / show-all / solar stay Knowledge-only. |

@@ -2,7 +2,9 @@
 
 This folder is the design source of truth for Adam’s hub sites (Teaching, Life, Knowledge, Tasks, and any new hub). Read it **before** writing or restyling UI.
 
-Tasks Hub agents: also read `TASKS.md` (Teaching chrome, board home, graph/charts borrowed from Knowledge and Life).
+Tasks Hub agents: also read `TASKS.md` (Teaching chrome, board home).
+
+Charts / graphs: read `CHARTS.md` only. That file is the library — catalog, APIs, tokens, log. Do not hunt Life or Knowledge for a look.
 
 Rail work: also read `RAIL.md`. The left rail is locked — one width, brand goes home, icon + label rows.
 
@@ -38,7 +40,8 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
 21. `js/hub-inline-edit.js` / `js/hub-create-disclosure.js` / `js/hub-capture.js` — stay-in-place edit, chips/tags, create-pill grid, voice + paste.
 22. `js/hub-command-search.js` — shared command palette. Teaching keeps `.search-palette` markup; call `enhanceSearchPalette` on that panel. Other hubs use `openHubCommandSearch`.
 23. `js/hub-surfaces.js` — pin list, labeled progress, step indicator, run widget, schedule/slots/reminders, task/activities/collection disclosure, scroll island, progressive input stack, journal nav, save toggle, status picker.
-24. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `hub-scroll-hide.html`, `morphing-popover.html`, `hub-compose.html`, `adaptive-slider.html`, `card-swipe.html`, `hub-toast.html`, `hub-ai-bar.html`)
+24. `CHARTS.md` — **locked** chart and graph library (catalog, APIs, tokens, log). Implementation roots listed there. Do not invent a type that is not in that file.
+25. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `hub-scroll-hide.html`, `morphing-popover.html`, `hub-compose.html`, `adaptive-slider.html`, `card-swipe.html`, `hub-toast.html`, `hub-ai-bar.html`)
 
 ### Passphrase gate (mandatory)
 
@@ -100,7 +103,7 @@ In this monorepo Teaching / Knowledge / Tasks symlink `design-kit/` → `package
 
 Overlays change **canvas** glass and tile density only. They do not change `--rail-width` or rail item layout.
 
-Product UI (graphs, lesson blocks, bloods) stays in the hub. Chrome does not.
+Lesson blocks and domain screens stay in the hub. Chart and graph **look** is this kit’s library (`CHARTS.md`). Chrome does not live in a hub.
 
 ## Hard rules
 
