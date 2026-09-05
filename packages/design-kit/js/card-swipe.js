@@ -340,12 +340,9 @@ function bindCardSwipe(wrap, {
   }
 
   function stepWidth() {
-    if (fluid) {
-      const width = measureWidth(viewport, measureWidth(wrap, itemWidth));
-      return width + gap;
-    }
     const first = slides()[0];
-    return measureWidth(first, itemWidth) + gap;
+    const measured = first?.offsetWidth || measureWidth(first, fluid ? measureWidth(viewport, itemWidth) : itemWidth);
+    return measured + gap;
   }
 
   function xFor(nextIndex) {

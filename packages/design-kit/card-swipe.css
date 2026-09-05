@@ -35,7 +35,6 @@
   gap: var(--hub-card-swipe-gap);
   touch-action: pan-y;
   cursor: grab;
-  transform-style: preserve-3d;
   will-change: transform;
 }
 
@@ -52,7 +51,11 @@
   flex: 0 0 var(--hub-card-swipe-item-width);
   min-width: 0;
   transform-origin: center center;
-  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+.hub-card-swipe__slide[aria-hidden="true"] {
+  pointer-events: none;
 }
 
 .hub-card-swipe__slide.is-tilting {
