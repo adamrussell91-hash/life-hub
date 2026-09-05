@@ -426,11 +426,14 @@ function messageBubbles(root) {
   return root.querySelector('#chat-messages').children.filter(child => child.className?.startsWith('chat-message'));
 }
 
+function nodeText(node) {
+  if (node.children?.length) return node.children.map(nodeText).join('');
+  return node.textContent ?? '';
+}
+
 function bubbleText(bubble) {
   const body = bubble.children.find(child => child.className === 'chat-message__body');
-  if (!body) return bubble.textContent ?? '';
-  if (body.children.length) return body.children.map(node => node.textContent).join('');
-  return body.textContent ?? '';
+  return nodeText(body ?? bubble);
 }
 
 test('a markdown heading in streamed text starts a new bubble instead of one growing wall of text', async () => {
