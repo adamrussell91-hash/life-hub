@@ -189,6 +189,9 @@ function revealDelay(el) {
 function enhanceCard(el, reduced) {
   if (el.dataset.hubMotionCard === '1') return;
   if (el.closest('[data-state="loading"]')) return;
+  // Virtual list windows append or rebuild rows while scrolling. A reveal
+  // here fades every visible card out and back in — archive flicker.
+  if (el.closest('.list-window, .virtual-list__window')) return;
   if (el.closest(CARD_SKIP) && !el.matches('.sign-in__card')) return;
   el.dataset.hubMotionCard = '1';
 
