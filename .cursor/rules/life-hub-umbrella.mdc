@@ -1,0 +1,22 @@
+---
+description: Life Hub is the live umbrella. Do not follow stale standalone-hub instructions.
+globs:
+alwaysApply: true
+---
+
+# Life Hub umbrella
+
+This repository is the live code repo for Adam’s hubs.
+
+Teaching, Knowledge, Tasks, and Life all run through this repo and the Life Hub API (`api.adam-russell.com`). Public student Teaching URLs stay unauthenticated. Private records stay in `life-hub-data`.
+
+Do not treat these as implementation targets:
+
+1. Standalone `teaching-hub`, `knowledge-hub`, `Tasks-Hub`, or `hub-design-kit` checkouts.
+2. Retired Netlify sites `arteaching-hub`, `artasks-hub`, and `knowledge-hub-archive`.
+3. Old API hosts `teaching-api`, `tasks-api`, and `knowledge-api`.
+4. `life-hub-data` as an application or Cursor-rules repo. It is the private data store. Do not change its schema, path policy, or access model unless the user explicitly asks.
+
+Folded `apps/*/AGENTS.md` files may still describe pre-fold standalone ports, passphrases, or Netlify sites. When they disagree with the current umbrella, follow `docs/consolidation/plan.md`, root `README.md`, root `package.json` scripts, and `packages/design-kit/`.
+
+Ponytail may reduce new machinery inside this repo. It may not revive a stale repo, split a hub back out, or simplify away the umbrella.
