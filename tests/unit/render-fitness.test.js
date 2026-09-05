@@ -260,7 +260,6 @@ test('kit charts unhide when their own data is ready and stay hidden otherwise',
       clockPoints: [],
       orbitDays: [],
       e1rmRadial: [],
-      focusChord: [{ themeA: 'chest', themeB: 'arms', count: 1 }],
       bumpRanks: [],
       regionStream: null,
       painHeat: [],
@@ -268,11 +267,6 @@ test('kit charts unhide when their own data is ready and stay hidden otherwise',
       e1rmBands: [],
       sessionGauge: null,
       yearDots: [],
-      sankeyFlows: [],
-      libraryMap: {
-        nodes: [{ key: 'Chest Press', count: 2 }, { key: 'Curl', count: 1 }],
-        edges: [{ themeA: 'Chest Press', themeB: 'Curl', count: 1 }]
-      },
       volumePerSetWeeks: [],
       durationSeries: [],
       distanceSeries: [],
@@ -288,8 +282,6 @@ test('kit charts unhide when their own data is ready and stay hidden otherwise',
   assert.equal(root.ensure('#fitness-push-pull-card').attributes.hidden, undefined);
   assert.match(root.ensure('[data-fitness="push-read"]').textContent, /push/);
   assert.equal(root.ensure('#fitness-rest-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-chord-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-library-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-e1rm-card').attributes.hidden, '');
   assert.equal(root.ensure('#fitness-readings-card').attributes.hidden, '');
   assert.equal(root.ensure('#fitness-clock-card').attributes.hidden, '');

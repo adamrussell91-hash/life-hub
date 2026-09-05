@@ -3,7 +3,6 @@ import { animateAreaReveal, animateColumnGrow, prefersReducedMotion } from './ch
 import { buildAreaLine, straightLinePath } from './chart-kit/area-line.js';
 import { buildBumpChart } from './chart-kit/bump.js';
 import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
-import { buildChordLayout } from './chart-kit/chord-layout.js';
 import { buildColumns } from './chart-kit/columns.js';
 import { buildEnergyOrbit } from './chart-kit/energy-orbit.js';
 import { buildHorizonBands } from './chart-kit/horizon.js';
@@ -14,9 +13,7 @@ import { rangeBarLayout, rangeBarTick } from './chart-kit/range-bar.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
 import { REGION_COLOURS } from './fitness-charts-model.js';
 import { REGION_LABELS } from './fitness-model.js';
-import { buildSankeyFlow } from './chart-kit/sankey-flow.js';
 import { buildStreamPaths } from './chart-kit/stream.js';
-import { buildThemeConstellation } from './chart-kit/theme-constellation.js';
 import { buildWatchlistHeat } from './chart-kit/watchlist-heat.js';
 import { formatDisplayDate } from '../core/time.js';
 import { matchFitnessRecentRows } from './fitness-recent-focus.js';
@@ -391,65 +388,6 @@ function renderE1rmRadial(root, points) {
     seen.add(point.name);
     return [{ label: point.name, swatch: point.colour ?? CLINICAL_CHART_SLOTS[0] }];
   }));
-}
-
-function renderChord(root, edges) {
-  const card = showCard(root, '#fitness-chord-card', edges?.length >= 1);
-  const svg = root.querySelector('#fitness-chord-chart');
-  if (!card || !svg || typeof root.createElementNS !== 'function') return;
-  const layout = buildChordLayout(edges);
-  clearSvg(svg);
-  svg.setAttribute('viewBox', '0 0 360 360');
-  const cx = 180;
-  const cy = 180;
-  const radius = 120;
-  const tip = ensureTip(root, card);
-  const colourByKey = new Map((layout.arcs ?? []).map((arc, index) => [
-    arc.key,
-    REGION_COLOURS[arc.key] ?? CLINICAL_CHART_SLOTS[index % CLINICAL_CHART_SLOTS.length]
-  ]));
-  for (const arc of layout.arcs ?? []) {
-    const mid = ((arc.startAngle ?? 0) + (arc.endAngle ?? 0)) / 2;
-    const path = createSvg(root, 'path');
-    const x0 = cx + radius * Math.cos(arc.startAngle - Math.PI / 2);
-    const y0 = cy + radius * Math.sin(arc.startAngle - Math.PI / 2);
-    const x1 = cx + radius * Math.cos(arc.endAngle - Math.PI / 2);
-    const y1 = cy + radius * Math.sin(arc.endAngle - Math.PI / 2);
-    const large = arc.endAngle - arc.startAngle > Math.PI ? 1 : 0;
-    path.setAttribute('d', `M${x0},${y0} A${radius},${radius},0,${large},1,${x1},${y1}`);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', colourByKey.get(arc.key));
-    path.setAttribute('stroke-width', '10');
-    path.setAttribute('data-role', 'arc');
-    const name = REGION_LABELS[arc.key] ?? arc.key;
-    bindTip(path, tip, name);
-    const label = createSvg(root, 'text');
-    label.setAttribute('class', 'mind-chart-label');
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('x', String(cx + 148 * Math.cos(mid - Math.PI / 2)));
-    label.setAttribute('y', String(cy + 148 * Math.sin(mid - Math.PI / 2)));
-    label.textContent = name;
-    svg.append(path, label);
-  }
-  for (const ribbon of layout.ribbons ?? []) {
-    const source = ribbon.source ?? {};
-    const target = ribbon.target ?? {};
-    const start = ((source.startAngle ?? 0) + (source.endAngle ?? 0)) / 2;
-    const end = ((target.startAngle ?? 0) + (target.endAngle ?? 0)) / 2;
-    const path = createSvg(root, 'path');
-    path.setAttribute('d', `M${cx + 110 * Math.cos(start - Math.PI / 2)},${cy + 110 * Math.sin(start - Math.PI / 2)} Q${cx},${cy} ${cx + 110 * Math.cos(end - Math.PI / 2)},${cy + 110 * Math.sin(end - Math.PI / 2)}`);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'var(--wave)');
-    path.setAttribute('stroke-width', String(Math.max(2, Number(ribbon.value) || 2)));
-    path.setAttribute('opacity', '0.45');
-    path.setAttribute('data-role', 'ribbon');
-    bindTip(path, tip, `${REGION_LABELS[ribbon.source?.key] ?? ribbon.source?.key ?? 'Region'} + ${REGION_LABELS[ribbon.target?.key] ?? ribbon.target?.key ?? 'region'} · ${ribbon.value ?? 1} sessions`);
-    svg.append(path);
-  }
-  paintLegend(root, card, [...colourByKey.entries()].map(([key, swatch]) => ({
-    label: REGION_LABELS[key] ?? key,
-    swatch
-  })));
 }
 
 function renderBump(root, ranks) {
@@ -867,138 +805,6 @@ function renderRepMix(root, items, read) {
   })));
 }
 
-function renderSankey(root, flows) {
-  const card = showCard(root, '#fitness-sankey-card', flows?.length >= 1);
-  const svg = root.querySelector('#fitness-sankey-chart');
-  if (!card || !svg || typeof root.createElementNS !== 'function') return;
-  const chart = buildSankeyFlow(flows, { width: 320, height: 140 });
-  if (!chart.nodes.length) {
-    setHidden(card, true);
-    return;
-  }
-  clearSvg(svg);
-  svg.setAttribute('viewBox', '0 0 320 140');
-  const tip = ensureTip(root, card);
-  for (const link of chart.links) {
-    const path = createSvg(root, 'path');
-    const x0 = link.x0 ?? 20;
-    const x1 = link.x1 ?? 300;
-    const y0 = link.y0 ?? 20;
-    const y1 = link.y1 ?? 20;
-    path.setAttribute('d', `M${x0},${y0} C${(x0 + x1) / 2},${y0} ${(x0 + x1) / 2},${y1} ${x1},${y1}`);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'var(--wave)');
-    path.setAttribute('stroke-width', String(Math.max(2, link.width ?? 4)));
-    path.setAttribute('opacity', '0.45');
-    const source = link.source?.id ?? link.source ?? 'From';
-    const target = link.target?.id ?? link.target ?? 'to';
-    bindTip(path, tip, `${source} → ${target} · ${link.value ?? 0}`);
-    svg.append(path);
-  }
-  for (const node of chart.nodes) {
-    const rect = createSvg(root, 'rect');
-    rect.setAttribute('x', String(node.x0));
-    rect.setAttribute('y', String(node.y0));
-    rect.setAttribute('width', String(Math.max(4, node.x1 - node.x0)));
-    rect.setAttribute('height', String(Math.max(8, node.y1 - node.y0)));
-    rect.setAttribute('fill', 'var(--marine)');
-    const label = createSvg(root, 'text');
-    const left = node.x0 < 80;
-    label.setAttribute('x', String(left ? node.x1 + 6 : node.x0 - 6));
-    label.setAttribute('y', String((node.y0 + node.y1) / 2 + 3));
-    label.setAttribute('text-anchor', left ? 'start' : 'end');
-    label.setAttribute('class', 'fitness-viz__label');
-    label.textContent = node.id ?? node.name ?? '';
-    bindTip(rect, tip, node.id ?? node.name ?? 'Step');
-    svg.append(rect, label);
-  }
-}
-
-function constellationViewBox(chart) {
-  const nodes = chart.nodes ?? [];
-  if (!nodes.length) return `0 0 ${chart.width} ${chart.height}`;
-  const xs = nodes.map(node => node.x);
-  const ys = nodes.map(node => node.y);
-  const controlYs = (chart.edges ?? []).map(edge => edge.controlY).filter(Number.isFinite);
-  const padX = 90;
-  const padY = 36;
-  const minX = Math.min(...xs) - padX;
-  const maxX = Math.max(...xs) + padX;
-  const minY = Math.min(...ys, ...controlYs) - padY;
-  const maxY = Math.max(...ys, ...controlYs) + padY + 20;
-  return `${minX} ${minY} ${Math.max(160, maxX - minX)} ${Math.max(100, maxY - minY)}`;
-}
-
-function renderLibrary(root, map) {
-  const card = showCard(root, '#fitness-library-card', Boolean(map?.nodes?.length >= 2));
-  const svg = root.querySelector('#fitness-library-chart');
-  if (!card || !svg || typeof root.createElementNS !== 'function') return;
-  const chart = buildThemeConstellation({
-    nodes: map.nodes,
-    edges: map.edges,
-    minEdgeCount: 1
-  });
-  if (chart.empty) {
-    setHidden(card, true);
-    return;
-  }
-  clearSvg(svg);
-  svg.setAttribute('viewBox', constellationViewBox(chart));
-  svg.setAttribute('class', 'mind-constellation__chart fitness-viz__svg');
-  const tip = ensureTip(root, card);
-  for (const edge of chart.edges ?? []) {
-    const path = createSvg(root, 'path');
-    path.setAttribute('class', 'mind-constellation__edge is-up');
-    path.setAttribute('data-role', 'edge');
-    path.setAttribute('d', edge.d);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke-width', String(edge.strokeWidth ?? 1.5));
-    path.setAttribute('opacity', String(edge.opacity ?? 0.4));
-    bindTip(path, tip, `${edge.themeA ?? edge.a ?? 'Lift'} + ${edge.themeB ?? edge.b ?? 'lift'} · ${edge.count ?? 1} sessions`);
-    svg.append(path);
-  }
-  for (const node of chart.nodes ?? []) {
-    const group = createSvg(root, 'g');
-    group.setAttribute('class', 'mind-constellation__star');
-    group.setAttribute('data-role', 'star');
-    const halo = createSvg(root, 'circle');
-    halo.setAttribute('class', 'mind-constellation__halo');
-    halo.setAttribute('cx', String(node.x));
-    halo.setAttribute('cy', String(node.y));
-    halo.setAttribute('r', String((node.r ?? 6) + 6));
-    halo.setAttribute('pointer-events', 'none');
-    const dot = createSvg(root, 'circle');
-    dot.setAttribute('class', 'mind-constellation__dot');
-    dot.setAttribute('cx', String(node.x));
-    dot.setAttribute('cy', String(node.y));
-    dot.setAttribute('r', String(node.r ?? 6));
-    dot.setAttribute('fill', node.colour ?? CLINICAL_CHART_SLOTS[0]);
-    dot.setAttribute('pointer-events', 'none');
-    const glyph = createSvg(root, 'text');
-    glyph.setAttribute('class', 'mind-constellation__glyph');
-    glyph.setAttribute('x', String(node.x));
-    glyph.setAttribute('y', String(node.y + 4));
-    glyph.setAttribute('text-anchor', 'middle');
-    glyph.setAttribute('pointer-events', 'none');
-    glyph.textContent = String(node.key ?? '?').charAt(0);
-    const hit = createSvg(root, 'circle');
-    hit.setAttribute('class', 'mind-constellation__hit');
-    hit.setAttribute('cx', String(node.x));
-    hit.setAttribute('cy', String(node.y));
-    hit.setAttribute('r', String(Math.max((node.r ?? 6) + 10, 18)));
-    const label = createSvg(root, 'text');
-    label.setAttribute('class', 'mind-constellation__label');
-    label.setAttribute('x', String(node.x));
-    label.setAttribute('y', String(node.y + (node.r ?? 6) + 18));
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('pointer-events', 'none');
-    label.textContent = node.key;
-    group.append(halo, dot, glyph, hit, label);
-    bindTip(group, tip, `${node.key} · ${node.count ?? 0} session${(node.count ?? 0) === 1 ? '' : 's'}`);
-    svg.append(group);
-  }
-}
-
 function renderSparks(root, readings, seriesMap) {
   const rows = (readings ?? []).filter(row => seriesMap[row.key]?.length >= 2);
   const card = showCard(root, '#fitness-readings-card', rows.length >= 1);
@@ -1088,7 +894,6 @@ export function renderFitnessCharts(root, charts = {}) {
   renderClock(root, charts.clockPoints);
   renderOrbit(root, charts.orbitDays);
   renderE1rmRadial(root, charts.e1rmRadial);
-  renderChord(root, charts.focusChord);
   renderBump(root, charts.bumpRanks);
   renderStream(root, charts.regionStream);
   renderPainHeat(root, charts.painHeat);
@@ -1112,8 +917,6 @@ export function renderFitnessCharts(root, charts = {}) {
   renderPill(root, charts.sessionGauge);
   renderYear(root, { year: charts.year, dots: charts.yearDots });
   renderRepMix(root, charts.repRanges, charts.repRead);
-  renderSankey(root, charts.sankeyFlows);
-  renderLibrary(root, charts.libraryMap);
   renderSparks(root, charts.sessionReadings, {
     duration: charts.durationSeries,
     distance: charts.distanceSeries,

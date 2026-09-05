@@ -1653,30 +1653,9 @@ main { max-width: 76rem; margin: 0 auto; }
   font-size: 32px;
   font-weight: 600;
 }
-#fitness-dashboard #fitness-chord-chart .mind-chart-label {
-  font-size: 16px;
-  fill: var(--ink);
-  font-weight: 600;
-}
 #fitness-dashboard #fitness-bump-chart .mind-bump__label,
 #fitness-dashboard #fitness-bump-chart .mind-bump__week {
   font-size: 28px;
-  fill: var(--ink);
-  font-weight: 600;
-}
-#fitness-dashboard #fitness-library-chart {
-  width: 100%;
-  max-width: 100%;
-  height: auto;
-}
-#fitness-dashboard #fitness-library-chart .mind-constellation__label {
-  font-size: 28px;
-}
-#fitness-dashboard #fitness-library-chart .mind-constellation__glyph {
-  font-size: 18px;
-}
-#fitness-dashboard #fitness-sankey-chart .fitness-viz__label {
-  font-size: 12px;
   fill: var(--ink);
   font-weight: 600;
 }
@@ -1686,17 +1665,10 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 #fitness-dashboard .fitness-viz [data-role="point"],
 #fitness-dashboard .fitness-viz [data-role="slice"],
-#fitness-dashboard .fitness-viz [data-role="ribbon"],
-#fitness-dashboard .fitness-viz [data-role="arc"],
-#fitness-dashboard .fitness-viz [data-role="edge"],
-#fitness-dashboard .fitness-viz [data-role="star"],
 #fitness-dashboard .fitness-viz [role="button"],
 #fitness-dashboard .fitness-viz .mind-mood-dot,
 #fitness-dashboard .fitness-viz .mind-energy-dot,
-#fitness-dashboard .fitness-viz .mind-mood-mix__seg,
-#fitness-dashboard .fitness-viz .mind-constellation__star,
-#fitness-dashboard .fitness-viz .mind-constellation__edge,
-#fitness-dashboard .fitness-viz .mind-constellation__hit {
+#fitness-dashboard .fitness-viz .mind-mood-mix__seg {
   pointer-events: auto;
   cursor: pointer;
 }

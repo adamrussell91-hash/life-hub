@@ -63,10 +63,9 @@ test('the Fitness tab renders the fixture workout and labeled analytics', async 
     assert.equal(await page.locator('#fitness-region-vol-card').isVisible(), true);
     assert.ok(await page.locator('#fitness-region-donut circle').count() >= 1);
     assert.ok(await page.locator('#fitness-region-vol-card .mind-chart-legend').count() >= 1);
-    assert.equal(await page.locator('#fitness-library-card').isVisible(), true);
-    assert.ok(await page.locator('#fitness-library-chart .mind-constellation__label').count() >= 1);
-    await page.locator('#fitness-library-chart [data-role="star"]').first().focus();
-    assert.match(await page.locator('#fitness-library-card [data-role="fitness-tip"]').textContent(), /session/i);
+    assert.equal(await page.locator('#fitness-chord-card').count(), 0);
+    assert.equal(await page.locator('#fitness-sankey-card').count(), 0);
+    assert.equal(await page.locator('#fitness-library-card').count(), 0);
     assert.equal(await page.locator('#fitness-push-pull-card').isVisible(), true);
     assert.equal(await page.locator('#fitness-rest-card').isVisible(), true);
     assert.equal(await page.locator('#fitness-e1rm-card').isHidden(), true);
