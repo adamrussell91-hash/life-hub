@@ -1,3 +1,5 @@
+import { scanDocumentFromImage } from "../../design-kit/js/hub-doc-scan.js";
+import { ensureWebImage, isHeicLike } from "../../design-kit/js/hub-heic.js";
 import { compressAndStripExif } from "../../design-kit/js/hub-image-pipeline.js";
 import {
   classifyClipboardData,
@@ -9,24 +11,46 @@ import { appendCaptureBlock, titleFromCapture, type CaptureKind } from "./append
 export { appendCaptureBlock, titleFromCapture };
 export type { CaptureKind };
 
-/** Compress phone photos before R2 upload; strip EXIF GPS by re-encoding. */
+/** HEIC→JPEG (native, then LGPL heic-to), then compress + strip EXIF GPS. */
 export async function prepareCaptureImage(file: File): Promise<File> {
-  if (!file.type.startsWith("image/")) return file;
+  let working = file;
   try {
-    const result = await compressAndStripExif(file, {
+    const ensured = await ensureWebImage(file, { enableLgplConverter: true });
+    working = ensured.file;
+  } catch {
+    if (isHeicLike(file)) return file;
+  }
+  if (!working.type.startsWith("image/")) return working;
+  try {
+    const result = await compressAndStripExif(working, {
       maxWidth: 1920,
       maxHeight: 1920,
       quality: 0.82,
       mimeType: "image/jpeg",
     });
-    if (result.skipped) return file;
-    const base = file.name.replace(/\.[^.]+$/, "") || "photo";
+    if (result.skipped) return working;
+    const base = working.name.replace(/\.[^.]+$/, "") || "photo";
     return new File([result.blob], `${base}.jpg`, {
       type: result.blob.type || "image/jpeg",
-      lastModified: file.lastModified,
+      lastModified: working.lastModified,
     });
   } catch {
-    return file;
+    return working;
+  }
+}
+
+/** Optional jscanify paper warp before the normal photo pipeline. */
+export async function prepareCaptureScan(file: File): Promise<File> {
+  try {
+    const scanned = await scanDocumentFromImage(file);
+    const base = file.name.replace(/\.[^.]+$/, "") || "scan";
+    const next = new File([scanned.blob], `${base}.jpg`, {
+      type: "image/jpeg",
+      lastModified: file.lastModified,
+    });
+    return prepareCaptureImage(next);
+  } catch {
+    return prepareCaptureImage(file);
   }
 }
 
@@ -73,10 +97,12 @@ export function captureFieldHtml(state: CaptureUiState) {
         <div class="compose__capture hub-capture" data-hub-capture>
           <button class="btn" data-capture-voice type="button" ${captureDisabled}>${voiceLabel}</button>
           <button class="btn" data-capture-photo type="button" ${captureOthersDisabled}>Photo</button>
+          <button class="btn" data-capture-scan type="button" ${captureOthersDisabled}>Scan</button>
           <button class="btn" data-capture-pdf type="button" ${captureOthersDisabled}>PDF</button>
           <button class="btn btn--ghost" data-capture-paste type="button" ${captureOthersDisabled}>Paste</button>
         </div>
-        <input id="compose-photo" class="compose__hidden-file" type="file" accept="image/*" capture="environment" />
+        <input id="compose-photo" class="compose__hidden-file" type="file" accept="image/*,.heic,.heif,image/heic,image/heif" capture="environment" />
+        <input id="compose-scan" class="compose__hidden-file" type="file" accept="image/*,.heic,.heif,image/heic,image/heif" capture="environment" />
         <input id="compose-pdf" class="compose__hidden-file" type="file" accept="application/pdf" />
       </div>`;
 }
@@ -240,6 +266,9 @@ export function bindCaptureControls(
   root.querySelector<HTMLButtonElement>("[data-capture-photo]")!.onclick = () => {
     root.querySelector<HTMLInputElement>("#compose-photo")?.click();
   };
+  root.querySelector<HTMLButtonElement>("[data-capture-scan]")!.onclick = () => {
+    root.querySelector<HTMLInputElement>("#compose-scan")?.click();
+  };
   root.querySelector<HTMLButtonElement>("[data-capture-pdf]")!.onclick = () => {
     root.querySelector<HTMLInputElement>("#compose-pdf")?.click();
   };
@@ -247,6 +276,17 @@ export function bindCaptureControls(
     opts.syncFields();
     const file = (event.target as HTMLInputElement).files?.[0];
     if (file) opts.onPhoto(file);
+  };
+  root.querySelector<HTMLInputElement>("#compose-scan")!.onchange = event => {
+    opts.syncFields();
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    void (async () => {
+      const scanned = await prepareCaptureScan(file);
+      opts.onPhoto(scanned);
+    })();
   };
   root.querySelector<HTMLInputElement>("#compose-pdf")!.onchange = event => {
     opts.syncFields();

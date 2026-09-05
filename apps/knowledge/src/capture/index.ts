@@ -9,6 +9,7 @@ export {
   createVoiceCapture,
   ingestCaptureFile,
   prepareCaptureImage,
+  prepareCaptureScan,
   recorderMime,
   type CaptureIngestDeps,
   type CaptureIngestInput,
