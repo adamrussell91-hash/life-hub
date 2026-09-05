@@ -615,6 +615,22 @@ export function startHubMotion(root = document) {
   });
 }
 
+/**
+ * Soften an abrupt remount (board pack, palette refresh). No Motion package.
+ * @param {Element | null | undefined} el
+ */
+export function playHubRemount(el) {
+  if (!el?.classList) return;
+  const root = el.ownerDocument ?? document;
+  if (prefersReducedMotion(root)) return;
+  el.classList.remove('hub-remount-in');
+  // Force restart when the same node is re-packed.
+  void el.offsetWidth;
+  el.classList.add('hub-remount-in');
+  const clear = () => el.classList.remove('hub-remount-in');
+  el.addEventListener('animationend', clear, { once: true });
+}
+
 /** Test helper — reset the singleton so suites can start clean. */
 export function resetHubMotionForTests() {
   started = false;

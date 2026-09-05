@@ -1,7 +1,7 @@
 /** Shared command palette. Tokens only. Does not replace Teaching's search-palette markup. */
 
 import { buildHubEntityIndex, filterCommandGroups } from './hub-entity-search.js';
-import { prefersReducedMotion } from './hub-motion.js';
+import { playHubRemount, prefersReducedMotion } from './hub-motion.js';
 
 function ownerDoc(root) {
   return root?.ownerDocument ?? root ?? globalThis.document;
@@ -110,6 +110,7 @@ export function openHubCommandSearch(options = {}) {
     }
     active = 0;
     paintActive();
+    playHubRemount(list);
   };
 
   const close = () => {
