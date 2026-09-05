@@ -4,6 +4,8 @@
  * Respects prefers-reduced-motion. Strength is the same on every hub.
  */
 
+@import url("./chat-prose.css");
+
 :root {
   --hub-ix-duration: 220ms;
   --hub-ix-spring: 420ms cubic-bezier(0.22, 1.2, 0.36, 1);

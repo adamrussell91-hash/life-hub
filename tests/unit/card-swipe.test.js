@@ -81,7 +81,17 @@ class FakeEl {
   }
 
   getBoundingClientRect() {
-    return { width: 320, height: 220, left: 0, top: 0, right: 320, bottom: 220 };
+    const width = Number.parseFloat(this.style?.width) || 320;
+    const height = Number.parseFloat(this.style?.height) || 220;
+    return { width, height, left: 0, top: 0, right: width, bottom: height };
+  }
+
+  get offsetWidth() {
+    return this.getBoundingClientRect().width;
+  }
+
+  get offsetHeight() {
+    return this.getBoundingClientRect().height;
   }
 }
 
@@ -178,6 +188,29 @@ test('createCardSwipe keeps the requested index until slides are appended', () =
   assert.match(swipe.status.textContent, /3 of 3 · Three/);
 });
 
+test('fluid decks pin slide widths to the measured viewport', () => {
+  const root = new FakeDoc();
+  const swipe = createCardSwipe({ root, items: [], fluid: true });
+  swipe.viewport.getBoundingClientRect = () => ({
+    width: 390, height: 200, left: 0, top: 0, right: 390, bottom: 200
+  });
+  for (let i = 0; i < 18; i++) {
+    const card = root.createElement('article');
+    card.className = 'hub-card-swipe__card';
+    swipe.appendSlide(card, { title: `Ex ${i + 1}` });
+  }
+  swipe.sync();
+  assert.equal(swipe.track.children.length, 18);
+  for (const slide of swipe.track.children) {
+    assert.equal(slide.style.width, '390px');
+    assert.equal(slide.style.maxWidth, '390px');
+    assert.equal(slide.style.flex, '0 0 390px');
+  }
+  assert.match(swipe.track.style.transform, /translate3d\(0px/);
+  swipe.setIndex(2, { animate: false });
+  assert.match(swipe.track.style.transform, /translate3d\(-812px/);
+});
+
 test('a tap without a drag selects the current card', () => {
   const root = new FakeDoc();
   const seen = [];
@@ -189,6 +222,46 @@ test('a tap without a drag selects the current card', () => {
   swipe.track.emit('pointerup', { clientX: 158, timeStamp: 20 });
   swipe.track.emit('click', { clientX: 158 });
   assert.deepEqual(seen, [0]);
+});
+
+test('pointerup alone selects without waiting for click', () => {
+  const root = new FakeDoc();
+  const seen = [];
+  const swipe = createCardSwipe({
+    root,
+    onSelect: index => seen.push(index)
+  });
+  swipe.track.emit('pointerdown', { clientX: 160, timeStamp: 0 });
+  swipe.track.emit('pointerup', { clientX: 160, timeStamp: 40 });
+  assert.deepEqual(seen, [0]);
+});
+
+test('small finger jitter still selects instead of dead-zoning', () => {
+  const root = new FakeDoc();
+  const seen = [];
+  const swipe = createCardSwipe({
+    root,
+    onSelect: index => seen.push(index)
+  });
+  swipe.track.emit('pointerdown', { clientX: 200, timeStamp: 0 });
+  swipe.track.emit('pointermove', { clientX: 220, timeStamp: 20 });
+  swipe.track.emit('pointerup', { clientX: 225, timeStamp: 50 });
+  assert.equal(swipe.getIndex(), 0);
+  assert.deepEqual(seen, [0]);
+});
+
+test('a real swipe past the buffer does not also select', () => {
+  const root = new FakeDoc();
+  const seen = [];
+  const swipe = createCardSwipe({
+    root,
+    onSelect: index => seen.push(index)
+  });
+  swipe.track.emit('pointerdown', { clientX: 200, timeStamp: 0 });
+  swipe.track.emit('pointermove', { clientX: 120, timeStamp: 30 });
+  swipe.track.emit('pointerup', { clientX: 80, timeStamp: 80 });
+  assert.equal(swipe.getIndex(), 1);
+  assert.deepEqual(seen, []);
 });
 
 test('drags that start on an input do not change the card', () => {

@@ -145,6 +145,23 @@ test('author styles preserve the semantic hidden state', async () => {
   assert.match(css, /\[hidden\]\s*{\s*display:\s*none\s*!important;?\s*}/);
 });
 
+test('full-page Chat uses the canvas width and hides the Talking to chip while empty', async () => {
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+
+  assert.match(
+    css,
+    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+\.page-header[\s\S]*max-width:\s*none/
+  );
+  assert.match(
+    css,
+    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+main[\s\S]*max-width:\s*none/
+  );
+  assert.match(
+    css,
+    /\.chat-view:not\(\[data-panel-mode\]\):not\(\[data-chrome='engaged'\]\)\s+#chat-who\s*\{\s*display:\s*none/
+  );
+});
+
 test('web app manifest is installable and uses only local icons', async () => {
   const manifest = JSON.parse(await readFile(new URL('../../apps/life/manifest.webmanifest', import.meta.url)));
 

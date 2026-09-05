@@ -327,6 +327,8 @@ function bindCardSwipe(wrap, {
   let index = Math.max(0, currentIndex);
   let drag = null;
   let moved = false;
+  /** True after pointerup already treated the gesture as a tap-select. */
+  let selectHandled = false;
   const listeners = [];
 
   function slides() {
@@ -410,9 +412,22 @@ function bindCardSwipe(wrap, {
     if (height) styleOf(viewport).height = `${height}px`;
   }
 
+  function syncSlideSizes() {
+    if (!fluid || !viewport) return;
+    const width = measureWidth(viewport, itemWidth);
+    if (!(width > 0)) return;
+    for (const slide of slides()) {
+      const style = styleOf(slide);
+      style.flex = `0 0 ${width}px`;
+      style.width = `${width}px`;
+      style.maxWidth = `${width}px`;
+    }
+  }
+
   function sync() {
     index = clamp(index);
     wrap.dataset.cardSwipeIndex = String(index);
+    syncSlideSizes();
     applyX(xFor(index), { animate: false });
     renderDots();
     renderStatus();
@@ -424,6 +439,7 @@ function bindCardSwipe(wrap, {
     const changed = clamped !== index;
     index = clamped;
     wrap.dataset.cardSwipeIndex = String(index);
+    syncSlideSizes();
     applyX(xFor(index), { animate });
     renderDots();
     renderStatus();
@@ -441,19 +457,24 @@ function bindCardSwipe(wrap, {
 
   function onPointerDown(event) {
     moved = false;
-    if (count() <= 1) return;
+    selectHandled = false;
     if (event.button != null && event.button !== 0) return;
     if (isIgnoredTarget(event.target)) return;
     const startX = event.clientX ?? event.touches?.[0]?.clientX;
     if (!Number.isFinite(startX)) return;
+    // Always record a press so a tap can select even when the deck has one
+    // card (no swipe) or when mobile Safari skips the click after capture.
     drag = {
       startX,
       lastX: startX,
       origin: xFor(index),
-      startedAt: event.timeStamp ?? Date.now()
+      startedAt: event.timeStamp ?? Date.now(),
+      canSwipe: count() > 1
     };
-    addClass(wrap, 'is-dragging');
-    event.currentTarget?.setPointerCapture?.(event.pointerId);
+    if (drag.canSwipe) {
+      addClass(wrap, 'is-dragging');
+      event.currentTarget?.setPointerCapture?.(event.pointerId);
+    }
   }
 
   function onPointerMove(event) {
@@ -462,6 +483,7 @@ function bindCardSwipe(wrap, {
     if (!Number.isFinite(x)) return;
     if (Math.abs(x - drag.startX) > 12) moved = true;
     drag.lastX = x;
+    if (!drag.canSwipe) return;
     applyX(drag.origin + (x - drag.startX), { animate: false });
   }
 
@@ -471,14 +493,26 @@ function bindCardSwipe(wrap, {
     const elapsed = Math.max(1, (event.timeStamp ?? Date.now()) - drag.startedAt);
     const offset = x - drag.startX;
     const velocity = (offset / elapsed) * 1000;
+    const canSwipe = drag.canSwipe;
+    const previous = index;
     drag = null;
     removeClass(wrap, 'is-dragging');
-    setIndex(nextSwipeIndex({
-      offset,
-      velocity,
-      currentIndex: index,
-      itemCount: count()
-    }));
+    if (canSwipe) {
+      setIndex(nextSwipeIndex({
+        offset,
+        velocity,
+        currentIndex: index,
+        itemCount: count()
+      }));
+    }
+    // Tap-select on pointerup. Relying on click alone fails on real phones:
+    // pointer capture + even tiny finger jitter swallows or skips click, and
+    // offsets between 12px and the swipe buffer used to neither select nor advance.
+    const wasTap = index === previous && Math.abs(offset) < CARD_SWIPE_DRAG_BUFFER;
+    if (wasTap && !isIgnoredTarget(event.target)) {
+      selectHandled = true;
+      onSelect?.(index);
+    }
   }
 
   function onKeyDown(event) {
@@ -501,6 +535,10 @@ function bindCardSwipe(wrap, {
   }
 
   function onClick(event) {
+    if (selectHandled) {
+      selectHandled = false;
+      return;
+    }
     if (moved) return;
     if (isIgnoredTarget(event.target)) return;
     onSelect?.(index);
@@ -513,6 +551,7 @@ function bindCardSwipe(wrap, {
   }
 
   function layout() {
+    syncSlideSizes();
     applyX(xFor(index), { animate: false });
     syncHeight();
   }

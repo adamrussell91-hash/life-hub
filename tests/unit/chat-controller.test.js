@@ -426,12 +426,35 @@ function messageBubbles(root) {
   return root.querySelector('#chat-messages').children.filter(child => child.className?.startsWith('chat-message'));
 }
 
+function nodeText(node) {
+  if (node.children?.length) return node.children.map(nodeText).join('');
+  return node.textContent ?? '';
+}
+
 function bubbleText(bubble) {
   const body = bubble.children.find(child => child.className === 'chat-message__body');
-  if (!body) return bubble.textContent ?? '';
-  if (body.children.length) return body.children.map(node => node.textContent).join('');
-  return body.textContent ?? '';
+  return nodeText(body ?? bubble);
 }
+
+test('a markdown heading in streamed text starts a new bubble instead of one growing wall of text', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Here is the picture.\n# Claim\nProtein is the lever.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('brisket, what should I eat');
+
+  const bubbles = messageBubbles(root);
+  assert.equal(bubbles.length, 3, 'expected the user bubble plus two separate assistant bubbles');
+  assert.equal(bubbleText(bubbles[1]), 'Here is the picture.');
+  assert.match(bubbleText(bubbles[2]), /Claim/);
+  assert.match(bubbleText(bubbles[2]), /Protein is the lever/);
+});
 
 test('a paragraph break in streamed text starts a new bubble instead of one growing wall of text', async () => {
   const root = new FakeDocument();

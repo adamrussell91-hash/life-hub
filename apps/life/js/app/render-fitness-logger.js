@@ -439,7 +439,7 @@ export function renderFitnessLogger(root, draft, {
       onCollapse: onCollapseExercise
     });
     presentExerciseEditor(host, root, {
-      trigger: null,
+      trigger: peeks[expandedExerciseIndex] ?? null,
       frame: editor,
       label: exercises[expandedExerciseIndex].name ?? 'Exercise',
       onClose: onCollapseExercise
