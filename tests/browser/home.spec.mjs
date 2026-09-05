@@ -233,7 +233,7 @@ test('the Life Hub tile does not sit beside any page title', async () => {
       ['central-node', 'Central Node']
     ];
     for (const [section, title] of sections) {
-      await page.locator(`.desktop-rail .nav-item[data-section="${section}"]`).click();
+      await page.locator(`.desktop-rail button[data-section="${section}"]`).first().click();
       await page.locator('#page-title', { hasText: title }).waitFor();
       assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 0, section);
       assert.equal(await page.locator('.hub-mark').count(), 0, section);
