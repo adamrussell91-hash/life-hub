@@ -1,9 +1,7 @@
 import { fillExercisePlanList } from './render-workout-plan.js';
 import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
 import { formatDisplayDate, formatWeekday } from '../core/time.js';
-
-const VOLUME_BAR_WEEKS = 12;
-const VOLUME_BAR_MIN = 8;
+import { renderFitnessCharts } from './render-fitness-charts.js';
 
 const DAY_TYPE_LABELS = {
   movement: 'Movement day',
@@ -38,19 +36,16 @@ const formatKg = kg => {
   return `${text} kg`;
 };
 
-const formatWorkoutsPerWeek = value => {
-  if (value == null || !Number.isFinite(value) || value <= 0) return '—';
-  if (Number.isInteger(value)) return String(value);
-  return value < 1 ? value.toFixed(2) : value.toFixed(1);
-};
-
 export function renderFitness(root, model, { logger, templates, libraryByName, onSelectTemplate } = {}) {
   setText(root, '[data-fitness="streak"]', model.streak);
   setText(root, '[data-fitness="day-type"]', DAY_TYPE_LABELS[model.dayType] ?? model.dayType ?? '—');
 
-  renderWeekBoard(root, model);
-  renderLongTerm(root, model.longTerm);
+  renderStatus(root, model);
+  renderWorkingWeights(root, model.workingWeights);
+  renderVolumeWeeks(root, model);
+  renderFitnessCharts(root, model.charts);
   renderRegions(root, model.regions);
+  renderRecentSessions(root, model.recentSessions);
 
   const empty = root.querySelector('[data-fitness="hero-empty"]');
   const heroWrap = root.querySelector('[data-fitness-hero]');
@@ -68,7 +63,6 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
   renderTemplateRail(root, templates, { libraryByName, onSelectTemplate });
   renderFocusStrip(root, model.focusHits);
   renderComparisons(root, model.comparisons);
-  renderHeatmap(root, model.month);
 
   root.querySelector('#fitness-dashboard')?.removeAttribute('hidden');
 }
@@ -143,102 +137,155 @@ export function renderTemplateRail(root, templatesState, { libraryByName, onSele
   }
 }
 
-function renderWeekBoard(root, model) {
+function renderStatus(root, model) {
   const done = Number.isFinite(model.weekCompletedCount) ? model.weekCompletedCount : 0;
   const target = Number.isFinite(model.weekTarget) && model.weekTarget > 0 ? model.weekTarget : 4;
   setText(root, '[data-fitness="week-done"]', String(done));
   setText(root, '[data-fitness="week-target"]', String(target));
+  setText(root, '[data-fitness="week-volume"]', formatKg(model.weekVolumeKg));
+  setText(root, '[data-fitness="last-week-volume"]', formatKg(model.lastWeekVolumeKg));
 
-  const volumeByDate = new Map((model.weekVolume ?? []).map(day => [day.date, day.volume]));
-  const maxVolume = Math.max(0, ...volumeByDate.values());
-  const days = root.querySelector('#fitness-week-days');
-  if (days) {
-    days.replaceChildren();
-    for (const day of model.weekDots ?? []) {
-      const cell = root.createElement('div');
-      cell.className = 'fitness-week-day';
-      cell.dataset.hit = String(Boolean(day.completed));
-      if (day.isToday) cell.dataset.today = 'true';
-      cell.title = formatDisplayDate(day.date);
-
-      const name = root.createElement('span');
-      name.className = 'fitness-week-day__name';
-      name.textContent = (formatWeekday(day.date) || '').slice(0, 2);
-
-      const bar = root.createElement('span');
-      bar.className = 'fitness-week-day__bar';
-      const fill = root.createElement('i');
-      const volume = volumeByDate.get(day.date) ?? 0;
-      const pct = maxVolume > 0 ? Math.max(8, Math.round((volume / maxVolume) * 100)) : 8;
-      fill.style = fill.style ?? {};
-      if (typeof fill.style.setProperty === 'function') {
-        fill.style.setProperty('--bar', day.completed ? `${pct}%` : '8%');
-      } else {
-        fill.style['--bar'] = day.completed ? `${pct}%` : '8%';
-      }
-      bar.append(fill);
-
-      cell.append(name, bar);
-      days.append(cell);
+  const trained = (model.weekDots ?? []).filter(day => day.completed);
+  const weekStory = root.querySelector('[data-fitness="week-story"]');
+  if (weekStory) {
+    if (!trained.length) {
+      weekStory.textContent = `No sessions yet this week · target ${target}`;
+    } else {
+      const days = trained.map(day => `${(formatWeekday(day.date) || '').slice(0, 3)} ${formatDisplayDate(day.date)}`);
+      const rest = Math.max(0, 7 - trained.length);
+      weekStory.textContent = `Trained ${days.join(', ')} · ${rest} rest day${rest === 1 ? '' : 's'}`;
     }
   }
 
-  const track = root.querySelector('#fitness-quota-track');
-  if (track) {
-    track.replaceChildren();
-    track.setAttribute('role', 'progressbar');
-    track.setAttribute('aria-valuemin', '0');
-    track.setAttribute('aria-valuemax', String(target));
-    track.setAttribute('aria-valuenow', String(done));
-    for (let i = 0; i < target; i++) {
-      const slot = root.createElement('span');
-      slot.dataset.filled = String(i < done);
-      track.append(slot);
+  const monthStory = root.querySelector('[data-fitness="month-story"]');
+  if (monthStory) {
+    const hits = Number.isFinite(model.monthHitCount) ? model.monthHitCount : 0;
+    const last = model.lastCompletedDate ? formatDisplayDate(model.lastCompletedDate) : null;
+    monthStory.textContent = hits
+      ? `Last 30 days: ${hits} session${hits === 1 ? '' : 's'}${last ? ` · most recent ${last}` : ''}`
+      : 'Last 30 days: no completed sessions';
+  }
+
+  const paceStory = root.querySelector('[data-fitness="pace-story"]');
+  if (paceStory) {
+    const remaining = Number.isFinite(model.weekRemaining) ? model.weekRemaining : Math.max(0, target - done);
+    const avgVol = formatKg(model.avgSessionVolumeKg);
+    const avgMin = Number.isFinite(model.avgDurationMin) ? `${model.avgDurationMin} min` : null;
+    const pace = remaining === 0
+      ? 'Week target hit'
+      : `${remaining} session${remaining === 1 ? '' : 's'} short of ${target}`;
+    const extras = [avgVol !== '—' ? `avg session ${avgVol}` : null, avgMin].filter(Boolean);
+    paceStory.textContent = extras.length ? `${pace} · ${extras.join(' · ')}` : pace;
+  }
+
+  const next = root.querySelector('[data-fitness="next-planned"]');
+  if (next) {
+    if (model.nextPlanned?.date) {
+      const day = (formatWeekday(model.nextPlanned.date) || '').slice(0, 3);
+      next.textContent = `Next planned: ${model.nextPlanned.title ?? 'Session'} · ${day} ${formatDisplayDate(model.nextPlanned.date)}`;
+      next.removeAttribute('hidden');
+    } else {
+      next.textContent = '';
+      next.setAttribute('hidden', '');
     }
   }
 }
 
-function renderLongTerm(root, longTerm) {
-  const data = longTerm ?? {};
-  const delta = formatSignedPct(data.volumeDeltaPct);
-  setText(root, '[data-fitness="volume-delta"]', delta);
-  setText(root, '[data-fitness="workouts-week"]', formatWorkoutsPerWeek(data.workoutsPerWeek));
-  setHidden(root.querySelector('[data-fitness="volume-delta-wrap"]'), delta === '—');
-
-  const host = root.querySelector('#fitness-volume-bars');
+function renderWorkingWeights(root, weights) {
+  const host = root.querySelector('#fitness-loads');
+  const card = root.querySelector('#fitness-loads-card');
   if (!host) return;
   host.replaceChildren();
-  const recent = (data.weeklyVolume ?? []).slice(-VOLUME_BAR_WEEKS);
-  const firstHit = recent.findIndex(week => Number(week.value) > 0);
-  let start = firstHit > 0 ? Math.max(0, firstHit - 1) : 0;
-  if (recent.length - start < VOLUME_BAR_MIN) start = Math.max(0, recent.length - VOLUME_BAR_MIN);
-  const series = recent.slice(start);
-  const max = Math.max(0, ...series.map(week => Number(week.value) || 0));
-  for (const week of series) {
-    const bar = root.createElement('span');
-    bar.className = 'fitness-volume-bar';
-    const value = Number(week.value) || 0;
-    const pct = max > 0 ? Math.max(value > 0 ? 12 : 6, Math.round((value / max) * 100)) : 6;
-    bar.dataset.hasValue = String(value > 0);
-    bar.title = `${formatDisplayDate(week.weekStart)} · ${formatKg(value)}`;
-    bar.style = bar.style ?? {};
-    if (typeof bar.style.setProperty === 'function') {
-      bar.style.setProperty('--bar', `${pct}%`);
-    } else {
-      bar.style['--bar'] = `${pct}%`;
-    }
-    host.append(bar);
+  const rows = Array.isArray(weights) ? weights : [];
+  setHidden(card, rows.length === 0);
+  for (const row of rows) {
+    const item = root.createElement('div');
+    item.className = 'fitness-kv-row';
+    const name = root.createElement('strong');
+    name.textContent = row.name;
+    const load = root.createElement('span');
+    load.textContent = `${formatLoad(row)} · ${formatDisplayDate(row.date)}`;
+    item.append(name, load);
+    host.append(item);
+  }
+}
+
+function appendKvRow(root, host, label, value) {
+  const row = root.createElement('div');
+  row.className = 'fitness-kv-row';
+  const name = root.createElement('strong');
+  name.textContent = label;
+  const amount = root.createElement('span');
+  amount.textContent = value;
+  row.append(name, amount);
+  host.append(row);
+}
+
+function renderVolumeWeeks(root, model) {
+  const host = root.querySelector('#fitness-volume-rows');
+  const card = root.querySelector('#fitness-volume-card');
+  if (!host) return;
+  host.replaceChildren();
+  const delta = formatSignedPct(model.weekVolumeDeltaPct);
+  setText(root, '[data-fitness="volume-delta"]', delta);
+  setHidden(root.querySelector('[data-fitness="volume-delta-wrap"]'), delta === '—');
+  appendKvRow(root, host, 'Last 30 days', formatKg(model.monthVolumeKg));
+  appendKvRow(root, host, 'Avg session', formatKg(model.avgSessionVolumeKg));
+  appendKvRow(
+    root,
+    host,
+    'Avg duration',
+    Number.isFinite(model.avgDurationMin) ? `${model.avgDurationMin} min` : '—'
+  );
+  appendKvRow(root, host, 'Unique lifts', String(model.charts?.uniqueLifts ?? 0));
+  appendKvRow(
+    root,
+    host,
+    'kg / set',
+    formatKg(model.charts?.volumePerSetKg)
+  );
+  setHidden(card, false);
+}
+
+function renderRecentSessions(root, sessions) {
+  const host = root.querySelector('#fitness-recent');
+  const card = root.querySelector('#fitness-recent-card');
+  if (!host) return;
+  host.replaceChildren();
+  const rows = Array.isArray(sessions) ? sessions : [];
+  setHidden(card, rows.length === 0);
+  for (const session of rows) {
+    const item = root.createElement('div');
+    item.className = 'fitness-recent-row';
+    const title = root.createElement('strong');
+    title.textContent = session.title ?? 'Session';
+    const meta = root.createElement('p');
+    const parts = [
+      formatWeekday(session.date),
+      formatDisplayDate(session.date),
+      formatKg(session.volume),
+      session.duration_min != null ? `${session.duration_min} min` : null,
+      session.exerciseCount ? `${session.exerciseCount} lifts` : null
+    ].filter(Boolean);
+    meta.textContent = parts.join(' · ');
+    item.append(title, meta);
+    host.append(item);
   }
 }
 
 function renderRegions(root, regions) {
   const grid = root.querySelector('#fitness-region-grid');
+  const block = root.querySelector('.fitness-region-block');
   if (!grid) return;
   grid.replaceChildren();
+  const visible = (regions ?? []).filter(region => (
+    region.currentBestKg != null || (Number(region.currentVolume) > 0)
+  ));
+  setHidden(block, visible.length === 0);
 
-  for (const region of regions ?? []) {
-    const card = root.createElement('article');
-    card.className = 'metric-card fitness-region-card';
+  for (const region of visible) {
+    const card = root.createElement('div');
+    card.className = 'fitness-region-card';
     card.dataset.region = region.key;
     card.dataset.colour = region.colour ?? 'neutral';
 
@@ -295,6 +342,7 @@ function renderHero(root, session, { logger, libraryByName } = {}) {
   setText(root, '[data-fitness="hero-title"]', session.title ?? 'Session');
   setText(root, '[data-fitness="hero-duration"]', session.duration_min != null ? `${session.duration_min} min` : '—');
   setText(root, '[data-fitness="hero-status"]', session.status ?? '—');
+  setText(root, '[data-fitness="hero-volume"]', formatKg(session.volume));
 
   const mapKeys = session.muscleMapKeys ?? resolveMuscleMapKeys({
     focus: session.focus,

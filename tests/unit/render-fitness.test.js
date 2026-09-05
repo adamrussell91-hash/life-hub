@@ -167,35 +167,40 @@ test('empty focus and first-logged comparisons stay hidden', () => {
   assert.equal(root.ensure('#fitness-comparisons').children.length, 0);
 });
 
-test('week board, volume bars, and compact heatmap render useful density', () => {
+test('status, working weights, and labeled volume rows replace empty charts', () => {
   const root = fitnessRoot();
   renderFitness(root, baseModel({
     heroSession: null,
     weekCompletedCount: 1,
     weekTarget: 4,
+    weekVolumeKg: 400,
+    lastWeekVolumeKg: 0,
+    monthVolumeKg: 400,
+    avgSessionVolumeKg: 400,
+    avgDurationMin: 26,
+    weekRemaining: 3,
+    nextPlanned: { date: '2026-08-29', title: 'Upper Body' },
+    lastCompletedDate: '2026-07-30',
+    monthHitCount: 1,
     weekDots: [
       { date: '2026-07-24', completed: false, isToday: false },
-      { date: '2026-07-25', completed: false, isToday: false },
-      { date: '2026-07-26', completed: false, isToday: false },
-      { date: '2026-07-27', completed: false, isToday: false },
-      { date: '2026-07-28', completed: false, isToday: false },
-      { date: '2026-07-29', completed: false, isToday: false },
       { date: '2026-07-30', completed: true, isToday: true }
     ],
-    weekVolume: [
-      { date: '2026-07-24', volume: 0 },
-      { date: '2026-07-30', volume: 400 }
-    ],
-    longTerm: {
-      weeklyVolume: Array.from({ length: 12 }, (_, i) => ({
-        weekStart: `2026-0${Math.min(9, 5 + Math.floor(i / 4))}-01`,
-        value: i === 11 ? 800 : 0
-      })),
-      volumeDeltaPct: 40,
-      workoutsPerWeek: 1.5,
-      adherencePct: 38,
-      strengthDeltaPct: 17.1
-    },
+    workingWeights: [{
+      name: 'Chest Press',
+      weight_kg: 34,
+      reps: 8,
+      date: '2026-07-30'
+    }],
+    volumeWeeks: [{ weekStart: '2026-07-27', value: 400 }],
+    weekVolumeDeltaPct: null,
+    recentSessions: [{
+      date: '2026-07-30',
+      title: 'Chest and Curls',
+      duration_min: 26,
+      volume: 400,
+      exerciseCount: 2
+    }],
     focusHits: [{ key: 'chest', label: 'chest', count: 2 }],
     comparisons: [{
       name: 'Bar Press',
@@ -204,23 +209,62 @@ test('week board, volume bars, and compact heatmap render useful density', () =>
       weightDeltaKg: 4,
       currentBest: { weight_kg: 34, reps: 10 },
       previousBest: { weight_kg: 30, reps: 10 }
-    }],
-    month: [
-      { date: '2026-07-01', completed: false },
-      { date: '2026-07-30', completed: true }
-    ]
+    }]
   }));
 
   assert.equal(root.ensure('[data-fitness="week-done"]').textContent, '1');
-  assert.equal(root.ensure('#fitness-week-days').children.length, 7);
-  assert.equal(root.ensure('#fitness-quota-track').children.length, 4);
-  assert.equal(root.ensure('#fitness-volume-bars').children.length, 8);
-  assert.equal(root.ensure('#fitness-focus-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('[data-fitness="week-volume"]').textContent, '400 kg');
+  assert.equal(root.ensure('[data-fitness="last-week-volume"]').textContent, '—');
+  assert.match(root.ensure('[data-fitness="week-story"]').textContent, /Trained Thu 30\/07/);
+  assert.match(root.ensure('[data-fitness="month-story"]').textContent, /1 session/);
+  assert.match(root.ensure('[data-fitness="pace-story"]').textContent, /3 sessions short/);
+  assert.match(root.ensure('[data-fitness="next-planned"]').textContent, /Upper Body/);
+  assert.equal(root.ensure('#fitness-loads-card').attributes.hidden, undefined);
+  assert.match(root.ensure('#fitness-loads').children[0].children[1].textContent, /34 kg × 8/);
+  assert.equal(root.ensure('#fitness-volume-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-volume-rows').children[0].children[0].textContent, 'Last 30 days');
+  assert.equal(root.ensure('#fitness-volume-rows').children[0].children[1].textContent, '400 kg');
+  assert.equal(root.ensure('#fitness-volume-rows').children[1].children[1].textContent, '400 kg');
+  assert.equal(root.ensure('#fitness-volume-rows').children[2].children[1].textContent, '26 min');
+  assert.equal(root.ensure('#fitness-volume-rows').children[3].children[0].textContent, 'Unique lifts');
+  assert.equal(root.ensure('#fitness-volume-rows').children[4].children[0].textContent, 'kg / set');
+  assert.equal(root.ensure('#fitness-recent-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-comparisons-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-comparisons').children.length, 1);
   assert.equal(root.ensure('#fitness-comparisons').children[0].children[2].textContent, 'PR');
-  assert.equal(root.ensure('[data-fitness="month-hits"]').textContent, '1');
-  assert.equal(root.ensure('#fitness-heatmap').children.length, 2);
+});
+
+test('labeled pies unhide and empty trend cards stay hidden', () => {
+  const root = fitnessRoot();
+  renderFitness(root, baseModel({
+    heroSession: null,
+    charts: {
+      longestStreak: 1,
+      uniqueLifts: 2,
+      volumePerSetKg: 200,
+      weekRing: { value: 1, target: 4 },
+      skipRing: { value: 0, target: 1, missed: 0, scheduled: 1, completed: 1 },
+      recoveryRing: { value: 0, target: 1, flagged: 0, completed: 1 },
+      restRatio: [{ key: 'trained', label: 'Trained', value: 1, colour: 'var(--wave)' }],
+      restCounts: { trained: 1, rest: 29, days: 30 },
+      repRanges: [{ key: '9-12', label: '9–12 reps', value: 2, colour: 'var(--wave)' }],
+      regionVolume: [{ key: 'chest', label: 'Chest', value: 400, colour: 'var(--wave)' }],
+      pushPull: [{ key: 'push', label: 'Push', value: 400, colour: 'var(--wave)' }],
+      e1rmTrends: [],
+      volumePerSetWeeks: [],
+      durationSeries: [],
+      distanceSeries: [],
+      paceSeries: [],
+      hrSeries: [],
+      painBySite: []
+    }
+  }));
+  assert.equal(root.ensure('[data-fitness="week-ring-value"]').textContent, '1');
+  assert.equal(root.ensure('[data-fitness="longest-streak"]').textContent, '1');
+  assert.equal(root.ensure('#fitness-rep-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-region-vol-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-e1rm-card').attributes.hidden, '');
+  assert.equal(root.ensure('#fitness-distance-card').attributes.hidden, '');
+  assert.equal(root.ensure('#fitness-pain-card').attributes.hidden, '');
 });
 
 test('region cards prefer the 30-day delta when both current and delta exist', () => {
