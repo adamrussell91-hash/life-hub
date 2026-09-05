@@ -2068,13 +2068,13 @@
   }
 
   .chat-view[data-panel-mode='overlay'] .chat-view__toolbar {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: var(--space-1);
   }
 
   .chat-view[data-panel-mode='overlay'] .chat-view__toolbar .btn {
     min-height: 2rem;
-    padding-inline: 0.7rem;
+    padding-inline: var(--space-2);
     font-size: var(--text-sm);
   }
 }
