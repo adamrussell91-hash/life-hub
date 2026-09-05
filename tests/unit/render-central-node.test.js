@@ -28,6 +28,12 @@ class FakeElement {
     this.listeners.push([type, fn]);
   }
 
+  click() {
+    for (const [type, fn] of this.listeners) {
+      if (type === 'click') fn();
+    }
+  }
+
   removeEventListener() {}
 
   set textContent(value) {
@@ -231,6 +237,11 @@ function fakeCentralNodeRoot({ boardWidth = 900 } = {}) {
   return {
     createElement: tag => new FakeElement(tag),
     createElementNS: (_ns, tag) => new FakeElement(tag),
+    createTextNode: text => {
+      const node = new FakeElement('#text');
+      node.textContent = text;
+      return node;
+    },
     querySelector(selector) {
       if (bySelector[selector]) return bySelector[selector];
       return board.querySelector(selector) ?? dashboard.querySelector(selector);
@@ -417,4 +428,41 @@ test('renderCentralNode paints three radial rings from year hit maps and honest-
     String(node.className).includes('cn-honest-empty')
   );
   assert.match(empty.textContent, /Need 1 hit days this year/);
+});
+
+test('renderCentralNode paints a stream with clinical colours and scans three trend blocks', () => {
+  const root = fakeCentralNodeRoot({ boardWidth: 900 });
+  renderCentralNode(root, baseModel({
+    domainWeekly: {
+      weeks: ['2026-07-20', '2026-07-27'],
+      series: [
+        { key: 'nutrition', values: [2, 4] },
+        { key: 'fitness', values: [1, 0] }
+      ]
+    },
+    sections: {
+      ...baseModel().sections,
+      longTermTrends: '**Nutrition:**\n- Protein rising.\n**Exercise:**\n- EP anchor.\n**Health Trajectory:**\n- Taper.\n**Work/Energy:**\n- Holidays.'
+    }
+  }));
+  const svg = root.querySelector('#central-node-stream');
+  assert.ok(svg.children.some(node => node.tagName === 'path'));
+  assert.ok(svg.children.some(node => node.getAttribute('fill') === 'var(--wave)'));
+  const scan = root.querySelector('[data-role="trend-scan"]');
+  assert.match(scan.textContent, /Nutrition/);
+  assert.match(scan.textContent, /Exercise/);
+  assert.equal(scan.textContent.includes('Work/Energy'), false);
+  const more = root.querySelector('[data-role="trend-more"]');
+  assert.equal(more.hidden, false);
+  more.click();
+  assert.match(scan.textContent, /Work\/Energy/);
+});
+
+test('renderCentralNode honest-empties the stream when there are no weekly bands', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel({ domainWeekly: { weeks: [], series: [] } }));
+  const empty = root.querySelector('#cn-tile-trends').children.find(node =>
+    String(node.className).includes('cn-honest-empty')
+  );
+  assert.match(empty.textContent, /Need 1 weekly domain bands/);
 });

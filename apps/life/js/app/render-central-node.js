@@ -3,7 +3,8 @@ import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
 import { buildHorizonBands } from './chart-kit/horizon.js';
 import { packMasonry } from './chart-kit/masonry.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
-import { buildCompletionRing, hitMapFromSeries, weekHorizonMetrics } from './central-node-charts.js';
+import { buildThemeTopography } from './chart-kit/stream.js';
+import { buildCompletionRing, hitMapFromSeries, scanTrendBlocks, weekHorizonMetrics } from './central-node-charts.js';
 import { renderInlineMarkdown } from './render-chat.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
@@ -47,6 +48,8 @@ export function renderCentralNode(root, model) {
   bindCnBoard(root);
   renderWeekHorizon(root, model);
   renderRadialYear(root, model);
+  renderStreamTile(root, model);
+  renderTrendScan(root, model);
   packCnBoard(root);
   root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
 }
@@ -166,6 +169,70 @@ function renderRadialYear(root, model) {
     label.textContent = month;
     svg.append(label);
   });
+}
+
+function renderStreamTile(root, model) {
+  const svg = root.querySelector('#central-node-stream');
+  const tile = root.querySelector('#cn-tile-trends') ?? svg?.parentNode;
+  if (!svg || !tile) return;
+  const chart = buildThemeTopography(model.domainWeekly ?? { weeks: [], series: [] });
+  if (!paintChartOrEmpty(root, tile, svg, {
+    need: 1,
+    have: chart.bands.length,
+    unit: 'weekly domain bands'
+  })) return;
+  svg.replaceChildren();
+  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+  const hideContours = (root.querySelector('#cn-board')?.getBoundingClientRect?.()?.width ?? 900) < 560;
+  chart.bands.forEach((band, index) => {
+    const colour = CLINICAL_CHART_SLOTS[index % CLINICAL_CHART_SLOTS.length];
+    const path = createSvg(root, 'path');
+    path.setAttribute('d', band.d);
+    path.setAttribute('fill', colour);
+    path.setAttribute('fill-opacity', '0.55');
+    path.setAttribute('stroke', 'none');
+    svg.append(path);
+    if (hideContours) return;
+    for (const contour of band.contours ?? []) {
+      const line = createSvg(root, 'path');
+      line.setAttribute('d', contour.d);
+      line.setAttribute('fill', 'none');
+      line.setAttribute('stroke', colour);
+      line.setAttribute('stroke-opacity', '0.35');
+      svg.append(line);
+    }
+  });
+}
+
+function renderTrendScan(root, model) {
+  const host = root.querySelector('[data-role="trend-scan"]');
+  const more = root.querySelector('[data-role="trend-more"]');
+  if (!host) return;
+  const scan = scanTrendBlocks(model.sections?.longTermTrends ?? '');
+  const paint = (blocks) => {
+    host.replaceChildren();
+    for (const block of blocks) {
+      const row = root.createElement('p');
+      row.className = 'metric-caption';
+      const strong = root.createElement('strong');
+      strong.textContent = block.label;
+      row.append(strong, root.createTextNode ? root.createTextNode(` · ${block.line}`) : null);
+      if (!root.createTextNode) row.append(Object.assign(root.createElement('span'), { textContent: ` · ${block.line}` }));
+      host.append(row);
+    }
+  };
+  paint(scan.preview);
+  if (more) {
+    more.hidden = scan.rest.length === 0;
+    if (!more.dataset.bound) {
+      more.dataset.bound = '1';
+      more.addEventListener('click', () => {
+        paint([...scan.preview, ...scan.rest]);
+        more.hidden = true;
+        packCnBoard(root);
+      });
+    }
+  }
 }
 
 function renderWeekHorizon(root, model) {
