@@ -50,8 +50,19 @@ function draftWithCues(coach_cues, sets) {
   };
 }
 
+function walk(node) {
+  const list = [];
+  const visit = current => {
+    if (!current) return;
+    list.push(current);
+    for (const child of current.children ?? []) visit(child);
+  };
+  visit(node);
+  return list;
+}
+
 function findExerciseCard(logger) {
-  return logger.children.find(child => child.className === 'fitness-logger__exercise');
+  return walk(logger).find(child => child.className === 'fitness-logger__exercise');
 }
 
 function cuesIn(node, marker) {
@@ -141,6 +152,24 @@ test('logger shows add-exercise, reorder controls, and session detail fields', (
   const details = root.logger.children.find(child => child.className === 'fitness-logger__details');
   assert.ok(details);
   assert.match(details.children[0].textContent, /Session details/);
+});
+
+test('multiple exercises sit in a swipe deck and keep set logging on each card', () => {
+  const root = new FakeRoot();
+  const draft = draftWithCues(undefined, [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }]);
+  draft.exercises.push({
+    name: 'Cable fly',
+    sets: [{ reps: 12, weight_kg: 12, cable_type: 'constant_force' }]
+  });
+  renderFitnessLogger(root, draft, { exerciseIndex: 1 });
+
+  const swipe = root.logger.children.find(child => String(child.className || '').includes('fitness-logger__swipe'));
+  assert.ok(swipe, 'logger mounts the kit swipe deck');
+  assert.equal(swipe.dataset.cardSwipeIndex, '1');
+  const cards = walk(swipe).filter(child => child.className === 'fitness-logger__exercise');
+  assert.equal(cards.length, 2);
+  assert.equal(cards[0].children[0].children[0].textContent, 'Bench');
+  assert.equal(cards[1].children[0].children[0].textContent, 'Cable fly');
 });
 
 test('a single-set exercise gets the final_set cue on that only set, never a rest cue', () => {

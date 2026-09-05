@@ -1,3 +1,4 @@
+import { createCardSwipe } from '../../../../packages/design-kit/js/card-swipe.js';
 import {
   createMorphingNotePopover,
   createMorphingValuesPopover
@@ -37,11 +38,13 @@ export function renderFitnessLogger(root, draft, {
   elapsedMs = 0,
   saveState = '',
   timer = { state: 'idle', everStarted: false, completeVisible: false },
+  exerciseIndex = 0,
   onChange,
   onAddSet,
   onAddExercise,
   onMoveExercise,
   onRemoveExercise,
+  onExerciseIndexChange,
   onFinish,
   onStart,
   onPause,
@@ -115,8 +118,20 @@ export function renderFitnessLogger(root, draft, {
   status.textContent = saveState;
   host.append(status);
 
-  for (let exerciseIndex = 0; exerciseIndex < (draft.exercises ?? []).length; exerciseIndex++) {
-    const exercise = draft.exercises[exerciseIndex];
+  const exercises = draft.exercises ?? [];
+  const swipe = createCardSwipe({
+    root,
+    items: [],
+    currentIndex: exerciseIndex,
+    onIndexChange: onExerciseIndexChange,
+    className: 'fitness-logger__swipe',
+    label: 'Exercises',
+    fluid: true,
+    tilt: 16
+  });
+
+  for (let index = 0; index < exercises.length; index++) {
+    const exercise = exercises[index];
     const card = root.createElement('div');
     card.className = 'fitness-logger__exercise';
 
@@ -133,8 +148,8 @@ export function renderFitnessLogger(root, draft, {
     moveUp.dataset.fitnessLogger = 'move-up';
     moveUp.setAttribute('aria-label', `Move ${exercise.name ?? 'exercise'} up`);
     moveUp.textContent = '↑';
-    moveUp.disabled = exerciseIndex === 0;
-    moveUp.addEventListener('click', () => onMoveExercise?.(exerciseIndex, exerciseIndex - 1));
+    moveUp.disabled = index === 0;
+    moveUp.addEventListener('click', () => onMoveExercise?.(index, index - 1));
 
     const moveDown = root.createElement('button');
     moveDown.type = 'button';
@@ -142,8 +157,8 @@ export function renderFitnessLogger(root, draft, {
     moveDown.dataset.fitnessLogger = 'move-down';
     moveDown.setAttribute('aria-label', `Move ${exercise.name ?? 'exercise'} down`);
     moveDown.textContent = '↓';
-    moveDown.disabled = exerciseIndex === (draft.exercises.length - 1);
-    moveDown.addEventListener('click', () => onMoveExercise?.(exerciseIndex, exerciseIndex + 1));
+    moveDown.disabled = index === (exercises.length - 1);
+    moveDown.addEventListener('click', () => onMoveExercise?.(index, index + 1));
 
     const remove = root.createElement('button');
     remove.type = 'button';
@@ -151,7 +166,7 @@ export function renderFitnessLogger(root, draft, {
     remove.dataset.fitnessLogger = 'remove-exercise';
     remove.setAttribute('aria-label', `Remove ${exercise.name ?? 'exercise'}`);
     remove.textContent = 'Remove';
-    remove.addEventListener('click', () => onRemoveExercise?.(exerciseIndex));
+    remove.addEventListener('click', () => onRemoveExercise?.(index));
 
     tools.append(moveUp, moveDown, remove);
     head.append(name, tools);
@@ -181,7 +196,7 @@ export function renderFitnessLogger(root, draft, {
       bench.value = exercise.bench_angle_deg ?? '';
       bench.addEventListener('input', () => {
         const value = bench.value.trim() === '' ? null : Number(bench.value);
-        onChange?.({ type: 'bench', exerciseIndex, value: Number.isFinite(value) ? value : null });
+        onChange?.({ type: 'bench', exerciseIndex: index, value: Number.isFinite(value) ? value : null });
       });
       benchRow.append(bench);
       card.append(benchRow);
@@ -203,7 +218,7 @@ export function renderFitnessLogger(root, draft, {
       intensification.append(el);
     }
     intensification.addEventListener('change', () => {
-      onChange?.({ type: 'intensification', exerciseIndex, value: intensification.value });
+      onChange?.({ type: 'intensification', exerciseIndex: index, value: intensification.value });
     });
     intensificationRow.append(intensification);
     card.append(intensificationRow);
@@ -232,7 +247,7 @@ export function renderFitnessLogger(root, draft, {
       weight.step = '0.5';
       weight.value = set.weight_kg ?? 0;
       weight.addEventListener('input', () => {
-        onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'weight_kg', value: Number(weight.value) });
+        onChange?.({ type: 'set', exerciseIndex: index, setIndex, field: 'weight_kg', value: Number(weight.value) });
       });
 
       const reps = root.createElement('input');
@@ -241,7 +256,7 @@ export function renderFitnessLogger(root, draft, {
       reps.step = '1';
       reps.value = set.reps ?? 0;
       reps.addEventListener('input', () => {
-        onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'reps', value: Number(reps.value) });
+        onChange?.({ type: 'set', exerciseIndex: index, setIndex, field: 'reps', value: Number(reps.value) });
       });
 
       const cable = root.createElement('select');
@@ -253,7 +268,7 @@ export function renderFitnessLogger(root, draft, {
         cable.append(el);
       }
       cable.addEventListener('change', () => {
-        onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'cable_type', value: cable.value });
+        onChange?.({ type: 'set', exerciseIndex: index, setIndex, field: 'cable_type', value: cable.value });
       });
 
       row.append(index, weight, reps, cable);
@@ -283,10 +298,13 @@ export function renderFitnessLogger(root, draft, {
     add.type = 'button';
     add.className = 'fitness-logger__add-set btn btn--secondary quiet-button';
     add.textContent = '+ Set';
-    add.addEventListener('click', () => onAddSet?.(exerciseIndex));
+    add.addEventListener('click', () => onAddSet?.(index));
     card.append(add);
-    host.append(card);
+    swipe.appendSlide(card, { title: exercise.name ?? 'Exercise' });
   }
+
+  swipe.sync();
+  host.append(swipe.el);
 
   const addExercise = root.createElement('div');
   addExercise.className = 'fitness-logger__add-exercise';

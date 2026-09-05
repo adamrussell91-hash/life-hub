@@ -1564,6 +1564,15 @@ main { max-width: 76rem; margin: 0 auto; }
   background: color-mix(in srgb, var(--fitness-accent) 12%, var(--warm-white));
 }
 .fitness-logger__save { min-height: 1.1em; margin: 0; }
+.fitness-logger__swipe {
+  width: 100%;
+}
+.fitness-logger__swipe .hub-card-swipe__viewport {
+  width: 100%;
+}
+.fitness-logger__swipe .fitness-logger__exercise {
+  min-height: 100%;
+}
 .fitness-logger__exercise {
   padding: 0.75rem;
   border-radius: 0.85rem;
