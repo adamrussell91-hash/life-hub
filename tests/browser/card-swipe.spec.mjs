@@ -248,3 +248,47 @@ test('fluid logger deck stays phone-width with many exercises', async () => {
     await context.close();
   }
 });
+
+test('pointer-only tap opens the set editor without a click event', async () => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}/card-swipe-preview.html`);
+    const peek = page.locator('#logger .hub-card-swipe__slide[aria-hidden="false"] .fitness-logger__peek');
+    await peek.waitFor();
+    const box = await peek.boundingBox();
+    assert.ok(box, 'expected peek card box');
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    // Real phones often never fire click after pointer capture — only pointer events.
+    await page.evaluate(({ x, y }) => {
+      const track = document.querySelector('#logger .hub-card-swipe__track');
+      const fire = (type, cx, cy, buttons) => {
+        track.dispatchEvent(new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX: cx,
+          clientY: cy,
+          pointerId: 1,
+          pointerType: 'touch',
+          isPrimary: true,
+          buttons
+        }));
+      };
+      fire('pointerdown', x, y, 1);
+      fire('pointermove', x + 18, y + 4, 1);
+      fire('pointerup', x + 18, y + 4, 0);
+    }, { x, y });
+    const dialog = page.locator('.hub-morph-dialog.is-in');
+    await dialog.waitFor();
+    const editor = dialog.locator('.fitness-logger__exercise');
+    await editor.waitFor();
+    assert.match(await editor.locator('h4').textContent(), /Bench press/);
+  } finally {
+    await context.close();
+  }
+});
