@@ -504,6 +504,112 @@ test('does not upsert a fitness template for a planned (not completed) workout',
   assert.ok(!calls.some(call => call.url.includes('data/fitness/templates/')), 'must not touch templates for a planned workout');
 });
 
+test('planned workout confirm does not write Central Node and reports the sync as fine', async () => {
+  const plannedCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'The Full Send',
+      session_kind: 'strength',
+      day_type: 'workout_45_60',
+      status: 'planned',
+      recovery_flag_next_day: false,
+      exercises: [{ name: 'Bar Squat', sets: [{ reps: 10, weight_kg: 30, cable_type: 'none' }] }],
+      pain_flags: []
+    }
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: plannedCandidate, slug: 'workout-planned' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.centralNodeUpdated, true);
+  assert.equal(payload.data.path, 'data/fitness/2026/08/2026-08-01-workout-planned.md');
+  assert.ok(!calls.some(call => call.options?.method === 'PUT' && call.url.includes('central-node.md')));
+});
+
+test('planned workout confirm overwrites today’s existing planned file instead of creating a second one', async () => {
+  const existingPath = 'data/fitness/2026/08/2026-08-01-workout-1607.md';
+  const existingSha = 'e'.repeat(40);
+  const existingMarkdown = [
+    '---',
+    'title: "The Full Send"',
+    'session_kind: "strength"',
+    'status: "planned"',
+    'day_type: "workout_45_60"',
+    'schema_version: 1',
+    'id: "workout-old"',
+    'type: "workout"',
+    'date: "2026-08-01"',
+    'time: "16:07"',
+    '---',
+    ''
+  ].join('\n');
+  const plannedCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'The Full Send — amended',
+      session_kind: 'strength',
+      day_type: 'workout_45_60',
+      status: 'planned',
+      recovery_flag_next_day: false,
+      exercises: [
+        { name: 'Bar Squat', sets: [{ reps: 10, weight_kg: 30, cable_type: 'none' }, { reps: 10, weight_kg: 30, cable_type: 'none' }] }
+      ],
+      pain_flags: []
+    }
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: existingPath, type: 'blob', sha: existingSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${existingSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(existingMarkdown, 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({
+    candidate: plannedCandidate,
+    slug: 'workout-1609',
+    overwrite: false
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, existingPath);
+  const workoutPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes(existingPath));
+  assert.ok(workoutPut, 'must overwrite the existing planned file');
+  assert.equal(JSON.parse(workoutPut.options.body).sha, existingSha);
+  assert.ok(!calls.some(call => call.options?.method === 'PUT' && call.url.includes('workout-1609')));
+});
+
 test('a failing template upsert never fails the confirm response', async () => {
   const workoutCandidate = {
     type: 'workout',

@@ -134,7 +134,7 @@ test('lock it onto Fitness shows a Confirm card', async () => {
 
   const proposal = page.locator('.record-proposal');
   await proposal.waitFor();
-  assert.match(await proposal.innerText(), /Start workout|Confirm/i);
+  assert.match(await proposal.innerText(), /Save to Fitness|Start workout|Confirm/i);
   await context.close();
 });
 
@@ -190,7 +190,7 @@ test('make the workout shows a Confirm card', async () => {
 
   const proposal = page.locator('.record-proposal');
   await proposal.waitFor();
-  assert.match(await proposal.innerText(), /Start workout|Confirm/i);
+  assert.match(await proposal.innerText(), /Save to Fitness|Start workout|Confirm/i);
   await page.locator('#chat-messages').waitFor();
   assert.doesNotMatch(await page.locator('#chat-messages').innerText(), /got cut off/i);
   await context.close();
