@@ -1,7 +1,7 @@
 # Central Node dashboard visual restyle
 
 **Date:** 2026-09-05  
-**Status:** Draft (review). Spec only — no implementation in this pass.  
+**Status:** Approved (planning).  
 **Does not replace:** `2026-08-09-hammond-central-node-governance-design.md` (CN + Governance Log write contract) or `2026-09-05-hammond-whole-hub-coordination-design.md` (Clare/Ann mailbox, audit contracts, `DOMAIN_PATH`). This spec is the **read surface** only.  
 **Chart language:** `2026-07-31-life-hub-design.md` → Charts.  
 **Tile chrome / spacing:** `2026-08-16-mind-visual-restyle-design.md` (question kicker, honest empty) and `2026-08-09-tile-spacing-chrome-design.md` (`--space-stack` / `--space-grid` / `--space-tile`). Do not invent a fifth layout convention.  
