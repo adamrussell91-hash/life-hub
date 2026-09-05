@@ -26,6 +26,7 @@
   position: relative;
   width: var(--hub-card-swipe-item-width);
   overflow: hidden;
+  overflow: clip;
   perspective: 1000px;
 }
 

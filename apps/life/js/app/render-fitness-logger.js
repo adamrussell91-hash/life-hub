@@ -426,8 +426,8 @@ export function renderFitnessLogger(root, draft, {
     swipe.appendSlide(peek, { title: exercise.name ?? 'Exercise' });
   }
 
-  swipe.sync();
   host.append(swipe.el);
+  swipe.sync();
 
   if (expandedExerciseIndex != null && exercises[expandedExerciseIndex]) {
     const editor = buildExerciseEditor(root, exercises[expandedExerciseIndex], expandedExerciseIndex, {

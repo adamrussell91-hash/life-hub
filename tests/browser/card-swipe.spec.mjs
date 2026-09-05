@@ -145,6 +145,18 @@ test('tapping a compact card expands the set editor', async () => {
     await peek.waitFor();
     assert.equal(await peek.evaluate(el => getComputedStyle(el).visibility), 'visible');
     assert.match(await peek.locator('.hub-card-swipe__title').textContent(), /Bayesian curl/);
+    const alignment = await page.evaluate(() => {
+      const viewport = document.querySelector('#logger .hub-card-swipe__viewport');
+      const slide = document.querySelector('#logger .hub-card-swipe__slide[aria-hidden="false"]');
+      const vr = viewport.getBoundingClientRect();
+      const sr = slide.getBoundingClientRect();
+      return {
+        leftDelta: Math.abs(sr.left - vr.left),
+        widthDelta: Math.abs(sr.width - vr.width)
+      };
+    });
+    assert.ok(alignment.leftDelta < 8, `expected current card flush in the viewport, left delta ${alignment.leftDelta}`);
+    assert.ok(alignment.widthDelta < 8, `expected current card to fill the viewport, width delta ${alignment.widthDelta}`);
   } finally {
     await context.close();
   }

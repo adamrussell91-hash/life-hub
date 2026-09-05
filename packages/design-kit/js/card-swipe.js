@@ -512,13 +512,25 @@ function bindCardSwipe(wrap, {
     listeners.push(() => target.removeEventListener?.(type, handler, options));
   }
 
+  function layout() {
+    applyX(xFor(index), { animate: false });
+    syncHeight();
+  }
+
   listen(track, 'pointerdown', onPointerDown);
   listen(track, 'pointermove', onPointerMove);
   listen(track, 'pointerup', onPointerUp);
   listen(track, 'pointercancel', onPointerUp);
   listen(track, 'click', onClick);
   listen(wrap, 'keydown', onKeyDown);
-  listen(viewOf(wrap), 'resize', () => applyX(xFor(index), { animate: false }));
+  listen(viewOf(wrap), 'resize', layout);
+
+  const ResizeObserverCtor = viewOf(wrap)?.ResizeObserver ?? globalThis.ResizeObserver;
+  if (typeof ResizeObserverCtor === 'function' && viewport) {
+    const observer = new ResizeObserverCtor(() => layout());
+    observer.observe(viewport);
+    listeners.push(() => observer.disconnect());
+  }
 
   function destroy() {
     for (const off of listeners) off();
