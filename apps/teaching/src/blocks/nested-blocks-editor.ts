@@ -1,3 +1,8 @@
+import {
+  draggable,
+  dropTargetForElements
+} from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
 import { createBlockEditor } from '@/blocks/editors';
 import {
   BLOCK_GROUPS,
@@ -7,7 +12,14 @@ import {
   expandGroupTypesForMenu,
   type NewBlockType
 } from '@/blocks/create-block';
+import {
+  isNestedBlockDrag,
+  nestedBlockDrag,
+  nestedReorderDrag
+} from '@/blocks/teaching-pragmatic-dnd';
 import type { Block } from '@/schemas/block';
+
+const COL_MOVE_MIME = 'application/x-th-col-move';
 
 export interface NestedBlocksEditorOptions {
   blocks: Block[];
@@ -21,17 +33,35 @@ export interface NestedBlocksEditorOptions {
   };
 }
 
+function reorderLocal(blocks: Block[], fromIndex: number, toIndex: number): Block[] {
+  if (fromIndex === toIndex || fromIndex < 0 || fromIndex >= blocks.length) return blocks;
+  const next = [...blocks];
+  const [moved] = next.splice(fromIndex, 1);
+  if (!moved) return blocks;
+  let insertAt = toIndex;
+  if (fromIndex < toIndex) insertAt -= 1;
+  insertAt = Math.max(0, Math.min(insertAt, next.length));
+  next.splice(insertAt, 0, moved);
+  return next;
+}
+
 export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HTMLElement {
   const root = document.createElement('div');
   root.className = 'block-editor__nested-list';
 
   let blocks = [...options.blocks];
   let counter = 0;
+  let cleanups: CleanupFn[] = [];
 
   const nextId = () => {
     counter += 1;
     return options.idFactory() + `_n${counter}`;
   };
+
+  function clearCleanups(): void {
+    for (const stop of cleanups) stop();
+    cleanups = [];
+  }
 
   function emit(next: Block[]): void {
     blocks = next;
@@ -39,8 +69,42 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
     render();
   }
 
+  function applyDropAt(index: number, data: Record<string | symbol, unknown>): void {
+    if (!isNestedBlockDrag(data)) return;
+    const columnMove = options.columnMove;
+    if (data.kind === 'nested-reorder') {
+      emit(reorderLocal(blocks, data.fromIndex, index));
+      return;
+    }
+    // Cross-column receive is owned by the column pane in layout-editors.
+    if (columnMove && data.fromCol !== columnMove.columnIndex) return;
+    emit(reorderLocal(blocks, data.fromIndex, index));
+  }
+
+  function bindGap(gap: HTMLElement, index: number): void {
+    cleanups.push(
+      dropTargetForElements({
+        element: gap,
+        canDrop: ({ source }) => isNestedBlockDrag(source.data),
+        onDragEnter: () => gap.classList.add('block-editor__nested-gap--active'),
+        onDragLeave: () => gap.classList.remove('block-editor__nested-gap--active'),
+        onDrop: ({ source }) => {
+          gap.classList.remove('block-editor__nested-gap--active');
+          applyDropAt(index, source.data);
+        }
+      })
+    );
+  }
+
   function render(): void {
+    clearCleanups();
     root.replaceChildren();
+
+    const firstGap = document.createElement('div');
+    firstGap.className = 'block-editor__nested-gap';
+    firstGap.dataset.index = '0';
+    bindGap(firstGap, 0);
+    root.append(firstGap);
 
     blocks.forEach((block, index) => {
       const row = document.createElement('div');
@@ -49,6 +113,14 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
 
       const controls = document.createElement('div');
       controls.className = 'block-editor__nested-controls';
+
+      const grip = document.createElement('button');
+      grip.type = 'button';
+      grip.className = 'btn btn--ghost block-editor__nested-grip';
+      grip.textContent = '⠿';
+      grip.title = 'Drag to reorder';
+      grip.setAttribute('aria-label', 'Drag to reorder');
+      grip.addEventListener('click', (event) => event.stopPropagation());
 
       const up = document.createElement('button');
       up.type = 'button';
@@ -97,7 +169,7 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
         emit(blocks.filter((_, i) => i !== index));
       });
 
-      controls.append(up, down, dup, del);
+      controls.append(grip, up, down, dup, del);
 
       const columnMove = options.columnMove;
       if (columnMove && columnMove.columnCount > 1) {
@@ -123,13 +195,25 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
           columnMove.onMoveToColumn(to, index);
         });
         controls.append(move);
+      }
 
-        row.draggable = true;
+      cleanups.push(
+        draggable({
+          element: row,
+          dragHandle: grip,
+          getInitialData: () =>
+            columnMove
+              ? nestedBlockDrag(columnMove.columnIndex, index)
+              : nestedReorderDrag(index),
+          onDragStart: () => row.classList.add('block-editor__nested-row--dragging'),
+          onDrop: () => row.classList.remove('block-editor__nested-row--dragging')
+        })
+      );
+
+      // HTML5 MIME kept for column-pane drop listeners / unit tests.
+      if (columnMove && columnMove.columnCount > 1) {
         row.addEventListener('dragstart', (event) => {
-          event.dataTransfer?.setData(
-            'application/x-th-col-move',
-            `${columnMove.columnIndex}:${index}`
-          );
+          event.dataTransfer?.setData(COL_MOVE_MIME, `${columnMove.columnIndex}:${index}`);
           if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
         });
       }
@@ -147,6 +231,12 @@ export function createNestedBlocksEditor(options: NestedBlocksEditorOptions): HT
 
       row.append(controls, editor);
       root.append(row);
+
+      const afterGap = document.createElement('div');
+      afterGap.className = 'block-editor__nested-gap';
+      afterGap.dataset.index = String(index + 1);
+      bindGap(afterGap, index + 1);
+      root.append(afterGap);
     });
 
     const addRow = document.createElement('div');

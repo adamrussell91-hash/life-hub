@@ -78,9 +78,21 @@ function persistMove(
   const column = detail.column as BoardColumnId;
   const status = statusForColumn(column);
   if (!status || status === task.status) return;
+  const previous = task.status;
   void tasksApi.updateTask(task.id, { status }).then(
     (updated) => {
       byId.set(updated.id, updated);
+      void import('../../design-kit/js/hub-feedback.js').then(({ offerTimedUndo }) => {
+        offerTimedUndo({
+          message: `Moved “${task.title}”`,
+          onUndo: () => {
+            void tasksApi.updateTask(updated.id, { status: previous }).then(
+              () => onReload(),
+              () => onReload()
+            );
+          }
+        });
+      });
     },
     (err: unknown) => {
       errorHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not save the move')));

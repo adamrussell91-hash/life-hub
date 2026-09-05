@@ -5688,6 +5688,25 @@ a.home-class-tile:hover {
   outline-offset: 2px;
 }
 
+.block-editor__nested-gap {
+  min-height: 0.5rem;
+  border-radius: var(--radius-xs);
+  transition: background-color 120ms ease, min-height 120ms ease;
+}
+
+.block-editor__nested-gap--active {
+  min-height: 0.75rem;
+  background: color-mix(in srgb, var(--wave) 35%, transparent);
+}
+
+.block-editor__nested-grip {
+  cursor: grab;
+}
+
+.block-editor__nested-row--dragging {
+  opacity: 0.55;
+}
+
 .block-editor__columns-widths {
   display: flex;
   flex-wrap: wrap;

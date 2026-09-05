@@ -487,6 +487,9 @@ Optional later: `@atlaskit/pragmatic-drag-and-drop` (+ hitbox) for Teaching only
 - Cached new modules in Life service worker.
 - Mined AI behaviour scenario fixture + unit tests (no aimock package).
 - Unit tests: `tests/unit/hub-entity-search.test.js`, `tests/unit/agent-behaviour-scenarios.test.js`.
+- Teaching `rich_text` now uses Tiptap (`@tiptap/core` + StarterKit) while persisting sanitised HTML; specialised blocks stay outside ProseMirror.
+- Added `apps/teaching/tests/unit/rich-text-tiptap.test.ts` for load→edit→HTML round-trip.
+- Tasks board drag already offers timed undo via `offerTimedUndo` on status moves.
 
 ## Verification results
 

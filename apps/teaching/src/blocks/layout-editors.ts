@@ -13,6 +13,9 @@ import {
 } from '@/blocks/create-block';
 import { editorShell, type BlockChangeHandler } from '@/blocks/editors';
 import { createNestedBlocksEditor } from '@/blocks/nested-blocks-editor';
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
+import { isNestedBlockDrag } from '@/blocks/teaching-pragmatic-dnd';
 import type { Block } from '@/schemas/block';
 
 type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
@@ -162,6 +165,8 @@ export function createColumnsEditor(
   const panes = document.createElement('div');
   panes.className = 'block-editor__column-panes';
 
+  let paneCleanups: CleanupFn[] = [];
+
   function applyMove(fromCol: number, fromIndex: number, toCol: number): void {
     const latest = getLatest();
     const moved = moveBlockBetweenColumns(
@@ -228,6 +233,9 @@ export function createColumnsEditor(
       .map((col) => `${col.width}fr`)
       .join(' ');
 
+    for (const stop of paneCleanups) stop();
+    paneCleanups = [];
+
     current.content.columns.forEach((col, colIndex) => {
       const pane = document.createElement('div');
       pane.className = 'block-editor__column-pane';
@@ -253,6 +261,23 @@ export function createColumnsEditor(
         if (!Number.isFinite(fromCol) || !Number.isFinite(fromIndex)) return;
         applyMove(fromCol, fromIndex, colIndex);
       });
+
+      paneCleanups.push(
+        dropTargetForElements({
+          element: pane,
+          canDrop: ({ source }) => isNestedBlockDrag(source.data) && source.data.kind === 'nested-block',
+          onDragEnter: () => pane.classList.add('block-editor__column-pane--drop'),
+          onDragLeave: () => pane.classList.remove('block-editor__column-pane--drop'),
+          onDrop: ({ source }) => {
+            pane.classList.remove('block-editor__column-pane--drop');
+            const data = source.data;
+            if (!isNestedBlockDrag(data) || data.kind !== 'nested-block') return;
+            if (data.fromCol === colIndex) return;
+            applyMove(data.fromCol, data.fromIndex, colIndex);
+          }
+        })
+      );
+
 
       const nested = createNestedBlocksEditor({
         blocks: col.blocks,

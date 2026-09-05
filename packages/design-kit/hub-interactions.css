@@ -312,6 +312,12 @@
   place-items: start center;
   padding: 12vh var(--space-4) var(--space-4);
   background: color-mix(in srgb, var(--depth) 28%, transparent);
+  opacity: 0;
+  transition: opacity var(--hub-motion-duration, 420ms) ease;
+}
+
+.hub-command.is-in {
+  opacity: 1;
 }
 
 .hub-command__panel {
@@ -321,6 +327,24 @@
   border-radius: var(--radius-md);
   background: var(--paper);
   box-shadow: var(--elev-3);
+  opacity: 0;
+  transform: translateY(var(--hub-motion-lift, 8px));
+  transition:
+    opacity var(--hub-motion-duration, 420ms) ease,
+    transform var(--hub-motion-duration, 420ms) ease;
+}
+
+.hub-command__panel.is-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-command,
+  .hub-command__panel {
+    transition: none;
+    transform: none;
+  }
 }
 
 .hub-command__input {
