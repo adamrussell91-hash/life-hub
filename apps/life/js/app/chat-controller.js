@@ -668,9 +668,16 @@ export function createChatController({
           gotUsefulOutput = true;
           clearWorkingBubble();
           endTextTurn();
+          const sources = Array.isArray(event.sources) ? event.sources : [];
+          const hasUrls = sources.some(source => typeof source?.url === 'string' && source.url.trim());
+          if (hasUrls) {
+            searchCardHost?.item?.remove?.();
+            searchCardHost = null;
+            searchSources.length = 0;
+          }
           appendSourcesCard(root, {
             heading: event.heading,
-            sources: Array.isArray(event.sources) ? event.sources : []
+            sources
           });
         } else if (event.type === 'action_rejected') {
           turnSignaled = true;

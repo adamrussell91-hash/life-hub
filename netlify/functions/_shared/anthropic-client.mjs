@@ -213,6 +213,23 @@ function sanitizeAssistantBlocks(blocks) {
   });
 }
 
+
+function sourcesFromWebSearchToolResult(block) {
+  const content = Array.isArray(block?.content) ? block.content : [];
+  const sources = [];
+  for (const item of content) {
+    if (!item || item.type !== 'web_search_result') continue;
+    const url = typeof item.url === 'string' ? item.url.trim() : '';
+    if (!url) continue;
+    const title = typeof item.title === 'string' && item.title.trim() ? item.title.trim() : url;
+    const snippet = typeof item.page_age === 'string' && item.page_age.trim()
+      ? item.page_age.trim()
+      : undefined;
+    sources.push(snippet ? { title, url, snippet } : { title, url });
+  }
+  return sources;
+}
+
 function* interpretEvent(event, toolBuffers, roundState) {
   if (event.name === 'content_block_start') {
     const block = event.payload.content_block;
@@ -235,6 +252,12 @@ function* interpretEvent(event, toolBuffers, roundState) {
     } else if (block && typeof blockType === 'string') {
       // Complete blocks (web_search_tool_result, redacted_thinking, etc.).
       roundState?.assistantBlocks.push(structuredClone(block));
+      if (blockType === 'web_search_tool_result') {
+        const sources = sourcesFromWebSearchToolResult(block);
+        if (sources.length) {
+          yield { type: 'sources', heading: 'Sources', sources };
+        }
+      }
     }
     return;
   }

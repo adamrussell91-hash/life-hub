@@ -149,3 +149,34 @@ test('Clare propose and accept stay behind the Life session and write Tasks', as
   }));
   assert.equal(anon.status, 401);
 });
+
+test('dump_stream emits status, voice chunks, dump_result, and done over SSE', async () => {
+  const store = memoryStore();
+  const handler = createClareHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  });
+
+  const response = await handler(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/clare',
+    body: { action: 'dump_stream', text: 'Email parents about camp', domain: 'teaching' }
+  }));
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') ?? '', /text\/event-stream/);
+  const body = await response.text();
+  const events = body
+    .split('\n\n')
+    .map(frame => frame.split('\n').find(line => line.startsWith('data:')))
+    .filter(Boolean)
+    .map(line => JSON.parse(line.slice(5).trim()));
+
+  assert.equal(events[0]?.type, 'status');
+  assert.ok(events.some(event => event.type === 'text' && typeof event.delta === 'string' && event.delta.length > 0));
+  const dump = events.find(event => event.type === 'dump_result');
+  assert.ok(dump?.result?.voice);
+  assert.ok(Array.isArray(dump.result.proposals));
+  assert.equal(events.at(-1)?.type, 'done');
+});
+

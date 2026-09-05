@@ -364,8 +364,14 @@ Scores are 0–5 averages across: usefulness, UX impact, functionality, cross-hu
 
 ### Later / deferred
 
-9. Confirm-card receipts; CN diff enrichment; plan status; menu typeahead; chart tip Floating UI; Tasks streaming parity (product, not these repos).
+9. CN diff enrichment; plan status; chart tip Floating UI.
 10. Quieter message action chrome.
+
+### Done in follow-up passes
+
+- Confirm-card receipts; menu typeahead; Life search→sources card; turn top-anchor.
+- Server-emitted citation URLs from `web_search_tool_result` → SSE `sources`.
+- Tasks Clare `dump_stream` SSE (status + voice deltas + dump_result) + client consumer.
 
 ### Reject
 

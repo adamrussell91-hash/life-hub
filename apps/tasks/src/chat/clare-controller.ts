@@ -18,6 +18,7 @@ import { syncChatChrome, toggleChatChrome } from '@/chat/chat-chrome';
 import {
   appendMessage,
   appendSavedCard,
+  renderInlineMarkdown,
   setChatBusy,
   setChatUnread,
   setConfirmBusy,
@@ -223,10 +224,13 @@ function paintDump(
   result: ClareDumpResult,
   frameworks: FrameworkEntry[],
   onSaved: () => void,
-  onDuplicateFollowUp?: (reply: string) => void | Promise<void>
+  onDuplicateFollowUp?: (reply: string) => void | Promise<void>,
+  options: { skipVoice?: boolean } = {}
 ): void {
   const agent = result.agent;
-  appendMessage(root, { role: 'assistant', text: result.voice, agent });
+  if (!options.skipVoice) {
+    appendMessage(root, { role: 'assistant', text: result.voice, agent });
+  }
   if (result.toolkit) {
     appendMessage(root, { role: 'assistant', text: toolkitToMarkdown(result.toolkit), agent });
   }
@@ -404,27 +408,88 @@ export function createClareChatController({
 
   async function submitDump(text: string): Promise<void> {
     const recent_thread = collectRecentThread(root);
-    const result = await withWait(() =>
-      tasksApi.processDumpWithClare({
-        text,
-        domain: preferredDomains()[0] ?? 'teaching',
-        protocol_id: selectedProtocolId as ClareProtocolId | undefined,
-        recent_thread,
-        agent_slug: selectedSlug
-      })
-    );
-    if (!result) return;
-    paintDump(
-      root,
-      result,
-      frameworks,
-      () => {
-        const field = input();
-        if (field) field.value = '';
-      },
-      (reply) => send(reply)
-    );
-    markUnreadIfHidden();
+    const body = {
+      text,
+      domain: preferredDomains()[0] ?? 'teaching',
+      protocol_id: selectedProtocolId as ClareProtocolId | undefined,
+      recent_thread,
+      agent_slug: selectedSlug
+    };
+    const mine = ++turn;
+    sending = true;
+    setChatBusy(root, true);
+    waitIndex = 0;
+    showWaitLine();
+    waitTimer = window.setInterval(showWaitLine, STATUS_ROTATE_MS);
+
+    let voiceBubble: HTMLElement | null = null;
+    let voiceText = '';
+    let result: ClareDumpResult | null = null;
+    let streamedVoice = false;
+
+    try {
+      for await (const event of tasksApi.streamDumpWithClare(body)) {
+        if (mine !== turn) return;
+        if (event.type === 'status') {
+          showWaitLine();
+          continue;
+        }
+        if (event.type === 'text' && typeof event.delta === 'string' && event.delta) {
+          stopWait();
+          streamedVoice = true;
+          voiceText += event.delta;
+          if (!voiceBubble) {
+            voiceBubble = appendMessage(root, {
+              role: 'assistant',
+              text: voiceText,
+              agent: selectedSlug
+            });
+          } else {
+            const bodyEl = voiceBubble.querySelector('.chat-message__body');
+            if (bodyEl instanceof HTMLElement) {
+              renderInlineMarkdown(bodyEl, voiceText, { multiline: true });
+            }
+            const list = root.querySelector('#chat-messages');
+            if (list) list.scrollTop = list.scrollHeight;
+          }
+          continue;
+        }
+        if (event.type === 'dump_result' && event.result) {
+          result = event.result;
+          continue;
+        }
+        if (event.type === 'error') {
+          throw new Error(event.message || `${currentAgent().firstName} could not reply.`);
+        }
+      }
+      if (mine !== turn) return;
+      if (!result) throw new Error(`${currentAgent().firstName} returned an empty dump.`);
+      paintDump(
+        root,
+        result,
+        frameworks,
+        () => {
+          const field = input();
+          if (field) field.value = '';
+        },
+        (reply) => send(reply),
+        { skipVoice: streamedVoice }
+      );
+      markUnreadIfHidden();
+    } catch (err) {
+      if (mine !== turn) return;
+      stopWait();
+      showChatError(
+        root,
+        err instanceof Error ? err.message : `${currentAgent().firstName} could not reply.`
+      );
+    } finally {
+      if (mine === turn) {
+        stopWait();
+        sending = false;
+        setChatBusy(root, false);
+      }
+    }
   }
 
   async function send(raw?: string): Promise<void> {
