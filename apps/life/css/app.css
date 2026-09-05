@@ -1594,7 +1594,9 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 600;
 }
 #fitness-dashboard #fitness-library-chart {
-  max-height: 11rem;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
 }
 #fitness-dashboard #fitness-library-chart .mind-constellation__label {
   font-size: 28px;

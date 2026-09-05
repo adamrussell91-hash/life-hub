@@ -971,7 +971,7 @@ function renderLibrary(root, map) {
     label.setAttribute('pointer-events', 'none');
     label.textContent = node.key;
     group.append(halo, dot, glyph, hit, label);
-    bindTip(group, tip, `${node.key} · ${node.count ?? 0} sessions`);
+    bindTip(group, tip, `${node.key} · ${node.count ?? 0} session${(node.count ?? 0) === 1 ? '' : 's'}`);
     svg.append(group);
   }
 }
