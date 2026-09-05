@@ -81,7 +81,17 @@ class FakeEl {
   }
 
   getBoundingClientRect() {
-    return { width: 320, height: 220, left: 0, top: 0, right: 320, bottom: 220 };
+    const width = Number.parseFloat(this.style?.width) || 320;
+    const height = Number.parseFloat(this.style?.height) || 220;
+    return { width, height, left: 0, top: 0, right: width, bottom: height };
+  }
+
+  get offsetWidth() {
+    return this.getBoundingClientRect().width;
+  }
+
+  get offsetHeight() {
+    return this.getBoundingClientRect().height;
   }
 }
 
@@ -176,6 +186,29 @@ test('createCardSwipe keeps the requested index until slides are appended', () =
   swipe.sync();
   assert.equal(swipe.getIndex(), 2);
   assert.match(swipe.status.textContent, /3 of 3 · Three/);
+});
+
+test('fluid decks pin slide widths to the measured viewport', () => {
+  const root = new FakeDoc();
+  const swipe = createCardSwipe({ root, items: [], fluid: true });
+  swipe.viewport.getBoundingClientRect = () => ({
+    width: 390, height: 200, left: 0, top: 0, right: 390, bottom: 200
+  });
+  for (let i = 0; i < 18; i++) {
+    const card = root.createElement('article');
+    card.className = 'hub-card-swipe__card';
+    swipe.appendSlide(card, { title: `Ex ${i + 1}` });
+  }
+  swipe.sync();
+  assert.equal(swipe.track.children.length, 18);
+  for (const slide of swipe.track.children) {
+    assert.equal(slide.style.width, '390px');
+    assert.equal(slide.style.maxWidth, '390px');
+    assert.equal(slide.style.flex, '0 0 390px');
+  }
+  assert.match(swipe.track.style.transform, /translate3d\(0px/);
+  swipe.setIndex(2, { animate: false });
+  assert.match(swipe.track.style.transform, /translate3d\(-812px/);
 });
 
 test('a tap without a drag selects the current card', () => {
