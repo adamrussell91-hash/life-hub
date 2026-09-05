@@ -3,7 +3,7 @@ import { daysBetween } from '../../../apps/life/js/core/time.js';
 export const FITNESS_SESSION_PATH =
   /^data\/fitness\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
-export const MAX_RECENT_WORKOUTS = 8;
+export const MAX_RECENT_WORKOUTS = 12;
 const DEFAULT_SEARCH_LIMIT = 8;
 const MAX_SEARCH_LIMIT = 20;
 const SET_SUFFIX = /\s+set\s+\d+\s*$/i;
@@ -77,23 +77,37 @@ function summarizeExercises(exercises) {
     .filter(Boolean);
 }
 
+function sortSessionsNewestFirst(records) {
+  return records.slice().sort((a, b) => {
+    const dateCmp = String(b.date).localeCompare(String(a.date));
+    if (dateCmp !== 0) return dateCmp;
+    return String(b.time ?? '').localeCompare(String(a.time ?? ''));
+  });
+}
+
+function sessionPromptLine(record) {
+  const moves = summarizeExercises(record.exercises);
+  const moveBit = moves.length ? ` — ${moves.join(', ')}` : '';
+  const title = record.title || 'Untitled session';
+  return `${record.date} · ${title}${moveBit}`;
+}
+
 export function formatRecentWorkoutsForPrompt(records) {
   if (!Array.isArray(records) || records.length === 0) return '';
-  return records
-    .filter(record => record?.type === 'workout' && record.date)
-    .slice()
-    .sort((a, b) => {
-      const dateCmp = String(b.date).localeCompare(String(a.date));
-      if (dateCmp !== 0) return dateCmp;
-      return String(b.time ?? '').localeCompare(String(a.time ?? ''));
-    })
-    .map(record => {
-      const moves = summarizeExercises(record.exercises);
-      const moveBit = moves.length ? ` — ${moves.join(', ')}` : '';
-      const title = record.title || 'Untitled session';
-      return `- ${record.date} · ${record.status ?? 'unknown'} · ${title}${moveBit}`;
-    })
-    .join('\n');
+  const workouts = records.filter(record => record?.type === 'workout' && record.date);
+  const completed = sortSessionsNewestFirst(workouts.filter(record => record.status === 'completed'));
+  const planned = sortSessionsNewestFirst(workouts.filter(record => record.status === 'planned'));
+  const lines = [];
+  if (completed[0]) {
+    lines.push(`- Last completed: ${sessionPromptLine(completed[0])}`);
+    for (const extra of completed.slice(1, 4)) {
+      lines.push(`- Completed: ${sessionPromptLine(extra)}`);
+    }
+  }
+  for (const plan of planned.slice(0, 3)) {
+    lines.push(`- Planned (not yet trained): ${sessionPromptLine(plan)}`);
+  }
+  return lines.join('\n');
 }
 
 function formatSession(record) {
@@ -194,7 +208,7 @@ export function getLastWorkoutSchema() {
   return {
     name: 'get_last_workout',
     description:
-      'Read Adam\'s most recent completed workout from Life Hub fitness history. Use whenever he asks when he last trained, what that session was, or what he lifted last time. Returns title, date, and collapsed exercises with sets.',
+      'Read Adam\'s most recent completed workout from the recent fitness files already loaded this turn (not full history). Use whenever he asks when he last trained, what that session was, or what he lifted last time. Returns title, date, and collapsed exercises with sets.',
     input_schema: {
       type: 'object',
       properties: {}
@@ -206,7 +220,7 @@ export function searchWorkoutRecordsSchema() {
   return {
     name: 'search_workout_records',
     description:
-      'Search Life Hub workout history by title, date, focus, or exercise name. Use when Adam asks about a past session or whether he has done a named workout. Words are ANDed.',
+      'Search the recent workout files loaded this turn (not full history) by title, date, focus, or exercise name. Use when Adam asks about a past session in that window. Words are ANDed.',
     input_schema: {
       type: 'object',
       properties: {

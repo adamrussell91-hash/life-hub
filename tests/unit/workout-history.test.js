@@ -55,7 +55,7 @@ test('selectRecentWorkoutEntries returns the newest session files, newest first,
     'data/fitness/2026/09/2026-09-01-workout-1628.md',
     'data/fitness/2026/08/2026-08-29-workout-1857.md'
   ]);
-  assert.equal(MAX_RECENT_WORKOUTS, 8);
+  assert.equal(MAX_RECENT_WORKOUTS, 12);
 });
 
 test('selectRecentWorkoutEntries tolerates a non-array tree', () => {
@@ -111,12 +111,24 @@ test('formatRecentWorkoutsForPrompt names the last completed session and collaps
     session({ date: '2026-08-29', title: 'Biceps and Boobs, 20 mins' }),
     session({ date: '2026-09-01', title: 'Planned session' })
   ]);
+  assert.match(text, /Last completed/);
   assert.match(text, /2026-09-01/);
   assert.match(text, /Planned session/);
-  assert.match(text, /completed/);
   assert.match(text, /Bar Press/);
   assert.doesNotMatch(text, /Bar Press set 1/);
   assert.match(text, /Biceps and Boobs/);
+});
+
+test('formatRecentWorkoutsForPrompt does not treat a newer planned file as the last trained session', () => {
+  const text = formatRecentWorkoutsForPrompt([
+    session({ date: '2026-09-05', title: 'The Full Send', status: 'planned' }),
+    session({ date: '2026-09-01', title: 'Planned session', status: 'completed' })
+  ]);
+  assert.match(text, /Last completed: 2026-09-01 · Planned session/);
+  assert.match(text, /Planned \(not yet trained\): 2026-09-05 · The Full Send/);
+  const lastCompletedIndex = text.indexOf('Last completed');
+  const plannedIndex = text.indexOf('Planned (not yet trained)');
+  assert.ok(lastCompletedIndex < plannedIndex);
 });
 
 test('formatRecentWorkoutsForPrompt is empty when there are no sessions', () => {
