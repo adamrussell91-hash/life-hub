@@ -1,0 +1,54 @@
+<!-- Dump / schedule composer. Calendar expands date + time; Dump stays immediate.
+     Load tokens.css → overlays.css → actions.css → hub-compose.css
+     then mountHubComposes(document) or startHubMotion().
+     Dates render as dd/mm/yy. Do not add a “will be posted” footer. -->
+
+<form class="hub-compose" data-hub-compose>
+  <div class="hub-compose__card">
+    <label class="sr-only" for="hub-compose-text">What's up?</label>
+    <textarea
+      id="hub-compose-text"
+      class="hub-compose__text"
+      name="text"
+      rows="3"
+      data-hub-compose-text
+      placeholder="What's up?"
+      required
+    ></textarea>
+    <div class="hub-compose__tray">
+      <div class="hub-compose__when" data-hub-compose-when aria-hidden="true">
+        <div class="hub-compose__when-bar">
+          <label class="hub-compose__chip">
+            <span class="hub-compose__chip-label" data-hub-compose-date-label></span>
+            <input type="date" data-hub-compose-date>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </label>
+          <label class="hub-compose__chip">
+            <span class="hub-compose__chip-label" data-hub-compose-time-label></span>
+            <input type="time" data-hub-compose-time>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </label>
+        </div>
+        <button class="hub-compose__close" type="button" data-hub-compose-close title="Close" aria-label="Close schedule">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="hub-compose__actions">
+        <button class="hub-compose__cal" type="button" data-hub-compose-cal aria-label="Add due date" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3.5" y="5" width="17" height="15.5" rx="2"/>
+            <path d="M8 3.5v3M16 3.5v3M3.5 10h17"/>
+          </svg>
+        </button>
+        <button class="btn btn--primary hub-compose__dump" type="submit" data-hub-compose-dump>Dump</button>
+        <button class="btn btn--primary hub-compose__schedule" type="button" data-hub-compose-schedule tabindex="-1">Schedule</button>
+      </div>
+    </div>
+  </div>
+</form>

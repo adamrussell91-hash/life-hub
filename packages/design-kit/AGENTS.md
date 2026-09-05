@@ -28,7 +28,8 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
 12. `js/hub-kinetic.js` — reusable word/line/character reveal (play / reset, stagger origins). Opt in with `.hub-kinetic` on canvas titles. **Not on the rail.**
 13. `js/morphing-dialog.js` — **locked** micro → expanded card morph (spring FLIP). Overlay: `openMorphingDialog`. In-place: `runMorphTransform`. Route change: `morphFromRect`. Mark shared title / subtitle / image with `data-hub-morph`.
 14. `morphing-popover.css` + `js/morphing-popover.js` — trigger expands into a compact editor (blur fade, 250ms ease-out). Use for short notes, quick text, and dimension / value edits. `createMorphingNotePopover` / `createMorphingValuesPopover`, or copy `snippets/morphing-popover.html` and call `mountMorphingPopovers()`.
-15. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `morphing-popover.html`)
+15. `hub-compose.css` + `js/hub-compose.js` — dump / schedule composer. Textarea + calendar expands a date/time row; Dump stays immediate; Schedule appends `due dd/mm/yy`. No “will be posted” footer. Copy `snippets/hub-compose.html` or call `mountHubComposes()` — `startHubMotion()` also mounts it.
+16. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `morphing-popover.html`, `hub-compose.html`)
 
 ### Passphrase gate (mandatory)
 
