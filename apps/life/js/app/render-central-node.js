@@ -1,7 +1,9 @@
 import { animateRingFill } from './chart-kit/animate.js';
+import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
 import { buildHorizonBands } from './chart-kit/horizon.js';
 import { packMasonry } from './chart-kit/masonry.js';
-import { buildCompletionRing, weekHorizonMetrics } from './central-node-charts.js';
+import { buildRadialYear } from './chart-kit/radial-year.js';
+import { buildCompletionRing, hitMapFromSeries, weekHorizonMetrics } from './central-node-charts.js';
 import { renderInlineMarkdown } from './render-chat.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
@@ -44,6 +46,7 @@ export function renderCentralNode(root, model) {
   renderCompletionRing(root, model.completeness);
   bindCnBoard(root);
   renderWeekHorizon(root, model);
+  renderRadialYear(root, model);
   packCnBoard(root);
   root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
 }
@@ -118,6 +121,51 @@ export function paintChartOrEmpty(root, host, svg, { need, have, unit }) {
   empty.hidden = false;
   empty.textContent = `Need ${threshold} ${unit}. ${count} so far.`;
   return false;
+}
+
+function renderRadialYear(root, model) {
+  const svg = root.querySelector('#central-node-radial-year');
+  const tile = root.querySelector('#cn-tile-radial') ?? svg?.parentNode;
+  if (!svg || !tile) return;
+  const logging = hitMapFromSeries(model.loggingYear, day => day.complete);
+  const exercise = hitMapFromSeries(model.exerciseYear, day => day.completed);
+  const eating = hitMapFromSeries(model.eatingYear, day => day.hitEatingTargets);
+  const hits = Object.keys(logging).length + Object.keys(exercise).length + Object.keys(eating).length;
+  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: hits, unit: 'hit days this year' })) return;
+  svg.replaceChildren();
+  const year = Number(String(model.date ?? '').slice(0, 4)) || 2026;
+  const rings = [
+    { byDate: logging, inner: 36, outer: 52, colour: CLINICAL_CHART_SLOTS[0] },
+    { byDate: exercise, inner: 56, outer: 72, colour: CLINICAL_CHART_SLOTS[1] },
+    { byDate: eating, inner: 76, outer: 92, colour: CLINICAL_CHART_SLOTS[2] }
+  ];
+  const cx = 120;
+  const cy = 120;
+  for (const ring of rings) {
+    for (const tick of buildRadialYear({ year, byDate: ring.byDate })) {
+      if (tick.mood !== 'hit') continue;
+      const line = createSvg(root, 'line');
+      line.setAttribute('x1', String(cx + ring.inner * Math.cos(tick.angle)));
+      line.setAttribute('y1', String(cy + ring.inner * Math.sin(tick.angle)));
+      line.setAttribute('x2', String(cx + ring.outer * Math.cos(tick.angle)));
+      line.setAttribute('y2', String(cy + ring.outer * Math.sin(tick.angle)));
+      line.setAttribute('stroke', ring.colour);
+      line.setAttribute('stroke-width', '2');
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('title', tick.date);
+      svg.append(line);
+    }
+  }
+  ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].forEach((month, index) => {
+    const angle = (index / 12) * Math.PI * 2 - Math.PI / 2;
+    const label = createSvg(root, 'text');
+    label.setAttribute('x', String(cx + 110 * Math.cos(angle)));
+    label.setAttribute('y', String(cy + 110 * Math.sin(angle) + 3));
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('class', 'mind-chart-label');
+    label.textContent = month;
+    svg.append(label);
+  });
 }
 
 function renderWeekHorizon(root, model) {
