@@ -6,6 +6,8 @@
  * Route change: morphFromRect(firstRect, target)
  */
 
+import { trapFocus } from './hub-focus-trap.js';
+
 const DEFAULT_SPRING = { stiffness: 200, damping: 24, mass: 1 };
 const SETTLE = 0.06;
 const MAX_MS = 900;
@@ -267,11 +269,12 @@ export function openMorphingDialog(options) {
   kick(() => backdrop.classList.add('is-in'));
 
   let disposed = false;
+  let releaseFocus = () => {};
   const close = () => {
     if (disposed) return;
     disposed = true;
     if (activeClose === close) activeClose = null;
-    doc.removeEventListener('keydown', onKey);
+    releaseFocus();
     showOrigin(trigger);
 
     const current = readRect(frame);
@@ -296,14 +299,7 @@ export function openMorphingDialog(options) {
     else close();
   };
 
-  const onKey = event => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      requestClose();
-    }
-  };
-
-  doc.addEventListener('keydown', onKey);
+  releaseFocus = trapFocus(frame, { onEscape: requestClose });
   backdrop.addEventListener('click', event => {
     if (event.target === backdrop) requestClose();
   });

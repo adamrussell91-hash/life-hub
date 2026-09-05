@@ -9195,7 +9195,7 @@ body.is-lesson-builder-full-page .hub-utilities {
 }
 
 .schedule-overflow {
-  position: absolute;
+  position: fixed;
   z-index: 40;
   min-width: 10rem;
   padding: var(--space-1);

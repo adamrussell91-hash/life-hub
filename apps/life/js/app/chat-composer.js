@@ -33,6 +33,12 @@ export function bindChatComposer(root, { onSend, onStop } = {}) {
     input.dataset.composerBound = '1';
     input.addEventListener('input', () => autoGrowComposer(input));
     input.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        if (event.isComposing || event.keyCode === 229) return;
+        event.preventDefault?.();
+        onStop?.();
+        return;
+      }
       if (event.key !== 'Enter') return;
       if (event.isComposing || event.keyCode === 229) return;
       if (event.shiftKey) return;
@@ -45,6 +51,12 @@ export function bindChatComposer(root, { onSend, onStop } = {}) {
   if (stop && stop.dataset.composerBound !== '1') {
     stop.dataset.composerBound = '1';
     stop.addEventListener('click', event => {
+      event.preventDefault?.();
+      onStop?.();
+    });
+    stop.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      if (event.isComposing || event.keyCode === 229) return;
       event.preventDefault?.();
       onStop?.();
     });

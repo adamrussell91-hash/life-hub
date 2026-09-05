@@ -1,5 +1,7 @@
 /** Overflow menu for Cotton Glass cards. Uses kit `.hub-menu` chrome. */
 
+import { autoUpdateHubFloating, positionHubFloating } from '../../../../packages/design-kit/js/hub-floating.js';
+
 export type CardMenuItem = {
   id: string;
   label: string;
@@ -11,6 +13,7 @@ type OpenMenu = {
   menu: HTMLElement;
   btn: HTMLButtonElement;
   close: (returnFocus?: boolean) => void;
+  stopFloating?: () => void;
 };
 
 let openMenu: OpenMenu | null = null;
@@ -35,20 +38,15 @@ function dots(): HTMLElement {
 
 export function closeCardMenu(returnFocus = false): void {
   if (!openMenu) return;
-  const { menu, btn, close } = openMenu;
+  const { menu, btn, close, stopFloating } = openMenu;
   openMenu = null;
+  stopFloating?.();
   close(returnFocus);
   btn.setAttribute('aria-expanded', 'false');
   menu.remove();
 }
 
-function positionMenu(menu: HTMLElement, btn: HTMLButtonElement): void {
-  const rect = btn.getBoundingClientRect();
-  const flip = rect.bottom + menu.offsetHeight + 12 > window.innerHeight && rect.top > menu.offsetHeight;
-  const left = Math.min(rect.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 12);
-  menu.style.left = `${Math.max(12, left + window.scrollX)}px`;
-  menu.style.top = `${(flip ? rect.top - menu.offsetHeight - 6 : rect.bottom + 6) + window.scrollY}px`;
-}
+const FLOATING_OPTS = { placement: 'bottom-end' as const, offset: 6, padding: 12 };
 
 function openItems(btn: HTMLButtonElement, items: CardMenuItem[], ariaLabel: string, heading: string): void {
   closeCardMenu();
@@ -75,7 +73,8 @@ function openItems(btn: HTMLButtonElement, items: CardMenuItem[], ariaLabel: str
   }
 
   document.body.append(menu);
-  positionMenu(menu, btn);
+  void positionHubFloating(btn, menu, FLOATING_OPTS);
+  const stopFloating = autoUpdateHubFloating(btn, menu, FLOATING_OPTS);
   requestAnimationFrame(() => menu.classList.add('is-open'));
   btn.setAttribute('aria-expanded', 'true');
 
@@ -83,7 +82,7 @@ function openItems(btn: HTMLButtonElement, items: CardMenuItem[], ariaLabel: str
     menu.classList.remove('is-open');
     if (returnFocus) btn.focus();
   };
-  openMenu = { menu, btn, close };
+  openMenu = { menu, btn, close, stopFloating };
 
   menu.addEventListener('keydown', (event) => {
     const index = buttons.indexOf(document.activeElement as HTMLButtonElement);

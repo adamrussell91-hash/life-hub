@@ -1,7 +1,13 @@
+/**
+ * Shared hub filter / exclusive menu.
+ * Positioning via Floating UI (hub-floating.js); chrome stays Cotton Glass.
+ */
+import { autoUpdateHubFloating, positionHubFloating } from './hub-floating.js';
+
 const CHEVRON = `<svg class="hub-filter__chev" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4 5 6.5 7.5 4"/></svg>`;
 const TICK = `<svg class="hub-menu__tick" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.3 4.8 8.6 9.5 3.6"/></svg>`;
 
-/** @type {{ menu: HTMLElement, btn: HTMLButtonElement, close: (focus?: boolean) => void } | null} */
+/** @type {{ menu: HTMLElement, btn: HTMLButtonElement, close: (focus?: boolean) => void, stopFloating?: () => void } | null} */
 let openMenu = null;
 
 function optionLabel(option) {
@@ -39,20 +45,12 @@ function paintTrigger(btn, options, value, defaultValue) {
 
 function closeOpenMenu(returnFocus = false) {
   if (!openMenu) return;
-  const { menu, btn, close } = openMenu;
+  const { menu, btn, close, stopFloating } = openMenu;
   openMenu = null;
+  stopFloating?.();
   close(returnFocus);
   btn.setAttribute('aria-expanded', 'false');
   menu.remove();
-}
-
-function positionMenu(menu, btn) {
-  const rect = btn.getBoundingClientRect();
-  const flip = rect.bottom + menu.offsetHeight + 12 > window.innerHeight && rect.top > menu.offsetHeight;
-  const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 12);
-  menu.style.left = `${Math.max(12, left + window.scrollX)}px`;
-  menu.style.top = `${(flip ? rect.top - menu.offsetHeight - 6 : rect.bottom + 6) + window.scrollY}px`;
-  menu.classList.toggle('hub-menu--above', flip);
 }
 
 function openFilterMenu(btn, options, currentValue, onSelect) {
@@ -74,7 +72,9 @@ function openFilterMenu(btn, options, currentValue, onSelect) {
       .join('');
 
   document.body.append(menu);
-  positionMenu(menu, btn);
+  const floatingOpts = { placement: 'bottom-start', offset: 6, padding: 12, matchWidth: true };
+  void positionHubFloating(btn, menu, floatingOpts);
+  const stopFloating = autoUpdateHubFloating(btn, menu, floatingOpts);
   requestAnimationFrame(() => menu.classList.add('is-open'));
   btn.setAttribute('aria-expanded', 'true');
 
@@ -83,7 +83,7 @@ function openFilterMenu(btn, options, currentValue, onSelect) {
     menu.classList.remove('is-open');
     if (returnFocus) btn.focus();
   };
-  openMenu = { menu, btn, close };
+  openMenu = { menu, btn, close, stopFloating };
 
   menu.addEventListener('click', (event) => {
     const opt = event.target.closest('.hub-menu__opt');

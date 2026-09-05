@@ -93,7 +93,8 @@ test('appendMessage still sets plain textContent for simple system-style bubbles
   const item = appendMessage(root, { role: 'assistant', text: '🔍 Searched the web: pizza' });
   const body = item.children.find(child => child.className === 'chat-message__body');
   assert.equal(body.textContent, '🔍 Searched the web: pizza');
-  assert.equal(item.className, 'chat-message chat-message--assistant');
+  assert.match(item.className, /chat-message chat-message--assistant/);
+  assert.match(item.className, /chat-message--latest/);
 });
 
 test('renderInlineMarkdown turns headings, quotes, and fenced code into structured blocks', () => {
@@ -244,7 +245,8 @@ test('appendRecordProposal renders a planned workout as a save-to-Fitness card',
   assert.equal(findByClass(card, 'workout-plan-card__meta').textContent, '35 min');
   assert.equal(findByClass(card, 'workout-plan-card__sets').textContent, '4 sets');
   assert.equal(confirm.textContent, 'Save to Fitness');
-  assert.equal(card.children.find(child => child.className === 'record-proposal__fields').children.length, 2);
+  // Planned workouts expose day_type / duration_min / status (+ notes) as editable pairs.
+  assert.equal(card.children.find(child => child.className === 'record-proposal__fields').children.length, 6);
 });
 
 test('appendRecordProposal renders protocol lint warnings without disabling Confirm', () => {
