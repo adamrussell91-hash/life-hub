@@ -1,6 +1,8 @@
 /**
  * Build a chat-confirm candidate from a Fitness workout template.
  */
+import { normalizeLoggerCableType } from './fitness-logger-draft.js';
+
 export function buildPlannedCandidateFromTemplate(template, { date, time = '07:30' } = {}) {
   if (!template || typeof template !== 'object') {
     throw new TypeError('template is required');
@@ -34,7 +36,7 @@ export function buildPlannedCandidateFromTemplate(template, { date, time = '07:3
           sets: (Array.isArray(exercise?.sets) ? exercise.sets : []).map(set => ({
             reps: set?.reps,
             weight_kg: set?.weight_kg,
-            cable_type: set?.cable_type ?? 'constant_force'
+            cable_type: normalizeLoggerCableType(set?.cable_type)
           }))
         }))
       }

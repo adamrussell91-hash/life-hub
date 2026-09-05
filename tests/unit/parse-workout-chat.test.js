@@ -4,6 +4,7 @@ import {
   buildPlannedWorkoutInput,
   findLatestWorkoutPlanText,
   flattenWorkoutExercises,
+  normalizeCableType,
   parseSupersetPairing,
   parseWorkoutChat,
   parseWorkoutSet,
@@ -33,6 +34,14 @@ test('parseWorkoutSet reads Chadwick chat loads and hub-style loads', () => {
   assert.equal(parseWorkoutSet('Set 3: 10x30kg').reps, 10);
   assert.equal(parseWorkoutSet('just a note'), null);
   assert.equal(parseWorkoutSet('Set 1:'), null);
+});
+
+test('normalizeCableType defaults blank and none to constant force', () => {
+  assert.equal(normalizeCableType(''), 'constant_force');
+  assert.equal(normalizeCableType('none'), 'constant_force');
+  assert.equal(normalizeCableType('none (free weights)'), 'constant_force');
+  assert.equal(normalizeCableType('constant force'), 'constant_force');
+  assert.equal(normalizeCableType('rowing'), 'rowing');
 });
 
 test('parseWorkoutChat splits a flattened one-paragraph dump into eight exercises', () => {
@@ -116,6 +125,7 @@ test('buildPlannedWorkoutInput turns a compact dump into a valid planned log_ent
   assert.equal(input.fields.status, 'planned');
   assert.equal(input.fields.day_type, 'workout_45_60');
   assert.equal(input.fields.exercises.length, 3);
+  assert.equal(input.fields.exercises[0].sets[0].cable_type, 'constant_force');
   assert.equal(input.fields.exercises[1].sets[0].cable_type, 'constant_force');
   assert.equal(input.fields.exercises[2].sets[0].reps, 20);
 });
