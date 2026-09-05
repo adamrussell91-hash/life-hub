@@ -3,6 +3,7 @@ import { buildAreaLine } from './chart-kit/area-line.js';
 import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { buildMealProteinPie } from './chart-kit/pie.js';
 import { buildRingTarget } from './chart-kit/ring.js';
+import { formatGrams } from '../core/aggregate.js';
 import { formatDisplayDate } from '../core/time.js';
 
 const setText = (root, selector, value) => {
@@ -271,7 +272,7 @@ function renderMealsToday(root, mealsToday) {
     detail.textContent = meal.summary;
     const macros = root.createElement('p');
     macros.className = 'meal-log__macros';
-    macros.textContent = `${meal.calories} kcal · ${meal.protein_g} g protein · ${meal.fat_g} g fat`;
+    macros.textContent = `${meal.calories} kcal · ${formatGrams(meal.protein_g)} g protein · ${formatGrams(meal.fat_g)} g fat`;
     item.append(title, detail, macros);
     list.append(item);
   }
@@ -341,7 +342,7 @@ function renderHeatmap(root, month) {
     tile.dataset.pct = String(pct);
     tile.dataset.hit = String(day.hitProtein);
     tile.style?.setProperty?.('--protein-pct', String(pct));
-    tile.title = `${formatDisplayDate(day.date)}: ${day.protein_g}g / ${day.proteinTarget}g`;
+    tile.title = `${formatDisplayDate(day.date)}: ${formatGrams(day.protein_g)}g / ${formatGrams(day.proteinTarget)}g`;
     tile.textContent = day.protein_g > 0 ? String(Math.round(day.protein_g)) : '';
     grid.append(tile);
   }
@@ -370,9 +371,9 @@ function renderMacroSplit(root, model) {
     energyPct: 0
   };
 
-  setText(root, '[data-split="protein"]', `${split.protein_g} g / ${split.proteinTarget} g`);
+  setText(root, '[data-split="protein"]', `${formatGrams(split.protein_g)} g / ${formatGrams(split.proteinTarget)} g`);
   setText(root, '[data-split="protein-pct"]', `${split.proteinPct}% of protein target`);
-  setText(root, '[data-split="fat"]', `${split.fat_g} g / ${split.fatCeiling} g`);
+  setText(root, '[data-split="fat"]', `${formatGrams(split.fat_g)} g / ${formatGrams(split.fatCeiling)} g`);
   setText(root, '[data-split="fat-pct"]', `${split.fatPct}% of fat ceiling`);
   setText(root, '[data-split="energy"]', `${split.calories.toLocaleString('en-AU')} / ${split.caloriesTarget.toLocaleString('en-AU')} kcal`);
   setText(root, '[data-split="energy-pct"]', `${split.energyPct}% of energy target`);
