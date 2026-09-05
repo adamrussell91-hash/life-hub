@@ -15,6 +15,9 @@ export interface CalendarDayLesson {
   title: string;
   status: DeliveryStatus;
   classId?: string;
+  date?: string;
+  startTime?: string | null;
+  durationMin?: number;
 }
 
 export interface ClassCalendarModel {
@@ -36,7 +39,7 @@ export interface ClassCalendarModel {
 type ScheduledInput = Pick<
   ScheduledLesson,
   'id' | 'lesson_id' | 'unit_id' | 'date' | 'delivery_status'
-> & { schedule_order?: number; class_id?: string };
+> & { schedule_order?: number; class_id?: string; start_time?: string | null };
 
 export function yearMonthFromDate(date: string): string {
   if (!isCalendarDate(date)) throw new TypeError(`Invalid calendar date: ${date}`);
@@ -88,7 +91,10 @@ function toCalendarDayLesson(
     unitId: row.unit_id,
     title: lessonTitles.get(row.lesson_id) ?? row.lesson_id,
     status: row.delivery_status,
-    classId: row.class_id
+    classId: row.class_id,
+    date: row.date,
+    startTime: row.start_time ?? null,
+    durationMin: 60
   };
 }
 
@@ -97,6 +103,10 @@ function compareScheduled(
   b: ScheduledInput,
   lessonTitles: Map<string, string>
 ): number {
+  const timeA = a.start_time ?? '99:99';
+  const timeB = b.start_time ?? '99:99';
+  const timeDiff = timeA.localeCompare(timeB);
+  if (timeDiff !== 0) return timeDiff;
   const orderDiff = (a.schedule_order ?? 0) - (b.schedule_order ?? 0);
   if (orderDiff !== 0) return orderDiff;
   const titleA = lessonTitles.get(a.lesson_id) ?? a.lesson_id;
