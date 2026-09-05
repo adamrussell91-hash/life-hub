@@ -62,4 +62,24 @@ describe('capture inbox routing hints', () => {
     const tip = suggestIngestTarget(payload, { currentHub: 'life' });
     assert.equal(tip?.hub, 'knowledge');
   });
+
+  it('prefers Share Target url param over mixed title/text bodies', async () => {
+    // Mirrors capture-inbox classifyShare precedence without DOM.
+    const share = {
+      title: 'Bloods PDF',
+      text: 'Lab results PDF',
+      url: 'https://example.com/report.pdf',
+      files: []
+    };
+    const urlCandidate =
+      (share.url || '').trim() ||
+      ((share.text || '').trim().match(/^(https?:\/\/\S+)$/i)?.[1] ?? '');
+    const payload = classifyClipboardData({
+      files: [],
+      getData: (type) => (type === 'text/plain' ? urlCandidate : '')
+    });
+    assert.equal(payload.kind, 'url');
+    assert.equal(payload.subtype, 'pdf');
+    assert.equal(suggestIngestTarget(payload, { currentHub: 'life' })?.hub, 'knowledge');
+  });
 });
