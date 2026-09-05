@@ -10,6 +10,7 @@ import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
 import { renderFitnessSurfaceWidgets, renderNutritionSurfaceWidgets } from './render-surface-widgets.js';
+import { readHubCompose } from '../../../../packages/design-kit/js/hub-compose.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
 const LAST_SUCCESS_KEY = 'life-hub:last-success';
@@ -813,7 +814,9 @@ export function createAppController(dependencies) {
 
   async function submitClareDump() {
     if (!tasksApi?.dumpWithClare) return;
-    const text = root.querySelector('#clare-dump-text')?.value ?? '';
+    const form = root.querySelector('#clare-dump-form');
+    const compose = readHubCompose(form);
+    const text = compose?.composed ?? root.querySelector('#clare-dump-text')?.value ?? '';
     renderClareResult(root, { status: 'loading' });
     try {
       const dump = await tasksApi.dumpWithClare({ text, protocol_id: clareProtocol() });
