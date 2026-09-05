@@ -19,6 +19,7 @@ import { buildStreamPaths } from './chart-kit/stream.js';
 import { buildThemeConstellation } from './chart-kit/theme-constellation.js';
 import { buildWatchlistHeat } from './chart-kit/watchlist-heat.js';
 import { formatDisplayDate } from '../core/time.js';
+import { matchFitnessRecentRows } from './fitness-recent-focus.js';
 
 const CLOCK_HOURS = [
   { time: '00:00', label: '00:00' },
@@ -737,10 +738,12 @@ function renderE1rmBands(root, lifts) {
           const selectDay = () => {
             const recent = root.querySelector('#fitness-recent');
             recent?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            for (const row of root.querySelectorAll('.fitness-recent-row')) {
-              const match = row.dataset.date === point.date;
-              row.classList.toggle('is-focused', match);
-            }
+            const rows = [...root.querySelectorAll('.fitness-recent-row')];
+            const matches = matchFitnessRecentRows(
+              rows.map((row) => ({ date: row.dataset.date })),
+              point.date
+            );
+            rows.forEach((row, index) => row.classList.toggle('is-focused', matches[index] === true));
           };
           dot.addEventListener('click', selectDay);
           dot.addEventListener('keydown', (event) => {

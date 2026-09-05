@@ -6006,3 +6006,48 @@ button.column-bar--row.is-active {
 .schedule-diff { margin: 0.75rem 0; padding: 0.65rem 0.75rem; border-radius: 10px; border: 1px dashed var(--wave); background: color-mix(in srgb, var(--wave) 10%, transparent); }
 .schedule-diff__label { margin: 0; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .schedule-diff__row { margin: 0.25rem 0 0; font-weight: 600; }
+.schedule-diff__week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+  margin-top: 0.55rem;
+}
+.schedule-diff__day {
+  min-height: 2.75rem;
+  padding: 0.2rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--glass, #fff) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+.schedule-diff__weekday {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+.schedule-diff__chip {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.15rem 0.25rem;
+  font-size: 0.65rem;
+  line-height: 1.2;
+  text-align: center;
+  border-radius: 999px;
+}
+.schedule-diff__chip--from {
+  opacity: 0.55;
+  text-decoration: line-through;
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+}
+.schedule-diff__chip--to {
+  border: 1.5px dashed var(--wave);
+  background: color-mix(in srgb, var(--wave) 16%, transparent);
+  color: var(--navy);
+  font-weight: 600;
+}
+.schedule-diff__note {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}

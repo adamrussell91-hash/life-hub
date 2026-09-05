@@ -178,6 +178,17 @@ describe('scope & sequences', () => {
     expect(canvas.querySelector('.scope-timeline__note-title')).toBeTruthy();
   });
 
+  it('selects and scrolls to a unit when selectedUnitId is provided', () => {
+    const scrollTo = vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(() => {});
+    renderScopeTimelineEditor(canvas, curriculum, 'subject_y12_engadv', {
+      selectedUnitId: 'unit_aotfw'
+    });
+    const selected = canvas.querySelector('.scope-timeline__item--selected');
+    expect(selected?.getAttribute('data-item-id')).toBe('ti_unit_aotfw');
+    expect(scrollTo).toHaveBeenCalled();
+    scrollTo.mockRestore();
+  });
+
   it('renders not-found for an unknown subject', () => {
     renderScopeTimelineEditor(canvas, curriculum, 'subject_missing');
     expect(canvas.textContent).toMatch(/not found/i);
