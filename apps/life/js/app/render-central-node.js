@@ -123,8 +123,9 @@ export function paintChartOrEmpty(root, host, svg, { need, have, unit }) {
   if (!empty) {
     empty = root.createElement('p');
     empty.className = 'cn-honest-empty mind-honest-empty metric-caption';
-    host.append(empty);
   }
+  if (svg && typeof svg.after === 'function') svg.after(empty);
+  else if (!(host?.children ?? []).includes(empty)) host.append(empty);
   empty.hidden = false;
   empty.textContent = `Need ${threshold} ${unit}. ${count} so far.`;
   return false;
@@ -228,10 +229,12 @@ function renderTrendScan(root, model) {
   paint(scan.preview);
   if (more) {
     more.hidden = scan.rest.length === 0;
+    more._scan = scan;
     if (!more.dataset.bound) {
       more.dataset.bound = '1';
       more.addEventListener('click', () => {
-        paint([...scan.preview, ...scan.rest]);
+        const latest = more._scan ?? { preview: [], rest: [] };
+        paint([...latest.preview, ...latest.rest]);
         more.hidden = true;
         packCnBoard(root);
       });
@@ -260,11 +263,13 @@ function renderChordTile(root, model) {
     (layout.arcs ?? []).map((arc, index) => [arc.key, CLINICAL_CHART_SLOTS[index % CLINICAL_CHART_SLOTS.length]])
   );
   const details = model.crossAgent?.details ?? [];
-  const linesFor = (agent) => details
-    .filter(row => row.themeA === agent || row.themeB === agent)
+  const linesFor = (sourceKey, targetKey) => details
+    .filter(row => targetKey
+      ? row.themeA === sourceKey && row.themeB === targetKey
+      : row.themeA === sourceKey || row.themeB === sourceKey)
     .flatMap(row => row.lines);
   const show = (text) => { if (caption) caption.textContent = text; };
-  show(details.at(-1)?.lines?.[0] ?? '');
+  show(details[0]?.lines?.[0] ?? '');
   const cx = 180;
   const cy = 180;
   const radius = 120;
@@ -306,6 +311,7 @@ function renderChordTile(root, model) {
     const x1 = cx + (radius - 10) * Math.cos(end - Math.PI / 2);
     const y1 = cy + (radius - 10) * Math.sin(end - Math.PI / 2);
     const sourceKey = layout.themes?.[source.index] ?? layout.arcs?.[source.index]?.key;
+    const targetKey = layout.themes?.[target.index] ?? layout.arcs?.[target.index]?.key;
     const colour = colourByKey.get(sourceKey) ?? CLINICAL_CHART_SLOTS[0];
     const path = createSvg(root, 'path');
     path.setAttribute('d', `M${x0},${y0} Q${cx},${cy} ${x1},${y1}`);
@@ -315,7 +321,7 @@ function renderChordTile(root, model) {
     path.setAttribute('data-role', 'ribbon');
     if (sourceKey) path.setAttribute('data-theme', sourceKey);
     path.setAttribute('tabindex', '0');
-    const focus = () => show(linesFor(sourceKey).join(' '));
+    const focus = () => show(linesFor(sourceKey, targetKey).join(' '));
     path.addEventListener('focus', focus);
     path.addEventListener('mouseenter', focus);
     svg.append(path);
@@ -327,8 +333,8 @@ function renderGovernanceHeat(root, model) {
   const tile = root.querySelector('#cn-tile-governance') ?? host;
   if (!host || !tile) return;
   const series = model.governanceHeat ?? [];
-  if (!paintChartOrEmpty(root, tile, null, { need: 1, have: series.length, unit: 'open items' })) {
-    host.replaceChildren();
+  host.replaceChildren();
+  if (!paintChartOrEmpty(root, host, null, { need: 1, have: series.length, unit: 'open items' })) {
     return;
   }
   const chart = buildWatchlistHeat(series);
@@ -364,7 +370,8 @@ function renderWeekHorizon(root, model) {
   const tile = root.querySelector('#cn-tile-week') ?? svg?.parentNode;
   if (!svg || !tile) return;
   const week = model.week ?? [];
-  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: week.length, unit: 'protein days' })) return;
+  const have = week.filter(day => Number(day.protein_g) > 0).length;
+  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have, unit: 'protein days' })) return;
   const bands = buildHorizonBands(weekHorizonMetrics(week), { width: 320, height: 24 });
   svg.replaceChildren();
   svg.setAttribute('viewBox', '0 0 320 24');

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { renderCentralNode } from '../../apps/life/js/app/render-central-node.js';
+import { packCnBoard, renderCentralNode } from '../../apps/life/js/app/render-central-node.js';
 
 class FakeElement {
   constructor(tag) {
@@ -50,11 +50,28 @@ class FakeElement {
   }
 
   append(...nodes) {
+    for (const node of nodes) {
+      if (node) node.parentNode = this;
+    }
     this.children.push(...nodes);
   }
 
+  after(node) {
+    if (!this.parentNode) return;
+    const siblings = this.parentNode.children;
+    const from = siblings.indexOf(node);
+    if (from >= 0) siblings.splice(from, 1);
+    const index = siblings.indexOf(this);
+    node.parentNode = this.parentNode;
+    siblings.splice(index + 1, 0, node);
+  }
+
   replaceChildren(...nodes) {
-    this.children = [...nodes];
+    for (const child of this.children) {
+      if (child && child.parentNode === this) child.parentNode = null;
+    }
+    this.children = [];
+    this.append(...nodes);
   }
 
   querySelector(selector) {
@@ -148,6 +165,8 @@ function fakeCentralNodeRoot({ boardWidth = 900 } = {}) {
   chord.id = 'central-node-chord';
   const governanceHeat = new FakeElement('div');
   governanceHeat.id = 'central-node-governance-heat';
+  const governanceLog = new FakeElement('div');
+  governanceLog.dataset.centralNode = 'governance-log';
 
   const chordDetail = new FakeElement('p');
   chordDetail.dataset.cn = 'chord-detail';
@@ -187,7 +206,7 @@ function fakeCentralNodeRoot({ boardWidth = 900 } = {}) {
   tiles['cn-tile-month'].append(sections['this-month']);
   tiles['cn-tile-trends'].append(stream, trendScan, trendMore, sections['long-term-trends']);
   tiles['cn-tile-radial'].append(radialYear);
-  tiles['cn-tile-governance'].append(governanceHeat);
+  tiles['cn-tile-governance'].append(governanceHeat, governanceLog);
   tiles['cn-tile-cross-agent'].append(chord, chordDetail, sections['cross-agent']);
   tiles['cn-tile-actions'].append(sections['recent-actions']);
   tiles['cn-tile-constraints'].append(sections.constraints);
@@ -228,7 +247,8 @@ function fakeCentralNodeRoot({ boardWidth = 900 } = {}) {
     '[data-live-snapshot]': liveSnapshot,
     '[data-cn="chord-detail"]': chordDetail,
     '[data-role="trend-scan"]': trendScan,
-    '[data-role="trend-more"]': trendMore
+    '[data-role="trend-more"]': trendMore,
+    '[data-central-node="governance-log"]': governanceLog
   };
   for (const [key, el] of Object.entries(liveComplete)) {
     bySelector[`[data-live-complete="${key}"]`] = el;
@@ -511,7 +531,7 @@ test('renderCentralNode paints open-item heat and captions ageDays', () => {
 test('renderCentralNode honest-empties governance heat when nothing is open', () => {
   const root = fakeCentralNodeRoot();
   renderCentralNode(root, baseModel({ governanceHeat: [], governanceOpen: [] }));
-  const empty = root.querySelector('#cn-tile-governance').children.find(node =>
+  const empty = root.querySelector('#central-node-governance-heat').children.find(node =>
     String(node.className).includes('cn-honest-empty')
   );
   assert.match(empty.textContent, /Need 1 open items/);
@@ -558,4 +578,132 @@ test('renderCentralNode paints a chord and focuses a line into the caption', () 
   arc._listeners.focus[0]();
   assert.match(caption.textContent, /Hammond→Ann/);
   assert.equal(root._sections['cross-agent'].hidden, true);
+});
+
+test('empty protein week honest-empties with no horizon rects', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel({
+    week: [
+      { date: '2026-07-24', protein_g: 0 },
+      { date: '2026-07-25', protein_g: 0 },
+      { date: '2026-07-26', protein_g: 0 },
+      { date: '2026-07-27', protein_g: 0 },
+      { date: '2026-07-28', protein_g: 0 },
+      { date: '2026-07-29', protein_g: 0 },
+      { date: '2026-07-30', protein_g: 0 }
+    ]
+  }));
+  const svg = root.querySelector('#central-node-week-horizon');
+  const empty = root.querySelector('#cn-tile-week').children.find(node =>
+    String(node.className).includes('cn-honest-empty')
+  );
+  assert.ok(empty);
+  assert.equal(empty.textContent, 'Need 1 protein days. 0 so far.');
+  assert.equal(svg.hidden, true);
+  assert.equal(svg.children.filter(node => node.tagName === 'rect').length, 0);
+});
+
+test('chord ribbon focus shows that pair’s line, not every line for the source', () => {
+  const root = fakeCentralNodeRoot();
+  const details = [
+    { themeA: 'Chadwick', themeB: 'Sara', lines: ['Chadwick→Sara: AC flag.'] },
+    { themeA: 'Chadwick', themeB: 'Ann', lines: ['Chadwick→Ann: teaching handoff.'] },
+    { themeA: 'Vera', themeB: 'Penelope', lines: ['Vera→Penelope: weekend framed as escape.'] }
+  ];
+  renderCentralNode(root, baseModel({
+    crossAgent: {
+      edges: details.map(row => ({ themeA: row.themeA, themeB: row.themeB, count: 1 })),
+      details
+    }
+  }));
+  const svg = root.querySelector('#central-node-chord');
+  const caption = root.querySelector('[data-cn="chord-detail"]');
+  assert.equal(caption.textContent, 'Chadwick→Sara: AC flag.');
+  const ribbons = svg.children.filter(node => node.getAttribute('data-role') === 'ribbon');
+  const chadwickRibbons = ribbons.filter(node => node.getAttribute('data-theme') === 'Chadwick');
+  assert.ok(chadwickRibbons.length >= 1);
+  for (const ribbon of chadwickRibbons) {
+    ribbon._listeners.focus[0]();
+    const hasSara = caption.textContent.includes('Chadwick→Sara');
+    const hasAnn = caption.textContent.includes('Chadwick→Ann');
+    assert.equal(hasSara && hasAnn, false);
+    assert.equal(hasSara || hasAnn, true);
+  }
+});
+
+test('trend More after a second render reveals the new rest', () => {
+  const root = fakeCentralNodeRoot();
+  const sections = baseModel().sections;
+  renderCentralNode(root, baseModel({
+    domainWeekly: {
+      weeks: ['2026-07-20', '2026-07-27'],
+      series: [{ key: 'nutrition', values: [2, 4] }]
+    },
+    sections: {
+      ...sections,
+      longTermTrends: '**Nutrition:**\n- Protein rising.\n**Exercise:**\n- EP anchor.\n**Health Trajectory:**\n- Taper.\n**Work/Energy:**\n- Holidays.'
+    }
+  }));
+  renderCentralNode(root, baseModel({
+    domainWeekly: {
+      weeks: ['2026-07-20', '2026-07-27'],
+      series: [{ key: 'nutrition', values: [2, 4] }]
+    },
+    sections: {
+      ...sections,
+      longTermTrends: '**Nutrition:**\n- Protein rising.\n**Exercise:**\n- EP anchor.\n**Health Trajectory:**\n- Taper.\n**Sleep:**\n- New rest.'
+    }
+  }));
+  const scan = root.querySelector('[data-role="trend-scan"]');
+  const more = root.querySelector('[data-role="trend-more"]');
+  assert.equal(more.hidden, false);
+  more.click();
+  assert.match(scan.textContent, /Sleep/);
+  assert.equal(scan.textContent.includes('Work/Energy'), false);
+});
+
+test('honest-empty for stream and governance is not after the scan or list', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel({
+    domainWeekly: { weeks: [], series: [] },
+    governanceHeat: [],
+    governanceOpen: []
+  }));
+
+  const trends = root.querySelector('#cn-tile-trends');
+  const stream = root.querySelector('#central-node-stream');
+  const scan = root.querySelector('[data-role="trend-scan"]');
+  const streamEmpty = trends.children.find(node => String(node.className).includes('cn-honest-empty'));
+  assert.ok(streamEmpty);
+  assert.equal(trends.children.indexOf(streamEmpty), trends.children.indexOf(stream) + 1);
+  assert.ok(trends.children.indexOf(streamEmpty) < trends.children.indexOf(scan));
+
+  const tile = root.querySelector('#cn-tile-governance');
+  const heat = root.querySelector('#central-node-governance-heat');
+  const list = tile.children.find(node => node.dataset?.centralNode === 'governance-log');
+  const heatEmpty = heat.children.find(node => String(node.className).includes('cn-honest-empty'));
+  const tileEmpty = tile.children.find(node => String(node.className).includes('cn-honest-empty'));
+  assert.ok(heatEmpty);
+  assert.match(heatEmpty.textContent, /Need 1 open items/);
+  assert.equal(tileEmpty, undefined);
+  assert.ok(list);
+  assert.equal(tile.children.indexOf(heatEmpty), -1);
+});
+
+test('packCnBoard after governance height growth moves later tiles', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel());
+  const board = root._board;
+  const governance = root._tiles['cn-tile-governance'];
+  const minBefore = Number.parseFloat(board.style.minHeight);
+  const constraints = root._tiles['cn-tile-constraints'];
+  const leftBefore = constraints.style.left;
+  const topBefore = constraints.style.top;
+  governance.offsetHeight = 480;
+  packCnBoard(root);
+  assert.ok(Number.parseFloat(board.style.minHeight) > minBefore);
+  assert.equal(
+    constraints.style.left !== leftBefore || constraints.style.top !== topBefore,
+    true
+  );
 });
