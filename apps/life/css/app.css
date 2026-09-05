@@ -1405,6 +1405,22 @@ main { max-width: 76rem; margin: 0 auto; }
   text-align: right;
   white-space: nowrap;
 }
+.fitness-board__visuals {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+}
+.fitness-board__ring {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+}
+.fitness-board__ring .metric-caption { margin-top: 0; }
+#fitness-dashboard .fitness-board .metric-caption,
+#fitness-dashboard .fitness-panel > .metric-caption {
+  font-size: var(--text-sm);
+}
 .fitness-stat-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1492,12 +1508,115 @@ main { max-width: 76rem; margin: 0 auto; }
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+  align-items: start;
 }
+#fitness-dashboard .fitness-panel { position: relative; }
 .fitness-viz__svg {
   width: 100%;
   height: auto;
   display: block;
   margin-top: var(--space-2);
+  max-height: 16rem;
+}
+.fitness-polar {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  margin-top: var(--space-2);
+}
+#fitness-dashboard .fitness-polar__svg,
+#fitness-dashboard .fitness-polar__svg.mind-mood-chart {
+  width: min(100%, 18rem);
+  max-width: 18rem;
+  aspect-ratio: 1;
+  height: auto;
+  display: block;
+  margin-inline: auto;
+}
+#fitness-dashboard .fitness-polar.mind-energy-orbit,
+#fitness-dashboard .fitness-polar--orbit {
+  width: min(100%, 20rem);
+  max-width: 20rem;
+  margin-inline: auto;
+}
+#fitness-dashboard .fitness-polar--orbit .fitness-polar__svg,
+#fitness-dashboard .fitness-polar--orbit .mind-energy-orbit__chart {
+  width: 100%;
+  max-width: none;
+}
+#fitness-dashboard .fitness-polar--donut .fitness-polar__svg {
+  width: min(100%, 11rem);
+  max-width: 11rem;
+}
+#fitness-dashboard .fitness-polar--clock [data-role="angle-label"],
+#fitness-dashboard .fitness-polar--clock [data-role="grid-label"],
+#fitness-dashboard #fitness-clock-chart [data-role="angle-label"],
+#fitness-dashboard #fitness-clock-chart [data-role="grid-label"],
+#fitness-dashboard #fitness-year-chart [data-role="angle-label"] {
+  font-size: 16px;
+  font-weight: 600;
+  fill: var(--chart-label, var(--muted));
+}
+#fitness-dashboard #fitness-e1rm-radial-chart [data-role="angle-label"],
+#fitness-dashboard #fitness-e1rm-radial-chart [data-role="grid-label"] {
+  font-size: 28px;
+  font-weight: 600;
+  fill: var(--chart-label, var(--muted));
+}
+#fitness-dashboard .fitness-polar--orbit [data-role="angle-label"],
+#fitness-dashboard .fitness-polar--orbit [data-role="orbit-label"] {
+  font-size: 32px;
+  font-weight: 600;
+}
+#fitness-dashboard #fitness-chord-chart .mind-chart-label {
+  font-size: 16px;
+  fill: var(--ink);
+  font-weight: 600;
+}
+#fitness-dashboard #fitness-bump-chart .mind-bump__label,
+#fitness-dashboard #fitness-bump-chart .mind-bump__week {
+  font-size: 28px;
+  fill: var(--ink);
+  font-weight: 600;
+}
+#fitness-dashboard #fitness-library-chart {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+#fitness-dashboard #fitness-library-chart .mind-constellation__label {
+  font-size: 28px;
+}
+#fitness-dashboard #fitness-library-chart .mind-constellation__glyph {
+  font-size: 18px;
+}
+#fitness-dashboard #fitness-sankey-chart .fitness-viz__label {
+  font-size: 12px;
+  fill: var(--ink);
+  font-weight: 600;
+}
+#fitness-dashboard .fitness-polar__svg,
+#fitness-dashboard .fitness-viz__svg {
+  pointer-events: none;
+}
+#fitness-dashboard .fitness-viz [data-role="point"],
+#fitness-dashboard .fitness-viz [data-role="slice"],
+#fitness-dashboard .fitness-viz [data-role="ribbon"],
+#fitness-dashboard .fitness-viz [data-role="arc"],
+#fitness-dashboard .fitness-viz [data-role="edge"],
+#fitness-dashboard .fitness-viz [data-role="star"],
+#fitness-dashboard .fitness-viz [role="button"],
+#fitness-dashboard .fitness-viz .mind-mood-dot,
+#fitness-dashboard .fitness-viz .mind-energy-dot,
+#fitness-dashboard .fitness-viz .mind-mood-mix__seg,
+#fitness-dashboard .fitness-viz .mind-constellation__star,
+#fitness-dashboard .fitness-viz .mind-constellation__edge,
+#fitness-dashboard .fitness-viz .mind-constellation__hit {
+  pointer-events: auto;
+  cursor: pointer;
+}
+#fitness-dashboard .fitness-viz .mind-mood-mix__seg {
+  pointer-events: stroke;
 }
 .fitness-viz__svg--orbit { max-height: 22rem; }
 .fitness-viz__ring {
@@ -1509,7 +1628,7 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-viz__band { fill: color-mix(in srgb, var(--success) 18%, transparent); }
 .fitness-viz__label {
   fill: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .fitness-heat { display: grid; gap: var(--space-2); }
 .fitness-heat-row {

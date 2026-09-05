@@ -10,6 +10,17 @@ class FakeEl {
     this.className = '';
     this.textContent = '';
     this.style = {};
+    this.classList = {
+      add: (...names) => {
+        const next = new Set(`${this.className} ${names.join(' ')}`.trim().split(/\s+/).filter(Boolean));
+        this.className = [...next].join(' ');
+      },
+      remove: (...names) => {
+        const drop = new Set(names);
+        this.className = `${this.className}`.split(/\s+/).filter(name => name && !drop.has(name)).join(' ');
+      },
+      contains: name => `${this.className}`.split(/\s+/).includes(name)
+    };
   }
 
   append(...nodes) { this.children.push(...nodes); }
@@ -167,7 +178,7 @@ test('empty focus and first-logged comparisons stay hidden', () => {
   assert.equal(root.ensure('#fitness-comparisons').children.length, 0);
 });
 
-test('status, working weights, and labeled volume rows replace empty charts', () => {
+test('status, working weights, and the visual week board replace empty charts', () => {
   const root = fitnessRoot();
   renderFitness(root, baseModel({
     heroSession: null,
@@ -213,21 +224,16 @@ test('status, working weights, and labeled volume rows replace empty charts', ()
   }));
 
   assert.equal(root.ensure('[data-fitness="week-done"]').textContent, '1');
-  assert.equal(root.ensure('[data-fitness="week-volume"]').textContent, '400 kg');
-  assert.equal(root.ensure('[data-fitness="last-week-volume"]').textContent, '—');
-  assert.match(root.ensure('[data-fitness="week-story"]').textContent, /Trained Thu 30\/07/);
-  assert.match(root.ensure('[data-fitness="month-story"]').textContent, /1 session/);
-  assert.match(root.ensure('[data-fitness="pace-story"]').textContent, /3 sessions short/);
+  assert.equal(root.ensure('[data-fitness="week-target"]').textContent, '4');
+  assert.equal(root.ensure('[data-fitness="week-strip"]').children.length, 2);
+  assert.equal(root.ensure('#fitness-week-columns').children.length, 2);
+  assert.equal(root.ensure('#fitness-week-columns').children[0].children[0].textContent, 'This week');
+  assert.equal(root.ensure('#fitness-week-columns').children[0].children[2].textContent, '400 kg');
+  assert.equal(root.ensure('#fitness-week-columns').children[1].children[0].textContent, 'Last week');
+  assert.equal(root.ensure('#fitness-week-columns').children[1].children[2].textContent, '—');
   assert.match(root.ensure('[data-fitness="next-planned"]').textContent, /Upper Body/);
   assert.equal(root.ensure('#fitness-loads-card').attributes.hidden, undefined);
   assert.match(root.ensure('#fitness-loads').children[0].children[1].textContent, /34 kg × 8/);
-  assert.equal(root.ensure('#fitness-volume-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-volume-rows').children[0].children[0].textContent, 'Last 30 days');
-  assert.equal(root.ensure('#fitness-volume-rows').children[0].children[1].textContent, '400 kg');
-  assert.equal(root.ensure('#fitness-volume-rows').children[1].children[1].textContent, '400 kg');
-  assert.equal(root.ensure('#fitness-volume-rows').children[2].children[1].textContent, '26 min');
-  assert.equal(root.ensure('#fitness-volume-rows').children[3].children[0].textContent, 'Unique lifts');
-  assert.equal(root.ensure('#fitness-volume-rows').children[4].children[0].textContent, 'kg / set');
   assert.equal(root.ensure('#fitness-recent-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-comparisons-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-comparisons').children[0].children[2].textContent, 'PR');
