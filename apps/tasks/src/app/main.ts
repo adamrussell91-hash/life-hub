@@ -6,6 +6,7 @@ import '../../design-kit/filters.css';
 import '../../design-kit/calendar.css';
 import '../../design-kit/sign-in.css';
 import '../../design-kit/motion.css';
+import '../../design-kit/view-on-map.css';
 import '../styles/hub.css';
 import '../styles/views.css';
 import '../styles/cards.css';
