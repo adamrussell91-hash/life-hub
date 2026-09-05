@@ -3,6 +3,9 @@ import { applyHubPillsThumb, prefersReducedMotion } from './hub-motion.js';
 const DURATION_MS = 250;
 const EASE = 'ease-out';
 const VIEW_PAD = 12;
+/** Clear the locked phone bottom bar when clamping a floating editor. */
+const MOBILE_BOTTOM_PAD = 72;
+const MOBILE_BREAKPOINT = 720;
 
 /** @type {{ close: (opts?: { restoreFocus?: boolean }) => void } | null} */
 let openPopover = null;
@@ -66,15 +69,24 @@ function uniqueLayoutId(prefix) {
 function clampPanel(rect, width, height, view) {
   const vw = view.innerWidth ?? 800;
   const vh = view.innerHeight ?? 600;
-  const maxW = Math.min(width, vw - VIEW_PAD * 2);
-  const maxH = Math.min(height, vh - VIEW_PAD * 2);
-  let left = rect.left;
+  const phone = vw < MOBILE_BREAKPOINT;
+  const padX = VIEW_PAD;
+  const padTop = VIEW_PAD;
+  const padBottom = phone ? MOBILE_BOTTOM_PAD : VIEW_PAD;
+  const maxW = Math.min(width, vw - padX * 2);
+  const maxH = Math.min(height, vh - padTop - padBottom);
+  // On phones, centre the editor — anchoring to a full-width trigger pins it
+  // awkwardly left and often under the bottom nav.
+  let left = phone ? (vw - maxW) / 2 : rect.left;
   let top = rect.bottom + 6;
-  if (top + maxH > vh - VIEW_PAD && rect.top > maxH + VIEW_PAD) {
+  if (top + maxH > vh - padBottom) {
     top = rect.top - maxH - 6;
   }
-  left = Math.min(Math.max(VIEW_PAD, left), vw - maxW - VIEW_PAD);
-  top = Math.min(Math.max(VIEW_PAD, top), vh - maxH - VIEW_PAD);
+  if (top < padTop || top + maxH > vh - padBottom) {
+    top = Math.max(padTop, (vh - padBottom - maxH + padTop) / 2);
+  }
+  left = Math.min(Math.max(padX, left), vw - maxW - padX);
+  top = Math.min(Math.max(padTop, top), Math.max(padTop, vh - padBottom - maxH));
   return { left, top, width: maxW, height: maxH };
 }
 
@@ -775,4 +787,9 @@ export function createMorphingClosedFieldPopover({
 /** Test helper — drop the singleton so suites can start clean. */
 export function resetMorphingPopoverForTests() {
   openPopover = null;
+}
+
+/** Test helper — phone vs desktop panel clamping. */
+export function clampMorphingPopoverPanelForTests(rect, width, height, view) {
+  return clampPanel(rect, width, height, view);
 }

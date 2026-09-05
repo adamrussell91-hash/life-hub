@@ -385,4 +385,27 @@ test('closed-field snippet and kit docs name the factory', async () => {
   assert.match(html, /createMorphingClosedFieldPopover/);
   assert.match(agents, /createMorphingClosedFieldPopover/);
   assert.match(css, /morphing-popover__choices/);
+  assert.match(css, /background:\s*var\(--paper\)/);
+});
+
+test('phone clamp centres the panel and clears the bottom nav', async () => {
+  const { clampMorphingPopoverPanelForTests } = await import('../../packages/design-kit/js/morphing-popover.js');
+  const phone = clampMorphingPopoverPanelForTests(
+    { left: 12, top: 700, bottom: 744, right: 378, width: 366, height: 44 },
+    320,
+    220,
+    { innerWidth: 390, innerHeight: 844 }
+  );
+  assert.ok(Math.abs(phone.left + phone.width / 2 - 195) < 1, `expected centred, left=${phone.left}`);
+  assert.ok(phone.bottom ?? phone.top + phone.height <= 844 - 72 + 0.5, 'clears bottom nav');
+  assert.ok(phone.top >= 12, 'stays below top pad');
+
+  const desktop = clampMorphingPopoverPanelForTests(
+    { left: 200, top: 100, bottom: 140, right: 360, width: 160, height: 40 },
+    320,
+    180,
+    { innerWidth: 1200, innerHeight: 800 }
+  );
+  assert.equal(desktop.left, 200);
+  assert.equal(desktop.top, 146);
 });
