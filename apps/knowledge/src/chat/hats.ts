@@ -1,4 +1,5 @@
 export type ChatHatId =
+  | "makeNote"
   | "fromBook"
   | "scoping"
   | "synthesis"
@@ -7,6 +8,11 @@ export type ChatHatId =
   | "internalExternal"
   | "methods"
   | "writing";
+
+/** Hats that research the open web and file a new archive page. */
+export function isWebFileNoteHat(id: ChatHatId): boolean {
+  return id === "makeNote" || id === "fromBook";
+}
 
 export type ChatScope = "narrow" | "standard" | "wide";
 export type ChatDepth = "single" | "verified" | "iterative" | "exhaustive";
@@ -25,6 +31,14 @@ export const SCOPES: ChatScope[] = ["narrow", "standard", "wide"];
 export const DEPTHS: ChatDepth[] = ["single", "verified", "iterative", "exhaustive"];
 
 export const CHAT_HATS: ChatHat[] = [
+  {
+    id: "makeNote",
+    label: "Ask Clementine",
+    explain: "Ask Clementine to research a topic on the open web and file a tagged information page with no notebook, unit, or book stamp.",
+    defaultScope: "standard",
+    defaultDepth: "single",
+    plan: "Capture the topic, question, or thinking process. Search the open web — not the archive — and write a referenced information page. Do not stamp it under a notebook, unit, degree, or book. Tags come after filing.",
+  },
   {
     id: "fromBook",
     label: "From a book",

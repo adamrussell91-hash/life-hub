@@ -3,6 +3,7 @@ import { normalizeOriginLabel } from "../origin/normalize";
 import type { ResearchFinding } from "../research/schema";
 
 export const BOOK_NOTE_WRITE_TOKENS = 3500;
+export const MAKE_NOTE_WRITE_TOKENS = 3500;
 export const BOOK_NOTE_BEST_CAP = 8;
 
 export type BookContext = {
