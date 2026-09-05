@@ -408,6 +408,34 @@
   align-items: center;
 }
 
+.quick-add__when {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex: 1 1 100%;
+  align-items: flex-end;
+}
+
+.quick-add__when-field {
+  flex: 1 1 8rem;
+  min-width: 7rem;
+  margin: 0;
+}
+
+.quick-add__when-field__label {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.quick-add__when-field .hub-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
 .plus-add .quick-add,
 .plus-add .someday-add {
   margin-bottom: 0;

@@ -5,6 +5,7 @@ import {
   hubClockParts,
   hubWeekdayLong,
   parseDue,
+  snapHubDueTime,
   tasksForDay,
   toDateKey,
   toHubDateKey,
@@ -128,6 +129,13 @@ describe('hub (Sydney) calendar day from an instant', () => {
     expect(clock.weekday).toBe('Sunday');
     expect(clock.hour).toBe(8);
     expect(clock.minute).toBe(5);
+    expect(snapHubDueTime(instant)).toBe('09:00');
+  });
+
+  it('keeps the current hour when already on the hour', () => {
+    process.env.TZ = 'UTC';
+    const onTheHour = new Date('2026-08-29T22:00:00.000Z'); // 08:00 AEST
+    expect(snapHubDueTime(onTheHour)).toBe('08:00');
   });
 
   it('stays on the same Sydney day when the process is already Sydney', () => {
