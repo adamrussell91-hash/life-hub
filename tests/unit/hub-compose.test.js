@@ -72,7 +72,7 @@ test('kit, chrome, Life, Teaching, and Knowledge all load hub-compose', async ()
 
   assert.match(css, /--hub-compose-duration: 700ms/);
   assert.match(css, /prefers-reduced-motion/);
-  assert.doesNotMatch(css, /will be posted/i);
+  assert.doesNotMatch(css, /\.hub-compose__posted|\.hub-compose__footer/);
   assert.match(chrome, /hub-compose\.css/);
   assert.match(html, /packages\/design-kit\/hub-compose\.css/);
   assert.match(html, /id="clare-dump-form"/);
