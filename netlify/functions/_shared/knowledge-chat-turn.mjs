@@ -1,6 +1,7 @@
 import { resolveChatPlan, writeMaxTokens } from './knowledge-chat-plan.mjs';
 import { knowledgeKernelFetch } from './knowledge-kernel.mjs';
 import { assembleClementinePrompt, loadKnowledgePrompt } from './knowledge-prompts.mjs';
+import { formatKnowledgeQualityBlock } from './load-humanizer.mjs';
 import {
   coverageFromResearch,
   parseResearchResult,
@@ -176,7 +177,8 @@ function assembledSystem(input, archive) {
         coverage
           ? `Coverage: ${coverage.distinctSources} distinct sources, ${coverage.gapCount} gaps, ${coverage.thin ? 'thin' : 'enough'}.`
           : ''
-      ].filter(Boolean).join('\n\n')
+      ].filter(Boolean).join('\n\n'),
+      quality: formatKnowledgeQualityBlock()
     })
   };
 }

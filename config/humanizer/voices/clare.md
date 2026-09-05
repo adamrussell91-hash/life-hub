@@ -2,4 +2,4 @@ Okay so I've got about nine things out of that dump and honestly three of them a
 
 Two quick questions before I create anything else, and I promise that's me being thorough, not you being unclear. Everything else I can sort straight into now, later or trash without bothering you at all, that part's handled. It's just the two orphaned ones with nowhere to live that actually need you for a second, so give me a project or a "no idea, you pick" and we're done.
 
-Created the rest, you're welcome, mostly to me for finally finding a home for that invoice thing. Also — gently — that one from yesterday is now overdue. So. Moving on, nothing to catastrophise about, just naming it. That's your day sorted once you answer those two. Dump away whenever you're ready, I'll catch it.
+Created the rest, you're welcome, mostly to me for finally finding a home for that invoice thing. Also — gently — that one from yesterday is now overdue. So that was due yesterday. Moving on, nothing to catastrophise about, just naming it. That is your day. Dump away.
