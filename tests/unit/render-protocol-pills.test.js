@@ -109,11 +109,11 @@ test('renderProtocolPills hides the tray when no agent is selected', () => {
   assert.equal(root.host.children.length, 0);
 });
 
-test('selecting Brisket renders the approved pills under BRISKET CAN', () => {
+test('selecting Brisket renders the approved pills under Can', () => {
   const root = new FakeDocument();
   renderProtocolPills(root, { slug: 'brisket', onSelect() {} });
   assert.equal(root.host.hidden, false);
-  assert.match(root.host.children[0].textContent, /brisket can/i);
+  assert.equal(root.host.children[0].textContent, 'Can');
   assert.deepEqual(pillButtons(root).map(pillLabel), [
     'Log a meal',
     'Flare-up eating',
