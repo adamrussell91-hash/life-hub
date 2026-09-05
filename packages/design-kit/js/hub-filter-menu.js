@@ -43,6 +43,18 @@ function paintTrigger(btn, options, value, defaultValue) {
   btn.classList.toggle('is-set', String(current.value) !== String(defaultValue));
 }
 
+/**
+ * Match typeahead buffer against option labels (case-insensitive prefix).
+ * @param {string[]} labels
+ * @param {string} buffer
+ * @returns {number} index of first match, or -1
+ */
+export function findTypeaheadMatch(labels, buffer) {
+  const needle = String(buffer ?? '').toLowerCase();
+  if (!needle) return -1;
+  return labels.findIndex((label) => String(label ?? '').toLowerCase().startsWith(needle));
+}
+
 function closeOpenMenu(returnFocus = false) {
   if (!openMenu) return;
   const { menu, btn, close, stopFloating } = openMenu;
@@ -93,6 +105,8 @@ function openFilterMenu(btn, options, currentValue, onSelect) {
     closeOpenMenu(true);
   });
 
+  let typeaheadBuffer = '';
+  let typeaheadTimer = 0;
   menu.addEventListener('keydown', (event) => {
     const index = items.indexOf(document.activeElement);
     if (event.key === 'ArrowDown') {
@@ -109,6 +123,26 @@ function openFilterMenu(btn, options, currentValue, onSelect) {
       items[items.length - 1]?.focus();
     } else if (event.key === 'Escape' || event.key === 'Tab') {
       closeOpenMenu(true);
+    } else if (
+      event.key.length === 1
+      && !event.ctrlKey
+      && !event.metaKey
+      && !event.altKey
+    ) {
+      typeaheadBuffer += event.key;
+      if (typeaheadTimer) clearTimeout(typeaheadTimer);
+      typeaheadTimer = setTimeout(() => {
+        typeaheadBuffer = '';
+        typeaheadTimer = 0;
+      }, 500);
+      const match = findTypeaheadMatch(
+        items.map((item) => item.textContent ?? ''),
+        typeaheadBuffer
+      );
+      if (match >= 0) {
+        event.preventDefault();
+        items[match].focus();
+      }
     }
   });
 

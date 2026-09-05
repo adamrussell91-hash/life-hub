@@ -29,6 +29,8 @@ import {
   MISSING_LOG_NUDGE_TEXT,
   shouldNudgeMissingLogEntry
 } from '../core/log-finalize-detect.js';
+import { beginChatTurnAnchor, clearChatTurnAnchors } from './chat-turn-anchor.js';
+import { lockConfirmCardReceipt } from './confirm-card-receipt.js';
 
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
@@ -80,6 +82,8 @@ export function createChatController({
   let selectedProtocolId = null;
   let activeAbort = null;
   let stickToBottom = true;
+  let turnAnchor = null;
+  let turnFollow = false;
   let syncJumpLatest = () => {};
   let auditSession = resumeAuditSession(storage);
   let savedMindSessionThisThread = false;
@@ -284,6 +288,10 @@ export function createChatController({
     setChatBusy(root, false);
     showChatError(root, '');
     const list = root.querySelector('#chat-messages');
+    turnAnchor?.release?.();
+    turnAnchor = null;
+    turnFollow = false;
+    clearChatTurnAnchors(list);
     list?.replaceChildren?.();
     const slug = stickyAgentSlug();
     if (slug) applyAgentAccent(slug);
@@ -348,7 +356,9 @@ export function createChatController({
       }
       jumpLatest.addEventListener?.('click', () => {
         stickToBottom = true;
-        list.scrollTop = list.scrollHeight;
+        turnFollow = Boolean(turnAnchor);
+        if (turnAnchor && turnFollow) turnAnchor.follow();
+        else list.scrollTop = list.scrollHeight;
         syncJumpLatest();
       });
       return jumpLatest;
@@ -366,6 +376,7 @@ export function createChatController({
       const scrollHeight = list.scrollHeight || 0;
       if (scrollTop < lastScrollTop && scrollHeight === lastScrollHeight) {
         stickToBottom = false;
+        turnFollow = false;
       } else if (isChatPinned(list)) {
         stickToBottom = true;
       }
@@ -376,7 +387,10 @@ export function createChatController({
 
     if (typeof globalThis.ResizeObserver === 'function') {
       const ro = new globalThis.ResizeObserver(() => {
-        if (stickToBottom) list.scrollTop = list.scrollHeight;
+        if (stickToBottom) {
+          if (turnAnchor && turnFollow) turnAnchor.follow();
+          else list.scrollTop = list.scrollHeight;
+        }
         lastScrollTop = list.scrollTop || 0;
         lastScrollHeight = list.scrollHeight || 0;
       });
@@ -463,9 +477,18 @@ export function createChatController({
       maybeStartAuditSession(message);
     }
     const sessionForSend = !hiddenUser && auditSession && talkingToHammond(message) ? auditSession : undefined;
+    turnAnchor?.release?.();
+    turnAnchor = null;
+    turnFollow = false;
     if (!hiddenUser) {
       remember('user', message);
-      appendMessage(root, { role: 'user', text: message });
+      const userBubble = appendMessage(root, { role: 'user', text: message });
+      stickToBottom = true;
+      turnFollow = true;
+      if (stickToBottom) {
+        const list = root.querySelector('#chat-messages');
+        turnAnchor = beginChatTurnAnchor(list, userBubble, root);
+      }
     }
 
     let assistantSlug = stickyAgentSlug();
@@ -475,6 +498,8 @@ export function createChatController({
     let statusLine = pickStatusLine(assistantSlug);
     stickToBottom = true;
     syncJumpLatest();
+    let searchSources = [];
+    let searchCardHost = null;
     let workingBubble = appendMessage(root, {
       role: 'assistant',
       agentSlug: assistantSlug,
@@ -542,7 +567,9 @@ export function createChatController({
 
     function scrollChatToBottom() {
       const list = root.querySelector('#chat-messages');
-      if (list && stickToBottom) list.scrollTop = list.scrollHeight;
+      if (!list || !stickToBottom) return;
+      if (turnAnchor && turnFollow) turnAnchor.follow();
+      else list.scrollTop = list.scrollHeight;
     }
 
     try {
@@ -641,9 +668,16 @@ export function createChatController({
           gotUsefulOutput = true;
           clearWorkingBubble();
           endTextTurn();
+          const sources = Array.isArray(event.sources) ? event.sources : [];
+          const hasUrls = sources.some(source => typeof source?.url === 'string' && source.url.trim());
+          if (hasUrls) {
+            searchCardHost?.item?.remove?.();
+            searchCardHost = null;
+            searchSources.length = 0;
+          }
           appendSourcesCard(root, {
             heading: event.heading,
-            sources: Array.isArray(event.sources) ? event.sources : []
+            sources
           });
         } else if (event.type === 'action_rejected') {
           turnSignaled = true;
@@ -692,7 +726,15 @@ export function createChatController({
           }
         } else if (event.type === 'search') {
           endTextTurn();
-          appendMessage(root, { role: 'assistant', text: `🔍 Searched the web: ${event.query ?? '…'}` });
+          searchSources.push({
+            title: event.query || 'Web search',
+            snippet: 'Web search query'
+          });
+          searchCardHost?.item?.remove?.();
+          searchCardHost = appendSourcesCard(root, {
+            heading: 'Searched the web',
+            sources: searchSources
+          });
           rotateWorkingStatus();
         } else if (event.type === 'food_library_saved') {
           endTextTurn();
@@ -767,6 +809,9 @@ export function createChatController({
     } finally {
       if (activeAbort === abort) activeAbort = null;
       clearWorkingBubble();
+      turnAnchor?.release?.();
+      turnAnchor = null;
+      turnFollow = false;
       sending = false;
       setChatBusy(root, false);
       if (turnSignaled && !hiddenUser) maybeMarkUnread();
@@ -826,11 +871,13 @@ export function createChatController({
         ...(id ? { id } : {}),
         slug
       });
-      const saved = root.createElement('p');
-      saved.textContent = result?.intent
-        ? `Saved: ${result.intent}`
-        : 'Action applied.';
-      proposalUi.card.replaceChildren(saved);
+      lockConfirmCardReceipt(proposalUi.card, {
+        createElement: root.createElement.bind(root),
+        summary: result?.intent
+          ? `Saved: ${result.intent}`
+          : 'Action applied.',
+        label: 'Confirmed'
+      });
       onRecordWritten?.(result);
     } catch {
       proposalUi.confirm.disabled = false;
@@ -850,11 +897,13 @@ export function createChatController({
         ...(id ? { id } : {}),
         slug: stickyAgentSlug() === 'hammond' ? stickyAgentSlug() : 'hammond'
       });
-      const saved = root.createElement('p');
-      saved.textContent = result?.summary
-        ? `Central Node updated: ${result.summary}`
-        : 'Central Node updated.';
-      proposal.card.replaceChildren(saved);
+      lockConfirmCardReceipt(proposal.card, {
+        createElement: root.createElement.bind(root),
+        summary: result?.summary
+          ? `Central Node updated: ${result.summary}`
+          : 'Central Node updated.',
+        label: 'Confirmed'
+      });
       onRecordWritten?.(result);
     } catch {
       proposal.confirm.disabled = false;
@@ -871,7 +920,11 @@ export function createChatController({
       const edited = collectEdits(event.record, proposal.inputs);
       const slug = slugFromPath(event.path);
       const result = await chatApi.confirm({ candidate: toCandidate(edited), slug, overwrite });
-      proposal.card.replaceChildren(Object.assign(root.createElement('p'), { textContent: 'Saved.' }));
+      lockConfirmCardReceipt(proposal.card, {
+        createElement: root.createElement.bind(root),
+        summary: 'Saved.',
+        label: 'Confirmed'
+      });
       if (result?.centralNodeUpdated === false) {
         showChatError(root, 'Logged, but Central Node didn\u2019t update — try Refresh.');
       }
