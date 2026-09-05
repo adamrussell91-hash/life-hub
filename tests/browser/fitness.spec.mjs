@@ -65,6 +65,7 @@ test('the Fitness tab renders the fixture workout and labeled analytics', async 
     assert.ok(topTiles.heroTop < topTiles.weekTop, 'last session should sit above this week');
     assert.ok(topTiles.regionTop < topTiles.weekTop, 'region strength should sit above this week');
     assert.ok(topTiles.heroRight <= topTiles.regionLeft + 1, 'last session and region strength should sit side by side');
+    assert.ok(Math.abs(topTiles.heroTop - topTiles.regionTop) < 8, 'last session and region strength should share the top row');
     assert.match(await page.locator('[data-fitness="streak"]').textContent(), /\d+/);
     assert.ok(await page.locator('#fitness-region-grid .fitness-region-card').count() >= 1);
     assert.ok(await page.locator('[data-fitness="week-strip"] span').count() >= 1);

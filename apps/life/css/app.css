@@ -1473,17 +1473,31 @@ main { max-width: 76rem; margin: 0 auto; }
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-auto-flow: dense;
   gap: var(--hub-tile-gap);
-  align-items: stretch;
+  align-items: start;
 }
-.fitness-bento > .hub-run {
+.fitness-bento > .hub-run,
+.fitness-bento > .fitness-lead {
   grid-column: 1 / -1;
 }
-.fitness-bento > .fitness-hero-card,
-.fitness-bento > .fitness-region-block {
-  grid-column: span 2;
-  grid-row: span 2;
+.fitness-lead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--hub-tile-gap);
+  align-items: stretch;
 }
-.fitness-bento > .fitness-board,
+.fitness-lead > .fitness-hero-card {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+.fitness-lead > .fitness-region-block {
+  grid-column: 2;
+  grid-row: 1;
+}
+.fitness-lead > .fitness-board {
+  grid-column: 2;
+  grid-row: 2;
+}
 .fitness-bento > .fitness-panel,
 .fitness-bento > .fitness-viz > .fitness-panel {
   grid-column: span 2;
@@ -6006,11 +6020,6 @@ main { max-width: 76rem; margin: 0 auto; }
 
 @media (max-width: 64rem) {
   .fitness-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .fitness-bento > .fitness-hero-card,
-  .fitness-bento > .fitness-region-block {
-    grid-column: span 1;
-  }
-  .fitness-bento > .fitness-board,
   .fitness-bento > .fitness-panel,
   .fitness-bento > .fitness-viz > .fitness-panel {
     grid-column: span 1;
@@ -6019,9 +6028,16 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 @media (max-width: 48rem) {
   .fitness-bento { grid-template-columns: 1fr; }
-  .fitness-bento > .fitness-hero-card,
-  .fitness-bento > .fitness-region-block,
-  .fitness-bento > .fitness-board,
+  .fitness-lead {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+  .fitness-lead > .fitness-hero-card,
+  .fitness-lead > .fitness-region-block,
+  .fitness-lead > .fitness-board {
+    grid-column: auto;
+    grid-row: auto;
+  }
   .fitness-bento > .fitness-panel,
   .fitness-bento > .fitness-viz > .fitness-panel {
     grid-column: auto;
