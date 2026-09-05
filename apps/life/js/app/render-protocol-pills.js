@@ -20,7 +20,7 @@ export function renderProtocolPills(root, {
 
   const eyebrow = root.createElement('p');
   eyebrow.className = 'agent-protocol-pills__eyebrow section-kicker';
-  eyebrow.textContent = pack.eyebrow;
+  eyebrow.textContent = 'Can';
 
   const row = root.createElement('div');
   row.className = 'hub-pills';

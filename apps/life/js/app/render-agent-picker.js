@@ -81,29 +81,15 @@ export function renderChatEmpty(root, slug) {
   const empty = root.querySelector?.('#chat-empty');
   if (!empty) return;
   const agent = avatarForSlug(slug);
-  if (!agent) {
-    const title = root.createElement('p');
-    title.className = 'chat-empty__name';
-    title.textContent = 'Choose who to talk to';
-    const purpose = root.createElement('p');
-    purpose.className = 'chat-empty__purpose';
-    purpose.textContent = 'Tap a personality to start.';
-    empty.replaceChildren?.(title, purpose);
-    return;
-  }
-  const img = root.createElement('img');
-  img.className = 'chat-empty__avatar';
-  img.src = agent.src;
-  img.alt = agent.name;
-  img.width = 72;
-  img.height = 72;
-  const title = root.createElement('p');
-  title.className = 'chat-empty__name';
-  title.textContent = agent.shortName || agent.name;
   const purpose = root.createElement('p');
   purpose.className = 'chat-empty__purpose';
+  if (!agent) {
+    purpose.textContent = 'Tap a personality to start.';
+    empty.replaceChildren?.(purpose);
+    return;
+  }
   purpose.textContent = agent.purpose || '';
-  empty.replaceChildren?.(img, title, purpose);
+  empty.replaceChildren?.(purpose);
 }
 
 export function applyAgentAvatarToBubble(bubble, slug) {
