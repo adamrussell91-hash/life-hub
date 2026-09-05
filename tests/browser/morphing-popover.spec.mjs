@@ -36,29 +36,6 @@ async function signIn(page) {
   await page.locator('#app[data-state="ready"]').waitFor();
 }
 
-test('Clare dump morphs open from Write a dump and focuses the textarea', async () => {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  try {
-    await signIn(page);
-    const trigger = page.locator('.hub-pulse-clare [data-morphing-trigger]');
-    await trigger.waitFor();
-    assert.equal(await page.locator('#clare-dump-text').isVisible(), false);
-
-    await trigger.click();
-    const panel = page.locator('.morphing-popover__panel.is-floating');
-    await panel.waitFor();
-    await page.locator('#clare-dump-text').waitFor({ state: 'visible' });
-    await page.waitForFunction(() => document.activeElement?.id === 'clare-dump-text');
-    assert.match(await panel.locator('.morphing-popover__title').textContent(), /Dump for Clare/);
-
-    await page.keyboard.press('Escape');
-    await page.locator('#clare-dump-text').waitFor({ state: 'hidden' });
-  } finally {
-    await context.close();
-  }
-});
-
 test('Body Log weight morphs into a value editor', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();

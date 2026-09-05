@@ -277,7 +277,11 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.hub-pulse-clare textarea,
+.hub-pulse-clare .hub-compose {
+  width: 100%;
+  --hub-compose-width: 100%;
+  margin: var(--space-2) 0;
+}
 .hub-pulse-clare select {
   display: block;
   width: 100%;
@@ -289,15 +293,14 @@ main { max-width: 76rem; margin: 0 auto; }
   color: var(--ink);
   font: inherit;
 }
+.hub-pulse-clare__tools {
+  margin-top: var(--space-3);
+}
 .hub-pulse-clare__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
   align-items: center;
-}
-.hub-pulse-clare .morphing-popover {
-  display: block;
-  margin: 0.55rem 0;
 }
 
 .hero-grid { display: grid; grid-template-columns: 1.35fr 1fr 1fr; gap: var(--space-grid); }
