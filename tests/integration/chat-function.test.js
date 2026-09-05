@@ -2726,6 +2726,30 @@ Rule one.
   assert.doesNotMatch(receivedArgs.system, /Stale April body/);
 });
 
+test('hub-agent-context loads only on Hammond turns, not Clare or Ann', async () => {
+  const loadedFor = [];
+  const run = async (message, priorAgentSlug) => {
+    const handler = createChatHandler({
+      env: validEnv,
+      now: () => Date.parse('2026-08-01T06:00:00Z'),
+      fetchImpl: githubFetchStub(),
+      loadHubAgentContext: async () => {
+        loadedFor.push(priorAgentSlug);
+        return 'Other hubs (live umbrella stores):\nTasks: mark essays';
+      },
+      createAnthropicClient: () => ({
+        streamMessage: () => mockedStream([{ type: 'done' }])
+      })
+    });
+    await readSse(await handler(request({ message, priorAgentSlug })));
+  };
+
+  await run('Hammond, what is the mission today?', 'hammond');
+  await run('Clare, triage this dump', 'clare');
+  await run("Ann, how is Thursday looking?", 'ann');
+  assert.deepEqual(loadedFor, ['hammond']);
+});
+
 test('non-hammond agents do not register Hammond CN or governance tools', async () => {
   let receivedArgs;
   const handler = createChatHandler({
@@ -2819,6 +2843,104 @@ test('propose_central_node_patch auto cross_agent append writes central-node.md'
   const written = Buffer.from(body.content, 'base64').toString('utf8');
   assert.match(written, /Hammond→Brisket: hold surplus tonight/);
   assert.match(body.message, /chore\(cn\): Direct Brisket to hold surplus/);
+});
+
+async function assertSpecialistCrossAgentWrite({ message, priorAgentSlug, sender, line }) {
+  const cnSha = '5'.repeat(40);
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'central-node.md', type: 'blob', sha: cnSha, size: HAMMOND_CN_FIXTURE.length }]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(HAMMOND_CN_FIXTURE, 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* (args) {
+        receivedArgs = args;
+        const toolResult = await args.executeTools({
+          id: 'call_1',
+          name: 'propose_central_node_patch',
+          input: {
+            section: 'cross_agent',
+            op: 'append_line',
+            payload: {
+              text: line,
+              summary: `${sender} collision note`
+            }
+          }
+        });
+        assert.deepEqual(JSON.parse(toolResult), {
+          ok: true,
+          status: 'applied',
+          summary: `${sender} collision note`
+        });
+        const rejected = await args.executeTools({
+          id: 'call_2',
+          name: 'propose_central_node_patch',
+          input: {
+            section: 'constraints',
+            op: 'append_line',
+            payload: {
+              text: `${sender}→Hammond: must not land`,
+              summary: 'illegal section'
+            }
+          }
+        });
+        assert.deepEqual(JSON.parse(rejected), { ok: false, error: 'patch_not_allowed' });
+        yield { type: 'text', delta: 'Noted.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message, priorAgentSlug }))));
+  assert.equal(events[0].slug, priorAgentSlug);
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'propose_central_node_patch'));
+  assert.ok(!receivedArgs.tools.some(tool => tool.name === 'append_governance_log'));
+  const putCall = calls.find(call => call.options?.method === 'PUT');
+  assert.ok(putCall, `expected ${sender} to write central-node.md`);
+  const written = Buffer.from(JSON.parse(putCall.options.body).content, 'base64').toString('utf8');
+  assert.match(written, new RegExp(line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 1);
+}
+
+test('Clare can persist Clare→ Cross-Agent lines and is rejected on other sections', async () => {
+  await assertSpecialistCrossAgentWrite({
+    message: 'Clare, flag the collision',
+    priorAgentSlug: 'clare',
+    sender: 'Clare',
+    line: 'Clare→Hammond: 11 open tasks collide with the rest flag'
+  });
+});
+
+test('Ann can persist Ann→ Cross-Agent lines and is rejected on other sections', async () => {
+  await assertSpecialistCrossAgentWrite({
+    message: "Ann, flag Thursday's double period",
+    priorAgentSlug: 'ann',
+    sender: 'Ann',
+    line: 'Ann→Hammond: 11PSYCHA Thursday sits on the flare flag'
+  });
 });
 
 test('propose_central_node_patch confirm-class does not write central-node.md, persists to the pending queue, and emits cn_patch_proposal with an id from executeTools', async () => {

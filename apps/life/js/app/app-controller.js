@@ -1,11 +1,11 @@
-import { getSydneyDateKey } from '../core/time.js';
+import { addCalendarDays, getSydneyDateKey } from '../core/time.js';
 import { bindHubAccordion, openHubAccordion, renderHubPreview } from '../shell/hub-accordion.js';
 import { renderHubPulse } from '../shell/render-hub-pulse.js';
 import { renderClareResult } from '../shell/render-tasks.js';
 import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
 import { tasksEventsFromTasks } from '../shell/tasks-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
-import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
+import { shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
@@ -71,6 +71,7 @@ export function createAppController(dependencies) {
     getCurrentRoutineKey,
     buildCalendarModel,
     renderCalendar,
+    chatApi,
     buildBodyModel,
     renderBody,
     bodyController,
@@ -117,7 +118,10 @@ export function createAppController(dependencies) {
   let currentSection = 'home';
   let calendarSelectedDate = null;
   let calendarViewMonth = null;
-  let calendarExpandedDate = null;
+  let calendarView = 'week';
+  let calendarCompose = { date: null, time: null, type: 'diary' };
+  let calendarSelectedEventId = null;
+  let calendarFocusCompose = false;
   let teachingEvents = [];
   let teachingCalendarInFlight = null;
   let knowledgeEvents = [];
@@ -558,7 +562,7 @@ export function createAppController(dependencies) {
     nutrition: { eyebrow: "Today's macros", title: 'Nutrition' },
     fitness: { eyebrow: 'Training', title: 'Fitness' },
     skincare: { eyebrow: 'Consistency first', title: 'Skincare' },
-    calendar: { eyebrow: 'Your logged days', title: 'Calendar' },
+    calendar: { eyebrow: 'Day, week, month', title: 'Calendar' },
     body: { eyebrow: 'Scale, composition, tape', title: 'Body' },
     'body-bloods': { eyebrow: 'Labs', title: 'Bloods' },
     'body-medical': { eyebrow: 'History', title: 'Medical Overview' },
@@ -948,38 +952,78 @@ export function createAppController(dependencies) {
     const date = latestResult.date;
     if (!calendarSelectedDate) calendarSelectedDate = date;
     if (!calendarViewMonth) calendarViewMonth = calendarSelectedDate.slice(0, 7);
+    if (!calendarCompose.date) calendarCompose = { ...calendarCompose, date: calendarSelectedDate };
     const model = buildCalendarModel({
       events: [...(latestResult.events ?? []), ...teachingEvents, ...knowledgeEvents, ...tasksEvents],
       date,
       selectedDate: calendarSelectedDate,
       viewMonth: calendarViewMonth
     });
+    const focusCompose = calendarFocusCompose;
+    calendarFocusCompose = false;
     renderCalendar(root, model, {
       scrollToDetail,
       monthDelta,
-      expanded: Boolean(calendarExpandedDate),
-      onSelectDate: next => {
-        const { selectedDate, expandedDate } = resolveCalendarDayClick(calendarExpandedDate, next);
-        const nextMonth = selectedDate.slice(0, 7);
+      expanded: true,
+      view: calendarView,
+      composeDraft: calendarCompose,
+      selectedEventId: calendarSelectedEventId,
+      focusCompose,
+      now: now(),
+      onSelectDate: (next, options = {}) => {
+        if (!next) return;
+        const nextMonth = next.slice(0, 7);
         const monthChanged = nextMonth !== calendarViewMonth;
-        const monthDelta = !monthChanged ? 0 : (nextMonth > calendarViewMonth ? 1 : -1);
-        calendarSelectedDate = selectedDate;
-        calendarExpandedDate = expandedDate;
+        const shift = !monthChanged ? 0 : (nextMonth > calendarViewMonth ? 1 : -1);
+        calendarSelectedDate = next;
         calendarViewMonth = nextMonth;
+        calendarCompose = {
+          ...calendarCompose,
+          date: next,
+          time: options.time !== undefined ? options.time : calendarCompose.time
+        };
+        calendarSelectedEventId = options.eventId ?? null;
+        calendarFocusCompose = Boolean(options.focusCompose);
         renderCalendarSection({
-          scrollToDetail: Boolean(expandedDate),
-          monthDelta
+          scrollToDetail: true,
+          monthDelta: shift
         });
       },
-      onShiftMonth: delta => {
-        calendarViewMonth = shiftYearMonth(calendarViewMonth, delta);
-        calendarSelectedDate = clampDateToYearMonth(calendarSelectedDate, calendarViewMonth);
-        if (calendarExpandedDate) {
-          calendarExpandedDate = calendarSelectedDate;
+      onSwitchView: next => {
+        calendarView = next === 'day' || next === 'month' ? next : 'week';
+        renderCalendarSection();
+      },
+      onShiftRange: delta => {
+        if (calendarView === 'month') {
+          calendarViewMonth = shiftYearMonth(calendarViewMonth, delta);
+          calendarSelectedDate = clampDateToYearMonth(calendarSelectedDate, calendarViewMonth);
+          calendarCompose = { ...calendarCompose, date: calendarSelectedDate };
+          renderCalendarSection({ monthDelta: delta, scrollToDetail: true });
+          return;
         }
-        renderCalendarSection({ monthDelta: delta, scrollToDetail: Boolean(calendarExpandedDate) });
+        const step = calendarView === 'day' ? delta : delta * 7;
+        calendarSelectedDate = addCalendarDays(calendarSelectedDate, step);
+        calendarViewMonth = calendarSelectedDate.slice(0, 7);
+        calendarCompose = { ...calendarCompose, date: calendarSelectedDate };
+        renderCalendarSection({ scrollToDetail: true });
+      },
+      onCreateLog: payload => {
+        void createCalendarLog(payload);
       }
     });
+  }
+
+  async function createCalendarLog({ candidate, slug }) {
+    if (!chatApi?.confirm || !candidate || !slug) return;
+    try {
+      await chatApi.confirm({ candidate, slug });
+      calendarCompose = { date: candidate.date, time: candidate.time ?? null, type: candidate.type };
+      calendarSelectedEventId = null;
+      await refresh({ manual: true, force: true });
+      if (currentSection === 'calendar') renderCalendarSection();
+    } catch {
+      setStatus('Could not save that log.');
+    }
   }
 
   function renderBodySection() {

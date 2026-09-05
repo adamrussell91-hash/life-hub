@@ -156,6 +156,48 @@
   transform: none;
 }
 
+/* Opt-in scroll-hide chrome. startHubMotion() watches [data-hub-scroll-hide].
+ * Scroll down past the threshold hides; scroll up (or back near top) reveals.
+ * In-flow: collapse so chat messages can grow. Overlay: slide away like a
+ * sticky header. */
+.hub-scroll-hide {
+  display: grid;
+  grid-template-rows: 1fr;
+  min-width: 0;
+  flex: 0 0 auto;
+  opacity: 1;
+  transition:
+    grid-template-rows 300ms ease-in-out,
+    opacity 300ms ease-in-out,
+    transform 300ms ease-in-out;
+}
+
+.hub-scroll-hide__inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: visible;
+}
+
+.hub-scroll-hide.is-hidden {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hub-scroll-hide.is-hidden .hub-scroll-hide__inner {
+  overflow: hidden;
+}
+
+.hub-scroll-hide--overlay {
+  display: block;
+}
+
+.hub-scroll-hide--overlay.is-hidden {
+  transform: translateY(-100%);
+}
+
 /* MorphingDialog — micro card → expanded overlay. Spring lives in JS. */
 .hub-morph-dialog {
   position: fixed;
@@ -214,6 +256,10 @@
     transform: none;
     translate: none;
     opacity: 1;
+  }
+
+  .hub-scroll-hide {
+    transition: none;
   }
 
   .hub-count.is-ticking > :not(.hub-count__fx) {
