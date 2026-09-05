@@ -388,3 +388,33 @@ test('paintChartOrEmpty keeps the tile and writes honest empty copy', async () =
   assert.equal(empty.className, 'cn-honest-empty mind-honest-empty metric-caption');
   assert.equal(empty.textContent, 'Need 3 protein days. 1 so far.');
 });
+
+test('renderCentralNode paints three radial rings from year hit maps and honest-empties without hits', () => {
+  const root = fakeCentralNodeRoot();
+  const loggingYear = [
+    { date: '2026-01-01', complete: true },
+    { date: '2026-01-02', complete: false }
+  ];
+  renderCentralNode(root, baseModel({
+    date: '2026-07-30',
+    loggingYear,
+    exerciseYear: [{ date: '2026-01-02', completed: true }],
+    eatingYear: [{ date: '2026-01-03', hitEatingTargets: false }]
+  }));
+  const svg = root.querySelector('#central-node-radial-year');
+  const lines = svg.children.filter(node => node.tagName === 'line');
+  assert.ok(lines.length >= 2);
+  assert.ok(lines.some(line => line.getAttribute('stroke') === 'var(--wave)'));
+  assert.equal(svg.hidden, false);
+
+  renderCentralNode(root, baseModel({
+    date: '2026-07-30',
+    loggingYear: [],
+    exerciseYear: [],
+    eatingYear: []
+  }));
+  const empty = root.querySelector('#cn-tile-radial').children.find(node =>
+    String(node.className).includes('cn-honest-empty')
+  );
+  assert.match(empty.textContent, /Need 1 hit days this year/);
+});
