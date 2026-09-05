@@ -224,7 +224,7 @@ input.hub-search::placeholder {
 }
 
 .hub-menu {
-  position: absolute;
+  position: fixed;
   z-index: 60;
   min-width: 12rem;
   max-height: 20rem;

@@ -46,3 +46,32 @@ test('bindChatComposer submits trimmed text and clears the field', () => {
   assert.deepEqual(sent, ['hello']);
   assert.equal(input.value, '');
 });
+
+test('bindChatComposer Escape calls onStop', () => {
+  const input = new FakeInput();
+  const stop = new FakeInput('BUTTON');
+  const form = new FakeForm(input);
+  const root = {
+    querySelector(selector) {
+      if (selector === '#chat-form') return form;
+      if (selector === '#chat-input') return input;
+      if (selector === '#chat-stop') return stop;
+      return null;
+    }
+  };
+  let stopped = 0;
+  bindChatComposer(root, { onStop: () => { stopped += 1; } });
+
+  const escape = new Event('keydown', { cancelable: true });
+  Object.defineProperty(escape, 'key', { value: 'Escape' });
+  Object.defineProperty(escape, 'isComposing', { value: false });
+  input.dispatchEvent(escape);
+  assert.equal(stopped, 1);
+  assert.equal(escape.defaultPrevented, true);
+
+  const stopEscape = new Event('keydown', { cancelable: true });
+  Object.defineProperty(stopEscape, 'key', { value: 'Escape' });
+  Object.defineProperty(stopEscape, 'isComposing', { value: false });
+  stop.dispatchEvent(stopEscape);
+  assert.equal(stopped, 2);
+});

@@ -1,9 +1,11 @@
 import {
   appendMessage,
   appendActionProposal,
+  appendChoiceCard,
   appendCnPatchProposal,
   appendRecordProposal,
   appendRecordSaved,
+  appendSourcesCard,
   isChatPinned,
   renderChatMarkdown,
   setChatBusy,
@@ -78,6 +80,7 @@ export function createChatController({
   let selectedProtocolId = null;
   let activeAbort = null;
   let stickToBottom = true;
+  let syncJumpLatest = () => {};
   let auditSession = resumeAuditSession(storage);
   let savedMindSessionThisThread = false;
   let flushAttempted = false;
@@ -317,9 +320,74 @@ export function createChatController({
     const list = root.querySelector('#chat-messages');
     if (!list || list.dataset.scrollBound === '1') return;
     list.dataset.scrollBound = '1';
+
+    let jumpLatest = null;
+    let lastScrollTop = list.scrollTop || 0;
+    let lastScrollHeight = list.scrollHeight || 0;
+
+    function ensureJumpLatest() {
+      if (jumpLatest) return jumpLatest;
+      jumpLatest = root.querySelector('#chat-jump-latest');
+      if (!jumpLatest) {
+        jumpLatest = root.createElement('button');
+        jumpLatest.id = 'chat-jump-latest';
+        jumpLatest.type = 'button';
+        jumpLatest.className = 'chat-jump-latest';
+        jumpLatest.hidden = true;
+        jumpLatest.textContent = 'Jump to latest';
+        const form = root.querySelector('#chat-form');
+        if (form?.parentNode?.insertBefore) {
+          form.parentNode.insertBefore(jumpLatest, form);
+        } else if (typeof form?.before === 'function') {
+          form.before(jumpLatest);
+        } else if (typeof list.after === 'function') {
+          list.after(jumpLatest);
+        } else {
+          list.parentNode?.append?.(jumpLatest);
+        }
+      }
+      jumpLatest.addEventListener?.('click', () => {
+        stickToBottom = true;
+        list.scrollTop = list.scrollHeight;
+        syncJumpLatest();
+      });
+      return jumpLatest;
+    }
+
+    // Keep the controller-level sync so send() can hide the jump control.
+    syncJumpLatest = () => {
+      const jump = ensureJumpLatest();
+      if (!jump) return;
+      jump.hidden = stickToBottom;
+    };
+
     list.addEventListener?.('scroll', () => {
-      stickToBottom = isChatPinned(list);
+      const scrollTop = list.scrollTop || 0;
+      const scrollHeight = list.scrollHeight || 0;
+      if (scrollTop < lastScrollTop && scrollHeight === lastScrollHeight) {
+        stickToBottom = false;
+      } else if (isChatPinned(list)) {
+        stickToBottom = true;
+      }
+      lastScrollTop = scrollTop;
+      lastScrollHeight = scrollHeight;
+      syncJumpLatest();
     });
+
+    if (typeof globalThis.ResizeObserver === 'function') {
+      const ro = new globalThis.ResizeObserver(() => {
+        if (stickToBottom) list.scrollTop = list.scrollHeight;
+        lastScrollTop = list.scrollTop || 0;
+        lastScrollHeight = list.scrollHeight || 0;
+      });
+      try {
+        ro.observe(list);
+      } catch {
+        /* ignore — FakeElement / non-Element roots */
+      }
+    }
+
+    syncJumpLatest();
   }
 
   function bindMessageActions() {
@@ -406,6 +474,7 @@ export function createChatController({
     let assistantFullText = '';
     let statusLine = pickStatusLine(assistantSlug);
     stickToBottom = true;
+    syncJumpLatest();
     let workingBubble = appendMessage(root, {
       role: 'assistant',
       agentSlug: assistantSlug,
@@ -549,6 +618,33 @@ export function createChatController({
           endTextTurn();
           const proposal = appendActionProposal(root, { proposal: event.proposal });
           bindActionProposal(proposal, event.proposal, event.id ?? null);
+        } else if (event.type === 'choice') {
+          turnSignaled = true;
+          gotUsefulOutput = true;
+          clearWorkingBubble();
+          endTextTurn();
+          appendChoiceCard(root, {
+            title: event.title,
+            hint: event.hint,
+            choices: Array.isArray(event.choices) ? event.choices : [],
+            multi: Boolean(event.multi),
+            confirmLabel: event.confirmLabel,
+            onConfirm: picks => {
+              const labels = picks.map(pick => pick.label).filter(Boolean);
+              if (!labels.length || sending) return;
+              void send(labels.join(', '));
+            },
+            onDismiss: () => {}
+          });
+        } else if (event.type === 'sources') {
+          turnSignaled = true;
+          gotUsefulOutput = true;
+          clearWorkingBubble();
+          endTextTurn();
+          appendSourcesCard(root, {
+            heading: event.heading,
+            sources: Array.isArray(event.sources) ? event.sources : []
+          });
         } else if (event.type === 'action_rejected') {
           turnSignaled = true;
           clearWorkingBubble();

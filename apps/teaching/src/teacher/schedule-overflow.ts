@@ -1,3 +1,5 @@
+import { autoUpdateHubFloating, positionHubFloating } from '../../../../packages/design-kit/js/hub-floating.js';
+
 export interface ScheduleOverflowOptions {
   currentDate: string;
   isCurrent: boolean;
@@ -6,10 +8,15 @@ export interface ScheduleOverflowOptions {
 }
 
 let openMenu: HTMLElement | null = null;
+let stopFloating: (() => void) | null = null;
 let onDocPointer: ((event: PointerEvent) => void) | null = null;
 let onDocKey: ((event: KeyboardEvent) => void) | null = null;
 
+const FLOATING_OPTS = { placement: 'bottom-end' as const, offset: 6, padding: 12 };
+
 export function closeScheduleOverflow(): void {
+  stopFloating?.();
+  stopFloating = null;
   openMenu?.remove();
   openMenu = null;
   if (onDocPointer) {
@@ -76,20 +83,8 @@ export function openScheduleOverflow(
 
   document.body.append(menu);
   openMenu = menu;
-
-  const rect = anchor.getBoundingClientRect();
-  const margin = 8;
-  const menuWidth = menu.offsetWidth;
-  const menuHeight = menu.offsetHeight;
-  let left = rect.right - menuWidth;
-  left = Math.min(Math.max(margin, left), window.innerWidth - menuWidth - margin);
-  let top = rect.bottom + 4;
-  if (top + menuHeight > window.innerHeight - margin) {
-    top = Math.max(margin, rect.top - menuHeight - 4);
-  }
-  menu.style.position = 'fixed';
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
+  void positionHubFloating(anchor, menu, FLOATING_OPTS);
+  stopFloating = autoUpdateHubFloating(anchor, menu, FLOATING_OPTS);
 
   onDocPointer = (event: PointerEvent) => {
     const target = event.target;
