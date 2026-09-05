@@ -160,3 +160,17 @@ test('kit sign-in snippet and CSS no longer ship haze', async () => {
     assert.doesNotMatch(source, /sign-in__sparkle/);
   }
 });
+
+test('kit motion no longer ships a cursor-follow spotlight sheen', async () => {
+  const css = await readFile(new URL('../../packages/design-kit/motion.css', import.meta.url), 'utf8');
+  const motion = await readFile(new URL('../../packages/design-kit/js/hub-motion.js', import.meta.url), 'utf8');
+  const agents = await readFile(new URL('../../packages/design-kit/AGENTS.md', import.meta.url), 'utf8');
+
+  for (const source of [css, motion, agents]) {
+    assert.doesNotMatch(source, /hub-spotlight/);
+    assert.doesNotMatch(source, /hub-spot-x/);
+    assert.doesNotMatch(source, /hub-motion-spot/);
+    assert.doesNotMatch(source, /spotlight sheen/);
+    assert.doesNotMatch(source, /card sheen/);
+  }
+});
