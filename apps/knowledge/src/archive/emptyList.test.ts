@@ -2,12 +2,10 @@ import { describe, expect, it } from "vitest";
 import { archiveEmptyHtml } from "./emptyList";
 
 describe("archiveEmptyHtml", () => {
-  it("shows a Make-a-note empty state when the archive has no pages", () => {
+  it("shows a New-note empty state when the archive has no pages", () => {
     const html = archiveEmptyHtml({ hasArchiveNotes: false });
     expect(html).toContain("No notes yet");
-    expect(html).toContain("Make a note");
-    expect(html).toContain("From a book");
-    expect(html).toContain("Blank note");
+    expect(html).toContain("New note");
     expect(html).not.toContain("University");
     expect(html).not.toContain("migrate");
     expect(html).not.toContain("Notion");

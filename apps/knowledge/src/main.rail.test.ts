@@ -62,10 +62,14 @@ describe("Knowledge Hub rail", () => {
     expect(css).not.toMatch(/\.reader__tidy\s*\{[^}]*font-size:/);
   });
 
-  it("opens Make a note and From a book sittings from the archive", () => {
-    expect(main).toContain('data-from-book');
-    expect(main).toContain('data-make-note');
-    expect(main).toContain("Note from this book");
+  it("puts Make a note, From a book, and Blank note under one New note menu", () => {
+    expect(main).toContain("function newNoteMenuHtml");
+    expect(main).toContain("function bindNewNoteMenu");
+    expect(main).toContain("data-new-note-menu");
+    expect(main).toContain("data-from-book");
+    expect(main).toContain("data-make-note");
+    expect(main).toContain("data-blank-note");
+    expect(main).toContain("New note");
     expect(main).toContain("Make a note");
     expect(main).toContain("Blank note");
     expect(main).toContain("function openBookNote");
@@ -73,6 +77,8 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("function openCompose");
     expect(main).toContain('hat: "makeNote"');
     expect(main).toContain("compose__savebar");
+    expect(css).toContain(".new-note");
+    expect(css).toContain(".new-note__menu");
     expect(css).toContain(".chat__composer");
     expect(css).toContain("--keyboard-inset");
     expect(css).toContain(".chat__hats");

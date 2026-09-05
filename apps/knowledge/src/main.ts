@@ -356,6 +356,92 @@ function openMakeNote() {
   render();
 }
 
+function newNoteMenuHtml(bookLabel?: string) {
+  const fromBookLabel = bookLabel ? `From “${escapeHtml(bookLabel)}”` : "From a book";
+  return `<div class="new-note">
+    <button class="btn" data-new-note-menu type="button" aria-haspopup="menu" aria-expanded="false">New note</button>
+    <div class="hub-menu new-note__menu" role="menu" hidden>
+      <p class="hub-menu__head">New note</p>
+      <button class="hub-menu__opt" role="menuitem" data-make-note type="button">
+        <span class="new-note__opt">
+          <span class="new-note__opt-title">Make a note</span>
+          <span class="new-note__opt-detail">Clementine researches and files it · tags only</span>
+        </span>
+      </button>
+      <button class="hub-menu__opt" role="menuitem" data-from-book type="button">
+        <span class="new-note__opt">
+          <span class="new-note__opt-title">${fromBookLabel}</span>
+          <span class="new-note__opt-detail">Researched from a passage, stamped under the book</span>
+        </span>
+      </button>
+      <button class="hub-menu__opt" role="menuitem" data-blank-note type="button">
+        <span class="new-note__opt">
+          <span class="new-note__opt-title">Blank note</span>
+          <span class="new-note__opt-detail">Write it yourself</span>
+        </span>
+      </button>
+    </div>
+  </div>`;
+}
+
+function bindNewNoteMenu(root: ParentNode, bookLabel?: string) {
+  const toggle = root.querySelector<HTMLButtonElement>("[data-new-note-menu]");
+  const menu = root.querySelector<HTMLElement>(".new-note__menu");
+  if (!toggle || !menu) return;
+
+  let docBound = false;
+  const onDocClick = (event: MouseEvent) => {
+    if (!(event.target instanceof Node) || menu.contains(event.target) || toggle.contains(event.target)) return;
+    close();
+  };
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    close();
+  };
+  const unbindDoc = () => {
+    if (!docBound) return;
+    document.removeEventListener("click", onDocClick, true);
+    document.removeEventListener("keydown", onKey, true);
+    docBound = false;
+  };
+  const bindDoc = () => {
+    if (docBound) return;
+    document.addEventListener("click", onDocClick, true);
+    document.addEventListener("keydown", onKey, true);
+    docBound = true;
+  };
+  const close = () => {
+    menu.hidden = true;
+    menu.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+    unbindDoc();
+  };
+  const open = () => {
+    menu.hidden = false;
+    menu.classList.add("is-open");
+    toggle.setAttribute("aria-expanded", "true");
+    queueMicrotask(bindDoc);
+  };
+
+  toggle.onclick = event => {
+    event.stopPropagation();
+    if (menu.classList.contains("is-open")) close();
+    else open();
+  };
+  root.querySelector<HTMLButtonElement>("[data-make-note]")!.onclick = () => {
+    close();
+    openMakeNote();
+  };
+  root.querySelector<HTMLButtonElement>("[data-from-book]")!.onclick = () => {
+    close();
+    openBookNote(bookLabel);
+  };
+  root.querySelector<HTMLButtonElement>("[data-blank-note]")!.onclick = () => {
+    close();
+    openCompose();
+  };
+}
+
 function resetOriginLabelChrome() {
   originLabelQuery = "";
   originLabelOpen = false;
@@ -561,15 +647,7 @@ function renderList() {
     ${pageHeader(
       `Private archive${originFilter.kind ? " · origin" : keywordFilter ? " · keyword" : ""}`,
       escapeHtml(listTitle()),
-      `${
-        originFilter.kind === "book" && originFilter.label
-          ? `<button class="btn" data-from-book type="button">Note from this book</button>
-             <button class="btn btn--ghost" data-make-note type="button">Make a note</button>
-             <button class="btn btn--ghost" data-new-note type="button">Blank note</button>`
-          : `<button class="btn" data-make-note type="button">Make a note</button>
-             <button class="btn btn--ghost" data-from-book type="button">From a book</button>
-             <button class="btn btn--ghost" data-new-note type="button">Blank note</button>`
-      }
+      `${newNoteMenuHtml(originFilter.kind === "book" ? originFilter.label : undefined)}
         <div class="viewbar">
           <button class="viewbar__btn is-active" type="button">List</button>
           <button class="viewbar__btn" data-jump-graph type="button">Graph</button>
@@ -597,15 +675,7 @@ function renderList() {
     view = "graph";
     render();
   };
-  app.querySelector<HTMLButtonElement>("[data-new-note]")!.onclick = () => {
-    openCompose();
-  };
-  app.querySelector<HTMLButtonElement>("[data-make-note]")!.onclick = () => {
-    openMakeNote();
-  };
-  app.querySelector<HTMLButtonElement>("[data-from-book]")!.onclick = () => {
-    openBookNote(originFilter.kind === "book" ? originFilter.label : undefined);
-  };
+  bindNewNoteMenu(app, originFilter.kind === "book" ? originFilter.label : undefined);
   app.querySelector<HTMLButtonElement>("[data-clear-keyword]")?.addEventListener("click", () => {
     keywordFilter = "";
     listScrollTop = 0;
