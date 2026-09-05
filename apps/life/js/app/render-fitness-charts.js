@@ -138,6 +138,33 @@ function bindTip(node, tip, text) {
   node.addEventListener('blur', hide);
 }
 
+function appendLeaderLabel(root, nodes, { cx, cy, x, y, text, fill, role = 'leader-label' }) {
+  const dx = x - cx;
+  const dy = y - cy;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const labelR = len + 36;
+  const lx = cx + ux * labelR;
+  const ly = cy + uy * labelR;
+  const line = createSvg(root, 'line');
+  if (!line) return;
+  line.setAttribute('data-role', 'leader');
+  line.setAttribute('x1', String(x));
+  line.setAttribute('y1', String(y));
+  line.setAttribute('x2', String(lx - ux * 10));
+  line.setAttribute('y2', String(ly - uy * 10));
+  if (fill) line.setAttribute('stroke', fill);
+  const label = createSvg(root, 'text');
+  label.setAttribute('data-role', role);
+  label.setAttribute('x', String(lx));
+  label.setAttribute('y', String(ly + 3));
+  label.setAttribute('text-anchor', ux > 0.25 ? 'start' : ux < -0.25 ? 'end' : 'middle');
+  if (fill) label.setAttribute('fill', fill);
+  label.textContent = text;
+  nodes.push(line, label);
+}
+
 function namedDot(root, { cx, cy, r, fill, delay, className = 'mind-mood-dot' }) {
   const dot = createSvg(root, 'circle');
   if (!dot) return null;
@@ -164,9 +191,9 @@ function renderClock(root, points) {
   const tip = ensureTip(root, card);
   const nodes = [];
   for (const ring of [
-    { r: 52, label: 'Older', x: 160, y: 116 },
-    { r: 86, label: '', x: 0, y: 0 },
-    { r: rim, label: 'Newer', x: 160, y: 36 }
+    { r: 52, label: 'Older' },
+    { r: 86, label: '' },
+    { r: rim, label: 'Newer' }
   ]) {
     const grid = createSvg(root, 'circle');
     grid.setAttribute('data-role', 'grid');
@@ -175,32 +202,35 @@ function renderClock(root, points) {
     grid.setAttribute('r', String(ring.r));
     nodes.push(grid);
     if (ring.label) {
-      const label = createSvg(root, 'text');
-      label.setAttribute('data-role', 'grid-label');
-      label.setAttribute('x', String(ring.x));
-      label.setAttribute('y', String(ring.y));
-      label.setAttribute('text-anchor', 'middle');
-      label.textContent = ring.label;
-      nodes.push(label);
+      const at = polar(cx, cy, ring.r, 210);
+      appendLeaderLabel(root, nodes, {
+        cx,
+        cy,
+        x: at.x,
+        y: at.y,
+        text: ring.label,
+        role: 'grid-label'
+      });
     }
   }
   for (const hour of CLOCK_HOURS) {
     const theta = thetaForTime(hour.time);
     const tick = polar(cx, cy, rim, theta);
-    const labelAt = polar(cx, cy, rim + 22, theta);
     const spoke = createSvg(root, 'line');
     spoke.setAttribute('data-role', 'spoke');
     spoke.setAttribute('x1', String(cx));
     spoke.setAttribute('y1', String(cy));
     spoke.setAttribute('x2', String(tick.x));
     spoke.setAttribute('y2', String(tick.y));
-    const label = createSvg(root, 'text');
-    label.setAttribute('data-role', 'angle-label');
-    label.setAttribute('x', String(labelAt.x));
-    label.setAttribute('y', String(labelAt.y + 4));
-    label.setAttribute('text-anchor', 'middle');
-    label.textContent = hour.label;
-    nodes.push(spoke, label);
+    nodes.push(spoke);
+    appendLeaderLabel(root, nodes, {
+      cx,
+      cy,
+      x: tick.x,
+      y: tick.y,
+      text: hour.label,
+      role: 'angle-label'
+    });
   }
   points.forEach((point, index) => {
     const theta = thetaForTime(point.time);
@@ -248,7 +278,7 @@ function renderOrbit(root, days) {
   const nodes = [];
   for (const tick of chart.angleTicks ?? []) {
     const outer = Math.hypot(tick.x - chart.cx, tick.y - chart.cy) || chart.plotRadius;
-    const inner = Math.max(outer - 14, 0);
+    const inner = Math.max(outer - 10, 0);
     const ux = (tick.x - chart.cx) / outer;
     const uy = (tick.y - chart.cy) / outer;
     const spoke = createSvg(root, 'line');
@@ -257,13 +287,15 @@ function renderOrbit(root, days) {
     spoke.setAttribute('y1', String(chart.cy + uy * inner));
     spoke.setAttribute('x2', String(tick.x));
     spoke.setAttribute('y2', String(tick.y));
-    const label = createSvg(root, 'text');
-    label.setAttribute('data-role', 'angle-label');
-    label.setAttribute('x', String(tick.labelX));
-    label.setAttribute('y', String(tick.labelY + 4));
-    label.setAttribute('text-anchor', 'middle');
-    label.textContent = tick.label;
-    nodes.push(spoke, label);
+    nodes.push(spoke);
+    appendLeaderLabel(root, nodes, {
+      cx: chart.cx,
+      cy: chart.cy,
+      x: tick.x,
+      y: tick.y,
+      text: tick.label,
+      role: 'angle-label'
+    });
   }
   const volumeRings = [
     { fraction: 0.44, label: 'Lighter', colour: 'var(--muted)' },
@@ -272,21 +304,23 @@ function renderOrbit(root, days) {
   ];
   for (const ring of volumeRings) {
     const radius = ring.fraction * chart.plotRadius;
-    const at = polar(chart.cx, chart.cy, radius, -8);
+    const at = polar(chart.cx, chart.cy, radius, 200);
     const grid = createSvg(root, 'circle');
     grid.setAttribute('data-role', 'orbit');
     grid.setAttribute('cx', String(chart.cx));
     grid.setAttribute('cy', String(chart.cy));
     grid.setAttribute('r', String(radius));
     grid.setAttribute('stroke', ring.colour);
-    const label = createSvg(root, 'text');
-    label.setAttribute('data-role', 'orbit-label');
-    label.setAttribute('x', String(at.x));
-    label.setAttribute('y', String(at.y));
-    label.setAttribute('text-anchor', 'end');
-    label.setAttribute('fill', ring.colour);
-    label.textContent = ring.label;
-    nodes.push(grid, label);
+    nodes.push(grid);
+    appendLeaderLabel(root, nodes, {
+      cx: chart.cx,
+      cy: chart.cy,
+      x: at.x,
+      y: at.y,
+      text: ring.label,
+      fill: ring.colour,
+      role: 'orbit-label'
+    });
   }
   const maxVol = Math.max(1, ...trained.map(day => day.volume));
   trained.forEach((day, index) => {

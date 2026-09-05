@@ -33,8 +33,8 @@ import { loadVeraProtocol, VERA_INTAKE_PATH } from './_shared/load-vera-protocol
 import { loadBrisketProtocol } from './_shared/load-brisket-protocol.mjs';
 import { loadSaraProtocol } from './_shared/load-sara-protocol.mjs';
 import { loadHammondProtocol } from './_shared/load-hammond-protocol.mjs';
-import {
 import { buildUserContent, normalizeChatAttachments } from '../../packages/design-kit/js/hub-chat-attachments.js';
+import {
   normalizeAuditSession,
   buildHammondAuditContract,
   startAuditSessionFromMessage,
