@@ -186,6 +186,30 @@ test('signs in and renders the approved Home values at desktop width', async () 
   await context.close();
 });
 
+test('home cards do not grow a cursor-follow spotlight sheen', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  const card = page.locator('.metric-card').first();
+  await card.waitFor();
+  const box = await card.boundingBox();
+  assert.ok(box, 'expected a Home metric card');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+  const sheen = await card.evaluate(el => ({
+    spotlight: el.classList.contains('hub-spotlight'),
+    spotX: el.style.getPropertyValue('--hub-spot-x'),
+    spotY: el.style.getPropertyValue('--hub-spot-y'),
+    afterImage: getComputedStyle(el, '::after').backgroundImage
+  }));
+  assert.equal(sheen.spotlight, false);
+  assert.equal(sheen.spotX, '');
+  assert.equal(sheen.spotY, '');
+  assert.equal(sheen.afterImage, 'none');
+  await context.close();
+});
+
 test('the Life Hub tile appears on sign-in and every signed-in page', async () => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
