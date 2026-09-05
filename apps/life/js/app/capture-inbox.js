@@ -10,6 +10,34 @@ import {
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_KEY = 'share-handoff';
 
+
+const CAPTURE_QUEUE_KEY = 'life-hub-capture-inbox-queue-v1';
+
+function loadCaptureQueue() {
+  try {
+    const raw = localStorage.getItem(CAPTURE_QUEUE_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCaptureQueue(list) {
+  localStorage.setItem(CAPTURE_QUEUE_KEY, JSON.stringify(list.slice(0, 20)));
+}
+
+function enqueueCapture(entry) {
+  const queue = loadCaptureQueue();
+  queue.unshift({
+    id: `cap_${Date.now().toString(36)}`,
+    savedAt: new Date().toISOString(),
+    ...entry
+  });
+  saveCaptureQueue(queue);
+  return queue;
+}
+
 const params = new URLSearchParams(location.search);
 const card = document.getElementById('capture-inbox-card');
 
@@ -33,7 +61,15 @@ async function init() {
   }
 
   const payload = classifyShare(share);
-  const suggestion = suggestIngestTarget(payload, { currentHub: 'life' });
+    const suggestion = suggestIngestTarget(payload, { currentHub: 'life' });
+  enqueueCapture({
+    source: share.files?.length ? 'share_target_file' : 'share_target_text',
+    title: share.title || '',
+    text: (share.text || '').slice(0, 2000),
+    url: share.url || '',
+    fileNames: (share.files || []).map(f => f.name || f.filename || 'file').slice(0, 10),
+    suggestion: suggestion?.hub || suggestion?.target || null
+  });
   renderShare(share, payload, suggestion);
 }
 
