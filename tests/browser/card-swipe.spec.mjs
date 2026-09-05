@@ -112,7 +112,10 @@ test('logger swipe moves between compact exercise cards', async () => {
     assert.equal(await page.locator('.fitness-logger__exercise').count(), 0);
     await logger.locator('.hub-card-swipe__dot').nth(2).click();
     assert.match(await logger.locator('.hub-card-swipe__status').textContent(), /3 of 3 · Bayesian curl/);
-    assert.match(await logger.locator('.fitness-logger__peek .hub-card-swipe__title').textContent(), /Bayesian curl/);
+    assert.match(
+      await logger.locator('.hub-card-swipe__slide[aria-hidden="false"] .hub-card-swipe__title').textContent(),
+      /Bayesian curl/
+    );
   } finally {
     await context.close();
   }
@@ -124,13 +127,16 @@ test('tapping a compact card expands the set editor', async () => {
   try {
     await page.goto(`${baseUrl}/card-swipe-preview.html`);
     await page.locator('#logger .fitness-logger__peek').first().click();
-    const editor = page.locator('.fitness-logger__exercise');
+    const dialog = page.locator('.hub-morph-dialog.is-in');
+    await dialog.waitFor();
+    const editor = dialog.locator('.fitness-logger__exercise');
     await editor.waitFor();
     assert.match(await editor.locator('h4').textContent(), /Bench press/);
     assert.equal(await editor.locator('.fitness-logger__sets input').first().inputValue(), '36');
-    await page.locator('[data-hub-morph-close], [data-fitness-logger="collapse-exercise"]').first().click();
-    await editor.waitFor({ state: 'hidden' });
+    await dialog.locator('[data-hub-morph-close]').click();
+    await page.locator('.hub-morph-dialog').waitFor({ state: 'detached' });
     assert.equal(await page.locator('.fitness-logger__exercise').count(), 0);
+    await page.locator('#logger .fitness-logger__peek').first().waitFor();
   } finally {
     await context.close();
   }
