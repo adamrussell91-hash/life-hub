@@ -265,6 +265,29 @@
       "student_group_reference": null,
       "generated_admin_tasks": [],
       "drafted_documents": null
+    },
+    {
+      "schema_version": 1,
+      "id": "proj_aotfw",
+      "title": "Artist of the Floating World",
+      "description": "Year 12 English Advanced unit — planning, lessons, and marking.",
+      "parent_goal_id": null,
+      "tags": ["teaching", "english"],
+      "arc_summary": "Deliver the AOTFW unit and close Term 2 marking.",
+      "type": "standard",
+      "milestones": [],
+      "status": "active",
+      "baseline_end_date": "2026-07-03",
+      "current_end_date": "2026-07-03",
+      "review_summary": null,
+      "stall_flagged_at": null,
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-15T09:00:00.000Z",
+      "competition_or_event_type": null,
+      "key_dates": null,
+      "student_group_reference": "12ENGADV1",
+      "generated_admin_tasks": [],
+      "drafted_documents": null
     }
   ],
   "tasks": [
