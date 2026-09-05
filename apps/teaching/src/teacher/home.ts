@@ -12,6 +12,7 @@ import {
   type ScheduleCalendarView
 } from '@/teacher/class-calendar';
 import { openBlankLesson } from '@/teacher/create/blank-lesson';
+import { patchScheduledLesson, postScheduledLesson } from '@/teacher/schedule-api';
 import { mountCreateControl } from '@/teacher/create/control';
 import { openCreateModal } from '@/teacher/create/modal';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
@@ -88,6 +89,8 @@ export function renderTeacherHome(
   let viewMonth = yearMonthFromDate(scheduleToday);
   let calendarView: ScheduleCalendarView = 'week';
   let monthDelta = 0;
+  let composeDraft = { date: scheduleToday, startTime: null as string | null };
+  let selectedScheduledId: string | null = null;
 
   const lessonTitles = new Map(
     curriculum.lessons.map((lesson) => [lesson.id, lesson.title] as const)
@@ -108,10 +111,15 @@ export function renderTeacherHome(
         monthDelta = 0;
         paintCalendar();
       },
-      onSelectDate: (date) => {
+      onSelectDate: (date, options = {}) => {
         selectedDate = date;
         viewMonth = yearMonthFromDate(date);
         monthDelta = 0;
+        composeDraft = {
+          date,
+          startTime: options.startTime !== undefined ? options.startTime : composeDraft.startTime
+        };
+        selectedScheduledId = options.scheduledId ?? null;
         paintCalendar();
       },
       onShiftMonth: (delta) => {
@@ -130,6 +138,43 @@ export function renderTeacherHome(
       chipMeta: (lesson) => {
         const cls = lesson.classId ? classesById.get(lesson.classId) : undefined;
         return cls ? classEyebrow(cls) : undefined;
+      },
+      lessons: curriculum.lessons.map((lesson) => ({
+        id: lesson.id,
+        title: lesson.title,
+        unitId: lesson.unit_id
+      })),
+      classes: curriculum.classes.map((cls) => ({
+        id: cls.id,
+        label: classEyebrow(cls)
+      })),
+      composeDraft,
+      selectedScheduledId,
+      onComposeLesson: (draft) => {
+        void postScheduledLesson({
+          class_id: draft.classId,
+          lesson_id: draft.lessonId,
+          unit_id: draft.unitId,
+          date: draft.date,
+          start_time: draft.startTime
+        }).then((created) => {
+          curriculum.scheduled_lessons = [...curriculum.scheduled_lessons, created];
+          selectedDate = created.date;
+          composeDraft = { date: created.date, startTime: created.start_time ?? null };
+          selectedScheduledId = created.id;
+          paintCalendar();
+        });
+      },
+      onRescheduleLesson: (scheduledId, patch) => {
+        void patchScheduledLesson(scheduledId, patch).then((updated) => {
+          curriculum.scheduled_lessons = curriculum.scheduled_lessons.map((row) =>
+            row.id === updated.id ? updated : row
+          );
+          selectedDate = updated.date;
+          composeDraft = { date: updated.date, startTime: updated.start_time ?? null };
+          selectedScheduledId = updated.id;
+          paintCalendar();
+        });
       }
     });
   };

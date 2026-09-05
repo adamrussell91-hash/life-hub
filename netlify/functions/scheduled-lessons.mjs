@@ -45,6 +45,10 @@ export async function createScheduledLessonRecord(store, body) {
     }
   }
 
+  const startTime = typeof body.start_time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.start_time)
+    ? body.start_time
+    : undefined;
+
   const timestamp = new Date().toISOString();
   const id = newId('sched');
   const record = {
@@ -54,6 +58,7 @@ export async function createScheduledLessonRecord(store, body) {
     lesson_id,
     unit_id,
     date,
+    ...(startTime ? { start_time: startTime } : {}),
     schedule_order: maxOrder + 1,
     delivery_status: 'planned',
     created_at: timestamp,

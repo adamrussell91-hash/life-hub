@@ -12,6 +12,7 @@ function modelForAugust(overrides?: {
     date: string;
     delivery_status: 'planned' | 'current' | 'delivered' | 'skipped' | 'rescheduled';
     schedule_order?: number;
+    start_time?: string;
   }>;
   lessonTitles?: Map<string, string>;
 }): ClassCalendarModel {
@@ -346,8 +347,7 @@ describe('renderClassCalendar', () => {
       chipMeta: () => '12ENA6'
     });
 
-    expect(host.querySelector('.class-calendar__week')).not.toBeNull();
-    expect(host.querySelector('[role="grid"]')).toBeNull();
+    expect(host.querySelector('.hub-calendar__timegrid')).not.toBeNull();
     const todayCol = host.querySelector('.class-calendar__week-day[data-today="true"]');
     expect(todayCol?.getAttribute('data-date')).toBe('2026-08-12');
     expect(host.querySelector('.event-chip__meta')?.textContent).toBe('12ENA6');
@@ -363,5 +363,45 @@ describe('renderClassCalendar', () => {
     });
     expect(host.querySelector('.class-calendar__timeline')).not.toBeNull();
     expect(host.textContent).toContain('Narrative Structure');
+  });
+
+  it('renders a day time grid and schedules from standing compose', () => {
+    const onComposeLesson = vi.fn();
+    const onSelectDate = vi.fn();
+    const model = modelForAugust({
+      scheduled: [
+        {
+          id: 's1',
+          lesson_id: 'l1',
+          unit_id: 'u1',
+          date: '2026-08-12',
+          delivery_status: 'current',
+          schedule_order: 1,
+          start_time: '09:00'
+        } as never
+      ]
+    });
+    renderClassCalendar(host, model, {
+      onSelectDate,
+      onShiftMonth: vi.fn(),
+      view: 'day',
+      lessons: [{ id: 'l2', title: 'Close reading', unitId: 'u1', classId: 'c1' }],
+      classId: 'c1',
+      composeDraft: { date: '2026-08-12', startTime: '10:00' },
+      onComposeLesson
+    });
+
+    expect(host.querySelector('.hub-calendar__timegrid')?.getAttribute('data-days')).toBe('1');
+    expect(host.querySelector('.event-chip--timed')).not.toBeNull();
+    const form = host.querySelector<HTMLFormElement>('.calendar-compose');
+    expect(form).not.toBeNull();
+    form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(onComposeLesson).toHaveBeenCalledWith({
+      date: '2026-08-12',
+      startTime: '10:00',
+      lessonId: 'l2',
+      classId: 'c1',
+      unitId: 'u1'
+    });
   });
 });

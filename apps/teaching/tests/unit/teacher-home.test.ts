@@ -198,7 +198,8 @@ describe('teacher home dashboard', () => {
     expect(lessonLink?.dataset.tint).toMatch(/blue|sage|peach|gold|lilac/);
 
     lessonLink?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(navigate).toHaveBeenCalledWith('/lessons/lesson_aotfw_008');
+    expect(navigate).not.toHaveBeenCalled();
+    expect(canvas.querySelector('.class-calendar__detail-heading')?.textContent).toBe('Memory');
   });
 
   it('switches month and timeline views', () => {
