@@ -1,6 +1,7 @@
 /** Shared hub motion. Same strength on Life, Knowledge, Teaching, and Tasks. */
 
 import { enhanceKinetic, KINETIC_SELECTOR } from './hub-kinetic.js';
+import { mountAdaptiveSliders } from './adaptive-slider.js';
 
 const CARD_SELECTOR = [
   '.metric-card',
@@ -529,6 +530,7 @@ function scan(root, reduced) {
   for (const el of scope.querySelectorAll(KINETIC_SELECTOR)) enhanceKinetic(el, reduced);
   for (const el of scope.querySelectorAll('.hub-pills')) enhancePills(el, reduced);
   for (const el of scope.querySelectorAll(SCROLL_HIDE_SELECTOR)) enhanceScrollHide(el);
+  mountAdaptiveSliders(scope);
 
   if (scope.matches?.(CARD_SELECTOR)) enhanceCard(scope, reduced);
   if (scope.matches?.(MAGNET_SELECTOR)) enhanceMagnet(scope, reduced);
