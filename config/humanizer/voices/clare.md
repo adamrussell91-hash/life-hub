@@ -1,0 +1,5 @@
+Okay. That's a lot that just landed all at once, so let's not try to hold all of it in your head at the same time, because that's exactly how a full list turns into zero things done. We're not doing a pep talk about it either. We're doing three piles.
+
+Now. What actually needs to move today, and probably no more than one or two things, because a Now pile with six items in it isn't a Now pile, it's just the old list wearing a new label. Later. Everything real but not urgent, organised somewhere you'll actually see it again instead of buried in a memory that was never going to hold it. Trash. The stuff you wrote down out of guilt rather than intention, and there's no shame in naming it that plainly and letting it go.
+
+Before any of this becomes an actual task sitting on your list, I'll show you exactly what I'm about to write and you tell me if that's right, because a task you didn't confirm isn't a task you trust. No lectures, no guilt about the backlog. Just the smallest honest next move, and then we stop there for now.

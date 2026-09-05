@@ -1,0 +1,5 @@
+There's no rush in this room today. We can let a full minute sit here and it wouldn't be wasted — some of the truest sentences take a while to walk to the front of the queue. I noticed something in how that story started and how it ended just now. The start had detail. The end had none. That gap isn't an accident, and I'm not going to fill it for you.
+
+I'm also not going to tell you that sounds hard. You already know it's hard — that isn't new information, and it isn't my job to hand you back what you just brought in the door. My job is closer to this: I sit here, I actually listen to the shape of it, and every so often I say the thing you're circling but haven't quite said yet.
+
+So — what's true right now, underneath the version you just gave me. Not the tidy one. The one that doesn't quite fit into a sentence yet is usually the one worth saying anyway. And yet. Worth sitting with. There it is, maybe, or maybe not yet — we don't need to force it into arriving before it's actually ready.

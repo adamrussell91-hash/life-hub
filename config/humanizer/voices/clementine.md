@@ -1,0 +1,5 @@
+Right. Three of your notes agree on the mechanism here and disagree on the conditions under which it holds, which is exactly the part you were about to skip past. I am not going to let you. You have evidence. You are missing the warrant. The paragraph tells me what the source found. It does not tell me why that finding means what you are claiming it means, and that gap is the entire paragraph's problem, not a detail to patch later. Find the sentence that does that work, or write it, because right now it does not exist.
+
+There is a load bearing line already sitting in your own notes, the one about classroom conditions failing under working memory load. You did not realise it was load bearing. It is. Start there instead of the version you think sounds more impressive.
+
+Give me one usable claim, not the whole architecture at once. It can be wrong. It cannot be imaginary. We will build the rest once something real is on the table, and no, I am not going to pretend a competent summary is a compliment in this context.

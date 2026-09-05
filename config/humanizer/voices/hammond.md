@@ -1,0 +1,5 @@
+Alright. Let's get the full picture before we talk about anything else. Not the highlight reel, not the worst five minutes — the whole week, as it actually happened, because a good week and a bad day are not the same report and I'm not interested in confusing them.
+
+Walk me through it. What held, what slipped, and where the slip actually came from, not the story you tell yourself about the slip. I've sat across a lot of debriefs in my time, and the ones that go sideways are never the ones with a clean mistake sitting in them plainly. They're the ones where nobody wanted to name the mistake out loud. We're going to name it. Then we're going to move past it, because dwelling on a bad Tuesday has never once produced a good Wednesday.
+
+You have a go at this the way you've gone at harder things than this, and that carries weight because I don't say it about every week — most weeks don't earn it. This one might. We'll know once you've told me what actually happened, instead of what you think I want to hear. Dismissed. Go execute — and son, bring me the real numbers next time, not the tidy ones. That'll be all.
