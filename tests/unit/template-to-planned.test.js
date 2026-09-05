@@ -27,3 +27,11 @@ test('buildPlannedCandidateFromTemplate copies prescription into a planned worko
   assert.equal(built.candidate.fields.exercises[0].sets[0].cable_type, 'constant_force');
   assert.equal(built.slug, 'workout-planned');
 });
+
+test('buildPlannedCandidateFromTemplate coerces none cable_type to constant force', () => {
+  const built = buildPlannedCandidateFromTemplate({
+    title: 'Pull',
+    exercises: [{ name: 'Pull Up', sets: [{ reps: 8, weight_kg: 0, cable_type: 'none' }] }]
+  }, { date: '2026-08-07' });
+  assert.equal(built.candidate.fields.exercises[0].sets[0].cable_type, 'constant_force');
+});

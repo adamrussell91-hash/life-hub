@@ -8,6 +8,7 @@ import {
   finishLabel,
   formatElapsed,
   loadDraft,
+  normalizeLoggerCableType,
   saveDraft,
   clearDraft,
   moveExercise,
@@ -88,6 +89,17 @@ test('createExercise rejects a blank name and seeds one set', () => {
   assert.equal(exercise.sets.length, 1);
   assert.equal(exercise.sets[0].reps, 10);
   assert.equal(exercise.sets[0].cable_type, 'constant_force');
+});
+
+test('normalizeLoggerCableType treats none and unknowns as constant force', () => {
+  assert.equal(normalizeLoggerCableType('none'), 'constant_force');
+  assert.equal(normalizeLoggerCableType(''), 'constant_force');
+  assert.equal(normalizeLoggerCableType(null), 'constant_force');
+  assert.equal(normalizeLoggerCableType('concentric'), 'concentric');
+  const session = planned();
+  session.exercises[0].sets[0].cable_type = 'none';
+  assert.equal(cloneLoggerDraft(session).exercises[0].sets[0].cable_type, 'constant_force');
+  assert.equal(appendSet(session.exercises[0]).sets[1].cable_type, 'constant_force');
 });
 
 test('moveExercise reorders and ignores out-of-range indexes', () => {

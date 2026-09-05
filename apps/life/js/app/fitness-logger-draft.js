@@ -1,11 +1,17 @@
+export const DEFAULT_CABLE_TYPE = 'constant_force';
+
+/** Modes shown in the logger. `none` is not a mode — treat it as constant. */
 export const CABLE_TYPES = [
   'constant_force',
   'concentric',
   'eccentric',
   'elastic',
-  'rowing',
-  'none'
+  'rowing'
 ];
+
+export function normalizeLoggerCableType(value) {
+  return CABLE_TYPES.includes(value) ? value : DEFAULT_CABLE_TYPE;
+}
 
 export const INTENSIFICATIONS = [
   'drop_set',
@@ -69,7 +75,7 @@ export function cloneLoggerDraft(session) {
       sets: (exercise.sets ?? []).map(set => ({
         reps: Number(set.reps) || 0,
         weight_kg: Number(set.weight_kg) || 0,
-        cable_type: CABLE_TYPES.includes(set.cable_type) ? set.cable_type : 'constant_force'
+        cable_type: normalizeLoggerCableType(set.cable_type)
       }))
     })),
     notes: typeof source.notes === 'string' ? source.notes : '',
@@ -148,7 +154,7 @@ export function appendSet(exercise) {
   const next = {
     reps: last?.reps ?? 10,
     weight_kg: last?.weight_kg ?? 0,
-    cable_type: last?.cable_type && CABLE_TYPES.includes(last.cable_type) ? last.cable_type : 'constant_force'
+    cable_type: normalizeLoggerCableType(last?.cable_type)
   };
   return {
     ...exercise,
@@ -161,7 +167,7 @@ export function createExercise(name) {
   if (!trimmed) return null;
   return {
     name: trimmed,
-    sets: [{ reps: 10, weight_kg: 0, cable_type: 'constant_force' }]
+    sets: [{ reps: 10, weight_kg: 0, cable_type: DEFAULT_CABLE_TYPE }]
   };
 }
 
