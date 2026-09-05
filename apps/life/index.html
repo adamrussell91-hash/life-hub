@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="packages/design-kit/adaptive-slider.css">
   <link rel="stylesheet" href="packages/design-kit/view-on-map.css">
   <link rel="stylesheet" href="packages/design-kit/card-swipe.css">
+  <link rel="stylesheet" href="packages/design-kit/hub-interactions.css">
   <link rel="stylesheet" href="packages/design-kit/rail.css">
   <link rel="stylesheet" href="packages/design-kit/mobile.css">
   <link rel="stylesheet" href="packages/design-kit/calendar.css">
@@ -415,17 +416,17 @@
             </div>
             <div class="hub-scroll-hide" data-hub-scroll-hide data-hub-scroll-scroller="#chat-messages">
               <div class="hub-scroll-hide__inner">
-                <div id="agent-picker" class="agent-picker" aria-label="Choose who to talk to"></div>
+                <div id="agent-picker" class="agent-picker hub-ai-agent" data-hub-ai-agent aria-label="Choose who to talk to"></div>
                 <div id="agent-protocol-pills" class="agent-protocol-pills" hidden></div>
               </div>
             </div>
             <div id="chat-agent-hero" class="chat-agent-hero" hidden aria-live="polite"></div>
             <p id="chat-error" class="chat-error" role="alert" hidden></p>
             <ul id="chat-messages" class="chat-messages" aria-live="polite"></ul>
-            <form id="chat-form" class="chat-form">
+            <form id="chat-form" class="chat-form hub-ai-bar" data-hub-ai-bar>
               <label class="sr-only" for="chat-input">Message</label>
-              <input id="chat-input" name="message" type="text" autocomplete="off" required>
-              <button id="chat-send" type="submit">Send</button>
+              <input id="chat-input" class="hub-ai-bar__input" name="message" type="text" autocomplete="off" required>
+              <button id="chat-send" class="btn btn--primary" type="submit">Send</button>
             </form>
           </section>
         </div>
@@ -597,6 +598,7 @@
         </section>
 
         <section id="fitness-dashboard" class="dashboard" aria-label="Fitness" hidden>
+          <div data-fitness="run-widget" class="hub-run"></div>
           <div class="fitness-long-term-trio" aria-label="Long-term training trends">
             <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-volume-label">
               <p class="metric-label" id="fitness-volume-label">Weekly volume</p>
@@ -748,6 +750,7 @@
         </section>
 
         <section id="calendar-dashboard" class="dashboard" aria-label="Calendar" hidden>
+          <div data-calendar="schedule" class="hub-schedule"></div>
           <div id="life-calendar-host"></div>
         </section>
 
@@ -840,6 +843,7 @@
         </section>
 
         <section id="mind-dashboard" class="dashboard" aria-label="Mind" hidden>
+          <nav data-mind="journal-nav" class="hub-journal-nav" aria-label="Journal"></nav>
           <p class="metric-caption" data-mind="entry-count">—</p>
           <div id="mind-range-control" class="body-range hub-pills" role="group" aria-label="Mind time range">
             <button type="button" class="hub-pills__btn" data-mind-range="weekly" aria-pressed="false">Weekly</button>
@@ -1060,6 +1064,7 @@
         </section>
 
         <section id="central-node-dashboard" class="dashboard" aria-label="Central Node" hidden>
+          <div data-central-node="progress" class="hub-progress"></div>
           <article class="metric-card status-card" aria-labelledby="todays-status-label">
             <p class="metric-label" id="todays-status-label">Today's Status</p>
             <div class="status-hybrid">

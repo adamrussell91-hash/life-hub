@@ -106,10 +106,16 @@ function paintCorey(canvas: HTMLElement, snapshot: CapacitySnapshot, share: Capa
   copy.type = 'button';
   copy.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(url);
+      const { showCopyConfirm } = await import('../../design-kit/js/hub-feedback.js');
+      await showCopyConfirm(copy, url);
       copy.textContent = 'Copied';
     } catch {
-      input.select();
+      try {
+        await navigator.clipboard.writeText(url);
+        copy.textContent = 'Copied';
+      } catch {
+        input.select();
+      }
     }
   });
   const rotate = el('button', 'btn btn--ghost', 'Rotate link');
