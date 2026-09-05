@@ -416,6 +416,29 @@ test('buildThemeOrbit keeps three arms and an empty chart still has rings', () =
   assert.ok(empty.rings.length >= 3);
 });
 
+test('buildThemeConstellation keeps a single co-occurrence when minEdgeCount is 1', () => {
+  const dropped = buildThemeConstellation({
+    nodes: [
+      { key: 'chest-press', count: 1, colour: 'var(--wave)' },
+      { key: 'curl', count: 1, colour: 'var(--marine)' }
+    ],
+    edges: [{ themeA: 'chest-press', themeB: 'curl', count: 1 }]
+  });
+  assert.equal(dropped.edges.length, 0);
+  assert.equal(dropped.nodes.find(node => node.key === 'chest-press').colour, 'var(--wave)');
+
+  const kept = buildThemeConstellation({
+    nodes: [
+      { key: 'chest-press', count: 1, colour: 'var(--wave)' },
+      { key: 'curl', count: 1, colour: 'var(--marine)' }
+    ],
+    edges: [{ themeA: 'chest-press', themeB: 'curl', count: 1 }],
+    minEdgeCount: 1
+  });
+  assert.equal(kept.edges.length, 1);
+  assert.equal(kept.nodes.find(node => node.key === 'curl').colour, 'var(--marine)');
+});
+
 test('buildThemeConstellation lays themes on a baseline and raises stronger arcs', () => {
   const chart = buildThemeConstellation({
     nodes: [

@@ -104,8 +104,9 @@ Use only when the data matches the type. Do not pick these for a generic count i
 | `energy-orbit` | Energy over a date window. | `buildEnergyOrbit(series, { bounds, range, previous })` | `energy-orbit.js` |
 | `mood-radial` | Mood over a date window. | `buildMoodRadial(series, { bounds, range })` | `mood-radial.js` |
 | `theme-orbit` | Theme arms from mean mood. | `buildThemeOrbit(themes)`, `THEME_ARMS`, `armForMeanMood` | `theme-orbit.js` |
-| `theme-constellation` | Theme co-occurrence map. | `buildThemeConstellation(…)`, `pairKey`, `neighborhood`, `arcFor` | `theme-constellation.js` |
+| `theme-constellation` | Theme co-occurrence map. | `buildThemeConstellation({ nodes, edges, minEdgeCount = 2, … })`, `pairKey`, `neighborhood`, `arcFor` | `theme-constellation.js` |
 | `masonry` | Tile packer (Mind). | `packMasonry(items, { columns, gap, columnWidth, flowOffset })` | `masonry.js` |
+| `range-bar` | Value on a reference span, with an optional balance tick. | `rangeBarLayout(value, refLow, refHigh, { width, padding })`, `rangeBarTick(fraction, { width, padding })` | `range-bar.js` |
 | `clinical-slots` | Closed multi-series colours. | `CLINICAL_CHART_SLOTS` | `clinical-slots.js` |
 | `d3-layout` | Vendored d3-shape / sankey / chord / force. No CDN. | `d3api()`, `stack`, `sankey`, `chord`, `forceSimulation` | `d3-layout.js`, `vendor/` |
 
@@ -184,6 +185,10 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-05 | `theme-constellation` | Optional `minEdgeCount` (default 2). Fitness library map uses 1 so a same-session pair draws an edge. Caller `node.colour` is kept when set. |
+| 2026-09-05 | `range-bar` | Promoted from Bloods `rangeBarLayout` into chart-kit. Fitness uses it for push/pull and trained/rest gauges. |
+| 2026-09-05 | `polar-clock` | Added `thetaForTime` / `minutesFromTime` for training time-of-day. |
+| 2026-09-05 | Fitness | Fitness tab consumes 18 catalog forms (polar-clock, energy-orbit, mood-radial, chord, bump, stream, watchlist-heat, horizon, mood-mix, range-bar, area-line, columns, radial-year, sankey, theme-constellation). Two-ring region volume uses mood-mix stroke rings. No invented types. |
 | 2026-09-05 | library | `CHARTS.md` is the design-kit source of truth. Agents stop being sent to Life / Knowledge / TASKS.md for viz. Implementation roots unchanged. |
 | 2026-09-05 | `ring` `pie` `columns` | Fitness week board consumes labeled rings, pies, gated trends, denser volume bars. No new types. |
 | 2026-09-01 | chart-kit | Life chart-kit remounted to `apps/life/js/app/chart-kit/` in the monorepo. Catalog ids already in that tree: ring, columns, area-line, pie, heatmap, stream, sankey, chord, bump, horizon, radial-year, polar-clock, energy-orbit, mood-radial, mood-mix, theme-orbit, theme-constellation, watchlist-heat, masonry, clinical-slots, animate. |

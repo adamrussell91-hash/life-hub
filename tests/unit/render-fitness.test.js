@@ -233,7 +233,7 @@ test('status, working weights, and labeled volume rows replace empty charts', ()
   assert.equal(root.ensure('#fitness-comparisons').children[0].children[2].textContent, 'PR');
 });
 
-test('labeled pies unhide and empty trend cards stay hidden', () => {
+test('kit charts unhide when their own data is ready and stay hidden otherwise', () => {
   const root = fitnessRoot();
   renderFitness(root, baseModel({
     heroSession: null,
@@ -241,30 +241,52 @@ test('labeled pies unhide and empty trend cards stay hidden', () => {
       longestStreak: 1,
       uniqueLifts: 2,
       volumePerSetKg: 200,
-      weekRing: { value: 1, target: 4 },
-      skipRing: { value: 0, target: 1, missed: 0, scheduled: 1, completed: 1 },
-      recoveryRing: { value: 0, target: 1, flagged: 0, completed: 1 },
-      restRatio: [{ key: 'trained', label: 'Trained', value: 1, colour: 'var(--wave)' }],
+      weekTarget: 4,
       restCounts: { trained: 1, rest: 29, days: 30 },
       repRanges: [{ key: '9-12', label: '9–12 reps', value: 2, colour: 'var(--wave)' }],
+      repRead: 'Mostly Hypertrophy',
       regionVolume: [{ key: 'chest', label: 'Chest', value: 400, colour: 'var(--wave)' }],
-      pushPull: [{ key: 'push', label: 'Push', value: 400, colour: 'var(--wave)' }],
-      e1rmTrends: [],
+      regionVolumePrior: [],
+      pushPull: [
+        { key: 'push', label: 'Push', value: 400 },
+        { key: 'pull', label: 'Pull', value: 200 }
+      ],
+      clockPoints: [],
+      orbitDays: [],
+      e1rmRadial: [],
+      focusChord: [{ themeA: 'chest', themeB: 'arms', count: 1 }],
+      bumpRanks: [],
+      regionStream: null,
+      painHeat: [],
+      loadHorizon: [],
+      e1rmBands: [],
+      sessionGauge: null,
+      yearDots: [],
+      sankeyFlows: [],
+      libraryMap: {
+        nodes: [{ key: 'Chest Press', count: 2 }, { key: 'Curl', count: 1 }],
+        edges: [{ themeA: 'Chest Press', themeB: 'Curl', count: 1 }]
+      },
       volumePerSetWeeks: [],
       durationSeries: [],
       distanceSeries: [],
       paceSeries: [],
       hrSeries: [],
-      painBySite: []
+      sessionReadings: []
     }
   }));
-  assert.equal(root.ensure('[data-fitness="week-ring-value"]').textContent, '1');
   assert.equal(root.ensure('[data-fitness="longest-streak"]').textContent, '1');
   assert.equal(root.ensure('#fitness-rep-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('[data-fitness="rep-read"]').textContent, 'Mostly Hypertrophy');
   assert.equal(root.ensure('#fitness-region-vol-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-push-pull-card').attributes.hidden, undefined);
+  assert.match(root.ensure('[data-fitness="push-read"]').textContent, /push/);
+  assert.equal(root.ensure('#fitness-rest-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-chord-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-library-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-e1rm-card').attributes.hidden, '');
-  assert.equal(root.ensure('#fitness-distance-card').attributes.hidden, '');
-  assert.equal(root.ensure('#fitness-pain-card').attributes.hidden, '');
+  assert.equal(root.ensure('#fitness-readings-card').attributes.hidden, '');
+  assert.equal(root.ensure('#fitness-clock-card').attributes.hidden, '');
 });
 
 function widgetText(el) {

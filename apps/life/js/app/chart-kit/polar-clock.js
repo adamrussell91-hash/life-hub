@@ -31,6 +31,20 @@ export function windowDays(bounds) {
   return 1;
 }
 
+/** Minutes past midnight from `HH:MM` or `HH:MM:SS`. */
+export function minutesFromTime(time) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(time ?? ''));
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+/** Angle for a clock time: midnight = 0°, clockwise through 24 hours. */
+export function thetaForTime(time) {
+  const minutes = minutesFromTime(time);
+  if (minutes == null) return null;
+  return (minutes / (24 * 60)) * 360;
+}
+
 export function thetaForDate(date, bounds, range) {
   if (range === 'year') {
     const year = Number(String(date).slice(0, 4));

@@ -655,145 +655,107 @@
             </div>
           </article>
 
-          <div class="fitness-rings">
-            <article class="metric-card fitness-panel">
-              <p class="metric-label">Week target</p>
-              <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-fitness-ring="week" viewBox="0 0 56 56" role="img" aria-label="Sessions this week versus target">
-                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                </svg>
-                <p class="metric-value"><strong data-fitness="week-ring-value">—</strong><span data-fitness="week-ring-target">/ 4</span></p>
-              </div>
+          <div class="fitness-viz">
+            <article id="fitness-clock-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">When you train</p>
+              <p class="metric-caption">Time of day, coloured by region. Newer sessions sit further out.</p>
+              <svg id="fitness-clock-chart" class="fitness-viz__svg" viewBox="0 0 220 220" role="img" aria-label="Training time of day"></svg>
             </article>
-            <article class="metric-card fitness-panel">
-              <p class="metric-label">Missed sessions</p>
-              <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-fitness-ring="skip" viewBox="0 0 56 56" role="img" aria-label="Missed or skipped sessions">
-                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                </svg>
-                <p class="metric-value"><strong data-fitness="skip-ring-value">—</strong><span data-fitness="skip-ring-target">missed</span></p>
-              </div>
+            <article id="fitness-orbit-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Monthly rhythm</p>
+              <p class="metric-caption">Radius is session volume. Colour is day type.</p>
+              <svg id="fitness-orbit-chart" class="fitness-viz__svg fitness-viz__svg--orbit" viewBox="0 0 680 680" role="img" aria-label="Monthly training rhythm"></svg>
             </article>
-            <article class="metric-card fitness-panel">
-              <p class="metric-label">Recovery flags</p>
-              <div class="metric-ring-wrap">
-                <svg class="metric-ring" data-fitness-ring="recovery" viewBox="0 0 56 56" role="img" aria-label="Sessions flagged for next-day recovery">
-                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
-                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
-                </svg>
-                <p class="metric-value"><strong data-fitness="recovery-ring-value">—</strong><span data-fitness="recovery-ring-target">flagged</span></p>
-              </div>
+            <article id="fitness-e1rm-radial-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">e1RM vs your best</p>
+              <p class="metric-caption">Each lift is a percent of its own all-time best in this window.</p>
+              <svg id="fitness-e1rm-radial-chart" class="fitness-viz__svg" role="img" aria-label="Estimated 1RM versus personal best"></svg>
             </article>
-          </div>
-
-          <div class="fitness-pies">
-            <article id="fitness-rep-card" class="metric-card fitness-panel" hidden>
-              <p class="metric-label">Rep ranges</p>
-              <p class="metric-caption">Sets in the last 30 days</p>
-              <p data-fitness-empty="reps" class="metric-caption" hidden>No sets logged.</p>
-              <div class="meal-protein-pie-wrap">
-                <svg id="fitness-rep-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Rep range distribution">
-                  <g data-role="slices"></g>
-                </svg>
-                <ul id="fitness-rep-legend" class="meal-protein-legend"></ul>
-              </div>
+            <article id="fitness-chord-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Trained together</p>
+              <p class="metric-caption">Regions that share a session.</p>
+              <svg id="fitness-chord-chart" class="fitness-viz__svg" viewBox="0 0 360 360" role="img" aria-label="Muscle groups trained together"></svg>
+            </article>
+            <article id="fitness-bump-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Who is improving</p>
+              <p class="metric-caption">Lifts ranked by relative e1RM change, by week.</p>
+              <svg id="fitness-bump-chart" class="fitness-viz__svg" role="img" aria-label="Lift improvement rank"></svg>
+            </article>
+            <article id="fitness-stream-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Region volume drift</p>
+              <p class="metric-caption">Weekly composition over the last 12 weeks.</p>
+              <svg id="fitness-stream-chart" class="fitness-viz__svg" role="img" aria-label="Region volume over time"></svg>
+            </article>
+            <article id="fitness-pain-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Pain vs load</p>
+              <p class="metric-caption">Site by week. A tick marks a high-volume week.</p>
+              <div id="fitness-pain-heat" class="fitness-heat"></div>
+            </article>
+            <article id="fitness-horizon-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Training load</p>
+              <p class="metric-caption">Weekly volume versus the previous 4 weeks. 0.8–1.3 is typical.</p>
+              <svg id="fitness-horizon-chart" class="fitness-viz__svg" viewBox="0 0 320 28" role="img" aria-label="Weekly training load"></svg>
+              <p class="metric-caption" data-fitness="load-read"></p>
             </article>
             <article id="fitness-region-vol-card" class="metric-card fitness-panel" hidden>
-              <p class="metric-label">Volume by region</p>
-              <p class="metric-caption">Kilograms moved — last 30 days</p>
-              <p data-fitness-empty="region-vol" class="metric-caption" hidden>No region volume yet.</p>
-              <div class="meal-protein-pie-wrap">
-                <svg id="fitness-region-vol-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Volume by muscle region">
-                  <g data-role="slices"></g>
-                </svg>
-                <ul id="fitness-region-vol-legend" class="meal-protein-legend"></ul>
-              </div>
+              <p class="metric-label">Region volume</p>
+              <p class="metric-caption">Outer ring this month, inner ring last month.</p>
+              <svg id="fitness-region-donut" class="fitness-viz__svg" viewBox="0 0 120 120" role="img" aria-label="Region volume this month versus last"></svg>
             </article>
             <article id="fitness-push-pull-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Push vs pull</p>
-              <p class="metric-caption">Volume from press/push vs row/pull/curl</p>
-              <p data-fitness-empty="push-pull" class="metric-caption" hidden>No push or pull volume yet.</p>
-              <div class="meal-protein-pie-wrap">
-                <svg id="fitness-push-pull-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Push versus pull volume">
-                  <g data-role="slices"></g>
-                </svg>
-                <ul id="fitness-push-pull-legend" class="meal-protein-legend"></ul>
-              </div>
+              <p class="metric-caption">Tick is 50/50.</p>
+              <svg id="fitness-push-gauge" class="fitness-viz__svg" viewBox="0 0 240 28" role="img" aria-label="Push versus pull balance"></svg>
+              <p class="metric-caption" data-fitness="push-read"></p>
             </article>
             <article id="fitness-rest-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Trained vs rest</p>
-              <p class="metric-caption">Last 30 days</p>
-              <p data-fitness-empty="rest" class="metric-caption" hidden>No days in range.</p>
-              <div class="meal-protein-pie-wrap">
-                <svg id="fitness-rest-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Trained versus rest days">
-                  <g data-role="slices"></g>
-                </svg>
-                <ul id="fitness-rest-legend" class="meal-protein-legend"></ul>
-              </div>
+              <p class="metric-caption">Tick is your weekly session target, spread over the window.</p>
+              <svg id="fitness-rest-gauge" class="fitness-viz__svg" viewBox="0 0 240 28" role="img" aria-label="Trained versus rest days"></svg>
+              <p class="metric-caption" data-fitness="rest-read"></p>
+            </article>
+            <article id="fitness-e1rm-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">e1RM vs recent form</p>
+              <p class="metric-caption">Band is your own min–max for that lift.</p>
+              <div id="fitness-e1rm-list"></div>
+            </article>
+            <article id="fitness-pill-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Last session size</p>
+              <p class="metric-caption">Last session versus your other sessions in the last 4 weeks.</p>
+              <svg id="fitness-pill-chart" class="fitness-viz__svg" viewBox="0 0 48 120" role="img" aria-label="Last session versus average"></svg>
+              <p class="metric-caption" data-fitness="pill-read"></p>
+            </article>
+            <article id="fitness-year-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Year wheel</p>
+              <p class="metric-caption">Each trained day, coloured by region. Size is volume.</p>
+              <svg id="fitness-year-chart" class="fitness-viz__svg" viewBox="0 0 240 240" role="img" aria-label="Year of trained days"></svg>
+            </article>
+            <article id="fitness-rep-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Rep mix</p>
+              <p class="metric-caption" data-fitness="rep-read"></p>
+              <svg id="fitness-rep-mix" class="fitness-viz__svg" viewBox="0 0 160 160" role="img" aria-label="Rep range mix"></svg>
+            </article>
+            <article id="fitness-sankey-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Planned to actual</p>
+              <p class="metric-caption">Completed as planned, substituted, or skipped — then logged sets.</p>
+              <svg id="fitness-sankey-chart" class="fitness-viz__svg" viewBox="0 0 320 140" role="img" aria-label="Planned versus actual flow"></svg>
+            </article>
+            <article id="fitness-library-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Exercise library</p>
+              <p class="metric-caption">Size is how often you log it. Edges are same-session pairs.</p>
+              <svg id="fitness-library-chart" class="fitness-viz__svg" role="img" aria-label="Exercise library map"></svg>
+            </article>
+            <article id="fitness-readings-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Session extras</p>
+              <p class="metric-caption">Duration, distance, pace, heart rate. Tick is your average.</p>
+              <div id="fitness-readings"></div>
+            </article>
+            <article id="fitness-efficiency-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Volume per set</p>
+              <p class="metric-caption">Green is above your trailing average.</p>
+              <div id="fitness-efficiency-bars" class="fitness-share-list"></div>
             </article>
           </div>
-
-          <article id="fitness-e1rm-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">e1RM trend</p>
-            <p class="metric-caption">Estimated 1RM — lifts with two or more logged days</p>
-            <div id="fitness-e1rm-list"></div>
-          </article>
-
-          <article id="fitness-efficiency-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Volume per set</p>
-            <p class="metric-caption">Kilograms moved ÷ sets, by week</p>
-            <div id="fitness-efficiency-bars"></div>
-          </article>
-
-          <article id="fitness-duration-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Session duration</p>
-            <svg id="fitness-duration-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Session duration">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <g data-role="value-labels"></g>
-              <g data-role="day-labels"></g>
-            </svg>
-          </article>
-
-          <article id="fitness-distance-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Distance</p>
-            <p class="metric-caption">Kilometres from logged walks</p>
-            <svg id="fitness-distance-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Distance">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <g data-role="value-labels"></g>
-              <g data-role="day-labels"></g>
-            </svg>
-          </article>
-
-          <article id="fitness-pace-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Pace</p>
-            <p class="metric-caption">Minutes per kilometre</p>
-            <svg id="fitness-pace-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pace">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <g data-role="value-labels"></g>
-              <g data-role="day-labels"></g>
-            </svg>
-          </article>
-
-          <article id="fitness-hr-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Average heart rate</p>
-            <svg id="fitness-hr-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Average heart rate">
-              <path data-role="area" d=""></path>
-              <path data-role="line" d=""></path>
-              <g data-role="value-labels"></g>
-              <g data-role="day-labels"></g>
-            </svg>
-          </article>
-
-          <article id="fitness-pain-card" class="metric-card fitness-panel" hidden>
-            <p class="metric-label">Pain flags</p>
-            <p class="metric-caption">Logged sites in the last 30 days</p>
-            <div id="fitness-pain-list" class="fitness-kv"></div>
-          </article>
 
           <div class="fitness-board-grid">
           <article class="metric-card fitness-hero-card" aria-labelledby="fitness-hero-label">
