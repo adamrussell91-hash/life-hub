@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as keys from '@/storage/keys';
@@ -14,6 +14,8 @@ import {
 import type { Task } from '@/schemas/task';
 import { createBlock } from '@/blocks/create-block';
 import { PageBlockSchema } from '@/schemas/page-block';
+import { DEFAULT_TASK_PROPERTY_CONFIG } from '@/domain/task-properties-defaults';
+import * as taskProperties from '@/services/task-properties';
 
 function memoryKv(): KvAdapter {
   const map = new Map<string, unknown>();
@@ -237,11 +239,24 @@ describe('tasks store', () => {
 });
 
 describe('queries', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('prefers teaching domains on weekdays', () => {
     const monday = new Date('2026-08-17T12:00:00');
     expect(preferredDomains(monday)).toContain('teaching');
     const saturday = new Date('2026-08-15T12:00:00');
     expect(preferredDomains(saturday)).toContain('wedding');
+  });
+
+  it('drops wedding from Focus once it is removed in Properties', () => {
+    vi.spyOn(taskProperties, 'getTaskPropertiesSync').mockReturnValue({
+      ...DEFAULT_TASK_PROPERTY_CONFIG,
+      domains: DEFAULT_TASK_PROPERTY_CONFIG.domains.filter((entry) => entry.id !== 'wedding')
+    });
+    const saturday = new Date('2026-08-15T12:00:00');
+    expect(preferredDomains(saturday)).toEqual(['life', 'health', 'other']);
   });
 
   it('sorts by priority', () => {

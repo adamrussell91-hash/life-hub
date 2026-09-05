@@ -302,12 +302,21 @@
 
 @media (max-width: 720px) {
   .daily-dial {
-    padding: var(--space-5) var(--space-4);
-    --dial-scale: 0.65;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: var(--space-4) var(--space-3);
+    --dial-scale: 0.72;
   }
 
   .daily-dial__shell {
-    width: min(19.5rem, 100%);
+    width: min(22.5rem, 100%);
+  }
+
+  .daily-dial__chip {
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-2);
   }
 }
 

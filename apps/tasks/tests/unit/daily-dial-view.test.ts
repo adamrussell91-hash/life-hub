@@ -111,4 +111,19 @@ describe('daily dial view', () => {
     expect(host.textContent).toContain('Tap a day to see its schedule');
     expect(host.querySelector('.daily-dial__week-total')).not.toBeNull();
   });
+
+  it('omits domains deleted from Properties in the dial legend', async () => {
+    const { DEFAULT_TASK_PROPERTY_CONFIG } = await import('@/domain/task-properties-defaults');
+    const taskProperties = await import('@/services/task-properties');
+    vi.spyOn(taskProperties, 'getTaskPropertiesSync').mockReturnValue({
+      ...DEFAULT_TASK_PROPERTY_CONFIG,
+      domains: DEFAULT_TASK_PROPERTY_CONFIG.domains.filter((entry) => entry.id !== 'wedding')
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountDailyDial(host, { tasks: [], projects: [] });
+    const legend = host.querySelector('.daily-dial__legend')?.textContent ?? '';
+    expect(legend).toContain('Life');
+    expect(legend).not.toContain('Wedding');
+  });
 });
