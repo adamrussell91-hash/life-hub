@@ -1,0 +1,36 @@
+<!-- Adaptive slider. Shared spring range control for every hub.
+     The motion is the primitive — pass label, unit, and range per use.
+     startHubMotion() mounts `.hub-slider` / [data-adaptive-slider].
+     Or call mountAdaptiveSliders() / createAdaptiveSlider().
+
+     Load tokens.css → overlays.css → adaptive-slider.css (or chrome.css).
+
+     Optional:
+       data-slider-label / data-slider-unit
+       data-slider-min / data-slider-max / data-slider-step / data-slider-value
+       data-slider-dots="6"
+       data-slider-readonly
+-->
+<div
+  class="hub-slider"
+  data-adaptive-slider
+  data-slider-label="Value"
+  data-slider-min="0"
+  data-slider-max="100"
+  data-slider-step="1"
+  data-slider-value="50"
+>
+  <p class="hub-slider__label">Value</p>
+  <div class="hub-slider__value">
+    <span class="hub-slider__digits" data-slider-digits>50</span>
+    <span class="hub-slider__unit"></span>
+  </div>
+  <div class="hub-slider__track">
+    <div class="hub-slider__dots" aria-hidden="true"></div>
+    <div class="hub-slider__fill" aria-hidden="true"></div>
+    <input class="hub-slider__input" type="range" min="0" max="100" step="1" value="50" title="Value">
+    <div class="hub-slider__thumb" aria-hidden="true">
+      <div class="hub-slider__knob"></div>
+    </div>
+  </div>
+</div>

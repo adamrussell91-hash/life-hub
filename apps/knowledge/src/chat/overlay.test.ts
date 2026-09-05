@@ -32,6 +32,9 @@ describe("chat overlay", () => {
     const portraits = [...document.querySelectorAll<HTMLImageElement>(".agent-picker__avatar img")].map(img => img.getAttribute("src"));
     expect(portraits).toEqual(["/assets/agents/clementine.png", "/assets/agents/ann.png"]);
     expect(document.querySelector(".chat-overlay")).toBeTruthy();
+    const hide = document.querySelector("[data-hub-scroll-hide]");
+    expect(hide?.contains(document.querySelector(".agent-picker"))).toBe(true);
+    expect(hide?.getAttribute("data-hub-scroll-scroller")).toBe(".chat-messages");
   });
 
   it("renders protocol bubbles for the active agent", () => {
@@ -241,5 +244,44 @@ Effortful retrieval is the load-bearing claim. The archive supports Bjork here a
     document.querySelector<HTMLButtonElement>("[data-save-brief]")!.click();
     await vi.waitFor(() => expect(savePageMock).toHaveBeenCalled());
     expect(savePageMock.mock.calls[0]?.[0]?.origins).toEqual([{ kind: "book", label: "Make It Stick" }]);
+  });
+
+  it("hides agent chrome when the transcript scrolls down and shows it on the way up", async () => {
+    const { resetHubMotionForTests, startHubMotion } = await import("../../design-kit/js/hub-motion.js");
+    resetHubMotionForTests();
+    sessionStorage.setItem(
+      "knowledge-hub-overlay-chat-v1",
+      JSON.stringify({
+        personality: "clementine",
+        open: true,
+        input: "",
+        turns: Array.from({ length: 8 }, (_, i) => ({
+          role: i % 2 ? "assistant" : "user",
+          content: `Turn ${i + 1}. ${"Enough copy to make the thread tall. ".repeat(4)}`,
+        })),
+      }),
+    );
+    ensureChatOverlay({ visible: true });
+    startHubMotion(document);
+
+    const hide = document.querySelector<HTMLElement>("[data-hub-scroll-hide]");
+    const list = document.querySelector<HTMLElement>(".chat-messages");
+    expect(hide).toBeTruthy();
+    expect(list).toBeTruthy();
+
+    Object.defineProperty(list!, "scrollHeight", { configurable: true, value: 900 });
+    Object.defineProperty(list!, "clientHeight", { configurable: true, value: 200 });
+
+    list!.scrollTop = 0;
+    list!.dispatchEvent(new Event("scroll"));
+    expect(hide!.classList.contains("is-hidden")).toBe(false);
+
+    list!.scrollTop = 220;
+    list!.dispatchEvent(new Event("scroll"));
+    expect(hide!.classList.contains("is-hidden")).toBe(true);
+
+    list!.scrollTop = 40;
+    list!.dispatchEvent(new Event("scroll"));
+    expect(hide!.classList.contains("is-hidden")).toBe(false);
   });
 });

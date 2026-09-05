@@ -1,6 +1,7 @@
 {
   "agent": "clare",
   "write_globs": [
+    "central-node.md",
     "data/challenges/**",
     "data/remember/**",
     "data/research/**",
