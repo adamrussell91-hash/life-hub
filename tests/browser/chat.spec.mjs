@@ -138,6 +138,40 @@ test('lock it onto Fitness shows a Confirm card', async () => {
   await context.close();
 });
 
+test('empty Chat names the agent once and uses the full canvas width', async () => {
+  const context = await browser.newContext({ viewport: { width: 1800, height: 1100 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#agent-picker [data-agent-slug="brisket"]').click();
+
+  assert.equal(await page.locator('#chat-who').isVisible(), false);
+  assert.equal(await page.locator('.agent-picker__name').first().innerText(), 'Brisket');
+  assert.equal(await page.locator('.agent-protocol-pills__eyebrow').innerText(), 'Can');
+  assert.match(await page.locator('#chat-empty').innerText(), /meals, macros/i);
+  assert.doesNotMatch(await page.locator('#chat-empty').innerText(), /brisket/i);
+
+  const widths = await page.evaluate(() => {
+    const frame = document.querySelector('.page-frame');
+    const main = document.querySelector('main');
+    const header = document.querySelector('.page-header');
+    const style = getComputedStyle(frame);
+    const pad = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    return {
+      canvas: frame.clientWidth - pad,
+      main: main.getBoundingClientRect().width,
+      header: header.getBoundingClientRect().width
+    };
+  });
+  assert.ok(widths.main > 1216, 'Chat must be wider than the old 76rem column');
+  assert.ok(Math.abs(widths.main - widths.canvas) < 2, 'Chat main should fill the canvas');
+  assert.ok(Math.abs(widths.header - widths.canvas) < 2, 'Chat header should fill the canvas');
+
+  await context.close();
+});
+
 test('mobile Chat tab and overlay keep send beside the field', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();

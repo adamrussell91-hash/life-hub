@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderAgentPicker, applyAgentAvatarToBubble } from '../../apps/life/js/app/render-agent-picker.js';
+import { renderAgentPicker, applyAgentAvatarToBubble, renderChatEmpty } from '../../apps/life/js/app/render-agent-picker.js';
 
 class FakeClassList {
   constructor(owner) {
@@ -60,6 +60,11 @@ class FakeElement {
     }
   }
 
+  replaceChildren(...nodes) {
+    this.children = [...nodes];
+    for (const node of nodes) node.parent = this;
+  }
+
   prepend(...nodes) {
     this.children.unshift(...nodes);
     for (const node of nodes) node.parent = this;
@@ -101,10 +106,17 @@ class FakeElement {
 class FakeDocument {
   constructor() {
     this.pickerHost = new FakeElement('div');
+    this.empty = new FakeElement('div');
+    this.empty.id = 'chat-empty';
   }
 
   createElement(tag) {
     return new FakeElement(tag);
+  }
+
+  querySelector(selector) {
+    if (selector === '#chat-empty') return this.empty;
+    return null;
   }
 
   querySelectorAll(selector) {
@@ -124,6 +136,25 @@ test('renderAgentPicker renders 64x64 avatar images in the picker', () => {
     assert.equal(img.width, 64);
     assert.equal(img.height, 64);
   }
+});
+
+test('renderChatEmpty shows purpose only and does not repeat the agent name', () => {
+  const root = new FakeDocument();
+  renderChatEmpty(root, 'brisket');
+
+  assert.equal(root.empty.children.length, 1);
+  assert.equal(root.empty.children[0].className, 'chat-empty__purpose');
+  assert.match(root.empty.children[0].textContent, /meals, macros/i);
+  assert.equal(root.empty.children.some(child => /brisket/i.test(child.textContent)), false);
+  assert.equal(root.empty.children.some(child => child.tagName === 'img'), false);
+});
+
+test('renderChatEmpty without an agent asks to pick a personality', () => {
+  const root = new FakeDocument();
+  renderChatEmpty(root, null);
+
+  assert.equal(root.empty.children.length, 1);
+  assert.match(root.empty.children[0].textContent, /tap a personality/i);
 });
 
 test('applyAgentAvatarToBubble renders a 52x52 avatar image in a chat bubble', () => {
