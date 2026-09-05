@@ -9,7 +9,7 @@ export function buildPlannedCandidateFromTemplate(template, { date, time = '07:3
     throw new TypeError('date must be YYYY-MM-DD');
   }
   const clock = typeof time === 'string' && /^\d{2}:\d{2}$/.test(time) ? time : '07:30';
-  const slug = `workout-${clock.replace(':', '')}`;
+  const slug = 'workout-planned';
 
   return {
     type: 'workout',

@@ -258,9 +258,12 @@ export function buildCanonicalPath({ type, date, slug }) {
   return `data/${domain}/${year}/${month}/${date}-${slug}.md`;
 }
 
+export const PLANNED_WORKOUT_SLUG = 'workout-planned';
+
 /**
  * Stable path slug for a validated record.
  * Meals use slot-only slugs so same-day corrections overwrite the same file.
+ * Planned workouts stay on one file per day so amend/save updates the same plan.
  */
 export function buildRecordSlug(record) {
   if (!record || typeof record !== 'object') throw new TypeError('record is required');
@@ -270,6 +273,7 @@ export function buildRecordSlug(record) {
     }
     return record.meal;
   }
+  if (record.type === 'workout' && record.status === 'planned') return PLANNED_WORKOUT_SLUG;
   if (record.type === 'mind_session') return 'session';
   if (record.type === 'medical') return buildMedicalSlug(record.title, record.time);
   const label = record.type === 'skincare' ? record.routine : record.type;

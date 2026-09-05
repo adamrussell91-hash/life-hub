@@ -78,8 +78,39 @@ test('streams an agent event, text, and a validated record proposal for a routed
   assert.deepEqual(events[1], { type: 'text', delta: 'Logging it now.' });
   assert.equal(events[2].type, 'record_proposal');
   assert.equal(events[2].record.type, 'workout');
-  assert.equal(events[2].path, 'data/fitness/2026/08/2026-08-01-workout-1600.md');
+  assert.equal(events[2].record.status, 'planned');
+  assert.equal(events[2].path, 'data/fitness/2026/08/2026-08-01-workout-planned.md');
   assert.deepEqual(events[3], { type: 'done' });
+});
+
+test('Chadwick actuals stay completed on a dated workout file', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([
+        { type: 'text', delta: 'Logged what you actually lifted.' },
+        { type: 'tool_call', id: 'call_1', name: 'log_entry', input: {
+          type: 'workout', date: '2026-08-01', fields: {
+            title: 'Squat Session', session_kind: 'strength',
+            day_type: 'workout_30', status: 'completed', duration_min: 30,
+            exercises: [{ name: 'Squat', sets: [{ reps: 10, weight_kg: 40, cable_type: 'concentric' }] }]
+          }
+        } },
+        { type: 'done' }
+      ])
+    })
+  });
+
+  const response = await handler(request({
+    message: 'Chadwick, I just finished — here is what I actually lifted'
+  }));
+  const events = contentEvents(await readSse(response));
+  const proposal = events.find(event => event.type === 'record_proposal');
+  assert.ok(proposal);
+  assert.equal(proposal.record.status, 'completed');
+  assert.equal(proposal.path, 'data/fitness/2026/08/2026-08-01-workout-1600.md');
 });
 
 test('every agent gets web_search with no max_uses cap', async () => {

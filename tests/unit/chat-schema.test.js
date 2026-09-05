@@ -21,9 +21,22 @@ test('meal slugs are slot-only so same-day corrections overwrite', () => {
 });
 
 test('non-meal slugs still include time when present', () => {
-  assert.equal(buildRecordSlug({ type: 'workout', time: '07:30' }), 'workout-0730');
+  assert.equal(buildRecordSlug({ type: 'workout', time: '07:30', status: 'completed' }), 'workout-0730');
   assert.equal(buildRecordSlug({ type: 'skincare', routine: 'am', time: '08:00' }), 'am-0800');
   assert.equal(buildRecordSlug({ type: 'diary', time: '21:15' }), 'diary-2115');
+});
+
+test('planned workouts use a stable slug so the same day keeps one plan file', () => {
+  assert.equal(buildRecordSlug({ type: 'workout', time: '16:07', status: 'planned' }), 'workout-planned');
+  assert.equal(buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned' }), 'workout-planned');
+  assert.equal(
+    buildCanonicalPath({
+      type: 'workout',
+      date: '2026-09-05',
+      slug: buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned' })
+    }),
+    'data/fitness/2026/09/2026-09-05-workout-planned.md'
+  );
 });
 
 test('rejects an unknown type, invalid date, or invalid slug', () => {

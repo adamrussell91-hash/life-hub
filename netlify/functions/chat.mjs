@@ -191,6 +191,7 @@ import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
 import { resolveForcedChadwickPlan } from './_shared/chadwick-plan-force.mjs';
+import { coerceChatWorkoutProposal } from '../../apps/life/js/core/workout-plan-detect.js';
 import { streamWithAgentLogForce } from './_shared/agent-log-force.mjs';
 import {
   forceStatusFor,
@@ -353,13 +354,15 @@ export function createChatHandler({
         });
         if (forcedPlan) {
           send({ type: 'status', text: 'Locking the plan onto Fitness…' });
-          send({ type: 'text', delta: 'On Fitness — confirm to start.' });
+          send({ type: 'text', delta: 'On Fitness — confirm to save the plan.' });
           const validation = validateLogEntry(forcedPlan, {
             id: `${forcedPlan.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
             now: getSydneyTimestamp(nowInstant)
           });
           if (validation.valid) {
-            await persistOrProposeLogEntry({ client, slug, today, validation, send });
+            await persistOrProposeLogEntry({
+              client, slug, today, validation, send, userMessage: parsed.message
+            });
           } else {
             send({ type: 'record_rejected', errors: validation.errors });
           }
@@ -1302,7 +1305,7 @@ export function createChatHandler({
                 }
                 try {
                   const outcome = await persistOrProposeLogEntry({
-                    client, slug, today, validation, send: emit
+                    client, slug, today, validation, send: emit, userMessage: parsed.message
                   });
                   if (outcome.status === 'written') {
                     return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
@@ -1475,7 +1478,9 @@ export function createChatHandler({
               });
               if (validation.valid) {
                 try {
-                  await persistOrProposeLogEntry({ client, slug, today, validation, send: emit });
+                  await persistOrProposeLogEntry({
+                    client, slug, today, validation, send: emit, userMessage: parsed.message
+                  });
                 } catch {
                   pendingLogRejection = {
                     errors: ['Could not prepare that record. Retry with a simpler payload.']
@@ -1568,12 +1573,15 @@ export function createChatHandler({
   };
 }
 
-async function persistOrProposeLogEntry({ client, slug, today, validation, send }) {
+async function persistOrProposeLogEntry({ client, slug, today, validation, send, userMessage }) {
   let proposal = validation;
+  if (slug === 'chadwick' && proposal.record?.type === 'workout') {
+    proposal = coerceChatWorkoutProposal(proposal, { userMessage });
+  }
   const path = buildCanonicalPath({
-    type: validation.record.type,
-    date: validation.record.date,
-    slug: buildRecordSlug(validation.record)
+    type: proposal.record.type,
+    date: proposal.record.date,
+    slug: buildRecordSlug(proposal.record)
   });
 
   let existingSha = null;
