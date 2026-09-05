@@ -2,7 +2,8 @@ import type { Media } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { isHttpUrl } from '@/blocks/url-safety';
 import { applyCreatedMedia } from '@/app/curriculum-state';
-import { createMedia, uploadMediaFile } from '@/teacher/media-api';
+import { createMedia } from '@/teacher/media-api';
+import { uploadMediaQueue } from '@/teacher/media-uppy';
 import { ApiClientError } from '@/api/client';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
@@ -72,6 +73,7 @@ export function renderResourcesIndex(
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
+  fileInput.multiple = true;
   fileInput.hidden = true;
   fileInput.setAttribute('aria-hidden', 'true');
 
@@ -140,17 +142,44 @@ export function renderResourcesIndex(
   });
 
   fileInput.addEventListener('change', () => {
-    const file = fileInput.files?.[0];
+    const files = [...(fileInput.files ?? [])];
     fileInput.value = '';
-    if (!file) return;
+    if (!files.length) return;
 
     void (async () => {
       setBusy(true);
-      setStatus(null);
+      setStatus(files.length === 1 ? `Uploading ${files[0]!.name}…` : `Uploading 0 of ${files.length}…`);
       try {
-        const created = await uploadMediaFile(file, { title: file.name });
-        applyCreatedMedia(created);
-        await options?.refresh?.();
+        const result = await uploadMediaQueue(files, {
+          onProgress: (done, total, currentName) => {
+            setStatus(
+              total === 1
+                ? `Uploading ${currentName || files[0]!.name}…`
+                : `Uploading ${done} of ${total}${currentName ? ` · ${currentName}` : ''}…`
+            );
+          }
+        });
+        for (const created of result.successful) {
+          applyCreatedMedia(created);
+        }
+        if (result.successful.length) {
+          await options?.refresh?.();
+        }
+        if (result.failed.length && result.successful.length) {
+          setStatus(
+            `Uploaded ${result.successful.length}; ${result.failed.length} failed (${result.failed
+              .map((entry) => entry.name)
+              .join(', ')}).`,
+            true
+          );
+        } else if (result.failed.length) {
+          setStatus(
+            result.failed.map((entry) => `${entry.name}: ${entry.error}`).join(' · ') || 'Upload failed.',
+            true
+          );
+        } else {
+          setStatus(null);
+        }
       } catch (error) {
         setStatus(errorMessage(error), true);
       } finally {
