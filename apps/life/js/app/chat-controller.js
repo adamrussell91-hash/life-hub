@@ -20,6 +20,7 @@ import {
   removeStoredAuditSession,
   saveStoredAuditSession
 } from './hammond-audit-session-storage.js';
+import { takeCompletedChatBlocks } from '../core/chat-blocks.js';
 import { HISTORY_WINDOW_MS, keepNewestHistory } from '../core/chat-history.js';
 import { shouldNudgeUnsavedWorkoutPlan } from '../core/workout-plan-detect.js';
 import {
@@ -27,7 +28,6 @@ import {
   shouldNudgeMissingLogEntry
 } from '../core/log-finalize-detect.js';
 
-const PARAGRAPH_BREAK = /\n{2,}/;
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
 const EMPTY_TURN_RECOVERY = 'That reply got cut off before it finished (usually a timeout while looking things up). Send the same message again and I’ll continue.';
@@ -446,8 +446,8 @@ export function createChatController({
       setWorkingStatus(pickStatusLine(assistantSlug, { exclude: statusLine }));
     }
 
-    // Streamed text arrives as one long buffer; splitting on paragraph breaks into
-    // separate bubbles reads like an actual back-and-forth instead of one wall of text.
+    // Streamed text arrives as one long buffer. Completed blocks (blank lines or a
+    // heading) become their own bubbles so the thread is a conversation, not a slab.
     function renderLiveText(text) {
       if (!text) return;
       clearWorkingBubble();
@@ -507,11 +507,10 @@ export function createChatController({
           gotUsefulOutput = true;
           assistantBuffer += event.delta;
           assistantFullText += event.delta;
-          let boundary;
-          while ((boundary = PARAGRAPH_BREAK.exec(assistantBuffer))) {
-            const paragraph = assistantBuffer.slice(0, boundary.index).trim();
-            assistantBuffer = assistantBuffer.slice(boundary.index + boundary[0].length);
-            renderLiveText(paragraph);
+          const taken = takeCompletedChatBlocks(assistantBuffer);
+          assistantBuffer = taken.rest;
+          for (const block of taken.blocks) {
+            renderLiveText(block);
             startNewBubble();
           }
           renderLiveText(assistantBuffer);
