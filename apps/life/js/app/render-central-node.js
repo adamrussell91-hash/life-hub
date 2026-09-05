@@ -1,3 +1,4 @@
+import { buildWatchlistHeat } from './chart-kit/watchlist-heat.js';
 import { animateRingFill } from './chart-kit/animate.js';
 import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
 import { buildHorizonBands } from './chart-kit/horizon.js';
@@ -52,6 +53,7 @@ export function renderCentralNode(root, model) {
   renderStreamTile(root, model);
   renderTrendScan(root, model);
   renderChordTile(root, model);
+  renderGovernanceHeat(root, model);
   packCnBoard(root);
   root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
 }
@@ -317,6 +319,43 @@ function renderChordTile(root, model) {
     path.addEventListener('focus', focus);
     path.addEventListener('mouseenter', focus);
     svg.append(path);
+  }
+}
+
+function renderGovernanceHeat(root, model) {
+  const host = root.querySelector('#central-node-governance-heat');
+  const tile = root.querySelector('#cn-tile-governance') ?? host;
+  if (!host || !tile) return;
+  const series = model.governanceHeat ?? [];
+  if (!paintChartOrEmpty(root, tile, null, { need: 1, have: series.length, unit: 'open items' })) {
+    host.replaceChildren();
+    return;
+  }
+  const chart = buildWatchlistHeat(series);
+  const ageByTerm = new Map(
+    (model.governanceOpen ?? []).map(entry => [entry.title || entry.entryType || 'Open item', entry.ageDays])
+  );
+  host.replaceChildren();
+  for (const row of (chart.rows ?? []).slice(0, 5)) {
+    const wrap = root.createElement('div');
+    wrap.className = 'cn-watchlist-heat__row';
+    const term = root.createElement('span');
+    term.className = 'cn-watchlist-heat__term';
+    term.textContent = row.term;
+    wrap.append(term);
+    for (const cell of row.cells ?? []) {
+      const swatch = root.createElement('span');
+      swatch.className = 'cn-watchlist-heat__cell';
+      if (swatch.style?.setProperty) swatch.style.setProperty('--heat', String(cell.mix ?? 0));
+      swatch.setAttribute('title', `${cell.date} · ${cell.count}`);
+      wrap.append(swatch);
+    }
+    const age = ageByTerm.get(row.term);
+    const caption = root.createElement('span');
+    caption.className = 'cn-watchlist-heat__age';
+    caption.textContent = Number.isFinite(age) ? `${age}d open` : '';
+    wrap.append(caption);
+    host.append(wrap);
   }
 }
 

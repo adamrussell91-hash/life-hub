@@ -485,6 +485,57 @@ test('renderCentralNode honest-empties a chord with fewer than 3 pairs', () => {
   assert.match(empty.textContent, /1 so far/);
 });
 
+test('renderCentralNode paints open-item heat and captions ageDays', () => {
+  const root = fakeCentralNodeRoot();
+  const points = [
+    { date: '2026-06-08', count: 0 },
+    { date: '2026-06-15', count: 1 },
+    { date: '2026-06-22', count: 1 },
+    { date: '2026-06-29', count: 1 },
+    { date: '2026-07-06', count: 1 },
+    { date: '2026-07-13', count: 1 },
+    { date: '2026-07-20', count: 1 },
+    { date: '2026-07-27', count: 1 }
+  ];
+  renderCentralNode(root, baseModel({
+    date: '2026-07-30',
+    governanceHeat: [{ term: 'Sleep goal', points }],
+    governanceOpen: [{ title: 'Sleep goal', entryType: 'Drift Detection', dateKey: '2026-07-01', ageDays: 29 }]
+  }));
+  const host = root.querySelector('#central-node-governance-heat');
+  assert.ok(host.children.length >= 1);
+  assert.match(host.textContent, /Sleep goal/);
+  assert.match(host.textContent, /29d open/);
+});
+
+test('renderCentralNode honest-empties governance heat when nothing is open', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel({ governanceHeat: [], governanceOpen: [] }));
+  const empty = root.querySelector('#cn-tile-governance').children.find(node =>
+    String(node.className).includes('cn-honest-empty')
+  );
+  assert.match(empty.textContent, /Need 1 open items/);
+});
+
+test('renderCentralNode caps visible heat rows at 5', () => {
+  const root = fakeCentralNodeRoot();
+  const points = Array.from({ length: 8 }, (_, index) => ({
+    date: `2026-06-${String(8 + index * 7).padStart(2, '0')}`,
+    count: 1
+  }));
+  const governanceHeat = Array.from({ length: 7 }, (_, index) => ({
+    term: `Item ${index + 1}`,
+    points
+  }));
+  renderCentralNode(root, baseModel({
+    governanceHeat,
+    governanceOpen: governanceHeat.map((row, index) => ({ title: row.term, ageDays: index }))
+  }));
+  const host = root.querySelector('#central-node-governance-heat');
+  const rows = host.children.filter(node => String(node.className).includes('cn-watchlist-heat__row'));
+  assert.equal(rows.length, 5);
+});
+
 test('renderCentralNode paints a chord and focuses a line into the caption', () => {
   const root = fakeCentralNodeRoot();
   const details = [
