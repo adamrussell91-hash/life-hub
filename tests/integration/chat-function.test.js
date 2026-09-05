@@ -2726,6 +2726,30 @@ Rule one.
   assert.doesNotMatch(receivedArgs.system, /Stale April body/);
 });
 
+test('hub-agent-context loads only on Hammond turns, not Clare or Ann', async () => {
+  const loadedFor = [];
+  const run = async (message, priorAgentSlug) => {
+    const handler = createChatHandler({
+      env: validEnv,
+      now: () => Date.parse('2026-08-01T06:00:00Z'),
+      fetchImpl: githubFetchStub(),
+      loadHubAgentContext: async () => {
+        loadedFor.push(priorAgentSlug);
+        return 'Other hubs (live umbrella stores):\nTasks: mark essays';
+      },
+      createAnthropicClient: () => ({
+        streamMessage: () => mockedStream([{ type: 'done' }])
+      })
+    });
+    await readSse(await handler(request({ message, priorAgentSlug })));
+  };
+
+  await run('Hammond, what is the mission today?', 'hammond');
+  await run('Clare, triage this dump', 'clare');
+  await run("Ann, how is Thursday looking?", 'ann');
+  assert.deepEqual(loadedFor, ['hammond']);
+});
+
 test('non-hammond agents do not register Hammond CN or governance tools', async () => {
   let receivedArgs;
   const handler = createChatHandler({
