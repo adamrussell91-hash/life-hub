@@ -482,17 +482,15 @@ function saveCardHtml(canSave: boolean) {
   </div>`;
 }
 
-function noteComposerHtml(fileNote: boolean, placeholder: string, label: string) {
-  const submitLabel = busy || researchSessionId || writeSessionId
+function noteComposerHtml(fileNote: boolean, placeholder: string, label: string, submitLabel = "Send") {
+  const buttonLabel = busy || researchSessionId || writeSessionId
     ? escapeHtml(waitLine)
-    : fileNote
-      ? "Make note"
-      : "Send";
+    : escapeHtml(submitLabel);
   return `<form class="coach__form ${fileNote ? "chat__note-form" : "glass-panel chat__composer"}" novalidate>
     <label for="chat-input">${escapeHtml(label)}</label>
     <textarea id="chat-input" rows="${fileNote ? 4 : 3}" placeholder="${escapeHtml(placeholder)}" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
     <div class="alchemist__actions">
-      <button class="btn btn--primary" type="submit" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${submitLabel}</button>
+      <button class="btn btn--primary" type="submit" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${buttonLabel}</button>
     </div>
     ${error ? `<p class="alchemist__error">${escapeHtml(error)}</p>` : ""}
     ${busy || researchSessionId || writeSessionId ? `<p class="chat__status" aria-live="polite">${escapeHtml(waitLine)}</p>` : ""}
@@ -555,6 +553,7 @@ export function renderChatRail(host: ChatRailHost) {
       ? "The topic, question, or thinking process to research…"
       : "Ask about the archive…";
   const inputLabel = fromBook ? "Note from the page" : makeNote ? "What should she research?" : "Message";
+  const submitLabel = fromBook ? "Make note" : makeNote ? "Research" : "Send";
   const bookLabels = host.bookLabels ?? [];
   const threadHtml = turns.length
     ? turns
@@ -579,7 +578,7 @@ export function renderChatRail(host: ChatRailHost) {
     ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · Chat needs the Netlify API (session + Anthropic). The browser never talks to the research kernel.</p>` : ""}
     ${host.pageHeader(
       CLEMENTINE.shortName,
-      fromBook ? "From a book" : makeNote ? "Make a note" : "Chat",
+      fromBook ? "From a book" : makeNote ? "Ask Clementine" : "Chat",
       `<button class="btn btn--ghost" data-new-chat type="button" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>New chat</button>`,
       { portraitSrc: CLEMENTINE.avatarSrc, portraitAlt: CLEMENTINE.name },
     )}
@@ -597,7 +596,7 @@ export function renderChatRail(host: ChatRailHost) {
             : ""
         }
         ${bookFieldHtml(bookLabels)}
-        ${fileNote ? noteComposerHtml(true, placeholder, inputLabel) : ""}
+        ${fileNote ? noteComposerHtml(true, placeholder, inputLabel, submitLabel) : ""}
         <button type="button" class="chat__dials-toggle" data-toggle-dials>${showDials ? "Hide scope and depth" : "Adjust scope and depth"}</button>
         ${
           showDials
@@ -625,7 +624,7 @@ export function renderChatRail(host: ChatRailHost) {
       <div class="coach__thread" aria-live="polite">
         ${threadHtml}
       </div>
-      ${fileNote ? "" : noteComposerHtml(false, placeholder, inputLabel)}
+      ${fileNote ? "" : noteComposerHtml(false, placeholder, inputLabel, submitLabel)}
     </section>
   `);
 

@@ -62,7 +62,7 @@ describe("Knowledge Hub rail", () => {
     expect(css).not.toMatch(/\.reader__tidy\s*\{[^}]*font-size:/);
   });
 
-  it("puts Make a note, From a book, and Blank note under one New note menu", () => {
+  it("puts Ask Clementine, From a book, and Write it yourself under one New note menu", () => {
     expect(main).toContain("function newNoteMenuHtml");
     expect(main).toContain("function bindNewNoteMenu");
     expect(main).toContain("data-new-note-menu");
@@ -70,8 +70,8 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("data-make-note");
     expect(main).toContain("data-blank-note");
     expect(main).toContain("New note");
-    expect(main).toContain("Make a note");
-    expect(main).toContain("Blank note");
+    expect(main).toContain("Ask Clementine");
+    expect(main).toContain("Write it yourself");
     expect(main).toContain("function openBookNote");
     expect(main).toContain("function openMakeNote");
     expect(main).toContain("function openCompose");

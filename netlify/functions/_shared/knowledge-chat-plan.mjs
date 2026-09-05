@@ -1,7 +1,7 @@
 export const CHAT_HATS = [
   {
     id: 'makeNote',
-    label: 'Make a note',
+    label: 'Ask Clementine',
     defaultScope: 'standard',
     defaultDepth: 'single',
     plan: 'Capture the topic, question, or thinking process. Search the open web — not the archive — and write a referenced information page. Do not stamp it under a notebook, unit, degree, or book. Tags come after filing.'

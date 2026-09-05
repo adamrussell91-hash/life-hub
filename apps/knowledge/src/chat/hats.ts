@@ -33,8 +33,8 @@ export const DEPTHS: ChatDepth[] = ["single", "verified", "iterative", "exhausti
 export const CHAT_HATS: ChatHat[] = [
   {
     id: "makeNote",
-    label: "Make a note",
-    explain: "Research a topic on the open web and file a tagged information page with no notebook, unit, or book stamp.",
+    label: "Ask Clementine",
+    explain: "Ask Clementine to research a topic on the open web and file a tagged information page with no notebook, unit, or book stamp.",
     defaultScope: "standard",
     defaultDepth: "single",
     plan: "Capture the topic, question, or thinking process. Search the open web — not the archive — and write a referenced information page. Do not stamp it under a notebook, unit, degree, or book. Tags come after filing.",

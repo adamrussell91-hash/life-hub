@@ -364,8 +364,8 @@ function newNoteMenuHtml(bookLabel?: string) {
       <p class="hub-menu__head">New note</p>
       <button class="hub-menu__opt" role="menuitem" data-make-note type="button">
         <span class="new-note__opt">
-          <span class="new-note__opt-title">Make a note</span>
-          <span class="new-note__opt-detail">Clementine researches and files it · tags only</span>
+          <span class="new-note__opt-title">Ask Clementine</span>
+          <span class="new-note__opt-detail">She researches the open web and files a tagged page</span>
         </span>
       </button>
       <button class="hub-menu__opt" role="menuitem" data-from-book type="button">
@@ -376,8 +376,8 @@ function newNoteMenuHtml(bookLabel?: string) {
       </button>
       <button class="hub-menu__opt" role="menuitem" data-blank-note type="button">
         <span class="new-note__opt">
-          <span class="new-note__opt-title">Blank note</span>
-          <span class="new-note__opt-detail">Write it yourself</span>
+          <span class="new-note__opt-title">Write it yourself</span>
+          <span class="new-note__opt-detail">Open a blank page and type</span>
         </span>
       </button>
     </div>

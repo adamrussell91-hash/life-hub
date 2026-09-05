@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CHAT_HATS, hatById, resolveChatPlan } from "./hats";
 
 describe("chat hats", () => {
-  it("ships nine hats including Make a note and From a book and no Consolidation", () => {
+  it("ships nine hats including Ask Clementine and From a book and no Consolidation", () => {
     expect(CHAT_HATS.map(hat => hat.id)).toEqual([
       "makeNote",
       "fromBook",

@@ -287,7 +287,7 @@ Effortful retrieval is the load-bearing claim. The archive supports Bjork here a
     expect(host.app.textContent).toContain("Economists and the rule of law");
   });
 
-  it("files a standalone Make a note page with no origin and still runs tidy for tags", async () => {
+  it("files a standalone Ask Clementine page with no origin and still runs tidy for tags", async () => {
     const { savePage, tidyPage } = await import("../api/client");
     const savePageMock = vi.mocked(savePage);
     const tidyPageMock = vi.mocked(tidyPage);
@@ -312,10 +312,10 @@ Effortful retrieval strengthens later recall. Named sources support the classroo
     enterChatRail({ fresh: true, hat: "makeNote" });
     const host = makeHost();
     host.render();
-    expect(host.app.textContent).toContain("Make a note");
+    expect(host.app.textContent).toContain("Ask Clementine");
     expect(host.app.querySelector(".chat--from-book")).toBeTruthy();
     expect(host.app.querySelector("#chat-book")).toBeNull();
-    expect(host.app.querySelector("[type=submit]")?.textContent).toBe("Make note");
+    expect(host.app.querySelector("[type=submit]")?.textContent).toBe("Research");
     const field = host.app.querySelector<HTMLTextAreaElement>("#chat-input")!;
     field.value = "desirable difficulties as a classroom habit";
     host.app.querySelector<HTMLFormElement>("form")!.dispatchEvent(

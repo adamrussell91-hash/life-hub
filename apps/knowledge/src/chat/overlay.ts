@@ -467,7 +467,7 @@ function overlayHtml() {
       <form class="chat-form">
         <label class="chat-form__label" for="overlay-chat-input">${inputLabel}</label>
         <textarea id="overlay-chat-input" rows="3" placeholder="${placeholder}" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
-        <button class="btn btn--primary" type="submit" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${busy || writeSessionId || researchSessionId ? "…" : fileNote ? "Make note" : "Send"}</button>
+        <button class="btn btn--primary" type="submit" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${busy || writeSessionId || researchSessionId ? "…" : fromBook ? "Make note" : makeNote ? "Research" : "Send"}</button>
       </form>
     </section>
   `;
