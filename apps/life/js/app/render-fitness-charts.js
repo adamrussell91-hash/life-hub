@@ -521,6 +521,21 @@ function renderSankey(root, flows) {
   }
 }
 
+function constellationViewBox(chart) {
+  const nodes = chart.nodes ?? [];
+  if (!nodes.length) return `0 0 ${chart.width} ${chart.height}`;
+  const xs = nodes.map(node => node.x);
+  const ys = nodes.map(node => node.y);
+  const controlYs = (chart.edges ?? []).map(edge => edge.controlY).filter(Number.isFinite);
+  const padX = 90;
+  const padY = 36;
+  const minX = Math.min(...xs) - padX;
+  const maxX = Math.max(...xs) + padX;
+  const minY = Math.min(...ys, ...controlYs) - padY;
+  const maxY = Math.max(...ys, ...controlYs) + padY + 20;
+  return `${minX} ${minY} ${Math.max(160, maxX - minX)} ${Math.max(100, maxY - minY)}`;
+}
+
 function renderLibrary(root, map) {
   const card = showCard(root, '#fitness-library-card', Boolean(map?.nodes?.length >= 2));
   const svg = root.querySelector('#fitness-library-chart');
@@ -535,7 +550,7 @@ function renderLibrary(root, map) {
     return;
   }
   clearSvg(svg);
-  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+  svg.setAttribute('viewBox', constellationViewBox(chart));
   for (const edge of chart.edges ?? []) {
     const path = createSvg(root, 'path');
     path.setAttribute('d', edge.d);
