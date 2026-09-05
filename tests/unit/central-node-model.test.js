@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
+import { getSydneyWeekStart } from '../../apps/life/js/core/time.js';
+import { formatGovernanceEntry } from '../../apps/life/js/core/governance-log.js';
 
 const records = [
   { type: 'meal', date: '2026-07-30', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420, calcium_mg: 380, polyphenol_score: 6 },
@@ -194,4 +196,64 @@ test('a repository with no central-node.md or config/targets.yml yet renders emp
   assert.equal(model.loggingMonth.every(day => day.complete === false), true);
   assert.equal(model.exerciseMonth.every(day => day.completed === false), true);
   assert.equal(model.eatingMonth.every(day => day.hitEatingTargets === false), true);
+});
+
+test('keeps the 30-day heatmap series for Hammond prompt math', () => {
+  const model = buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdown: markdown, date: '2026-07-30' });
+  assert.equal(model.loggingMonth.length, 30);
+  assert.equal(model.exerciseMonth.length, 30);
+  assert.equal(model.eatingMonth.length, 30);
+});
+
+test('adds year series from 1 Jan through the display date', () => {
+  const model = buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdown: markdown, date: '2026-07-30' });
+  assert.equal(model.loggingYear[0].date, '2026-01-01');
+  assert.equal(model.loggingYear.at(-1).date, '2026-07-30');
+  assert.equal(model.loggingYear.length, 211);
+  assert.equal(model.loggingYear.find(day => day.date === '2026-07-24').complete, true);
+  assert.equal(model.exerciseYear.find(day => day.date === '2026-07-29').completed, true);
+  assert.equal(model.eatingYear.find(day => day.date === '2026-07-24').hitEatingTargets, true);
+});
+
+test('domainWeekly and crossAgent are derived, not fetched', () => {
+  const model = buildCentralNodeModel({ events, targetsConfig, centralNodeMarkdown: markdown, date: '2026-07-30' });
+  assert.equal(model.domainWeekly.weeks[0], getSydneyWeekStart('2026-01-01'));
+  assert.ok(model.domainWeekly.series.some(item => item.key === 'nutrition'));
+  assert.deepEqual(
+    model.crossAgent.edges.map(edge => `${edge.themeA}→${edge.themeB}`),
+    ['Chadwick→Brisket']
+  );
+});
+
+test('governanceHeat uses openGovernanceEntries and ignores resolved rows', () => {
+  const log = [
+    '# Governance Log',
+    '',
+    formatGovernanceEntry({
+      dateKey: '2026-07-01',
+      entryType: 'Drift Detection',
+      title: 'Open loop',
+      status: 'Still Active',
+      body: 'Still open.'
+    }),
+    formatGovernanceEntry({
+      dateKey: '2026-07-02',
+      entryType: 'Major Decision',
+      title: 'Done',
+      status: 'Resolved',
+      body: 'Closed.'
+    })
+  ].join('\n');
+  const model = buildCentralNodeModel({
+    events,
+    targetsConfig,
+    centralNodeMarkdown: markdown,
+    date: '2026-07-30',
+    governanceLogMarkdown: log
+  });
+  assert.equal(model.governanceOpen.length, 1);
+  assert.equal(model.governanceOpen[0].title, 'Open loop');
+  assert.equal(model.governanceHeat.length, 1);
+  assert.equal(model.governanceHeat[0].term, 'Open loop');
+  assert.equal(model.governanceHeat[0].points.length, 8);
 });
