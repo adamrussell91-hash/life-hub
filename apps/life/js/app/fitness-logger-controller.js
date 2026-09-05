@@ -13,7 +13,7 @@ import {
   toConfirmPayload
 } from './fitness-logger-draft.js';
 import { closeActiveMorphingDialog } from '../../../../packages/design-kit/js/morphing-dialog.js';
-import { hideFitnessLogger, renderFitnessLogger, updateLoggerChrome } from './render-fitness-logger.js';
+import { collapseExerciseEditor, hideFitnessLogger, renderFitnessLogger, updateLoggerChrome } from './render-fitness-logger.js';
 
 export function createFitnessLoggerController({
   root,
@@ -269,7 +269,7 @@ export function createFitnessLoggerController({
         exerciseIndex = clamped;
         if (changed && expandedExerciseIndex != null) {
           expandedExerciseIndex = null;
-          closeActiveMorphingDialog();
+          collapseExerciseEditor(root);
         }
       },
       onExpandExercise: next => {
@@ -280,7 +280,7 @@ export function createFitnessLoggerController({
       onCollapseExercise: () => {
         if (expandedExerciseIndex == null) return;
         expandedExerciseIndex = null;
-        closeActiveMorphingDialog();
+        collapseExerciseEditor(root);
       },
       onFinish: () => void finish(),
       onStart: startTimer,

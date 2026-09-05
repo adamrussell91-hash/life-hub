@@ -26,8 +26,7 @@ const PREVIEW = `<!doctype html>
 <body>
   <div id="logger" class="fitness-logger"></div>
   <script type="module">
-    import { closeActiveMorphingDialog } from '/packages/design-kit/js/morphing-dialog.js';
-    import { renderFitnessLogger } from '/js/app/render-fitness-logger.js';
+    import { collapseExerciseEditor, renderFitnessLogger } from '/js/app/render-fitness-logger.js';
 
     const draft = {
       title: 'Upper Body',
@@ -67,7 +66,7 @@ const PREVIEW = `<!doctype html>
           exerciseIndex = next;
           if (expandedExerciseIndex != null) {
             expandedExerciseIndex = null;
-            closeActiveMorphingDialog();
+            collapseExerciseEditor(root);
           }
         },
         onExpandExercise(next) {
@@ -78,7 +77,7 @@ const PREVIEW = `<!doctype html>
         onCollapseExercise() {
           if (expandedExerciseIndex == null) return;
           expandedExerciseIndex = null;
-          closeActiveMorphingDialog();
+          collapseExerciseEditor(root);
         }
       });
     }
@@ -140,7 +139,10 @@ test('tapping a compact card expands the set editor', async () => {
     await dialog.locator('[data-hub-morph-close]').click();
     await page.locator('.hub-morph-dialog').waitFor({ state: 'detached' });
     assert.equal(await page.locator('.fitness-logger__exercise').count(), 0);
-    await page.locator('#logger .fitness-logger__peek').first().waitFor();
+    const peek = page.locator('#logger .hub-card-swipe__slide[aria-hidden="false"] .fitness-logger__peek');
+    await peek.waitFor();
+    assert.equal(await peek.evaluate(el => getComputedStyle(el).visibility), 'visible');
+    assert.match(await peek.locator('.hub-card-swipe__title').textContent(), /Bench press/);
   } finally {
     await context.close();
   }

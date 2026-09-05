@@ -272,6 +272,7 @@ export function openMorphingDialog(options) {
     disposed = true;
     if (activeClose === close) activeClose = null;
     doc.removeEventListener('keydown', onKey);
+    showOrigin(trigger);
 
     const current = readRect(frame);
     const origin = readRect(trigger) ?? first;

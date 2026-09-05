@@ -288,7 +288,16 @@ function presentExerciseEditor(host, root, { trigger, frame, label, onClose }) {
   host?.append(frame);
 }
 
+function revealPeekOrigins(scope) {
+  const nodes = scope?.querySelectorAll?.('.hub-morph-dialog__origin') ?? [];
+  for (const node of nodes) {
+    node.classList?.remove?.('hub-morph-dialog__origin');
+    node.removeAttribute?.('aria-hidden');
+  }
+}
+
 function closeExerciseEditor(host) {
+  revealPeekOrigins(host);
   const session = host && openEditors.get(host);
   session?.close?.();
   if (host) openEditors.delete(host);
@@ -597,6 +606,10 @@ export function updateLoggerChrome(root, { elapsedMs, saveState, timer }) {
       complete.disabled = timer.state !== 'running' && timer.state !== 'paused';
     }
   }
+}
+
+export function collapseExerciseEditor(root) {
+  closeExerciseEditor(root?.querySelector?.('#fitness-logger'));
 }
 
 export function hideFitnessLogger(root) {
