@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Round A UI mining demo</title>
+  <link rel="stylesheet" href="/packages/design-kit/tokens.css" />
+  <link rel="stylesheet" href="/packages/design-kit/actions.css" />
+  <link rel="stylesheet" href="/packages/design-kit/filters.css" />
+  <link rel="stylesheet" href="/packages/design-kit/hub-interactions.css" />
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 2rem;
+      font-family: var(--font-ui, system-ui);
+      background: linear-gradient(160deg, #f3f0ea, #e7eef5 55%, #f7f4ef);
+      color: var(--ink, #1c2430);
+    }
+    h1 { font-size: 1.4rem; margin: 0 0 0.35rem; }
+    .lede { color: var(--muted, #5b6573); margin: 0 0 1.5rem; max-width: 40rem; }
+    .grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+    .panel {
+      background: color-mix(in srgb, white 78%, transparent);
+      border: 1px solid var(--line, #d7dde5);
+      border-radius: 1rem;
+      padding: 1.1rem;
+      box-shadow: 0 8px 24px rgb(0 0 0 / 6%);
+    }
+    .panel h2 { margin: 0 0 0.75rem; font-size: 1rem; }
+    .edge-anchor { position: absolute; right: 1rem; bottom: 1rem; }
+    .stage { position: relative; min-height: 12rem; }
+    #log {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 0.75rem;
+      background: #111827;
+      color: #e5e7eb;
+      font: 0.85rem/1.45 ui-monospace, monospace;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>Round A — mined UI patterns</h1>
+  <p class="lede">Floating UI menu geometry, agent choice card, and sources card — Cotton Glass chrome, vanilla ESM.</p>
+  <div id="filter-host"></div>
+  <div class="grid">
+    <section class="panel stage">
+      <h2>1. Floating menu near viewport edge</h2>
+      <button type="button" id="edge-btn" class="btn btn--secondary edge-anchor">Open menu</button>
+    </section>
+    <section class="panel" id="choice-host">
+      <h2>2. Agent choice card</h2>
+    </section>
+    <section class="panel" id="sources-host">
+      <h2>3. Sources card</h2>
+    </section>
+  </div>
+  <pre id="log">Ready.</pre>
+  <script type="module">
+    import { createHubFilter } from '/packages/design-kit/js/hub-filter-menu.js';
+    import { createAgentChoiceCard } from '/packages/design-kit/js/agent-choice-card.js';
+    import { createAgentSourcesCard } from '/packages/design-kit/js/agent-sources-card.js';
+    import { autoUpdateHubFloating, positionHubFloating } from '/packages/design-kit/js/hub-floating.js';
+
+    const logEl = document.getElementById('log');
+    const log = (msg) => {
+      logEl.textContent = `${new Date().toLocaleTimeString()}  ${msg}`;
+    };
+
+    const edgeBtn = document.getElementById('edge-btn');
+    let stop = null;
+    let menu = null;
+    edgeBtn.addEventListener('click', async () => {
+      if (menu) {
+        stop?.();
+        menu.remove();
+        menu = null;
+        stop = null;
+        edgeBtn.setAttribute('aria-expanded', 'false');
+        log('Menu closed');
+        return;
+      }
+      menu = document.createElement('div');
+      menu.className = 'hub-menu is-open';
+      menu.setAttribute('role', 'menu');
+      menu.innerHTML = `
+        <div class="hub-menu__head">Near edge</div>
+        <button type="button" class="hub-menu__opt" role="menuitem">Flip above</button>
+        <button type="button" class="hub-menu__opt" role="menuitem">Shift into view</button>
+        <button type="button" class="hub-menu__opt" role="menuitem">Stay Cotton Glass</button>`;
+      document.body.append(menu);
+      const opts = { placement: 'bottom-end', offset: 8, padding: 12 };
+      await positionHubFloating(edgeBtn, menu, opts);
+      stop = autoUpdateHubFloating(edgeBtn, menu, opts);
+      edgeBtn.setAttribute('aria-expanded', 'true');
+      log(`Menu placed: ${menu.dataset.hubPlacement || menu.className} @ ${menu.style.left}, ${menu.style.top}`);
+    });
+
+    const choice = createAgentChoiceCard(document, {
+      title: 'What should Clare do with these five tasks?',
+      hint: 'Pick one — no durable write yet.',
+      choices: [
+        { id: 'now', label: 'Do now', detail: 'Schedule into today' },
+        { id: 'later', label: 'Park for later', detail: 'Keep in backlog' },
+        { id: 'drop', label: 'Drop', detail: 'Archive quietly' }
+      ],
+      onConfirm: (picked) => log(`Choice confirmed: ${picked.map((p) => p.label).join(', ')}`),
+      onDismiss: () => log('Choice dismissed')
+    });
+    document.getElementById('choice-host').append(choice);
+
+    const sources = createAgentSourcesCard(document, {
+      heading: 'Sources',
+      sources: [
+        { title: 'Training load primer', url: 'https://example.com/load', snippet: 'How to read acute:chronic ratios.' },
+        { title: 'Sleep debt notes', snippet: 'Local vault — no outbound link.' }
+      ]
+    });
+    document.getElementById('sources-host').append(sources);
+
+    const filter = createHubFilter({
+      key: 'Status',
+      label: 'Status',
+      defaultValue: 'open',
+      options: [
+        { value: 'open', label: 'Open' },
+        { value: 'done', label: 'Done' },
+        { value: 'blocked', label: 'Blocked' }
+      ],
+      onChange: (value) => log(`Filter → ${value}`)
+    });
+    document.getElementById('filter-host').append(filter.el);
+  </script>
+</body>
+</html>

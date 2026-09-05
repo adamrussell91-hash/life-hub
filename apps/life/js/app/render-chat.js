@@ -5,6 +5,8 @@ import { appendWorkoutPlanCard } from './render-workout-plan.js';
 import { parseWorkoutChat, setsAreIdentical } from '../core/parse-workout-chat.js';
 import { formatDisplayDate } from '../core/time.js';
 import { syncChatChrome } from './chat-chrome.js';
+import { createAgentChoiceCard } from '../../../../packages/design-kit/js/agent-choice-card.js';
+import { createAgentSourcesCard } from '../../../../packages/design-kit/js/agent-sources-card.js';
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
 const WORKOUT_HEADER_FIELDS = new Set(['title', 'session_kind', 'day_type', 'status', 'duration_min']);
@@ -49,6 +51,16 @@ export function scrollChatIfPinned(list, pinned = true) {
   if (list && pinned) list.scrollTop = list.scrollHeight;
 }
 
+function markLatestMessage(list) {
+  if (!list?.children) return;
+  const queried = list.querySelectorAll?.('.chat-message');
+  const pool = queried?.length ? queried : list.children;
+  const items = [...pool].filter(node => String(node.className || '').includes('chat-message'));
+  for (const item of items) toggleClass(item, 'chat-message--latest', false);
+  const last = items[items.length - 1];
+  if (last) toggleClass(last, 'chat-message--latest', true);
+}
+
 export function appendMessage(root, { role, agentSlug, text = '', actions = true } = {}) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
@@ -65,6 +77,7 @@ export function appendMessage(root, { role, agentSlug, text = '', actions = true
   item.append(body);
   if (actions !== false) appendMessageActions(root, item, role);
   list.append(item);
+  markLatestMessage(list);
   scrollChatIfPinned(list, pinned);
   syncChatChrome(root);
   return item;
@@ -539,7 +552,7 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
   card.append(actions);
 
   list.append(card);
-  list.scrollTop = list.scrollHeight;
+  scrollChatIfPinned(list);
   return { card, confirm, discard, inputs };
 }
 
@@ -611,7 +624,7 @@ export function appendCnPatchProposal(root, { patch }) {
   card.append(actions);
 
   list.append(card);
-  list.scrollTop = list.scrollHeight;
+  scrollChatIfPinned(list);
   return { card, confirm, discard };
 }
 
@@ -681,14 +694,43 @@ export function appendActionProposal(root, { proposal }) {
   card.append(actions);
 
   list.append(card);
-  list.scrollTop = list.scrollHeight;
+  scrollChatIfPinned(list);
   return { card, confirm, discard };
+}
+
+export function appendChoiceCard(root, opts = {}) {
+  const list = root.querySelector('#chat-messages');
+  if (!list) return null;
+  const item = root.createElement('li');
+  item.className = 'chat-message chat-message--structured';
+  const card = createAgentChoiceCard(root, opts);
+  item.append(card);
+  list.append(item);
+  markLatestMessage(list);
+  scrollChatIfPinned(list);
+  syncChatChrome(root);
+  return { item, card };
+}
+
+export function appendSourcesCard(root, opts = {}) {
+  const list = root.querySelector('#chat-messages');
+  if (!list) return null;
+  const item = root.createElement('li');
+  item.className = 'chat-message chat-message--structured';
+  const card = createAgentSourcesCard(root, opts);
+  item.append(card);
+  list.append(item);
+  markLatestMessage(list);
+  scrollChatIfPinned(list);
+  syncChatChrome(root);
+  return { item, card };
 }
 
 export function setChatBusy(root, busy) {
   const input = root.querySelector('#chat-input');
   const button = root.querySelector('#chat-send');
   const stop = root.querySelector('#chat-stop');
+  const view = root.querySelector('#chat-view') ?? root.querySelector?.('.chat-view');
   if (input) input.disabled = busy;
   if (button) {
     button.disabled = busy;
@@ -698,6 +740,7 @@ export function setChatBusy(root, busy) {
     stop.hidden = !busy;
     stop.disabled = !busy;
   }
+  if (view) toggleClass(view, 'is-busy', Boolean(busy));
 }
 
 export function showChatError(root, message) {
