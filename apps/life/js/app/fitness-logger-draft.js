@@ -86,7 +86,11 @@ export function loadDraft(storage, date, path) {
     const raw = storage?.getItem?.(draftStorageKey(date, path));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? cloneLoggerDraft(parsed) : null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      ...cloneLoggerDraft(parsed),
+      ...(parsed._planFingerprint ? { _planFingerprint: parsed._planFingerprint } : {})
+    };
   } catch {
     return null;
   }
@@ -94,7 +98,11 @@ export function loadDraft(storage, date, path) {
 
 export function saveDraft(storage, draft) {
   if (!storage?.setItem || !draft?.date) return;
-  storage.setItem(draftStorageKey(draft.date, draft.path), JSON.stringify(draft));
+  const payload = {
+    ...cloneLoggerDraft(draft),
+    ...(draft._planFingerprint ? { _planFingerprint: draft._planFingerprint } : {})
+  };
+  storage.setItem(draftStorageKey(draft.date, draft.path), JSON.stringify(payload));
 }
 
 export function clearDraft(storage, date, path) {
@@ -104,14 +112,22 @@ export function clearDraft(storage, date, path) {
 export function resolveDraft(session, storage) {
   if (!session || session.status !== 'planned') return null;
   const base = cloneLoggerDraft(session);
+  const serverPlan = planFingerprint(session);
+  base._planFingerprint = serverPlan;
   const stored = loadDraft(storage, base.date, base.path);
   if (!stored || stored.date !== base.date) return base;
   if (stored.path && base.path && stored.path !== base.path) return base;
-  return { ...stored, path: base.path ?? stored.path };
+  if (stored._planFingerprint && stored._planFingerprint !== serverPlan) {
+    // Confirmed plan changed under the draft — discard stale local exercise list.
+    return base;
+  }
+  return { ...stored, path: base.path ?? stored.path, _planFingerprint: serverPlan };
 }
 
 export function toConfirmPayload(draft, { status = 'planned' } = {}) {
-  const working = cloneLoggerDraft(draft);
+  const working = status === 'completed'
+    ? ensureCompletedNotes(draft)
+    : cloneLoggerDraft(draft);
   working.status = status;
   const slug = slugFromWorkoutPath(working.path) || slugifyWorkoutTitle(working.title);
   const notes = working.notes ?? '';
@@ -141,6 +157,42 @@ export function toConfirmPayload(draft, { status = 'planned' } = {}) {
 export function draftFingerprint(draft) {
   const { path: _path, ...rest } = cloneLoggerDraft(draft);
   return JSON.stringify(rest);
+}
+
+/** Fingerprint of the server plan shape — stale local drafts must not beat a newly confirmed plan. */
+export function planFingerprint(session) {
+  const exercises = (session?.exercises ?? []).map(exercise => ({
+    name: exercise?.name,
+    sets: exercise?.sets,
+    coach_cues: exercise?.coach_cues,
+    intensification: exercise?.intensification,
+    bench_angle_deg: exercise?.bench_angle_deg
+  }));
+  return JSON.stringify({
+    title: session?.title ?? '',
+    day_type: session?.day_type ?? '',
+    focus: session?.focus ?? [],
+    exercises
+  });
+}
+
+export function ensureCompletedNotes(draft) {
+  const working = cloneLoggerDraft(draft);
+  const existing = typeof working.notes === 'string' ? working.notes.trim() : '';
+  if (existing) return working;
+  const title = typeof working.title === 'string' && working.title.trim() ? working.title.trim() : 'Session';
+  const pain = (working.pain_flags ?? [])
+    .map(flag => {
+      if (!flag || typeof flag !== 'object') return '';
+      const site = typeof flag.site === 'string' ? flag.site.trim() : '';
+      if (!site) return '';
+      const note = typeof flag.note === 'string' && flag.note.trim() ? flag.note.trim() : '';
+      return note ? `${site}: ${note}` : site;
+    })
+    .filter(Boolean);
+  const verdict = pain.length ? `pain ${pain.join('; ')}` : 'session completed';
+  working.notes = `${title} — ${verdict}`;
+  return working;
 }
 
 export function appendSet(exercise) {

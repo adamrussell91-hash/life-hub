@@ -56,7 +56,7 @@ test('selectRecentWorkoutEntries returns the newest session files, newest first,
     'data/fitness/2026/09/2026-09-01-workout-1628.md',
     'data/fitness/2026/08/2026-08-29-workout-1857.md'
   ]);
-  assert.equal(MAX_RECENT_WORKOUTS, 12);
+  assert.equal(MAX_RECENT_WORKOUTS, 20);
 });
 
 test('selectRecentWorkoutEntries tolerates a non-array tree', () => {

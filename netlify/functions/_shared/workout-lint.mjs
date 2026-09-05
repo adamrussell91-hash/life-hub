@@ -51,8 +51,26 @@ export function lintWorkoutProposal(record) {
     warnings.push(`${setSplitCount} exercises look like set rows (e.g. "Bar Press set 1") — log one row per exercise with multiple sets, not one exercise per set.`);
   }
 
-  if (record.status === 'completed' && /^planned session$/i.test(String(record.title ?? '').trim())) {
-    warnings.push('Completed session is still titled "Planned session" — give it a real unique title before it becomes history.');
+  if (record.status === 'completed' && /^(?:planned session|strength session)$/i.test(String(record.title ?? '').trim())) {
+    warnings.push('Completed session still has a generic title — give it a real unique title before it becomes history.');
+  }
+
+  if (record.status === 'planned') {
+    const missingCues = exercises.filter(exercise => {
+      const cues = exercise?.coach_cues;
+      if (!cues || typeof cues !== 'object') return true;
+      return !(cues.start || cues.rest || cues.final_set);
+    }).length;
+    if (missingCues > 0) {
+      warnings.push(`${missingCues} exercises are missing coach_cues (start/rest/final_set) — mid-session presence needs them on planned sessions.`);
+    }
+    const focusCount = Array.isArray(record.focus) ? record.focus.filter(Boolean).length : 0;
+    if (record.day_type === 'workout_30' && focusCount > 2) {
+      warnings.push(`${focusCount} focus areas on a workout_30 day — protocol default is 2 focuses in the 30-minute window.`);
+    }
+    if (record.day_type === 'workout_45_60' && focusCount > 0 && focusCount < 2) {
+      warnings.push(`${focusCount} focus area on a workout_45_60 day — use the extra room for at least 2 focuses.`);
+    }
   }
 
   return warnings;

@@ -16,7 +16,9 @@ import {
   resolveDraft,
   slugFromWorkoutPath,
   slugifyWorkoutTitle,
-  toConfirmPayload
+  toConfirmPayload,
+  planFingerprint,
+  ensureCompletedNotes
 } from '../../apps/life/js/app/fitness-logger-draft.js';
 
 const planned = () => ({
@@ -145,4 +147,38 @@ test('draftFingerprint changes when a set changes', () => {
 test('formatElapsed pads mm:ss', () => {
   assert.equal(formatElapsed(65_000), '01:05');
   assert.equal(formatElapsed(3_661_000), '01:01:01');
+});
+
+test('resolveDraft discards a local draft when the confirmed plan fingerprint changed', () => {
+  const store = new Map();
+  const storage = {
+    getItem: key => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key)
+  };
+  const original = planned();
+  const draft = cloneLoggerDraft(original);
+  draft._planFingerprint = planFingerprint(original);
+  draft.exercises[0].sets[0].weight_kg = 99;
+  saveDraft(storage, draft);
+
+  const revised = planned();
+  revised.exercises = [{
+    name: 'Fly',
+    sets: [{ reps: 12, weight_kg: 15, cable_type: 'constant_force' }]
+  }];
+  const resolved = resolveDraft(revised, storage);
+  assert.equal(resolved.exercises[0].name, 'Fly');
+  assert.equal(resolved.exercises[0].sets[0].weight_kg, 15);
+});
+
+test('ensureCompletedNotes fills a verdict when notes are blank', () => {
+  const blank = cloneLoggerDraft(planned());
+  blank.notes = '';
+  blank.pain_flags = [{ site: 'right AC', note: 'pinch' }];
+  const filled = ensureCompletedNotes(blank);
+  assert.match(filled.notes, /Chest and Curls — pain right AC: pinch/);
+
+  blank.notes = 'Already wrote this';
+  assert.equal(ensureCompletedNotes(blank).notes, 'Already wrote this');
 });

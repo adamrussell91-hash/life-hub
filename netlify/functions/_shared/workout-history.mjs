@@ -3,7 +3,7 @@ import { daysBetween } from '../../../apps/life/js/core/time.js';
 export const FITNESS_SESSION_PATH =
   /^data\/fitness\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
-export const MAX_RECENT_WORKOUTS = 12;
+export const MAX_RECENT_WORKOUTS = 20;
 const DEFAULT_SEARCH_LIMIT = 8;
 const MAX_SEARCH_LIMIT = 20;
 const SET_SUFFIX = /\s+set\s+\d+\s*$/i;
@@ -158,7 +158,13 @@ function formatSession(record) {
     pain_flags: Array.isArray(record.pain_flags) ? record.pain_flags : [],
     exercises: collapsed.map(exercise => ({
       name: exercise.name,
-      sets: exercise.sets
+      sets: exercise.sets,
+      ...(exercise.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
+      ...(exercise.intensification != null ? { intensification: exercise.intensification } : {}),
+      ...(exercise.equipment != null ? { equipment: exercise.equipment } : {}),
+      ...(exercise.coach_cues != null ? { coach_cues: exercise.coach_cues } : {}),
+      ...(exercise.superset_group != null ? { superset_group: exercise.superset_group } : {}),
+      ...(exercise.between_sets != null ? { between_sets: exercise.between_sets } : {})
     }))
   };
 }

@@ -347,30 +347,9 @@ export function createChatHandler({
           });
         }
 
-        const forcedPlan = resolveForcedChadwickPlan({
-          slug,
-          userMessage: parsed.message,
-          today,
-          messages: [...parsed.history, { role: 'user', content: parsed.message }]
-        });
-        if (forcedPlan) {
-          send({ type: 'status', text: 'Locking the plan onto Fitness…' });
-          send({ type: 'text', delta: 'On Fitness — confirm to save the plan.' });
-          const validation = validateLogEntry(forcedPlan, {
-            id: `${forcedPlan.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
-            now: getSydneyTimestamp(nowInstant)
-          });
-          if (validation.valid) {
-            await persistOrProposeLogEntry({
-              client, slug, today, validation, send, userMessage: parsed.message
-            });
-          } else {
-            send({ type: 'record_rejected', errors: validation.errors });
-          }
-          send({ type: 'done' });
-          controller.close();
-          return;
-        }
+        // Never short-circuit Chadwick lock-in before Central Node / body / history
+        // load — streamWithChadwickPlanForce still forces a Confirm after the model
+        // (or as a late safety net) once that context is in the system prompt.
 
         send({ type: 'status', text: 'Loading your logs…' });
 
@@ -563,9 +542,11 @@ export function createChatHandler({
               ? purgeStaleRecentActions(rollStaleSections(decodedCentralNode, today), today)
               : decodedCentralNode;
             constraints = extractConstraints(centralNodeForTurn);
+            // Chadwick needs This Week so the EP day-before rule can see Veronica.
+            const needsThisWeek = needsNutritionChallenges || slug === 'chadwick';
             centralNodeLog = [
               extractTodaysStatus(centralNodeForTurn),
-              needsNutritionChallenges ? extractThisWeek(centralNodeForTurn) : '',
+              needsThisWeek ? extractThisWeek(centralNodeForTurn) : '',
               extractCrossAgentCoordination(centralNodeForTurn),
               extractRecentAgentActions(centralNodeForTurn)
             ].filter(Boolean).join('\n\n');

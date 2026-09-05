@@ -75,19 +75,36 @@ export function upsertExerciseLibraryEntry(entries, entry, updatedAt) {
  * Close the progression loop: upsert per-exercise last_performed / times_performed /
  * working_weight_kg / best_weight_kg from a confirmed completed workout.
  *
- * Only updates exercises that already have a matching Exercise Library row (matched
- * case/whitespace-insensitively, same identity `upsertExerciseLibraryEntry` uses) --
- * it never invents a new row, since a workout record carries no target_area.
+ * Upserts per-exercise last_performed / working_weight / best_weight from a confirmed
+ * completed workout. Unknown names get a stub library row (target_area: unspecified)
+ * so progression and rotation checks still see them. Session pain_flags land on
+ * last_pain so Chadwick does not blindly push load on a just-flagged move.
  *
  * Returns { entries, pbs } where pbs lists exercises that set a genuine new best
  * (strictly beat the prior best_weight_kg; a first-ever performance or a tied best
  * is not a PB, just an initial/unchanged reading).
  */
+function summarizeSessionPain(record) {
+  if (!Array.isArray(record?.pain_flags) || record.pain_flags.length === 0) return null;
+  const bits = [];
+  for (const flag of record.pain_flags) {
+    if (!flag || typeof flag !== 'object') continue;
+    const site = typeof flag.site === 'string' ? flag.site.trim() : '';
+    if (!site) continue;
+    const note = typeof flag.note === 'string' && flag.note.trim() ? flag.note.trim() : '';
+    bits.push(note ? `${site}: ${note}` : site);
+  }
+  if (bits.length === 0) return null;
+  const compact = bits.join('; ');
+  return compact.length > 120 ? `${compact.slice(0, 117)}...` : compact;
+}
+
 export function applyCompletedWorkoutToLibrary(entries, record, updatedAt) {
   const list = Array.isArray(entries) ? entries.slice() : [];
   const pbs = [];
   if (!record || !Array.isArray(record.exercises)) return { entries: list, pbs };
   const sessionDate = typeof record.date === 'string' ? record.date : undefined;
+  const sessionPain = summarizeSessionPain(record);
   const exercises = collapseSetSplitExercises(record.exercises);
 
   for (const exercise of exercises) {
@@ -100,8 +117,22 @@ export function applyCompletedWorkoutToLibrary(entries, record, updatedAt) {
     const sessionMax = Math.max(...weights);
 
     const key = libraryKey({ name });
-    const index = list.findIndex(existing => libraryKey(existing) === key);
-    if (index === -1) continue;
+    let index = list.findIndex(existing => libraryKey(existing) === key);
+    // New moves must still close the progression loop — seed a stub row rather than skipping.
+    if (index === -1) {
+      list.push({
+        name,
+        target_area: 'unspecified',
+        last_performed: sessionDate,
+        times_performed: 1,
+        working_weight_kg: sessionMax,
+        best_weight_kg: sessionMax,
+        in_rotation: false,
+        ...(sessionPain ? { last_pain: sessionPain } : {}),
+        updated_at: updatedAt
+      });
+      continue;
+    }
 
     const existing = list[index];
     const hadBest = typeof existing.best_weight_kg === 'number';
@@ -116,6 +147,7 @@ export function applyCompletedWorkoutToLibrary(entries, record, updatedAt) {
       times_performed: timesPerformed,
       working_weight_kg: sessionMax,
       best_weight_kg: nextBest,
+      ...(sessionPain ? { last_pain: sessionPain } : { last_pain: null }),
       updated_at: updatedAt
     };
 
@@ -200,7 +232,10 @@ export function formatExerciseLibraryForPrompt(entries) {
     const lastPerformed = typeof entry.last_performed === 'string' ? `last ${formatLogDate(entry.last_performed)}` : '';
     const best = typeof entry.best_weight_kg === 'number' ? `PB ${entry.best_weight_kg} kg` : '';
     const frequency = typeof entry.times_performed === 'number' ? `${entry.times_performed}x logged` : '';
-    const bits = [entry.target_area, equipment, weight, lastPerformed, best, frequency, rotation]
+    const pain = typeof entry.last_pain === 'string' && entry.last_pain.trim()
+      ? `pain ${entry.last_pain.trim()}`
+      : '';
+    const bits = [entry.target_area, equipment, weight, lastPerformed, best, frequency, rotation, pain]
       .filter(Boolean).join(' · ');
     return `- ${entry.name} — ${bits}`;
   }).join('\n');

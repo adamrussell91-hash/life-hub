@@ -871,3 +871,10 @@ test('protocolSteer is injected after voice so the model stays in character', ()
   const steerAt = prompt.indexOf('Flare-up eating');
   assert.ok(voiceAt >= 0 && steerAt > voiceAt);
 });
+
+
+test('Chadwick persona requires web_search for exercise-science grounding', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick', digest: '', constraints: '' });
+  assert.match(prompt, /actively use web_search for exercise-science sources/);
+  assert.match(prompt, /This Week on Central Node includes EP/);
+});

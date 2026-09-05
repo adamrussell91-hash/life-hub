@@ -504,6 +504,29 @@ export function renderFitnessLogger(root, draft, {
       onInput: value => onChange?.({ type: 'session', field: 'duration_min', value })
     })
   );
+
+  const dayTypeWrap = root.createElement('label');
+  dayTypeWrap.className = 'fitness-logger__field';
+  const dayTypeLabel = root.createElement('span');
+  dayTypeLabel.textContent = 'Day type';
+  const dayType = root.createElement('select');
+  dayType.setAttribute('aria-label', 'Day type');
+  for (const [value, label] of [
+    ['movement', 'Movement'],
+    ['workout_30', 'Workout 30'],
+    ['workout_45_60', 'Workout 45–60']
+  ]) {
+    const opt = root.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    if ((draft.day_type ?? 'workout_30') === value) opt.selected = true;
+    dayType.append(opt);
+  }
+  dayType.addEventListener('change', () => {
+    onChange?.({ type: 'session', field: 'day_type', value: dayType.value });
+  });
+  dayTypeWrap.append(dayTypeLabel, dayType);
+  detailsGrid.append(dayTypeWrap);
   details.append(detailsGrid);
 
   const recovery = root.createElement('label');

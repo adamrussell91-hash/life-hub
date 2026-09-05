@@ -95,6 +95,9 @@ export function isThinMindTurn({ slug, message } = {}) {
 }
 
 export function shouldStripWebSearch({ slug, message } = {}) {
+  // Chadwick keeps web_search on every turn — exercise-science research is part of
+  // programming, including lock-in turns that still need a sourced progression call.
+  if (slug === 'chadwick') return false;
   if (!LOG_AGENTS.has(slug)) return false;
   if (isLogFinalize(message)) return true;
   return slug === 'vera' && isVeraFlushMessage(message);

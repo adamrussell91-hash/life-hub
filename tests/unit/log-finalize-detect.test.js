@@ -32,6 +32,8 @@ test('Vera flush and thin-mind / strip-search helpers', () => {
   assert.equal(isThinMindTurn({ slug: 'brisket', message: 'Log' }), false);
   assert.equal(shouldStripWebSearch({ slug: 'brisket', message: 'Confirm logged' }), true);
   assert.equal(shouldStripWebSearch({ slug: 'hammond', message: 'Log' }), false);
+  assert.equal(shouldStripWebSearch({ slug: 'chadwick', message: 'Log' }), false);
+  assert.equal(shouldStripWebSearch({ slug: 'chadwick', message: 'lock this in' }), false);
 });
 
 test('claimedDomainSave covers each logging agent', () => {

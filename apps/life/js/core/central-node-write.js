@@ -82,8 +82,22 @@ export function buildWorkoutFlagsLine(record, notes) {
   }
   if (parts.length === 0) return null;
   const compact = parts.join(' · ');
-  const truncated = compact.length > 140 ? `${compact.slice(0, 137)}...` : compact;
+  const truncated = compact.length > 280 ? `${compact.slice(0, 277)}...` : compact;
   return `**Flags:** ${truncated}`;
+}
+
+/** Merge a new Flags line into Status instead of last-writer-wins clobber. */
+export function mergeFlagsIntoStatus(body, flagsLine) {
+  if (!flagsLine) return body;
+  const incoming = String(flagsLine).replace(/^\*\*Flags:\*\*\s*/i, '').trim();
+  if (!incoming) return body;
+  const match = /\*\*Flags:\*\*\s*(.+)/i.exec(body ?? '');
+  if (!match) return upsertStatusField(body, 'Flags', flagsLine);
+  const existing = match[1].trim().replace(/\.\.\.$/, '');
+  if (existing.includes(incoming.slice(0, Math.min(40, incoming.length)))) return body;
+  const merged = `${existing} · ${incoming}`;
+  const truncated = merged.length > 280 ? `${merged.slice(0, 277)}...` : merged;
+  return upsertStatusField(body, 'Flags', `**Flags:** ${truncated}`);
 }
 
 /** One Cross-Agent line per pain flag so Sara sees new session signals. */
@@ -274,7 +288,7 @@ export function humanizeDayType(dayType) {
 // Its own header says "purge once actioned" and nothing ever did: by Aug 2026 it held
 // ~15 stale auto-generated Day Type directives, all injected into every specialist turn.
 // Hammond owns semantic purge (condense op); this is the mechanical floor underneath him.
-export const MAX_CROSS_AGENT_LINES = 12;
+export const MAX_CROSS_AGENT_LINES = 24;
 
 const CROSS_AGENT_LINE_RE = /^-\s*([A-Za-z][\w' ]*?)(?:→([A-Za-z][\w' ]*?))?:\s*(.*)$/;
 
@@ -505,7 +519,7 @@ export function applyLogToCentralNode(content, {
   if (record.type === 'meal' && nutritionTotals) {
     body = upsertStatusField(body, 'Nutrition', buildNutritionStatusLine(nutritionTotals));
     const flags = buildMealFlagsLine(flagNotes);
-    if (flags) body = upsertStatusField(body, 'Flags', flags);
+    if (flags) body = mergeFlagsIntoStatus(body, flags);
   } else if (record.type === 'workout') {
     // Protocol: Central Node after finish — planned autosaves leave Status alone.
     if (!shouldUpdateWorkoutStatus(record)) {
@@ -513,7 +527,7 @@ export function applyLogToCentralNode(content, {
     }
     body = upsertStatusField(body, 'Exercise', buildExerciseStatusLine(record));
     const flags = buildWorkoutFlagsLine(record, flagNotes);
-    if (flags) body = upsertStatusField(body, 'Flags', flags);
+    if (flags) body = mergeFlagsIntoStatus(body, flags);
   } else if (record.type === 'diary') {
     const mood = record.mood_score != null ? `${record.mood_score}/10` : (record.mood ?? 'logged');
     body = upsertStatusField(body, 'Mood', `**Mood:** ${mood}.`);
@@ -527,22 +541,22 @@ export function applyLogToCentralNode(content, {
     const weight = record.weight_kg != null ? `${record.weight_kg} kg` : 'logged';
     body = upsertStatusField(body, 'Health', `**Health:** Weight ${weight}.`);
     const flags = buildMealFlagsLine(flagNotes);
-    if (flags) body = upsertStatusField(body, 'Flags', flags);
+    if (flags) body = mergeFlagsIntoStatus(body, flags);
   } else if (record.type === 'measurements') {
     body = upsertStatusField(body, 'Health', '**Health:** Measurements logged.');
     const flags = buildMealFlagsLine(flagNotes);
-    if (flags) body = upsertStatusField(body, 'Flags', flags);
+    if (flags) body = mergeFlagsIntoStatus(body, flags);
   } else if (record.type === 'skincare') {
     const flags = buildMealFlagsLine(flagNotes)
       ?? `**Flags:** Skincare ${record.routine ?? ''} logged.`.replace(/\s+/g, ' ').trim();
-    body = upsertStatusField(body, 'Flags', flags);
+    body = mergeFlagsIntoStatus(body, flags);
   } else if (record.type === 'medical') {
     const title = typeof record.title === 'string' && record.title.trim()
       ? record.title.trim()
       : 'Visit logged';
     body = upsertStatusField(body, 'Health', `**Health:** ${title}.`);
     const flags = buildMealFlagsLine(flagNotes);
-    if (flags) body = upsertStatusField(body, 'Flags', flags);
+    if (flags) body = mergeFlagsIntoStatus(body, flags);
   } else {
     return dedupeRecentActions(next);
   }

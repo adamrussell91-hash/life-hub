@@ -296,6 +296,15 @@ export function extractWorkoutTitle(text) {
   return '';
 }
 
+function titleFromExercises(exercises) {
+  const names = (exercises ?? [])
+    .map(exercise => (typeof exercise?.name === 'string' ? exercise.name.trim() : ''))
+    .filter(Boolean)
+    .slice(0, 2);
+  if (names.length === 0) return '';
+  return names.join(' + ');
+}
+
 export function extractWorkoutDuration(text) {
   const range = /(\d+)\s*-\s*(\d+)\s*min/i.exec(text ?? '');
   if (range) return Number(range[2]);
@@ -323,9 +332,10 @@ export function buildPlannedWorkoutInput(text, { date } = {}) {
     return {
       type: 'workout',
       date,
-      notes: plan.intro ? plan.intro.replace(/\s+/g, ' ').trim().slice(0, 240) : '',
+      // Never park design chatter as the post-session verdict — notes stay empty on planned.
+      notes: '',
       fields: {
-        title: extractWorkoutTitle(text) || 'Planned session',
+        title: extractWorkoutTitle(text) || titleFromExercises(loaded) || 'Strength session',
         session_kind: 'strength',
         day_type: (duration ?? 45) >= 45 ? 'workout_45_60' : 'workout_30',
         status: 'planned',
@@ -343,9 +353,9 @@ export function buildPlannedWorkoutInput(text, { date } = {}) {
     return {
       type: 'workout',
       date,
-      notes: plan.intro ? plan.intro.replace(/\s+/g, ' ').trim().slice(0, 240) : '',
+      notes: '',
       fields: {
-        title: extractWorkoutTitle(text) || 'Planned session',
+        title: extractWorkoutTitle(text) || titleFromExercises(namesOnly) || 'Strength session',
         session_kind: 'strength',
         day_type: (duration ?? 45) >= 45 ? 'workout_45_60' : 'workout_30',
         status: 'planned',

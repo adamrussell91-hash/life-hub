@@ -426,7 +426,7 @@ function renderHero(root, session, { logger, libraryByName } = {}) {
     for (const flag of session.pain_flags ?? []) {
       const pill = root.createElement('span');
       pill.className = 'fitness-tag';
-      pill.textContent = typeof flag === 'string' ? flag : (flag?.area ?? flag?.note ?? 'pain');
+      pill.textContent = typeof flag === 'string' ? flag : (flag?.site ?? flag?.area ?? flag?.note ?? 'pain');
       pain.append(pill);
     }
   }
