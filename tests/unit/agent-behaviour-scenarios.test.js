@@ -8,10 +8,17 @@ import { evaluateConstraintBehaviour } from '../../apps/life/js/core/context-int
 const here = dirname(fileURLToPath(import.meta.url));
 const scenariosDir = join(here, '../fixtures/agent-scenarios');
 
-function replyText(scenario) {
-  const event = scenario.turns[0].stream.find((entry) => entry.type === 'text');
-  assert.ok(event, 'scenario needs a text stream event');
-  return event.text;
+function turnTexts(scenario) {
+  assert.ok(scenario.turns?.length >= 1, 'scenario needs turns');
+  return scenario.turns.map((turn, index) => {
+    const event = turn.stream.find((entry) => entry.type === 'text');
+    assert.ok(event, `scenario turn ${index} needs a text stream event`);
+    return event.text;
+  });
+}
+
+function hasStreamTheatre(scenario) {
+  return scenario.turns.some((turn) => turn.stream.some((entry) => entry.type === 'status'));
 }
 
 async function loadScenarios() {
@@ -26,12 +33,16 @@ async function loadScenarios() {
 
 test('AI scenarios: constraint-present good replies pass behaviour fixtures', async () => {
   for (const scenario of await loadScenarios()) {
-    const result = evaluateConstraintBehaviour({
-      constraintPresent: true,
-      recommendation: replyText(scenario),
-      mustNotPatterns: scenario.behaviour.mustNotPatterns.map((pattern) => new RegExp(pattern, 'i'))
-    });
-    assert.equal(result.ok, true, scenario.id);
+    assert.ok(scenario.turns.length >= 2, `${scenario.id} needs a multi-turn pushback`);
+    assert.ok(hasStreamTheatre(scenario), `${scenario.id} needs stream theatre status`);
+    for (const [index, text] of turnTexts(scenario).entries()) {
+      const result = evaluateConstraintBehaviour({
+        constraintPresent: true,
+        recommendation: text,
+        mustNotPatterns: scenario.behaviour.mustNotPatterns.map((pattern) => new RegExp(pattern, 'i'))
+      });
+      assert.equal(result.ok, true, `${scenario.id} turn ${index}`);
+    }
   }
 });
 
