@@ -569,3 +569,27 @@ test('a realistic session-build sequence of single continuing tool calls (e.g. e
   assert.equal(calls, CONTINUING_ROUNDS + 1, 'expected the round budget to allow one round per tool call plus the final proposal round');
   assert.ok(events.some(e => e.type === 'tool_call' && e.id === 'call_final' && e.name === 'log_entry'));
 });
+
+
+test('createAnthropicClient uses injectable baseUrl for mock servers', async () => {
+  const seen = [];
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    baseUrl: 'https://mock.anthropic.test',
+    fetchImpl: async (url) => {
+      seen.push(String(url));
+      return sseResponse([
+        frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+        frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'hi' } }),
+        frame('content_block_stop', { index: 0 }),
+        frame('message_stop', {})
+      ]);
+    }
+  });
+  const chunks = [];
+  for await (const event of client.streamMessage({ system: 's', messages: [], tools: [] })) {
+    chunks.push(event);
+  }
+  assert.equal(seen[0], 'https://mock.anthropic.test/v1/messages');
+  assert.ok(chunks.some((c) => c.type === 'text' || c.type === 'done'));
+});

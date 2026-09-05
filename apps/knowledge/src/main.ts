@@ -35,6 +35,7 @@ import { escapeHtml, showToast } from "./lib/dom";
 import { hubUtilitiesHtml } from "./lib/hubChrome";
 import { bindKeyboardInset } from "./lib/keyboardInset";
 import { renderMarkdown } from "./lib/markdown";
+import { mountMarkdownTiptap, type MarkdownTiptapHandle } from "./compose/markdown-tiptap";
 import { resolveArchivePageId } from "./chat/noteLinks";
 import { cardSupportingText } from "./archive/cardText";
 import { archiveEmptyHtml } from "./archive/emptyList";
@@ -196,6 +197,7 @@ type ComposeState = {
   recording: boolean;
 };
 
+let composeBodyEditor: MarkdownTiptapHandle | null = null;
 let compose: ComposeState | null = null;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -1317,8 +1319,8 @@ function renderCompose(state: ComposeState) {
         composeOriginKind,
       )}
       <div class="compose__field compose__field--body">
-        <label for="compose-body">Body (markdown)</label>
-        <textarea id="compose-body">${escapeHtml(state.body)}</textarea>
+        <label id="compose-body-label">Body (markdown)</label>
+        <div id="compose-body-host" class="compose__body-host" aria-labelledby="compose-body-label"></div>
       </div>
       ${captureFieldHtml({
         busy: state.busy,
@@ -1339,10 +1341,24 @@ function renderCompose(state: ComposeState) {
     </section>
   `);
 
+  composeBodyEditor?.destroy();
+  composeBodyEditor = null;
+  const bodyHost = app.querySelector<HTMLElement>("#compose-body-host");
+  if (bodyHost && compose) {
+    composeBodyEditor = mountMarkdownTiptap({
+      markdown: compose.body,
+      ariaLabel: "Body (markdown)",
+      onMarkdown: (markdown) => {
+        if (compose) compose.body = markdown;
+      },
+    });
+    bodyHost.replaceChildren(composeBodyEditor.host);
+  }
+
   const syncFields = () => {
     if (!compose) return;
     compose.title = app.querySelector<HTMLInputElement>("#compose-title")!.value;
-    compose.body = app.querySelector<HTMLTextAreaElement>("#compose-body")!.value;
+    if (composeBodyEditor) compose.body = composeBodyEditor.getMarkdown();
   };
 
   const voice = createVoiceCapture({
@@ -1369,6 +1385,8 @@ function renderCompose(state: ComposeState) {
   }
 
   app.querySelector<HTMLButtonElement>("[data-compose-cancel]")!.onclick = () => {
+    composeBodyEditor?.destroy();
+    composeBodyEditor = null;
     compose = null;
     resetComposeTagChrome();
     view = activePage ? "page" : "list";
@@ -1530,9 +1548,9 @@ function renderCompose(state: ComposeState) {
     onPhoto: file => void ingestAndApply(file, "photo"),
     onPdf: file => void ingestAndApply(file, "pdf"),
     onPaste: text => {
-      const body = app.querySelector<HTMLTextAreaElement>("#compose-body");
-      if (!body) return;
-      body.value = body.value ? `${body.value}\n${text}` : text;
+      if (!composeBodyEditor) return;
+      const next = composeBodyEditor.getMarkdown();
+      composeBodyEditor.setMarkdown(next ? `${next}\n${text}` : text);
       syncFields();
       showToast("Pasted");
     },
@@ -1542,7 +1560,7 @@ function renderCompose(state: ComposeState) {
 async function saveCompose() {
   if (!compose || compose.busy) return;
   compose.title = app.querySelector<HTMLInputElement>("#compose-title")!.value;
-  compose.body = app.querySelector<HTMLTextAreaElement>("#compose-body")!.value;
+  if (composeBodyEditor) compose.body = composeBodyEditor.getMarkdown();
   if (!compose.title.trim()) {
     compose.titleError = "Title is required";
     render();
@@ -1590,6 +1608,8 @@ async function saveCompose() {
     const saved = await savePage(page);
     entries = await listPages();
     activePage = saved;
+    composeBodyEditor?.destroy();
+    composeBodyEditor = null;
     compose = null;
     resetComposeTagChrome();
     view = "page";

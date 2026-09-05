@@ -17,6 +17,7 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@atlaskit/pragmatic-drag-and-drop": "^3.1.0",
     "@netlify/blobs": "9.1.2",
     "@tiptap/core": "^3.31.3",
     "@tiptap/pm": "^3.31.3",
