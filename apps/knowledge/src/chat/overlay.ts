@@ -3,6 +3,7 @@ import { newHubPageId } from "../domain/page";
 import { escapeHtml, showToast } from "../lib/dom";
 import { bindKeyboardInset } from "../lib/keyboardInset";
 import { findProtocol, protocolHat } from "./agentProtocols";
+import { isWebFileNoteHat, resolveChatPlan } from "./hats";
 import {
   bookContextLine,
   bookOrigin,
@@ -13,7 +14,7 @@ import {
 import { briefIsSavable, briefToPage } from "./saveBrief";
 import { renderChatMarkdown, type NoteTitle } from "./noteLinks";
 import { protocolPillsHtml } from "./protocolPills";
-import type { ResearchFinding } from "../research/schema";
+import type { ResearchFinding, ResearchResult } from "../research/schema";
 import { topicKeywords } from "../archive/keywordGraph";
 import type { Page } from "../domain/page";
 import type { ChatTurnResult } from "./chatTurn";
@@ -27,6 +28,12 @@ import {
   type OverlayNote,
 } from "./personalities";
 import { applyRetagToPage, parseNoteEdit, retagDelta, type RetagProposal } from "./noteEdit";
+import {
+  STATUS_ROTATE_MS,
+  chatTick,
+  pickAgentWaitLine,
+  type ChatTickPhase,
+} from "./ticker";
 
 const STORAGE_KEY = "knowledge-hub-overlay-chat-v1";
 const ROOT_ID = "kh-chat-overlay";
@@ -36,6 +43,13 @@ type OverlayTurn = {
   content: string;
   findings?: ResearchFinding[];
   edit?: RetagProposal;
+};
+
+type OverlayWorking = {
+  phase: ChatTickPhase;
+  line: string;
+  lastChangedAt: number;
+  research?: ResearchResult;
 };
 
 export type ChatOverlayHost = {
@@ -64,6 +78,8 @@ let saveBusy = false;
 let savedBrief = false;
 let fileAfterDone = false;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let rotateTimer: ReturnType<typeof setTimeout> | null = null;
+let working: OverlayWorking | null = null;
 let currentHost: ChatOverlayHost | null = null;
 
 function persist() {
@@ -111,9 +127,99 @@ function restore() {
     notes = Array.isArray(saved.notes) ? saved.notes : [];
     writeSessionId = saved.writeSessionId ?? "";
     researchSessionId = saved.researchSessionId ?? "";
+    busy = false;
+    error = "";
+    stopPoll();
+    if (researchSessionId || writeSessionId) reconstructWorking();
+    else clearWorking();
   } catch {
     /* keep defaults */
   }
+}
+
+function stopPoll() {
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function stopRotate() {
+  if (rotateTimer) {
+    clearTimeout(rotateTimer);
+    rotateTimer = null;
+  }
+}
+
+function nextWaitLine(exclude?: string) {
+  return pickAgentWaitLine(personality, { exclude, webResearch: webFileNoteSelected() });
+}
+
+function overlayTickText(state: OverlayWorking): string {
+  const plan = resolveChatPlan(protocolHat(personality, selectedProtocolId));
+  const hasResearchMeta = Boolean(
+    state.research &&
+      (state.research.round != null ||
+        state.research.findings?.length ||
+        state.research.followUpQueries?.length),
+  );
+  if (hasResearchMeta || state.phase === "writing" || state.phase === "failed" || state.phase === "library") {
+    return chatTick({
+      phase: state.phase,
+      hatLabel: plan.hat.label,
+      scope: plan.scope,
+      depth: plan.depth,
+      waitLine: state.line,
+      webResearch: webFileNoteSelected() || isWebFileNoteHat(plan.hat.id),
+      round: state.research?.round,
+      maxRounds: plan.maxRounds,
+      noteCount: state.research?.findings?.length,
+      followUps: state.research?.followUpQueries?.length,
+    });
+  }
+  return state.line;
+}
+
+function scheduleRotate() {
+  stopRotate();
+  if (!working) return;
+  rotateTimer = setTimeout(() => {
+    if (!working) return;
+    working = {
+      ...working,
+      line: nextWaitLine(working.line),
+      lastChangedAt: Date.now(),
+    };
+    paint();
+    scheduleRotate();
+  }, STATUS_ROTATE_MS);
+}
+
+function setWorking(phase: ChatTickPhase, research?: ResearchResult) {
+  const phaseChanged = !working || working.phase !== phase;
+  const line = phaseChanged ? nextWaitLine(working?.line) : working.line;
+  working = {
+    phase,
+    line,
+    lastChangedAt: phaseChanged ? Date.now() : working.lastChangedAt,
+    research: research ?? working?.research,
+  };
+  if (phaseChanged) scheduleRotate();
+}
+
+function reconstructWorking() {
+  if (writeSessionId) {
+    setWorking("writing");
+    return;
+  }
+  if (researchSessionId) {
+    setWorking("searching");
+  }
+}
+
+function clearWorking() {
+  working = null;
+  stopRotate();
 }
 
 function resetSitting() {
@@ -125,6 +231,9 @@ function resetSitting() {
   error = "";
   savedBrief = false;
   fileAfterDone = false;
+  busy = false;
+  stopPoll();
+  clearWorking();
 }
 
 function currentPersonality() {
@@ -160,11 +269,13 @@ function applyResult(history: OverlayTurn[], result: ChatTurnResult) {
   if (result.status === "researching") {
     researchSessionId = result.researchSessionId;
     writeSessionId = "";
+    setWorking(result.research ? "round" : "searching", result.research);
     return;
   }
   if (result.status === "writing") {
     writeSessionId = result.writeSessionId;
     researchSessionId = "";
+    setWorking("writing", result.research);
     return;
   }
   if (result.status === "compose" || result.status === "external-unavailable") {
@@ -172,6 +283,7 @@ function applyResult(history: OverlayTurn[], result: ChatTurnResult) {
       error = result.reason;
       writeSessionId = "";
       fileAfterDone = false;
+      clearWorking();
     }
     researchSessionId = "";
     return;
@@ -179,6 +291,7 @@ function applyResult(history: OverlayTurn[], result: ChatTurnResult) {
   researchSessionId = "";
   writeSessionId = "";
   savedBrief = false;
+  clearWorking();
   const parsed = parseNoteEdit(result.reply);
   turns = [
     ...history,
@@ -205,6 +318,9 @@ async function send(outgoingOverride?: string) {
   }
   busy = true;
   error = "";
+  if (!working) {
+    setWorking(notes.length ? "library" : "searching");
+  }
   persist();
   paint();
   try {
@@ -232,6 +348,7 @@ async function send(outgoingOverride?: string) {
     if (caught instanceof ChatWriteDroppedError) {
       error = caught.message;
       fileAfterDone = false;
+      clearWorking();
     } else {
       if (!researchSessionId) {
         input = outgoing;
@@ -239,12 +356,14 @@ async function send(outgoingOverride?: string) {
       }
       error = caught instanceof Error ? caught.message : "Chat failed";
       if (!researchSessionId && !writeSessionId) fileAfterDone = false;
+      if (!researchSessionId && !writeSessionId) clearWorking();
     }
   } finally {
     busy = false;
     persist();
     paint();
     if (researchSessionId || writeSessionId) {
+      stopPoll();
       pollTimer = setTimeout(() => void send(), 2000);
     }
   }
@@ -460,10 +579,20 @@ function overlayHtml() {
                   </li>`;
                 })
                 .join("")
-            : `<li class="chat-message chat-message--assistant" data-agent="${personality}">
+            : working
+              ? ""
+              : `<li class="chat-message chat-message--assistant" data-agent="${personality}">
                 <img class="chat-message__avatar" src="${who.avatarSrc}" alt="${escapeHtml(who.name)}" width="52" height="52" />
                 <div class="chat-message__body">${empty}</div>
               </li>`
+        }
+        ${
+          working
+            ? `<li class="chat-message chat-message--assistant chat-message--status" data-agent="${personality}" style="--agent-colour:${who.colour}">
+                <img class="chat-message__avatar" src="${who.avatarSrc}" alt="${escapeHtml(who.name)}" width="52" height="52" />
+                <div class="chat-message__body" role="status" aria-live="polite">${escapeHtml(overlayTickText(working))}</div>
+              </li>`
+            : ""
         }
       </ul>
       ${error ? `<p class="alchemist__error">${escapeHtml(error)}</p>` : ""}
@@ -475,7 +604,7 @@ function overlayHtml() {
           <textarea id="overlay-chat-input" class="hub-ai-bar__input" rows="2" placeholder="${placeholder}" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
         </div>
         <div class="hub-ai-bar__tools">
-          <button class="btn btn--primary" type="submit" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${busy || writeSessionId || researchSessionId ? "…" : fromBook ? "Make note" : makeNote ? "Research" : "Send"}</button>
+          <button class="btn btn--primary" type="submit" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${fromBook ? "Make note" : makeNote ? "Research" : "Send"}</button>
         </div>
       </form>
     </section>
@@ -649,6 +778,7 @@ export function ensureChatOverlay(host: ChatOverlayHost) {
   restore();
   bindKeyboardInset();
   currentHost = host;
+  if ((researchSessionId || writeSessionId) && !working) reconstructWorking();
   if ((researchSessionId || writeSessionId) && !pollTimer && open) {
     pollTimer = setTimeout(() => void send(), 400);
   }
@@ -657,6 +787,9 @@ export function ensureChatOverlay(host: ChatOverlayHost) {
 
 export function hideChatOverlay() {
   currentHost = null;
+  busy = false;
+  stopPoll();
+  if (!researchSessionId && !writeSessionId) clearWorking();
   const root = document.getElementById(ROOT_ID);
   if (root) {
     root.replaceChildren();

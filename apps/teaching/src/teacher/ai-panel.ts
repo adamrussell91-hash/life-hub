@@ -66,17 +66,45 @@ interface ChatMessage {
 }
 
 const POLL_MS = import.meta.env.MODE === 'test' ? 50 : 1000;
+const STATUS_ROTATE_MS = 5000;
 const MAX_POLLS = Math.ceil(AI_JOB_STALE_MS / 1000);
 function transcriptKey(lessonId: string): string {
   return `teaching_hub_ai_transcript_${lessonId}`;
 }
 
-function loadTranscript(lessonId: string): ChatMessage[] {
+function persistableMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages
+    .filter((msg) => {
+      if (msg.role !== 'assistant') return true;
+      if (msg.text.trim() || msg.proposal || msg.jobId) return true;
+      return false;
+    })
+    .slice(-40)
+    .map((msg) => {
+      const { status: _status, ...rest } = msg;
+      return rest;
+    });
+}
+
+function hydrateTranscript(messages: ChatMessage[], random: () => number): ChatMessage[] {
+  return messages.map((msg) => {
+    if (msg.role === 'assistant' && msg.jobId && !msg.text.trim() && msg.agent) {
+      return { ...msg, status: pickAgentWaitLine(msg.agent, { random }) };
+    }
+    if (msg.status && !msg.text.trim() && !msg.jobId) {
+      const { status: _status, ...rest } = msg;
+      return rest;
+    }
+    return { ...msg, status: undefined };
+  });
+}
+
+function loadTranscript(lessonId: string, random: () => number = Math.random): ChatMessage[] {
   try {
     const raw = localStorage.getItem(transcriptKey(lessonId));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as ChatMessage[];
-    return Array.isArray(parsed) ? parsed.slice(-40) : [];
+    return Array.isArray(parsed) ? hydrateTranscript(parsed.slice(-40), random) : [];
   } catch {
     return [];
   }
@@ -84,7 +112,7 @@ function loadTranscript(lessonId: string): ChatMessage[] {
 
 function saveTranscript(lessonId: string, messages: ChatMessage[]): void {
   try {
-    localStorage.setItem(transcriptKey(lessonId), JSON.stringify(messages.slice(-40)));
+    localStorage.setItem(transcriptKey(lessonId), JSON.stringify(persistableMessages(messages)));
   } catch {
     /* ignore */
   }
@@ -125,7 +153,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   let selectedBlockId: string | null = null;
   let selectedBlockType: Block['block_type'] | null = null;
   let scope: AiScope = 'lesson';
-  let messages = loadTranscript(options.lessonId);
+  let messages = loadTranscript(options.lessonId, options.random ?? Math.random);
   let busy = false;
   let abort: AbortController | null = null;
   let msgCounter = 0;
@@ -427,6 +455,10 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       const bubble = document.createElement('div');
       bubble.className = 'ai-panel__bubble';
       bubble.textContent = msg.text || msg.status || '';
+      if (msg.status && !msg.text.trim()) {
+        bubble.setAttribute('role', 'status');
+        bubble.setAttribute('aria-live', 'polite');
+      }
       row.append(bubble);
 
       if (msg.archiveFailed) {
@@ -559,9 +591,11 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
   ): Promise<void> {
     const assistant = messages.find((m) => m.id === assistantId);
     if (assistant) assistant.jobId = jobId;
+    saveTranscript(options.lessonId, messages);
     let job = await pollAiJob(jobId, { signal });
-    if (assistant && job.status === 'working' && assistant.agent) {
-      assistant.status = pickAgentWaitLine(assistant.agent, { exclude: assistant.status, random });
+    let lastPhase = job.phase ?? job.status;
+    let lastStatusAt = Date.now();
+    if (assistant && job.status === 'working') {
       renderThread();
     }
     let polls = 1;
@@ -570,8 +604,15 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
       await sleep(POLL_MS, signal);
       job = await pollAiJob(jobId, { signal });
       if (assistant && job.status === 'working' && assistant.agent) {
-        assistant.status = pickAgentWaitLine(assistant.agent, { exclude: assistant.status, random });
-        renderThread();
+        const phase = job.phase ?? job.status;
+        const now = Date.now();
+        const phaseChanged = phase !== lastPhase;
+        if (phaseChanged || now - lastStatusAt >= STATUS_ROTATE_MS) {
+          assistant.status = pickAgentWaitLine(assistant.agent, { exclude: assistant.status, random });
+          lastPhase = phase;
+          lastStatusAt = now;
+          renderThread();
+        }
       }
     }
     if (!assistant) return;
@@ -633,6 +674,7 @@ export function mountAiPanel(host: HTMLElement, options: MountAiPanelOptions): A
         if (assistant) {
           assistant.agent = existing.agent;
           assistant.jobId = existing.id;
+          saveTranscript(options.lessonId, messages);
         }
         jobId = error.jobId;
       } else {

@@ -3097,6 +3097,11 @@ body.is-universe-fullscreen .local-banner {
   line-height: 1.55;
 }
 
+.chat-overlay .chat-message--status .chat-message__body {
+  opacity: 0.85;
+  border-left-color: var(--agent-colour, var(--wave));
+}
+
 .chat-message__avatar {
   width: 2.25rem;
   height: 2.25rem;
