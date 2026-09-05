@@ -211,6 +211,29 @@ test('the workout whitelist accepts every field validateWorkout actually recogni
   assert.equal(result.valid, true, JSON.stringify(result.errors));
 });
 
+test('validateLogEntry collapses Bar Press set N rows into one Bar Press before save', () => {
+  const result = validateLogEntry({
+    type: 'workout',
+    date: '2026-09-01',
+    fields: {
+      title: 'Planned session',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'completed',
+      exercises: [
+        { name: 'Bar Press set 1', sets: [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }] },
+        { name: 'Curl set 1', sets: [{ reps: 8, weight_kg: 37, cable_type: 'constant_force' }] },
+        { name: 'Bar Press set 2', sets: [{ reps: 8, weight_kg: 34, cable_type: 'constant_force' }] },
+        { name: 'Curl set 2', sets: [{ reps: 10, weight_kg: 37, cable_type: 'constant_force' }] }
+      ]
+    }
+  }, { id: 'workout-2026-09-01-1', now: '2026-09-01T18:26:45+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.deepEqual(result.record.exercises.map(exercise => exercise.name), ['Bar Press', 'Curl']);
+  assert.equal(result.record.exercises[0].sets.length, 2);
+});
+
 test('the workout tool schema advertises coach_cues on each exercise so Chadwick knows to populate it', () => {
   const schema = logEntryToolSchema(['workout']);
   const exerciseProps = schema.input_schema.properties.fields.properties.exercises.items.properties;

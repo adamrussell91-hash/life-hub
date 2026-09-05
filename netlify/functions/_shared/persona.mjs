@@ -27,6 +27,7 @@ export function buildSystemPrompt({
   skincareRoutines = '',
   bodyState = '',
   daysSinceLastSession = null,
+  lastWorkouts = '',
   mindDiaryDigest = '',
   mindSessionDigest = '',
   mindTodaySession = '',
@@ -103,6 +104,10 @@ export function buildSystemPrompt({
     typeof daysSinceLastSession === 'number'
       ? `${daysSinceLastSession} days since Adam's last completed session.${daysSinceLastSession >= 2 ? ' At 2+ missed days, lead with a smaller default offer (10-minute single-lift or a walk) and never a guilt trip. If Adam already rejected that trim and asked for a full / longer / 2-per-area session, honor that shape with lighter loads — do not keep rewriting a smaller different session.' : ''}`
       : '',
+    lastWorkouts
+      ? `Recent sessions (source of truth for "when did I last train" and "what was it" — never guess or say you have no record when this block is present). Answer those questions from this list, or call get_last_workout / search_workout_records for more. Do not claim you cannot see history.\n\n${lastWorkouts}`
+      : '',
+    'Default programming is a NEW uniquely titled session, not a rerun of the last completed title, unless Adam asks to repeat a named template. Change the exercise mix, pairing, or focus versus the most recent completed session — templates are for "do X again," not your default.',
     chadwickProtocol
       ? `Chadwick operating manual (follow these Life Hub rules; ignore any Notion database mechanics):\n${chadwickProtocol}`
       : '',

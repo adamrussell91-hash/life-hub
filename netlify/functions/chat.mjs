@@ -83,6 +83,14 @@ import {
   validateExerciseLibraryEntry
 } from './_shared/exercise-library.mjs';
 import {
+  combineSessionAdherenceDays,
+  daysSinceLastCompletedWorkout,
+  formatRecentWorkoutsForPrompt,
+  getLastWorkout,
+  searchWorkoutRecords,
+  selectRecentWorkoutEntries
+} from './_shared/workout-history.mjs';
+import {
   applySaveSkincareLibraryEntry,
   applySetSkincareRoutineMembership,
   executeListSkincareRoutines,
@@ -272,6 +280,7 @@ export function createChatHandler({
     const needsFoodLibrary = Boolean(allowedTypes?.includes('meal'));
     const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
     const needsExerciseLibrary = slug === 'chadwick';
+    const needsWorkoutHistory = slug === 'chadwick';
     const needsSkincareLibrary = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
     const hubContextPromise = needsHammondTools
@@ -397,6 +406,8 @@ export function createChatHandler({
           : emptyMembership();
         let skincareMembershipSha;
         let workoutTemplates = '';
+        let lastWorkouts = '';
+        let workoutRecords = [];
         let bodyState = '';
         let sessionAdherenceDays = null;
         let mindDiaryDigest = '';
@@ -461,6 +472,9 @@ export function createChatHandler({
           const templateEntries = needsWorkoutTemplates
             ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
             : [];
+          const chadwickWorkoutEntries = needsWorkoutHistory
+            ? selectRecentWorkoutEntries(current.tree)
+            : [];
           // Chadwick's eyes on Adam's body: a bounded read (latest 1-2 per type from the
           // already-fetched tree, never a history scan) -- see body-state.mjs.
           const bodyEntries = needsBodyState
@@ -502,6 +516,7 @@ export function createChatHandler({
             skincareMembershipBlob,
             skincareCatalogBlob,
             templateBlobs,
+            chadwickWorkoutBlobs,
             compositionBlobs,
             measurementBlobs,
             hammondFitnessBlobs,
@@ -522,6 +537,7 @@ export function createChatHandler({
             skincareMembershipEntry ? client.readBlob(skincareMembershipEntry.sha) : null,
             skincareCatalogEntry ? client.readBlob(skincareCatalogEntry.sha) : null,
             Promise.all(templateEntries.map(entry => client.readBlob(entry.sha))),
+            Promise.all(chadwickWorkoutEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.composition.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha))),
@@ -593,6 +609,15 @@ export function createChatHandler({
             exerciseLibraryEntries = parseExerciseLibrary(decodedExerciseLibrary);
             exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries);
             sessionAdherenceDays = daysSinceLastSession(exerciseLibraryEntries, today);
+          }
+
+          if (needsWorkoutHistory) {
+            workoutRecords = parseHammondFitnessRecords(chadwickWorkoutEntries, chadwickWorkoutBlobs);
+            lastWorkouts = formatRecentWorkoutsForPrompt(workoutRecords);
+            sessionAdherenceDays = combineSessionAdherenceDays(
+              daysSinceLastCompletedWorkout(workoutRecords, today),
+              sessionAdherenceDays
+            );
           }
 
           const decodedCatalog = skincareCatalogBlob ? decodeBlob(skincareCatalogBlob) : null;
@@ -777,6 +802,8 @@ export function createChatHandler({
             : emptyMembership();
           skincareMembershipSha = undefined;
           workoutTemplates = '';
+          lastWorkouts = '';
+          workoutRecords = [];
           bodyState = '';
           sessionAdherenceDays = null;
           mindDiaryDigest = '';
@@ -862,6 +889,7 @@ export function createChatHandler({
           hammondProtocol,
           hammondAuditContract,
           workoutTemplates,
+          lastWorkouts,
           exerciseLibrary,
           skincareRoutines,
           bodyState,
@@ -984,6 +1012,14 @@ export function createChatHandler({
                   parseDocument: (content, path) => parseEventDocument(content, path, loadYaml)
                 });
                 return JSON.stringify(result);
+              }
+              if (event.name === 'get_last_workout') {
+                send({ type: 'status', text: 'Checking last workout…' });
+                return JSON.stringify(getLastWorkout(workoutRecords));
+              }
+              if (event.name === 'search_workout_records') {
+                send({ type: 'status', text: 'Searching workout history…' });
+                return JSON.stringify(searchWorkoutRecords(workoutRecords, event.input ?? {}));
               }
               if (event.name === 'search_exercise_library') {
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});

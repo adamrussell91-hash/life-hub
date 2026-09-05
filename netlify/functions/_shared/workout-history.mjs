@@ -1,0 +1,219 @@
+import { daysBetween } from '../../../apps/life/js/core/time.js';
+
+export const FITNESS_SESSION_PATH =
+  /^data\/fitness\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+
+export const MAX_RECENT_WORKOUTS = 8;
+const DEFAULT_SEARCH_LIMIT = 8;
+const MAX_SEARCH_LIMIT = 20;
+const SET_SUFFIX = /\s+set\s+\d+\s*$/i;
+
+export function normalizeExerciseName(name) {
+  return String(name ?? '')
+    .replace(SET_SUFFIX, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function collapseSetSplitExercises(exercises) {
+  if (!Array.isArray(exercises)) return [];
+  const out = [];
+  const indexByKey = new Map();
+  for (const exercise of exercises) {
+    if (!exercise || typeof exercise !== 'object') continue;
+    const name = normalizeExerciseName(exercise.name);
+    if (!name) continue;
+    const key = name.toLowerCase();
+    const sets = Array.isArray(exercise.sets) ? exercise.sets.slice() : [];
+    const existingIndex = indexByKey.get(key);
+    if (existingIndex == null) {
+      indexByKey.set(key, out.length);
+      out.push({ ...exercise, name, sets });
+      continue;
+    }
+    const existing = out[existingIndex];
+    existing.sets = [...(existing.sets ?? []), ...sets];
+  }
+  return out;
+}
+
+export function selectRecentWorkoutEntries(tree, { limit = MAX_RECENT_WORKOUTS } = {}) {
+  if (!Array.isArray(tree)) return [];
+  const cap = Math.min(Math.max(Number(limit) || MAX_RECENT_WORKOUTS, 1), 20);
+  return tree
+    .filter(entry => entry && entry.type === 'blob' && FITNESS_SESSION_PATH.test(entry.path ?? ''))
+    .sort((a, b) => String(b.path).localeCompare(String(a.path)))
+    .slice(0, cap);
+}
+
+export function lastCompletedWorkout(records) {
+  return (Array.isArray(records) ? records : [])
+    .filter(record => record?.type === 'workout' && record.status === 'completed' && record.date)
+    .slice()
+    .sort((a, b) => {
+      const dateCmp = String(b.date).localeCompare(String(a.date));
+      if (dateCmp !== 0) return dateCmp;
+      return String(b.time ?? '').localeCompare(String(a.time ?? ''));
+    })[0] ?? null;
+}
+
+export function daysSinceLastCompletedWorkout(records, today) {
+  const last = lastCompletedWorkout(records);
+  if (!last?.date) return null;
+  return daysBetween(last.date, today);
+}
+
+export function combineSessionAdherenceDays(fromRecords, fromLibrary) {
+  const known = [fromRecords, fromLibrary].filter(value => typeof value === 'number');
+  return known.length ? Math.min(...known) : null;
+}
+
+function summarizeExercises(exercises) {
+  return collapseSetSplitExercises(exercises)
+    .map(exercise => {
+      const setCount = Array.isArray(exercise.sets) ? exercise.sets.length : 0;
+      return setCount > 0 ? `${exercise.name} (${setCount} set${setCount === 1 ? '' : 's'})` : exercise.name;
+    })
+    .filter(Boolean);
+}
+
+export function formatRecentWorkoutsForPrompt(records) {
+  if (!Array.isArray(records) || records.length === 0) return '';
+  return records
+    .filter(record => record?.type === 'workout' && record.date)
+    .slice()
+    .sort((a, b) => {
+      const dateCmp = String(b.date).localeCompare(String(a.date));
+      if (dateCmp !== 0) return dateCmp;
+      return String(b.time ?? '').localeCompare(String(a.time ?? ''));
+    })
+    .map(record => {
+      const moves = summarizeExercises(record.exercises);
+      const moveBit = moves.length ? ` — ${moves.join(', ')}` : '';
+      const title = record.title || 'Untitled session';
+      return `- ${record.date} · ${record.status ?? 'unknown'} · ${title}${moveBit}`;
+    })
+    .join('\n');
+}
+
+function formatSession(record) {
+  const collapsed = collapseSetSplitExercises(record.exercises);
+  return {
+    date: record.date,
+    time: record.time,
+    title: record.title,
+    status: record.status,
+    session_kind: record.session_kind,
+    day_type: record.day_type,
+    duration_min: record.duration_min,
+    focus: record.focus,
+    notes: record.notes,
+    exercises: collapsed.map(exercise => ({
+      name: exercise.name,
+      sets: exercise.sets
+    }))
+  };
+}
+
+export function getLastWorkout(records) {
+  const last = lastCompletedWorkout(records);
+  if (!last) {
+    return { ok: true, found: false, store: 'life_hub_fitness' };
+  }
+  return {
+    ok: true,
+    found: true,
+    store: 'life_hub_fitness',
+    session: formatSession(last)
+  };
+}
+
+function queryTokens(query) {
+  return String(query ?? '')
+    .toLowerCase()
+    .split(/\s+/)
+    .map(token => token.trim())
+    .filter(token => token.length >= 2);
+}
+
+function sessionHaystack(record) {
+  const collapsed = collapseSetSplitExercises(record.exercises);
+  return [
+    record.title,
+    record.date,
+    record.status,
+    record.session_kind,
+    record.day_type,
+    record.notes,
+    ...(Array.isArray(record.focus) ? record.focus : []),
+    ...collapsed.map(exercise => exercise.name)
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+export function searchWorkoutRecords(records, { query, limit = DEFAULT_SEARCH_LIMIT } = {}) {
+  const tokens = queryTokens(query);
+  if (!tokens.length) {
+    return { ok: false, error: 'empty_query' };
+  }
+  const cap = Math.min(Math.max(Number(limit) || DEFAULT_SEARCH_LIMIT, 1), MAX_SEARCH_LIMIT);
+  const hits = (records ?? [])
+    .filter(record => record?.type === 'workout')
+    .map(record => {
+      const haystack = sessionHaystack(record);
+      const matched = tokens.filter(token => haystack.includes(token));
+      return { record, score: matched.length };
+    })
+    .filter(row => row.score === tokens.length)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return String(b.record.date ?? '').localeCompare(String(a.record.date ?? ''));
+    })
+    .slice(0, cap)
+    .map(({ record, score }) => ({
+      date: record.date,
+      title: record.title,
+      status: record.status,
+      session_kind: record.session_kind,
+      day_type: record.day_type,
+      duration_min: record.duration_min,
+      focus: record.focus,
+      exercises: summarizeExercises(record.exercises),
+      score
+    }));
+
+  return {
+    ok: true,
+    store: 'life_hub_fitness',
+    query,
+    count: hits.length,
+    results: hits
+  };
+}
+
+export function getLastWorkoutSchema() {
+  return {
+    name: 'get_last_workout',
+    description:
+      'Read Adam\'s most recent completed workout from Life Hub fitness history. Use whenever he asks when he last trained, what that session was, or what he lifted last time. Returns title, date, and collapsed exercises with sets.',
+    input_schema: {
+      type: 'object',
+      properties: {}
+    }
+  };
+}
+
+export function searchWorkoutRecordsSchema() {
+  return {
+    name: 'search_workout_records',
+    description:
+      'Search Life Hub workout history by title, date, focus, or exercise name. Use when Adam asks about a past session or whether he has done a named workout. Words are ANDed.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search text; words are ANDed.' },
+        limit: { type: 'number', description: 'Max results (default 8, max 20).' }
+      },
+      required: ['query']
+    }
+  };
+}

@@ -147,6 +147,21 @@ test('OS floor is identical for every agents.yml roster member', () => {
   }
 });
 
+test('buildAgentTools gives Chadwick last-workout read tools with the exercise library', () => {
+  resetCapabilityCaches();
+  const tools = buildAgentTools({
+    slug: 'chadwick',
+    allowedTypes: ['workout'],
+    needsExerciseLibrary: true
+  });
+  const names = tools.map(tool => tool.name);
+  assert.ok(names.includes('get_last_workout'));
+  assert.ok(names.includes('search_workout_records'));
+  assert.ok(names.includes('search_exercise_library'));
+  const brisket = buildAgentTools({ slug: 'brisket', allowedTypes: ['meal'] }).map(tool => tool.name);
+  assert.ok(!brisket.includes('get_last_workout'));
+});
+
 test('buildAgentTools always includes os_propose_action', () => {
   resetCapabilityCaches();
   const tools = buildAgentTools({
