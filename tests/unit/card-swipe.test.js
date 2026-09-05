@@ -224,6 +224,46 @@ test('a tap without a drag selects the current card', () => {
   assert.deepEqual(seen, [0]);
 });
 
+test('pointerup alone selects without waiting for click', () => {
+  const root = new FakeDoc();
+  const seen = [];
+  const swipe = createCardSwipe({
+    root,
+    onSelect: index => seen.push(index)
+  });
+  swipe.track.emit('pointerdown', { clientX: 160, timeStamp: 0 });
+  swipe.track.emit('pointerup', { clientX: 160, timeStamp: 40 });
+  assert.deepEqual(seen, [0]);
+});
+
+test('small finger jitter still selects instead of dead-zoning', () => {
+  const root = new FakeDoc();
+  const seen = [];
+  const swipe = createCardSwipe({
+    root,
+    onSelect: index => seen.push(index)
+  });
+  swipe.track.emit('pointerdown', { clientX: 200, timeStamp: 0 });
+  swipe.track.emit('pointermove', { clientX: 220, timeStamp: 20 });
+  swipe.track.emit('pointerup', { clientX: 225, timeStamp: 50 });
+  assert.equal(swipe.getIndex(), 0);
+  assert.deepEqual(seen, [0]);
+});
+
+test('a real swipe past the buffer does not also select', () => {
+  const root = new FakeDoc();
+  const seen = [];
+  const swipe = createCardSwipe({
+    root,
+    onSelect: index => seen.push(index)
+  });
+  swipe.track.emit('pointerdown', { clientX: 200, timeStamp: 0 });
+  swipe.track.emit('pointermove', { clientX: 120, timeStamp: 30 });
+  swipe.track.emit('pointerup', { clientX: 80, timeStamp: 80 });
+  assert.equal(swipe.getIndex(), 1);
+  assert.deepEqual(seen, []);
+});
+
 test('drags that start on an input do not change the card', () => {
   const root = new FakeDoc();
   const swipe = createCardSwipe({ root, items: [] });
