@@ -210,6 +210,43 @@ describe("Knowledge chat rail protocol affordances", () => {
     expect(runChatMock).not.toHaveBeenCalled();
   });
 
+  it("keeps From a book fields outside scroll-hide so they stay typeable", async () => {
+    enterChatRail({ fresh: true, hat: "fromBook" });
+    const host = makeHost();
+    host.bookLabels = ["Make It Stick"];
+    host.render();
+
+    const book = host.app.querySelector<HTMLInputElement>("#chat-book")!;
+    const note = host.app.querySelector<HTMLTextAreaElement>("#chat-input")!;
+    const hats = host.app.querySelector(".chat__hats");
+    expect(book.closest("[data-hub-scroll-hide]")).toBeNull();
+    expect(note.closest("[data-hub-scroll-hide]")).toBeNull();
+    expect(hats?.closest("[data-hub-scroll-hide]")).toBeTruthy();
+
+    const { applyHubScrollHide, resetHubMotionForTests, startHubMotion } = await import(
+      "../../design-kit/js/hub-motion.js"
+    );
+    resetHubMotionForTests();
+    startHubMotion(document);
+    const hide = host.app.querySelector<HTMLElement>("[data-hub-scroll-hide]")!;
+    applyHubScrollHide(hide, { current: 200, previous: 0, threshold: 80 });
+    expect(hide.classList.contains("is-hidden")).toBe(true);
+    expect(hide.hasAttribute("inert")).toBe(true);
+    expect(book.closest("[inert]")).toBeNull();
+    expect(note.closest("[inert]")).toBeNull();
+
+    book.focus();
+    book.value = "Make It Stick";
+    book.dispatchEvent(new Event("input", { bubbles: true }));
+    note.focus();
+    note.value = "desirable difficulties";
+    note.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(book.value).toBe("Make It Stick");
+    expect(note.value).toBe("desirable difficulties");
+    expect(book.disabled).toBe(false);
+    expect(note.disabled).toBe(false);
+  });
+
   it("does not leave a duplicate You turn when Make note fails", async () => {
     runChatMock.mockRejectedValueOnce(new Error("hat and messages are required"));
     sessionStorage.setItem(
