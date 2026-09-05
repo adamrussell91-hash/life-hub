@@ -1,6 +1,6 @@
 import type { FrameworkEntry } from '@/schemas/templates';
 import type { ClareDumpResult, ClareProposal } from '@/domain/clare';
-import { scheduleDiffFromMutation } from '@/domain/schedule-diff';
+import { scheduleDiffFromMutation, scheduleGhostWeek, type ScheduleDiffItem } from '@/domain/schedule-diff';
 import type { AgentMutation } from '@/domain/agent-mutations';
 import { mutationLabel } from '@/domain/agent-mutations';
 import { briefingToMarkdown, toolkitToMarkdown, type ClareBriefing } from '@/domain/clare-desk';
@@ -174,6 +174,36 @@ function appendProposalCard(
   list.scrollTop = list.scrollHeight;
 }
 
+function paintScheduleGhostWeek(host: HTMLElement, diff: ScheduleDiffItem): void {
+  host.replaceChildren();
+  host.parentElement?.querySelector('.schedule-diff__note')?.remove();
+  for (const day of scheduleGhostWeek(diff)) {
+    const col = document.createElement('div');
+    col.className = 'schedule-diff__day';
+    col.dataset.date = day.dateKey;
+    const head = document.createElement('span');
+    head.className = 'schedule-diff__weekday';
+    head.textContent = day.weekday;
+    col.append(head);
+    for (const chip of day.chips) {
+      const node = document.createElement('span');
+      node.className = `event-chip schedule-diff__chip schedule-diff__chip--${chip.role}`;
+      node.dataset.taskId = chip.taskId;
+      node.dataset.role = chip.role;
+      node.title = chip.summary;
+      node.textContent = chip.role === 'from' ? 'from' : 'to';
+      col.append(node);
+    }
+    host.append(col);
+  }
+  if (diff.to == null) {
+    const note = document.createElement('p');
+    note.className = 'schedule-diff__note';
+    note.textContent = 'Clears the due date';
+    host.after(note);
+  }
+}
+
 function appendMutationCard(
   root: ParentNode,
   mutation: AgentMutation,
@@ -200,7 +230,15 @@ function appendMutationCard(
     const row = document.createElement('p');
     row.className = 'schedule-diff__row';
     row.textContent = `… → ${mutation.patch.due_date == null ? 'unscheduled' : String(mutation.patch.due_date)}`;
-    ghost.append(label, row);
+    const weekHost = document.createElement('div');
+    weekHost.className = 'schedule-diff__week';
+    ghost.append(label, row, weekHost);
+    paintScheduleGhostWeek(weekHost, {
+      taskId: mutation.task_id,
+      from: null,
+      to: mutation.patch.due_date == null ? null : String(mutation.patch.due_date),
+      summary: mutation.summary
+    });
     card.append(ghost);
     void tasksApi.getTask(mutation.task_id).then((task) => {
       const diff = scheduleDiffFromMutation(mutation, task?.due_date ?? null);
@@ -209,6 +247,7 @@ function appendMutationCard(
         return;
       }
       row.textContent = `${diff.from ?? 'unscheduled'} → ${diff.to ?? 'unscheduled'}`;
+      paintScheduleGhostWeek(weekHost, diff);
     });
   }
   if (mutation.kind === 'repo_file') {
