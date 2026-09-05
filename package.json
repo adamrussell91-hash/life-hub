@@ -24,6 +24,9 @@
     "@aws-sdk/s3-request-presigner": "^3.758.0",
     "@floating-ui/dom": "^1.8.0",
     "@netlify/blobs": "^9.1.2",
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
     "js-yaml": "4.3.0",
     "minisearch": "^7.2.0"
   },
