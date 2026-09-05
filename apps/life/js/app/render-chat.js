@@ -7,6 +7,7 @@ import { formatDisplayDate } from '../core/time.js';
 import { syncChatChrome } from './chat-chrome.js';
 import { createAgentChoiceCard } from '../../../../packages/design-kit/js/agent-choice-card.js';
 import { createAgentSourcesCard } from '../../../../packages/design-kit/js/agent-sources-card.js';
+import { createAgentPlanCard } from '../../../../packages/design-kit/js/agent-plan-card.js';
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
 const WORKOUT_HEADER_FIELDS = new Set(['title', 'session_kind', 'day_type', 'status', 'duration_min']);
@@ -577,6 +578,38 @@ function cnPatchAffectedDetail(patch) {
   return parts.filter(Boolean).join(' · ');
 }
 
+/** Structured before/after rows for the confirm card (mirrors action-proposal diffs). */
+function cnPatchDiffRows(patch) {
+  const payload = patch?.payload && typeof patch.payload === 'object' ? patch.payload : {};
+  const op = typeof patch?.op === 'string' && patch.op.trim() ? patch.op.trim() : 'change';
+  const rows = [];
+  if (typeof payload.field === 'string' && payload.field.trim()) {
+    rows.push({
+      path: payload.field.trim(),
+      mode: op,
+      diff: typeof payload.text === 'string' ? truncateCnPatchDetail(payload.text, 220) : op
+    });
+  }
+  if (typeof payload.match === 'string' && payload.match.trim()) {
+    rows.push({
+      path: 'match',
+      mode: 'before',
+      diff: truncateCnPatchDetail(payload.match, 220)
+    });
+  }
+  if (typeof payload.text === 'string' && payload.text.trim()) {
+    const already = rows.some(row => row.path === 'field' || row.mode === op);
+    if (!already || !rows.some(row => row.diff === truncateCnPatchDetail(payload.text, 220))) {
+      rows.push({
+        path: typeof payload.field === 'string' && payload.field.trim() ? 'text' : op,
+        mode: /replace|set|update/i.test(op) ? 'after' : op,
+        diff: truncateCnPatchDetail(payload.text, 220)
+      });
+    }
+  }
+  return rows;
+}
+
 export function appendCnPatchProposal(root, { patch }) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
@@ -599,12 +632,30 @@ export function appendCnPatchProposal(root, { patch }) {
   meta.textContent = `${section} · ${op}`;
   card.append(meta);
 
-  const detailText = cnPatchAffectedDetail(patch);
-  if (detailText) {
-    const detail = root.createElement('p');
-    detail.className = 'cn-patch-proposal__detail';
-    detail.textContent = detailText;
-    card.append(detail);
+  const diffRows = cnPatchDiffRows(patch);
+  if (diffRows.length) {
+    const diffs = root.createElement('ul');
+    diffs.className = 'action-proposal__diffs';
+    for (const row of diffRows) {
+      const item = root.createElement('li');
+      const path = root.createElement('code');
+      path.textContent = row.path;
+      item.append(path);
+      const detail = root.createElement('div');
+      detail.className = 'action-proposal__diff';
+      detail.textContent = `${row.mode}: ${row.diff}`;
+      item.append(detail);
+      diffs.append(item);
+    }
+    card.append(diffs);
+  } else {
+    const detailText = cnPatchAffectedDetail(patch);
+    if (detailText) {
+      const detail = root.createElement('p');
+      detail.className = 'cn-patch-proposal__detail';
+      detail.textContent = detailText;
+      card.append(detail);
+    }
   }
 
   const actions = root.createElement('div');
@@ -696,6 +747,34 @@ export function appendActionProposal(root, { proposal }) {
   list.append(card);
   scrollChatIfPinned(list);
   return { card, confirm, discard };
+}
+
+export function appendPlanStatusCard(root, opts = {}) {
+  const list = root.querySelector('#chat-messages');
+  if (!list) return null;
+  const planId = typeof opts.id === 'string' && opts.id.trim() ? opts.id.trim() : '';
+  if (planId) {
+    const existing = list.querySelector(`[data-plan-id="${CSS.escape?.(planId) ?? planId}"]`);
+    if (existing?.__planUpdate) {
+      existing.__planUpdate({
+        heading: opts.heading,
+        steps: opts.steps,
+        current: opts.current
+      });
+      scrollChatIfPinned(list);
+      return { item: existing.closest('li') ?? existing, card: existing, update: existing.__planUpdate };
+    }
+  }
+  const item = root.createElement('li');
+  item.className = 'chat-message chat-message--structured';
+  const { card, update } = createAgentPlanCard(root, opts);
+  card.__planUpdate = update;
+  item.append(card);
+  list.append(item);
+  markLatestMessage(list);
+  scrollChatIfPinned(list);
+  syncChatChrome(root);
+  return { item, card, update };
 }
 
 export function appendChoiceCard(root, opts = {}) {

@@ -3,7 +3,8 @@ import {
   buildOpenLoopsToolkit,
   buildShatterToolkit,
   buildTimeMapToolkit,
-  sortOpenLoops
+  sortOpenLoops,
+  buildOpenLoopsChoice
 } from './clare-desk.mjs';
 
 export const CLARE_DOMAINS = new Set(['teaching', 'life', 'wedding', 'health', 'other']);
@@ -278,6 +279,8 @@ export function assembleDumpResult(
   }
   if (protocolId === 'open-loops') toolkit = buildOpenLoopsToolkit(items);
 
+  const choice = protocolId === 'open-loops' ? buildOpenLoopsChoice(items) : null;
+
   return {
     voice: dumpVoiceLine(items),
     proposals,
@@ -285,6 +288,7 @@ export function assembleDumpResult(
     notes,
     toolkit,
     mutations: [],
-    agent
+    agent,
+    ...(choice ? { choice } : {})
   };
 }

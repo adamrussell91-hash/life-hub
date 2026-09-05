@@ -180,3 +180,38 @@ test('dump_stream emits status, voice chunks, dump_result, and done over SSE', a
   assert.equal(events.at(-1)?.type, 'done');
 });
 
+
+
+test('dump_stream emits plan_status and open-loops choice over SSE', async () => {
+  const store = memoryStore();
+  const handler = createClareHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  });
+
+  const response = await handler(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/clare',
+    body: {
+      action: 'dump_stream',
+      text: 'email parents due today\nremember: bring the USB\nbuy milk someday',
+      domain: 'teaching',
+      protocol_id: 'open-loops'
+    }
+  }));
+  assert.equal(response.status, 200);
+  const body = await response.text();
+  const events = body
+    .split('\n\n')
+    .map(frame => frame.split('\n').find(line => line.startsWith('data:')))
+    .filter(Boolean)
+    .map(line => JSON.parse(line.slice(5).trim()));
+
+  assert.ok(events.some(event => event.type === 'status'));
+  assert.ok(events.filter(event => event.type === 'plan_status').length >= 2);
+  const dump = events.find(event => event.type === 'dump_result');
+  assert.ok(dump?.result?.choice?.choices?.length);
+  assert.ok(events.some(event => event.type === 'choice' && Array.isArray(event.choices)));
+  assert.equal(events.at(-1)?.type, 'done');
+});

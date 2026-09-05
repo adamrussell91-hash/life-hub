@@ -337,10 +337,9 @@ test('appendCnPatchProposal renders summary, section/op, affected detail, and Co
     card.children.find(child => child.className === 'cn-patch-proposal__meta')?.textContent,
     'constraints · delete_lines'
   );
-  assert.equal(
-    card.children.find(child => child.className === 'cn-patch-proposal__detail')?.textContent,
-    'Steroid taper'
-  );
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  assert.ok(diffs);
+  assert.match(collectCardText(diffs), /Steroid taper/);
   assert.equal(confirm.textContent, 'Confirm');
   assert.equal(discard.textContent, 'Discard');
   assert.match(card.className, /confirm-card/);
@@ -349,7 +348,7 @@ test('appendCnPatchProposal renders summary, section/op, affected detail, and Co
   assert.equal(root.querySelector('#chat-messages').children.includes(card), true);
 });
 
-test('appendCnPatchProposal includes truncated payload.text in the detail line', () => {
+test('appendCnPatchProposal includes truncated payload.text in structured diffs', () => {
   const root = new FakeDocument();
   const longText = `${'Keep surplus and hold the line. '.repeat(12)}tail`;
   const { card } = appendCnPatchProposal(root, {
@@ -364,12 +363,13 @@ test('appendCnPatchProposal includes truncated payload.text in the detail line',
     }
   });
 
-  const detail = card.children.find(child => child.className === 'cn-patch-proposal__detail')?.textContent ?? '';
-  assert.match(detail, /^old directive · /);
-  const textPart = detail.slice('old directive · '.length);
-  assert.ok(textPart.length <= 160);
-  assert.match(textPart, /…$/);
-  assert.doesNotMatch(detail, /tail/);
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  assert.ok(diffs);
+  const blob = collectCardText(diffs);
+  assert.match(blob, /old directive/);
+  assert.match(blob, /Keep surplus and hold the line/);
+  assert.match(blob, /…/);
+  assert.doesNotMatch(blob, /tail/);
 });
 
 function collectCardText(node) {
@@ -508,3 +508,25 @@ test('appendActionProposal renders intent, path diffs, and Confirm/Discard', () 
   assert.equal(confirm.textContent, 'Confirm');
   assert.equal(discard.textContent, 'Discard');
 });
+
+test('appendCnPatchProposal renders structured diff rows for match/text payloads', () => {
+  const root = new FakeDocument();
+  const { card } = appendCnPatchProposal(root, {
+    patch: {
+      section: 'cross_agent',
+      op: 'replace_line',
+      payload: {
+        summary: 'Nudge Brisket',
+        match: 'old directive',
+        text: 'new directive'
+      }
+    }
+  });
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  assert.ok(diffs);
+  assert.ok(diffs.children.length >= 1);
+  const blob = collectCardText(card);
+  assert.match(blob, /old directive/);
+  assert.match(blob, /new directive/);
+});
+

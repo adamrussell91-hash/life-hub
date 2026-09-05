@@ -1,3 +1,4 @@
+import { positionHubFloating } from '../../../../packages/design-kit/js/hub-floating.js';
 import { animateAreaReveal, animateColumnGrow, prefersReducedMotion } from './chart-kit/animate.js';
 import { buildAreaLine, straightLinePath } from './chart-kit/area-line.js';
 import { buildBumpChart } from './chart-kit/bump.js';
@@ -120,13 +121,12 @@ function bindTip(node, tip, text) {
   const show = event => {
     tip.hidden = false;
     tip.textContent = text;
-    const host = tip.parentNode;
-    const box = host?.getBoundingClientRect?.();
-    const mark = (event.currentTarget || node).getBoundingClientRect?.();
-    if (box && mark && tip.style?.setProperty) {
-      tip.style.setProperty('left', `${Math.max(8, mark.left - box.left + mark.width / 2)}px`);
-      tip.style.setProperty('top', `${Math.max(8, mark.top - box.top - 10)}px`);
-    }
+    const mark = event.currentTarget || node;
+    void positionHubFloating(mark, tip, {
+      placement: 'top',
+      strategy: 'fixed',
+      offset: 8
+    });
   };
   const hide = () => { tip.hidden = true; };
   node.setAttribute('tabindex', '0');

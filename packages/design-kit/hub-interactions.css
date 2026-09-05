@@ -538,7 +538,8 @@
 /* Agent choice + sources (Tool UI patterns, Cotton Glass) */
 
 .agent-choice-card,
-.agent-sources-card {
+.agent-sources-card,
+.agent-plan-card {
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -547,6 +548,17 @@
   background: var(--hub-glass-fill, var(--glass));
   box-shadow: var(--hub-elev-card, var(--elev-1));
   color: var(--ink);
+}
+
+.agent-plan-card__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.agent-plan-card__steps {
+  margin: 0;
 }
 
 .agent-choice-card__title,

@@ -309,6 +309,14 @@ export type ClareDumpResult = {
   toolkit: ClareToolkitResult | null;
   mutations: AgentMutation[];
   agent: AgentProtocolSlug;
+  choice?: {
+    type?: 'choice';
+    title?: string;
+    hint?: string;
+    multi?: boolean;
+    confirmLabel?: string;
+    choices: Array<{ id: string; label: string; detail?: string }>;
+  } | null;
 };
 
 function proposalFromDumpItem(
