@@ -62,7 +62,15 @@ function appendTaskCard(
       await handlers.onChanged();
     }),
     onDelete: (current) => deleteTaskNow(current, handlers.onRemoved, confirmHost),
-    onEdit: (current) => void renderTaskEditor(confirmHost, current, projects, () => void handlers.onChanged())
+    onEdit: (current) => void renderTaskEditor(confirmHost, current, projects, () => void handlers.onChanged()),
+    onPatch: (current, patch) => {
+      void tasksApi.updateTask(current.id, patch).then(
+        () => void handlers.onChanged(),
+        (err: unknown) => {
+          confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not save')));
+        }
+      );
+    }
   });
 }
 
@@ -105,9 +113,20 @@ export function requestToggleDone(
     return;
   }
   if (!(task.estimated_duration && task.actual_duration == null)) {
-    void markTaskDone(task).then(onDone).catch((err) => {
-      host.append(el('p', 'empty-state', errorMessage(err)));
-    });
+    void markTaskDone(task)
+      .then(async () => {
+        await onDone();
+        const { offerTimedUndo } = await import('../../design-kit/js/hub-feedback.js');
+        offerTimedUndo({
+          message: `Completed “${task.title}”`,
+          onUndo: () => {
+            void markTaskOpen(task).then(onDone);
+          }
+        });
+      })
+      .catch((err) => {
+        host.append(el('p', 'empty-state', errorMessage(err)));
+      });
     return;
   }
 

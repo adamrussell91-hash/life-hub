@@ -257,6 +257,20 @@ test('add, reorder, and session extras land on the completed confirm payload', a
   controller.destroy();
 });
 
+test('adding an exercise jumps the swipe to the new card', () => {
+  const { controller } = makeController();
+  controller.mount(session());
+  assert.equal(controller.getExerciseIndex(), 0);
+  controller.addExercise('Cable fly');
+  assert.equal(controller.getExerciseIndex(), 1);
+  assert.equal(controller.getExpandedExerciseIndex(), 1);
+  controller.addExercise('Curl');
+  assert.equal(controller.getExerciseIndex(), 2);
+  controller.removeExercise(2);
+  assert.equal(controller.getExerciseIndex(), 1);
+  controller.destroy();
+});
+
 test('removeExercise drops a movement from the draft', () => {
   const { controller } = makeController();
   controller.mount(session());

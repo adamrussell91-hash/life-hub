@@ -197,6 +197,11 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#more-sheet'), 'click', event => {
     if (event.target === event.currentTarget) closeMoreSheet();
   });
+  bind(root.querySelector('#chat-close'), 'click', () => {
+    if (!chatPanel?.isOpen()) return;
+    void chatFlushVeraSession?.();
+    chatPanel.close();
+  });
   bind(root.querySelector('#nutrition-chat-button'), 'click', () => {
     toggleSectionChat('#nutrition-dashboard', NUTRITION_AGENT_SLUG);
   });

@@ -17,7 +17,7 @@ export function renderAgentPicker(root, {
       for (const agent of AGENT_AVATARS) {
         const button = root.createElement('button');
         button.type = 'button';
-        button.className = 'agent-picker__avatar';
+        button.className = 'agent-picker__avatar hub-ai-agent__btn';
         button.dataset.agentSlug = agent.slug;
         if (agent.colour) button.style?.setProperty?.('--agent-colour', agent.colour);
         button.setAttribute?.('role', 'option');
@@ -29,7 +29,10 @@ export function renderAgentPicker(root, {
         img.width = 64;
         img.height = 64;
         img.decoding = 'async';
-        button.append(img);
+        const name = root.createElement('span');
+        name.className = 'agent-picker__name';
+        name.textContent = agent.shortName;
+        button.append(img, name);
         button.addEventListener('click', () => onSelect?.(agent.slug));
         host.append(button);
       }
@@ -39,12 +42,68 @@ export function renderAgentPicker(root, {
       button.classList?.toggle?.('is-active', active);
       if (!button.classList?.toggle) {
         button.className = active
-          ? 'agent-picker__avatar is-active'
-          : 'agent-picker__avatar';
+          ? 'agent-picker__avatar hub-ai-agent__btn is-active'
+          : 'agent-picker__avatar hub-ai-agent__btn';
       }
       button.setAttribute?.('aria-selected', active ? 'true' : 'false');
     }
   }
+  renderChatWho(root, selectedSlug);
+  syncChatComposerHint(root, selectedSlug);
+}
+
+export function renderChatWho(root, slug) {
+  const who = root.querySelector?.('#chat-who');
+  if (!who) return;
+  const agent = avatarForSlug(slug);
+  if (!agent) {
+    who.hidden = true;
+    return;
+  }
+  who.hidden = false;
+  const img = who.querySelector?.('.chat-view__who-avatar');
+  const name = who.querySelector?.('.chat-view__who-name');
+  if (img) {
+    img.src = agent.src;
+    img.alt = agent.name;
+  }
+  if (name) name.textContent = agent.shortName || agent.name;
+}
+
+export function syncChatComposerHint(root, slug) {
+  const input = root.querySelector?.('#chat-input');
+  if (!input) return;
+  const agent = avatarForSlug(slug);
+  input.placeholder = agent?.shortName ? `Message ${agent.shortName}…` : 'Message…';
+}
+
+export function renderChatEmpty(root, slug) {
+  const empty = root.querySelector?.('#chat-empty');
+  if (!empty) return;
+  const agent = avatarForSlug(slug);
+  if (!agent) {
+    const title = root.createElement('p');
+    title.className = 'chat-empty__name';
+    title.textContent = 'Choose who to talk to';
+    const purpose = root.createElement('p');
+    purpose.className = 'chat-empty__purpose';
+    purpose.textContent = 'Tap a personality to start.';
+    empty.replaceChildren?.(title, purpose);
+    return;
+  }
+  const img = root.createElement('img');
+  img.className = 'chat-empty__avatar';
+  img.src = agent.src;
+  img.alt = agent.name;
+  img.width = 72;
+  img.height = 72;
+  const title = root.createElement('p');
+  title.className = 'chat-empty__name';
+  title.textContent = agent.shortName || agent.name;
+  const purpose = root.createElement('p');
+  purpose.className = 'chat-empty__purpose';
+  purpose.textContent = agent.purpose || '';
+  empty.replaceChildren?.(img, title, purpose);
 }
 
 export function applyAgentAvatarToBubble(bubble, slug) {

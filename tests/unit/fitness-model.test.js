@@ -5,6 +5,7 @@ import {
   estimateOneRepMax,
   sessionVolume,
   normalizeExerciseName,
+  canonicalExerciseName,
   REGION_KEYS,
   resolveExerciseRegion
 } from '../../apps/life/js/app/fitness-model.js';
@@ -40,6 +41,47 @@ test('sessionVolume sums reps * weight for valid sets only', () => {
 
 test('normalizeExerciseName trims and lowercases', () => {
   assert.equal(normalizeExerciseName('  Chest Press '), 'chest press');
+});
+
+test('canonicalExerciseName strips trailing set numbers so logged sets collapse', () => {
+  assert.equal(canonicalExerciseName('Bar Press set 1'), 'Bar Press');
+  assert.equal(canonicalExerciseName('Bar Press set 12'), 'Bar Press');
+  assert.equal(normalizeExerciseName('Bar Press set 2'), 'bar press');
+});
+
+test('comparisons collapse set-suffixed names and expose a kg delta', () => {
+  const model = buildFitnessModel({
+    events: events([
+      workout({
+        date: '2026-07-20',
+        exercises: [
+          { name: 'Bar Press set 1', sets: [{ reps: 10, weight_kg: 28 }] },
+          { name: 'Bar Press set 2', sets: [{ reps: 8, weight_kg: 30 }] }
+        ]
+      }),
+      workout({
+        date: '2026-07-30',
+        exercises: [
+          { name: 'Bar Press set 1', sets: [{ reps: 10, weight_kg: 30 }] },
+          { name: 'Bar Press set 2', sets: [{ reps: 8, weight_kg: 32 }] },
+          { name: 'Bar Press set 3', sets: [{ reps: 8, weight_kg: 32 }] }
+        ]
+      })
+    ]),
+    date: '2026-07-30'
+  });
+  assert.equal(model.comparisons.length, 1);
+  assert.equal(model.comparisons[0].name, 'Bar Press');
+  assert.equal(model.comparisons[0].firstLogged, false);
+  assert.equal(model.comparisons[0].weightDeltaKg, 2);
+  assert.equal(model.weekCompletedCount, 1);
+  assert.equal(model.weekTarget, 4);
+  assert.equal(model.workingWeights.length, 1);
+  assert.equal(model.workingWeights[0].name, 'Bar Press');
+  assert.equal(model.workingWeights[0].weight_kg, 32);
+  assert.equal(model.recentSessions.length, 2);
+  assert.equal(model.volumeWeeks.length, 2);
+  assert.ok(model.weekVolumeKg > 0);
 });
 
 test('hero prefers today planned over older completed', () => {
@@ -307,6 +349,30 @@ test('strengthDeltaPct averages region best-set percent changes with data', () =
   });
   // chest +25%, back +10% → mean 17.5
   assert.ok(Math.abs(model.longTerm.strengthDeltaPct - 17.5) < 1e-9);
+});
+
+test('month averages and next planned session sit on the model', () => {
+  const model = buildFitnessModel({
+    events: events([
+      workout({ date: '2026-07-30' }),
+      workout({
+        date: '2026-08-29',
+        status: 'planned',
+        title: 'Upper Body',
+        exercises: [{ name: 'Bench Press', sets: [{ reps: 8, weight_kg: 36 }] }]
+      })
+    ]),
+    date: '2026-07-30'
+  });
+  assert.equal(model.monthVolumeKg, 10 * 32 + 8 * 34 + 12 * 12);
+  assert.equal(model.avgSessionVolumeKg, model.monthVolumeKg);
+  assert.equal(model.avgDurationMin, 26);
+  assert.equal(model.weekRemaining, 3);
+  assert.equal(model.nextPlanned.title, 'Upper Body');
+  assert.equal(model.nextPlanned.date, '2026-08-29');
+  assert.equal(model.heroSession.volume, model.monthVolumeKg);
+  assert.equal(model.charts.uniqueLifts, 2);
+  assert.equal(model.charts.longestStreak, 1);
 });
 
 test('existing streak and weekVolume fields remain on the model', () => {

@@ -22,8 +22,8 @@ test('does not start a second round for non-Penelope agents', async () => {
   };
   await collect(streamWithPenelopeDiaryForce(anthropic, {
     slug: 'chadwick',
-    userMessage: 'Log',
-    messages: [{ role: 'user', content: 'Log' }]
+    userMessage: 'how are the weights looking',
+    messages: [{ role: 'user', content: 'how are the weights looking' }]
   }));
   assert.equal(calls, 1);
 });

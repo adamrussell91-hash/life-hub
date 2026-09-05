@@ -37,7 +37,9 @@ describe("captureFieldHtml", () => {
     expect(html).toContain("data-capture-voice");
     expect(html).toContain("data-capture-photo");
     expect(html).toContain("data-capture-pdf");
+    expect(html).toContain("data-capture-paste");
     expect(html).toContain(">Voice<");
+    expect(html).toContain(">Paste<");
   });
 
   it("disables actions while capturing and labels Stop while recording", () => {

@@ -43,10 +43,11 @@ export function captureFieldHtml(state: CaptureUiState) {
   const { captureDisabled, captureOthersDisabled, voiceLabel } = captureControlState(state);
   return `<div class="compose__field">
         <label>Capture</label>
-        <div class="compose__capture">
+        <div class="compose__capture hub-capture" data-hub-capture>
           <button class="btn" data-capture-voice type="button" ${captureDisabled}>${voiceLabel}</button>
           <button class="btn" data-capture-photo type="button" ${captureOthersDisabled}>Photo</button>
           <button class="btn" data-capture-pdf type="button" ${captureOthersDisabled}>PDF</button>
+          <button class="btn btn--ghost" data-capture-paste type="button" ${captureOthersDisabled}>Paste</button>
         </div>
         <input id="compose-photo" class="compose__hidden-file" type="file" accept="image/*" capture="environment" />
         <input id="compose-pdf" class="compose__hidden-file" type="file" accept="application/pdf" />
@@ -138,12 +139,21 @@ export function bindCaptureControls(
     onVoice: () => void;
     onPhoto: (file: File) => void;
     onPdf: (file: File) => void;
+    onPaste?: (text: string) => void;
   },
 ) {
   root.querySelector<HTMLButtonElement>("[data-capture-voice]")!.onclick = () => {
     opts.syncFields();
     opts.onVoice();
   };
+  const paste = root.querySelector<HTMLButtonElement>("[data-capture-paste]");
+  if (paste) {
+    paste.onclick = async () => {
+      opts.syncFields();
+      const text = await navigator.clipboard?.readText?.();
+      if (text) opts.onPaste?.(text);
+    };
+  }
   root.querySelector<HTMLButtonElement>("[data-capture-photo]")!.onclick = () => {
     root.querySelector<HTMLInputElement>("#compose-photo")?.click();
   };

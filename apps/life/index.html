@@ -21,6 +21,8 @@
   <link rel="stylesheet" href="packages/design-kit/hub-compose.css">
   <link rel="stylesheet" href="packages/design-kit/adaptive-slider.css">
   <link rel="stylesheet" href="packages/design-kit/view-on-map.css">
+  <link rel="stylesheet" href="packages/design-kit/card-swipe.css">
+  <link rel="stylesheet" href="packages/design-kit/hub-interactions.css">
   <link rel="stylesheet" href="packages/design-kit/rail.css">
   <link rel="stylesheet" href="packages/design-kit/mobile.css">
   <link rel="stylesheet" href="packages/design-kit/calendar.css">
@@ -409,22 +411,39 @@
 
         <div id="chat-view-home">
           <section id="chat-view" class="chat-view" aria-labelledby="page-title" hidden>
-            <div class="section-heading">
-              <button type="button" id="chat-new" class="chat-new-button">New chat</button>
-            </div>
+            <header class="chat-view__toolbar">
+              <div id="chat-who" class="chat-view__who" hidden>
+                <img class="chat-view__who-avatar" alt="" width="36" height="36">
+                <div>
+                  <p class="chat-view__who-eyebrow">Talking to</p>
+                  <p class="chat-view__who-name"></p>
+                </div>
+              </div>
+              <div class="chat-view__actions">
+                <button type="button" id="chat-tools" class="btn btn--ghost chat-tools-button" hidden aria-expanded="false" aria-controls="agent-protocol-pills">Tools</button>
+                <button type="button" id="chat-new" class="btn btn--ghost chat-new-button">New chat</button>
+                <button type="button" id="chat-close" class="btn btn--ghost chat-close-button" aria-label="Close chat">Close</button>
+              </div>
+            </header>
             <div class="hub-scroll-hide" data-hub-scroll-hide data-hub-scroll-scroller="#chat-messages">
               <div class="hub-scroll-hide__inner">
-                <div id="agent-picker" class="agent-picker" aria-label="Choose who to talk to"></div>
+                <div id="agent-picker" class="agent-picker hub-ai-agent hub-ai-agent--portraits" data-hub-ai-agent aria-label="Choose who to talk to"></div>
                 <div id="agent-protocol-pills" class="agent-protocol-pills" hidden></div>
               </div>
             </div>
             <div id="chat-agent-hero" class="chat-agent-hero" hidden aria-live="polite"></div>
             <p id="chat-error" class="chat-error" role="alert" hidden></p>
+            <div id="chat-empty" class="chat-empty" hidden></div>
             <ul id="chat-messages" class="chat-messages" aria-live="polite"></ul>
-            <form id="chat-form" class="chat-form">
+            <form id="chat-form" class="chat-form hub-ai-bar hub-ai-bar--thread" data-hub-ai-bar>
               <label class="sr-only" for="chat-input">Message</label>
-              <input id="chat-input" name="message" type="text" autocomplete="off" required>
-              <button id="chat-send" type="submit">Send</button>
+              <div class="hub-ai-bar__field">
+                <textarea id="chat-input" class="chat-input hub-ai-bar__input" name="message" rows="1" autocomplete="off" required enterkeyhint="send" placeholder="Message…"></textarea>
+              </div>
+              <div class="chat-form__tools hub-ai-bar__tools">
+                <button id="chat-stop" class="btn btn--secondary" type="button" hidden>Stop</button>
+                <button id="chat-send" class="btn btn--primary" type="submit">Send</button>
+              </div>
             </form>
           </section>
         </div>
@@ -595,41 +614,191 @@
           <button id="nutrition-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Brisket">💬</button>
         </section>
 
-        <section id="fitness-dashboard" class="dashboard" aria-label="Fitness" hidden>
-          <div class="fitness-long-term-trio" aria-label="Long-term training trends">
-            <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-volume-label">
-              <p class="metric-label" id="fitness-volume-label">Weekly volume</p>
-              <p class="metric-value"><strong data-fitness="volume-delta">—</strong><span> vs earlier half</span></p>
-              <svg id="fitness-volume-sparkline" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Weekly training volume over 26 weeks">
-                <path data-role="area" d=""></path>
-                <path data-role="line" d=""></path>
-              </svg>
-            </article>
-            <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-workouts-label">
-              <p class="metric-label" id="fitness-workouts-label">Workouts / week</p>
-              <p class="metric-value"><strong data-fitness="workouts-week">—</strong></p>
-              <p class="metric-caption">Adherence <strong data-fitness="adherence">—</strong></p>
-            </article>
-            <article class="metric-card fitness-long-term-card" aria-labelledby="fitness-strength-label">
-              <p class="metric-label" id="fitness-strength-label">Strength Δ</p>
-              <p class="metric-value"><strong data-fitness="strength-delta">—</strong></p>
-              <p class="metric-caption">Best-set trend across regions</p>
-            </article>
-          </div>
-
-          <article class="metric-card fitness-streak-card fitness-streak-card--quiet">
-            <div class="fitness-streak-strip">
+        <section id="fitness-dashboard" class="dashboard fitness-dashboard" aria-label="Fitness" hidden>
+          <div data-fitness="run-widget" class="hub-run"></div>
+          <article class="metric-card fitness-board" aria-labelledby="fitness-week-heading">
+            <div class="fitness-board__top">
               <div>
-                <p class="metric-label">Streak</p>
-                <p class="metric-value metric-value--compact"><strong data-fitness="streak">—</strong><span> day streak</span></p>
+                <p class="metric-label" id="fitness-week-heading">This week</p>
+                <p class="metric-caption" data-fitness="week-story"></p>
               </div>
-              <p class="fitness-day-type" data-fitness="day-type">—</p>
-              <div id="fitness-week-dots" class="fitness-week-dots" aria-label="Last 7 days of sessions"></div>
+              <p class="metric-caption fitness-board__today" data-fitness="day-type">—</p>
+            </div>
+            <dl class="fitness-stat-strip">
+              <div>
+                <dt>Sessions</dt>
+                <dd><strong data-fitness="week-done">—</strong> / <span data-fitness="week-target">4</span></dd>
+              </div>
+              <div>
+                <dt>This week</dt>
+                <dd><strong data-fitness="week-volume">—</strong></dd>
+              </div>
+              <div>
+                <dt>Last week</dt>
+                <dd><strong data-fitness="last-week-volume">—</strong></dd>
+              </div>
+              <div>
+                <dt>Streak</dt>
+                <dd><strong data-fitness="streak">—</strong> · longest <span data-fitness="longest-streak">—</span></dd>
+              </div>
+            </dl>
+            <div id="fitness-volume-card">
+              <p class="metric-caption" data-fitness="volume-delta-wrap" hidden>
+                This week vs last week: <strong data-fitness="volume-delta">—</strong>
+              </p>
+              <div id="fitness-volume-rows" class="fitness-kv"></div>
+            </div>
+            <p class="metric-caption" data-fitness="month-story"></p>
+            <p class="metric-caption" data-fitness="pace-story"></p>
+            <p class="metric-caption" data-fitness="next-planned" hidden></p>
+            <div id="fitness-focus-card" hidden>
+              <div id="fitness-focus-strip" class="fitness-focus-strip"></div>
             </div>
           </article>
 
+          <div class="fitness-rings">
+            <article class="metric-card fitness-panel">
+              <p class="metric-label">Week target</p>
+              <div class="metric-ring-wrap">
+                <svg class="metric-ring" data-fitness-ring="week" viewBox="0 0 56 56" role="img" aria-label="Sessions this week versus target">
+                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
+                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
+                </svg>
+                <p class="metric-value"><strong data-fitness="week-ring-value">—</strong><span data-fitness="week-ring-target">/ 4</span></p>
+              </div>
+            </article>
+            <article class="metric-card fitness-panel">
+              <p class="metric-label">Missed sessions</p>
+              <div class="metric-ring-wrap">
+                <svg class="metric-ring" data-fitness-ring="skip" viewBox="0 0 56 56" role="img" aria-label="Missed or skipped sessions">
+                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
+                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
+                </svg>
+                <p class="metric-value"><strong data-fitness="skip-ring-value">—</strong><span data-fitness="skip-ring-target">missed</span></p>
+              </div>
+            </article>
+            <article class="metric-card fitness-panel">
+              <p class="metric-label">Recovery flags</p>
+              <div class="metric-ring-wrap">
+                <svg class="metric-ring" data-fitness-ring="recovery" viewBox="0 0 56 56" role="img" aria-label="Sessions flagged for next-day recovery">
+                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
+                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
+                </svg>
+                <p class="metric-value"><strong data-fitness="recovery-ring-value">—</strong><span data-fitness="recovery-ring-target">flagged</span></p>
+              </div>
+            </article>
+          </div>
+
+          <div class="fitness-pies">
+            <article id="fitness-rep-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Rep ranges</p>
+              <p class="metric-caption">Sets in the last 30 days</p>
+              <p data-fitness-empty="reps" class="metric-caption" hidden>No sets logged.</p>
+              <div class="meal-protein-pie-wrap">
+                <svg id="fitness-rep-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Rep range distribution">
+                  <g data-role="slices"></g>
+                </svg>
+                <ul id="fitness-rep-legend" class="meal-protein-legend"></ul>
+              </div>
+            </article>
+            <article id="fitness-region-vol-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Volume by region</p>
+              <p class="metric-caption">Kilograms moved — last 30 days</p>
+              <p data-fitness-empty="region-vol" class="metric-caption" hidden>No region volume yet.</p>
+              <div class="meal-protein-pie-wrap">
+                <svg id="fitness-region-vol-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Volume by muscle region">
+                  <g data-role="slices"></g>
+                </svg>
+                <ul id="fitness-region-vol-legend" class="meal-protein-legend"></ul>
+              </div>
+            </article>
+            <article id="fitness-push-pull-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Push vs pull</p>
+              <p class="metric-caption">Volume from press/push vs row/pull/curl</p>
+              <p data-fitness-empty="push-pull" class="metric-caption" hidden>No push or pull volume yet.</p>
+              <div class="meal-protein-pie-wrap">
+                <svg id="fitness-push-pull-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Push versus pull volume">
+                  <g data-role="slices"></g>
+                </svg>
+                <ul id="fitness-push-pull-legend" class="meal-protein-legend"></ul>
+              </div>
+            </article>
+            <article id="fitness-rest-card" class="metric-card fitness-panel" hidden>
+              <p class="metric-label">Trained vs rest</p>
+              <p class="metric-caption">Last 30 days</p>
+              <p data-fitness-empty="rest" class="metric-caption" hidden>No days in range.</p>
+              <div class="meal-protein-pie-wrap">
+                <svg id="fitness-rest-pie" class="meal-protein-pie" viewBox="0 0 72 72" role="img" aria-label="Trained versus rest days">
+                  <g data-role="slices"></g>
+                </svg>
+                <ul id="fitness-rest-legend" class="meal-protein-legend"></ul>
+              </div>
+            </article>
+          </div>
+
+          <article id="fitness-e1rm-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">e1RM trend</p>
+            <p class="metric-caption">Estimated 1RM — lifts with two or more logged days</p>
+            <div id="fitness-e1rm-list"></div>
+          </article>
+
+          <article id="fitness-efficiency-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Volume per set</p>
+            <p class="metric-caption">Kilograms moved ÷ sets, by week</p>
+            <div id="fitness-efficiency-bars"></div>
+          </article>
+
+          <article id="fitness-duration-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Session duration</p>
+            <svg id="fitness-duration-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Session duration">
+              <path data-role="area" d=""></path>
+              <path data-role="line" d=""></path>
+              <g data-role="value-labels"></g>
+              <g data-role="day-labels"></g>
+            </svg>
+          </article>
+
+          <article id="fitness-distance-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Distance</p>
+            <p class="metric-caption">Kilometres from logged walks</p>
+            <svg id="fitness-distance-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Distance">
+              <path data-role="area" d=""></path>
+              <path data-role="line" d=""></path>
+              <g data-role="value-labels"></g>
+              <g data-role="day-labels"></g>
+            </svg>
+          </article>
+
+          <article id="fitness-pace-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Pace</p>
+            <p class="metric-caption">Minutes per kilometre</p>
+            <svg id="fitness-pace-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pace">
+              <path data-role="area" d=""></path>
+              <path data-role="line" d=""></path>
+              <g data-role="value-labels"></g>
+              <g data-role="day-labels"></g>
+            </svg>
+          </article>
+
+          <article id="fitness-hr-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Average heart rate</p>
+            <svg id="fitness-hr-chart" class="line-chart line-chart--dense" viewBox="0 0 320 72" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Average heart rate">
+              <path data-role="area" d=""></path>
+              <path data-role="line" d=""></path>
+              <g data-role="value-labels"></g>
+              <g data-role="day-labels"></g>
+            </svg>
+          </article>
+
+          <article id="fitness-pain-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Pain flags</p>
+            <p class="metric-caption">Logged sites in the last 30 days</p>
+            <div id="fitness-pain-list" class="fitness-kv"></div>
+          </article>
+
+          <div class="fitness-board-grid">
           <article class="metric-card fitness-hero-card" aria-labelledby="fitness-hero-label">
-            <p class="metric-label" id="fitness-hero-label">Session</p>
+            <p class="metric-label" id="fitness-hero-label">Last session</p>
             <p data-fitness="hero-empty" hidden>No session yet — ask Chadwick to plan today’s workout</p>
             <div data-fitness-hero class="workout-plan-card">
               <p class="workout-plan-card__day" data-fitness="hero-day"></p>
@@ -637,6 +806,7 @@
               <p class="metric-caption workout-plan-card__meta">
                 <span data-fitness="hero-duration">—</span>
                 · <span data-fitness="hero-status">—</span>
+                · <span data-fitness="hero-volume">—</span>
               </p>
               <div id="fitness-muscle-maps" class="fitness-muscle-strip" aria-label="Muscles trained"></div>
               <div id="fitness-focus-tags" class="fitness-tags"></div>
@@ -651,6 +821,31 @@
               <p class="metric-caption" data-fitness="hero-notes"></p>
             </div>
           </article>
+
+          <div class="fitness-side-stack">
+          <article id="fitness-loads-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Working weights</p>
+            <p class="metric-caption">Best set in the last 30 days</p>
+            <div id="fitness-loads" class="fitness-kv"></div>
+          </article>
+
+          <article id="fitness-recent-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Recent sessions</p>
+            <div id="fitness-recent" class="fitness-recent-list"></div>
+          </article>
+
+          <article id="fitness-comparisons-card" class="metric-card fitness-panel" hidden>
+            <p class="metric-label">Vs last time</p>
+            <div id="fitness-comparisons" class="fitness-comparisons"></div>
+          </article>
+
+          <article class="metric-card fitness-panel fitness-region-block">
+            <p class="metric-label" id="fitness-region-heading">Region strength</p>
+            <p class="metric-caption">Best set last 30 days. A signed kg is vs the previous month.</p>
+            <div id="fitness-region-grid" class="fitness-region-grid" aria-labelledby="fitness-region-heading"></div>
+          </article>
+          </div>
+          </div>
 
           <article id="fitness-surface-widgets" class="metric-card fitness-surface-widgets-card" aria-labelledby="fitness-surface-widgets-label" hidden>
             <p class="metric-label" id="fitness-surface-widgets-label">Challenge widgets</p>
@@ -679,29 +874,6 @@
               </menu>
             </form>
           </dialog>
-
-          <div class="fitness-region-block">
-            <div class="body-section__head">
-              <h3 class="metric-label" id="fitness-region-heading">Region strength</h3>
-              <p class="metric-caption">Vs the previous 30 days. A plain kg figure is this month’s best, with nothing to compare yet.</p>
-            </div>
-            <div id="fitness-region-grid" class="fitness-region-grid" aria-labelledby="fitness-region-heading"></div>
-          </div>
-
-          <article class="metric-card">
-            <p class="metric-label">Focus this week</p>
-            <div id="fitness-focus-strip" class="fitness-focus-strip"></div>
-          </article>
-
-          <article class="metric-card">
-            <p class="metric-label">Vs last time</p>
-            <div id="fitness-comparisons" class="fitness-comparisons"></div>
-          </article>
-
-          <article class="metric-card chart-card">
-            <p class="metric-label">30-day consistency</p>
-            <div id="fitness-heatmap" class="heatmap-grid" aria-label="Completed workouts last 30 days"></div>
-          </article>
 
           <button id="fitness-chat-button" class="floating-chat-button" type="button" aria-label="Chat with Chadwick">💬</button>
         </section>
@@ -747,6 +919,7 @@
         </section>
 
         <section id="calendar-dashboard" class="dashboard" aria-label="Calendar" hidden>
+          <div data-calendar="schedule" class="hub-schedule"></div>
           <div id="life-calendar-host"></div>
         </section>
 
@@ -839,6 +1012,7 @@
         </section>
 
         <section id="mind-dashboard" class="dashboard" aria-label="Mind" hidden>
+          <nav data-mind="journal-nav" class="hub-journal-nav" aria-label="Journal"></nav>
           <p class="metric-caption" data-mind="entry-count">—</p>
           <div id="mind-range-control" class="body-range hub-pills" role="group" aria-label="Mind time range">
             <button type="button" class="hub-pills__btn" data-mind-range="weekly" aria-pressed="false">Weekly</button>
@@ -1059,6 +1233,7 @@
         </section>
 
         <section id="central-node-dashboard" class="dashboard" aria-label="Central Node" hidden>
+          <div data-central-node="progress" class="hub-progress"></div>
           <div id="cn-board" class="cn-board">
             <article id="cn-tile-status" class="metric-card cn-tile" data-cn-span="2" aria-labelledby="todays-status-label">
               <p class="cn-tile__question">Has today been logged?</p>

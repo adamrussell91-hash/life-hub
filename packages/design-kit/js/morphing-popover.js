@@ -1,4 +1,4 @@
-import { prefersReducedMotion } from './hub-motion.js';
+import { applyHubPillsThumb, prefersReducedMotion } from './hub-motion.js';
 
 const DURATION_MS = 250;
 const EASE = 'ease-out';
@@ -78,8 +78,20 @@ function clampPanel(rect, width, height, view) {
   return { left, top, width: maxW, height: maxH };
 }
 
+function cancelAnimations(el) {
+  if (!el || typeof el.getAnimations !== 'function') return;
+  for (const animation of el.getAnimations()) {
+    try {
+      animation.cancel();
+    } catch {
+      // Ignore animations the document already dropped.
+    }
+  }
+}
+
 function animateBox(el, from, to, reduced) {
   if (reduced || typeof el.animate !== 'function') return Promise.resolve();
+  cancelAnimations(el);
   const animation = el.animate(
     [
       {
@@ -126,7 +138,7 @@ function closeOpen(opts) {
 
 /**
  * Trigger that expands into a compact editor. Use for short notes, quick text,
- * and dimension / value edits.
+ * dimension / value edits, and closed-field chips (status, priority, domain).
  *
  * @param {object} options
  * @param {{ createElement: Function, querySelector?: Function }} options.root
@@ -268,8 +280,12 @@ export function createMorphingPopover({
     removeClass(panel, 'is-floating');
     removeClass(panel, 'is-animating');
     removeClass(panel, 'is-ready');
-    panel.style && (panel.style.cssText = '');
+    // Hide before cancelling fill:forwards so the panel does not flash
+    // back to its last inline box. Leftover WAAPI fill was pinning the
+    // next open to chip size (one letter of the title).
     setHidden(panel, true);
+    cancelAnimations(panel);
+    panel.style && (panel.style.cssText = '');
     restoreHome();
     trigger.setAttribute?.('aria-expanded', 'false');
     onClose?.();
@@ -305,6 +321,7 @@ export function createMorphingPopover({
     openPopover = apiRef;
     trigger.setAttribute?.('aria-expanded', 'true');
     addClass(wrap, 'is-open');
+    cancelAnimations(panel);
     setHidden(panel, false);
     addClass(panel, 'is-floating');
     addClass(panel, 'is-animating');
@@ -420,24 +437,47 @@ export function createMorphingPopover({
   return apiRef;
 }
 
+function mountRoot(el, options = {}) {
+  const root = el.ownerDocument ?? options.root ?? globalThis.document;
+  return {
+    createElement: name => root.createElement(name),
+    ownerDocument: root,
+    defaultView: root.defaultView,
+    querySelector: sel => el.querySelector?.(sel)
+  };
+}
+
 /**
  * Wire a declarative morphing popover already in the tree.
+ * Closed-field chips: `data-morphing-kind="closed-field"` plus
+ * `data-morphing-options` JSON and `data-morphing-value`.
  * @param {HTMLElement} el
  */
 export function mountMorphingPopover(el, options = {}) {
   if (!el || el.dataset?.morphingBound === '1') return null;
-  const root = el.ownerDocument ?? options.root ?? globalThis.document;
   const trigger = el.querySelector?.('[data-morphing-trigger]') ?? el.querySelector?.('.morphing-popover__trigger');
+  const kind = el.dataset?.morphingKind || '';
+  if (kind === 'closed-field') {
+    el.dataset.morphingBound = '1';
+    return createMorphingClosedFieldPopover({
+      root: mountRoot(el, options),
+      wrap: el,
+      trigger,
+      title: el.dataset.morphingTitle || options.title,
+      supporting: el.dataset.morphingSupporting || options.supporting,
+      options: el.dataset.morphingOptions || options.options,
+      value: el.dataset.morphingValue ?? options.value,
+      layoutId: el.dataset.morphingLayoutId || options.layoutId,
+      onSave: options.onSave,
+      onDiscard: options.onDiscard,
+      onChange: options.onChange
+    });
+  }
   const content = el.querySelector?.('[data-morphing-content]') ?? el.querySelector?.('.morphing-popover__panel');
   if (!trigger || !content) return null;
   el.dataset.morphingBound = '1';
   return createMorphingPopover({
-    root: {
-      createElement: name => root.createElement(name),
-      ownerDocument: root,
-      defaultView: root.defaultView,
-      querySelector: sel => el.querySelector?.(sel)
-    },
+    root: mountRoot(el, options),
     wrap: el,
     trigger,
     content,
@@ -578,6 +618,158 @@ export function createMorphingValuesPopover({
     }
   });
   return { ...popover, inputs };
+}
+
+function parseClosedFieldOptions(raw) {
+  if (Array.isArray(raw)) {
+    return raw
+      .filter(option => option && option.value != null && String(option.value).trim())
+      .map(option => ({
+        value: String(option.value),
+        label: textOf(option.label, String(option.value))
+      }));
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      return parseClosedFieldOptions(JSON.parse(raw));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function labelForClosedField(options, value, fallback = '') {
+  const match = options.find(option => option.value === String(value ?? ''));
+  return match?.label ?? textOf(fallback, String(value ?? ''));
+}
+
+/**
+ * Chip that expands into a closed-list picker. Stolen interaction from the
+ * EditBadge demo: stage a choice, then Save. Discard / click-outside / Escape
+ * keep the committed value. No free text, colours, or custom icons — options
+ * are a closed vocabulary rendered as `.hub-pills`.
+ */
+export function createMorphingClosedFieldPopover({
+  root,
+  label,
+  title = 'Edit',
+  supporting = 'Closed list. Save writes it.',
+  options = [],
+  value = '',
+  submitLabel = 'Save',
+  discardLabel = 'Discard',
+  className = '',
+  layoutId,
+  triggerClass = 'hub-chip',
+  wrap,
+  trigger,
+  onChange,
+  onSave,
+  onDiscard
+} = {}) {
+  const list = parseClosedFieldOptions(options);
+  let committed = value != null && String(value) !== '' ? String(value) : String(list[0]?.value ?? '');
+  let draft = committed;
+  let buttons = [];
+  let group = null;
+  /** @type {ReturnType<typeof createMorphingPopover> | null} */
+  let popover = null;
+
+  const triggerText = textOf(label, labelForClosedField(list, committed, title));
+
+  function paintSelection() {
+    for (const btn of buttons) {
+      const selected = btn.dataset?.value === draft;
+      if (selected) addClass(btn, 'is-active');
+      else removeClass(btn, 'is-active');
+      btn.setAttribute?.('aria-checked', selected ? 'true' : 'false');
+    }
+    applyHubPillsThumb(group);
+  }
+
+  popover = createMorphingPopover({
+    root,
+    wrap,
+    trigger,
+    triggerLabel: triggerText,
+    title,
+    supporting,
+    layoutId,
+    triggerClass,
+    className: ['morphing-popover--closed-field', className].filter(Boolean).join(' '),
+    onOpen() {
+      draft = committed;
+      paintSelection();
+    },
+    onClose() {
+      draft = committed;
+    },
+    renderContent(body, api) {
+      group = root.createElement('div');
+      group.className =
+        list.length > 4
+          ? 'hub-pills hub-pills--loose morphing-popover__choices'
+          : 'hub-pills morphing-popover__choices';
+      group.setAttribute?.('role', 'radiogroup');
+      group.setAttribute?.('aria-label', title);
+      buttons = list.map(option => {
+        const btn = root.createElement('button');
+        btn.type = 'button';
+        btn.className = 'hub-pills__btn';
+        btn.dataset.value = option.value;
+        btn.textContent = option.label;
+        btn.setAttribute?.('role', 'radio');
+        btn.setAttribute?.('aria-checked', 'false');
+        btn.addEventListener?.('click', () => {
+          draft = option.value;
+          paintSelection();
+          onChange?.(draft);
+        });
+        group.append(btn);
+        return btn;
+      });
+      body.append(group);
+
+      const actions = root.createElement('div');
+      actions.className = 'morphing-popover__actions';
+      const discard = root.createElement('button');
+      discard.type = 'button';
+      discard.className = 'btn btn--ghost';
+      discard.textContent = discardLabel;
+      discard.addEventListener?.('click', () => {
+        draft = committed;
+        paintSelection();
+        onDiscard?.(committed);
+        api.close();
+      });
+      const save = root.createElement('button');
+      save.type = 'button';
+      save.className = 'btn btn--primary';
+      save.textContent = submitLabel;
+      save.addEventListener?.('click', () => {
+        committed = draft;
+        popover?.setTriggerLabel(labelForClosedField(list, committed, triggerText));
+        onSave?.(committed, api);
+        api.close();
+      });
+      actions.append(discard, save);
+      body.append(actions);
+      paintSelection();
+    }
+  });
+
+  return {
+    ...popover,
+    getValue: () => committed,
+    getDraft: () => draft,
+    setValue(next) {
+      committed = String(next ?? '');
+      draft = committed;
+      popover?.setTriggerLabel(labelForClosedField(list, committed, triggerText));
+      paintSelection();
+    }
+  };
 }
 
 /** Test helper — drop the singleton so suites can start clean. */

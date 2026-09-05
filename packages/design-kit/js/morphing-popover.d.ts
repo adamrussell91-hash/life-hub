@@ -26,6 +26,17 @@ export function createMorphingPopover(options?: {
   onClose?: () => void;
 }): MorphingPopoverApi;
 
+export type ClosedFieldOption = {
+  value: string;
+  label?: string;
+};
+
+export type MorphingClosedFieldApi = MorphingPopoverApi & {
+  getValue: () => string;
+  getDraft: () => string;
+  setValue: (value: string) => void;
+};
+
 export function mountMorphingPopover(
   el: HTMLElement,
   options?: {
@@ -36,8 +47,13 @@ export function mountMorphingPopover(
     autoFocus?: boolean;
     onOpen?: () => void;
     onClose?: () => void;
+    options?: ClosedFieldOption[] | string;
+    value?: string;
+    onSave?: (value: string, api: Pick<MorphingPopoverApi, 'open' | 'close' | 'isOpen'>) => void;
+    onDiscard?: (value: string) => void;
+    onChange?: (value: string) => void;
   }
-): MorphingPopoverApi | null;
+): MorphingPopoverApi | MorphingClosedFieldApi | null;
 
 export function mountMorphingPopovers(scope?: ParentNode): MorphingPopoverApi[];
 
@@ -85,5 +101,24 @@ export function createMorphingValuesPopover(options?: {
   triggerClass?: string;
   onSubmit?: (values: Record<string, string>, api: Pick<MorphingPopoverApi, 'open' | 'close' | 'isOpen'>) => void;
 }): MorphingPopoverApi & { inputs: Array<{ field: object; input: HTMLInputElement }> };
+
+export function createMorphingClosedFieldPopover(options?: {
+  root: ParentNode & { createElement: typeof document.createElement };
+  label?: string;
+  title?: string;
+  supporting?: string;
+  options?: ClosedFieldOption[] | string;
+  value?: string;
+  submitLabel?: string;
+  discardLabel?: string;
+  className?: string;
+  layoutId?: string;
+  triggerClass?: string;
+  wrap?: HTMLElement;
+  trigger?: HTMLElement;
+  onChange?: (value: string) => void;
+  onSave?: (value: string, api: Pick<MorphingPopoverApi, 'open' | 'close' | 'isOpen'>) => void;
+  onDiscard?: (value: string) => void;
+}): MorphingClosedFieldApi;
 
 export function resetMorphingPopoverForTests(): void;

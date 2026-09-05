@@ -3,7 +3,8 @@ import { parseEventDocument, TYPE_DOMAINS } from '../../../apps/life/js/core/rec
 import {
   applyLogToCentralNode,
   formatLogDate,
-  humanizeDayType
+  humanizeDayType,
+  shouldUpdateWorkoutStatus
 } from '../../../apps/life/js/core/central-node-write.js';
 import {
   GOVERNANCE_LOG_PATH,
@@ -79,6 +80,11 @@ export function describeRecordForLog(record, notes, { medicalAppend = false } = 
   }
 }
 
+export function shouldSyncCentralNode(record) {
+  if (record?.type === 'workout' && !shouldUpdateWorkoutStatus(record)) return false;
+  return true;
+}
+
 export async function persistLogEntry(client, { record, notes, path, existingSha, nowDateKey }) {
   const result = await client.writeFile({
     path,
@@ -87,11 +93,17 @@ export async function persistLogEntry(client, { record, notes, path, existingSha
     message: `feat(chat): log ${record.type} for ${record.date}`
   });
   let centralNodeUpdated = false;
-  try {
-    const cn = await syncCentralNodeAfterLog(client, record, notes);
-    centralNodeUpdated = cn?.updated === true;
-  } catch {
-    centralNodeUpdated = false;
+  if (!shouldSyncCentralNode(record)) {
+    // Planned workouts must not touch Status / Recent Actions. A no-op sync
+    // used to report centralNodeUpdated:false and flash a save error in chat.
+    centralNodeUpdated = true;
+  } else {
+    try {
+      const cn = await syncCentralNodeAfterLog(client, record, notes);
+      centralNodeUpdated = cn?.updated === true;
+    } catch {
+      centralNodeUpdated = false;
+    }
   }
   let governanceUpdated = false;
   if (record.type === 'mind_session' && typeof record.insight === 'string' && record.insight.trim()) {
