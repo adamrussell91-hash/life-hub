@@ -112,7 +112,13 @@ export function buildChatView(): HTMLElement {
   const picker = el('div', 'agent-picker');
   picker.id = 'agent-picker';
   picker.setAttribute('aria-label', 'Choose who to talk to');
-  view.append(picker);
+  const hide = el('div', 'hub-scroll-hide');
+  hide.setAttribute('data-hub-scroll-hide', '');
+  hide.setAttribute('data-hub-scroll-scroller', '#chat-messages');
+  const hideInner = el('div', 'hub-scroll-hide__inner');
+  hideInner.append(picker);
+  hide.append(hideInner);
+  view.append(hide);
 
   const trays = el('div', 'chat-protocols');
   trays.id = 'chat-protocol-trays';
