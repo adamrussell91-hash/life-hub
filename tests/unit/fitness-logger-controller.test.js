@@ -263,6 +263,7 @@ test('adding an exercise jumps the swipe to the new card', () => {
   assert.equal(controller.getExerciseIndex(), 0);
   controller.addExercise('Cable fly');
   assert.equal(controller.getExerciseIndex(), 1);
+  assert.equal(controller.getExpandedExerciseIndex(), 1);
   controller.addExercise('Curl');
   assert.equal(controller.getExerciseIndex(), 2);
   controller.removeExercise(2);

@@ -178,6 +178,19 @@ test('createCardSwipe keeps the requested index until slides are appended', () =
   assert.match(swipe.status.textContent, /3 of 3 · Three/);
 });
 
+test('a tap without a drag selects the current card', () => {
+  const root = new FakeDoc();
+  const seen = [];
+  const swipe = createCardSwipe({
+    root,
+    onSelect: index => seen.push(index)
+  });
+  swipe.track.emit('pointerdown', { clientX: 160, timeStamp: 0 });
+  swipe.track.emit('pointerup', { clientX: 158, timeStamp: 20 });
+  swipe.track.emit('click', { clientX: 158 });
+  assert.deepEqual(seen, [0]);
+});
+
 test('drags that start on an input do not change the card', () => {
   const root = new FakeDoc();
   const swipe = createCardSwipe({ root, items: [] });

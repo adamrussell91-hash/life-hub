@@ -42,6 +42,7 @@ export function createCardSwipe(options?: {
   slides?: HTMLElement[];
   currentIndex?: number;
   onIndexChange?: (index: number) => void;
+  onSelect?: (index: number) => void;
   className?: string;
   label?: string;
   itemWidth?: number;
@@ -56,6 +57,7 @@ export function mountCardSwipe(
     root?: Document;
     currentIndex?: number;
     onIndexChange?: (index: number) => void;
+    onSelect?: (index: number) => void;
     itemWidth?: number;
     gap?: number;
     tilt?: number;

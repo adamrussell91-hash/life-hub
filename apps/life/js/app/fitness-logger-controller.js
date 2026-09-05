@@ -43,6 +43,7 @@ export function createFitnessLoggerController({
   let mountedPath = null;
   let saveState = '';
   let exerciseIndex = 0;
+  let expandedExerciseIndex = null;
 
   function elapsedMs() {
     if (timerState === 'running' && segmentStartedAt != null) {
@@ -173,6 +174,7 @@ export function createFitnessLoggerController({
     if (!exercise) return;
     draft.exercises = [...(draft.exercises ?? []), exercise];
     exerciseIndex = draft.exercises.length - 1;
+    expandedExerciseIndex = exerciseIndex;
     touchDraft({ rerenderAfter: true });
   }
 
@@ -191,6 +193,10 @@ export function createFitnessLoggerController({
     if (!draft?.exercises?.[removeIndex]) return;
     draft.exercises = draft.exercises.filter((_, index) => index !== removeIndex);
     if (removeIndex <= exerciseIndex) exerciseIndex = Math.max(0, exerciseIndex - 1);
+    if (expandedExerciseIndex === removeIndex) expandedExerciseIndex = null;
+    else if (expandedExerciseIndex != null && removeIndex < expandedExerciseIndex) {
+      expandedExerciseIndex -= 1;
+    }
     touchDraft({ rerenderAfter: true });
   }
 
@@ -250,13 +256,30 @@ export function createFitnessLoggerController({
       saveState,
       timer: getTimerState(),
       exerciseIndex,
+      expandedExerciseIndex,
       onChange: applyChange,
       onAddSet: addSet,
       onAddExercise: addExercise,
       onMoveExercise: reorderExercise,
       onRemoveExercise: removeExercise,
       onExerciseIndexChange: next => {
+        const clamped = Math.min(Math.max(0, next), Math.max(0, (draft?.exercises?.length ?? 1) - 1));
+        const changed = clamped !== exerciseIndex;
+        exerciseIndex = clamped;
+        if (changed && expandedExerciseIndex != null) {
+          expandedExerciseIndex = null;
+          rerender();
+        }
+      },
+      onExpandExercise: next => {
         exerciseIndex = Math.min(Math.max(0, next), Math.max(0, (draft?.exercises?.length ?? 1) - 1));
+        expandedExerciseIndex = exerciseIndex;
+        rerender();
+      },
+      onCollapseExercise: () => {
+        if (expandedExerciseIndex == null) return;
+        expandedExerciseIndex = null;
+        rerender();
       },
       onFinish: () => void finish(),
       onStart: startTimer,
@@ -333,6 +356,7 @@ export function createFitnessLoggerController({
     draft = null;
     mountedPath = null;
     exerciseIndex = 0;
+    expandedExerciseIndex = null;
     saving = false;
     finishing = false;
     saveState = '';
@@ -375,6 +399,7 @@ export function createFitnessLoggerController({
     finish,
     getDraft: () => draft,
     getExerciseIndex: () => exerciseIndex,
+    getExpandedExerciseIndex: () => expandedExerciseIndex,
     getTimerState,
     startTimer,
     pauseTimer,

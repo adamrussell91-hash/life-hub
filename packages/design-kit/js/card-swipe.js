@@ -216,6 +216,7 @@ export function createCardSwipe({
   slides,
   currentIndex = 0,
   onIndexChange,
+  onSelect,
   className = '',
   label = 'Cards',
   itemWidth = CARD_SWIPE_ITEM_WIDTH,
@@ -256,6 +257,7 @@ export function createCardSwipe({
     root: host,
     currentIndex,
     onIndexChange,
+    onSelect,
     itemWidth,
     gap,
     tilt,
@@ -294,6 +296,7 @@ function bindCardSwipe(wrap, {
   root,
   currentIndex = 0,
   onIndexChange,
+  onSelect,
   itemWidth = CARD_SWIPE_ITEM_WIDTH,
   gap = CARD_SWIPE_GAP,
   tilt = 28,
@@ -323,6 +326,7 @@ function bindCardSwipe(wrap, {
 
   let index = Math.max(0, currentIndex);
   let drag = null;
+  let moved = false;
   const listeners = [];
 
   function slides() {
@@ -436,6 +440,7 @@ function bindCardSwipe(wrap, {
   }
 
   function onPointerDown(event) {
+    moved = false;
     if (count() <= 1) return;
     if (event.button != null && event.button !== 0) return;
     if (isIgnoredTarget(event.target)) return;
@@ -455,6 +460,7 @@ function bindCardSwipe(wrap, {
     if (!drag) return;
     const x = event.clientX ?? event.touches?.[0]?.clientX;
     if (!Number.isFinite(x)) return;
+    if (Math.abs(x - drag.startX) > 12) moved = true;
     drag.lastX = x;
     applyX(drag.origin + (x - drag.startX), { animate: false });
   }
@@ -488,7 +494,16 @@ function bindCardSwipe(wrap, {
     } else if (event.key === 'End') {
       event.preventDefault?.();
       setIndex(count() - 1);
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault?.();
+      onSelect?.(index);
     }
+  }
+
+  function onClick(event) {
+    if (moved) return;
+    if (isIgnoredTarget(event.target)) return;
+    onSelect?.(index);
   }
 
   function listen(target, type, handler, options) {
@@ -501,6 +516,7 @@ function bindCardSwipe(wrap, {
   listen(track, 'pointermove', onPointerMove);
   listen(track, 'pointerup', onPointerUp);
   listen(track, 'pointercancel', onPointerUp);
+  listen(track, 'click', onClick);
   listen(wrap, 'keydown', onKeyDown);
   listen(viewOf(wrap), 'resize', () => applyX(xFor(index), { animate: false }));
 

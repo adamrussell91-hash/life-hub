@@ -15,32 +15,20 @@ const PREVIEW = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Card swipe preview</title>
+  <title>Workout card swipe</title>
   <link rel="stylesheet" href="/packages/design-kit/tokens.css">
   <link rel="stylesheet" href="/packages/design-kit/overlays.css">
   <link rel="stylesheet" href="/packages/design-kit/actions.css">
+  <link rel="stylesheet" href="/packages/design-kit/motion.css">
   <link rel="stylesheet" href="/packages/design-kit/card-swipe.css">
+  <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-  <div id="mount"></div>
   <div id="logger" class="fitness-logger"></div>
   <script type="module">
-    import { createCardSwipe } from '/packages/design-kit/js/card-swipe.js';
     import { renderFitnessLogger } from '/js/app/render-fitness-logger.js';
 
-    const swipe = createCardSwipe({
-      root: document,
-      label: 'Exercises'
-    });
-    document.getElementById('mount').append(swipe.el);
-
-    const root = {
-      querySelector(sel) {
-        return sel === '#fitness-logger' ? document.getElementById('logger') : document.querySelector(sel);
-      },
-      createElement: tag => document.createElement(tag)
-    };
-    renderFitnessLogger(root, {
+    const draft = {
       title: 'Upper Body',
       session_kind: 'strength',
       notes: '',
@@ -51,11 +39,47 @@ const PREVIEW = `<!doctype html>
       recovery_flag_next_day: false,
       pain_flags: [],
       exercises: [
-        { name: 'Bench press', sets: [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }] },
+        { name: 'Bench press', coach_cues: { start: 'Chest over the handles.' }, sets: [
+          { reps: 8, weight_kg: 36, cable_type: 'constant_force' }
+        ]},
         { name: 'Cable fly', sets: [{ reps: 12, weight_kg: 12, cable_type: 'constant_force' }] },
         { name: 'Bayesian curl', sets: [{ reps: 10, weight_kg: 14, cable_type: 'none' }] }
       ]
-    }, { exerciseIndex: 0, timer: { state: 'running', everStarted: true, completeVisible: true } });
+    };
+
+    const root = {
+      querySelector(sel) {
+        return sel === '#fitness-logger' ? document.getElementById('logger') : document.querySelector(sel);
+      },
+      createElement: tag => document.createElement(tag)
+    };
+
+    let exerciseIndex = 0;
+    let expandedExerciseIndex = null;
+
+    function paint() {
+      renderFitnessLogger(root, draft, {
+        exerciseIndex,
+        expandedExerciseIndex,
+        timer: { state: 'running', everStarted: true, completeVisible: true },
+        onExerciseIndexChange(next) {
+          exerciseIndex = next;
+          expandedExerciseIndex = null;
+          paint();
+        },
+        onExpandExercise(next) {
+          exerciseIndex = next;
+          expandedExerciseIndex = next;
+          paint();
+        },
+        onCollapseExercise() {
+          expandedExerciseIndex = null;
+          paint();
+        }
+      });
+    }
+
+    paint();
   </script>
 </body>
 </html>`;
@@ -77,30 +101,7 @@ after(async () => {
   server?.close();
 });
 
-test('kit card swipe moves to the next exercise on drag and dot', async () => {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  try {
-    await page.goto(`${baseUrl}/card-swipe-preview.html`);
-    const deck = page.locator('#mount .hub-card-swipe');
-    await deck.waitFor();
-    assert.match(await deck.locator('.hub-card-swipe__status').textContent(), /1 of 5 · Bench press/);
-    await deck.locator('.hub-card-swipe__dot').nth(1).click();
-    assert.match(await deck.locator('.hub-card-swipe__status').textContent(), /2 of 5 · Cable fly/);
-
-    const box = await deck.locator('.hub-card-swipe__viewport').boundingBox();
-    assert.ok(box);
-    await page.mouse.move(box.x + box.width * 0.8, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width * 0.15, box.y + box.height / 2, { steps: 8 });
-    await page.mouse.up();
-    assert.match(await deck.locator('.hub-card-swipe__status').textContent(), /3 of 5 · Bayesian curl/);
-  } finally {
-    await context.close();
-  }
-});
-
-test('fitness logger swipe shows one exercise card at a time', async () => {
+test('logger swipe moves between compact exercise cards', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
@@ -108,9 +109,28 @@ test('fitness logger swipe shows one exercise card at a time', async () => {
     const logger = page.locator('#logger .fitness-logger__swipe');
     await logger.waitFor();
     assert.match(await logger.locator('.hub-card-swipe__status').textContent(), /1 of 3 · Bench press/);
+    assert.equal(await page.locator('.fitness-logger__exercise').count(), 0);
     await logger.locator('.hub-card-swipe__dot').nth(2).click();
     assert.match(await logger.locator('.hub-card-swipe__status').textContent(), /3 of 3 · Bayesian curl/);
-    assert.equal(await logger.locator('.fitness-logger__exercise').count(), 3);
+    assert.match(await logger.locator('.fitness-logger__peek .hub-card-swipe__title').textContent(), /Bayesian curl/);
+  } finally {
+    await context.close();
+  }
+});
+
+test('tapping a compact card expands the set editor', async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}/card-swipe-preview.html`);
+    await page.locator('#logger .fitness-logger__peek').first().click();
+    const editor = page.locator('.fitness-logger__exercise');
+    await editor.waitFor();
+    assert.match(await editor.locator('h4').textContent(), /Bench press/);
+    assert.equal(await editor.locator('.fitness-logger__sets input').first().inputValue(), '36');
+    await page.locator('[data-hub-morph-close], [data-fitness-logger="collapse-exercise"]').first().click();
+    await editor.waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('.fitness-logger__exercise').count(), 0);
   } finally {
     await context.close();
   }
