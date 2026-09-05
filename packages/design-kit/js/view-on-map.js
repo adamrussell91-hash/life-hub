@@ -99,12 +99,6 @@ function openMapFrame({
   media.append(iframe, loading);
   frame.append(media);
 
-  if (locationName || address) {
-    const caption = make(create, 'p', 'view-on-map__caption');
-    caption.textContent = locationName || address;
-    frame.append(caption);
-  }
-
   if (mapImageUrl) {
     frame.style.backgroundImage = `url(${mapImageUrl})`;
   }

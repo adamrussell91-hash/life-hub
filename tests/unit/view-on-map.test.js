@@ -101,5 +101,6 @@ test('Life medical sheet and Tasks programs import the shared control', async ()
   assert.match(worker, /packages\/design-kit\/js\/view-on-map\.js/);
   assert.match(worker, /packages\/design-kit\/js\/morphing-dialog\.js/);
   assert.match(css, /\.view-on-map__trigger\b/);
+  assert.match(css, /\.view-on-map__dialog \.hub-morph-dialog__close/);
   assert.match(agents, /createViewOnMap/);
 });
