@@ -118,6 +118,34 @@ Do not special-case one path in a way that breaks the general mechanism.
 
 Do not fake success by swallowing errors, serving placeholder or stale data, bypassing validation, auth, or confirmation, hardcoding a one-off result, catching without handling, or weakening tests. Fallbacks must be intentional product behaviour.
 
+Distinguish optional absence, recoverable degradation, and integrity failure. Soft-fail that yields a plausible empty state (empty catch, catch→`{}`/`[]`/`''`, `|| []` masking a failed fetch, log-and-continue as success) is not "resilience" when the user path depends on that data. Prefer fail-visible markers, explicit degraded status, or a failing check over silent emptiness.
+
+## Must / Must-not / Verify (Goodhart-resistant)
+
+For non-trivial work, before claiming done, state briefly:
+
+- **Must** — observable outcome that has to happen
+- **Must-not** — what would still look "done" while violating the user contract
+- **Verify** — evidence that proves Must and Must-not (real path, not a proxy)
+
+Do not accept checks the implementation can game (for example "response mentions pain" when the contract is "do not programme as if the constraint is absent"). Prefer outcome and boundary evidence over keyword presence.
+
+## Evidence honesty
+
+`NOT_RUN`, skipped, unavailable, or inconclusive evidence must never be reported or treated as PASS. Say what was verified and what was not. Visually plausible UI, a 200 response, or a green unrelated test is not evidence for an unexercised path.
+
+## Dual / multi-path parity
+
+One working route, personality, provider, tool, or continuation path does not prove another. When contracts should be shared, exercise the named path under change (Clare desk ≠ Clare chat ≠ Chadwick ≠ Knowledge Clementine).
+
+## Click-path sets / resets
+
+For non-trivial interactive state, identify what an action sets and resets (and derived state). After A → B → undo B, state must match the real post-A contract — not only the visually obvious field.
+
+## Proof / anti-noise for completion and review
+
+Completion claims and review findings need appropriate evidence (failing/passing check, reproduction, concrete path). Speculative "could" lists and "looks done" without exercised outcome are noise, not proof. Zero proven findings is a valid review result.
+
 ## Appropriate evidence, not verification bureaucracy
 
 For trivial work, use trivial verification. Do not create Playwright infrastructure for a typo, add a test framework, create a verification document per task, or leave permanent one-off harnesses without lasting value.

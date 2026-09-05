@@ -23,6 +23,7 @@ import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
 import { buildSystemPrompt } from './_shared/persona.mjs';
+import { CENTRAL_NODE_UNAVAILABLE_MARKER } from '../../apps/life/js/core/context-integrity.js';
 import { loadHubAgentContext } from './_shared/hub-agent-context.mjs';
 import { normalizeProtocolId, protocolSteerBlock } from '../../apps/life/js/app/agent-protocols.js';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
@@ -834,9 +835,10 @@ export function createChatHandler({
             veraIntake = decodeBlob(veraIntakeBlob) || '';
           }
         } catch {
+          // Fail-visible: do not continue as if Central Node were empty-by-design.
           digest = '';
           constraints = '';
-          centralNodeLog = '';
+          centralNodeLog = CENTRAL_NODE_UNAVAILABLE_MARKER;
           centralNodeFull = '';
           centralNodeMarkdown = '';
           centralNodeSha = undefined;

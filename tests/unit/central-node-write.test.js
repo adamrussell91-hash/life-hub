@@ -311,6 +311,7 @@ test('trimCrossAgentSection keeps the newest directives and drops the tail', () 
   assert.match(next, /- Directive 12\./);
   assert.doesNotMatch(next, /- Directive 13\./);
   assert.doesNotMatch(next, /- Directive 15\./);
+  assert.match(next, /life-hub:cross-agent-truncated kept=12 omitted=3/);
   // Non-directive content and later sections survive the trim.
   assert.match(next, /\*One-line directives only\.\*/);
   assert.match(next, /## 📝 Recent Agent Actions/);

@@ -3,6 +3,7 @@ import {
   TODAYS_STATUS_HEADING,
   CROSS_AGENT_HEADING
 } from './constraints.js';
+import { crossAgentTruncationComment } from './context-integrity.js';
 import { addCalendarDays, getSydneyWeekStart, isCalendarDate } from './time.js';
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -347,16 +348,30 @@ export function trimCrossAgentSection(content, { maxLines = MAX_CROSS_AGENT_LINE
   const section = endRel === -1 ? after : after.slice(0, endRel);
   const rest = endRel === -1 ? '' : after.slice(endRel);
 
-  const lines = section.split('\n');
+  // Drop any previous truncation marker so a second trim cannot stack comments.
+  const cleanedSection = section
+    .split('\n')
+    .filter(line => !/<!--\s*life-hub:cross-agent-truncated\b/.test(line))
+    .join('\n');
+
+  const lines = cleanedSection.split('\n');
   const directiveIndexes = lines
     .map((line, index) => (/^\s*[-*]\s+\S/.test(line) ? index : -1))
     .filter(index => index !== -1);
-  if (directiveIndexes.length <= maxLines) return content;
+  if (directiveIndexes.length <= maxLines) {
+    // If we only stripped a stale marker and kept all directives, still rewrite.
+    if (cleanedSection === section) return content;
+    return `${content.slice(0, sectionStart)}${cleanedSection}${rest}`;
+  }
 
   // Newest directives are inserted at the top, so drop from the tail.
+  const omitted = directiveIndexes.length - maxLines;
   const dropFrom = new Set(directiveIndexes.slice(maxLines));
   const kept = lines.filter((_, index) => !dropFrom.has(index));
-  return `${content.slice(0, sectionStart)}${kept.join('\n')}${rest}`;
+  // Fail-visible: "12 lines present" must not look like "12 lines was the full set".
+  const marker = crossAgentTruncationComment({ kept: maxLines, omitted });
+  const body = `${kept.join('\n').replace(/\n+$/u, '')}\n${marker}\n`;
+  return `${content.slice(0, sectionStart)}${body}${rest}`;
 }
 
 export function extractTodaysStatusBlock(content) {
