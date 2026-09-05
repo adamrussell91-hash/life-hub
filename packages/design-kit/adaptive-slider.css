@@ -62,6 +62,11 @@
   line-height: var(--leading-tight);
 }
 
+.hub-slider__label:empty,
+.hub-slider__unit:empty {
+  display: none;
+}
+
 .hub-slider__value {
   display: flex;
   align-items: baseline;
