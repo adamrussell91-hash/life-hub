@@ -751,6 +751,68 @@ test('brisket prompt never receives mind diary digest', () => {
   assert.doesNotMatch(prompt, /Diary leak/);
 });
 
+test('clare prompt instructs Cross-Agent read before dump and a restricted CN patch', () => {
+  const prompt = buildSystemPrompt({ slug: 'clare' });
+  assert.match(prompt, /Hammond→Clare/);
+  assert.match(prompt, /before triaging a dump/);
+  assert.match(prompt, /propose_central_node_patch/);
+  assert.match(prompt, /cross_agent/);
+  assert.match(prompt, /Clare→\[Agent\]/);
+});
+
+test('clare prompt does not include hubContext even when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'clare',
+    hubContext: 'Other hubs leak: Call Clare'
+  });
+  assert.doesNotMatch(prompt, /Other hubs leak/);
+});
+
+test('ann prompt instructs Cross-Agent read before respond and a restricted CN patch', () => {
+  const prompt = buildSystemPrompt({ slug: 'ann' });
+  assert.match(prompt, /Hammond→Ann/);
+  assert.match(prompt, /before responding/);
+  assert.match(prompt, /propose_central_node_patch/);
+  assert.match(prompt, /cross_agent/);
+  assert.match(prompt, /Ann→\[Agent\]/);
+  assert.match(prompt, /lesson\/load/);
+});
+
+test('ann prompt does not include hubContext even when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'ann',
+    hubContext: 'Other hubs leak: upcoming lesson'
+  });
+  assert.doesNotMatch(prompt, /Other hubs leak/);
+});
+
+test('hammond prompt relays to both Clare and Ann', () => {
+  const prompt = buildSystemPrompt({ slug: 'hammond' });
+  assert.match(prompt, /Hammond→Clare/);
+  assert.match(prompt, /Hammond→Ann/);
+  assert.match(prompt, /Clare→Hammond/);
+  assert.match(prompt, /Ann→Hammond/);
+  assert.match(prompt, /Do not address Clementine/);
+});
+
+test('non-clare prompts never include clareBlocks dump-triage prose', () => {
+  const prompt = buildSystemPrompt({ slug: 'brisket' });
+  assert.doesNotMatch(prompt, /before triaging a dump/);
+  assert.doesNotMatch(prompt, /Clare→\[Agent\]/);
+});
+
+test('non-ann prompts never include annBlocks lesson-collision prose', () => {
+  const prompt = buildSystemPrompt({ slug: 'clare' });
+  assert.doesNotMatch(prompt, /lesson\/load/);
+  assert.doesNotMatch(prompt, /Ann→\[Agent\]/);
+});
+
+test('clementine prompt does not gain a Knowledge coordination block', () => {
+  const prompt = buildSystemPrompt({ slug: 'clementine' });
+  assert.doesNotMatch(prompt, /propose_central_node_patch/);
+  assert.doesNotMatch(prompt, /Knowledge Hub coordination/);
+});
+
 test('protocolSteer is injected after voice so the model stays in character', () => {
   const prompt = buildSystemPrompt({
     slug: 'brisket',
