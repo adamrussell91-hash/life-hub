@@ -355,25 +355,6 @@ function buildE1rmRadial(trends) {
   return points.length >= 2 ? points : [];
 }
 
-function buildFocusChord(records) {
-  const pairs = new Map();
-  for (const record of records) {
-    const regions = sessionRegions(record);
-    for (let i = 0; i < regions.length; i += 1) {
-      for (let j = i + 1; j < regions.length; j += 1) {
-        const key = [regions[i], regions[j]].sort().join('|');
-        pairs.set(key, (pairs.get(key) ?? 0) + 1);
-      }
-    }
-  }
-  const edges = [...pairs.entries()].map(([key, count]) => {
-    const [themeA, themeB] = key.split('|');
-    return { themeA, themeB, count };
-  });
-  const regions = new Set(edges.flatMap(edge => [edge.themeA, edge.themeB]));
-  return regions.size >= 2 && edges.length ? edges : [];
-}
-
 function buildBumpRanks(trends, date) {
   const ready = (trends ?? []).filter(lift => lift.series.length >= 2);
   if (ready.length < 2) return [];
@@ -562,82 +543,6 @@ function buildRepRead(items) {
   return REP_READ[dominant.key] ?? dominant.label;
 }
 
-function buildSankeyFlows(events, from, date) {
-  const records = (events ?? []).map(({ record }) => record).filter(record => record?.date >= from && record.date <= date);
-  const planned = records.filter(record => record.status === 'planned');
-  const completed = records.filter(record => record.status === 'completed');
-  const skipped = records.filter(record => record.status === 'skipped');
-  const flows = [];
-  const bump = (fromKey, toKey, count = 1) => {
-    const existing = flows.find(flow => flow.from === fromKey && flow.to === toKey);
-    if (existing) existing.count += count;
-    else flows.push({ from: fromKey, to: toKey, count });
-  };
-  for (const plan of planned) {
-    const actual = completed.find(record => record.date === plan.date);
-    const plannedNames = new Set((plan.exercises ?? []).map(exercise => normalizeExerciseName(exercise.name)).filter(Boolean));
-    if (!actual) {
-      bump('Planned', plan.date < date ? 'Skipped' : 'Planned');
-      continue;
-    }
-    const actualNames = new Set((actual.exercises ?? []).map(exercise => normalizeExerciseName(exercise.name)).filter(Boolean));
-    let asPlanned = 0;
-    let substituted = 0;
-    let dropped = 0;
-    for (const name of plannedNames) {
-      if (actualNames.has(name)) asPlanned += 1;
-      else dropped += 1;
-    }
-    for (const name of actualNames) {
-      if (!plannedNames.has(name)) substituted += 1;
-    }
-    if (asPlanned) bump('Planned', 'Completed as planned', asPlanned);
-    if (substituted) bump('Planned', 'Substituted', substituted);
-    if (dropped) bump('Planned', 'Skipped', dropped);
-    const sets = setCount(actual);
-    if (asPlanned) bump('Completed as planned', 'Logged sets', sets || asPlanned);
-    if (substituted) bump('Substituted', 'Logged sets', sets || substituted);
-  }
-  for (const record of skipped) bump('Planned', 'Skipped');
-  const nodes = new Set(flows.flatMap(flow => [flow.from, flow.to]));
-  return nodes.size >= 3 && flows.length ? flows : [];
-}
-
-function buildLibraryConstellation(records) {
-  const counts = new Map();
-  const edges = new Map();
-  const colours = new Map();
-  for (const record of records) {
-    const names = [];
-    for (const exercise of record.exercises ?? []) {
-      const name = canonicalExerciseName(exercise.name);
-      if (!name) continue;
-      const key = name;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-      if (!colours.has(key)) {
-        const region = resolveExerciseRegion(exercise, record.focus);
-        colours.set(key, REGION_COLOURS[region] ?? CLINICAL_CHART_SLOTS[7]);
-      }
-      names.push({ key, name });
-    }
-    for (let i = 0; i < names.length; i += 1) {
-      for (let j = i + 1; j < names.length; j += 1) {
-        const pair = [names[i].key, names[j].key].sort().join('|');
-        const existing = edges.get(pair) ?? { themeA: names[i].name, themeB: names[j].name, count: 0 };
-        existing.count += 1;
-        edges.set(pair, existing);
-      }
-    }
-  }
-  const nodes = [...counts.entries()].map(([key, count]) => ({
-    key,
-    count,
-    colour: colours.get(key)
-  }));
-  const list = [...edges.values()];
-  return nodes.length >= 2 && list.length ? { nodes, edges: list } : null;
-}
-
 function skipStats(events, from, date) {
   const inWindow = (events ?? [])
     .map(({ record }) => record)
@@ -733,7 +638,6 @@ export function buildFitnessCharts({
     clockPoints: buildClockPoints(history),
     orbitDays: buildOrbitDays(records, windowDates),
     e1rmRadial: buildE1rmRadial(buildE1rmTrends(history)),
-    focusChord: buildFocusChord(records),
     bumpRanks: buildBumpRanks(buildE1rmTrends(history), date),
     regionStream: buildRegionStream(history, date),
     painHeat: buildPainHeat(history, date),
@@ -744,8 +648,6 @@ export function buildFitnessCharts({
     yearDots: buildYearDots(events, date),
     year: Number(String(date).slice(0, 4)),
     repRead: buildRepRead(buildRepRanges(records)),
-    sankeyFlows: buildSankeyFlows(events, from, date),
-    libraryMap: buildLibraryConstellation(history),
     weekTarget
   };
 }
