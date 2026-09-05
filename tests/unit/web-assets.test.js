@@ -162,6 +162,19 @@ test('full-page Chat uses the canvas width and hides the Talking to chip while e
   );
 });
 
+test('Mind keeps a tighter canvas than the shared 76rem shell', async () => {
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+
+  assert.match(
+    css,
+    /:has\(#mind-dashboard:not\(\[hidden\]\)\)\s+\.page-header[\s\S]*max-width:\s*60rem/
+  );
+  assert.match(
+    css,
+    /:has\(#mind-dashboard:not\(\[hidden\]\)\)\s+main[\s\S]*max-width:\s*60rem/
+  );
+});
+
 test('web app manifest is installable and uses only local icons', async () => {
   const manifest = JSON.parse(await readFile(new URL('../../apps/life/manifest.webmanifest', import.meta.url)));
 

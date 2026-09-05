@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { CLINICAL_CHART_SLOTS } from '../../apps/life/js/app/chart-kit/clinical-slots.js';
-import { firstSentence, renderMind } from '../../apps/life/js/app/render-mind.js';
+import { firstSentence, mindBoardColumns, MIND_BOARD_GAP, renderMind } from '../../apps/life/js/app/render-mind.js';
 
 function el(tag = 'div') {
   let text = '';
@@ -524,6 +524,17 @@ test('renderMind hides hero in the empty state and does not require launchers', 
 test('firstSentence keeps one clause', () => {
   assert.equal(firstSentence('Rest is not a prize. Keep going.'), 'Rest is not a prize.');
   assert.equal(firstSentence(''), '');
+});
+
+test('mindBoardColumns follows Mind v2 narrow/default/wide breakpoints', () => {
+  assert.equal(MIND_BOARD_GAP, 12);
+  assert.equal(mindBoardColumns(400), 1);
+  assert.equal(mindBoardColumns(560), 2);
+  assert.equal(mindBoardColumns(899), 2);
+  assert.equal(mindBoardColumns(900), 3);
+  assert.equal(mindBoardColumns(1099), 3);
+  assert.equal(mindBoardColumns(1100), 4);
+  assert.equal(mindBoardColumns(1216), 4);
 });
 
 test('renderMind caps insights to three scan rows', () => {

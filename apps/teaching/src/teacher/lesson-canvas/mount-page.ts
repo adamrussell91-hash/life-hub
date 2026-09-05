@@ -33,6 +33,12 @@ import {
   type DropRootMode
 } from '@/teacher/lesson-canvas/drop';
 import { isInlineEditor } from '@/teacher/lesson-canvas/kinds';
+import {
+  draggable,
+  dropTargetForElements
+} from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import type { CleanupFn } from '@atlaskit/pragmatic-drag-and-drop/types';
+import { isRootBlockDrag, rootBlockDrag } from '@/blocks/teaching-pragmatic-dnd';
 
 const DND_MIME = 'application/x-teaching-hub-block';
 
@@ -196,11 +202,17 @@ export function mountBlockCanvas(
   let activeDropIndex: number | null = null;
   let pendingReveal: string | null = null;
   let publishErrorIds = new Set<string>();
+  let dndCleanups: CleanupFn[] = [];
   const rootMode: DropRootMode = options.allowCollectionAtRoot ? 'page' : 'lesson';
 
   const root = document.createElement('div');
   root.className = 'lesson-page lesson-page--blocks';
   host.append(root);
+
+  function clearDnd(): void {
+    for (const stop of dndCleanups) stop();
+    dndCleanups = [];
+  }
 
   root.addEventListener('dragleave', (event) => {
     const next = (event as DragEvent).relatedTarget as Node | null;
@@ -334,14 +346,42 @@ export function mountBlockCanvas(
     select(block.id);
   }
 
+  function applyRootMove(blockId: string, index: number): void {
+    const result = moveBlockTo(blocks, blockId, { kind: 'root' }, index, { rootMode });
+    if (!result.ok) {
+      setHint(result.message);
+      return;
+    }
+    setHint('');
+    emit(result.blocks);
+    pendingReveal = blockId;
+    select(blockId);
+  }
+
   function createGap(index: number): HTMLElement {
     const gap = document.createElement('div');
     gap.className = 'lesson-page__gap';
     gap.dataset.index = String(index);
     gap.style.pointerEvents = 'auto';
+    // HTML5 path kept for palette / composition drops and existing unit tests.
     gap.addEventListener('dragover', (event) => handleDragOverAt(event, index));
     gap.addEventListener('dragenter', (event) => handleDragOverAt(event, index));
     gap.addEventListener('drop', (event) => handleDropAt(event, index));
+    dndCleanups.push(
+      dropTargetForElements({
+        element: gap,
+        canDrop: ({ source }) => isRootBlockDrag(source.data),
+        onDragEnter: () => showDropIndicator(index),
+        onDragLeave: () => {
+          if (activeDropIndex === index) clearDropIndicator();
+        },
+        onDrop: ({ source }) => {
+          clearDropIndicator();
+          if (!isRootBlockDrag(source.data)) return;
+          applyRootMove(source.data.blockId, index);
+        }
+      })
+    );
     return gap;
   }
 
@@ -373,6 +413,7 @@ export function mountBlockCanvas(
     grip.title = 'Drag to move';
     grip.append(gripIcon());
     grip.addEventListener('click', (event) => event.stopPropagation());
+    // HTML5 MIME kept for palette-compatible drops / unit tests.
     grip.addEventListener('dragstart', (event) => {
       const dt = event.dataTransfer;
       if (!dt) return;
@@ -385,6 +426,17 @@ export function mountBlockCanvas(
       row.classList.remove('lesson-page__block--dragging');
       clearDropIndicator();
     });
+    dndCleanups.push(
+      draggable({
+        element: grip,
+        getInitialData: () => rootBlockDrag(block.id),
+        onDragStart: () => row.classList.add('lesson-page__block--dragging'),
+        onDrop: () => {
+          row.classList.remove('lesson-page__block--dragging');
+          clearDropIndicator();
+        }
+      })
+    );
     return grip;
   }
 
@@ -539,6 +591,7 @@ export function mountBlockCanvas(
   }
 
   function render(): void {
+    clearDnd();
     root.replaceChildren();
 
     if (options.heading) {
@@ -668,6 +721,7 @@ export function mountBlockCanvas(
       }
     },
     dispose() {
+      clearDnd();
       root.remove();
     }
   };

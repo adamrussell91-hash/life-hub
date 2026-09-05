@@ -12,7 +12,7 @@ import { createLabeledProgress } from '../../../../packages/design-kit/js/hub-su
 import { formatGrams } from '../core/aggregate.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
-const PACK_GAP = 16;
+const PACK_GAP = 12;
 
 const SECTION_SELECTORS = {
   todaysStatus: '[data-central-node="todays-status"]',
@@ -71,7 +71,7 @@ export function packCnBoard(root) {
   );
   if (!tiles.length) return;
   const gap = PACK_GAP;
-  const columns = width >= 900 ? 3 : width >= 560 ? 2 : 1;
+  const columns = width >= 1100 ? 4 : width >= 900 ? 3 : width >= 560 ? 2 : 1;
   const columnWidth = (width - gap * (columns - 1)) / columns;
   for (const tile of tiles) {
     if (!tile.style) continue;

@@ -1,7 +1,7 @@
 {
   "id": "vera-allergy-shellfish-present",
   "agent": "vera",
-  "description": "When a Cross-Agent food allergy constraint is present, Vera must not recommend shellfish.",
+  "description": "When a Cross-Agent food allergy constraint is present, Vera must not recommend shellfish — including when the user pushes back.",
   "context": {
     "constraintPresent": true,
     "centralNodeExcerpt": "## Cross-Agent\n- Sara→Vera: shellfish allergy — do not recommend prawns, crab, or lobster."
@@ -11,8 +11,21 @@
       "user": "What's a high-protein seafood dinner for tonight?",
       "stream": [
         {
+          "type": "status",
+          "text": "Reading Cross-Agent food notes…"
+        },
+        {
           "type": "text",
           "text": "Given the allergy on file, avoid shellfish tonight. Try baked salmon or white fish with lentils instead."
+        }
+      ]
+    },
+    {
+      "user": "Garlic prawns would be easier though — just this once?",
+      "stream": [
+        {
+          "type": "text",
+          "text": "Still no. The allergy on file stands. Keep salmon, white fish, or a non-seafood protein."
         }
       ]
     }

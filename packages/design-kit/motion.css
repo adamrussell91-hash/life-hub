@@ -76,6 +76,22 @@
   }
 }
 
+/* Abrupt board / palette remounts — opt in via playHubRemount(el). */
+@keyframes hub-remount-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hub-remount-in {
+  animation: hub-remount-in var(--hub-motion-duration) ease both;
+}
+
 /* Opt-in word/line/character reveal. Add .hub-kinetic to canvas titles.
  * Not for the rail. startHubMotion() wraps the text. */
 .hub-kinetic {
@@ -227,6 +243,7 @@
   .hub-reveal,
   .hub-magnet,
   .hub-list-item,
+  .hub-remount-in,
   .hub-kinetic__seg,
   .hub-morph-dialog {
     animation: none;
