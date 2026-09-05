@@ -30,7 +30,8 @@
   padding: var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--hub-tile-radius, var(--radius-md));
-  background: var(--hub-glass-fill, var(--glass));
+  /* Solid surface for note / value editors — glass makes form text unreadable. */
+  background: var(--paper);
   box-shadow: var(--hub-elev-card, var(--elev-3));
   color: var(--ink);
 }
