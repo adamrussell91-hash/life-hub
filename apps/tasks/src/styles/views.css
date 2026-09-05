@@ -1953,9 +1953,11 @@
 
 .chat-view__toolbar {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .chat-new-button {
@@ -2465,6 +2467,11 @@
 
   .chat-view[data-panel-mode='overlay'] .chat-close-button {
     display: inline-flex;
+  }
+
+  .chat-view[data-panel-mode='overlay'] .chat-view__toolbar .btn {
+    min-height: 2.2rem;
+    padding-inline: var(--space-2);
   }
 
   .chat-view[data-panel-mode='overlay'] .agent-picker__avatar {
