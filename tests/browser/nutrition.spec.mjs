@@ -49,6 +49,7 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     await page.locator('#page-title', { hasText: 'Nutrition' }).waitFor();
     assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 1);
 
+    assert.equal(await page.locator('#nutrition-energy-slider').count(), 0);
     assert.equal(await page.locator('[data-split="energy"]').textContent(), '1,130 / 1,900 kcal');
     assert.equal(await page.locator('[data-split="protein"]').textContent(), '80 g / 120 g');
     assert.equal(await page.locator('[data-split="fat"]').textContent(), '27 g / 50 g');
@@ -86,30 +87,6 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     await page.locator('#nutrition-challenges').waitFor({ state: 'visible' });
     assert.match(await page.locator('.nutrition-challenge__heading strong').textContent(), /No refined sugar/);
     assert.equal(await page.locator('.nutrition-challenge__day').count(), 7);
-  } finally {
-    await context.close();
-  }
-});
-
-test('Nutrition binds the adaptive slider to today\'s logged energy', async () => {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  try {
-    await signIn(page);
-    await page.locator('.desktop-rail [data-section="nutrition"]').click();
-    await page.locator('#nutrition-dashboard').waitFor({ state: 'visible' });
-
-    const slider = page.locator('#nutrition-energy-slider');
-    await slider.waitFor();
-    assert.equal(await slider.locator('[data-slider-digits]').textContent(), '1130');
-    assert.equal(await slider.getAttribute('data-band'), 'mid');
-
-    await slider.locator('input[type=range]').evaluate(input => {
-      input.value = '1600';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    assert.equal(await slider.locator('[data-slider-digits]').textContent(), '1600');
-    assert.equal(await slider.getAttribute('data-band'), 'high');
   } finally {
     await context.close();
   }

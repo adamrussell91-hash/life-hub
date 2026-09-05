@@ -28,7 +28,7 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
 12. `js/hub-kinetic.js` — reusable word/line/character reveal (play / reset, stagger origins). Opt in with `.hub-kinetic` on canvas titles. **Not on the rail.**
 13. `js/morphing-dialog.js` — **locked** micro → expanded card morph (spring FLIP). Overlay: `openMorphingDialog`. In-place: `runMorphTransform`. Route change: `morphFromRect`. Mark shared title / subtitle / image with `data-hub-morph`.
 14. `morphing-popover.css` + `js/morphing-popover.js` — trigger expands into a compact editor (blur fade, 250ms ease-out). Use for short notes, quick text, and dimension / value edits. `createMorphingNotePopover` / `createMorphingValuesPopover`, or copy `snippets/morphing-popover.html` and call `mountMorphingPopovers()`.
-15. `adaptive-slider.css` + `js/adaptive-slider.js` — spring range control (fill, thumb, digit pop). Token bands only. Copy `snippets/adaptive-slider.html` and call `mountAdaptiveSliders()`.
+15. `adaptive-slider.css` + `js/adaptive-slider.js` — spring range **picker** (fill, thumb, digit pop) for a value the user is choosing. Token bands only. Not a display for computed logs (daily energy is meals, not a slider). Copy `snippets/adaptive-slider.html` and call `mountAdaptiveSliders()`.
 16. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `morphing-popover.html`, `adaptive-slider.html`)
 
 ### Passphrase gate (mandatory)

@@ -4,7 +4,6 @@ import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { buildMealProteinPie } from './chart-kit/pie.js';
 import { buildRingTarget } from './chart-kit/ring.js';
 import { formatDisplayDate } from '../core/time.js';
-import { mountAdaptiveSlider, sliderCeiling } from '../../../../packages/design-kit/js/adaptive-slider.js';
 
 const setText = (root, selector, value) => {
   const element = root.querySelector(selector);
@@ -29,7 +28,6 @@ export function renderNutrition(root, model) {
 
   renderMealProteinPie(root, model.nutrition.meals);
 
-  renderEnergySlider(root, model);
   renderMacroSplit(root, model);
   renderMealsToday(root, model.mealsToday);
   renderChallengeTrackers(root, model.challenges);
@@ -354,18 +352,6 @@ function renderProteinTrend(root, trend) {
   if (!badge) return;
   badge.textContent = trend.label;
   badge.dataset.colour = trend.colour;
-}
-
-export function renderEnergySlider(root, model) {
-  const el = root.querySelector?.('#nutrition-energy-slider');
-  if (!el) return null;
-  const calories = Number(model.nutrition?.calories ?? 0);
-  const target = Number(model.targets?.calories ?? 0);
-  const api = mountAdaptiveSlider(el);
-  if (!api) return null;
-  api.setRange({ min: 0, max: sliderCeiling(calories, target, 50), step: 1 });
-  if (!api.isDragging()) api.setValue(calories, { silent: true });
-  return api;
 }
 
 function renderMacroSplit(root, model) {

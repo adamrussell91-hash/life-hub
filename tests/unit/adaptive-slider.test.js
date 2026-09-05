@@ -10,7 +10,6 @@ import {
   sliderCeiling,
   sliderPercentage
 } from '../../packages/design-kit/js/adaptive-slider.js';
-import { renderEnergySlider } from '../../apps/life/js/app/render-nutrition.js';
 
 class FakeEl {
   constructor(tag = 'div', doc = null) {
@@ -286,46 +285,15 @@ test('kit CSS uses tokens and chrome imports the sheet', async () => {
   assert.doesNotMatch(css, /#10B981|#FE55B7|#D946EF|#4946FF|#FEB101|#FEFEFE/i);
 });
 
-test('Life Hub loads and mounts the slider on Nutrition', async () => {
+test('Life Hub does not treat daily energy as a slider', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const main = await readFile(new URL('../../apps/life/js/app/main.js', import.meta.url), 'utf8');
-  const worker = await readFile(new URL('../../apps/life/service-worker.js', import.meta.url), 'utf8');
+  const nutrition = await readFile(new URL('../../apps/life/js/app/render-nutrition.js', import.meta.url), 'utf8');
+  const agents = await readFile(new URL('../../packages/design-kit/AGENTS.md', import.meta.url), 'utf8');
 
-  assert.match(html, /packages\/design-kit\/adaptive-slider\.css/);
-  assert.match(html, /id="nutrition-energy-slider"/);
-  assert.match(html, /data-adaptive-slider/);
-  assert.match(main, /adaptive-slider\.js/);
-  assert.match(main, /mountAdaptiveSliders/);
-  assert.match(worker, /life-hub-shell-v120/);
-  assert.match(worker, /packages\/design-kit\/adaptive-slider\.css/);
-  assert.match(worker, /packages\/design-kit\/js\/adaptive-slider\.js/);
-});
-
-test('renderEnergySlider binds today\'s calories to the daily target', () => {
-  const root = new FakeDoc();
-  const el = root.createElement('div');
-  el.id = 'nutrition-energy-slider';
-  el.classList.add('hub-slider');
-  el.setAttribute('data-adaptive-slider', '');
-  el.setAttribute('data-slider-min', '0');
-  el.setAttribute('data-slider-max', '2500');
-  el.setAttribute('data-slider-step', '50');
-  el.setAttribute('data-slider-value', '0');
-  root.body.append(el);
-
-  const queryRoot = {
-    querySelector(selector) {
-      if (selector === '#nutrition-energy-slider') return el;
-      return root.body.querySelector(selector);
-    }
-  };
-
-  const api = renderEnergySlider(queryRoot, {
-    nutrition: { calories: 1130 },
-    targets: { calories: 1900 }
-  });
-
-  assert.equal(api.getValue(), 1130);
-  assert.deepEqual(api.getRange(), { min: 0, max: 1900, step: 1 });
-  assert.equal(el.dataset.band, 'mid');
+  assert.doesNotMatch(html, /nutrition-energy-slider/);
+  assert.doesNotMatch(html, /data-adaptive-slider/);
+  assert.doesNotMatch(main, /mountAdaptiveSliders/);
+  assert.doesNotMatch(nutrition, /adaptive-slider/);
+  assert.match(agents, /Not a display for computed logs/);
 });
