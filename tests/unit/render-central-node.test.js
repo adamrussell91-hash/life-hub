@@ -314,7 +314,9 @@ test('central node board markup packs tiles and unmounts the protein line and he
   const end = html.indexOf('hub-mobile-nav');
   const block = html.slice(start, end);
 
+  assert.match(block, /data-central-node="progress"/);
   assert.match(block, /id="cn-board"/);
+  assert.ok(block.indexOf('data-central-node="progress"') < block.indexOf('id="cn-board"'));
   assert.match(block, /id="cn-tile-status"[\s\S]*cn-tile__question">Has today been logged\?/);
   assert.match(block, /id="cn-tile-week"[\s\S]*How is protein moving\?/);
   assert.match(block, /id="cn-tile-month"[\s\S]*What's on the month\?/);

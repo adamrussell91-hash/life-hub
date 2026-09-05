@@ -3,6 +3,11 @@
 import { enhanceKinetic, KINETIC_SELECTOR } from './hub-kinetic.js';
 import { mountHubComposes } from './hub-compose.js';
 import { mountAdaptiveSliders } from './adaptive-slider.js';
+import { mountContextualAiBars, mountSelectAiAgents } from './hub-ai-bar.js';
+import { mountInlineEdits } from './hub-inline-edit.js';
+import { mountCreateDisclosures } from './hub-create-disclosure.js';
+import { mountCaptures } from './hub-capture.js';
+import { mountHubSurfaces } from './hub-surfaces.js';
 
 const CARD_SELECTOR = [
   '.metric-card',
@@ -533,6 +538,12 @@ function scan(root, reduced) {
   for (const el of scope.querySelectorAll(SCROLL_HIDE_SELECTOR)) enhanceScrollHide(el);
   mountHubComposes(scope);
   mountAdaptiveSliders(scope);
+  mountContextualAiBars(scope);
+  mountSelectAiAgents(scope);
+  mountInlineEdits(scope);
+  mountCreateDisclosures(scope);
+  mountCaptures(scope);
+  mountHubSurfaces(scope);
 
   if (scope.matches?.(CARD_SELECTOR)) enhanceCard(scope, reduced);
   if (scope.matches?.(MAGNET_SELECTOR)) enhanceMagnet(scope, reduced);

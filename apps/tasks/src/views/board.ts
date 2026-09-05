@@ -95,13 +95,23 @@ function persistStatus(
   byId: Map<string, Task>,
   errorHost: HTMLElement,
   onSuccess: (updated: Task) => void,
-  onReload: () => void
+  onReload: () => void,
+  offerUndo = true
 ): void {
   if (status === task.status) return;
+  const previous = task.status;
   void tasksApi.updateTask(task.id, { status }).then(
     (updated) => {
       byId.set(updated.id, updated);
       onSuccess(updated);
+      if (status === 'done' && offerUndo) {
+        void import('../../design-kit/js/hub-feedback.js').then(({ offerTimedUndo }) => {
+          offerTimedUndo({
+            message: `Completed “${task.title}”`,
+            onUndo: () => persistStatus(updated, previous, byId, errorHost, onSuccess, onReload, false)
+          });
+        });
+      }
     },
     (err: unknown) => {
       errorHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not save the move')));
@@ -251,6 +261,15 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     onToggle: (current) => {
       const next = current.status === 'done' ? 'open' : 'done';
       persistStatus(current, next, byId, confirmHost, upsertTask, onReload);
+    },
+    onPatch: (current, patch) => {
+      void tasksApi.updateTask(current.id, patch).then(
+        (updated) => upsertTask(updated),
+        (err: unknown) => {
+          confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not save')));
+          onReload();
+        }
+      );
     }
   });
 

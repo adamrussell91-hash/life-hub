@@ -1,6 +1,8 @@
 import "./tokens.css";
 import "./style.css";
 import { startHubMotion } from "../design-kit/js/hub-motion.js";
+import { openHubCommandSearch } from "../design-kit/js/hub-command-search.js";
+import { createJournalNav, createPinList } from "../design-kit/js/hub-surfaces.js";
 import { morphFromRect } from "../design-kit/js/morphing-dialog.js";
 import { bindHubAccordion, hubSwitcherHtml } from "../../../packages/hub-switcher.js";
 import type { Attachment, Origin, Page, PageManifestEntry } from "./domain/page";
@@ -111,6 +113,31 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 const DESKTOP_ROW_HEIGHT = 68;
 const MOBILE_ROW_HEIGHT = 104;
 const OVERSCAN = 8;
+const PIN_KEY = "knowledge-hub:pinned-notes";
+
+function readPinnedIds(): string[] {
+  try {
+    const raw = localStorage.getItem(PIN_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePinnedIds(ids: string[]) {
+  localStorage.setItem(PIN_KEY, JSON.stringify(ids));
+}
+
+function isPinned(id: string) {
+  return readPinnedIds().includes(id);
+}
+
+function setPinned(id: string, pinned: boolean) {
+  const next = readPinnedIds().filter(entry => entry !== id);
+  if (pinned) next.unshift(id);
+  writePinnedIds(next);
+}
 
 function listRowHeight() {
   return window.matchMedia("(max-width: 720px)").matches ? MOBILE_ROW_HEIGHT : DESKTOP_ROW_HEIGHT;
@@ -665,12 +692,31 @@ function renderList() {
     </div>
     ${originFilterHtml(entries, originFilter, { labelQuery: originLabelQuery, labelOpen: originLabelOpen })}
     <p class="list-count">${visible.length.toLocaleString()} notes</p>
+    <div data-hub-pins></div>
     <div class="cards list-viewport" aria-label="Archive list"></div>
   `);
   // shell() remounts the viewport — drop the previous painted window so the
   // first paint recreates spacer/window instead of assuming they still exist.
   listPainted = null;
 
+  const pinHost = app.querySelector<HTMLElement>("[data-hub-pins]");
+  if (pinHost) {
+    const pinned = readPinnedIds()
+      .map(id => entries.find(entry => entry.id === id))
+      .filter((entry): entry is PageManifestEntry => Boolean(entry))
+      .map(entry => ({ id: entry.id, label: entry.title, pinned: true }));
+    if (pinned.length) {
+      createPinList({
+        wrap: pinHost,
+        items: pinned,
+        onPin: (id, next) => {
+          setPinned(id, next);
+          render();
+        },
+        onOpen: id => void openPage(id)
+      });
+    }
+  }
   app.querySelector<HTMLButtonElement>("[data-jump-graph]")!.onclick = () => {
     view = "graph";
     render();
@@ -863,8 +909,21 @@ function renderTimeline() {
   shell(`
     ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · university timeline stays on this canvas</p>` : ""}
     ${pageHeader("University", "Study timeline")}
+    <div data-hub-journal></div>
     <section class="uni-tl" data-uni-timeline></section>
   `);
+  const journal = app.querySelector<HTMLElement>("[data-hub-journal]");
+  if (journal) {
+    journal.replaceWith(createJournalNav({
+      current: "timeline",
+      sections: [
+        { id: "all", label: "Archive" },
+        { id: "graph", label: "Graph" },
+        { id: "timeline", label: "Timeline" }
+      ],
+      onSelect: (id) => document.querySelector<HTMLButtonElement>(`[data-nav="${id}"]`)?.click()
+    }).el);
+  }
   const host = app.querySelector<HTMLElement>("[data-uni-timeline]");
   if (host) graphTeardown = mountUniversityTimeline(host);
 }
@@ -1118,7 +1177,8 @@ function renderPage(page: Page) {
     ${pageHeader(
       topics[0] ? escapeHtml(topics[0]) : "Note",
       escapeHtml(page.title),
-      `<button class="btn btn--ghost reader__back" data-back type="button">← Archive</button>
+      `        <button class="btn btn--ghost reader__back" data-back type="button">← Archive</button>
+        <button class="btn btn--ghost" data-pin-note type="button">${isPinned(page.id) ? "Unpin" : "Pin"}</button>
         <button class="btn btn--ghost" data-edit type="button">Edit</button>
         <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyConfirmPending ? "disabled" : ""}>${tidyBusy ? "Cleaning up…" : "Clean up"}</button>
         <button class="btn btn--ghost" data-open-chat type="button">Chat</button>
@@ -1150,6 +1210,11 @@ function renderPage(page: Page) {
     </article>
   `);
 
+  app.querySelector<HTMLButtonElement>("[data-pin-note]")?.addEventListener("click", () => {
+    setPinned(page.id, !isPinned(page.id));
+    showToast(isPinned(page.id) ? "Pinned" : "Unpinned");
+    render();
+  });
   app.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => {
     activePage = null;
     view = "list";
@@ -1464,6 +1529,13 @@ function renderCompose(state: ComposeState) {
     },
     onPhoto: file => void ingestAndApply(file, "photo"),
     onPdf: file => void ingestAndApply(file, "pdf"),
+    onPaste: text => {
+      const body = app.querySelector<HTMLTextAreaElement>("#compose-body");
+      if (!body) return;
+      body.value = body.value ? `${body.value}\n${text}` : text;
+      syncFields();
+      showToast("Pasted");
+    },
   });
 }
 
@@ -1752,4 +1824,23 @@ async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean 
 }
 
 startHubMotion(document);
+document.addEventListener("keydown", event => {
+  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+  if ((event.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable]")) return;
+  event.preventDefault();
+  openHubCommandSearch({
+    placeholder: "Jump in Knowledge Hub",
+    groups: [{
+      heading: "Go to",
+      items: [
+        { id: "all", label: "Archive", hint: "Notes", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=all]")?.click() },
+        { id: "graph", label: "Graph", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=graph]")?.click() },
+        { id: "timeline", label: "Timeline", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=timeline]")?.click() },
+        { id: "chat", label: "Chat", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=chat]")?.click() },
+        { id: "podcast", label: "Podcast", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=podcast]")?.click() },
+        { id: "quiz", label: "Quiz", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=quiz]")?.click() }
+      ]
+    }]
+  });
+});
 boot();

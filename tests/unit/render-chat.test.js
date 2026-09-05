@@ -96,6 +96,19 @@ test('appendMessage still sets plain textContent for simple system-style bubbles
   assert.equal(item.className, 'chat-message chat-message--assistant');
 });
 
+test('renderInlineMarkdown turns headings, quotes, and fenced code into structured blocks', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, '# Title\n> quoted\n```js\nconst x = 1;\n```', { multiline: true });
+
+  assert.equal(container.children[0].tagName, 'h3');
+  assert.equal(container.children[0].children[0].textContent, 'Title');
+  assert.equal(container.children[1].tagName, 'blockquote');
+  assert.equal(container.children[1].children[0].textContent, 'quoted');
+  assert.equal(container.children[2].tagName, 'pre');
+  assert.equal(container.children[2].children[0].textContent, 'const x = 1;');
+});
+
 test('renderInlineMarkdown groups consecutive "- " lines into a single bulleted list', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');
@@ -207,7 +220,7 @@ test('appendRecordProposal adds a read-only exercises summary with cable types',
   assert.match(secondCopy.children[1].textContent, /cable: constant force/);
 });
 
-test('appendRecordProposal renders a planned workout as a startable session card', () => {
+test('appendRecordProposal renders a planned workout as a save-to-Fitness card', () => {
   const root = new FakeDocument();
   const { card, confirm } = appendRecordProposal(root, {
     path: 'data/fitness/2026/07/2026-07-30-test.md',
@@ -230,7 +243,7 @@ test('appendRecordProposal renders a planned workout as a startable session card
   assert.equal(findByClass(card, 'workout-plan-card__title').textContent, 'Upper Body');
   assert.equal(findByClass(card, 'workout-plan-card__meta').textContent, '35 min');
   assert.equal(findByClass(card, 'workout-plan-card__sets').textContent, '4 sets');
-  assert.equal(confirm.textContent, 'Start workout');
+  assert.equal(confirm.textContent, 'Save to Fitness');
   assert.equal(card.children.find(child => child.className === 'record-proposal__fields').children.length, 2);
 });
 

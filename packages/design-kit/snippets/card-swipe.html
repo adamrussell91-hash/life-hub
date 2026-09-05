@@ -1,0 +1,43 @@
+<!-- Horizontal card deck. Swipe / drag, dots, arrow keys.
+     Load tokens.css → overlays.css → actions.css → card-swipe.css
+     then createCardSwipe(root) or copy this markup and mountCardSwipe(el).
+     Workout session: pass existing exercise nodes with { fluid: true }. -->
+
+<div class="hub-card-swipe" data-card-swipe aria-label="Exercises" aria-roledescription="carousel">
+  <p class="hub-card-swipe__status" data-card-swipe-status>1 of 3 · Bench press</p>
+  <div class="hub-card-swipe__viewport">
+    <div class="hub-card-swipe__track">
+      <div class="hub-card-swipe__slide" data-card-swipe-slide data-card-swipe-title="Bench press">
+        <article class="hub-card-swipe__card">
+          <div class="hub-card-swipe__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h16M6 14V9h12v5M8 14v4M16 14v4M4 9h16"/></svg>
+          </div>
+          <h3 class="hub-card-swipe__title">Bench press</h3>
+          <p class="hub-card-swipe__description">4 × 8 · 36 kg · constant force. Chest stays over the handles.</p>
+          <button class="btn btn--primary" type="button" data-card-swipe-ignore>Log set</button>
+        </article>
+      </div>
+      <div class="hub-card-swipe__slide" data-card-swipe-slide data-card-swipe-title="Cable fly">
+        <article class="hub-card-swipe__card">
+          <div class="hub-card-swipe__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 8a5 5 0 0 1 10 0M6 14h12M8 14v5M16 14v5"/></svg>
+          </div>
+          <h3 class="hub-card-swipe__title">Cable fly</h3>
+          <p class="hub-card-swipe__description">3 × 12 · 12 kg · squeeze at the centre, slow return.</p>
+          <button class="btn btn--primary" type="button" data-card-swipe-ignore>Log set</button>
+        </article>
+      </div>
+      <div class="hub-card-swipe__slide" data-card-swipe-slide data-card-swipe-title="Bayesian curl">
+        <article class="hub-card-swipe__card">
+          <div class="hub-card-swipe__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 20V9a4 4 0 0 1 8 0v11M8 12h8"/></svg>
+          </div>
+          <h3 class="hub-card-swipe__title">Bayesian curl</h3>
+          <p class="hub-card-swipe__description">3 × 10 · 14 kg · stretch at the back, no swing.</p>
+          <button class="btn btn--primary" type="button" data-card-swipe-ignore>Log set</button>
+        </article>
+      </div>
+    </div>
+  </div>
+  <div class="hub-card-swipe__dots" data-card-swipe-dots></div>
+</div>

@@ -8,6 +8,7 @@ import { buildThemeTopography } from './chart-kit/stream.js';
 import { buildChordLayout } from './chart-kit/chord-layout.js';
 import { buildCompletionRing, focusCrossAgentEdges, hitMapFromSeries, scanTrendBlocks, weekHorizonMetrics } from './central-node-charts.js';
 import { renderInlineMarkdown } from './render-chat.js';
+import { createLabeledProgress } from '../../../../packages/design-kit/js/hub-surfaces.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
 const PACK_GAP = 16;
@@ -47,6 +48,7 @@ export function renderCentralNode(root, model) {
 
   renderLiveStatus(root, model.liveStatus);
   renderCompletionRing(root, model.completeness);
+  renderDayProgress(root, model.completeness);
   bindCnBoard(root);
   renderWeekHorizon(root, model);
   renderRadialYear(root, model);
@@ -421,6 +423,19 @@ function renderCompletionRing(root, completeness) {
   if (fill) animateRingFill(fill, ring);
   const label = root.querySelector('[data-value="completion-ring-label"]');
   if (label) label.textContent = `${completeness.complete} of ${completeness.total}`;
+}
+
+function renderDayProgress(root, completeness) {
+  const host = root.querySelector('[data-central-node="progress"]');
+  if (!host || !completeness) return;
+  host.replaceChildren();
+  createLabeledProgress({
+    root,
+    wrap: host,
+    label: 'Today',
+    value: completeness.complete,
+    max: completeness.total
+  });
 }
 
 function createSvg(root, tag) {

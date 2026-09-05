@@ -12,7 +12,8 @@ import {
   saveDraft,
   toConfirmPayload
 } from './fitness-logger-draft.js';
-import { hideFitnessLogger, renderFitnessLogger, updateLoggerChrome } from './render-fitness-logger.js';
+import { closeActiveMorphingDialog } from '../../../../packages/design-kit/js/morphing-dialog.js';
+import { collapseExerciseEditor, hideFitnessLogger, renderFitnessLogger, updateLoggerChrome } from './render-fitness-logger.js';
 
 export function createFitnessLoggerController({
   root,
@@ -42,6 +43,8 @@ export function createFitnessLoggerController({
   let finishing = false;
   let mountedPath = null;
   let saveState = '';
+  let exerciseIndex = 0;
+  let expandedExerciseIndex = null;
 
   function elapsedMs() {
     if (timerState === 'running' && segmentStartedAt != null) {
@@ -171,6 +174,8 @@ export function createFitnessLoggerController({
     const exercise = createExercise(name);
     if (!exercise) return;
     draft.exercises = [...(draft.exercises ?? []), exercise];
+    exerciseIndex = draft.exercises.length - 1;
+    expandedExerciseIndex = exerciseIndex;
     touchDraft({ rerenderAfter: true });
   }
 
@@ -179,12 +184,20 @@ export function createFitnessLoggerController({
     const next = moveExercise(draft.exercises, fromIndex, toIndex);
     if (next === draft.exercises) return;
     draft.exercises = next;
+    if (exerciseIndex === fromIndex) exerciseIndex = toIndex;
+    else if (fromIndex < exerciseIndex && toIndex >= exerciseIndex) exerciseIndex -= 1;
+    else if (fromIndex > exerciseIndex && toIndex <= exerciseIndex) exerciseIndex += 1;
     touchDraft({ rerenderAfter: true });
   }
 
-  function removeExercise(exerciseIndex) {
-    if (!draft?.exercises?.[exerciseIndex]) return;
-    draft.exercises = draft.exercises.filter((_, index) => index !== exerciseIndex);
+  function removeExercise(removeIndex) {
+    if (!draft?.exercises?.[removeIndex]) return;
+    draft.exercises = draft.exercises.filter((_, index) => index !== removeIndex);
+    if (removeIndex <= exerciseIndex) exerciseIndex = Math.max(0, exerciseIndex - 1);
+    if (expandedExerciseIndex === removeIndex) expandedExerciseIndex = null;
+    else if (expandedExerciseIndex != null && removeIndex < expandedExerciseIndex) {
+      expandedExerciseIndex -= 1;
+    }
     touchDraft({ rerenderAfter: true });
   }
 
@@ -243,11 +256,32 @@ export function createFitnessLoggerController({
       elapsedMs: elapsedMs(),
       saveState,
       timer: getTimerState(),
+      exerciseIndex,
+      expandedExerciseIndex,
       onChange: applyChange,
       onAddSet: addSet,
       onAddExercise: addExercise,
       onMoveExercise: reorderExercise,
       onRemoveExercise: removeExercise,
+      onExerciseIndexChange: next => {
+        const clamped = Math.min(Math.max(0, next), Math.max(0, (draft?.exercises?.length ?? 1) - 1));
+        const changed = clamped !== exerciseIndex;
+        exerciseIndex = clamped;
+        if (changed && expandedExerciseIndex != null) {
+          expandedExerciseIndex = null;
+          collapseExerciseEditor(root);
+        }
+      },
+      onExpandExercise: next => {
+        exerciseIndex = Math.min(Math.max(0, next), Math.max(0, (draft?.exercises?.length ?? 1) - 1));
+        expandedExerciseIndex = exerciseIndex;
+        rerender();
+      },
+      onCollapseExercise: () => {
+        if (expandedExerciseIndex == null) return;
+        expandedExerciseIndex = null;
+        collapseExerciseEditor(root);
+      },
       onFinish: () => void finish(),
       onStart: startTimer,
       onPause: pauseTimer,
@@ -322,6 +356,8 @@ export function createFitnessLoggerController({
     hideFitnessLogger(root);
     draft = null;
     mountedPath = null;
+    exerciseIndex = 0;
+    expandedExerciseIndex = null;
     saving = false;
     finishing = false;
     saveState = '';
@@ -363,6 +399,8 @@ export function createFitnessLoggerController({
     flushAutosave,
     finish,
     getDraft: () => draft,
+    getExerciseIndex: () => exerciseIndex,
+    getExpandedExerciseIndex: () => expandedExerciseIndex,
     getTimerState,
     startTimer,
     pauseTimer,

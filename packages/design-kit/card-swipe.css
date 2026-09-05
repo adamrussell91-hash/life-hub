@@ -1,0 +1,167 @@
+/* Shared card swipe. Horizontal deck with optional 3D tilt.
+   Tokens only. Respects prefers-reduced-motion.
+   Load tokens.css → overlays.css → actions.css → card-swipe.css
+   (chrome.css imports this). Then createCardSwipe / mountCardSwipe.
+ */
+
+.hub-card-swipe {
+  --hub-card-swipe-item-width: 20rem;
+  --hub-card-swipe-gap: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.hub-card-swipe__status {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hub-card-swipe__viewport {
+  position: relative;
+  width: var(--hub-card-swipe-item-width);
+  overflow: hidden;
+  overflow: clip;
+  perspective: 1000px;
+}
+
+.hub-card-swipe__track {
+  display: flex;
+  align-items: stretch;
+  gap: var(--hub-card-swipe-gap);
+  touch-action: pan-y;
+  cursor: grab;
+  will-change: transform;
+}
+
+.hub-card-swipe.is-dragging .hub-card-swipe__track {
+  cursor: grabbing;
+  transition: none;
+}
+
+.hub-card-swipe__track.is-animated {
+  transition: transform var(--hub-motion-duration, 420ms) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hub-card-swipe__slide {
+  flex: 0 0 var(--hub-card-swipe-item-width);
+  min-width: 0;
+  transform-origin: center center;
+  backface-visibility: hidden;
+}
+
+.hub-card-swipe__slide[aria-hidden="true"] {
+  pointer-events: none;
+}
+
+.hub-card-swipe__slide.is-tilting {
+  transition: transform var(--hub-motion-duration, 420ms) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hub-card-swipe__card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 100%;
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--paper);
+  box-shadow: var(--elev-2);
+  color: var(--ink);
+}
+
+.hub-card-swipe__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-16);
+  height: var(--space-16);
+  margin-bottom: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--warm-white);
+  color: var(--marine);
+  box-shadow: var(--elev-1);
+}
+
+.hub-card-swipe__icon svg {
+  display: block;
+  width: 2rem;
+  height: 2rem;
+}
+
+.hub-card-swipe__title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  color: var(--depth);
+}
+
+.hub-card-swipe__description {
+  margin: 0 0 var(--space-5);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--muted);
+}
+
+.hub-card-swipe__dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.hub-card-swipe__dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--shore);
+  cursor: pointer;
+}
+
+.hub-card-swipe__dot[aria-current="true"] {
+  background: var(--navy);
+}
+
+.hub-card-swipe--fluid {
+  align-items: stretch;
+}
+
+.hub-card-swipe--fluid .hub-card-swipe__viewport,
+.hub-card-swipe--fluid .hub-card-swipe__slide {
+  width: 100%;
+}
+
+.hub-card-swipe--fluid {
+  --hub-card-swipe-item-width: 100%;
+}
+
+.hub-card-swipe input,
+.hub-card-swipe textarea,
+.hub-card-swipe select,
+.hub-card-swipe button:not(.hub-card-swipe__dot) {
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-card-swipe__track.is-animated,
+  .hub-card-swipe__slide.is-tilting {
+    transition: none;
+  }
+
+  .hub-card-swipe__slide {
+    transform: none !important;
+  }
+}
