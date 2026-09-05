@@ -1,0 +1,21 @@
+---
+description: Life Hub is the live umbrella repository. Current consolidation architecture outranks stale folded hub instructions.
+globs:
+alwaysApply: true
+---
+
+# Life Hub umbrella
+
+This repository is the live umbrella code repository for the Life Hub ecosystem.
+
+Permanent rules:
+
+1. life-hub is the application and umbrella code repository.
+2. life-hub-data is the private data store. Do not treat life-hub-data as an application repository or Cursor rules repository.
+3. Teaching, Knowledge, Tasks, Life, and future hub work belong inside this umbrella unless the user explicitly directs otherwise.
+4. Do not revive, recreate, or move new implementation work back into folded standalone hub repositories.
+5. Folded apps may still contain AGENTS.md files or other notes written before consolidation.
+6. When a folded app instruction conflicts with the current umbrella architecture, follow docs/consolidation/plan.md and the current root repository architecture.
+7. docs/consolidation/plan.md is the source of truth for current migration state, deployment topology, domains, services, retired infrastructure, and other operational details.
+8. Root repository instructions and packages/design-kit remain authoritative within their respective scopes.
+9. Ponytail may reduce unnecessary implementation inside the umbrella. It must not split the architecture apart, revive retired repository structures, or weaken explicit product requirements.
