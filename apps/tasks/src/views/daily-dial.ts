@@ -75,7 +75,11 @@ export type DailyDialOptions = {
   now?: Date;
   timeZone?: string;
   filters?: { domain?: CalendarFilters['domain']; priority?: Task['priority'] | 'all' };
+  /** Prefer this hour when the day ring first mounts (e.g. after creating a timed task). */
+  focusHour?: number | null;
   onOpen?: (task: Task) => void;
+  /** Fired when the user taps an hour wedge — Today uses this to seed quick-add time. */
+  onHourSelect?: (hour: number) => void;
 };
 
 function svgEl<K extends keyof SVGElementTagNameMap>(
@@ -368,7 +372,9 @@ function mountDayRing(
   now: Date,
   timeZone: string,
   tasks: Task[],
-  onOpen?: (task: Task) => void
+  onOpen?: (task: Task) => void,
+  focusHour?: number | null,
+  onHourSelect?: (hour: number) => void
 ): { destroy: () => void; positionHand: () => void } {
   const occupancy = hourOccupancy(events);
   const clock = hubClockParts(now, timeZone);
@@ -419,9 +425,20 @@ function mountDayRing(
     dateEl.textContent = formatDisplayDate(parts.dateKey);
   };
 
-  const ring = makeFisheyeRing({
+  const preferredFocus =
+    focusHour != null && focusHour >= 0 && focusHour <= 23
+      ? focusHour
+      : closestOccupiedHour(events, clock.hour);
+
+  let ring: ReturnType<typeof makeFisheyeRing>;
+  const selectHour = (hour: number): void => {
+    onHourSelect?.(hour);
+    ring.focus(hour);
+  };
+
+  ring = makeFisheyeRing({
     count: 24,
-    defaultFocus: closestOccupiedHour(events, clock.hour),
+    defaultFocus: preferredFocus,
     onFrame: (boundaries, focusIndex, settled) => {
       lastBoundaries = boundaries;
       spokes.replaceChildren();
@@ -450,10 +467,16 @@ function mountDayRing(
           : R_IN + Math.max(data.occ, data.occ > 0 ? 0.16 : 0) * (R_OUT_MAX - R_IN);
         if (!focused) {
           const bar = drawArcBar(bars, a0, span, R_IN, Math.max(outerR, R_IN + 3), tintColor(data.cat), false);
-          bar.addEventListener('click', () => ring.focus(i));
+          bar.addEventListener('click', () => selectHour(i));
         }
         const hourEvents = eventsInHour(events, i);
-        drawHit(bars, a0, span, () => ring.focus(i), `${hourCaption(i)}, ${hourEvents.length} ${hourEvents.length === 1 ? 'task' : 'tasks'}`);
+        drawHit(
+          bars,
+          a0,
+          span,
+          () => selectHour(i),
+          `${hourCaption(i)}, ${hourEvents.length} ${hourEvents.length === 1 ? 'task' : 'tasks'}`
+        );
         const mid = (a0 + a1) / 2;
         if (focused) {
           const at = point(R_OUT_MAX + 24, mid);
@@ -648,7 +671,7 @@ export function mountDailyDial(host: HTMLElement, options: DailyDialOptions): Da
   const weekPanel = el('div', 'daily-dial__panel');
   const dayShell = el('div', 'daily-dial__shell');
   const weekShell = el('div', 'daily-dial__shell');
-  dayPanel.append(dayShell, el('p', 'daily-dial__hint', 'Tap an hour to open it up'));
+  dayPanel.append(dayShell, el('p', 'daily-dial__hint', 'Tap an hour to schedule'));
   weekPanel.append(weekShell, el('p', 'daily-dial__hint', 'Tap a day to see its schedule'));
 
   const desc = el('p', 'visually-hidden');
@@ -705,7 +728,16 @@ export function mountDailyDial(host: HTMLElement, options: DailyDialOptions): Da
       });
     }
     if (mode === 'day' && !dayRing) {
-      dayRing = mountDayRing(dayShell, dayEvents, now, timeZone, visibleTasks, options.onOpen);
+      dayRing = mountDayRing(
+        dayShell,
+        dayEvents,
+        now,
+        timeZone,
+        visibleTasks,
+        options.onOpen,
+        options.focusHour,
+        options.onHourSelect
+      );
     }
     if (mode === 'week' && !weekRing) {
       weekRing = mountWeekRing(weekShell, week, byDay, todayKey, visibleTasks, options.onOpen);
