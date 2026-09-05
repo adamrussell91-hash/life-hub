@@ -80,6 +80,19 @@ test('Life Hub tile is favicon and sign-in only, never beside the page title', a
   assert.match(html, /icons\/life-hub\.svg/);
 });
 
+test('Life chrome does not revive retired rail marks, gate copy, or the calorie slider', async () => {
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /class="brand-mark"/);
+  assert.doesNotMatch(html, /class="nav-dot"/);
+  assert.doesNotMatch(html, /sign-in__supporting/);
+  assert.doesNotMatch(html, /apple-touch-icon/);
+  assert.doesNotMatch(html, /nutrition-energy-slider/);
+  assert.doesNotMatch(css, /\.brand-mark\b/);
+  assert.doesNotMatch(css, /\.nav-dot\b/);
+  assert.doesNotMatch(css, /hub-spotlight/);
+});
+
 test('skip link is unavailable until the authenticated shell is revealed', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const shellStart = html.indexOf('id="app-shell"');
