@@ -121,12 +121,23 @@ export function mountPublicLinkControl(
     copyBtn.textContent = options.copyLabel ?? 'Copy';
     copyBtn.addEventListener('click', (event) => {
       event.stopPropagation();
-      void copyText(absolute).then((ok) => {
-        copyBtn.textContent = ok ? 'Copied' : 'Copy failed';
+      const resetLabel = () => {
         window.setTimeout(() => {
           copyBtn.textContent = options.copyLabel ?? 'Copy';
         }, 1500);
-      });
+      };
+      void import('../../design-kit/js/hub-feedback.js')
+        .then(({ showCopyConfirm }) => showCopyConfirm(copyBtn, absolute))
+        .then(() => {
+          copyBtn.textContent = 'Copied';
+          resetLabel();
+        })
+        .catch(() => {
+          void copyText(absolute).then((ok) => {
+            copyBtn.textContent = ok ? 'Copied' : 'Copy failed';
+            resetLabel();
+          });
+        });
     });
 
     const openBtn = document.createElement('a');
