@@ -108,6 +108,24 @@ Do not silently drop context because a field is undefined on one path, a seriali
 
 If context is intentionally excluded, that must be explicit product logic.
 
+## Fail-visible truncation and load failure
+
+When context is trimmed, truncated, or omitted for size, preserve enough signal to distinguish "this is the complete relevant set" from "items were dropped" (kept/omitted counts, marker, or equivalent). A reduced Cross-Agent list must not masquerade as the full mailbox.
+
+When Central Node or other required context fails to load, do not continue as if the agent simply has an empty memory by design — surface a fail-visible unavailable state to the model path and to operators/tests.
+
+## Admission / pseudo-facts
+
+Do not promote agent inference, model speculation, digests, or another personality's assertion into authoritative user truth. Explicit user corrections outrank agent assertions. Digests and summaries are derived context; they must not override fresher user facts or corrections. Cross-agent lines are coordination mail, not proven user state, until confirmed by the owning write path.
+
+## Delivery proof is mandatory for agent-context features
+
+For features that claim a named agent will know something, leave a deterministic check at the final request-assembly boundary (system/prompt string), not only at storage or an intermediate object. Clare or Knowledge success does not prove Chadwick Delivery.
+
+## Behaviour is not keyword Delivery
+
+`prompt contains painFlag` is Delivery only. Behaviour fixtures should use Must / Must-not against the user contract (constraint respected; must-not proceed as if absent) with a negative control when practical. Do not require robotic recitation of flag names. Do not special-case one historical fixture in production code.
+
 ## No fake agent correctness
 
 Do not make an agent test pass by hardcoding the expected response, special-casing the fixture, asserting only HTTP or model success, asserting only storage or retrieval success, asserting only prompt inclusion, mocking away the exact context boundary under test, weakening personality behaviour, removing conflicting context instead of fixing precedence, or bypassing the real agent route.
