@@ -131,7 +131,16 @@ export const ImageBlockSchema = z.object({
   content: z.object({
     url: z.string(),
     alt_text: z.string(),
-    caption: z.string().optional()
+    caption: z.string().optional(),
+    annotations: z
+      .array(
+        z.object({
+          id: z.string().min(1),
+          body: z.string().min(1),
+          selector: z.unknown().optional()
+        })
+      )
+      .optional()
   }),
   ...blockLayout,
   ...blockTimestamps

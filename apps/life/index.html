@@ -441,7 +441,10 @@
               <div class="hub-ai-bar__field">
                 <textarea id="chat-input" class="chat-input hub-ai-bar__input" name="message" rows="1" autocomplete="off" required enterkeyhint="send" placeholder="Message…"></textarea>
               </div>
+              <div id="chat-attach-list" class="chat-attach-list" hidden></div>
               <div class="chat-form__tools hub-ai-bar__tools">
+                <input id="chat-attach-input" class="sr-only" type="file" accept="image/*,text/plain,application/pdf" multiple />
+                <button id="chat-attach" class="btn btn--ghost" type="button" title="Attach">Attach</button>
                 <button id="chat-stop" class="btn btn--secondary" type="button" hidden>Stop</button>
                 <button id="chat-send" class="btn btn--primary" type="submit">Send</button>
               </div>

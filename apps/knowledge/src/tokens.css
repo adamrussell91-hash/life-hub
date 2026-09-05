@@ -10,6 +10,7 @@
 @import "../design-kit/mobile.css";
 @import "../design-kit/hub-compose.css";
 @import "../design-kit/hub-interactions.css";
+@import "../design-kit/hub-audio-player.css";
 
 :root {
   --paper: var(--warm-white);

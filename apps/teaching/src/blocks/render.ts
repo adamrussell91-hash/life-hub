@@ -25,6 +25,8 @@ import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block, type EmbedProvider } from 
 import { renderOutcomeList } from '@/outcomes/display';
 import type { PublicOutcome } from '@/curriculum/outcome-catalog';
 import { openHubMediaViewer } from '../../design-kit/js/hub-media-viewer.js';
+import { createHubAudioPlayer } from '../../design-kit/js/hub-audio-player.js';
+import { mountHubImageAnnotator } from '../../design-kit/js/hub-image-annotate.js';
 import 'photoswipe/dist/photoswipe.css';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
@@ -168,6 +170,22 @@ export function renderImageBlock(
       img.replaceWith(unavailable);
     });
     figure.append(img);
+    const annotations = Array.isArray((block.content as { annotations?: unknown }).annotations)
+      ? (block.content as { annotations?: unknown }).annotations
+      : [];
+    if (mode !== 'print' && (annotations?.length || mode === 'edit')) {
+      img.addEventListener(
+        'load',
+        () => {
+          void mountHubImageAnnotator(img, {
+            annotations: annotations as never,
+            readOnly: mode !== 'edit',
+          });
+        },
+        { once: true }
+      );
+      if (img.complete) img.dispatchEvent(new Event('load'));
+    }
   } else {
     const unavailable = document.createElement('p');
     unavailable.className = 'block-image__unavailable';
@@ -542,11 +560,12 @@ export function renderAudioBlock(
   }
 
   if (isHttpUrl(block.content.url)) {
-    const audio = document.createElement('audio');
-    audio.className = 'block-audio__player';
-    audio.controls = true;
-    audio.src = block.content.url.trim();
-    wrap.append(audio);
+    const host = document.createElement('div');
+    host.className = 'block-audio__player';
+    wrap.append(host);
+    void createHubAudioPlayer(block.content.url.trim(), { className: 'block-audio__chrome' }).then(player => {
+      if (player) host.replaceChildren(player);
+    });
   } else {
     const unavailable = document.createElement('p');
     unavailable.className = 'block-audio__unavailable';

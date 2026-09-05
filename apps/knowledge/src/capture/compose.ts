@@ -101,6 +101,7 @@ export function captureFieldHtml(state: CaptureUiState) {
           <button class="btn" data-capture-pdf type="button" ${captureOthersDisabled}>PDF</button>
           <button class="btn btn--ghost" data-capture-paste type="button" ${captureOthersDisabled}>Paste</button>
         </div>
+        <div class="compose__voice-wave hub-voice-wave" data-voice-wave hidden></div>
         <input id="compose-photo" class="compose__hidden-file" type="file" accept="image/*,.heic,.heif,image/heic,image/heif" capture="environment" />
         <input id="compose-scan" class="compose__hidden-file" type="file" accept="image/*,.heic,.heif,image/heic,image/heif" capture="environment" />
         <input id="compose-pdf" class="compose__hidden-file" type="file" accept="application/pdf" />
@@ -339,10 +340,16 @@ export type VoiceCaptureHandle = {
   stopMic: () => void;
 };
 
-export function createVoiceCapture(opts: { onFile: (file: File) => void }): VoiceCaptureHandle {
+export function createVoiceCapture(opts: {
+  onFile: (file: File) => void;
+  waveformHost?: HTMLElement | null;
+}): VoiceCaptureHandle {
   let recorder: MediaRecorder | null = null;
   let chunks: Blob[] = [];
   let stream: MediaStream | null = null;
+  let wave: Awaited<ReturnType<typeof import("../../design-kit/js/hub-voice-recorder.js").createHubVoiceRecorder>> | null =
+    null;
+  let waveLoading: Promise<void> | null = null;
 
   const stopMic = () => {
     recorder = null;
@@ -351,9 +358,41 @@ export function createVoiceCapture(opts: { onFile: (file: File) => void }): Voic
     stream = null;
   };
 
+  const ensureWave = async () => {
+    if (!opts.waveformHost) return null;
+    if (wave) return wave;
+    if (!waveLoading) {
+      waveLoading = (async () => {
+        const { createHubVoiceRecorder } = await import("../../design-kit/js/hub-voice-recorder.js");
+        opts.waveformHost!.hidden = false;
+        wave = await createHubVoiceRecorder({
+          host: opts.waveformHost!,
+          onFile: opts.onFile,
+        });
+      })().catch(() => {
+        wave = null;
+      });
+    }
+    await waveLoading;
+    return wave;
+  };
+
   return {
-    stopMic,
+    stopMic() {
+      wave?.destroy();
+      wave = null;
+      waveLoading = null;
+      if (opts.waveformHost) opts.waveformHost.hidden = true;
+      stopMic();
+    },
     async toggle() {
+      const waveHandle = await ensureWave();
+      if (waveHandle) {
+        const result = await waveHandle.toggle();
+        if (result === "denied") return "denied";
+        if (result === "started") return "started";
+        return "stopping";
+      }
       if (recorder) {
         recorder.stop();
         return "stopping";
