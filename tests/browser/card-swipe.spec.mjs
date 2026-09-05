@@ -26,6 +26,7 @@ const PREVIEW = `<!doctype html>
 <body>
   <div id="logger" class="fitness-logger"></div>
   <script type="module">
+    import { closeActiveMorphingDialog } from '/packages/design-kit/js/morphing-dialog.js';
     import { renderFitnessLogger } from '/js/app/render-fitness-logger.js';
 
     const draft = {
@@ -64,8 +65,10 @@ const PREVIEW = `<!doctype html>
         timer: { state: 'running', everStarted: true, completeVisible: true },
         onExerciseIndexChange(next) {
           exerciseIndex = next;
-          expandedExerciseIndex = null;
-          paint();
+          if (expandedExerciseIndex != null) {
+            expandedExerciseIndex = null;
+            closeActiveMorphingDialog();
+          }
         },
         onExpandExercise(next) {
           exerciseIndex = next;
@@ -73,8 +76,9 @@ const PREVIEW = `<!doctype html>
           paint();
         },
         onCollapseExercise() {
+          if (expandedExerciseIndex == null) return;
           expandedExerciseIndex = null;
-          paint();
+          closeActiveMorphingDialog();
         }
       });
     }
