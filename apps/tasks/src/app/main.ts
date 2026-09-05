@@ -65,7 +65,7 @@ import { renderReminderStrip } from '@/views/reminder-strip';
 import { loadTaskProperties } from '@/services/task-properties';
 import { tasksApi } from '@/services/client-api';
 import { mapsOrSeed } from '@/domain/maps';
-import { hydrateFocusFromHash } from '@/domain/focus';
+import { getFocus, hydrateFocusFromHash, mergeFocusIntoHash } from '@/domain/focus';
 
 function renderNotFound(canvas: HTMLElement, hash: string): void {
   canvas.replaceChildren();
@@ -265,6 +265,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
     try {
       if (!soft) await renderReminderStrip(shell.reminderHost, () => void paint({ force: true }));
       hydrateFocusFromHash();
+      // Sidebar links are bare `#/week` etc. — re-attach focus so multi-rep selection survives.
+      mergeFocusIntoHash(getFocus());
       await renderActiveView(view, shell.canvas);
       lastView = view;
     } catch (err) {

@@ -65,4 +65,11 @@ describe('focus contract', () => {
     expect(ref).toEqual({ type: 'task', id: 't42' });
     expect(getFocus()?.id).toBe('t42');
   });
+
+  it('re-attaches focus onto a bare view hash (sidebar nav)', () => {
+    setFocus({ type: 'task', id: 'keep-me' }, { persistUrl: false });
+    const next = mergeFocusIntoHash(getFocus(), '#/week');
+    expect(next).toBe('#/week?focus=task%3Akeep-me');
+    expect(hydrateFocusFromHash('#/timeline')).toEqual({ type: 'task', id: 'keep-me' });
+  });
 });

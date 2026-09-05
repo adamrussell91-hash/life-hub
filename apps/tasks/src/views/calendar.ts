@@ -261,7 +261,22 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   hydrateFocusFromHash();
   const focusRef = getFocus();
   const focusItemId = focusRef ? calendarItemIdForFocus(focusRef) : null;
-  if (focusItemId) selectedItemId = focusItemId;
+  if (focusItemId) {
+    selectedItemId = focusItemId;
+    const focused = filterCalendarItems(collectCalendarItems(tasks, projects), sessionFilters).find(
+      (item) => item.id === focusItemId
+    );
+    if (focused?.date_key) {
+      const focusedDay = parseCalendarAnchor(focused.date_key, today);
+      const days = visibleDays(anchor, session.mode);
+      const startKey = toDateKey(days[0]!);
+      const endKey = toDateKey(days[days.length - 1]!);
+      if (focused.date_key < startKey || focused.date_key > endKey) {
+        anchor = focusedDay;
+        selectedDateKey = focused.date_key;
+      }
+    }
+  }
 
   function allItems(): CalendarItem[] {
     return filterCalendarItems(collectCalendarItems(tasks, projects), sessionFilters);
