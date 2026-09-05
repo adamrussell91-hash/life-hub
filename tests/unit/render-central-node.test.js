@@ -18,6 +18,7 @@ class FakeElement {
     this._width = 0;
     this.classList = { add() {}, remove() {} };
     this.listeners = [];
+    this._listeners = {};
   }
 
   getBoundingClientRect() {
@@ -26,6 +27,8 @@ class FakeElement {
 
   addEventListener(type, fn) {
     this.listeners.push([type, fn]);
+    if (!this._listeners[type]) this._listeners[type] = [];
+    this._listeners[type].push(fn);
   }
 
   click() {
@@ -465,4 +468,43 @@ test('renderCentralNode honest-empties the stream when there are no weekly bands
     String(node.className).includes('cn-honest-empty')
   );
   assert.match(empty.textContent, /Need 1 weekly domain bands/);
+});
+
+test('renderCentralNode honest-empties a chord with fewer than 3 pairs', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel({
+    crossAgent: {
+      edges: [{ themeA: 'Chadwick', themeB: 'Sara', count: 4 }],
+      details: [{ themeA: 'Chadwick', themeB: 'Sara', lines: ['Chadwick→Sara: AC flag.'] }]
+    }
+  }));
+  const empty = root.querySelector('#cn-tile-cross-agent').children.find(node =>
+    String(node.className).includes('cn-honest-empty')
+  );
+  assert.match(empty.textContent, /Need 3 paired handoffs/);
+  assert.match(empty.textContent, /1 so far/);
+});
+
+test('renderCentralNode paints a chord and focuses a line into the caption', () => {
+  const root = fakeCentralNodeRoot();
+  const details = [
+    { themeA: 'Chadwick', themeB: 'Sara', lines: ['Chadwick→Sara: AC flag.'] },
+    { themeA: 'Hammond', themeB: 'Ann', lines: ['Hammond→Ann: teaching handoff.'] },
+    { themeA: 'Vera', themeB: 'Penelope', lines: ['Vera→Penelope: weekend framed as escape.'] }
+  ];
+  renderCentralNode(root, baseModel({
+    crossAgent: {
+      edges: details.map(row => ({ themeA: row.themeA, themeB: row.themeB, count: 1 })),
+      details
+    }
+  }));
+  const svg = root.querySelector('#central-node-chord');
+  assert.ok(svg.children.some(node => node.getAttribute('data-role') === 'arc'));
+  assert.ok(svg.children.some(node => node.getAttribute('data-role') === 'ribbon'));
+  const caption = root.querySelector('[data-cn="chord-detail"]');
+  assert.match(caption.textContent, /→/);
+  const arc = svg.children.find(node => node.getAttribute('data-theme') === 'Hammond');
+  arc._listeners.focus[0]();
+  assert.match(caption.textContent, /Hammond→Ann/);
+  assert.equal(root._sections['cross-agent'].hidden, true);
 });
