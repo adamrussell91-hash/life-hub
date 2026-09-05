@@ -167,6 +167,17 @@ test('a horizontal drag past the buffer advances the card', () => {
   assert.equal(swipe.getIndex(), 1);
 });
 
+test('createCardSwipe keeps the requested index until slides are appended', () => {
+  const root = new FakeDoc();
+  const swipe = createCardSwipe({ root, items: [], currentIndex: 2 });
+  swipe.appendSlide(root.createElement('div'), { title: 'One' });
+  swipe.appendSlide(root.createElement('div'), { title: 'Two' });
+  swipe.appendSlide(root.createElement('div'), { title: 'Three' });
+  swipe.sync();
+  assert.equal(swipe.getIndex(), 2);
+  assert.match(swipe.status.textContent, /3 of 3 · Three/);
+});
+
 test('drags that start on an input do not change the card', () => {
   const root = new FakeDoc();
   const swipe = createCardSwipe({ root, items: [] });

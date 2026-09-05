@@ -334,8 +334,9 @@ function bindCardSwipe(wrap, {
   }
 
   function clamp(next) {
-    const last = Math.max(0, count() - 1);
-    return Math.min(Math.max(0, next), last);
+    const total = count();
+    if (total === 0) return Math.max(0, next);
+    return Math.min(Math.max(0, next), total - 1);
   }
 
   function stepWidth() {
