@@ -8,7 +8,6 @@ import { buildEnergyOrbit } from './chart-kit/energy-orbit.js';
 import { buildHorizonBands } from './chart-kit/horizon.js';
 import { buildMoodMixDonut } from './chart-kit/mood-mix.js';
 import { buildMoodRadial } from './chart-kit/mood-radial.js';
-import { buildDistributionPie } from './chart-kit/pie.js';
 import { polar, thetaForDate, thetaForTime } from './chart-kit/polar-clock.js';
 import { rangeBarLayout, rangeBarTick } from './chart-kit/range-bar.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
