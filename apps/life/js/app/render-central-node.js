@@ -9,6 +9,7 @@ import { buildChordLayout } from './chart-kit/chord-layout.js';
 import { buildCompletionRing, focusCrossAgentEdges, hitMapFromSeries, scanTrendBlocks, weekHorizonMetrics } from './central-node-charts.js';
 import { renderInlineMarkdown } from './render-chat.js';
 import { createLabeledProgress } from '../../../../packages/design-kit/js/hub-surfaces.js';
+import { formatGrams } from '../core/aggregate.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
 const PACK_GAP = 16;
@@ -402,7 +403,7 @@ function renderLiveStatus(root, liveStatus) {
   }
   const el = root.querySelector('[data-live-snapshot]');
   if (el) {
-    el.textContent = `Protein ${snapshot.protein_g} g · Energy ${snapshot.calories.toLocaleString('en-AU')} kcal · Fat ${snapshot.fat_g} g`;
+    el.textContent = `Protein ${formatGrams(snapshot.protein_g)} g · Energy ${snapshot.calories.toLocaleString('en-AU')} kcal · Fat ${formatGrams(snapshot.fat_g)} g`;
   }
 }
 

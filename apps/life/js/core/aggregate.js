@@ -7,10 +7,20 @@ const BODY_TYPES = new Set(['weight', 'composition']);
 
 const toRecord = item => item?.record ?? item;
 const getRecords = items => items.map(toRecord);
-const sum = (items, field) => items.reduce(
-  (total, item) => total + (Number(item[field]) || 0),
-  0
-);
+// Round to 1 decimal so summed meal macros don't print as 135.10000000000002.
+const sum = (items, field) => {
+  const total = items.reduce(
+    (acc, item) => acc + (Number(item[field]) || 0),
+    0
+  );
+  return Math.round(total * 10) / 10;
+};
+
+/** Grams for UI: whole numbers stay bare; otherwise one decimal (no float noise). */
+export function formatGrams(n) {
+  const v = Math.round(Number(n) * 10) / 10;
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
 
 export function aggregateNutrition(items, date) {
   const meals = getRecords(items).filter(record => record.type === 'meal' && record.date === date);

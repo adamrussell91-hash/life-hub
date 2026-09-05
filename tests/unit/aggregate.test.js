@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   aggregateNutrition,
   calculateWorkoutStreak,
+  formatGrams,
   getLoggingCompleteness,
   getTopSets,
   hasRecoveryBonus,
@@ -37,6 +38,23 @@ test('matches the approved sample Home totals for parsed events', () => {
   });
   assert.equal(resolveDayType(events, '2026-07-30'), 'workout_30');
   assert.deepEqual(getTopSets(events[2]), { 'Chest Press': { weight_kg: 34, reps: 8 } });
+});
+
+test('fat and protein sums round off IEEE754 noise to one decimal', () => {
+  // 12.3 + 45.6 + 77.2 === 135.10000000000002 without rounding
+  const meals = [
+    { type: 'meal', date: '2026-09-05', meal: 'breakfast', fat_g: 12.3, protein_g: 30.1, calories: 400 },
+    { type: 'meal', date: '2026-09-05', meal: 'lunch', fat_g: 45.6, protein_g: 50.3, calories: 500 },
+    { type: 'meal', date: '2026-09-05', meal: 'dinner', fat_g: 77.2, protein_g: 59.3, calories: 600 }
+  ];
+  assert.equal(String(12.3 + 45.6 + 77.2), '135.10000000000002');
+  const nutrition = aggregateNutrition(meals, '2026-09-05');
+  assert.equal(nutrition.fat_g, 135.1);
+  assert.equal(String(nutrition.fat_g), '135.1');
+  assert.equal(formatGrams(135.10000000000002), '135.1');
+  assert.equal(formatGrams(139.7), '139.7');
+  assert.equal(formatGrams(50), '50');
+  assert.equal(nutrition.protein_g, 139.7);
 });
 
 test('empty and missing additive nutrition values contribute zero', () => {

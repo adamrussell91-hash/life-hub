@@ -120,3 +120,13 @@ test('renderHome clears nutrition--fat-over when fat is within the ceiling', () 
   renderHome(root, { ...baseModel, overFatCeiling: false, nutrition: { ...baseModel.nutrition, fat_g: 27 } });
   assert.equal(root.home.classList.contains('nutrition--fat-over'), false);
 });
+
+test('renderHome formats fat grams without float noise', () => {
+  const root = new FakeDocument();
+  renderHome(root, {
+    ...baseModel,
+    nutrition: { ...baseModel.nutrition, fat_g: 135.10000000000002, protein_g: 139.7 }
+  });
+  assert.equal(root.nodes.get('[data-value="fat"]').textContent, '135.1 g');
+  assert.equal(root.nodes.get('[data-value="protein"]').textContent, '139.7 g');
+});

@@ -4,6 +4,7 @@ import {
   CROSS_AGENT_HEADING
 } from './constraints.js';
 import { crossAgentTruncationComment } from './context-integrity.js';
+import { formatGrams } from './aggregate.js';
 import { addCalendarDays, getSydneyWeekStart, isCalendarDate } from './time.js';
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -36,8 +37,8 @@ export function formatLogDate(dateKey) {
 export function buildNutritionStatusLine(totals) {
   const parts = [
     totals.calories != null ? `${Number(totals.calories).toLocaleString('en-AU')} kcal` : null,
-    totals.protein_g != null ? `${totals.protein_g}g P` : null,
-    totals.fat_g != null ? `${totals.fat_g}g F` : null,
+    totals.protein_g != null ? `${formatGrams(totals.protein_g)}g P` : null,
+    totals.fat_g != null ? `${formatGrams(totals.fat_g)}g F` : null,
     totals.sodium_mg != null ? `${Number(totals.sodium_mg).toLocaleString('en-AU')}mg Na` : null,
     totals.calcium_mg != null ? `${Number(totals.calcium_mg).toLocaleString('en-AU')}mg Ca` : null,
     totals.polyphenol_score != null ? `polyphenol ${totals.polyphenol_score}` : null
