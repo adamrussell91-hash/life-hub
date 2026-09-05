@@ -1,4 +1,4 @@
-import type { Task } from '@/schemas/task';
+import type { Task, TaskDomain, TaskPriority, TaskStatus } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import type { BoardColumnId } from '@/domain/board';
 import {
@@ -13,8 +13,10 @@ import {
   taskPageHash
 } from '@/domain/cards';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { createMorphingClosedFieldPopover } from '../../design-kit/js/morphing-popover.js';
 import { cardTransitionName, runContainerTransform } from '@/views/container-transform';
 import { closeCardMenu, renderCardMenu, type CardMenuItem } from '@/views/card-menu';
+import { domainFilterOptions, priorityFilterOptions, statusFilterOptions } from '@/views/hub-kit';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -55,10 +57,89 @@ function chevron(up = false): SVGSVGElement {
   return node;
 }
 
-function domainChip(domain: string): HTMLElement {
-  const chip = el('span', 'hub-chip', domain[0]!.toUpperCase() + domain.slice(1));
-  chip.dataset.area = domain;
-  return chip;
+export type TaskFieldPatch = Partial<Pick<Task, 'status' | 'priority' | 'domain'>>;
+
+function titleCase(value: string): string {
+  return value ? value[0]!.toUpperCase() + value.slice(1) : value;
+}
+
+function closedFieldChip(spec: {
+  faceClass: (value: string) => string;
+  text: string;
+  dataset?: Record<string, string>;
+  title: string;
+  value: string;
+  choices: Array<{ value: string; label: string }>;
+  onSave?: (value: string) => void;
+}): HTMLElement {
+  if (!spec.onSave) {
+    const node = el('span', spec.faceClass(spec.value), spec.text);
+    if (spec.dataset) {
+      for (const [key, value] of Object.entries(spec.dataset)) node.dataset[key] = value;
+    }
+    return node;
+  }
+  const trigger = el('button', spec.faceClass(spec.value), spec.text) as HTMLButtonElement;
+  trigger.type = 'button';
+  if (spec.dataset) {
+    for (const [key, value] of Object.entries(spec.dataset)) trigger.dataset[key] = value;
+  }
+  const popover = createMorphingClosedFieldPopover({
+    root: document,
+    trigger,
+    title: spec.title,
+    supporting: 'Closed list. Save writes it.',
+    options: spec.choices,
+    value: spec.value,
+    onSave(value) {
+      trigger.className = `${spec.faceClass(value)} morphing-popover__trigger`;
+      if (spec.dataset) {
+        for (const key of Object.keys(spec.dataset)) {
+          if (key === 'priority' || key === 'area') trigger.dataset[key] = value;
+        }
+      }
+      spec.onSave?.(value);
+    }
+  });
+  return popover.el;
+}
+
+function domainChip(domain: string, onSave?: (value: string) => void): HTMLElement {
+  return closedFieldChip({
+    faceClass: () => 'hub-chip',
+    text: titleCase(domain),
+    dataset: { area: domain },
+    title: 'Domain',
+    value: domain,
+    choices: domainFilterOptions(false).map((option) => ({
+      value: option.value,
+      label: titleCase(option.label)
+    })),
+    onSave
+  });
+}
+
+function priorityChip(priority: string, onSave?: (value: string) => void): HTMLElement {
+  return closedFieldChip({
+    faceClass: () => 'priority-chip',
+    text: priority,
+    dataset: { priority },
+    title: 'Priority',
+    value: priority,
+    choices: priorityFilterOptions(false),
+    onSave
+  });
+}
+
+function statusChip(status: string, onSave?: (value: string) => void): HTMLElement {
+  return closedFieldChip({
+    faceClass: (value) => statusBadgeClass(value),
+    text: statusLabel(status),
+    title: 'Status',
+    value: status,
+    choices: statusFilterOptions(false).filter((option) => option.value !== 'dead'),
+    onSave
+  });
 }
 
 function dateBadge(due: string | null, prefix = ''): HTMLElement | null {
@@ -72,6 +153,7 @@ export type TaskCardHandlers = {
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
   onToggle?: (task: Task) => void;
+  onPatch?: (task: Task, patch: TaskFieldPatch) => void | Promise<void>;
   onOpenPage?: (task: Task) => void;
   onExpand?: (task: Task) => void;
   onCollapse?: (task: Task) => void;
@@ -95,7 +177,10 @@ function morphTarget(slot: HTMLElement): HTMLElement | null {
 }
 
 function isInteractive(target: EventTarget | null): boolean {
-  return target instanceof Element && Boolean(target.closest('button, a, input, textarea, select, label'));
+  return (
+    target instanceof Element &&
+    Boolean(target.closest('button, a, input, textarea, select, label, .morphing-popover'))
+  );
 }
 
 function boardCardInteractive(target: EventTarget | null): boolean {
@@ -177,10 +262,15 @@ export function renderTaskMicroCard(task: Task, handlers: TaskCardHandlers = {})
   const title = el('p', 'hub-row__title card-title', task.title);
   title.setAttribute('data-hub-morph', 'title');
   const chips = el('div', 'hub-chips');
-  chips.append(domainChip(task.domain));
-  const priority = el('span', 'priority-chip', task.priority);
-  priority.dataset.priority = task.priority;
-  chips.append(priority);
+  chips.append(
+    domainChip(task.domain, handlers.onPatch ? (value) => void handlers.onPatch?.(task, { domain: value as TaskDomain }) : undefined)
+  );
+  chips.append(
+    priorityChip(
+      task.priority,
+      handlers.onPatch ? (value) => void handlers.onPatch?.(task, { priority: value as TaskPriority }) : undefined
+    )
+  );
   const foot = el('div', 'hub-row__foot');
   const meta = el('div', 'hub-row__foot-meta');
   const due = dateBadge(task.due_date);
@@ -197,15 +287,26 @@ export function renderTaskExpandedCard(task: Task, handlers: TaskCardHandlers = 
   card.dataset.taskId = task.id;
   card.setAttribute('aria-label', `${task.title} task card`);
   const head = el('header', 'task-card__head');
-  head.append(el('span', 'hub-card__eyebrow', 'Task'), el('span', statusBadgeClass(task.status), statusLabel(task.status)));
+  head.append(
+    el('span', 'hub-card__eyebrow', 'Task'),
+    statusChip(
+      task.status,
+      handlers.onPatch ? (value) => void handlers.onPatch?.(task, { status: value as TaskStatus }) : undefined
+    )
+  );
   const title = el('h2', 'hub-card__title card-title', task.title);
   title.setAttribute('data-hub-morph', 'title');
   const tags = el('div', 'task-card__tags-row');
   const chips = el('div', 'hub-chips');
-  chips.append(domainChip(task.domain));
-  const priority = el('span', 'priority-chip', task.priority);
-  priority.dataset.priority = task.priority;
-  chips.append(priority);
+  chips.append(
+    domainChip(task.domain, handlers.onPatch ? (value) => void handlers.onPatch?.(task, { domain: value as TaskDomain }) : undefined)
+  );
+  chips.append(
+    priorityChip(
+      task.priority,
+      handlers.onPatch ? (value) => void handlers.onPatch?.(task, { priority: value as TaskPriority }) : undefined
+    )
+  );
   for (const tag of task.tags) chips.append(el('span', 'hub-chip', tag));
   tags.append(chips);
   const due = dateBadge(task.due_date, 'Due ');

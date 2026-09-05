@@ -217,7 +217,15 @@ function renderStop(
       onOpenPage: (task) => {
         location.hash = taskPageHash(task.id);
       },
-      onDelete: (task) => deleteTaskNow(task, reload, confirmHost)
+      onDelete: (task) => deleteTaskNow(task, reload, confirmHost),
+      onPatch: (task, patch) => {
+        void tasksApi.updateTask(task.id, patch).then(
+          (saved) => afterTaskSave(task, saved, reload, onEventDate),
+          (err: unknown) => {
+            confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not save')));
+          }
+        );
+      }
     });
   } else {
     body.append(renderMissingCard(stop, project, confirmHost, reload, onEventDate));
