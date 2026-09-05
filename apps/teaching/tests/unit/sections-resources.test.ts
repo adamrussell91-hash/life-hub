@@ -169,7 +169,7 @@ describe('resources section', () => {
     expect(canvas.querySelector('[data-drive-pick]')).toBeTruthy();
   });
 
-  it('archives media then calls refresh', () => {
+  it('archives media then calls refresh', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const refresh = vi.fn().mockResolvedValue(undefined);
     renderResourcesIndex(canvas, curriculum, { refresh });
@@ -180,7 +180,16 @@ describe('resources section', () => {
     expect(archiveBtn).toBeTruthy();
     archiveBtn!.click();
 
-    expect(refresh).toHaveBeenCalled();
+    // Kit confirm card — click Archive in the dialog.
+    await vi.waitFor(() => {
+      const confirm = document.querySelector<HTMLButtonElement>('.confirm-card button.btn--primary, .confirm-card [data-confirm]');
+      expect(confirm).toBeTruthy();
+      confirm!.click();
+    });
+
+    await vi.waitFor(() => {
+      expect(refresh).toHaveBeenCalled();
+    });
   });
 
   it('shows Drive stub message when onDrivePick is not provided', () => {

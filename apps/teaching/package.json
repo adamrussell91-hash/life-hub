@@ -22,6 +22,7 @@
     "@tiptap/core": "^3.31.3",
     "@tiptap/pm": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
+    "@uppy/core": "^4.5.3",
     "happy-dom": "^17.4.4",
     "katex": "^0.16.22",
     "photoswipe": "^5.4.4",

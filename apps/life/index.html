@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="packages/design-kit/hub-compose.css">
   <link rel="stylesheet" href="packages/design-kit/adaptive-slider.css">
   <link rel="stylesheet" href="packages/design-kit/view-on-map.css">
+  <link rel="stylesheet" href="packages/design-kit/hub-places-map.css">
   <link rel="stylesheet" href="packages/design-kit/card-swipe.css">
   <link rel="stylesheet" href="packages/design-kit/hub-interactions.css">
   <link rel="stylesheet" href="packages/design-kit/chat-prose.css">
@@ -440,7 +441,10 @@
               <div class="hub-ai-bar__field">
                 <textarea id="chat-input" class="chat-input hub-ai-bar__input" name="message" rows="1" autocomplete="off" required enterkeyhint="send" placeholder="Message…"></textarea>
               </div>
+              <div id="chat-attach-list" class="chat-attach-list" hidden></div>
               <div class="chat-form__tools hub-ai-bar__tools">
+                <input id="chat-attach-input" class="sr-only" type="file" accept="image/*,text/plain,application/pdf" multiple />
+                <button id="chat-attach" class="btn btn--ghost" type="button" title="Attach">Attach</button>
                 <button id="chat-stop" class="btn btn--secondary" type="button" hidden>Stop</button>
                 <button id="chat-send" class="btn btn--primary" type="submit">Send</button>
               </div>
@@ -964,6 +968,7 @@
               <button type="button" class="hub-pills__btn is-active" data-medical-density="months" aria-pressed="true">Months</button>
               <button type="button" class="hub-pills__btn" data-medical-density="years" aria-pressed="false">Years</button>
             </div>
+            <button type="button" id="medical-places" class="btn btn--secondary">Places</button>
             <button type="button" id="medical-add" class="btn btn--primary">Add</button>
           </div>
           <div id="medical-chips" class="hub-chips"></div>
