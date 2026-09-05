@@ -410,9 +410,22 @@ function bindCardSwipe(wrap, {
     if (height) styleOf(viewport).height = `${height}px`;
   }
 
+  function syncSlideSizes() {
+    if (!fluid || !viewport) return;
+    const width = measureWidth(viewport, itemWidth);
+    if (!(width > 0)) return;
+    for (const slide of slides()) {
+      const style = styleOf(slide);
+      style.flex = `0 0 ${width}px`;
+      style.width = `${width}px`;
+      style.maxWidth = `${width}px`;
+    }
+  }
+
   function sync() {
     index = clamp(index);
     wrap.dataset.cardSwipeIndex = String(index);
+    syncSlideSizes();
     applyX(xFor(index), { animate: false });
     renderDots();
     renderStatus();
@@ -424,6 +437,7 @@ function bindCardSwipe(wrap, {
     const changed = clamped !== index;
     index = clamped;
     wrap.dataset.cardSwipeIndex = String(index);
+    syncSlideSizes();
     applyX(xFor(index), { animate });
     renderDots();
     renderStatus();
@@ -513,6 +527,7 @@ function bindCardSwipe(wrap, {
   }
 
   function layout() {
+    syncSlideSizes();
     applyX(xFor(index), { animate: false });
     syncHeight();
   }

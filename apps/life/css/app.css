@@ -1915,6 +1915,8 @@ main { max-width: 76rem; margin: 0 auto; }
   margin-top: 0.85rem;
   display: grid;
   gap: 0.85rem;
+  min-width: 0;
+  max-width: 100%;
 }
 .fitness-logger__header {
   display: flex;
@@ -1955,9 +1957,13 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-logger__save { min-height: 1.1em; margin: 0; }
 .fitness-logger__swipe {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 .fitness-logger__swipe .hub-card-swipe__viewport {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 .fitness-logger__swipe .fitness-logger__exercise,
 .fitness-logger__swipe .fitness-logger__peek {
@@ -2168,14 +2174,6 @@ main { max-width: 76rem; margin: 0 auto; }
   font: inherit;
   font-weight: var(--weight-bold);
   cursor: pointer;
-}
-@media (max-width: 48rem) {
-  .fitness-logger__finish {
-    position: sticky;
-    bottom: 5.5rem;
-    z-index: 3;
-    box-shadow: var(--elev-2);
-  }
 }
 .fitness-logger__finish:disabled { opacity: 0.6; cursor: wait; }
 
