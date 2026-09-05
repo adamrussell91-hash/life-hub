@@ -44,6 +44,7 @@ describe("captureFieldHtml", () => {
     expect(html).toContain(">Scan<");
     expect(html).toContain(">Paste<");
     expect(html).toContain(".heic");
+    expect(html).toContain("data-voice-wave");
   });
 
   it("disables actions while capturing and labels Stop while recording", () => {

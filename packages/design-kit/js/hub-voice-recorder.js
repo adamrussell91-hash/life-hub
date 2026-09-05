@@ -50,9 +50,11 @@ export async function createHubVoiceRecorder(opts) {
   );
 
   let recording = false;
+  let live = true;
 
   record.on('record-end', (blob) => {
     recording = false;
+    if (!live) return;
     const type = blob.type || 'audio/webm';
     const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
     opts.onFile(new File([blob], `voice-${Date.now()}.${ext}`, { type }));
@@ -84,6 +86,7 @@ export async function createHubVoiceRecorder(opts) {
       return recording ? stop() : start();
     },
     destroy() {
+      live = false;
       try {
         if (recording) record.stopRecording();
       } catch {

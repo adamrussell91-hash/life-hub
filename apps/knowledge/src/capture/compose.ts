@@ -340,6 +340,21 @@ export type VoiceCaptureHandle = {
   stopMic: () => void;
 };
 
+/** Stable waveform node so compose re-renders do not kill an in-flight recording. */
+export function createComposeVoiceWave(): HTMLElement {
+  const host = document.createElement("div");
+  host.className = "compose__voice-wave hub-voice-wave";
+  host.setAttribute("data-voice-wave", "");
+  host.hidden = true;
+  return host;
+}
+
+export function adoptComposeVoiceWave(root: ParentNode, host: HTMLElement) {
+  const slot = root.querySelector<HTMLElement>("[data-voice-wave]");
+  if (!slot || slot === host) return;
+  slot.replaceWith(host);
+}
+
 export function createVoiceCapture(opts: {
   onFile: (file: File) => void;
   waveformHost?: HTMLElement | null;
@@ -350,12 +365,34 @@ export function createVoiceCapture(opts: {
   let wave: Awaited<ReturnType<typeof import("../../design-kit/js/hub-voice-recorder.js").createHubVoiceRecorder>> | null =
     null;
   let waveLoading: Promise<void> | null = null;
+  let discarded = false;
 
-  const stopMic = () => {
-    recorder = null;
-    chunks = [];
+  const releaseMic = () => {
     stream?.getTracks().forEach(track => track.stop());
     stream = null;
+  };
+
+  const deliver = (file: File) => {
+    if (discarded) return;
+    if (opts.waveformHost) opts.waveformHost.hidden = true;
+    opts.onFile(file);
+  };
+
+  const abortRecorder = () => {
+    if (recorder) {
+      recorder.ondataavailable = null;
+      recorder.onstop = null;
+      if (recorder.state !== "inactive") {
+        try {
+          recorder.stop();
+        } catch {
+          /* already stopped */
+        }
+      }
+    }
+    recorder = null;
+    chunks = [];
+    releaseMic();
   };
 
   const ensureWave = async () => {
@@ -364,11 +401,11 @@ export function createVoiceCapture(opts: {
     if (!waveLoading) {
       waveLoading = (async () => {
         const { createHubVoiceRecorder } = await import("../../design-kit/js/hub-voice-recorder.js");
-        opts.waveformHost!.hidden = false;
         wave = await createHubVoiceRecorder({
           host: opts.waveformHost!,
-          onFile: opts.onFile,
+          onFile: deliver,
         });
+        opts.waveformHost!.hidden = false;
       })().catch(() => {
         wave = null;
       });
@@ -379,18 +416,23 @@ export function createVoiceCapture(opts: {
 
   return {
     stopMic() {
+      discarded = true;
       wave?.destroy();
       wave = null;
       waveLoading = null;
       if (opts.waveformHost) opts.waveformHost.hidden = true;
-      stopMic();
+      abortRecorder();
     },
     async toggle() {
+      discarded = false;
       const waveHandle = await ensureWave();
       if (waveHandle) {
         const result = await waveHandle.toggle();
         if (result === "denied") return "denied";
-        if (result === "started") return "started";
+        if (result === "started") {
+          if (opts.waveformHost) opts.waveformHost.hidden = false;
+          return "started";
+        }
         return "stopping";
       }
       if (recorder) {
@@ -408,13 +450,13 @@ export function createVoiceCapture(opts: {
         recorder.onstop = () => {
           const type = recorder?.mimeType || "audio/webm";
           const blob = new Blob(chunks, { type });
-          stopMic();
-          opts.onFile(new File([blob], "", { type }));
+          abortRecorder();
+          deliver(new File([blob], "", { type }));
         };
         recorder.start();
         return "started";
       } catch {
-        stopMic();
+        abortRecorder();
         return "denied";
       }
     },

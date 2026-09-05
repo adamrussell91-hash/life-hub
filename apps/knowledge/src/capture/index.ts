@@ -1,11 +1,13 @@
 export { appendCaptureBlock, titleFromCapture, type CaptureKind } from "./appendBlock";
 export {
   MAX_CAPTURE_BYTES,
+  adoptComposeVoiceWave,
   bindCaptureControls,
   captureContentType,
   captureControlState,
   captureFieldHtml,
   captureFileName,
+  createComposeVoiceWave,
   createVoiceCapture,
   ingestCaptureFile,
   prepareCaptureImage,
