@@ -196,3 +196,15 @@ describe("note reader and editor fill the canvas", () => {
     expect(main).toContain("compose__field compose__field--body");
   });
 });
+
+describe("new-note voice capture", () => {
+  it("keeps one recorder across compose re-renders so Stop can finish the take", () => {
+    expect(main).toContain("createComposeVoiceWave");
+    expect(main).toContain("adoptComposeVoiceWave");
+    expect(main).toContain("const composeVoice = createVoiceCapture");
+    expect(main.indexOf("const composeVoice = createVoiceCapture")).toBeLessThan(main.indexOf("function renderCompose"));
+    expect(main).not.toMatch(/function renderCompose[\s\S]*createVoiceCapture\(/);
+    expect(main).toContain("paintComposeCaptureChrome");
+    expect(css).toContain(".compose__voice-wave");
+  });
+});
