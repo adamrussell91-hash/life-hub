@@ -162,12 +162,22 @@ test('timed undo calls onUndo when the action is pressed', () => {
 
 test('kit sheet and snippets exist and chrome loads them', async () => {
   const css = await readFile(new URL('../../packages/design-kit/hub-interactions.css', import.meta.url), 'utf8');
+  const prose = await readFile(new URL('../../packages/design-kit/chat-prose.css', import.meta.url), 'utf8');
   const chrome = await readFile(new URL('../../packages/design-kit/chrome.css', import.meta.url), 'utf8');
   const snippet = await readFile(new URL('../../packages/design-kit/snippets/hub-toast.html', import.meta.url), 'utf8');
   const agents = await readFile(new URL('../../packages/design-kit/AGENTS.md', import.meta.url), 'utf8');
+  const life = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
+  const worker = await readFile(new URL('../../apps/life/service-worker.js', import.meta.url), 'utf8');
   assert.match(css, /\.hub-toast\b/);
   assert.match(css, /prefers-reduced-motion/);
+  assert.match(css, /chat-prose\.css/);
+  assert.match(prose, /\.chat-message--assistant \.chat-message__body/);
+  assert.match(prose, /\.chat-md-h1/);
   assert.match(chrome, /hub-interactions\.css/);
   assert.match(snippet, /hub-toast/);
   assert.match(agents, /hub-feedback\.js/);
+  assert.match(agents, /chat-prose\.css/);
+  assert.match(life, /chat-prose\.css/);
+  assert.match(worker, /chat-prose\.css/);
+  assert.match(worker, /chat-blocks\.js/);
 });
