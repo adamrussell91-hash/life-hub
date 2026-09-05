@@ -2838,6 +2838,15 @@ main { max-width: 76rem; margin: 0 auto; }
 .body-range {
   margin: 0 0 0.85rem;
 }
+/* Range pill rows fill the column. Mind’s Week/Month (was Weekly/Monthly) labels
+   plus bare .hub-pills inline-flex nowrap otherwise expand the page past the phone. */
+.body-range.hub-pills {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
 .body-sections {
   display: grid;
   gap: var(--space-stack);
@@ -4404,7 +4413,12 @@ main { max-width: 76rem; margin: 0 auto; }
   animation: none !important;
   transition: none !important;
 }
-.mind-board { position: relative; min-height: 12rem; }
+.mind-board {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 12rem;
+}
 .cn-board { position: relative; min-height: 12rem; }
 .mind-hero-clocks {
   display: grid;
