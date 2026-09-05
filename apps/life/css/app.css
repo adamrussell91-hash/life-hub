@@ -1566,6 +1566,11 @@ main { max-width: 76rem; margin: 0 auto; }
   text-align: right;
   white-space: nowrap;
 }
+.fitness-recent-row.is-focused {
+  box-shadow: inset 0 0 0 2px var(--wave);
+  border-radius: var(--radius-sm, 8px);
+  padding-inline: var(--space-2);
+}
 .fitness-recent-row p {
   margin: 0;
   color: var(--muted);
@@ -6113,6 +6118,12 @@ main { max-width: 76rem; margin: 0 auto; }
 .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) main {
   max-width: none;
   width: 100%;
+}
+
+/* Mind’s masonry + hero clocks look stretched on the shared 76rem shell. */
+.app-shell:has(#mind-dashboard:not([hidden])) .page-header,
+.app-shell:has(#mind-dashboard:not([hidden])) main {
+  max-width: 60rem;
 }
 
 .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #main-content,

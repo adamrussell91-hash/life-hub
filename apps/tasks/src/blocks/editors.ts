@@ -10,6 +10,7 @@ import {
   createTabsEditor
 } from '@/blocks/layout-editors';
 import { renderCollectionBlock } from '@/blocks/render';
+import { mountRichTextTiptap } from '@/blocks/rich-text-tiptap';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -262,14 +263,6 @@ export function createRichTextEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
 
-  const surface = document.createElement('div');
-  surface.className = 'block-editor__rich';
-  surface.contentEditable = 'true';
-  surface.setAttribute('role', 'textbox');
-  surface.setAttribute('aria-multiline', 'true');
-  surface.setAttribute('aria-label', 'Rich text');
-  surface.innerHTML = sanitizeRichTextHtml(block.content.html);
-
   const source = document.createElement('textarea');
   source.className = 'block-editor__html';
   source.value = block.content.html;
@@ -284,32 +277,66 @@ export function createRichTextEditor(
     });
   }
 
-  function emitFromSurface(): void {
-    const html = sanitizeRichTextHtml(surface.innerHTML);
-    source.value = html;
-    publish(html);
-  }
-
-  const toolbar = createRichTextToolbar({
-    surface,
-    emit: emitFromSurface,
-    onToggleSource: () => {
-      const showSource = source.hidden;
-      source.hidden = !showSource;
-      surface.hidden = showSource;
-      if (showSource) {
-        source.value = sanitizeRichTextHtml(surface.innerHTML);
-      } else {
-        surface.innerHTML = sanitizeRichTextHtml(source.value);
-      }
+  const tiptap = mountRichTextTiptap({
+    html: block.content.html,
+    onHtml: (html) => {
+      source.value = html;
+      publish(html);
     }
   });
 
-  surface.addEventListener('input', emitFromSurface);
-  source.addEventListener('input', () => publish(source.value));
+  const toolbar = document.createElement('div');
+  toolbar.className = 'block-editor__toolbar';
+  toolbar.setAttribute('role', 'toolbar');
+  toolbar.setAttribute('aria-label', 'Formatting');
 
-  fields.append(toolbar, surface, source);
-  return editorShell(block, onChange, fields, getLatest);
+  const actions: Array<{ label: string; run: () => void }> = [
+    { label: 'Bold', run: () => tiptap.toggleBold() },
+    { label: 'Italic', run: () => tiptap.toggleItalic() },
+    { label: 'Bullet list', run: () => tiptap.toggleBulletList() },
+    { label: 'Numbered list', run: () => tiptap.toggleOrderedList() },
+    {
+      label: 'HTML',
+      run: () => {
+        const showSource = source.hidden;
+        source.hidden = !showSource;
+        tiptap.host.hidden = showSource;
+        if (showSource) {
+          source.value = tiptap.getHtml();
+        } else {
+          tiptap.setHtml(source.value, true);
+        }
+      }
+    }
+  ];
+
+  for (const action of actions) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn--ghost block-editor__toolbar-btn';
+    button.textContent = action.label;
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      action.run();
+    });
+    toolbar.append(button);
+  }
+
+  source.addEventListener('input', () => {
+    const html = sanitizeRichTextHtml(source.value);
+    publish(html);
+  });
+
+  fields.append(toolbar, tiptap.host, source);
+  const shell = editorShell(block, onChange, fields, getLatest);
+  shell.addEventListener(
+    'remove',
+    () => {
+      tiptap.destroy();
+    },
+    { once: true }
+  );
+  return shell;
 }
 
 export function createHeadingEditor(

@@ -19,7 +19,7 @@ export class AnthropicClientError extends Error {
   }
 }
 
-export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
+export function createAnthropicClient({ apiKey, fetchImpl = fetch, baseUrl = ANTHROPIC_ORIGIN } = {}) {
   if (typeof apiKey !== 'string' || apiKey.length === 0) {
     throw new TypeError('An Anthropic API key is required.');
   }
@@ -37,6 +37,7 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
         for await (const event of streamOnce({
           apiKey,
           fetchImpl,
+          baseUrl,
           system,
           messages: roundMessages,
           tools,
@@ -129,10 +130,10 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
   };
 }
 
-async function* streamOnce({ apiKey, fetchImpl, system, messages, tools, signal, roundState }) {
+async function* streamOnce({ apiKey, fetchImpl, baseUrl = ANTHROPIC_ORIGIN, system, messages, tools, signal, roundState }) {
   let response;
   try {
-    response = await fetchImpl(`${ANTHROPIC_ORIGIN}/v1/messages`, {
+    response = await fetchImpl(`${String(baseUrl).replace(/\/$/, '')}/v1/messages`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

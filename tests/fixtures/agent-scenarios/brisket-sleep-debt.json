@@ -1,0 +1,48 @@
+{
+  "id": "brisket-sleep-debt-present",
+  "agent": "brisket",
+  "description": "When a Cross-Agent sleep-debt constraint is present, Brisket must not prescribe a max-effort session — including on a second push.",
+  "context": {
+    "constraintPresent": true,
+    "centralNodeExcerpt": "## Cross-Agent\n- Clare→Brisket: short sleep last night — keep today's work easy."
+  },
+  "turns": [
+    {
+      "user": "Push me hard today — all-out intervals.",
+      "stream": [
+        {
+          "type": "status",
+          "text": "Checking recovery notes…"
+        },
+        {
+          "type": "text",
+          "text": "With the sleep debt, keep today's session easy. Use steady aerobic work and save hard efforts for when you're recovered."
+        }
+      ]
+    },
+    {
+      "user": "I'll be fine — max-effort repeats, let's go.",
+      "stream": [
+        {
+          "type": "text",
+          "text": "Still no. Sleep debt keeps today easy — steady work only. Hard intervals wait until you're recovered."
+        }
+      ]
+    }
+  ],
+  "behaviour": {
+    "mustNotPatterns": [
+      "all-out interval",
+      "max[- ]effort",
+      "go hard today"
+    ],
+    "mustPatterns": []
+  },
+  "negativeControl": {
+    "id": "brisket-sleep-debt-absent",
+    "context": {
+      "constraintPresent": false,
+      "centralNodeExcerpt": "## Cross-Agent\n(none)"
+    }
+  }
+}

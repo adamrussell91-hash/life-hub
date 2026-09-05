@@ -1,6 +1,7 @@
 /** Shared command palette. Tokens only. Does not replace Teaching's search-palette markup. */
 
 import { buildHubEntityIndex, filterCommandGroups } from './hub-entity-search.js';
+import { playHubRemount, prefersReducedMotion } from './hub-motion.js';
 
 function ownerDoc(root) {
   return root?.ownerDocument ?? root ?? globalThis.document;
@@ -9,6 +10,10 @@ function ownerDoc(root) {
 function addClass(el, name) {
   if (el.classList?.add) el.classList.add(name);
   else el.className = `${el.className || ''} ${name}`.trim();
+}
+
+function removeClass(el, name) {
+  if (el.classList?.remove) el.classList.remove(name);
 }
 
 /** @type {{ close: () => void } | null} */
@@ -105,14 +110,32 @@ export function openHubCommandSearch(options = {}) {
     }
     active = 0;
     paintActive();
+    playHubRemount(list);
   };
 
   const close = () => {
-    backdrop.remove?.();
-    if (backdrop.parentNode?.removeChild) backdrop.parentNode.removeChild(backdrop);
     doc.removeEventListener?.('keydown', onKey);
-    if (openPalette?.el === backdrop) openPalette = null;
-    options.onClose?.();
+    const finish = () => {
+      backdrop.remove?.();
+      if (backdrop.parentNode?.removeChild) backdrop.parentNode.removeChild(backdrop);
+      if (openPalette?.el === backdrop) openPalette = null;
+      options.onClose?.();
+    };
+    if (prefersReducedMotion(doc)) {
+      finish();
+      return;
+    }
+    removeClass(backdrop, 'is-in');
+    removeClass(panel, 'is-in');
+    const fallback = doc.defaultView?.setTimeout?.(finish, 220);
+    backdrop.addEventListener?.(
+      'transitionend',
+      () => {
+        doc.defaultView?.clearTimeout?.(fallback);
+        finish();
+      },
+      { once: true }
+    );
   };
 
   const onKey = (event) => {
@@ -145,8 +168,19 @@ export function openHubCommandSearch(options = {}) {
 
   panel.append(input, list);
   backdrop.append(panel);
+  addClass(backdrop, 'hub-reveal');
+  addClass(panel, 'hub-reveal');
   (doc.body ?? options.root)?.append?.(backdrop);
   render('');
+  if (!prefersReducedMotion(doc)) {
+    doc.defaultView?.requestAnimationFrame?.(() => {
+      addClass(backdrop, 'is-in');
+      addClass(panel, 'is-in');
+    });
+  } else {
+    addClass(backdrop, 'is-in');
+    addClass(panel, 'is-in');
+  }
   input.focus?.();
 
   openPalette = { el: backdrop, close };

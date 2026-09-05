@@ -34,6 +34,7 @@ import { createHubField, createHubFilter, createHubToolbar, domainFilterOptions,
 import { createPlusButton } from '@/views/plus-add';
 import { renderTaskEditor } from '@/views/task-editor';
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
+import { getFocus, hydrateFocusFromHash, setFocus } from '@/domain/focus';
 
 const STATUS_DOT: Record<string, string> = {
   open: 'var(--shallow)',
@@ -178,7 +179,14 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
     session.projectId = dated?.id ?? liveProjects[0]?.id ?? '';
   }
 
-  let previewId: string | null = null;
+  hydrateFocusFromHash();
+  const initialFocus = getFocus();
+  let previewId: string | null =
+    initialFocus?.type === 'task'
+      ? initialFocus.id
+      : initialFocus?.type === 'milestone'
+        ? initialFocus.id
+        : null;
   let activeLayout: GanttLayout | null = null;
   let activePopover: HTMLElement | null = null;
   let toastTimer = 0;
@@ -357,6 +365,8 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
     const milestoneHit = task ? null : findMilestone(projects, id);
     if (!task && !milestoneHit) return;
     previewId = id;
+    if (task) setFocus({ type: 'task', id: task.id });
+    else if (milestoneHit) setFocus({ type: 'milestone', id: milestoneHit.milestone.id, projectId: milestoneHit.project.id });
     preview.hidden = false;
     side.classList.add('has-preview');
 
@@ -734,6 +744,7 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
         const row = el('div', 'gantt-rail__row');
         row.style.height = `${GANTT_ROW_HEIGHT}px`;
         row.style.paddingLeft = `${0.75 + item.depth * 0.75}rem`;
+        row.classList.toggle('is-focused', previewId === item.id);
         const dot = el('span', 'gantt-rail__dot');
         dot.style.background =
           item.kind === 'milestone' ? 'var(--navy)' : STATUS_DOT[item.status] ?? 'var(--shallow)';
@@ -957,7 +968,11 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
     for (const bar of layout.bars) {
       const isCritical = critical.nodes.has(bar.row.id);
       const dimmed = session.showCritical && critical.nodes.size > 0 && !isCritical;
-      const group = svgEl('g', { class: 'gantt-bar-group', 'data-item-id': bar.row.id });
+      const focused = previewId === bar.row.id;
+      const group = svgEl('g', {
+        class: `gantt-bar-group${focused ? ' is-focused' : ''}`,
+        'data-item-id': bar.row.id
+      });
       group.setAttribute('transform', `translate(0,${bar.y})`);
 
       if (bar.row.kind === 'milestone') {
@@ -965,7 +980,7 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
         const cy = GANTT_ROW_HEIGHT / 2;
         const poly = svgEl('polygon', {
           points: `${cx},${cy - 8} ${cx + 8},${cy} ${cx},${cy + 8} ${cx - 8},${cy}`,
-          class: `gantt-milestone${dimmed ? ' gantt-dimmed' : ''}`
+          class: `gantt-milestone${dimmed ? ' gantt-dimmed' : ''}${focused ? ' is-focused' : ''}`
         });
         const title = svgEl('title');
         title.textContent = `${bar.row.label} · due ${formatDisplayDate(bar.row.end)}`;
@@ -983,7 +998,7 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
         width: bar.width,
         height: GANTT_BAR_HEIGHT,
         rx: GANTT_BAR_HEIGHT / 2,
-        class: `gantt-bar${isCritical ? ' gantt-bar--critical' : ''}${dimmed ? ' gantt-dimmed' : ''}`
+        class: `gantt-bar${isCritical ? ' gantt-bar--critical' : ''}${dimmed ? ' gantt-dimmed' : ''}${focused ? ' is-focused' : ''}`
       });
       const title = svgEl('title');
       title.textContent = `${bar.row.label} · ${bar.row.status} · due ${formatDisplayDate(bar.row.end)}`;

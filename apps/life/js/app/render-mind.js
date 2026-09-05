@@ -17,6 +17,7 @@ import { buildThemeTopography } from './chart-kit/stream.js';
 import { entriesForTheme, entriesForThemePair, entriesForThemeWeek, entriesForWatchlistTerm, energyStreakWhy, MOOD_ORDER, displayThemeLabel } from './mind-model.js';
 import { addCalendarDays, formatDisplayDate, isCalendarDate } from '../core/time.js';
 import { openMindThreadSheet } from './mind-thread-sheet.js';
+import { playHubRemount } from '../../../../packages/design-kit/js/hub-motion.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
 
@@ -52,6 +53,16 @@ export function moodShiftDirection(moodAtOpen, moodAtClose) {
   if (close > open) return 'declined';
   return 'flat';
 }
+
+/** Mind v2: 2 narrow, 3 default desktop, 4 when the board is actually wide. */
+export function mindBoardColumns(width) {
+  if (width >= 1100) return 4;
+  if (width >= 900) return 3;
+  if (width >= 560) return 2;
+  return 1;
+}
+
+export const MIND_BOARD_GAP = 12;
 
 export function firstSentence(text, max = 140) {
   const raw = String(text ?? '').replace(/\s+/g, ' ').trim();
@@ -676,8 +687,8 @@ function packMindBoard(root) {
     String(node.className || '').split(/\s+/).includes('mind-tile')
   );
   if (!tiles.length) return;
-  const gap = 16;
-  const columns = width >= 900 ? 3 : width >= 560 ? 2 : 1;
+  const gap = MIND_BOARD_GAP;
+  const columns = mindBoardColumns(width);
   const columnWidth = (width - gap * (columns - 1)) / columns;
   for (const tile of tiles) {
     if (!tile.style) continue;
@@ -709,6 +720,7 @@ function packMindBoard(root) {
     bottom = Math.max(bottom, item.y + item.height);
   }
   if (board.style) board.style.minHeight = `${bottom}px`;
+  playHubRemount(board);
 }
 
 function createSvg(root, tag) {
