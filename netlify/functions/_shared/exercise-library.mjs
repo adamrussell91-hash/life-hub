@@ -1,5 +1,6 @@
 import { formatLogDate } from '../../../apps/life/js/core/central-node-write.js';
 import { daysBetween } from '../../../apps/life/js/core/time.js';
+import { collapseSetSplitExercises } from './workout-history.mjs';
 
 export const EXERCISE_LIBRARY_PATH = 'data/exercise-library.json';
 
@@ -87,8 +88,9 @@ export function applyCompletedWorkoutToLibrary(entries, record, updatedAt) {
   const pbs = [];
   if (!record || !Array.isArray(record.exercises)) return { entries: list, pbs };
   const sessionDate = typeof record.date === 'string' ? record.date : undefined;
+  const exercises = collapseSetSplitExercises(record.exercises);
 
-  for (const exercise of record.exercises) {
+  for (const exercise of exercises) {
     const name = typeof exercise?.name === 'string' ? exercise.name.trim() : '';
     if (!name) continue;
     const weights = (Array.isArray(exercise.sets) ? exercise.sets : [])

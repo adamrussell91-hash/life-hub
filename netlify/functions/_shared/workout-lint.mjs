@@ -46,5 +46,14 @@ export function lintWorkoutProposal(record) {
     warnings.push('No exercise looks like a warmup by name — the protocol requires a 5-minute specific warmup.');
   }
 
+  const setSplitCount = exercises.filter(exercise => /\bset\s+\d+\s*$/i.test(exercise?.name ?? '')).length;
+  if (setSplitCount > 0) {
+    warnings.push(`${setSplitCount} exercises look like set rows (e.g. "Bar Press set 1") — log one row per exercise with multiple sets, not one exercise per set.`);
+  }
+
+  if (record.status === 'completed' && /^planned session$/i.test(String(record.title ?? '').trim())) {
+    warnings.push('Completed session is still titled "Planned session" — give it a real unique title before it becomes history.');
+  }
+
   return warnings;
 }
