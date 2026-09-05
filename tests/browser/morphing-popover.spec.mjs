@@ -50,11 +50,11 @@ test('Body Log weight morphs into a value editor', async () => {
 
     const panel = page.locator('.morphing-popover__panel.is-floating');
     await panel.waitFor();
-    await page.locator('#body-weight-kg').waitFor({ state: 'visible' });
+    await panel.locator('#body-weight-kg').waitFor({ state: 'visible' });
     assert.match(await panel.locator('.morphing-popover__title').textContent(), /Weight/);
-    await page.locator('#body-weight-kg').fill('82.4');
+    await panel.locator('#body-weight-kg').fill('82.4');
     await page.keyboard.press('Escape');
-    await page.locator('#body-weight-kg').waitFor({ state: 'hidden' });
+    await panel.waitFor({ state: 'hidden' });
   } finally {
     await context.close();
   }

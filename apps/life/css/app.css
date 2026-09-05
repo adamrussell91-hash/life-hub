@@ -1990,6 +1990,10 @@ main { max-width: 76rem; margin: 0 auto; }
   border-radius: 0.85rem;
   background: rgba(20, 43, 81, 0.04);
 }
+/* Set editor is also the morph dialog frame — keep it opaque over the page. */
+.hub-morph-dialog__frame.fitness-logger__exercise {
+  background: var(--paper);
+}
 .fitness-logger__exercise-head {
   display: flex;
   align-items: flex-start;
