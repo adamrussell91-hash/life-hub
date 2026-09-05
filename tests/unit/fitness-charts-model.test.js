@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildFitnessModel } from '../../apps/life/js/app/fitness-model.js';
 import {
+  acwrBand,
   buildFitnessCharts,
   classifyPushPull,
   classifyRepRange,
@@ -26,6 +27,13 @@ const workout = (overrides) => ({
 });
 
 const events = records => records.map(record => ({ record, body: '', path: '', legacy: false }));
+
+const volumeSession = (date, kg, overrides = {}) => workout({
+  date,
+  duration_min: 30,
+  exercises: [{ name: 'Chest Press', sets: [{ reps: 10, weight_kg: kg / 10 }] }],
+  ...overrides
+});
 
 test('classifyRepRange buckets working sets', () => {
   assert.equal(classifyRepRange(5).key, '1-5');
@@ -65,6 +73,11 @@ test('one completed session fills pies and rings, not empty trend cards', () => 
   assert.equal(charts.recoveryRing.flagged, 0);
   assert.ok(charts.repRanges.some(item => item.key === '9-12' && item.value === 2));
   assert.ok(charts.repRanges.some(item => item.key === '6-8' && item.value === 1));
+  assert.equal(charts.repRead, 'Mostly Hypertrophy');
+  assert.ok(!charts.repRanges.some(item => String(item.colour).includes('--navy-2') || String(item.colour).includes('--high-sea)')));
+  assert.ok(charts.focusChord.length >= 1);
+  assert.ok(charts.libraryMap?.nodes?.length >= 2);
+  assert.ok(charts.libraryMap.edges.some(edge => edge.count >= 1));
   assert.ok(charts.regionVolume.some(item => item.key === 'chest' && item.value > 0));
   assert.ok(charts.regionVolume.some(item => item.key === 'arms' && item.value > 0));
   assert.deepEqual(charts.pushPull.map(item => item.key).sort(), ['pull', 'push']);
@@ -101,11 +114,18 @@ test('e1RM trend and pain flags appear only when history exists', () => {
   assert.equal(charts.e1rmTrends.length, 1);
   assert.equal(charts.e1rmTrends[0].name, 'Chest Press');
   assert.equal(charts.e1rmTrends[0].series.length, 2);
+  assert.equal(charts.e1rmTrends[0].current, charts.e1rmTrends[0].series[1].value);
+  assert.equal(charts.e1rmTrends[0].previous, charts.e1rmTrends[0].series[0].value);
+  assert.ok(charts.e1rmTrends[0].delta > 0);
   assert.equal(charts.painBySite[0].site, 'right AC');
   assert.equal(charts.recoveryRing.flagged, 1);
+  assert.equal(charts.recoveryFlags.length, 1);
+  assert.equal(charts.recoveryFlags[0].title, 'Chest and Curls');
   assert.equal(charts.skipRing.skipped, 1);
   assert.equal(charts.skipRing.pastDue, 1);
   assert.equal(charts.skipRing.missed, 2);
+  assert.equal(charts.trainedMarks.length, 30);
+  assert.equal(charts.trainedMarks.filter(day => day.trained).length, 2);
 });
 
 test('longest streak uses history outside the 30-day pie window', () => {
@@ -117,6 +137,62 @@ test('longest streak uses history outside the 30-day pie window', () => {
   assert.equal(model.charts.longestStreak, 1);
   assert.equal(model.charts.repRanges.length, 0);
   assert.equal(model.charts.restRatio.length, 0);
+});
+
+test('acwrBand follows the 0.8–1.3 sweet spot', () => {
+  assert.equal(acwrBand(0.7), 'low');
+  assert.equal(acwrBand(0.8), 'medium');
+  assert.equal(acwrBand(1), 'medium');
+  assert.equal(acwrBand(1.3), 'medium');
+  assert.equal(acwrBand(1.4), 'high');
+  assert.equal(acwrBand(null), 'medium');
+});
+
+test('training load is weekly tonnage banded by ACWR against the prior 4 weeks', () => {
+  const charts = buildFitnessCharts({
+    events: events([
+      volumeSession('2026-06-22', 200),
+      volumeSession('2026-06-29', 200),
+      volumeSession('2026-07-06', 200),
+      volumeSession('2026-07-13', 200),
+      volumeSession('2026-07-20', 200),
+      volumeSession('2026-07-30', 400, { duration_min: 90 })
+    ]),
+    date: '2026-07-30'
+  });
+  const latest = charts.loadHorizon[0].points.at(-1);
+  assert.equal(latest.date, '2026-07-27');
+  assert.equal(latest.value, 400);
+  assert.equal(latest.ratio, 2);
+  assert.equal(latest.band, 'high');
+});
+
+test('session duration does not inflate weekly load', () => {
+  const charts = buildFitnessCharts({
+    events: events([
+      volumeSession('2026-07-20', 200, { duration_min: 20 }),
+      volumeSession('2026-07-30', 200, { duration_min: 90 })
+    ]),
+    date: '2026-07-30'
+  });
+  const points = charts.loadHorizon[0].points.filter(point => point.value > 0);
+  assert.equal(points.length, 2);
+  assert.equal(points[0].value, 200);
+  assert.equal(points[1].value, 200);
+});
+
+test('session gauge compares the last session to other sessions in the last 4 weeks', () => {
+  const charts = buildFitnessCharts({
+    events: events([
+      volumeSession('2026-07-02', 200),
+      volumeSession('2026-07-16', 200),
+      volumeSession('2026-07-30', 100, { duration_min: 90 })
+    ]),
+    date: '2026-07-30'
+  });
+  assert.equal(charts.sessionGauge.value, 100);
+  assert.equal(charts.sessionGauge.average, 200);
+  assert.equal(charts.sessionGauge.pct, 50);
 });
 
 test('distance, pace, and HR series stay empty without those fields', () => {
@@ -131,4 +207,7 @@ test('distance, pace, and HR series stay empty without those fields', () => {
   assert.equal(charts.paceSeries.length, 2);
   assert.equal(charts.hrSeries.length, 2);
   assert.equal(charts.durationSeries.length, 2);
+  assert.deepEqual(charts.sessionReadings.map(row => row.key), ['duration', 'distance', 'pace', 'hr']);
+  assert.equal(charts.sessionReadings.find(row => row.key === 'hr').current, 128);
+  assert.equal(charts.sessionReadings.find(row => row.key === 'hr').delta, 8);
 });

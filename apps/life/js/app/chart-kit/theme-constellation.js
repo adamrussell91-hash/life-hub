@@ -144,20 +144,22 @@ export function buildThemeConstellation({
   previousEdges = [],
   focus = null,
   hops = null,
-  compare = false
+  compare = false,
+  minEdgeCount = 2
 } = {}) {
   const ranked = [...(nodes ?? [])]
     .filter(node => node?.key && Number(node.count) > 0)
     .sort((a, b) => (Number(b.count) - Number(a.count)) || String(a.key).localeCompare(String(b.key)))
     .slice(0, MAX_NODES);
   let keys = ranked.map(node => node.key);
+  const edgeFloor = Math.max(1, Number(minEdgeCount) || 2);
   const rawEdges = (edges ?? [])
     .map(edge => ({
       themeA: edge.themeA,
       themeB: edge.themeB,
       count: Number(edge.count) || 0
     }))
-    .filter(edge => edge.count >= 2 && edge.themeA && edge.themeB);
+    .filter(edge => edge.count >= edgeFloor && edge.themeA && edge.themeB);
 
   if (focus && keys.includes(focus) && hops) {
     const keep = neighborhood(rawEdges, focus, hops);
@@ -181,7 +183,8 @@ export function buildThemeConstellation({
       x: xs.get(key) ?? WIDTH / 2,
       y: AXIS_Y,
       r: 12 + t * 7,
-      colour: WATCHLIST_SLOTS[ranked.findIndex(item => item.key === key) % WATCHLIST_SLOTS.length],
+      colour: node?.colour
+        || WATCHLIST_SLOTS[ranked.findIndex(item => item.key === key) % WATCHLIST_SLOTS.length],
       rising: false
     };
   });
