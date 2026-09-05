@@ -24,6 +24,8 @@ import {
 import { DIAGRAM_IMAGE_PUBLISH_URL_ISSUE, type Block, type EmbedProvider } from '@/schemas/block';
 import { renderOutcomeList } from '@/outcomes/display';
 import type { PublicOutcome } from '@/curriculum/outcome-catalog';
+import { openHubMediaViewer } from '../../design-kit/js/hub-media-viewer.js';
+import 'photoswipe/dist/photoswipe.css';
 
 export type RenderMode = 'teacher' | 'student' | 'print';
 export type RenderContext = {
@@ -1059,62 +1061,48 @@ export function renderTabsBlock(
   return wrapBlock(root, block, mode);
 }
 
-let activeLightboxCleanup: (() => void) | null = null;
+let activeLightboxClose: (() => void) | null = null;
 
-function openGalleryLightbox(src: string, alt: string): void {
-  activeLightboxCleanup?.();
+type GalleryEntry = { url: string; alt_text: string; caption?: string };
+
+function galleryMediaItems(entries: GalleryEntry[]) {
+  return entries
+    .filter((entry) => isHttpUrl(entry.url))
+    .map((entry) => ({
+      src: entry.url,
+      alt: entry.alt_text,
+      caption: entry.caption
+    }));
+}
+
+function openGalleryLightbox(entries: GalleryEntry[], index: number): void {
+  activeLightboxClose?.();
+  activeLightboxClose = null;
 
   const previousFocus =
     document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const items = galleryMediaItems(entries);
+  if (!items.length) return;
 
-  const backdrop = document.createElement('div');
-  backdrop.className = 'block-gallery-lightbox';
-  backdrop.setAttribute('role', 'dialog');
-  backdrop.setAttribute('aria-modal', 'true');
-  backdrop.setAttribute('aria-label', alt || 'Enlarged image');
-
-  const img = document.createElement('img');
-  img.className = 'block-gallery-lightbox__image';
-  img.src = src;
-  img.alt = alt;
-
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.className = 'btn block-gallery-lightbox__close';
-  close.textContent = 'Close';
-  close.setAttribute('aria-label', 'Close enlarged image');
-
-  function dismiss(): void {
-    document.removeEventListener('keydown', onKey);
-    backdrop.remove();
-    activeLightboxCleanup = null;
-    if (previousFocus && document.contains(previousFocus)) {
-      previousFocus.focus();
+  const startIndex = Math.min(Math.max(index, 0), items.length - 1);
+  void openHubMediaViewer(items, {
+    index: startIndex,
+    onClose: () => {
+      activeLightboxClose = null;
+      if (previousFocus && document.contains(previousFocus)) {
+        previousFocus.focus();
+      }
     }
-  }
-
-  function onKey(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      dismiss();
-    }
-  }
-
-  close.addEventListener('click', dismiss);
-  backdrop.addEventListener('click', (event) => {
-    if (event.target === backdrop) dismiss();
+  }).then((handle) => {
+    activeLightboxClose = handle ? () => handle.close() : null;
   });
-  document.addEventListener('keydown', onKey);
-  activeLightboxCleanup = dismiss;
-
-  backdrop.append(img, close);
-  document.body.append(backdrop);
-  close.focus();
 }
 
 function galleryFigure(
-  entry: { url: string; alt_text: string; caption?: string },
-  interactive: boolean
+  entry: GalleryEntry,
+  interactive: boolean,
+  entries: GalleryEntry[] = [entry],
+  index = 0
 ): HTMLElement {
   const figure = document.createElement('figure');
   figure.className = 'block-gallery__item';
@@ -1130,7 +1118,7 @@ function galleryFigure(
       img.alt = entry.alt_text;
       img.loading = 'lazy';
       button.append(img);
-      button.addEventListener('click', () => openGalleryLightbox(entry.url, entry.alt_text));
+      button.addEventListener('click', () => openGalleryLightbox(entries, index));
       figure.append(button);
     } else {
       const img = document.createElement('img');
@@ -1203,7 +1191,7 @@ export function renderGalleryBlock(
     function show(i: number): void {
       const len = block.content.items.length;
       index = ((i % len) + len) % len;
-      viewport.replaceChildren(galleryFigure(block.content.items[index]!, true));
+      viewport.replaceChildren(galleryFigure(block.content.items[index]!, true, block.content.items, index));
       status.textContent = `${index + 1} / ${len}`;
       [...dots.children].forEach((dot, di) => {
         (dot as HTMLButtonElement).setAttribute('aria-selected', di === index ? 'true' : 'false');
@@ -1241,9 +1229,9 @@ export function renderGalleryBlock(
   } else {
     const list = document.createElement('div');
     list.className = 'block-gallery__list';
-    for (const entry of block.content.items) {
-      list.append(galleryFigure(entry, true));
-    }
+    block.content.items.forEach((entry, index) => {
+      list.append(galleryFigure(entry, true, block.content.items, index));
+    });
     root.append(list);
   }
 
