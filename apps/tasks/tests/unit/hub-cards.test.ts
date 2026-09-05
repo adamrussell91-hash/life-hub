@@ -267,6 +267,19 @@ describe('hub cards', () => {
       expect.objectContaining({ id: 'task_chip' }),
       { priority: 'urgent' }
     );
+
+    const domain = slot.querySelector<HTMLButtonElement>('.hub-chip');
+    domain!.click();
+    const domainPanel = document.querySelector<HTMLElement>('.morphing-popover__panel:not([hidden])');
+    expect(domainPanel?.querySelector('.morphing-popover__title')?.textContent).toBe('Domain');
+    [...domainPanel!.querySelectorAll('.hub-pills__btn')].find((btn) => btn.textContent === 'Wedding')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true })
+    );
+    [...domainPanel!.querySelectorAll('button')].find((btn) => btn.textContent === 'Save')?.click();
+    expect(onPatch).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'task_chip' }),
+      { domain: 'wedding' }
+    );
   });
 
   it('leaves chips as display spans when onPatch is missing', () => {
