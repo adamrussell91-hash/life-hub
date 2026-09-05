@@ -5,8 +5,7 @@ import { hashQuery } from '@/shell/shell';
 import { toDateKey } from '@/domain/queries';
 import { detectPinchPoints } from '@/domain/pinch';
 import {
-  addMonths,
-  addWeeks,
+  addCalendarRange,
   calendarHash,
   collectCalendarItems,
   dayTaskMinutes,
@@ -18,6 +17,7 @@ import {
   monthTitle,
   overdueItems,
   parseCalendarAnchor,
+  parseCalendarMode,
   pickSelectedDateKey,
   visibleDays,
   visibleOverflow,
@@ -26,12 +26,23 @@ import {
   type CalendarItem,
   type CalendarMode
 } from '@/domain/calendar';
+import {
+  blockStyle,
+  formatBlockTime,
+  hoursFromOffset,
+  hoursToDueTime,
+  layoutTimedBlocks,
+  nowLineOffset,
+  parseGoToDate,
+  splitDayItems,
+  timeGridHours
+} from '@/domain/time-grid';
+import { hourCaption } from '@/domain/daily-dial';
 import { formatDisplayDate, formatDisplayDateRange } from '../../design-kit/js/format-display-date.js';
 import { keyDateKindFromLabel } from '@/domain/excursion';
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
 import { materializeExcursionAdminTask } from '@/views/excursion-admin';
 import { renderQuickAdd, renderTaskEditor } from '@/views/task-editor';
-import { openPlusAdd } from '@/views/plus-add';
 import { renderPressureStrips } from '@/views/pinch-strip';
 import { requestToggleDone } from '@/views/dashboard';
 import { mountTaskCard } from '@/views/hub-cards';
@@ -56,12 +67,16 @@ const sessionFilters: CalendarFilters = {
 };
 
 let selectedDateKey: string | null = null;
+let selectedItemId: string | null = null;
+let composeDraft: { dateKey: string; dueTime: string | null } = { dateKey: '', dueTime: null };
 let lastMonthDelta = 0;
+let focusComposeOnPaint = false;
 
 type LiveCalendar = {
   canvas: HTMLElement;
   mode: CalendarMode;
   apply: (mode: CalendarMode) => void;
+  dispose: () => void;
 };
 
 let liveCalendar: LiveCalendar | null = null;
@@ -145,11 +160,13 @@ function renderEventChip(
 function wireDropTarget(
   node: HTMLElement,
   dateKey: string,
-  onDropTask: (taskId: string, dateKey: string) => void
+  onDropTask: (taskId: string, dateKey: string, dueTime?: string | null) => void,
+  timeFromEvent?: (event: DragEvent) => string | null | undefined
 ): void {
   node.dataset.dropDate = dateKey;
   node.addEventListener('dragover', (event) => {
     event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
     node.classList.add('is-drop-target');
   });
@@ -163,7 +180,7 @@ function wireDropTarget(
     const taskId =
       event.dataTransfer?.getData('text/task-id') || event.dataTransfer?.getData('text/plain');
     if (!taskId) return;
-    onDropTask(taskId, dateKey);
+    onDropTask(taskId, dateKey, timeFromEvent?.(event));
   });
 }
 
@@ -175,6 +192,7 @@ function renderViewTabs(
   tabs.setAttribute('role', 'tablist');
   tabs.setAttribute('aria-label', 'Calendar view');
   for (const item of [
+    { id: 'day' as const, label: 'Day' },
     { id: 'week' as const, label: 'Week' },
     { id: 'month' as const, label: 'Month' }
   ]) {
@@ -216,17 +234,22 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
 
   const today = new Date();
   let anchor = parseCalendarAnchor(hashQuery().get('date'), today);
+  const keys = new AbortController();
   const session: LiveCalendar = {
     canvas,
-    mode,
+    mode: mode === 'week' ? parseCalendarMode() : mode,
     apply: (next) => {
-      const fromHash = parseCalendarAnchor(hashQuery().get('date'), today);
-      if (session.mode === next && toDateKey(anchor) === toDateKey(fromHash)) return;
-      session.mode = next;
+      const rawDate = hashQuery().get('date');
+      const fromHash = rawDate ? parseCalendarAnchor(rawDate, today) : anchor;
+      const resolved = next === 'week' ? parseCalendarMode() : next;
+      if (session.mode === resolved && toDateKey(anchor) === toDateKey(fromHash)) return;
+      session.mode = resolved;
       anchor = fromHash;
       paint();
-    }
+    },
+    dispose: () => keys.abort()
   };
+  if (liveCalendar) liveCalendar.dispose();
   liveCalendar = session;
 
   function allItems(): CalendarItem[] {
@@ -234,12 +257,15 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   }
 
   async function reload(): Promise<void> {
+    liveCalendar?.dispose();
     liveCalendar = null;
     await renderCalendarView(canvas, session.mode);
   }
 
   async function openItem(item: CalendarItem, preview: HTMLElement): Promise<void> {
     selectedDateKey = item.date_key;
+    selectedItemId = item.id;
+    composeDraft = { dateKey: item.date_key, dueTime: item.task?.due_time ?? composeDraft.dueTime };
     preview.hidden = false;
     let task = item.task;
     if (!task && item.kind === 'key_date' && item.project_id) {
@@ -278,19 +304,26 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     );
   }
 
-  function dropTask(taskId: string, dateKey: string): void {
+  function dropTask(taskId: string, dateKey: string, dueTime?: string | null): void {
     const task = tasks.find((entry) => entry.id === taskId);
-    if (!task || task.due_date === dateKey) return;
-    const previous = task.due_date;
+    const timeUnchanged = dueTime === undefined || task?.due_time === dueTime;
+    if (!task || (task.due_date === dateKey && timeUnchanged)) return;
+    const previous = { due_date: task.due_date, due_time: task.due_time };
     task.due_date = dateKey;
+    if (dueTime !== undefined) task.due_time = dueTime;
     paint();
-    void tasksApi.updateTask(taskId, { due_date: dateKey }).then(
+    const patch: { due_date: string; due_time?: string | null } = { due_date: dateKey };
+    if (dueTime !== undefined) patch.due_time = dueTime;
+    void tasksApi.updateTask(taskId, patch).then(
       (updated) => {
         const index = tasks.findIndex((entry) => entry.id === updated.id);
         if (index >= 0) tasks[index] = updated;
       },
       (err: unknown) => {
-        if (task) task.due_date = previous;
+        if (task) {
+          task.due_date = previous.due_date;
+          task.due_time = previous.due_time;
+        }
         paint();
         const host = canvas.querySelector('.calendar-preview');
         if (host instanceof HTMLElement) {
@@ -315,8 +348,9 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
 
   function shiftRange(delta: number): void {
     if (session.mode === 'month') lastMonthDelta = delta;
-    anchor = session.mode === 'week' ? addWeeks(anchor, delta) : addMonths(anchor, delta);
-    selectedDateKey = null;
+    anchor = addCalendarRange(anchor, session.mode, delta);
+    if (session.mode === 'day') selectedDateKey = toDateKey(anchor);
+    else selectedDateKey = null;
     replaceHash(session.mode, anchor);
     paint();
   }
@@ -325,13 +359,21 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     lastMonthDelta = 0;
     anchor = date;
     selectedDateKey = toDateKey(date);
-    replaceHash(session.mode, date);
     paint();
+    const nextHash = calendarHash(session.mode, date);
+    if (location.hash !== nextHash) location.hash = nextHash;
   }
 
-  function selectDay(day: Date): void {
+  function selectDay(day: Date, dueTime?: string | null, focusCompose = false): void {
     selectedDateKey = toDateKey(day);
+    selectedItemId = null;
+    composeDraft = { dateKey: selectedDateKey, dueTime: dueTime ?? null };
+    if (focusCompose) focusComposeOnPaint = true;
     if (session.mode === 'month' && !isSameMonth(day, anchor)) {
+      anchor = day;
+      replaceHash(session.mode, day);
+    }
+    if (session.mode === 'day') {
       anchor = day;
       replaceHash(session.mode, day);
     }
@@ -458,32 +500,34 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       canvas.append(pressure);
     }
 
+    if (!composeDraft.dateKey) composeDraft = { dateKey: selectedDateKey!, dueTime: composeDraft.dueTime };
+
     const preview = el('aside', 'graph-preview week-preview calendar-preview');
-    preview.hidden = true;
     preview.setAttribute('aria-live', 'polite');
 
     const showPreview = (item: CalendarItem) => {
       selectedDateKey = item.date_key;
-      void openItem(item, preview);
+      selectedItemId = item.id;
+      composeDraft = { dateKey: item.date_key, dueTime: item.task?.due_time ?? composeDraft.dueTime };
+      paint();
     };
 
-    const calendar = el('div', 'hub-calendar');
+    const onCreated = (created: Task) => {
+      const index = tasks.findIndex((entry) => entry.id === created.id);
+      if (index >= 0) tasks[index] = created;
+      else tasks.push(created);
+      if (created.due_date) {
+        selectedDateKey = created.due_date;
+        composeDraft = { dateKey: created.due_date, dueTime: created.due_time };
+      }
+      paint();
+    };
+
+    const calendar = el('div', 'hub-calendar hub-calendar--workspace');
     calendar.append(renderCalendarNav(session.mode, anchor, shiftRange, goTo, today, switchMode));
+    const workspace = el('div', 'hub-calendar__workspace');
     const body = el('div', 'hub-calendar__body');
-    if (session.mode === 'week') {
-      body.append(
-        renderWeekGrid(
-          days,
-          items,
-          pinchesByKey,
-          todayKey,
-          selectedDateKey!,
-          showPreview,
-          selectDay,
-          dropTask
-        )
-      );
-    } else {
+    if (session.mode === 'month') {
       body.append(
         renderMonthGrid(
           days,
@@ -498,19 +542,44 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
           lastMonthDelta
         )
       );
+    } else {
+      body.append(
+        renderTimeGrid(
+          days,
+          items,
+          todayKey,
+          selectedDateKey!,
+          today,
+          showPreview,
+          selectDay,
+          dropTask
+        )
+      );
     }
-    calendar.append(body);
-    calendar.append(
-      renderAgenda(items, selectedDateKey!, session.mode, showPreview, (created) => {
-        const index = tasks.findIndex((entry) => entry.id === created.id);
-        if (index >= 0) tasks[index] = created;
-        else tasks.push(created);
-        if (created.due_date) selectedDateKey = created.due_date;
-        paint();
-      }, switchMode)
+    const rail = el('div', 'hub-calendar__rail');
+    const agenda = renderAgenda(
+      items,
+      selectedDateKey!,
+      session.mode,
+      showPreview,
+      onCreated,
+      switchMode,
+      false
     );
+    rail.append(renderStandingCompose(composeDraft, onCreated), agenda, preview, renderShortcutHint());
+    workspace.append(body, rail);
+    calendar.append(workspace);
     canvas.append(calendar);
-    canvas.append(preview);
+
+    const selected = items.find((item) => item.id === selectedItemId);
+    if (selected) {
+      agenda.hidden = true;
+      void openItem(selected, preview).finally(() => {
+        canvas.scrollTop = scrollTop;
+      });
+    } else {
+      preview.hidden = true;
+    }
 
     canvas.scrollTop = scrollTop;
     if (searchFocused) {
@@ -519,8 +588,26 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
         input.focus();
         if (searchPos != null) input.setSelectionRange(searchPos, searchPos);
       }
+    } else if (focusComposeOnPaint) {
+      focusComposeOnPaint = false;
+      focusCalendarCompose(canvas);
     }
   }
+
+  const goDate = (raw: string) => {
+    const next = parseGoToDate(raw, today);
+    if (next) goTo(next);
+  };
+  bindCalendarKeys(canvas, keys.signal, {
+    onAdd: () => {
+      focusComposeOnPaint = true;
+      paint();
+    },
+    onToday: () => goTo(today),
+    onGoToDate: () => openCalendarCommand(canvas, 'date', goDate),
+    onShortcuts: () => openCalendarCommand(canvas, 'help', goDate),
+    onSwitch: switchMode
+  });
 
   paint();
 }
@@ -540,28 +627,42 @@ function renderCalendarNav(
   const nav = el('div', 'hub-calendar__nav');
   const paging = el('div', 'hub-calendar__paging');
   paging.setAttribute('role', 'group');
-  paging.setAttribute('aria-label', mode === 'week' ? 'Week navigation' : 'Month navigation');
+  paging.setAttribute(
+    'aria-label',
+    mode === 'day' ? 'Day navigation' : mode === 'week' ? 'Week navigation' : 'Month navigation'
+  );
 
   const prev = el('button', 'hub-calendar__nav-btn');
   prev.type = 'button';
-  prev.setAttribute('aria-label', mode === 'week' ? 'Previous week' : 'Previous month');
+  prev.setAttribute(
+    'aria-label',
+    mode === 'day' ? 'Previous day' : mode === 'week' ? 'Previous week' : 'Previous month'
+  );
   prev.textContent = '‹';
   prev.addEventListener('click', () => shiftRange(-1));
 
   const label = el(
     'span',
     'hub-calendar__month-label',
-    mode === 'week' ? formatDisplayDateRange(rangeStart, rangeEnd) : monthTitle(anchor)
+    mode === 'month'
+      ? monthTitle(anchor)
+      : mode === 'week'
+        ? formatDisplayDateRange(rangeStart, rangeEnd)
+        : formatDisplayDate(toDateKey(anchor))
   );
 
   const next = el('button', 'hub-calendar__nav-btn');
   next.type = 'button';
-  next.setAttribute('aria-label', mode === 'week' ? 'Next week' : 'Next month');
+  next.setAttribute(
+    'aria-label',
+    mode === 'day' ? 'Next day' : mode === 'week' ? 'Next week' : 'Next month'
+  );
   next.textContent = '›';
   next.addEventListener('click', () => shiftRange(1));
 
   const todayBtn = el('button', 'hub-calendar__today', 'Today');
   todayBtn.type = 'button';
+  todayBtn.append(el('span', 'hub-kbd', 'T'));
   todayBtn.addEventListener('click', () => goTo(today));
 
   paging.append(prev, label, next, todayBtn);
@@ -576,8 +677,8 @@ function renderWeekGrid(
   todayKey: string,
   selectedKey: string,
   onOpen: (item: CalendarItem) => void,
-  onSelect: (day: Date) => void,
-  onDrop: (taskId: string, dateKey: string) => void
+  onSelect: (day: Date, dueTime?: string | null, focusCompose?: boolean) => void,
+  onDrop: (taskId: string, dateKey: string, dueTime?: string | null) => void
 ): HTMLElement {
   const grid = el('div', 'hub-calendar__week');
   grid.setAttribute('role', 'grid');
@@ -606,11 +707,7 @@ function renderWeekGrid(
     add.setAttribute('aria-label', `Add task on ${formatDisplayDate(day)}`);
     add.addEventListener('click', (event) => {
       event.stopPropagation();
-      onSelect(day);
-      queueMicrotask(() => {
-        const detail = document.querySelector('.hub-calendar__detail');
-        if (detail) openPlusAdd(detail)?.focus();
-      });
+      onSelect(day, null, true);
     });
     head.append(weekday, num, add);
     col.append(head);
@@ -642,8 +739,8 @@ function renderMonthGrid(
   selectedKey: string,
   monthAnchor: Date,
   onOpen: (item: CalendarItem) => void,
-  onSelect: (day: Date) => void,
-  onDrop: (taskId: string, dateKey: string) => void,
+  onSelect: (day: Date, dueTime?: string | null, focusCompose?: boolean) => void,
+  onDrop: (taskId: string, dateKey: string, dueTime?: string | null) => void,
   monthDelta: number
 ): HTMLElement {
   const grid = el('div', 'hub-calendar__grid');
@@ -684,11 +781,7 @@ function renderMonthGrid(
     });
     cell.addEventListener('dblclick', (event) => {
       event.preventDefault();
-      onSelect(day);
-      queueMicrotask(() => {
-        const detail = document.querySelector('.hub-calendar__detail');
-        if (detail) openPlusAdd(detail)?.focus();
-      });
+      onSelect(day, null, true);
     });
 
     const num = el('span', 'hub-calendar__day-num', String(day.getDate()));
@@ -711,13 +804,54 @@ function renderMonthGrid(
   return grid;
 }
 
+function renderStandingCompose(
+  draft: { dateKey: string; dueTime: string | null },
+  onCreated: (task: Task) => void
+): HTMLElement {
+  const card = el('section', 'hub-calendar__detail calendar-compose-card');
+  const heading = el('div', 'calendar-agenda__head');
+  heading.append(el('h3', 'hub-calendar__detail-heading', 'Add'));
+  heading.append(el('span', 'hub-kbd', 'A'));
+  card.append(heading);
+  card.append(
+    renderQuickAdd(onCreated, null, {
+      dueDate: draft.dateKey,
+      dueTime: draft.dueTime,
+      standing: true
+    })
+  );
+  return card;
+}
+
+function renderShortcutHint(): HTMLElement {
+  const hint = el('p', 'calendar-shortcuts');
+  for (const [key, label] of [
+    ['A', 'Add'],
+    ['T', 'Today'],
+    ['G', 'Date'],
+    ['?', 'Keys']
+  ]) {
+    const item = el('span');
+    item.append(el('kbd', 'hub-kbd', key), ` ${label}`);
+    hint.append(item);
+  }
+  return hint;
+}
+
+function focusCalendarCompose(host: ParentNode): HTMLElement | null {
+  const input = host.querySelector<HTMLInputElement>('[aria-label="New task title"]');
+  input?.focus();
+  return input;
+}
+
 function renderAgenda(
   items: CalendarItem[],
   dateKey: string,
   mode: CalendarMode,
   onOpen: (item: CalendarItem) => void,
   onCreated: (task: Task) => void,
-  onSwitch: (mode: CalendarMode, date?: Date) => void
+  onSwitch: (mode: CalendarMode, date?: Date) => void,
+  includeAdd = true
 ): HTMLElement {
   const dayItems = itemsForDay(items, dateKey);
   const agenda = el('section', 'hub-calendar__detail');
@@ -725,6 +859,12 @@ function renderAgenda(
   agenda.append(heading);
 
   const headActions = el('div', 'calendar-agenda__head');
+  if (mode !== 'day') {
+    const openDay = el('button', 'btn btn--secondary', 'Open day');
+    openDay.type = 'button';
+    openDay.addEventListener('click', () => onSwitch('day', parseCalendarAnchor(dateKey)));
+    headActions.append(openDay);
+  }
   if (mode === 'month') {
     const openWeek = el('button', 'btn btn--secondary', 'Open week');
     openWeek.type = 'button';
@@ -745,7 +885,11 @@ function renderAgenda(
           'hub-calendar__detail-empty',
           `${dayItems.length} on this day · ${formatLoad(dayTaskMinutes(dayItems)) || 'no timed work'}`
         )
-      : el('p', 'hub-calendar__detail-empty', 'Nothing on this day yet — add one below.')
+      : el(
+          'p',
+          'hub-calendar__detail-empty',
+          includeAdd ? 'Nothing on this day yet — add one below.' : 'Nothing on this day yet — add one above.'
+        )
   );
 
   const stack = el('div', 'task-stack calendar-agenda__stack');
@@ -792,12 +936,233 @@ function renderAgenda(
     stack.append(row);
   }
   agenda.append(stack);
-  agenda.append(renderQuickAdd(onCreated, null, { dueDate: dateKey }));
+  if (includeAdd) agenda.append(renderQuickAdd(onCreated, null, { dueDate: dateKey }));
   return agenda;
 }
 
+function hourTimeFromEvent(event: DragEvent, host: HTMLElement): string {
+  const rect = host.getBoundingClientRect();
+  const y = event.clientY ? event.clientY - rect.top : 0;
+  return hoursToDueTime(hoursFromOffset(y));
+}
+
+function renderTimeGrid(
+  days: Date[],
+  items: CalendarItem[],
+  todayKey: string,
+  selectedKey: string,
+  now: Date,
+  onOpen: (item: CalendarItem) => void,
+  onSelect: (day: Date, dueTime?: string | null, focusCompose?: boolean) => void,
+  onDrop: (taskId: string, dateKey: string, dueTime?: string | null) => void
+): HTMLElement {
+  const grid = el('div', 'hub-calendar__timegrid');
+  grid.style.setProperty('--days', String(days.length));
+  grid.dataset.days = String(days.length);
+  grid.setAttribute('role', 'grid');
+  grid.setAttribute('aria-label', days.length === 1 ? 'Day time grid' : 'Week time grid');
+
+  grid.append(el('div', 'hub-calendar__time-corner'));
+  for (const day of days) {
+    const key = toDateKey(day);
+    const heading = el('div', 'hub-calendar__time-heading hub-calendar__week-day');
+    heading.dataset.date = key;
+    if (key === todayKey) heading.dataset.today = 'true';
+    if (key === selectedKey) heading.dataset.selected = 'true';
+    heading.append(
+      el('span', 'hub-calendar__week-weekday', weekdayShort(day)),
+      el('span', 'hub-calendar__day-num', String(day.getDate()))
+    );
+    heading.addEventListener('click', () => onSelect(day));
+    wireDropTarget(heading, key, onDrop);
+    grid.append(heading);
+  }
+
+  grid.append(el('div', 'hub-calendar__time-allday-label', 'All day'));
+  for (const day of days) {
+    const key = toDateKey(day);
+    const { allDay } = splitDayItems(itemsForDay(items, day));
+    const cell = el('div', 'hub-calendar__all-day');
+    cell.dataset.date = key;
+    if (key === selectedKey) cell.dataset.selected = 'true';
+    wireDropTarget(cell, key, onDrop, () => null);
+    cell.addEventListener('click', (event) => {
+      if ((event.target as HTMLElement).closest('.event-chip')) return;
+      onSelect(day, null, true);
+    });
+    for (const item of allDay) cell.append(renderEventChip(item, onOpen));
+    grid.append(cell);
+  }
+
+  const gutter = el('div', 'hub-calendar__time-gutter');
+  for (const hour of timeGridHours()) {
+    gutter.append(el('p', 'hub-calendar__time-label', hourCaption(hour)));
+  }
+  grid.append(gutter);
+
+  for (const day of days) {
+    const key = toDateKey(day);
+    const { timed } = splitDayItems(itemsForDay(items, day));
+    const hours = el('div', 'hub-calendar__hours');
+    hours.dataset.date = key;
+    hours.dataset.dropDate = key;
+    if (key === selectedKey) hours.dataset.selected = 'true';
+    if (key === todayKey) {
+      const offset = nowLineOffset(now);
+      if (offset != null) {
+        const line = el('div', 'hub-calendar__now');
+        line.style.top = `${offset}px`;
+        hours.append(line);
+      }
+    }
+    wireDropTarget(hours, key, onDrop, (event) => hourTimeFromEvent(event, hours));
+    hours.addEventListener('click', (event) => {
+      if ((event.target as HTMLElement).closest('.event-chip')) return;
+      const rect = hours.getBoundingClientRect();
+      const dueTime = hoursToDueTime(hoursFromOffset(event.clientY - rect.top));
+      onSelect(day, dueTime, true);
+    });
+    for (const block of layoutTimedBlocks(timed)) {
+      const chip = renderEventChip(block.item, onOpen);
+      chip.classList.add('event-chip--timed');
+      const meta = chip.querySelector('.event-chip__meta');
+      if (meta) meta.textContent = formatBlockTime(block);
+      else chip.append(el('span', 'event-chip__meta', formatBlockTime(block)));
+      Object.assign(chip.style, blockStyle(block));
+      hours.append(chip);
+    }
+    grid.append(hours);
+  }
+  return grid;
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    ? Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+    : false;
+}
+
+function bindCalendarKeys(
+  canvas: HTMLElement,
+  signal: AbortSignal,
+  handlers: {
+    onAdd: () => void;
+    onToday: () => void;
+    onGoToDate: () => void;
+    onShortcuts: () => void;
+    onSwitch: (mode: CalendarMode) => void;
+  }
+): void {
+  document.addEventListener(
+    'keydown',
+    (event) => {
+      if (!canvas.isConnected || event.defaultPrevented) return;
+      if (event.key === 'Escape') {
+        document.querySelector('.calendar-command')?.remove();
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        handlers.onShortcuts();
+        return;
+      }
+      if (isTypingTarget(event.target)) return;
+      if (event.key === 'a' || event.key === 'A') {
+        event.preventDefault();
+        handlers.onAdd();
+      } else if (event.key === 't' || event.key === 'T') {
+        event.preventDefault();
+        handlers.onToday();
+      } else if (event.key === 'g' || event.key === 'G' || event.key === '.') {
+        event.preventDefault();
+        handlers.onGoToDate();
+      } else if (event.key === '?') {
+        event.preventDefault();
+        handlers.onShortcuts();
+      } else if (event.key === 'd' || event.key === 'D') {
+        event.preventDefault();
+        handlers.onSwitch('day');
+      } else if (event.key === 'w' || event.key === 'W') {
+        event.preventDefault();
+        handlers.onSwitch('week');
+      } else if (event.key === 'm' || event.key === 'M') {
+        event.preventDefault();
+        handlers.onSwitch('month');
+      }
+    },
+    { signal }
+  );
+}
+
+function openCalendarCommand(
+  canvas: HTMLElement,
+  mode: 'date' | 'help',
+  onDate: (value: string) => void
+): void {
+  document.querySelector('.calendar-command')?.remove();
+  const overlay = el('div', 'calendar-command');
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-label', mode === 'date' ? 'Go to date' : 'Calendar shortcuts');
+  const panel = el('div', 'calendar-command__panel');
+  if (mode === 'date') {
+    panel.append(el('h3', 'hub-calendar__detail-heading', 'Go to date'));
+    const form = el('form', 'quick-add hub-toolbar');
+    const field = document.createElement('input');
+    field.className = 'hub-search__input';
+    field.type = 'text';
+    field.placeholder = 'dd/mm/yy or today';
+    field.setAttribute('aria-label', 'Go to date');
+    const go = el('button', 'btn btn--primary', 'Go');
+    go.type = 'submit';
+    form.append(field, go);
+    const submitDate = () => {
+      onDate(field.value);
+      overlay.remove();
+    };
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      submitDate();
+    });
+    go.addEventListener('click', (event) => {
+      event.preventDefault();
+      submitDate();
+    });
+    panel.append(form);
+  } else {
+    panel.append(el('h3', 'hub-calendar__detail-heading', 'Shortcuts'));
+    const list = el('ul', 'calendar-command__list');
+    for (const [key, label] of [
+      ['A', 'Add to this day'],
+      ['T', 'Jump to today'],
+      ['G', 'Go to date'],
+      ['D / W / M', 'Day, week, month'],
+      ['⌘K / ?', 'This menu']
+    ]) {
+      const row = el('li');
+      const btn = el('button');
+      btn.type = 'button';
+      btn.append(el('span', '', label), el('kbd', 'hub-kbd', key));
+      btn.addEventListener('click', () => {
+        overlay.remove();
+        if (key === 'A') focusCalendarCompose(canvas);
+        if (key === 'T') onDate('today');
+        if (key === 'G') openCalendarCommand(canvas, 'date', onDate);
+      });
+      row.append(btn);
+      list.append(row);
+    }
+    panel.append(list);
+  }
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) overlay.remove();
+  });
+  overlay.append(panel);
+  document.body.append(overlay);
+  overlay.querySelector('input')?.focus();
+}
+
 export async function renderWeekView(canvas: HTMLElement): Promise<void> {
-  return renderCalendarView(canvas, 'week');
+  return renderCalendarView(canvas, parseCalendarMode() === 'day' ? 'day' : 'week');
 }
 
 export async function renderMonthView(canvas: HTMLElement): Promise<void> {
@@ -812,6 +1177,10 @@ export function resetCalendarSession(): void {
   sessionFilters.includeDone = false;
   sessionFilters.includeDates = true;
   selectedDateKey = null;
+  selectedItemId = null;
+  composeDraft = { dateKey: '', dueTime: null };
+  focusComposeOnPaint = false;
   lastMonthDelta = 0;
+  liveCalendar?.dispose();
   liveCalendar = null;
 }
