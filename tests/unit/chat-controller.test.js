@@ -17,7 +17,13 @@ class FakeElement extends EventTarget {
     this.children = [];
     this.parent = null;
     this.attributes = new Map();
+    this.offsetTop = 0;
+    this.offsetHeight = 0;
+    this.clientHeight = 0;
+    this.scrollHeight = 0;
+    this.scrollTop = 0;
     this.style = {
+      height: '0px',
       props: new Map(),
       setProperty(name, value) {
         this.props.set(name, value);
@@ -26,10 +32,31 @@ class FakeElement extends EventTarget {
         return this.props.get(name) ?? '';
       }
     };
+    this.classList = {
+      add: (...names) => {
+        const set = new Set((this.className || '').split(/\s+/).filter(Boolean));
+        for (const name of names) set.add(name);
+        this.className = [...set].join(' ');
+      },
+      remove: (...names) => {
+        const set = new Set((this.className || '').split(/\s+/).filter(Boolean));
+        for (const name of names) set.delete(name);
+        this.className = [...set].join(' ');
+      },
+      contains: (name) => (this.className || '').split(/\s+/).includes(name)
+    };
+  }
+
+  get isConnected() {
+    return this.parent != null;
   }
 
   setAttribute(name, value) {
     this.attributes.set(name, String(value));
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(name);
   }
 
   append(...nodes) {
@@ -58,12 +85,38 @@ class FakeElement extends EventTarget {
     if (selector === '.chat-message__avatar') {
       return this.children.find(child => child.className === 'chat-message__avatar') ?? null;
     }
+    if (selector === '.confirm-card__actions') {
+      return this.children.find(child => child.className === 'confirm-card__actions') ?? null;
+    }
+    if (selector === '.confirm-card__receipt') {
+      const actions = this.children.find(child => child.className === 'confirm-card__actions');
+      return actions?.children?.find(child => child.className === 'confirm-card__receipt')
+        ?? this.children.find(child => child.className === 'confirm-card__receipt')
+        ?? null;
+    }
+    if (selector?.startsWith?.('[') && selector.endsWith(']')) {
+      const attr = selector.slice(1, -1);
+      return this.children.find(child => child.attributes?.has(attr)) ?? null;
+    }
     return null;
   }
 
   querySelectorAll(selector) {
     if (selector === '[data-agent-slug]') {
       return this.children.filter(child => child.dataset?.agentSlug);
+    }
+    if (selector === 'button, input, textarea, select') {
+      const out = [];
+      const walk = (node) => {
+        if (/^(button|input|textarea|select)$/i.test(node.tagName)) out.push(node);
+        for (const child of node.children ?? []) walk(child);
+      };
+      walk(this);
+      return out;
+    }
+    if (selector?.startsWith?.('[') && selector.endsWith(']')) {
+      const attr = selector.slice(1, -1);
+      return this.children.filter(child => child.attributes?.has(attr));
     }
     return [];
   }
@@ -255,7 +308,11 @@ test('a confirm that reports centralNodeUpdated:false shows an ephemeral warning
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
-  assert.match(proposal.children[0]?.textContent ?? '', /Saved/);
+  assert.match(
+    proposal.querySelector('.confirm-card__receipt')?.textContent
+      ?? nodeText(proposal),
+    /Saved/
+  );
   assert.equal(
     root.querySelector('#chat-error').textContent,
     'Logged, but Central Node didn\u2019t update — try Refresh.'
@@ -307,7 +364,11 @@ test('a diary confirm that reports dayoneSent:false shows a Day One warning with
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
-  assert.match(proposal.children[0]?.textContent ?? '', /Saved/);
+  assert.match(
+    proposal.querySelector('.confirm-card__receipt')?.textContent
+      ?? nodeText(proposal),
+    /Saved/
+  );
   assert.match(root.querySelector('#chat-error').textContent, /Day One email didn.t send/i);
 });
 
@@ -495,7 +556,9 @@ test('a search event ends the current bubble so text before and after it does no
   const bubbles = messageBubbles(root);
   assert.equal(bubbles.length, 4, 'user bubble, pre-search text, the search note, and post-search text');
   assert.equal(bubbleText(bubbles[1]), 'Let me check that.');
-  assert.equal(bubbleText(bubbles[2]), '🔍 Searched the web: McChicken nutrition');
+  assert.match(bubbles[2].className, /chat-message--structured/);
+  assert.match(nodeText(bubbles[2]), /Searched the web/);
+  assert.match(nodeText(bubbles[2]), /McChicken nutrition/);
   assert.equal(bubbleText(bubbles[3]), 'Found it, 452 kcal.');
 });
 
@@ -1742,7 +1805,11 @@ test('cn_patch_proposal Confirm posts kind cn_patch with the patch candidate', a
   assert.equal(confirmCalls[0].kind, 'cn_patch');
   assert.equal(confirmCalls[0].slug, 'hammond');
   assert.deepEqual(confirmCalls[0].candidate, patch);
-  assert.match(proposal.children[0]?.textContent ?? '', /Central Node updated: Remove taper constraint/);
+  assert.match(
+    proposal.querySelector('.confirm-card__receipt')?.textContent
+      ?? nodeText(proposal),
+    /Central Node updated: Remove taper constraint/
+  );
 });
 
 test('cn_patch_proposal Confirm includes the pending id when the propose SSE carried one', async () => {
