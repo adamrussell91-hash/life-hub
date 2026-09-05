@@ -6025,6 +6025,7 @@ main { max-width: 76rem; margin: 0 auto; }
 .medical-sheet__notes { margin: 0 0 var(--space-3); color: var(--orca); font-size: var(--text-md); }
 .medical-sheet__line { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
 .medical-sheet__map { color: var(--wave); font-weight: var(--weight-semibold); }
+.medical-sheet .view-on-map { margin: var(--space-3) 0; }
 .medical-sheet__labs { margin: var(--space-3) 0; }
 .medical-sheet__close {
   display: none;
