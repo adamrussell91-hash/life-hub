@@ -1,4 +1,6 @@
-const CACHE_NAME = 'life-hub-shell-v147';
+const CACHE_NAME = 'life-hub-shell-v148';
+const SHARE_CACHE = 'life-hub-share-target-v1';
+const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
 // so every shell path is resolved against this worker's own registration scope
 // instead of being hardcoded to "/".
@@ -6,6 +8,11 @@ const SCOPE_PATH = new URL(self.registration.scope).pathname;
 const SHELL_FILES = [
   '',
   'index.html',
+  'packages/design-kit/js/hub-rich-paste.js',
+  'packages/design-kit/js/hub-places-map.js',
+  'packages/design-kit/hub-places-map.css',
+  'js/app/capture-inbox.js',
+  'capture-inbox.html',
   'css/app.css',
   'packages/design-kit/tokens.css',
   'packages/design-kit/overlays.css',
@@ -239,6 +246,12 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Web Share Target POST → stash payload → redirect to Capture Inbox (online path; not offline-first).
+  if (request.method === 'POST' && url.pathname.endsWith('/capture-inbox.html')) {
+    event.respondWith(handleShareTarget(request, url));
+    return;
+  }
+
   if (request.method !== 'GET') return;
 
   if (request.mode === 'navigate') {
@@ -265,3 +278,46 @@ self.addEventListener('fetch', event => {
       .catch(() => caches.match(request))
   );
 });
+
+async function handleShareTarget(request, url) {
+  try {
+    const form = await request.formData();
+    const files = [];
+    for (const value of form.getAll('media')) {
+      if (!(value instanceof Blob) || !value.size) continue;
+      const name = typeof value.name === 'string' && value.name ? value.name : 'shared-file';
+      const buffer = await value.arrayBuffer();
+      files.push({
+        name,
+        type: value.type || 'application/octet-stream',
+        size: value.size,
+        base64: arrayBufferToBase64(buffer)
+      });
+    }
+    const handoff = {
+      title: String(form.get('title') || '').trim(),
+      text: String(form.get('text') || '').trim(),
+      url: String(form.get('url') || '').trim(),
+      files
+    };
+    const cache = await caches.open(SHARE_CACHE);
+    await cache.put(SHARE_HANDOFF, new Response(JSON.stringify(handoff), {
+      headers: { 'Content-Type': 'application/json' }
+    }));
+  } catch {
+    // Still redirect — inbox will show empty/waiting state.
+  }
+  const redirect = new URL('capture-inbox.html', url);
+  redirect.searchParams.set('share', '1');
+  return Response.redirect(redirect.href, 303);
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}

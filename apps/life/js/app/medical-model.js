@@ -90,6 +90,7 @@ export function buildMedicalModel({
     provider,
     selected,
     items,
+    visits: filtered,
     recordTypes,
     providers,
     count: filtered.length
