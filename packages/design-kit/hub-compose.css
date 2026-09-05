@@ -1,6 +1,6 @@
 /* Hub compose — dump / schedule composer.
  * The motion is the primitive. Labels and submit wiring are per use.
- * Tokens only. No “will be posted” footer. Respects prefers-reduced-motion.
+ * Tokens only. No confirmation strip under the card. Respects prefers-reduced-motion.
  *
  * Markup: snippets/hub-compose.html
  * startHubMotion() mounts `.hub-compose` / `[data-hub-compose]`.

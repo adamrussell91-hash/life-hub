@@ -1,7 +1,7 @@
 /** Hub compose — dump / schedule composer.
  * Calendar expands a date + time row. Dump stays immediate.
  * Schedule appends `due dd/mm/yy` (optional `at HH:MM`) for Clare to parse.
- * No “will be posted” footer. Tokens only. Respects prefers-reduced-motion.
+ * No confirmation strip. Tokens only. Respects prefers-reduced-motion.
  *
  * Markup: snippets/hub-compose.html
  * startHubMotion() mounts `.hub-compose` / `[data-hub-compose]`.
