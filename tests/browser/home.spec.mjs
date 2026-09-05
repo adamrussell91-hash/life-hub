@@ -158,6 +158,28 @@ test('signs in and renders the approved Home values at desktop width', async () 
   });
   assert.equal(await page.locator('[data-ring="protein"]').count(), 1);
   assert.equal(await page.locator('[data-progress="protein"]').count(), 0);
+
+  await page.waitForFunction(() => {
+    const total = document.querySelector('[data-value="logging"]');
+    if (!total || !/\d+ of \d+/.test(total.textContent || '')) return false;
+    const wrap = total.closest('.hub-count');
+    return Boolean(wrap && !wrap.classList.contains('is-ticking') && wrap.querySelector('.hub-count__fx'));
+  });
+  const loggingOverlay = await page.evaluate(() => {
+    const total = document.querySelector('[data-value="logging"]');
+    const wrap = total?.closest('.hub-count');
+    const fx = wrap?.querySelector('.hub-count__fx');
+    return {
+      text: total?.textContent,
+      ticking: Boolean(wrap?.classList.contains('is-ticking')),
+      hasFx: Boolean(fx),
+      fxDisplay: fx ? getComputedStyle(fx).display : 'missing'
+    };
+  });
+  assert.equal(loggingOverlay.text, '3 of 5');
+  assert.equal(loggingOverlay.ticking, false);
+  assert.equal(loggingOverlay.hasFx, true);
+  assert.equal(loggingOverlay.fxDisplay, 'none');
   assert.match(await page.evaluate(() => sessionStorage.getItem('life-hub:session-expiry')), /^2026-/);
   assert.equal(await page.locator('#sign-in-view').isHidden(), true);
   await assertNoSecretResponses();
