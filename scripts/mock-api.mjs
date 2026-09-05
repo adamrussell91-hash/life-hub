@@ -37,6 +37,10 @@ const FIXTURE_FILES = [
   {
     path: 'data/nutrition/challenges.json',
     source: 'tests/fixtures/valid/data/nutrition/challenges.json'
+  },
+  {
+    path: 'data/body/2026/07/2026-07-08-therapy-kate-semple.md',
+    source: 'tests/fixtures/valid/data/body/2026/07/2026-07-08-therapy-kate-semple.md'
   }
 ];
 

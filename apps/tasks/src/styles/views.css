@@ -4127,6 +4127,10 @@ html.is-map-fullscreen .map-page .map-preview {
   font-size: var(--text-sm);
 }
 
+.catalog-overlay__card .view-on-map {
+  margin-top: var(--space-4);
+}
+
 .catalog-detail__actions,
 .catalog-form {
   display: flex;
