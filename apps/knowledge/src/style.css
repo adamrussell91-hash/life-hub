@@ -2067,11 +2067,8 @@ body.is-universe-fullscreen .local-banner {
     order: 10;
   }
 
-  .coach.chat .hub-scroll-hide {
-    order: -2;
-  }
-
   .coach.chat .chat__sitting {
+    order: -2;
     padding: var(--space-3);
   }
 
@@ -2135,6 +2132,10 @@ body.is-universe-fullscreen .local-banner {
 
   .coach.chat .chat__composer textarea,
   .coach.chat.chat--from-book .chat__note-form textarea,
+  .coach.chat .chat__book-add input,
+  .coach.chat #chat-book-locus,
+  .coach.chat #chat-thesis,
+  .coach.chat #chat-draft,
   .compose input,
   .compose select,
   .compose textarea,
