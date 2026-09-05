@@ -879,7 +879,8 @@ export function createChatController({
         kind: 'action',
         candidate: proposal,
         ...(id ? { id } : {}),
-        slug
+        slug,
+        accept: proposalUi.acceptedPaths?.() ?? null
       });
       lockConfirmCardReceipt(proposalUi.card, {
         createElement: root.createElement.bind(root),
@@ -889,10 +890,15 @@ export function createChatController({
         label: 'Confirmed'
       });
       onRecordWritten?.(result);
-    } catch {
+    } catch (error) {
       proposalUi.confirm.disabled = false;
       proposalUi.confirm.textContent = previousLabel;
-      showChatError(root, 'Saving that action failed. You can try again.');
+      showChatError(
+        root,
+        error?.code === 'stale_write'
+          ? 'A target file changed since this proposal. Discard and ask again.'
+          : 'Saving that action failed. You can try again.'
+      );
     }
   }
 

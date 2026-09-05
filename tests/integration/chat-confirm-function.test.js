@@ -1114,3 +1114,192 @@ test('action confirm rejects out-of-allowlist writes', async () => {
   assert.equal(payload.error.code, 'invalid_action');
   assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 0);
 });
+
+function memoryBlobStore(initial = {}) {
+  const data = { ...initial };
+  return {
+    async get(key) {
+      return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null;
+    },
+    async setJSON(key, value) {
+      data[key] = value;
+    },
+    data
+  };
+}
+
+function decodePut(call) {
+  return Buffer.from(JSON.parse(call.options.body).content, 'base64').toString('utf8');
+}
+
+test('action confirm returns 409 stale_write when a queued base no longer matches', async () => {
+  const queueSha = 'e'.repeat(40);
+  const fileSha = 'f'.repeat(40);
+  const path = 'data/challenges/2026-08-01-no-sugar.json';
+  const proposal = {
+    capability: 'os.propose-action',
+    agent: 'brisket',
+    intent: 'open a 7-day no-refined-sugar tracker',
+    reads: [],
+    writes: [{
+      path,
+      mode: 'overwrite',
+      content: JSON.stringify({ title: 'No refined sugar' }),
+      diff: 'replace challenge file'
+    }],
+    surfaces: ['governance_log']
+  };
+  const queue = [{
+    id: 'act_stale',
+    createdAt: '2026-08-01',
+    slug: 'brisket',
+    proposal,
+    bases: { [path]: { sha: 'old'.padEnd(40, '0'), missing: false } }
+  }];
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'data/os/pending-actions.json', type: 'blob', sha: queueSha },
+          { path, type: 'blob', sha: fileSha }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${fileSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from('{"title":"changed"}', 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'brisket',
+    id: 'act_stale'
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 409);
+  assert.equal(payload.error.code, 'stale_write');
+  assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 0);
+});
+
+test('action confirm applies only accepted writes and records the decision', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+  const keep = 'data/challenges/2026-08-01-no-sugar.json';
+  const skip = 'data/remember/travel.md';
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'brisket',
+    accept: [keep],
+    reason: 'Only the tracker this week',
+    revisit: '2026-09-12',
+    candidate: {
+      capability: 'os.propose-action',
+      agent: 'brisket',
+      intent: 'open a tracker and a travel note',
+      reads: [],
+      writes: [
+        { path: keep, mode: 'create', content: '{"title":"No sugar"}', diff: 'new challenge' },
+        { path: skip, mode: 'create', content: 'Away\n', diff: 'new note' }
+      ],
+      surfaces: ['governance_log']
+    }
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.results.length, 1);
+  assert.equal(payload.data.results[0].path, keep);
+  assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes(keep)));
+  assert.equal(calls.filter(call => call.options?.method === 'PUT' && call.url.includes('travel.md')).length, 0);
+  const govPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('governance-log.md'));
+  assert.ok(govPut);
+  const written = decodePut(govPut);
+  assert.match(written, /\*\*Chosen:\*\* Accepted `data\/challenges\/2026-08-01-no-sugar\.json`; rejected `data\/remember\/travel\.md`/);
+  assert.match(written, /\*\*Reasoning:\*\* Only the tracker this week/);
+  assert.match(written, /\*\*Revisit:\*\* 2026-09-12/);
+  assert.match(written, /skipped/);
+});
+
+test('action confirm writes a Tasks project blob and leaves GitHub files alone', async () => {
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: {
+      capability: 'os.propose-action',
+      agent: 'clare',
+      intent: 'open the AOTFW project',
+      reads: [],
+      writes: [{
+        path: 'tasks:project:proj_aotfw',
+        mode: 'create',
+        content: JSON.stringify({ name: 'Artist of the Floating World', status: 'active' }),
+        diff: 'new project'
+      }],
+      surfaces: ['governance_log']
+    }
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(store.data['projects/proj_aotfw'].name, 'Artist of the Floating World');
+  assert.equal(store.data['projects/proj_aotfw'].id, 'proj_aotfw');
+  assert.deepEqual(store.data['projects/_index'], ['proj_aotfw']);
+  assert.equal(
+    calls.filter(call => call.options?.method === 'PUT' && call.url.includes('tasks:project')).length,
+    0
+  );
+  assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('governance-log.md')));
+  assert.equal(payload.data.results[0].path, 'tasks:project:proj_aotfw');
+});

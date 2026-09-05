@@ -108,6 +108,25 @@ test('confirm passes kind through when provided', async () => {
   assert.equal(result.path, 'central-node.md');
 });
 
+test('confirm passes accept, reason, and revisit for action proposals', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return Response.json({ ok: true, data: { intent: 'open a tracker' } });
+  });
+  await chatApi.confirm({
+    kind: 'action',
+    slug: 'brisket',
+    candidate: { intent: 'open a tracker' },
+    accept: ['data/challenges/no-sugar.json'],
+    reason: 'Keep the week honest',
+    revisit: '2026-09-12'
+  });
+  assert.deepEqual(sentBody.accept, ['data/challenges/no-sugar.json']);
+  assert.equal(sentBody.reason, 'Keep the week honest');
+  assert.equal(sentBody.revisit, '2026-09-12');
+});
+
 test('confirm passes id through when provided, and can omit candidate entirely', async () => {
   let sentBody;
   const chatApi = createChatApi(async (_url, init) => {

@@ -25,7 +25,16 @@ export function emptyGovernanceLog() {
   return TITLE_LINE;
 }
 
-export function formatGovernanceEntry({ dateKey, entryType, body, status, title } = {}) {
+export function formatGovernanceEntry({
+  dateKey,
+  entryType,
+  body,
+  status,
+  title,
+  chosen,
+  reasoning,
+  revisit
+} = {}) {
   if (typeof dateKey !== 'string' || !dateKey.trim()) return null;
   if (!GOVERNANCE_ENTRY_TYPES.includes(entryType)) return null;
   if (typeof body !== 'string' || !body.trim()) return null;
@@ -36,6 +45,15 @@ export function formatGovernanceEntry({ dateKey, entryType, body, status, title 
   }
   if (typeof status === 'string' && status.trim()) {
     lines.push(`**Status:** ${status.trim()}`);
+  }
+  if (typeof chosen === 'string' && chosen.trim()) {
+    lines.push(`**Chosen:** ${chosen.trim()}`);
+  }
+  if (typeof reasoning === 'string' && reasoning.trim()) {
+    lines.push(`**Reasoning:** ${reasoning.trim()}`);
+  }
+  if (typeof revisit === 'string' && revisit.trim()) {
+    lines.push(`**Revisit:** ${revisit.trim()}`);
   }
   lines.push('');
   lines.push(body.trim());
@@ -120,11 +138,17 @@ function parseGovernanceEntryBlock(block) {
 
   const titleMatch = /^\*\*Title:\*\*\s*(.+)$/m.exec(block);
   const statusMatch = /^\*\*Status:\*\*\s*(.+)$/m.exec(block);
+  const chosenMatch = /^\*\*Chosen:\*\*\s*(.+)$/m.exec(block);
+  const reasoningMatch = /^\*\*Reasoning:\*\*\s*(.+)$/m.exec(block);
+  const revisitMatch = /^\*\*Revisit:\*\*\s*(.+)$/m.exec(block);
 
   const withoutHeading = block.slice(heading.index + heading[0].length);
   const body = withoutHeading
     .replace(/^\*\*Title:\*\*.*$/m, '')
     .replace(/^\*\*Status:\*\*.*$/m, '')
+    .replace(/^\*\*Chosen:\*\*.*$/m, '')
+    .replace(/^\*\*Reasoning:\*\*.*$/m, '')
+    .replace(/^\*\*Revisit:\*\*.*$/m, '')
     .replace(/^\n+/, '')
     .replace(/\s+$/, '');
 
@@ -133,6 +157,9 @@ function parseGovernanceEntryBlock(block) {
     entryType: entryType || null,
     title: titleMatch ? titleMatch[1].trim() : null,
     status: statusMatch ? statusMatch[1].trim() : null,
+    chosen: chosenMatch ? chosenMatch[1].trim() : null,
+    reasoning: reasoningMatch ? reasoningMatch[1].trim() : null,
+    revisit: revisitMatch ? revisitMatch[1].trim() : null,
     body
   };
 }

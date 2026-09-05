@@ -9,14 +9,18 @@
     "data/research/**",
     "data/widgets/**",
     "data/os/**",
-    "intuition/**"
+    "intuition/**",
+    "teaching:unit:*",
+    "tasks:project:*"
   ],
   "read_globs": [
     "central-node.md",
     "data/**",
     "data/widgets/**",
     "data/os/**",
-    "intuition/**"
+    "intuition/**",
+    "teaching:unit:*",
+    "tasks:project:*"
   ],
   "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1."
 }
