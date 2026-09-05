@@ -300,7 +300,7 @@ export function mountSavePublishControls(options: SavePublishMountOptions): Save
 
   const saveButton = document.createElement('button');
   saveButton.type = 'button';
-  saveButton.className = 'btn btn--secondary context-bar__save';
+  saveButton.className = 'btn btn--secondary context-bar__save hub-save-toggle';
   saveButton.textContent = 'Save';
   saveButton.addEventListener('click', () => {
     void controller.saveNow();

@@ -53,6 +53,12 @@ import { renderCalendar } from './render-calendar.js';
 import { syncRepository } from './sync-repository.js';
 import { startHubMotion } from '../../../../packages/design-kit/js/hub-motion.js';
 import { mountMorphingPopovers } from '../../../../packages/design-kit/js/morphing-popover.js';
+import { showHubToast } from '../../../../packages/design-kit/js/hub-feedback.js';
+import { openHubCommandSearch } from '../../../../packages/design-kit/js/hub-command-search.js';
+import {
+  createJournalNav,
+  createScheduleButton
+} from '../../../../packages/design-kit/js/hub-surfaces.js';
 
 // The API lives on a different origin (Netlify Functions) from the site (GitHub
 // Pages), so every /api/* call needs the full URL and must send the session cookie
@@ -115,23 +121,28 @@ const fitnessTemplateLibrary = createFitnessTemplateLibrary({
   onPlanned: () => void controller.refresh({ manual: true, force: true })
 });
 const surfaceWidgetLibrary = createSurfaceWidgetLibrary({ widgetsApi: surfaceWidgetsApi });
+function notifyLogged() {
+  showHubToast('Logged', { tone: 'success' });
+  void controller.refresh({ manual: true, force: true });
+}
+
 const skincareController = createSkincareController({
   root: document,
   chatApi,
   skincareApi,
-  onRecordWritten: () => void controller.refresh({ manual: true, force: true }),
+  onRecordWritten: notifyLogged,
   onShelfChanged: patch => controller?.applySkincareShelf?.(patch)
 });
 const bodyController = createBodyController({
   root: document,
   chatApi,
   getDate: () => controller.getDisplayDate?.() ?? null,
-  onRecordWritten: () => void controller.refresh({ manual: true, force: true })
+  onRecordWritten: notifyLogged
 });
 const medicalController = createMedicalController({
   chatApi,
   getDate: () => controller.getDisplayDate?.() ?? null,
-  onRecordWritten: () => void controller.refresh({ manual: true, force: true })
+  onRecordWritten: notifyLogged
 });
 
 controller = createAppController({
@@ -191,6 +202,44 @@ controller.start();
 startHubMotion(document);
 mountMorphingPopovers(document);
 
+document.addEventListener('keydown', (event) => {
+  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;
+  if (event.target?.closest?.('input, textarea, select, [contenteditable]')) return;
+  event.preventDefault();
+  openHubCommandSearch({
+    placeholder: 'Jump in Life Hub',
+    groups: [{
+      heading: 'Go to',
+      items: ['home', 'chat', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node'].map((id) => ({
+        id,
+        label: id.replace(/-/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()),
+        onSelect: () => document.querySelector(`[data-section="${id}"]`)?.click()
+      }))
+    }]
+  });
+});
+
+const mindNav = document.querySelector('[data-mind="journal-nav"]');
+if (mindNav) {
+  createJournalNav({
+    wrap: mindNav,
+    current: 'mind',
+    sections: [
+      { id: 'mind', label: 'Mind' },
+      { id: 'body', label: 'Body' },
+      { id: 'calendar', label: 'Calendar' }
+    ],
+    onSelect: (id) => document.querySelector(`[data-section="${id}"]`)?.click()
+  });
+}
+const calHost = document.querySelector('[data-calendar="schedule"]');
+if (calHost) {
+  createScheduleButton({
+    wrap: calHost,
+    onSchedule: () => document.querySelector('[data-hub-compose-cal]')?.click()
+  });
+}
+
 const DEFAULT_AGENT_BY_SECTION = {
   nutrition: NUTRITION_AGENT_SLUG,
   fitness: FITNESS_AGENT_SLUG,
@@ -203,7 +252,7 @@ const DEFAULT_AGENT_BY_SECTION = {
 chatController = createChatController({
   root: document,
   chatApi,
-  onRecordWritten: () => void controller.refresh({ manual: true, force: true }),
+  onRecordWritten: notifyLogged,
   getDefaultAgentSlug: () => DEFAULT_AGENT_BY_SECTION[controller.getCurrentSection()],
   agentColour,
   getAgentsConfig: () => controller.getAgentsConfig?.() ?? null,

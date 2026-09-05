@@ -113,9 +113,20 @@ export function requestToggleDone(
     return;
   }
   if (!(task.estimated_duration && task.actual_duration == null)) {
-    void markTaskDone(task).then(onDone).catch((err) => {
-      host.append(el('p', 'empty-state', errorMessage(err)));
-    });
+    void markTaskDone(task)
+      .then(async () => {
+        await onDone();
+        const { offerTimedUndo } = await import('../../design-kit/js/hub-feedback.js');
+        offerTimedUndo({
+          message: `Completed “${task.title}”`,
+          onUndo: () => {
+            void markTaskOpen(task).then(onDone);
+          }
+        });
+      })
+      .catch((err) => {
+        host.append(el('p', 'empty-state', errorMessage(err)));
+      });
     return;
   }
 

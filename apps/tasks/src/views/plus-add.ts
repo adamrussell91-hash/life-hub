@@ -13,7 +13,7 @@ export function createPlusAdd(options: {
   panel: HTMLElement;
   className?: string;
 }): PlusAddHandle {
-  const root = el('div', ['plus-add', options.className].filter(Boolean).join(' '));
+  const root = el('div', ['plus-add', 'hub-create', options.className].filter(Boolean).join(' '));
   const btn = el('button', 'icon-plus-btn plus-add__btn') as HTMLButtonElement;
   btn.type = 'button';
   btn.title = options.ariaLabel;
@@ -21,7 +21,7 @@ export function createPlusAdd(options: {
   btn.setAttribute('aria-expanded', 'false');
   btn.append(plusIcon());
 
-  const slot = el('div', 'plus-add__panel');
+  const slot = el('div', 'plus-add__panel hub-create__panel');
   slot.hidden = true;
   slot.append(options.panel);
 

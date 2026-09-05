@@ -152,6 +152,16 @@ export async function confirmAndTrash(
     onApplied,
     'Unable to move to trash.'
   );
+  void import('../../design-kit/js/hub-feedback.js').then(({ offerTimedUndo }) => {
+    offerTimedUndo({
+      message: `Moved “${title}” to trash`,
+      onUndo: () => {
+        if (isCurriculumEntityType(type) && previous) applyEntityStatus(type, id, previous);
+        onApplied?.();
+        void restoreFromTrash(type, id).catch(() => undefined);
+      }
+    });
+  });
   return true;
 }
 

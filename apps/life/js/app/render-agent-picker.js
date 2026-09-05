@@ -11,7 +11,8 @@ export function renderAgentPicker(root, {
   for (const host of hosts) {
     if (!host.dataset.built) {
       host.dataset.built = '1';
-      host.className = `${host.className ?? ''} agent-picker`.trim();
+      host.className = `${host.className ?? ''} agent-picker hub-ai-agent`.trim();
+      host.setAttribute?.('data-hub-ai-agent', '');
       host.setAttribute?.('role', 'listbox');
       host.setAttribute?.('aria-label', 'Choose who to talk to');
       for (const agent of AGENT_AVATARS) {

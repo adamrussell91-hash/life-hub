@@ -228,7 +228,7 @@ export function renderResourcesIndex(
   }
 
   const list = document.createElement('ul');
-  list.className = 'lesson-list';
+  list.className = 'lesson-list hub-grid-disclose';
 
   for (const entry of media) {
     const item = document.createElement('li');

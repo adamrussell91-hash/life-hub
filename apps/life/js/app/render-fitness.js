@@ -3,6 +3,7 @@ import { buildAreaLine } from './chart-kit/area-line.js';
 import { fillExercisePlanList } from './render-workout-plan.js';
 import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
 import { formatDisplayDate, formatWeekday } from '../core/time.js';
+import { createRunWidget } from '../../../../packages/design-kit/js/hub-surfaces.js';
 
 const DAY_TYPE_LABELS = {
   movement: 'Movement day',
@@ -78,8 +79,27 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
   renderFocusStrip(root, model.focusHits);
   renderComparisons(root, model.comparisons);
   renderHeatmap(root, model.month);
+  renderRunWidget(root, model);
 
   root.querySelector('#fitness-dashboard')?.removeAttribute('hidden');
+}
+
+function renderRunWidget(root, model) {
+  const host = root.querySelector('[data-fitness="run-widget"]');
+  if (!host) return;
+  host.replaceChildren();
+  const sessionKm = Number(model.heroSession?.distance_km);
+  if (Number.isFinite(sessionKm) && sessionKm > 0) {
+    createRunWidget({ root, wrap: host, distance: sessionKm, unit: 'km', label: 'Last session' });
+    return;
+  }
+  createRunWidget({
+    root,
+    wrap: host,
+    distance: Number(model.longTerm?.workoutsPerWeek) || 0,
+    unit: '/ week',
+    label: 'Workouts'
+  });
 }
 
 export function renderMuscleStrip(container, keys) {

@@ -16,6 +16,7 @@ import '../styles/lesson-engine.css';
 import 'katex/dist/katex.min.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
+import { openHubCommandSearch } from '../../design-kit/js/hub-command-search.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
 import {
   isKnownHashView,
@@ -311,5 +312,24 @@ const app = document.querySelector<HTMLElement>('#app');
 if (app) {
   document.documentElement.dataset.hub = 'tasks';
   startHubMotion(document);
+  document.addEventListener('keydown', (event) => {
+    if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;
+    if ((event.target as HTMLElement | null)?.closest?.('input, textarea, [contenteditable]')) return;
+    event.preventDefault();
+    openHubCommandSearch({
+      placeholder: 'Jump in Tasks Hub',
+      groups: [{
+        heading: 'Go to',
+        items: [
+          { id: 'board', label: 'Board', onSelect: () => { location.hash = '#/board'; } },
+          { id: 'today', label: 'Today', onSelect: () => { location.hash = '#/today'; } },
+          { id: 'week', label: 'Week', onSelect: () => { location.hash = '#/week'; } },
+          { id: 'backlog', label: 'Backlog', onSelect: () => { location.hash = '#/backlog'; } },
+          { id: 'graph', label: 'Graph', onSelect: () => { location.hash = '#/graph'; } },
+          { id: 'clare', label: 'Clare', onSelect: () => { location.hash = '#/clare'; } }
+        ]
+      }]
+    });
+  });
   void boot(app);
 }
