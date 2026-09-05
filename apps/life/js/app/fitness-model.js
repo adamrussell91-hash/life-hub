@@ -1,5 +1,6 @@
 import { calculateWorkoutStreak, resolveDayType } from '../core/aggregate.js';
 import { addCalendarDays, enumerateDateKeys, getSydneyWeekStart } from '../core/time.js';
+import { buildFitnessCharts } from './fitness-charts-model.js';
 import { resolveMuscleMapKeys } from './muscle-maps.js';
 
 const WEEK_DAYS = 7;
@@ -9,7 +10,7 @@ const WORKOUT_TARGET_PER_WEEK = 4;
 
 export const REGION_KEYS = ['chest', 'arms', 'abs', 'legs', 'back'];
 
-const REGION_LABELS = {
+export const REGION_LABELS = {
   chest: 'Chest',
   arms: 'Arms',
   abs: 'Abs',
@@ -35,8 +36,12 @@ const REGION_NAME_PATTERNS = [
   ['back', /\b(row|pull[\s-]?up|pullup|lat|pulldown)\b/i]
 ];
 
+export function canonicalExerciseName(name) {
+  return String(name ?? '').replace(/\s+set\s+\d+\s*$/i, '').trim();
+}
+
 export function normalizeExerciseName(name) {
-  return String(name ?? '').trim().toLowerCase();
+  return canonicalExerciseName(name).toLowerCase();
 }
 
 export function estimateOneRepMax(weightKg, reps) {
@@ -150,16 +155,35 @@ function buildComparisons(hero, events) {
     .filter(record => record.status === 'completed' && record.date < hero.date)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  return hero.exercises.map(exercise => {
-    const name = exercise.name;
-    const key = normalizeExerciseName(name);
+  const grouped = new Map();
+  for (const exercise of hero.exercises) {
+    const display = canonicalExerciseName(exercise.name) || String(exercise.name ?? '').trim();
+    const key = normalizeExerciseName(display);
+    if (!key) continue;
     const currentBest = bestSet(exercise);
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { name: display, currentBest });
+      continue;
+    }
+    if (currentBest && (!existing.currentBest || currentBest.e1rm > existing.currentBest.e1rm)) {
+      existing.currentBest = currentBest;
+    }
+  }
+
+  return [...grouped.values()].map(({ name, currentBest }) => {
+    const key = normalizeExerciseName(name);
 
     let previousBest = null;
     for (const session of prior) {
-      const match = (session.exercises ?? []).find(ex => normalizeExerciseName(ex.name) === key);
-      if (!match) continue;
-      previousBest = bestSet(match);
+      let sessionBest = null;
+      for (const candidate of session.exercises ?? []) {
+        if (normalizeExerciseName(candidate.name) !== key) continue;
+        const set = bestSet(candidate);
+        if (set && (!sessionBest || set.e1rm > sessionBest.e1rm)) sessionBest = set;
+      }
+      if (!sessionBest) continue;
+      previousBest = sessionBest;
       break;
     }
 
@@ -176,12 +200,16 @@ function buildComparisons(hero, events) {
 
     const firstLogged = historicalBestE1rm == null;
     const isPr = !firstLogged && currentBest != null && currentBest.e1rm > historicalBestE1rm;
+    const weightDeltaKg = currentBest && previousBest
+      ? Number(currentBest.weight_kg) - Number(previousBest.weight_kg)
+      : null;
     return {
       name,
       currentBest,
       previousBest,
       e1rm: currentBest?.e1rm ?? null,
       previousE1rm: previousBest?.e1rm ?? null,
+      weightDeltaKg: Number.isFinite(weightDeltaKg) ? weightDeltaKg : null,
       isPr: Boolean(isPr),
       firstLogged
     };
@@ -347,6 +375,92 @@ function buildLongTerm(events, date) {
   };
 }
 
+function buildWorkingWeights(events, date) {
+  const from = addCalendarDays(date, -(MONTH_DAYS - 1));
+  const best = new Map();
+  for (const { record } of events) {
+    if (record.status !== 'completed' || record.date < from || record.date > date) continue;
+    for (const exercise of record.exercises ?? []) {
+      const display = canonicalExerciseName(exercise.name) || String(exercise.name ?? '').trim();
+      const key = normalizeExerciseName(display);
+      const set = bestSet(exercise);
+      if (!key || !set) continue;
+      const existing = best.get(key);
+      if (!existing || set.e1rm > existing.e1rm) {
+        best.set(key, {
+          name: display,
+          weight_kg: set.weight_kg,
+          reps: set.reps,
+          e1rm: set.e1rm,
+          date: record.date
+        });
+      }
+    }
+  }
+  return [...best.values()].sort((a, b) => b.e1rm - a.e1rm || a.name.localeCompare(b.name));
+}
+
+function buildRecentSessions(events, date, limit = 4) {
+  return events
+    .filter(({ record }) => record.status === 'completed' && record.date <= date)
+    .sort((a, b) => b.record.date.localeCompare(a.record.date)
+      || String(b.record.time ?? '').localeCompare(String(a.record.time ?? '')))
+    .slice(0, limit)
+    .map(({ record }) => ({
+      date: record.date,
+      title: record.title ?? 'Session',
+      duration_min: record.duration_min ?? null,
+      volume: sessionVolume(record),
+      focus: asFocusList(record.focus),
+      exerciseCount: (record.exercises ?? []).length
+    }));
+}
+
+function buildVolumeWeeks(weeklyVolume, limit = 4) {
+  return (weeklyVolume ?? [])
+    .filter(week => Number(week.value) > 0)
+    .slice(-limit)
+    .map(week => ({
+      weekStart: week.weekStart,
+      value: week.value
+    }));
+}
+
+function selectNextPlanned(events, date) {
+  const upcoming = events
+    .filter(({ record }) => record.status === 'planned' && record.date > date)
+    .sort((a, b) => a.record.date.localeCompare(b.record.date)
+      || String(a.record.time ?? '').localeCompare(String(b.record.time ?? '')));
+  const record = upcoming[0]?.record;
+  if (!record) return null;
+  return {
+    date: record.date,
+    title: record.title ?? 'Session'
+  };
+}
+
+function buildMonthStats(events, from, to) {
+  const completed = events
+    .map(({ record }) => record)
+    .filter(record => record.status === 'completed' && record.date >= from && record.date <= to);
+  let volume = 0;
+  let durationSum = 0;
+  let durationCount = 0;
+  for (const record of completed) {
+    volume += sessionVolume(record);
+    const mins = Number(record.duration_min);
+    if (Number.isFinite(mins) && mins > 0) {
+      durationSum += mins;
+      durationCount += 1;
+    }
+  }
+  return {
+    monthVolumeKg: volume,
+    avgSessionVolumeKg: completed.length ? volume / completed.length : null,
+    avgDurationMin: durationCount ? Math.round(durationSum / durationCount) : null
+  };
+}
+
 export function buildFitnessModel({ events, date, libraryByName = null }) {
   if (!date) throw new RangeError('Fitness display date is unavailable');
   const workoutEvts = workoutEvents(events);
@@ -363,6 +477,25 @@ export function buildFitnessModel({ events, date, libraryByName = null }) {
 
   const regions = buildRegions(workoutEvts, date);
   const longTerm = buildLongTerm(workoutEvts, date);
+  const weekVolume = weekDates.map(day => ({
+    date: day,
+    volume: workoutEvts
+      .filter(({ record }) => record.date === day && record.status === 'completed')
+      .reduce((sum, { record }) => sum + sessionVolume(record), 0)
+  }));
+  const lastWeekDates = enumerateDateKeys(addCalendarDays(date, -13), addCalendarDays(date, -7));
+  const lastWeekVolumeKg = lastWeekDates.reduce((sum, day) => (
+    sum + workoutEvts
+      .filter(({ record }) => record.date === day && record.status === 'completed')
+      .reduce((inner, { record }) => inner + sessionVolume(record), 0)
+  ), 0);
+  const weekVolumeKg = weekVolume.reduce((sum, day) => sum + day.volume, 0);
+  const monthHits = monthDates.filter(day => completedOn(workoutEvts, day));
+  const monthStats = buildMonthStats(workoutEvts, monthDates[0], date);
+  const weekCompletedCount = weekDates.filter(day => completedOn(workoutEvts, day)).length;
+  if (heroSession) {
+    heroSession.volume = sessionVolume(heroSession);
+  }
 
   return {
     date,
@@ -374,19 +507,36 @@ export function buildFitnessModel({ events, date, libraryByName = null }) {
       isToday: day === date
     })),
     heroSession,
-    weekVolume: weekDates.map(day => ({
-      date: day,
-      volume: workoutEvts
-        .filter(({ record }) => record.date === day && record.status === 'completed')
-        .reduce((sum, { record }) => sum + sessionVolume(record), 0)
-    })),
+    weekCompletedCount,
+    weekTarget: WORKOUT_TARGET_PER_WEEK,
+    weekVolume,
+    weekVolumeKg,
+    lastWeekVolumeKg,
+    weekVolumeDeltaPct: percentDelta(weekVolumeKg, lastWeekVolumeKg),
     focusHits: focusHits(workoutEvts, weekDates),
     comparisons: buildComparisons(heroSession, workoutEvts),
     month: monthDates.map(day => ({
       date: day,
       completed: completedOn(workoutEvts, day)
     })),
+    monthHitCount: monthHits.length,
+    lastCompletedDate: monthHits.at(-1) ?? null,
+    monthVolumeKg: monthStats.monthVolumeKg,
+    avgSessionVolumeKg: monthStats.avgSessionVolumeKg,
+    avgDurationMin: monthStats.avgDurationMin,
+    weekRemaining: Math.max(0, WORKOUT_TARGET_PER_WEEK - weekCompletedCount),
+    nextPlanned: selectNextPlanned(workoutEvts, date),
+    workingWeights: buildWorkingWeights(workoutEvts, date),
+    recentSessions: buildRecentSessions(workoutEvts, date),
+    volumeWeeks: buildVolumeWeeks(longTerm.weeklyVolume),
     longTerm,
-    regions
+    regions,
+    charts: buildFitnessCharts({
+      events: workoutEvts,
+      date,
+      weekCompletedCount,
+      weekTarget: WORKOUT_TARGET_PER_WEEK,
+      monthDates
+    })
   };
 }

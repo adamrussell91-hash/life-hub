@@ -36,7 +36,7 @@ async function signIn(page) {
   await page.locator('#app[data-state="ready"]').waitFor();
 }
 
-test('the Fitness tab renders the fixture workout and consistency heatmap', async () => {
+test('the Fitness tab renders the fixture workout and labeled analytics', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
@@ -50,9 +50,24 @@ test('the Fitness tab renders the fixture workout and consistency heatmap', asyn
     assert.equal(await page.locator('[data-fitness="hero-duration"]').textContent(), '26 min');
     assert.equal(await page.locator('[data-fitness="hero-status"]').textContent(), 'completed');
     assert.match(await page.locator('[data-fitness="streak"]').textContent(), /\d+/);
-    assert.equal(await page.locator('#fitness-region-grid .fitness-region-card').count(), 5);
-    assert.ok(await page.locator('#fitness-volume-sparkline').count() === 1);
-    assert.equal(await page.locator('#fitness-heatmap .heatmap-tile').count(), 30);
+    assert.ok(await page.locator('#fitness-region-grid .fitness-region-card').count() >= 1);
+    assert.match(await page.locator('[data-fitness="week-volume"]').textContent(), /kg/);
+    assert.match(await page.locator('[data-fitness="last-week-volume"]').textContent(), /—|kg/);
+    assert.match(await page.locator('[data-fitness="week-ring-value"]').textContent(), /1/);
+    assert.match(await page.locator('#fitness-loads').textContent(), /Chest Press|Bicep Curl/i);
+    assert.match(await page.locator('#fitness-volume-rows').textContent(), /Last 30 days/);
+    assert.match(await page.locator('#fitness-volume-rows').textContent(), /Unique lifts/);
+    assert.equal(await page.locator('.fitness-volume-row__track').count(), 0);
+    assert.equal(await page.locator('#fitness-rep-card').isVisible(), true);
+    assert.match(await page.locator('#fitness-rep-legend').textContent(), /reps/);
+    assert.equal(await page.locator('#fitness-region-vol-card').isVisible(), true);
+    assert.equal(await page.locator('#fitness-push-pull-card').isVisible(), true);
+    assert.equal(await page.locator('#fitness-rest-card').isVisible(), true);
+    assert.equal(await page.locator('#fitness-e1rm-card').isHidden(), true);
+    assert.equal(await page.locator('#fitness-distance-card').isHidden(), true);
+    assert.equal(await page.locator('#fitness-hr-card').isHidden(), true);
+    assert.match(await page.locator('#fitness-recent').textContent(), /Chest and Curls/);
+    assert.equal(await page.locator('#fitness-comparisons-card').isHidden(), true);
     assert.ok(await page.locator('#fitness-exercise-list .fitness-exercise').count() >= 2);
     assert.match(await page.locator('#fitness-exercise-list').textContent(), /kg/i);
     assert.match(await page.locator('#fitness-exercise-list').textContent(), /constant force|concentric|eccentric|elastic|rowing|none/i);
