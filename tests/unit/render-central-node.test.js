@@ -193,19 +193,37 @@ function baseModel(overrides = {}) {
   };
 }
 
-test('protein this week markup places chart before this-week prose and includes rolling elements', () => {
+test('central node board markup packs tiles and unmounts the protein line and heatmaps', () => {
   const html = readFileSync(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
-  const weekStart = html.indexOf('id="central-node-week-label"');
-  const weekEnd = html.indexOf('central-node-month-label');
-  assert.ok(weekStart >= 0 && weekEnd > weekStart);
-  const weekCard = html.slice(weekStart, weekEnd);
+  const start = html.indexOf('id="central-node-dashboard"');
+  const end = html.indexOf('hub-mobile-nav');
+  const block = html.slice(start, end);
 
-  assert.ok(
-    weekCard.indexOf('central-node-week-chart') < weekCard.indexOf('data-central-node="this-week"'),
-    'chart must appear before the this-week prose block'
-  );
-  assert.match(weekCard, /Dotted = 3-day average/);
-  assert.match(weekCard, /data-role="rolling"/);
+  assert.match(block, /id="cn-board"/);
+  assert.match(block, /id="cn-tile-status"[\s\S]*cn-tile__question">Has today been logged\?/);
+  assert.match(block, /id="cn-tile-week"[\s\S]*How is protein moving\?/);
+  assert.match(block, /id="cn-tile-month"[\s\S]*What's on the month\?/);
+  assert.match(block, /id="cn-tile-trends"[\s\S]*Where is attention going\?/);
+  assert.match(block, /id="cn-tile-radial"[\s\S]*Who showed up this year\?/);
+  assert.match(block, /id="cn-tile-governance"[\s\S]*What's still open\?/);
+  assert.match(block, /id="cn-tile-cross-agent"[\s\S]*Who is handing off to whom\?/);
+  assert.match(block, /id="cn-tile-actions"[\s\S]*What just happened\?/);
+  assert.match(block, /id="cn-tile-constraints"[\s\S]*What still binds\?/);
+  assert.match(block, /id="central-node-week-horizon"/);
+  assert.match(block, /id="central-node-radial-year"/);
+  assert.match(block, /id="central-node-stream"/);
+  assert.match(block, /id="central-node-chord"/);
+  assert.match(block, /id="central-node-governance-heat"/);
+  assert.equal(block.includes('central-node-week-chart'), false);
+  assert.equal(block.includes('central-node-logging-heatmap'), false);
+  assert.equal(block.includes('central-node-exercise-heatmap'), false);
+  assert.equal(block.includes('central-node-eating-heatmap'), false);
+  assert.ok(block.indexOf('id="cn-board"') < block.indexOf('id="central-node-audit-button"'));
+  assert.ok(block.indexOf('id="cn-board"') < block.indexOf('id="central-node-chat-button"'));
+  assert.match(block, /id="central-node-audit-button"[\s\S]*Run audit/);
+  assert.match(block, /id="central-node-chat-button"/);
+  const week = block.slice(block.indexOf('id="cn-tile-week"'), block.indexOf('id="cn-tile-month"'));
+  assert.ok(week.indexOf('central-node-week-horizon') < week.indexOf('data-central-node="this-week"'));
 });
 
 test('renderCentralNode omits empty this-week prose', () => {

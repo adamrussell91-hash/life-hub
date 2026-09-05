@@ -3799,6 +3799,7 @@ main { max-width: 76rem; margin: 0 auto; }
   transition: none !important;
 }
 .mind-board { position: relative; min-height: 12rem; }
+.cn-board { position: relative; min-height: 12rem; }
 .mind-hero-clocks {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3809,6 +3810,13 @@ main { max-width: 76rem; margin: 0 auto; }
   .mind-hero-clocks { grid-template-columns: 1fr; }
 }
 .mind-tile {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 12px);
+  padding: var(--space-md, 16px);
+  box-sizing: border-box;
+}
+.cn-tile {
   background: var(--glass);
   border: 1px solid var(--line);
   border-radius: var(--radius-card, 12px);
@@ -3838,19 +3846,46 @@ main { max-width: 76rem; margin: 0 auto; }
   filter: brightness(1.08);
   outline: none;
 }
-.mind-tile__question {
+.mind-tile__question,
+.cn-tile__question {
   margin: 0 0 4px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: var(--text-xs, 0.7rem);
   color: var(--wave);
 }
-.mind-tile__legend { color: var(--muted); margin: 0 0 12px; }
-.mind-honest-empty {
+.mind-tile__legend,
+.cn-tile__legend { color: var(--muted); margin: 0 0 12px; }
+.mind-honest-empty,
+.cn-honest-empty {
   margin: 0.35rem 0 0;
   color: var(--muted);
   font-size: var(--text-base);
 }
+#central-node-dashboard .cn-tile { position: relative; }
+.cn-horizon,
+.cn-stream,
+.cn-radial-year,
+.cn-chord { display: block; width: 100%; height: auto; }
+.cn-horizon { aspect-ratio: 320 / 24; }
+.cn-radial-year { aspect-ratio: 1; max-width: 16rem; margin-inline: auto; }
+.cn-stream { aspect-ratio: 960 / 480; }
+.cn-chord { aspect-ratio: 1; min-height: 16rem; }
+.cn-watchlist-heat { display: grid; gap: var(--space-tile); }
+.cn-watchlist-heat__row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 8rem) repeat(8, minmax(0, 1fr)) auto;
+  gap: var(--space-tile);
+  align-items: center;
+}
+.cn-watchlist-heat__term { color: var(--marine); font-size: var(--text-xs); font-weight: 600; }
+.cn-watchlist-heat__cell {
+  aspect-ratio: 1;
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--wave) calc(var(--heat, 0) * 1%), rgba(20, 43, 81, 0.08));
+}
+.cn-watchlist-heat__age { color: var(--muted); font-size: var(--text-xs); }
+.constraints-card summary .cn-tile__question { display: block; }
 .mind-factor-list {
   display: flex;
   flex-direction: column;
