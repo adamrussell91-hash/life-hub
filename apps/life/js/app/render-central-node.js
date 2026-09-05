@@ -3,6 +3,7 @@ import { buildCompletionRing } from './central-node-charts.js';
 import { buildProteinLineChart } from './nutrition-charts.js';
 import { renderInlineMarkdown } from './render-chat.js';
 import { formatDisplayDate } from '../core/time.js';
+import { createLabeledProgress } from '../../../../packages/design-kit/js/hub-surfaces.js';
 
 const SECTION_SELECTORS = {
   todaysStatus: '[data-central-node="todays-status"]',
@@ -45,6 +46,7 @@ export function renderCentralNode(root, model) {
 
   renderLiveStatus(root, model.liveStatus);
   renderCompletionRing(root, model.completeness);
+  renderDayProgress(root, model.completeness);
   renderWeekChart(root, model.week);
   renderHeatmap(root, '#central-node-logging-heatmap', model.loggingMonth, day => day.complete);
   renderHeatmap(root, '#central-node-exercise-heatmap', model.exerciseMonth, day => day.completed);
@@ -86,6 +88,18 @@ function renderCompletionRing(root, completeness) {
   if (fill) animateRingFill(fill, ring);
 
   setText(root, '[data-value="completion-ring-label"]', `${completeness.complete} of ${completeness.total}`);
+}
+
+function renderDayProgress(root, completeness) {
+  const host = root.querySelector('[data-central-node="progress"]');
+  if (!host || !completeness) return;
+  host.replaceChildren();
+  createLabeledProgress({
+    wrap: host,
+    label: 'Today',
+    value: completeness.complete,
+    max: completeness.total
+  });
 }
 
 function renderWeekChart(root, week) {

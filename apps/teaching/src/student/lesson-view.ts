@@ -94,6 +94,19 @@ function renderPublishedLesson(
     );
   }
   content.append(blocks);
+  void import('../../../design-kit/js/hub-surfaces.js').then(({ createScrollIsland }) => {
+    content.append(
+      createScrollIsland({
+        progressLabel: lesson.title,
+        actions: [
+          {
+            label: 'Top',
+            onSelect: () => content.closest('main')?.scrollTo?.({ top: 0, behavior: 'smooth' })
+          }
+        ]
+      }).el
+    );
+  });
 }
 
 function renderLessonNav(

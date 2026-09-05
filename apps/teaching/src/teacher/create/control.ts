@@ -30,7 +30,8 @@ export function mountCreateControl(
   }
 ): { dispose: () => void } {
   host.replaceChildren();
-  host.classList.add('create-control');
+  host.classList.add('create-control', 'hub-create');
+  host.setAttribute('data-hub-create', '');
 
   const openKind = (kind: CreateKind): void => {
     closeMenu();
@@ -60,14 +61,14 @@ export function mountCreateControl(
     }
 
     menu = document.createElement('div');
-    menu.className = 'create-control__menu glass-panel';
+    menu.className = 'create-control__menu glass-panel hub-create__panel';
     menu.dataset.createMenu = '';
     menu.setAttribute('role', 'menu');
 
     for (const item of MENU_ITEMS) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'create-control__menu-item';
+      button.className = 'create-control__menu-item hub-create__item';
       button.dataset.createKind = item.kind;
       button.setAttribute('role', 'menuitem');
       button.textContent = item.label;

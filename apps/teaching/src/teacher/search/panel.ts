@@ -148,6 +148,9 @@ export function openSearchPanel(options: SearchPanelOptions): void {
   panel.append(input, status, list);
   backdrop.append(panel);
   document.body.append(backdrop);
+  void import('../../../design-kit/js/hub-command-search.js').then(({ enhanceSearchPalette }) => {
+    enhanceSearchPalette(panel);
+  });
 
   openRoot = backdrop;
   openInput = input;
