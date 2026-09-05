@@ -295,6 +295,9 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
   if (!title) {
     throw knowledgeWriteError(400, 'validation_error', 'title is required');
   }
+  const connected = Array.isArray(input.connected)
+    ? normalizeConnected(input.connected)
+    : null;
   const id = isSafeKnowledgePageId(input.id) ? input.id : newKnowledgePageId();
   const existing = await getKnowledgeContent(`pages/${id}.json`, { env, fetchImpl });
   let previous = null;
@@ -309,9 +312,7 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
     area: input.area === 'university' || input.area === 'notes' ? input.area : (previous?.area ?? 'notes'),
     tags: Array.isArray(input.tags) ? input.tags.filter(tag => typeof tag === 'string') : (previous?.tags ?? []),
     body,
-    connected: Array.isArray(input.connected)
-      ? normalizeConnected(input.connected)
-      : (previous?.connected ?? []),
+    connected: connected ?? (previous?.connected ?? []),
     attachments: Array.isArray(input.attachments) ? input.attachments : (previous?.attachments ?? []),
     source: input.source === 'notion' ? 'notion' : 'hub',
     created_at: previous?.created_at ?? (typeof input.created_at === 'string' ? input.created_at : timestamp),

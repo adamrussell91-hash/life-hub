@@ -97,6 +97,9 @@ describe('project lifecycle mix', () => {
     expect(classifyProjectLifecycle(seed.projects.find((p) => p.id === 'proj_ex_ethics_seed')!, seed.tasks, stallIds, now)).toBe(
       'not_started'
     );
+    expect(classifyProjectLifecycle(seed.projects.find((p) => p.id === 'proj_aotfw')!, seed.tasks, stallIds, now)).toBe(
+      'not_started'
+    );
 
     const mix = projectLifecycleMix(seed.projects, seed.tasks, stallIds, now);
     const byId = Object.fromEntries(mix.map((slice) => [slice.id, slice.count]));
@@ -104,7 +107,7 @@ describe('project lifecycle mix', () => {
     expect(byId.stalled).toBe(1);
     expect(byId.planning).toBe(0);
     expect(byId.on_the_go).toBe(1);
-    expect(byId.not_started).toBe(2);
+    expect(byId.not_started).toBe(3);
     expect(byId.completed).toBe(0);
     expect(runningProjectCount(mix)).toBe(2);
   });
