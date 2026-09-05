@@ -786,6 +786,18 @@ test('ann prompt does not include hubContext even when provided', () => {
   assert.doesNotMatch(prompt, /Other hubs leak/);
 });
 
+test('hammond stale_drift prompt keeps Other hubs snapshot and Ann relay together', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    hubContext: 'Other hubs (live umbrella stores):\nTeaching: 11PSYCHA Thursday',
+    hammondAuditContract: 'Also use the Other hubs block already in this prompt (open Tasks, active classes, upcoming Teaching lessons).'
+  });
+  assert.match(prompt, /11PSYCHA Thursday/);
+  assert.match(prompt, /Other hubs block already in this prompt/);
+  assert.match(prompt, /Hammond→Ann/);
+  assert.doesNotMatch(prompt, /Clementine Blocks|clementineBlocks/);
+});
+
 test('hammond prompt relays to both Clare and Ann', () => {
   const prompt = buildSystemPrompt({ slug: 'hammond' });
   assert.match(prompt, /Hammond→Clare/);
