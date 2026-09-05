@@ -12,6 +12,8 @@ export type LifeContextDigest = {
   this_month: string | null;
   clare_directives: string[];
   as_of: string | null;
+  /** Soft signals parsed from today_status / this_week prose — null when absent, never invented. */
+  predictive_hints: string[];
 };
 
 const ALLOWED_HEADINGS: Record<
@@ -80,6 +82,26 @@ function extractClareDirectives(markdown: string): string[] {
     .slice(0, 10);
 }
 
+
+/** Read exercise/mood/meal cues already present in Today's Status / This Week prose. */
+export function extractPredictiveHints(digest: Pick<LifeContextDigest, 'today_status' | 'this_week'>): string[] {
+  const hints: string[] = [];
+  const today = digest.today_status ?? '';
+  const week = digest.this_week ?? '';
+  const exerciseLine = today.split(/\r?\n/).find((line) => /\*\*exercise:?\*\*/i.test(line.trim()));
+  if (exerciseLine && /\b(none|no session|skipped|rest day|not logged)\b/i.test(exerciseLine)) {
+    hints.push('Exercise gap: today\'s status shows no training logged — if the load is high, consider a Clare→Chadwick nudge.');
+  }
+  const moodLine = today.split(/\r?\n/).find((line) => /\*\*mood:?\*\*/i.test(line.trim()));
+  if (moodLine && /\b(low|bad|flat|rough|1\/10|2\/10|3\/10)\b/i.test(moodLine)) {
+    hints.push("Mood flag: today reads low — keep the day's ask small; route to Vera only if Adam asks.");
+  }
+  if (/no meals? logged|meals?:\s*(none|0)|nutrition:\s*(none|not logged)/i.test(`${today}\n${week}`)) {
+    hints.push('Fuel gap: no meals logged on a loaded day — Clare→Brisket note is fair game.');
+  }
+  return hints;
+}
+
 /** Extract only the operational digest — never the Constraints or health-trajectory sections. */
 export function buildLifeContextDigest(markdown: string): LifeContextDigest {
   const sections = splitSections(markdown);
@@ -88,7 +110,8 @@ export function buildLifeContextDigest(markdown: string): LifeContextDigest {
     this_week: null,
     this_month: null,
     clare_directives: extractClareDirectives(markdown),
-    as_of: null
+    as_of: null,
+    predictive_hints: []
   };
 
   for (const section of sections) {
@@ -100,6 +123,7 @@ export function buildLifeContextDigest(markdown: string): LifeContextDigest {
     }
   }
 
+  digest.predictive_hints = extractPredictiveHints(digest);
   return digest;
 }
 
@@ -114,6 +138,11 @@ export function lifeContextToPromptBlock(digest: LifeContextDigest | null): stri
   if (digest.clare_directives.length) {
     parts.push(
       `Routed to/from Clare on the network:\n${digest.clare_directives.map((l) => `- ${l}`).join('\n')}`
+    );
+  }
+  if (digest.predictive_hints.length) {
+    parts.push(
+      `Predictive hints (from Life Hub prose already in this digest — do not invent beyond these):\n${digest.predictive_hints.map((l) => `- ${l}`).join('\n')}`
     );
   }
   return parts.length ? parts.join('\n\n') : null;

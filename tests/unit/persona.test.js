@@ -220,13 +220,18 @@ test('chadwick prompt omits the body state block when empty', () => {
   assert.doesNotMatch(prompt, /Body state/i);
 });
 
-test('non-chadwick, non-brisket agents never receive the body-state block', () => {
-  const prompt = buildSystemPrompt({
+test('sara receives a body-state snapshot; hyaluronica does not', () => {
+  const sara = buildSystemPrompt({
     slug: 'sara',
     bodyState: 'Shoulder:waist ratio: 1.43 (improving).'
   });
-  assert.doesNotMatch(prompt, /reference body trend/i);
-  assert.doesNotMatch(prompt, /Shoulder:waist ratio: 1\.43/);
+  assert.match(sara, /Shoulder:waist ratio: 1\.43/);
+  assert.doesNotMatch(sara, /reference body trend/i);
+  const hyaluronica = buildSystemPrompt({
+    slug: 'hyaluronica',
+    bodyState: 'Shoulder:waist ratio: 1.43 (improving).'
+  });
+  assert.doesNotMatch(hyaluronica, /Shoulder:waist ratio: 1\.43/);
 });
 
 test('brisket prompt includes the body state block when provided, framed as his lane to address', () => {

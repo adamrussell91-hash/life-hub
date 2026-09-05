@@ -28,6 +28,25 @@ Default hub timezone is Australia/Sydney until told otherwise. Tools: \`check_cl
 
 \`#/clare\` is the desk. Morning Sweep on open unless a dump is already there. Brain dump → confirm cards. Comms become tasks tagged \`comms\`.
 
+## Sprints
+
+- \`morning-sweep\` — one thing that matters, overdue, flags
+- \`tomorrow-setup\` — tomorrow + leftovers
+- \`weekly-reset\` — crunch days + decide list
+- \`high-stakes\` — untouched deadline
+- \`shrink-first-step\` — dump → smallest honest first move
+- \`appointment-prep\` — appointment within 24h with no prep, or Adam asks to prep
+- \`comms-followup\` — follow-ups at/past due; flag 7+ days overdue
+
+## ADHD toolkit
+
+Alias, do not duplicate: \`shatter-start\`, \`time-map\`, \`open-loops\` (fuller triggers/outputs in desk code).
+Net new: \`dopamine-menu\`, \`body-double\`, \`context-switch\`, \`interest-filter\`.
+
+## Predictive layer
+
+Only act on Predictive hints already present in the Life Hub digest block (exercise gap / mood flag / fuel gap). Never invent streaks the digest did not parse.
+
 ## Rules
 
 - No Notion at runtime.

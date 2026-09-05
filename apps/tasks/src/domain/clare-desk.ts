@@ -315,6 +315,113 @@ export function buildHighStakesBrief(tasks: Task[], now: Date = new Date()): Cla
   };
 }
 
+
+function isAppointmentTask(task: Task): boolean {
+  return (
+    task.tags.includes('appointment') ||
+    task.tags.includes('comms') ||
+    /appointment|gp|specialist|dentist|interview|meeting/i.test(task.title)
+  );
+}
+
+function isFollowUpTask(task: Task): boolean {
+  return (
+    task.tags.includes('follow-up') ||
+    task.tags.includes('comms') ||
+    /follow[- ]?up|chase|reply|email|call back/i.test(task.title)
+  );
+}
+
+export function buildAppointmentPrep(tasks: Task[], now: Date = new Date()): ClareBriefing {
+  const start = startOfDay(now);
+  const horizon = addDays(start, 1);
+  const open = openBoard(tasks);
+  const upcoming = open
+    .filter((task) => {
+      if (!isAppointmentTask(task)) return false;
+      const due = parseDue(task.due_date);
+      if (!due) return false;
+      const day = startOfDay(due);
+      return day.getTime() >= start.getTime() && day.getTime() <= horizon.getTime();
+    })
+    .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)));
+  const top = upcoming[0];
+  const related = top
+    ? open
+        .filter((task) => task.id !== top.id && (task.parent_task_id === top.id || task.title.split(' ')[0] === top.title.split(' ')[0]))
+        .slice(0, 4)
+    : [];
+  return {
+    protocol_id: 'appointment-prep',
+    lead: top
+      ? `${top.title} is within 24 hours. Prep now, not in the car park.`
+      : 'No appointment in the next 24 hours is sitting on the board. Dump one if you want prep tasks built.',
+    closer: top ? 'Want me to create prep tasks from this?' : 'When an appointment lands, run this sprint again.',
+    sections: top
+      ? trimSections(
+          [
+            { heading: 'Appointment', lines: [formatTaskLine(top, now)] },
+            related.length
+              ? { heading: 'Related open items', lines: related.map((t) => formatTaskLine(t, now)) }
+              : { heading: 'Related open items', lines: ['Nothing linked yet — dump prep notes and I will card them.'] }
+          ].filter((s): s is ClareBriefingSection => Boolean(s)),
+          6
+        )
+      : [],
+    flags: top
+      ? [{ kind: 'high-stakes', text: `${top.title} needs prep before you walk in.`, task_id: top.id }]
+      : []
+  };
+}
+
+export function buildCommsFollowup(tasks: Task[], now: Date = new Date()): ClareBriefing {
+  const start = startOfDay(now);
+  const open = openBoard(tasks);
+  const followups = open
+    .filter((task) => {
+      if (!isFollowUpTask(task)) return false;
+      const due = parseDue(task.due_date);
+      if (!due) return true;
+      return startOfDay(due).getTime() <= start.getTime();
+    })
+    .sort((a, b) => String(a.due_date ?? '').localeCompare(String(b.due_date ?? '')));
+  const stale = followups.filter((task) => {
+    const due = parseDue(task.due_date);
+    if (!due) return ageDays(task.updated_at, now) >= 7;
+    return (start.getTime() - startOfDay(due).getTime()) / MS_DAY >= 7;
+  });
+  return {
+    protocol_id: 'comms-followup',
+    lead: followups[0]
+      ? `Comms sweep: ${followups.length} follow-up${followups.length === 1 ? '' : 's'} at or past due.`
+      : 'Comms sweep is clear — nothing tagged follow-up is overdue.',
+    closer: followups[0]
+      ? 'Want me to create, update, or resolve these one by one?'
+      : 'Dump outstanding chases whenever they appear.',
+    sections: followups.length
+      ? trimSections(
+          [
+            {
+              heading: 'Follow-ups',
+              lines: followups.slice(0, 6).map((t) => formatTaskLine(t, now))
+            },
+            stale.length
+              ? {
+                  heading: '7+ days overdue',
+                  lines: stale.slice(0, 3).map((t) => `${t.title} — flag explicitly.`)
+                }
+              : null
+          ].filter((s): s is ClareBriefingSection => Boolean(s)),
+          8
+        )
+      : [],
+    flags: stale[0]
+      ? [{ kind: 'overdue', text: `${stale[0].title} is 7+ days overdue.`, task_id: stale[0].id }]
+      : []
+  };
+}
+
+
 export function buildClareBriefing(
   tasks: Task[],
   protocolId: ClareProtocolId | undefined,
@@ -327,6 +434,10 @@ export function buildClareBriefing(
       return buildWeeklyReset(tasks, now);
     case 'high-stakes':
       return buildHighStakesBrief(tasks, now);
+    case 'appointment-prep':
+      return buildAppointmentPrep(tasks, now);
+    case 'comms-followup':
+      return buildCommsFollowup(tasks, now);
     default:
       return buildMorningSweep(tasks, now);
   }
@@ -349,13 +460,13 @@ function firstVerbCue(title: string): string {
 export function buildShatterToolkit(item: Pick<DumpItem, 'title'>): ClareToolkitResult {
   const steps = [
     `Sit down with the materials for “${item.title}” in reach.`,
-    'Write the next physical action in one line.',
+    'Write the next physical action in one line (under a minute).',
     'Start a 60-second timer and do only that line.',
     'Stop when the timer ends. Decide then if a second minute is allowed.'
   ];
   return {
     title: 'Task paralysis shatterer',
-    body: `Do not start “${item.title}”. Start sixty seconds of the first move. ${firstVerbCue(item.title)}`,
+    body: `Trigger: “I am staring at ${item.title} and cannot start.” Do not start the whole thing — start sixty seconds of the first move. ${firstVerbCue(item.title)}`,
     steps
   };
 }
@@ -369,7 +480,7 @@ export function buildTimeMapToolkit(item: Pick<DumpItem, 'title'>, proposedMinut
   const budget = Math.max(25, Math.round((proposedMinutes * 2.4) / 5) * 5);
   return {
     title: 'Time blindness auditor',
-    body: `You will not do “${item.title}” in a tidy ${proposedMinutes} minutes. Budget ${budget}m and protect a finish line.`,
+    body: `Trigger: “I think ${item.title} takes ${proposedMinutes} minutes but it usually blows out.” Budget ${budget}m and protect a finish line.`,
     steps: hidden
   };
 }
@@ -409,10 +520,69 @@ export function buildOpenLoopsToolkit<T extends SortableDumpLike>(items: T[]): C
   ];
   return {
     title: 'Open loops',
-    body: 'Now gets a next action. Later and Trash stay lists — no extra commentary.',
+    body: 'Trigger: “Brain full of open loops, dumping below.” Now gets a one-sentence next action. Later and Trash stay lists — no extra commentary.',
     steps: lines
   };
 }
+
+
+export function buildDopamineMenuToolkit(item?: Pick<DumpItem, 'title'>): ClareToolkitResult {
+  const focus = item?.title ? ` for “${item.title}”` : '';
+  return {
+    title: 'Dopamine menu architect',
+    body: `Trigger: “I am under-stimulated${focus}.” Pick one appetizer, one entree, or one side — not all three.`,
+    steps: [
+      'Appetizers (5 min): stand outside, cold water on face, one song standing up, tidy one surface, text one safe person',
+      'Entrees (20 min): short walk without podcast, shower + change clothes, cook a real snack, stretch/mobility block, one competitive game level',
+      'Sides (10 min): inbox zero for starred only, water plants, make tomorrow’s bag, sketch the stuck task’s first box, put laundry on'
+    ]
+  };
+}
+
+export function buildBodyDoubleToolkit(item: Pick<DumpItem, 'title'>): ClareToolkitResult {
+  return {
+    title: 'Body doubling simulator',
+    body: `Trigger: “Act as my virtual body double for 30 minutes on ${item.title}.” Say what done looks like, then we run three 10-minute check-ins.`,
+    steps: [
+      'Minute 0: write one sentence for done. Start timer.',
+      'Minute 10: still on the same object? Yes/no. If no, return to it.',
+      'Minute 20: name the next physical move in five words.',
+      'Minute 30: stop. Mark done / parked / needs a second block.'
+    ]
+  };
+}
+
+export function buildContextSwitchToolkit(item: Pick<DumpItem, 'title'>, fromTitle?: string): ClareToolkitResult {
+  const from = fromTitle ? `“${fromTitle}”` : 'what you just finished';
+  return {
+    title: 'Context switching guide',
+    body: `Trigger: “I just finished ${from}, need to start ${item.title}.” Three-minute palate-cleanser, then the first step of B only.`,
+    steps: [
+      'End cue: close the A tab/document and stand up.',
+      'Palate-cleanser (3 min): water, stretch, or look out a window — no new inputs.',
+      `Start cue: open only what “${item.title}” needs.`,
+      `First step of B: ${firstVerbCue(item.title)}`
+    ]
+  };
+}
+
+export function buildInterestFilterToolkit(
+  item: Pick<DumpItem, 'title'>,
+  hyperfixation = 'the current hyperfixation'
+): ClareToolkitResult {
+  return {
+    title: 'Interest-based filter',
+    body: `Trigger: “Boring task: ${item.title}. Hyperfixation: ${hyperfixation}.” Gamify the chore as a quest — stages with visible checks.`,
+    steps: [
+      `Stage 1 — Setup: assemble materials for “${item.title}” as if packing for the quest`,
+      'Stage 2 — Scout: two-minute recon, no finishing allowed',
+      'Stage 3 — Boss attempt: one focused 10-minute raid on the real work',
+      'Stage 4 — Loot: write what moved; choose Stage 5 or stop',
+      'Stage 5 — Side quest (optional): reward from the hyperfixation, timed'
+    ]
+  };
+}
+
 
 /** Flatten a briefing into safe markdown for a chat bubble. */
 export function briefingToMarkdown(briefing: ClareBriefing): string {
