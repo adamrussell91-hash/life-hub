@@ -138,6 +138,42 @@ test('lock it onto Fitness shows a Confirm card', async () => {
   await context.close();
 });
 
+test('mobile Chat tab and overlay keep send beside the field', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.hub-mobile-nav [data-section="chat"]').click();
+  const view = page.locator('#chat-view');
+  await view.waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#chat-empty').isVisible(), true);
+  assert.equal(await page.locator('.agent-picker__name').first().isVisible(), true);
+
+  let inputBox = await page.locator('#chat-input').boundingBox();
+  let sendBox = await page.locator('#chat-send').boundingBox();
+  assert.ok(inputBox && sendBox);
+  assert.ok(sendBox.x > inputBox.x, 'send stays beside the field on the Chat tab');
+  assert.ok(Math.abs(sendBox.y - inputBox.y) < 48, 'send stays on the composer row');
+
+  await page.locator('#more-nav-button').click();
+  await page.locator('#more-sheet [data-section="nutrition"]').click();
+  await page.locator('#nutrition-dashboard').waitFor({ state: 'visible' });
+  await page.locator('#nutrition-chat-button').click();
+  await view.waitFor({ state: 'visible' });
+  assert.equal(await view.getAttribute('data-panel-mode'), 'overlay');
+  assert.equal(await page.locator('#chat-close').isVisible(), true);
+  assert.match(await page.locator('#chat-who').innerText(), /Brisket/i);
+
+  inputBox = await page.locator('#chat-input').boundingBox();
+  sendBox = await page.locator('#chat-send').boundingBox();
+  assert.ok(inputBox && sendBox);
+  assert.ok(sendBox.x > inputBox.x, 'overlay send stays beside the field');
+
+  await page.locator('#chat-close').click();
+  await view.waitFor({ state: 'hidden' });
+  await context.close();
+});
+
 test('make the workout shows a Confirm card', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();

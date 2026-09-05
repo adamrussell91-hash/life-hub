@@ -96,6 +96,19 @@ test('appendMessage still sets plain textContent for simple system-style bubbles
   assert.equal(item.className, 'chat-message chat-message--assistant');
 });
 
+test('renderInlineMarkdown turns headings, quotes, and fenced code into structured blocks', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, '# Title\n> quoted\n```js\nconst x = 1;\n```', { multiline: true });
+
+  assert.equal(container.children[0].tagName, 'h3');
+  assert.equal(container.children[0].children[0].textContent, 'Title');
+  assert.equal(container.children[1].tagName, 'blockquote');
+  assert.equal(container.children[1].children[0].textContent, 'quoted');
+  assert.equal(container.children[2].tagName, 'pre');
+  assert.equal(container.children[2].children[0].textContent, 'const x = 1;');
+});
+
 test('renderInlineMarkdown groups consecutive "- " lines into a single bulleted list', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');
