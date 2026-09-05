@@ -1,8 +1,25 @@
 import { formatDisplayDate } from '../core/time.js';
 import { createHubFilter } from '../../../../packages/design-kit/js/hub-filter-menu.js';
 import { createViewOnMap } from '../../../../packages/design-kit/js/view-on-map.js';
+import { openMorphingDialog } from '../../../../packages/design-kit/js/morphing-dialog.js';
+import {
+  listMedicalPlaceLabels,
+  mapPlacesFromMedicalVisits,
+  mountHubPlacesMap,
+  parseMapPlacesPayload
+} from '../../../../packages/design-kit/js/hub-places-map.js';
+
+/** Seeded Sydney-area medical coords for the constellation prototype (not a geocoder). */
+const MEDICAL_PLACE_COORDS = {
+  'north shore private hospital': { lng: 151.1936, lat: -33.8225 },
+  'north shore private': { lng: 151.1936, lat: -33.8225 },
+  'royal north shore hospital': { lng: 151.1905, lat: -33.822 },
+  'macquarie university hospital': { lng: 151.1175, lat: -33.7735 },
+  'prosper nutrition': { lng: 151.1689, lat: -33.8142 }
+};
 
 const filterCache = new WeakMap();
+let placesMapSession = null;
 
 export function renderMedical(root, model, {
   onSelect,
@@ -32,6 +49,9 @@ export function renderMedical(root, model, {
   });
   bindOnce(root, '#medical-today', 'click', () => onToday?.());
   bindOnce(root, '#medical-add', 'click', () => onAdd?.());
+  bindOnce(root, '#medical-places', 'click', event => {
+    openMedicalPlacesMap(root, model, event.currentTarget);
+  });
   bindOnce(root, '#medical-sheet-close', 'click', () => onClose?.());
 
   const search = root.querySelector('#medical-search');
@@ -52,6 +72,111 @@ function bindOnce(root, selector, type, handler) {
   if (!node || node.dataset.bound) return;
   node.dataset.bound = '1';
   node.addEventListener(type, handler);
+}
+
+function openMedicalPlacesMap(root, model, trigger) {
+  const doc = root.ownerDocument || globalThis.document;
+  if (!doc?.body) return;
+
+  placesMapSession?.destroy?.();
+  placesMapSession = null;
+
+  const visits = model.visits || [];
+  const labels = listMedicalPlaceLabels(visits);
+  const payload =
+    mapPlacesFromMedicalVisits(visits, { coordsByLocation: MEDICAL_PLACE_COORDS }) ||
+    parseMapPlacesPayload({ type: 'map_places', places: [] });
+
+  const frame = doc.createElement('div');
+  frame.className = 'hub-places-map medical-places-dialog';
+  frame.style.width = 'min(42rem, calc(100vw - 2rem))';
+  frame.style.maxHeight = 'min(36rem, calc(100vh - 2rem))';
+  frame.style.overflow = 'auto';
+  frame.style.padding = '1rem 1.1rem 1.2rem';
+
+  const title = doc.createElement('h2');
+  title.id = 'medical-places-title';
+  title.textContent = 'Medical places';
+  frame.append(title);
+
+  const blurb = doc.createElement('p');
+  blurb.className = 'hub-places-map__empty';
+  blurb.textContent = payload?.places?.length
+    ? 'Trusted MapLibre constellation for visits with known coordinates.'
+    : labels.length
+      ? 'Places are listed below. Map markers appear once coordinates are known (seed lookup or agent map_places).'
+      : 'No place-kind visits in the current medical filter.';
+  frame.append(blurb);
+
+  const layout = doc.createElement('div');
+  layout.className = 'hub-places-map';
+  const list = doc.createElement('ul');
+  list.className = 'hub-places-map__list';
+  list.setAttribute('aria-label', 'Places');
+
+  const mapped = new Map((payload?.places || []).map((place) => [place.name.toLowerCase(), place]));
+  for (const entry of labels) {
+    const item = doc.createElement('li');
+    const btn = doc.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hub-places-map__item';
+    const place = mapped.get(entry.name.toLowerCase());
+    btn.textContent = place
+      ? `${entry.name} · ${entry.visitIds.length} visit${entry.visitIds.length === 1 ? '' : 's'}`
+      : `${entry.name} · no coordinates yet`;
+    btn.disabled = !place;
+    if (place) {
+      btn.addEventListener('click', () => {
+        list.querySelectorAll('.hub-places-map__item').forEach((node) => node.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        placesMapSession?.focusPlace?.(place.id);
+      });
+    }
+    item.append(btn);
+    list.append(item);
+  }
+  layout.append(list);
+
+  if (payload?.places?.length) {
+    const frameEl = doc.createElement('div');
+    frameEl.className = 'hub-places-map__frame';
+    frameEl.style.minHeight = '16rem';
+    const canvas = doc.createElement('div');
+    canvas.className = 'hub-places-map__canvas';
+    canvas.style.position = 'absolute';
+    canvas.style.inset = '0';
+    frameEl.append(canvas);
+    layout.append(frameEl);
+    frame.append(layout);
+    openMorphingDialog({
+      trigger,
+      frame,
+      labelledBy: 'medical-places-title',
+      label: 'Medical places',
+      onClose: () => {
+        placesMapSession?.destroy?.();
+        placesMapSession = null;
+      }
+    });
+    void mountHubPlacesMap(canvas, payload, {
+      onSelect: (place) => {
+        list.querySelectorAll('.hub-places-map__item').forEach((node) => {
+          node.classList.toggle('is-active', node.textContent?.startsWith(place.name));
+        });
+      }
+    }).then((session) => {
+      placesMapSession = session;
+    });
+    return;
+  }
+
+  frame.append(layout);
+  openMorphingDialog({
+    trigger,
+    frame,
+    labelledBy: 'medical-places-title',
+    label: 'Medical places'
+  });
 }
 
 function canUseKitFilter() {
