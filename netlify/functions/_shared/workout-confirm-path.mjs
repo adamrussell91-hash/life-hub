@@ -55,8 +55,20 @@ export async function resolveWorkoutConfirmTarget(client, { record, slug, overwr
 
     const sameDay = await annotateWorkoutEntries(client, sameDayWorkoutEntries(current.tree, record.date));
     const planned = pickSameDayPlannedWorkout(sameDay);
-    if (planned && (record.status === 'planned' || record.status === 'completed' || record.status === 'skipped')) {
+    if (planned && record.status === 'planned') {
       return { path: planned.path, existingSha: planned.sha };
+    }
+    if (planned && (record.status === 'completed' || record.status === 'skipped')) {
+      // Reuse today's plan file only when this is that same session (slug match or
+      // generic planned path). A different completed session (walk, EP, second lift)
+      // must not overwrite the strength plan.
+      const plannedFile = planned.path.split('/').at(-1)?.replace(/\.md$/, '') ?? '';
+      const plannedSlug = plannedFile.split('-').slice(3).join('-');
+      const recordSlug = typeof slug === 'string' ? slug : '';
+      const generic = /workout-planned$/.test(planned.path) || ['planned', 'planned-session', 'strength-session'].includes(plannedSlug);
+      if (!recordSlug || generic || plannedSlug === recordSlug || planned.path.includes(recordSlug)) {
+        return { path: planned.path, existingSha: planned.sha };
+      }
     }
 
     if (overwrite) {

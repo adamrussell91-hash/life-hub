@@ -18,7 +18,9 @@ import {
   rollStaleSections,
   shouldAppendRecentAction,
   trimCrossAgentSection,
-  upsertStatusField
+  upsertStatusField,
+  mergeFlagsIntoStatus,
+  buildWorkoutFlagsLine
 } from '../../apps/life/js/core/central-node-write.js';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -588,9 +590,9 @@ test('mind_session upserts Mind status and Cross-Agent line', () => {
   assert.match(next, /Vera→Penelope: ask what the weekend is for\.\n- Old line\./);
 });
 
-test('appendCrossAgentLine inserts newest-first and trim still caps at 12', () => {
+test('appendCrossAgentLine inserts newest-first and trim still caps at 24', () => {
   let content = `${base}\n## 🤝 Cross-Agent Coordination\n`;
-  for (let i = 0; i < 12; i += 1) content = appendCrossAgentLine(content, `- Old ${i}.`);
+  for (let i = 0; i < 24; i += 1) content = appendCrossAgentLine(content, `- Old ${i}.`);
   const next = appendCrossAgentLine(content, '- New line.');
   const trimmed = applyLogToCentralNode(next, {
     record: { type: 'diary', date: '2026-06-19', mood: 'good', energy: 'high' },
@@ -602,5 +604,27 @@ test('appendCrossAgentLine inserts newest-first and trim still caps at 12', () =
   const xaEndRel = xaRest.search(/\n## /);
   const xaSection = xaEndRel === -1 ? xaRest : xaRest.slice(0, xaEndRel);
   const bullets = xaSection.split('\n').filter(l => l.startsWith('- '));
-  assert.equal(bullets.length, 12);
+  assert.equal(bullets.length, 24);
+});
+
+
+test('mergeFlagsIntoStatus appends instead of clobbering, and workout flags allow 280 chars', () => {
+  const base = [
+    "# Purpose",
+    "---",
+    "## ⚡ Today's Status (Friday 19 June 2026)",
+    "**Flags:** Meal note — sodium high.",
+    "---"
+  ].join('\n');
+  const merged = mergeFlagsIntoStatus(base, '**Flags:** right AC: pinch on fly');
+  assert.match(merged, /Meal note — sodium high/);
+  assert.match(merged, /right AC: pinch on fly/);
+
+  const longNote = 'x'.repeat(200);
+  const flags = buildWorkoutFlagsLine(
+    { pain_flags: [{ site: 'left knee', note: 'grind' }] },
+    longNote
+  );
+  assert.ok(flags.length <= 280 + '**Flags:** '.length);
+  assert.match(flags, /left knee: grind/);
 });

@@ -2,7 +2,7 @@ const LOCK_IN_RE = /\b(?:put (?:it|this) into action|lock(?:ed|ing)? (?:it|this|
 
 const BARE_LOG_RE = /^\s*log(?:\s+(?:it|this|now))?[!?.]*\s*$/i;
 
-const WORKOUT_ACTUALS_RE = /\b(?:i (?:just )?(?:did|finished|completed|trained)|just (?:did|finished|trained)|log(?:ged)? actuals|here(?:'s| is) what i (?:lifted|did|actually)|what i actually (?:lifted|did)|actually lifted|session(?:'s| is) (?:done|finished)|i skipped|skipped (?:today|the session))\b/i;
+const WORKOUT_ACTUALS_RE = /\b(?:i (?:just )?(?:did|finished|completed|trained)|just (?:did|finished|trained)|(?:session|workout)(?:'s| is)? (?:done|finished|over)|finished (?:lifting|training|the session|the workout)|done training|log(?:ged)? actuals|here(?:'s| is) what i (?:lifted|did|actually)|what i actually (?:lifted|did)|actually lifted|how (?:the session|it) went|i skipped|skipped (?:today|the session))\b/i;
 
 const CLAIMED_LOCKED_RE = /\b(?:locked in|locking (?:it|this|the plan|this in now)|logging this as (?:your|the) plan|saved as (?:your|the) plan(?: for today)?|plan for today|actually saved|get this actually saved|on fitness(?: now)?|i loaded up|the full send|cues loaded(?: for mid-session)?)\b/i;
 
@@ -24,15 +24,31 @@ export function looksLikeWorkoutActualsReport(text) {
   return WORKOUT_ACTUALS_RE.test(text ?? '');
 }
 
+function looksLikeCompletedWorkoutPayload(record) {
+  if (!record || record.status !== 'completed') return false;
+  if (Array.isArray(record.pain_flags) && record.pain_flags.length > 0) return true;
+  if (typeof record.notes === 'string' && /—|--|matched|skipped|pain|twinge|flare|clear|AC\b|knee|groin/i.test(record.notes)) {
+    return true;
+  }
+  return false;
+}
+
 export function coerceChatWorkoutProposal(validation, { userMessage } = {}) {
   if (!validation?.valid || validation.record?.type !== 'workout') return validation;
   if (validation.record.status === 'skipped') return validation;
-  if (looksLikeWorkoutActualsReport(userMessage)) return validation;
   if (validation.record.status === 'planned') return validation;
-  return {
-    ...validation,
-    record: { ...validation.record, status: 'planned' }
-  };
+  if (validation.record.status !== 'completed') return validation;
+  // Trust a completed payload that already carries finish signals or when Adam reported actuals.
+  if (looksLikeWorkoutActualsReport(userMessage)) return validation;
+  if (looksLikeCompletedWorkoutPayload(validation.record)) return validation;
+  // Design lock-in turns often mis-fire status:completed — demote those only.
+  if (isWorkoutLockIn(userMessage)) {
+    return {
+      ...validation,
+      record: { ...validation.record, status: 'planned' }
+    };
+  }
+  return validation;
 }
 
 export function claimedPlanLocked(text) {

@@ -255,13 +255,15 @@ test('chadwick prompt reports days since last session and instructs him to lower
 test('chadwick prompt includes recent sessions and tells him to answer last-workout questions from them', () => {
   const prompt = buildSystemPrompt({
     slug: 'chadwick',
-    lastWorkouts: '- 2026-09-01 · completed · Planned session — Bar Press, Curl'
+    lastWorkouts: '- 2026-09-01 · completed · Planned session — Bar Press, Curl — notes: AC clear — pain: right AC: mild'
   });
   assert.match(prompt, /Recent sessions/);
   assert.match(prompt, /2026-09-01/);
   assert.match(prompt, /Planned session/);
   assert.match(prompt, /get_last_workout|search_workout_records/);
   assert.match(prompt, /never guess|do not claim you cannot see history|never say you have no record/i);
+  assert.match(prompt, /notes:|pain:/);
+  assert.match(prompt, /read them before programming|pain flags/i);
 });
 
 test('chadwick prompt tells him the default is a new unique session, not a rerun of the last title', () => {
@@ -868,4 +870,11 @@ test('protocolSteer is injected after voice so the model stays in character', ()
   const voiceAt = prompt.indexOf('You ARE Brisket Lasso');
   const steerAt = prompt.indexOf('Flare-up eating');
   assert.ok(voiceAt >= 0 && steerAt > voiceAt);
+});
+
+
+test('Chadwick persona requires web_search for exercise-science grounding', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick', digest: '', constraints: '' });
+  assert.match(prompt, /actively use web_search for exercise-science sources/);
+  assert.match(prompt, /This Week on Central Node includes EP/);
 });
