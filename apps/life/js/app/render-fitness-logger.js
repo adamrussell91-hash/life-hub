@@ -1,7 +1,10 @@
+import { createCardSwipe } from '../../../../packages/design-kit/js/card-swipe.js';
+import { closeActiveMorphingDialog, openMorphingDialog } from '../../../../packages/design-kit/js/morphing-dialog.js';
 import {
   createMorphingNotePopover,
   createMorphingValuesPopover
 } from '../../../../packages/design-kit/js/morphing-popover.js';
+import { formatExerciseSetCount } from './format-exercise.js';
 import {
   CABLE_TYPES,
   INTENSIFICATIONS,
@@ -17,6 +20,288 @@ function previewNote(text) {
   const compact = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (compact.length <= 28) return compact;
   return `${compact.slice(0, 27).trimEnd()}…`;
+}
+
+const openEditors = new WeakMap();
+
+function ownerDoc(root) {
+  return root?.ownerDocument ?? root?.defaultView?.document ?? globalThis.document;
+}
+
+function summarizeExercise(exercise) {
+  const sets = exercise?.sets ?? [];
+  if (!sets.length) return 'No sets yet · tap to log';
+  const first = sets[0];
+  const reps = first.reps ?? '—';
+  const kg = first.weight_kg ?? 0;
+  return `${formatExerciseSetCount(exercise)} · ${reps} reps · ${kg} kg`;
+}
+
+function buildExercisePeek(root, exercise) {
+  const card = root.createElement('article');
+  card.className = 'hub-card-swipe__card fitness-logger__peek';
+  card.dataset.fitnessLogger = 'peek';
+
+  const title = root.createElement('h3');
+  title.className = 'hub-card-swipe__title';
+  title.dataset.hubMorph = 'title';
+  title.textContent = exercise.name ?? 'Exercise';
+
+  const summary = root.createElement('p');
+  summary.className = 'hub-card-swipe__description';
+  summary.dataset.hubMorph = 'subtitle';
+  summary.dataset.fitnessLogger = 'peek-summary';
+  summary.textContent = summarizeExercise(exercise);
+  card.append(title, summary);
+
+  if (exercise.coach_cues?.start) {
+    const startCue = root.createElement('p');
+    startCue.className = 'fitness-logger__cue fitness-logger__cue--start';
+    startCue.dataset.fitnessLogger = 'cue-start';
+    startCue.textContent = exercise.coach_cues.start;
+    card.append(startCue);
+  }
+
+  const hint = root.createElement('p');
+  hint.className = 'fitness-logger__peek-hint';
+  hint.textContent = 'Tap to log sets';
+  card.append(hint);
+  return card;
+}
+
+function buildExerciseEditor(root, exercise, exerciseIndex, {
+  onChange,
+  onAddSet,
+  onMoveExercise,
+  onRemoveExercise,
+  exerciseCount = 1,
+  onCollapse
+} = {}) {
+  const card = root.createElement('div');
+  card.className = 'fitness-logger__exercise';
+  card.dataset.fitnessLogger = 'editor';
+
+  const head = root.createElement('div');
+  head.className = 'fitness-logger__exercise-head';
+  const name = root.createElement('h4');
+  name.dataset.hubMorph = 'title';
+  name.textContent = exercise.name ?? 'Exercise';
+  const tools = root.createElement('div');
+  tools.className = 'fitness-logger__exercise-tools';
+
+  const moveUp = root.createElement('button');
+  moveUp.type = 'button';
+  moveUp.className = 'fitness-logger__icon-btn';
+  moveUp.dataset.fitnessLogger = 'move-up';
+  moveUp.dataset.cardSwipeIgnore = '';
+  moveUp.setAttribute('aria-label', `Move ${exercise.name ?? 'exercise'} up`);
+  moveUp.textContent = '↑';
+  moveUp.disabled = exerciseIndex === 0;
+  moveUp.addEventListener('click', () => onMoveExercise?.(exerciseIndex, exerciseIndex - 1));
+
+  const moveDown = root.createElement('button');
+  moveDown.type = 'button';
+  moveDown.className = 'fitness-logger__icon-btn';
+  moveDown.dataset.fitnessLogger = 'move-down';
+  moveDown.dataset.cardSwipeIgnore = '';
+  moveDown.setAttribute('aria-label', `Move ${exercise.name ?? 'exercise'} down`);
+  moveDown.textContent = '↓';
+  moveDown.disabled = exerciseIndex === exerciseCount - 1;
+  moveDown.addEventListener('click', () => onMoveExercise?.(exerciseIndex, exerciseIndex + 1));
+
+  const remove = root.createElement('button');
+  remove.type = 'button';
+  remove.className = 'fitness-logger__icon-btn';
+  remove.dataset.fitnessLogger = 'remove-exercise';
+  remove.dataset.cardSwipeIgnore = '';
+  remove.setAttribute('aria-label', `Remove ${exercise.name ?? 'exercise'}`);
+  remove.textContent = 'Remove';
+  remove.addEventListener('click', () => onRemoveExercise?.(exerciseIndex));
+
+  tools.append(moveUp, moveDown, remove);
+  if (onCollapse) {
+    const done = root.createElement('button');
+    done.type = 'button';
+    done.className = 'fitness-logger__icon-btn';
+    done.dataset.fitnessLogger = 'collapse-exercise';
+    done.dataset.cardSwipeIgnore = '';
+    done.textContent = 'Done';
+    done.addEventListener('click', () => onCollapse());
+    tools.append(done);
+  }
+  head.append(name, tools);
+  card.append(head);
+
+  if (exercise.coach_cues?.start) {
+    const startCue = root.createElement('p');
+    startCue.className = 'fitness-logger__cue fitness-logger__cue--start';
+    startCue.dataset.fitnessLogger = 'cue-start';
+    startCue.textContent = exercise.coach_cues.start;
+    card.append(startCue);
+  }
+
+  if (exercise.bench_angle_deg != null || /bench/i.test(exercise.name ?? '')) {
+    const benchRow = root.createElement('label');
+    benchRow.className = 'fitness-logger__bench';
+    benchRow.textContent = 'Bench ° ';
+    const bench = root.createElement('input');
+    bench.type = 'number';
+    bench.min = '0';
+    bench.max = '90';
+    bench.step = '5';
+    bench.value = exercise.bench_angle_deg ?? '';
+    bench.addEventListener('input', () => {
+      const value = bench.value.trim() === '' ? null : Number(bench.value);
+      onChange?.({ type: 'bench', exerciseIndex, value: Number.isFinite(value) ? value : null });
+    });
+    benchRow.append(bench);
+    card.append(benchRow);
+  }
+
+  const intensificationRow = root.createElement('label');
+  intensificationRow.className = 'fitness-logger__bench';
+  intensificationRow.textContent = 'Strength move ';
+  const intensification = root.createElement('select');
+  const none = root.createElement('option');
+  none.value = '';
+  none.textContent = 'Standard';
+  intensification.append(none);
+  for (const option of INTENSIFICATIONS) {
+    const el = root.createElement('option');
+    el.value = option;
+    el.textContent = intensificationLabel(option);
+    if (option === exercise.intensification) el.selected = true;
+    intensification.append(el);
+  }
+  intensification.addEventListener('change', () => {
+    onChange?.({ type: 'intensification', exerciseIndex, value: intensification.value });
+  });
+  intensificationRow.append(intensification);
+  card.append(intensificationRow);
+
+  const table = root.createElement('div');
+  table.className = 'fitness-logger__sets';
+  const setHead = root.createElement('div');
+  setHead.className = 'fitness-logger__set fitness-logger__set--head';
+  for (const label of ['#', 'kg', 'reps', 'cable']) {
+    const cell = root.createElement('span');
+    cell.textContent = label;
+    setHead.append(cell);
+  }
+  table.append(setHead);
+
+  const exerciseSets = exercise.sets ?? [];
+  exerciseSets.forEach((set, setIndex) => {
+    const row = root.createElement('div');
+    row.className = 'fitness-logger__set';
+    const number = root.createElement('span');
+    number.textContent = String(setIndex + 1);
+
+    const weight = root.createElement('input');
+    weight.type = 'number';
+    weight.inputMode = 'decimal';
+    weight.step = '0.5';
+    weight.value = set.weight_kg ?? 0;
+    weight.addEventListener('input', () => {
+      onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'weight_kg', value: Number(weight.value) });
+    });
+
+    const reps = root.createElement('input');
+    reps.type = 'number';
+    reps.inputMode = 'numeric';
+    reps.step = '1';
+    reps.value = set.reps ?? 0;
+    reps.addEventListener('input', () => {
+      onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'reps', value: Number(reps.value) });
+    });
+
+    const cable = root.createElement('select');
+    for (const option of CABLE_TYPES) {
+      const el = root.createElement('option');
+      el.value = option;
+      el.textContent = cableLabel(option);
+      if (option === set.cable_type) el.selected = true;
+      cable.append(el);
+    }
+    cable.addEventListener('change', () => {
+      onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'cable_type', value: cable.value });
+    });
+
+    row.append(number, weight, reps, cable);
+    table.append(row);
+
+    const isFinalSet = setIndex === exerciseSets.length - 1;
+    if (isFinalSet) {
+      if (exercise.coach_cues?.final_set) {
+        const finalCue = root.createElement('p');
+        finalCue.className = 'fitness-logger__cue fitness-logger__cue--final-set';
+        finalCue.dataset.fitnessLogger = 'cue-final-set';
+        finalCue.textContent = exercise.coach_cues.final_set;
+        table.append(finalCue);
+      }
+    } else if (exercise.coach_cues?.rest) {
+      const restCue = root.createElement('p');
+      restCue.className = 'fitness-logger__cue fitness-logger__cue--rest';
+      restCue.dataset.fitnessLogger = 'cue-rest';
+      restCue.textContent = exercise.coach_cues.rest;
+      table.append(restCue);
+    }
+  });
+
+  card.append(table);
+
+  const add = root.createElement('button');
+  add.type = 'button';
+  add.className = 'fitness-logger__add-set btn btn--secondary quiet-button';
+  add.dataset.cardSwipeIgnore = '';
+  add.textContent = '+ Set';
+  add.addEventListener('click', () => onAddSet?.(exerciseIndex));
+  card.append(add);
+  return card;
+}
+
+function frameIsLive(frame, doc) {
+  if (!frame) return false;
+  if (frame.isConnected) return true;
+  if (typeof doc?.body?.contains === 'function') return doc.body.contains(frame);
+  return Boolean(frame.parentNode);
+}
+
+function presentExerciseEditor(host, root, { trigger, frame, label, onClose }) {
+  const doc = ownerDoc(root);
+  if (doc?.body?.append) {
+    const existing = host && openEditors.get(host);
+    if (existing?.frame && frameIsLive(existing.frame, doc) && typeof existing.frame.replaceChildren === 'function') {
+      existing.frame.replaceChildren(...(frame.children ?? []));
+      return;
+    }
+    closeExerciseEditor(host);
+    const session = openMorphingDialog({
+      trigger,
+      frame,
+      label,
+      onClose
+    });
+    if (host) openEditors.set(host, session);
+    return;
+  }
+  host?.append(frame);
+}
+
+function revealPeekOrigins(scope) {
+  const nodes = scope?.querySelectorAll?.('.hub-morph-dialog__origin') ?? [];
+  for (const node of nodes) {
+    node.classList?.remove?.('hub-morph-dialog__origin');
+    node.removeAttribute?.('aria-hidden');
+  }
+}
+
+function closeExerciseEditor(host) {
+  revealPeekOrigins(host);
+  const session = host && openEditors.get(host);
+  session?.close?.();
+  if (host) openEditors.delete(host);
+  closeActiveMorphingDialog();
 }
 
 function labeledNumber(root, { label, value, step = '1', inputMode = 'decimal', onInput }) {
@@ -37,11 +322,16 @@ export function renderFitnessLogger(root, draft, {
   elapsedMs = 0,
   saveState = '',
   timer = { state: 'idle', everStarted: false, completeVisible: false },
+  exerciseIndex = 0,
+  expandedExerciseIndex = null,
   onChange,
   onAddSet,
   onAddExercise,
   onMoveExercise,
   onRemoveExercise,
+  onExerciseIndexChange,
+  onExpandExercise,
+  onCollapseExercise,
   onFinish,
   onStart,
   onPause,
@@ -115,177 +405,47 @@ export function renderFitnessLogger(root, draft, {
   status.textContent = saveState;
   host.append(status);
 
-  for (let exerciseIndex = 0; exerciseIndex < (draft.exercises ?? []).length; exerciseIndex++) {
-    const exercise = draft.exercises[exerciseIndex];
-    const card = root.createElement('div');
-    card.className = 'fitness-logger__exercise';
+  const exercises = draft.exercises ?? [];
+  const swipe = createCardSwipe({
+    root,
+    items: [],
+    currentIndex: exerciseIndex,
+    onIndexChange: onExerciseIndexChange,
+    onSelect: onExpandExercise,
+    className: 'fitness-logger__swipe',
+    label: 'Exercises',
+    fluid: true,
+    tilt: 16
+  });
 
-    const head = root.createElement('div');
-    head.className = 'fitness-logger__exercise-head';
-    const name = root.createElement('h4');
-    name.textContent = exercise.name ?? 'Exercise';
-    const tools = root.createElement('div');
-    tools.className = 'fitness-logger__exercise-tools';
+  const peeks = [];
+  for (let index = 0; index < exercises.length; index++) {
+    const exercise = exercises[index];
+    const peek = buildExercisePeek(root, exercise);
+    peeks[index] = peek;
+    swipe.appendSlide(peek, { title: exercise.name ?? 'Exercise' });
+  }
 
-    const moveUp = root.createElement('button');
-    moveUp.type = 'button';
-    moveUp.className = 'fitness-logger__icon-btn';
-    moveUp.dataset.fitnessLogger = 'move-up';
-    moveUp.setAttribute('aria-label', `Move ${exercise.name ?? 'exercise'} up`);
-    moveUp.textContent = '↑';
-    moveUp.disabled = exerciseIndex === 0;
-    moveUp.addEventListener('click', () => onMoveExercise?.(exerciseIndex, exerciseIndex - 1));
+  host.append(swipe.el);
+  swipe.sync();
 
-    const moveDown = root.createElement('button');
-    moveDown.type = 'button';
-    moveDown.className = 'fitness-logger__icon-btn';
-    moveDown.dataset.fitnessLogger = 'move-down';
-    moveDown.setAttribute('aria-label', `Move ${exercise.name ?? 'exercise'} down`);
-    moveDown.textContent = '↓';
-    moveDown.disabled = exerciseIndex === (draft.exercises.length - 1);
-    moveDown.addEventListener('click', () => onMoveExercise?.(exerciseIndex, exerciseIndex + 1));
-
-    const remove = root.createElement('button');
-    remove.type = 'button';
-    remove.className = 'fitness-logger__icon-btn';
-    remove.dataset.fitnessLogger = 'remove-exercise';
-    remove.setAttribute('aria-label', `Remove ${exercise.name ?? 'exercise'}`);
-    remove.textContent = 'Remove';
-    remove.addEventListener('click', () => onRemoveExercise?.(exerciseIndex));
-
-    tools.append(moveUp, moveDown, remove);
-    head.append(name, tools);
-    card.append(head);
-
-    // Mid-session presence (Phase 5): Chadwick's per-exercise cues, generated once up front
-    // alongside the plan -- no extra API calls during the workout. The start cue greets the
-    // exercise; rest/final-set cues are placed inline in the sets table below, at the moment
-    // they're actually relevant (see the sets loop).
-    if (exercise.coach_cues?.start) {
-      const startCue = root.createElement('p');
-      startCue.className = 'fitness-logger__cue fitness-logger__cue--start';
-      startCue.dataset.fitnessLogger = 'cue-start';
-      startCue.textContent = exercise.coach_cues.start;
-      card.append(startCue);
-    }
-
-    if (exercise.bench_angle_deg != null || /bench/i.test(exercise.name ?? '')) {
-      const benchRow = root.createElement('label');
-      benchRow.className = 'fitness-logger__bench';
-      benchRow.textContent = 'Bench ° ';
-      const bench = root.createElement('input');
-      bench.type = 'number';
-      bench.min = '0';
-      bench.max = '90';
-      bench.step = '5';
-      bench.value = exercise.bench_angle_deg ?? '';
-      bench.addEventListener('input', () => {
-        const value = bench.value.trim() === '' ? null : Number(bench.value);
-        onChange?.({ type: 'bench', exerciseIndex, value: Number.isFinite(value) ? value : null });
-      });
-      benchRow.append(bench);
-      card.append(benchRow);
-    }
-
-    const intensificationRow = root.createElement('label');
-    intensificationRow.className = 'fitness-logger__bench';
-    intensificationRow.textContent = 'Strength move ';
-    const intensification = root.createElement('select');
-    const none = root.createElement('option');
-    none.value = '';
-    none.textContent = 'Standard';
-    intensification.append(none);
-    for (const option of INTENSIFICATIONS) {
-      const el = root.createElement('option');
-      el.value = option;
-      el.textContent = intensificationLabel(option);
-      if (option === exercise.intensification) el.selected = true;
-      intensification.append(el);
-    }
-    intensification.addEventListener('change', () => {
-      onChange?.({ type: 'intensification', exerciseIndex, value: intensification.value });
+  if (expandedExerciseIndex != null && exercises[expandedExerciseIndex]) {
+    const editor = buildExerciseEditor(root, exercises[expandedExerciseIndex], expandedExerciseIndex, {
+      onChange,
+      onAddSet,
+      onMoveExercise,
+      onRemoveExercise,
+      exerciseCount: exercises.length,
+      onCollapse: onCollapseExercise
     });
-    intensificationRow.append(intensification);
-    card.append(intensificationRow);
-
-    const table = root.createElement('div');
-    table.className = 'fitness-logger__sets';
-    const setHead = root.createElement('div');
-    setHead.className = 'fitness-logger__set fitness-logger__set--head';
-    for (const label of ['#', 'kg', 'reps', 'cable']) {
-      const cell = root.createElement('span');
-      cell.textContent = label;
-      setHead.append(cell);
-    }
-    table.append(setHead);
-
-    const exerciseSets = exercise.sets ?? [];
-    exerciseSets.forEach((set, setIndex) => {
-      const row = root.createElement('div');
-      row.className = 'fitness-logger__set';
-      const index = root.createElement('span');
-      index.textContent = String(setIndex + 1);
-
-      const weight = root.createElement('input');
-      weight.type = 'number';
-      weight.inputMode = 'decimal';
-      weight.step = '0.5';
-      weight.value = set.weight_kg ?? 0;
-      weight.addEventListener('input', () => {
-        onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'weight_kg', value: Number(weight.value) });
-      });
-
-      const reps = root.createElement('input');
-      reps.type = 'number';
-      reps.inputMode = 'numeric';
-      reps.step = '1';
-      reps.value = set.reps ?? 0;
-      reps.addEventListener('input', () => {
-        onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'reps', value: Number(reps.value) });
-      });
-
-      const cable = root.createElement('select');
-      for (const option of CABLE_TYPES) {
-        const el = root.createElement('option');
-        el.value = option;
-        el.textContent = cableLabel(option);
-        if (option === set.cable_type) el.selected = true;
-        cable.append(el);
-      }
-      cable.addEventListener('change', () => {
-        onChange?.({ type: 'set', exerciseIndex, setIndex, field: 'cable_type', value: cable.value });
-      });
-
-      row.append(index, weight, reps, cable);
-      table.append(row);
-
-      const isFinalSet = setIndex === exerciseSets.length - 1;
-      if (isFinalSet) {
-        if (exercise.coach_cues?.final_set) {
-          const finalCue = root.createElement('p');
-          finalCue.className = 'fitness-logger__cue fitness-logger__cue--final-set';
-          finalCue.dataset.fitnessLogger = 'cue-final-set';
-          finalCue.textContent = exercise.coach_cues.final_set;
-          table.append(finalCue);
-        }
-      } else if (exercise.coach_cues?.rest) {
-        const restCue = root.createElement('p');
-        restCue.className = 'fitness-logger__cue fitness-logger__cue--rest';
-        restCue.dataset.fitnessLogger = 'cue-rest';
-        restCue.textContent = exercise.coach_cues.rest;
-        table.append(restCue);
-      }
+    presentExerciseEditor(host, root, {
+      trigger: null,
+      frame: editor,
+      label: exercises[expandedExerciseIndex].name ?? 'Exercise',
+      onClose: onCollapseExercise
     });
-
-    card.append(table);
-
-    const add = root.createElement('button');
-    add.type = 'button';
-    add.className = 'fitness-logger__add-set btn btn--secondary quiet-button';
-    add.textContent = '+ Set';
-    add.addEventListener('click', () => onAddSet?.(exerciseIndex));
-    card.append(add);
-    host.append(card);
+  } else {
+    closeExerciseEditor(host);
   }
 
   const addExercise = root.createElement('div');
@@ -448,9 +608,14 @@ export function updateLoggerChrome(root, { elapsedMs, saveState, timer }) {
   }
 }
 
+export function collapseExerciseEditor(root) {
+  closeExerciseEditor(root?.querySelector?.('#fitness-logger'));
+}
+
 export function hideFitnessLogger(root) {
   const host = root.querySelector('#fitness-logger');
   if (!host) return;
+  closeExerciseEditor(host);
   host.setAttribute('hidden', '');
   host.replaceChildren();
 }
