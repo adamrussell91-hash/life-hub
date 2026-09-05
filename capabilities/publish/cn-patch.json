@@ -2,7 +2,7 @@
   "id": "publish.cn-patch",
   "tool_name": "propose_central_node_patch",
   "verb": "Publish",
-  "agents": ["hammond"],
+  "agents": ["hammond", "clare", "ann"],
   "risk": "confirm",
   "kind": "capacity",
   "legacy_tool": "propose_central_node_patch",

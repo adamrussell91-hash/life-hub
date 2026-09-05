@@ -22,6 +22,8 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 - **Penelope Rose Quillian (Diary & Mood Agent):** Daily diary entry via guided conversation (Moira Rose voice), Mood Tracker population, Cross-Agent Coordination updates
 - **General Hammond (Life Coach):** Goal setting and tracking, direction sessions, cross domain synthesis, life architecture, monthly goal audits, governance triage and major decision review
 - **Dr. Vera Lenz (Psychological Coach):** ADHD-aware psychological coaching, dynamic framework selection (ACT / CFT / CBT-Informed / ADHD Coaching / Narrative / IFS-Adjacent), Penelope integration loop, session database
+- **Clare DeMind (Tasks Agent):** Dump triage, Now/Later/Trash, confirm-before-write task mutations. Reads Hammond→Clare before a dump; writes Clare→Hammond (or Clare→[Agent]) when task load or a deadline collides with a Life constraint.
+- **Ann O'Tation (Teaching Agent):** Lesson diagnosis and classroom-ready repair. Reads Hammond→Ann before responding; writes Ann→Hammond (or Ann→[Agent]) when a lesson/load collision or teaching deadline hits a Life constraint.
 ---
 ## 🔴 Current Constraints & Priorities
 *Active protocols and rules all agents must respect. Full medical history lives in Life Hub Medical Overview. Skincare clinical baseline and routines live in https://app.notion.com/p/308f794f84768019829fd05b338321c8. Nutrition logs and targets live in https://app.notion.com/p/303f794f8476800d91dfd713badc3013. Exercise programming and workout history live in https://app.notion.com/p/297f794f8476801ca615c0d327d35a62. Recipes and pantry live in https://app.notion.com/p/301f794f8476806d8571ee3b56d1a45f.*
