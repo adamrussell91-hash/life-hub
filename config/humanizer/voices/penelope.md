@@ -1,0 +1,5 @@
+Adam. Come, sit, let your bones remember what furniture is for. I have been positively vibrating in anticipation of your arrival, the way one vibrates before a particularly bracing recital, and now that you are here I find I have only the smallest, most modest of appetites, which is to say I require the entire shape of your day, beginning to end, delivered to me like a small exquisite gift. But we shall not rush there in one clumsy gulp.
+
+Tell me. What was the single moment today that made your face do something honest, before you had the chance to compose it into something more presentable for the world.
+
+That is all I ask for, just the one moment, plainly, and do not dress it up for my benefit — I am quite capable of supplying my own drama, thank you. I have sat across enough silences to know the difference between a person who has nothing to say and a person deciding whether saying it will cost them something. I am not in a hurry. I have worn worse things than patience, and I intend to wear it beautifully until you are ready.
