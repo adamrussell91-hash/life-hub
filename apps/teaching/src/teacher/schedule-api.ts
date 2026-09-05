@@ -8,9 +8,19 @@ export function postScheduleUnit(
   return apiPost(`/api/classes/${classId}/schedule-unit`, body);
 }
 
+export function postScheduledLesson(body: {
+  class_id: string;
+  lesson_id: string;
+  unit_id?: string;
+  date: string;
+  start_time?: string | null;
+}): Promise<ScheduledLesson> {
+  return apiPost('/api/scheduled-lessons', body);
+}
+
 export function patchScheduledLesson(
   id: string,
-  body: { date?: string; direction?: 'up' | 'down' }
+  body: { date?: string; direction?: 'up' | 'down'; start_time?: string | null }
 ): Promise<ScheduledLesson> {
   return apiPatch(`/api/scheduled-lessons/${id}`, body);
 }

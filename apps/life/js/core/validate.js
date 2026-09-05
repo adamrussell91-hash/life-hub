@@ -18,7 +18,7 @@ const OMEGA3_LEVELS = ['high', 'medium', 'low', 'none'];
 const SESSION_TYPES = ['check-in', 'deep-dive', 'pattern-review', 'historical'];
 const DIARY_SOURCE_AGENTS = ['penelope', 'import'];
 const SESSION_SOURCE_AGENTS = ['vera', 'import'];
-const CROSS_AGENT_AGENT_NAMES = ['Vera', 'Penelope', 'Hammond', 'Sara', 'Brisket', 'Chadwick', 'Hyaluronica'];
+const CROSS_AGENT_AGENT_NAMES = ['Vera', 'Penelope', 'Hammond', 'Sara', 'Brisket', 'Chadwick', 'Hyaluronica', 'Clare', 'Ann'];
 const CROSS_AGENT_NOTE_RE = new RegExp(
   `^(${CROSS_AGENT_AGENT_NAMES.join('|')})\\u2192(${CROSS_AGENT_AGENT_NAMES.join('|')}):\\s*\\S`
 );

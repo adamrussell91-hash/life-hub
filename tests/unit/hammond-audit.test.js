@@ -77,7 +77,25 @@ test('lock contract requires governance log and CN patch tools', () => {
   const text = buildHammondAuditContract({ kind: 'cn_audit', phase: 'lock', intakeCount: 2 });
   assert.match(text, /append_governance_log/);
   assert.match(text, /propose_central_node_patch/);
+  assert.match(text, /Cross-Domain Tension/);
+  assert.match(text, /Hammond→Clare/);
+  assert.match(text, /Hammond→Ann/);
   assert.doesNotMatch(text, /Do not invent a database write/);
+});
+
+test('stale_drift contract requires Other hubs Tasks and Teaching', () => {
+  const text = buildHammondAuditContract({ kind: 'cn_audit', phase: 'stale_drift', intakeCount: 2 });
+  assert.match(text, /Other hubs/);
+  assert.match(text, /Tasks/);
+  assert.match(text, /[Tt]eaching|[Ll]esson/);
+  assert.match(text, /Do not run open loops or lock yet/i);
+});
+
+test('open_loops contract includes open Tasks and upcoming lessons', () => {
+  const text = buildHammondAuditContract({ kind: 'cn_audit', phase: 'open_loops', intakeCount: 2 });
+  assert.match(text, /Tasks/);
+  assert.match(text, /lesson/i);
+  assert.match(text, /Do not lock yet/i);
 });
 
 test('nextAuditPhase advances and clears after lock', () => {
