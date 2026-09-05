@@ -279,7 +279,6 @@ function pageHeader(
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">${eyebrow}</p>
         <div class="page-header__title-row">
-          <img class="hub-mark" src="${HUB_MARK_SRC}" alt="" width="32" height="32" />
           <h1 class="page-header__title hub-kinetic">${title}</h1>
         </div>
       </div>
