@@ -42,4 +42,36 @@ describe('visual viewport inset', () => {
     expect(document.documentElement.style.getPropertyValue('--vv-height')).toBe('');
     expect(document.documentElement.style.getPropertyValue('--vv-offset-bottom')).toBe('');
   });
+
+  it('re-syncs when the chat composer receives focus', () => {
+    vi.useFakeTimers();
+    const listeners: Record<string, Set<() => void>> = { resize: new Set(), scroll: new Set() };
+    const vv = {
+      height: 400,
+      offsetTop: 0,
+      addEventListener: (type: string, fn: () => void) => listeners[type]?.add(fn),
+      removeEventListener: (type: string, fn: () => void) => listeners[type]?.delete(fn)
+    };
+    vi.stubGlobal('innerHeight', 800);
+    vi.stubGlobal('visualViewport', vv);
+
+    const form = document.createElement('form');
+    form.className = 'chat-form';
+    const input = document.createElement('textarea');
+    input.id = 'chat-input';
+    input.scrollIntoView = vi.fn();
+    form.append(input);
+    document.body.append(form);
+
+    attachVisualViewportInset();
+    vv.height = 360;
+    input.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    vi.runAllTimers();
+
+    expect(document.documentElement.style.getPropertyValue('--vv-height')).toBe('360px');
+    expect(input.scrollIntoView).toHaveBeenCalled();
+
+    form.remove();
+    vi.useRealTimers();
+  });
 });
