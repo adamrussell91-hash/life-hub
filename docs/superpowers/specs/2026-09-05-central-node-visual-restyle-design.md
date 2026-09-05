@@ -167,7 +167,7 @@ Allowed companions (view-model / tests only — not coordination work):
 - `tests/browser/central-node.spec.mjs` — drop “30 heatmap tiles” assertions; assert board tiles, honest empty, ring label, Hammond FAB unchanged  
 - `apps/life/service-worker.js` — `CACHE_NAME` bump after shell HTML/CSS/JS change  
 
-**Do not expect changes to:** `persona.mjs`, `hammond-audit.mjs`, `hammond-audit.js`, `validate.js` agent-name lists, `hammond-digest.mjs`, `hub-agent-context.mjs`, chat functions.
+**Do not expect changes to:** `persona.mjs`, `hammond-audit.mjs`, `hammond-audit.js`, `validate.js` agent-name lists, `hammond-digest.mjs` (`CN_MODEL_WINDOW_DAYS` stays 30), `hub-agent-context.mjs`, chat functions.
 
 ## Success
 
