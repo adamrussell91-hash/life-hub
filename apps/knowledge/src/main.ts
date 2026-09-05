@@ -30,8 +30,11 @@ import { takeSignInQuery } from "./api/loginGate";
 import { isPageHash, pageHashForId, pageIdFromHash } from "./routing/pageHash";
 import { runCapture } from "./api/captureClient";
 import {
+  adoptComposeVoiceWave,
   bindCaptureControls,
+  captureControlState,
   captureFieldHtml,
+  createComposeVoiceWave,
   createVoiceCapture,
   ingestCaptureFile,
 } from "./capture";
@@ -204,6 +207,11 @@ type ComposeState = {
 
 let composeBodyEditor: MarkdownTiptapHandle | null = null;
 let compose: ComposeState | null = null;
+const composeVoiceWave = createComposeVoiceWave();
+const composeVoice = createVoiceCapture({
+  onFile: file => void ingestAndApply(file, "voice"),
+  waveformHost: composeVoiceWave,
+});
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 function blankCompose(origins: Origin[] = []): ComposeState {
@@ -350,6 +358,7 @@ function filteredOrigin(): Origin | undefined {
 }
 
 function openCompose(origins: Origin[] = []) {
+  composeVoice.stopMic();
   const seeded = origins.length ? origins : filteredOrigin() ? [filteredOrigin()!] : [];
   compose = blankCompose(seeded);
   resetComposeTagChrome();
@@ -1317,6 +1326,49 @@ function renderPage(page: Page) {
   if (origin) morphFromRect(origin, app.querySelector("[data-hub-morph-page]"));
 }
 
+async function ingestAndApply(file: File, kind: "voice" | "photo" | "pdf") {
+  if (!compose) return;
+  compose.captureBusy = true;
+  render();
+  const result = await ingestCaptureFile(
+    { file, kind, pageId: compose.id, area: compose.area, body: compose.body, title: compose.title },
+    { signAttachment, uploadSignedFile, runCapture, localData: USE_LOCAL_DATA },
+  );
+  if (result.attachment) compose.existing.push(result.attachment as Attachment);
+  if (result.ok) {
+    compose.body = result.body;
+    compose.title = result.title;
+  }
+  showToast(result.toast);
+  compose.captureBusy = false;
+  compose.recording = false;
+  render();
+}
+
+function paintComposeCaptureChrome() {
+  if (!compose) return;
+  const ui = captureControlState({
+    busy: compose.busy,
+    captureBusy: compose.captureBusy,
+    recording: compose.recording,
+    localData: USE_LOCAL_DATA,
+  });
+  const voiceBtn = app.querySelector<HTMLButtonElement>("[data-capture-voice]");
+  if (voiceBtn) {
+    voiceBtn.textContent = ui.voiceLabel;
+    voiceBtn.disabled = Boolean(ui.captureDisabled);
+  }
+  app
+    .querySelectorAll<HTMLButtonElement>(
+      "[data-capture-photo], [data-capture-scan], [data-capture-pdf], [data-capture-paste]",
+    )
+    .forEach(btn => {
+      btn.disabled = Boolean(ui.captureOthersDisabled);
+    });
+  const save = app.querySelector<HTMLButtonElement>("[data-compose-save]");
+  if (save) save.disabled = Boolean(USE_LOCAL_DATA || compose.busy || compose.captureBusy || compose.recording);
+}
+
 function renderCompose(state: ComposeState) {
   bindKeyboardInset();
   const files = [
@@ -1395,35 +1447,14 @@ function renderCompose(state: ComposeState) {
     bodyHost.replaceChildren(composeBodyEditor.host);
   }
 
+  adoptComposeVoiceWave(app, composeVoiceWave);
+  if (state.recording) composeVoiceWave.hidden = false;
+
   const syncFields = () => {
     if (!compose) return;
     compose.title = app.querySelector<HTMLInputElement>("#compose-title")!.value;
     if (composeBodyEditor) compose.body = composeBodyEditor.getMarkdown();
   };
-
-  const voice = createVoiceCapture({
-    onFile: file => void ingestAndApply(file, "voice"),
-    waveformHost: app.querySelector<HTMLElement>("[data-voice-wave]"),
-  });
-
-  async function ingestAndApply(file: File, kind: "voice" | "photo" | "pdf") {
-    if (!compose) return;
-    compose.captureBusy = true;
-    render();
-    const result = await ingestCaptureFile(
-      { file, kind, pageId: compose.id, area: compose.area, body: compose.body, title: compose.title },
-      { signAttachment, uploadSignedFile, runCapture, localData: USE_LOCAL_DATA },
-    );
-    if (result.attachment) compose.existing.push(result.attachment as Attachment);
-    if (result.ok) {
-      compose.body = result.body;
-      compose.title = result.title;
-    }
-    showToast(result.toast);
-    compose.captureBusy = false;
-    compose.recording = false;
-    render();
-  }
 
   app.querySelector<HTMLButtonElement>("[data-compose-cancel]")!.onclick = () => {
     composeBodyEditor?.destroy();
@@ -1577,12 +1608,17 @@ function renderCompose(state: ComposeState) {
   bindCaptureControls(app, {
     syncFields,
     onVoice: () => {
-      void voice.toggle().then(status => {
+      void composeVoice.toggle().then(status => {
         if (!compose) return;
         if (status === "denied") showToast("Microphone permission is required for voice capture");
         if (status === "started") {
           compose.recording = true;
-          render();
+          paintComposeCaptureChrome();
+        }
+        if (status === "stopping") {
+          compose.recording = false;
+          compose.captureBusy = true;
+          paintComposeCaptureChrome();
         }
       });
     },
@@ -1702,6 +1738,7 @@ function afterSignedInPaint() {
 }
 
 function render() {
+  if (view !== "compose") composeVoice.stopMic();
   if (view === "compose" && compose) renderCompose(compose);
   else if (view === "page" && activePage) renderPage(activePage);
   else if (view === "graph") renderGraph();
