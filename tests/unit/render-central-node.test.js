@@ -359,6 +359,16 @@ test('renderCentralNode omits empty this-month prose and keeps status fallback',
   assert.match(root._sections['todays-status'].textContent, /No agent notes yet/);
 });
 
+test('renderCentralNode paints a protein horizon and not a line chart', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel());
+  const svg = root.querySelector('#central-node-week-horizon');
+  const rects = svg.children.filter(node => node.tagName === 'rect');
+  assert.equal(rects.length, 7);
+  assert.ok(rects.every(rect => rect.getAttribute('fill') === 'var(--wave)'));
+  assert.equal(root.querySelector('#central-node-week-chart'), null);
+});
+
 test('paintChartOrEmpty keeps the tile and writes honest empty copy', async () => {
   const { paintChartOrEmpty } = await import('../../apps/life/js/app/render-central-node.js');
   const root = fakeCentralNodeRoot();
