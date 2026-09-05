@@ -14,7 +14,7 @@ test('fixture validator reports the approved Home sample', async () => {
   const { stdout } = await exec(process.execPath, ['scripts/validate-fixtures.mjs']);
   const result = JSON.parse(stdout);
   assert.deepEqual(result, {
-    files: 6, valid: 6, invalid: 0,
+    files: 7, valid: 7, invalid: 0,
     home: { calories: 1130, protein_g: 80, fat_g: 27, day_type: 'workout_30', workout_streak: 1 }
   });
 });

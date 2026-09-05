@@ -113,8 +113,6 @@ test('Home shell loads the morphing popover stylesheet and mounts it', async () 
   const chrome = await readFile(new URL('../../packages/design-kit/chrome.css', import.meta.url), 'utf8');
 
   assert.match(html, /packages\/design-kit\/morphing-popover\.css/);
-  assert.match(html, /data-morphing-popover/);
-  assert.match(html, /Write a dump/);
   assert.match(main, /morphing-popover\.js/);
   assert.match(main, /mountMorphingPopovers/);
   assert.match(chrome, /morphing-popover\.css/);

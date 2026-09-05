@@ -20,6 +20,7 @@ describe("Chat rail layout", () => {
     expect(rail).toContain("thinkingHistoryHtml");
     expect(rail).toContain("searchedNotesHtml");
     expect(rail).toContain("sittingLibrary");
+    expect(rail).toContain("data-hub-scroll-hide");
     expect(rail).toContain("data-new-chat");
     expect(rail).toContain("New chat");
     expect(rail).not.toContain("data-open-visualiser");

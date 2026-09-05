@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { parseCountable } from '../../packages/design-kit/js/hub-motion.js';
+import {
+  applyHubScrollHide,
+  nextScrollHideState,
+  parseCountable
+} from '../../packages/design-kit/js/hub-motion.js';
 import {
   DEFAULT_STAGGER_MS,
   getDelay,
@@ -30,6 +34,8 @@ test('Home shell loads the shared motion stylesheet and module', async () => {
   const motion = await readFile(new URL('../../packages/design-kit/motion.css', import.meta.url), 'utf8');
   assert.match(html, /packages\/design-kit\/motion\.css/);
   assert.match(html, /page-header__title hub-kinetic/);
+  assert.match(html, /data-hub-scroll-hide/);
+  assert.match(html, /data-hub-scroll-scroller="#chat-messages"/);
   assert.match(main, /hub-motion\.js/);
   assert.match(main, /startHubMotion/);
   assert.match(motion, /hub-morph-dialog/);
@@ -79,6 +85,33 @@ test('kinetic grapheme split keeps a combining mark with its letter', () => {
   assert.equal(parts[0], 'e\u0301');
 });
 
+test('scroll-hide tucks away on the way down and comes back on the way up', () => {
+  assert.equal(nextScrollHideState({ current: 40, previous: 10, threshold: 80 }), false);
+  assert.equal(nextScrollHideState({ current: 120, previous: 90, threshold: 80 }), true);
+  assert.equal(nextScrollHideState({ current: 90, previous: 120, threshold: 80, hidden: true }), false);
+  assert.equal(nextScrollHideState({ current: 90, previous: 90, threshold: 80, hidden: true }), true);
+
+  const el = {
+    className: '',
+    classList: {
+      tokens: new Set(),
+      add(name) { this.tokens.add(name); },
+      contains(name) { return this.tokens.has(name); },
+      toggle(name, on) { if (on) this.tokens.add(name); else this.tokens.delete(name); }
+    },
+    attributes: {},
+    getAttribute() { return null; },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    removeAttribute(name) { delete this.attributes[name]; },
+    toggleAttribute(name, on) { if (on) this.attributes[name] = ''; else delete this.attributes[name]; }
+  };
+  assert.equal(applyHubScrollHide(el, { current: 160, previous: 90 }), true);
+  assert.equal(el.classList.contains('is-hidden'), true);
+  assert.equal(el.attributes.inert, '');
+  assert.equal(applyHubScrollHide(el, { current: 40, previous: 160 }), false);
+  assert.equal(el.classList.contains('is-hidden'), false);
+});
+
 test('kit documents kinetic as canvas-only motion', async () => {
   const agents = await readFile(new URL('../../packages/design-kit/AGENTS.md', import.meta.url), 'utf8');
   const snippet = await readFile(new URL('../../packages/design-kit/snippets/hub-kinetic.html', import.meta.url), 'utf8');
@@ -86,11 +119,18 @@ test('kit documents kinetic as canvas-only motion', async () => {
   const motion = await readFile(new URL('../../packages/design-kit/js/hub-motion.js', import.meta.url), 'utf8');
 
   assert.match(agents, /hub-kinetic\.js/);
+  assert.match(agents, /scroll-hide chrome/);
   assert.match(agents, /Not on the rail/);
   assert.match(snippet, /Do not use on the rail/);
   assert.match(css, /\.hub-kinetic__seg/);
+  assert.match(css, /\.hub-scroll-hide\.is-hidden/);
   assert.match(motion, /hub-kinetic\.js/);
   assert.match(motion, /watchKinetic/);
+  assert.match(motion, /data-hub-scroll-hide/);
+
+  const hideSnippet = await readFile(new URL('../../packages/design-kit/snippets/hub-scroll-hide.html', import.meta.url), 'utf8');
+  assert.match(hideSnippet, /data-hub-scroll-hide/);
+  assert.match(hideSnippet, /Do not put this on the rail/);
 
   const rail = await readFile(new URL('../../packages/design-kit/snippets/rail.html', import.meta.url), 'utf8');
   const worker = await readFile(new URL('../../apps/life/service-worker.js', import.meta.url), 'utf8');
