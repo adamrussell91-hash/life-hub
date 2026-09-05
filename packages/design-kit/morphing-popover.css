@@ -132,6 +132,20 @@
   margin-top: var(--space-2);
 }
 
+/* Closed-field chip editor. Options are `.hub-pills` from filters.css. */
+.morphing-popover--closed-field .morphing-popover__choices,
+.morphing-popover__choices {
+  width: 100%;
+}
+
+.morphing-popover__choices.hub-pills--loose {
+  justify-content: flex-start;
+}
+
+.morphing-popover__trigger.hub-chip {
+  cursor: pointer;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .morphing-popover__panel.is-animating .morphing-popover__body,
   .morphing-popover__panel.is-ready .morphing-popover__body {

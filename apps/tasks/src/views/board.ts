@@ -251,6 +251,15 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     onToggle: (current) => {
       const next = current.status === 'done' ? 'open' : 'done';
       persistStatus(current, next, byId, confirmHost, upsertTask, onReload);
+    },
+    onPatch: (current, patch) => {
+      void tasksApi.updateTask(current.id, patch).then(
+        (updated) => upsertTask(updated),
+        (err: unknown) => {
+          confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not save')));
+          onReload();
+        }
+      );
     }
   });
 

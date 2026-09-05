@@ -543,6 +543,14 @@
   flex: none;
 }
 
+button.status-badge,
+button.priority-chip,
+button.hub-chip {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .priority-chip {
   display: inline-flex;
   align-items: center;
