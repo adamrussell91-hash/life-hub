@@ -3,6 +3,7 @@ import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
 import { formatDisplayDate, formatWeekday } from '../core/time.js';
 
 const VOLUME_BAR_WEEKS = 12;
+const VOLUME_BAR_MIN = 8;
 
 const DAY_TYPE_LABELS = {
   movement: 'Movement day',
@@ -38,8 +39,9 @@ const formatKg = kg => {
 };
 
 const formatWorkoutsPerWeek = value => {
-  if (value == null || !Number.isFinite(value)) return '—';
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  if (value == null || !Number.isFinite(value) || value <= 0) return '—';
+  if (Number.isInteger(value)) return String(value);
+  return value < 1 ? value.toFixed(2) : value.toFixed(1);
 };
 
 export function renderFitness(root, model, { logger, templates, libraryByName, onSelectTemplate } = {}) {
@@ -206,7 +208,11 @@ function renderLongTerm(root, longTerm) {
   const host = root.querySelector('#fitness-volume-bars');
   if (!host) return;
   host.replaceChildren();
-  const series = (data.weeklyVolume ?? []).slice(-VOLUME_BAR_WEEKS);
+  const recent = (data.weeklyVolume ?? []).slice(-VOLUME_BAR_WEEKS);
+  const firstHit = recent.findIndex(week => Number(week.value) > 0);
+  let start = firstHit > 0 ? Math.max(0, firstHit - 1) : 0;
+  if (recent.length - start < VOLUME_BAR_MIN) start = Math.max(0, recent.length - VOLUME_BAR_MIN);
+  const series = recent.slice(start);
   const max = Math.max(0, ...series.map(week => Number(week.value) || 0));
   for (const week of series) {
     const bar = root.createElement('span');
