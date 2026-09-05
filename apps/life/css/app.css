@@ -1579,6 +1579,9 @@ main { max-width: 76rem; margin: 0 auto; }
   cursor: pointer;
   text-align: left;
 }
+.fitness-logger__peek.hub-morph-dialog__origin {
+  visibility: visible;
+}
 .fitness-logger__peek-hint {
   margin: auto 0 0;
   font-size: var(--text-xs);

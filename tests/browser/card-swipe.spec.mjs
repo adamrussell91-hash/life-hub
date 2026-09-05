@@ -129,20 +129,22 @@ test('tapping a compact card expands the set editor', async () => {
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}/card-swipe-preview.html`);
-    await page.locator('#logger .fitness-logger__peek').first().click();
+    const logger = page.locator('#logger .fitness-logger__swipe');
+    await logger.locator('.hub-card-swipe__dot').nth(2).click();
+    await logger.locator('.hub-card-swipe__slide[aria-hidden="false"] .fitness-logger__peek').click();
     const dialog = page.locator('.hub-morph-dialog.is-in');
     await dialog.waitFor();
     const editor = dialog.locator('.fitness-logger__exercise');
     await editor.waitFor();
-    assert.match(await editor.locator('h4').textContent(), /Bench press/);
-    assert.equal(await editor.locator('.fitness-logger__sets input').first().inputValue(), '36');
+    assert.match(await editor.locator('h4').textContent(), /Bayesian curl/);
+    assert.equal(await editor.locator('.fitness-logger__sets input').first().inputValue(), '14');
     await dialog.locator('[data-hub-morph-close]').click();
     await page.locator('.hub-morph-dialog').waitFor({ state: 'detached' });
     assert.equal(await page.locator('.fitness-logger__exercise').count(), 0);
     const peek = page.locator('#logger .hub-card-swipe__slide[aria-hidden="false"] .fitness-logger__peek');
     await peek.waitFor();
     assert.equal(await peek.evaluate(el => getComputedStyle(el).visibility), 'visible');
-    assert.match(await peek.locator('.hub-card-swipe__title').textContent(), /Bench press/);
+    assert.match(await peek.locator('.hub-card-swipe__title').textContent(), /Bayesian curl/);
   } finally {
     await context.close();
   }
