@@ -3,9 +3,18 @@ export type ClareSprintId =
   | 'tomorrow-setup'
   | 'weekly-reset'
   | 'high-stakes'
-  | 'shrink-first-step';
+  | 'shrink-first-step'
+  | 'appointment-prep'
+  | 'comms-followup';
 
-export type ClareToolkitId = 'shatter-start' | 'time-map' | 'open-loops';
+export type ClareToolkitId =
+  | 'shatter-start'
+  | 'time-map'
+  | 'open-loops'
+  | 'dopamine-menu'
+  | 'body-double'
+  | 'context-switch'
+  | 'interest-filter';
 
 export type ClareProtocolId = ClareSprintId | ClareToolkitId;
 
@@ -41,6 +50,16 @@ export const CLARE_PROTOCOLS: readonly ClareProtocol[] = [
     id: 'shrink-first-step',
     label: 'Shrink first move',
     explain: 'Clare turns the dump into the smallest honest first move you can start.'
+  },
+  {
+    id: 'appointment-prep',
+    label: 'Appointment prep',
+    explain: 'Clare pulls an upcoming appointment and related prep tasks/notes.'
+  },
+  {
+    id: 'comms-followup',
+    label: 'Comms follow-up',
+    explain: 'Clare lists follow-ups at or past due and offers to resolve each.'
   }
 ];
 
@@ -60,6 +79,26 @@ export const CLARE_ADHD_PROTOCOLS: readonly ClareProtocol[] = [
     id: 'open-loops',
     label: 'Open loops',
     explain: 'Clare sorts the dump into Now, Later, and Trash, then proposes Now.'
+  },
+  {
+    id: 'dopamine-menu',
+    label: 'Dopamine menu',
+    explain: 'Clare builds 5-min / 20-min / 10-min stimulation options when under-stimulated.'
+  },
+  {
+    id: 'body-double',
+    label: 'Body double',
+    explain: 'Clare acts as a virtual body double for a 30-minute focus block.'
+  },
+  {
+    id: 'context-switch',
+    label: 'Context switch',
+    explain: 'Clare runs a 3-minute palate-cleanser between finished A and starting B.'
+  },
+  {
+    id: 'interest-filter',
+    label: 'Interest filter',
+    explain: 'Clare gamifies a boring task using a current hyperfixation as the quest frame.'
   }
 ];
 
@@ -69,12 +108,22 @@ export function isClareSprint(id: ClareProtocolId | undefined): id is ClareSprin
     id === 'tomorrow-setup' ||
     id === 'weekly-reset' ||
     id === 'high-stakes' ||
-    id === 'shrink-first-step'
+    id === 'shrink-first-step' ||
+    id === 'appointment-prep' ||
+    id === 'comms-followup'
   );
 }
 
 export function isClareToolkit(id: ClareProtocolId | undefined): id is ClareToolkitId {
-  return id === 'shatter-start' || id === 'time-map' || id === 'open-loops';
+  return (
+    id === 'shatter-start' ||
+    id === 'time-map' ||
+    id === 'open-loops' ||
+    id === 'dopamine-menu' ||
+    id === 'body-double' ||
+    id === 'context-switch' ||
+    id === 'interest-filter'
+  );
 }
 
 export function isBriefingProtocol(id: ClareProtocolId | undefined): boolean {
@@ -82,7 +131,9 @@ export function isBriefingProtocol(id: ClareProtocolId | undefined): boolean {
     id === 'morning-sweep' ||
     id === 'tomorrow-setup' ||
     id === 'weekly-reset' ||
-    id === 'high-stakes'
+    id === 'high-stakes' ||
+    id === 'appointment-prep' ||
+    id === 'comms-followup'
   );
 }
 

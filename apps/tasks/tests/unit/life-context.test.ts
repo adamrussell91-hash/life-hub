@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildLifeContextDigest, lifeContextToPromptBlock } from '@/domain/life-context';
+import { buildLifeContextDigest, extractPredictiveHints, lifeContextToPromptBlock } from '@/domain/life-context';
 import { createLifeContextProvider, defaultLifeContextProvider } from '@/ai/life-hub-client';
 
 const SAMPLE = `# Purpose
@@ -108,5 +108,18 @@ describe('life-hub-client', () => {
       fetchImpl
     });
     expect(await provider()).toBeNull();
+  });
+});
+
+describe('predictive hints from Life Hub prose', () => {
+  it('extracts exercise/mood/fuel hints without inventing streaks', () => {
+    const markdown = SAMPLE.replace('**Exercise:** Session logged.', '**Exercise:** None\n**Mood:** Low');
+    const digest = buildLifeContextDigest(markdown);
+    expect(digest.predictive_hints.some((h) => /exercise gap/i.test(h))).toBe(true);
+    expect(digest.predictive_hints.some((h) => /mood flag/i.test(h))).toBe(true);
+    expect(digest.predictive_hints.every((h) => !/\d+ day streak/i.test(h))).toBe(true);
+    const block = lifeContextToPromptBlock(digest) ?? '';
+    expect(block).toMatch(/Predictive hints/i);
+    expect(extractPredictiveHints({ today_status: null, this_week: null })).toEqual([]);
   });
 });

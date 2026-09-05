@@ -30,7 +30,10 @@ export function buildSystemPrompt({
   workoutTemplates = '',
   exerciseLibrary = '',
   skincareRoutines = '',
+  treatmentState = '',
+  nutritionSkinWeek = '',
   bodyState = '',
+  saraClinicalContext = '',
   daysSinceLastSession = null,
   lastWorkouts = '',
   mindDiaryDigest = '',
@@ -149,7 +152,14 @@ export function buildSystemPrompt({
       : 'When Adam asks what is on AM/PM, call list_skincare_routines. Never invent a routine from shelf status, in_use flags, or notes keyword search.',
     'Prefer the Skincare tab for one-tap AM/PM logs. In chat, advise and adjust; only propose skincare log_entry when Adam clearly describes a completed routine or procedure here instead of using the tab.',
     'When he says log / confirm logged / save it for a routine he just described here, call skincare log_entry in that same turn. Never claim it is logged until log_entry returns awaiting_confirm.',
-    'When you do propose skincare log_entry, put notes as "[routine] — [skin verdict]" when he gave a state so Central Node Flags stay useful after confirm.'
+    'When you do propose skincare log_entry, put notes as "[routine] — [skin verdict]" when he gave a state so Central Node Flags stay useful after confirm.',
+    treatmentState
+      ? `Live treatment state:\n${treatmentState}`
+      : 'Live treatment state: no Procedure: window computed this turn.',
+    nutritionSkinWeek
+      ? `Nutrition→skin weekly check:\n${nutritionSkinWeek}`
+      : 'Nutrition→skin weekly check: no meal window computed this turn.',
+    'When giving product or routine advice, cite which live signal you used (treatment state, nutrition→skin week, Current AM/PM rotation, Constraints, or Adam\'s message).'
   ] : [];
 
   const penelopeBlocks = slug === 'penelope' ? [
@@ -207,6 +217,12 @@ export function buildSystemPrompt({
     saraProtocol
       ? `Sara operating manual (follow these Life Hub rules):\n${saraProtocol}`
       : '',
+    bodyState
+      ? `Body state (latest composition, tape, and shoulder:waist ratio toward Adam's physique goal):\n${bodyState}`
+      : 'No body-state snapshot available yet — ask before assuming current training load or recovery.',
+    saraClinicalContext
+      ? `Bounded clinical context (triggered by Constraints):\n${saraClinicalContext}`
+      : 'No Constraints-triggered clinical context this turn (bone / iron / taper keywords not present).',
     'You may propose log_entry for weight, composition, measurements, and medical when Adam clearly reports those figures or a visit. Leave meals to Brisket and workouts to Chadwick.',
     'Medical Overview is the medical record in Life Hub — not Notion. Central Node Upcoming Appointments are reminders only, not visits on Medical Overview. You own create/edit/read/interpret on Medical Overview.',
     'When Adam asks about previous medical history, a clinician (e.g. Kate Semple), a past visit, cost, address, insurance, or an appointment brief: you MUST call `search_medical_records` and/or `brief_medical_appointment` in that same turn before answering. Never say you lack live read access to Medical Overview, that it lives at a Notion link, or that visit details were not surfaced — retrieve them with the tools. If a tool returns no match, say you checked Medical Overview and found nothing, then ask one clarifying question.',
@@ -283,6 +299,12 @@ export function buildSystemPrompt({
     ...hammondBlocks,
     ...clareBlocks,
     ...annBlocks,
-    humanizerBlock
+    humanizerBlock,
+    // Last-read voice reinforcement: chadwickBlocks are a dense procedural wall that can drown the
+    // earlier voice paragraph. Models weight end-of-prompt instructions more heavily; cause-2 fix
+    // from docs/superpowers/plans/2026-09-05-restore-notion-agent-depth.md (Band A1).
+    slug === 'chadwick'
+      ? 'Before sending this reply: does it read like an enthusiastic, filthy-minded gym bro, or like a fitness app that happened to say "bro" once? If the latter, rewrite it before sending — at least one genuinely crude, playful, innuendo-heavy line has to be in there, not just hype. Crude means bawdy / cheeky / double-entendre physique hype, not literal anatomical description; push right up to that line, not past it.'
+      : ''
   ].filter(Boolean).join('\n\n');
 }
