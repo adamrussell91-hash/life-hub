@@ -1,6 +1,7 @@
 import type { Task, TaskDomain } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { isBoardTask } from '@/domain/hierarchy';
+import { getTaskPropertiesSync } from '@/services/task-properties';
 
 const PRIORITY_RANK: Record<Task['priority'], number> = {
   urgent: 0,
@@ -9,14 +10,26 @@ const PRIORITY_RANK: Record<Task['priority'], number> = {
   low: 3
 };
 
+/** Preferred focus order — only ids still present in Tools → Properties are used. */
+const WEEKDAY_FOCUS = ['teaching', 'other'] as const;
+const WEEKEND_FOCUS = ['life', 'wedding', 'health', 'other'] as const;
+
 export function isSchoolDay(date: Date = new Date()): boolean {
   const day = date.getDay();
   return day >= 1 && day <= 5;
 }
 
-/** Adaptive default domains: teaching on school days, life/wedding/health on weekends. */
+/**
+ * Adaptive focus domains for Today / Home.
+ * Intersects the weekday/weekend shortlist with the live Properties vocabulary so
+ * a removed domain (e.g. wedding) never appears in the Focus line.
+ */
 export function preferredDomains(date: Date = new Date()): TaskDomain[] {
-  return isSchoolDay(date) ? ['teaching', 'other'] : ['life', 'wedding', 'health', 'other'];
+  const configured = getTaskPropertiesSync().domains.map((entry) => entry.id);
+  const configuredSet = new Set(configured);
+  const shortlist = isSchoolDay(date) ? WEEKDAY_FOCUS : WEEKEND_FOCUS;
+  const prefs = shortlist.filter((id) => configuredSet.has(id));
+  return prefs.length ? prefs : configured;
 }
 
 export function startOfDay(date: Date): Date {

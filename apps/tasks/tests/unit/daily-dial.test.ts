@@ -3,6 +3,7 @@ import type { Task } from '@/schemas/task';
 import {
   assignLanes,
   closestOccupiedHour,
+  dialLegendForDomains,
   dialTintForDomain,
   eventsFromTasks,
   eventsInHour,
@@ -83,6 +84,17 @@ describe('daily dial mapping', () => {
     expect(dialTintForDomain('wedding')).toBe('peach');
     expect(dialTintForDomain('health')).toBe('lilac');
     expect(dialTintForDomain('other')).toBe('sage');
+  });
+
+  it('builds the dial legend from the live Properties domains only', () => {
+    const legend = dialLegendForDomains([
+      { id: 'teaching', label: 'teaching' },
+      { id: 'life', label: 'life' },
+      { id: 'health', label: 'health' },
+      { id: 'other', label: 'other' }
+    ]);
+    expect(legend.map((item) => item.label)).toEqual(['Teaching', 'Life', 'Health', 'Other']);
+    expect(legend.some((item) => item.label === 'Wedding')).toBe(false);
   });
 
   it('keeps fisheye widths summing to 360', () => {

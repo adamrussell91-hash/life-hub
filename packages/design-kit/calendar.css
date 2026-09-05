@@ -615,6 +615,8 @@
 .event-chip--timed {
   position: absolute;
   z-index: 1;
+  box-sizing: border-box;
+  max-width: calc(100% - 4px);
   overflow: hidden;
   padding: 2px var(--space-2) 2px 0.65rem;
   box-shadow: inset 3px 0 0 currentColor;
@@ -718,6 +720,11 @@
 
   .hub-calendar__timegrid {
     grid-template-columns: 2.75rem repeat(var(--days, 7), minmax(7.5rem, 1fr));
+  }
+
+  /* Day view: use the full canvas — do not keep the week minmax that starves chips. */
+  .hub-calendar__timegrid[data-days='1'] {
+    grid-template-columns: 2.75rem minmax(0, 1fr);
   }
 
   .hub-calendar__week {
