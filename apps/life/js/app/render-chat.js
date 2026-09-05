@@ -497,7 +497,7 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
   const confirm = root.createElement('button');
   confirm.type = 'button';
   confirm.className = 'btn btn--primary record-proposal__confirm';
-  confirm.textContent = plannedWorkout ? 'Start workout' : 'Confirm';
+  confirm.textContent = plannedWorkout ? 'Save to Fitness' : 'Confirm';
 
   const discard = root.createElement('button');
   discard.type = 'button';

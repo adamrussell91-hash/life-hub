@@ -83,6 +83,14 @@ import {
   validateExerciseLibraryEntry
 } from './_shared/exercise-library.mjs';
 import {
+  combineSessionAdherenceDays,
+  daysSinceLastCompletedWorkout,
+  formatRecentWorkoutsForPrompt,
+  getLastWorkout,
+  searchWorkoutRecords,
+  selectRecentWorkoutEntries
+} from './_shared/workout-history.mjs';
+import {
   applySaveSkincareLibraryEntry,
   applySetSkincareRoutineMembership,
   executeListSkincareRoutines,
@@ -183,6 +191,7 @@ import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
 import { resolveForcedChadwickPlan } from './_shared/chadwick-plan-force.mjs';
+import { coerceChatWorkoutProposal } from '../../apps/life/js/core/workout-plan-detect.js';
 import { streamWithAgentLogForce } from './_shared/agent-log-force.mjs';
 import {
   forceStatusFor,
@@ -272,6 +281,7 @@ export function createChatHandler({
     const needsFoodLibrary = Boolean(allowedTypes?.includes('meal'));
     const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
     const needsExerciseLibrary = slug === 'chadwick';
+    const needsWorkoutHistory = slug === 'chadwick';
     const needsSkincareLibrary = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
     const hubContextPromise = needsHammondTools
@@ -344,13 +354,15 @@ export function createChatHandler({
         });
         if (forcedPlan) {
           send({ type: 'status', text: 'Locking the plan onto Fitness…' });
-          send({ type: 'text', delta: 'On Fitness — confirm to start.' });
+          send({ type: 'text', delta: 'On Fitness — confirm to save the plan.' });
           const validation = validateLogEntry(forcedPlan, {
             id: `${forcedPlan.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
             now: getSydneyTimestamp(nowInstant)
           });
           if (validation.valid) {
-            await persistOrProposeLogEntry({ client, slug, today, validation, send });
+            await persistOrProposeLogEntry({
+              client, slug, today, validation, send, userMessage: parsed.message
+            });
           } else {
             send({ type: 'record_rejected', errors: validation.errors });
           }
@@ -397,6 +409,8 @@ export function createChatHandler({
           : emptyMembership();
         let skincareMembershipSha;
         let workoutTemplates = '';
+        let lastWorkouts = '';
+        let workoutRecords = [];
         let bodyState = '';
         let sessionAdherenceDays = null;
         let mindDiaryDigest = '';
@@ -461,6 +475,9 @@ export function createChatHandler({
           const templateEntries = needsWorkoutTemplates
             ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
             : [];
+          const chadwickWorkoutEntries = needsWorkoutHistory
+            ? selectRecentWorkoutEntries(current.tree)
+            : [];
           // Chadwick's eyes on Adam's body: a bounded read (latest 1-2 per type from the
           // already-fetched tree, never a history scan) -- see body-state.mjs.
           const bodyEntries = needsBodyState
@@ -502,6 +519,7 @@ export function createChatHandler({
             skincareMembershipBlob,
             skincareCatalogBlob,
             templateBlobs,
+            chadwickWorkoutBlobs,
             compositionBlobs,
             measurementBlobs,
             hammondFitnessBlobs,
@@ -522,6 +540,7 @@ export function createChatHandler({
             skincareMembershipEntry ? client.readBlob(skincareMembershipEntry.sha) : null,
             skincareCatalogEntry ? client.readBlob(skincareCatalogEntry.sha) : null,
             Promise.all(templateEntries.map(entry => client.readBlob(entry.sha))),
+            Promise.all(chadwickWorkoutEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.composition.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha))),
@@ -593,6 +612,15 @@ export function createChatHandler({
             exerciseLibraryEntries = parseExerciseLibrary(decodedExerciseLibrary);
             exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries);
             sessionAdherenceDays = daysSinceLastSession(exerciseLibraryEntries, today);
+          }
+
+          if (needsWorkoutHistory) {
+            workoutRecords = parseHammondFitnessRecords(chadwickWorkoutEntries, chadwickWorkoutBlobs);
+            lastWorkouts = formatRecentWorkoutsForPrompt(workoutRecords);
+            sessionAdherenceDays = combineSessionAdherenceDays(
+              daysSinceLastCompletedWorkout(workoutRecords, today),
+              sessionAdherenceDays
+            );
           }
 
           const decodedCatalog = skincareCatalogBlob ? decodeBlob(skincareCatalogBlob) : null;
@@ -777,6 +805,8 @@ export function createChatHandler({
             : emptyMembership();
           skincareMembershipSha = undefined;
           workoutTemplates = '';
+          lastWorkouts = '';
+          workoutRecords = [];
           bodyState = '';
           sessionAdherenceDays = null;
           mindDiaryDigest = '';
@@ -862,6 +892,7 @@ export function createChatHandler({
           hammondProtocol,
           hammondAuditContract,
           workoutTemplates,
+          lastWorkouts,
           exerciseLibrary,
           skincareRoutines,
           bodyState,
@@ -984,6 +1015,14 @@ export function createChatHandler({
                   parseDocument: (content, path) => parseEventDocument(content, path, loadYaml)
                 });
                 return JSON.stringify(result);
+              }
+              if (event.name === 'get_last_workout') {
+                send({ type: 'status', text: 'Checking last workout…' });
+                return JSON.stringify(getLastWorkout(workoutRecords));
+              }
+              if (event.name === 'search_workout_records') {
+                send({ type: 'status', text: 'Searching workout history…' });
+                return JSON.stringify(searchWorkoutRecords(workoutRecords, event.input ?? {}));
               }
               if (event.name === 'search_exercise_library') {
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
@@ -1266,7 +1305,7 @@ export function createChatHandler({
                 }
                 try {
                   const outcome = await persistOrProposeLogEntry({
-                    client, slug, today, validation, send: emit
+                    client, slug, today, validation, send: emit, userMessage: parsed.message
                   });
                   if (outcome.status === 'written') {
                     return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
@@ -1439,7 +1478,9 @@ export function createChatHandler({
               });
               if (validation.valid) {
                 try {
-                  await persistOrProposeLogEntry({ client, slug, today, validation, send: emit });
+                  await persistOrProposeLogEntry({
+                    client, slug, today, validation, send: emit, userMessage: parsed.message
+                  });
                 } catch {
                   pendingLogRejection = {
                     errors: ['Could not prepare that record. Retry with a simpler payload.']
@@ -1532,12 +1573,15 @@ export function createChatHandler({
   };
 }
 
-async function persistOrProposeLogEntry({ client, slug, today, validation, send }) {
+async function persistOrProposeLogEntry({ client, slug, today, validation, send, userMessage }) {
   let proposal = validation;
+  if (slug === 'chadwick' && proposal.record?.type === 'workout') {
+    proposal = coerceChatWorkoutProposal(proposal, { userMessage });
+  }
   const path = buildCanonicalPath({
-    type: validation.record.type,
-    date: validation.record.date,
-    slug: buildRecordSlug(validation.record)
+    type: proposal.record.type,
+    date: proposal.record.date,
+    slug: buildRecordSlug(proposal.record)
   });
 
   let existingSha = null;

@@ -38,7 +38,7 @@ export function resolveForcedChadwickPlan({
 function forcedPlanEvents(input) {
   return [
     { type: 'status', text: 'Locking the plan onto Fitness…' },
-    { type: 'text', delta: 'On Fitness — confirm to start.' },
+    { type: 'text', delta: 'On Fitness — confirm to save the plan.' },
     { type: 'tool_call', id: 'forced_plan', name: 'log_entry', input }
   ];
 }

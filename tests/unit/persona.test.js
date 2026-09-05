@@ -252,6 +252,38 @@ test('chadwick prompt reports days since last session and instructs him to lower
   assert.match(prompt, /do not keep rewriting/i);
 });
 
+test('chadwick prompt includes recent sessions and tells him to answer last-workout questions from them', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    lastWorkouts: '- 2026-09-01 · completed · Planned session — Bar Press, Curl'
+  });
+  assert.match(prompt, /Recent sessions/);
+  assert.match(prompt, /2026-09-01/);
+  assert.match(prompt, /Planned session/);
+  assert.match(prompt, /get_last_workout|search_workout_records/);
+  assert.match(prompt, /never guess|do not claim you cannot see history|never say you have no record/i);
+});
+
+test('chadwick prompt tells him the default is a new unique session, not a rerun of the last title', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick' });
+  assert.match(prompt, /new uniquely titled session|NEW uniquely titled session/i);
+  assert.match(prompt, /unless Adam asks to repeat/i);
+});
+
+test('chadwick prompt omits the recent-sessions block when empty', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick', lastWorkouts: '' });
+  assert.doesNotMatch(prompt, /Recent sessions/);
+});
+
+test('non-chadwick agents never receive the recent-sessions block', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    lastWorkouts: '- 2026-09-01 · completed · Planned session'
+  });
+  assert.doesNotMatch(prompt, /Recent sessions/);
+  assert.doesNotMatch(prompt, /get_last_workout/);
+});
+
 test('chadwick prompt omits the adherence line when days-since-last-session is unknown (null)', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick', daysSinceLastSession: null });
   assert.doesNotMatch(prompt, /days since/i);

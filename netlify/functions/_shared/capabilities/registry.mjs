@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { logEntryToolSchema } from '../chat-schema.mjs';
 import { foodLibraryEntrySchema } from '../food-library.mjs';
 import { saveExerciseLibraryEntrySchema, searchExerciseLibrarySchema } from '../exercise-library.mjs';
+import { getLastWorkoutSchema, searchWorkoutRecordsSchema } from '../workout-history.mjs';
 import {
   listSkincareRoutinesSchema,
   searchSkincareLibrarySchema,
@@ -226,10 +227,15 @@ export function buildAgentTools({
   }
 
   if (has('lookup.save-exercise-library') && needsExerciseLibrary) {
-    tools.push(searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema());
+    tools.push(
+      searchExerciseLibrarySchema(),
+      saveExerciseLibraryEntrySchema(),
+      getLastWorkoutSchema(),
+      searchWorkoutRecordsSchema()
+    );
   } else if (needsExerciseLibrary) {
     // Search is resourcing, not yet a named capacity — keep available for Chadwick.
-    tools.push(searchExerciseLibrarySchema());
+    tools.push(searchExerciseLibrarySchema(), getLastWorkoutSchema(), searchWorkoutRecordsSchema());
   }
 
   if (needsVeraMindTools) {

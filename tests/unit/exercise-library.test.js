@@ -225,6 +225,29 @@ test('applyCompletedWorkoutToLibrary leaves an exercise with no library match un
   assert.deepEqual(pbs, []);
 });
 
+test('applyCompletedWorkoutToLibrary matches Bar Press set N rows to Bar Press once', () => {
+  const library = [{
+    name: 'Bar Press',
+    target_area: 'Chest',
+    best_weight_kg: 40,
+    times_performed: 1,
+    last_performed: '2026-08-29'
+  }];
+  const record = workoutRecord([
+    { name: 'Bar Press set 1', sets: [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }] },
+    { name: 'Bar Press set 2', sets: [{ reps: 8, weight_kg: 34, cable_type: 'constant_force' }] },
+    { name: 'Bar Press set 3', sets: [{ reps: 12, weight_kg: 40, cable_type: 'constant_force' }] }
+  ], '2026-09-01');
+
+  const { entries, pbs } = applyCompletedWorkoutToLibrary(library, record, '2026-09-01T18:26:45+10:00');
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].last_performed, '2026-09-01');
+  assert.equal(entries[0].times_performed, 2);
+  assert.equal(entries[0].working_weight_kg, 40);
+  assert.deepEqual(pbs, []);
+});
+
 test('daysSinceLastSession returns the gap since the most recent last_performed across all entries', () => {
   const library = [
     { name: 'Bar Press', target_area: 'Chest', last_performed: '2026-07-29' },

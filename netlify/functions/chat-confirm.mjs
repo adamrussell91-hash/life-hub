@@ -15,6 +15,7 @@ import {
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { buildCanonicalPath, validateLogEntry } from './_shared/chat-schema.mjs';
+import { resolveWorkoutConfirmTarget } from './_shared/workout-confirm-path.mjs';
 import { buildTemplateRecord, renderTemplateMarkdown, templatePathForTitle } from './_shared/workout-templates.mjs';
 import {
   applyCompletedWorkoutToLibrary,
@@ -132,13 +133,21 @@ export function createChatConfirmHandler({
     }
 
     let existingSha;
-    if (parsed.overwrite) {
-      try {
+    try {
+      if (validation.record.type === 'workout') {
+        const target = await resolveWorkoutConfirmTarget(client, {
+          record: validation.record,
+          slug: parsed.slug,
+          overwrite: parsed.overwrite
+        });
+        path = target.path;
+        existingSha = target.existingSha;
+      } else if (parsed.overwrite) {
         const current = await client.resolveTree();
         existingSha = current.tree.find(entry => entry.path === path && entry.type === 'blob')?.sha;
-      } catch (error) {
-        return mapRepositoryError(error);
       }
+    } catch (error) {
+      return mapRepositoryError(error);
     }
 
     try {
