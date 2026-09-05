@@ -1254,14 +1254,12 @@ main { max-width: 76rem; margin: 0 auto; }
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--space-2);
-  min-height: 4.5rem;
 }
 .fitness-week-day {
   display: grid;
   grid-template-rows: auto 1fr;
   justify-items: center;
   gap: var(--space-1);
-  min-height: 4.5rem;
 }
 .fitness-week-day__name {
   color: var(--muted);
@@ -1313,10 +1311,11 @@ main { max-width: 76rem; margin: 0 auto; }
   display: flex;
   align-items: flex-end;
   gap: 0.2rem;
-  height: 5.5rem;
+  height: 4rem;
 }
 .fitness-volume-bar {
-  flex: 1 1 0;
+  flex: 0 0 0.65rem;
+  width: 0.65rem;
   height: var(--bar, 6%);
   min-height: 0.25rem;
   border-radius: 0.125rem 0.125rem 0 0;

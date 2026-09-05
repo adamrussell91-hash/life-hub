@@ -214,7 +214,7 @@ test('week board, volume bars, and compact heatmap render useful density', () =>
   assert.equal(root.ensure('[data-fitness="week-done"]').textContent, '1');
   assert.equal(root.ensure('#fitness-week-days').children.length, 7);
   assert.equal(root.ensure('#fitness-quota-track').children.length, 4);
-  assert.equal(root.ensure('#fitness-volume-bars').children.length, 12);
+  assert.equal(root.ensure('#fitness-volume-bars').children.length, 8);
   assert.equal(root.ensure('#fitness-focus-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-comparisons-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-comparisons').children.length, 1);
