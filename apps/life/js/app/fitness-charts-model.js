@@ -1,4 +1,4 @@
-import { addCalendarDays, getSydneyWeekStart } from '../core/time.js';
+import { addCalendarDays, enumerateDateKeys, getSydneyWeekStart } from '../core/time.js';
 import {
   REGION_KEYS,
   REGION_LABELS,
@@ -88,6 +88,33 @@ function seriesIfReady(points) {
   return ready.length >= 2 ? ready : [];
 }
 
+function seriesChange(points) {
+  if (!points?.length) return { current: null, previous: null, delta: null };
+  const current = points.at(-1).value;
+  const previous = points.length > 1 ? points[0].value : null;
+  return {
+    current,
+    previous,
+    delta: previous == null ? null : current - previous
+  };
+}
+
+function readingFromSeries(points, { key, label, unit }) {
+  const ready = seriesIfReady(points);
+  if (!ready.length) return null;
+  const last = ready.at(-1);
+  const prev = ready.at(-2);
+  return {
+    key,
+    label,
+    unit,
+    current: last.value,
+    previous: prev.value,
+    delta: last.value - prev.value,
+    date: last.date
+  };
+}
+
 function buildRepRanges(records) {
   const counts = Object.fromEntries(REP_RANGES.map(range => [range.key, 0]));
   for (const record of records) {
@@ -141,7 +168,7 @@ function buildPushPull(records) {
   }
   return pieItems([
     { key: 'push', label: 'Push', value: volume.push, colour: 'var(--wave)' },
-    { key: 'pull', label: 'Pull', value: volume.pull, colour: 'var(--navy-2)' }
+    { key: 'pull', label: 'Pull', value: volume.pull, colour: 'var(--high-sea)' }
   ]);
 }
 
@@ -171,12 +198,12 @@ function buildE1rmTrends(records) {
     }
   }
   return [...byLift.values()]
-    .map(entry => ({
-      name: entry.name,
-      series: [...entry.byDate.entries()]
+    .map(entry => {
+      const series = [...entry.byDate.entries()]
         .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([date, value]) => ({ date, value }))
-    }))
+        .map(([date, value]) => ({ date, value }));
+      return { name: entry.name, series, ...seriesChange(series) };
+    })
     .filter(entry => entry.series.length >= 2)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -249,6 +276,7 @@ export function buildFitnessCharts({
   monthDates = []
 } = {}) {
   const from = monthDates[0] ?? addCalendarDays(date, -(MONTH_DAYS - 1));
+  const windowDates = monthDates.length ? monthDates : enumerateDateKeys(from, date);
   const records = completedRecords(events, from, date);
   const trainedDates = [...new Set(records.map(record => record.date))];
   const allCompletedDates = [...new Set(
@@ -257,7 +285,7 @@ export function buildFitnessCharts({
       .filter(record => record?.status === 'completed' && record.date && record.date <= date)
       .map(record => record.date)
   )];
-  const windowDays = monthDates.length || MONTH_DAYS;
+  const windowDays = windowDates.length || MONTH_DAYS;
   const skips = skipStats(events, from, date);
   const recoveryFlagged = records.filter(record => record.recovery_flag_next_day === true).length;
   const totalSets = records.reduce((sum, record) => sum + setCount(record), 0);
@@ -280,6 +308,13 @@ export function buildFitnessCharts({
     return min / km;
   }));
   const volumePerSetWeeks = buildVolumePerSetWeeks(records, date);
+  const trainedSet = new Set(trainedDates);
+  const recoveryFlags = records
+    .filter(record => record.recovery_flag_next_day === true)
+    .map(record => ({
+      date: record.date,
+      title: String(record.title ?? '').trim() || 'Session'
+    }));
 
   return {
     longestStreak: longestCompletedStreak(allCompletedDates),
@@ -288,8 +323,13 @@ export function buildFitnessCharts({
     weekRing: { value: weekCompletedCount, target: weekTarget },
     skipRing: { value: skips.missed, target: Math.max(skips.scheduled, 1), ...skips },
     recoveryRing: { value: recoveryFlagged, target: Math.max(records.length, 1), flagged: recoveryFlagged, completed: records.length },
+    recoveryFlags,
     restRatio: trainedDates.length > 0 ? buildRestRatio(trainedDates.length, windowDays) : [],
     restCounts: { trained: trainedDates.length, rest: Math.max(0, windowDays - trainedDates.length), days: windowDays },
+    trainedMarks: windowDates.map(day => ({
+      date: day,
+      trained: trainedSet.has(day)
+    })),
     repRanges: buildRepRanges(records),
     regionVolume: buildRegionVolume(records),
     pushPull: buildPushPull(records),
@@ -299,6 +339,12 @@ export function buildFitnessCharts({
     distanceSeries,
     paceSeries,
     hrSeries,
+    sessionReadings: [
+      readingFromSeries(durationSeries, { key: 'duration', label: 'Duration', unit: 'min' }),
+      readingFromSeries(distanceSeries, { key: 'distance', label: 'Distance', unit: 'km' }),
+      readingFromSeries(paceSeries, { key: 'pace', label: 'Pace', unit: 'min/km' }),
+      readingFromSeries(hrSeries, { key: 'hr', label: 'Heart rate', unit: 'bpm' })
+    ].filter(Boolean),
     painBySite: buildPainBySite(records)
   };
 }

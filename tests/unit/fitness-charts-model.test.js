@@ -101,11 +101,18 @@ test('e1RM trend and pain flags appear only when history exists', () => {
   assert.equal(charts.e1rmTrends.length, 1);
   assert.equal(charts.e1rmTrends[0].name, 'Chest Press');
   assert.equal(charts.e1rmTrends[0].series.length, 2);
+  assert.equal(charts.e1rmTrends[0].current, charts.e1rmTrends[0].series[1].value);
+  assert.equal(charts.e1rmTrends[0].previous, charts.e1rmTrends[0].series[0].value);
+  assert.ok(charts.e1rmTrends[0].delta > 0);
   assert.equal(charts.painBySite[0].site, 'right AC');
   assert.equal(charts.recoveryRing.flagged, 1);
+  assert.equal(charts.recoveryFlags.length, 1);
+  assert.equal(charts.recoveryFlags[0].title, 'Chest and Curls');
   assert.equal(charts.skipRing.skipped, 1);
   assert.equal(charts.skipRing.pastDue, 1);
   assert.equal(charts.skipRing.missed, 2);
+  assert.equal(charts.trainedMarks.length, 30);
+  assert.equal(charts.trainedMarks.filter(day => day.trained).length, 2);
 });
 
 test('longest streak uses history outside the 30-day pie window', () => {
@@ -131,4 +138,7 @@ test('distance, pace, and HR series stay empty without those fields', () => {
   assert.equal(charts.paceSeries.length, 2);
   assert.equal(charts.hrSeries.length, 2);
   assert.equal(charts.durationSeries.length, 2);
+  assert.deepEqual(charts.sessionReadings.map(row => row.key), ['duration', 'distance', 'pace', 'hr']);
+  assert.equal(charts.sessionReadings.find(row => row.key === 'hr').current, 128);
+  assert.equal(charts.sessionReadings.find(row => row.key === 'hr').delta, 8);
 });
