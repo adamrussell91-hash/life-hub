@@ -28,7 +28,7 @@ export type CalendarFilters = {
   includeDates: boolean;
 };
 
-export type CalendarMode = 'week' | 'month';
+export type CalendarMode = 'day' | 'week' | 'month';
 
 const KIND_RANK: Record<CalendarKind, number> = {
   key_date: 0,
@@ -70,6 +70,7 @@ export function monthGrid(month: Date): Date[] {
 }
 
 export function visibleDays(anchor: Date, mode: CalendarMode): Date[] {
+  if (mode === 'day') return [startOfDay(anchor)];
   return mode === 'week' ? weekDays(anchor) : monthGrid(anchor);
 }
 
@@ -89,7 +90,23 @@ export function parseCalendarAnchor(raw: string | null | undefined, fallback = n
 }
 
 export function calendarHash(view: CalendarMode, anchor: Date): string {
-  return `#/${view}?date=${toDateKey(anchor)}`;
+  const date = toDateKey(anchor);
+  if (view === 'day') return `#/week?date=${date}&layout=day`;
+  return `#/${view}?date=${date}`;
+}
+
+export function parseCalendarMode(hash = typeof location === 'undefined' ? '' : location.hash): CalendarMode {
+  const path = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
+  const query = new URLSearchParams(hash.split('?')[1] ?? '');
+  if (path === 'month') return 'month';
+  if (query.get('layout') === 'day') return 'day';
+  return 'week';
+}
+
+export function addCalendarRange(date: Date, mode: CalendarMode, delta: number): Date {
+  if (mode === 'day') return addDays(startOfDay(date), delta);
+  if (mode === 'week') return addWeeks(date, delta);
+  return addMonths(date, delta);
 }
 
 export function monthTitle(month: Date): string {

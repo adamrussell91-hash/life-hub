@@ -418,18 +418,25 @@ export async function renderTaskEditor(
     renderSteps(host, task, allTasks, onSaved);
   }
 
-  card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (!host.closest('.hub-calendar__rail')) {
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
 }
 
 export function renderQuickAdd(
   onCreated: (task: Task) => void,
   projectId: string | null = null,
-  options: { dueDate?: string | null } = {}
+  options: {
+    dueDate?: string | null;
+    dueTime?: string | null;
+    standing?: boolean;
+    durationMinutes?: number | null;
+  } = {}
 ): HTMLElement {
   const form = el('form', 'quick-add hub-toolbar');
   const title = createHubSearch({
     type: 'text',
-    placeholder: 'New task title',
+    placeholder: options.standing ? 'Add to this day…' : 'New task title',
     ariaLabel: 'New task title',
     required: true
   });
@@ -439,6 +446,12 @@ export function renderQuickAdd(
     value: options.dueDate ?? ''
   });
   if (options.dueDate) due.input.dataset.calendarDue = options.dueDate;
+  const time = createHubField({
+    type: 'time',
+    ariaLabel: 'Start time',
+    value: options.dueTime ?? ''
+  });
+  if (options.dueTime) time.input.dataset.calendarTime = options.dueTime;
   const domain = createHubFilter({
     key: 'Domain',
     label: 'Domain',
@@ -448,12 +461,14 @@ export function renderQuickAdd(
   });
   const submit = el('button', 'btn btn--primary', 'Add');
   submit.type = 'submit';
-  if (options.dueDate) form.append(title.el, due.el, domain.el, submit);
+  if (options.dueDate) form.append(title.el, due.el, time.el, domain.el, submit);
   else form.append(title.el, domain.el, submit);
-  const plus = createPlusAdd({
-    ariaLabel: options.dueDate ? 'Add a task for this day' : 'Add a task',
-    panel: form
-  });
+  const plus = options.standing
+    ? null
+    : createPlusAdd({
+        ariaLabel: options.dueDate ? 'Add a task for this day' : 'Add a task',
+        panel: form
+      });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     submit.disabled = true;
@@ -463,6 +478,8 @@ export function renderQuickAdd(
         domain: string;
         parent_project_id: string | null;
         due_date?: string;
+        due_time?: string;
+        estimated_duration?: number;
         kind: 'task';
         bucket: 'active';
       } = {
@@ -475,10 +492,15 @@ export function renderQuickAdd(
       if (options.dueDate) {
         const nextDue = due.input.value.trim();
         if (nextDue) body.due_date = nextDue;
+        const nextTime = time.input.value.trim();
+        if (nextTime) {
+          body.due_time = nextTime;
+          body.estimated_duration = options.durationMinutes ?? 60;
+        }
       }
       const created = await tasksApi.createTask(body);
       title.input.value = '';
-      plus.close();
+      plus?.close();
       onCreated(created);
     } catch (err) {
       form.append(el('p', 'empty-state', errorMessage(err)));
@@ -486,5 +508,8 @@ export function renderQuickAdd(
       submit.disabled = false;
     }
   });
-  return plus.root;
+  if (plus) return plus.root;
+  const wrap = el('div', 'calendar-compose');
+  wrap.append(form);
+  return wrap;
 }
