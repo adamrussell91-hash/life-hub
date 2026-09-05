@@ -108,6 +108,17 @@ test('e1RM trend and pain flags appear only when history exists', () => {
   assert.equal(charts.skipRing.missed, 2);
 });
 
+test('longest streak uses history outside the 30-day pie window', () => {
+  const model = buildFitnessModel({
+    events: events([workout({ date: '2026-07-30' })]),
+    date: '2026-09-05'
+  });
+  assert.equal(model.streak, 1);
+  assert.equal(model.charts.longestStreak, 1);
+  assert.equal(model.charts.repRanges.length, 0);
+  assert.equal(model.charts.restRatio.length, 0);
+});
+
 test('distance, pace, and HR series stay empty without those fields', () => {
   const charts = buildFitnessCharts({
     events: events([
