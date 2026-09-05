@@ -57,13 +57,10 @@ export async function mountHubImageAnnotator(image, opts = {}) {
 
   const mod = await import('@annotorious/annotorious');
   try {
+    // Package export map: "./annotorious.css" → dist/annotorious.css
     await import('@annotorious/annotorious/annotorious.css');
   } catch {
-    try {
-      await import('@annotorious/annotorious/dist/annotorious.css');
-    } catch {
-      /* CSS optional in tests */
-    }
+    /* CSS optional in node tests */
   }
   const createImageAnnotator = mod.createImageAnnotator || mod.default?.createImageAnnotator;
   if (!createImageAnnotator) {
