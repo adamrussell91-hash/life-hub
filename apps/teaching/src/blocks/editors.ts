@@ -10,6 +10,7 @@ import {
   createTabsEditor
 } from '@/blocks/layout-editors';
 import { renderCollectionBlock } from '@/blocks/render';
+import { mountRichTextTiptap } from '@/blocks/rich-text-tiptap';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -158,104 +159,13 @@ export function editorShell<T extends Block>(
   return shell;
 }
 
-function selectionRangeWithin(surface: HTMLElement): Range | null {
-  const selection = window.getSelection?.();
-  if (!selection || selection.rangeCount === 0) return null;
-  const range = selection.getRangeAt(0);
-  return surface.contains(range.commonAncestorContainer) ? range : null;
-}
-
-function wrapRangeIn(range: Range, tag: 'strong' | 'em'): void {
-  const wrapper = document.createElement(tag);
-  wrapper.append(range.extractContents());
-  range.insertNode(wrapper);
-}
-
-/**
- * One list item per paragraph the selection covers, falling back to text lines
- * when the selection sits inside a single paragraph.
- */
-function linesForList(surface: HTMLElement, range: Range | null): string[] {
-  const selected = range && !range.collapsed;
-  const scope: ParentNode = selected ? range.cloneContents() : surface;
-  const paragraphs = [...scope.querySelectorAll('p, li, blockquote')]
-    .map((el) => el.textContent?.trim() ?? '')
-    .filter(Boolean);
-  if (paragraphs.length > 0) return paragraphs;
-
-  const text = selected ? range.toString() : (surface.textContent ?? '');
-  const lines = text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-  return lines.length > 0 ? lines : [''];
-}
-
-function createRichTextToolbar(args: {
-  surface: HTMLElement;
-  emit: () => void;
-  onToggleSource: () => void;
-}): HTMLElement {
-  const { surface, emit } = args;
-
-  const toolbar = document.createElement('div');
-  toolbar.className = 'block-editor__toolbar';
-  toolbar.setAttribute('role', 'toolbar');
-  toolbar.setAttribute('aria-label', 'Formatting');
-
-  function applyInline(tag: 'strong' | 'em'): void {
-    const range = selectionRangeWithin(surface);
-    if (!range || range.collapsed) return;
-    wrapRangeIn(range, tag);
-    emit();
-  }
-
-  function applyList(tag: 'ul' | 'ol'): void {
-    const range = selectionRangeWithin(surface);
-    const items = linesForList(surface, range);
-    const list = document.createElement(tag);
-    for (const line of items) {
-      const li = document.createElement('li');
-      li.textContent = line;
-      list.append(li);
-    }
-
-    if (range && !range.collapsed) {
-      range.deleteContents();
-      range.insertNode(list);
-    } else {
-      surface.replaceChildren(list);
-    }
-    emit();
-  }
-
-  const actions: Array<{ label: string; run: () => void }> = [
-    { label: 'Bold', run: () => applyInline('strong') },
-    { label: 'Italic', run: () => applyInline('em') },
-    { label: 'Bullet list', run: () => applyList('ul') },
-    { label: 'Numbered list', run: () => applyList('ol') },
-    { label: 'HTML', run: () => args.onToggleSource() }
-  ];
-
-  for (const action of actions) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'btn btn--ghost block-editor__toolbar-btn';
-    button.textContent = action.label;
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      action.run();
-    });
-    toolbar.append(button);
-  }
-
-  return toolbar;
-}
-
 /**
  * Teachers write prose here, so the surface shows formatted text and keeps the
  * markup out of sight. It renders sanitised html, which makes the editor an
  * honest preview of what publishing keeps.
+ *
+ * Editing engine: Tiptap (ProseMirror). Persist format remains HTML through
+ * `sanitizeRichTextHtml` — specialised lesson blocks stay outside this schema.
  */
 export function createRichTextEditor(
   block: Extract<Block, { block_type: 'rich_text' }>,
@@ -264,14 +174,6 @@ export function createRichTextEditor(
 ): HTMLElement {
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields';
-
-  const surface = document.createElement('div');
-  surface.className = 'block-editor__rich';
-  surface.contentEditable = 'true';
-  surface.setAttribute('role', 'textbox');
-  surface.setAttribute('aria-multiline', 'true');
-  surface.setAttribute('aria-label', 'Rich text');
-  surface.innerHTML = sanitizeRichTextHtml(block.content.html);
 
   const source = document.createElement('textarea');
   source.className = 'block-editor__html';
@@ -287,32 +189,66 @@ export function createRichTextEditor(
     });
   }
 
-  function emitFromSurface(): void {
-    const html = sanitizeRichTextHtml(surface.innerHTML);
-    source.value = html;
-    publish(html);
-  }
-
-  const toolbar = createRichTextToolbar({
-    surface,
-    emit: emitFromSurface,
-    onToggleSource: () => {
-      const showSource = source.hidden;
-      source.hidden = !showSource;
-      surface.hidden = showSource;
-      if (showSource) {
-        source.value = sanitizeRichTextHtml(surface.innerHTML);
-      } else {
-        surface.innerHTML = sanitizeRichTextHtml(source.value);
-      }
+  const tiptap = mountRichTextTiptap({
+    html: block.content.html,
+    onHtml: (html) => {
+      source.value = html;
+      publish(html);
     }
   });
 
-  surface.addEventListener('input', emitFromSurface);
-  source.addEventListener('input', () => publish(source.value));
+  const toolbar = document.createElement('div');
+  toolbar.className = 'block-editor__toolbar';
+  toolbar.setAttribute('role', 'toolbar');
+  toolbar.setAttribute('aria-label', 'Formatting');
 
-  fields.append(toolbar, surface, source);
-  return editorShell(block, onChange, fields, getLatest);
+  const actions: Array<{ label: string; run: () => void }> = [
+    { label: 'Bold', run: () => tiptap.toggleBold() },
+    { label: 'Italic', run: () => tiptap.toggleItalic() },
+    { label: 'Bullet list', run: () => tiptap.toggleBulletList() },
+    { label: 'Numbered list', run: () => tiptap.toggleOrderedList() },
+    {
+      label: 'HTML',
+      run: () => {
+        const showSource = source.hidden;
+        source.hidden = !showSource;
+        tiptap.host.hidden = showSource;
+        if (showSource) {
+          source.value = tiptap.getHtml();
+        } else {
+          tiptap.setHtml(source.value, true);
+        }
+      }
+    }
+  ];
+
+  for (const action of actions) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn--ghost block-editor__toolbar-btn';
+    button.textContent = action.label;
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      action.run();
+    });
+    toolbar.append(button);
+  }
+
+  source.addEventListener('input', () => {
+    const html = sanitizeRichTextHtml(source.value);
+    publish(html);
+  });
+
+  fields.append(toolbar, tiptap.host, source);
+  const shell = editorShell(block, onChange, fields, getLatest);
+  shell.addEventListener(
+    'remove',
+    () => {
+      tiptap.destroy();
+    },
+    { once: true }
+  );
+  return shell;
 }
 
 export function createHeadingEditor(

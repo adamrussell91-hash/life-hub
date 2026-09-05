@@ -18,6 +18,9 @@
   },
   "dependencies": {
     "@netlify/blobs": "9.1.2",
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
     "happy-dom": "^17.4.4",
     "katex": "^0.16.22",
     "zod": "3.25.76"
