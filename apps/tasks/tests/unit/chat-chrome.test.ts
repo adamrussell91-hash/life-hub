@@ -31,7 +31,7 @@ describe('chat chrome collapse', () => {
     expect(view.dataset.chromeExpanded).toBe('true');
     const tools = view.querySelector<HTMLButtonElement>('#chat-tools')!;
     expect(tools.getAttribute('aria-expanded')).toBe('true');
-    expect(tools.textContent).toBe('Hide tools');
+    expect(tools.textContent).toBe('Tools');
     toggleChatChrome(view);
     expect(view.dataset.chromeExpanded).toBeUndefined();
   });

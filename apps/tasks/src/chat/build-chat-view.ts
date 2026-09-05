@@ -109,7 +109,7 @@ export function buildChatView(): HTMLElement {
   heading.append(skip, neu, toolsBtn, close);
   view.append(heading);
 
-  const picker = el('div', 'agent-picker');
+  const picker = el('div', 'agent-picker hub-ai-agent hub-ai-agent--portraits');
   picker.id = 'agent-picker';
   picker.setAttribute('aria-label', 'Choose who to talk to');
   const hide = el('div', 'hub-scroll-hide');
@@ -140,7 +140,7 @@ export function buildChatView(): HTMLElement {
   messages.setAttribute('aria-live', 'polite');
   view.append(messages);
 
-  const form = el('form', 'chat-form');
+  const form = el('form', 'chat-form hub-ai-bar hub-ai-bar--thread');
   form.id = 'chat-form';
   const label = el('label', 'sr-only', 'Message');
   label.htmlFor = 'chat-input';

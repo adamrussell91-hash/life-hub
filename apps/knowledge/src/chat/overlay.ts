@@ -376,11 +376,12 @@ function saveCardHtml() {
 }
 
 function pickerHtml() {
-  return `<div class="agent-picker" role="listbox" aria-label="Choose who to talk to">
+  return `<div class="agent-picker hub-ai-agent hub-ai-agent--portraits" role="listbox" aria-label="Choose who to talk to">
     ${CHAT_PERSONALITIES.map(item => {
       const active = item.id === personality;
-      return `<button type="button" class="agent-picker__avatar${active ? " is-active" : ""}" data-personality="${item.id}" role="option" aria-selected="${active}" title="${escapeHtml(item.name)}" style="--agent-colour:${item.colour}">
+      return `<button type="button" class="agent-picker__avatar hub-ai-agent__btn${active ? " is-active" : ""}" data-personality="${item.id}" role="option" aria-selected="${active}" title="${escapeHtml(item.name)}" style="--agent-colour:${item.colour}">
         <img src="${item.avatarSrc}" alt="${escapeHtml(item.name)}" width="52" height="52" />
+        <span class="agent-picker__name">${escapeHtml(item.shortName)}</span>
       </button>`;
     }).join("")}
   </div>`;
@@ -468,10 +469,14 @@ function overlayHtml() {
       ${error ? `<p class="alchemist__error">${escapeHtml(error)}</p>` : ""}
       ${saveCardHtml()}
       ${bookFieldHtml()}
-      <form class="chat-form">
+      <form class="chat-form hub-ai-bar hub-ai-bar--thread">
         <label class="chat-form__label" for="overlay-chat-input">${inputLabel}</label>
-        <textarea id="overlay-chat-input" rows="3" placeholder="${placeholder}" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
-        <button class="btn btn--primary" type="submit" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${busy || writeSessionId || researchSessionId ? "…" : fromBook ? "Make note" : makeNote ? "Research" : "Send"}</button>
+        <div class="hub-ai-bar__field">
+          <textarea id="overlay-chat-input" class="hub-ai-bar__input" rows="2" placeholder="${placeholder}" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
+        </div>
+        <div class="hub-ai-bar__tools">
+          <button class="btn btn--primary" type="submit" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${busy || writeSessionId || researchSessionId ? "…" : fromBook ? "Make note" : makeNote ? "Research" : "Send"}</button>
+        </div>
       </form>
     </section>
   `;

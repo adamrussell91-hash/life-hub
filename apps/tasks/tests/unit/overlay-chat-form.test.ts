@@ -9,9 +9,9 @@ const visualViewport = readFileSync(
 );
 
 describe('mobile overlay chat form', () => {
-  it('stacks the composer as a single-column grid so Send sits under the textarea', () => {
+  it('keeps Send beside the textarea on mobile instead of stacking the composer', () => {
     expect(viewsCss).toMatch(
-      /\.chat-view\s+\.chat-form\s*\{[^}]*grid-template-columns:\s*1fr/
+      /\.chat-view\s+\.chat-form\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/
     );
   });
 
