@@ -8,7 +8,7 @@ import {
   openHubPdfViewer,
 } from "../design-kit/js/hub-pdf-viewer.js";
 import { createJournalNav, createPinList } from "../design-kit/js/hub-surfaces.js";
-import { morphFromRect } from "../design-kit/js/morphing-dialog.js";
+import { closeActiveMorphingDialog, morphFromRect } from "../design-kit/js/morphing-dialog.js";
 import { bindHubAccordion, hubSwitcherHtml } from "../../../packages/hub-switcher.js";
 import type { Attachment, Origin, Page, PageManifestEntry } from "./domain/page";
 import { newHubPageId } from "./domain/page";
@@ -106,11 +106,14 @@ import { applyTopicTags, toggleTopicTag } from "./tidy/applyTags";
 import { remainingTopicTags, topicTagPickerHtml } from "./tidy/tagPicker";
 import { filterPickerOptions, optionPickerListHtml } from "./ui/optionPicker";
 import { syncKnowledgeMobileChrome } from "./mobile-chrome";
+import { notebookCards, notesForNotebook } from "./notebooks/catalog";
+import { bindNotebooksGrid, notebooksGridHtml } from "./notebooks/view";
 
 type View =
   | "list"
   | "graph"
   | "timeline"
+  | "notebooks"
   | "page"
   | "compose"
   | "chat"
@@ -155,6 +158,7 @@ function listRowHeight() {
 let entries: PageManifestEntry[] = [];
 let visible: PageManifestEntry[] = [];
 let view: View = "list";
+let pageReturnView: View = "list";
 let query = "";
 let keywordFilter = "";
 let originFilter = emptyOriginFilter();
@@ -255,6 +259,7 @@ const icons = {
   podcast: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M8 10a4 4 0 0 0 8 0"/><path d="M6 10a6 6 0 0 0 12 0"/><path d="M12 13v6M9 19h6"/></svg>`,
   quiz: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v16H8z"/><path d="M11 8h2M11 12h2M11 16h1"/></svg>`,
   timeline: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/></svg>`,
+  notebooks: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h11a2 2 0 0 1 2 2v14H8a2 2 0 0 0-2 2V4z"/><path d="M8 20a2 2 0 0 1 2-2h9"/><path d="M10 8h6M10 12h6"/></svg>`,
 };
 
 function kindBadge(attachment: Attachment) {
@@ -521,6 +526,7 @@ function goToHome() {
 }
 
 function shell(main: string) {
+  closeActiveMorphingDialog();
   if (graphTeardown) {
     graphTeardown();
     graphTeardown = null;
@@ -530,6 +536,7 @@ function shell(main: string) {
       <div class="hub-rail__brand-block"><a href="#" class="hub-rail__brand" data-home>Knowledge Hub</a></div>
       <nav class="rail__nav hub-rail__nav">
         <button class="rail__btn hub-rail__link ${view === "list" && archiveIsUnfiltered() ? "is-current" : ""}" data-nav="all" type="button">${icons.archive}<span>Archive</span></button>
+        <button class="rail__btn hub-rail__link ${view === "notebooks" ? "is-current" : ""}" data-nav="notebooks" type="button">${icons.notebooks}<span>Notebooks</span></button>
         <button class="rail__btn hub-rail__link ${view === "graph" ? "is-current" : ""}" data-nav="graph" type="button">${icons.graph}<span>Graph</span></button>
         <button class="rail__btn hub-rail__link ${view === "timeline" ? "is-current" : ""}" data-nav="timeline" type="button">${icons.timeline}<span>Timeline</span></button>
         <button class="rail__btn hub-rail__link ${view === "chat" ? "is-current" : ""}" data-nav="chat" type="button">${icons.chat}<span>Chat</span></button>
@@ -548,6 +555,7 @@ function shell(main: string) {
     button.onclick = () => {
       const next = button.dataset.nav!;
       const special: Record<string, View> = {
+        notebooks: "notebooks",
         graph: "graph",
         timeline: "timeline",
         chat: "chat",
@@ -599,6 +607,13 @@ function shell(main: string) {
       clearPageHash();
       listScrollTop = 0;
       void refreshVisible().then(render);
+    },
+    goNotebooks: () => {
+      leaveSpecialRails();
+      view = "notebooks";
+      activePage = null;
+      clearPageHash();
+      render();
     },
     goGraph: () => {
       leaveSpecialRails();
@@ -930,6 +945,26 @@ function writeGraphChrome() {
   });
 }
 
+function renderNotebooks() {
+  const cards = notebookCards(entries);
+  shell(`
+    ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · notebooks stay on this canvas</p>` : ""}
+    ${pageHeader("Knowledge", "Notebooks")}
+    ${notebooksGridHtml(cards)}
+  `);
+  bindNotebooksGrid(
+    app,
+    cards,
+    label =>
+      notesForNotebook(entries, label).map(entry => ({
+        id: entry.id,
+        title: entry.title,
+        excerpt: entry.excerpt,
+      })),
+    id => void openPage(id),
+  );
+}
+
 function renderTimeline() {
   shell(`
     ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · university timeline stays on this canvas</p>` : ""}
@@ -1135,6 +1170,7 @@ function archiveNotes() {
 }
 
 async function openPage(id: string, title?: string) {
+  if (view !== "page") pageReturnView = view === "notebooks" ? "notebooks" : "list";
   const resolved = resolveArchivePageId(id, title, archiveNotes());
   try {
     activePage = await getPage(resolved);
@@ -1202,7 +1238,7 @@ function renderPage(page: Page) {
     ${pageHeader(
       topics[0] ? escapeHtml(topics[0]) : "Note",
       escapeHtml(page.title),
-      `        <button class="btn btn--ghost reader__back" data-back type="button">← Archive</button>
+      `        <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : "Archive"}</button>
         <button class="btn btn--ghost" data-pin-note type="button">${isPinned(page.id) ? "Unpin" : "Pin"}</button>
         <button class="btn btn--ghost" data-edit type="button">Edit</button>
         <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyConfirmPending ? "disabled" : ""}>${tidyBusy ? "Cleaning up…" : "Clean up"}</button>
@@ -1242,7 +1278,7 @@ function renderPage(page: Page) {
   });
   app.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => {
     activePage = null;
-    view = "list";
+    view = pageReturnView === "notebooks" ? "notebooks" : "list";
     render();
   };
   app.querySelector<HTMLButtonElement>("[data-edit]")!.onclick = () => openCompose();
@@ -1742,6 +1778,7 @@ function render() {
   if (view === "compose" && compose) renderCompose(compose);
   else if (view === "page" && activePage) renderPage(activePage);
   else if (view === "graph") renderGraph();
+  else if (view === "notebooks") renderNotebooks();
   else if (view === "timeline") renderTimeline();
   else if (view === "chat") {
     renderChatRail({
@@ -1831,6 +1868,7 @@ function renderLoadError() {
     goArchive: () => void boot({ signedIn: true }),
     goGraph: () => void boot({ signedIn: true }),
     goChat: () => void boot({ signedIn: true }),
+    goNotebooks: () => void boot({ signedIn: true }),
     goTimeline: () => void boot({ signedIn: true }),
     goPodcast: () => void boot({ signedIn: true }),
     goQuiz: () => void boot({ signedIn: true })
