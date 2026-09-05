@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/teacher/confirm-dialog', () => ({
+  askConfirmCard: vi.fn()
+}));
+
 vi.mock('@/api/client', async () => {
   const actual = await vi.importActual<typeof import('@/api/client')>('@/api/client');
   return {
@@ -11,6 +15,7 @@ vi.mock('@/api/client', async () => {
 
 import { apiPatch } from '@/api/client';
 import { peekCurriculum, resetCurriculumStateForTests } from '@/app/curriculum-state';
+import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Class } from '@/schemas';
@@ -52,11 +57,12 @@ describe('optimistic trash and archive', () => {
   afterEach(() => {
     resetCurriculumStateForTests();
     vi.mocked(apiPatch).mockClear();
+    vi.mocked(askConfirmCard).mockReset();
   });
 
-  it('trashes locally before the PATCH settles', () => {
+  it('trashes locally before the PATCH settles', async () => {
     resetCurriculumStateForTests(snapshot());
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(askConfirmCard).mockResolvedValue(true);
     let patchGate: (value: unknown) => void = () => undefined;
     vi.mocked(apiPatch).mockImplementation(
       () =>
@@ -66,7 +72,7 @@ describe('optimistic trash and archive', () => {
     );
 
     const applied = vi.fn();
-    const ok = confirmAndTrash('class', 'class_1', '11 Psych A', applied);
+    const ok = await confirmAndTrash('class', 'class_1', '11 Psych A', applied);
 
     expect(ok).toBe(true);
     expect(applied).toHaveBeenCalledTimes(1);
@@ -75,21 +81,21 @@ describe('optimistic trash and archive', () => {
     patchGate({});
   });
 
-  it('does not wait on a dependencies GET before confirming trash', () => {
+  it('does not wait on a dependencies GET before confirming trash', async () => {
     resetCurriculumStateForTests(snapshot());
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    const ok = confirmAndTrash('class', 'class_1', '11 Psych A');
+    vi.mocked(askConfirmCard).mockResolvedValue(false);
+    const ok = await confirmAndTrash('class', 'class_1', '11 Psych A');
     expect(ok).toBe(false);
-    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(askConfirmCard).toHaveBeenCalledTimes(1);
     expect(apiPatch).not.toHaveBeenCalled();
   });
 
-  it('archives locally before the PATCH settles', () => {
+  it('archives locally before the PATCH settles', async () => {
     resetCurriculumStateForTests(snapshot());
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(askConfirmCard).mockResolvedValue(true);
     vi.mocked(apiPatch).mockReturnValue(new Promise(() => undefined));
 
-    confirmAndArchive('class', 'class_1', '11 Psych A');
+    await confirmAndArchive('class', 'class_1', '11 Psych A');
     expect(peekCurriculum()?.classes[0]?.status).toBe('archived');
   });
 });

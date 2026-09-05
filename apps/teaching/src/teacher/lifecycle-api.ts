@@ -120,16 +120,23 @@ function persistStatusInBackground(
 }
 
 /**
- * Confirm, paint the change immediately, then persist in the background.
+ * Confirm via kit confirm-card, paint immediately, then persist in the background.
  * Returns true if the teacher confirmed.
  */
-export function confirmAndTrash(
+export async function confirmAndTrash(
   type: LifecycleEntityType,
   id: string,
   title: string,
   onApplied?: () => void
-): boolean {
-  const ok = window.confirm(`Move “${title}” to trash?`);
+): Promise<boolean> {
+  const { askConfirmCard } = await import('@/teacher/confirm-dialog');
+  const ok = await askConfirmCard({
+    eyebrow: 'Trash',
+    title: `Move “${title}” to trash?`,
+    supporting: 'You can restore it later from Trash.',
+    confirmLabel: 'Move to trash',
+    discardLabel: 'Cancel'
+  });
   if (!ok) return false;
 
   const previous = isCurriculumEntityType(type) ? readEntityStatus(type, id) : undefined;
@@ -149,16 +156,23 @@ export function confirmAndTrash(
 }
 
 /**
- * Confirm, paint the change immediately, then persist in the background.
+ * Confirm via kit confirm-card, paint immediately, then persist in the background.
  * Returns true if the teacher confirmed.
  */
-export function confirmAndArchive(
+export async function confirmAndArchive(
   type: LifecycleEntityType,
   id: string,
   title: string,
   onApplied?: () => void
-): boolean {
-  const ok = window.confirm(`Archive “${title}”?`);
+): Promise<boolean> {
+  const { askConfirmCard } = await import('@/teacher/confirm-dialog');
+  const ok = await askConfirmCard({
+    eyebrow: 'Archive',
+    title: `Archive “${title}”?`,
+    supporting: 'Archived items leave the active lists but stay recoverable.',
+    confirmLabel: 'Archive',
+    discardLabel: 'Cancel'
+  });
   if (!ok) return false;
 
   const previous = isCurriculumEntityType(type) ? readEntityStatus(type, id) : undefined;

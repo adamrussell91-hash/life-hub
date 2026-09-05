@@ -9416,3 +9416,27 @@ body.is-lesson-builder-full-page .hub-utilities {
   color: var(--muted);
   font-size: var(--text-sm);
 }
+
+/* Kit confirm-card modal overlay (destructive / agent writes). */
+.confirm-card-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: color-mix(in srgb, var(--depth) 42%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.confirm-card-overlay .confirm-card {
+  width: min(100%, 26rem);
+  margin: 0;
+  padding: var(--space-6);
+  display: grid;
+  gap: var(--space-4);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-4);
+}
