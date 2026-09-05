@@ -617,38 +617,21 @@
           <div data-fitness="run-widget" class="hub-run"></div>
           <article class="metric-card fitness-board" aria-labelledby="fitness-week-heading">
             <div class="fitness-board__top">
-              <div>
-                <p class="metric-label" id="fitness-week-heading">This week</p>
-                <p class="metric-caption" data-fitness="week-story"></p>
-              </div>
+              <p class="metric-label" id="fitness-week-heading">This week</p>
               <p class="metric-caption fitness-board__today" data-fitness="day-type">—</p>
             </div>
-            <dl class="fitness-stat-strip">
-              <div>
-                <dt>Sessions</dt>
-                <dd><strong data-fitness="week-done">—</strong> / <span data-fitness="week-target">4</span></dd>
+            <div class="week-strip" data-fitness="week-strip" aria-label="This week sessions"></div>
+            <div class="fitness-board__visuals">
+              <div class="fitness-board__ring">
+                <svg class="metric-ring" data-fitness-ring="sessions" viewBox="0 0 72 72" role="img" aria-label="Sessions this week">
+                  <circle data-role="track" class="metric-ring-track" fill="none"></circle>
+                  <circle data-role="fill" class="metric-ring-fill" fill="none"></circle>
+                </svg>
+                <p class="metric-caption"><strong data-fitness="week-done">—</strong> / <span data-fitness="week-target">4</span> sessions</p>
               </div>
-              <div>
-                <dt>This week</dt>
-                <dd><strong data-fitness="week-volume">—</strong></dd>
-              </div>
-              <div>
-                <dt>Last week</dt>
-                <dd><strong data-fitness="last-week-volume">—</strong></dd>
-              </div>
-              <div>
-                <dt>Streak</dt>
-                <dd><strong data-fitness="streak">—</strong> · longest <span data-fitness="longest-streak">—</span></dd>
-              </div>
-            </dl>
-            <div id="fitness-volume-card">
-              <p class="metric-caption" data-fitness="volume-delta-wrap" hidden>
-                This week vs last week: <strong data-fitness="volume-delta">—</strong>
-              </p>
-              <div id="fitness-volume-rows" class="fitness-kv"></div>
+              <div id="fitness-week-columns" class="fitness-share-list" aria-label="This week versus last week volume"></div>
             </div>
-            <p class="metric-caption" data-fitness="month-story"></p>
-            <p class="metric-caption" data-fitness="pace-story"></p>
+            <p class="metric-caption">Streak <strong data-fitness="streak">—</strong> · longest <span data-fitness="longest-streak">—</span></p>
             <p class="metric-caption" data-fitness="next-planned" hidden></p>
             <div id="fitness-focus-card" hidden>
               <div id="fitness-focus-strip" class="fitness-focus-strip"></div>
@@ -659,22 +642,35 @@
             <article id="fitness-clock-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">When you train</p>
               <p class="metric-caption">Time of day, coloured by region. Newer sessions sit further out.</p>
-              <svg id="fitness-clock-chart" class="fitness-viz__svg" viewBox="0 0 220 220" role="img" aria-label="Training time of day"></svg>
+              <div class="fitness-polar fitness-polar--clock">
+                <svg id="fitness-clock-chart" class="mind-mood-chart fitness-polar__svg" viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Training time of day"></svg>
+              </div>
             </article>
             <article id="fitness-orbit-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Monthly rhythm</p>
               <p class="metric-caption">Radius is session volume. Colour is day type.</p>
-              <svg id="fitness-orbit-chart" class="fitness-viz__svg fitness-viz__svg--orbit" viewBox="0 0 680 680" role="img" aria-label="Monthly training rhythm"></svg>
+              <div class="mind-energy-orbit fitness-polar fitness-polar--orbit">
+                <svg id="fitness-orbit-chart" class="mind-energy-orbit__chart fitness-polar__svg" viewBox="0 0 680 680" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Monthly training rhythm"></svg>
+                <div class="mind-energy-orbit__center" data-fitness="orbit-center">
+                  <p class="mind-energy-orbit__kicker">Rhythm</p>
+                  <p class="mind-energy-orbit__status" data-fitness="orbit-status">—</p>
+                  <p class="metric-caption" data-fitness="orbit-period"></p>
+                </div>
+              </div>
             </article>
             <article id="fitness-e1rm-radial-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">e1RM vs your best</p>
               <p class="metric-caption">Each lift is a percent of its own all-time best in this window.</p>
-              <svg id="fitness-e1rm-radial-chart" class="fitness-viz__svg" role="img" aria-label="Estimated 1RM versus personal best"></svg>
+              <div class="fitness-polar fitness-polar--clock">
+                <svg id="fitness-e1rm-radial-chart" class="mind-mood-chart fitness-polar__svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Estimated 1RM versus personal best"></svg>
+              </div>
             </article>
             <article id="fitness-chord-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Trained together</p>
               <p class="metric-caption">Regions that share a session.</p>
-              <svg id="fitness-chord-chart" class="fitness-viz__svg" viewBox="0 0 360 360" role="img" aria-label="Muscle groups trained together"></svg>
+              <div class="fitness-polar fitness-polar--clock">
+                <svg id="fitness-chord-chart" class="fitness-polar__svg" viewBox="0 0 360 360" role="img" aria-label="Muscle groups trained together"></svg>
+              </div>
             </article>
             <article id="fitness-bump-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Who is improving</p>
@@ -700,7 +696,9 @@
             <article id="fitness-region-vol-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Region volume</p>
               <p class="metric-caption">Outer ring this month, inner ring last month.</p>
-              <svg id="fitness-region-donut" class="fitness-viz__svg" viewBox="0 0 120 120" role="img" aria-label="Region volume this month versus last"></svg>
+              <div class="fitness-polar fitness-polar--donut">
+                <svg id="fitness-region-donut" class="fitness-polar__svg" viewBox="0 0 160 160" role="img" aria-label="Region volume this month versus last"></svg>
+              </div>
             </article>
             <article id="fitness-push-pull-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Push vs pull</p>
@@ -728,12 +726,16 @@
             <article id="fitness-year-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Year wheel</p>
               <p class="metric-caption">Each trained day, coloured by region. Size is volume.</p>
-              <svg id="fitness-year-chart" class="fitness-viz__svg" viewBox="0 0 240 240" role="img" aria-label="Year of trained days"></svg>
+              <div class="fitness-polar fitness-polar--clock">
+                <svg id="fitness-year-chart" class="mind-mood-chart fitness-polar__svg" viewBox="0 0 240 240" role="img" aria-label="Year of trained days"></svg>
+              </div>
             </article>
             <article id="fitness-rep-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Rep mix</p>
               <p class="metric-caption" data-fitness="rep-read"></p>
-              <svg id="fitness-rep-mix" class="fitness-viz__svg" viewBox="0 0 160 160" role="img" aria-label="Rep range mix"></svg>
+              <div class="fitness-polar fitness-polar--donut">
+                <svg id="fitness-rep-mix" class="fitness-polar__svg" viewBox="0 0 160 160" role="img" aria-label="Rep range mix"></svg>
+              </div>
             </article>
             <article id="fitness-sankey-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Planned to actual</p>

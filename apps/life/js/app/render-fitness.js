@@ -1,6 +1,9 @@
 import { fillExercisePlanList } from './render-workout-plan.js';
 import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
 import { formatDisplayDate, formatWeekday } from '../core/time.js';
+import { applyRingTarget } from './chart-kit/apply-ring.js';
+import { animateColumnGrow } from './chart-kit/animate.js';
+import { buildColumns } from './chart-kit/columns.js';
 import { renderFitnessCharts } from './render-fitness-charts.js';
 import { createRunWidget } from '../../../../packages/design-kit/js/hub-surfaces.js';
 
@@ -43,7 +46,6 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
 
   renderStatus(root, model);
   renderWorkingWeights(root, model.workingWeights);
-  renderVolumeWeeks(root, model);
   renderFitnessCharts(root, model.charts);
   renderRegions(root, model.regions);
   renderRecentSessions(root, model.recentSessions);
@@ -157,40 +159,51 @@ function renderStatus(root, model) {
   const target = Number.isFinite(model.weekTarget) && model.weekTarget > 0 ? model.weekTarget : 4;
   setText(root, '[data-fitness="week-done"]', String(done));
   setText(root, '[data-fitness="week-target"]', String(target));
-  setText(root, '[data-fitness="week-volume"]', formatKg(model.weekVolumeKg));
-  setText(root, '[data-fitness="last-week-volume"]', formatKg(model.lastWeekVolumeKg));
+  applyRingTarget(root.querySelector('[data-fitness-ring="sessions"]'), { value: done, target }, { size: 72, strokeWidth: 7 });
 
-  const trained = (model.weekDots ?? []).filter(day => day.completed);
-  const weekStory = root.querySelector('[data-fitness="week-story"]');
-  if (weekStory) {
-    if (!trained.length) {
-      weekStory.textContent = `No sessions yet this week · target ${target}`;
-    } else {
-      const days = trained.map(day => `${(formatWeekday(day.date) || '').slice(0, 3)} ${formatDisplayDate(day.date)}`);
-      const rest = Math.max(0, 7 - trained.length);
-      weekStory.textContent = `Trained ${days.join(', ')} · ${rest} rest day${rest === 1 ? '' : 's'}`;
+  const strip = root.querySelector('[data-fitness="week-strip"]');
+  if (strip) {
+    strip.replaceChildren();
+    for (const day of model.weekDots ?? []) {
+      const cell = root.createElement('span');
+      if (day.isToday) cell.classList.add('is-current');
+      if (day.completed) cell.dataset.hit = 'true';
+      const label = root.createElement('small');
+      label.textContent = (formatWeekday(day.date) || '?').slice(0, 1);
+      const dot = root.createElement('i');
+      cell.append(label, dot);
+      strip.append(cell);
     }
   }
 
-  const monthStory = root.querySelector('[data-fitness="month-story"]');
-  if (monthStory) {
-    const hits = Number.isFinite(model.monthHitCount) ? model.monthHitCount : 0;
-    const last = model.lastCompletedDate ? formatDisplayDate(model.lastCompletedDate) : null;
-    monthStory.textContent = hits
-      ? `Last 30 days: ${hits} session${hits === 1 ? '' : 's'}${last ? ` · most recent ${last}` : ''}`
-      : 'Last 30 days: no completed sessions';
-  }
-
-  const paceStory = root.querySelector('[data-fitness="pace-story"]');
-  if (paceStory) {
-    const remaining = Number.isFinite(model.weekRemaining) ? model.weekRemaining : Math.max(0, target - done);
-    const avgVol = formatKg(model.avgSessionVolumeKg);
-    const avgMin = Number.isFinite(model.avgDurationMin) ? `${model.avgDurationMin} min` : null;
-    const pace = remaining === 0
-      ? 'Week target hit'
-      : `${remaining} session${remaining === 1 ? '' : 's'} short of ${target}`;
-    const extras = [avgVol !== '—' ? `avg session ${avgVol}` : null, avgMin].filter(Boolean);
-    paceStory.textContent = extras.length ? `${pace} · ${extras.join(' · ')}` : pace;
+  const host = root.querySelector('#fitness-week-columns');
+  if (host) {
+    host.replaceChildren();
+    const chart = buildColumns([
+      { key: 'this', label: 'This week', value: Number(model.weekVolumeKg) || 0 },
+      { key: 'last', label: 'Last week', value: Number(model.lastWeekVolumeKg) || 0 }
+    ]);
+    for (const bar of chart.bars) {
+      const row = root.createElement('div');
+      row.className = 'fitness-share-row';
+      const name = root.createElement('strong');
+      name.textContent = bar.label;
+      const track = root.createElement('span');
+      track.className = 'fitness-share-row__track';
+      const fill = root.createElement('i');
+      fill.dataset.tone = bar.key === 'this' ? 'up' : 'same';
+      if (typeof fill.style?.setProperty === 'function') fill.style.setProperty('--bar', `${bar.heightPct}%`);
+      else {
+        fill.style = fill.style ?? {};
+        fill.style['--bar'] = `${bar.heightPct}%`;
+      }
+      animateColumnGrow(fill, bar.heightPct);
+      track.append(fill);
+      const value = root.createElement('span');
+      value.textContent = formatKg(bar.value);
+      row.append(name, track, value);
+      host.append(row);
+    }
   }
 
   const next = root.querySelector('[data-fitness="next-planned"]');
@@ -223,43 +236,6 @@ function renderWorkingWeights(root, weights) {
     item.append(name, load);
     host.append(item);
   }
-}
-
-function appendKvRow(root, host, label, value) {
-  const row = root.createElement('div');
-  row.className = 'fitness-kv-row';
-  const name = root.createElement('strong');
-  name.textContent = label;
-  const amount = root.createElement('span');
-  amount.textContent = value;
-  row.append(name, amount);
-  host.append(row);
-}
-
-function renderVolumeWeeks(root, model) {
-  const host = root.querySelector('#fitness-volume-rows');
-  const card = root.querySelector('#fitness-volume-card');
-  if (!host) return;
-  host.replaceChildren();
-  const delta = formatSignedPct(model.weekVolumeDeltaPct);
-  setText(root, '[data-fitness="volume-delta"]', delta);
-  setHidden(root.querySelector('[data-fitness="volume-delta-wrap"]'), delta === '—');
-  appendKvRow(root, host, 'Last 30 days', formatKg(model.monthVolumeKg));
-  appendKvRow(root, host, 'Avg session', formatKg(model.avgSessionVolumeKg));
-  appendKvRow(
-    root,
-    host,
-    'Avg duration',
-    Number.isFinite(model.avgDurationMin) ? `${model.avgDurationMin} min` : '—'
-  );
-  appendKvRow(root, host, 'Unique lifts', String(model.charts?.uniqueLifts ?? 0));
-  appendKvRow(
-    root,
-    host,
-    'kg / set',
-    formatKg(model.charts?.volumePerSetKg)
-  );
-  setHidden(card, false);
 }
 
 function renderRecentSessions(root, sessions) {

@@ -311,6 +311,7 @@ function buildClockPoints(records) {
   return dated.map((record, index) => ({
     date: record.date,
     time: record.time,
+    title: String(record.title ?? '').trim() || 'Session',
     region: primaryRegion(record),
     colour: REGION_COLOURS[primaryRegion(record)] ?? CLINICAL_CHART_SLOTS[7],
     recency: newest === 0 ? 1 : index / newest
