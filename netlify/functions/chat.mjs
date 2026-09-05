@@ -83,6 +83,7 @@ import {
   validateExerciseLibraryEntry
 } from './_shared/exercise-library.mjs';
 import {
+  attachWorkoutNotes,
   combineSessionAdherenceDays,
   daysSinceLastCompletedWorkout,
   formatRecentWorkoutsForPrompt,
@@ -1776,8 +1777,10 @@ function parseHammondFitnessRecords(entries, blobs) {
     const content = decodeBlob(blobs[index]);
     if (content === null) continue;
     try {
-      const { record } = parseEventDocument(content, entries[index].path, loadYaml);
-      if (record) records.push(record);
+      const { record, body } = parseEventDocument(content, entries[index].path, loadYaml);
+      // Notes are the markdown body (not YAML). Without this, Chadwick's recent-session
+      // prompt and get_last_workout/search tools never see session verdicts Adam wrote.
+      if (record) records.push(attachWorkoutNotes(record, body));
     } catch {
       // Skip an unreadable/invalid fitness record rather than breaking the chat turn.
     }

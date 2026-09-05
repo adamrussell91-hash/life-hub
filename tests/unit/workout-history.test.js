@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   FITNESS_SESSION_PATH,
   MAX_RECENT_WORKOUTS,
+  attachWorkoutNotes,
   collapseSetSplitExercises,
   daysSinceLastCompletedWorkout,
   formatRecentWorkoutsForPrompt,
@@ -180,4 +181,72 @@ test('searchWorkoutRecords rejects an empty query', () => {
 test('workout history tool schemas use the expected names', () => {
   assert.equal(getLastWorkoutSchema().name, 'get_last_workout');
   assert.equal(searchWorkoutRecordsSchema().name, 'search_workout_records');
+});
+
+test('attachWorkoutNotes copies markdown body onto the record (notes live in body, not YAML)', () => {
+  const record = session({ notes: undefined });
+  delete record.notes;
+  const hydrated = attachWorkoutNotes(record, 'Biceps and Boobs — AC clear, matched last loads\n');
+  assert.equal(hydrated.notes, 'Biceps and Boobs — AC clear, matched last loads');
+  assert.equal(record.notes, undefined);
+});
+
+test('attachWorkoutNotes prefers body over a stale frontmatter notes field', () => {
+  const hydrated = attachWorkoutNotes(
+    session({ notes: 'stale yaml' }),
+    'Fresh session verdict — groin quiet'
+  );
+  assert.equal(hydrated.notes, 'Fresh session verdict — groin quiet');
+});
+
+test('attachWorkoutNotes leaves the record alone when body is empty', () => {
+  const record = session({ notes: undefined });
+  delete record.notes;
+  assert.equal(attachWorkoutNotes(record, '  ').notes, undefined);
+  assert.equal(attachWorkoutNotes(record, null), record);
+});
+
+test('formatRecentWorkoutsForPrompt surfaces session notes and pain_flags on completed rows', () => {
+  const text = formatRecentWorkoutsForPrompt([
+    session({
+      date: '2026-09-01',
+      title: 'Planned session',
+      notes: 'Planned session — AC clear, matched last loads',
+      pain_flags: [{ site: 'right AC', note: 'mild twinge on fly' }]
+    })
+  ]);
+  assert.match(text, /Last completed: 2026-09-01 · Planned session/);
+  assert.match(text, /notes: Planned session — AC clear, matched last loads/);
+  assert.match(text, /pain: right AC: mild twinge on fly/);
+});
+
+test('getLastWorkout returns notes and pain_flags on the session', () => {
+  const result = getLastWorkout([
+    session({
+      notes: 'Matched loads — AC quiet',
+      pain_flags: [{ site: 'left groin', note: 'twinge set 1' }]
+    })
+  ]);
+  assert.equal(result.found, true);
+  assert.equal(result.session.notes, 'Matched loads — AC quiet');
+  assert.deepEqual(result.session.pain_flags, [{ site: 'left groin', note: 'twinge set 1' }]);
+});
+
+test('searchWorkoutRecords matches pain site / notes and returns them on hits', () => {
+  const records = [
+    session({
+      date: '2026-09-01',
+      title: 'Chest day',
+      notes: 'AC flared on flys',
+      pain_flags: [{ site: 'right AC', note: 'parked flys' }],
+      exercises: [{ name: 'Bar Press', sets: [{ reps: 10, weight_kg: 40, cable_type: 'constant_force' }] }]
+    })
+  ];
+  const byPain = searchWorkoutRecords(records, { query: 'right AC' });
+  assert.equal(byPain.count, 1);
+  assert.equal(byPain.results[0].notes, 'AC flared on flys');
+  assert.deepEqual(byPain.results[0].pain_flags, [{ site: 'right AC', note: 'parked flys' }]);
+
+  const byNote = searchWorkoutRecords(records, { query: 'flared' });
+  assert.equal(byNote.count, 1);
 });

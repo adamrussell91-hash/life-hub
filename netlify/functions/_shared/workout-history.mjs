@@ -77,6 +77,35 @@ function summarizeExercises(exercises) {
     .filter(Boolean);
 }
 
+/** Session notes live in the markdown body, not YAML — attach body onto the record for prompt/tools. */
+export function attachWorkoutNotes(record, body) {
+  if (!record || typeof record !== 'object') return record;
+  const notes = typeof body === 'string' ? body.trim() : '';
+  if (!notes) return record;
+  return { ...record, notes };
+}
+
+function compactNote(text, max = 120) {
+  const cleaned = String(text).trim().replace(/\s+/g, ' ');
+  if (!cleaned) return '';
+  return cleaned.length > max ? `${cleaned.slice(0, max - 3)}...` : cleaned;
+}
+
+function formatPainFlags(flags) {
+  if (!Array.isArray(flags) || flags.length === 0) return '';
+  const parts = [];
+  for (const flag of flags) {
+    if (!flag || typeof flag !== 'object') continue;
+    const site = typeof flag.site === 'string' ? flag.site.trim() : '';
+    if (!site) continue;
+    const note = typeof flag.note === 'string' && flag.note.trim()
+      ? `${site}: ${flag.note.trim().replace(/\s+/g, ' ')}`
+      : site;
+    parts.push(note);
+  }
+  return parts.length ? `pain: ${parts.join('; ')}` : '';
+}
+
 function sortSessionsNewestFirst(records) {
   return records.slice().sort((a, b) => {
     const dateCmp = String(b.date).localeCompare(String(a.date));
@@ -89,7 +118,11 @@ function sessionPromptLine(record) {
   const moves = summarizeExercises(record.exercises);
   const moveBit = moves.length ? ` — ${moves.join(', ')}` : '';
   const title = record.title || 'Untitled session';
-  return `${record.date} · ${title}${moveBit}`;
+  const noteText = typeof record.notes === 'string' ? compactNote(record.notes) : '';
+  const noteBit = noteText ? ` — notes: ${noteText}` : '';
+  const painBit = formatPainFlags(record.pain_flags);
+  const painSuffix = painBit ? ` — ${painBit}` : '';
+  return `${record.date} · ${title}${moveBit}${noteBit}${painSuffix}`;
 }
 
 export function formatRecentWorkoutsForPrompt(records) {
@@ -122,6 +155,7 @@ function formatSession(record) {
     duration_min: record.duration_min,
     focus: record.focus,
     notes: record.notes,
+    pain_flags: Array.isArray(record.pain_flags) ? record.pain_flags : [],
     exercises: collapsed.map(exercise => ({
       name: exercise.name,
       sets: exercise.sets
@@ -152,6 +186,12 @@ function queryTokens(query) {
 
 function sessionHaystack(record) {
   const collapsed = collapseSetSplitExercises(record.exercises);
+  const painBits = Array.isArray(record.pain_flags)
+    ? record.pain_flags.flatMap(flag => {
+      if (!flag || typeof flag !== 'object') return [];
+      return [flag.site, flag.note].filter(Boolean);
+    })
+    : [];
   return [
     record.title,
     record.date,
@@ -159,6 +199,7 @@ function sessionHaystack(record) {
     record.session_kind,
     record.day_type,
     record.notes,
+    ...painBits,
     ...(Array.isArray(record.focus) ? record.focus : []),
     ...collapsed.map(exercise => exercise.name)
   ].filter(Boolean).join(' ').toLowerCase();
@@ -191,6 +232,10 @@ export function searchWorkoutRecords(records, { query, limit = DEFAULT_SEARCH_LI
       day_type: record.day_type,
       duration_min: record.duration_min,
       focus: record.focus,
+      notes: typeof record.notes === 'string' && record.notes.trim() ? record.notes.trim() : undefined,
+      pain_flags: Array.isArray(record.pain_flags) && record.pain_flags.length
+        ? record.pain_flags
+        : undefined,
       exercises: summarizeExercises(record.exercises),
       score
     }));
@@ -208,7 +253,7 @@ export function getLastWorkoutSchema() {
   return {
     name: 'get_last_workout',
     description:
-      'Read Adam\'s most recent completed workout from the recent fitness files already loaded this turn (not full history). Use whenever he asks when he last trained, what that session was, or what he lifted last time. Returns title, date, and collapsed exercises with sets.',
+      'Read Adam\'s most recent completed workout from the recent fitness files already loaded this turn (not full history). Use whenever he asks when he last trained, what that session was, what he lifted, how it felt, or any pain flags. Returns title, date, notes, pain_flags, and collapsed exercises with sets.',
     input_schema: {
       type: 'object',
       properties: {}
@@ -220,7 +265,7 @@ export function searchWorkoutRecordsSchema() {
   return {
     name: 'search_workout_records',
     description:
-      'Search the recent workout files loaded this turn (not full history) by title, date, focus, or exercise name. Use when Adam asks about a past session in that window. Words are ANDed.',
+      'Search the recent workout files loaded this turn (not full history) by title, date, focus, exercise name, session notes, or pain flag site/note. Use when Adam asks about a past session in that window. Words are ANDed.',
     input_schema: {
       type: 'object',
       properties: {
