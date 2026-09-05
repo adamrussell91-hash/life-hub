@@ -52,6 +52,7 @@ import { buildCalendarModel } from './calendar-model.js';
 import { renderCalendar } from './render-calendar.js';
 import { syncRepository } from './sync-repository.js';
 import { startHubMotion } from '../../../../packages/design-kit/js/hub-motion.js';
+import { mountAdaptiveSliders } from '../../../../packages/design-kit/js/adaptive-slider.js';
 import { mountMorphingPopovers } from '../../../../packages/design-kit/js/morphing-popover.js';
 
 // The API lives on a different origin (Netlify Functions) from the site (GitHub
@@ -188,6 +189,7 @@ controller = createAppController({
 
 controller.start();
 startHubMotion(document);
+mountAdaptiveSliders(document);
 for (const popover of mountMorphingPopovers(document)) {
   popover.content.querySelector('#clare-dump-form')?.addEventListener('submit', () => {
     queueMicrotask(() => popover.close({ restoreFocus: false }));
