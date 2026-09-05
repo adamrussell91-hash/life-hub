@@ -33,14 +33,17 @@ describe("capture file helpers", () => {
 });
 
 describe("captureFieldHtml", () => {
-  it("renders Voice Photo PDF actions", () => {
+  it("renders Voice Photo Scan PDF actions", () => {
     const html = captureFieldHtml({ busy: false, captureBusy: false, recording: false, localData: false });
     expect(html).toContain("data-capture-voice");
     expect(html).toContain("data-capture-photo");
+    expect(html).toContain("data-capture-scan");
     expect(html).toContain("data-capture-pdf");
     expect(html).toContain("data-capture-paste");
     expect(html).toContain(">Voice<");
+    expect(html).toContain(">Scan<");
     expect(html).toContain(">Paste<");
+    expect(html).toContain(".heic");
   });
 
   it("disables actions while capturing and labels Stop while recording", () => {
@@ -138,5 +141,12 @@ describe("prepareCaptureImage", () => {
   it("returns non-images unchanged", async () => {
     const file = new File(["x"], "notes.pdf", { type: "application/pdf" });
     await expect(prepareCaptureImage(file)).resolves.toBe(file);
+  });
+});
+
+describe("prepareCaptureScan", () => {
+  it("is exported for the Scan capture control", async () => {
+    const { prepareCaptureScan } = await import("./compose");
+    expect(typeof prepareCaptureScan).toBe("function");
   });
 });
