@@ -1,3 +1,5 @@
+import { normalizeConnected } from './hub-ref.mjs';
+
 const GITHUB_ORIGIN = 'https://api.github.com';
 const REPOSITORY = /^(?<owner>[A-Za-z0-9](?:[A-Za-z0-9.-]{0,38}))\/(?<repo>[A-Za-z0-9_.-]{1,100})$/;
 const PAGE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
@@ -307,7 +309,9 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
     area: input.area === 'university' || input.area === 'notes' ? input.area : (previous?.area ?? 'notes'),
     tags: Array.isArray(input.tags) ? input.tags.filter(tag => typeof tag === 'string') : (previous?.tags ?? []),
     body,
-    connected: Array.isArray(input.connected) ? input.connected : (previous?.connected ?? []),
+    connected: Array.isArray(input.connected)
+      ? normalizeConnected(input.connected)
+      : (previous?.connected ?? []),
     attachments: Array.isArray(input.attachments) ? input.attachments : (previous?.attachments ?? []),
     source: input.source === 'notion' ? 'notion' : 'hub',
     created_at: previous?.created_at ?? (typeof input.created_at === 'string' ? input.created_at : timestamp),

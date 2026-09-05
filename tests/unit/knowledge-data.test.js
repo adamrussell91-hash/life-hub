@@ -6,6 +6,32 @@ import {
   unwrapGithubFileText
 } from '../../netlify/functions/_shared/knowledge-data.mjs';
 
+function memoryGithub(initial = {}) {
+  const files = new Map(Object.entries(initial));
+  const fetchImpl = async (url, init = {}) => {
+    const path = decodeURIComponent(String(url).split('/contents/')[1] ?? '');
+    if ((init.method ?? 'GET') === 'GET') {
+      const current = files.get(path);
+      if (!current) return new Response('missing', { status: 404 });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sha: current.sha,
+          encoding: 'base64',
+          content: Buffer.from(current.text).toString('base64'),
+          size: Buffer.byteLength(current.text)
+        })
+      };
+    }
+    const body = JSON.parse(init.body);
+    const text = Buffer.from(body.content, 'base64').toString('utf8');
+    files.set(path, { sha: 'sha2', text });
+    return { ok: true, status: 200, json: async () => ({ content: { sha: 'sha2' } }) };
+  };
+  return { files, fetchImpl };
+}
+
 test('unwraps a GitHub blob wrapper so a large manifest is not treated as empty', () => {
   const inner = JSON.stringify([{ id: 'note-1', title: 'Archive note' }]);
   const wrapper = JSON.stringify({
@@ -107,5 +133,43 @@ test('saveKnowledgePage refuses to overwrite an unreadable manifest', async () =
       }
     ),
     error => error.status === 502 && /unreadable/.test(error.message)
+  );
+});
+
+test('saveKnowledgePage keeps Teaching and Tasks refs on connected', async () => {
+  const { files, fetchImpl } = memoryGithub({
+    'manifest.json': { sha: 'man1', text: '[]' }
+  });
+  const saved = await saveKnowledgePage(
+    {
+      id: 'page_aotfw',
+      title: 'Artist of the Floating World — sources',
+      body: 'Ishiguro',
+      area: 'university',
+      connected: ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw', 'knowledge:page:page_aotfw']
+    },
+    {
+      env: { GITHUB_TOKEN: 'token' },
+      fetchImpl,
+      nowIso: () => '2026-01-15T09:00:00.000Z'
+    }
+  );
+  assert.deepEqual(saved.connected, ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw', 'page_aotfw']);
+  const stored = JSON.parse(files.get('pages/page_aotfw.json').text);
+  assert.deepEqual(stored.connected, saved.connected);
+});
+
+test('saveKnowledgePage rejects an invalid connected ref', async () => {
+  await assert.rejects(
+    () => saveKnowledgePage(
+      { title: 'Broken', connected: ['life://diary/x'] },
+      {
+        env: { GITHUB_TOKEN: 'token' },
+        fetchImpl: async () => {
+          throw new Error('GitHub must not be called');
+        }
+      }
+    ),
+    error => error.status === 400 && /Invalid connected ref/.test(error.message)
   );
 });

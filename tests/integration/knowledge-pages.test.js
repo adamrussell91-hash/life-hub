@@ -162,6 +162,35 @@ function memoryGithub(initial = {}) {
   };
 }
 
+test('Knowledge page save keeps Teaching and Tasks connected refs', async () => {
+  const github = memoryGithub({
+    'manifest.json': { sha: 'man1', text: '[]' }
+  });
+  const handler = createKnowledgePagesHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    fetchImpl: github
+  });
+  const response = await handler(new Request('https://api.adam-russell.com/api/knowledge/pages', {
+    method: 'POST',
+    headers: {
+      cookie: `life_hub_session=${session}`,
+      origin: 'https://knowledge-hub.adam-russell.com',
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      id: 'page_aotfw',
+      title: 'Artist of the Floating World — sources',
+      body: 'Ishiguro',
+      area: 'university',
+      connected: ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw']
+    })
+  }));
+  assert.equal(response.status, 200);
+  const saved = (await response.json()).data;
+  assert.deepEqual(saved.connected, ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw']);
+});
+
 test('Knowledge page save writes page JSON and upserts the manifest', async () => {
   const handler = createKnowledgePagesHandler({
     env,
