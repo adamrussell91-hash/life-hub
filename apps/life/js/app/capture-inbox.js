@@ -87,7 +87,17 @@ function classifyShare(share) {
     };
   }
 
-  const text = [share.title, share.text, share.url].filter(Boolean).join('\n').trim();
+  // Prefer an explicit shared URL (Share Target `url` param), then a URL-only text body.
+  const urlCandidate = (share.url || '').trim() || ((share.text || '').trim().match(/^(https?:\/\/\S+)$/i)?.[1] ?? '');
+  if (urlCandidate) {
+    const dt = {
+      files: [],
+      getData: (type) => (type === 'text/plain' ? urlCandidate : '')
+    };
+    return classifyClipboardData(/** @type {DataTransfer} */ (dt));
+  }
+
+  const text = [share.title, share.text].filter(Boolean).join('\n').trim();
   const dt = {
     files: [],
     getData: (type) => (type === 'text/plain' ? text : '')
