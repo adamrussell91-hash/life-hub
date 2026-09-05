@@ -564,7 +564,8 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       showPreview,
       onCreated,
       switchMode,
-      false
+      false,
+      () => void reload()
     );
     rail.append(renderStandingCompose(composeDraft, onCreated), agenda, preview, renderShortcutHint());
     workspace.append(body, rail);
@@ -851,7 +852,8 @@ function renderAgenda(
   onOpen: (item: CalendarItem) => void,
   onCreated: (task: Task) => void,
   onSwitch: (mode: CalendarMode, date?: Date) => void,
-  includeAdd = true
+  includeAdd = true,
+  onReload?: () => void
 ): HTMLElement {
   const dayItems = itemsForDay(items, dateKey);
   const agenda = el('section', 'hub-calendar__detail');
@@ -896,7 +898,17 @@ function renderAgenda(
   for (const item of dayItems) {
     if (item.task) {
       mountTaskCard(stack, item.task, {
-        onEdit: () => onOpen(item)
+        onEdit: () => onOpen(item),
+        onPatch: onReload
+          ? (task, patch) => {
+              void tasksApi.updateTask(task.id, patch).then(
+                () => onReload(),
+                (err: unknown) => {
+                  stack.append(el('p', 'empty-state', errorMessage(err, 'Could not save')));
+                }
+              );
+            }
+          : undefined
       });
       continue;
     }

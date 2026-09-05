@@ -88,6 +88,7 @@ function menuLabels(menu: HTMLElement): string[] {
 
 afterEach(() => {
   closeCardMenu();
+  document.querySelectorAll('.morphing-popover__panel').forEach((node) => node.remove());
 });
 
 describe('hub cards', () => {
@@ -234,6 +235,46 @@ describe('hub cards', () => {
     expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 'proj_mw' }));
     expect(host.querySelector('.confirm-card')).toBeNull();
     expect(document.body.textContent).not.toContain('Proposed write');
+  });
+
+  it('opens a closed-field chip from the card without expanding, then Save patches', () => {
+    reduceMotion();
+    const host = document.createElement('div');
+    const onPatch = vi.fn();
+    const current = task({ id: 'task_chip', title: 'Chip edit', priority: 'high' });
+    const slot = mountTaskCard(host, current, { onPatch });
+
+    const chip = slot.querySelector<HTMLButtonElement>('.priority-chip');
+    expect(chip?.tagName).toBe('BUTTON');
+    chip!.click();
+    expect(slot.dataset.state).toBe('compact');
+
+    const panel = document.querySelector<HTMLElement>('.morphing-popover__panel:not([hidden])');
+    expect(panel).not.toBeNull();
+    expect(panel?.querySelector('.morphing-popover__title')?.textContent).toBe('Priority');
+    expect([...panel!.querySelectorAll('.hub-pills__btn')].map((btn) => btn.textContent)).toEqual([
+      'urgent',
+      'high',
+      'medium',
+      'low'
+    ]);
+
+    [...panel!.querySelectorAll('.hub-pills__btn')].find((btn) => btn.textContent === 'urgent')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true })
+    );
+    [...panel!.querySelectorAll('button')].find((btn) => btn.textContent === 'Save')?.click();
+    expect(onPatch).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'task_chip' }),
+      { priority: 'urgent' }
+    );
+  });
+
+  it('leaves chips as display spans when onPatch is missing', () => {
+    const host = document.createElement('div');
+    const slot = mountTaskCard(host, task({ id: 'task_plain', title: 'Read only chips' }), {});
+    expect(slot.querySelector('.priority-chip')?.tagName).toBe('SPAN');
+    expect(slot.querySelector('.hub-chip')?.tagName).toBe('SPAN');
+    expect(slot.querySelector('.morphing-popover')).toBeNull();
   });
 
   it('opens via onActivate instead of expanding when that handler is set', () => {
