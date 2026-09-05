@@ -227,6 +227,79 @@ test('closed-field popover stages a pill then Save commits it', () => {
   assert.equal(triggerLabel.textContent, 'Done');
 });
 
+test('close cancels leftover box animations so the next open can measure', async () => {
+  const cancelled = [];
+
+  class AnimEl extends FakeEl {
+    getBoundingClientRect() {
+      const panel = String(this.className || '').includes('morphing-popover__panel');
+      return {
+        left: 8,
+        top: 8,
+        width: panel ? 320 : 80,
+        height: panel ? 180 : 36
+      };
+    }
+
+    animate() {
+      const anim = {
+        cancel() {
+          cancelled.push(1);
+        },
+        finished: Promise.resolve()
+      };
+      this.anims = this.anims || [];
+      this.anims.push(anim);
+      return anim;
+    }
+
+    getAnimations() {
+      return this.anims || [];
+    }
+
+    focus() {}
+  }
+
+  class AnimDoc extends FakeDoc {
+    constructor() {
+      super();
+      this.body = new AnimEl('body');
+      this.defaultView = {
+        matchMedia: () => ({ matches: false }),
+        requestAnimationFrame: cb => cb(),
+        getComputedStyle: () => ({ borderRadius: '8px' }),
+        innerWidth: 800,
+        innerHeight: 600
+      };
+    }
+
+    createElement(tag) {
+      return new AnimEl(tag);
+    }
+  }
+
+  const root = new AnimDoc();
+  const popover = createMorphingClosedFieldPopover({
+    root,
+    title: 'Status',
+    value: 'open',
+    options: [
+      { value: 'open', label: 'Open' },
+      { value: 'done', label: 'Done' }
+    ]
+  });
+
+  popover.open();
+  await Promise.resolve();
+  popover.close();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.ok(cancelled.length > 0, 'close should cancel fill:forwards box animations');
+  popover.open();
+  await Promise.resolve();
+  assert.equal(popover.isOpen(), true);
+});
+
 test('closed-field popover discards a staged pick on Discard', () => {
   const root = new FakeDoc();
   let saved = null;

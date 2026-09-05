@@ -78,8 +78,20 @@ function clampPanel(rect, width, height, view) {
   return { left, top, width: maxW, height: maxH };
 }
 
+function cancelAnimations(el) {
+  if (!el || typeof el.getAnimations !== 'function') return;
+  for (const animation of el.getAnimations()) {
+    try {
+      animation.cancel();
+    } catch {
+      // Ignore animations the document already dropped.
+    }
+  }
+}
+
 function animateBox(el, from, to, reduced) {
   if (reduced || typeof el.animate !== 'function') return Promise.resolve();
+  cancelAnimations(el);
   const animation = el.animate(
     [
       {
@@ -268,8 +280,12 @@ export function createMorphingPopover({
     removeClass(panel, 'is-floating');
     removeClass(panel, 'is-animating');
     removeClass(panel, 'is-ready');
-    panel.style && (panel.style.cssText = '');
+    // Hide before cancelling fill:forwards so the panel does not flash
+    // back to its last inline box. Leftover WAAPI fill was pinning the
+    // next open to chip size (one letter of the title).
     setHidden(panel, true);
+    cancelAnimations(panel);
+    panel.style && (panel.style.cssText = '');
     restoreHome();
     trigger.setAttribute?.('aria-expanded', 'false');
     onClose?.();
@@ -305,6 +321,7 @@ export function createMorphingPopover({
     openPopover = apiRef;
     trigger.setAttribute?.('aria-expanded', 'true');
     addClass(wrap, 'is-open');
+    cancelAnimations(panel);
     setHidden(panel, false);
     addClass(panel, 'is-floating');
     addClass(panel, 'is-animating');
