@@ -251,6 +251,12 @@ export function buildFitnessCharts({
   const from = monthDates[0] ?? addCalendarDays(date, -(MONTH_DAYS - 1));
   const records = completedRecords(events, from, date);
   const trainedDates = [...new Set(records.map(record => record.date))];
+  const allCompletedDates = [...new Set(
+    (events ?? [])
+      .map(({ record }) => record)
+      .filter(record => record?.status === 'completed' && record.date && record.date <= date)
+      .map(record => record.date)
+  )];
   const windowDays = monthDates.length || MONTH_DAYS;
   const skips = skipStats(events, from, date);
   const recoveryFlagged = records.filter(record => record.recovery_flag_next_day === true).length;
@@ -276,13 +282,13 @@ export function buildFitnessCharts({
   const volumePerSetWeeks = buildVolumePerSetWeeks(records, date);
 
   return {
-    longestStreak: longestCompletedStreak(trainedDates),
+    longestStreak: longestCompletedStreak(allCompletedDates),
     uniqueLifts: uniqueLifts.size,
     volumePerSetKg: totalSets > 0 ? totalVolume / totalSets : null,
     weekRing: { value: weekCompletedCount, target: weekTarget },
     skipRing: { value: skips.missed, target: Math.max(skips.scheduled, 1), ...skips },
     recoveryRing: { value: recoveryFlagged, target: Math.max(records.length, 1), flagged: recoveryFlagged, completed: records.length },
-    restRatio: buildRestRatio(trainedDates.length, windowDays),
+    restRatio: trainedDates.length > 0 ? buildRestRatio(trainedDates.length, windowDays) : [],
     restCounts: { trained: trainedDates.length, rest: Math.max(0, windowDays - trainedDates.length), days: windowDays },
     repRanges: buildRepRanges(records),
     regionVolume: buildRegionVolume(records),
