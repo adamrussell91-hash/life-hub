@@ -134,3 +134,17 @@ test('open-loops toolkit sorts Now later and trash', () => {
   assert.equal(result.toolkit.title, 'Open loops');
   assert.match(result.toolkit.steps[0], /Email parents/);
 });
+
+
+test('open-loops dump includes a Later triage choice when Later items exist', () => {
+  const items = parseBrainDump(
+    'email parents due today\nremember: bring the USB\nbuy milk someday',
+    { now: new Date(2026, 7, 25), preferredDomain: 'teaching' }
+  );
+  const result = assembleDumpResult(items, frameworks, () => null, 'open-loops');
+  assert.ok(result.choice);
+  assert.equal(result.choice.type, 'choice');
+  assert.equal(result.choice.multi, true);
+  assert.ok(result.choice.choices.length >= 1);
+  assert.ok(result.choice.choices.every(choice => choice.label));
+});

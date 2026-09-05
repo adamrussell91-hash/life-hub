@@ -353,10 +353,53 @@ export function createMockApi({ seed }: MockApiOptions) {
           }
           const voice = typeof dump.voice === 'string' ? dump.voice : '';
           const mid = Math.max(1, Math.ceil(voice.length / 2));
+          const laterNotes = (dump.notes ?? [])
+            .map((note: unknown) => String(note))
+            .filter((note: string) => note.startsWith('Later: '))
+            .map((note: string, index: number) => ({
+              id: `later-${index}`,
+              label: note.slice('Later: '.length).trim(),
+              detail: 'Later'
+            }))
+            .filter((row: { label: string }) => row.label);
+          const choice =
+            dump.choice ??
+            (laterNotes.length
+              ? {
+                  type: 'choice' as const,
+                  title: 'Pull anything into Now?',
+                  hint: 'Clare parked these as Later. Pick any that need a next action today.',
+                  multi: true,
+                  confirmLabel: 'Move to Now',
+                  choices: laterNotes.slice(0, 8)
+                }
+              : null);
           const events = [
             { type: 'status', text: 'Sorting the dump…' },
+            {
+              type: 'plan_status',
+              id: 'clare-dump',
+              heading: 'Dump',
+              steps: ['Sort items', 'Draft voice', 'Build cards'],
+              current: 0
+            },
+            {
+              type: 'plan_status',
+              id: 'clare-dump',
+              heading: 'Dump',
+              steps: ['Sort items', 'Draft voice', 'Build cards'],
+              current: 1
+            },
             ...(voice ? [{ type: 'text', delta: voice.slice(0, mid) }, { type: 'text', delta: voice.slice(mid) }] : []),
-            { type: 'dump_result', result: dump },
+            {
+              type: 'plan_status',
+              id: 'clare-dump',
+              heading: 'Dump',
+              steps: ['Sort items', 'Draft voice', 'Build cards'],
+              current: 2
+            },
+            { type: 'dump_result', result: choice ? { ...dump, choice } : dump },
+            ...(choice ? [choice] : []),
             { type: 'done' }
           ];
           const body = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join('');

@@ -334,3 +334,22 @@ export function briefingToMarkdown(briefing) {
   parts.push(briefing.closer);
   return parts.filter(line => line.trim()).join('\n');
 }
+
+/** Interactive triage for Later items — Tasks renders as choice card. */
+export function buildOpenLoopsChoice(items) {
+  const loops = sortOpenLoops(Array.isArray(items) ? items : []);
+  const later = loops.later.filter(item => typeof item?.title === 'string' && item.title.trim());
+  if (!later.length) return null;
+  return {
+    type: 'choice',
+    title: 'Pull anything into Now?',
+    hint: 'Clare parked these as Later. Pick any that need a next action today.',
+    multi: true,
+    confirmLabel: 'Move to Now',
+    choices: later.slice(0, 8).map((item, index) => ({
+      id: `later-${index}`,
+      label: item.title.trim(),
+      detail: 'Later'
+    }))
+  };
+}

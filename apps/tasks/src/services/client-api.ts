@@ -24,6 +24,21 @@ import type {
 async function* readClareDumpSse(body: ReadableStream<Uint8Array>): AsyncGenerator<
   | { type: 'status'; text?: string }
   | { type: 'text'; delta: string }
+  | {
+      type: 'plan_status';
+      id?: string;
+      heading?: string;
+      steps?: string[];
+      current?: number;
+    }
+  | {
+      type: 'choice';
+      title?: string;
+      hint?: string;
+      multi?: boolean;
+      confirmLabel?: string;
+      choices?: Array<{ id: string; label: string; detail?: string }>;
+    }
   | { type: 'dump_result'; result: import('@/domain/clare').ClareDumpResult }
   | { type: 'done' }
   | { type: 'error'; message: string }

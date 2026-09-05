@@ -50,6 +50,9 @@
       <h2>1. Floating menu near viewport edge</h2>
       <button type="button" id="edge-btn" class="btn btn--secondary edge-anchor">Open menu</button>
     </section>
+    <section class="panel" id="plan-host">
+      <h2>2b. Agent plan status</h2>
+    </section>
     <section class="panel" id="choice-host">
       <h2>2. Agent choice card</h2>
     </section>
@@ -61,6 +64,7 @@
   <script type="module">
     import { createHubFilter } from '/packages/design-kit/js/hub-filter-menu.js';
     import { createAgentChoiceCard } from '/packages/design-kit/js/agent-choice-card.js';
+    import { createAgentPlanCard } from '/packages/design-kit/js/agent-plan-card.js';
     import { createAgentSourcesCard } from '/packages/design-kit/js/agent-sources-card.js';
     import { autoUpdateHubFloating, positionHubFloating } from '/packages/design-kit/js/hub-floating.js';
 
@@ -109,6 +113,14 @@
       onConfirm: (picked) => log(`Choice confirmed: ${picked.map((p) => p.label).join(', ')}`),
       onDismiss: () => log('Choice dismissed')
     });
+    const plan = createAgentPlanCard(document, {
+      id: 'demo-plan',
+      heading: 'Dump',
+      steps: ['Sort items', 'Draft voice', 'Build cards'],
+      current: 1
+    });
+    document.getElementById('plan-host').append(plan.card);
+
     document.getElementById('choice-host').append(choice);
 
     const sources = createAgentSourcesCard(document, {

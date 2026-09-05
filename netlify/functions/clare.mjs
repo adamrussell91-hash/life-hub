@@ -297,11 +297,33 @@ export function createClareHandler(deps = {}) {
             };
             try {
               send({ type: 'status', text: 'Sorting the dump…' });
+              send({
+                type: 'plan_status',
+                id: 'clare-dump',
+                heading: 'Dump',
+                steps: ['Sort items', 'Draft voice', 'Build cards'],
+                current: 0
+              });
+              send({
+                type: 'plan_status',
+                id: 'clare-dump',
+                heading: 'Dump',
+                steps: ['Sort items', 'Draft voice', 'Build cards'],
+                current: 1
+              });
               const voice = typeof result.voice === 'string' ? result.voice : '';
               for (const delta of chunkVoice(voice)) {
                 send({ type: 'text', delta });
               }
+              send({
+                type: 'plan_status',
+                id: 'clare-dump',
+                heading: 'Dump',
+                steps: ['Sort items', 'Draft voice', 'Build cards'],
+                current: 2
+              });
               send({ type: 'dump_result', result });
+              if (result?.choice) send(result.choice);
               send({ type: 'done' });
             } catch (error) {
               send({

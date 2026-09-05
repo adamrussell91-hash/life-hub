@@ -1,5 +1,7 @@
 import { syncChatChrome } from '@/chat/chat-chrome';
 import { applyAgentAvatarToBubble } from '@/chat/render-agent-picker';
+import { createAgentChoiceCard } from '../../design-kit/js/agent-choice-card.js';
+import { createAgentPlanCard } from '../../design-kit/js/agent-plan-card.js';
 
 export type ChatRole = 'user' | 'assistant' | 'status';
 
@@ -129,3 +131,54 @@ export function appendSavedCard(card: HTMLElement, text = 'Saved.'): void {
   card.removeAttribute('aria-label');
   card.replaceChildren(saved);
 }
+
+export function appendChoiceCard(
+  root: ParentNode,
+  opts: {
+    title?: string;
+    hint?: string;
+    choices: Array<{ id: string; label: string; detail?: string }>;
+    multi?: boolean;
+    confirmLabel?: string;
+    onConfirm?: (selected: Array<{ id: string; label: string; detail?: string }>) => void;
+    onDismiss?: () => void;
+  }
+): HTMLElement | null {
+  const list = root.querySelector('#chat-messages');
+  if (!list) return null;
+  const item = document.createElement('li');
+  item.className = 'chat-message chat-message--structured';
+  const card = createAgentChoiceCard(document, opts);
+  item.append(card);
+  list.append(item);
+  list.scrollTop = list.scrollHeight;
+  return item;
+}
+
+export function appendPlanStatusCard(
+  root: ParentNode,
+  opts: { id?: string; heading?: string; steps?: string[]; current?: number }
+): HTMLElement | null {
+  const list = root.querySelector('#chat-messages');
+  if (!list) return null;
+  const planId = typeof opts.id === 'string' && opts.id.trim() ? opts.id.trim() : '';
+  if (planId) {
+    const existing = list.querySelector(`[data-plan-id="${CSS.escape?.(planId) ?? planId}"]`) as
+      | (HTMLElement & { __planUpdate?: (next: typeof opts) => void })
+      | null;
+    if (existing?.__planUpdate) {
+      existing.__planUpdate(opts);
+      list.scrollTop = list.scrollHeight;
+      return existing.closest('li');
+    }
+  }
+  const item = document.createElement('li');
+  item.className = 'chat-message chat-message--structured';
+  const { card, update } = createAgentPlanCard(document, opts);
+  (card as HTMLElement & { __planUpdate?: (next: typeof opts) => void }).__planUpdate = update;
+  item.append(card);
+  list.append(item);
+  list.scrollTop = list.scrollHeight;
+  return item;
+}
+
