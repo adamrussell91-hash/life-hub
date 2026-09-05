@@ -279,7 +279,10 @@ export function createChatHandler({
       : Promise.resolve('');
     const needsNutritionChallenges = slug === 'brisket';
     // Brisket writes challenge scoreboards onto Central Node; keep markdown mutable.
-    const needsCentralNodeWrite = needsHammondTools || needsNutritionChallenges;
+    const needsCentralNodeWrite = needsHammondTools
+      || needsNutritionChallenges
+      || slug === 'clare'
+      || slug === 'ann';
     const needsBodyState = slug === 'chadwick' || slug === 'brisket' || slug === 'sara';
     const needsSaraMedical = slug === 'sara';
     const needsMindDigest = slug === 'vera' || slug === 'penelope';
