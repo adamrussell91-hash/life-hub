@@ -90,10 +90,11 @@ function renderRunWidget(root, model) {
   host.replaceChildren();
   const sessionKm = Number(model.heroSession?.distance_km);
   if (Number.isFinite(sessionKm) && sessionKm > 0) {
-    createRunWidget({ wrap: host, distance: sessionKm, unit: 'km', label: 'Last session' });
+    createRunWidget({ root, wrap: host, distance: sessionKm, unit: 'km', label: 'Last session' });
     return;
   }
   createRunWidget({
+    root,
     wrap: host,
     distance: Number(model.longTerm?.workoutsPerWeek) || 0,
     unit: '/ week',

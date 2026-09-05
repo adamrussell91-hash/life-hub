@@ -95,6 +95,7 @@ function renderDayProgress(root, completeness) {
   if (!host || !completeness) return;
   host.replaceChildren();
   createLabeledProgress({
+    root,
     wrap: host,
     label: 'Today',
     value: completeness.complete,

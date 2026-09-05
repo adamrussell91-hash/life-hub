@@ -1,7 +1,8 @@
 /** Pin, progress, run, schedule, disclosures, scroll island, input stack, journal, save, status. */
 
 function ownerDoc(root) {
-  return root?.ownerDocument ?? root ?? globalThis.document;
+  if (root?.createElement) return root;
+  return root?.ownerDocument ?? globalThis.document;
 }
 
 function addClass(el, name) {
@@ -14,7 +15,7 @@ function textOf(value, fallback = '') {
 }
 
 export function createPinList(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('div');
   addClass(el, 'hub-pin-list');
   const items = (options.items ?? []).map((item) => ({ ...item, pinned: Boolean(item.pinned) }));
@@ -51,7 +52,7 @@ export function createPinList(options = {}) {
 }
 
 export function createLabeledProgress(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('div');
   addClass(el, 'hub-progress');
   const max = Number(options.max) > 0 ? Number(options.max) : 100;
@@ -72,7 +73,7 @@ export function createLabeledProgress(options = {}) {
 }
 
 export function createStepIndicator(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('ol');
   addClass(el, 'hub-steps');
   const current = options.current ?? 0;
@@ -87,7 +88,7 @@ export function createStepIndicator(options = {}) {
 }
 
 export function createRunWidget(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('div');
   addClass(el, 'hub-run');
   const value = doc.createElement('p');
@@ -104,7 +105,7 @@ export function createRunWidget(options = {}) {
 }
 
 export function createScheduleButton(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('div');
   addClass(el, 'hub-schedule');
   const btn = doc.createElement('button');
@@ -118,7 +119,7 @@ export function createScheduleButton(options = {}) {
 }
 
 export function createSlotPicker(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('div');
   addClass(el, 'hub-slots');
   const selected = new Set(options.selected ?? []);
@@ -152,7 +153,7 @@ export function createEventReminders(options = {}) {
 }
 
 export function createDisclosureCard(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('article');
   addClass(el, 'hub-disclosure');
   if (options.className) addClass(el, options.className);
@@ -199,7 +200,7 @@ export function createActivitiesCard(options = {}) {
 }
 
 export function createCollectionGrid(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('div');
   addClass(el, 'hub-grid-disclose');
   for (const item of options.items ?? []) {
@@ -215,7 +216,7 @@ export function createCollectionGrid(options = {}) {
 }
 
 export function createScrollIsland(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('div');
   addClass(el, 'hub-scroll-island');
   const progress = doc.createElement('p');
@@ -235,7 +236,7 @@ export function createScrollIsland(options = {}) {
 }
 
 export function createProgressiveInputStack(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('div');
   addClass(el, 'hub-input-stack');
   const fields = options.fields ?? [];
@@ -261,7 +262,7 @@ export function createProgressiveInputStack(options = {}) {
 }
 
 export function createJournalNav(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('nav');
   addClass(el, 'hub-journal-nav');
   el.setAttribute('aria-label', options.label ?? 'Journal');
@@ -278,7 +279,7 @@ export function createJournalNav(options = {}) {
 }
 
 export function createSaveToggle(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const btn = options.wrap ?? doc.createElement('button');
   btn.type = 'button';
   addClass(btn, 'btn');
@@ -300,7 +301,7 @@ export function createSaveToggle(options = {}) {
 }
 
 export function createStatusPicker(options = {}) {
-  const doc = ownerDoc(options.root);
+  const doc = ownerDoc(options.root ?? options.wrap);
   const el = options.wrap ?? doc.createElement('div');
   addClass(el, 'hub-status-picker');
   let value = options.value ?? options.statuses?.[0]?.id ?? '';

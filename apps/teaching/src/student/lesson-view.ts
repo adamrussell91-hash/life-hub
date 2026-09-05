@@ -94,7 +94,7 @@ function renderPublishedLesson(
     );
   }
   content.append(blocks);
-  void import('../../../design-kit/js/hub-surfaces.js').then(({ createScrollIsland }) => {
+  void import('../../design-kit/js/hub-surfaces.js').then(({ createScrollIsland }) => {
     content.append(
       createScrollIsland({
         progressLabel: lesson.title,
