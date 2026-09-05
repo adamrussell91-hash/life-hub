@@ -47,7 +47,7 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     assert.equal(await page.locator('#home-dashboard').isHidden(), true);
     assert.equal(await page.locator('#page-eyebrow').textContent(), "Today's macros");
     assert.equal(await page.locator('#page-title').textContent(), 'Nutrition');
-    assert.equal(await page.locator('.hub-mark').count(), 1);
+    assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 1);
 
     assert.equal(await page.locator('[data-split="energy"]').textContent(), '1,130 / 1,900 kcal');
     assert.equal(await page.locator('[data-split="protein"]').textContent(), '80 g / 120 g');

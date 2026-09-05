@@ -16,6 +16,7 @@ class FakeElement extends EventTarget {
     this.hidden = false;
     this.children = [];
     this.parent = null;
+    this.attributes = new Map();
     this.style = {
       props: new Map(),
       setProperty(name, value) {
@@ -25,6 +26,10 @@ class FakeElement extends EventTarget {
         return this.props.get(name) ?? '';
       }
     };
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
   }
 
   append(...nodes) {

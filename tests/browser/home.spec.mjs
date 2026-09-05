@@ -170,7 +170,7 @@ test('the Life Hub tile appears on sign-in and every signed-in page', async () =
   try {
     await page.goto(baseUrl);
     await page.locator('#sign-in-view').waitFor();
-    assert.equal(await page.locator('.sign-in__mark, img[src*="life-hub"]').count(), 1);
+    assert.equal(await page.locator('#sign-in-view .sign-in__mark').count(), 1);
     assert.equal(await page.locator('link[rel="icon"][href*="life-hub"]').count(), 1);
 
     await signIn(page);
@@ -189,7 +189,7 @@ test('the Life Hub tile appears on sign-in and every signed-in page', async () =
     for (const [section, title] of sections) {
       await page.locator(`.desktop-rail .nav-item[data-section="${section}"]`).click();
       await page.locator('#page-title', { hasText: title }).waitFor();
-      assert.equal(await page.locator('.hub-mark, img[src*="life-hub"]').count(), 1, section);
+      assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 1, section);
     }
   } finally {
     await context.close();
