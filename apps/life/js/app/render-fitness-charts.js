@@ -296,34 +296,34 @@ function renderHorizon(root, metrics) {
   }
 }
 
+function paintDonut(root, svg, items, { radius, size = 160, gap = 4, opacity = 1 }) {
+  const donut = buildMoodMixDonut(items, { size, radius, gap });
+  if (donut.empty) return;
+  for (const segment of donut.segments) {
+    if (!segment.visible) continue;
+    const circle = createSvg(root, 'circle');
+    circle.setAttribute('cx', String(donut.center));
+    circle.setAttribute('cy', String(donut.center));
+    circle.setAttribute('r', String(donut.radius));
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', segment.colour);
+    circle.setAttribute('stroke-width', '12');
+    circle.setAttribute('stroke-dasharray', segment.dasharray);
+    circle.setAttribute('stroke-dashoffset', String(segment.dashoffset));
+    circle.setAttribute('transform', `rotate(-90 ${donut.center} ${donut.center})`);
+    circle.setAttribute('opacity', String(opacity));
+    svg.append(circle);
+  }
+}
+
 function renderTwoRing(root, current, prior) {
   const card = showCard(root, '#fitness-region-vol-card', current?.length >= 1);
   const svg = root.querySelector('#fitness-region-donut');
   if (!card || !svg || typeof root.createElementNS !== 'function') return;
-  const outer = buildDistributionPie(current, { size: 120 });
-  const inner = buildDistributionPie(prior ?? [], { size: 72 });
   clearSvg(svg);
-  svg.setAttribute('viewBox', '0 0 120 120');
-  const group = createSvg(root, 'g');
-  group.setAttribute('transform', 'translate(24 24) scale(0.6)');
-  for (const slice of outer.slices) {
-    const path = createSvg(root, 'path');
-    path.setAttribute('d', slice.path);
-    path.setAttribute('fill', slice.colour);
-    path.setAttribute('transform', 'translate(24 24)');
-    svg.append(path);
-  }
-  if (!inner.empty) {
-    for (const slice of inner.slices) {
-      const path = createSvg(root, 'path');
-      path.setAttribute('d', slice.path);
-      path.setAttribute('fill', slice.colour);
-      path.setAttribute('opacity', '0.55');
-      path.setAttribute('transform', 'translate(24 24)');
-      svg.append(path);
-    }
-  }
-  svg.append(group);
+  svg.setAttribute('viewBox', '0 0 160 160');
+  paintDonut(root, svg, current, { radius: 62 });
+  if (prior?.length) paintDonut(root, svg, prior, { radius: 42, opacity: 0.7 });
 }
 
 function renderGauge(root, cardSelector, svgSelector, value, target, label) {
@@ -528,7 +528,8 @@ function renderLibrary(root, map) {
   if (!card || !svg || typeof root.createElementNS !== 'function') return;
   const chart = buildThemeConstellation({
     nodes: map.nodes,
-    edges: map.edges
+    edges: map.edges,
+    minEdgeCount: 1
   });
   if (chart.empty) {
     setHidden(card, true);
