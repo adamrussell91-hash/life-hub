@@ -274,22 +274,32 @@ function renderPainHeat(root, series) {
   }
 }
 
+function bandFill(band) {
+  if (band === 'high') return 'var(--danger)';
+  if (band === 'low') return 'var(--muted)';
+  return 'var(--wave)';
+}
+
 function renderHorizon(root, metrics) {
   const card = showCard(root, '#fitness-horizon-card', metrics?.length >= 1);
+  const latest = metrics?.[0]?.points?.at(-1);
+  setText(root, '[data-fitness="load-read"]', Number.isFinite(latest?.ratio)
+    ? `${latest.ratio.toFixed(1)}× your 4-week average`
+    : '');
   const svg = root.querySelector('#fitness-horizon-chart');
   if (!card || !svg || typeof root.createElementNS !== 'function') return;
   const chart = buildHorizonBands(metrics, { width: 320, height: 28 });
   clearSvg(svg);
   svg.setAttribute('viewBox', '0 0 320 28');
   for (const band of chart) {
-    for (const rect of band.rects) {
+    for (const [index, rect] of band.rects.entries()) {
       const node = createSvg(root, 'rect');
       node.setAttribute('x', String(rect.x));
       node.setAttribute('y', String(rect.y));
       node.setAttribute('width', String(rect.width));
       node.setAttribute('height', String(rect.height));
-      node.setAttribute('fill', 'var(--wave)');
-      node.setAttribute('opacity', String(Math.max(0.12, rect.opacity)));
+      node.setAttribute('fill', bandFill(metrics[0]?.points?.[index]?.band));
+      node.setAttribute('opacity', String(Math.max(0.18, rect.opacity)));
       svg.append(node);
     }
   }
@@ -433,7 +443,7 @@ function renderPill(root, gauge) {
   tick.setAttribute('y2', '47');
   tick.setAttribute('stroke', 'var(--high-sea-ink)');
   svg.append(track, fill, tick);
-  setText(root, '[data-fitness="pill-read"]', `${Math.round(gauge.pct)}% of 8-week average`);
+  setText(root, '[data-fitness="pill-read"]', `${Math.round(gauge.pct)}% of your 4-week average`);
 }
 
 function renderYear(root, { year, dots }) {

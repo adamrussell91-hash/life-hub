@@ -13,7 +13,11 @@ import {
 
 const MONTH_DAYS = 30;
 const STREAM_WEEKS = 12;
-const LOAD_WEEKS = 8;
+const HORIZON_WEEKS = 8;
+const CHRONIC_WEEKS = 4;
+const GAUGE_DAYS = 28;
+const ACWR_LOW = 0.8;
+const ACWR_HIGH = 1.3;
 const REP_READ = {
   '1-5': 'Mostly Strength',
   '6-8': 'Mostly Hypertrophy',
@@ -293,19 +297,11 @@ function mean(values) {
   return finite.reduce((sum, n) => sum + n, 0) / finite.length;
 }
 
-function stdev(values) {
-  const finite = (values ?? []).filter(Number.isFinite);
-  if (finite.length < 2) return 0;
-  const avg = mean(finite);
-  const variance = finite.reduce((sum, n) => sum + (n - avg) ** 2, 0) / finite.length;
-  return Math.sqrt(variance);
-}
-
-function loadScore(record) {
-  const volume = sessionVolume(record);
-  const duration = Number(record.duration_min);
-  if (!(volume > 0)) return 0;
-  return volume * (Number.isFinite(duration) && duration > 0 ? duration : 30);
+export function acwrBand(ratio) {
+  if (!Number.isFinite(ratio)) return 'medium';
+  if (ratio > ACWR_HIGH) return 'high';
+  if (ratio < ACWR_LOW) return 'low';
+  return 'medium';
 }
 
 function buildClockPoints(records) {
@@ -467,30 +463,36 @@ function buildPainHeat(records, date) {
   }));
 }
 
+function weekVolume(records, weekStart) {
+  const weekEnd = addCalendarDays(weekStart, 6);
+  return (records ?? [])
+    .filter(record => record.date >= weekStart && record.date <= weekEnd)
+    .reduce((sum, record) => sum + sessionVolume(record), 0);
+}
+
 function buildLoadHorizon(records, date) {
   const endWeek = getSydneyWeekStart(date);
+  const computed = HORIZON_WEEKS + CHRONIC_WEEKS;
   const weeks = [];
-  for (let i = LOAD_WEEKS - 1; i >= 0; i -= 1) weeks.push(addCalendarDays(endWeek, -7 * i));
-  const scores = weeks.map(weekStart => {
-    const weekEnd = addCalendarDays(weekStart, 6);
-    const score = records
-      .filter(record => record.date >= weekStart && record.date <= weekEnd)
-      .reduce((sum, record) => sum + loadScore(record), 0);
-    return { date: weekStart, value: score };
-  });
-  const values = scores.map(row => row.value);
-  if (values.filter(value => value > 0).length < 2) return [];
-  const avg = mean(values) || 1;
-  const spread = stdev(values) || avg * 0.25;
+  for (let i = computed - 1; i >= 0; i -= 1) weeks.push(addCalendarDays(endWeek, -7 * i));
+  const scores = weeks.map(weekStart => ({
+    date: weekStart,
+    value: weekVolume(records, weekStart)
+  }));
+  const shown = scores.slice(-HORIZON_WEEKS);
+  if (shown.filter(row => row.value > 0).length < 2) return [];
   return [{
     key: 'load',
-    points: scores.map(row => {
-      const z = (row.value - avg) / spread;
+    points: shown.map((row, index) => {
+      const offset = scores.length - HORIZON_WEEKS + index;
+      const prior = scores.slice(Math.max(0, offset - CHRONIC_WEEKS), offset);
+      const chronic = mean(prior.map(item => item.value));
+      const ratio = chronic > 0 ? row.value / chronic : null;
       return {
         date: row.date,
         value: row.value,
-        z,
-        band: z > 0.75 ? 'high' : z < -0.75 ? 'low' : 'medium'
+        ratio,
+        band: acwrBand(ratio)
       };
     })
   }];
@@ -520,9 +522,15 @@ function buildE1rmBands(trends) {
 }
 
 function buildSessionGauge(records) {
-  if (records.length < 2) return null;
-  const last = records.at(-1);
-  const avg = mean(records.map(sessionVolume));
+  const sorted = [...(records ?? [])]
+    .filter(record => sessionVolume(record) > 0)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  if (sorted.length < 2) return null;
+  const last = sorted.at(-1);
+  const windowFrom = addCalendarDays(last.date, -(GAUGE_DAYS - 1));
+  const inWindow = sorted.filter(record => record.date >= windowFrom && record.date < last.date);
+  const baseline = inWindow.length ? inWindow : sorted.slice(0, -1);
+  const avg = mean(baseline.map(sessionVolume));
   if (!(avg > 0)) return null;
   return {
     value: sessionVolume(last),
