@@ -48,6 +48,13 @@ import { requestToggleDone } from '@/views/dashboard';
 import { mountTaskCard } from '@/views/hub-cards';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
 import {
+  calendarItemIdForFocus,
+  getFocus,
+  hydrateFocusFromHash,
+  normalizeCalendarItemId,
+  setFocus
+} from '@/domain/focus';
+import {
   createHubFilter,
   createHubPills,
   createHubSearch,
@@ -251,6 +258,10 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   };
   if (liveCalendar) liveCalendar.dispose();
   liveCalendar = session;
+  hydrateFocusFromHash();
+  const focusRef = getFocus();
+  const focusItemId = focusRef ? calendarItemIdForFocus(focusRef) : null;
+  if (focusItemId) selectedItemId = focusItemId;
 
   function allItems(): CalendarItem[] {
     return filterCalendarItems(collectCalendarItems(tasks, projects), sessionFilters);
@@ -265,6 +276,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   async function openItem(item: CalendarItem, preview: HTMLElement): Promise<void> {
     selectedDateKey = item.date_key;
     selectedItemId = item.id;
+    setFocus(normalizeCalendarItemId(item.id));
     composeDraft = { dateKey: item.date_key, dueTime: item.task?.due_time ?? composeDraft.dueTime };
     preview.hidden = false;
     let task = item.task;
@@ -508,6 +520,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     const showPreview = (item: CalendarItem) => {
       selectedDateKey = item.date_key;
       selectedItemId = item.id;
+      setFocus(normalizeCalendarItemId(item.id));
       composeDraft = { dateKey: item.date_key, dueTime: item.task?.due_time ?? composeDraft.dueTime };
       paint();
     };

@@ -1,5 +1,6 @@
 import type { FrameworkEntry } from '@/schemas/templates';
 import type { ClareDumpResult, ClareProposal } from '@/domain/clare';
+import { scheduleDiffFromMutation } from '@/domain/schedule-diff';
 import type { AgentMutation } from '@/domain/agent-mutations';
 import { mutationLabel } from '@/domain/agent-mutations';
 import { briefingToMarkdown, toolkitToMarkdown, type ClareBriefing } from '@/domain/clare-desk';
@@ -186,6 +187,27 @@ function appendMutationCard(
   const meta = el('div', 'hub-chips');
   meta.append(el('span', 'chip', mutation.kind), el('span', 'chip chip--muted', mutationLabel(mutation)));
   card.append(meta);
+  if (mutation.kind === 'task_update' && 'due_date' in (mutation.patch ?? {})) {
+    const ghost = document.createElement('div');
+    ghost.className = 'schedule-diff';
+    ghost.setAttribute('aria-label', 'Proposed schedule change');
+    const label = document.createElement('p');
+    label.className = 'schedule-diff__label';
+    label.textContent = 'Proposed schedule';
+    const row = document.createElement('p');
+    row.className = 'schedule-diff__row';
+    row.textContent = `… → ${mutation.patch.due_date == null ? 'unscheduled' : String(mutation.patch.due_date)}`;
+    ghost.append(label, row);
+    card.append(ghost);
+    void tasksApi.getTask(mutation.task_id).then((task) => {
+      const diff = scheduleDiffFromMutation(mutation, task?.due_date ?? null);
+      if (!diff) {
+        ghost.remove();
+        return;
+      }
+      row.textContent = `${diff.from ?? 'unscheduled'} → ${diff.to ?? 'unscheduled'}`;
+    });
+  }
   if (mutation.kind === 'repo_file') {
     card.append(el('p', 'record-proposal__reasoning', mutation.path));
   }

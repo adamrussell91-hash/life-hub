@@ -730,6 +730,26 @@ function renderE1rmBands(root, lifts) {
         });
         if (!dot) continue;
         bindTip(dot, tip, `${lift.name} · ${formatDisplayDate(point.date)} · ${Number(point.value).toFixed(1)} kg`);
+        if (point.date) {
+          dot.style.cursor = 'pointer';
+          dot.setAttribute('role', 'button');
+          dot.tabIndex = 0;
+          const selectDay = () => {
+            const recent = root.querySelector('#fitness-recent');
+            recent?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            for (const row of root.querySelectorAll('.fitness-recent-row')) {
+              const match = row.dataset.date === point.date;
+              row.classList.toggle('is-focused', match);
+            }
+          };
+          dot.addEventListener('click', selectDay);
+          dot.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              selectDay();
+            }
+          });
+        }
         svg.append(dot);
       }
       block.append(svg);

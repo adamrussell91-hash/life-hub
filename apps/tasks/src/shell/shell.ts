@@ -28,6 +28,7 @@ export type HubViewId =
   | 'graph'
   | 'maps'
   | 'gantt'
+  | 'timeline'
   | 'orbit'
   | 'universe'
   | 'branch'
@@ -71,7 +72,8 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'month', label: 'Month', href: '#/month' },
       { id: 'list', label: 'Backlog', href: '#/list' },
       { id: 'graph', label: 'Graph', href: '#/graph' },
-      { id: 'gantt', label: 'Gantt', href: '#/gantt' }
+      { id: 'gantt', label: 'Gantt', href: '#/gantt' },
+      { id: 'timeline', label: 'Timeline', href: '#/timeline' }
     ]
   },
   {

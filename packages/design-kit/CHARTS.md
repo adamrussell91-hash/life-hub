@@ -168,6 +168,22 @@ Tasks Graph is a rail page, not home. Charts on Tasks are board blocks (counts, 
 
 ---
 
+## Visual grammar (multi-representation)
+
+Shared encoding so the same object feels related across chart / calendar / Gantt / timeline / graph. Not a new library — conventions only.
+
+| Axis | Encoding | Apply on |
+|------|----------|----------|
+| **Time** | Past = muted; today = Wave focus; future = default ink | Calendar chips, Gantt/timeline bars, area-line markers |
+| **State** | Planned / Active / Done / Blocked via existing status chips | Board, Gantt, calendar |
+| **Selection** | Wave inset/outline (`.is-focused`) | Board card, calendar item, Gantt row, chronology bar, graph node |
+| **Importance** | Primary series = clinical slots; secondary = muted | Multi-series charts |
+| **Relationship** | Direct = solid; inferred = soft/dashed | Knowledge spokes vs overlap; Tasks deps |
+
+Agents may name catalog ids + focus/schedule payloads. They must not emit third-party chart option trees.
+
+---
+
 ## How to add or change a type
 
 1. Edit the module under the implementation root (or add one file there).
@@ -185,6 +201,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-05 | grammar | Documented multi-representation visual grammar (time/state/selection/importance/relationship) + agent catalog rule. No new chart types. |
 | 2026-09-05 | Fitness | Fitness painters now consume Mind / Bloods interaction chrome: axis and ring labels, `mind-chart-legend`, `mind-bump__tooltip` hover, `animateAreaReveal` / `animateColumnGrow`. Polar cards cap at 18–20rem. No new catalog types. |
 | 2026-09-05 | `theme-constellation` | Optional `minEdgeCount` (default 2). Fitness library map uses 1 so a same-session pair draws an edge. Caller `node.colour` is kept when set. |
 | 2026-09-05 | `range-bar` | Promoted from Bloods `rangeBarLayout` into chart-kit. Fitness uses it for push/pull and trained/rest gauges. |
