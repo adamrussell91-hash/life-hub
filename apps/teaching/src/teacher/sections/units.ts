@@ -308,7 +308,7 @@ function renderUnitCard(
       {
         label: 'Archive',
         onSelect: () => {
-          confirmAndArchive('unit', unit.id, unit.title, () => {
+          void confirmAndArchive('unit', unit.id, unit.title, () => {
             void options.onMutated?.();
           });
         }
@@ -317,7 +317,7 @@ function renderUnitCard(
         label: 'Move to trash',
         danger: true,
         onSelect: () => {
-          confirmAndTrash('unit', unit.id, unit.title, () => {
+          void confirmAndTrash('unit', unit.id, unit.title, () => {
             void options.onMutated?.();
           });
         }
@@ -387,7 +387,7 @@ export function renderUnitPage(
       {
         label: 'Archive',
         onSelect: () => {
-          confirmAndArchive('unit', unit.id, unit.title, () => {
+          void confirmAndArchive('unit', unit.id, unit.title, () => {
             navigate('/units');
           });
         }
@@ -396,7 +396,7 @@ export function renderUnitPage(
         label: 'Move to trash',
         danger: true,
         onSelect: () => {
-          confirmAndTrash('unit', unit.id, unit.title, () => {
+          void confirmAndTrash('unit', unit.id, unit.title, () => {
             navigate('/units');
           });
         }

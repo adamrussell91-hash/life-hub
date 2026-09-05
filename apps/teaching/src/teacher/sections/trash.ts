@@ -10,6 +10,7 @@ import {
   type LifecycleEntityType,
   type TrashSummary
 } from '@/teacher/lifecycle-api';
+import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { renderPageHeader } from '@/teacher/page-header';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { downloadPortableExport, pushGithubBackup } from '@/teacher/export-api';
@@ -180,13 +181,14 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
       deleteBtn.className = 'btn btn--ghost';
       deleteBtn.textContent = 'Delete permanently';
       deleteBtn.addEventListener('click', () => {
-        if (
-          !window.confirm(
-            `Permanently delete “${row.title}”? This cannot be undone.`
-          )
-        ) {
-          return;
-        }
+        void askConfirmCard({
+          eyebrow: 'Delete forever',
+          title: `Permanently delete “${row.title}”?`,
+          supporting: 'This cannot be undone.',
+          confirmLabel: 'Delete permanently',
+          discardLabel: 'Cancel'
+        }).then((ok) => {
+          if (!ok) return;
         setStatus(null);
         currentRows = currentRows.filter(
           (entry) => !(entry.id === row.id && entry.type === row.type)
@@ -211,6 +213,7 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
                 : 'Unable to delete.';
           setStatus(message, true);
           void reload();
+        });
         });
       });
 

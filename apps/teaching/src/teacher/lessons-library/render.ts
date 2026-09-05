@@ -5,6 +5,7 @@ import {
   pedagogicalModeLabel,
   type PedagogicalMode
 } from '@/curriculum/pedagogical-mode';
+import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { selectTodaySchedule } from '@/teacher/home-model';
 import { resolveScheduleToday } from '@/schedule/today';
 import { applyCreatedEntity, applyEntityStatus } from '@/app/curriculum-state';
@@ -425,27 +426,43 @@ export function renderLessonsLibrary(
       {
         label: 'Archive',
         run: () => {
-          if (!window.confirm(`Archive ${selected.size} lessons?`)) return;
-          const ids = [...selected];
-          for (const id of ids) applyEntityStatus('lesson', id, 'archived');
-          selected = new Set();
-          void options.onMutated?.();
-          void Promise.all(ids.map((id) => patchStatus(entityPath('lesson', id), 'archived'))).catch(
-            () => window.alert('Bulk action failed.')
-          );
+          void askConfirmCard({
+            eyebrow: 'Archive',
+            title: `Archive ${selected.size} lessons?`,
+            supporting: 'Archived lessons leave the active library.',
+            confirmLabel: 'Archive',
+            discardLabel: 'Cancel'
+          }).then((ok) => {
+            if (!ok) return;
+            const ids = [...selected];
+            for (const id of ids) applyEntityStatus('lesson', id, 'archived');
+            selected = new Set();
+            void options.onMutated?.();
+            void Promise.all(ids.map((id) => patchStatus(entityPath('lesson', id), 'archived'))).catch(
+              () => window.alert('Bulk action failed.')
+            );
+          });
         }
       },
       {
         label: 'Trash',
         run: () => {
-          if (!window.confirm(`Move ${selected.size} lessons to trash?`)) return;
-          const ids = [...selected];
-          for (const id of ids) applyEntityStatus('lesson', id, 'trashed');
-          selected = new Set();
-          void options.onMutated?.();
-          void Promise.all(ids.map((id) => patchStatus(entityPath('lesson', id), 'trashed'))).catch(
-            () => window.alert('Bulk action failed.')
-          );
+          void askConfirmCard({
+            eyebrow: 'Trash',
+            title: `Move ${selected.size} lessons to trash?`,
+            supporting: 'You can restore them later from Trash.',
+            confirmLabel: 'Move to trash',
+            discardLabel: 'Cancel'
+          }).then((ok) => {
+            if (!ok) return;
+            const ids = [...selected];
+            for (const id of ids) applyEntityStatus('lesson', id, 'trashed');
+            selected = new Set();
+            void options.onMutated?.();
+            void Promise.all(ids.map((id) => patchStatus(entityPath('lesson', id), 'trashed'))).catch(
+              () => window.alert('Bulk action failed.')
+            );
+          });
         }
       },
       {
@@ -604,7 +621,7 @@ export function renderLessonsLibrary(
         {
           label: 'Archive',
           onSelect: () => {
-            confirmAndArchive('lesson', row.id, row.title, () => {
+            void confirmAndArchive('lesson', row.id, row.title, () => {
               void options.onMutated?.();
             });
           }
@@ -613,7 +630,7 @@ export function renderLessonsLibrary(
           label: 'Move to trash',
           danger: true,
           onSelect: () => {
-            confirmAndTrash('lesson', row.id, row.title, () => {
+            void confirmAndTrash('lesson', row.id, row.title, () => {
               void options.onMutated?.();
             });
           }

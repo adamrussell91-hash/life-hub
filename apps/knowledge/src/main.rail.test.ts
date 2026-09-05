@@ -47,23 +47,38 @@ describe("Knowledge Hub rail", () => {
     expect(main).not.toContain('class="chip"');
   });
 
-  it("keeps reader header actions as the same ghost buttons and drops the hub tile", () => {
+  it("keeps reader header actions as ghost buttons and shows the hub tile beside the title", () => {
     expect(main).toContain('class="btn btn--ghost reader__back" data-back type="button"');
     expect(main).toContain('class="btn btn--ghost" data-edit type="button"');
     expect(main).toContain('class="btn btn--ghost" data-open-chat type="button"');
-    expect(main).not.toContain("hub-mark");
-    expect(main).not.toContain("icons/knowledge.svg");
+    expect(main).toContain("hub-mark");
+    expect(main).toContain("page-header__title-row");
+    expect(main).toContain("icons/knowledge.svg");
+    expect(main).toContain("sign-in__mark");
+    expect(main).toContain("confirm-card");
+    expect(main).toContain("data-tidy-confirm");
     expect(css).toContain("grid-template-areas:");
     expect(css).toContain('"title title"');
     expect(css).not.toMatch(/\.reader__tidy\s*\{[^}]*font-size:/);
   });
 
-  it("opens a From a book sitting from the archive and seeds compose origins", () => {
-    expect(main).toContain('data-from-book');
-    expect(main).toContain("Note from this book");
+  it("puts Ask Clementine, From a book, and Write it yourself under one New note menu", () => {
+    expect(main).toContain("function newNoteMenuHtml");
+    expect(main).toContain("function bindNewNoteMenu");
+    expect(main).toContain("data-new-note-menu");
+    expect(main).toContain("data-from-book");
+    expect(main).toContain("data-make-note");
+    expect(main).toContain("data-blank-note");
+    expect(main).toContain("New note");
+    expect(main).toContain("Ask Clementine");
+    expect(main).toContain("Write it yourself");
     expect(main).toContain("function openBookNote");
+    expect(main).toContain("function openMakeNote");
     expect(main).toContain("function openCompose");
+    expect(main).toContain('hat: "makeNote"');
     expect(main).toContain("compose__savebar");
+    expect(css).toContain(".new-note");
+    expect(css).toContain(".new-note__menu");
     expect(css).toContain(".chat__composer");
     expect(css).toContain("--keyboard-inset");
     expect(css).toContain(".chat__hats");

@@ -22,8 +22,11 @@ describe('sign-in gate', () => {
     expect(host.querySelector('.sign-in__haze')).toBeNull();
     expect(host.querySelector('.sign-in__bubble')).toBeNull();
     expect(host.querySelector('.sign-in__sparkle')).toBeNull();
-    expect(host.querySelector('.sign-in__mark')).toBeNull();
-    expect(card?.firstElementChild).toBe(brand);
+    const mark = host.querySelector('.sign-in__mark');
+    expect(mark).not.toBeNull();
+    expect(mark?.getAttribute('src')).toContain('tasks.svg');
+    expect(card?.firstElementChild).toBe(mark);
+    expect(card?.querySelector('.sign-in__brand')).toBe(brand);
     expect(brand?.textContent).toBe('Tasks Hub');
   });
 });

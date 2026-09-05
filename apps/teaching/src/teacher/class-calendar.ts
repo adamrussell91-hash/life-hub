@@ -366,7 +366,8 @@ function buildDayCell(
 
   const num = document.createElement('span');
   num.className = 'class-calendar__day-num';
-  num.textContent = String(day.day);
+  num.textContent = formatDisplayDate(day.date);
+  num.title = formatDisplayDate(day.date);
   cell.append(num);
 
   const visible = day.lessons.slice(0, 2);
@@ -421,7 +422,8 @@ function buildTimeGrid(
     weekday.textContent = formatWeekdayShort(date);
     const num = document.createElement('span');
     num.className = 'class-calendar__day-num hub-calendar__day-num';
-    num.textContent = String(Number(date.slice(8, 10)));
+    num.textContent = formatDisplayDate(date);
+    num.title = formatDisplayDate(date);
     heading.append(weekday, num);
     const schedule = handlersByRoot.get(root)?.onScheduleLesson;
     if (schedule) {

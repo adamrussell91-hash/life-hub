@@ -9,6 +9,7 @@ import {
   isCompositionUsable,
   isLinkedSection
 } from '@/blocks/composition-link';
+import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
 import { createFromInsertMenu } from '@/blocks/create-block';
 import { findBlockById } from '@/blocks/find-block';
@@ -572,7 +573,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         });
       },
           onTrash: () => {
-        confirmAndTrash('lesson', lesson.id, lesson.title, () => {
+        void confirmAndTrash('lesson', lesson.id, lesson.title, () => {
           navigate('/lessons');
         });
       },
@@ -609,13 +610,15 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
         return { ok: true };
       },
       onStaleAccept: (apply) => {
-        if (
-          window.confirm(
-            'You edited while the plan was built. Accept replaces the lesson with this plan.'
-          )
-        ) {
-          apply();
-        }
+        void askConfirmCard({
+          eyebrow: 'Stale plan',
+          title: 'You edited while the plan was built.',
+          supporting: 'Accept replaces the lesson with this plan.',
+          confirmLabel: 'Accept plan',
+          discardLabel: 'Cancel'
+        }).then((ok) => {
+          if (ok) apply();
+        });
       },
       onWorkingChange: (working) => {
         chatFab.classList.toggle('lesson-builder__chat-fab--working', working);

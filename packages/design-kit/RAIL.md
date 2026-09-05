@@ -2,7 +2,7 @@
 
 The left rail is **the same component on every hub**. Glass/tile overlays may change the canvas. They must not change rail width, brand behaviour, item markers, or type.
 
-Read this before adding or restyling a rail destination. Snippet: `snippets/rail.html`. CSS: `css/rail.css` (also pulled in by `chrome.css`).
+Read this before adding or restyling a rail destination. Snippet: `snippets/rail.html`. CSS: `rail.css` (also pulled in by `chrome.css`).
 
 **Phones:** the rail is hidden under `720px`. Use the locked bottom bar + More sheet instead (`MOBILE.md`). Do not force the rail back on as a compact top strip.
 
@@ -104,7 +104,7 @@ Tasks clones Teaching. See `TASKS.md`.
 
 ## Adopt in an existing hub
 
-1. Load `css/rail.css` (or `chrome.css`, which imports it).
+1. Load `rail.css` (or `chrome.css`, which imports it).
 2. Replace the aside with `snippets/rail.html`. Keep existing `href`s / ids if tests rely on them.
 3. Make the brand an `<a>` to home. Drop stacked titles, logos, and brand-adjacent chevrons.
 4. Give every primary destination an outline icon + title-case label. Replace coloured dots.

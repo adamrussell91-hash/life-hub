@@ -15,6 +15,8 @@ test('repo-root design-kit/ is gone so the frozen copy cannot drift', async () =
 test('prepare-web copies the kit from packages/design-kit into dist/packages/design-kit', async () => {
   const source = await readFile(new URL('scripts/prepare-web.mjs', root), 'utf8');
   assert.match(source, /packages\/design-kit\//);
+  assert.match(source, /copyDesignKitIcons/);
+  assert.match(source, /packages\/design-kit\/icons\//);
   assert.doesNotMatch(source, /new URL\('design-kit\//);
 });
 

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ANSWER_FROM_ARCHIVE, CITE_NOTES_AS_LINKS, RESEARCH_THE_OPEN_WEB, runChatTurn, START_KERNEL_BUDGET_MS, writeMaxTokens } from "./chatTurn";
 import { SYNTHESIS_WRITE_TOKENS } from "./synthesisProtocol";
-import { BOOK_NOTE_WRITE_TOKENS } from "./bookNote";
+import { BOOK_NOTE_WRITE_TOKENS, MAKE_NOTE_WRITE_TOKENS } from "./bookNote";
 
 const voice = readFileSync(join(process.cwd(), "prompts/clementine-voice.md"), "utf8");
 const universityJob = readFileSync(join(process.cwd(), "prompts/clementine-university.md"), "utf8");
@@ -118,6 +118,7 @@ describe("runChatTurn", () => {
   it("gives thematic synthesis a larger write budget than a cheap scoping map", () => {
     expect(writeMaxTokens({ hat: "synthesis", depth: "iterative" })).toBe(SYNTHESIS_WRITE_TOKENS);
     expect(writeMaxTokens({ hat: "fromBook" })).toBe(BOOK_NOTE_WRITE_TOKENS);
+    expect(writeMaxTokens({ hat: "makeNote" })).toBe(MAKE_NOTE_WRITE_TOKENS);
     expect(writeMaxTokens({ hat: "scoping" })).toBe(1200);
     expect(writeMaxTokens({ hat: "evidence" })).toBe(2000);
   });
@@ -199,6 +200,36 @@ describe("runChatTurn", () => {
     expect(write.start).toHaveBeenCalledOnce();
     expect(write.poll).not.toHaveBeenCalled();
     expect(result).toMatchObject({ status: "writing", writeSessionId: "w-web" });
+  });
+
+  it("skips the archive and starts a web-search write for Make a note", async () => {
+    const fetchImpl = vi.fn();
+    const archivePull = vi.fn();
+    const write = {
+      start: vi.fn(async (input: { system: string; webSearch?: boolean }) => {
+        expect(input.webSearch).toBe(true);
+        expect(input.system).toContain("Make a note protocol");
+        expect(input.system).toContain(RESEARCH_THE_OPEN_WEB);
+        expect(input.system).toContain("Do not invent an origin");
+        expect(input.system).not.toContain(ANSWER_FROM_ARCHIVE);
+        expect(input.system).not.toContain("From a book protocol");
+        return { writeSessionId: "w-make", status: "writing" as const };
+      }),
+      poll: vi.fn(),
+    };
+    const result = await runChatTurn({
+      voice,
+      universityJob,
+      hat: "makeNote",
+      messages: [{ role: "user", content: "desirable difficulties as a classroom habit" }],
+      kernel: { url: "https://kernel.test", secret: "k", fetchImpl: fetchImpl as unknown as typeof fetch },
+      archivePull,
+      write,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(archivePull).not.toHaveBeenCalled();
+    expect(write.start).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ status: "writing", writeSessionId: "w-make" });
   });
 
   it("tells her to answer a curriculum question from the archive instead of refusing it", async () => {

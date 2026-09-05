@@ -16,6 +16,7 @@ class FakeElement extends EventTarget {
     this.hidden = false;
     this.children = [];
     this.parent = null;
+    this.attributes = new Map();
     this.style = {
       props: new Map(),
       setProperty(name, value) {
@@ -25,6 +26,10 @@ class FakeElement extends EventTarget {
         return this.props.get(name) ?? '';
       }
     };
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
   }
 
   append(...nodes) {
@@ -97,6 +102,21 @@ class FakeDocument {
   }
 }
 
+function findProposalCard(list, token = 'record-proposal') {
+  return list.children.find(child => child.className.includes(token));
+}
+
+function findProposalButton(proposal, token) {
+  const actions = proposal.children.find(child => child.className === 'confirm-card__actions');
+  return actions?.children.find(child => child.className.includes(token)) ?? null;
+}
+
+function proposalHasConfirmButton(item) {
+  if (item.className.includes('record-proposal__confirm')) return true;
+  const actions = item.children?.find(child => child.className === 'confirm-card__actions');
+  return actions?.children?.some(child => child.className.includes('record-proposal__confirm')) ?? false;
+}
+
 function fakeChatApi({ record, path, confirmImpl }) {
   const confirmCalls = [];
   return {
@@ -164,8 +184,8 @@ test('confirm shows Saving… while the request is in flight then restores on fa
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -192,7 +212,7 @@ test('editing a numeric and a boolean field before confirming sends the coerced 
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
+  const proposal = findProposalCard(list);
   assert.ok(proposal, 'a record proposal card should have been appended');
 
   const fields = proposal.children.find(child => child.tagName === 'dl');
@@ -206,7 +226,7 @@ test('editing a numeric and a boolean field before confirming sends the coerced 
   inputsByField.get('duration_minutes').value = '45';
   inputsByField.get('completed').value = 'true';
 
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -230,8 +250,8 @@ test('a confirm that reports centralNodeUpdated:false shows an ephemeral warning
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -254,8 +274,8 @@ test('a confirm that reports centralNodeUpdated:true does not show the Central N
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -282,8 +302,8 @@ test('a diary confirm that reports dayoneSent:false shows a Day One warning with
   await controller.send('Penelope, diary time');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -307,8 +327,8 @@ test('confirming a completed workout with a reported PB appends an in-voice Chad
   await controller.send('Chadwick, log today\'s session');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -335,8 +355,8 @@ test('confirming a completed workout with no PB does not append a hype line', as
   await controller.send('Chadwick, log today\'s session');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   const bubbleCountBefore = list.children.length;
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -356,8 +376,8 @@ test('a non-workout confirm never appends a PB hype line even if personalBests i
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -383,8 +403,8 @@ test('a write_conflict on first confirm prompts a retry, and confirming again se
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
 
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -1691,7 +1711,7 @@ test('cn_patch_proposal Confirm posts kind cn_patch with the patch candidate', a
   const list = root.querySelector('#chat-messages');
   const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
   assert.ok(proposal, 'expected a CN patch proposal card');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -1725,8 +1745,8 @@ test('cn_patch_proposal Confirm includes the pending id when the propose SSE car
   await controller.send('Hammond, run the weekly review');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -1759,7 +1779,7 @@ test('cn_patch_proposal Discard also dismisses the server-side queue entry when 
 
   const list = root.querySelector('#chat-messages');
   const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
-  const discardButton = proposal.children.find(child => child.className === 'record-proposal__discard');
+  const discardButton = findProposalButton(proposal, 'record-proposal__discard');
   discardButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -1793,7 +1813,7 @@ test('cn_patch_proposal Discard removes the card without confirming', async () =
 
   const list = root.querySelector('#chat-messages');
   const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
-  const discardButton = proposal.children.find(child => child.className === 'record-proposal__discard');
+  const discardButton = findProposalButton(proposal, 'record-proposal__discard');
   discardButton.dispatchEvent(new Event('click'));
 
   assert.equal(confirmCalls.length, 0);
@@ -1826,10 +1846,7 @@ test('record_saved appends the summary without a Confirm card and notifies onRec
   );
   assert.ok(hasSummary, 'expected the record_saved summary in a message body');
 
-  const hasConfirm = list.children.some(item =>
-    item.className === 'record-proposal__confirm'
-    || item.children?.some(child => child.className === 'record-proposal__confirm')
-  );
+  const hasConfirm = list.children.some(item => proposalHasConfirmButton(item));
   assert.equal(hasConfirm, false, 'auto-saved sessions must not show a Confirm card');
   assert.equal(written.length, 1);
   assert.equal(written[0].type, 'record_saved');

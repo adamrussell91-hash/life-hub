@@ -139,7 +139,7 @@ For each path: unauthenticated `GET`/`OPTIONS` should not be `404` from a missin
 
 Teaching (session): `/api/curriculum`, `/api/lessons`, `/api/classes`, `/api/scheduled-lessons`, `/api/search`, `/api/compositions`, `/api/trash`, `/api/scope-sequences`, `/api/export`, `/api/ai/jobs`, `/api/alchemy-lab`, `/api/media`, `/api/outcomes`.
 
-Tasks: `/api/tasks`, `/api/projects`, `/api/areas`, `/api/goals`, `/api/maps`, `/api/programs`, `/api/clare`, `/api/templates`, `/api/stall`, `/api/reviews`.
+Tasks: `/api/tasks`, `/api/projects`, `/api/areas`, `/api/goals`, `/api/maps`, `/api/programs`, `/api/clare`, `/api/templates`, `/api/stall`, `/api/reviews`, `/api/task-properties`.
 
 Knowledge (prefix `/api/knowledge`): `/pages`, `/search`, `/quiz`, `/tidy`, `/curator`, `/podcast`, `/clementine-chat`, `/clementine-coach`, `/capture`, `/attachments-sign`.
 

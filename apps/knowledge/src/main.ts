@@ -131,6 +131,8 @@ let composeOriginKind: Origin["kind"] = "degree";
 let activePage: Page | null = null;
 let pendingMorphOrigin: { left: number; top: number; width: number; height: number } | null = null;
 let tidyBusy = false;
+let tidyConfirmPending = false;
+const HUB_MARK_SRC = "./icons/knowledge.svg";
 let listScrollTop = 0;
 let listPainted: VirtualListPainted | null = null;
 let graphTeardown: (() => void) | null = null;
@@ -246,7 +248,10 @@ function pageHeader(
       ${portrait}
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">${eyebrow}</p>
-        <h1 class="page-header__title hub-kinetic">${title}</h1>
+        <div class="page-header__title-row">
+          <img class="hub-mark" src="${HUB_MARK_SRC}" alt="" width="32" height="32" />
+          <h1 class="page-header__title hub-kinetic">${title}</h1>
+        </div>
       </div>
       ${actions}
     </header>`;
@@ -334,6 +339,107 @@ function openBookNote(book?: string) {
     history.replaceState(null, "", `${location.pathname}${location.search}`);
   }
   render();
+}
+
+function openMakeNote() {
+  leaveSpecialRails();
+  compose = null;
+  activePage = null;
+  enterChatRail({
+    fresh: true,
+    hat: "makeNote",
+  });
+  view = "chat";
+  if (isPageHash(location.hash)) {
+    history.replaceState(null, "", `${location.pathname}${location.search}`);
+  }
+  render();
+}
+
+function newNoteMenuHtml(bookLabel?: string) {
+  const fromBookLabel = bookLabel ? `From “${escapeHtml(bookLabel)}”` : "From a book";
+  return `<div class="new-note">
+    <button class="btn" data-new-note-menu type="button" aria-haspopup="menu" aria-expanded="false">New note</button>
+    <div class="hub-menu new-note__menu" role="menu" hidden>
+      <p class="hub-menu__head">New note</p>
+      <button class="hub-menu__opt" role="menuitem" data-make-note type="button">
+        <span class="new-note__opt">
+          <span class="new-note__opt-title">Ask Clementine</span>
+          <span class="new-note__opt-detail">She researches the open web and files a tagged page</span>
+        </span>
+      </button>
+      <button class="hub-menu__opt" role="menuitem" data-from-book type="button">
+        <span class="new-note__opt">
+          <span class="new-note__opt-title">${fromBookLabel}</span>
+          <span class="new-note__opt-detail">Researched from a passage, stamped under the book</span>
+        </span>
+      </button>
+      <button class="hub-menu__opt" role="menuitem" data-blank-note type="button">
+        <span class="new-note__opt">
+          <span class="new-note__opt-title">Write it yourself</span>
+          <span class="new-note__opt-detail">Open a blank page and type</span>
+        </span>
+      </button>
+    </div>
+  </div>`;
+}
+
+function bindNewNoteMenu(root: ParentNode, bookLabel?: string) {
+  const toggle = root.querySelector<HTMLButtonElement>("[data-new-note-menu]");
+  const menu = root.querySelector<HTMLElement>(".new-note__menu");
+  if (!toggle || !menu) return;
+
+  let docBound = false;
+  const onDocClick = (event: MouseEvent) => {
+    if (!(event.target instanceof Node) || menu.contains(event.target) || toggle.contains(event.target)) return;
+    close();
+  };
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    close();
+  };
+  const unbindDoc = () => {
+    if (!docBound) return;
+    document.removeEventListener("click", onDocClick, true);
+    document.removeEventListener("keydown", onKey, true);
+    docBound = false;
+  };
+  const bindDoc = () => {
+    if (docBound) return;
+    document.addEventListener("click", onDocClick, true);
+    document.addEventListener("keydown", onKey, true);
+    docBound = true;
+  };
+  const close = () => {
+    menu.hidden = true;
+    menu.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+    unbindDoc();
+  };
+  const open = () => {
+    menu.hidden = false;
+    menu.classList.add("is-open");
+    toggle.setAttribute("aria-expanded", "true");
+    queueMicrotask(bindDoc);
+  };
+
+  toggle.onclick = event => {
+    event.stopPropagation();
+    if (menu.classList.contains("is-open")) close();
+    else open();
+  };
+  root.querySelector<HTMLButtonElement>("[data-make-note]")!.onclick = () => {
+    close();
+    openMakeNote();
+  };
+  root.querySelector<HTMLButtonElement>("[data-from-book]")!.onclick = () => {
+    close();
+    openBookNote(bookLabel);
+  };
+  root.querySelector<HTMLButtonElement>("[data-blank-note]")!.onclick = () => {
+    close();
+    openCompose();
+  };
 }
 
 function resetOriginLabelChrome() {
@@ -541,13 +647,7 @@ function renderList() {
     ${pageHeader(
       `Private archive${originFilter.kind ? " · origin" : keywordFilter ? " · keyword" : ""}`,
       escapeHtml(listTitle()),
-      `${
-        originFilter.kind === "book" && originFilter.label
-          ? `<button class="btn" data-from-book type="button">Note from this book</button>
-             <button class="btn btn--ghost" data-new-note type="button">New note</button>`
-          : `<button class="btn" data-new-note type="button">New note</button>
-             <button class="btn btn--ghost" data-from-book type="button">From a book</button>`
-      }
+      `${newNoteMenuHtml(originFilter.kind === "book" ? originFilter.label : undefined)}
         <div class="viewbar">
           <button class="viewbar__btn is-active" type="button">List</button>
           <button class="viewbar__btn" data-jump-graph type="button">Graph</button>
@@ -575,12 +675,7 @@ function renderList() {
     view = "graph";
     render();
   };
-  app.querySelector<HTMLButtonElement>("[data-new-note]")!.onclick = () => {
-    openCompose();
-  };
-  app.querySelector<HTMLButtonElement>("[data-from-book]")!.onclick = () => {
-    openBookNote(originFilter.kind === "book" ? originFilter.label : undefined);
-  };
+  bindNewNoteMenu(app, originFilter.kind === "book" ? originFilter.label : undefined);
   app.querySelector<HTMLButtonElement>("[data-clear-keyword]")?.addEventListener("click", () => {
     keywordFilter = "";
     listScrollTop = 0;
@@ -1025,7 +1120,7 @@ function renderPage(page: Page) {
       escapeHtml(page.title),
       `<button class="btn btn--ghost reader__back" data-back type="button">← Archive</button>
         <button class="btn btn--ghost" data-edit type="button">Edit</button>
-        <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy ? "disabled" : ""}>${tidyBusy ? "Cleaning up…" : "Clean up"}</button>
+        <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyConfirmPending ? "disabled" : ""}>${tidyBusy ? "Cleaning up…" : "Clean up"}</button>
         <button class="btn btn--ghost" data-open-chat type="button">Chat</button>
         ${
           resolvedOrigins(page).find(origin => origin.kind === "book")
@@ -1034,6 +1129,19 @@ function renderPage(page: Page) {
         }`,
     )}
     <article class="reader" data-hub-morph-page>
+      ${
+        tidyConfirmPending
+          ? `<section class="confirm-card" role="region" aria-label="Confirm clean up">
+        <p class="page-header__eyebrow">Proposed write</p>
+        <h2 class="page-header__title" style="font-size: var(--text-lg)">Clean up this note</h2>
+        <p class="page-header__supporting">AI will rewrite the title, tags, and body. Review the result when it finishes.</p>
+        <div class="confirm-card__actions">
+          <button class="btn btn--ghost" data-tidy-discard type="button">Discard</button>
+          <button class="btn btn--primary" data-tidy-confirm type="button">Confirm</button>
+        </div>
+      </section>`
+          : ""
+      }
       ${originPillsHtml(resolvedOrigins(page), { openEdit: true })}
       ${readerTopicPillsHtml(topics.slice(0, 6))}
       <div class="reader__body">${renderMarkdown(page.body)}</div>
@@ -1058,8 +1166,18 @@ function renderPage(page: Page) {
     const book = resolvedOrigins(page).find(origin => origin.kind === "book");
     openBookNote(book?.label);
   });
-  app.querySelector<HTMLButtonElement>("[data-tidy]")!.onclick = async () => {
+  app.querySelector<HTMLButtonElement>("[data-tidy]")!.onclick = () => {
+    if (tidyBusy || tidyConfirmPending) return;
+    tidyConfirmPending = true;
+    render();
+  };
+  app.querySelector<HTMLButtonElement>("[data-tidy-discard]")?.addEventListener("click", () => {
+    tidyConfirmPending = false;
+    render();
+  });
+  app.querySelector<HTMLButtonElement>("[data-tidy-confirm]")?.addEventListener("click", async () => {
     if (tidyBusy) return;
+    tidyConfirmPending = false;
     tidyBusy = true;
     render();
     try {
@@ -1073,7 +1191,7 @@ function renderPage(page: Page) {
       tidyBusy = false;
       render();
     }
-  };
+  });
   app.querySelectorAll<HTMLButtonElement>("[data-open-page]").forEach(button => {
     button.onclick = () => void openPage(button.dataset.openPage!);
   });
@@ -1553,6 +1671,7 @@ function renderLogin(message?: string) {
   hideChatOverlay();
   app.innerHTML = `<div class="sign-in">
     <form class="sign-in__card" method="post" action="#" novalidate>
+      <img class="sign-in__mark" src="${HUB_MARK_SRC}" alt="" width="56" height="56" />
       <p class="sign-in__brand">Knowledge Hub</p>
       <h1 class="sign-in__title">Sign in</h1>
       <div class="sign-in__field">

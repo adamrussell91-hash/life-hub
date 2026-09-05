@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
+  blockStyle,
   hoursFromOffset,
   hoursToDueTime,
   layoutTimedBlocks,
@@ -97,5 +100,37 @@ describe('time grid', () => {
     expect(parseGoToDate('today', today)?.getDate()).toBe(17);
     expect(parseGoToDate('tomorrow', today)?.getDate()).toBe(18);
     expect(parseGoToDate('nope', today)).toBeNull();
+  });
+
+  it('sizes a lone timed block nearly full width of the hour column', () => {
+    const gym = item({
+      id: 'task:gym',
+      title: 'Gym',
+      task: task({ id: 'gym', title: 'Gym', due_time: '12:00', estimated_duration: 60 })
+    });
+    const [block] = layoutTimedBlocks([gym]);
+    expect(block).toBeDefined();
+    const style = blockStyle(block!);
+    expect(style.width).toBe('calc((100% - 4px) / 1)');
+    expect(style.left).toBe('calc(0 * (100% - 4px) / 1 + 2px)');
+  });
+});
+
+describe('mobile calendar width CSS', () => {
+  const calendarCss = readFileSync(
+    resolve(process.cwd(), 'design-kit/calendar.css'),
+    'utf8'
+  );
+  const viewsCss = readFileSync(resolve(process.cwd(), 'src/styles/views.css'), 'utf8');
+
+  it('gives day-view timegrids the full remaining column on phones', () => {
+    expect(calendarCss).toMatch(
+      /@media \(max-width:\s*720px\)[\s\S]*?\.hub-calendar__timegrid\[data-days='1'\]\s*\{[^}]*minmax\(0,\s*1fr\)/
+    );
+  });
+
+  it('keeps Today task stacks full width', () => {
+    expect(viewsCss).toMatch(/\.task-stack\s*\{[^}]*width:\s*100%/);
+    expect(viewsCss).toMatch(/\.hub-card-slot\s*\{[^}]*width:\s*100%/);
   });
 });

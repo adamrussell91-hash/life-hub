@@ -69,7 +69,7 @@ describe('daily dial view', () => {
     expect(host.querySelector('.daily-dial')).not.toBeNull();
     expect(host.querySelector('.glass-panel')).not.toBeNull();
     expect(host.querySelector('.hub-pills')).not.toBeNull();
-    expect(host.textContent).toContain('Tap an hour to open it up');
+    expect(host.textContent).toContain('Tap an hour to schedule');
     expect(host.querySelector('.daily-dial__label--focused')?.textContent).toBe('9 AM');
     expect(host.querySelector('.daily-dial__chip-title')?.textContent).toBe('Standup');
     handle.destroy();
@@ -110,5 +110,20 @@ describe('daily dial view', () => {
     expect(weekBtn?.classList.contains('is-active')).toBe(true);
     expect(host.textContent).toContain('Tap a day to see its schedule');
     expect(host.querySelector('.daily-dial__week-total')).not.toBeNull();
+  });
+
+  it('omits domains deleted from Properties in the dial legend', async () => {
+    const { DEFAULT_TASK_PROPERTY_CONFIG } = await import('@/domain/task-properties-defaults');
+    const taskProperties = await import('@/services/task-properties');
+    vi.spyOn(taskProperties, 'getTaskPropertiesSync').mockReturnValue({
+      ...DEFAULT_TASK_PROPERTY_CONFIG,
+      domains: DEFAULT_TASK_PROPERTY_CONFIG.domains.filter((entry) => entry.id !== 'wedding')
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountDailyDial(host, { tasks: [], projects: [] });
+    const legend = host.querySelector('.daily-dial__legend')?.textContent ?? '';
+    expect(legend).toContain('Life');
+    expect(legend).not.toContain('Wedding');
   });
 });

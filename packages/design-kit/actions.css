@@ -1,5 +1,5 @@
 /* Shared action chrome. Existing hubs import this instead of full chrome.css.
- * Left rail is css/rail.css (RAIL.md) — load it alongside this sheet when adopting.
+ * Left rail is rail.css (RAIL.md) — load it alongside this sheet when adopting.
  */
 
 /* Discrete chrome utilities (refresh / sign out). Top-right of the page header —

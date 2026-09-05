@@ -1,4 +1,5 @@
 import { apiPost, apiPut, ApiClientError } from '@/api/client';
+import { askConfirmCard } from '@/teacher/confirm-dialog';
 import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import type { VersionReason } from '@/schemas/version';
@@ -317,9 +318,13 @@ export function mountSavePublishControls(options: SavePublishMountOptions): Save
           const ctx = await options.getPublishMediaContext();
           const warnings = collectRestrictedDriveMediaWarnings(ctx);
           if (warnings.length > 0) {
-            const proceed = window.confirm(
-              `${formatPublishMediaWarnings(warnings)}\n\nPublish anyway?`
-            );
+            const proceed = await askConfirmCard({
+              eyebrow: 'Publish',
+              title: 'Restricted Drive media detected',
+              supporting: `${formatPublishMediaWarnings(warnings)} Publish anyway?`,
+              confirmLabel: 'Publish anyway',
+              discardLabel: 'Cancel'
+            });
             if (!proceed) return;
           }
         }

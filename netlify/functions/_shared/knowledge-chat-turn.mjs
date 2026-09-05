@@ -155,8 +155,10 @@ function assembledSystem(input, archive) {
     ? `\n${loadKnowledgePrompt('clementine-thematic-synthesis.md', input.cwd)}`
     : input.hat === 'fromBook'
       ? `\n${loadKnowledgePrompt('clementine-book-note.md', input.cwd)}`
-      : '';
-  const grounding = input.hat === 'fromBook'
+      : input.hat === 'makeNote'
+        ? `\n${loadKnowledgePrompt('clementine-make-note.md', input.cwd)}`
+        : '';
+  const grounding = input.hat === 'fromBook' || input.hat === 'makeNote'
     ? RESEARCH_THE_OPEN_WEB
     : `${ANSWER_FROM_ARCHIVE}\n${CITE_NOTES_AS_LINKS}`;
   return {
@@ -187,7 +189,7 @@ async function startWrite(input, archive) {
     maxTokens: writeMaxTokens(input),
     research: archive.research,
     archiveFailed: archive.archiveFailed,
-    webSearch: input.hat === 'fromBook' || undefined
+    webSearch: input.hat === 'fromBook' || input.hat === 'makeNote' || undefined
   });
   if (started.status === 'done' && started.reply) {
     return {
@@ -297,7 +299,7 @@ export async function runChatTurn(input) {
     };
   }
   if (input.writeSessionId) return pollWrite(input);
-  if (input.hat === 'fromBook' && !input.compose) return startWrite(input, { note: '' });
+  if ((input.hat === 'fromBook' || input.hat === 'makeNote') && !input.compose) return startWrite(input, { note: '' });
   if (input.compose) {
     if (input.priorResearch?.findings?.length) {
       return startWrite(input, {

@@ -6,7 +6,7 @@ import {
   type CalendarFilters
 } from '@/domain/calendar';
 import {
-  DIAL_LEGEND,
+  dialLegendForDomains,
   assignLanes,
   closestOccupiedHour,
   eventsFromTasks,
@@ -30,6 +30,7 @@ import {
   toDateKey,
   weekDays
 } from '@/domain/queries';
+import { getTaskPropertiesSync } from '@/services/task-properties';
 import { createHubPills, el } from '@/views/hub-kit';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -47,7 +48,9 @@ const LANE_START = BAND_IN + 9;
 const TASK_GAP = 1.2;
 const LEADER_ELBOW_R = 150;
 const LEADER_STUB = 12;
-const LEADER_CHIP_W = 92;
+/** Wide enough that scaled-down mobile dials still show a readable title. */
+const LEADER_CHIP_W = 148;
+const DIAL_VIEWBOX = '-40 0 600 520';
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 const TINT_INK: Record<DialTint, string> = {
@@ -75,7 +78,11 @@ export type DailyDialOptions = {
   now?: Date;
   timeZone?: string;
   filters?: { domain?: CalendarFilters['domain']; priority?: Task['priority'] | 'all' };
+  /** Prefer this hour when the day ring first mounts (e.g. after creating a timed task). */
+  focusHour?: number | null;
   onOpen?: (task: Task) => void;
+  /** Fired when the user taps an hour wedge — Today uses this to seed quick-add time. */
+  onHourSelect?: (hour: number) => void;
 };
 
 function svgEl<K extends keyof SVGElementTagNameMap>(
@@ -368,11 +375,13 @@ function mountDayRing(
   now: Date,
   timeZone: string,
   tasks: Task[],
-  onOpen?: (task: Task) => void
+  onOpen?: (task: Task) => void,
+  focusHour?: number | null,
+  onHourSelect?: (hour: number) => void
 ): { destroy: () => void; positionHand: () => void } {
   const occupancy = hourOccupancy(events);
   const clock = hubClockParts(now, timeZone);
-  const svg = svgEl('svg', { viewBox: '0 0 520 520', 'aria-hidden': 'true' });
+  const svg = svgEl('svg', { viewBox: DIAL_VIEWBOX, 'aria-hidden': 'true' });
   svg.append(svgEl('circle', { class: 'daily-dial__rim', cx: CX, cy: CY, r: 146 }));
   const spokes = svgEl('g');
   const bars = svgEl('g');
@@ -419,9 +428,20 @@ function mountDayRing(
     dateEl.textContent = formatDisplayDate(parts.dateKey);
   };
 
-  const ring = makeFisheyeRing({
+  const preferredFocus =
+    focusHour != null && focusHour >= 0 && focusHour <= 23
+      ? focusHour
+      : closestOccupiedHour(events, clock.hour);
+
+  let ring: ReturnType<typeof makeFisheyeRing>;
+  const selectHour = (hour: number): void => {
+    onHourSelect?.(hour);
+    ring.focus(hour);
+  };
+
+  ring = makeFisheyeRing({
     count: 24,
-    defaultFocus: closestOccupiedHour(events, clock.hour),
+    defaultFocus: preferredFocus,
     onFrame: (boundaries, focusIndex, settled) => {
       lastBoundaries = boundaries;
       spokes.replaceChildren();
@@ -450,10 +470,16 @@ function mountDayRing(
           : R_IN + Math.max(data.occ, data.occ > 0 ? 0.16 : 0) * (R_OUT_MAX - R_IN);
         if (!focused) {
           const bar = drawArcBar(bars, a0, span, R_IN, Math.max(outerR, R_IN + 3), tintColor(data.cat), false);
-          bar.addEventListener('click', () => ring.focus(i));
+          bar.addEventListener('click', () => selectHour(i));
         }
         const hourEvents = eventsInHour(events, i);
-        drawHit(bars, a0, span, () => ring.focus(i), `${hourCaption(i)}, ${hourEvents.length} ${hourEvents.length === 1 ? 'task' : 'tasks'}`);
+        drawHit(
+          bars,
+          a0,
+          span,
+          () => selectHour(i),
+          `${hourCaption(i)}, ${hourEvents.length} ${hourEvents.length === 1 ? 'task' : 'tasks'}`
+        );
         const mid = (a0 + a1) / 2;
         if (focused) {
           const at = point(R_OUT_MAX + 24, mid);
@@ -517,7 +543,7 @@ function mountWeekRing(
   tasks: Task[],
   onOpen?: (task: Task) => void
 ): { destroy: () => void } {
-  const svg = svgEl('svg', { viewBox: '0 0 520 520', 'aria-hidden': 'true' });
+  const svg = svgEl('svg', { viewBox: DIAL_VIEWBOX, 'aria-hidden': 'true' });
   svg.append(svgEl('circle', { class: 'daily-dial__rim', cx: CX, cy: CY, r: 146 }));
   const spokes = svgEl('g');
   const bars = svgEl('g');
@@ -648,7 +674,7 @@ export function mountDailyDial(host: HTMLElement, options: DailyDialOptions): Da
   const weekPanel = el('div', 'daily-dial__panel');
   const dayShell = el('div', 'daily-dial__shell');
   const weekShell = el('div', 'daily-dial__shell');
-  dayPanel.append(dayShell, el('p', 'daily-dial__hint', 'Tap an hour to open it up'));
+  dayPanel.append(dayShell, el('p', 'daily-dial__hint', 'Tap an hour to schedule'));
   weekPanel.append(weekShell, el('p', 'daily-dial__hint', 'Tap a day to see its schedule'));
 
   const desc = el('p', 'visually-hidden');
@@ -658,7 +684,7 @@ export function mountDailyDial(host: HTMLElement, options: DailyDialOptions): Da
     : 'No timed work on the dial today.';
 
   const legend = el('div', 'daily-dial__legend');
-  for (const item of DIAL_LEGEND) {
+  for (const item of dialLegendForDomains(getTaskPropertiesSync().domains)) {
     const row = el('span', 'daily-dial__legend-item');
     const dot = el('span', 'daily-dial__legend-dot');
     dot.dataset.tint = item.tint;
@@ -705,7 +731,16 @@ export function mountDailyDial(host: HTMLElement, options: DailyDialOptions): Da
       });
     }
     if (mode === 'day' && !dayRing) {
-      dayRing = mountDayRing(dayShell, dayEvents, now, timeZone, visibleTasks, options.onOpen);
+      dayRing = mountDayRing(
+        dayShell,
+        dayEvents,
+        now,
+        timeZone,
+        visibleTasks,
+        options.onOpen,
+        options.focusHour,
+        options.onHourSelect
+      );
     }
     if (mode === 'week' && !weekRing) {
       weekRing = mountWeekRing(weekShell, week, byDay, todayKey, visibleTasks, options.onOpen);

@@ -31,6 +31,7 @@ const DOMAIN_TINT: Record<string, DialTint> = {
   other: 'sage'
 };
 
+/** Fallback legend when Properties has not loaded — mirrors the seed defaults. */
 export const DIAL_LEGEND: Array<{ tint: DialTint; label: string }> = [
   { tint: 'blue', label: 'Teaching' },
   { tint: 'gold', label: 'Life' },
@@ -42,6 +43,22 @@ export const DIAL_LEGEND: Array<{ tint: DialTint; label: string }> = [
 export function dialTintForDomain(domain: TaskDomain | string | null | undefined): DialTint {
   if (!domain) return 'sage';
   return DOMAIN_TINT[domain] ?? 'sage';
+}
+
+function titleCaseLabel(label: string): string {
+  return label
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+/** Dial colour key — only domains still in Tools → Properties. */
+export function dialLegendForDomains(
+  domains: Array<{ id: string; label: string }>
+): Array<{ tint: DialTint; label: string }> {
+  return domains.map((domain) => ({
+    tint: dialTintForDomain(domain.id),
+    label: titleCaseLabel(domain.label)
+  }));
 }
 
 export function parseDueTimeHours(dueTime: string | null | undefined): number | null {
