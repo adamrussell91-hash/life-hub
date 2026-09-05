@@ -231,12 +231,31 @@ test('status, working weights, and the visual week board replace empty charts', 
   assert.equal(root.ensure('#fitness-week-columns').children[0].children[2].textContent, '400 kg');
   assert.equal(root.ensure('#fitness-week-columns').children[1].children[0].textContent, 'Last week');
   assert.equal(root.ensure('#fitness-week-columns').children[1].children[2].textContent, '—');
+  const thisFill = root.ensure('#fitness-week-columns').children[0].children[1].children[0];
+  const lastFill = root.ensure('#fitness-week-columns').children[1].children[1].children[0];
+  assert.equal(thisFill.style['--bar'], '100%');
+  assert.equal(lastFill.style['--bar'], '0%');
+  assert.notEqual(lastFill.style.height, '0%');
   assert.match(root.ensure('[data-fitness="next-planned"]').textContent, /Upper Body/);
   assert.equal(root.ensure('#fitness-loads-card').attributes.hidden, undefined);
   assert.match(root.ensure('#fitness-loads').children[0].children[1].textContent, /34 kg × 8/);
   assert.equal(root.ensure('#fitness-recent-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-comparisons-card').attributes.hidden, undefined);
   assert.equal(root.ensure('#fitness-comparisons').children[0].children[2].textContent, 'PR');
+});
+
+test('last-week volume bar fills track height and scales width against this week', () => {
+  const root = fitnessRoot();
+  renderFitness(root, baseModel({
+    heroSession: null,
+    weekVolumeKg: 10000,
+    lastWeekVolumeKg: 4000
+  }));
+  const thisFill = root.ensure('#fitness-week-columns').children[0].children[1].children[0];
+  const lastFill = root.ensure('#fitness-week-columns').children[1].children[1].children[0];
+  assert.equal(thisFill.style['--bar'], '100%');
+  assert.equal(lastFill.style['--bar'], '40%');
+  assert.equal(lastFill.style.height, undefined);
 });
 
 test('kit charts unhide when their own data is ready and stay hidden otherwise', () => {

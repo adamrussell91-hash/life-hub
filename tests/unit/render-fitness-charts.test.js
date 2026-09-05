@@ -83,6 +83,11 @@ test('clock and orbit paint hour labels, legends, and hover tips', () => {
   assert.ok(clock.includes('12:00'));
   assert.ok(clock.includes('Older'));
   assert.ok(clock.includes('Newer'));
+  let clockLeaders = 0;
+  walk(root.ensure('#fitness-clock-chart'), node => {
+    if (node.attributes?.['data-role'] === 'leader') clockLeaders += 1;
+  });
+  assert.ok(clockLeaders >= 6, 'clock hour and recency labels use leader lines');
   const clockLegend = texts(root.ensure('#fitness-clock-card'));
   assert.ok(clockLegend.some(text => /Chest|Back/.test(text)));
   assert.ok(root.ensure('#fitness-clock-card').children.some(node => node.dataset?.role === 'fitness-tip'));
@@ -90,5 +95,10 @@ test('clock and orbit paint hour labels, legends, and hover tips', () => {
   const orbit = texts(root.ensure('#fitness-orbit-chart'));
   assert.ok(orbit.includes('Lighter'));
   assert.ok(orbit.includes('Heavier'));
+  let orbitLeaders = 0;
+  walk(root.ensure('#fitness-orbit-chart'), node => {
+    if (node.attributes?.['data-role'] === 'leader') orbitLeaders += 1;
+  });
+  assert.ok(orbitLeaders >= 3, 'orbit volume and date labels use leader lines');
   assert.equal(root.ensure('[data-fitness="orbit-status"]').textContent, '2 sessions');
 });

@@ -201,6 +201,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-05 | Fitness | Polar labels sit outside the plot with leader lines; week volume bars animate width, not height. No new catalog types. |
 | 2026-09-05 | grammar | Documented multi-representation visual grammar (time/state/selection/importance/relationship) + agent catalog rule. No new chart types. |
 | 2026-09-05 | Fitness | Fitness painters now consume Mind / Bloods interaction chrome: axis and ring labels, `mind-chart-legend`, `mind-bump__tooltip` hover, `animateAreaReveal` / `animateColumnGrow`. Polar cards cap at 18–20rem. No new catalog types. |
 | 2026-09-05 | `theme-constellation` | Optional `minEdgeCount` (default 2). Fitness library map uses 1 so a same-session pair draws an edge. Caller `node.colour` is kept when set. |
