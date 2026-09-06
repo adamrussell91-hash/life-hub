@@ -68,7 +68,9 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain('class="btn btn--ghost" data-edit type="button"');
     expect(main).toContain('class="btn btn--ghost" data-open-chat type="button"');
     expect(main).toContain("titleRowHtml");
-    expect(hubChrome).toMatch(/page-header__title-row[\s\S]*?hub-mark/);
+    expect(hubChrome).toContain("page-header__title-row");
+    expect(hubChrome).toContain('class="hub-mark"');
+    expect(hubChrome).toContain("${hubMarkHtml()}");
     expect(main).toContain("icons/knowledge.svg");
     expect(main).toContain("sign-in__mark");
     expect(intakeView).toContain("confirm-card");

@@ -93,6 +93,7 @@ test('Tasks list returns stored records the remounted SPA can render', async () 
     parent_project_id: 'proj_1',
     tags: ['marking'],
     depends_on: [],
+    attachments: [],
     kind: 'task',
     bucket: 'active'
   };

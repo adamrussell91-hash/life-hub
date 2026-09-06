@@ -746,7 +746,7 @@ test('index.html leads Skincare with the consistency hero, heatmap, and legend; 
   assert.doesNotMatch(html, /skincare-week-dots/);
 });
 
-test('index.html uses an AM|PM beauty drawer (segment + sliding track) instead of a dual-card grid', async () => {
+test('index.html uses an AM|PM beauty drawer (segment + hidden inactive card) instead of a dual-card grid', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
@@ -759,8 +759,7 @@ test('index.html uses an AM|PM beauty drawer (segment + sliding track) instead o
   assert.match(html, /id="skincare-routine-cards"[^>]*class="[^"]*skincare-drawer-track/);
   assert.doesNotMatch(html, /id="skincare-routine-cards"[^>]*skincare-grid/);
 
-  assert.match(css, /skincare-drawer-track[\s\S]*320ms\s+cubic-bezier/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce[\s\S]*skincare-drawer-track[\s\S]*transition:\s*none/);
+  assert.match(css, /skincare-drawer-track > \.skincare-card\[hidden\]/);
 });
 
 test('Log button shows Logging… and disables until onLogRoutine settles', async () => {
