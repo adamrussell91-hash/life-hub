@@ -9,7 +9,8 @@ import {
   recentGovernanceTail,
   parseGovernanceEntries,
   openGovernanceEntries,
-  oldestOpenGovernanceEntry
+  oldestOpenGovernanceEntry,
+  decisionTraces
 } from '../../apps/life/js/core/governance-log.js';
 
 test('path is data/governance/governance-log.md', () => {
@@ -169,6 +170,61 @@ test('oldestOpenGovernanceEntry picks the oldest unresolved entry', () => {
   const oldest = oldestOpenGovernanceEntry(log, '2026-08-11');
   assert.equal(oldest.dateKey, '2026-05-24');
   assert.equal(oldest.ageDays, 79);
+});
+
+test('format and parse keep chosen, reasoning, and revisit on a decision', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-09-01',
+    entryType: 'Major Decision',
+    title: 'MEd load',
+    status: 'Still Active',
+    chosen: 'Drop one elective',
+    reasoning: 'Two units plus teaching is too much.',
+    revisit: '2026-10-01',
+    body: 'Hold the extra unit for summer.'
+  });
+  const [entry] = parseGovernanceEntries(log);
+  assert.equal(entry.chosen, 'Drop one elective');
+  assert.equal(entry.reasoning, 'Two units plus teaching is too much.');
+  assert.equal(entry.revisit, '2026-10-01');
+  assert.equal(entry.body, 'Hold the extra unit for summer.');
+});
+
+test('decisionTraces groups same-title entries oldest-first', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-06',
+    entryType: 'Major Decision',
+    title: 'MEd load',
+    chosen: 'Drop one elective',
+    reasoning: 'Teaching clash',
+    body: 'Later take.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-01',
+    entryType: 'Major Decision',
+    title: 'MEd load',
+    chosen: 'Take both units',
+    reasoning: 'Stay on timeline',
+    body: 'First take.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-02',
+    entryType: "Coach's Notes",
+    title: 'Unrelated',
+    body: 'One-off.'
+  });
+  const traces = decisionTraces(parseGovernanceEntries(log));
+  assert.equal(traces.length, 1);
+  assert.equal(traces[0].title, 'MEd load');
+  assert.deepEqual(traces[0].steps.map(step => step.chosen), [
+    'Take both units',
+    'Drop one elective'
+  ]);
+  assert.deepEqual(traces[0].steps.map(step => step.dateKey), [
+    '2026-08-01',
+    '2026-09-06'
+  ]);
 });
 
 test('Mind Insight is a valid governance entry type', () => {
