@@ -101,16 +101,14 @@ const MUTATE_OPS = [
 ];
 
 const OFFICIAL_AU = [
-  { label: 'NSW school terms', url: 'https://education.nsw.gov.au/schooling/parents-and-carers/going-to-school/school-holidays-and-term-dates' },
+  { label: 'NSW school calendars', url: 'https://education.nsw.gov.au/schooling/calendars' },
+  { label: 'NSW 2026 school calendar', url: 'https://education.nsw.gov.au/schooling/calendars/2026' },
   { label: 'QLD school terms', url: 'https://education.qld.gov.au/about-us/calendar/term-dates' },
-  { label: 'Fair Work public holidays', url: 'https://www.fairwork.gov.au/tools-and-resources/public-holidays' },
   { label: 'NSW public holidays', url: 'https://www.nsw.gov.au/about-nsw/public-holidays' },
   { label: 'QLD public holidays', url: 'https://www.qld.gov.au/recreation/travel/holidays/public' },
   { label: 'NSW Education', url: 'https://education.nsw.gov.au/' },
   { label: 'QLD Education', url: 'https://education.qld.gov.au/' },
-  { label: 'Australia.gov.au', url: 'https://www.australia.gov.au/' },
-  { label: 'NESA', url: 'https://www.nsw.gov.au/education-and-training/nesa' },
-  { label: 'QCAA', url: 'https://www.qcaa.qld.edu.au/' }
+  { label: 'NESA', url: 'https://www.nsw.gov.au/education-and-training/nesa' }
 ];
 
 export function formatClareJobsForPrompt() {
@@ -412,7 +410,7 @@ export function lookupAuDates({ year, state = 'NSW', kind = 'both' } = {}) {
       ok: true,
       year: y,
       note: 'No baked table for that year. Fetch the official URLs.',
-      official: OFFICIAL_AU.filter(item => /holiday|term/i.test(item.label)),
+      official: OFFICIAL_AU.filter(item => /holiday|term|calendar/i.test(item.label)),
       holidays: [],
       school_terms: []
     };
@@ -426,7 +424,7 @@ export function lookupAuDates({ year, state = 'NSW', kind = 'both' } = {}) {
     state,
     holidays,
     school_terms,
-    official: OFFICIAL_AU.filter(item => /holiday|term/i.test(item.label)),
+    official: OFFICIAL_AU.filter(item => /holiday|term|calendar/i.test(item.label)),
     note: 'Baked 2026–2027 dates. Verify against the official URLs if a later year or a gazette change matters.'
   };
 }
