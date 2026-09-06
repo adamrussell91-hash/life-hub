@@ -701,6 +701,7 @@ test('desktop overlay Chat window stays still while a reply streams', async () =
   assert.ok(flicker.viewHRange < 2, `overlay window must not grow with the reply (viewHRange=${flicker.viewHRange})`);
   assert.ok(flicker.viewTopRange < 2, `overlay window must not jump (viewTopRange=${flicker.viewTopRange})`);
   assert.equal(flicker.viewHReversals, 0, `overlay height must not oscillate (viewHReversals=${flicker.viewHReversals})`);
+  assert.ok(flicker.listTopRange < 4, `overlay thread top must stay put (listTopRange=${flicker.listTopRange})`);
   assert.equal(flicker.listTopReversals, 0, `overlay thread top must not bounce (listTopReversals=${flicker.listTopReversals})`);
 
   await page.locator('.chat-workout').waitFor({ timeout: 10_000 });
