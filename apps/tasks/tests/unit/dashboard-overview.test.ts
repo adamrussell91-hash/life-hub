@@ -280,7 +280,8 @@ describe('renderDashboardOverview', () => {
       ]
     });
 
-    expect(host.querySelector('.dashboard-focus')?.textContent).toContain("Today's tasks");
+    expect(host.querySelector('.dashboard-focus')?.textContent).toContain('Overdue');
+    expect(host.querySelector('.dashboard-focus')?.textContent).toContain('Today');
     expect(host.querySelector('.dashboard-focus__value')?.textContent).toBeTruthy();
     expect(host.querySelector('[aria-label="Timeline"]')?.textContent).toContain('Mark essays');
     expect(host.querySelector('.dashboard-rail')).not.toBeNull();
@@ -325,10 +326,10 @@ describe('renderDashboardOverview', () => {
       expect(tile.tagName === 'A' || tile.tagName === 'BUTTON').toBe(true);
     }
 
-    const today = tiles.find((tile) => tile.getAttribute('aria-label')?.includes("Today's tasks"));
+    const today = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Today'));
     const overdue = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Overdue'));
-    const attention = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Needs attention'));
-    const projects = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Active projects'));
+    const attention = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Attention'));
+    const projects = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Projects'));
     expect(today?.tagName).toBe('A');
     expect((today as HTMLAnchorElement).href).toContain('#/day');
     expect(attention?.tagName).toBe('A');
@@ -478,5 +479,20 @@ describe('renderDashboardOverview', () => {
     expect(panel?.hidden).toBe(true);
     expect(sessionStorage.getItem('tasks-hub:dashboard-overview-open')).toBe('false');
     expect(host.querySelector('.dashboard-focus')).not.toBeNull();
+  });
+
+  it('parks the focus counts in the page-header status slot when given one', () => {
+    const host = document.createElement('div');
+    const statusHost = document.createElement('div');
+    statusHost.className = 'page-header__status';
+    renderDashboardOverview(host, {
+      now,
+      tasks: [task({ id: 't1', title: 'Mark essays', due_date: '2026-08-20' })],
+      projects: [],
+      statusHost
+    });
+    expect(host.querySelector('.dashboard-focus')).toBeNull();
+    expect(statusHost.querySelector('.dashboard-focus')?.textContent).toContain('Overdue');
+    expect(statusHost.querySelector('.dashboard-focus__tile--danger')?.textContent).toContain('1');
   });
 });

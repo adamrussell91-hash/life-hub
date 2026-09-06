@@ -15,6 +15,20 @@ export interface HubShellRefs {
   refreshButton: HTMLButtonElement | null;
 }
 
+/** Status cluster between the title and utilities — dashboard fills this. */
+export function pageHeaderStatusSlot(header: HTMLElement): HTMLElement {
+  let slot = header.querySelector<HTMLElement>('.page-header__status');
+  if (!slot) {
+    slot = document.createElement('div');
+    slot.className = 'page-header__status';
+  }
+  slot.replaceChildren();
+  const actions = header.querySelector('.page-header__actions');
+  if (actions) header.insertBefore(slot, actions);
+  else header.append(slot);
+  return slot;
+}
+
 export interface HubShellOptions {
   onLogout?: () => void | Promise<void>;
   onRefresh?: () => void | Promise<void>;
@@ -557,6 +571,7 @@ function syncPageHeaderCopy(refs: HubShellRefs, config: PageHeaderConfig): boole
     if (config.actions) refs.headerActions.append(config.actions);
     refs.headerActions.append(mountUtilities(refs));
   }
+  pageHeaderStatusSlot(refs.pageHeader);
   return true;
 }
 
@@ -590,6 +605,7 @@ export function renderPageHeader(refs: HubShellRefs, config: PageHeaderConfig): 
   if (config.actions) refs.headerActions.append(config.actions);
   refs.headerActions.append(mountUtilities(refs));
   refs.pageHeader.append(refs.headerActions);
+  pageHeaderStatusSlot(refs.pageHeader);
 }
 
 const KNOWN_VIEWS: HubViewId[] = NAV.map((item) => item.id);

@@ -43,6 +43,10 @@ describe('hub shell chrome', () => {
     expect(refs.logoutButton?.querySelector('svg')).not.toBeNull();
     expect(refs.logoutButton?.textContent?.trim()).toBe('');
     expect(refs.pageHeader.querySelector('.page-header__actions .hub-utilities')).not.toBeNull();
+    expect(refs.pageHeader.querySelector('.page-header__status')).not.toBeNull();
+    expect(refs.pageHeader.querySelector('.page-header__copy')?.nextElementSibling?.className).toBe(
+      'page-header__status'
+    );
 
     refs.logoutButton?.click();
     expect(onLogout).toHaveBeenCalledTimes(1);

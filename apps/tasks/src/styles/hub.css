@@ -161,6 +161,12 @@
     max-width: 100%;
   }
 
+  .page-header__status {
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
   /* Utility-app title (~21px, near iOS Title 3). Leave the title input alone so
      task/project editors stay readable while editing. */
   .page-header__title:not(.page-header__title-input) {
@@ -179,8 +185,20 @@
 }
 
 .page-header__copy {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
+}
+
+.page-header__status {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.page-header__status:empty {
+  display: none;
 }
 
 .page-header__title,
