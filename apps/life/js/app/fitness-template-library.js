@@ -58,7 +58,7 @@ export function createFitnessTemplateLibrary({
       exercises: template.exercises,
       libraryByName: state.libraryByName
     });
-    renderMuscleStrip(root.querySelector('#fitness-template-sheet-maps'), keys);
+    renderMuscleStrip(root.querySelector('#fitness-template-sheet-maps'), keys, root);
 
     const focus = root.querySelector('#fitness-template-sheet-focus');
     if (focus) {

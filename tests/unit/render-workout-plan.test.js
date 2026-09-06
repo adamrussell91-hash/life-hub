@@ -82,6 +82,22 @@ test('appendWorkoutPlanCard writes weekday, title, duration, and rows', () => {
   assert.equal(card.children[3].children[0].children[2].textContent, '2 sets');
 });
 
+test('fillExercisePlanList reuses exercise thumb nodes on a second fill', () => {
+  const root = new FakeRoot();
+  const host = new FakeEl('div');
+  const exercises = [
+    { name: 'Bench Press', sets: [{}, {}, {}, {}] },
+    { name: 'Cable Curl', sets: [{}, {}] }
+  ];
+  fillExercisePlanList(root, host, { exercises });
+  const firstThumbs = host.children.map(row => row.children[0]);
+  assert.equal(firstThumbs.length, 2);
+  assert.match(firstThumbs[0].src, /chest-whole/);
+  fillExercisePlanList(root, host, { exercises });
+  assert.equal(host.children[0].children[0], firstThumbs[0]);
+  assert.equal(host.children[1].children[0], firstThumbs[1]);
+});
+
 test('fillExercisePlanList uses set details for completed sessions', () => {
   const root = new FakeRoot();
   const host = new FakeEl('div');

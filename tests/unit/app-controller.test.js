@@ -326,6 +326,7 @@ function harness(options = {}) {
       calls.fitnessRenders = (calls.fitnessRenders ?? 0) + 1;
       documentRoot.querySelector('#fitness-dashboard').hidden = false;
     },
+    fitnessTemplateLibrary: options.fitnessTemplateLibrary,
     buildCentralNodeModel: input => ({ date: input.date, source: input, kind: 'central-node' }),
     renderCentralNode(documentRoot, model) {
       calls.centralNodeRenders = (calls.centralNodeRenders ?? 0) + 1;
@@ -1063,6 +1064,44 @@ test('the floating chat button opens the chat panel into the Fitness section, th
   assert.equal(state.chatPanelCalls.opens.length, 1);
   assert.equal(state.chatPanelCalls.opens[0].slot, state.root.querySelector('#fitness-dashboard'));
   assert.equal(state.chatPanelCalls.opens[0].accentColour, '#colour-for-chadwick');
+});
+
+test('opening Fitness paints again after an idle template library becomes ready', async () => {
+  let status = 'idle';
+  let resolveLoad;
+  const loaded = new Promise(resolve => { resolveLoad = resolve; });
+  const library = {
+    templates: [],
+    libraryByName: null,
+    getState() { return { status, templates: this.templates, libraryByName: this.libraryByName }; },
+    ensureLoaded() { return loaded.then(() => this.getState()); },
+    openTemplate() {}
+  };
+  const state = harness({ fitnessTemplateLibrary: library });
+  await state.controller.start();
+  state.root.fitnessNavigation.dispatchEvent(new Event('click'));
+  assert.equal(state.calls.fitnessRenders, 1);
+  status = 'ready';
+  resolveLoad();
+  await loaded;
+  await Promise.resolve();
+  assert.equal(state.calls.fitnessRenders, 2);
+});
+
+test('opening Fitness does not paint twice when the template library is already ready', async () => {
+  const library = {
+    status: 'ready',
+    templates: [],
+    libraryByName: null,
+    getState() { return this; },
+    async ensureLoaded() { return this; },
+    openTemplate() {}
+  };
+  const state = harness({ fitnessTemplateLibrary: library });
+  await state.controller.start();
+  state.root.fitnessNavigation.dispatchEvent(new Event('click'));
+  await Promise.resolve();
+  assert.equal(state.calls.fitnessRenders, 1);
 });
 
 test('a completed refresh while viewing Fitness re-renders the dashboard', async () => {
