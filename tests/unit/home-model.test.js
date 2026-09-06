@@ -143,3 +143,30 @@ test('hammondLine is null when there is no open governance entry', () => {
   });
   assert.equal(model.hammondLine, null);
 });
+
+test('hammondLine prefers an older Clare Later item over a newer governance entry', () => {
+  const log = [
+    '# Governance Log',
+    '',
+    '## 2026-05-24 — Drift Detection',
+    '**Title:** MEd Sem 2',
+    '**Status:** Still Active',
+    '',
+    'Unactioned.',
+    ''
+  ].join('\n');
+  const model = buildHomeModel({
+    events: [],
+    targetsConfig,
+    date: '2026-08-11',
+    governanceLogMarkdown: log,
+    tasks: [{
+      title: 'Someday reading',
+      kind: 'task',
+      priority: 'low',
+      status: 'open',
+      created_at: '2026-01-01T00:00:00Z'
+    }]
+  });
+  assert.equal(model.hammondLine, 'Clare: Someday reading — 222d open.');
+});

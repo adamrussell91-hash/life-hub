@@ -1,6 +1,7 @@
 import { parseEventDocument } from '../core/records.js';
 import { addCalendarDays, daysBetween, isCalendarDate } from '../core/time.js';
 import { GOVERNANCE_LOG_PATH } from '../core/governance-log.js';
+import { WEEK_FLAGS_PATH, parseWeekFlags } from '../core/open-loops.js';
 import {
   NUTRITION_CHALLENGES_PATH,
   parseNutritionChallenges
@@ -96,6 +97,7 @@ export async function loadLiveEvents({
       agentsConfig: parsedFiles.agentsConfig,
       centralNodeMarkdown: parsedFiles.centralNodeMarkdown,
       governanceLogMarkdown: parsedFiles.governanceLogMarkdown,
+      weekFlags: parsedFiles.weekFlags,
       nutritionChallenges: parsedFiles.nutritionChallenges,
       warnings: [...warnings, ...parsedFiles.warnings],
       commitSha,
@@ -149,6 +151,8 @@ function createValidator(loadYaml) {
         // Freeform markdown, no schema to violate -- any string content is acceptable.
       } else if (file.path === NUTRITION_CHALLENGES_PATH) {
         parseNutritionChallenges(file.content);
+      } else if (file.path === WEEK_FLAGS_PATH) {
+        parseWeekFlags(file.content);
       } else if (EVENT_PATH.test(file.path)) {
         parseEventDocument(file.content, file.path, loadYaml);
       } else {
@@ -176,6 +180,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
   let agentsConfig = null;
   let centralNodeMarkdown = null;
   let governanceLogMarkdown = null;
+  let weekFlags = null;
   let nutritionChallenges = null;
 
   for (const file of files) {
@@ -193,6 +198,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
     else if (entry.kind === 'agents') agentsConfig = entry.value;
     else if (entry.kind === 'central_node') centralNodeMarkdown = entry.value;
     else if (entry.kind === 'governance_log') governanceLogMarkdown = entry.value;
+    else if (entry.kind === 'week_flags') weekFlags = entry.value;
     else if (entry.kind === 'nutrition_challenges') nutritionChallenges = entry.value;
     else if (entry.kind === 'event') events.push(entry.value);
   }
@@ -206,6 +212,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
     agentsConfig,
     centralNodeMarkdown,
     governanceLogMarkdown,
+    weekFlags,
     nutritionChallenges,
     warnings
   };
@@ -217,6 +224,7 @@ function parseFile(file, loadYaml) {
     if (file.path === AGENTS_PATH) return { kind: 'agents', value: loadYaml(file.content) };
     if (file.path === CENTRAL_NODE_PATH) return { kind: 'central_node', value: file.content };
     if (file.path === GOVERNANCE_LOG_PATH) return { kind: 'governance_log', value: file.content };
+    if (file.path === WEEK_FLAGS_PATH) return { kind: 'week_flags', value: parseWeekFlags(file.content) };
     if (file.path === NUTRITION_CHALLENGES_PATH) {
       return { kind: 'nutrition_challenges', value: parseNutritionChallenges(file.content) };
     }
