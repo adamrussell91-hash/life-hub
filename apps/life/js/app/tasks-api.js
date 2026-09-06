@@ -22,6 +22,14 @@ export function createTasksApi(fetchImpl = fetch) {
       }
       return payload.data?.projects ?? [];
     },
+    async loadStressFlags() {
+      const response = await fetchImpl('/api/stress-flags');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError('Tasks request failed', response.status, payload?.error?.code ?? 'request_failed');
+      }
+      return payload.data?.flags ?? [];
+    },
     async dumpWithClare({ text, domain = 'teaching', protocol_id } = {}) {
       const response = await fetchImpl('/api/clare', {
         method: 'POST',
