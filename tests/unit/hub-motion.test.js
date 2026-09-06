@@ -56,6 +56,7 @@ test('Home shell loads the shared motion stylesheet and module', async () => {
   assert.match(html, /page-header__title hub-kinetic/);
   assert.match(html, /data-hub-scroll-hide/);
   assert.match(html, /data-hub-scroll-scroller="#chat-messages"/);
+  assert.match(html, /hub-scroll-hide--overlay/);
   assert.match(main, /hub-motion\.js/);
   assert.match(main, /startHubMotion/);
   assert.match(motion, /hub-morph-dialog/);
@@ -110,6 +111,16 @@ test('scroll-hide tucks away on the way down and comes back on the way up', () =
   assert.equal(nextScrollHideState({ current: 120, previous: 90, threshold: 80 }), true);
   assert.equal(nextScrollHideState({ current: 90, previous: 120, threshold: 80, hidden: true }), false);
   assert.equal(nextScrollHideState({ current: 90, previous: 90, threshold: 80, hidden: true }), true);
+  assert.equal(
+    nextScrollHideState({ current: 122, previous: 120, threshold: 80, hidden: true }),
+    true,
+    '2px layout nudge must not reverse a hide'
+  );
+  assert.equal(
+    nextScrollHideState({ current: 118, previous: 120, threshold: 80, hidden: true }),
+    true,
+    '2px layout nudge must not reveal chrome'
+  );
 
   const el = {
     className: '',
