@@ -15,6 +15,17 @@ const pending = [{
   proposedAt: '2026-08-15T00:00:00.000Z'
 }];
 
+test('approveProposal keeps Teaching and Tasks refs already on a note', () => {
+  const result = approveProposal(
+    pending,
+    { id: 'a', connected: ['teaching:unit:unit_aotfw'] },
+    { id: 'b', connected: ['tasks:project:proj_aotfw'] },
+    'a||b'
+  );
+  assert.deepEqual(result.pageA.connected, ['teaching:unit:unit_aotfw', 'b']);
+  assert.deepEqual(result.pageB.connected, ['tasks:project:proj_aotfw', 'a']);
+});
+
 test('approveProposal links both notes and drops the proposal', () => {
   const result = approveProposal(
     pending,
