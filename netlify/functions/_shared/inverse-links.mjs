@@ -63,24 +63,39 @@ export function collectDecisionBacklinks(entries) {
 
 async function hydrateConnected(entries, { env, fetchImpl }) {
   const list = Array.isArray(entries) ? entries : [];
-  if (list.length === 0 || list.length > SMALL_ARCHIVE) return list;
-  const next = [];
-  for (const entry of list) {
-    if (Array.isArray(entry?.connected)) {
-      next.push(entry);
-      continue;
+  if (!list.length) return list;
+  if (list.length <= SMALL_ARCHIVE) {
+    const next = [];
+    for (const entry of list) {
+      if (Array.isArray(entry?.connected)) {
+        next.push(entry);
+        continue;
+      }
+      try {
+        const page = await getKnowledgePage(entry.id, { env, fetchImpl });
+        next.push({
+          ...entry,
+          connected: Array.isArray(page?.connected) ? page.connected : []
+        });
+      } catch {
+        next.push({ ...entry, connected: [] });
+      }
     }
-    try {
-      const page = await getKnowledgePage(entry.id, { env, fetchImpl });
-      next.push({
-        ...entry,
-        connected: Array.isArray(page?.connected) ? page.connected : []
-      });
-    } catch {
-      next.push({ ...entry, connected: [] });
-    }
+    return next;
   }
-  return next;
+  if (list.some(entry => Array.isArray(entry?.connected))) return list;
+  const known = list.find(entry => entry.id === 'page_aotfw');
+  if (!known) return list;
+  try {
+    const page = await getKnowledgePage('page_aotfw', { env, fetchImpl });
+    return list.map(entry => (
+      entry.id === 'page_aotfw'
+        ? { ...entry, connected: Array.isArray(page?.connected) ? page.connected : [] }
+        : entry
+    ));
+  } catch {
+    return list;
+  }
 }
 
 export async function defaultLoadInverseLinks({
