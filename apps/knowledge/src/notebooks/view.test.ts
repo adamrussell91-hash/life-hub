@@ -17,6 +17,7 @@ describe("notebooks view html", () => {
     expect(html).toContain('src="./notebooks/cognitive-psychology.jpg"');
     expect(html).toContain('data-hub-morph="image"');
     expect(html).toContain('data-hub-morph="title"');
+    expect(html).toContain("nb-card__media");
     expect(html).toContain("nb-card__image--empty");
     expect(html).toContain("Literacy");
     expect(notebookCardHtml(covered)).not.toContain("nb-card__image--empty");

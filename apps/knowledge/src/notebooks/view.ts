@@ -12,7 +12,7 @@ function coverHtml(card: NotebookCard, className: string) {
 
 export function notebookCardHtml(card: NotebookCard) {
   return `<button class="nb-card" type="button" data-notebook="${escapeHtml(card.label)}">
-    ${coverHtml(card, "nb-card__image")}
+    <span class="nb-card__media">${coverHtml(card, "nb-card__image")}</span>
     <span class="nb-card__copy">
       <span class="nb-card__eyebrow" data-hub-morph="subtitle">Notebook</span>
       <span class="nb-card__title" data-hub-morph="title">${escapeHtml(card.label)}</span>
@@ -41,7 +41,7 @@ export function notebookOpenHtml(card: NotebookCard, notes: NotebookNote[]) {
       ${coverHtml(card, "nb-open__image")}
       <div class="nb-open__copy">
         <p class="nb-card__eyebrow" data-hub-morph="subtitle">Notebook</p>
-        <h2 class="nb-card__title" id="nb-open-${escapeHtml(card.slug)}" data-hub-morph="title">${escapeHtml(card.label)}</h2>
+        <h2 class="nb-card__title nb-open__title" id="nb-open-${escapeHtml(card.slug)}" data-hub-morph="title">${escapeHtml(card.label)}</h2>
         <p class="nb-open__count">${count}</p>
       </div>
     </header>
