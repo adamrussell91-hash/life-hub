@@ -175,8 +175,9 @@ test('research_topic without URLs returns official AU sources; with URLs it cite
     mode: 'official'
   });
   assert.equal(official.ok, true);
-  assert.ok(official.official.some(item => /term/i.test(item.label)));
+  assert.ok(official.official.some(item => /calendar|term/i.test(item.label)));
   assert.ok(official.official.every(item => item.url.startsWith('https://')));
+  assert.ok(official.official.every(item => !/fairwork\.gov\.au|qcaa\.qld\.edu\.au/.test(item.url)));
 
   const sourced = await executeClareWork('research_topic', {
     topic: 'term dates',
