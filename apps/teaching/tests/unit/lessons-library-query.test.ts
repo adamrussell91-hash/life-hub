@@ -195,6 +195,28 @@ describe('lessons library query', () => {
     expect(result.rows.map((r) => r.id)).toEqual(['l1']);
   });
 
+  it('treats a lesson with no status as live library stock', () => {
+    const curriculumWithoutStatus = {
+      ...curriculum,
+      lessons: [
+        ...curriculum.lessons,
+        lesson({
+          id: 'l5',
+          title: 'Untitled import',
+          slug: 'untitled-import',
+          unit_id: 'unit_aotfw',
+          sequence: 3,
+          published: false,
+          updated_at: '2026-08-02T00:00:00.000Z',
+          created_at: ISO
+        } as LessonLibraryRow)
+      ]
+    } as CurriculumResponse;
+    const result = applyLessonsQuery(curriculumWithoutStatus, DEFAULT_LESSONS_STATE);
+    expect(result.rows.map((r) => r.id)).toEqual(['l5', 'l2', 'l4', 'l1']);
+    expect(result.totalInLibrary).toBe(4);
+  });
+
   it('includes archived only when that status is selected', () => {
     const result = applyLessonsQuery(curriculum, {
       ...DEFAULT_LESSONS_STATE,

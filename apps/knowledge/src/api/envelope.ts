@@ -31,6 +31,6 @@ export function sessionAuthenticated(payload: unknown): boolean {
   return body.authenticated === true || body.data?.authenticated === true;
 }
 
-export function sessionTargets(apiBase: string, leftoverBase: string, path: "/auth-login" | "/auth-logout"): string[] {
+export function sessionTargets(apiBase: string, path: "/auth-login" | "/auth-logout"): string[] {
   return [`${apiBase}${path}`];
 }

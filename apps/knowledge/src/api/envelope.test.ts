@@ -20,14 +20,10 @@ describe("envelope", () => {
   });
 
   it("only signs in on the umbrella Knowledge prefix", () => {
-    expect(sessionTargets("/api", "/api", "/auth-login")).toEqual(["/api/auth-login"]);
-    expect(
-      sessionTargets(
-        "https://api.adam-russell.com/api/knowledge",
-        "https://knowledge-api.adam-russell.com/api",
-        "/auth-login",
-      ),
-    ).toEqual(["https://api.adam-russell.com/api/knowledge/auth-login"]);
+    expect(sessionTargets("/api", "/auth-login")).toEqual(["/api/auth-login"]);
+    expect(sessionTargets("https://api.adam-russell.com/api/knowledge", "/auth-login")).toEqual([
+      "https://api.adam-russell.com/api/knowledge/auth-login",
+    ]);
   });
 
   it("reads Life error.message and Knowledge error strings", () => {

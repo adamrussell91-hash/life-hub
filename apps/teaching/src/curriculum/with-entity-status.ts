@@ -32,6 +32,11 @@ function patchCollection<T extends { id: string; status: string }>(
   return list.map((row) => (row.id === id ? patchRow(row, status) : row));
 }
 
+/** Missing status is live library stock — only archive/trash hide a row. */
+export function isActiveLibraryStatus(status?: string | null): boolean {
+  return status !== 'archived' && status !== 'trashed';
+}
+
 export function readCurriculumEntityStatus(
   curriculum: CurriculumResponse,
   type: CurriculumEntityType,
