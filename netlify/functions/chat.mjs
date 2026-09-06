@@ -38,7 +38,7 @@ import {
   loadAnnProtocol,
   loadClementineProtocol
 } from './_shared/load-hub-protocols.mjs';
-import { activationForTurn } from './_shared/capabilities/activation-policy.mjs';
+import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
 import {
   getNutritionSnapshot,
   getNutritionAdherence,
@@ -367,7 +367,13 @@ export function createChatHandler({
     const needsTreatmentContext = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
     const needsHubRetrieval = needsHammondTools || slug === 'clare' || slug === 'ann';
-    const needsNutritionHistory = slug === 'brisket';
+    // Nutrition history is for adherence/overview retrieval — not every meal log turn
+    // (those stay on the thin today+yesterday digest budget).
+    const nutritionHistoryNeeded = slug === 'brisket' && (
+      classifyIntent('brisket', parsed.message).id === 'nutrition_overview'
+      || classifyIntent('brisket', parsed.message).id === 'history_search'
+    );
+    const needsNutritionHistory = nutritionHistoryNeeded;
     const needsSkincareHistory = slug === 'hyaluronica';
     const needsKnowledgeSearch = slug === 'clementine';
     const needsPenelopeDiaryTools = slug === 'penelope';
@@ -793,6 +799,18 @@ export function createChatHandler({
             .map((entry, index) => ({ path: entry.path, content: decodeBlob(dataBlobs[index]) }))
             .filter(file => file.content !== null);
           digest = summarizeRecentHistory(files, TARGETS_CONFIG, today);
+
+          if (slug === 'brisket' && nutritionRecords.length === 0) {
+            for (const file of files) {
+              if (!file.path?.startsWith('data/nutrition/')) continue;
+              try {
+                const { record } = parseEventDocument(file.content, file.path, loadYaml);
+                if (record?.type === 'meal') nutritionRecords.push(record);
+              } catch {
+                // Skip unreadable thin-window meals.
+              }
+            }
+          }
 
           const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
           if (decodedCentralNode !== null) {
