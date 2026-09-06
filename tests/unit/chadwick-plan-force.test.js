@@ -151,6 +151,45 @@ test('superset pairing late-forces log_entry after the model pass', async () => 
   assert.equal(proposal.input.fields.exercises[0].name, 'Bar Press');
 });
 
+test('does not late-force a second Confirm when executeTools already handled log_entry', async () => {
+  let executeCalls = 0;
+  const anthropic = {
+    async *streamMessage({ executeTools } = {}) {
+      await executeTools?.({
+        type: 'tool_call',
+        id: 'call_1',
+        name: 'log_entry',
+        input: { type: 'workout', fields: { status: 'planned' } }
+      });
+      executeCalls += 1;
+      yield {
+        type: 'text',
+        delta: [
+          "Here's the plan:",
+          '1. Bar Press — Set 1: 10 reps x 30kg (cable: constant force)',
+          '2. Bar Row — Set 1: 10 reps x 27kg (cable: constant force)',
+          '3. Bar Squat — Set 1: 10 reps x 25kg (cable: none)'
+        ].join('\n')
+      };
+      yield { type: 'done' };
+    }
+  };
+  const events = await collect(streamWithChadwickPlanForce(anthropic, {
+    slug: 'chadwick',
+    userMessage: 'build a full body session',
+    today: '2026-08-29',
+    messages: [{ role: 'user', content: 'build a full body session' }],
+    executeTools: async () => JSON.stringify({ ok: true, status: 'awaiting_confirm' })
+  }));
+
+  assert.equal(executeCalls, 1);
+  assert.equal(
+    events.filter(event => event.type === 'tool_call' && event.name === 'log_entry').length,
+    0,
+    'swallowed log_entry must still count as sawLogEntry so the force wrapper does not emit a second card'
+  );
+});
+
 test('does not force a second round once log_entry already ran', async () => {
   let calls = 0;
   const anthropic = {

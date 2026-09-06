@@ -33,6 +33,17 @@ export async function* streamWithAgentLogForce(anthropic, {
   let assistantText = '';
   let sawLogEntry = false;
 
+  if (typeof streamOpts.executeTools === 'function') {
+    const innerExecute = streamOpts.executeTools;
+    streamOpts = {
+      ...streamOpts,
+      executeTools: async (toolCall) => {
+        if (toolCall?.name === 'log_entry') sawLogEntry = true;
+        return innerExecute(toolCall);
+      }
+    };
+  }
+
   for await (const event of anthropic.streamMessage(streamOpts)) {
     if (event.type === 'text' && typeof event.delta === 'string') {
       assistantText += event.delta;

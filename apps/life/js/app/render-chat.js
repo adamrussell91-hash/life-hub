@@ -1,3 +1,4 @@
+import { appendChatThreadItem } from './chat-turn-anchor.js';
 import { formatExerciseSets, formatExerciseTitle, humanizeFieldLabel } from './format-exercise.js';
 import { applyAgentAvatarToBubble } from './render-agent-picker.js';
 import { showEphemeralMessage } from './ephemeral-message.js';
@@ -49,7 +50,13 @@ export function isChatPinned(list) {
 }
 
 export function scrollChatIfPinned(list, pinned = true) {
-  if (list && pinned) list.scrollTop = list.scrollHeight;
+  if (!list || !pinned) return;
+  // Turn spacer owns scroll while a reply is growing — jumping to scrollHeight
+  // lands in the empty spacer and fights follow().
+  if (typeof list.querySelector === 'function' && list.querySelector('[data-chat-turn-spacer]')) {
+    return;
+  }
+  list.scrollTop = list.scrollHeight;
 }
 
 function markLatestMessage(list) {
@@ -77,7 +84,7 @@ export function appendMessage(root, { role, agentSlug, text = '', actions = true
   body.textContent = text;
   item.append(body);
   if (actions !== false) appendMessageActions(root, item, role);
-  list.append(item);
+  appendChatThreadItem(list, item);
   markLatestMessage(list);
   scrollChatIfPinned(list, pinned);
   syncChatChrome(root);
@@ -552,7 +559,7 @@ export function appendRecordProposal(root, { path, record, notes, warnings, libr
   actions.append(discard, confirm);
   card.append(actions);
 
-  list.append(card);
+  appendChatThreadItem(list, card);
   scrollChatIfPinned(list);
   return { card, confirm, discard, inputs };
 }
@@ -674,7 +681,7 @@ export function appendCnPatchProposal(root, { patch }) {
   actions.append(discard, confirm);
   card.append(actions);
 
-  list.append(card);
+  appendChatThreadItem(list, card);
   scrollChatIfPinned(list);
   return { card, confirm, discard };
 }
@@ -755,7 +762,7 @@ export function appendActionProposal(root, { proposal }) {
   actions.append(discard, confirm);
   card.append(actions);
 
-  list.append(card);
+  appendChatThreadItem(list, card);
   scrollChatIfPinned(list);
   return {
     card,
@@ -788,7 +795,7 @@ export function appendPlanStatusCard(root, opts = {}) {
   const { card, update } = createAgentPlanCard(root, opts);
   card.__planUpdate = update;
   item.append(card);
-  list.append(item);
+  appendChatThreadItem(list, item);
   markLatestMessage(list);
   scrollChatIfPinned(list);
   syncChatChrome(root);
@@ -802,7 +809,7 @@ export function appendChoiceCard(root, opts = {}) {
   item.className = 'chat-message chat-message--structured';
   const card = createAgentChoiceCard(root, opts);
   item.append(card);
-  list.append(item);
+  appendChatThreadItem(list, item);
   markLatestMessage(list);
   scrollChatIfPinned(list);
   syncChatChrome(root);
@@ -816,7 +823,7 @@ export function appendSourcesCard(root, opts = {}) {
   item.className = 'chat-message chat-message--structured';
   const card = createAgentSourcesCard(root, opts);
   item.append(card);
-  list.append(item);
+  appendChatThreadItem(list, item);
   markLatestMessage(list);
   scrollChatIfPinned(list);
   syncChatChrome(root);
