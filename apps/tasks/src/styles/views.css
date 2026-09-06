@@ -736,9 +736,10 @@
 
 .reminder-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-3);
   width: 100%;
   max-width: none;
   padding: var(--space-2) var(--space-3);
@@ -772,8 +773,8 @@
 
 .reminder-strip__list {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--hub-tile-gap, var(--space-3));
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .reminder-card__title {
@@ -799,6 +800,7 @@
 .reminder-card__actions {
   display: flex;
   flex-wrap: wrap;
+  flex: 0 0 auto;
   gap: var(--space-2);
   margin-top: 0;
 }
@@ -4668,9 +4670,35 @@ body.is-universe-fullscreen .page-header {
 
 .page-header__status .dashboard-focus {
   margin-bottom: 0;
-  justify-content: space-between;
+  align-items: stretch;
+  justify-content: stretch;
   width: 100%;
-  gap: var(--space-2) var(--space-4);
+  gap: 0;
+}
+
+.page-header__status .dashboard-focus__tile {
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0;
+  width: auto;
+  padding: 0 var(--space-4);
+  border-radius: 0;
+  border-left: 1px solid var(--line);
+}
+
+.page-header__status .dashboard-focus__tile:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.page-header__status .dashboard-focus__value {
+  font-size: var(--text-lg);
+}
+
+.page-header__status .dashboard-focus__label {
+  font-size: var(--text-2xs);
 }
 
 .dashboard-focus__tile {
@@ -5550,6 +5578,14 @@ button.column-bar--row.is-active {
   .page-header__status {
     flex: 1 1 100%;
     justify-content: flex-start;
+  }
+
+  .page-header__status .dashboard-focus__tile {
+    padding: 0 var(--space-2);
+  }
+
+  .page-header__status .dashboard-focus__value {
+    font-size: var(--text-md);
   }
 
   .dashboard-focus__value {
