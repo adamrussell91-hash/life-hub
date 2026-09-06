@@ -108,6 +108,11 @@ import { filterPickerOptions, optionPickerListHtml } from "./ui/optionPicker";
 import { syncKnowledgeMobileChrome } from "./mobile-chrome";
 import { notebookCards, notesForNotebook } from "./notebooks/catalog";
 import { bindNotebooksGrid, notebooksGridHtml } from "./notebooks/view";
+import { getQuizSchedule, saveQuiz } from "./api/quizClient";
+import { applyRating } from "./quiz/review";
+import { duePageReviews, seedPageReview, upsertPageReview } from "./quiz/pageReview";
+import { duePagesHtml, pageReviewActionsHtml } from "./quiz/pageReviewView";
+import { type PageReview, type QuizRating, type QuizStore } from "./quiz/schema";
 
 type View =
   | "list"
@@ -155,6 +160,55 @@ function listRowHeight() {
   return window.matchMedia("(max-width: 720px)").matches ? MOBILE_ROW_HEIGHT : DESKTOP_ROW_HEIGHT;
 }
 
+async function ensurePageReviews() {
+  if (quizStore) return;
+  try {
+    quizStore = await getQuizSchedule();
+    pageReviews = quizStore.page_reviews ?? [];
+  } catch {
+    quizStore = null;
+    pageReviews = [];
+  }
+}
+
+function dueReviewsFor(pages: Array<Page | PageManifestEntry>) {
+  return duePageReviews(
+    pages.map(page => ({
+      id: page.id,
+      title: page.title,
+      area: page.area,
+      tags: page.tags,
+      updated_at: "updated_at" in page ? page.updated_at : page.created_at,
+      created_at: page.created_at,
+    })),
+    pageReviews,
+  );
+}
+
+async function rateActivePage(rating: QuizRating) {
+  if (!activePage || !quizStore) {
+    showToast("Could not save review.");
+    return;
+  }
+  const current = pageReviews.find(review => review.page_id === activePage.id) ?? seedPageReview(activePage);
+  const next = applyRating(current, rating);
+  const reviews = upsertPageReview(pageReviews, next);
+  try {
+    quizStore = await saveQuiz({
+      schedule: quizStore.schedule,
+      items: [],
+      edges: quizStore.edges,
+      dumps: quizStore.dumps,
+      page_reviews: reviews,
+    });
+    pageReviews = quizStore.page_reviews ?? reviews;
+    showToast("Review saved");
+    render();
+  } catch {
+    showToast("Could not save review.");
+  }
+}
+
 let entries: PageManifestEntry[] = [];
 let visible: PageManifestEntry[] = [];
 let view: View = "list";
@@ -173,6 +227,8 @@ let pendingMorphOrigin: { left: number; top: number; width: number; height: numb
 let tidyBusy = false;
 let tidyConfirmPending = false;
 const HUB_MARK_SRC = "./icons/knowledge.svg";
+let quizStore: QuizStore | null = null;
+let pageReviews: PageReview[] = [];
 let listScrollTop = 0;
 let listPainted: VirtualListPainted | null = null;
 let graphTeardown: (() => void) | null = null;
@@ -730,6 +786,7 @@ function renderList() {
       }
     </div>
     ${originFilterHtml(entries, originFilter, { labelQuery: originLabelQuery, labelOpen: originLabelOpen })}
+    ${duePagesHtml(dueReviewsFor(entries))}
     <p class="list-count">${visible.length.toLocaleString()} notes</p>
     <div data-hub-pins></div>
     <div class="cards list-viewport" aria-label="Archive list"></div>
@@ -756,6 +813,9 @@ function renderList() {
       });
     }
   }
+  app.querySelectorAll<HTMLButtonElement>("[data-open-page]").forEach(button => {
+    button.onclick = () => void openPage(button.dataset.openPage!);
+  });
   app.querySelector<HTMLButtonElement>("[data-jump-graph]")!.onclick = () => {
     graphSearch = (query.trim() || keywordFilter).trim();
     view = "graph";
@@ -1263,6 +1323,7 @@ function renderPage(page: Page) {
       </section>`
           : ""
       }
+      ${dueReviewsFor([page]).length ? pageReviewActionsHtml() : ""}
       ${originPillsHtml(resolvedOrigins(page), { openEdit: true })}
       ${readerTopicPillsHtml(topics.slice(0, 6))}
       <div class="reader__body">${renderMarkdown(page.body)}</div>
@@ -1271,6 +1332,9 @@ function renderPage(page: Page) {
     </article>
   `);
 
+  app.querySelectorAll<HTMLButtonElement>("[data-page-rate]").forEach(button => {
+    button.onclick = () => void rateActivePage(Number(button.dataset.pageRate) as QuizRating);
+  });
   app.querySelector<HTMLButtonElement>("[data-pin-note]")?.addEventListener("click", () => {
     setPinned(page.id, !isPinned(page.id));
     showToast(isPinned(page.id) ? "Pinned" : "Unpinned");
@@ -1923,6 +1987,7 @@ function renderLogin(message?: string) {
 async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean }) {
   try {
     entries = await listPages();
+    await ensurePageReviews();
     await refreshVisible();
     view = "list";
     if (!(await applyPageHash())) render();
