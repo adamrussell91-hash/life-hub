@@ -268,14 +268,68 @@ function isResolvedStatus(status) {
   return typeof status === 'string' && status.trim().toLowerCase() === 'resolved';
 }
 
+// Completed notes / insights are not open loops. A March Pattern Review with
+// no Status: Resolved is a finished synthesis, not something still being worked.
+const OPEN_LOOP_TYPES = new Set([
+  'Cross-Domain Tension',
+  'Major Decision',
+  'Drift Detection',
+  'Escalation'
+]);
+
+const HAMMOND_REVIEW_TYPES = new Set([
+  "Coach's Notes",
+  'Weekly Review',
+  'Closed Loop Review',
+  'Goal Audit',
+  'Direction Session'
+]);
+
+// Sunday review stays on Home through the following Monday; then the line hides.
+const HAMMOND_REVIEW_FRESH_DAYS = 8;
+const REVIEW_LINE_MAX = 80;
+
+export function isOpenLoopEntry(entry) {
+  return Boolean(entry && OPEN_LOOP_TYPES.has(entry.entryType) && !isResolvedStatus(entry.status));
+}
+
+function clipReviewLabel(text) {
+  const title = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (!title) return '';
+  return title.length > REVIEW_LINE_MAX ? `${title.slice(0, REVIEW_LINE_MAX - 1).trimEnd()}…` : title;
+}
+
+function reviewLabel(entry) {
+  if (typeof entry?.title === 'string' && entry.title.trim()) return clipReviewLabel(entry.title);
+  const body = String(entry?.body ?? '').replace(/\s+/g, ' ').trim();
+  if (body) return clipReviewLabel(body.split(/(?<=[.!?])\s+/)[0]);
+  return clipReviewLabel(entry?.entryType);
+}
+
+/** Newest Hammond review note still inside the freshness window, or null. */
+export function latestHammondReview(markdown, today, { maxAgeDays = HAMMOND_REVIEW_FRESH_DAYS } = {}) {
+  if (!isCalendarDate(today)) return null;
+  const fresh = parseGovernanceEntries(markdown ?? '')
+    .filter(entry => HAMMOND_REVIEW_TYPES.has(entry.entryType) && isCalendarDate(entry.dateKey))
+    .filter(entry => daysBetween(entry.dateKey, today) <= maxAgeDays)
+    .sort((a, b) => (a.dateKey < b.dateKey ? 1 : a.dateKey > b.dateKey ? -1 : 0));
+  return fresh[0] ?? null;
+}
+
+export function formatHammondReviewLine(entry) {
+  const label = reviewLabel(entry);
+  return label ? `Hammond: ${label}` : null;
+}
+
 /**
- * Unresolved governance entries annotated with ageDays when dateKey is valid.
+ * Unresolved open-loop entries annotated with ageDays when dateKey is valid.
+ * Mind Insights, Weekly Reviews, and other notes are not loops.
  * Malformed/missing dateKey → included without ageDays (never dropped).
  */
 export function openGovernanceEntries(markdown, today) {
   if (!isCalendarDate(today)) return [];
   return parseGovernanceEntries(markdown)
-    .filter(entry => !isResolvedStatus(entry.status))
+    .filter(isOpenLoopEntry)
     .map(entry => {
       if (isCalendarDate(entry.dateKey)) {
         return { ...entry, ageDays: daysBetween(entry.dateKey, today) };

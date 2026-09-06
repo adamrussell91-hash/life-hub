@@ -1,4 +1,4 @@
-import { decisionTraces, parseGovernanceEntries, recentGovernanceTail } from '../core/governance-log.js';
+import { decisionTraces, isOpenLoopEntry, parseGovernanceEntries, recentGovernanceTail } from '../core/governance-log.js';
 import { daysBetween, formatDisplayDate, getSydneyDateKey, isCalendarDate } from '../core/time.js';
 
 function displayDate(value) {
@@ -70,8 +70,7 @@ export function renderGovernance(root, governanceLogMarkdown, { today = getSydne
     const heading = root.createElement('p');
     heading.className = 'governance-entry-heading';
     const bits = [entry.dateKey, entry.entryType].filter(Boolean);
-    const resolved = typeof entry.status === 'string' && entry.status.trim().toLowerCase() === 'resolved';
-    if (!resolved && isCalendarDate(entry.dateKey) && isCalendarDate(today)) {
+    if (isOpenLoopEntry(entry) && isCalendarDate(entry.dateKey) && isCalendarDate(today)) {
       bits.push(`${daysBetween(entry.dateKey, today)}d open`);
     }
     heading.textContent = bits.join(' — ');
