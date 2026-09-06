@@ -227,13 +227,17 @@ test('local sign-in exposes the fixture repository contract', async t => {
   });
   assert.equal(manifest.status, 200);
   const payload = await manifest.json();
-  assert.equal(payload.data.files.length, 9);
+  assert.equal(payload.data.files.length, 10);
   assert.ok(payload.data.files.some(f => f.path === 'data/body/2026/07/2026-07-08-therapy-kate-semple.md'));
   const agents = payload.data.files[0];
   assert.equal(agents.path, 'config/agents.yml');
   assert.match(agents.sha, /^[0-9a-f]{40}$/);
   assert.equal(typeof agents.size, 'number');
   assert.ok(agents.size > 0);
+  const targets = payload.data.files.find(f => f.path === 'config/targets.yml');
+  assert.ok(targets);
+  assert.match(targets.sha, /^[0-9a-f]{40}$/);
+  assert.ok(targets.size > 0);
   const challenges = payload.data.files.find(f => f.path === 'data/nutrition/challenges.json');
   assert.ok(challenges);
   const centralNode = payload.data.files.find(f => f.path === 'central-node.md');
