@@ -731,7 +731,17 @@
 }
 
 .reminder-strip-host {
-  margin: 0 var(--space-5) var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+
+.reminder-card {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 28rem;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--hub-glass-fill);
 }
 
 .reminder-strip__head {
@@ -753,8 +763,8 @@
 }
 
 .reminder-strip__list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--hub-tile-gap, var(--space-3));
 }
 
@@ -782,7 +792,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-top: var(--space-4);
+  margin-top: 0;
 }
 
 .task-editor__repeat,
@@ -4636,24 +4646,29 @@ body.is-universe-fullscreen .page-header {
 .dashboard-focus {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
-  gap: var(--space-1);
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
   margin-bottom: var(--space-3);
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: var(--space-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--hub-glass-fill);
-  box-shadow: var(--elev-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.page-header__status .dashboard-focus {
+  margin-bottom: 0;
+  justify-content: flex-end;
+  gap: var(--space-2) var(--space-5);
 }
 
 .dashboard-focus__tile {
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  flex: 1 1 8rem;
+  flex: 0 1 auto;
   /* width:100% + overflow:hidden — WebKit won't shrink grid <button>s otherwise */
   width: auto;
   max-width: 100%;
@@ -5516,11 +5531,16 @@ button.column-bar--row.is-active {
   }
 
   .dashboard-focus__tile {
-    flex: 1 1 calc(50% - var(--space-1));
+    flex: 0 1 auto;
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-xs);
     gap: var(--space-1);
     box-shadow: none;
+  }
+
+  .page-header__status {
+    flex: 1 1 100%;
+    justify-content: flex-start;
   }
 
   .dashboard-focus__value {

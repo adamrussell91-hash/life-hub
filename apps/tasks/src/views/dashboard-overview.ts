@@ -37,6 +37,7 @@ export type DashboardOverviewOptions = {
   onCompleteTask?: (task: Task) => void;
   onStartTask?: (task: Task) => void;
   onRescheduleTask?: (task: Task, dateKey: string) => void;
+  statusHost?: HTMLElement;
 };
 
 const OVERVIEW_OPEN_KEY = 'tasks-hub:dashboard-overview-open';
@@ -162,7 +163,6 @@ function renderFocusStrip(
     href?: string;
     onClick?: () => void;
   }> = [
-    { id: 'today', label: "Today's tasks", value: stats.today, href: '#/day' },
     {
       id: 'overdue',
       label: 'Overdue',
@@ -180,15 +180,16 @@ function renderFocusStrip(
         });
       }
     },
+    { id: 'today', label: 'Today', value: stats.today, href: '#/day' },
     {
       id: 'attention',
-      label: 'Needs attention',
+      label: 'Attention',
       value: stats.needsAttention,
       href: '#/projects'
     },
     {
       id: 'projects',
-      label: 'Active projects',
+      label: 'Projects',
       value: stats.activeProjects,
       onClick: () => {
         if (options.onFilterRunning) {
@@ -598,7 +599,12 @@ export function renderDashboardOverview(host: HTMLElement, options: DashboardOve
     renderDashboardOverview(host, options);
   };
 
-  host.append(renderFocusStrip(stats, options, host));
+  const strip = renderFocusStrip(stats, options, host);
+  if (options.statusHost) {
+    options.statusHost.replaceChildren(strip);
+  } else {
+    host.append(strip);
+  }
 
   const shell = el('div', 'dashboard-overview__shell');
   const toggle = el('button', 'dashboard-overview__toggle');

@@ -22,6 +22,7 @@ import {
 import { deleteTaskNow } from '@/views/card-actions';
 import { mountTaskCard, type TaskCardHandlers } from '@/views/hub-cards';
 import { renderDashboardOverview } from '@/views/dashboard-overview';
+import { pageHeaderStatusSlot } from '@/shell/shell';
 import { requestToggleDone } from '@/views/dashboard';
 import { runningProjectIds } from '@/domain/dashboard-overview';
 
@@ -185,9 +186,12 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
   };
 
   const overviewHost = el('div', 'dashboard-overview');
+  const header = canvas.closest('.hub-canvas')?.querySelector('.page-header');
+  const statusHost = header instanceof HTMLElement ? pageHeaderStatusSlot(header) : undefined;
   renderDashboardOverview(overviewHost, {
     tasks,
     projects,
+    statusHost,
     runningFilterActive: boardRunningOnly,
     onChanged: reloadBoard,
     onFilterRunning: () => {
