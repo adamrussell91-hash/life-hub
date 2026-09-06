@@ -220,7 +220,7 @@ test('mobile Chat tab and overlay keep send beside the field', async () => {
   assert.ok(inputBox && sendBox && formBox && navBox);
   assert.ok(sendBox.x > inputBox.x, 'send stays beside the field on the Chat tab');
   assert.ok(Math.abs(sendBox.y - inputBox.y) < 48, 'send stays on the composer row');
-  assert.ok(formBox.bottom <= navBox.top + 2, 'composer stays above the mobile nav');
+  assert.ok(formBox.y + formBox.height <= navBox.y + 2, 'composer stays above the mobile nav');
 
   await page.locator('#more-nav-button').click();
   await page.locator('#more-sheet [data-section="nutrition"]').click();

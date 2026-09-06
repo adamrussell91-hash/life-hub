@@ -175,6 +175,10 @@ test('full-page Chat locks the canvas height and anchors the composer on the flo
   );
   assert.match(
     css,
+    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+#chat-view \.chat-messages[\s\S]*scrollbar-gutter:\s*stable/
+  );
+  assert.match(
+    css,
     /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+#chat-view \.chat-form[\s\S]*margin-top:\s*auto/
   );
   assert.doesNotMatch(
