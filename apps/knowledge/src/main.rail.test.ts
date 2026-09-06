@@ -52,6 +52,11 @@ describe("Knowledge Hub rail", () => {
     expect(mobile).toContain("goNotebooks");
   });
 
+  it("opens on Notebooks after boot, not the archive list", () => {
+    expect(main).toMatch(/let view: View = "notebooks"/);
+    expect(main).toMatch(/await refreshVisible\(\);\s*view = "notebooks"/);
+  });
+
   it("offers a quiet Clean up control beside Edit in the reader", () => {
     expect(main).toContain('class="btn btn--ghost reader__tidy" data-tidy type="button"');
     expect(main).toContain("Clean up");
