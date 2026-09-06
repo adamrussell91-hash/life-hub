@@ -174,6 +174,13 @@ test('short chat bubbles are sized by text, not Copy/Retry, and status lines do 
   assert.doesNotMatch(css, /chat-status-pulse/);
 });
 
+test('desktop overlay Chat locks its window height so a reply cannot grow the panel', async () => {
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+  const overlay = css.match(/\.chat-view\[data-panel-mode="overlay"\]\s*\{[^}]+\}/)?.[0] ?? '';
+  assert.match(overlay, /height:\s*min\(70vh,\s*40rem\)/);
+  assert.match(overlay, /max-height:\s*min\(70vh,\s*40rem\)/);
+});
+
 test('full-page Chat locks the canvas height and anchors the composer on the floor', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
@@ -247,7 +254,7 @@ test('service worker paints cached images immediately and keeps scripts network-
   assert.match(worker, /function staleWhileRevalidate/);
   assert.match(worker, /function networkFirst/);
   assert.match(worker, /isStaticImage\(url\.pathname\)/);
-  assert.match(worker, /life-hub-shell-v153/);
+  assert.match(worker, /life-hub-shell-v154/);
 });
 
 test('web app manifest is installable and uses only local icons', async () => {

@@ -442,9 +442,17 @@ async function sampleChatWindow(page, ms) {
       const faded = [...(list?.querySelectorAll('.chat-message') ?? [])].filter(el => (
         Number(getComputedStyle(el).opacity) < 0.95
       )).length;
+      const viewBox = view?.getBoundingClientRect();
+      const listBox = list?.getBoundingClientRect();
+      const spacer = list?.querySelector?.('[data-chat-turn-spacer]');
       samples.push({
         frameH: frame?.getBoundingClientRect().height ?? 0,
-        viewH: view?.getBoundingClientRect().height ?? 0,
+        viewH: viewBox?.height ?? 0,
+        viewTop: viewBox?.top ?? 0,
+        listTop: listBox?.top ?? 0,
+        listH: listBox?.height ?? 0,
+        spacerH: spacer ? (spacer.getBoundingClientRect().height || 0) : 0,
+        spacer: Boolean(spacer),
         nav: getComputedStyle(nav).display,
         header: getComputedStyle(header).display,
         picker: getComputedStyle(picker).display,
@@ -461,6 +469,18 @@ async function sampleChatWindow(page, ms) {
 
 function windowFlicker(samples) {
   const range = arr => (arr.length ? Math.max(...arr) - Math.min(...arr) : 0);
+  const reversals = (arr, eps = 0.5) => {
+    let n = 0;
+    let dir = 0;
+    for (let i = 1; i < arr.length; i += 1) {
+      const d = arr[i] - arr[i - 1];
+      if (Math.abs(d) < eps) continue;
+      const next = d > 0 ? 1 : -1;
+      if (dir && next !== dir) n += 1;
+      dir = next;
+    }
+    return n;
+  };
   let chromeFlips = 0;
   let hideFlips = 0;
   let kbFlips = 0;
@@ -471,14 +491,46 @@ function windowFlicker(samples) {
     if (samples[i].hide !== samples[i - 1].hide) hideFlips += 1;
     if (samples[i].kb !== samples[i - 1].kb) kbFlips += 1;
   }
+  const viewH = samples.map(sample => sample.viewH ?? 0);
+  const viewTop = samples.map(sample => sample.viewTop ?? 0);
+  const listTop = samples.map(sample => sample.listTop ?? 0);
+  const spacerH = samples.map(sample => sample.spacerH ?? 0);
   return {
     frameHRange: range(samples.map(sample => sample.frameH)),
-    viewHRange: range(samples.map(sample => sample.viewH)),
+    viewHRange: range(viewH),
+    viewHReversals: reversals(viewH),
+    viewTopRange: range(viewTop),
+    viewTopReversals: reversals(viewTop),
+    listTopRange: range(listTop),
+    listTopReversals: reversals(listTop),
+    spacerHRange: range(spacerH),
+    spacerHReversals: reversals(spacerH),
+    hadSpacer: samples.some(sample => sample.spacer),
     chromeFlips,
     hideFlips,
     kbFlips,
     faded: samples.some(sample => sample.faded > 0)
   };
+}
+
+async function seedEngagedThread(page) {
+  await page.evaluate(() => {
+    const list = document.querySelector('#chat-messages');
+    const empty = document.querySelector('#chat-empty');
+    const view = document.querySelector('#chat-view');
+    if (empty) empty.hidden = true;
+    view.dataset.chrome = 'engaged';
+    list.replaceChildren();
+    for (let i = 0; i < 8; i += 1) {
+      const li = document.createElement('li');
+      li.className = i % 2 ? 'chat-message chat-message--user' : 'chat-message chat-message--assistant';
+      const body = document.createElement('div');
+      body.className = 'chat-message__body';
+      body.textContent = `Seed ${i} — already-engaged thread so first-message chrome collapse is not in the sample.`;
+      li.append(body);
+      list.append(li);
+    }
+  });
 }
 
 test('mobile Chat window does not strobe while a reply streams', async () => {
@@ -600,6 +652,82 @@ test('refreshing the app state does not fade existing Chat messages', async () =
   });
 
   assert.equal(flicker.faded, false, 'existing bubbles must not replay hub-list-in on data-state');
+  await context.close();
+});
+
+test('desktop Chat window stays still while a reply streams', async () => {
+  const context = await browser.newContext({ viewport: { width: 1800, height: 1100 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await seedEngagedThread(page);
+  await page.locator('#chat-input').fill('Chadwick, describe the session — full send');
+
+  const sampling = sampleChatWindow(page, 2000);
+  await page.locator('#chat-send').click();
+  const flicker = windowFlicker(await sampling);
+
+  assert.equal(flicker.hadSpacer, false, 'must not insert a turn spacer on desktop');
+  assert.equal(flicker.spacerHRange, 0, 'spacer height must stay 0');
+  assert.ok(flicker.viewHRange < 2, `full-page Chat window height must stay still (viewHRange=${flicker.viewHRange})`);
+  assert.ok(flicker.viewTopRange < 2, `full-page Chat window must not jump (viewTopRange=${flicker.viewTopRange})`);
+  assert.equal(flicker.listTopReversals, 0, `thread top must not bounce (listTopReversals=${flicker.listTopReversals})`);
+  assert.ok(flicker.listTopRange < 4, `engaged thread top must stay put (listTopRange=${flicker.listTopRange})`);
+
+  await page.locator('.chat-workout').waitFor({ timeout: 10_000 });
+  await context.close();
+});
+
+test('desktop overlay Chat window stays still while a reply streams', async () => {
+  const context = await browser.newContext({ viewport: { width: 1800, height: 1100 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="nutrition"]').click();
+  await page.locator('#nutrition-dashboard').waitFor({ state: 'visible' });
+  await page.locator('#nutrition-chat-button').click();
+  await page.locator('#chat-view[data-panel-mode="overlay"]').waitFor({ state: 'visible' });
+  await seedEngagedThread(page);
+  await page.locator('#chat-input').fill('Chadwick, describe the session — full send');
+
+  const sampling = sampleChatWindow(page, 2000);
+  await page.locator('#chat-send').click();
+  const flicker = windowFlicker(await sampling);
+
+  assert.equal(flicker.hadSpacer, false, 'must not insert a turn spacer in the overlay');
+  assert.equal(flicker.spacerHRange, 0, 'overlay spacer height must stay 0');
+  assert.ok(flicker.viewHRange < 2, `overlay window must not grow with the reply (viewHRange=${flicker.viewHRange})`);
+  assert.ok(flicker.viewTopRange < 2, `overlay window must not jump (viewTopRange=${flicker.viewTopRange})`);
+  assert.equal(flicker.viewHReversals, 0, `overlay height must not oscillate (viewHReversals=${flicker.viewHReversals})`);
+  assert.equal(flicker.listTopReversals, 0, `overlay thread top must not bounce (listTopReversals=${flicker.listTopReversals})`);
+
+  await page.locator('.chat-workout').waitFor({ timeout: 10_000 });
+  await context.close();
+});
+
+test('desktop first send does not strobe the Chat window', async () => {
+  const context = await browser.newContext({ viewport: { width: 1800, height: 1100 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#agent-picker [data-agent-slug="brisket"]').click();
+  await page.locator('#chat-input').fill('Yep');
+
+  const sampling = sampleChatWindow(page, 1800);
+  await page.locator('#chat-send').click();
+  const flicker = windowFlicker(await sampling);
+
+  assert.equal(flicker.hadSpacer, false, 'first send must not insert a turn spacer');
+  assert.equal(flicker.spacerHReversals, 0, 'first send must not grow and collapse a spacer');
+  assert.ok(flicker.viewHRange < 2, `first-send window height must stay still (viewHRange=${flicker.viewHRange})`);
+  assert.ok(flicker.viewTopRange < 2, `first-send window must not jump (viewTopRange=${flicker.viewTopRange})`);
+  assert.equal(flicker.listTopReversals, 0, `first-send thread top may collapse once, not bounce (listTopReversals=${flicker.listTopReversals})`);
+
+  await page.locator('.chat-message--assistant').waitFor({ timeout: 10_000 });
   await context.close();
 });
 
