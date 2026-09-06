@@ -61,11 +61,23 @@ export type DumpSnapshot = {
   saved_at: string;
 };
 
+export type PageReview = {
+  page_id: string;
+  title: string;
+  area: "university" | "notes";
+  tags: string[];
+  updated_at: string;
+  fsrs: FsrsCard;
+  status: QuizItemStatus;
+  last_rating?: QuizRating;
+};
+
 export type QuizStore = {
   schema_version: 1;
   schedule: QuizScheduleEntry[];
   edges: QuizEdge[];
   dumps: DumpSnapshot[];
+  page_reviews: PageReview[];
 };
 
 export function newFsrsCard(now: Date = new Date()): FsrsCard {
@@ -100,5 +112,5 @@ export function toScheduleEntry(item: QuizItem): QuizScheduleEntry {
 }
 
 export function emptyQuizStore(): QuizStore {
-  return { schema_version: 1, schedule: [], edges: [], dumps: [] };
+  return { schema_version: 1, schedule: [], edges: [], dumps: [], page_reviews: [] };
 }

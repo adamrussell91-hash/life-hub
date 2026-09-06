@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   listKnowledgePages,
+  parseQuizStore,
   saveKnowledgePage,
   unwrapGithubFileText
 } from '../../netlify/functions/_shared/knowledge-data.mjs';
@@ -171,5 +172,17 @@ test('saveKnowledgePage rejects an invalid connected ref', async () => {
       }
     ),
     error => error.status === 400 && /Invalid connected ref/.test(error.message)
+  );
+});
+
+test('parseQuizStore keeps page reviews and defaults a missing list', () => {
+  assert.deepEqual(parseQuizStore(null).page_reviews, []);
+  assert.equal(
+    parseQuizStore({
+      schema_version: 1,
+      schedule: [],
+      page_reviews: [{ page_id: 'note-1', title: 'Working memory' }]
+    }).page_reviews[0].page_id,
+    'note-1'
   );
 });
