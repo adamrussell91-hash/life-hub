@@ -38,14 +38,17 @@ function renderReminderCard(
   onChanged: () => void
 ): HTMLElement {
   const card = el('article', 'reminder-card');
-  card.append(el('h3', 'reminder-card__title', item.task.title));
-  card.append(el('p', 'reminder-card__copy', item.label));
+  const body = el('div', 'reminder-card__body');
+  body.append(el('h3', 'reminder-card__title', item.task.title));
+  body.append(el('p', 'reminder-card__copy', item.label));
 
   const meta = el('div', 'reminder-card__meta');
   const rule = parseRecurrenceRule(item.task.recurrence_rule);
   if (rule) meta.append(el('span', 'chip chip--muted', formatRecurrenceLabel(rule)));
   if (item.task.due_time) meta.append(el('span', 'chip chip--muted', item.task.due_time));
+  card.append(body);
   if (meta.childElementCount) card.append(meta);
+  else card.append(el('div', 'reminder-card__meta'));
 
   const actions = el('div', 'reminder-card__actions');
   const open = el('button', 'btn btn--primary', 'Open task');

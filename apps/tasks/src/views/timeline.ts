@@ -2,6 +2,7 @@ import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { toDateKey } from '@/domain/queries';
 import {
   chronologyBounds,
   collectChronologyItems,
@@ -17,7 +18,7 @@ import {
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
 import { renderTaskEditor } from '@/views/task-editor';
 
-const PX_PER_DAY = 18;
+const PX_PER_DAY = 22;
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -73,7 +74,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     const width = bounds.days * PX_PER_DAY;
     const track = el('div', 'chronology__track');
     track.style.width = `${width}px`;
-    track.style.minHeight = `${Math.max(10, 3.5 + items.length * 2)}rem`;
+    track.style.minHeight = `${Math.max(10, 3 + items.length * 1.45)}rem`;
 
     const axis = el('div', 'chronology__axis');
     axis.style.width = `${width}px`;
@@ -86,6 +87,14 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       axis.append(tick);
     }
     track.append(axis);
+
+    const todayOffset = dayOffset(bounds.start, toDateKey(new Date()));
+    if (todayOffset >= 0 && todayOffset <= bounds.days) {
+      const todayMark = el('div', 'chronology__today');
+      todayMark.style.left = `${todayOffset * PX_PER_DAY}px`;
+      todayMark.setAttribute('aria-hidden', 'true');
+      track.append(todayMark);
+    }
 
     if (!items.length) {
       track.append(el('p', 'empty-state', 'No dated tasks yet. Give work a due date to see it here.'));
@@ -101,8 +110,9 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       );
       row.style.left = `${left}px`;
       row.style.width = `${span * PX_PER_DAY}px`;
-      row.style.top = `${2.75 + index * 2}rem`;
+      row.style.top = `${2.5 + index * 1.45}rem`;
       row.dataset.taskId = item.taskId;
+      row.dataset.status = item.status;
       row.classList.toggle('is-focused', isFocusedTaskId(item.taskId));
       row.textContent = item.title;
       row.title = `${item.title} · ${formatDisplayDate(item.startKey)} → ${formatDisplayDate(item.endKey)}`;

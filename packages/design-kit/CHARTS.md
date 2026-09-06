@@ -161,7 +161,7 @@ Consumers are not a second catalog. Open them only to wire data, not to restyle.
 |-----|--------|--------|
 | Life | `nutrition-charts.js`, `bloods-charts.js`, `central-node-charts.js`, `fitness-charts-model.js`, `render-fitness-charts.js`, `render-home.js`, `render-nutrition.js`, `render-mind.js`, `render-skincare.js`, `render-body.js`, `render-bloods.js`, `render-central-node.js` (all under `apps/life/js/app/`) | — |
 | Knowledge | — | `apps/knowledge/src/archive/` (library root) |
-| Tasks | `apps/tasks/src/chart-kit/{ring,apply-ring,columns,animate}.ts`, `blocks/chart-svg.ts`, `views/project-portfolio-chart.ts` | `apps/tasks/src/views/graph.ts`, `blocks/graph-svg.ts`, `blocks/graph-layout.ts` — blockers + workstreams |
+| Tasks | `apps/tasks/src/chart-kit/{ring,apply-ring,columns,area-line,animate}.ts`, `blocks/chart-svg.ts`, `views/project-portfolio-chart.ts`, `views/dashboard-overview.ts` | `apps/tasks/src/views/graph.ts`, `blocks/graph-svg.ts`, `blocks/graph-layout.ts` — blockers + workstreams |
 | Teaching | `apps/teaching/src/blocks/chart-svg.ts` | `blocks/graph-svg.ts`, `graph-layout.ts`, `graph-maker/` |
 
 Tasks Graph is a rail page, not home. Charts on Tasks are board blocks (counts, trends).
@@ -201,6 +201,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-06 | `area-line` | Tasks dashboard completion trend consumes Life `area-line` (typed consumer + `animateAreaReveal`). No new catalog types. |
 | 2026-09-06 | Fitness | e1RM vs recent form is one `area-line` overlay (each lift as % of its own peak) with a legend. Who is improving keeps `bump` but uses kit label size, fewer week ticks, and a legend instead of cramped right-side names. |
 | 2026-09-06 | Fitness | Polar “When you train”, monthly rhythm, e1RM scatter, and year wheel now use `columns` plus a one-line read. Chart hovers pin to the mark with `position: fixed`. |
 | 2026-09-05 | Fitness | Polar labels sit outside the plot with leader lines; week volume bars animate width, not height. No new catalog types. |
