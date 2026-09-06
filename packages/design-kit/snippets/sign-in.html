@@ -1,16 +1,9 @@
-<!-- Locked passphrase gate. Per hub: brand eyebrow text + hub tile only.
-     Required: .sign-in__mark (tile from icons/). Forbidden: supporting /
-     purpose / privacy copy. Enter submits via form submit (not click-only).
+<!-- Locked passphrase gate. Per hub: brand eyebrow text only.
+     Forbidden: .sign-in__mark / hub tile, supporting / purpose / privacy copy.
+     Enter submits via form submit (not click-only).
      Load: tokens.css → overlays.css → actions.css → sign-in.css -->
 <div class="sign-in">
   <form class="sign-in__card" method="post" action="#" novalidate>
-    <img
-      class="sign-in__mark"
-      src="../icons/knowledge.svg"
-      alt=""
-      width="56"
-      height="56"
-    />
     <p class="sign-in__brand">Hub name</p>
     <h1 class="sign-in__title">Sign in</h1>
     <div class="sign-in__field">
