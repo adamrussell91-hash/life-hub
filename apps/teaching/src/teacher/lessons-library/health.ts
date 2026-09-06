@@ -1,3 +1,4 @@
+import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
 import type { LessonLibraryRow } from './types';
 
 export type HealthFlag = 'draft_stale' | 'missing_resources' | 'stale' | 'never_opened';
@@ -20,7 +21,7 @@ export function lessonHealthFlags(
 ): HealthFlag[] {
   const flags: HealthFlag[] = [];
   const updatedAge = ageDays(lesson.updated_at, now);
-  if (!lesson.published && lesson.status === 'active' && updatedAge >= DRAFT_STALE_DAYS) {
+  if (!lesson.published && isActiveLibraryStatus(lesson.status) && updatedAge >= DRAFT_STALE_DAYS) {
     flags.push('draft_stale');
   }
   if ((lesson.attachment_count ?? 0) === 0) flags.push('missing_resources');

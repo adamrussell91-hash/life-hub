@@ -166,7 +166,7 @@ Shared core lives in `src/tidy/` and **must run in Cloudflare Workers** (fetch-b
 
 ### Auth for the button (no Netlify tidy function)
 
-`kh_session` is set by `netlify/functions/auth-login.ts` as host-only on `knowledge-api.adam-russell.com`, so `*.workers.dev` never sees it.
+`life_hub_session` is set on `api.adam-russell.com`. The old `knowledge-api.adam-russell.com` host is deleted and unused for routing.
 
 1. Give the existing Worker a custom hostname under `adam-russell.com` (e.g. `knowledge-tidy.adam-russell.com` routing to `knowledge-hub-research`). Public URL — not a secret.
 2. Change login **and** logout `Set-Cookie` to include `Domain=.adam-russell.com` (keep `HttpOnly; Secure; SameSite=None; Path=/`). This is a small edit to existing auth functions, not a new function.
@@ -322,7 +322,7 @@ Must-haves:
 - Messy detector: triple blank lines true; tidy duplicate H1 true; clean short note false
 - Prompt file exists and contains all 20 §2a names, says one tag is enough, at most three, no padding, preserve Q/A
 - `run-tidy` scan cap 20; skip unchanged; writes manifest
-- Client: production `tidyPage` does **not** call `knowledge-api.adam-russell.com` / `/api/tidy`
+- Client: production `tidyPage` uses same-origin / `api.adam-russell.com` Knowledge tidy, not the deleted `knowledge-api` host
 - Grep/unit: **no** `netlify/functions/tidy` and **no** `/api/tidy` redirect in `netlify.toml`
 - Rail has no Uni/Notes nav; compose has no area select
 - Knowledge Hub brand control returns to the unfiltered archive list from a page view

@@ -128,8 +128,12 @@ test('curriculum lists teacher classes and marks published lessons', async () =>
   assert.deepEqual(body.data.lessons, [{
     id: 'lesson-1',
     title: 'Draft',
+    slug: '',
     unit_id: 'unit-1',
-    published: true
+    sequence: 0,
+    status: 'active',
+    published: true,
+    updated_at: ''
   }]);
   assert.deepEqual(body.data.media.map(item => item.id), ['file-2']);
   assert.equal(body.data.schedule_anchor_date, '2026-08-12');

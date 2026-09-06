@@ -5,6 +5,7 @@ import {
   pedagogicalModeLabel,
   type PedagogicalMode
 } from '@/curriculum/pedagogical-mode';
+import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
 import { askConfirmCard } from '@/teacher/confirm-dialog';
 import { selectTodaySchedule } from '@/teacher/home-model';
 import { resolveScheduleToday } from '@/schedule/today';
@@ -855,7 +856,7 @@ export function renderLessonsLibrary(
           const unitNode = el('details', 'lessons-map__node');
           unitNode.open = false;
           const unitLessons = curriculum.lessons.filter(
-            (lesson) => lesson.unit_id === unit.id && lesson.status === 'active'
+            (lesson) => lesson.unit_id === unit.id && isActiveLibraryStatus(lesson.status)
           );
           unitNode.append(
             el('summary', undefined, `${unit.title} (${unitLessons.length})`)

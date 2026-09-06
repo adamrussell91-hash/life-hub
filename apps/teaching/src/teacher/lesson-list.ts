@@ -1,4 +1,5 @@
 import { navigate } from '@/app/router';
+import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
@@ -24,7 +25,7 @@ export function renderLessonList(
   }
 
   const lessons = curriculum.lessons
-    .filter((lesson) => lesson.status === 'active')
+    .filter((lesson) => isActiveLibraryStatus(lesson.status))
     .sort((a, b) => {
       if (a.unit_id !== b.unit_id) return a.unit_id.localeCompare(b.unit_id);
       return a.sequence - b.sequence;

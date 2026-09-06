@@ -539,7 +539,7 @@ Teacher UI leftovers now on `life-hub2` (Life session, Teaching Blobs):
 - `GET /api/trash`; `POST /api/:collection/:id/restore-from-trash`; `GET …/dependencies` (empty list)
 - `POST /api/scope-sequences` and `GET/PATCH /api/scope-sequences/:id`
 - `GET /api/export?kind=lesson|unit|archive`
-- `GET/POST /api/ai/jobs` and `GET/PATCH /api/ai/jobs/:id` — create/poll/resolve; no background runner yet
+- `GET/POST /api/ai/jobs` and `GET/PATCH /api/ai/jobs/:id` — create/poll/resolve. Intake stays request-driven. Midnight tidy and stale working jobs move on `GET/POST /api/ai/jobs/tick` (`cron` `17 14 * * *` = 00:17 AEST) without a browser.
 
 DNS decision: point `teaching-hub` / `knowledge-hub` / `tasks-hub` at this product (`/teaching/`, `/knowledge/`, `/tasks/`), including student `/s/…` → `/teaching/s/…`.
 
