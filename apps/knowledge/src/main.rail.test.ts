@@ -47,6 +47,8 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain('id: "notebooks", label: "Notebooks"');
     expect(css).toContain(".nb-grid");
     expect(css).toContain("aspect-ratio: 3 / 2");
+    expect(css).toContain(".nb-card__media");
+    expect(css).toContain("repeat(4, minmax(0, 1fr))");
     expect(css).toContain(".nb-open__notes");
     expect(mobile).toContain('id: "notebooks"');
     expect(mobile).toContain("goNotebooks");
