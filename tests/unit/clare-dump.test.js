@@ -3,7 +3,9 @@ import test from 'node:test';
 import { assembleDumpResult } from '../../netlify/functions/_shared/clare.mjs';
 import {
   parseBrainDump,
+  parseWordingCorrection,
   resolveDuplicateFollowUp,
+  resolveWordingCorrectionFollowUp,
   splitDumpLines
 } from '../../netlify/functions/_shared/clare-dump.mjs';
 
@@ -96,6 +98,55 @@ test('treats meta-commentary as non-actionable', () => {
   const result = assembleDumpResult(items, frameworks, () => null);
   assert.equal(result.proposals.length, 0);
   assert.match(result.voice, /listening|got it/i);
+});
+
+test('does not propose a wording correction as a new task', () => {
+  const items = parseBrainDump('Encouraging is supposed to be incursion for both of those', {
+    now: new Date(2026, 8, 6),
+    preferredDomain: 'teaching'
+  });
+  assert.equal(items[0].kind, 'meta');
+  assert.equal(items[0].actionable, false);
+  assert.equal(assembleDumpResult(items, frameworks, () => null).proposals.length, 0);
+});
+
+test('rewrites the prior quoted title when Adam corrects a word', () => {
+  const priorTitle =
+    'At some point I need to put in the international neuroscience Olympiad encouraging request and the UN voice encouraging request as well';
+  const thread = [
+    { role: 'user', text: priorTitle },
+    {
+      role: 'assistant',
+      text: `Is “${priorTitle}” due this week or next week?`
+    }
+  ];
+  const correction = 'Encouraging is supposed to be incursion for both of those';
+  assert.deepEqual(parseWordingCorrection(correction), {
+    wrong: 'Encouraging',
+    right: 'incursion'
+  });
+  const resolved = resolveWordingCorrectionFollowUp(correction, thread);
+  assert.ok(resolved);
+  assert.ok(resolved.correctedTitles.some(title => /incursion/i.test(title)));
+  assert.ok(resolved.correctedTitles.every(title => !/encouraging/i.test(title)));
+  const items = parseBrainDump(resolved.correctedTitles.join('\n'), {
+    now: new Date(2026, 8, 6),
+    preferredDomain: 'teaching'
+  });
+  const result = assembleDumpResult(items, frameworks, () => null);
+  assert.ok(result.proposals.length >= 1);
+  assert.ok(result.proposals.every(p => /incursion/i.test(p.title)));
+  assert.ok(result.proposals.every(p => !/supposed to be/i.test(p.title)));
+});
+
+test('scheduling supposed-to-be lines stay actionable', () => {
+  assert.equal(parseWordingCorrection('The meeting is supposed to be tomorrow'), null);
+  const items = parseBrainDump('The meeting is supposed to be tomorrow', {
+    now: new Date(2026, 8, 6),
+    preferredDomain: 'teaching'
+  });
+  assert.notEqual(items[0].kind, 'meta');
+  assert.equal(items[0].actionable, true);
 });
 
 test('anchors due today to Australia/Sydney on a UTC host clock', () => {

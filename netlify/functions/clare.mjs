@@ -21,7 +21,7 @@ import {
 } from './_shared/clare.mjs';
 import { HUB_TZ } from './_shared/clare-dates.mjs';
 import { buildClareBriefing } from './_shared/clare-desk.mjs';
-import { parseBrainDump, resolveDuplicateFollowUp } from './_shared/clare-dump.mjs';
+import { parseBrainDump, resolveDuplicateFollowUp, resolveWordingCorrectionFollowUp } from './_shared/clare-dump.mjs';
 import {
   applyRecordPatch,
   mutationLabel,
@@ -149,6 +149,21 @@ async function computeDumpResult(store, body, nowIso) {
       agent
     };
   }
+  const wording =
+    followUp?.action === 'make_new'
+      ? null
+      : resolveWordingCorrectionFollowUp(text, body.recent_thread);
+  if (wording && !wording.correctedTitles.length) {
+    return {
+      voice: `Got it — “${wording.wrong}” → “${wording.right}”. Which card should I fix?`,
+      proposals: [],
+      questions: [],
+      notes: [],
+      toolkit: null,
+      mutations: [],
+      agent
+    };
+  }
   const [frameworks, tasks, projects, calibrations] = await Promise.all([
     loadFrameworks(store),
     listJSON(store, TASK_PREFIX),
@@ -156,7 +171,13 @@ async function computeDumpResult(store, body, nowIso) {
     listJSON(store, CLARE_CALIBRATION_PREFIX)
   ]);
   const byDomain = new Map(calibrations.map(item => [item.domain, item]));
-  const items = parseBrainDump(followUp?.action === 'make_new' ? followUp.title : text, {
+  const dumpText =
+    followUp?.action === 'make_new'
+      ? followUp.title
+      : wording
+        ? wording.correctedTitles.join('\n')
+        : text;
+  const items = parseBrainDump(dumpText, {
     now: new Date(nowIso),
     timezone: HUB_TZ,
     preferredDomain: domain,
@@ -164,7 +185,7 @@ async function computeDumpResult(store, body, nowIso) {
     projects,
     forceNewTitles: followUp?.action === 'make_new' || Boolean(body.force_new_titles)
   });
-  return assembleDumpResult(
+  const result = assembleDumpResult(
     items,
     frameworks,
     itemDomain => {
@@ -174,6 +195,11 @@ async function computeDumpResult(store, body, nowIso) {
     protocolId,
     agent
   );
+  if (!wording) return result;
+  return {
+    ...result,
+    voice: `Fixed — “${wording.wrong}” → “${wording.right}”. ${result.voice}`.trim()
+  };
 }
 
 function chunkVoice(text, size = 28) {
