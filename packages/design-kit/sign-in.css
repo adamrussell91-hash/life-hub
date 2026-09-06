@@ -44,7 +44,7 @@
   -webkit-backdrop-filter: blur(var(--sign-in-glass-blur));
 }
 
-/* Website tile — same asset as favicon + .hub-mark (ICONS.md). */
+/* Website tile — same asset as the favicon (ICONS.md). */
 .sign-in__mark {
   display: block;
   width: 3.5rem;

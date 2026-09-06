@@ -70,14 +70,14 @@ describe("Knowledge Hub rail", () => {
     expect(main).not.toContain('class="chip"');
   });
 
-  it("keeps reader header actions as ghost buttons and puts the hub tile in the title row", () => {
+  it("keeps reader header actions as ghost buttons and leaves the title row as h1 only", () => {
     expect(main).toContain('class="btn btn--ghost reader__back" data-back type="button"');
     expect(main).toContain('class="btn btn--ghost" data-edit type="button"');
     expect(main).toContain('class="btn btn--ghost" data-open-chat type="button"');
     expect(main).toContain("titleRowHtml");
     expect(hubChrome).toContain("page-header__title-row");
-    expect(hubChrome).toContain('class="hub-mark"');
-    expect(hubChrome).toContain("${hubMarkHtml()}");
+    expect(hubChrome).not.toContain('class="hub-mark"');
+    expect(hubChrome).not.toContain("hubMarkHtml");
     expect(main).toContain("icons/knowledge.svg");
     expect(main).toContain("sign-in__mark");
     expect(intakeView).toContain("confirm-card");
