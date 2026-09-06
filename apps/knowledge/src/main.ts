@@ -218,8 +218,8 @@ async function rateActivePage(rating: QuizRating) {
 
 let entries: PageManifestEntry[] = [];
 let visible: PageManifestEntry[] = [];
-let view: View = "list";
-let pageReturnView: View = "list";
+let view: View = "notebooks";
+let pageReturnView: View = "notebooks";
 let query = "";
 let keywordFilter = "";
 let originFilter = emptyOriginFilter();
@@ -1271,7 +1271,7 @@ async function applyPageHash(): Promise<boolean> {
     return true;
   } catch {
     showToast("That note isn't in the archive.");
-    view = "list";
+    view = "notebooks";
     render();
     return false;
   }
@@ -2027,7 +2027,7 @@ async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean 
     entries = await listPages();
     await ensurePageReviews();
     await refreshVisible();
-    view = "list";
+    view = "notebooks";
     if (!(await applyPageHash())) render();
     if (!(window as Window & { __khPageHashBound?: boolean }).__khPageHashBound) {
       (window as Window & { __khPageHashBound?: boolean }).__khPageHashBound = true;
@@ -2035,7 +2035,7 @@ async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean 
         void (async () => {
           const opened = await applyPageHash();
           if (!opened && view === "page") {
-            view = "list";
+            view = pageReturnView === "notebooks" ? "notebooks" : "list";
             activePage = null;
             render();
           }

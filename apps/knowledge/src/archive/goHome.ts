@@ -23,7 +23,7 @@ export type HubHomeState<PageT = unknown, ComposeT = unknown> = {
 export function goHome<PageT, ComposeT>(state: HubHomeState<PageT, ComposeT>): HubHomeState<PageT, ComposeT> {
   return {
     ...state,
-    view: "list",
+    view: "notebooks",
     query: "",
     keywordFilter: "",
     originFilter: emptyOriginFilter(),

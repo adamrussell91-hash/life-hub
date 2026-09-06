@@ -18,7 +18,7 @@
         if (!redirect) return;
         if (redirect === '/knowledge' || redirect.indexOf('/knowledge/') === 0) {
           sessionStorage.removeItem(key);
-          history.replaceState(null, '', redirect);
+          history.replaceState(null, '', redirect === '/knowledge' ? '/knowledge/' : redirect);
         }
       })();
     </script>
