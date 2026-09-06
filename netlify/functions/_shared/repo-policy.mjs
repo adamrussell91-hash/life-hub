@@ -1,5 +1,6 @@
 import { daysBetween, isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { GOVERNANCE_LOG_PATH } from '../../../apps/life/js/core/governance-log.js';
+import { WEEK_FLAGS_PATH } from '../../../apps/life/js/core/open-loops.js';
 import { isTemplatePath } from './workout-templates.mjs';
 
 export const CONFIG_PATHS = new Set([
@@ -7,7 +8,8 @@ export const CONFIG_PATHS = new Set([
   'config/targets.yml',
   'central-node.md',
   GOVERNANCE_LOG_PATH,
-  'data/nutrition/challenges.json'
+  'data/nutrition/challenges.json',
+  WEEK_FLAGS_PATH
 ]);
 const EVENT_PATH = /^data\/(?<domain>nutrition|fitness|body|mind|skincare)\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 const BLOB_SHA = /^[0-9a-f]{40}$/;
