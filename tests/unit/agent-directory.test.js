@@ -29,23 +29,37 @@ test('an unnamed message stays with the sticky agent from the current conversati
   assert.equal(routeAgent('actually make that 3 eggs', 'brisket'), 'brisket');
 });
 
-test('an explicit name always wins over a sticky agent from a different conversation', () => {
-  assert.equal(routeAgent('chad, log a workout', 'brisket'), 'chadwick');
+test('a sticky conversation never changes agent from the message text', () => {
+  const stealers = [
+    'Chadwick said I should eat more protein',
+    'chad, log a workout',
+    'log a chest and curls session for Chadwick',
+    'what should I eat, brisket?',
+    'hey ann, what do you think',
+    'talk to vera about this',
+    'Ann: gifted education audit?',
+    "they're planning a gifted education audit",
+    'several teachers mentioned it',
+    'I cannot tell yet',
+    'I should declare this later',
+    'after my workout I want a burger'
+  ];
+  for (const agent of AGENTS) {
+    for (const message of stealers) {
+      assert.equal(
+        routeAgent(message, agent.slug),
+        agent.slug,
+        `${agent.slug} must keep the thread for ${JSON.stringify(message)}`
+      );
+    }
+  }
 });
 
-test('ordinary words that contain a name trigger do not steal a sticky conversation', () => {
-  const diaryFollowUp = "Don't know much at all Nina found out from one of the junior school special education teachers that apparently they're planning or are doing a gifted education audit";
-  assert.equal(routeAgent(diaryFollowUp, 'penelope'), 'penelope');
-  assert.equal(routeAgent("they're planning a gifted education audit", 'penelope'), 'penelope');
-  assert.equal(routeAgent('several teachers mentioned it', 'penelope'), 'penelope');
-  assert.equal(routeAgent('I cannot tell yet', 'penelope'), 'penelope');
-  assert.equal(routeAgent('I should declare this later', 'penelope'), 'penelope');
-});
-
-test('a spoken first name still wins over a sticky agent after word-boundary matching', () => {
-  assert.equal(routeAgent('hey ann, what do you think', 'penelope'), 'ann');
-  assert.equal(routeAgent('talk to vera about this', 'penelope'), 'vera');
-  assert.equal(routeAgent('Ann: gifted education audit?', 'penelope'), 'ann');
+test('ordinary words do not count as naming an agent on a fresh conversation', () => {
+  assert.equal(routeAgent("they're planning a gifted education audit"), ROUTER_SLUG);
+  assert.equal(routeAgent('several teachers mentioned it'), ROUTER_SLUG);
+  assert.equal(routeAgent('I cannot tell yet'), ROUTER_SLUG);
+  assert.equal(routeAgent('I should declare this later'), ROUTER_SLUG);
 });
 
 test('a stale or unknown sticky slug falls back to the router rather than being trusted blindly', () => {

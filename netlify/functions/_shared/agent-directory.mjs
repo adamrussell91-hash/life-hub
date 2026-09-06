@@ -90,12 +90,14 @@ function hasSpokenName(normalized, trigger) {
 
 export function routeAgent(message, stickySlug) {
   if (typeof message !== 'string') throw new TypeError('message must be a string');
+  // Once a conversation has an agent, stay there. Avatar click / New chat
+  // change stickySlug; the message text never does.
+  if (typeof stickySlug === 'string' && findAgent(stickySlug)) return stickySlug;
   const normalized = message.toLowerCase();
   for (const agent of AGENTS) {
     // Word bounds, not includes(): "planning" is not Ann, "several" is not Vera.
     if (agent.nameTriggers.some(trigger => hasSpokenName(normalized, trigger))) return agent.slug;
   }
-  if (typeof stickySlug === 'string' && findAgent(stickySlug)) return stickySlug;
   return ROUTER_SLUG;
 }
 
