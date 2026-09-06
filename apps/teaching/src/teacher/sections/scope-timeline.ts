@@ -19,6 +19,14 @@ import type { CurriculumResponse } from '@/teacher/nav';
 import { patchScopeSequence } from '@/teacher/scope-api';
 import { renderPageHeader } from '@/teacher/page-header';
 import { mountOutcomeStrip } from '@/outcomes/strip';
+import {
+  applyPlacementsToTimeline,
+  applyUnitOrder,
+  compareUnitOrderings,
+  moveUnitInOrder,
+  unitPlacementsFromTimeline
+} from '@/teacher/compare-unit-orderings';
+import { renderSequenceComparePanel } from '@/teacher/compare-unit-orderings-view';
 
 export const SCOPE_TIMELINE_ZOOM_KEY = 'teaching-hub.scope-timeline-zoom';
 
@@ -221,6 +229,8 @@ export function renderScopeTimelineEditor(
   let zoom = readZoom();
   let saving = false;
   let suppressClick = false;
+  let compareOpen = false;
+  let proposedUnitIds: string[] = [];
 
   type DragMode = 'move' | 'resize-start' | 'resize-end';
   let activeDrag: {
@@ -297,10 +307,16 @@ export function renderScopeTimelineEditor(
   addNote.className = 'btn btn--ghost scope-timeline__add-note';
   addNote.textContent = 'Add note';
 
+  const compareBtn = document.createElement('button');
+  compareBtn.type = 'button';
+  compareBtn.className = 'btn btn--ghost scope-timeline__compare-order';
+  compareBtn.textContent = 'Compare order';
+  compareBtn.setAttribute('aria-pressed', 'false');
+
   const meta = document.createElement('span');
   meta.className = 'scope-timeline__meta';
 
-  actions.append(addUnit, addNote, meta);
+  actions.append(addUnit, addNote, compareBtn, meta);
 
   const controls = document.createElement('div');
   controls.className = 'scope-timeline__controls';
@@ -343,6 +359,10 @@ export function renderScopeTimelineEditor(
   controls.append(termJump, todayBtn, zoomSeg);
   toolbar.append(actions, controls);
 
+  const compareHost = document.createElement('div');
+  compareHost.className = 'scope-timeline__compare-host';
+  compareHost.hidden = true;
+
   const banner = document.createElement('div');
   banner.className = 'scope-timeline__banner';
   banner.hidden = true;
@@ -363,7 +383,7 @@ export function renderScopeTimelineEditor(
 
   main.append(viewHost);
   body.append(main, inspector);
-  root.append(tabs, toolbar, banner, body);
+  root.append(tabs, toolbar, compareHost, banner, body);
   canvas.append(root);
 
   const showBanner = (message: string, tone: 'error' | 'info' = 'error'): void => {
@@ -376,6 +396,60 @@ export function renderScopeTimelineEditor(
     banner.hidden = true;
     banner.textContent = '';
     banner.classList.remove('scope-timeline__banner--info');
+  };
+
+  const liveUnitIds = (): string[] =>
+    unitPlacementsFromTimeline(scope.timeline_items).map((item) => item.unit_id);
+
+  const syncProposedIds = (): void => {
+    const live = liveUnitIds();
+    const liveSet = new Set(live);
+    proposedUnitIds = [
+      ...proposedUnitIds.filter((id) => liveSet.has(id)),
+      ...live.filter((id) => !proposedUnitIds.includes(id))
+    ];
+  };
+
+  const closeCompare = (): void => {
+    compareOpen = false;
+    proposedUnitIds = [];
+    compareHost.hidden = true;
+    compareHost.replaceChildren();
+    compareBtn.setAttribute('aria-pressed', 'false');
+  };
+
+  const paintCompare = (): void => {
+    if (!compareOpen) {
+      compareHost.hidden = true;
+      compareBtn.setAttribute('aria-pressed', 'false');
+      return;
+    }
+    syncProposedIds();
+    const current = unitPlacementsFromTimeline(scope.timeline_items);
+    const proposed = applyUnitOrder(current, proposedUnitIds, scope.week_count);
+    const report = compareUnitOrderings({
+      current,
+      proposed,
+      units: curriculum.units,
+      lessons: curriculum.lessons,
+      outcomes: (curriculum.outcomes ?? []).map((outcome) => ({
+        id: outcome.id,
+        code: outcome.code
+      }))
+    });
+    const currentTitles = current.map(
+      (item) => unitsById.get(item.unit_id)?.title ?? 'Unknown unit'
+    );
+    compareHost.hidden = false;
+    compareHost.innerHTML = renderSequenceComparePanel({
+      currentTitles,
+      proposed: proposed.map((item) => ({
+        unit_id: item.unit_id,
+        title: unitsById.get(item.unit_id)?.title ?? 'Unknown unit'
+      })),
+      report
+    });
+    compareBtn.setAttribute('aria-pressed', 'true');
   };
 
   const applyScope = (next: ScopeSequence): void => {
@@ -1051,6 +1125,7 @@ export function renderScopeTimelineEditor(
     zoomYear.setAttribute('aria-pressed', zoom === 'year' ? 'true' : 'false');
     if (tab === 'timeline') paintTimeline();
     else paintMap();
+    paintCompare();
   };
 
   const placeUnit = (unitId: string, preferredStart?: number): void => {
@@ -1090,6 +1165,48 @@ export function renderScopeTimelineEditor(
       units: availableUnits(curriculum, subject.id, scope),
       onChoose: (unitId) => placeUnit(unitId)
     });
+  });
+
+  compareBtn.addEventListener('click', () => {
+    hideBanner();
+    if (compareOpen) {
+      closeCompare();
+      return;
+    }
+    compareOpen = true;
+    proposedUnitIds = liveUnitIds();
+    paintCompare();
+  });
+
+  compareHost.addEventListener('click', (event) => {
+    const target = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      '[data-move-unit], [data-discard-sequence], [data-confirm-sequence]'
+    );
+    if (!target) return;
+    if (target.disabled) return;
+
+    if (target.hasAttribute('data-discard-sequence')) {
+      closeCompare();
+      return;
+    }
+
+    if (target.hasAttribute('data-confirm-sequence')) {
+      const current = unitPlacementsFromTimeline(scope.timeline_items);
+      const proposed = applyUnitOrder(current, proposedUnitIds, scope.week_count);
+      const items = applyPlacementsToTimeline(scope.timeline_items, proposed, (start, end) =>
+        datesForWeekSpan(scope, start, end)
+      );
+      void persistItems(items).then((ok) => {
+        if (ok) closeCompare();
+      });
+      return;
+    }
+
+    const unitId = target.dataset.moveUnit;
+    const dir = target.dataset.moveDir;
+    if (!unitId || (dir !== 'up' && dir !== 'down')) return;
+    proposedUnitIds = moveUnitInOrder(proposedUnitIds, unitId, dir);
+    paintCompare();
   });
 
   addNote.addEventListener('click', () => {
