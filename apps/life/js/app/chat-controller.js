@@ -148,15 +148,17 @@ export function createChatController({
     return keepNewestHistory(transcript.map(({ role, content }) => ({ role, content })));
   }
 
-  // Pinned avatar wins until another avatar is clicked. Otherwise keep talking to
-  // the last agent inside the memory window, then fall back to section default.
-  // An explicit name in the message still wins server-side in routeAgent.
-  function stickyAgentSlug() {
+  // A live thread (clicked avatar or an agent who already answered) never
+  // retargets from message text or a stream event. Section default is only a
+  // first-turn hint. History age drops transcript, not the agent.
+  function lockedAgentSlug() {
     if (pinnedAgentSlug) return pinnedAgentSlug;
-    if (lastAgentSlug && lastAgentSlug !== 'router' && now() - lastAgentAt <= HISTORY_WINDOW_MS) {
-      return lastAgentSlug;
-    }
-    return getDefaultAgentSlug?.();
+    if (lastAgentSlug && lastAgentSlug !== 'router') return lastAgentSlug;
+    return null;
+  }
+
+  function stickyAgentSlug() {
+    return lockedAgentSlug() ?? getDefaultAgentSlug?.();
   }
 
   function paintRoster() {
@@ -479,6 +481,7 @@ export function createChatController({
     let sawRecordProposal = false;
     let sawGovernanceLogAppended = false;
     const history = recentHistory();
+    const lockedSlug = lockedAgentSlug();
     const priorAgentSlug = stickyAgentSlug();
     if (!hiddenUser) {
       if (CANCEL_AUDIT_RE.test(message)) clearAuditSession();
@@ -601,18 +604,19 @@ export function createChatController({
         ...(protocolId ? { protocolId } : {})
       })) {
         if (event.type === 'agent') {
-          if (event.slug !== 'hammond') clearAuditSession();
-          assistantSlug = event.slug;
-          lastAgentSlug = event.slug;
+          const slug = lockedSlug && event.slug !== lockedSlug ? lockedSlug : event.slug;
+          if (slug !== 'hammond') clearAuditSession();
+          assistantSlug = slug;
+          lastAgentSlug = slug;
           lastAgentAt = now();
-          if (selectedProtocolId && !findProtocol(event.slug, selectedProtocolId)) {
+          if (selectedProtocolId && !findProtocol(slug, selectedProtocolId)) {
             selectedProtocolId = null;
           }
           if (!pinnedAgentSlug) paintRoster();
-          applyAgentAccent(event.slug);
-          if (workingBubble) applyAgentAvatarToBubble(workingBubble, event.slug);
-          if (assistantBubble) applyAgentAvatarToBubble(assistantBubble, event.slug);
-          if (workingBubble && !isAgentStatusLine(event.slug, statusLine)) {
+          applyAgentAccent(slug);
+          if (workingBubble) applyAgentAvatarToBubble(workingBubble, slug);
+          if (assistantBubble) applyAgentAvatarToBubble(assistantBubble, slug);
+          if (workingBubble && !isAgentStatusLine(slug, statusLine)) {
             rotateWorkingStatus();
           }
         } else if (event.type === 'text') {
