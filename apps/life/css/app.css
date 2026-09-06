@@ -6190,10 +6190,18 @@ main { max-width: 76rem; margin: 0 auto; }
   box-shadow: 0 0 0 2px var(--marine);
 }
 
+.app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) {
+  height: 100dvh;
+  overflow: hidden;
+}
+
 .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  height: 100dvh;
+  min-height: 0;
+  padding-bottom: var(--space-4);
+  overflow: hidden;
 }
 
 .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-header,
@@ -6218,6 +6226,14 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #chat-view .chat-messages {
   max-height: none;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Composer stays on the canvas floor — page-frame is already inset by --rail-width. */
+.app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #chat-view .chat-form {
+  flex: 0 0 auto;
+  margin-top: auto;
 }
 
 .chat-view[data-chrome='engaged'] .chat-tools-button {
@@ -6284,6 +6300,10 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 @media (max-width: 720px) {
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
   .chat-view {
     min-width: 0;
     max-width: 100%;
