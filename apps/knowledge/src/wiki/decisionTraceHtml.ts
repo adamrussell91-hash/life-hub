@@ -13,7 +13,16 @@ export type DecisionTrace = {
   steps?: DecisionTraceStep[];
 };
 
-export function decisionTraceHtml(traces: DecisionTrace[] | undefined): string {
+export function decisionTraceHtml(
+  traces: DecisionTrace[] | undefined,
+  status?: string | null,
+): string {
+  if (status === "unavailable") {
+    return `<section class="wiki-links decision-traces" aria-label="How this changed">
+              <h3>How this changed</h3>
+              <p class="decision-traces__unavailable">Decision history is unavailable.</p>
+            </section>`;
+  }
   const list = Array.isArray(traces) ? traces.filter(trace => Array.isArray(trace.steps) && trace.steps.length) : [];
   if (!list.length) return "";
   return `<section class="wiki-links decision-traces" aria-label="How this changed">

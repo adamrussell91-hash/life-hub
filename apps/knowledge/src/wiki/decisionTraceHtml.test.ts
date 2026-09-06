@@ -7,6 +7,12 @@ describe("decisionTraceHtml", () => {
     expect(decisionTraceHtml([])).toBe("");
   });
 
+  it("is fail-visible when the Life governance log cannot load", () => {
+    const html = decisionTraceHtml([], "unavailable");
+    expect(html).toContain("How this changed");
+    expect(html).toContain("Decision history is unavailable.");
+  });
+
   it("renders a same-decision timeline", () => {
     const html = decisionTraceHtml([
       {

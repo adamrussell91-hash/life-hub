@@ -143,9 +143,44 @@ test('Knowledge page GET expands the live workout token and attaches decision tr
   );
   assert.equal(response.status, 200);
   const page = (await response.json()).data;
-  assert.doesNotMatch(page.body, /\{\{life:compare_workout_windows\}\}/);
-  assert.match(page.body, /11 completed workouts/);
+  assert.match(page.body, /\{\{life:compare_workout_windows\}\}/);
+  assert.doesNotMatch(page.body, /11 completed workouts/);
+  assert.match(page.live_body, /11 completed workouts/);
+  assert.doesNotMatch(page.live_body, /\{\{life:compare_workout_windows\}\}/);
   assert.equal(page.decision_traces[0].decisionId, 'aotfw-sources');
+  assert.equal(page.decision_traces_status, undefined);
+});
+
+test('Knowledge page GET keeps the token and is fail-visible when Life loaders miss', async () => {
+  const handler = createKnowledgePageHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    fetchImpl: async url => {
+      if (String(url).includes('knowledge-hub-data')) {
+        return jsonResponse({
+          sha: 'b'.repeat(40),
+          encoding: 'base64',
+          content: Buffer.from(JSON.stringify({
+            id: 'page_training_pulse',
+            title: 'Training pulse',
+            body: 'Pulse\n\n{{life:compare_workout_windows}}',
+            connected: ['life:decision:aotfw-sources']
+          })).toString('base64')
+        });
+      }
+      throw new Error('Life GitHub must not be reached from this test');
+    },
+    loadWorkoutCompare: async () => ({ ok: false }),
+    loadDecisionTraces: async () => ({ traces: [], status: 'unavailable' })
+  });
+  const response = await handler(
+    request({ url: 'https://api.adam-russell.com/api/knowledge/pages/page_training_pulse' })
+  );
+  assert.equal(response.status, 200);
+  const page = (await response.json()).data;
+  assert.match(page.body, /\{\{life:compare_workout_windows\}\}/);
+  assert.match(page.live_body, /unavailable/i);
+  assert.equal(page.decision_traces_status, 'unavailable');
 });
 
 test('Knowledge page GET uses the Life session and returns page JSON', async () => {

@@ -9,7 +9,9 @@ import {
   LIVE_WORKOUT_TOKEN,
   defaultLoadDecisionTraces,
   defaultLoadWorkoutCompare,
-  enrichKnowledgePage
+  enrichKnowledgePage,
+  loadLifeRepo,
+  normalizeDecisionTraces
 } from './_shared/knowledge-live.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 
@@ -32,25 +34,61 @@ export function createKnowledgePageHandler(deps = {}) {
       }
       const body = typeof page.body === 'string' ? page.body : '';
       const connected = Array.isArray(page.connected) ? page.connected : [];
+      const needsCompare = body.includes(LIVE_WORKOUT_TOKEN);
+      const needsTraces = connected.some(item => String(item).startsWith('life:decision:'));
       let compare = { ok: false };
       let traces = [];
-      if (body.includes(LIVE_WORKOUT_TOKEN)) {
+      let tracesStatus = 'ready';
+      let lifeRepo;
+      const usingDefaultLoaders = !deps.loadWorkoutCompare && !deps.loadDecisionTraces;
+      if (usingDefaultLoaders && (needsCompare || needsTraces)) {
+        try {
+          lifeRepo = await loadLifeRepo({ env, fetchImpl: deps.fetchImpl });
+        } catch {
+          if (needsTraces) tracesStatus = 'unavailable';
+        }
+      }
+      const runLoaders = !usingDefaultLoaders || Boolean(lifeRepo);
+      const jobs = [];
+      if (runLoaders && needsCompare) {
         const loadCompare = deps.loadWorkoutCompare ?? defaultLoadWorkoutCompare;
-        try {
-          compare = await loadCompare({ env, fetchImpl: deps.fetchImpl, page }) ?? { ok: false };
-        } catch {
-          compare = { ok: false };
-        }
+        jobs.push((async () => {
+          try {
+            compare = await loadCompare({
+              env,
+              fetchImpl: deps.fetchImpl,
+              page,
+              ...(lifeRepo ? { lifeRepo } : {})
+            }) ?? { ok: false };
+          } catch {
+            compare = { ok: false };
+          }
+        })());
       }
-      if (connected.some(item => String(item).startsWith('life:decision:'))) {
+      if (runLoaders && needsTraces) {
         const loadTraces = deps.loadDecisionTraces ?? defaultLoadDecisionTraces;
-        try {
-          traces = await loadTraces({ env, fetchImpl: deps.fetchImpl, page }) ?? [];
-        } catch {
-          traces = [];
-        }
+        jobs.push((async () => {
+          try {
+            const loaded = normalizeDecisionTraces(await loadTraces({
+              env,
+              fetchImpl: deps.fetchImpl,
+              page,
+              ...(lifeRepo ? { lifeRepo } : {})
+            }));
+            traces = loaded.traces;
+            tracesStatus = loaded.status;
+          } catch {
+            traces = [];
+            tracesStatus = 'unavailable';
+          }
+        })());
       }
-      return withCors(okResponse(200, enrichKnowledgePage(page, { compare, traces })), request, env);
+      await Promise.all(jobs);
+      return withCors(okResponse(200, enrichKnowledgePage(page, {
+        compare,
+        traces,
+        tracesStatus
+      })), request, env);
     } catch (error) {
       const status = Number.isInteger(error?.status) ? error.status : 502;
       const code = typeof error?.code === 'string' ? error.code : 'github_unavailable';

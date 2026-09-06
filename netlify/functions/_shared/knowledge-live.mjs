@@ -31,35 +31,67 @@ export function expandLiveTokens(body, comparison) {
   return body.split(LIVE_WORKOUT_TOKEN).join(formatLiveWorkoutCompare(comparison));
 }
 
-export function enrichKnowledgePage(page, { compare = { ok: false }, traces = [] } = {}) {
+export function normalizeDecisionTraces(result) {
+  if (Array.isArray(result)) {
+    return { traces: result, status: 'ready' };
+  }
+  if (result && typeof result === 'object') {
+    const traces = Array.isArray(result.traces) ? result.traces : [];
+    const status = result.status === 'unavailable' ? 'unavailable' : 'ready';
+    return { traces, status };
+  }
+  return { traces: [], status: 'ready' };
+}
+
+export function enrichKnowledgePage(page, {
+  compare = { ok: false },
+  traces = [],
+  tracesStatus = 'ready'
+} = {}) {
   if (!page || typeof page !== 'object') return page;
   const next = { ...page };
-  if (typeof page.body === 'string') {
-    next.body = expandLiveTokens(page.body, compare);
+  if (typeof page.body === 'string' && page.body.includes(LIVE_WORKOUT_TOKEN)) {
+    next.live_body = expandLiveTokens(page.body, compare);
   }
-  if (Array.isArray(traces) && traces.length) {
-    next.decision_traces = traces;
-  }
+  const list = Array.isArray(traces) ? traces : [];
+  if (list.length) next.decision_traces = list;
+  if (tracesStatus === 'unavailable') next.decision_traces_status = 'unavailable';
   return next;
 }
 
-export async function defaultLoadWorkoutCompare({ env, fetchImpl, today } = {}) {
+export async function loadLifeRepo({ env, fetchImpl, client } = {}) {
+  const github = client ?? createGitHubClient({ env, fetchImpl });
+  const resolved = await github.resolveTree();
+  return {
+    client: github,
+    tree: resolved.tree,
+    commitSha: resolved.commitSha,
+    treeSha: resolved.treeSha
+  };
+}
+
+export async function defaultLoadWorkoutCompare({ env, fetchImpl, today, lifeRepo } = {}) {
   const day = isCalendarDate(today) ? today : getSydneyDateKey(new Date());
   try {
-    const client = createGitHubClient({ env, fetchImpl });
-    const { tree } = await client.resolveTree();
+    const { client, tree } = lifeRepo ?? await loadLifeRepo({ env, fetchImpl });
     const bounds = workoutWindowBounds(day);
     if (!bounds) return { ok: false };
     const entries = selectWorkoutEntriesInRange(tree, {
       from: bounds.previousFrom,
       to: bounds.currentTo
     });
-    const records = [];
-    for (const entry of entries) {
+    const blobs = await Promise.all(entries.map(async entry => {
       try {
-        const content = decodeBlob(await client.readBlob(entry.sha));
-        if (!content) continue;
-        const parsed = parseEventDocument(content, entry.path, loadYaml);
+        return { entry, content: decodeBlob(await client.readBlob(entry.sha)) };
+      } catch {
+        return null;
+      }
+    }));
+    const records = [];
+    for (const item of blobs) {
+      if (!item?.content) continue;
+      try {
+        const parsed = parseEventDocument(item.content, item.entry.path, loadYaml);
         if (parsed?.record) records.push(parsed.record);
       } catch {
         // Skip one unreadable session rather than failing the page.
@@ -71,14 +103,15 @@ export async function defaultLoadWorkoutCompare({ env, fetchImpl, today } = {}) 
   }
 }
 
-export async function defaultLoadDecisionTraces({ env, fetchImpl, page } = {}) {
+export async function defaultLoadDecisionTraces({ env, fetchImpl, page, lifeRepo } = {}) {
   const connected = Array.isArray(page?.connected) ? page.connected : [];
-  if (!connected.some(item => String(item).startsWith('life:decision:'))) return [];
+  if (!connected.some(item => String(item).startsWith('life:decision:'))) {
+    return { traces: [], status: 'ready' };
+  }
   try {
-    const client = createGitHubClient({ env, fetchImpl });
-    const { tree } = await client.resolveTree();
+    const { client, tree } = lifeRepo ?? await loadLifeRepo({ env, fetchImpl });
     const file = tree.find(item => item.path === GOVERNANCE_LOG_PATH && item.type === 'blob');
-    if (!file?.sha) return [];
+    if (!file?.sha) return { traces: [], status: 'ready' };
     const content = decodeBlob(await client.readBlob(file.sha));
     const entries = parseGovernanceEntries(typeof content === 'string' ? content : '');
     const traces = [];
@@ -91,9 +124,9 @@ export async function defaultLoadDecisionTraces({ env, fetchImpl, page } = {}) {
         traces.push(trace);
       }
     }
-    return traces;
+    return { traces, status: 'ready' };
   } catch {
-    return [];
+    return { traces: [], status: 'unavailable' };
   }
 }
 
