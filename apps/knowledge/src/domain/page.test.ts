@@ -52,6 +52,15 @@ describe("PageSchema", () => {
     expect(PageSchema.parse({ ...validPage, connected: ["page_b"] }).connected).toEqual(["page_b"]);
   });
 
+  it("keeps connected refs that point at Teaching units and Tasks projects", () => {
+    expect(
+      PageSchema.parse({
+        ...validPage,
+        connected: ["page_b", "teaching:unit:unit_aotfw", "tasks:project:proj_aotfw"],
+      }).connected,
+    ).toEqual(["page_b", "teaching:unit:unit_aotfw", "tasks:project:proj_aotfw"]);
+  });
+
   it("accepts a hub page without Notion fields", () => {
     expect(
       PageSchema.parse({
