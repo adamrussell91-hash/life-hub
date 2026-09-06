@@ -1,4 +1,4 @@
-/** Life Hub `js/app/chart-kit/animate.js` — ring fill and column grow. */
+/** Life Hub `js/app/chart-kit/animate.js` — ring fill, area reveal, column grow. */
 
 export type ChartMotionOptions = {
   quiet?: boolean;
@@ -39,6 +39,40 @@ export function animateRingFill(
   void circle.getBoundingClientRect();
   circle.style.transition = 'stroke-dashoffset 700ms cubic-bezier(.2,.8,.2,1)';
   circle.setAttribute('stroke-dashoffset', String(dashoffset));
+}
+
+export function animateAreaReveal(svg: SVGSVGElement | null, options: ChartMotionOptions = {}): void {
+  if (!svg) return;
+  const reduced = motionIsQuiet(svg, options);
+  svg.classList.remove('chart-animating', 'chart-static');
+
+  const line = svg.querySelector<SVGPathElement>('[data-role="line"]');
+  if (line) {
+    line.style.strokeDasharray = '';
+    line.style.strokeDashoffset = '';
+    if (!reduced && typeof line.getTotalLength === 'function') {
+      try {
+        const length = Math.max(line.getTotalLength(), 1);
+        line.style.strokeDasharray = String(length);
+        line.style.strokeDashoffset = String(length);
+      } catch {
+        // Some environments lack getTotalLength for the node type.
+      }
+    }
+  }
+
+  svg.classList.add(reduced ? 'chart-static' : 'chart-animating');
+
+  if (!reduced && line) {
+    const onEnd = (event: Event): void => {
+      const name = (event as AnimationEvent).animationName;
+      if (name && name !== 'line-draw') return;
+      line.style.strokeDasharray = '';
+      line.style.strokeDashoffset = '';
+      line.removeEventListener('animationend', onEnd);
+    };
+    line.addEventListener('animationend', onEnd);
+  }
 }
 
 export function animateColumnGrow(

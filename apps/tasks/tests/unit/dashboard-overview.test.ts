@@ -264,7 +264,7 @@ describe('renderDashboardOverview', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders focus tiles, a merged timeline, heat row, and no due-soon pills', () => {
+  it('renders focus tiles, a dated timeline rail, heat row, and no due-soon pills', () => {
     const host = document.createElement('div');
     renderDashboardOverview(host, {
       now,
@@ -280,15 +280,21 @@ describe('renderDashboardOverview', () => {
       ]
     });
 
-    expect(host.querySelector('.dashboard-focus')?.textContent).toContain("Today's tasks");
+    expect(host.querySelector('.dashboard-focus')?.textContent).toContain('Overdue');
+    expect(host.querySelector('.dashboard-focus')?.textContent).toContain('Today');
     expect(host.querySelector('.dashboard-focus__value')?.textContent).toBeTruthy();
     expect(host.querySelector('[aria-label="Timeline"]')?.textContent).toContain('Mark essays');
-    expect(host.querySelector('[aria-label="Timeline"]')?.textContent).toContain('Permission note');
-    expect(host.querySelector('[aria-label="Timeline"]')?.textContent).toContain('MindWorks');
+    expect(host.querySelector('.dashboard-rail')).not.toBeNull();
+    expect(
+      host.querySelector('.dashboard-rail__day[data-date="2026-09-01"]')?.getAttribute('aria-label')
+    ).toContain('Permission note');
+    expect(
+      host.querySelector('.dashboard-rail__day[data-date="2026-09-02"]')?.getAttribute('aria-label')
+    ).toContain('MindWorks');
     expect(host.querySelector('[aria-label="Today"]')).toBeNull();
     expect(host.querySelector('[aria-label="Excursions"]')).toBeNull();
     expect(host.querySelector('[aria-label="Projects"] .project-pulse-chart')).not.toBeNull();
-    expect(host.querySelector('.dashboard-sparkline')).not.toBeNull();
+    expect(host.querySelector('.dashboard-trend-chart [data-role="line"]')).not.toBeNull();
     expect(host.querySelector('[aria-label="Next 14 days"] .dashboard-heat__cell')).not.toBeNull();
     expect(host.querySelector('.due-soon-strip')).toBeNull();
     expect(host.querySelector('.dashboard-row__grip')).not.toBeNull();
@@ -296,6 +302,11 @@ describe('renderDashboardOverview', () => {
     expect(host.querySelector('.chip--source-task')).not.toBeNull();
     expect(host.querySelector('.chip--urgency-warning')?.textContent).toBe('Today');
     expect(host.querySelector('.dashboard-next')?.textContent).toContain('Mark essays');
+    expect(host.querySelector('[aria-label="Next 14 days"] a')?.getAttribute('href')).toContain(
+      '#/week?date='
+    );
+    expect(host.querySelector('.dashboard-heat__peek')?.textContent).toContain('Mark essays');
+    expect(host.querySelector('.dashboard-heat__peek')?.textContent).not.toMatch(/\+\d+ more/);
   });
 
   it('makes every focus tile and the next-action card activate on click', () => {
@@ -315,10 +326,10 @@ describe('renderDashboardOverview', () => {
       expect(tile.tagName === 'A' || tile.tagName === 'BUTTON').toBe(true);
     }
 
-    const today = tiles.find((tile) => tile.getAttribute('aria-label')?.includes("Today's tasks"));
+    const today = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Today'));
     const overdue = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Overdue'));
-    const attention = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Needs attention'));
-    const projects = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Active projects'));
+    const attention = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Attention'));
+    const projects = tiles.find((tile) => tile.getAttribute('aria-label')?.includes('Projects'));
     expect(today?.tagName).toBe('A');
     expect((today as HTMLAnchorElement).href).toContain('#/day');
     expect(attention?.tagName).toBe('A');
@@ -331,7 +342,7 @@ describe('renderDashboardOverview', () => {
     if (panel) panel.hidden = true;
     overdue?.click();
     expect(host.dataset.open).toBe('true');
-    expect(panel?.hidden).toBe(false);
+    expect(host.querySelector<HTMLElement>('.dashboard-overview__panel')?.hidden).toBe(false);
     expect(sessionStorage.getItem('tasks-hub:dashboard-overview-open')).toBe('true');
 
     projects?.click();
@@ -392,6 +403,52 @@ describe('renderDashboardOverview', () => {
     expect(onRescheduleTask).toHaveBeenCalledWith(open, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
   });
 
+  it('selects a week-strip day in place instead of jumping to week view', () => {
+    const host = document.createElement('div');
+    const hashBefore = window.location.hash;
+    renderDashboardOverview(host, {
+      now,
+      tasks: [task({ id: 't1', title: 'Mark essays', due_date: '2026-08-27', domain: 'teaching' })],
+      projects: [
+        project({ id: 'p1', title: 'MindWorks', status: 'active', current_end_date: '2026-09-02' })
+      ]
+    });
+
+    const later = host.querySelector<HTMLButtonElement>('.dashboard-heat__cell[aria-label*="02/09/26"]');
+    expect(later).not.toBeNull();
+    later!.click();
+    expect(window.location.hash).toBe(hashBefore);
+    expect(sessionStorage.getItem('tasks-hub:dashboard-selected-day')).toBe('2026-09-02');
+    expect(host.querySelector('.dashboard-heat__cell[data-selected="true"]')?.getAttribute('aria-label')).toContain(
+      '02/09/26'
+    );
+    expect(host.querySelector('.dashboard-heat__peek')?.textContent).toContain('MindWorks');
+    expect(host.querySelector('.dashboard-timeline')?.textContent).toContain('MindWorks');
+    expect(host.querySelector('.dashboard-rail__day[data-selected="true"]')?.getAttribute('data-date')).toBe(
+      '2026-09-02'
+    );
+  });
+
+  it('keeps the fortnight peek to three titles plus a remainder', () => {
+    const host = document.createElement('div');
+    renderDashboardOverview(host, {
+      now,
+      tasks: [
+        task({ id: 'a', title: 'Alpha', due_date: '2026-08-27' }),
+        task({ id: 'b', title: 'Bravo', due_date: '2026-08-27' }),
+        task({ id: 'c', title: 'Charlie', due_date: '2026-08-27' }),
+        task({ id: 'd', title: 'Delta', due_date: '2026-08-27' })
+      ],
+      projects: []
+    });
+    const peek = host.querySelector('.dashboard-heat__peek')?.textContent ?? '';
+    expect(peek).toContain('Alpha');
+    expect(peek).toContain('Bravo');
+    expect(peek).toContain('Charlie');
+    expect(peek).toContain('+1 more');
+    expect(peek).not.toContain('Delta');
+  });
+
   it('collapses and expands the overview panel on mobile', () => {
     vi.mocked(window.matchMedia).mockReturnValue({
       matches: true,
@@ -422,5 +479,20 @@ describe('renderDashboardOverview', () => {
     expect(panel?.hidden).toBe(true);
     expect(sessionStorage.getItem('tasks-hub:dashboard-overview-open')).toBe('false');
     expect(host.querySelector('.dashboard-focus')).not.toBeNull();
+  });
+
+  it('parks the focus counts in the page-header status slot when given one', () => {
+    const host = document.createElement('div');
+    const statusHost = document.createElement('div');
+    statusHost.className = 'page-header__status';
+    renderDashboardOverview(host, {
+      now,
+      tasks: [task({ id: 't1', title: 'Mark essays', due_date: '2026-08-20' })],
+      projects: [],
+      statusHost
+    });
+    expect(host.querySelector('.dashboard-focus')).toBeNull();
+    expect(statusHost.querySelector('.dashboard-focus')?.textContent).toContain('Overdue');
+    expect(statusHost.querySelector('.dashboard-focus__tile--danger')?.textContent).toContain('1');
   });
 });
