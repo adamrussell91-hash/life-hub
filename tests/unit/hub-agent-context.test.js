@@ -54,9 +54,56 @@ test('caps Tasks rows so the prompt stays short', () => {
   }));
   const text = formatHubAgentContext({ now: NOW, tasks });
   assert.equal([...text.matchAll(/Task \d+/g)].length, 12);
+  assert.match(text, /Tasks truncated kept=12 omitted=8/);
+  assert.match(text, /This is not the complete set/);
 });
 
-test('loadHubAgentContext fails open when a store throws', async () => {
+test('caps Teaching classes and in-window lessons with omitted counts', () => {
+  const classes = Array.from({ length: 15 }, (_, i) => ({
+    code: `CLS${String(i).padStart(2, '0')}`,
+    status: 'active'
+  }));
+  const scheduledLessons = Array.from({ length: 14 }, (_, i) => ({
+    date: `2026-09-${String(5 + i).padStart(2, '0')}`,
+    class_id: 'c1',
+    delivery_status: 'planned'
+  }));
+  const text = formatHubAgentContext({ now: NOW, classes, scheduledLessons });
+  assert.equal([...text.matchAll(/CLS\d+/g)].length, 12);
+  assert.match(text, /Teaching classes truncated kept=12 omitted=3/);
+  assert.match(text, /- 2026-09-05/);
+  assert.doesNotMatch(text, /- 2026-09-15/);
+  assert.match(text, /Teaching lessons truncated kept=10 omitted=4/);
+});
+
+test('windowing later Teaching lessons is fail-visible, not silent', () => {
+  const text = formatHubAgentContext({
+    now: NOW,
+    scheduledLessons: [
+      { date: '2026-09-08', class_id: 'c1', delivery_status: 'planned' },
+      { date: '2026-10-01', class_id: 'c1', delivery_status: 'planned' },
+      { date: '2026-10-08', class_id: 'c1', delivery_status: 'planned' }
+    ]
+  });
+  assert.match(text, /2026-09-08/);
+  assert.doesNotMatch(text, /2026-10-01/);
+  assert.match(text, /Teaching lessons window ends 2026-09-18; omitted=2 later scheduled/);
+});
+
+test('a store load failure is not identical to an empty store', () => {
+  const empty = formatHubAgentContext({ now: NOW });
+  const failed = formatHubAgentContext({
+    now: NOW,
+    loadErrors: { tasks: 'load_failed' }
+  });
+  assert.equal(empty, '');
+  assert.match(failed, /Other hubs/);
+  assert.match(failed, /Tasks unavailable this turn/);
+  assert.match(failed, /Do not invent Tasks rows/);
+  assert.doesNotMatch(failed, /Tasks:\n-/);
+});
+
+test('loadHubAgentContext is fail-visible when a store throws', async () => {
   const text = await loadHubAgentContext({
     now: NOW,
     listTasks: async () => {
@@ -67,6 +114,7 @@ test('loadHubAgentContext fails open when a store throws', async () => {
   });
   assert.match(text, /12ENA6/);
   assert.doesNotMatch(text, /Tasks:/);
+  assert.match(text, /Tasks unavailable this turn/);
 });
 
 test('loadHubAgentContext formats both stores when they resolve', async () => {

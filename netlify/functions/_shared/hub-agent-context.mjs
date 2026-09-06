@@ -9,6 +9,13 @@ import {
   defaultGetTasksStore,
   listJSON as listTasksJSON
 } from './tasks-blobs.mjs';
+import {
+  HUB_TASKS_UNAVAILABLE_MARKER,
+  HUB_TEACHING_CLASSES_UNAVAILABLE_MARKER,
+  HUB_TEACHING_LESSONS_UNAVAILABLE_MARKER,
+  hubContextTruncationLine,
+  hubLessonsWindowLine
+} from '../../../apps/life/js/core/context-integrity.js';
 
 const HUB_TZ = 'Australia/Sydney';
 const TASK_CAP = 12;
@@ -50,26 +57,71 @@ function isUpcomingLesson(item, today, until) {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today && date <= until;
 }
 
+function isLaterLesson(item, until) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+  if (item.delivery_status === 'cancelled') return false;
+  const date = typeof item.date === 'string' ? item.date : '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && date > until;
+}
+
 export function formatHubAgentContext({
   tasks = [],
   classes = [],
   scheduledLessons = [],
-  now = new Date()
+  now = new Date(),
+  loadErrors = {}
 } = {}) {
   const today = ymdInSydney(now);
   const until = addDays(today, WINDOW_DAYS);
+  const notes = [];
 
-  const openTasks = tasks
-    .filter(isOpenTask)
-    .sort((a, b) => String(a.due_date || '9999').localeCompare(String(b.due_date || '9999')))
-    .slice(0, TASK_CAP);
+  if (loadErrors.tasks) notes.push(HUB_TASKS_UNAVAILABLE_MARKER);
+  if (loadErrors.classes) notes.push(HUB_TEACHING_CLASSES_UNAVAILABLE_MARKER);
+  if (loadErrors.scheduledLessons) notes.push(HUB_TEACHING_LESSONS_UNAVAILABLE_MARKER);
 
-  const activeClasses = classes.filter(isActiveClass).slice(0, CLASS_CAP);
+  const allOpenTasks = loadErrors.tasks
+    ? []
+    : tasks
+      .filter(isOpenTask)
+      .sort((a, b) => String(a.due_date || '9999').localeCompare(String(b.due_date || '9999')));
+  const openTasks = allOpenTasks.slice(0, TASK_CAP);
+  if (!loadErrors.tasks && allOpenTasks.length > TASK_CAP) {
+    notes.push(hubContextTruncationLine({
+      label: 'Tasks',
+      kept: TASK_CAP,
+      omitted: allOpenTasks.length - TASK_CAP
+    }));
+  }
 
-  const upcoming = scheduledLessons
-    .filter(item => isUpcomingLesson(item, today, until))
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, LESSON_CAP);
+  const allActiveClasses = loadErrors.classes ? [] : classes.filter(isActiveClass);
+  const activeClasses = allActiveClasses.slice(0, CLASS_CAP);
+  if (!loadErrors.classes && allActiveClasses.length > CLASS_CAP) {
+    notes.push(hubContextTruncationLine({
+      label: 'Teaching classes',
+      kept: CLASS_CAP,
+      omitted: allActiveClasses.length - CLASS_CAP
+    }));
+  }
+
+  const inWindow = loadErrors.scheduledLessons
+    ? []
+    : scheduledLessons
+      .filter(item => isUpcomingLesson(item, today, until))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  const later = loadErrors.scheduledLessons
+    ? []
+    : scheduledLessons.filter(item => isLaterLesson(item, until));
+  const upcoming = inWindow.slice(0, LESSON_CAP);
+  if (!loadErrors.scheduledLessons && inWindow.length > LESSON_CAP) {
+    notes.push(hubContextTruncationLine({
+      label: 'Teaching lessons',
+      kept: LESSON_CAP,
+      omitted: inWindow.length - LESSON_CAP
+    }));
+  }
+  if (!loadErrors.scheduledLessons && later.length) {
+    notes.push(hubLessonsWindowLine({ until, omitted: later.length }));
+  }
 
   const sections = [];
 
@@ -99,17 +151,17 @@ export function formatHubAgentContext({
     sections.push(`Teaching:\n${parts.join('\n')}`);
   }
 
-  if (!sections.length) return '';
-  return `Other hubs (live umbrella stores — use for triage, do not invent extra rows):\n${sections.join('\n\n')}`;
+  if (!sections.length && !notes.length) return '';
+  return `Other hubs (live umbrella stores — use for triage, do not invent extra rows):\n${[...notes, ...sections].join('\n\n')}`;
 }
 
 async function safeList(listFn, env) {
-  if (typeof listFn !== 'function') return [];
+  if (typeof listFn !== 'function') return { ok: false, error: 'missing_lister', rows: [] };
   try {
     const rows = await listFn(env);
-    return Array.isArray(rows) ? rows : [];
-  } catch {
-    return [];
+    return { ok: true, rows: Array.isArray(rows) ? rows : [] };
+  } catch (error) {
+    return { ok: false, error: error?.code || 'load_failed', rows: [] };
   }
 }
 
@@ -140,5 +192,15 @@ export async function loadHubAgentContext({
     safeList(listClasses, env),
     safeList(listScheduledLessons, env)
   ]);
-  return formatHubAgentContext({ tasks, classes, scheduledLessons, now });
+  return formatHubAgentContext({
+    tasks: tasks.rows,
+    classes: classes.rows,
+    scheduledLessons: scheduledLessons.rows,
+    now,
+    loadErrors: {
+      ...(tasks.ok ? {} : { tasks: tasks.error }),
+      ...(classes.ok ? {} : { classes: classes.error }),
+      ...(scheduledLessons.ok ? {} : { scheduledLessons: scheduledLessons.error })
+    }
+  });
 }
