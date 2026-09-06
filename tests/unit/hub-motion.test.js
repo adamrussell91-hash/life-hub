@@ -111,6 +111,8 @@ test('scroll-hide tucks away on the way down and comes back on the way up', () =
   assert.equal(nextScrollHideState({ current: 120, previous: 90, threshold: 80 }), true);
   assert.equal(nextScrollHideState({ current: 90, previous: 120, threshold: 80, hidden: true }), false);
   assert.equal(nextScrollHideState({ current: 90, previous: 90, threshold: 80, hidden: true }), true);
+  assert.equal(nextScrollHideState({ current: 848, previous: 842, threshold: 80, hidden: true }), true, '6px follow() jitter must not reveal');
+  assert.equal(nextScrollHideState({ current: 842, previous: 848, threshold: 80, hidden: false }), false, '6px follow() jitter must not hide');
 
   const el = {
     className: '',
