@@ -801,8 +801,9 @@ test('a search followed by a saved-library note keeps a sticky Researching… st
   assert.match(duringStatus[0].className, /chat-message--status/);
 
   const list = root.querySelector('#chat-messages');
+  const threadItems = list.children.filter(child => !child.attributes?.has('data-chat-turn-spacer'));
   assert.equal(
-    list.children[list.children.length - 1],
+    threadItems[threadItems.length - 1],
     duringStatus[0],
     'the sticky status bubble should sit below the search chip and library confirmation, not above them'
   );
