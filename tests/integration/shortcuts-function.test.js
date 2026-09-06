@@ -117,7 +117,7 @@ test('GET /api/shortcuts fails visibly when the repository tree is incomplete', 
   assert.equal(response.status, 503);
   const payload = await response.json();
   assert.equal(payload.ok, false);
-  assert.equal(payload.error, 'repository_tree_incomplete');
+  assert.equal(payload.error.code, 'repository_tree_incomplete');
 });
 
 test('POST /api/shortcuts runs a promoted draft into a Confirm proposal', async () => {
