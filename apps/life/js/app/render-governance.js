@@ -1,5 +1,49 @@
-import { parseGovernanceEntries, recentGovernanceTail } from '../core/governance-log.js';
-import { daysBetween, getSydneyDateKey, isCalendarDate } from '../core/time.js';
+import { decisionTraces, parseGovernanceEntries, recentGovernanceTail } from '../core/governance-log.js';
+import { daysBetween, formatDisplayDate, getSydneyDateKey, isCalendarDate } from '../core/time.js';
+
+function displayDate(value) {
+  return isCalendarDate(value) ? formatDisplayDate(value) : value;
+}
+
+function appendField(root, block, className, label, value) {
+  if (!value) return;
+  const line = root.createElement('p');
+  line.className = className;
+  line.textContent = `${label}: ${label === 'Revisit' ? displayDate(value) : value}`;
+  block.append(line);
+}
+
+function renderTraces(root, container, entries) {
+  const traces = decisionTraces(entries);
+  if (traces.length === 0) return;
+  const wrap = root.createElement('section');
+  wrap.className = 'governance-traces';
+  wrap.dataset.governanceTraces = '';
+  const heading = root.createElement('h3');
+  heading.className = 'governance-traces__title';
+  heading.textContent = 'How this changed';
+  wrap.append(heading);
+  for (const trace of traces) {
+    const article = root.createElement('article');
+    article.className = 'governance-trace';
+    const title = root.createElement('p');
+    title.className = 'governance-trace__title';
+    title.textContent = trace.title;
+    const list = root.createElement('ol');
+    list.className = 'governance-trace__steps';
+    for (const step of trace.steps) {
+      const item = root.createElement('li');
+      item.textContent = [
+        displayDate(step.dateKey),
+        step.chosen || step.status || step.body
+      ].filter(Boolean).join(' — ');
+      list.append(item);
+    }
+    article.append(title, list);
+    wrap.append(article);
+  }
+  container.append(wrap);
+}
 
 export function renderGovernance(root, governanceLogMarkdown, { today = getSydneyDateKey() } = {}) {
   const container = root.querySelector?.('[data-central-node="governance-log"]');
@@ -16,6 +60,8 @@ export function renderGovernance(root, governanceLogMarkdown, { today = getSydne
     container.append(empty);
     return;
   }
+
+  renderTraces(root, container, entries);
 
   for (const entry of entries) {
     const block = root.createElement('article');
@@ -45,6 +91,10 @@ export function renderGovernance(root, governanceLogMarkdown, { today = getSydne
       status.textContent = entry.status;
       block.append(status);
     }
+
+    appendField(root, block, 'governance-entry-chosen', 'Chosen', entry.chosen);
+    appendField(root, block, 'governance-entry-reasoning', 'Reasoning', entry.reasoning);
+    appendField(root, block, 'governance-entry-revisit', 'Revisit', entry.revisit);
 
     if (entry.body) {
       const body = root.createElement('p');

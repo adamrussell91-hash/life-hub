@@ -89,6 +89,18 @@ export function appendGovernanceLogSchema() {
         dateKey: {
           type: 'string',
           description: 'Optional YYYY-MM-DD; server may default when omitted'
+        },
+        chosen: {
+          type: 'string',
+          description: 'Option taken. Use the same Title on later entries to trace how it changed.'
+        },
+        reasoning: {
+          type: 'string',
+          description: 'Why this option won. A second agent can append another entry with the same Title.'
+        },
+        revisit: {
+          type: 'string',
+          description: 'Optional YYYY-MM-DD to look at this decision again'
         }
       },
       required: ['entry_type', 'body']
@@ -173,6 +185,15 @@ export function validateGovernanceLogAppendInput(input) {
   }
   if (typeof input.dateKey === 'string' && input.dateKey.trim()) {
     entry.dateKey = input.dateKey.trim();
+  }
+  if (typeof input.chosen === 'string' && input.chosen.trim()) {
+    entry.chosen = input.chosen.trim();
+  }
+  if (typeof input.reasoning === 'string' && input.reasoning.trim()) {
+    entry.reasoning = input.reasoning.trim();
+  }
+  if (typeof input.revisit === 'string' && input.revisit.trim()) {
+    entry.revisit = input.revisit.trim();
   }
 
   return entry;

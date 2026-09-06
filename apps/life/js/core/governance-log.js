@@ -25,17 +25,33 @@ export function emptyGovernanceLog() {
   return TITLE_LINE;
 }
 
-export function formatGovernanceEntry({ dateKey, entryType, body, status, title } = {}) {
+function optionalLine(label, value) {
+  return typeof value === 'string' && value.trim() ? `**${label}:** ${value.trim()}` : null;
+}
+
+export function formatGovernanceEntry({
+  dateKey,
+  entryType,
+  body,
+  status,
+  title,
+  chosen,
+  reasoning,
+  revisit
+} = {}) {
   if (typeof dateKey !== 'string' || !dateKey.trim()) return null;
   if (!GOVERNANCE_ENTRY_TYPES.includes(entryType)) return null;
   if (typeof body !== 'string' || !body.trim()) return null;
 
   const lines = [`## ${dateKey.trim()} — ${entryType}`];
-  if (typeof title === 'string' && title.trim()) {
-    lines.push(`**Title:** ${title.trim()}`);
-  }
-  if (typeof status === 'string' && status.trim()) {
-    lines.push(`**Status:** ${status.trim()}`);
+  for (const line of [
+    optionalLine('Title', title),
+    optionalLine('Status', status),
+    optionalLine('Chosen', chosen),
+    optionalLine('Reasoning', reasoning),
+    optionalLine('Revisit', revisit)
+  ]) {
+    if (line) lines.push(line);
   }
   lines.push('');
   lines.push(body.trim());
@@ -120,11 +136,17 @@ function parseGovernanceEntryBlock(block) {
 
   const titleMatch = /^\*\*Title:\*\*\s*(.+)$/m.exec(block);
   const statusMatch = /^\*\*Status:\*\*\s*(.+)$/m.exec(block);
+  const chosenMatch = /^\*\*Chosen:\*\*\s*(.+)$/m.exec(block);
+  const reasoningMatch = /^\*\*Reasoning:\*\*\s*(.+)$/m.exec(block);
+  const revisitMatch = /^\*\*Revisit:\*\*\s*(.+)$/m.exec(block);
 
   const withoutHeading = block.slice(heading.index + heading[0].length);
   const body = withoutHeading
     .replace(/^\*\*Title:\*\*.*$/m, '')
     .replace(/^\*\*Status:\*\*.*$/m, '')
+    .replace(/^\*\*Chosen:\*\*.*$/m, '')
+    .replace(/^\*\*Reasoning:\*\*.*$/m, '')
+    .replace(/^\*\*Revisit:\*\*.*$/m, '')
     .replace(/^\n+/, '')
     .replace(/\s+$/, '');
 
@@ -133,8 +155,47 @@ function parseGovernanceEntryBlock(block) {
     entryType: entryType || null,
     title: titleMatch ? titleMatch[1].trim() : null,
     status: statusMatch ? statusMatch[1].trim() : null,
+    chosen: chosenMatch ? chosenMatch[1].trim() : null,
+    reasoning: reasoningMatch ? reasoningMatch[1].trim() : null,
+    revisit: revisitMatch ? revisitMatch[1].trim() : null,
     body
   };
+}
+
+function normalizeTraceTitle(title) {
+  return typeof title === 'string' ? title.trim().replace(/\s+/g, ' ').toLowerCase() : '';
+}
+
+/**
+ * Same-title decision / idea threads, oldest step first.
+ * One-off untitled entries are not traces.
+ */
+export function decisionTraces(entries) {
+  const groups = new Map();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const key = normalizeTraceTitle(entry?.title);
+    if (!key) continue;
+    const group = groups.get(key) ?? { title: entry.title.trim(), steps: [] };
+    group.steps.push(entry);
+    groups.set(key, group);
+  }
+  const traces = [...groups.values()].filter(group => group.steps.length >= 2);
+  for (const trace of traces) {
+    trace.steps.sort((a, b) => {
+      const aOk = isCalendarDate(a.dateKey);
+      const bOk = isCalendarDate(b.dateKey);
+      if (aOk && bOk) return a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0;
+      if (aOk) return -1;
+      if (bOk) return 1;
+      return 0;
+    });
+  }
+  traces.sort((a, b) => {
+    const aLatest = a.steps[a.steps.length - 1]?.dateKey ?? '';
+    const bLatest = b.steps[b.steps.length - 1]?.dateKey ?? '';
+    return aLatest < bLatest ? 1 : aLatest > bLatest ? -1 : 0;
+  });
+  return traces;
 }
 
 function isResolvedStatus(status) {

@@ -5934,10 +5934,41 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 700;
 }
 .governance-entry-status,
+.governance-entry-chosen,
+.governance-entry-reasoning,
+.governance-entry-revisit,
 .governance-entry-body {
   margin: 0.25rem 0 0;
   color: var(--muted);
   font-size: var(--text-base);
+}
+
+.governance-traces {
+  margin: 0 0 var(--space-4);
+}
+
+.governance-traces__title {
+  margin: 0 0 var(--space-2);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+}
+
+.governance-trace {
+  margin: 0 0 var(--space-3);
+}
+
+.governance-trace__title {
+  margin: 0;
+  color: var(--marine);
+  font-weight: 700;
+}
+
+.governance-trace__steps {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-5);
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 .mind-cross-agent {
   list-style: none;

@@ -121,6 +121,20 @@ test('validateGovernanceLogAppendInput requires entry_type and body', () => {
   assert.equal(entry.dateKey, undefined);
 });
 
+test('validateGovernanceLogAppendInput keeps chosen, reasoning, and revisit', () => {
+  const entry = validateGovernanceLogAppendInput({
+    entry_type: 'Major Decision',
+    body: 'Hold the extra unit.',
+    title: 'MEd load',
+    chosen: 'Drop one elective',
+    reasoning: 'Teaching clash',
+    revisit: '2026-10-01'
+  });
+  assert.equal(entry.chosen, 'Drop one elective');
+  assert.equal(entry.reasoning, 'Teaching clash');
+  assert.equal(entry.revisit, '2026-10-01');
+});
+
 test('validateGovernanceLogAppendInput keeps optional dateKey when provided', () => {
   const entry = validateGovernanceLogAppendInput({
     entry_type: "Coach's Notes",

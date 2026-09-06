@@ -91,3 +91,30 @@ test('renderGovernance renders dated entry blocks with status badges', () => {
   assert.match(entry.textContent, /Still Active/);
   assert.match(entry.textContent, /Stalled sleep goal/);
 });
+
+test('renderGovernance shows decision fields and a same-title timeline', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-06',
+    entryType: 'Major Decision',
+    title: 'MEd load',
+    chosen: 'Drop one elective',
+    reasoning: 'Teaching clash',
+    revisit: '2026-10-01',
+    body: 'Later take.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-01',
+    entryType: 'Major Decision',
+    title: 'MEd load',
+    chosen: 'Take both units',
+    body: 'First take.'
+  });
+  const { root, container } = fakeRoot();
+  renderGovernance(root, log, { today: '2026-09-06' });
+  assert.match(container.textContent, /How this changed/);
+  assert.match(container.textContent, /Take both units/);
+  assert.match(container.textContent, /Drop one elective/);
+  assert.match(container.textContent, /Teaching clash/);
+  assert.match(container.textContent, /01\/10\/26/);
+});
