@@ -132,6 +132,7 @@ function inferPriority(text) {
 
 function isNonActionable(text) {
   if (NON_ACTIONABLE.some(pattern => pattern.test(text))) return true;
+  if (parseWordingCorrection(text)) return true;
   if (/\?\s*$/.test(text.trim()) && !includesAny(text, COMMS)) {
     const actionish =
       /\b(?:email|call|book|schedule|write|draft|finish|prep|mark|send|reply|fix|sort|organis[ez]e|plan|review|update|handle|tackle)\b/i;
@@ -231,6 +232,127 @@ export function resolveDuplicateFollowUp(text, recentThread) {
     return leave ? { action: 'leave', title } : { action: 'make_new', title };
   }
   return null;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function stripBothClause(value) {
+  return String(value ?? '')
+    .replace(/\s+for\s+both(?:\s+of\s+(?:those|them|these))?\.?$/i, '')
+    .replace(/[.!?]+$/g, '')
+    .trim();
+}
+
+function looksLikeLexicalSwap(wrong, right, full) {
+  if (
+    /\b(?:today|tomorrow|tonight|this afternoon|this week|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(
+      full
+    )
+  ) {
+    return false;
+  }
+  if (/\b(?:sent|done|finished|ready|due|scheduled)\b/i.test(right)) return false;
+  const wWords = wrong.trim().split(/\s+/).filter(Boolean).length;
+  const rWords = right.trim().split(/\s+/).filter(Boolean).length;
+  return wWords >= 1 && wWords <= 4 && rWords >= 1 && rWords <= 4;
+}
+
+function applyLexicalReplace(haystack, wrong, right) {
+  const re = new RegExp(escapeRegExp(wrong), 'gi');
+  return haystack.replace(re, match => {
+    if (match === match.toUpperCase()) return right.toUpperCase();
+    if (match === match.toLowerCase()) return right.toLowerCase();
+    if (match[0] === match[0].toUpperCase()) {
+      return `${right.charAt(0).toUpperCase()}${right.slice(1)}`;
+    }
+    return right;
+  });
+}
+
+export function parseWordingCorrection(text) {
+  const trimmed = String(text ?? '').trim();
+  if (!trimmed) return null;
+
+  const itsNot = /^(?:it'?s|its)\s+(.+?),?\s+not\s+(.+?)$/i.exec(trimmed);
+  if (itsNot) {
+    const right = stripBothClause(itsNot[1] ?? '');
+    const wrong = stripBothClause(itsNot[2] ?? '');
+    if (wrong && right && looksLikeLexicalSwap(wrong, right, trimmed)) {
+      return { wrong, right };
+    }
+  }
+
+  const notDash = /^not\s+(.+?)[,—-]\s*(?:it'?s\s+)?(.+?)$/i.exec(trimmed);
+  if (notDash) {
+    const wrong = stripBothClause(notDash[1] ?? '');
+    const right = stripBothClause(notDash[2] ?? '');
+    if (wrong && right && looksLikeLexicalSwap(wrong, right, trimmed)) {
+      return { wrong, right };
+    }
+  }
+
+  const patterns = [
+    /^(.+?)\s+(?:is|was|are)\s+supposed\s+to\s+be\s+(.+)$/i,
+    /^(.+?)\s+should\s+(?:be|read|say)\s+(.+)$/i,
+    /^(.+?)\s+(?:was\s+)?meant\s+to\s+(?:be|say|read)\s+(.+)$/i,
+    /^change\s+(.+?)\s+to\s+(.+)$/i,
+    /^replace\s+(.+?)\s+with\s+(.+)$/i,
+    /^(.+?)\s*(?:→|->|=>)\s*(.+)$/i
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(trimmed);
+    if (!match) continue;
+    const wrong = stripBothClause(match[1] ?? '');
+    const right = stripBothClause(match[2] ?? '');
+    if (!wrong || !right || wrong.toLowerCase() === right.toLowerCase()) continue;
+    if (!looksLikeLexicalSwap(wrong, right, trimmed)) continue;
+    return { wrong, right };
+  }
+  return null;
+}
+
+export function resolveWordingCorrectionFollowUp(text, recentThread) {
+  const parsed = parseWordingCorrection(text);
+  if (!parsed) return null;
+
+  const candidates = [];
+  if (Array.isArray(recentThread) && recentThread.length) {
+    for (let i = recentThread.length - 1; i >= 0; i -= 1) {
+      const turn = recentThread[i];
+      if (turn?.role === 'assistant') {
+        for (const match of String(turn.text ?? '').matchAll(/[“"]([^”"]{3,})[”"]/g)) {
+          const title = match[1]?.trim();
+          if (title) candidates.push(title);
+        }
+      } else if (turn?.role === 'user' && String(turn.text ?? '').trim() !== String(text ?? '').trim()) {
+        const prior = String(turn.text ?? '').trim();
+        if (prior && new RegExp(escapeRegExp(parsed.wrong), 'i').test(prior)) {
+          candidates.push(prior);
+        }
+      }
+    }
+  }
+
+  const correctedTitles = [];
+  const seen = new Set();
+  const wrongRe = new RegExp(escapeRegExp(parsed.wrong), 'i');
+  for (const title of candidates) {
+    if (!wrongRe.test(title)) continue;
+    const next = applyLexicalReplace(title, parsed.wrong, parsed.right);
+    if (next === title) continue;
+    const key = next.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    correctedTitles.push(next);
+  }
+
+  return {
+    wrong: parsed.wrong,
+    right: parsed.right,
+    correctedTitles
+  };
 }
 
 function questionFor(item) {

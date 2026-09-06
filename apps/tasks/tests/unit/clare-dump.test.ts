@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { parseBrainDump, resolveDuplicateFollowUp, splitDumpLines } from '@/domain/clare-dump';
+import {
+  parseBrainDump,
+  parseWordingCorrection,
+  resolveDuplicateFollowUp,
+  resolveWordingCorrectionFollowUp,
+  splitDumpLines
+} from '@/domain/clare-dump';
 import { assembleDumpResult } from '@/domain/clare';
 import type { FrameworkEntry } from '@/schemas/templates';
 
@@ -152,6 +158,59 @@ describe('brain dump parsing', () => {
     expect(result.proposals).toHaveLength(0);
     expect(result.questions).toHaveLength(0);
     expect(result.voice).toMatch(/listening|got it/i);
+  });
+
+  it('does not propose a wording correction as a new task', () => {
+    const items = parseBrainDump('Encouraging is supposed to be incursion for both of those', {
+      now: new Date(2026, 8, 6),
+      preferredDomain: 'teaching'
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]!.kind).toBe('meta');
+    expect(items[0]!.actionable).toBe(false);
+    expect(assembleDumpResult(items, frameworks, () => null).proposals).toHaveLength(0);
+  });
+
+  it('still treats scheduling "supposed to be" lines as real work', () => {
+    const items = parseBrainDump('The meeting is supposed to be tomorrow', {
+      now: new Date(2026, 8, 6),
+      preferredDomain: 'teaching'
+    });
+    expect(parseWordingCorrection('The meeting is supposed to be tomorrow')).toBeNull();
+    expect(items[0]!.kind).not.toBe('meta');
+    expect(items[0]!.actionable).toBe(true);
+  });
+
+  it('rewrites the prior quoted title when Adam corrects a word', () => {
+    const priorTitle =
+      'At some point I need to put in the international neuroscience Olympiad encouraging request and the UN voice encouraging request as well';
+    const thread = [
+      { role: 'user' as const, text: priorTitle },
+      {
+        role: 'assistant' as const,
+        text: `Is “${priorTitle}” due this week or next week?`
+      }
+    ];
+    const correction = 'Encouraging is supposed to be incursion for both of those';
+    expect(parseWordingCorrection(correction)).toEqual({
+      wrong: 'Encouraging',
+      right: 'incursion'
+    });
+    const resolved = resolveWordingCorrectionFollowUp(correction, thread);
+    expect(resolved).not.toBeNull();
+    expect(resolved!.correctedTitles.length).toBeGreaterThanOrEqual(1);
+    expect(resolved!.correctedTitles.some((title) => /incursion/i.test(title))).toBe(true);
+    expect(resolved!.correctedTitles.every((title) => !/encouraging/i.test(title))).toBe(true);
+
+    const items = parseBrainDump(resolved!.correctedTitles.join('\n'), {
+      now: new Date(2026, 8, 6),
+      preferredDomain: 'teaching'
+    });
+    const result = assembleDumpResult(items, frameworks, () => null);
+    expect(result.proposals.length).toBeGreaterThanOrEqual(1);
+    expect(result.proposals.every((p) => /incursion/i.test(p.title))).toBe(true);
+    expect(result.proposals.every((p) => !/encouraging/i.test(p.title))).toBe(true);
+    expect(result.proposals.every((p) => !/supposed to be/i.test(p.title))).toBe(true);
   });
 
   it('anchors "due today" to Australia/Sydney when the host clock is UTC', () => {

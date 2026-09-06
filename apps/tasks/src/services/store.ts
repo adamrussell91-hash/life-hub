@@ -61,7 +61,7 @@ import {
   type ClareProposalInput
 } from '@/domain/clare';
 import { buildClareDumpDigest } from '@/domain/clare-digest';
-import { parseBrainDump, resolveDuplicateFollowUp } from '@/domain/clare-dump';
+import { parseBrainDump, resolveDuplicateFollowUp, resolveWordingCorrectionFollowUp } from '@/domain/clare-dump';
 import {
   defaultClareProposalJudge,
   type ClareProposalJudge
@@ -886,7 +886,30 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
           agent: agentSlug
         };
       }
-      const dumpText = followUp?.action === 'make_new' ? followUp.title : input.text;
+      const wording =
+        followUp?.action === 'make_new'
+          ? null
+          : resolveWordingCorrectionFollowUp(input.text, input.recent_thread);
+      if (wording && !wording.correctedTitles.length) {
+        return {
+          voice: `Got it — “${wording.wrong}” → “${wording.right}”. Which card should I fix?`,
+          proposals: [],
+          questions: [],
+          notes: [],
+          toolkit: null,
+          mutations: [],
+          agent: agentSlug
+        };
+      }
+      const wordingNote = wording
+        ? `Fixed — “${wording.wrong}” → “${wording.right}”.`
+        : null;
+      const dumpText =
+        followUp?.action === 'make_new'
+          ? followUp.title
+          : wording
+            ? wording.correctedTitles.join('\n')
+            : input.text;
       const forceNewTitles = followUp?.action === 'make_new';
       // Twin follow-ups are shared across agents; Clare also uses the offline parser for dumps.
       const items =
@@ -904,6 +927,8 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         const cal = byDomain.get(domain);
         return cal && cal.sample_count > 0 ? cal : null;
       };
+      const withWordingVoice = <T extends { voice: string }>(result: T): T =>
+        wordingNote ? { ...result, voice: `${wordingNote} ${result.voice}`.trim() } : result;
       const toolRuntime = {
         getTimezone: async () => (await this.getHubPrefs()).timezone,
         setTimezone: (zone: string) => this.setHubTimezone(zone),
@@ -954,16 +979,18 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
               forceNewTitles
                 ? judgment.items.map((row) => ({ ...row, existing_task_id: null }))
                 : judgment.items;
-            return assembleJudgedDumpResult(
-              rows,
-              frameworks,
-              calibrationFor,
-              input.protocol_id,
-              forceNewTitles && (!judgment.voice || /already on the board/i.test(judgment.voice))
-                ? `Making a fresh “${followUp!.title}”. Confirm when ready.`
-                : judgment.voice,
-              judgment.mutations,
-              agentSlug
+            return withWordingVoice(
+              assembleJudgedDumpResult(
+                rows,
+                frameworks,
+                calibrationFor,
+                input.protocol_id,
+                forceNewTitles && (!judgment.voice || /already on the board/i.test(judgment.voice))
+                  ? `Making a fresh “${followUp!.title}”. Confirm when ready.`
+                  : judgment.voice,
+                judgment.mutations,
+                agentSlug
+              )
             );
           }
         } catch {
@@ -971,7 +998,9 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         }
       }
       if (forceNewTitles && items.length) {
-        return assembleDumpResult(items, frameworks, calibrationFor, input.protocol_id, agentSlug);
+        return withWordingVoice(
+          assembleDumpResult(items, frameworks, calibrationFor, input.protocol_id, agentSlug)
+        );
       }
       if (agentSlug !== 'clare') {
         return {
@@ -985,7 +1014,9 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
           agent: agentSlug
         };
       }
-      return assembleDumpResult(items, frameworks, calibrationFor, input.protocol_id, agentSlug);
+      return withWordingVoice(
+        assembleDumpResult(items, frameworks, calibrationFor, input.protocol_id, agentSlug)
+      );
     },
     async applyAgentMutations(mutations: AgentMutation[]) {
       const results: Array<{ summary: string; ok: boolean; note: string }> = [];
