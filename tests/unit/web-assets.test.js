@@ -219,6 +219,10 @@ test('engaged phone Chat drops the page title stack and assistant left bar', asy
     css,
     /\.chat-message--assistant\[data-agent\] \.chat-message__body\s*\{[^}]*border-left:\s*0/
   );
+  assert.match(
+    css,
+    /\.chat-message--assistant\[data-agent\] \.chat-message__body\s*\{[^}]*padding-left:\s*var\(--space-3\)/
+  );
   assert.doesNotMatch(
     css,
     /\.chat-message--assistant\[data-agent\] \.chat-message__body\s*\{[^}]*border-left:\s*0\.2rem solid var\(--agent-accent/

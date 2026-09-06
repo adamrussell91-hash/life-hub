@@ -787,10 +787,10 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 .chat-message--assistant[data-agent] .chat-message__body {
-  /* Avatar already carries the agent colour. A left bar next to lists
-     reads as a leftover quote and does not line up with the portrait. */
+  /* Avatar already carries the agent colour. Keep the inset so outside
+     list markers (10., 11.) are not clipped; do not paint a leftover bar. */
   border-left: 0;
-  padding-left: 0;
+  padding-left: var(--space-3);
 }
 
 .chat-message__body {

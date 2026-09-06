@@ -916,6 +916,16 @@ test('engaged phone Chat hides the title stack and has no assistant accent bar',
   await page.evaluate(() => {
     const item = document.querySelector('.chat-message--assistant');
     item.dataset.agent = 'clare';
+    const body = item.querySelector('.chat-message__body');
+    body.replaceChildren();
+    const list = document.createElement('ol');
+    list.start = 10;
+    for (const title of ['Pathfinders session', 'Reports, block two']) {
+      const li = document.createElement('li');
+      li.textContent = title;
+      list.append(li);
+    }
+    body.append(list);
   });
 
   const layout = await page.evaluate(() => {
@@ -931,7 +941,10 @@ test('engaged phone Chat hides the title stack and has no assistant accent bar',
       refreshDisplay: getComputedStyle(refresh).display,
       whoDisplay: who.hidden ? 'hidden-attr' : getComputedStyle(who).display,
       pickerDisplay: getComputedStyle(picker).display,
-      borderLeft: getComputedStyle(body).borderLeftWidth
+      borderLeft: getComputedStyle(body).borderLeftWidth,
+      paddingLeft: parseFloat(getComputedStyle(body).paddingLeft) || 0,
+      listLeft: body.querySelector('ol')?.getBoundingClientRect().left ?? 0,
+      bodyLeft: body.getBoundingClientRect().left
     };
   });
 
@@ -940,6 +953,11 @@ test('engaged phone Chat hides the title stack and has no assistant accent bar',
   assert.notEqual(layout.refreshDisplay, 'none', 'refresh must stay');
   assert.equal(layout.pickerDisplay, 'none', 'picker portraits yield to Talking to');
   assert.equal(layout.borderLeft, '0px', 'assistant body must not wear a leftover accent bar');
+  assert.ok(layout.paddingLeft >= 8, `list inset must remain (paddingLeft=${layout.paddingLeft})`);
+  assert.ok(
+    layout.listLeft > layout.bodyLeft,
+    'numbered markers must sit inside the body, not clip off the left edge'
+  );
 
   await context.close();
 });
