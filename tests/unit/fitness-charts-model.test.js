@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import { buildFitnessModel } from '../../apps/life/js/app/fitness-model.js';
 import {
   acwrBand,
+  buildE1rmVsBest,
   buildFitnessCharts,
+  buildMonthRhythm,
   buildTrainWhen,
+  buildYearMonths,
   classifyPushPull,
   classifyRepRange,
   longestCompletedStreak,
@@ -154,6 +157,43 @@ test('trainWhen answers typical time of day instead of scattering clock dots', (
   assert.match(when.read, /mostly Tue/);
   assert.equal(buildTrainWhen([volumeSession('2026-07-30', 200, { time: '19:00' })]), null);
   assert.equal(buildTrainWhen([volumeSession('2026-07-20', 200), volumeSession('2026-07-30', 200)]), null);
+});
+
+test('monthRhythm counts sessions by week and names the longest gap between them', () => {
+  const dates = [];
+  for (let day = 1; day <= 30; day += 1) dates.push(`2026-07-${String(day).padStart(2, '0')}`);
+  const rhythm = buildMonthRhythm([
+    volumeSession('2026-07-14', 200),
+    volumeSession('2026-07-30', 200)
+  ], dates, '2026-07-30');
+  assert.equal(rhythm.count, 2);
+  assert.equal(rhythm.longestGap, 15);
+  assert.match(rhythm.read, /2 sessions in the last 30 days · longest gap 15 days/);
+  assert.equal(rhythm.weeks.find(week => week.key === '2026-07-13').value, 1);
+  assert.equal(rhythm.weeks.find(week => week.key === '2026-07-27').value, 1);
+});
+
+test('e1rmVsBest ranks latest estimate against each lift’s peak', () => {
+  const best = buildE1rmVsBest([
+    { name: 'Squat', series: [{ date: '2026-07-01', value: 100 }, { date: '2026-07-30', value: 90 }] },
+    { name: 'Press', series: [{ date: '2026-07-01', value: 50 }, { date: '2026-07-30', value: 50 }] }
+  ]);
+  assert.equal(best.lifts[0].label, 'Press');
+  assert.equal(best.lifts[0].value, 100);
+  assert.equal(best.lifts[1].label, 'Squat');
+  assert.equal(best.lifts[1].value, 90);
+  assert.match(best.read, /Closest to best: Press · 100%/);
+  assert.match(best.read, /furthest Squat · 90%/);
+});
+
+test('yearMonths totals completed sessions by calendar month', () => {
+  const year = buildYearMonths(events([
+    volumeSession('2026-07-24', 200),
+    volumeSession('2026-07-30', 200)
+  ]), '2026-07-30');
+  assert.equal(year.count, 2);
+  assert.equal(year.months.find(month => month.label === 'Jul').value, 2);
+  assert.equal(year.read, '2 sessions in 2026');
 });
 
 test('acwrBand follows the 0.8–1.3 sweet spot', () => {

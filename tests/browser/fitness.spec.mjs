@@ -91,7 +91,9 @@ test('the Fitness tab renders the fixture workout and labeled analytics', async 
     assert.match(await page.locator('[data-fitness="when-read"]').textContent(), /Split mornings and evenings · typical start 12:25/);
     assert.match(await page.locator('#fitness-clock-chart').textContent(), /Morning/);
     assert.match(await page.locator('#fitness-clock-chart').textContent(), /Evening/);
-    assert.match(await page.locator('[data-fitness="when-read"]').textContent(), /mostly Thu/);
+    assert.equal(await page.locator('#fitness-orbit-card').isVisible(), true);
+    assert.match(await page.locator('[data-fitness="orbit-read"]').textContent(), /2 sessions in the last 30 days/);
+    assert.match(await page.locator('#fitness-year-card').textContent(), /2 sessions in 2026/);
     assert.match(await page.locator('#fitness-recent').textContent(), /Chest and Curls/);
     assert.equal(await page.locator('#fitness-comparisons-card').isHidden(), true);
     assert.ok(await page.locator('#fitness-exercise-list .fitness-exercise').count() >= 2);

@@ -16,8 +16,8 @@ const FIXTURE_FILES = [
   { path: 'config/targets.yml', source: 'config/targets.yml' },
   { path: 'central-node.md', source: 'tests/fixtures/valid/central-node.md' },
   {
-    path: 'data/fitness/2026/07/2026-07-23-leg-day.md',
-    source: 'tests/fixtures/valid/data/fitness/2026/07/2026-07-23-leg-day.md'
+    path: 'data/fitness/2026/07/2026-07-24-leg-day.md',
+    source: 'tests/fixtures/valid/data/fitness/2026/07/2026-07-24-leg-day.md'
   },
   {
     path: 'data/fitness/2026/07/2026-07-30-chest-curls.md',

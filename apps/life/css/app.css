@@ -1483,9 +1483,9 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-bento {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-flow: dense;
+  grid-auto-flow: row;
   gap: var(--hub-tile-gap);
-  align-items: start;
+  align-items: stretch;
 }
 .fitness-bento > .hub-run,
 .fitness-bento > .fitness-lead {
@@ -1513,6 +1513,7 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-bento > .fitness-panel,
 .fitness-bento > .fitness-viz > .fitness-panel {
   grid-column: span 2;
+  height: 100%;
 }
 .fitness-bento > .fitness-tile--slim,
 .fitness-bento > .fitness-viz > .fitness-tile--slim {
@@ -1791,7 +1792,19 @@ main { max-width: 76rem; margin: 0 auto; }
   background: var(--shore);
 }
 .fitness-month-pip[data-hit="true"] { background: var(--wave); }
+#fitness-dashboard [data-role="fitness-tip"] {
+  position: fixed;
+  z-index: 20;
+}
 .fitness-share-list { display: grid; }
+.fitness-share-list--lifts .fitness-share-row {
+  grid-template-columns: minmax(0, 1fr) minmax(4rem, 1fr) 3.25rem;
+}
+.fitness-share-list--lifts .fitness-share-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .fitness-share-row {
   display: grid;
   grid-template-columns: 6.5rem minmax(0, 1fr) auto;

@@ -80,10 +80,34 @@ test('when-you-train paints day-part counts and a typical-time caption', () => {
         { key: 'night', label: 'Night', value: 0 }
       ]
     },
-    orbitDays: [
-      { date: '2026-08-20', volume: 1200, dayType: 'workout_30', colour: 'var(--wave)' },
-      { date: '2026-09-01', volume: 2400, dayType: 'workout_45_60', colour: 'var(--marine)' }
-    ]
+    monthRhythm: {
+      count: 4,
+      days: 30,
+      longestGap: 8,
+      read: '4 sessions in the last 30 days · longest gap 8 days',
+      weeks: [
+        { key: '2026-08-04', value: 0 },
+        { key: '2026-08-11', value: 1 },
+        { key: '2026-08-18', value: 2 },
+        { key: '2026-08-25', value: 1 },
+        { key: '2026-09-01', value: 0 }
+      ]
+    },
+    e1rmVsBest: {
+      read: 'Closest to best: Squat · 98% · furthest Press · 72%',
+      lifts: [
+        { key: 'Squat', label: 'Squat', value: 98, kg: 80, peak: 82, date: '2026-09-01' },
+        { key: 'Press', label: 'Press', value: 72, kg: 40, peak: 55, date: '2026-08-20' }
+      ]
+    },
+    yearMonths: {
+      count: 4,
+      read: '4 sessions in 2026',
+      months: [
+        { key: '8', label: 'Aug', value: 3 },
+        { key: '9', label: 'Sep', value: 1 }
+      ]
+    }
   });
 
   assert.equal(root.ensure('[data-fitness="when-read"]').textContent, 'Usually evenings, around 18:40 · mostly Tue');
@@ -94,13 +118,14 @@ test('when-you-train paints day-part counts and a typical-time caption', () => {
   assert.equal(root.ensure('#fitness-clock-card').attributes.hidden, undefined);
   assert.ok(root.ensure('#fitness-clock-card').children.some(node => node.dataset?.role === 'fitness-tip'));
 
-  const orbit = texts(root.ensure('#fitness-orbit-chart'));
-  assert.ok(orbit.includes('Lighter'));
-  assert.ok(orbit.includes('Heavier'));
-  let orbitLeaders = 0;
-  walk(root.ensure('#fitness-orbit-chart'), node => {
-    if (node.attributes?.['data-role'] === 'leader') orbitLeaders += 1;
-  });
-  assert.ok(orbitLeaders >= 3, 'orbit volume and date labels use leader lines');
-  assert.equal(root.ensure('[data-fitness="orbit-status"]').textContent, '2 sessions');
+  assert.equal(root.ensure('[data-fitness="orbit-read"]').textContent, '4 sessions in the last 30 days · longest gap 8 days');
+  const rhythm = texts(root.ensure('#fitness-orbit-chart'));
+  assert.ok(rhythm.includes('11/08'));
+  assert.ok(rhythm.includes('2'));
+  assert.equal(root.ensure('[data-fitness="e1rm-best-read"]').textContent, 'Closest to best: Squat · 98% · furthest Press · 72%');
+  const best = texts(root.ensure('#fitness-e1rm-radial-chart'));
+  assert.ok(best.includes('Squat'));
+  assert.ok(best.includes('98%'));
+  assert.equal(root.ensure('[data-fitness="year-read"]').textContent, '4 sessions in 2026');
+  assert.ok(texts(root.ensure('#fitness-year-chart')).includes('Aug'));
 });

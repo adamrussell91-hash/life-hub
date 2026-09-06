@@ -1,29 +1,17 @@
-import { positionHubFloating } from '../../../../packages/design-kit/js/hub-floating.js';
 import { animateAreaReveal, animateColumnGrow, prefersReducedMotion } from './chart-kit/animate.js';
 import { buildAreaLine, straightLinePath } from './chart-kit/area-line.js';
 import { buildBumpChart } from './chart-kit/bump.js';
 import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
 import { buildColumns } from './chart-kit/columns.js';
-import { buildEnergyOrbit } from './chart-kit/energy-orbit.js';
 import { buildHorizonBands } from './chart-kit/horizon.js';
 import { buildMoodMixDonut } from './chart-kit/mood-mix.js';
-import { buildMoodRadial } from './chart-kit/mood-radial.js';
-import { MONTHS, polar, thetaForDate } from './chart-kit/polar-clock.js';
 import { rangeBarLayout, rangeBarTick } from './chart-kit/range-bar.js';
-import { buildRadialYear } from './chart-kit/radial-year.js';
 import { REGION_COLOURS } from './fitness-charts-model.js';
 import { REGION_LABELS } from './fitness-model.js';
 import { buildStreamPaths } from './chart-kit/stream.js';
 import { buildWatchlistHeat } from './chart-kit/watchlist-heat.js';
 import { formatDisplayDate } from '../core/time.js';
 import { matchFitnessRecentRows } from './fitness-recent-focus.js';
-
-const DAY_TYPE_LABELS = {
-  movement: 'Movement',
-  workout_30: '30 min',
-  workout_45_60: '45–60 min',
-  rest: 'Rest'
-};
 
 const setText = (root, selector, value) => {
   const element = root.querySelector(selector);
@@ -108,17 +96,34 @@ function ensureTip(root, host) {
   return tip;
 }
 
+function hideFitnessTips(root, keep) {
+  const tips = root.querySelectorAll?.('[data-role="fitness-tip"]');
+  if (!tips) return;
+  for (const node of tips) {
+    if (node !== keep) node.hidden = true;
+  }
+}
+
+function placeTip(mark, tip, event) {
+  const rect = typeof mark.getBoundingClientRect === 'function' ? mark.getBoundingClientRect() : null;
+  const wide = Boolean(rect && (rect.width || rect.height));
+  const x = wide ? rect.left + rect.width / 2 : Number(event?.clientX) || 0;
+  const y = wide ? rect.top : Number(event?.clientY) || 0;
+  tip.style.position = 'fixed';
+  tip.style.left = `${Math.round(x)}px`;
+  tip.style.top = `${Math.round(y)}px`;
+  tip.style.right = 'auto';
+  tip.style.bottom = 'auto';
+  tip.style.transform = 'translate(-50%, calc(-100% - 8px))';
+}
+
 function bindTip(node, tip, text) {
   if (!node || !tip || typeof node.addEventListener !== 'function') return;
   const show = event => {
+    hideFitnessTips(node.getRootNode?.() ?? tip.parentNode, tip);
     tip.hidden = false;
     tip.textContent = text;
-    const mark = event.currentTarget || node;
-    void positionHubFloating(mark, tip, {
-      placement: 'top',
-      strategy: 'fixed',
-      offset: 8
-    });
+    placeTip(event.currentTarget || node, tip, event);
   };
   const hide = () => { tip.hidden = true; };
   node.setAttribute('tabindex', '0');
@@ -127,33 +132,6 @@ function bindTip(node, tip, text) {
   node.addEventListener('pointerleave', hide);
   node.addEventListener('focus', show);
   node.addEventListener('blur', hide);
-}
-
-function appendLeaderLabel(root, nodes, { cx, cy, x, y, text, fill, role = 'leader-label' }) {
-  const dx = x - cx;
-  const dy = y - cy;
-  const len = Math.hypot(dx, dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
-  const labelR = len + 36;
-  const lx = cx + ux * labelR;
-  const ly = cy + uy * labelR;
-  const line = createSvg(root, 'line');
-  if (!line) return;
-  line.setAttribute('data-role', 'leader');
-  line.setAttribute('x1', String(x));
-  line.setAttribute('y1', String(y));
-  line.setAttribute('x2', String(lx - ux * 10));
-  line.setAttribute('y2', String(ly - uy * 10));
-  if (fill) line.setAttribute('stroke', fill);
-  const label = createSvg(root, 'text');
-  label.setAttribute('data-role', role);
-  label.setAttribute('x', String(lx));
-  label.setAttribute('y', String(ly + 3));
-  label.setAttribute('text-anchor', ux > 0.25 ? 'start' : ux < -0.25 ? 'end' : 'middle');
-  if (fill) label.setAttribute('fill', fill);
-  label.textContent = text;
-  nodes.push(line, label);
 }
 
 function namedDot(root, { cx, cy, r, fill, delay, className = 'mind-mood-dot' }) {
@@ -169,198 +147,79 @@ function namedDot(root, { cx, cy, r, fill, delay, className = 'mind-mood-dot' })
   return dot;
 }
 
+function paintShareList(root, host, rows, tip) {
+  host.replaceChildren();
+  for (const item of rows) {
+    const row = root.createElement('div');
+    row.className = 'fitness-share-row';
+    const label = root.createElement('strong');
+    label.textContent = item.label;
+    const track = root.createElement('span');
+    track.className = 'fitness-share-row__track';
+    const fill = root.createElement('i');
+    fill.dataset.tone = item.tone ?? 'same';
+    setWidth(fill, item.widthPct);
+    track.append(fill);
+    const value = root.createElement('span');
+    value.textContent = item.display;
+    bindTip(row, tip, item.copy);
+    row.append(label, track, value);
+    host.append(row);
+  }
+}
+
+function shareRowsFromColumns(items, copyFor) {
+  const chart = buildColumns(items);
+  const peak = Math.max(0, ...chart.bars.map(bar => bar.value));
+  return chart.bars.map(bar => ({
+    label: bar.label,
+    display: String(bar.value),
+    widthPct: bar.heightPct,
+    tone: bar.value === peak && bar.value > 0 ? 'up' : 'same',
+    copy: copyFor(bar)
+  }));
+}
+
 function renderWhen(root, when) {
   const ready = Number(when?.count) >= 2 && when?.buckets?.length;
   const card = showCard(root, '#fitness-clock-card', ready);
   const host = root.querySelector('#fitness-clock-chart');
   setText(root, '[data-fitness="when-read"]', when?.read ?? '');
   if (!card || !host) return;
-  host.replaceChildren();
-  const chart = buildColumns(when.buckets);
-  const tip = ensureTip(root, card);
-  const peak = Math.max(0, ...chart.bars.map(bar => bar.value));
-  for (const bar of chart.bars) {
-    const row = root.createElement('div');
-    row.className = 'fitness-share-row';
-    const label = root.createElement('strong');
-    label.textContent = bar.label;
-    const track = root.createElement('span');
-    track.className = 'fitness-share-row__track';
-    const fill = root.createElement('i');
-    fill.dataset.tone = bar.value === peak && bar.value > 0 ? 'up' : 'same';
-    setWidth(fill, bar.heightPct);
-    track.append(fill);
-    const value = root.createElement('span');
-    value.textContent = String(bar.value);
-    const copy = `${bar.label} · ${bar.value} session${bar.value === 1 ? '' : 's'}`;
-    bindTip(row, tip, copy);
-    row.append(label, track, value);
-    host.append(row);
-  }
+  paintShareList(root, host, shareRowsFromColumns(when.buckets, bar => (
+    `${bar.label} · ${bar.value} session${bar.value === 1 ? '' : 's'}`
+  )), ensureTip(root, card));
 }
 
-function renderOrbit(root, days) {
-  const trained = (days ?? []).filter(day => day.volume > 0);
-  const card = showCard(root, '#fitness-orbit-card', trained.length >= 2);
-  const svg = root.querySelector('#fitness-orbit-chart');
-  if (!card || !svg || typeof root.createElementNS !== 'function') return;
-  const from = days[0]?.date;
-  const to = days.at(-1)?.date;
-  const series = trained.map(day => ({ date: day.date, energy: 'medium' }));
-  const chart = buildEnergyOrbit(series, { bounds: { from, to }, range: 'monthly' });
-  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
-  svg.setAttribute('class', 'mind-energy-orbit__chart fitness-polar__svg');
-  const tip = ensureTip(root, card);
-  const nodes = [];
-  for (const tick of chart.angleTicks ?? []) {
-    const outer = Math.hypot(tick.x - chart.cx, tick.y - chart.cy) || chart.plotRadius;
-    const inner = Math.max(outer - 10, 0);
-    const ux = (tick.x - chart.cx) / outer;
-    const uy = (tick.y - chart.cy) / outer;
-    const spoke = createSvg(root, 'line');
-    spoke.setAttribute('data-role', 'tick');
-    spoke.setAttribute('x1', String(chart.cx + ux * inner));
-    spoke.setAttribute('y1', String(chart.cy + uy * inner));
-    spoke.setAttribute('x2', String(tick.x));
-    spoke.setAttribute('y2', String(tick.y));
-    nodes.push(spoke);
-    appendLeaderLabel(root, nodes, {
-      cx: chart.cx,
-      cy: chart.cy,
-      x: tick.x,
-      y: tick.y,
-      text: tick.label,
-      role: 'angle-label'
-    });
-  }
-  const volumeRings = [
-    { fraction: 0.44, label: 'Lighter', colour: 'var(--muted)' },
-    { fraction: 0.66, label: 'Typical', colour: 'var(--marine)' },
-    { fraction: 0.88, label: 'Heavier', colour: 'var(--wave)' }
-  ];
-  for (const ring of volumeRings) {
-    const radius = ring.fraction * chart.plotRadius;
-    const at = polar(chart.cx, chart.cy, radius, 200);
-    const grid = createSvg(root, 'circle');
-    grid.setAttribute('data-role', 'orbit');
-    grid.setAttribute('cx', String(chart.cx));
-    grid.setAttribute('cy', String(chart.cy));
-    grid.setAttribute('r', String(radius));
-    grid.setAttribute('stroke', ring.colour);
-    nodes.push(grid);
-    appendLeaderLabel(root, nodes, {
-      cx: chart.cx,
-      cy: chart.cy,
-      x: at.x,
-      y: at.y,
-      text: ring.label,
-      fill: ring.colour,
-      role: 'orbit-label'
-    });
-  }
-  const maxVol = Math.max(1, ...trained.map(day => day.volume));
-  trained.forEach((day, index) => {
-    const theta = thetaForDate(day.date, { from, to }, 'monthly');
-    const radius = chart.plotRadius * (0.44 + (day.volume / maxVol) * 0.44);
-    const { x, y } = polar(chart.cx, chart.cy, radius, theta);
-    const kind = DAY_TYPE_LABELS[day.dayType] ?? day.dayType;
-    const copy = `${formatDisplayDate(day.date)} · ${formatKg(day.volume)} · ${kind}`;
-    const dot = namedDot(root, {
-      cx: x,
-      cy: y,
-      r: 6 + (day.volume / maxVol) * 5,
-      fill: day.colour,
-      className: 'mind-energy-dot',
-      delay: `${Math.min(index * 18, 400)}ms`
-    });
-    if (!dot) return;
-    const title = createSvg(root, 'title');
-    title.textContent = copy;
-    dot.append(title);
-    bindTip(dot, tip, copy);
-    nodes.push(dot);
-  });
-  svg.replaceChildren(...nodes);
-  animateAreaReveal(svg);
-  setText(root, '[data-fitness="orbit-status"]', `${trained.length} sessions`);
-  setText(root, '[data-fitness="orbit-period"]', 'Past 30 days');
-  const seen = new Set();
-  paintLegend(root, card, trained.flatMap(day => {
-    if (seen.has(day.dayType)) return [];
-    seen.add(day.dayType);
-    return [{ label: DAY_TYPE_LABELS[day.dayType] ?? day.dayType, swatch: day.colour }];
+function renderRhythm(root, rhythm) {
+  const ready = Number(rhythm?.count) >= 2 && rhythm?.weeks?.length;
+  const card = showCard(root, '#fitness-orbit-card', ready);
+  const host = root.querySelector('#fitness-orbit-chart');
+  setText(root, '[data-fitness="orbit-read"]', rhythm?.read ?? '');
+  if (!card || !host) return;
+  const items = rhythm.weeks.map(week => ({
+    key: week.key,
+    label: formatDisplayDate(week.key).slice(0, 5),
+    value: week.value
   }));
+  paintShareList(root, host, shareRowsFromColumns(items, bar => (
+    `w/c ${formatDisplayDate(bar.key)} · ${bar.value} session${bar.value === 1 ? '' : 's'}`
+  )), ensureTip(root, card));
 }
 
-function renderE1rmRadial(root, points) {
-  const card = showCard(root, '#fitness-e1rm-radial-card', points?.length >= 2);
-  const svg = root.querySelector('#fitness-e1rm-radial-chart');
-  if (!card || !svg || typeof root.createElementNS !== 'function') return;
-  const dates = points.map(point => point.date).sort();
-  const chart = buildMoodRadial(
-    points.map(point => ({ date: point.date, value: 5 })),
-    { bounds: { from: dates[0], to: dates.at(-1) }, range: 'monthly' }
-  );
-  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
-  const tip = ensureTip(root, card);
-  const nodes = [];
-  for (const tick of chart.angleTicks ?? []) {
-    const spoke = createSvg(root, 'line');
-    spoke.setAttribute('data-role', 'spoke');
-    spoke.setAttribute('x1', String(chart.cx));
-    spoke.setAttribute('y1', String(chart.cy));
-    spoke.setAttribute('x2', String(tick.x));
-    spoke.setAttribute('y2', String(tick.y));
-    const label = createSvg(root, 'text');
-    label.setAttribute('data-role', 'angle-label');
-    label.setAttribute('x', String(tick.labelX));
-    label.setAttribute('y', String(tick.labelY + 4));
-    label.setAttribute('text-anchor', 'middle');
-    label.textContent = tick.label;
-    nodes.push(spoke, label);
-  }
-  for (const pct of [50, 75, 100]) {
-    const radius = (pct / 100) * chart.plotRadius;
-    const grid = createSvg(root, 'circle');
-    grid.setAttribute('data-role', 'grid');
-    grid.setAttribute('cx', String(chart.cx));
-    grid.setAttribute('cy', String(chart.cy));
-    grid.setAttribute('r', String(radius));
-    const label = createSvg(root, 'text');
-    label.setAttribute('data-role', 'grid-label');
-    label.setAttribute('x', String(chart.cx - radius));
-    label.setAttribute('y', String(chart.cy - 6));
-    label.setAttribute('text-anchor', 'middle');
-    label.textContent = `${pct}%`;
-    nodes.push(grid, label);
-  }
-  points.forEach((source, index) => {
-    const theta = thetaForDate(source.date, { from: dates[0], to: dates.at(-1) }, 'monthly');
-    const radius = Math.max(28, (Math.min(source.pct, 110) / 100) * chart.plotRadius);
-    const { x, y } = polar(chart.cx, chart.cy, radius, theta);
-    const copy = `${source.name ?? 'Lift'} · ${formatDisplayDate(source.date)} · ${Math.round(source.pct ?? 0)}% of best`;
-    const dot = namedDot(root, {
-      cx: x,
-      cy: y,
-      r: 7,
-      fill: source.colour ?? CLINICAL_CHART_SLOTS[0],
-      delay: `${Math.min(index * 25, 400)}ms`
-    });
-    if (!dot) return;
-    const title = createSvg(root, 'title');
-    title.textContent = copy;
-    dot.append(title);
-    bindTip(dot, tip, copy);
-    nodes.push(dot);
-  });
-  svg.replaceChildren(...nodes);
-  animateAreaReveal(svg);
-  const seen = new Set();
-  paintLegend(root, card, (points ?? []).flatMap(point => {
-    if (seen.has(point.name)) return [];
-    seen.add(point.name);
-    return [{ label: point.name, swatch: point.colour ?? CLINICAL_CHART_SLOTS[0] }];
-  }));
+function renderE1rmBest(root, best) {
+  const ready = best?.lifts?.length >= 1;
+  const card = showCard(root, '#fitness-e1rm-radial-card', ready);
+  const host = root.querySelector('#fitness-e1rm-radial-chart');
+  setText(root, '[data-fitness="e1rm-best-read"]', best?.read ?? '');
+  if (!card || !host) return;
+  paintShareList(root, host, best.lifts.map(lift => ({
+    label: lift.label,
+    display: `${lift.value}%`,
+    widthPct: Math.max(0, Math.min(100, lift.value)),
+    tone: lift.value >= 90 ? 'up' : 'same',
+    copy: `${lift.label} · ${lift.value}% of best · ${Number(lift.kg).toFixed(1)} kg on ${formatDisplayDate(lift.date)}`
+  })), ensureTip(root, card));
 }
 
 function renderBump(root, ranks) {
@@ -707,59 +566,15 @@ function renderPill(root, gauge) {
   bindTip(fill, ensureTip(root, card), copy);
 }
 
-function renderYear(root, { year, dots }) {
-  const card = showCard(root, '#fitness-year-card', dots?.length >= 2);
-  const svg = root.querySelector('#fitness-year-chart');
-  if (!card || !svg || typeof root.createElementNS !== 'function') return;
-  const ticks = buildRadialYear({ year, byDate: Object.fromEntries(dots.map(dot => [dot.date, dot])) });
-  clearSvg(svg);
-  svg.setAttribute('viewBox', '0 0 240 240');
-  const cx = 120;
-  const cy = 120;
-  const tip = ensureTip(root, card);
-  const maxVol = Math.max(1, ...dots.map(dot => dot.volume));
-  for (const ring of [48, 74, 100]) {
-    const grid = createSvg(root, 'circle');
-    grid.setAttribute('data-role', 'grid');
-    grid.setAttribute('cx', String(cx));
-    grid.setAttribute('cy', String(cy));
-    grid.setAttribute('r', String(ring));
-    svg.append(grid);
-  }
-  MONTHS.forEach((name, index) => {
-    const angle = (2 * Math.PI * index) / 12 - Math.PI / 2;
-    const label = createSvg(root, 'text');
-    label.setAttribute('data-role', 'angle-label');
-    label.setAttribute('x', String(cx + 112 * Math.cos(angle)));
-    label.setAttribute('y', String(cy + 112 * Math.sin(angle) + 3));
-    label.setAttribute('text-anchor', 'middle');
-    label.textContent = name;
-    svg.append(label);
-  });
-  ticks.forEach((tick, index) => {
-    const hit = tick.mood;
-    if (!hit) return;
-    const r = 48 + (hit.volume / maxVol) * 52;
-    const x = cx + r * Math.cos(tick.angle);
-    const y = cy + r * Math.sin(tick.angle);
-    const copy = `${formatDisplayDate(hit.date ?? tick.date)} · ${formatKg(hit.volume)} · ${REGION_LABELS[hit.region] ?? hit.region ?? 'Session'}`;
-    const dot = namedDot(root, {
-      cx: x,
-      cy: y,
-      r: 2.8 + (hit.volume / maxVol) * 3,
-      fill: hit.colour,
-      delay: `${Math.min(index, 400)}ms`
-    });
-    if (!dot) return;
-    bindTip(dot, tip, copy);
-    svg.append(dot);
-  });
-  const seen = new Set();
-  paintLegend(root, card, (dots ?? []).flatMap(dot => {
-    if (!dot.region || seen.has(dot.region)) return [];
-    seen.add(dot.region);
-    return [{ label: REGION_LABELS[dot.region] ?? dot.region, swatch: dot.colour }];
-  }));
+function renderYear(root, yearMonths) {
+  const ready = Number(yearMonths?.count) >= 2 && yearMonths?.months?.length;
+  const card = showCard(root, '#fitness-year-card', ready);
+  const host = root.querySelector('#fitness-year-chart');
+  setText(root, '[data-fitness="year-read"]', yearMonths?.read ?? '');
+  if (!card || !host) return;
+  paintShareList(root, host, shareRowsFromColumns(yearMonths.months, bar => (
+    `${bar.label} · ${bar.value} session${bar.value === 1 ? '' : 's'}`
+  )), ensureTip(root, card));
 }
 
 function renderRepMix(root, items, read) {
@@ -865,8 +680,8 @@ export function renderFitnessCharts(root, charts = {}) {
   setText(root, '[data-fitness="longest-streak"]', String(charts.longestStreak ?? 0));
 
   renderWhen(root, charts.trainWhen);
-  renderOrbit(root, charts.orbitDays);
-  renderE1rmRadial(root, charts.e1rmRadial);
+  renderRhythm(root, charts.monthRhythm);
+  renderE1rmBest(root, charts.e1rmVsBest);
   renderBump(root, charts.bumpRanks);
   renderStream(root, charts.regionStream);
   renderPainHeat(root, charts.painHeat);
@@ -888,7 +703,7 @@ export function renderFitnessCharts(root, charts = {}) {
   });
   renderE1rmBands(root, charts.e1rmBands);
   renderPill(root, charts.sessionGauge);
-  renderYear(root, { year: charts.year, dots: charts.yearDots });
+  renderYear(root, charts.yearMonths);
   renderRepMix(root, charts.repRanges, charts.repRead);
   renderSparks(root, charts.sessionReadings, {
     duration: charts.durationSeries,

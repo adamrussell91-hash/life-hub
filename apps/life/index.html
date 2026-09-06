@@ -702,22 +702,13 @@
             </article>
             <article id="fitness-orbit-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Monthly rhythm</p>
-              <p class="metric-caption">Radius is session volume. Colour is day type.</p>
-              <div class="mind-energy-orbit fitness-polar fitness-polar--orbit">
-                <svg id="fitness-orbit-chart" class="mind-energy-orbit__chart fitness-polar__svg" viewBox="0 0 680 680" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Monthly training rhythm"></svg>
-                <div class="mind-energy-orbit__center" data-fitness="orbit-center">
-                  <p class="mind-energy-orbit__kicker">Rhythm</p>
-                  <p class="mind-energy-orbit__status" data-fitness="orbit-status">—</p>
-                  <p class="metric-caption" data-fitness="orbit-period"></p>
-                </div>
-              </div>
+              <p class="metric-caption" data-fitness="orbit-read">Sessions by week.</p>
+              <div id="fitness-orbit-chart" class="fitness-share-list" aria-label="Sessions by week"></div>
             </article>
             <article id="fitness-e1rm-radial-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">e1RM vs your best</p>
-              <p class="metric-caption">Each lift is a percent of its own all-time best in this window.</p>
-              <div class="fitness-polar fitness-polar--clock">
-                <svg id="fitness-e1rm-radial-chart" class="mind-mood-chart fitness-polar__svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Estimated 1RM versus personal best"></svg>
-              </div>
+              <p class="metric-caption" data-fitness="e1rm-best-read">Latest e1RM as a percent of that lift’s best.</p>
+              <div id="fitness-e1rm-radial-chart" class="fitness-share-list fitness-share-list--lifts" aria-label="Latest e1RM versus best"></div>
             </article>
             <article id="fitness-bump-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Who is improving</p>
@@ -771,11 +762,9 @@
               <p class="metric-caption" data-fitness="pill-read"></p>
             </article>
             <article id="fitness-year-card" class="metric-card fitness-panel" hidden>
-              <p class="metric-label">Year wheel</p>
-              <p class="metric-caption">Each trained day, coloured by region. Size is volume.</p>
-              <div class="fitness-polar fitness-polar--clock">
-                <svg id="fitness-year-chart" class="mind-mood-chart fitness-polar__svg" viewBox="0 0 240 240" role="img" aria-label="Year of trained days"></svg>
-              </div>
+              <p class="metric-label">This year</p>
+              <p class="metric-caption" data-fitness="year-read">Sessions by month.</p>
+              <div id="fitness-year-chart" class="fitness-share-list" aria-label="Sessions by month"></div>
             </article>
             <article id="fitness-rep-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Rep mix</p>
