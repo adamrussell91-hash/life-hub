@@ -80,6 +80,24 @@ test('defaultLoadInverseLinks uses connected on the list when present', async ()
   assert.equal(loaded.groups[0].target, 'life:decision:aotfw-sources');
 });
 
+test('defaultLoadInverseLinks uses backfilled connected on a large archive without fetching pages', async () => {
+  const listed = Array.from({ length: 25 }, (_, i) => ({
+    id: `note-${i + 1}`,
+    title: `Note ${i + 1}`
+  }));
+  listed[0] = { id: 'page_ethics', title: 'Ethics', connected: ['page_training_pulse'] };
+  listed[1] = { id: 'page_training_pulse', title: 'Training pulse' };
+  const loaded = await defaultLoadInverseLinks({
+    page: { id: 'page_training_pulse' },
+    listPages: async () => listed,
+    fetchImpl: async () => {
+      throw new Error('must not hydrate pages when the manifest already has connected');
+    }
+  });
+  assert.equal(loaded.status, 'ready');
+  assert.deepEqual(loaded.links, [{ id: 'page_ethics', title: 'Ethics' }]);
+});
+
 test('defaultLoadInverseLinks hydrates page_aotfw on a large archive without connected rows', async () => {
   const listed = Array.from({ length: 25 }, (_, i) => ({
     id: `note-${i + 1}`,

@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  backfillManifestConnected,
   listKnowledgePages,
   parseQuizStore,
   saveKnowledgePage,
   unwrapGithubFileText
 } from '../../netlify/functions/_shared/knowledge-data.mjs';
+import { collectInverseLinks } from '../../netlify/functions/_shared/inverse-links.mjs';
 
 function memoryGithub(initial = {}) {
   const files = new Map(Object.entries(initial));
@@ -175,6 +177,26 @@ test('saveKnowledgePage rejects an invalid connected ref', async () => {
     ),
     error => error.status === 400 && /Invalid connected ref/.test(error.message)
   );
+});
+
+test('backfillManifestConnected copies nonempty connected from page files onto manifest rows', () => {
+  const rows = [
+    { id: 'page_ethics', title: 'Ethics' },
+    { id: 'page_training_pulse', title: 'Training pulse' },
+    { id: 'page_empty', title: 'Empty' }
+  ];
+  const pages = new Map([
+    ['page_ethics', { id: 'page_ethics', connected: ['page_training_pulse', 'teaching:unit:unit_aotfw'] }],
+    ['page_training_pulse', { id: 'page_training_pulse', connected: [] }],
+    ['page_empty', { id: 'page_empty' }]
+  ]);
+  const next = backfillManifestConnected(rows, pages);
+  assert.deepEqual(next[0].connected, ['page_training_pulse', 'teaching:unit:unit_aotfw']);
+  assert.equal(next[1].connected, undefined);
+  assert.equal(next[2].connected, undefined);
+  assert.deepEqual(collectInverseLinks(next, 'page_training_pulse'), [
+    { id: 'page_ethics', title: 'Ethics' }
+  ]);
 });
 
 test('parseQuizStore keeps page reviews and defaults a missing list', () => {
