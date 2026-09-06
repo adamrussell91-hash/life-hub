@@ -75,7 +75,7 @@ Default for board metrics, counts, targets, trends.
 - **Root:** `apps/life/js/app/chart-kit/area-line.js`
 - **API:** `buildAreaLine(series, { width = 320, height = 120, padding = 12, paddingBottom, valueKey = 'value', rollingAverage = 0, guideValue, yDomain = 'zero' \| 'padded' \| 'fixed', includeValues, min, max })`. Also `smoothLinePath`, `straightLinePath`, `smoothAreaPath`.
 - **Motion:** `animateAreaReveal(svg)` — SVG `[data-role="line"]`.
-- **Used on:** Nutrition, Bloods, Body, Central Node.
+- **Used on:** Nutrition, Bloods, Body, Central Node, Fitness e1RM form overlay.
 
 ### `animate` — shared motion
 
@@ -201,6 +201,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-06 | Fitness | e1RM vs recent form is one `area-line` overlay (each lift as % of its own peak) with a legend. Who is improving keeps `bump` but uses kit label size, fewer week ticks, and a legend instead of cramped right-side names. |
 | 2026-09-06 | Fitness | Polar “When you train”, monthly rhythm, e1RM scatter, and year wheel now use `columns` plus a one-line read. Chart hovers pin to the mark with `position: fixed`. |
 | 2026-09-05 | Fitness | Polar labels sit outside the plot with leader lines; week volume bars animate width, not height. No new catalog types. |
 | 2026-09-05 | grammar | Documented multi-representation visual grammar (time/state/selection/importance/relationship) + agent catalog rule. No new chart types. |

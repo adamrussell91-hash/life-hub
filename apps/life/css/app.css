@@ -1681,9 +1681,8 @@ main { max-width: 76rem; margin: 0 auto; }
 #fitness-dashboard .fitness-polar [data-role="grid-label"],
 #fitness-dashboard .fitness-polar [data-role="orbit-label"],
 #fitness-dashboard .fitness-polar [data-role="leader-label"],
-#fitness-dashboard #fitness-year-chart [data-role="angle-label"],
-#fitness-dashboard #fitness-e1rm-radial-chart [data-role="angle-label"],
-#fitness-dashboard #fitness-e1rm-radial-chart [data-role="grid-label"] {
+#fitness-dashboard .fitness-viz svg text,
+#fitness-dashboard .fitness-viz__label {
   font-size: var(--text-2xs);
   font-weight: 600;
   fill: var(--chart-label, var(--muted));
@@ -1693,12 +1692,6 @@ main { max-width: 76rem; margin: 0 auto; }
   stroke-width: 1;
   fill: none;
   vector-effect: non-scaling-stroke;
-}
-#fitness-dashboard #fitness-bump-chart .mind-bump__label,
-#fitness-dashboard #fitness-bump-chart .mind-bump__week {
-  font-size: 28px;
-  fill: var(--ink);
-  font-weight: 600;
 }
 #fitness-dashboard .fitness-polar__svg,
 #fitness-dashboard .fitness-viz__svg {
@@ -1725,8 +1718,8 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-viz__track { fill: var(--shore); }
 .fitness-viz__band { fill: color-mix(in srgb, var(--success) 18%, transparent); }
 .fitness-viz__label {
-  fill: var(--muted);
-  font-size: 12px;
+  fill: var(--chart-label, var(--muted));
+  font-size: var(--text-2xs);
 }
 .fitness-heat { display: grid; gap: var(--space-2); }
 .fitness-heat-row {
@@ -1752,7 +1745,6 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-spark-row:first-child { border-top: 0; }
 .fitness-spark { width: 100%; height: 1.75rem; }
 .fitness-share-row__track i[data-tone="up"] { background: var(--success); }
-.fitness-e1rm-band { display: grid; gap: var(--space-2); }
 #fitness-dashboard .metric-value {
   margin: 0;
   display: grid;

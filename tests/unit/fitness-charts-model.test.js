@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildFitnessModel } from '../../apps/life/js/app/fitness-model.js';
 import {
   acwrBand,
+  buildE1rmBands,
   buildE1rmVsBest,
   buildFitnessCharts,
   buildMonthRhythm,
@@ -171,6 +172,33 @@ test('monthRhythm counts sessions by week and names the longest gap between them
   assert.match(rhythm.read, /2 sessions in the last 30 days · longest gap 15 days/);
   assert.equal(rhythm.weeks.find(week => week.key === '2026-07-13').value, 1);
   assert.equal(rhythm.weeks.find(week => week.key === '2026-07-27').value, 1);
+});
+
+test('e1rmBands plot each lift as a percent of its own peak', () => {
+  const bands = buildE1rmBands([
+    {
+      name: 'Squat',
+      series: [
+        { date: '2026-07-01', value: 80 },
+        { date: '2026-07-15', value: 100 },
+        { date: '2026-07-30', value: 90 }
+      ]
+    },
+    {
+      name: 'Curl',
+      series: [
+        { date: '2026-07-08', value: 20 },
+        { date: '2026-07-22', value: 20 }
+      ]
+    }
+  ]);
+  const squat = bands.find(lift => lift.name === 'Squat');
+  const curl = bands.find(lift => lift.name === 'Curl');
+  assert.equal(squat.peak, 100);
+  assert.deepEqual(squat.pctSeries.map(point => point.value), [80, 100, 90]);
+  assert.deepEqual(squat.pctSeries.map(point => point.kg), [80, 100, 90]);
+  assert.deepEqual(curl.pctSeries.map(point => point.value), [100, 100]);
+  assert.equal(curl.peak, 20);
 });
 
 test('e1rmVsBest ranks latest estimate against each lift’s peak', () => {

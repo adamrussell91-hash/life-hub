@@ -573,18 +573,24 @@ function buildPriorRegionVolume(events, date) {
   return buildRegionVolume(completedRecords(events, priorFrom, priorTo));
 }
 
-function buildE1rmBands(trends) {
+export function buildE1rmBands(trends) {
   return (trends ?? []).map(lift => {
     const values = lift.series.map(point => point.value);
+    const peak = Math.max(...values);
     const bandLow = Math.min(...values);
-    const bandHigh = Math.max(...values);
     const latest = values.at(-1);
     return {
       ...lift,
+      peak,
       bandLow,
-      bandHigh,
-      outside: latest < bandLow || latest > bandHigh ? latest > bandHigh : false,
-      tone: latest > bandHigh ? 'up' : latest < bandLow ? 'down' : 'same'
+      bandHigh: peak,
+      pctSeries: lift.series.map(point => ({
+        date: point.date,
+        value: peak > 0 ? Math.round((point.value / peak) * 100) : 0,
+        kg: point.value
+      })),
+      outside: latest < bandLow || latest > peak ? latest > peak : false,
+      tone: latest > peak ? 'up' : latest < bandLow ? 'down' : 'same'
     };
   }).filter(lift => lift.series.length >= 2);
 }

@@ -222,12 +222,24 @@ function renderE1rmBest(root, best) {
   })), ensureTip(root, card));
 }
 
+function rankTickShown(tick, ranks) {
+  const last = ranks.at(-1)?.rank;
+  if (tick.rank === 1 || tick.rank === last) return true;
+  return tick.rank === Math.round((1 + last) / 2);
+}
+
 function renderBump(root, ranks) {
   const card = showCard(root, '#fitness-bump-card', ranks?.length >= 2);
   const svg = root.querySelector('#fitness-bump-chart');
   if (!card || !svg || typeof root.createElementNS !== 'function') return;
   const themes = [...new Set(ranks.flatMap(row => Object.keys(row.rankByTheme)))];
-  const chart = buildBumpChart({ ranks, themes });
+  const chart = buildBumpChart({
+    ranks,
+    themes,
+    width: 320,
+    height: 200,
+    pad: { top: 12, right: 16, bottom: 28, left: 24 }
+  });
   if (chart.empty) {
     setHidden(card, true);
     return;
@@ -236,11 +248,12 @@ function renderBump(root, ranks) {
   svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
   const tip = ensureTip(root, card);
   for (const tick of chart.ranks ?? []) {
+    if (!rankTickShown(tick, chart.ranks)) continue;
     const label = createSvg(root, 'text');
-    label.setAttribute('x', String((chart.pad?.left ?? 52) - 12));
-    label.setAttribute('y', String(tick.y + 4));
+    label.setAttribute('x', String((chart.pad?.left ?? 24) - 8));
+    label.setAttribute('y', String(tick.y + 3));
     label.setAttribute('text-anchor', 'end');
-    label.setAttribute('class', 'mind-bump__week');
+    label.setAttribute('class', 'fitness-viz__label');
     label.textContent = String(tick.rank);
     svg.append(label);
   }
@@ -248,10 +261,10 @@ function renderBump(root, ranks) {
     if (!tick.show) continue;
     const label = createSvg(root, 'text');
     label.setAttribute('x', String(tick.x));
-    label.setAttribute('y', String(chart.height - 16));
+    label.setAttribute('y', String(chart.height - 10));
     label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('class', 'mind-bump__week');
-    label.textContent = tick.label;
+    label.setAttribute('class', 'fitness-viz__label');
+    label.textContent = formatDisplayDate(tick.week).slice(0, 5);
     svg.append(label);
   }
   for (const line of chart.lines ?? []) {
@@ -262,18 +275,12 @@ function renderBump(root, ranks) {
     path.setAttribute('stroke-width', '2');
     svg.append(path);
     const last = line.points.at(-1);
-    const label = createSvg(root, 'text');
-    label.setAttribute('x', String((last?.x ?? 0) + 8));
-    label.setAttribute('y', String(line.labelY));
-    label.setAttribute('class', 'mind-bump__label');
-    label.textContent = line.key;
     bindTip(path, tip, `${line.key} · rank ${last?.rank ?? ''}`);
-    svg.append(label);
     for (const point of line.points ?? []) {
       const dot = namedDot(root, {
         cx: point.x,
         cy: point.y,
-        r: 5,
+        r: 4,
         fill: line.colour,
         className: 'mind-bump__dot'
       });
@@ -282,6 +289,10 @@ function renderBump(root, ranks) {
       svg.append(dot);
     }
   }
+  paintLegend(root, card, (chart.lines ?? []).map(line => ({
+    label: line.key,
+    swatch: line.colour
+  })));
   animateAreaReveal(svg);
 }
 
@@ -454,82 +465,127 @@ function renderGauge(root, cardSelector, svgSelector, value, target, label) {
   }
 }
 
+function focusRecentDay(root, date) {
+  const recent = root.querySelector('#fitness-recent');
+  recent?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const rows = [...root.querySelectorAll('.fitness-recent-row')];
+  const matches = matchFitnessRecentRows(
+    rows.map((row) => ({ date: row.dataset.date })),
+    date
+  );
+  rows.forEach((row, index) => row.classList.toggle('is-focused', matches[index] === true));
+}
+
+function bindRecentFocus(dot, root, date) {
+  if (!dot || !date) return;
+  dot.style.cursor = 'pointer';
+  dot.setAttribute('role', 'button');
+  dot.tabIndex = 0;
+  const selectDay = () => focusRecentDay(root, date);
+  dot.addEventListener('click', selectDay);
+  dot.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      selectDay();
+    }
+  });
+}
+
+function overlayLayout(lifts) {
+  const dates = [...new Set(lifts.flatMap(lift => (lift.pctSeries ?? []).map(point => point.date)))].sort();
+  const pcts = lifts.flatMap(lift => (lift.pctSeries ?? []).map(point => point.value)).filter(Number.isFinite);
+  const width = 320;
+  const height = 160;
+  const pad = { top: 12, right: 12, bottom: 24, left: 28 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const rawMin = pcts.length ? Math.min(...pcts) : 0;
+  const rawMax = pcts.length ? Math.max(...pcts) : 100;
+  const padY = Math.max((rawMax - rawMin) * 0.15, rawMax === rawMin ? 4 : 0);
+  const min = rawMin - padY;
+  const max = rawMax + padY;
+  const span = max - min || 1;
+  return {
+    width,
+    height,
+    pad,
+    dates,
+    pctMin: rawMin,
+    pctMax: rawMax,
+    xAt: date => (
+      dates.length <= 1
+        ? pad.left + plotW / 2
+        : pad.left + (dates.indexOf(date) / (dates.length - 1)) * plotW
+    ),
+    yAt: value => pad.top + ((max - value) / span) * plotH
+  };
+}
+
 function renderE1rmBands(root, lifts) {
   const card = showCard(root, '#fitness-e1rm-card', lifts?.length >= 1);
-  const host = root.querySelector('#fitness-e1rm-list');
-  if (!card || !host) return;
-  host.replaceChildren();
-  for (const lift of lifts) {
-    const block = root.createElement('div');
-    block.className = 'fitness-e1rm-band';
-    const title = root.createElement('p');
-    title.className = 'metric-caption';
-    title.textContent = `${lift.name} · ${lift.current.toFixed(1)} kg`;
-    block.append(title);
-    if (typeof root.createElementNS === 'function') {
-      const svg = createSvg(root, 'svg');
-      svg.setAttribute('class', 'line-chart line-chart--dense');
-      const chart = buildAreaLine(lift.series, {
-        width: 320,
-        height: 56,
-        padding: 10,
-        paddingBottom: 8,
-        yDomain: 'fixed',
-        min: lift.bandLow,
-        max: lift.bandHigh
-      });
-      svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
-      const band = createSvg(root, 'rect');
-      band.setAttribute('x', '10');
-      band.setAttribute('y', String(chart.scaleY(lift.bandHigh)));
-      band.setAttribute('width', '300');
-      band.setAttribute('height', String(Math.max(4, chart.scaleY(lift.bandLow) - chart.scaleY(lift.bandHigh))));
-      band.setAttribute('class', 'fitness-viz__band');
-      const line = createSvg(root, 'path');
-      line.setAttribute('data-role', 'line');
-      line.setAttribute('d', straightLinePath(chart.points));
-      line.setAttribute('fill', 'none');
-      line.setAttribute('stroke', lift.tone === 'up' ? 'var(--success)' : lift.tone === 'down' ? 'var(--danger)' : 'var(--wave)');
-      svg.append(band, line);
-      const tip = ensureTip(root, card);
-      for (const point of chart.points ?? []) {
-        const dot = namedDot(root, {
-          cx: point.x,
-          cy: point.y,
-          r: 4,
-          fill: lift.tone === 'up' ? 'var(--success)' : lift.tone === 'down' ? 'var(--danger)' : 'var(--wave)'
-        });
-        if (!dot) continue;
-        bindTip(dot, tip, `${lift.name} · ${formatDisplayDate(point.date)} · ${Number(point.value).toFixed(1)} kg`);
-        if (point.date) {
-          dot.style.cursor = 'pointer';
-          dot.setAttribute('role', 'button');
-          dot.tabIndex = 0;
-          const selectDay = () => {
-            const recent = root.querySelector('#fitness-recent');
-            recent?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            const rows = [...root.querySelectorAll('.fitness-recent-row')];
-            const matches = matchFitnessRecentRows(
-              rows.map((row) => ({ date: row.dataset.date })),
-              point.date
-            );
-            rows.forEach((row, index) => row.classList.toggle('is-focused', matches[index] === true));
-          };
-          dot.addEventListener('click', selectDay);
-          dot.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              selectDay();
-            }
-          });
-        }
-        svg.append(dot);
-      }
-      block.append(svg);
-      animateAreaReveal(svg);
-    }
-    host.append(block);
+  const svg = root.querySelector('#fitness-e1rm-chart');
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  const layout = overlayLayout(lifts);
+  if (!layout.dates.length) {
+    setHidden(card, true);
+    return;
   }
+  clearSvg(svg);
+  svg.setAttribute('viewBox', `0 0 ${layout.width} ${layout.height}`);
+  const tip = ensureTip(root, card);
+  const axis = [
+    { x: layout.pad.left - 6, y: layout.yAt(layout.pctMax) + 3, anchor: 'end', text: `${layout.pctMax}%` },
+    { x: layout.pad.left - 6, y: layout.yAt(layout.pctMin) + 3, anchor: 'end', text: `${layout.pctMin}%` },
+    { x: layout.xAt(layout.dates[0]), y: layout.height - 8, anchor: 'start', text: formatDisplayDate(layout.dates[0]).slice(0, 5) },
+    { x: layout.xAt(layout.dates.at(-1)), y: layout.height - 8, anchor: 'end', text: formatDisplayDate(layout.dates.at(-1)).slice(0, 5) }
+  ];
+  if (layout.dates.length > 2) {
+    const mid = layout.dates[Math.floor(layout.dates.length / 2)];
+    axis.push({
+      x: layout.xAt(mid),
+      y: layout.height - 8,
+      anchor: 'middle',
+      text: formatDisplayDate(mid).slice(0, 5)
+    });
+  }
+  for (const tick of axis) {
+    const label = createSvg(root, 'text');
+    label.setAttribute('x', String(tick.x));
+    label.setAttribute('y', String(tick.y));
+    label.setAttribute('text-anchor', tick.anchor);
+    label.setAttribute('class', 'fitness-viz__label');
+    label.textContent = tick.text;
+    svg.append(label);
+  }
+  for (const [index, lift] of lifts.entries()) {
+    const colour = CLINICAL_CHART_SLOTS[index % CLINICAL_CHART_SLOTS.length];
+    const points = (lift.pctSeries ?? []).map(point => ({
+      x: layout.xAt(point.date),
+      y: layout.yAt(point.value),
+      date: point.date,
+      value: point.value,
+      kg: point.kg
+    }));
+    const line = createSvg(root, 'path');
+    line.setAttribute('data-role', 'line');
+    line.setAttribute('d', straightLinePath(points));
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', colour);
+    line.setAttribute('stroke-width', '2');
+    svg.append(line);
+    for (const point of points) {
+      const dot = namedDot(root, { cx: point.x, cy: point.y, r: 4, fill: colour });
+      if (!dot) continue;
+      bindTip(dot, tip, `${lift.name} · ${formatDisplayDate(point.date)} · ${Number(point.kg).toFixed(1)} kg · ${point.value}% of best`);
+      bindRecentFocus(dot, root, point.date);
+      svg.append(dot);
+    }
+  }
+  paintLegend(root, card, lifts.map((lift, index) => ({
+    label: lift.name,
+    swatch: CLINICAL_CHART_SLOTS[index % CLINICAL_CHART_SLOTS.length]
+  })));
+  animateAreaReveal(svg);
 }
 
 function renderPill(root, gauge) {
