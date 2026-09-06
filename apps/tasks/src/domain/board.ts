@@ -1,3 +1,4 @@
+import { stringList } from '@/domain/task-shape';
 import type { Task } from '@/schemas/task';
 
 export type BoardColumnId = 'todo' | 'doing' | 'blocked' | 'done';
@@ -17,7 +18,7 @@ export const BOARD_COLUMNS: readonly BoardColumn[] = [
 
 export function isBlocked(task: Task, byId: Map<string, Task>): boolean {
   if (task.status === 'done' || task.status === 'dead') return false;
-  return task.depends_on.some((id) => {
+  return stringList(task.depends_on).some((id) => {
     const dep = byId.get(id);
     return !dep || dep.status !== 'done';
   });

@@ -25,3 +25,14 @@ export function hubUtilitiesActionsHtml(): string {
   const utilities = hubUtilitiesHtml();
   return utilities ? `<div class="page-header__actions">${utilities}</div>` : "";
 }
+
+const HUB_MARK_SRC = "./icons/knowledge.svg";
+
+/** Teaching / Knowledge / Tasks put the tile left of the page title. Life never does. */
+export function hubMarkHtml(): string {
+  return `<img class="hub-mark" src="${HUB_MARK_SRC}" alt="" width="32" height="32" />`;
+}
+
+export function titleRowHtml(title: string): string {
+  return `<div class="page-header__title-row">${hubMarkHtml()}<h1 class="page-header__title hub-kinetic">${title}</h1></div>`;
+}

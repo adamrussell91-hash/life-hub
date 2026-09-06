@@ -1,3 +1,4 @@
+import { normalizeTask } from '@/domain/task-shape';
 import type { Task } from '@/schemas/task';
 
 const listed = new Map<string, Task>();
@@ -20,7 +21,8 @@ export function mergeListedTasks(fetched: Task[]): Task[] {
   for (const task of fetched) {
     if (deleted.has(task.id)) continue;
     const current = listed.get(task.id);
-    listed.set(task.id, current ? pickNewer(task, current) : task);
+    const incoming = normalizeTask(task);
+    listed.set(task.id, current ? pickNewer(incoming, current) : incoming);
   }
   return [...listed.values()].filter((task) => !deleted.has(task.id));
 }
@@ -28,7 +30,7 @@ export function mergeListedTasks(fetched: Task[]): Task[] {
 export function rememberCreatedTask(task: Task): void {
   deleted.delete(task.id);
   tombstones.delete(task.id);
-  listed.set(task.id, task);
+  listed.set(task.id, normalizeTask(task));
 }
 
 export function rememberUpdatedTask(task: Task): void {

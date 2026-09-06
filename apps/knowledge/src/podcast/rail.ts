@@ -10,7 +10,7 @@ import {
 import { topicKeywords } from "../archive/keywordGraph";
 import { formatDisplayDate } from "../../design-kit/js/format-display-date.js";
 import { escapeHtml } from "../lib/dom";
-import { hubUtilitiesActionsHtml } from "../lib/hubChrome";
+import { hubUtilitiesActionsHtml, titleRowHtml } from "../lib/hubChrome";
 import type { ResearchScope } from "../research/scope";
 import { playerHtml, bindPlayer, resetPlayer } from "./playerView";
 import {
@@ -579,7 +579,7 @@ export function renderPodcastRail(host: PodcastRailHost) {
     <header class="topbar page-header">
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">Professor Clementine Haig &amp; Ann O’Tation</p>
-        <h1 class="page-header__title hub-kinetic">Podcast</h1>
+        ${titleRowHtml("Podcast")}
       </div>
       ${hubUtilitiesActionsHtml()}
     </header>

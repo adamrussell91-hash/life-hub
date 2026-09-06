@@ -366,7 +366,7 @@ let liveGraph: LiveGraph | null = null;
 
 /** Graph rail page — readable blocker map plus workstream force layout. */
 export async function renderGraphView(canvas: HTMLElement): Promise<void> {
-  if (liveGraph && liveGraph.canvas === canvas && canvas.querySelector('.graph-host')) {
+  if (liveGraph && liveGraph.canvas === canvas && canvas.querySelector('.graph-host > .graph-stage')) {
     liveGraph.setMode(hashGraphMode());
     return;
   }

@@ -93,6 +93,7 @@ test('Tasks list returns stored records the remounted SPA can render', async () 
     parent_project_id: 'proj_1',
     tags: ['marking'],
     depends_on: [],
+    attachments: [],
     kind: 'task',
     bucket: 'active'
   };
@@ -107,6 +108,27 @@ test('Tasks list returns stored records the remounted SPA can render', async () 
   const response = await handler(request({ origin: 'https://tasks-hub.adam-russell.com' }));
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).data.tasks, [stored]);
+});
+
+test('Tasks list fills missing depends_on and tags so Board and Graph can iterate them', async () => {
+  const stored = {
+    id: 'task-dirty',
+    title: 'Breakfast'
+  };
+  const handler = createTasksHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => memoryStore({
+      'tasks/_index': ['task-dirty'],
+      'tasks/task-dirty': stored
+    })
+  });
+  const response = await handler(request({ origin: 'https://life-hub.adam-russell.com' }));
+  assert.equal(response.status, 200);
+  const [task] = (await response.json()).data.tasks;
+  assert.deepEqual(task.depends_on, []);
+  assert.deepEqual(task.tags, []);
+  assert.deepEqual(task.attachments, []);
 });
 
 test('Tasks POST/PATCH/DELETE use the Life session and keep the index', async () => {

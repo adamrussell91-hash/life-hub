@@ -59,6 +59,11 @@ describe('board columns', () => {
     expect(columnForTask(started, byId)).toBe('doing');
     expect(columnForTask(baseTask({ id: 'done', title: 'Done', status: 'done' }), byId)).toBe('done');
   });
+
+  it('treats a missing depends_on as unblocked', () => {
+    const dirty = { ...baseTask({ id: 'raw', title: 'Breakfast' }), depends_on: undefined } as Task;
+    expect(columnForTask(dirty, new Map([[dirty.id, dirty]]))).toBe('todo');
+  });
 });
 
 function stubRect(el: Element, rect: Partial<DOMRect>): void {

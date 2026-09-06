@@ -18,6 +18,7 @@ export {
   CoverSchema,
   CoverPatchSchema,
   resolveCoverUrl,
+  rewriteLegacyApiHost,
   coverAltText,
   type Cover
 } from './cover';

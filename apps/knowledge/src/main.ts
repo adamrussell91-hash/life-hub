@@ -43,7 +43,7 @@ import {
 } from "./capture";
 import type { ResearchFinding } from "./research/schema";
 import { escapeHtml, showToast } from "./lib/dom";
-import { hubUtilitiesHtml } from "./lib/hubChrome";
+import { hubUtilitiesHtml, titleRowHtml } from "./lib/hubChrome";
 import { bindKeyboardInset } from "./lib/keyboardInset";
 import { renderMarkdown } from "./lib/markdown";
 import { mountMarkdownTiptap, type MarkdownTiptapHandle } from "./compose/markdown-tiptap";
@@ -358,9 +358,7 @@ function pageHeader(
       ${portrait}
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">${eyebrow}</p>
-        <div class="page-header__title-row">
-          <h1 class="page-header__title hub-kinetic">${title}</h1>
-        </div>
+        ${titleRowHtml(title)}
       </div>
       ${actions}
     </header>`;
