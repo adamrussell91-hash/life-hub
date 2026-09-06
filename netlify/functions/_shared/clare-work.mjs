@@ -115,7 +115,7 @@ export function formatClareJobsForPrompt() {
   return [
     'Clare workbench — 40 jobs you can actually do from this chat. Use the named tool. Do not say you cannot do these.',
     'Internet research: web_search finds pages; fetch_url opens a specific URL; research_topic cites sources; lookup_au_dates / lookup_place / compare_options for dates, venues, and options.',
-    'Writes (create/update/complete/reschedule/split/trash/move/estimate/tag/waiting-on/research notes/batch/pin/create project) go through clare_mutate and wait for Adam to Confirm. Never claim a write landed until the tool returns awaiting_confirm or applied.',
+    'Prefer create_task / update_task for ordinary capture and edits. Other writes (complete/reschedule/split/trash/move/estimate/tag/waiting-on/research notes/batch/pin/create project) go through clare_mutate. Writes wait for Adam to Confirm. Never claim a write landed until the tool returns awaiting_confirm or applied.',
     'You cannot send email. draft_comms writes a draft only.',
     ...CLARE_JOBS.map(item => `${item.id}. ${item.job} — ${item.tool}`)
   ].join('\n');
@@ -202,7 +202,7 @@ export function clareWorkSchemas() {
     tool('check_clock', 'Read Adam\'s current calendar day and local time in the hub timezone. Never invent a date.', {
       reason: { type: 'string' }
     }),
-    tool('parse_dump', 'Parse a brain dump into distinct items with domain, due date, and duplicate flags. Does not write — follow with clare_mutate create_task after Confirm.', {
+    tool('parse_dump', 'Parse a brain dump into distinct items with domain, due date, and duplicate flags. Does not write — follow with create_task after Confirm.', {
       text: { type: 'string' },
       domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] }
     }, ['text']),
