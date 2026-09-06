@@ -102,6 +102,18 @@ export function aiJobsInboxKey() {
   return 'meta/ai_jobs_inbox';
 }
 
+export function versionKey(kind, parentId, revision) {
+  return `versions/${kind}/${parentId}/${revision}`;
+}
+
+export function versionIndexKey(kind, parentId) {
+  return `versions/${kind}/${parentId}/_index`;
+}
+
+export function versionsPrefix(kind, parentId) {
+  return `versions/${kind}/${parentId}/`;
+}
+
 export function scheduleAnchorKey() {
   return 'meta/schedule_anchor_date';
 }
