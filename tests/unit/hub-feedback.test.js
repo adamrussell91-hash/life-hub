@@ -173,6 +173,20 @@ test('kit sheet and snippets exist and chrome loads them', async () => {
   assert.match(css, /chat-prose\.css/);
   assert.match(prose, /\.chat-message--assistant \.chat-message__body/);
   assert.match(prose, /\.chat-md-h1/);
+  assert.match(
+    prose,
+    /\.chat-message--assistant \.chat-message__body,\s*\.coach-msg__body\s*\{[^}]*font-size:\s*var\(--text-base\)/,
+    'chat bubbles use Messenger-density body text, not reading-copy --text-md'
+  );
+  assert.match(
+    prose,
+    /\.chat-message--assistant \.chat-message__body,\s*\.coach-msg__body\s*\{[^}]*line-height:\s*var\(--leading-snug\)/,
+    'chat bubbles use snug leading, not article --leading-normal'
+  );
+  assert.doesNotMatch(
+    prose,
+    /\.chat-message--assistant \.chat-message__body,\s*\.coach-msg__body\s*\{[^}]*font-size:\s*var\(--text-md\)/
+  );
   assert.match(chrome, /hub-interactions\.css/);
   assert.match(snippet, /hub-toast/);
   assert.match(agents, /hub-feedback\.js/);
