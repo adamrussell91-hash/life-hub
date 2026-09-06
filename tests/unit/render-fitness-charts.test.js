@@ -65,31 +65,33 @@ function chartRoot() {
   };
 }
 
-test('clock and orbit paint hour labels, legends, and hover tips', () => {
+test('when-you-train paints day-part counts and a typical-time caption', () => {
   const root = chartRoot();
   renderFitnessCharts(root, {
-    clockPoints: [
-      { date: '2026-09-01', time: '07:10', region: 'chest', colour: 'var(--wave)', recency: 1, title: 'Chest' },
-      { date: '2026-09-03', time: '18:20', region: 'back', colour: 'var(--marine)', recency: 0.4, title: 'Back' }
-    ],
+    trainWhen: {
+      count: 4,
+      typicalTime: '18:40',
+      typicalBand: 'evening',
+      read: 'Usually evenings, around 18:40 · mostly Tue',
+      buckets: [
+        { key: 'morning', label: 'Morning', value: 1 },
+        { key: 'afternoon', label: 'Afternoon', value: 0 },
+        { key: 'evening', label: 'Evening', value: 3 },
+        { key: 'night', label: 'Night', value: 0 }
+      ]
+    },
     orbitDays: [
       { date: '2026-08-20', volume: 1200, dayType: 'workout_30', colour: 'var(--wave)' },
       { date: '2026-09-01', volume: 2400, dayType: 'workout_45_60', colour: 'var(--marine)' }
     ]
   });
 
+  assert.equal(root.ensure('[data-fitness="when-read"]').textContent, 'Usually evenings, around 18:40 · mostly Tue');
   const clock = texts(root.ensure('#fitness-clock-chart'));
-  assert.ok(clock.includes('00:00'));
-  assert.ok(clock.includes('12:00'));
-  assert.ok(clock.includes('Older'));
-  assert.ok(clock.includes('Newer'));
-  let clockLeaders = 0;
-  walk(root.ensure('#fitness-clock-chart'), node => {
-    if (node.attributes?.['data-role'] === 'leader') clockLeaders += 1;
-  });
-  assert.ok(clockLeaders >= 6, 'clock hour and recency labels use leader lines');
-  const clockLegend = texts(root.ensure('#fitness-clock-card'));
-  assert.ok(clockLegend.some(text => /Chest|Back/.test(text)));
+  assert.ok(clock.includes('Morning'));
+  assert.ok(clock.includes('Evening'));
+  assert.ok(clock.includes('3'));
+  assert.equal(root.ensure('#fitness-clock-card').attributes.hidden, undefined);
   assert.ok(root.ensure('#fitness-clock-card').children.some(node => node.dataset?.role === 'fitness-tip'));
 
   const orbit = texts(root.ensure('#fitness-orbit-chart'));

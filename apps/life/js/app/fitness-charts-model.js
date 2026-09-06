@@ -1,5 +1,6 @@
-import { addCalendarDays, enumerateDateKeys, getSydneyWeekStart } from '../core/time.js';
+import { addCalendarDays, enumerateDateKeys, formatWeekday, getSydneyWeekStart } from '../core/time.js';
 import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
+import { minutesFromTime } from './chart-kit/polar-clock.js';
 import {
   REGION_KEYS,
   REGION_LABELS,
@@ -42,6 +43,12 @@ const DAY_TYPE_COLOURS = {
   workout_30: CLINICAL_CHART_SLOTS[0],
   workout_45_60: CLINICAL_CHART_SLOTS[1]
 };
+const TRAIN_BANDS = [
+  { key: 'morning', label: 'Morning', adverb: 'mornings' },
+  { key: 'afternoon', label: 'Afternoon', adverb: 'afternoons' },
+  { key: 'evening', label: 'Evening', adverb: 'evenings' },
+  { key: 'night', label: 'Night', adverb: 'nights' }
+];
 const PUSH_NAME = /press|dip|push|fly|pec|bench/i;
 const PULL_NAME = /row|pull|curl|lat|chin/i;
 
@@ -304,23 +311,81 @@ export function acwrBand(ratio) {
   return 'medium';
 }
 
-function buildClockPoints(records) {
-  const dated = records.filter(record => record.time && minutesFromClock(record.time) != null);
-  if (dated.length < 2) return [];
-  const newest = dated.length - 1;
-  return dated.map((record, index) => ({
-    date: record.date,
-    time: record.time,
-    title: String(record.title ?? '').trim() || 'Session',
-    region: primaryRegion(record),
-    colour: REGION_COLOURS[primaryRegion(record)] ?? CLINICAL_CHART_SLOTS[7],
-    recency: newest === 0 ? 1 : index / newest
-  }));
+function trainBandForMinutes(minutes) {
+  if (minutes >= 5 * 60 && minutes < 12 * 60) return 'morning';
+  if (minutes >= 12 * 60 && minutes < 17 * 60) return 'afternoon';
+  if (minutes >= 17 * 60 && minutes < 21 * 60) return 'evening';
+  return 'night';
 }
 
-function minutesFromClock(time) {
-  const match = /^(\d{1,2}):(\d{2})/.exec(String(time ?? ''));
-  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+function formatClockMinutes(minutes) {
+  const clamped = ((Math.round(minutes) % 1440) + 1440) % 1440;
+  const hour = Math.floor(clamped / 60);
+  const minute = clamped % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function medianMinutes(values) {
+  // ponytail: linear median; circular midnight wrap is the upgrade if night sessions dominate.
+  const sorted = [...values].sort((left, right) => left - right);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+function weekdayHabit(records) {
+  const counts = new Map();
+  for (const record of records) {
+    const day = formatWeekday(record.date);
+    if (!day) continue;
+    counts.set(day, (counts.get(day) ?? 0) + 1);
+  }
+  const ranked = [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+  if (!ranked.length || ranked[0][1] < 2) return '';
+  const short = day => day.slice(0, 3);
+  const [topDay, topCount] = ranked[0];
+  const second = ranked[1];
+  if (second && second[1] >= 2 && second[1] >= topCount - 1) {
+    return `mostly ${short(topDay)} and ${short(second[0])}`;
+  }
+  if (topCount / records.length >= 0.4) return `mostly ${short(topDay)}`;
+  return '';
+}
+
+function trainWhenRead(buckets, typicalTime, weekday) {
+  const total = buckets.reduce((sum, band) => sum + band.value, 0);
+  const ranked = [...buckets].sort((left, right) => right.value - left.value);
+  const top = ranked[0];
+  const second = ranked[1];
+  const adverb = key => TRAIN_BANDS.find(band => band.key === key)?.adverb ?? key;
+  let head = `Typical start ${typicalTime}`;
+  if (top && total && top.value / total > 0.5) {
+    head = `Usually ${adverb(top.key)}, around ${typicalTime}`;
+  } else if (top && second?.value > 0 && (top.value + second.value) / total >= 0.75) {
+    head = `Split ${adverb(top.key)} and ${adverb(second.key)} · typical start ${typicalTime}`;
+  }
+  return weekday ? `${head} · ${weekday}` : head;
+}
+
+export function buildTrainWhen(records) {
+  const timed = (records ?? []).flatMap(record => {
+    const minutes = minutesFromTime(record?.time);
+    if (minutes == null) return [];
+    return [{ ...record, minutes, band: trainBandForMinutes(minutes) }];
+  });
+  if (timed.length < 2) return null;
+  const buckets = TRAIN_BANDS.map(band => ({
+    key: band.key,
+    label: band.label,
+    value: timed.filter(record => record.band === band.key).length
+  }));
+  const typicalTime = formatClockMinutes(medianMinutes(timed.map(record => record.minutes)));
+  return {
+    count: timed.length,
+    typicalTime,
+    typicalBand: [...buckets].sort((left, right) => right.value - left.value)[0]?.key ?? null,
+    buckets,
+    read: trainWhenRead(buckets, typicalTime, weekdayHabit(timed))
+  };
 }
 
 function buildOrbitDays(records, windowDates) {
@@ -635,7 +700,7 @@ export function buildFitnessCharts({
       readingFromSeries(hrSeries, { key: 'hr', label: 'Heart rate', unit: 'bpm' })
     ].filter(Boolean),
     painBySite: buildPainBySite(records),
-    clockPoints: buildClockPoints(history),
+    trainWhen: buildTrainWhen(history),
     orbitDays: buildOrbitDays(records, windowDates),
     e1rmRadial: buildE1rmRadial(buildE1rmTrends(history)),
     bumpRanks: buildBumpRanks(buildE1rmTrends(history), date),
