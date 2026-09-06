@@ -105,9 +105,13 @@ function searchHaystack(event) {
     Array.isArray(r.pattern_tags) ? r.pattern_tags.join(' ') : '',
     Array.isArray(r.tags) ? r.tags.join(' ') : '',
     r.mood,
+    r.mood_score,
+    r.energy,
+    r.notes,
     r.system_note,
     r.highlights,
-    r.challenges
+    r.challenges,
+    typeof event?.body === 'string' ? event.body : ''
   ];
   return parts.filter(Boolean).join(' ').toLowerCase();
 }
