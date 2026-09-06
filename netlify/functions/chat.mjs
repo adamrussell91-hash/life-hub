@@ -87,11 +87,16 @@ import {
 import {
   attachWorkoutNotes,
   combineSessionAdherenceDays,
+  compareWorkoutWindows,
   daysSinceLastCompletedWorkout,
   formatRecentWorkoutsForPrompt,
+  formatWorkoutWindowCompareForPrompt,
   getLastWorkout,
+  mergeWorkoutEntries,
   searchWorkoutRecords,
-  selectRecentWorkoutEntries
+  selectRecentWorkoutEntries,
+  selectWorkoutEntriesInRange,
+  workoutWindowBounds
 } from './_shared/workout-history.mjs';
 import {
   applySaveSkincareLibraryEntry,
@@ -430,6 +435,7 @@ export function createChatHandler({
         let skincareMembershipSha;
         let workoutTemplates = '';
         let lastWorkouts = '';
+        let workoutWindowCompare = '';
         let workoutRecords = [];
         let bodyState = '';
         let treatmentState = '';
@@ -498,9 +504,17 @@ export function createChatHandler({
           const templateEntries = needsWorkoutTemplates
             ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
             : [];
-          const chadwickWorkoutEntries = needsWorkoutHistory
+          const chadwickRecentEntries = needsWorkoutHistory
             ? selectRecentWorkoutEntries(current.tree)
             : [];
+          const workoutCompareBounds = slug === 'chadwick' ? workoutWindowBounds(today) : null;
+          const workoutCompareEntries = workoutCompareBounds
+            ? selectWorkoutEntriesInRange(current.tree, {
+              from: workoutCompareBounds.previousFrom,
+              to: workoutCompareBounds.currentTo
+            })
+            : [];
+          const chadwickWorkoutEntries = mergeWorkoutEntries(chadwickRecentEntries, workoutCompareEntries);
           // Chadwick's eyes on Adam's body: a bounded read (latest 1-2 per type from the
           // already-fetched tree, never a history scan) -- see body-state.mjs.
           const bodyEntries = needsBodyState
@@ -652,6 +666,11 @@ export function createChatHandler({
           if (needsWorkoutHistory) {
             workoutRecords = parseHammondFitnessRecords(chadwickWorkoutEntries, chadwickWorkoutBlobs);
             lastWorkouts = formatRecentWorkoutsForPrompt(workoutRecords);
+            if (slug === 'chadwick') {
+              workoutWindowCompare = formatWorkoutWindowCompareForPrompt(
+                compareWorkoutWindows(workoutRecords, today)
+              );
+            }
             sessionAdherenceDays = combineSessionAdherenceDays(
               daysSinceLastCompletedWorkout(workoutRecords, today),
               sessionAdherenceDays
@@ -895,6 +914,7 @@ export function createChatHandler({
           skincareMembershipSha = undefined;
           workoutTemplates = '';
           lastWorkouts = '';
+          workoutWindowCompare = '';
           workoutRecords = [];
           bodyState = '';
           treatmentState = '';
@@ -985,6 +1005,7 @@ export function createChatHandler({
           hammondAuditContract,
           workoutTemplates,
           lastWorkouts,
+          workoutWindowCompare,
           exerciseLibrary,
           skincareRoutines,
           treatmentState,
@@ -1118,6 +1139,10 @@ export function createChatHandler({
               if (event.name === 'search_workout_records') {
                 send({ type: 'status', text: 'Searching workout history…' });
                 return JSON.stringify(searchWorkoutRecords(workoutRecords, event.input ?? {}));
+              }
+              if (event.name === 'compare_workout_windows') {
+                send({ type: 'status', text: 'Comparing training windows…' });
+                return JSON.stringify(compareWorkoutWindows(workoutRecords, today));
               }
               if (event.name === 'search_exercise_library') {
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});

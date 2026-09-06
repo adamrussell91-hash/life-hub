@@ -282,6 +282,31 @@ test('chadwick prompt omits the recent-sessions block when empty', () => {
   assert.doesNotMatch(prompt, /Recent sessions/);
 });
 
+test('chadwick prompt includes computed 8-week training volume and forbids guessing it', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    workoutWindowCompare: [
+      'Computed training volume (do not re-count or estimate — this is the number):',
+      'Last 8 weeks (2026-06-17 to 2026-08-11): 12 completed workouts.',
+      'Previous 8 weeks (2026-04-22 to 2026-06-16): 9 completed workouts.',
+      'Delta: +3.'
+    ].join('\n')
+  });
+  assert.match(prompt, /Computed training volume/);
+  assert.match(prompt, /12 completed workouts/);
+  assert.match(prompt, /compare_workout_windows/);
+  assert.match(prompt, /not an estimate|Do not recount/i);
+});
+
+test('non-chadwick agents never receive the computed training volume block', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    workoutWindowCompare: 'Computed training volume (do not re-count or estimate — this is the number):'
+  });
+  assert.doesNotMatch(prompt, /Computed training volume/);
+  assert.doesNotMatch(prompt, /compare_workout_windows/);
+});
+
 test('non-chadwick agents never receive the recent-sessions block', () => {
   const prompt = buildSystemPrompt({
     slug: 'brisket',
