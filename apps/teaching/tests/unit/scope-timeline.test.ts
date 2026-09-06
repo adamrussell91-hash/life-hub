@@ -610,4 +610,117 @@ describe('scope timeline editor', () => {
     );
     expect(refreshed?.style.left).toBe(originLeft);
   });
+
+  function twoUnitCurriculum(): CurriculumResponse {
+    const two = cloneScope();
+    two.timeline_items = [
+      {
+        id: 'ti_unit_aotfw',
+        kind: 'unit',
+        unit_id: 'unit_aotfw',
+        start_week: 12,
+        end_week: 18,
+        order: 1
+      },
+      {
+        id: 'ti_unit_hamlet',
+        kind: 'unit',
+        unit_id: 'unit_hamlet',
+        start_week: 20,
+        end_week: 23,
+        order: 2
+      },
+      {
+        id: 'ti_note_1',
+        kind: 'note',
+        title: 'Assessment week',
+        start_week: 19,
+        end_week: 19,
+        order: 3
+      }
+    ];
+    return makeCurriculum({ scope_sequences: [two] });
+  }
+
+  it('opens a compare panel from the toolbar without writing', () => {
+    renderScopeTimelineEditor(canvas, twoUnitCurriculum(), 'subject_y12_engadv');
+    canvas.querySelector<HTMLButtonElement>('.scope-timeline__compare-order')?.click();
+    const panel = canvas.querySelector('[data-sequence-compare-panel]');
+    expect(panel?.textContent).toContain('Compare order');
+    expect(panel?.textContent).toContain('Artist of the Floating World');
+    expect(panel?.textContent).toContain('Hamlet');
+    expect(panel?.querySelector('[data-confirm-sequence]')).toBeNull();
+    expect(patchScopeSequenceMock).not.toHaveBeenCalled();
+  });
+
+  it('confirms a proposed unit order through persistItems', async () => {
+    const local = twoUnitCurriculum();
+    const updated = cloneScope(local.scope_sequences[0]);
+    updated.timeline_items = [
+      {
+        id: 'ti_unit_hamlet',
+        kind: 'unit',
+        unit_id: 'unit_hamlet',
+        start_week: 1,
+        end_week: 4,
+        order: 1
+      },
+      {
+        id: 'ti_unit_aotfw',
+        kind: 'unit',
+        unit_id: 'unit_aotfw',
+        start_week: 5,
+        end_week: 11,
+        order: 2
+      },
+      {
+        id: 'ti_note_1',
+        kind: 'note',
+        title: 'Assessment week',
+        start_week: 19,
+        end_week: 19,
+        order: 3
+      }
+    ];
+    patchScopeSequenceMock.mockResolvedValue(updated);
+
+    renderScopeTimelineEditor(canvas, local, 'subject_y12_engadv');
+    canvas.querySelector<HTMLButtonElement>('.scope-timeline__compare-order')?.click();
+    canvas
+      .querySelector<HTMLButtonElement>('[data-move-unit="unit_hamlet"][data-move-dir="up"]')
+      ?.click();
+    expect(canvas.querySelector('[data-confirm-sequence]')).toBeTruthy();
+    canvas.querySelector<HTMLButtonElement>('[data-confirm-sequence]')?.click();
+
+    await vi.waitFor(() => {
+      expect(patchScopeSequenceMock).toHaveBeenCalledTimes(1);
+    });
+    const [, body] = patchScopeSequenceMock.mock.calls[0]!;
+    expect(body.timeline_items!.find((item) => item.kind === 'unit' && item.unit_id === 'unit_hamlet')).toMatchObject({
+      start_week: 1,
+      end_week: 4
+    });
+    expect(body.timeline_items!.find((item) => item.kind === 'unit' && item.unit_id === 'unit_aotfw')).toMatchObject({
+      start_week: 5,
+      end_week: 11
+    });
+    expect(body.timeline_items!.find((item) => item.kind === 'note')).toMatchObject({
+      start_week: 19,
+      end_week: 19
+    });
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-sequence-compare-panel]')).toBeNull();
+    });
+  });
+
+  it('discards a draft order without writing', () => {
+    renderScopeTimelineEditor(canvas, twoUnitCurriculum(), 'subject_y12_engadv');
+    canvas.querySelector<HTMLButtonElement>('.scope-timeline__compare-order')?.click();
+    canvas
+      .querySelector<HTMLButtonElement>('[data-move-unit="unit_hamlet"][data-move-dir="up"]')
+      ?.click();
+    canvas.querySelector<HTMLButtonElement>('[data-discard-sequence]')?.click();
+    expect(canvas.querySelector('[data-sequence-compare-panel]')).toBeNull();
+    expect(patchScopeSequenceMock).not.toHaveBeenCalled();
+  });
 });
