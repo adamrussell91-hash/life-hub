@@ -9,9 +9,12 @@ import {
   compareWorkoutWindowsSchema,
   daysSinceLastCompletedWorkout,
   formatRecentWorkoutsForPrompt,
+  formatRegionStrengthForPrompt,
   formatWorkoutWindowCompareForPrompt,
   getLastWorkout,
   getLastWorkoutSchema,
+  getRegionStrength,
+  getRegionStrengthSchema,
   lastCompletedWorkout,
   mergeWorkoutEntries,
   normalizeExerciseName,
@@ -188,6 +191,7 @@ test('workout history tool schemas use the expected names', () => {
   assert.equal(getLastWorkoutSchema().name, 'get_last_workout');
   assert.equal(searchWorkoutRecordsSchema().name, 'search_workout_records');
   assert.equal(compareWorkoutWindowsSchema().name, 'compare_workout_windows');
+  assert.equal(getRegionStrengthSchema().name, 'get_region_strength');
 });
 
 test('workoutWindowBounds is two adjacent 56-day windows ending today', () => {
@@ -323,4 +327,55 @@ test('searchWorkoutRecords matches pain site / notes and returns them on hits', 
 
   const byNote = searchWorkoutRecords(records, { query: 'flared' });
   assert.equal(byNote.count, 1);
+});
+
+test('getRegionStrength matches Fitness page 30d vs prior 30d region tiles', () => {
+  const records = [
+    session({
+      date: '2026-06-20',
+      focus: ['chest'],
+      exercises: [{ name: 'Bench Press', sets: [{ reps: 10, weight_kg: 40, cable_type: 'constant_force' }] }]
+    }),
+    session({
+      date: '2026-08-01',
+      focus: ['chest'],
+      exercises: [{ name: 'Bench Press', sets: [{ reps: 10, weight_kg: 38, cable_type: 'constant_force' }] }]
+    })
+  ];
+  const result = getRegionStrength(records, '2026-08-12');
+  assert.equal(result.ok, true);
+  assert.equal(result.same_as, 'Fitness page Region strength tiles');
+  assert.equal(result.windows.days, 30);
+  assert.equal(result.windows.current.from, '2026-07-14');
+  assert.equal(result.windows.prior.to, '2026-07-13');
+  const chest = result.regions.find(region => region.key === 'chest');
+  assert.equal(chest.best_set_delta_kg, -2);
+  assert.equal(chest.current_best_kg, 38);
+  assert.equal(chest.current_volume, 380);
+  assert.ok(Math.abs(chest.volume_delta_pct - (-5)) < 1e-9);
+
+  const filtered = getRegionStrength(records, '2026-08-12', { region: 'chest' });
+  assert.equal(filtered.regions.length, 1);
+  assert.equal(filtered.regions[0].key, 'chest');
+});
+
+test('formatRegionStrengthForPrompt is what Chadwick must quote for Fitness tiles', () => {
+  const text = formatRegionStrengthForPrompt(getRegionStrength([
+    session({
+      date: '2026-06-20',
+      focus: ['chest'],
+      exercises: [{ name: 'Bench Press', sets: [{ reps: 10, weight_kg: 40, cable_type: 'constant_force' }] }]
+    }),
+    session({
+      date: '2026-08-01',
+      focus: ['chest'],
+      exercises: [{ name: 'Bench Press', sets: [{ reps: 10, weight_kg: 38, cable_type: 'constant_force' }] }]
+    })
+  ], '2026-08-12'));
+  assert.match(text, /Computed Region strength/);
+  assert.match(text, /Fitness page Region strength/);
+  assert.match(text, /Chest: best-set Δ -2 kg/);
+  assert.match(text, /volume -5%/);
+  assert.match(text, /get_region_strength/);
+  assert.equal(formatRegionStrengthForPrompt({ ok: false }), '');
 });

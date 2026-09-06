@@ -1765,6 +1765,23 @@ test('Chadwick prompt and tools can read the last completed workout file, not ju
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'get_last_workout'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_workout_records'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'compare_workout_windows'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'get_region_strength'));
+  for (const name of [
+    'get_fitness_snapshot',
+    'get_training_volume',
+    'get_working_weights',
+    'get_long_term_fitness',
+    'get_session_comparisons',
+    'get_exercise_history',
+    'get_load_status',
+    'get_pain_training_summary',
+    'get_body_state',
+    'get_workout_template'
+  ]) {
+    assert.ok(receivedArgs.tools.some(tool => tool.name === name), name);
+  }
+  assert.match(receivedArgs.system, /Computed Region strength|get_region_strength/);
+  assert.match(receivedArgs.system, /get_fitness_snapshot/);
   const last = JSON.parse(await receivedArgs.executeTools({
     name: 'get_last_workout',
     id: 'call_last',
@@ -1789,7 +1806,29 @@ test('Chadwick prompt and tools can read the last completed workout file, not ju
   assert.equal(compare.current.count, 1);
   assert.equal(compare.previous.count, 0);
   assert.equal(compare.delta, 1);
+  const regions = JSON.parse(await receivedArgs.executeTools({
+    name: 'get_region_strength',
+    id: 'call_regions',
+    input: { region: 'chest' }
+  }));
+  assert.equal(regions.ok, true);
+  assert.equal(regions.same_as, 'Fitness page Region strength tiles');
+  assert.ok(Array.isArray(regions.regions));
+  const snapshot = JSON.parse(await receivedArgs.executeTools({
+    name: 'get_fitness_snapshot',
+    id: 'call_snapshot',
+    input: {}
+  }));
+  assert.equal(snapshot.ok, true);
+  const volume = JSON.parse(await receivedArgs.executeTools({
+    name: 'get_training_volume',
+    id: 'call_volume',
+    input: {}
+  }));
+  assert.equal(volume.ok, true);
+  assert.match(String(volume.how_to_read || ''), /kg|tonnage|session/i);
 });
+
 
 test('Chadwick 8-week compare counts a previous-window session the recent list would still see', async () => {
   const currentPath = 'data/fitness/2026/08/2026-08-01-workout.md';
