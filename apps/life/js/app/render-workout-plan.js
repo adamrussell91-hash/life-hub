@@ -15,6 +15,24 @@ function classNames(...parts) {
   return parts.filter(Boolean).join(' ');
 }
 
+function assignedSrc(img) {
+  return img?.getAttribute?.('src') ?? img?.src ?? '';
+}
+
+function collectThumbs(node, into = []) {
+  if (!node) return into;
+  const cls = String(node.className ?? '');
+  if (cls.includes('workout-plan-card__thumb') && !cls.includes('--empty')) into.push(node);
+  for (const child of node.children ?? []) collectThumbs(child, into);
+  return into;
+}
+
+function takeThumb(pool, src) {
+  const index = pool.findIndex(img => assignedSrc(img) === src);
+  if (index < 0) return null;
+  return pool.splice(index, 1)[0];
+}
+
 function formatBetweenSetsLine(betweenSets) {
   if (!betweenSets?.name) return '';
   const sets = Array.isArray(betweenSets.sets) ? betweenSets.sets : [];
@@ -31,22 +49,25 @@ export function renderExercisePlanRow(root, exercise, libraryByName, {
   tag = 'li',
   detail = 'count',
   extraClass = '',
-  showBetweenSets = true
+  showBetweenSets = true,
+  reuseThumb = null
 } = {}) {
   const row = create(root, tag);
   row.className = classNames('workout-plan-card__row', extraClass);
 
-  const thumb = create(root, 'img');
+  const src = muscleAssetPath(resolveExerciseThumbKey(exercise, libraryByName));
+  const thumb = reuseThumb ?? create(root, 'img');
   thumb.className = 'workout-plan-card__thumb';
-  thumb.src = muscleAssetPath(resolveExerciseThumbKey(exercise, libraryByName));
+  if (assignedSrc(thumb) !== src) thumb.src = src;
   thumb.alt = '';
-  thumb.loading = 'lazy';
-  thumb.decoding = 'async';
-  thumb.addEventListener?.('error', () => {
-    const fallback = create(root, 'span');
-    fallback.className = 'workout-plan-card__thumb workout-plan-card__thumb--empty';
-    thumb.replaceWith?.(fallback);
-  });
+  if (!reuseThumb) {
+    thumb.decoding = 'async';
+    thumb.addEventListener?.('error', () => {
+      const fallback = create(root, 'span');
+      fallback.className = 'workout-plan-card__thumb workout-plan-card__thumb--empty';
+      thumb.replaceWith?.(fallback);
+    });
+  }
 
   const copy = create(root, 'div');
   copy.className = 'workout-plan-card__copy';
@@ -170,15 +191,18 @@ export function fillExercisePlanList(root, host, {
   extraClass = 'fitness-exercise'
 } = {}) {
   if (!host) return;
+  const thumbPool = collectThumbs(host);
   host.replaceChildren();
   const tag = /^(ul|ol)$/i.test(host.tagName ?? '') ? 'li' : 'div';
   const blocks = groupWorkoutPlanExercises(exercises);
   for (const [index, block] of blocks.entries()) {
     if (block.kind === 'single' && !block.exercises[0]?.superset_group) {
-      host.append(renderExercisePlanRow(root, block.exercises[0], libraryByName, {
+      const exercise = block.exercises[0];
+      host.append(renderExercisePlanRow(root, exercise, libraryByName, {
         tag,
         detail,
-        extraClass
+        extraClass,
+        reuseThumb: takeThumb(thumbPool, muscleAssetPath(resolveExerciseThumbKey(exercise, libraryByName)))
       }));
       continue;
     }
@@ -200,7 +224,8 @@ export function fillExercisePlanList(root, host, {
         tag: tag === 'li' ? 'li' : 'div',
         detail,
         extraClass: 'workout-plan-card__row--paired',
-        showBetweenSets: block.kind === 'between'
+        showBetweenSets: block.kind === 'between',
+        reuseThumb: takeThumb(thumbPool, muscleAssetPath(resolveExerciseThumbKey(exercise, libraryByName)))
       }));
     });
     wrap.append(inner);

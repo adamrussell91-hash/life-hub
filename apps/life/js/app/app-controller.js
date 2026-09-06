@@ -1016,14 +1016,12 @@ export function createAppController(dependencies) {
     });
   }
 
-  function renderFitnessSection() {
-    if (!latestResult || !buildFitnessModel || !renderFitness) return;
-    const libraryByName = fitnessTemplateLibrary?.getState?.()?.libraryByName ?? null;
+  function paintFitness(templatesState) {
+    const libraryByName = templatesState?.libraryByName ?? null;
     const model = buildFitnessModel({ ...latestResult, libraryByName });
-    const templates = fitnessTemplateLibrary?.getState?.() ?? { status: 'idle', templates: [] };
     renderFitness(root, model, {
       logger: fitnessLogger,
-      templates,
+      templates: templatesState ?? { status: 'idle', templates: [] },
       libraryByName,
       onSelectTemplate: template => fitnessTemplateLibrary?.openTemplate?.(template),
       quiet: syncQuiet
@@ -1031,19 +1029,18 @@ export function createAppController(dependencies) {
     renderFitnessSurfaceWidgets(root, surfaceWidgetLibrary?.getState?.() ?? { status: 'idle', widgets: [] });
     const button = root.querySelector('#fitness-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, FITNESS_AGENT_SLUG));
-    void fitnessTemplateLibrary?.ensureLoaded?.().then(() => {
-      if (currentSection !== 'fitness' || !latestResult) return;
-      const nextLibrary = fitnessTemplateLibrary.getState()?.libraryByName ?? null;
-      const nextModel = buildFitnessModel({ ...latestResult, libraryByName: nextLibrary });
-      renderFitness(root, nextModel, {
-        logger: fitnessLogger,
-        templates: fitnessTemplateLibrary.getState(),
-        libraryByName: nextLibrary,
-        onSelectTemplate: template => fitnessTemplateLibrary.openTemplate(template),
-        quiet: syncQuiet
+  }
+
+  function renderFitnessSection() {
+    if (!latestResult || !buildFitnessModel || !renderFitness) return;
+    const templates = fitnessTemplateLibrary?.getState?.() ?? { status: 'idle', templates: [] };
+    paintFitness(templates);
+    if (templates.status !== 'ready') {
+      void fitnessTemplateLibrary?.ensureLoaded?.().then(() => {
+        if (currentSection !== 'fitness' || !latestResult) return;
+        paintFitness(fitnessTemplateLibrary.getState());
       });
-      renderFitnessSurfaceWidgets(root, surfaceWidgetLibrary?.getState?.() ?? { status: 'idle', widgets: [] });
-    });
+    }
     void surfaceWidgetLibrary?.ensureLoaded?.().then(() => {
       if (currentSection !== 'fitness' || !latestResult) return;
       renderFitnessSurfaceWidgets(root, surfaceWidgetLibrary.getState());
