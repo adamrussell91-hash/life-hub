@@ -2296,7 +2296,7 @@ test('a plain trigger message with no auditSession bootstraps a headless audit a
     })
   });
 
-  const events = await readSse(await handler(request({ message: 'Hammond, run the weekly review' })));
+  const events = await readSse(await handler(request({ message: 'Hammond, run the weekly audit' })));
   assert.match(receivedArgs.system, /audit phase contract/i);
   assert.match(receivedArgs.system, /triage/i);
 
@@ -2305,6 +2305,139 @@ test('a plain trigger message with no auditSession bootstraps a headless audit a
 
   const nextEvent = events.find(event => event.type === 'audit_next_session');
   assert.deepEqual(nextEvent.session, { kind: 'cn_audit', phase: 'intake', intakeCount: 1 });
+});
+
+test('weekly review is recap+plan, not a CN audit, and delivers last-week facts', async () => {
+  let receivedArgs;
+  const workout = `---
+schema_version: 1
+id: workout-upper-week
+type: workout
+date: 2026-08-25
+time: "07:30"
+created_at: 2026-08-25T07:30:00+10:00
+updated_at: 2026-08-25T07:30:00+10:00
+source: test_fixture
+title: Upper Body
+session_kind: strength
+focus: [chest]
+duration_min: 35
+day_type: workout_30
+status: completed
+recovery_flag_next_day: false
+exercises:
+  - name: Bench Press
+    equipment: AEKE
+    sets:
+      - { reps: 8, weight_kg: 36, cable_type: constant_force }
+---
+Completed upper.
+`;
+  const meal = `---
+schema_version: 1
+id: meal-week-breakfast
+type: meal
+date: 2026-08-25
+time: "07:45"
+created_at: 2026-08-25T07:45:00+10:00
+updated_at: 2026-08-25T07:45:00+10:00
+source: test_fixture
+meal: breakfast
+calories: 520
+protein_g: 38
+fat_g: 12
+saturated_fat_g: 3
+unsaturated_fat_g: 9
+carbs_g: 48
+sugar_g: 6
+fibre_g: 5
+sodium_mg: 420
+calcium_mg: 380
+polyphenol_score: 6
+omega3: medium
+---
+Protein smoothie.
+`;
+  const diary = `---
+schema_version: 1
+id: diary-week
+type: diary
+date: 2026-08-29
+time: "21:40"
+created_at: 2026-08-29T21:40:00+10:00
+updated_at: 2026-08-29T21:40:00+10:00
+source: test_fixture
+mood_score: 3
+mood: low
+energy: low
+tags: [marking]
+system_note: marking pile ate the evening
+dayone_sent: false
+---
+Long marking night.
+`;
+  const weekCn = `# Purpose
+Purpose.
+
+## 📅 This Week
+`;
+  const workoutSha = 'a'.repeat(40);
+  const mealSha = 'b'.repeat(40);
+  const diarySha = 'c'.repeat(40);
+  const cnSha = 'd'.repeat(40);
+  const blobs = {
+    [workoutSha]: workout,
+    [mealSha]: meal,
+    [diarySha]: diary,
+    [cnSha]: weekCn
+  };
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'e'.repeat(40), commit: { tree: { sha: 'f'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'central-node.md', type: 'blob', sha: cnSha, size: weekCn.length },
+          { path: 'data/fitness/2026/08/2026-08-25-upper-body.md', type: 'blob', sha: workoutSha, size: workout.length },
+          { path: 'data/nutrition/2026/08/2026-08-25-breakfast.md', type: 'blob', sha: mealSha, size: meal.length },
+          { path: 'data/mind/2026/08/2026-08-29-diary.md', type: 'blob', sha: diarySha, size: diary.length }
+        ]
+      });
+    }
+    const blobMatch = /\/git\/blobs\/([a-f0-9]+)/.exec(url);
+    if (blobMatch && blobs[blobMatch[1]]) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(blobs[blobMatch[1]], 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-30T10:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'text', delta: 'Here is the week that was.' }, { type: 'done' }]);
+      }
+    })
+  });
+
+  const events = await readSse(await handler(request({
+    message: "Hammond, let's recap the week",
+    protocolId: 'weekly-review'
+  })));
+
+  assert.doesNotMatch(receivedArgs.system, /audit phase contract/i);
+  assert.ok(!events.some(event => event.type === 'audit_phase'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'get_week_review'));
+  assert.match(receivedArgs.system, /Week pack \(Sydney weeks/);
+  assert.match(receivedArgs.system, /Upper Body/);
+  assert.match(receivedArgs.system, /marking pile ate the evening/);
+  assert.match(receivedArgs.system, /Do not start a Central Node audit/);
 });
 
 test('a skip-intake trigger message bootstraps a headless audit straight to stale_drift', async () => {

@@ -71,7 +71,7 @@ export const AGENT_PROTOCOLS = {
     pills: [
       { id: 'whats-running', label: "What's running", steer: 'Session Triage (gateway)', explain: 'Triage what’s live across the hubs.' },
       { id: 'decision', label: 'Decision help', steer: 'Decision Priority Hierarchy (provisional)', explain: 'Work a choice through the priority hierarchy.' },
-      { id: 'weekly-review', label: 'Weekly review', steer: 'Follow-on protocols — Weekly Review', explain: 'Do the weekly governance pass.' },
+      { id: 'weekly-review', label: 'Week recap + plan', steer: 'Follow-on protocols — Weekly Review', explain: 'Recap the week that happened, then plan the next one.' },
       { id: 'drifting', label: "Something's drifting", steer: 'Follow-on protocols — Drift', explain: 'Name a drift before it becomes a problem.' },
       { id: 'specialist', label: 'Talk to a specialist', steer: 'Specialist pattern relay', explain: 'Hand the pattern to the right specialist.' }
     ]

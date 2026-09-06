@@ -259,6 +259,7 @@ test('buildAgentTools attaches domain retrieval for parity agents', () => {
     needsHammondTools: true
   }).map(t => t.name);
   assert.ok(hammond.includes('inspect_hub_signals'));
+  assert.ok(hammond.includes('get_week_review'));
 
   assert.ok(domainRetrievalSchemasFor('clare').length >= 2);
 });
@@ -278,6 +279,15 @@ test('system prompt delivers activation catalogue and directive for Chadwick', (
   assert.match(prompt, /get_fitness_snapshot/);
   assert.match(prompt, /MUST call these retrieval tools/);
   assert.match(prompt, /fitness_sessions/);
+});
+
+test('classifyIntent weekly_planning requires get_week_review', () => {
+  assert.deepEqual(
+    classifyIntent('hammond', "Hammond, let's recap the week").requiredTools,
+    ['get_week_review']
+  );
+  assert.equal(classifyIntent('hammond', 'weekly review').id, 'weekly_planning');
+  assert.equal(classifyIntent('hammond', 'What is slipping across my life?').id, 'life_slipping');
 });
 
 test('classifyIntent history_search maps per agent', () => {

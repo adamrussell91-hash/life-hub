@@ -1,10 +1,11 @@
 // Keep behaviour aligned with netlify/functions/_shared/hammond-audit.mjs
 export const AUDIT_PHASES = ['triage', 'intake', 'stale_drift', 'open_loops', 'lock'];
 
+// Weekly review is recap + forward plan (hammond-week.mjs), not this audit.
 const TRIGGER_PATTERNS = [
   /central\s*node\s*audit/i,
   /\bcn\s*audit\b/i,
-  /weekly\s*(review|audit)/i,
+  /weekly\s*audit/i,
   /monthly\s*audit/i,
   /goal\s*audit/i
 ];
