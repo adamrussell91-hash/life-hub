@@ -14,6 +14,9 @@ class FakeElement {
     this.scrollTop = 0;
     this.scrollHeight = 0;
     this.attributes = new Map();
+    this.type = '';
+    this.checked = false;
+    this.value = '';
   }
 
   setAttribute(name, value) {
@@ -479,7 +482,7 @@ test('renderChatMarkdown leaves ordinary chat as multiline markdown', () => {
 
 test('appendActionProposal renders intent, path diffs, and Confirm/Discard', () => {
   const root = new FakeDocument();
-  const { card, confirm, discard } = appendActionProposal(root, {
+  const { card, confirm, discard, acceptedPaths } = appendActionProposal(root, {
     proposal: {
       agent: 'brisket',
       intent: 'open a 7-day no-refined-sugar tracker',
@@ -503,8 +506,16 @@ test('appendActionProposal renders intent, path diffs, and Confirm/Discard', () 
   );
   const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
   assert.ok(diffs);
-  assert.match(diffs.children[0].children[0].textContent, /data\/challenges\/2026-08-01-no-sugar\.json/);
+  const writeRow = diffs.children[0].children[0];
+  assert.equal(writeRow.className, 'action-proposal__write');
+  assert.equal(writeRow.children[0].type, 'checkbox');
+  assert.equal(writeRow.children[0].checked, true);
+  assert.equal(writeRow.children[0].value, 'data/challenges/2026-08-01-no-sugar.json');
+  assert.match(writeRow.children[1].textContent, /data\/challenges\/2026-08-01-no-sugar\.json/);
   assert.match(diffs.children[0].children[1].textContent, /create: new challenge file/);
+  assert.deepEqual(acceptedPaths(), ['data/challenges/2026-08-01-no-sugar.json']);
+  writeRow.children[0].checked = false;
+  assert.deepEqual(acceptedPaths(), []);
   assert.equal(confirm.textContent, 'Confirm');
   assert.equal(discard.textContent, 'Discard');
 });

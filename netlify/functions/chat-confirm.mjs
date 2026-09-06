@@ -44,8 +44,18 @@ import {
   removePendingActionById,
   findPendingActionById,
   validateProposeActionInput,
-  executeProposeActionWrites
+  executeProposeActionWrites,
+  classifyWriteTarget,
+  snapshotGithubBases,
+  snapshotBlobBases,
+  detectStaleWrites,
+  selectAcceptedWrites,
+  decisionFieldsFromAction,
+  getTasksJSON,
+  getTeachingJSON
 } from './_shared/capabilities/propose-action.mjs';
+import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
+import { defaultGetContentStore as defaultGetTeachingStore } from './_shared/teaching-blobs.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -67,7 +77,9 @@ export function createChatConfirmHandler({
   verifySessionToken: verify = verifySessionToken,
   serializeExpiredSessionCookie: clearCookie = serializeExpiredSessionCookie,
   createGitHubClient: createClient = createGitHubClient,
-  now = Date.now
+  now = Date.now,
+  getTasksStore = defaultGetTasksStore,
+  getTeachingStore = defaultGetTeachingStore
 } = {}) {
   return async function chatConfirmHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -464,8 +476,67 @@ export function createChatConfirmHandler({
       return errorResponse(400, 'write_path_denied', 'A write path is outside this agent\'s allowlist.', false, PRIVATE_CACHE);
     }
 
+    const selected = selectAcceptedWrites(proposal.writes, parsed.accept);
+    if (!selected.ok) {
+      return errorResponse(
+        400,
+        selected.error ?? 'invalid_accept',
+        selected.error === 'unknown_accept_path'
+          ? `Unknown accept path: ${selected.detail}`
+          : 'accept must be an array of write paths from this proposal.',
+        false,
+        PRIVATE_CACHE
+      );
+    }
+    const { accepted, rejected } = selected;
+
+    const blobStoresResult = await loadBlobStoresForWrites(accepted, {
+      env,
+      getTasksStore,
+      getTeachingStore
+    });
+    if (!blobStoresResult.ok) {
+      return errorResponse(503, blobStoresResult.error, 'The blob store is temporarily unavailable.', true, PRIVATE_CACHE);
+    }
+    const blobStores = blobStoresResult.stores;
+
+    const storedBases = stored?.bases && typeof stored.bases === 'object' && !Array.isArray(stored.bases)
+      ? stored.bases
+      : null;
+    if (storedBases && accepted.length) {
+      const current = {
+        ...snapshotGithubBases(accepted, tree),
+        ...await snapshotBlobBases(accepted, blobStores)
+      };
+      const stale = detectStaleWrites(accepted, storedBases, current);
+      if (stale.length) {
+        return errorResponse(
+          409,
+          'stale_write',
+          'A target file changed since this proposal. Discard and ask again.',
+          true,
+          PRIVATE_CACHE
+        );
+      }
+    }
+
     const files = {};
-    for (const write of proposal.writes) {
+    for (const write of accepted) {
+      const target = classifyWriteTarget(write.path);
+      if (target.store === 'tasks' || target.store === 'teaching') {
+        try {
+          const record = await (target.store === 'tasks' ? getTasksJSON : getTeachingJSON)(
+            blobStores[target.store],
+            target.key
+          );
+          if (record && typeof record === 'object' && !Array.isArray(record)) {
+            files[write.path] = { record };
+          }
+        } catch (error) {
+          return mapRepositoryError(error);
+        }
+        continue;
+      }
       const entry = tree.find(item => item.path === write.path && item.type === 'blob');
       if (!entry) continue;
       try {
@@ -476,21 +547,35 @@ export function createChatConfirmHandler({
       }
     }
 
-    let writeResult;
-    try {
-      writeResult = await executeProposeActionWrites(client, proposal, { files });
-    } catch (error) {
-      if (error instanceof GitHubClientError && error.code === 'write_conflict') {
-        return errorResponse(409, 'write_conflict', 'A target file changed while confirming. Try again.', true, PRIVATE_CACHE);
+    let writeResult = { ok: true, results: [] };
+    if (accepted.length) {
+      try {
+        writeResult = await executeProposeActionWrites(client, { ...proposal, writes: accepted }, {
+          files,
+          blobStores,
+          nowIso: () => new Date(now()).toISOString()
+        });
+      } catch (error) {
+        if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+          return errorResponse(409, 'write_conflict', 'A target file changed while confirming. Try again.', true, PRIVATE_CACHE);
+        }
+        return mapRepositoryError(error);
       }
-      return mapRepositoryError(error);
-    }
-    if (!writeResult.ok) {
-      if (writeResult.error === 'already_exists') {
-        return errorResponse(409, 'write_conflict', `File already exists: ${writeResult.detail}`, true, PRIVATE_CACHE);
+      if (!writeResult.ok) {
+        if (writeResult.error === 'already_exists') {
+          return errorResponse(409, 'write_conflict', `File already exists: ${writeResult.detail}`, true, PRIVATE_CACHE);
+        }
+        return errorResponse(400, writeResult.error ?? 'apply_failed', 'The proposed action could not be applied.', false, PRIVATE_CACHE);
       }
-      return errorResponse(400, writeResult.error ?? 'apply_failed', 'The proposed action could not be applied.', false, PRIVATE_CACHE);
     }
+
+    const decision = decisionFieldsFromAction({
+      proposal,
+      accepted,
+      rejected,
+      reason: parsed.reason,
+      revisit: parsed.revisit
+    });
 
     // Best-effort governance log + dequeue.
     try {
@@ -507,16 +592,18 @@ export function createChatConfirmHandler({
       const diffBody = [
         `**Agent:** ${proposal.agent}`,
         `**Intent:** ${proposal.intent}`,
-        `**Status:** Approved`,
+        `**Status:** ${accepted.length ? 'Approved' : 'Rejected'}`,
         '',
-        ...proposal.writes.map(write => `- \`${write.path}\` (${write.mode}): ${write.diff}`)
+        ...accepted.map(write => `- \`${write.path}\` (${write.mode}): ${write.diff}`),
+        ...rejected.map(write => `- \`${write.path}\` (${write.mode}): skipped`)
       ].join('\n');
       const nextGov = appendGovernanceEntry(govContent, {
         dateKey: getSydneyDateKey(new Date(now())),
         entryType: 'Capability Action',
         title: proposal.intent.slice(0, 120),
         body: diffBody,
-        status: 'Resolved'
+        status: 'Resolved',
+        ...decision
       });
       await client.writeFile({
         path: GOVERNANCE_LOG_PATH,
@@ -590,6 +677,14 @@ export function createChatConfirmHandler({
           }
         }
         const intent = stored?.proposal?.intent ?? parsed.id;
+        const decision = decisionFieldsFromAction({
+          proposal: stored?.proposal,
+          accepted: [],
+          rejected: Array.isArray(stored?.proposal?.writes) ? stored.proposal.writes : [],
+          reason: parsed.reason,
+          revisit: parsed.revisit,
+          dismissed: true
+        });
         const nextGov = appendGovernanceEntry(govContent, {
           dateKey: getSydneyDateKey(new Date(now())),
           entryType: 'Capability Action',
@@ -599,7 +694,8 @@ export function createChatConfirmHandler({
             `**Intent:** ${intent}`,
             '**Status:** Rejected'
           ].join('\n'),
-          status: 'Resolved'
+          status: 'Resolved',
+          ...decision
         });
         await client.writeFile({
           path: GOVERNANCE_LOG_PATH,
@@ -694,11 +790,13 @@ async function parseRequest(request) {
           ? 'action_dismiss'
           : 'log';
 
+  const extras = parseActionDecisionFields(body);
+
   if (kind === 'cn_patch_dismiss' || kind === 'action_dismiss') {
     if (!id) {
       return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
     }
-    return { slug: body.slug, kind, id };
+    return { slug: body.slug, kind, id, ...extras };
   }
 
   const hasCandidate = body.candidate && typeof body.candidate === 'object' && !Array.isArray(body.candidate);
@@ -708,7 +806,41 @@ async function parseRequest(request) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
 
-  return { candidate: body.candidate, slug: body.slug, overwrite: body.overwrite === true, kind, id };
+  if (kind === 'action' && 'accept' in body && !Array.isArray(body.accept)) {
+    return { error: errorResponse(400, 'invalid_accept', 'accept must be an array of write paths.', false, PRIVATE_CACHE) };
+  }
+
+  return {
+    candidate: body.candidate,
+    slug: body.slug,
+    overwrite: body.overwrite === true,
+    kind,
+    id,
+    accept: kind === 'action' && Array.isArray(body.accept) ? body.accept : null,
+    ...extras
+  };
+}
+
+function parseActionDecisionFields(body) {
+  return {
+    reason: typeof body.reason === 'string' ? body.reason : null,
+    revisit: typeof body.revisit === 'string' ? body.revisit : null
+  };
+}
+
+async function loadBlobStoresForWrites(writes, { env, getTasksStore, getTeachingStore }) {
+  const stores = {};
+  const needsTasks = writes.some(write => classifyWriteTarget(write.path).store === 'tasks');
+  const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching');
+  try {
+    if (needsTasks) stores.tasks = await getTasksStore(env);
+    if (needsTeaching) stores.teaching = await getTeachingStore(env);
+  } catch {
+    return { ok: false, error: 'blobs_unavailable' };
+  }
+  if (needsTasks && !stores.tasks) return { ok: false, error: 'tasks_blobs_unbound' };
+  if (needsTeaching && !stores.teaching) return { ok: false, error: 'teaching_blobs_unbound' };
+  return { ok: true, stores };
 }
 
 async function readAtMost(stream, limit) {

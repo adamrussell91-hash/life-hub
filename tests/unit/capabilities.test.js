@@ -22,7 +22,13 @@ import {
   addPendingAction,
   removePendingActionById,
   findPendingActionById,
-  proposeActionToolSchema
+  proposeActionToolSchema,
+  classifyWriteTarget,
+  snapshotGithubBases,
+  snapshotBlobBases,
+  detectStaleWrites,
+  selectAcceptedWrites,
+  decisionFieldsFromAction
 } from '../../netlify/functions/_shared/capabilities/propose-action.mjs';
 import {
   executeShortcut,
@@ -615,4 +621,151 @@ test('intent router surfaces track.close-challenge on dispute asks', () => {
     message: 'Close this challenge — I dispute the auto judge verdict'
   });
   assert.ok(ids.includes('track.close-challenge'));
+});
+
+test('classifyWriteTarget routes typed refs to Tasks and Teaching blobs', () => {
+  assert.deepEqual(classifyWriteTarget('data/challenges/no-sugar.json'), {
+    store: 'github',
+    path: 'data/challenges/no-sugar.json'
+  });
+  assert.deepEqual(classifyWriteTarget('tasks:project:proj_aotfw'), {
+    store: 'tasks',
+    kind: 'project',
+    id: 'proj_aotfw',
+    key: 'projects/proj_aotfw',
+    path: 'tasks:project:proj_aotfw'
+  });
+  assert.deepEqual(classifyWriteTarget('teaching:unit:unit_aotfw'), {
+    store: 'teaching',
+    kind: 'unit',
+    id: 'unit_aotfw',
+    key: 'units/unit_aotfw',
+    path: 'teaching:unit:unit_aotfw'
+  });
+  assert.equal(classifyWriteTarget('tasks:task:task_1').store, 'unknown');
+});
+
+test('clare and hammond may write typed blob refs; brisket may not', () => {
+  resetCapabilityCaches();
+  assert.equal(isPathAllowedForAgent('clare', 'tasks:project:proj_aotfw'), true);
+  assert.equal(isPathAllowedForAgent('clare', 'teaching:unit:unit_aotfw'), false);
+  assert.equal(isPathAllowedForAgent('hammond', 'tasks:project:proj_aotfw'), true);
+  assert.equal(isPathAllowedForAgent('hammond', 'teaching:unit:unit_aotfw'), true);
+  assert.equal(isPathAllowedForAgent('brisket', 'tasks:project:proj_aotfw'), false);
+});
+
+test('validateProposeActionInput rejects unknown typed write targets', () => {
+  resetCapabilityCaches();
+  const result = validateProposeActionInput({
+    intent: 'rewrite a task',
+    writes: [{ path: 'tasks:task:task_1', mode: 'overwrite', content: '{}' }]
+  }, { agentSlug: 'clare' });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'unknown_write_target');
+});
+
+test('selectAcceptedWrites omits all when accept is missing and none when empty', () => {
+  const writes = [
+    { path: 'a.md', mode: 'create', content: 'a' },
+    { path: 'b.md', mode: 'create', content: 'b' }
+  ];
+  assert.deepEqual(selectAcceptedWrites(writes, null).accepted.map(write => write.path), ['a.md', 'b.md']);
+  assert.deepEqual(selectAcceptedWrites(writes, []).accepted, []);
+  assert.deepEqual(selectAcceptedWrites(writes, ['b.md']).accepted.map(write => write.path), ['b.md']);
+  assert.equal(selectAcceptedWrites(writes, ['missing.md']).ok, false);
+});
+
+test('detectStaleWrites compares GitHub shas and blob updated_at', () => {
+  const writes = [
+    { path: 'data/os/note.md' },
+    { path: 'tasks:project:proj_aotfw' }
+  ];
+  const bases = {
+    'data/os/note.md': { sha: 'aaa', missing: false },
+    'tasks:project:proj_aotfw': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
+  };
+  assert.deepEqual(detectStaleWrites(writes, bases, {
+    'data/os/note.md': { sha: 'aaa', missing: false },
+    'tasks:project:proj_aotfw': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
+  }), []);
+  assert.deepEqual(detectStaleWrites(writes, bases, {
+    'data/os/note.md': { sha: 'bbb', missing: false },
+    'tasks:project:proj_aotfw': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
+  }), ['data/os/note.md']);
+  assert.deepEqual(detectStaleWrites(writes, bases, {
+    'data/os/note.md': { sha: 'aaa', missing: false },
+    'tasks:project:proj_aotfw': { updated_at: '2026-09-01T00:00:00.000Z', missing: false }
+  }), ['tasks:project:proj_aotfw']);
+});
+
+test('snapshotGithubBases and snapshotBlobBases record missing vs present', async () => {
+  const writes = [
+    { path: 'data/os/note.md' },
+    { path: 'tasks:project:proj_aotfw' }
+  ];
+  assert.deepEqual(snapshotGithubBases(writes, [
+    { path: 'data/os/note.md', type: 'blob', sha: 'abc' }
+  ]), {
+    'data/os/note.md': { sha: 'abc', missing: false }
+  });
+  const store = {
+    async get(key) {
+      return key === 'projects/proj_aotfw' ? { id: 'proj_aotfw', updated_at: '2026-08-15T00:00:00.000Z' } : null;
+    }
+  };
+  assert.deepEqual(await snapshotBlobBases(writes, { tasks: store }), {
+    'tasks:project:proj_aotfw': { updated_at: '2026-08-15T00:00:00.000Z', missing: false }
+  });
+});
+
+test('executeProposeActionWrites routes tasks project creates onto the blob store', async () => {
+  const data = {};
+  const store = {
+    async get(key) {
+      return data[key] ?? null;
+    },
+    async setJSON(key, value) {
+      data[key] = value;
+    }
+  };
+  const result = await executeProposeActionWrites(null, {
+    agent: 'clare',
+    intent: 'open the AOTFW project',
+    writes: [{
+      path: 'tasks:project:proj_aotfw',
+      mode: 'create',
+      content: JSON.stringify({ name: 'Artist of the Floating World', status: 'active' }),
+      diff: 'new project'
+    }]
+  }, {
+    blobStores: { tasks: store },
+    nowIso: () => '2026-09-05T00:00:00.000Z'
+  });
+  assert.equal(result.ok, true);
+  assert.equal(data['projects/proj_aotfw'].name, 'Artist of the Floating World');
+  assert.equal(data['projects/proj_aotfw'].id, 'proj_aotfw');
+  assert.equal(data['projects/proj_aotfw'].updated_at, '2026-09-05T00:00:00.000Z');
+  assert.deepEqual(data['projects/_index'], ['proj_aotfw']);
+});
+
+test('decisionFieldsFromAction records chosen, reasoning, and revisit', () => {
+  const approved = decisionFieldsFromAction({
+    proposal: { intent: 'open a tracker' },
+    accepted: [{ path: 'a.md' }],
+    rejected: [],
+    reason: 'Keep the week honest',
+    revisit: '2026-09-12'
+  });
+  assert.equal(approved.chosen, 'Approved');
+  assert.equal(approved.reasoning, 'Keep the week honest');
+  assert.equal(approved.revisit, '2026-09-12');
+
+  const partial = decisionFieldsFromAction({
+    proposal: { intent: 'two writes' },
+    accepted: [{ path: 'keep.md' }],
+    rejected: [{ path: 'skip.md' }]
+  });
+  assert.match(partial.chosen, /Accepted `keep\.md`/);
+  assert.match(partial.chosen, /rejected `skip\.md`/);
+  assert.equal(partial.reasoning, 'two writes');
 });

@@ -707,14 +707,25 @@ export function appendActionProposal(root, { proposal }) {
   }
 
   const writes = Array.isArray(proposal?.writes) ? proposal.writes : [];
+  const acceptBoxes = [];
   if (writes.length > 0) {
     const diffs = root.createElement('ul');
     diffs.className = 'action-proposal__diffs';
     for (const write of writes) {
       const item = root.createElement('li');
+      const row = root.createElement('label');
+      row.className = 'action-proposal__write';
+      const box = root.createElement('input');
+      box.type = 'checkbox';
+      box.className = 'action-proposal__accept';
+      box.checked = true;
+      box.value = typeof write?.path === 'string' ? write.path : '';
+      box.setAttribute('aria-label', `Accept ${box.value || 'write'}`);
+      acceptBoxes.push(box);
       const path = root.createElement('code');
-      path.textContent = typeof write?.path === 'string' ? write.path : '(unknown path)';
-      item.append(path);
+      path.textContent = box.value || '(unknown path)';
+      row.append(box, path);
+      item.append(row);
       const detail = root.createElement('div');
       detail.className = 'action-proposal__diff';
       const mode = typeof write?.mode === 'string' ? write.mode : 'write';
@@ -746,7 +757,14 @@ export function appendActionProposal(root, { proposal }) {
 
   list.append(card);
   scrollChatIfPinned(list);
-  return { card, confirm, discard };
+  return {
+    card,
+    confirm,
+    discard,
+    acceptedPaths() {
+      return acceptBoxes.filter(box => box.checked).map(box => box.value).filter(Boolean);
+    }
+  };
 }
 
 export function appendPlanStatusCard(root, opts = {}) {
