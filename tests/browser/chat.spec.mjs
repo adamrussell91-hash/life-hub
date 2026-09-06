@@ -253,15 +253,35 @@ test('mobile full-page Chat docks the composer to the keyboard viewport', async 
   await page.locator('.hub-mobile-nav [data-section="chat"]').click();
   await page.locator('#chat-view').waitFor({ state: 'visible' });
   await page.locator('#chat-form').waitFor({ state: 'visible' });
+  // Brisket + protocol pills — the chrome that previously pushed the composer below a short keyboard viewport.
+  await page.locator('#agent-picker button', { hasText: 'Brisket' }).first().click();
+  await page.locator('#agent-protocol-pills').waitFor({ state: 'visible' });
 
-  // Chromium does not shrink visualViewport like iOS — apply the same CSS contract.
+  // Mock iOS visualViewport: short visible canvas, layout height already shrunk (inset ~0).
   await page.evaluate(() => {
-    const root = document.documentElement;
-    root.style.setProperty('--vv-offset-top', '0px');
-    root.style.setProperty('--vv-height', '480px');
-    root.style.setProperty('--vv-offset-bottom', '364px');
-    root.classList.add('vv-keyboard-open');
+    const vv = {
+      offsetTop: 0,
+      height: 360,
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => vv });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => 360 });
+    window.dispatchEvent(new Event('resize'));
+    document.documentElement.style.setProperty('--vv-offset-top', '0px');
+    document.documentElement.style.setProperty('--vv-height', '360px');
+    document.documentElement.style.setProperty('--vv-offset-bottom', '0px');
   });
+  await page.locator('#chat-input').focus();
+  // focusin schedules resync at 120ms and 320ms — wait, then pin the short canvas again.
+  await new Promise(resolve => setTimeout(resolve, 350));
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--vv-offset-top', '0px');
+    document.documentElement.style.setProperty('--vv-height', '360px');
+    document.documentElement.style.setProperty('--vv-offset-bottom', '0px');
+    document.documentElement.classList.add('vv-keyboard-open');
+  });
+  await page.evaluate(() => new Promise(requestAnimationFrame));
 
   const layout = await page.evaluate(() => {
     const form = document.querySelector('#chat-form');
@@ -271,16 +291,21 @@ test('mobile full-page Chat docks the composer to the keyboard viewport', async 
     const frameBox = frame.getBoundingClientRect();
     const navStyle = getComputedStyle(nav);
     return {
+      formTop: formBox.top,
       formBottom: formBox.bottom,
+      formHeight: formBox.height,
       frameBottom: frameBox.bottom,
       frameHeight: frameBox.height,
       navDisplay: navStyle.display,
-      gap: frameBox.bottom - formBox.bottom
+      gap: frameBox.bottom - formBox.bottom,
+      clipped: formBox.bottom > frameBox.bottom + 1 || formBox.top >= frameBox.bottom
     };
   });
 
-  assert.equal(layout.navDisplay, 'none', 'tab bar hides while the keyboard is open');
-  assert.ok(Math.abs(layout.frameHeight - 480) < 2, 'canvas height tracks the visual viewport');
+  assert.equal(layout.navDisplay, 'none', 'tab bar hides while composing');
+  assert.ok(Math.abs(layout.frameHeight - 360) < 2, 'canvas height tracks the visual viewport');
+  assert.equal(layout.clipped, false, 'composer must stay inside the short keyboard viewport');
+  assert.ok(layout.formHeight > 40, 'composer is on-screen');
   assert.ok(layout.gap < 8, 'composer sits on the keyboard floor, not floating mid-canvas');
   assert.ok(layout.formBottom <= layout.frameBottom + 1, 'composer stays inside the visible viewport');
 

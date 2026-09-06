@@ -1,6 +1,11 @@
 /** Inset (px) above which we treat the visual viewport as keyboard-shrunk. */
 export const VV_KEYBOARD_OPEN_PX = 120;
 
+function composerIsFocused() {
+  const active = globalThis.document?.activeElement;
+  return Boolean(active?.closest?.('.chat-form, #chat-form'));
+}
+
 function syncVisualViewport() {
   const vv = globalThis.visualViewport;
   if (!vv) return;
@@ -10,7 +15,12 @@ function syncVisualViewport() {
   root.style.setProperty('--vv-offset-top', `${vv.offsetTop}px`);
   root.style.setProperty('--vv-height', `${vv.height}px`);
   root.style.setProperty('--vv-offset-bottom', `${insetBottom}px`);
-  root.classList.toggle('vv-keyboard-open', insetBottom > VV_KEYBOARD_OPEN_PX);
+  // iOS often resizes window.innerHeight with the keyboard, so insetBottom stays ~0.
+  // Composer focus is the reliable signal that the field must stay docked and the tab bar must hide.
+  root.classList.toggle(
+    'vv-keyboard-open',
+    insetBottom > VV_KEYBOARD_OPEN_PX || composerIsFocused()
+  );
 }
 
 /** iOS updates visualViewport after focus/keyboard animation — resync a few times. */
@@ -32,9 +42,19 @@ function onComposerFocusIn(event) {
   const target = event.target;
   if (!target?.closest) return;
   if (!target.closest('.chat-form, #chat-form')) return;
-  // Full-page Chat pins to --vv-height; overlay already does. Do not scrollIntoView —
-  // that is what left the composer floating above the nav/keyboard on iOS.
+  // Mark open immediately so CSS docks before the keyboard animation finishes.
+  globalThis.document?.documentElement?.classList?.add?.('vv-keyboard-open');
   syncVisualViewportSoon();
+}
+
+function onComposerFocusOut(event) {
+  const target = event.target;
+  if (!target?.closest) return;
+  if (!target.closest('.chat-form, #chat-form')) return;
+  // Allow focus to move within the form before clearing; then re-sync from metrics.
+  globalThis.setTimeout?.(() => {
+    syncVisualViewport();
+  }, 0);
 }
 
 let attached = false;
@@ -46,6 +66,7 @@ export function attachVisualViewportInset() {
   globalThis.visualViewport?.addEventListener?.('resize', syncVisualViewport);
   globalThis.visualViewport?.addEventListener?.('scroll', syncVisualViewport);
   globalThis.document?.addEventListener?.('focusin', onComposerFocusIn);
+  globalThis.document?.addEventListener?.('focusout', onComposerFocusOut);
 }
 
 export function detachVisualViewportInset() {
@@ -54,6 +75,7 @@ export function detachVisualViewportInset() {
   globalThis.visualViewport?.removeEventListener?.('resize', syncVisualViewport);
   globalThis.visualViewport?.removeEventListener?.('scroll', syncVisualViewport);
   globalThis.document?.removeEventListener?.('focusin', onComposerFocusIn);
+  globalThis.document?.removeEventListener?.('focusout', onComposerFocusOut);
   const root = globalThis.document?.documentElement;
   root?.style?.removeProperty?.('--vv-offset-top');
   root?.style?.removeProperty?.('--vv-height');

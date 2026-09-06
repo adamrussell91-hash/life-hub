@@ -6317,12 +6317,50 @@ main { max-width: 76rem; margin: 0 auto; }
     overflow: hidden;
   }
 
-  /* Keyboard open: hide the tab bar and dock the composer to the keyboard floor. */
-  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame {
+  /*
+   * Pin the composer to the canvas floor. Agent picker + protocol pills are taller than a
+   * keyboard-shrunk visual viewport; without this, overflow:hidden clips the field off-screen.
+   */
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #chat-view {
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    /* Absolute composer is out of flow — keep thread clear of it. */
+    padding-bottom: 4.75rem;
+  }
+
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #chat-view .chat-messages {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #chat-view .chat-form {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    margin-top: 0;
+    box-sizing: border-box;
+    background: var(--paper);
+  }
+
+  /* Keyboard / composing: hide the tab bar and drop nav clearance. */
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])):has(#chat-form:focus-within) .page-frame {
     padding-bottom: 0;
   }
 
-  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .hub-mobile-nav {
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .hub-mobile-nav,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])):has(#chat-form:focus-within) .hub-mobile-nav {
+    display: none;
+  }
+
+  /* Free vertical space while typing — pills and portraits were eating the short canvas. */
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #agent-protocol-pills,
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .hub-scroll-hide,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])):has(#chat-form:focus-within) #agent-protocol-pills,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])):has(#chat-form:focus-within) .hub-scroll-hide {
     display: none;
   }
 

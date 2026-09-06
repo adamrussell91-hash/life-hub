@@ -59,6 +59,7 @@ test('attachVisualViewportInset writes CSS variables from visualViewport metrics
 test('vv-keyboard-open stays off when the visual viewport barely shrinks', () => {
   const { classList } = mockDocument();
   globalThis.innerHeight = 800;
+  globalThis.document.activeElement = null;
   globalThis.visualViewport = {
     offsetTop: 0,
     height: 800 - (VV_KEYBOARD_OPEN_PX - 1),
@@ -68,5 +69,22 @@ test('vv-keyboard-open stays off when the visual viewport barely shrinks', () =>
 
   attachVisualViewportInset();
   assert.equal(classList.contains('vv-keyboard-open'), false);
+  detachVisualViewportInset();
+});
+
+test('vv-keyboard-open turns on while the composer is focused even if inset is zero', () => {
+  const { classList } = mockDocument();
+  globalThis.innerHeight = 800;
+  const input = { closest: (sel) => (sel.includes('chat-form') ? input : null) };
+  globalThis.document.activeElement = input;
+  globalThis.visualViewport = {
+    offsetTop: 0,
+    height: 800,
+    addEventListener() {},
+    removeEventListener() {}
+  };
+
+  attachVisualViewportInset();
+  assert.equal(classList.contains('vv-keyboard-open'), true);
   detachVisualViewportInset();
 });
