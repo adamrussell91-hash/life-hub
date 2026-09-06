@@ -6,6 +6,7 @@ import {
   isPathAllowedForAgent,
   loadAllowlist,
   loadCapability,
+  listNamedShortcuts,
   loadRegistry,
   matchGlob,
   OS_FLOOR_CAPABILITY_IDS,
@@ -160,6 +161,18 @@ test('buildAgentTools gives Chadwick last-workout read tools with the exercise l
   assert.ok(names.includes('search_exercise_library'));
   const brisket = buildAgentTools({ slug: 'brisket', allowedTypes: ['meal'] }).map(tool => tool.name);
   assert.ok(!brisket.includes('get_last_workout'));
+});
+
+test('listNamedShortcuts exposes catalog entries without the promote/list/run trio', () => {
+  resetCapabilityCaches();
+  const catalog = listNamedShortcuts();
+  const ids = catalog.map(item => item.id);
+  assert.ok(ids.includes('remember.set-week-flag'));
+  assert.ok(ids.includes('track.open-challenge'));
+  assert.ok(!ids.includes('os.promote-shortcut'));
+  assert.ok(!ids.includes('os.list-promoted-shortcuts'));
+  assert.ok(!ids.includes('os.run-promoted-shortcut'));
+  assert.ok(catalog.every(item => item.tool_name && item.summary));
 });
 
 test('buildAgentTools always includes os_propose_action', () => {
@@ -554,6 +567,7 @@ test('os_list_promoted_shortcuts and os_run_promoted_shortcut replay Confirm wri
   assert.equal(listed.kind, 'ok');
   assert.equal(listed.count, 1);
   assert.equal(listed.drafts[0].proposed_id, 'track.morning-weigh-in');
+  assert.equal(listed.drafts[0].proposed_by, 'brisket');
 
   const run = await executeShortcut(
     'os_run_promoted_shortcut',

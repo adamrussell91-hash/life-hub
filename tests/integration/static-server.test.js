@@ -380,3 +380,32 @@ test('local repository file reads return exact fixture pairs in request order', 
   assert.match(payload.data.files[0].content, /Marley Spoon chicken bowl\./);
   assert.match(payload.data.files[1].content, /^agents:/m);
 });
+
+test('local shortcuts list and run stay on the Confirm path', async t => {
+  const baseUrl = await startServer(t);
+  const auth = await fetch(`${baseUrl}/api/auth`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ passphrase: 'life-hub-local' })
+  });
+  const cookie = auth.headers.get('set-cookie').split(';', 1)[0];
+
+  const listed = await fetch(`${baseUrl}/api/shortcuts`, { headers: { cookie } });
+  const listPayload = await listed.json();
+  assert.equal(listed.status, 200);
+  assert.ok(listPayload.data.catalog.some(item => item.id === 'remember.set-week-flag'));
+  assert.equal(listPayload.data.promoted[0].proposed_id, 'track.morning-weigh-in');
+  assert.equal(listPayload.data.promoted[0].proposed_by, 'brisket');
+
+  const ran = await fetch(`${baseUrl}/api/shortcuts`, {
+    method: 'POST',
+    headers: { cookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ proposed_id: 'track.morning-weigh-in', agent_slug: 'brisket' })
+  });
+  const runPayload = await ran.json();
+  assert.equal(ran.status, 200);
+  assert.match(runPayload.data.proposal.intent, /track\.morning-weigh-in/);
+  assert.equal(runPayload.data.proposal.writes[0].path, 'data/challenges/2026-08-31-weigh-in.json');
+  assert.equal(runPayload.data.agent_slug, 'brisket');
+});
+

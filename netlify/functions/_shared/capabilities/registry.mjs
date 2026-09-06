@@ -121,6 +121,22 @@ export function osFloorIdsForAgent(slug) {
   return OS_FLOOR_CAPABILITY_IDS.filter(id => have.has(id));
 }
 
+export function listNamedShortcuts() {
+  return [...SHORTCUT_CAPABILITY_IDS]
+    .filter(id => id !== 'os.list-promoted-shortcuts' && id !== 'os.run-promoted-shortcut' && id !== 'os.promote-shortcut')
+    .map(id => {
+      const def = loadCapability(id);
+      const entry = loadRegistry().capabilities?.[id] ?? {};
+      return {
+        id,
+        tool_name: def?.tool_name || entry.tool_name || null,
+        summary: def?.prompt_one_liner || '',
+        risk: def?.risk || entry.risk || 'confirm'
+      };
+    })
+    .filter(item => item.tool_name);
+}
+
 export function promptOneLinersForAgent(slug) {
   return capabilityIdsForAgent(slug)
     .map(id => loadCapability(id))

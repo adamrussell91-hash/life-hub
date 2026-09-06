@@ -6881,3 +6881,36 @@ main { max-width: 76rem; margin: 0 auto; }
   min-height: 56px;
   margin-top: 0.5rem;
 }
+
+.shortcuts-list {
+  list-style: none;
+  margin: var(--space-3, 0.75rem) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+}
+
+.shortcuts-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3, 0.75rem);
+}
+
+.shortcuts-item__title {
+  margin: 0;
+  font-weight: var(--weight-medium);
+}
+
+.shortcuts-item__detail,
+.shortcuts-confirm-title {
+  margin: 0.25rem 0 0;
+  color: var(--muted, var(--ink-2));
+  font-size: var(--text-sm);
+}
+
+.shortcuts-confirm-title {
+  color: var(--ink);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
