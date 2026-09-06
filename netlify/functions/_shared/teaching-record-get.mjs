@@ -1,11 +1,17 @@
 import {
   errorResponse,
+  jsonResponse,
   methodNotAllowed,
   okResponse,
   withCors
 } from './http.mjs';
 import { createOperatorHandler } from './operator-gate.mjs';
 import { deleteKey, getJSON, readPublishedId, setJSON } from './teaching-blobs.mjs';
+import {
+  blobJsonStore,
+  liveSnapshotForKind,
+  writeCheckpoint
+} from './teaching-versions.mjs';
 
 const WRITE_METHODS = new Set(['GET', 'PUT', 'PATCH', 'DELETE']);
 
@@ -34,7 +40,7 @@ function mergeRecord(existing, patch) {
   return next;
 }
 
-export function createTeachingRecordHandler({ keyFor, notFound, methods }, deps = {}) {
+export function createTeachingRecordHandler({ keyFor, notFound, methods, versionKind }, deps = {}) {
   const allowed = new Set(methods ?? WRITE_METHODS);
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
@@ -59,8 +65,31 @@ export function createTeachingRecordHandler({ keyFor, notFound, methods }, deps 
     }
     const parsed = await readJsonObject(request);
     if (parsed.error) return withCors(parsed.error, request, env);
+    const checkpointReason = parsed.value.checkpoint_reason;
     const next = mergeRecord(record, parsed.value);
+    delete next.checkpoint_reason;
     await setJSON(store, key, next);
+
+    let warning;
+    if (
+      versionKind &&
+      (checkpointReason === 'ai_accepted' || checkpointReason === 'manual_checkpoint')
+    ) {
+      try {
+        await writeCheckpoint(blobJsonStore(store), {
+          kind: versionKind,
+          parentId: id,
+          snapshot: liveSnapshotForKind(versionKind, next),
+          reason: checkpointReason
+        });
+      } catch {
+        warning = 'Saved, but version history checkpoint failed.';
+      }
+    }
+
+    if (warning) {
+      return withCors(jsonResponse(200, { ok: true, data: next, warning }), request, env);
+    }
     return withCors(okResponse(200, next), request, env);
   }, deps);
 }

@@ -6,7 +6,8 @@ export const config = { path: '/api/lessons/:id' };
 export function createLessonHandler(deps = {}) {
   return createTeachingRecordHandler({
     keyFor: draftLessonKey,
-    notFound: 'Lesson not found'
+    notFound: 'Lesson not found',
+    versionKind: 'lesson'
   }, deps);
 }
 

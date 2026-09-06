@@ -11,6 +11,7 @@ import {
   publishedLessonKey,
   setJSON
 } from './_shared/teaching-blobs.mjs';
+import { blobJsonStore, writeCheckpoint } from './_shared/teaching-versions.mjs';
 import { attachedOutcomeIds, filterBlocksForStudent, sanitizeBlocksDeep } from './_shared/teaching-student.mjs';
 
 export const config = { path: '/api/lessons/:id/publish' };
@@ -49,6 +50,27 @@ export function createLessonPublishHandler(deps = {}) {
     }
 
     const publishedAt = new Date().toISOString();
+    try {
+      await writeCheckpoint(blobJsonStore(store), {
+        kind: 'lesson',
+        parentId: id,
+        snapshot: draft,
+        reason: 'publish',
+        now: publishedAt
+      });
+    } catch {
+      return withCors(
+        errorResponse(
+          500,
+          'checkpoint_failed',
+          'Publish aborted: version history checkpoint failed before writing the published snapshot.',
+          true
+        ),
+        request,
+        env
+      );
+    }
+
     const outcomeIds = attachedOutcomeIds(draft);
     const snapshot = {
       lesson_id: id,
