@@ -7,13 +7,12 @@ import {
   dashboardNextAction,
   dashboardTimeline,
   sourceChipClass,
-  TIMELINE_BUCKETS,
   trendLabel,
   weeklyCompletionTrend,
   type DashboardHeatDay,
   type DashboardTimelineItem
 } from '@/domain/dashboard-overview';
-import { preferredDomains } from '@/domain/queries';
+import { addDays, preferredDomains, startOfDay, toDateKey } from '@/domain/queries';
 import { findStallCandidates } from '@/domain/stall';
 import {
   findPortfolioTension,
@@ -22,6 +21,8 @@ import {
   runningProjectCount
 } from '@/domain/projects-pulse';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { buildAreaLine } from '@/chart-kit/area-line';
+import { animateAreaReveal } from '@/chart-kit/animate';
 import { renderPressureStrips } from '@/views/pinch-strip';
 import { renderProjectPortfolioChart } from '@/views/project-portfolio-chart';
 import { el } from '@/views/hub-kit';
@@ -39,8 +40,10 @@ export type DashboardOverviewOptions = {
 };
 
 const OVERVIEW_OPEN_KEY = 'tasks-hub:dashboard-overview-open';
+const SELECTED_DAY_KEY = 'tasks-hub:dashboard-selected-day';
 const MOBILE_OVERVIEW_QUERY = '(max-width: 720px)';
 const TASK_DRAG_MIME = 'application/x-tasks-hub-task';
+const RAIL_DAYS = 31;
 
 let tensionDismissed = false;
 let draggingTaskId: string | null = null;
@@ -54,6 +57,15 @@ function readOverviewOpen(): boolean {
 
 function writeOverviewOpen(open: boolean): void {
   sessionStorage.setItem(OVERVIEW_OPEN_KEY, open ? 'true' : 'false');
+}
+
+function readSelectedDay(fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  return sessionStorage.getItem(SELECTED_DAY_KEY) ?? fallback;
+}
+
+function writeSelectedDay(dateKey: string): void {
+  sessionStorage.setItem(SELECTED_DAY_KEY, dateKey);
 }
 
 function viewLink(href: string, label: string): HTMLAnchorElement {
@@ -90,28 +102,42 @@ function renderTensionBanner(message: string, onDismiss: () => void): HTMLElemen
   return banner;
 }
 
-function renderSparkline(values: number[], delta: number): SVGSVGElement {
+function renderTrendChart(values: number[], dates: string[], delta: number): SVGSVGElement {
+  const series = values.map((value, index) => ({ date: dates[index], value }));
+  const chart = buildAreaLine(series, { width: 280, height: 72, padding: 8, paddingBottom: 18 });
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'dashboard-sparkline');
-  svg.setAttribute('viewBox', '0 0 84 24');
+  svg.setAttribute('class', 'dashboard-trend-chart');
+  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', 'Completions over the last 14 days');
-  const max = Math.max(1, ...values);
-  const step = values.length > 1 ? 84 / (values.length - 1) : 84;
-  const coords = values.map((value, index) => {
-    const x = index * step;
-    const y = 22 - (value / max) * 18;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const area = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-  area.setAttribute('class', 'dashboard-sparkline__area');
-  area.setAttribute('points', `0,24 ${coords.join(' ')} 84,24`);
-  const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-  line.setAttribute('class', 'dashboard-sparkline__line');
-  line.setAttribute('points', coords.join(' '));
-  line.setAttribute('fill', 'none');
   svg.dataset.trend = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
+
+  const area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  area.setAttribute('data-role', 'area');
+  area.setAttribute('class', 'dashboard-trend-chart__area');
+  area.setAttribute('d', chart.areaPath);
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  line.setAttribute('data-role', 'line');
+  line.setAttribute('class', 'dashboard-trend-chart__line');
+  line.setAttribute('d', chart.linePath);
+  line.setAttribute('fill', 'none');
   svg.append(area, line);
+
+  const first = chart.dayLabels[0];
+  const last = chart.dayLabels[chart.dayLabels.length - 1];
+  for (const label of [first, last]) {
+    if (!label?.date) continue;
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('class', 'dashboard-trend-chart__label');
+    text.setAttribute('x', String(label.x));
+    text.setAttribute('y', String(chart.height - 4));
+    text.setAttribute('text-anchor', label === first ? 'start' : 'end');
+    text.textContent = formatDisplayDate(label.date);
+    svg.append(text);
+  }
+
+  queueMicrotask(() => animateAreaReveal(svg));
   return svg;
 }
 
@@ -143,7 +169,10 @@ function renderFocusStrip(
       value: stats.overdue,
       onClick: () => {
         writeOverviewOpen(true);
+        const todayKey = toDateKey(options.now ?? new Date());
+        writeSelectedDay(todayKey);
         setOverviewOpen(host, true);
+        renderDashboardOverview(host, options);
         requestAnimationFrame(() => {
           document
             .getElementById('timeline-today')
@@ -314,42 +343,102 @@ function renderTimelineRow(
   return row;
 }
 
+function itemsForDay(items: DashboardTimelineItem[], dateKey: string, todayKey: string): DashboardTimelineItem[] {
+  if (dateKey === todayKey) return items.filter((item) => item.daysOut <= 0);
+  return items.filter((item) => item.due_date === dateKey);
+}
+
+function renderTimelineRail(
+  items: DashboardTimelineItem[],
+  selectedKey: string,
+  now: Date,
+  onSelect: (dateKey: string) => void
+): HTMLElement {
+  const todayKey = toDateKey(now);
+  const start = startOfDay(now);
+  const byDay = new Map<string, DashboardTimelineItem[]>();
+  for (const item of items) {
+    const key = item.daysOut <= 0 ? todayKey : item.due_date;
+    const bucket = byDay.get(key) ?? [];
+    bucket.push(item);
+    byDay.set(key, bucket);
+  }
+
+  const rail = el('div', 'dashboard-rail');
+  rail.setAttribute('role', 'list');
+  rail.setAttribute('aria-label', 'Work on a 31-day timeline');
+
+  for (let index = 0; index < RAIL_DAYS; index++) {
+    const date = addDays(start, index);
+    const dateKey = toDateKey(date);
+    const dayItems = byDay.get(dateKey) ?? [];
+    const cell = el('button', 'dashboard-rail__day');
+    cell.type = 'button';
+    cell.setAttribute('role', 'listitem');
+    cell.dataset.date = dateKey;
+    if (dateKey === todayKey) cell.dataset.today = 'true';
+    if (dateKey === selectedKey) cell.dataset.selected = 'true';
+    if (dayItems.some((item) => item.daysOut < 0)) cell.dataset.overdue = 'true';
+    const spoken = dayItems.length
+      ? `${dayItems.length} on ${formatDisplayDate(dateKey)}: ${dayItems.map((item) => item.title).join(', ')}`
+      : `Nothing on ${formatDisplayDate(dateKey)}`;
+    cell.setAttribute('aria-label', spoken);
+    cell.setAttribute('aria-pressed', dateKey === selectedKey ? 'true' : 'false');
+    cell.addEventListener('click', () => onSelect(dateKey));
+
+    const stack = el('span', 'dashboard-rail__stack');
+    for (const item of dayItems.slice(0, 4)) {
+      const mark = el('span', `dashboard-rail__mark dashboard-rail__mark--${item.source}`);
+      mark.title = item.title;
+      stack.append(mark);
+    }
+    if (dayItems.length > 4) {
+      stack.append(el('span', 'dashboard-rail__more', `+${dayItems.length - 4}`));
+    }
+    cell.append(stack, el('span', 'dashboard-rail__tick', String(date.getDate())));
+    rail.append(cell);
+  }
+  return rail;
+}
+
 function renderTimelineCard(
   items: DashboardTimelineItem[],
   options: DashboardOverviewOptions,
-  now: Date
+  now: Date,
+  selectedKey: string,
+  onSelectDay: (dateKey: string) => void
 ): HTMLElement {
   const card = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--timeline');
   card.setAttribute('aria-label', 'Timeline');
   const head = el('div', 'dashboard-overview__head');
   head.append(el('p', 'hub-card__eyebrow', 'Timeline'));
-  head.append(viewLink('#/day', 'Open Today'));
+  head.append(viewLink('#/timeline', 'Open Timeline'));
   card.append(head);
 
   const next = renderNextAction(options, now);
   if (next) card.append(next);
 
-  if (!items.length) {
-    card.append(el('p', 'empty-state empty-state--compact', 'Nothing dated in the next month.'));
-    return card;
-  }
+  card.append(renderTimelineRail(items, selectedKey, now, onSelectDay));
 
-  const rail = el('div', 'dashboard-timeline');
-  for (const bucket of TIMELINE_BUCKETS) {
-    const slice = items.filter((item) => item.bucket === bucket.id);
-    const section = el('section', 'dashboard-timeline__bucket');
-    if (bucket.id === 'today') section.id = 'timeline-today';
-    section.append(el('h3', 'dashboard-timeline__label', bucket.label));
-    if (!slice.length) {
-      section.append(el('p', 'empty-state empty-state--compact', 'Clear.'));
-    } else {
-      const list = el('ul', 'dashboard-overview__list dashboard-timeline__list');
-      for (const item of slice) list.append(renderTimelineRow(item, options));
-      section.append(list);
-    }
-    rail.append(section);
+  const todayKey = toDateKey(now);
+  const dayItems = itemsForDay(items, selectedKey, todayKey);
+  const agenda = el('div', 'dashboard-timeline');
+  if (selectedKey === todayKey) agenda.id = 'timeline-today';
+  agenda.append(
+    el(
+      'h3',
+      'dashboard-timeline__label',
+      selectedKey === todayKey ? 'Today' : formatDisplayDate(selectedKey)
+    )
+  );
+  if (!dayItems.length) {
+    agenda.append(el('p', 'empty-state empty-state--compact', 'Clear.'));
+  } else {
+    const list = el('ul', 'dashboard-overview__list dashboard-timeline__list');
+    for (const item of dayItems) list.append(renderTimelineRow(item, options));
+    agenda.append(list);
   }
-  card.append(rail);
+  card.append(agenda);
   return card;
 }
 
@@ -382,19 +471,55 @@ function renderProjectsCard(
   );
   card.append(portfolio);
 
-  const spark = el('div', `dashboard-trend dashboard-trend--${trend.delta > 0 ? 'up' : trend.delta < 0 ? 'down' : 'flat'}`);
-  spark.append(renderSparkline(trend.daily, trend.delta), el('p', 'dashboard-trend__label', trendLabel(trend)));
+  const heatStart = addDays(startOfDay(now), -13);
+  const dates = trend.daily.map((_, index) => toDateKey(addDays(heatStart, index)));
+  const spark = el(
+    'div',
+    `dashboard-trend dashboard-trend--${trend.delta > 0 ? 'up' : trend.delta < 0 ? 'down' : 'flat'}`
+  );
+  spark.append(renderTrendChart(trend.daily, dates, trend.delta), el('p', 'dashboard-trend__label', trendLabel(trend)));
   card.append(spark);
   return card;
 }
 
+function bindHeatDrop(
+  cell: HTMLElement,
+  day: DashboardHeatDay,
+  options: DashboardOverviewOptions
+): void {
+  cell.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    cell.classList.add('is-drop');
+  });
+  cell.addEventListener('dragleave', () => cell.classList.remove('is-drop'));
+  cell.addEventListener('drop', (event) => {
+    event.preventDefault();
+    cell.classList.remove('is-drop');
+    const id =
+      event.dataTransfer?.getData(TASK_DRAG_MIME) ||
+      event.dataTransfer?.getData('text/plain') ||
+      draggingTaskId;
+    if (!id) return;
+    const task = options.tasks.find((entry) => entry.id === id);
+    if (task) options.onRescheduleTask?.(task, day.date_key);
+  });
+}
+
 function renderHeatCard(
   days: DashboardHeatDay[],
-  options: DashboardOverviewOptions
+  selectedKey: string,
+  options: DashboardOverviewOptions,
+  onSelectDay: (dateKey: string) => void
 ): HTMLElement {
+  const selected = days.find((day) => day.date_key === selectedKey) ?? days[0];
   const card = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--heat');
   card.setAttribute('aria-label', 'Next 14 days');
-  card.append(el('p', 'hub-card__eyebrow', 'Next 14 days'));
+  const head = el('div', 'dashboard-overview__head');
+  head.append(el('p', 'hub-card__eyebrow', 'This fortnight'));
+  if (selected) head.append(viewLink(`#/week?date=${selected.date_key}`, 'Open week'));
+  card.append(head);
+
   const row = el('div', 'dashboard-heat');
   row.setAttribute('role', 'list');
   for (const day of days) {
@@ -402,36 +527,30 @@ function renderHeatCard(
     cell.type = 'button';
     cell.dataset.heat = String(day.heat);
     if (day.isToday) cell.dataset.today = 'true';
+    if (day.date_key === selectedKey) cell.dataset.selected = 'true';
     cell.setAttribute('role', 'listitem');
     cell.setAttribute(
       'aria-label',
       `${day.count} item${day.count === 1 ? '' : 's'} on ${formatDisplayDate(day.date_key)}`
     );
+    cell.setAttribute('aria-pressed', day.date_key === selectedKey ? 'true' : 'false');
     cell.append(el('span', 'dashboard-heat__weekday', day.weekday), el('span', 'dashboard-heat__day', String(day.day)));
     if (day.count) cell.append(el('span', 'dashboard-heat__count', String(day.count)));
-    cell.addEventListener('click', () => {
-      location.hash = `#/week?date=${day.date_key}`;
-    });
-    cell.addEventListener('dragover', (event) => {
-      event.preventDefault();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-      cell.classList.add('is-drop');
-    });
-    cell.addEventListener('dragleave', () => cell.classList.remove('is-drop'));
-    cell.addEventListener('drop', (event) => {
-      event.preventDefault();
-      cell.classList.remove('is-drop');
-      const id =
-        event.dataTransfer?.getData(TASK_DRAG_MIME) ||
-        event.dataTransfer?.getData('text/plain') ||
-        draggingTaskId;
-      if (!id) return;
-      const task = options.tasks.find((entry) => entry.id === id);
-      if (task) options.onRescheduleTask?.(task, day.date_key);
-    });
+    cell.addEventListener('click', () => onSelectDay(day.date_key));
+    bindHeatDrop(cell, day, options);
     row.append(cell);
   }
   card.append(row);
+
+  const peek = el('p', 'dashboard-heat__peek');
+  if (!selected?.items.length) {
+    peek.textContent = selected
+      ? `Nothing dated ${selected.isToday ? 'today' : formatDisplayDate(selected.date_key)}.`
+      : 'Nothing dated in the next fortnight.';
+  } else {
+    peek.textContent = selected.items.map((item) => item.title).join(' · ');
+  }
+  card.append(peek);
   return card;
 }
 
@@ -468,6 +587,14 @@ export function renderDashboardOverview(host: HTMLElement, options: DashboardOve
 
   const prefs = preferredDomains(now);
   const stats = dashboardFocusStats(tasks, projects, now);
+  const todayKey = toDateKey(now);
+  const selectedKey = readSelectedDay(todayKey);
+  const selectDay = (dateKey: string): void => {
+    writeSelectedDay(dateKey);
+    writeOverviewOpen(true);
+    renderDashboardOverview(host, options);
+  };
+
   host.append(renderFocusStrip(stats, options, host));
 
   const shell = el('div', 'dashboard-overview__shell');
@@ -521,14 +648,16 @@ export function renderDashboardOverview(host: HTMLElement, options: DashboardOve
     );
   }
 
+  const heatDays = dashboardHeatDays(tasks, projects, now);
+  panel.append(renderHeatCard(heatDays, selectedKey, options, selectDay));
+
   const grid = el('div', 'dashboard-overview__grid dashboard-overview__grid--merged');
   const timeline = dashboardTimeline(tasks, projects, now);
   grid.append(
-    renderTimelineCard(timeline, options, now),
+    renderTimelineCard(timeline, options, now, selectedKey, selectDay),
     renderProjectsCard(projects, tasks, now, options)
   );
   panel.append(grid);
-  panel.append(renderHeatCard(dashboardHeatDays(tasks, projects, now), options));
 
   const pressure = el('div', 'dashboard-overview__pressure');
   renderPressureStrips(pressure, tasks, now, () => onChanged?.(), {
