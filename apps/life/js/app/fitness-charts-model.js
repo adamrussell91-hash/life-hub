@@ -1,6 +1,6 @@
-import { addCalendarDays, enumerateDateKeys, formatWeekday, getSydneyWeekStart } from '../core/time.js';
+import { addCalendarDays, daysBetween, enumerateDateKeys, formatWeekday, getSydneyWeekStart } from '../core/time.js';
 import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
-import { minutesFromTime } from './chart-kit/polar-clock.js';
+import { MONTHS, minutesFromTime } from './chart-kit/polar-clock.js';
 import {
   REGION_KEYS,
   REGION_LABELS,
@@ -37,11 +37,6 @@ export const REGION_COLOURS = {
   abs: CLINICAL_CHART_SLOTS[2],
   legs: CLINICAL_CHART_SLOTS[3],
   back: CLINICAL_CHART_SLOTS[4]
-};
-const DAY_TYPE_COLOURS = {
-  movement: CLINICAL_CHART_SLOTS[7],
-  workout_30: CLINICAL_CHART_SLOTS[0],
-  workout_45_60: CLINICAL_CHART_SLOTS[1]
 };
 const TRAIN_BANDS = [
   { key: 'morning', label: 'Morning', adverb: 'mornings' },
@@ -294,10 +289,6 @@ function sessionRegions(record) {
   return [...regions];
 }
 
-function primaryRegion(record) {
-  return sessionRegions(record)[0] ?? null;
-}
-
 function mean(values) {
   const finite = (values ?? []).filter(Number.isFinite);
   if (!finite.length) return null;
@@ -388,36 +379,66 @@ export function buildTrainWhen(records) {
   };
 }
 
-function buildOrbitDays(records, windowDates) {
-  const byDate = new Map(records.map(record => [record.date, record]));
-  const days = windowDates.map(date => {
-    const record = byDate.get(date);
-    return {
-      date,
-      volume: record ? sessionVolume(record) : 0,
-      dayType: record?.day_type ?? (record ? 'workout_30' : 'rest'),
-      colour: record ? (DAY_TYPE_COLOURS[record.day_type] ?? CLINICAL_CHART_SLOTS[0]) : CLINICAL_CHART_SLOTS[7]
-    };
-  });
-  return days.some(day => day.volume > 0) && days.filter(day => day.volume > 0).length >= 2 ? days : [];
+function longestRestGap(trained, date) {
+  const ordered = [...trained].sort();
+  let best = 0;
+  for (let index = 1; index < ordered.length; index += 1) {
+    best = Math.max(best, daysBetween(ordered[index - 1], ordered[index]) - 1);
+  }
+  if (ordered.length) best = Math.max(best, daysBetween(ordered.at(-1), date));
+  return best;
 }
 
-function buildE1rmRadial(trends) {
-  const points = [];
-  for (const lift of trends ?? []) {
-    const peak = Math.max(...lift.series.map(point => point.value), 0);
-    if (!(peak > 0) || lift.series.length < 2) continue;
-    for (const point of lift.series) {
-      points.push({
-        name: lift.name,
-        date: point.date,
-        value: point.value,
-        pct: (point.value / peak) * 100,
-        colour: CLINICAL_CHART_SLOTS[points.length % CLINICAL_CHART_SLOTS.length]
-      });
-    }
+export function buildMonthRhythm(records, windowDates, date) {
+  const days = windowDates ?? [];
+  if (days.length < 2) return null;
+  const trained = new Set((records ?? []).map(record => record.date).filter(day => day >= days[0] && day <= days.at(-1)));
+  if (trained.size < 2) return null;
+  const endWeek = getSydneyWeekStart(date);
+  const weeks = [];
+  for (let offset = 4; offset >= 0; offset -= 1) {
+    const weekStart = addCalendarDays(endWeek, -7 * offset);
+    const weekEnd = addCalendarDays(weekStart, 6);
+    weeks.push({
+      key: weekStart,
+      value: [...trained].filter(day => day >= weekStart && day <= weekEnd && day <= date).length
+    });
   }
-  return points.length >= 2 ? points : [];
+  const gap = longestRestGap(trained, date);
+  return {
+    count: trained.size,
+    days: days.length,
+    longestGap: gap,
+    weeks,
+    read: gap >= 3
+      ? `${trained.size} sessions in the last ${days.length} days · longest gap ${gap} days`
+      : `${trained.size} sessions in the last ${days.length} days`
+  };
+}
+
+export function buildE1rmVsBest(trends) {
+  const lifts = (trends ?? []).flatMap(lift => {
+    if (lift.series.length < 2) return [];
+    const peak = Math.max(...lift.series.map(point => point.value), 0);
+    const latest = lift.series.at(-1);
+    if (!(peak > 0) || !latest) return [];
+    return [{
+      key: lift.name,
+      label: lift.name,
+      value: Math.round((latest.value / peak) * 100),
+      kg: latest.value,
+      peak,
+      date: latest.date
+    }];
+  }).sort((left, right) => right.value - left.value || left.label.localeCompare(right.label));
+  if (!lifts.length) return null;
+  const closest = lifts[0];
+  const furthest = lifts.at(-1);
+  let read = `Closest to best: ${closest.label} · ${closest.value}%`;
+  if (lifts.length > 1 && furthest.value < closest.value) {
+    read += ` · furthest ${furthest.label} · ${furthest.value}%`;
+  }
+  return { lifts, read };
 }
 
 function buildBumpRanks(trends, date) {
@@ -587,18 +608,27 @@ function buildSessionGauge(records) {
   };
 }
 
-function buildYearDots(events, date) {
+export function buildYearMonths(events, date) {
   const year = String(date).slice(0, 4);
-  const dots = (events ?? [])
-    .map(({ record }) => record)
-    .filter(record => record?.status === 'completed' && String(record.date).startsWith(year) && record.date <= date)
-    .map(record => ({
-      date: record.date,
-      region: primaryRegion(record),
-      colour: REGION_COLOURS[primaryRegion(record)] ?? CLINICAL_CHART_SLOTS[7],
-      volume: sessionVolume(record)
-    }));
-  return dots.length >= 2 ? dots : [];
+  const counts = MONTHS.map(() => 0);
+  for (const { record } of events ?? []) {
+    if (record?.status !== 'completed' || !String(record.date).startsWith(year) || record.date > date) continue;
+    const month = Number(String(record.date).slice(5, 7)) - 1;
+    if (month >= 0 && month < 12) counts[month] += 1;
+  }
+  const total = counts.reduce((sum, value) => sum + value, 0);
+  if (total < 2) return null;
+  const through = Number(String(date).slice(5, 7));
+  return {
+    year,
+    count: total,
+    months: MONTHS.slice(0, through).map((label, index) => ({
+      key: String(index + 1),
+      label,
+      value: counts[index]
+    })),
+    read: `${total} sessions in ${year}`
+  };
 }
 
 function buildRepRead(items) {
@@ -701,8 +731,8 @@ export function buildFitnessCharts({
     ].filter(Boolean),
     painBySite: buildPainBySite(records),
     trainWhen: buildTrainWhen(history),
-    orbitDays: buildOrbitDays(records, windowDates),
-    e1rmRadial: buildE1rmRadial(buildE1rmTrends(history)),
+    monthRhythm: buildMonthRhythm(records, windowDates, date),
+    e1rmVsBest: buildE1rmVsBest(buildE1rmTrends(history)),
     bumpRanks: buildBumpRanks(buildE1rmTrends(history), date),
     regionStream: buildRegionStream(history, date),
     painHeat: buildPainHeat(history, date),
@@ -710,7 +740,7 @@ export function buildFitnessCharts({
     regionVolumePrior: buildPriorRegionVolume(events, date),
     e1rmBands: buildE1rmBands(buildE1rmTrends(history)),
     sessionGauge: buildSessionGauge(history),
-    yearDots: buildYearDots(events, date),
+    yearMonths: buildYearMonths(events, date),
     year: Number(String(date).slice(0, 4)),
     repRead: buildRepRead(buildRepRanges(records)),
     weekTarget

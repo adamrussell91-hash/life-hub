@@ -201,7 +201,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
-| 2026-09-06 | Fitness | “When you train” uses `columns` plus a typical-time caption. Polar time-of-day scatter retired. |
+| 2026-09-06 | Fitness | Polar “When you train”, monthly rhythm, e1RM scatter, and year wheel now use `columns` plus a one-line read. Chart hovers pin to the mark with `position: fixed`. |
 | 2026-09-05 | Fitness | Polar labels sit outside the plot with leader lines; week volume bars animate width, not height. No new catalog types. |
 | 2026-09-05 | grammar | Documented multi-representation visual grammar (time/state/selection/importance/relationship) + agent catalog rule. No new chart types. |
 | 2026-09-05 | Fitness | Fitness painters now consume Mind / Bloods interaction chrome: axis and ring labels, `mind-chart-legend`, `mind-bump__tooltip` hover, `animateAreaReveal` / `animateColumnGrow`. Polar cards cap at 18–20rem. No new catalog types. |
