@@ -196,7 +196,8 @@ export function parseQuizStore(raw) {
     schema_version: 1,
     schedule: Array.isArray(value.schedule) ? value.schedule : [],
     edges: Array.isArray(value.edges) ? value.edges : [],
-    dumps: Array.isArray(value.dumps) ? value.dumps : []
+    dumps: Array.isArray(value.dumps) ? value.dumps : [],
+    page_reviews: Array.isArray(value.page_reviews) ? value.page_reviews : []
   };
 }
 
@@ -398,7 +399,8 @@ export async function saveQuizRecord(input, { env, fetchImpl = fetch } = {}) {
     schema_version: 1,
     schedule: input.schedule,
     edges: Array.isArray(input.edges) ? input.edges : previous.edges,
-    dumps: Array.isArray(input.dumps) ? input.dumps : previous.dumps
+    dumps: Array.isArray(input.dumps) ? input.dumps : previous.dumps,
+    page_reviews: Array.isArray(input.page_reviews) ? input.page_reviews : previous.page_reviews
   };
   await putWithRetry('quiz/schedule.json', JSON.stringify(store), { env, fetchImpl }, 'Save quiz schedule', current?.sha);
   const byPage = new Map();
