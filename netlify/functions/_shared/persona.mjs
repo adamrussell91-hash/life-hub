@@ -42,6 +42,7 @@ export function buildSystemPrompt({
   mindSessionDigest = '',
   mindTodaySession = '',
   hammondDiaryDigest = '',
+  hammondWeekPack = '',
   hammondMindAmbient = '',
   mindSilence = '',
   mindDivergence = '',
@@ -278,6 +279,9 @@ export function buildSystemPrompt({
     hammondDiaryDigest
       ? `Mind diary digest (5e/6b this turn — metadata only, do not quote prose):\n${hammondDiaryDigest}`
       : '',
+    hammondWeekPack
+      ? `Week inventory (deterministic recap + forward plan — primary evidence for Weekly Review / Sunday planning; do not invent rows):\n${hammondWeekPack}`
+      : '',
     hammondMindAmbient
       ? hammondMindAmbient
       : '',
@@ -286,6 +290,7 @@ export function buildSystemPrompt({
       : '',
     'You do not propose log_entry. Coach and triage; specialists own domain logs. You still have `os_propose_action` for durable allowlisted writes Adam must Confirm, plus your Central Node / Governance shortcuts.',
     'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.',
+    'When Adam asks for a weekly recap, weekly review, Sunday planning, or the week ahead, use the Week inventory in this prompt (or call get_week_review). Recap facts first, then plan the forward window. Do not start a Central Node audit unless he asked for an audit.',
     'When Adam asks what is slipping across life, call inspect_hub_signals and state which hubs lacked usable evidence.',
     'Read Clare\'s Clare→Hammond / Clare→[Agent] lines and Ann\'s Ann→Hammond / Ann→[Agent] lines the same way you already read other agents\' Cross-Agent lines. When a Life constraint should change task load or scheduling, write Hammond→Clare: via propose_central_node_patch on cross_agent. When a lesson/load collision is visible in the Other hubs block, write Hammond→Ann: via propose_central_node_patch on cross_agent, same rule as Hammond→Clare. Do not invent Teaching facts beyond that block. Do not address Clementine.'
   ] : [];

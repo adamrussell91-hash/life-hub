@@ -242,6 +242,12 @@ import {
 } from './_shared/sara-clinical-context.mjs';
 import { selectHammondFitnessEntries, selectHammondEventEntries, summarizeHammondDigest, formatCentralNodeModelForPrompt, getWindowStart, getCnModelWindowStart } from './_shared/hammond-digest.mjs';
 import {
+  WEEK_PACK_UNAVAILABLE_MARKER,
+  buildHammondWeekPack,
+  formatHammondWeekPackForPrompt,
+  getWeekReview
+} from './_shared/hammond-week.mjs';
+import {
   getMindDigestWindowStart,
   selectMindEntries,
   selectOnThisDayEntries,
@@ -486,6 +492,9 @@ export function createChatHandler({
         let pendingActionsSha;
         let hammondDigest = '';
         let hammondCnSummary = '';
+        let hammondEvents = [];
+        let hammondWeekPack = '';
+        let hammondLifeLoadFailed = false;
         let foodLibraryEntries = [];
         let foodLibrary = '';
         let foodLibrarySha;
@@ -1000,6 +1009,7 @@ export function createChatHandler({
             const fitnessRecords = parseHammondFitnessRecords(hammondFitnessEntries, hammondFitnessBlobs);
             hammondDigest = summarizeHammondDigest({ tree: current.tree, fitnessRecords, today });
             const cnEvents = parseHammondEventDocuments(hammondCnEntries, hammondCnBlobs);
+            hammondEvents = cnEvents;
             hammondCnSummary = formatCentralNodeModelForPrompt(buildCentralNodeModel({
               events: cnEvents,
               targetsConfig: TARGETS_CONFIG,
@@ -1112,6 +1122,9 @@ export function createChatHandler({
           pendingCnPatchesSha = undefined;
           hammondDigest = '';
           hammondCnSummary = '';
+          hammondEvents = [];
+          hammondWeekPack = '';
+          hammondLifeLoadFailed = needsHammondTools;
           hammondMindAmbient = '';
           foodLibraryEntries = [];
           foodLibrary = '';
@@ -1204,6 +1217,19 @@ export function createChatHandler({
         const intuitionPrompt = formatIntuitionForPrompt(intuitionPacks);
         const capacityOneLiners = promptOneLinersForAgent(slug);
         const hubContext = needsHubRetrieval ? await hubContextPromise : '';
+        if (needsHammondTools) {
+          hammondWeekPack = hammondLifeLoadFailed
+            ? WEEK_PACK_UNAVAILABLE_MARKER
+            : formatHammondWeekPackForPrompt(buildHammondWeekPack({
+              events: hammondEvents,
+              tasks: hubTasks,
+              lessons: hubLessons,
+              classes: hubClasses,
+              centralNodeMarkdown,
+              today,
+              loadErrors: hubLoadErrors
+            }));
+        }
         sourceMeta = {
           ...(slug === 'chadwick' ? {
             fitness_sessions: {
@@ -1272,6 +1298,8 @@ export function createChatHandler({
             pages: knowledgePages,
             loadErrors: hubLoadErrors,
             hammondDigest,
+            hammondEvents,
+            centralNodeMarkdown,
             nutritionChallenges,
             templates: [],
             stressFlags: [],
@@ -1320,6 +1348,7 @@ export function createChatHandler({
           daysSinceLastSession: sessionAdherenceDays,
           mindDiaryDigest,
           hammondDiaryDigest,
+          hammondWeekPack,
           hammondMindAmbient,
           mindSessionDigest,
           mindTodaySession,
@@ -1544,6 +1573,21 @@ export function createChatHandler({
                   loadErrors: hubLoadErrors,
                   hammondDigest,
                   now: nowInstant
+                }));
+              }
+              if (event.name === 'get_week_review') {
+                send({ type: 'status', text: 'Reading the week…' });
+                return JSON.stringify(getWeekReview({
+                  events: hammondEvents,
+                  tasks: hubTasks,
+                  lessons: hubLessons,
+                  classes: hubClasses,
+                  centralNodeMarkdown,
+                  today,
+                  loadErrors: {
+                    ...hubLoadErrors,
+                    ...(hammondLifeLoadFailed ? { life: 'load_failed' } : {})
+                  }
                 }));
               }
               if (event.name === 'search_medical_records') {

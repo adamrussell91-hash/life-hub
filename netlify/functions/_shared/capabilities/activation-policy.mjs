@@ -137,6 +137,22 @@ const INTENT_RULES = [
     ]
   },
   {
+    id: 'weekly_planning',
+    agents: ['hammond'],
+    requiredTools: ['get_week_review'],
+    patterns: [
+      /weekly\s*review/i,
+      /weekly\s*recap/i,
+      /week\s+recap/i,
+      /recap\s+(?:the\s+|this\s+)?week/i,
+      /week(?:ly)?\s+(?:forward\s+)?plan/i,
+      /plan\s+(?:the\s+|my\s+|for\s+)?(?:next|coming)\s+week/i,
+      /sunday\s+(?:night\s+)?(?:review|planning|recap)/i,
+      /how\s+(?:was|did)\s+(?:this|the)\s+week/i,
+      /week\s+ahead/i
+    ]
+  },
+  {
     id: 'history_search',
     agents: ['chadwick', 'brisket', 'sara', 'penelope', 'vera', 'hyaluronica', 'clare', 'ann', 'clementine'],
     requiredToolsByAgent: {
@@ -206,6 +222,7 @@ const CATALOGUES = {
   ],
   hammond: [
     'Cross-hub signals — inspect_hub_signals (Tasks/Teaching/Life digests available this turn)',
+    'Week inventory — get_week_review (last-week recap + next-week forward plan). A Week pack may be preloaded; still call the tool if the pack is missing/unavailable or he asks to refresh.',
     'Full Central Node + governance tail may be preloaded — still call inspect_hub_signals when asking what is slipping across life.',
     'State which hubs lacked usable evidence. Do not invent rows.'
   ]

@@ -135,7 +135,7 @@ const CASES = [
   {
     slug: 'hammond',
     broad: 'What is slipping across my life?',
-    expectTools: ['inspect_hub_signals']
+    expectTools: ['inspect_hub_signals', 'get_week_review']
   }
 ];
 
