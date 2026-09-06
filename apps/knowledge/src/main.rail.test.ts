@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 const dir = dirname(fileURLToPath(import.meta.url));
 const main = readFileSync(join(dir, "main.ts"), "utf8");
 const css = readFileSync(join(dir, "style.css"), "utf8");
+const mobile = readFileSync(join(dir, "mobile-chrome.ts"), "utf8");
 
 describe("Knowledge Hub rail", () => {
   it("does not expose an Alchemist workplace", () => {
@@ -35,6 +36,19 @@ describe("Knowledge Hub rail", () => {
     expect(css).toContain(".gpa-chip");
     expect(css).not.toContain(".uni-tl__labels");
     expect(css).toContain("overflow-y: auto");
+  });
+
+  it("adds a Notebooks gallery with equal cover cards", () => {
+    expect(main).toContain('data-nav="notebooks"');
+    expect(main).toContain("<span>Notebooks</span>");
+    expect(main).toContain("renderNotebooks");
+    expect(main).toContain("notebooksGridHtml");
+    expect(main).toContain('id: "notebooks", label: "Notebooks"');
+    expect(css).toContain(".nb-grid");
+    expect(css).toContain("aspect-ratio: 3 / 2");
+    expect(css).toContain(".nb-open__notes");
+    expect(mobile).toContain('id: "notebooks"');
+    expect(mobile).toContain("goNotebooks");
   });
 
   it("offers a quiet Clean up control beside Edit in the reader", () => {
