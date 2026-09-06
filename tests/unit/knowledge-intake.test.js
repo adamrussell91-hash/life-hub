@@ -94,6 +94,25 @@ test('accept applies the tidy proposal; reject leaves the page alone', async () 
   assert.equal(rejectedContext.saved.length, 0);
 });
 
+test('accepting tidy keeps pre-existing file links the model dropped', async () => {
+  const pageWithFile = {
+    ...page,
+    body: '[paper.pdf](Readings%20folder/paper.pdf)\n\nMessy notes.',
+    attachments: [{ id: 'att-1', filename: 'paper.pdf', r2_key: 'university/paper.pdf' }]
+  };
+  const context = deps({
+    getPage: async id => (id === pageWithFile.id ? { ...pageWithFile } : null)
+  });
+  const review = await runKnowledgeIntakeUntilReview(
+    createKnowledgeIntakeJob({ id: 'ai_job_1', page_id: 'note-1', now: '2026-09-06T01:00:00.000Z' }),
+    context
+  );
+  const accepted = await resolveKnowledgeIntakeJob(review, 'accepted', context);
+  assert.equal(accepted.resolution, 'accepted');
+  assert.match(context.saved[0].body, /\[paper\.pdf\]\(Readings%20folder\/paper\.pdf\)/);
+  assert.deepEqual(context.saved[0].attachments, pageWithFile.attachments);
+});
+
 test('accept refuses when the page changed while the review card was open', async () => {
   const context = deps({
     getPage: async () => ({
