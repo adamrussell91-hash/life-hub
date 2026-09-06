@@ -793,13 +793,19 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .chat-message__body {
   min-width: 0;
-  flex: 1 1 12rem;
+  /* Grow beside an avatar; size short replies to their text, not a fixed floor. */
+  flex: 1 1 auto;
+  width: max-content;
+  max-width: 100%;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
 }
 
 .chat-message__actions {
+  /* Stay on their own row without widening fit-content bubbles to Copy/Retry. */
   flex: 1 1 100%;
+  width: 0;
+  min-width: 100%;
   display: flex;
   gap: var(--space-2);
   padding-left: 3.4rem;
@@ -4394,16 +4400,9 @@ main { max-width: 76rem; margin: 0 auto; }
 .chat-message--user .chat-message__avatar { display: none; }
 
 .chat-message--status .chat-message__body {
+  color: var(--muted);
+  font-size: var(--text-sm);
   opacity: 0.85;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .chat-message--status .chat-message__body {
-    animation: chat-status-pulse 1.4s ease-in-out infinite;
-  }
-}
-@keyframes chat-status-pulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
 }
 
 [data-sync-quiet] .chart-animating [data-role="line"],
@@ -6242,22 +6241,6 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .chat-view[data-chrome='engaged'] .agent-picker__name {
   display: none;
-}
-
-.chat-message--status .chat-message__body {
-  color: var(--muted);
-  font-size: var(--text-sm);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .chat-message--status .chat-message__body {
-    animation: chat-status-pulse 1.4s ease-in-out infinite;
-  }
-}
-
-@keyframes chat-status-pulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
 }
 
 .chat-view[data-panel-mode="overlay"] {

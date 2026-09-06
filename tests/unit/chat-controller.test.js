@@ -59,6 +59,17 @@ class FakeElement extends EventTarget {
     return this.parent != null;
   }
 
+  get nextSibling() {
+    if (!this.parent) return null;
+    const idx = this.parent.children.indexOf(this);
+    if (idx < 0) return null;
+    return this.parent.children[idx + 1] ?? null;
+  }
+
+  get lastElementChild() {
+    return this.children[this.children.length - 1] ?? null;
+  }
+
   setAttribute(name, value) {
     this.attributes.set(name, String(value));
   }
@@ -772,6 +783,57 @@ test('shows an in-character wait line immediately and clears it when real text a
 function statusBubbles(root) {
   return messageBubbles(root).filter(bubble => bubble.className?.includes('chat-message--status'));
 }
+
+test('status rotates update text without remounting a bubble that is already last', async () => {
+  const root = new FakeDocument();
+  let resolveSecond;
+  const secondStatus = new Promise(resolve => {
+    resolveSecond = resolve;
+  });
+  let resolveDone;
+  const finish = new Promise(resolve => {
+    resolveDone = resolve;
+  });
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'status', text: 'tick-1' };
+      await secondStatus;
+      yield { type: 'status', text: 'tick-2' };
+      await finish;
+      yield { type: 'text', delta: 'About 520 kcal.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  const pending = controller.send('bacon egg roll');
+  await flushMicrotasks();
+
+  const first = statusBubbles(root)[0];
+  assert.ok(first);
+  const before = bubbleText(first);
+  assert.equal(isAgentStatusLine('brisket', before), true);
+  let removes = 0;
+  const originalRemove = first.remove.bind(first);
+  first.remove = () => {
+    removes += 1;
+    originalRemove();
+  };
+
+  resolveSecond();
+  await flushMicrotasks();
+  await flushMicrotasks();
+
+  const second = statusBubbles(root)[0];
+  assert.equal(second, first, 'status rotate must keep the same DOM node');
+  assert.equal(isAgentStatusLine('brisket', bubbleText(second)), true);
+  assert.equal(removes, 0, 'already-last status bubble must not remount on rotate');
+
+  resolveDone();
+  await pending;
+  assert.equal(statusBubbles(root).length, 0);
+});
 
 test('a search followed by a saved-library note keeps a sticky Researching… status until real text arrives', async () => {
   const root = new FakeDocument();
