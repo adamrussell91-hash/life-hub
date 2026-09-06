@@ -24,13 +24,33 @@ import {
 
 export const config = { path: '/api/curriculum' };
 
+function lessonStatus(lesson) {
+  return lesson.status === 'archived' || lesson.status === 'trashed' ? lesson.status : 'active';
+}
+
 function lessonSummary(lesson, publishedIds) {
   const id = typeof lesson.id === 'string' ? lesson.id : '';
   return {
     id,
     title: typeof lesson.title === 'string' ? lesson.title : '',
+    slug: typeof lesson.slug === 'string' ? lesson.slug : '',
     unit_id: typeof lesson.unit_id === 'string' ? lesson.unit_id : undefined,
-    published: publishedIds.has(id)
+    sequence: Number.isInteger(lesson.sequence) ? lesson.sequence : 0,
+    status: lessonStatus(lesson),
+    published: publishedIds.has(id),
+    updated_at: typeof lesson.updated_at === 'string' ? lesson.updated_at : '',
+    ...(typeof lesson.created_at === 'string' ? { created_at: lesson.created_at } : {}),
+    ...(typeof lesson.published_at === 'string' ? { published_at: lesson.published_at } : {}),
+    ...(Array.isArray(lesson.tags) && lesson.tags.length ? { tags: lesson.tags } : {}),
+    ...(typeof lesson.author_id === 'string' ? { author_id: lesson.author_id } : {}),
+    ...(lesson.review_status === 'needs_review' ? { review_status: 'needs_review' } : {}),
+    ...(Array.isArray(lesson.syllabus_outcomes) && lesson.syllabus_outcomes.length
+      ? { syllabus_outcomes: lesson.syllabus_outcomes }
+      : {}),
+    ...(Array.isArray(lesson.outcome_ids) && lesson.outcome_ids.length
+      ? { outcome_ids: lesson.outcome_ids }
+      : {}),
+    ...(typeof lesson.pedagogical_mode === 'string' ? { pedagogical_mode: lesson.pedagogical_mode } : {})
   };
 }
 
