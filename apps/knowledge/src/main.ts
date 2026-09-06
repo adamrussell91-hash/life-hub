@@ -23,9 +23,12 @@ import {
   savePage,
   searchPages,
   signAttachment,
-  tidyPage,
+  resolveTidyIntake,
+  startTidyIntake,
   uploadSignedFile,
+  type KnowledgeIntakeJob,
 } from "./api/client";
+import { intakeBusyLabel, intakeReviewHtml } from "./tidy/intakeView";
 import { takeSignInQuery } from "./api/loginGate";
 import { isPageHash, pageHashForId, pageIdFromHash } from "./routing/pageHash";
 import { runCapture } from "./api/captureClient";
@@ -225,7 +228,7 @@ let composeOriginKind: Origin["kind"] = "degree";
 let activePage: Page | null = null;
 let pendingMorphOrigin: { left: number; top: number; width: number; height: number } | null = null;
 let tidyBusy = false;
-let tidyConfirmPending = false;
+let tidyReviewJob: KnowledgeIntakeJob | null = null;
 const HUB_MARK_SRC = "./icons/knowledge.svg";
 let quizStore: QuizStore | null = null;
 let pageReviews: PageReview[] = [];
@@ -1301,7 +1304,7 @@ function renderPage(page: Page) {
       `        <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : "Archive"}</button>
         <button class="btn btn--ghost" data-pin-note type="button">${isPinned(page.id) ? "Unpin" : "Pin"}</button>
         <button class="btn btn--ghost" data-edit type="button">Edit</button>
-        <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyConfirmPending ? "disabled" : ""}>${tidyBusy ? "Cleaning up…" : "Clean up"}</button>
+        <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyReviewJob ? "disabled" : ""}>${tidyBusy ? intakeBusyLabel(tidyReviewJob?.phase) : "Clean up"}</button>
         <button class="btn btn--ghost" data-open-chat type="button">Chat</button>
         ${
           resolvedOrigins(page).find(origin => origin.kind === "book")
@@ -1311,16 +1314,8 @@ function renderPage(page: Page) {
     )}
     <article class="reader" data-hub-morph-page>
       ${
-        tidyConfirmPending
-          ? `<section class="confirm-card" role="region" aria-label="Confirm clean up">
-        <p class="page-header__eyebrow">Proposed write</p>
-        <h2 class="page-header__title" style="font-size: var(--text-lg)">Clean up this note</h2>
-        <p class="page-header__supporting">AI will rewrite the title, tags, and body. Review the result when it finishes.</p>
-        <div class="confirm-card__actions">
-          <button class="btn btn--ghost" data-tidy-discard type="button">Discard</button>
-          <button class="btn btn--primary" data-tidy-confirm type="button">Confirm</button>
-        </div>
-      </section>`
+        tidyReviewJob
+          ? intakeReviewHtml(tidyReviewJob)
           : ""
       }
       ${dueReviewsFor([page]).length ? pageReviewActionsHtml() : ""}
@@ -1356,22 +1351,43 @@ function renderPage(page: Page) {
     const book = resolvedOrigins(page).find(origin => origin.kind === "book");
     openBookNote(book?.label);
   });
-  app.querySelector<HTMLButtonElement>("[data-tidy]")!.onclick = () => {
-    if (tidyBusy || tidyConfirmPending) return;
-    tidyConfirmPending = true;
-    render();
-  };
-  app.querySelector<HTMLButtonElement>("[data-tidy-discard]")?.addEventListener("click", () => {
-    tidyConfirmPending = false;
-    render();
-  });
-  app.querySelector<HTMLButtonElement>("[data-tidy-confirm]")?.addEventListener("click", async () => {
-    if (tidyBusy) return;
-    tidyConfirmPending = false;
+  app.querySelector<HTMLButtonElement>("[data-tidy]")!.onclick = async () => {
+    if (tidyBusy || tidyReviewJob) return;
     tidyBusy = true;
     render();
     try {
-      activePage = await tidyPage(page.id, page.updated_at);
+      const job = await startTidyIntake(page.id);
+      if (job.status === "error") throw new Error(job.error || "Clean up failed");
+      tidyReviewJob = job;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Clean up failed");
+    } finally {
+      tidyBusy = false;
+      render();
+    }
+  };
+  app.querySelector<HTMLButtonElement>("[data-tidy-discard]")?.addEventListener("click", async () => {
+    const job = tidyReviewJob;
+    tidyReviewJob = null;
+    render();
+    if (job) {
+      try {
+        await resolveTidyIntake(job.id, "rejected");
+      } catch {
+        // Discard still closes the card if the job is already gone.
+      }
+    }
+  });
+  app.querySelector<HTMLButtonElement>("[data-tidy-confirm]")?.addEventListener("click", async () => {
+    const job = tidyReviewJob;
+    if (!job || tidyBusy) return;
+    tidyBusy = true;
+    render();
+    try {
+      const next = await resolveTidyIntake(job.id, "accepted");
+      if (next.applied_page) activePage = next.applied_page;
+      else activePage = await getPage(page.id);
+      tidyReviewJob = null;
       entries = await listPages();
       await refreshVisible();
       showToast("Cleaned up");

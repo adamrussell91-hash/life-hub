@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const main = readFileSync(join(dir, "main.ts"), "utf8");
+const intakeView = readFileSync(join(dir, "tidy/intakeView.ts"), "utf8");
 const css = readFileSync(join(dir, "style.css"), "utf8");
 const mobile = readFileSync(join(dir, "mobile-chrome.ts"), "utf8");
 
@@ -54,7 +55,7 @@ describe("Knowledge Hub rail", () => {
   it("offers a quiet Clean up control beside Edit in the reader", () => {
     expect(main).toContain('class="btn btn--ghost reader__tidy" data-tidy type="button"');
     expect(main).toContain("Clean up");
-    expect(main).toContain("Cleaning up…");
+    expect(intakeView).toContain("Cleaning up…");
     expect(main).toContain("readerTopicPillsHtml");
     expect(main).toContain("cardSupportingText");
     expect(main).not.toMatch(/hub-utilities[\s\S]*data-tidy/);
@@ -69,8 +70,10 @@ describe("Knowledge Hub rail", () => {
     expect(main).not.toMatch(/page-header__title-row[\s\S]*?hub-mark/);
     expect(main).toContain("icons/knowledge.svg");
     expect(main).toContain("sign-in__mark");
-    expect(main).toContain("confirm-card");
-    expect(main).toContain("data-tidy-confirm");
+    expect(intakeView).toContain("confirm-card");
+    expect(intakeView).toContain("data-tidy-confirm");
+    expect(main).toContain("startTidyIntake");
+    expect(main).toContain("intakeReviewHtml");
     expect(css).toContain("grid-template-areas:");
     expect(css).toContain('"title title"');
     expect(css).not.toMatch(/\.reader__tidy\s*\{[^}]*font-size:/);

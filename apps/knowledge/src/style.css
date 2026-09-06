@@ -2893,6 +2893,24 @@ body.is-universe-fullscreen .local-banner {
   color: var(--muted);
 }
 
+.reader__intake-title,
+.reader__intake-tags,
+.reader__intake-body {
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+.reader__intake-title {
+  font-size: var(--text-md);
+}
+
+.reader__intake-tags,
+.reader__intake-body {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
 .floating-chat-button {
   position: fixed;
   right: 1.5rem;

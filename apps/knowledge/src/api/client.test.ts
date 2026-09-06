@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ChatWriteDroppedError, fetchSession, getPage, listPages, login, runChat, runCoach, savePage, signAttachment, tidyEndpoint, tidyPage } from "./client";
+import { ChatWriteDroppedError, fetchSession, getPage, listPages, login, runChat, runCoach, savePage, signAttachment, startTidyIntake, tidyEndpoint, tidyPage } from "./client";
 import { API_BASE } from "./config";
 
 describe("api client", () => {
@@ -303,7 +303,7 @@ describe("api client", () => {
     await expect(tidyPage("p", "t0")).resolves.toEqual({ id: "p" });
     expect(fetch).toHaveBeenCalledWith(
       "/api/tidy",
-      expect.objectContaining({ credentials: "include", method: "POST", body: JSON.stringify({ id: "p" }) }),
+      expect.objectContaining({ credentials: "include", method: "POST", body: JSON.stringify({ id: "p", apply: true }) }),
     );
   });
 
@@ -323,6 +323,22 @@ describe("api client", () => {
 
   it("uses the local-data route in local mode", () => {
     expect(tidyEndpoint(true)).toBe("/local-data/tidy");
+  });
+
+  it("starts a tidy intake job without applying the write", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: async () => ({
+        ok: true,
+        data: { id: "ai_job_1", kind: "knowledge_intake", phase: "awaiting_review", page_id: "p" }
+      })
+    }));
+    await expect(startTidyIntake("p")).resolves.toMatchObject({ id: "ai_job_1", phase: "awaiting_review" });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/tidy",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ id: "p" }) }),
+    );
   });
 });
 
