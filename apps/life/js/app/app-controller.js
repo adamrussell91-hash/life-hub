@@ -161,9 +161,6 @@ export function createAppController(dependencies) {
   let cnPanelsInFlight = null;
   let tasksEvents = [];
   let tasksCalendarInFlight = null;
-  let homeOpenLoopTasks = [];
-  let homeOpenLoopStressFlags = [];
-  let homeOpenLoopKey = '';
   let hubPulseInFlight = null;
   let bodyRange = 'six_month';
   let bloodsRange = 'five_year';
@@ -433,7 +430,7 @@ export function createAppController(dependencies) {
           if (syncQuiet) app.dataset.syncQuiet = 'true';
           else delete app.dataset.syncQuiet;
         }
-        const model = buildHomeModel(homeModelInput(result, date));
+        const model = buildHomeModel({ ...result, date });
         renderHome(root, model);
         if (currentSection === 'home') void loadHubPulse();
         if (currentSection === 'nutrition') renderNutritionSection();
@@ -536,7 +533,7 @@ export function createAppController(dependencies) {
       const result = await loadCached({ date });
       if (!isCurrentLifecycle(version) || !requireUnexpiredSession()) return;
       latestResult = { ...result, date };
-      const model = buildHomeModel(homeModelInput(result, date));
+      const model = buildHomeModel({ ...result, date });
       renderHome(root, model);
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
       authenticated = true;
@@ -919,33 +916,19 @@ export function createAppController(dependencies) {
     const tasks = tasksApi?.listTasks
       ? tasksApi.listTasks()
         .then(list => {
-          homeOpenLoopTasks = Array.isArray(list) ? list : [];
-          const open = homeOpenLoopTasks.filter(item => item?.status !== 'done');
+          const open = (Array.isArray(list) ? list : []).filter(item => item?.status !== 'done');
           renderHubPreview(root, 'tasks', open.map(item => item.title));
           return { status: 'ready', count: open.length };
         })
         .catch(error => {
-          homeOpenLoopTasks = [];
           renderHubPreview(root, 'tasks', ['Board is not bound yet']);
           return { status: error?.code === 'tasks_blobs_unbound' ? 'unbound' : 'error' };
         })
       : Promise.resolve({ status: 'error' });
-    const stressFlags = tasksApi?.loadStressFlags
-      ? tasksApi.loadStressFlags()
-        .then(flags => {
-          homeOpenLoopStressFlags = Array.isArray(flags) ? flags : [];
-          return homeOpenLoopStressFlags;
-        })
-        .catch(() => {
-          homeOpenLoopStressFlags = [];
-          return [];
-        })
-      : Promise.resolve([]);
     const [teachingPulse, knowledgePulse, tasksPulse] = await Promise.all([
       teaching,
       knowledge,
-      tasks,
-      stressFlags
+      tasks
     ]);
     if (currentSection !== 'home') return;
     renderHubPulse(root, {
@@ -953,25 +936,6 @@ export function createAppController(dependencies) {
       knowledge: knowledgePulse,
       tasks: tasksPulse
     });
-    const extrasKey = homeOpenLoopExtrasKey();
-    if ((tasksApi?.listTasks || tasksApi?.loadStressFlags) && latestResult && extrasKey !== homeOpenLoopKey) {
-      renderHome(root, buildHomeModel(homeModelInput(latestResult, latestResult.date)));
-      setSectionVisibility(currentSection);
-    }
-  }
-
-  function homeOpenLoopExtrasKey() {
-    return JSON.stringify({ tasks: homeOpenLoopTasks, stressFlags: homeOpenLoopStressFlags });
-  }
-
-  function homeModelInput(result, date) {
-    homeOpenLoopKey = homeOpenLoopExtrasKey();
-    return {
-      ...result,
-      date,
-      tasks: homeOpenLoopTasks,
-      stressFlags: homeOpenLoopStressFlags
-    };
   }
 
   function clareProtocol() {
@@ -1488,9 +1452,6 @@ export function createAppController(dependencies) {
     cnPanelsInFlight = null;
     tasksEvents = [];
     tasksCalendarInFlight = null;
-    homeOpenLoopTasks = [];
-    homeOpenLoopStressFlags = [];
-    homeOpenLoopKey = '';
     hubPulseInFlight = null;
     clearRefreshTimer();
     clearSessionExpiry();

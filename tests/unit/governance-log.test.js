@@ -10,6 +10,9 @@ import {
   parseGovernanceEntries,
   openGovernanceEntries,
   oldestOpenGovernanceEntry,
+  latestHammondReview,
+  formatHammondReviewLine,
+  isOpenLoopEntry,
   decisionTraces,
   tracesForRef
 } from '../../apps/life/js/core/governance-log.js';
@@ -146,6 +149,56 @@ test('openGovernanceEntries includes malformed dateKey entries without ageDays',
   assert.equal(open.length, 1);
   assert.equal(open[0].ageDays, undefined);
   assert.equal(open[0].entryType, 'Drift Detection');
+});
+
+test('openGovernanceEntries skips Mind Insights and completed review notes', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-03-10',
+    entryType: 'Mind Insight',
+    title: 'Mar 2026 — Pattern Review: First Year',
+    body: 'Historical synthesis.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-09',
+    entryType: 'Weekly Review',
+    title: 'Lock is marking',
+    body: 'Protein held.'
+  });
+  assert.deepEqual(openGovernanceEntries(log, '2026-09-06'), []);
+});
+
+test('latestHammondReview returns the newest fresh review and ignores Pattern Reviews', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-03-10',
+    entryType: 'Mind Insight',
+    title: 'Mar 2026 — Pattern Review: First Year',
+    body: 'Historical synthesis.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-02',
+    entryType: 'Weekly Review',
+    title: 'Stale week',
+    body: 'Too old.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-05',
+    entryType: 'Weekly Review',
+    title: 'Lock is marking',
+    body: 'Protein held.'
+  });
+  const review = latestHammondReview(log, '2026-09-06');
+  assert.equal(review.title, 'Lock is marking');
+  assert.equal(formatHammondReviewLine(review), 'Hammond: Lock is marking');
+  assert.equal(latestHammondReview(log, '2026-10-01'), null);
+});
+
+test('isOpenLoopEntry is only unresolved drift / tension / decision / escalation', () => {
+  assert.equal(isOpenLoopEntry({ entryType: 'Drift Detection', status: 'Still Active' }), true);
+  assert.equal(isOpenLoopEntry({ entryType: 'Mind Insight' }), false);
+  assert.equal(isOpenLoopEntry({ entryType: 'Weekly Review' }), false);
+  assert.equal(isOpenLoopEntry({ entryType: 'Major Decision', status: 'Resolved' }), false);
 });
 
 test('oldestOpenGovernanceEntry picks the oldest unresolved entry', () => {
