@@ -409,4 +409,60 @@ Effortful retrieval is the load-bearing claim. The archive supports Bjork here a
     await vi.waitFor(() => expect(savePageMock).toHaveBeenCalled());
     expect(savePageMock.mock.calls[0]?.[0]?.origins).toEqual([{ kind: "book", label: "Make It Stick" }]);
   });
+
+  it("does not remount .chat__sitting across book-note research phase and researching result", async () => {
+    const research = {
+      query: "desirable difficulties",
+      round: 1,
+      status: "running" as const,
+      findings: [
+        {
+          pageId: "page_1",
+          title: "Make It Stick",
+          sourceUrl: "https://example.com",
+          excerpt: "retrieval",
+          stance: "supports" as const,
+          analysis: "",
+        },
+      ],
+      gaps: [],
+      followUpQueries: ["spacing"],
+    };
+    let phase:
+      | ((value: { status: "researching"; researchSessionId: string; research: typeof research }) => void)
+      | undefined;
+    let finish:
+      | ((value: { status: "researching"; researchSessionId: string; research: typeof research }) => void)
+      | undefined;
+    runChatMock.mockImplementation((_input, onPhase) => {
+      phase = onPhase as typeof phase;
+      return new Promise(resolve => {
+        finish = resolve;
+      });
+    });
+    enterChatRail({
+      fresh: true,
+      hat: "fromBook",
+      bookContext: { label: "Make It Stick", locus: "p. 142" },
+    });
+    const host = makeHost();
+    host.render();
+    const field = host.app.querySelector<HTMLTextAreaElement>("#chat-input")!;
+    field.value = "desirable difficulties";
+    host.app.querySelector<HTMLFormElement>("form")!.dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
+    await vi.waitFor(() => expect(runChatMock).toHaveBeenCalled());
+    const sitting = host.app.querySelector(".chat__sitting");
+    expect(sitting).toBeTruthy();
+
+    phase?.({ status: "researching", researchSessionId: "res_phase", research });
+    await vi.waitFor(() => expect(host.app.querySelector(".chat__status")).toBeTruthy());
+    expect(host.app.querySelector(".chat__sitting")).toBe(sitting);
+
+    finish?.({ status: "researching", researchSessionId: "res_1", research });
+    await vi.waitFor(() => expect(host.app.querySelector(".chat__status")?.textContent).toBeTruthy());
+    expect(host.app.querySelector(".chat__sitting")).toBe(sitting);
+    expect(host.app.querySelector("[data-thinking-history]")).toBeTruthy();
+  });
 });
