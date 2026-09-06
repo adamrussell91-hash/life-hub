@@ -4,6 +4,9 @@ export const VV_KEYBOARD_OPEN_PX = 120;
 /** How far vv.height must fall from the closed baseline before we trust geometry alone. */
 export const VV_BASELINE_SHRINK_PX = 120;
 
+/** Ignore visualViewport jitter smaller than this so the Chat canvas does not resize every frame. */
+export const VV_HEIGHT_STICK_PX = 16;
+
 let attached = false;
 let composerFocused = false;
 let closedBaselineHeight = 0;
@@ -27,6 +30,19 @@ function keyboardOpenFromGeometry(vv) {
   return { open: false, insetBottom };
 }
 
+function chatViewBusy() {
+  return Boolean(globalThis.document?.querySelector?.('.chat-view.is-busy'));
+}
+
+function stickCssPx(root, name, next) {
+  const rounded = Math.round(next);
+  const raw = root.style.getPropertyValue(name);
+  const prev = parseFloat(raw);
+  if (!raw || !Number.isFinite(prev) || Math.abs(rounded - prev) >= VV_HEIGHT_STICK_PX) {
+    root.style.setProperty(name, `${rounded}px`);
+  }
+}
+
 function syncVisualViewport() {
   const vv = globalThis.visualViewport;
   if (!vv) return;
@@ -34,15 +50,17 @@ function syncVisualViewport() {
   if (!root?.style) return;
 
   const { open: geometryOpen, insetBottom } = keyboardOpenFromGeometry(vv);
-  const open = composerFocused || geometryOpen;
+  const open = composerFocused || geometryOpen || chatViewBusy();
 
   if (!open && vv.height > 0) {
     closedBaselineHeight = Math.max(closedBaselineHeight, vv.height);
   }
 
-  root.style.setProperty('--vv-offset-top', `${vv.offsetTop}px`);
-  root.style.setProperty('--vv-height', `${vv.height}px`);
-  root.style.setProperty('--vv-offset-bottom', `${insetBottom}px`);
+  // iOS visualViewport resize/scroll fires with 1–12px jitter. Binding the
+  // Chat page-frame to every pixel made the whole window throb.
+  stickCssPx(root, '--vv-offset-top', vv.offsetTop);
+  stickCssPx(root, '--vv-height', vv.height);
+  stickCssPx(root, '--vv-offset-bottom', insetBottom);
   root.classList.toggle('vv-keyboard-open', open);
 }
 
@@ -78,7 +96,7 @@ function onComposerFocusOut(event) {
   // Defer so focus moving Attach → input inside the form does not clear the mode.
   globalThis.setTimeout?.(() => {
     const active = globalThis.document?.activeElement;
-    if (isComposerTarget(active)) return;
+    if (isComposerTarget(active) || chatViewBusy()) return;
     composerFocused = false;
     syncVisualViewport();
   }, 0);
@@ -101,6 +119,16 @@ export function attachVisualViewportInset() {
   bind(globalThis.visualViewport, 'scroll', syncVisualViewport, vvListeners);
   bind(globalThis.document, 'focusin', onComposerFocusIn, docListeners);
   bind(globalThis.document, 'focusout', onComposerFocusOut, docListeners);
+}
+
+/** Re-read busy/focus after Chat send/stop so keyboard chrome does not slam back. */
+export function notifyChatViewport() {
+  if (!attached) return;
+  if (!chatViewBusy()) {
+    const active = globalThis.document?.activeElement;
+    if (!isComposerTarget(active)) composerFocused = false;
+  }
+  syncVisualViewport();
 }
 
 export function detachVisualViewportInset() {
