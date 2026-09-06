@@ -6292,12 +6292,38 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 @media (max-width: 720px) {
+  /*
+   * Full-page Chat must track the visual viewport (same contract as overlay).
+   * height:100dvh does not shrink when the iOS keyboard opens, so margin-top:auto
+   * left the composer floating mid-screen above the locked nav.
+   */
   .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) {
     padding-bottom: 0;
+    height: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame {
+    position: fixed;
+    z-index: 20;
+    top: var(--vv-offset-top, 0px);
+    left: 0;
+    right: 0;
+    box-sizing: border-box;
+    height: var(--vv-height, 100dvh);
+    max-height: var(--vv-height, 100dvh);
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    overflow: hidden;
+  }
+
+  /* Keyboard open: hide the tab bar and dock the composer to the keyboard floor. */
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame {
+    padding-bottom: 0;
+  }
+
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .hub-mobile-nav {
+    display: none;
   }
 
   .chat-view {

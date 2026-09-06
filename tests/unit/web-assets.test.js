@@ -187,6 +187,25 @@ test('full-page Chat locks the canvas height and anchors the composer on the flo
   );
 });
 
+test('full-page Chat on phone pins the canvas to the visual viewport and docks on keyboard', async () => {
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+  const mobile = css.match(/@media \(max-width:\s*720px\)\s*\{[\s\S]*$/);
+  assert.ok(mobile, 'mobile breakpoint exists');
+
+  assert.match(
+    mobile[0],
+    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+\.page-frame[\s\S]*height:\s*var\(--vv-height/
+  );
+  assert.match(
+    mobile[0],
+    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+\.page-frame[\s\S]*top:\s*var\(--vv-offset-top/
+  );
+  assert.match(
+    mobile[0],
+    /html\.vv-keyboard-open[\s\S]*:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)[\s\S]*\.hub-mobile-nav[\s\S]*display:\s*none/
+  );
+});
+
 test('Mind fills the shared 76rem shell; only Chat lifts the canvas width', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 

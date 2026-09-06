@@ -245,6 +245,48 @@ test('mobile Chat tab and overlay keep send beside the field', async () => {
   await context.close();
 });
 
+test('mobile full-page Chat docks the composer to the keyboard viewport', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.hub-mobile-nav [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#chat-form').waitFor({ state: 'visible' });
+
+  // Chromium does not shrink visualViewport like iOS — apply the same CSS contract.
+  await page.evaluate(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--vv-offset-top', '0px');
+    root.style.setProperty('--vv-height', '480px');
+    root.style.setProperty('--vv-offset-bottom', '364px');
+    root.classList.add('vv-keyboard-open');
+  });
+
+  const layout = await page.evaluate(() => {
+    const form = document.querySelector('#chat-form');
+    const frame = document.querySelector('.page-frame');
+    const nav = document.querySelector('.hub-mobile-nav');
+    const formBox = form.getBoundingClientRect();
+    const frameBox = frame.getBoundingClientRect();
+    const navStyle = getComputedStyle(nav);
+    return {
+      formBottom: formBox.bottom,
+      frameBottom: frameBox.bottom,
+      frameHeight: frameBox.height,
+      navDisplay: navStyle.display,
+      gap: frameBox.bottom - formBox.bottom
+    };
+  });
+
+  assert.equal(layout.navDisplay, 'none', 'tab bar hides while the keyboard is open');
+  assert.ok(Math.abs(layout.frameHeight - 480) < 2, 'canvas height tracks the visual viewport');
+  assert.ok(layout.gap < 8, 'composer sits on the keyboard floor, not floating mid-canvas');
+  assert.ok(layout.formBottom <= layout.frameBottom + 1, 'composer stays inside the visible viewport');
+
+  await context.close();
+});
+
 test('make the workout shows a Confirm card', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
