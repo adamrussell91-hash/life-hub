@@ -162,6 +162,18 @@ test('full-page Chat uses the canvas width and hides the Talking to chip while e
   );
 });
 
+test('short chat bubbles are sized by text, not Copy/Retry, and status lines do not pulse', async () => {
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+  const bodyRule = css.match(/(?:^|\n)\.chat-message__body\s*\{[^}]+\}/)?.[0] ?? '';
+  const actionsRule = css.match(/(?:^|\n)\.chat-message__actions\s*\{[^}]+\}/)?.[0] ?? '';
+  assert.match(bodyRule, /flex:\s*1 1 auto/);
+  assert.match(bodyRule, /width:\s*max-content/);
+  assert.doesNotMatch(bodyRule, /12rem/);
+  assert.match(actionsRule, /width:\s*0/);
+  assert.match(actionsRule, /min-width:\s*100%/);
+  assert.doesNotMatch(css, /chat-status-pulse/);
+});
+
 test('full-page Chat locks the canvas height and anchors the composer on the floor', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
