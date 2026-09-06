@@ -5215,6 +5215,9 @@ body.is-universe-fullscreen .page-header {
   color: var(--muted);
   line-height: var(--leading-snug);
   min-height: 1.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-heat__cell.is-drop,

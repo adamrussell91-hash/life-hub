@@ -304,6 +304,8 @@ describe('renderDashboardOverview', () => {
     expect(host.querySelector('[aria-label="Next 14 days"] a')?.getAttribute('href')).toContain(
       '#/week?date='
     );
+    expect(host.querySelector('.dashboard-heat__peek')?.textContent).toContain('Mark essays');
+    expect(host.querySelector('.dashboard-heat__peek')?.textContent).not.toMatch(/\+\d+ more/);
   });
 
   it('makes every focus tile and the next-action card activate on click', () => {
@@ -424,6 +426,26 @@ describe('renderDashboardOverview', () => {
     expect(host.querySelector('.dashboard-rail__day[data-selected="true"]')?.getAttribute('data-date')).toBe(
       '2026-09-02'
     );
+  });
+
+  it('keeps the fortnight peek to three titles plus a remainder', () => {
+    const host = document.createElement('div');
+    renderDashboardOverview(host, {
+      now,
+      tasks: [
+        task({ id: 'a', title: 'Alpha', due_date: '2026-08-27' }),
+        task({ id: 'b', title: 'Bravo', due_date: '2026-08-27' }),
+        task({ id: 'c', title: 'Charlie', due_date: '2026-08-27' }),
+        task({ id: 'd', title: 'Delta', due_date: '2026-08-27' })
+      ],
+      projects: []
+    });
+    const peek = host.querySelector('.dashboard-heat__peek')?.textContent ?? '';
+    expect(peek).toContain('Alpha');
+    expect(peek).toContain('Bravo');
+    expect(peek).toContain('Charlie');
+    expect(peek).toContain('+1 more');
+    expect(peek).not.toContain('Delta');
   });
 
   it('collapses and expands the overview panel on mobile', () => {
