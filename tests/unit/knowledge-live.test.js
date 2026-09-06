@@ -174,13 +174,21 @@ test('defaultLoadDecisionTraces is ready and empty when the governance file is m
 });
 
 test('defaultLoadDecisionTraces groups the connected Life decision', async () => {
-  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+  let log = appendGovernanceEntry(emptyGovernanceLog(), {
     dateKey: '2026-09-01',
     entryType: 'Major Decision',
     title: 'AOTFW sources',
     decisionId: 'aotfw-sources',
     chosen: 'Keep the unit linked',
     body: 'Identity lives on the Knowledge page.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-01',
+    entryType: 'Major Decision',
+    title: 'AOTFW sources',
+    decisionId: 'aotfw-sources',
+    chosen: 'Start the unit',
+    body: 'First take.'
   });
   const { fetchImpl } = memoryLifeGithub({
     tree: [{ path: 'data/governance/governance-log.md', type: 'blob', sha: GOVERNANCE_SHA }],
@@ -193,7 +201,10 @@ test('defaultLoadDecisionTraces groups the connected Life decision', async () =>
   });
   assert.equal(loaded.status, 'ready');
   assert.equal(loaded.traces[0].decisionId, 'aotfw-sources');
-  assert.equal(loaded.traces[0].steps[0].chosen, 'Keep the unit linked');
+  assert.deepEqual(loaded.traces[0].steps.map(step => step.chosen), [
+    'Start the unit',
+    'Keep the unit linked'
+  ]);
 });
 
 test('default loaders are fail-visible when Life GitHub env is missing', async () => {
