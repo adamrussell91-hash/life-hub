@@ -113,6 +113,9 @@ test('every agent gets os.propose-action plus domain shortcuts', () => {
   assert.ok(hammond.includes('coordinate.request-cn-write'));
 
   assert.ok(capabilityIdsForAgent('clare').includes('publish.cn-patch'));
+  assert.ok(capabilityIdsForAgent('clare').includes('tasks.create'));
+  assert.ok(capabilityIdsForAgent('clare').includes('tasks.update'));
+  assert.ok(!capabilityIdsForAgent('hammond').includes('tasks.create'));
   assert.ok(capabilityIdsForAgent('ann').includes('publish.cn-patch'));
   assert.ok(!capabilityIdsForAgent('clementine').includes('publish.cn-patch'));
 });
@@ -368,7 +371,9 @@ test('shortcutSchemas covers Phase 1-3 tool names', () => {
     'intuition_edit_pack',
     'os_promote_shortcut',
     'os_list_promoted_shortcuts',
-    'os_run_promoted_shortcut'
+    'os_run_promoted_shortcut',
+    'create_task',
+    'update_task'
   ]) {
     assert.ok(isShortcutTool(name), name);
     assert.ok(names.includes(name), name);
@@ -384,6 +389,62 @@ test('remember_set_week_flag auto-writes allowlisted path', async () => {
   );
   assert.equal(result.kind, 'ok');
   assert.equal(writes[0].path, REMEMBER_WEEK_FLAGS_PATH);
+});
+
+test('create_task returns Confirm writes on tasks:task paths', async () => {
+  resetCapabilityCaches();
+  const { ctx } = mockCtx('clare');
+  const result = await executeShortcut(
+    'create_task',
+    {
+      items: [
+        { title: 'Draft appraisal SMART goals', domain: 'teaching' },
+        { title: 'Gather appraisal evidence', domain: 'teaching', priority: 'high' }
+      ]
+    },
+    ctx
+  );
+  assert.equal(result.kind, 'propose');
+  assert.equal(result.proposal.writes.length, 2);
+  assert.match(result.proposal.writes[0].path, /^tasks:task:task_/);
+  const validated = validateProposeActionInput(result.proposal, { agentSlug: 'clare' });
+  assert.equal(validated.ok, true);
+  const first = JSON.parse(result.proposal.writes[0].content);
+  assert.equal(first.title, 'Draft appraisal SMART goals');
+  assert.equal(first.domain, 'teaching');
+  assert.equal(first.source, 'suggested_by_agent');
+});
+
+test('update_task returns Confirm append on the named task', async () => {
+  resetCapabilityCaches();
+  const { ctx } = mockCtx('clare');
+  const result = await executeShortcut(
+    'update_task',
+    { task_id: 'task_appraisal', append_description: 'Add evidence notes' },
+    ctx
+  );
+  assert.equal(result.kind, 'propose');
+  assert.equal(result.proposal.writes[0].path, 'tasks:task:task_appraisal');
+  assert.equal(result.proposal.writes[0].mode, 'append');
+  const validated = validateProposeActionInput(result.proposal, { agentSlug: 'clare' });
+  assert.equal(validated.ok, true);
+});
+
+test('clare keeps create_task attached on a focus-today turn', () => {
+  resetCapabilityCaches();
+  const names = buildAgentTools({
+    slug: 'clare',
+    message: 'What should I focus on today?'
+  }).map(tool => tool.name);
+  assert.ok(names.includes('create_task'));
+  assert.ok(names.includes('update_task'));
+  assert.ok(names.includes('get_tasks_focus'));
+  const brisket = buildAgentTools({
+    slug: 'brisket',
+    allowedTypes: ['meal'],
+    message: 'Add a task for appraisal'
+  }).map(tool => tool.name);
+  assert.ok(!brisket.includes('create_task'));
 });
 
 test('track_open_challenge returns Confirm proposal', async () => {
@@ -675,26 +736,47 @@ test('classifyWriteTarget routes typed refs to Tasks and Teaching blobs', () => 
     key: 'units/unit_aotfw',
     path: 'teaching:unit:unit_aotfw'
   });
-  assert.equal(classifyWriteTarget('tasks:task:task_1').store, 'unknown');
+  assert.deepEqual(classifyWriteTarget('tasks:task:task_1'), {
+    store: 'tasks',
+    kind: 'task',
+    id: 'task_1',
+    key: 'tasks/task_1',
+    path: 'tasks:task:task_1'
+  });
 });
 
 test('clare and hammond may write typed blob refs; brisket may not', () => {
   resetCapabilityCaches();
   assert.equal(isPathAllowedForAgent('clare', 'tasks:project:proj_aotfw'), true);
+  assert.equal(isPathAllowedForAgent('clare', 'tasks:task:task_1'), true);
   assert.equal(isPathAllowedForAgent('clare', 'teaching:unit:unit_aotfw'), false);
   assert.equal(isPathAllowedForAgent('hammond', 'tasks:project:proj_aotfw'), true);
   assert.equal(isPathAllowedForAgent('hammond', 'teaching:unit:unit_aotfw'), true);
   assert.equal(isPathAllowedForAgent('brisket', 'tasks:project:proj_aotfw'), false);
+  assert.equal(isPathAllowedForAgent('brisket', 'tasks:task:task_1'), false);
 });
 
-test('validateProposeActionInput rejects unknown typed write targets', () => {
+test('clare may propose tasks:task writes; unknown typed targets still reject', () => {
   resetCapabilityCaches();
-  const result = validateProposeActionInput({
+  const clare = validateProposeActionInput({
     intent: 'rewrite a task',
     writes: [{ path: 'tasks:task:task_1', mode: 'overwrite', content: '{}' }]
   }, { agentSlug: 'clare' });
-  assert.equal(result.ok, false);
-  assert.equal(result.error, 'unknown_write_target');
+  assert.equal(clare.ok, true);
+
+  const brisket = validateProposeActionInput({
+    intent: 'rewrite a task',
+    writes: [{ path: 'tasks:task:task_1', mode: 'overwrite', content: '{}' }]
+  }, { agentSlug: 'brisket' });
+  assert.equal(brisket.ok, false);
+  assert.equal(brisket.error, 'write_path_denied');
+
+  const unknown = validateProposeActionInput({
+    intent: 'rewrite a mystery row',
+    writes: [{ path: 'tasks:mystery:task_1', mode: 'overwrite', content: '{}' }]
+  }, { agentSlug: 'clare' });
+  assert.equal(unknown.ok, false);
+  assert.equal(unknown.error, 'unknown_write_target');
 });
 
 test('selectAcceptedWrites omits all when accept is missing and none when empty', () => {
@@ -779,6 +861,80 @@ test('executeProposeActionWrites routes tasks project creates onto the blob stor
   assert.equal(data['projects/proj_aotfw'].id, 'proj_aotfw');
   assert.equal(data['projects/proj_aotfw'].updated_at, '2026-09-05T00:00:00.000Z');
   assert.deepEqual(data['projects/_index'], ['proj_aotfw']);
+});
+
+test('executeProposeActionWrites routes task creates onto the blob store', async () => {
+  const data = {};
+  const store = {
+    async get(key) {
+      return data[key] ?? null;
+    },
+    async setJSON(key, value) {
+      data[key] = value;
+    }
+  };
+  const result = await executeProposeActionWrites(null, {
+    agent: 'clare',
+    intent: 'Create task: Draft appraisal SMART goals',
+    writes: [{
+      path: 'tasks:task:task_appraisal',
+      mode: 'create',
+      content: JSON.stringify({
+        title: 'Draft appraisal SMART goals',
+        domain: 'teaching',
+        status: 'open'
+      }),
+      diff: 'new task'
+    }]
+  }, {
+    blobStores: { tasks: store },
+    nowIso: () => '2026-09-06T00:00:00.000Z'
+  });
+  assert.equal(result.ok, true);
+  assert.equal(data['tasks/task_appraisal'].title, 'Draft appraisal SMART goals');
+  assert.equal(data['tasks/task_appraisal'].id, 'task_appraisal');
+  assert.equal(data['tasks/task_appraisal'].updated_at, '2026-09-06T00:00:00.000Z');
+  assert.deepEqual(data['tasks/_index'], ['task_appraisal']);
+  assert.equal(data['projects/_index'], undefined);
+});
+
+test('executeProposeActionWrites append_description keeps the existing body', async () => {
+  const data = {
+    'tasks/task_appraisal': {
+      id: 'task_appraisal',
+      title: 'Appraisal',
+      description: 'Existing goals draft',
+      created_at: '2026-09-01T00:00:00.000Z',
+      schema_version: 1
+    }
+  };
+  const store = {
+    async get(key) {
+      return data[key] ?? null;
+    },
+    async setJSON(key, value) {
+      data[key] = value;
+    }
+  };
+  const result = await executeProposeActionWrites(null, {
+    agent: 'clare',
+    intent: 'Update task task_appraisal',
+    writes: [{
+      path: 'tasks:task:task_appraisal',
+      mode: 'append',
+      content: JSON.stringify({ append_description: 'Add evidence notes' }),
+      diff: 'append notes'
+    }]
+  }, {
+    blobStores: { tasks: store },
+    files: { 'tasks:task:task_appraisal': { record: data['tasks/task_appraisal'] } },
+    nowIso: () => '2026-09-06T00:00:00.000Z'
+  });
+  assert.equal(result.ok, true);
+  assert.equal(data['tasks/task_appraisal'].description, 'Existing goals draft\n\nAdd evidence notes');
+  assert.equal(data['tasks/task_appraisal'].title, 'Appraisal');
+  assert.equal(data['tasks/task_appraisal'].created_at, '2026-09-01T00:00:00.000Z');
+  assert.equal(data['tasks/task_appraisal'].append_description, undefined);
 });
 
 test('decisionFieldsFromAction records chosen, reasoning, and revisit', () => {

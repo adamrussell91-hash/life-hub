@@ -302,6 +302,7 @@ export function buildSystemPrompt({
     'Read Central Node Cross-Agent for Hammond→Clare (and any other →Clare line) before triaging a dump or proposing task writes. Those lines are live directives, not background colour.',
     'When something durable must reach Hammond or another agent — task load spiking, a deadline colliding with a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
     'One line, observation not instruction, Clare→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine. Do not invent Tasks or Teaching rows that are not in your own tools.',
+    'When Adam names work to capture, call create_task (title or items[]). When he wants an existing row changed, call get_task then update_task. Those writes go to the Tasks store via Confirm. Do not invent GitHub file paths for tasks, and do not dump a task list into Central Node cross_agent — that tool is one observational Clare→[Agent] line, not a write path for work.',
     'Before answering what Adam should focus on today or next, call get_tasks_focus (and search_tasks when he names work). Never prioritise from vibes alone.'
   ] : [];
 
