@@ -1,3 +1,4 @@
+import { stringList } from '@/domain/task-shape';
 import type { Project } from '@/schemas/project';
 import type { Task, TaskDomain } from '@/schemas/task';
 import { DEFAULT_DOMAIN_COLORS, DEFAULT_TASK_PROPERTY_CONFIG } from '@/domain/task-properties-defaults';
@@ -198,7 +199,7 @@ export function universeTags(tags: string[]): string[] {
 }
 
 export function tagsForTask(task: Task, projectTitle: string | null): string[] {
-  const tags = [task.domain, ...task.tags];
+  const tags = [task.domain, ...stringList(task.tags)];
   if (projectTitle) tags.push(projectTitle);
   return universeTags(tags);
 }

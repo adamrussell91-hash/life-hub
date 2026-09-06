@@ -326,6 +326,12 @@ test('beauty drawer keeps both routine cards in the track (one visible via data-
   assert.equal(root._routineCards.children[0].dataset.routine, 'am');
   assert.equal(root._routineCards.children[1].dataset.routine, 'pm');
   assert.equal(root._routineCards.className.includes('skincare-drawer-track'), true);
+  assert.equal(root._routineCards.children[0].hidden, true);
+  assert.equal(root._routineCards.children[1].hidden, false);
+
+  root._amTab.click();
+  assert.equal(root._routineCards.children[0].hidden, false);
+  assert.equal(root._routineCards.children[1].hidden, true);
 });
 
 test('prefers-reduced-motion marks the drawer for an instant swap', () => {

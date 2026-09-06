@@ -131,4 +131,28 @@ describe('graph view mode pills', () => {
     expect(nextWorkstreams?.classList.contains('is-active')).toBe(true);
     expect(location.hash).toBe('#/graph?mode=workstreams');
   });
+
+  it('remounts when a stretch view left a graph-host on the canvas', async () => {
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderGraphView(canvas);
+    expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
+
+    canvas.replaceChildren();
+    const leftover = document.createElement('div');
+    leftover.className = 'constellation-host graph-host';
+    leftover.textContent = 'sky leftover';
+    canvas.append(leftover);
+
+    location.hash = '#/graph?mode=workstreams';
+    await renderGraphView(canvas);
+
+    expect(canvas.querySelector('.graph-stage')).not.toBeNull();
+    expect(canvas.textContent).not.toContain('sky leftover');
+    const workstreams = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (btn) => btn.textContent === 'Workstreams'
+    );
+    expect(workstreams?.classList.contains('is-active')).toBe(true);
+    expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(2);
+  });
 });

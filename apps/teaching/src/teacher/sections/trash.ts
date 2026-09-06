@@ -150,29 +150,38 @@ export function renderTrashSection(canvas: HTMLElement): { dispose: () => void }
       restoreBtn.className = 'btn btn--secondary';
       restoreBtn.textContent = 'Restore';
       restoreBtn.addEventListener('click', () => {
-        setStatus(null);
-        currentRows = currentRows.filter(
-          (entry) => !(entry.id === row.id && entry.type === row.type)
-        );
-        renderRows(currentRows);
-        if (
-          row.type === 'lesson' ||
-          row.type === 'unit' ||
-          row.type === 'class' ||
-          row.type === 'media'
-        ) {
-          applyEntityStatus(row.type as CurriculumEntityType, row.id, row.previous_status ?? 'active');
-        }
-        setStatus(`Restored “${row.title}”.`);
-        void restoreFromTrash(row.type, row.id).catch((error: unknown) => {
-          const message =
-            error instanceof ApiClientError
-              ? error.message
-              : error instanceof Error
+        void askConfirmCard({
+          eyebrow: 'Restore',
+          title: `Restore “${row.title}”?`,
+          supporting: 'It will return to the active lists.',
+          confirmLabel: 'Restore',
+          discardLabel: 'Cancel'
+        }).then((ok) => {
+          if (!ok) return;
+          setStatus(null);
+          currentRows = currentRows.filter(
+            (entry) => !(entry.id === row.id && entry.type === row.type)
+          );
+          renderRows(currentRows);
+          if (
+            row.type === 'lesson' ||
+            row.type === 'unit' ||
+            row.type === 'class' ||
+            row.type === 'media'
+          ) {
+            applyEntityStatus(row.type as CurriculumEntityType, row.id, row.previous_status ?? 'active');
+          }
+          setStatus(`Restored “${row.title}”.`);
+          void restoreFromTrash(row.type, row.id).catch((error: unknown) => {
+            const message =
+              error instanceof ApiClientError
                 ? error.message
-                : 'Unable to restore.';
-          setStatus(message, true);
-          void reload();
+                : error instanceof Error
+                  ? error.message
+                  : 'Unable to restore.';
+            setStatus(message, true);
+            void reload();
+          });
         });
       });
 

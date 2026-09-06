@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const main = readFileSync(join(dir, "main.ts"), "utf8");
+const hubChrome = readFileSync(join(dir, "lib/hubChrome.ts"), "utf8");
 const intakeView = readFileSync(join(dir, "tidy/intakeView.ts"), "utf8");
 const css = readFileSync(join(dir, "style.css"), "utf8");
 const mobile = readFileSync(join(dir, "mobile-chrome.ts"), "utf8");
@@ -62,12 +63,12 @@ describe("Knowledge Hub rail", () => {
     expect(main).not.toContain('class="chip"');
   });
 
-  it("keeps reader header actions as ghost buttons and leaves the title row as h1 only", () => {
+  it("keeps reader header actions as ghost buttons and puts the hub tile in the title row", () => {
     expect(main).toContain('class="btn btn--ghost reader__back" data-back type="button"');
     expect(main).toContain('class="btn btn--ghost" data-edit type="button"');
     expect(main).toContain('class="btn btn--ghost" data-open-chat type="button"');
-    expect(main).toContain("page-header__title-row");
-    expect(main).not.toMatch(/page-header__title-row[\s\S]*?hub-mark/);
+    expect(main).toContain("titleRowHtml");
+    expect(hubChrome).toMatch(/page-header__title-row[\s\S]*?hub-mark/);
     expect(main).toContain("icons/knowledge.svg");
     expect(main).toContain("sign-in__mark");
     expect(intakeView).toContain("confirm-card");

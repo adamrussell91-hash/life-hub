@@ -2462,22 +2462,16 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .skincare-drawer-track {
   display: flex;
-  width: 200%;
-  will-change: transform;
-  transition: transform 320ms cubic-bezier(.2, .8, .2, 1);
-}
-.skincare-drawer-track[data-active="am"] { transform: translateX(0); }
-.skincare-drawer-track[data-active="pm"] { transform: translateX(-50%); }
-.skincare-drawer-track[data-reduced-motion="true"],
-.skincare-drawer-track[data-reduced-motion="true"][data-active="am"],
-.skincare-drawer-track[data-reduced-motion="true"][data-active="pm"] {
-  transition: none;
+  width: 100%;
 }
 .skincare-drawer-track > .skincare-card {
-  flex: 0 0 50%;
-  width: 50%;
-  max-width: 50%;
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+}
+.skincare-drawer-track > .skincare-card[hidden] {
+  display: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .skincare-drawer-track { transition: none; }
