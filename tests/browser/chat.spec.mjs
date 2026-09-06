@@ -951,7 +951,11 @@ test('engaged phone Chat hides the title stack and has no assistant accent bar',
   assert.equal(layout.copyDisplay, 'none', 'engaged Chat must drop TALK TO YOUR AGENTS / Chat');
   assert.equal(layout.dateDisplay, 'none', 'engaged Chat must drop the date chip');
   assert.notEqual(layout.refreshDisplay, 'none', 'refresh must stay');
-  assert.equal(layout.pickerDisplay, 'none', 'picker portraits yield to Talking to');
+  assert.notEqual(
+    layout.pickerDisplay,
+    'none',
+    'engaged must not display:none the picker — that collapses scroll-hide and bounces the thread'
+  );
   assert.equal(layout.borderLeft, '0px', 'assistant body must not wear a leftover accent bar');
   assert.ok(layout.paddingLeft >= 8, `list inset must remain (paddingLeft=${layout.paddingLeft})`);
   assert.ok(
