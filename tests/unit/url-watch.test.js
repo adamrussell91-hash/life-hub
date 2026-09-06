@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   URL_WATCHES_PATH,
   checkWatchedUrl,
@@ -10,6 +13,11 @@ import {
   normalizeUrlWatchStatus,
   parseUrlWatchStore
 } from '../../netlify/functions/_shared/url-watch.mjs';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const knowledgeSeed = JSON.parse(
+  readFileSync(join(root, 'apps/knowledge/fixtures/seed.json'), 'utf8')
+);
 
 test('extractWatchUrls keeps external http(s) links and skips hub hosts', () => {
   const body = [
@@ -24,8 +32,19 @@ test('extractWatchUrls keeps external http(s) links and skips hub hosts', () => 
 });
 
 test('extractWatchUrls is empty when the body has no external URL', () => {
-  assert.deepEqual(extractWatchUrls('# Training pulse\n\n{{life:compare_workout_windows}}'), []);
+  assert.deepEqual(extractWatchUrls('# Static note\n\n{{life:compare_workout_windows}}'), []);
   assert.deepEqual(extractWatchUrls(''), []);
+});
+
+test('seed pages expose one real external URL for URL watch', () => {
+  const aotfw = knowledgeSeed.find(item => item.id === 'page_aotfw');
+  const pulse = knowledgeSeed.find(item => item.id === 'page_training_pulse');
+  assert.deepEqual(extractWatchUrls(aotfw.body), [
+    'https://en.wikipedia.org/wiki/An_Artist_of_the_Floating_World'
+  ]);
+  assert.deepEqual(extractWatchUrls(pulse.body), [
+    'https://www.who.int/news-room/fact-sheets/detail/physical-activity'
+  ]);
 });
 
 test('checkWatchedUrl treats If-None-Match 304 as unchanged', async () => {

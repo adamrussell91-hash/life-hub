@@ -149,6 +149,22 @@ export async function readKnowledgeFile(file, { env, fetchImpl = fetch } = {}) {
   }
 }
 
+export function backfillManifestConnected(rows, pagesById) {
+  const list = Array.isArray(rows) ? rows : [];
+  const pages = pagesById instanceof Map
+    ? pagesById
+    : new Map(Object.entries(pagesById && typeof pagesById === 'object' ? pagesById : {}));
+  return list.map(row => {
+    if (!row || typeof row.id !== 'string') return row;
+    const page = pages.get(row.id);
+    const connected = Array.isArray(page?.connected)
+      ? page.connected.filter(item => typeof item === 'string' && item)
+      : [];
+    if (!connected.length) return row;
+    return { ...row, connected };
+  });
+}
+
 function summarizeManifestEntry(item) {
   if (!item || typeof item !== 'object') return null;
   const id = typeof item.id === 'string' ? item.id : '';
