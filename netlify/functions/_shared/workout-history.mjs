@@ -1,10 +1,13 @@
 import { addCalendarDays, daysBetween, isCalendarDate } from '../../../apps/life/js/core/time.js';
+import { buildFitnessModel, REGION_KEYS } from '../../../apps/life/js/app/fitness-model.js';
 
 export const FITNESS_SESSION_PATH =
   /^data\/fitness\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
 export const MAX_RECENT_WORKOUTS = 20;
 export const WORKOUT_COMPARE_WEEKS = 8;
+/** Same rolling window the Fitness page Region strength tiles use. */
+export const REGION_STRENGTH_DAYS = 30;
 const DEFAULT_SEARCH_LIMIT = 8;
 const MAX_SEARCH_LIMIT = 20;
 const SET_SUFFIX = /\s+set\s+\d+\s*$/i;
@@ -360,6 +363,121 @@ export function compareWorkoutWindowsSchema() {
     input_schema: {
       type: 'object',
       properties: {}
+    }
+  };
+}
+
+function regionStrengthWindows(today) {
+  const currentTo = today;
+  const currentFrom = addCalendarDays(today, -(REGION_STRENGTH_DAYS - 1));
+  const priorTo = addCalendarDays(currentFrom, -1);
+  const priorFrom = addCalendarDays(priorTo, -(REGION_STRENGTH_DAYS - 1));
+  return {
+    days: REGION_STRENGTH_DAYS,
+    current: { from: currentFrom, to: currentTo },
+    prior: { from: priorFrom, to: priorTo }
+  };
+}
+
+function roundPct(value) {
+  if (value == null || !Number.isFinite(value)) return null;
+  return Math.round(value * 10) / 10;
+}
+
+function workoutEventsFromRecords(records) {
+  return (Array.isArray(records) ? records : [])
+    .filter(record => record && (record.type === 'workout' || record.type == null))
+    .map(record => ({ record: { ...record, type: 'workout' } }));
+}
+
+/**
+ * Same Region strength numbers as the Fitness page tiles — best working-weight
+ * kg delta and regional volume % over current 30d vs prior 30d.
+ */
+export function getRegionStrength(records, today, { region } = {}) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date' };
+  const windows = regionStrengthWindows(today);
+  const model = buildFitnessModel({
+    events: workoutEventsFromRecords(records),
+    date: today
+  });
+  let regions = (model.regions ?? []).map(entry => ({
+    key: entry.key,
+    label: entry.label,
+    best_set_delta_kg: entry.bestSetDeltaKg,
+    current_best_kg: entry.currentBestKg,
+    current_volume: entry.currentVolume,
+    volume_delta_pct: roundPct(entry.volumeDeltaPct),
+    colour: entry.colour
+  }));
+  if (region != null && String(region).trim()) {
+    const needle = String(region).trim().toLowerCase();
+    regions = regions.filter(entry =>
+      entry.key === needle || String(entry.label).toLowerCase() === needle
+    );
+  }
+  return {
+    ok: true,
+    store: 'life_hub_fitness',
+    same_as: 'Fitness page Region strength tiles',
+    date: today,
+    windows,
+    how_to_read: {
+      best_set_delta_kg:
+        'Tile headline: change in best working weight (kg) for that region, current 30 days vs prior 30 days — not vs all-time PB.',
+      volume_delta_pct:
+        'Tile secondary %: change in total region volume (reps×kg) over those same windows. When Adam quotes “chest −5%” under Region strength, this is usually the figure.'
+    },
+    regions
+  };
+}
+
+function formatSignedKg(value) {
+  if (value == null || !Number.isFinite(value)) return '—';
+  if (value > 0) return `+${value} kg`;
+  if (value < 0) return `${value} kg`;
+  return '0 kg';
+}
+
+function formatSignedPct(value) {
+  if (value == null || !Number.isFinite(value)) return '—';
+  const rounded = roundPct(value);
+  if (rounded > 0) return `+${rounded}%`;
+  if (rounded < 0) return `${rounded}%`;
+  return '0%';
+}
+
+export function formatRegionStrengthForPrompt(result) {
+  if (!result?.ok || !Array.isArray(result.regions) || result.regions.length === 0) return '';
+  const { windows } = result;
+  const lines = [
+    'Computed Region strength (identical to the Fitness page Region strength tiles — do not invent these, and never claim you cannot read them):',
+    `Windows: current ${windows.current.from}→${windows.current.to} vs prior ${windows.prior.from}→${windows.prior.to} (${windows.days} days each).`,
+    'Headline = best working-weight kg delta (not vs PB). Secondary % = regional volume change over the same windows.'
+  ];
+  for (const entry of result.regions) {
+    const best = entry.current_best_kg != null ? `${entry.current_best_kg} kg best` : 'no best yet';
+    lines.push(
+      `- ${entry.label}: best-set Δ ${formatSignedKg(entry.best_set_delta_kg)} (${best}); volume ${formatSignedPct(entry.volume_delta_pct)}`
+    );
+  }
+  lines.push('get_region_strength returns the same numbers; call it when Adam asks about a region tile or you need a fresh read.');
+  return lines.join('\n');
+}
+
+export function getRegionStrengthSchema() {
+  return {
+    name: 'get_region_strength',
+    description:
+      'Read the Fitness page Region strength tiles computed from Adam\'s loaded workout files (same math as the UI). Returns per-region best working-weight kg delta and volume % for current 30 days vs prior 30 days. Use whenever he asks about Region strength, a region % / kg tile (chest/back/arms/abs/legs), or why a Fitness strength tile moved — never claim those tiles are UI-only or unverifiable, and never substitute PB-vs-today guesswork when this tool can answer.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        region: {
+          type: 'string',
+          description: `Optional region filter: ${REGION_KEYS.join(', ')} (or the label). Omit for all five.`
+        }
+      }
     }
   };
 }

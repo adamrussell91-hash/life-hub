@@ -90,14 +90,29 @@ import {
   compareWorkoutWindows,
   daysSinceLastCompletedWorkout,
   formatRecentWorkoutsForPrompt,
+  formatRegionStrengthForPrompt,
   formatWorkoutWindowCompareForPrompt,
   getLastWorkout,
+  getRegionStrength,
   mergeWorkoutEntries,
   searchWorkoutRecords,
   selectRecentWorkoutEntries,
   selectWorkoutEntriesInRange,
   workoutWindowBounds
 } from './_shared/workout-history.mjs';
+import {
+  fitnessHistoryBounds,
+  getBodyState,
+  getExerciseHistory,
+  getFitnessSnapshot,
+  getLoadStatus,
+  getLongTermFitness,
+  getPainTrainingSummary,
+  getSessionComparisons,
+  getTrainingVolume,
+  getWorkingWeights,
+  getWorkoutTemplate
+} from './_shared/fitness-tools.mjs';
 import {
   applySaveSkincareLibraryEntry,
   applySetSkincareRoutineMembership,
@@ -444,8 +459,13 @@ export function createChatHandler({
         let workoutTemplates = '';
         let lastWorkouts = '';
         let workoutWindowCompare = '';
+        let regionStrength = '';
         let workoutRecords = [];
         let bodyState = '';
+        let compositionRecords = [];
+        let measurementRecords = [];
+        let physiqueTargetRatio = null;
+        let templateContents = [];
         let treatmentState = '';
         let nutritionSkinWeek = '';
         let saraClinicalContext = '';
@@ -522,7 +542,18 @@ export function createChatHandler({
               to: workoutCompareBounds.currentTo
             })
             : [];
-          const chadwickWorkoutEntries = mergeWorkoutEntries(chadwickRecentEntries, workoutCompareEntries);
+          const fitnessHistory = slug === 'chadwick' ? fitnessHistoryBounds(today) : null;
+          const fitnessHistoryEntries = fitnessHistory
+            ? selectWorkoutEntriesInRange(current.tree, {
+              from: fitnessHistory.from,
+              to: fitnessHistory.to
+            })
+            : [];
+          const chadwickWorkoutEntries = mergeWorkoutEntries(
+            chadwickRecentEntries,
+            workoutCompareEntries,
+            fitnessHistoryEntries
+          );
           // Chadwick's eyes on Adam's body: a bounded read (latest 1-2 per type from the
           // already-fetched tree, never a history scan) -- see body-state.mjs.
           const bodyEntries = needsBodyState
@@ -678,6 +709,9 @@ export function createChatHandler({
               workoutWindowCompare = formatWorkoutWindowCompareForPrompt(
                 compareWorkoutWindows(workoutRecords, today)
               );
+              regionStrength = formatRegionStrengthForPrompt(
+                getRegionStrength(workoutRecords, today)
+              );
             }
             sessionAdherenceDays = combineSessionAdherenceDays(
               daysSinceLastCompletedWorkout(workoutRecords, today),
@@ -721,16 +755,21 @@ export function createChatHandler({
               : seedMembershipFromDefaults(SKINCARE_ROUTINES, skincareLibrary);
           }
 
-          const templateContents = templateEntries
+          const templateContentsLoaded = templateEntries
             .map((entry, index) => ({ path: entry.path, content: decodeBlob(templateBlobs[index]) }))
             .filter(file => file.content !== null);
+          templateContents = templateContentsLoaded;
           workoutTemplates = formatTemplatesForPrompt(summarizeTemplatesFromContents(templateContents));
 
           if (needsBodyState) {
-            const compositionRecords = parseBodyRecords(bodyEntries.composition, compositionBlobs);
-            const measurementRecords = parseBodyRecords(bodyEntries.measurements, measurementBlobs);
-            const targetRatio = loadPhysiqueTarget().shoulder_waist_ratio;
-            bodyState = formatBodyStateForPrompt({ compositionRecords, measurementRecords, targetRatio });
+            compositionRecords = parseBodyRecords(bodyEntries.composition, compositionBlobs);
+            measurementRecords = parseBodyRecords(bodyEntries.measurements, measurementBlobs);
+            physiqueTargetRatio = loadPhysiqueTarget().shoulder_waist_ratio;
+            bodyState = formatBodyStateForPrompt({
+              compositionRecords,
+              measurementRecords,
+              targetRatio: physiqueTargetRatio
+            });
           }
 
           if (needsTreatmentContext) {
@@ -923,6 +962,7 @@ export function createChatHandler({
           workoutTemplates = '';
           lastWorkouts = '';
           workoutWindowCompare = '';
+          regionStrength = '';
           workoutRecords = [];
           bodyState = '';
           treatmentState = '';
@@ -1014,6 +1054,7 @@ export function createChatHandler({
           workoutTemplates,
           lastWorkouts,
           workoutWindowCompare,
+          regionStrength,
           exerciseLibrary,
           skincareRoutines,
           treatmentState,
@@ -1164,6 +1205,54 @@ export function createChatHandler({
               if (event.name === 'compare_workout_windows') {
                 send({ type: 'status', text: 'Comparing training windows…' });
                 return JSON.stringify(compareWorkoutWindows(workoutRecords, today));
+              }
+              if (event.name === 'get_region_strength') {
+                send({ type: 'status', text: 'Reading region strength…' });
+                return JSON.stringify(getRegionStrength(workoutRecords, today, event.input ?? {}));
+              }
+              if (event.name === 'get_fitness_snapshot') {
+                send({ type: 'status', text: 'Reading Fitness dashboard…' });
+                return JSON.stringify(getFitnessSnapshot(workoutRecords, today));
+              }
+              if (event.name === 'get_training_volume') {
+                send({ type: 'status', text: 'Reading training volume…' });
+                return JSON.stringify(getTrainingVolume(workoutRecords, today));
+              }
+              if (event.name === 'get_working_weights') {
+                send({ type: 'status', text: 'Reading working weights…' });
+                return JSON.stringify(getWorkingWeights(workoutRecords, today, event.input ?? {}));
+              }
+              if (event.name === 'get_long_term_fitness') {
+                send({ type: 'status', text: 'Reading long-term fitness…' });
+                return JSON.stringify(getLongTermFitness(workoutRecords, today));
+              }
+              if (event.name === 'get_session_comparisons') {
+                send({ type: 'status', text: 'Comparing session lifts…' });
+                return JSON.stringify(getSessionComparisons(workoutRecords, today));
+              }
+              if (event.name === 'get_exercise_history') {
+                send({ type: 'status', text: 'Reading exercise history…' });
+                return JSON.stringify(getExerciseHistory(workoutRecords, today, event.input ?? {}));
+              }
+              if (event.name === 'get_load_status') {
+                send({ type: 'status', text: 'Reading load status…' });
+                return JSON.stringify(getLoadStatus(workoutRecords, today));
+              }
+              if (event.name === 'get_pain_training_summary') {
+                send({ type: 'status', text: 'Reading training pain flags…' });
+                return JSON.stringify(getPainTrainingSummary(workoutRecords, today, event.input ?? {}));
+              }
+              if (event.name === 'get_body_state') {
+                send({ type: 'status', text: 'Reading body state…' });
+                return JSON.stringify(getBodyState({
+                  compositionRecords,
+                  measurementRecords,
+                  targetRatio: physiqueTargetRatio
+                }));
+              }
+              if (event.name === 'get_workout_template') {
+                send({ type: 'status', text: 'Looking up workout template…' });
+                return JSON.stringify(getWorkoutTemplate(templateContents, event.input ?? {}));
               }
               if (event.name === 'search_exercise_library') {
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});

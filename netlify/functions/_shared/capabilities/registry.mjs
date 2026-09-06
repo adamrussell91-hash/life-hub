@@ -4,7 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { logEntryToolSchema } from '../chat-schema.mjs';
 import { foodLibraryEntrySchema } from '../food-library.mjs';
 import { saveExerciseLibraryEntrySchema, searchExerciseLibrarySchema } from '../exercise-library.mjs';
-import { compareWorkoutWindowsSchema, getLastWorkoutSchema, searchWorkoutRecordsSchema } from '../workout-history.mjs';
+import {
+  compareWorkoutWindowsSchema,
+  getLastWorkoutSchema,
+  getRegionStrengthSchema,
+  searchWorkoutRecordsSchema
+} from '../workout-history.mjs';
+import { chadwickFitnessToolSchemas } from '../fitness-tools.mjs';
 import {
   listSkincareRoutinesSchema,
   searchSkincareLibrarySchema,
@@ -248,7 +254,9 @@ export function buildAgentTools({
       saveExerciseLibraryEntrySchema(),
       getLastWorkoutSchema(),
       searchWorkoutRecordsSchema(),
-      compareWorkoutWindowsSchema()
+      compareWorkoutWindowsSchema(),
+      getRegionStrengthSchema(),
+      ...chadwickFitnessToolSchemas()
     );
   } else if (needsExerciseLibrary) {
     // Search is resourcing, not yet a named capacity — keep available for Chadwick.
@@ -256,7 +264,9 @@ export function buildAgentTools({
       searchExerciseLibrarySchema(),
       getLastWorkoutSchema(),
       searchWorkoutRecordsSchema(),
-      compareWorkoutWindowsSchema()
+      compareWorkoutWindowsSchema(),
+      getRegionStrengthSchema(),
+      ...chadwickFitnessToolSchemas()
     );
   }
 
