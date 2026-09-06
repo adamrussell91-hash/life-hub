@@ -221,6 +221,18 @@ export function adaptiveTodayTasks(tasks: Task[], date: Date = new Date()): Task
   return [...preferred, ...rest];
 }
 
+/**
+ * Work on today's plate: overdue first, then due today.
+ * Matches the dashboard Timeline TODAY bucket (daysOut <= 0) for tasks.
+ */
+export function todayPlateTasks(tasks: Task[], date: Date = new Date()): Task[] {
+  const overdue = overdueTasks(tasks, date);
+  const dueToday = adaptiveTodayTasks(tasks, date);
+  if (!overdue.length) return dueToday;
+  const seen = new Set(overdue.map((task) => task.id));
+  return [...overdue, ...dueToday.filter((task) => !seen.has(task.id))];
+}
+
 export function weekDays(anchor: Date = new Date()): Date[] {
   const start = startOfDay(anchor);
   const mondayOffset = (start.getDay() + 6) % 7;

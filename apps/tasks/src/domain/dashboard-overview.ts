@@ -7,7 +7,8 @@ import {
   overdueTasks,
   parseDue,
   startOfDay,
-  toDateKey
+  toDateKey,
+  todayPlateTasks
 } from '@/domain/queries';
 import { findStallCandidates } from '@/domain/stall';
 import { classifyProjectLifecycle, type ProjectLifecycle } from '@/domain/projects-pulse';
@@ -179,7 +180,8 @@ export function dashboardFocusStats(
     (project) => classifyProjectLifecycle(project, tasks, stallIds, now) === 'needs_attention'
   ).length;
   return {
-    today: adaptiveTodayTasks(tasks, now).length,
+    // Same task set as Timeline TODAY (due today + overdue), not due-today alone.
+    today: todayPlateTasks(tasks, now).length,
     overdue: overdueTasks(tasks, now).length,
     needsAttention,
     activeProjects: live.length

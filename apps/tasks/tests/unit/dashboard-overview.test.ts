@@ -139,10 +139,29 @@ describe('dashboard focus model', () => {
       ],
       now
     );
-    expect(stats.today).toBe(1);
+    // Today tile matches Timeline TODAY: due-today + overdue (disjoint).
+    expect(stats.today).toBe(2);
     expect(stats.overdue).toBe(1);
     expect(stats.needsAttention).toBeGreaterThanOrEqual(1);
     expect(stats.activeProjects).toBe(2);
+  });
+
+  it('does not claim 0 today when Timeline TODAY only has overdue work', () => {
+    // Adam screenshot: 0 Today's tasks + 1 Overdue while TODAY lists the overdue task.
+    const overdueOnly = task({
+      id: 'steam',
+      title: 'Plan Year 5/6 Pathfinders STEAM extension course',
+      due_date: '2026-08-20',
+      domain: 'teaching',
+      status: 'in_progress'
+    });
+    const stats = dashboardFocusStats([overdueOnly], [], now);
+    const todayRows = dashboardTimeline([overdueOnly], [], now).filter(
+      (item) => item.bucket === 'today' && item.source === 'task'
+    );
+    expect(todayRows).toHaveLength(1);
+    expect(stats.overdue).toBe(1);
+    expect(stats.today).toBe(todayRows.length);
   });
 
   it('merges tasks, projects, and excursions onto one chronological rail', () => {

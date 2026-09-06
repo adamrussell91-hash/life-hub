@@ -1,13 +1,13 @@
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import {
-  adaptiveTodayTasks,
   backlogTasks,
   hubCalendarDate,
   preferredDomains,
   searchEntities,
   snapHubDueTime,
-  toDateKey
+  toDateKey,
+  todayPlateTasks
 } from '@/domain/queries';
 import { parseDueTimeHours } from '@/domain/daily-dial';
 import { hoursToDueTime } from '@/domain/time-grid';
@@ -196,7 +196,7 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
     const today = hubCalendarDate();
     const todayKey = toDateKey(today);
     const defaultDueTime = snapHubDueTime();
-    const list = adaptiveTodayTasks(tasks, today).filter((t) => {
+    const list = todayPlateTasks(tasks, today).filter((t) => {
       if (dayDomain !== 'all' && t.domain !== dayDomain) return false;
       if (dayPriority !== 'all' && t.priority !== dayPriority) return false;
       return true;
