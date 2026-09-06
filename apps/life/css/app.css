@@ -1680,8 +1680,6 @@ main { max-width: 76rem; margin: 0 auto; }
 #fitness-dashboard .fitness-polar [data-role="grid-label"],
 #fitness-dashboard .fitness-polar [data-role="orbit-label"],
 #fitness-dashboard .fitness-polar [data-role="leader-label"],
-#fitness-dashboard #fitness-clock-chart [data-role="angle-label"],
-#fitness-dashboard #fitness-clock-chart [data-role="grid-label"],
 #fitness-dashboard #fitness-year-chart [data-role="angle-label"],
 #fitness-dashboard #fitness-e1rm-radial-chart [data-role="angle-label"],
 #fitness-dashboard #fitness-e1rm-radial-chart [data-role="grid-label"] {

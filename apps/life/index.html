@@ -697,10 +697,8 @@
           <div class="fitness-viz">
             <article id="fitness-clock-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">When you train</p>
-              <p class="metric-caption">Time of day, coloured by region. Newer sessions sit further out.</p>
-              <div class="fitness-polar fitness-polar--clock">
-                <svg id="fitness-clock-chart" class="mind-mood-chart fitness-polar__svg" viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Training time of day"></svg>
-              </div>
+              <p class="metric-caption" data-fitness="when-read">Sessions by time of day.</p>
+              <div id="fitness-clock-chart" class="fitness-share-list" aria-label="Sessions by time of day"></div>
             </article>
             <article id="fitness-orbit-card" class="metric-card fitness-panel" hidden>
               <p class="metric-label">Monthly rhythm</p>

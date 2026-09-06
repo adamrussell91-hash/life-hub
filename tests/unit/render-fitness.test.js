@@ -282,7 +282,7 @@ test('kit charts unhide when their own data is ready and stay hidden otherwise',
         { key: 'push', label: 'Push', value: 400 },
         { key: 'pull', label: 'Pull', value: 200 }
       ],
-      clockPoints: [],
+      trainWhen: null,
       orbitDays: [],
       e1rmRadial: [],
       bumpRanks: [],

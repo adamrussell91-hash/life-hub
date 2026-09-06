@@ -8,7 +8,7 @@ import { buildEnergyOrbit } from './chart-kit/energy-orbit.js';
 import { buildHorizonBands } from './chart-kit/horizon.js';
 import { buildMoodMixDonut } from './chart-kit/mood-mix.js';
 import { buildMoodRadial } from './chart-kit/mood-radial.js';
-import { MONTHS, polar, thetaForDate, thetaForTime } from './chart-kit/polar-clock.js';
+import { MONTHS, polar, thetaForDate } from './chart-kit/polar-clock.js';
 import { rangeBarLayout, rangeBarTick } from './chart-kit/range-bar.js';
 import { buildRadialYear } from './chart-kit/radial-year.js';
 import { REGION_COLOURS } from './fitness-charts-model.js';
@@ -18,12 +18,6 @@ import { buildWatchlistHeat } from './chart-kit/watchlist-heat.js';
 import { formatDisplayDate } from '../core/time.js';
 import { matchFitnessRecentRows } from './fitness-recent-focus.js';
 
-const CLOCK_HOURS = [
-  { time: '00:00', label: '00:00' },
-  { time: '06:00', label: '06:00' },
-  { time: '12:00', label: '12:00' },
-  { time: '18:00', label: '18:00' }
-];
 const DAY_TYPE_LABELS = {
   movement: 'Movement',
   workout_30: '30 min',
@@ -175,89 +169,34 @@ function namedDot(root, { cx, cy, r, fill, delay, className = 'mind-mood-dot' })
   return dot;
 }
 
-function renderClock(root, points) {
-  const card = showCard(root, '#fitness-clock-card', points?.length >= 2);
-  const svg = root.querySelector('#fitness-clock-chart');
-  if (!card || !svg || typeof root.createElementNS !== 'function') return;
-  clearSvg(svg);
-  const size = 320;
-  const cx = 160;
-  const cy = 160;
-  const rim = 118;
-  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+function renderWhen(root, when) {
+  const ready = Number(when?.count) >= 2 && when?.buckets?.length;
+  const card = showCard(root, '#fitness-clock-card', ready);
+  const host = root.querySelector('#fitness-clock-chart');
+  setText(root, '[data-fitness="when-read"]', when?.read ?? '');
+  if (!card || !host) return;
+  host.replaceChildren();
+  const chart = buildColumns(when.buckets);
   const tip = ensureTip(root, card);
-  const nodes = [];
-  for (const ring of [
-    { r: 52, label: 'Older' },
-    { r: 86, label: '' },
-    { r: rim, label: 'Newer' }
-  ]) {
-    const grid = createSvg(root, 'circle');
-    grid.setAttribute('data-role', 'grid');
-    grid.setAttribute('cx', String(cx));
-    grid.setAttribute('cy', String(cy));
-    grid.setAttribute('r', String(ring.r));
-    nodes.push(grid);
-    if (ring.label) {
-      const at = polar(cx, cy, ring.r, 210);
-      appendLeaderLabel(root, nodes, {
-        cx,
-        cy,
-        x: at.x,
-        y: at.y,
-        text: ring.label,
-        role: 'grid-label'
-      });
-    }
+  const peak = Math.max(0, ...chart.bars.map(bar => bar.value));
+  for (const bar of chart.bars) {
+    const row = root.createElement('div');
+    row.className = 'fitness-share-row';
+    const label = root.createElement('strong');
+    label.textContent = bar.label;
+    const track = root.createElement('span');
+    track.className = 'fitness-share-row__track';
+    const fill = root.createElement('i');
+    fill.dataset.tone = bar.value === peak && bar.value > 0 ? 'up' : 'same';
+    setWidth(fill, bar.heightPct);
+    track.append(fill);
+    const value = root.createElement('span');
+    value.textContent = String(bar.value);
+    const copy = `${bar.label} · ${bar.value} session${bar.value === 1 ? '' : 's'}`;
+    bindTip(row, tip, copy);
+    row.append(label, track, value);
+    host.append(row);
   }
-  for (const hour of CLOCK_HOURS) {
-    const theta = thetaForTime(hour.time);
-    const tick = polar(cx, cy, rim, theta);
-    const spoke = createSvg(root, 'line');
-    spoke.setAttribute('data-role', 'spoke');
-    spoke.setAttribute('x1', String(cx));
-    spoke.setAttribute('y1', String(cy));
-    spoke.setAttribute('x2', String(tick.x));
-    spoke.setAttribute('y2', String(tick.y));
-    nodes.push(spoke);
-    appendLeaderLabel(root, nodes, {
-      cx,
-      cy,
-      x: tick.x,
-      y: tick.y,
-      text: hour.label,
-      role: 'angle-label'
-    });
-  }
-  points.forEach((point, index) => {
-    const theta = thetaForTime(point.time);
-    if (theta == null) return;
-    const radius = 52 + point.recency * 66;
-    const { x, y } = polar(cx, cy, radius, theta);
-    const region = REGION_LABELS[point.region] ?? point.region ?? 'Session';
-    const copy = `${point.title ?? 'Session'} · ${formatDisplayDate(point.date)} · ${point.time} · ${region}`;
-    const dot = namedDot(root, {
-      cx: x,
-      cy: y,
-      r: 7,
-      fill: point.colour,
-      delay: `${Math.min(index * 25, 400)}ms`
-    });
-    if (!dot) return;
-    const title = createSvg(root, 'title');
-    title.textContent = copy;
-    dot.append(title);
-    bindTip(dot, tip, copy);
-    nodes.push(dot);
-  });
-  svg.replaceChildren(...nodes);
-  animateAreaReveal(svg);
-  const seen = new Set();
-  paintLegend(root, card, (points ?? []).flatMap(point => {
-    if (!point.region || seen.has(point.region)) return [];
-    seen.add(point.region);
-    return [{ label: REGION_LABELS[point.region] ?? point.region, swatch: point.colour }];
-  }));
 }
 
 function renderOrbit(root, days) {
@@ -925,7 +864,7 @@ function renderEfficiency(root, weeks) {
 export function renderFitnessCharts(root, charts = {}) {
   setText(root, '[data-fitness="longest-streak"]', String(charts.longestStreak ?? 0));
 
-  renderClock(root, charts.clockPoints);
+  renderWhen(root, charts.trainWhen);
   renderOrbit(root, charts.orbitDays);
   renderE1rmRadial(root, charts.e1rmRadial);
   renderBump(root, charts.bumpRanks);

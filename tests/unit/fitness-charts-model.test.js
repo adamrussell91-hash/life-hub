@@ -4,6 +4,7 @@ import { buildFitnessModel } from '../../apps/life/js/app/fitness-model.js';
 import {
   acwrBand,
   buildFitnessCharts,
+  buildTrainWhen,
   classifyPushPull,
   classifyRepRange,
   longestCompletedStreak,
@@ -134,6 +135,25 @@ test('longest streak uses history outside the 30-day pie window', () => {
   assert.equal(model.charts.longestStreak, 1);
   assert.equal(model.charts.repRanges.length, 0);
   assert.equal(model.charts.restRatio.length, 0);
+});
+
+test('trainWhen answers typical time of day instead of scattering clock dots', () => {
+  const when = buildTrainWhen([
+    volumeSession('2026-07-07', 200, { time: '07:10' }),
+    volumeSession('2026-07-14', 200, { time: '07:20' }),
+    volumeSession('2026-07-21', 200, { time: '18:40' }),
+    volumeSession('2026-07-28', 200, { time: '19:00' }),
+    volumeSession('2026-07-30', 200, { time: '19:10' })
+  ]);
+  assert.equal(when.count, 5);
+  assert.equal(when.typicalTime, '18:40');
+  assert.equal(when.typicalBand, 'evening');
+  assert.equal(when.buckets.find(band => band.key === 'morning').value, 2);
+  assert.equal(when.buckets.find(band => band.key === 'evening').value, 3);
+  assert.match(when.read, /Usually evenings, around 18:40/);
+  assert.match(when.read, /mostly Tue/);
+  assert.equal(buildTrainWhen([volumeSession('2026-07-30', 200, { time: '19:00' })]), null);
+  assert.equal(buildTrainWhen([volumeSession('2026-07-20', 200), volumeSession('2026-07-30', 200)]), null);
 });
 
 test('acwrBand follows the 0.8–1.3 sweet spot', () => {
