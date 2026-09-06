@@ -210,14 +210,14 @@ test('home cards do not grow a cursor-follow spotlight sheen', async () => {
   await context.close();
 });
 
-test('the Life Hub tile does not sit beside any page title', async () => {
+test('the Life Hub tile is deleted from favicon, sign-in, and every page title', async () => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
   try {
     await page.goto(baseUrl);
     await page.locator('#sign-in-view').waitFor();
-    assert.equal(await page.locator('#sign-in-view .sign-in__mark').count(), 1);
-    assert.equal(await page.locator('link[rel="icon"][href*="life-hub"]').count(), 1);
+    assert.equal(await page.locator('#sign-in-view .sign-in__mark').count(), 0);
+    assert.equal(await page.locator('link[rel="icon"]').count(), 0);
 
     await signIn(page);
 
@@ -238,6 +238,7 @@ test('the Life Hub tile does not sit beside any page title', async () => {
       await page.locator('#page-title', { hasText: title }).waitFor();
       assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 0, section);
       assert.equal(await page.locator('.hub-mark').count(), 0, section);
+      assert.equal(await page.locator('.sign-in__mark').count(), 0, section);
     }
   } finally {
     await context.close();

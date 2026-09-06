@@ -78,8 +78,8 @@ describe("Knowledge Hub rail", () => {
     expect(hubChrome).toContain("page-header__title-row");
     expect(hubChrome).not.toContain('class="hub-mark"');
     expect(hubChrome).not.toContain("hubMarkHtml");
-    expect(main).toContain("icons/knowledge.svg");
-    expect(main).toContain("sign-in__mark");
+    expect(main).not.toContain("sign-in__mark");
+    expect(main).not.toContain("HUB_MARK_SRC");
     expect(intakeView).toContain("confirm-card");
     expect(intakeView).toContain("data-tidy-confirm");
     expect(main).toContain("startTidyIntake");

@@ -41,8 +41,9 @@ test('Home shell exposes landmarks and named rendering regions', async () => {
 test('authenticated shell provides a semantic sign-in gate and reachable controls', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
 
-  assert.match(html, /class="sign-in__mark"/);
-  assert.match(html, /packages\/design-kit\/icons\/life-hub\.svg/);
+  assert.doesNotMatch(html, /class="sign-in__mark"/);
+  assert.doesNotMatch(html, /rel="icon"/);
+  assert.doesNotMatch(html, /icons\/life-hub\.svg/);
 
   for (const fragment of [
     'id="sign-in-view"',
@@ -86,16 +87,16 @@ async function walkSourceFiles(dirUrl, acc = []) {
   return acc;
 }
 
-test('Life Hub tile is favicon and sign-in only, never beside the page title', async () => {
+test('Life Hub tile is deleted from favicon, sign-in, and title row', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const copy = html.slice(html.indexOf('page-header__copy'), html.indexOf('page-header__actions'));
   assert.match(copy, /class="page-header__title-row"/);
   assert.match(copy, /id="page-title"/);
   assert.doesNotMatch(copy, /class="hub-mark"/);
   assert.doesNotMatch(html, /class="hub-mark"/);
-  assert.match(html, /class="sign-in__mark"/);
-  assert.match(html, /rel="icon"/);
-  assert.match(html, /icons\/life-hub\.svg/);
+  assert.doesNotMatch(html, /class="sign-in__mark"/);
+  assert.doesNotMatch(html, /rel="icon"/);
+  assert.doesNotMatch(html, /icons\/life-hub\.svg/);
 });
 
 test('no hub injects the favicon tile beside a page title', async () => {
@@ -116,6 +117,44 @@ test('no hub injects the favicon tile beside a page title', async () => {
   }
   assert.deepEqual(hits, []);
 });
+
+
+test('no hub wires a favicon or sign-in hub tile', async () => {
+  const root = new URL('../../', import.meta.url);
+  const files = [
+    ...(await walkSourceFiles(new URL('apps/life/', root))),
+    ...(await walkSourceFiles(new URL('apps/tasks/src/', root))),
+    ...(await walkSourceFiles(new URL('apps/tasks/', root)).then(files => files.filter(f => String(f).endsWith('index.html')))),
+    ...(await walkSourceFiles(new URL('apps/teaching/src/', root))),
+    ...(await walkSourceFiles(new URL('apps/teaching/', root)).then(files => files.filter(f => String(f).endsWith('index.html')))),
+    ...(await walkSourceFiles(new URL('apps/knowledge/src/', root))),
+    ...(await walkSourceFiles(new URL('apps/knowledge/', root)).then(files => files.filter(f => /index\.html$|mindmap\.html$/.test(String(f))))),
+    ...(await walkSourceFiles(new URL('packages/design-kit/snippets/', root))),
+    new URL('packages/design-kit/sign-in.css', root)
+  ];
+  // Flatten unique
+  const seen = new Set();
+  const unique = [];
+  for (const file of files) {
+    const key = fileURLToPath(file);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(file);
+  }
+  const hits = [];
+  for (const file of unique) {
+    const text = await readFile(file, 'utf8');
+    if (/rel=["']icon["']/.test(text)) hits.push(`${fileURLToPath(file)}:favicon`);
+    if (/class=["']sign-in__mark["']|sign-in__mark/.test(text) && !/Forbidden: \.sign-in__mark|No `\.sign-in__mark`|never.*sign-in__mark|not\.toContain\(["']sign-in__mark/.test(text) && !fileURLToPath(file).includes('.test.')) {
+      // Allow docs/comments that forbid the mark; flag real markup/class usage in product files.
+      if (/<img[^>]*sign-in__mark|className\s*=\s*['"]sign-in__mark['"]|class=["']sign-in__mark["']|\.sign-in__mark\s*\{/.test(text)) {
+        hits.push(`${fileURLToPath(file)}:sign-in-mark`);
+      }
+    }
+  }
+  assert.deepEqual(hits, []);
+});
+
 
 test('Life chrome does not revive retired rail marks, gate copy, or the calorie slider', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
@@ -337,12 +376,11 @@ test('service worker paints cached images immediately and keeps scripts network-
   assert.match(worker, /life-hub-shell-v157/);
 });
 
-test('web app manifest is installable and uses only local icons', async () => {
+test('web app manifest stays installable without hub-tile icons', async () => {
   const manifest = JSON.parse(await readFile(new URL('../../apps/life/manifest.webmanifest', import.meta.url)));
 
   assert.equal(manifest.name, 'Life Hub');
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.start_url, './');
-  assert.deepEqual(manifest.icons.map(icon => icon.sizes), ['192x192', '512x512']);
-  assert.ok(manifest.icons.every(icon => icon.src.startsWith('assets/icons/')));
+  assert.deepEqual(manifest.icons, []);
 });

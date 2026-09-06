@@ -2,7 +2,7 @@
  *
  * Markup: snippets/sign-in.html
  * Do not restyle per hub. Only the brand eyebrow text changes.
- * Required: hub tile via .sign-in__mark (see ICONS.md).
+ * Forbidden: .sign-in__mark / hub tile (ICONS.md — deleted everywhere).
  * Forbidden: supporting / purpose / privacy copy.
  * Enter submits (form submit, not click-only).
  * Glass density overlays do not apply here.
@@ -42,15 +42,6 @@
   box-shadow: var(--elev-3);
   backdrop-filter: blur(var(--sign-in-glass-blur));
   -webkit-backdrop-filter: blur(var(--sign-in-glass-blur));
-}
-
-/* Website tile — same asset as the favicon (ICONS.md). */
-.sign-in__mark {
-  display: block;
-  width: 3.5rem;
-  height: 3.5rem;
-  margin: 0;
-  border-radius: var(--radius-md);
 }
 
 .sign-in__brand {
