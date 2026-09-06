@@ -10,6 +10,7 @@ import {
 } from './teaching-blobs.mjs';
 
 export const VERSION_RETENTION = 10;
+export const CHECKPOINT_AFTER_SAVE_WARNING = 'Saved, but version history checkpoint failed.';
 
 export class VersionStoreError extends Error {
   constructor(code, message, details) {
@@ -46,8 +47,20 @@ export function createMemoryJsonStore(entries = {}) {
     },
     async delete(key) {
       map.delete(key);
+    },
+    async listKeys(prefix) {
+      return [...map.keys()].filter(key => !prefix || key.startsWith(prefix));
     }
   };
+}
+
+export async function tryWriteCheckpoint(store, args) {
+  try {
+    const record = await writeCheckpoint(store, args);
+    return { ok: true, record };
+  } catch {
+    return { ok: false };
+  }
 }
 
 export function versionTypeForKind(kind) {
