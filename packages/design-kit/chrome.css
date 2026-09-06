@@ -185,14 +185,6 @@ html[data-hub="life"] .glass-panel {
   display: block;
 }
 
-/* Site tile — canvas top-left, level with the page title. Same file as favicon + login. */
-.hub-mark {
-  display: block;
-  width: 2rem;
-  height: 2rem;
-  flex-shrink: 0;
-}
-
 /* ── Buttons ──────────────────────────────────────────────────────────── */
 
 .btn {

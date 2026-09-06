@@ -67,9 +67,25 @@ describe('hub shell chrome', () => {
     const actions = [...refs.headerActions.children].map((el) => el.className);
     expect(actions[0]).toContain('btn');
     expect(actions.at(-1)).toBe('hub-utilities');
-    expect(refs.pageHeader.querySelector('.page-header__title-row .hub-mark')).not.toBeNull();
-    expect(refs.headerActions.querySelector('.hub-mark')).toBeNull();
+    expect(refs.pageHeader.querySelector('.hub-mark')).toBeNull();
     expect(refs.logoutButton?.getAttribute('aria-label')).toBe('Sign out');
+  });
+
+  it('strips a leftover title-row hub tile on re-render', () => {
+    const root = document.createElement('div');
+    const refs = renderHubShell(root, { onLogout: vi.fn(), onRefresh: vi.fn() });
+    renderPageHeader(refs, { eyebrow: 'Home', title: 'Dashboard' });
+
+    const leftover = document.createElement('img');
+    leftover.className = 'hub-mark';
+    leftover.src = '/icons/tasks.svg';
+    leftover.alt = '';
+    refs.pageHeader.querySelector('.page-header__title-row')?.prepend(leftover);
+    expect(refs.pageHeader.querySelector('.hub-mark')).not.toBeNull();
+
+    renderPageHeader(refs, { eyebrow: 'Home', title: 'Dashboard' });
+    expect(refs.pageHeader.querySelector('.hub-mark')).toBeNull();
+    expect(refs.pageHeader.querySelector('.page-header__title')?.textContent).toBe('Dashboard');
   });
 
   it('renders sectioned rail links with a distinct icon per destination', () => {
