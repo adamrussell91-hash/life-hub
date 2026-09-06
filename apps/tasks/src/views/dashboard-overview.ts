@@ -548,7 +548,10 @@ function renderHeatCard(
       ? `Nothing dated ${selected.isToday ? 'today' : formatDisplayDate(selected.date_key)}.`
       : 'Nothing dated in the next fortnight.';
   } else {
-    peek.textContent = selected.items.map((item) => item.title).join(' · ');
+    const titles = selected.items.map((item) => item.title);
+    const shown = titles.slice(0, 3);
+    const extra = titles.length - shown.length;
+    peek.textContent = extra > 0 ? `${shown.join(' · ')} · +${extra} more` : shown.join(' · ');
   }
   card.append(peek);
   return card;
