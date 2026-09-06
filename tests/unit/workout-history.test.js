@@ -5,15 +5,21 @@ import {
   MAX_RECENT_WORKOUTS,
   attachWorkoutNotes,
   collapseSetSplitExercises,
+  compareWorkoutWindows,
+  compareWorkoutWindowsSchema,
   daysSinceLastCompletedWorkout,
   formatRecentWorkoutsForPrompt,
+  formatWorkoutWindowCompareForPrompt,
   getLastWorkout,
   getLastWorkoutSchema,
   lastCompletedWorkout,
+  mergeWorkoutEntries,
   normalizeExerciseName,
   searchWorkoutRecords,
   searchWorkoutRecordsSchema,
-  selectRecentWorkoutEntries
+  selectRecentWorkoutEntries,
+  selectWorkoutEntriesInRange,
+  workoutWindowBounds
 } from '../../netlify/functions/_shared/workout-history.mjs';
 
 function session(overrides = {}) {
@@ -181,6 +187,74 @@ test('searchWorkoutRecords rejects an empty query', () => {
 test('workout history tool schemas use the expected names', () => {
   assert.equal(getLastWorkoutSchema().name, 'get_last_workout');
   assert.equal(searchWorkoutRecordsSchema().name, 'search_workout_records');
+  assert.equal(compareWorkoutWindowsSchema().name, 'compare_workout_windows');
+});
+
+test('workoutWindowBounds is two adjacent 56-day windows ending today', () => {
+  const bounds = workoutWindowBounds('2026-08-11');
+  assert.deepEqual(bounds, {
+    weeks: 8,
+    currentFrom: '2026-06-17',
+    currentTo: '2026-08-11',
+    previousFrom: '2026-04-22',
+    previousTo: '2026-06-16'
+  });
+  assert.equal(workoutWindowBounds('not-a-date'), null);
+});
+
+test('compareWorkoutWindows counts completed sessions and ignores planned', () => {
+  const records = [
+    session({ date: '2026-07-20', title: 'Current A' }),
+    session({ date: '2026-07-20', title: 'Current B', time: '18:00' }),
+    session({ date: '2026-05-01', title: 'Previous' }),
+    session({ date: '2026-07-22', title: 'Not yet', status: 'planned' }),
+    session({ date: '2026-03-01', title: 'Too old' })
+  ];
+  const result = compareWorkoutWindows(records, '2026-08-11');
+  assert.equal(result.ok, true);
+  assert.equal(result.current.count, 2);
+  assert.equal(result.previous.count, 1);
+  assert.equal(result.delta, 1);
+  assert.equal(result.current.from, '2026-06-17');
+  assert.equal(result.previous.to, '2026-06-16');
+});
+
+test('formatWorkoutWindowCompareForPrompt is the number agents must quote', () => {
+  const text = formatWorkoutWindowCompareForPrompt(compareWorkoutWindows([
+    session({ date: '2026-07-20' })
+  ], '2026-08-11'));
+  assert.match(text, /Computed training volume/);
+  assert.match(text, /Last 8 weeks \(2026-06-17 to 2026-08-11\): 1 completed workout\./);
+  assert.match(text, /Previous 8 weeks \(2026-04-22 to 2026-06-16\): 0 completed workouts\./);
+  assert.match(text, /Delta: \+1\./);
+  assert.equal(formatWorkoutWindowCompareForPrompt({ ok: false }), '');
+});
+
+test('selectWorkoutEntriesInRange keeps dated session files and drops templates', () => {
+  const tree = [
+    { type: 'blob', path: 'data/fitness/templates/chest-and-curls.md', sha: 't' },
+    { type: 'blob', path: 'data/fitness/2026/05/2026-05-01-workout.md', sha: 'a' },
+    { type: 'blob', path: 'data/fitness/2026/07/2026-07-20-workout.md', sha: 'b' },
+    { type: 'blob', path: 'data/fitness/2026/03/2026-03-01-workout.md', sha: 'c' },
+    { type: 'tree', path: 'data/fitness/2026/07' }
+  ];
+  const entries = selectWorkoutEntriesInRange(tree, { from: '2026-04-22', to: '2026-08-11' });
+  assert.deepEqual(entries.map(entry => entry.path), [
+    'data/fitness/2026/05/2026-05-01-workout.md',
+    'data/fitness/2026/07/2026-07-20-workout.md'
+  ]);
+});
+
+test('mergeWorkoutEntries de-duplicates by path', () => {
+  const recent = [{ path: 'data/fitness/2026/08/2026-08-01-workout.md', sha: 'a' }];
+  const windowed = [
+    { path: 'data/fitness/2026/08/2026-08-01-workout.md', sha: 'a' },
+    { path: 'data/fitness/2026/05/2026-05-01-workout.md', sha: 'b' }
+  ];
+  assert.deepEqual(mergeWorkoutEntries(recent, windowed).map(entry => entry.path), [
+    'data/fitness/2026/08/2026-08-01-workout.md',
+    'data/fitness/2026/05/2026-05-01-workout.md'
+  ]);
 });
 
 test('attachWorkoutNotes copies markdown body onto the record (notes live in body, not YAML)', () => {
