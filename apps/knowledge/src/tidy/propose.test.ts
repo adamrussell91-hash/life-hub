@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildTidyPrompt, normalizeTidyBody, parseTidyProposal, proposeTidy, tidyQualityIssues } from "./propose";
+import { applyTidyProposal, buildTidyPrompt, normalizeTidyBody, parseTidyProposal, proposeTidy, restoreDroppedFileLinks, tidyQualityIssues } from "./propose";
 
 describe("parseTidyProposal", () => {
   it("accepts Claude JSON and rejects malformed, empty-tag, and garbage replies", () => {
@@ -108,12 +108,42 @@ describe("parseTidyProposal", () => {
     expect(normalizeTidyBody("Q: Why?\r\nA: Because.\r\n\r\n\r\nContext.")).toBe("Q: Why?\nA: Because.\n\nContext.");
   });
 
-  it("rejects extraction dumps, encoded local paths, and broken source titles", () => {
+  it("rejects extraction dumps and broken source titles, not existing file links", () => {
     const page = { id: "p", title: "'Are we being de-gifted, Miss?' Primary School Gif", area: "notes" as const, tags: [], body: "Raw", connected: [], attachments: [], source: "hub" as const, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z", schema_version: 1 as const };
     expect(tidyQualityIssues(page, {
       title: null,
       tags: ["High Potential and High Ability Education"],
-      body: "APA 7 reference: text\n\n(..%2FEDST5888%20Capstone%20Readings%2Fpaper.md)",
-    })).toEqual(expect.arrayContaining(["title looks incomplete", "contains an encoded local file path", "contains an extraction metadata dump"]));
+      body: "APA 7 reference: text\n\n[Paper](..%2FEDST5888%20Capstone%20Readings%2Fpaper.md)",
+    })).toEqual(expect.arrayContaining(["title looks incomplete", "contains an extraction metadata dump"]));
+    expect(tidyQualityIssues(page, {
+      title: "Working memory",
+      tags: ["Learning Science and Cognition"],
+      body: "[Paper](..%2FEDST5888%20Capstone%20Readings%2Fpaper.md)",
+    })).toEqual([]);
+  });
+
+  it("puts back file links the model dropped and keeps attachments", () => {
+    const attachment = { id: "att-1", kind: "pdf" as const, r2_key: "university/paper.pdf", filename: "paper.pdf", content_type: "application/pdf" };
+    const next = applyTidyProposal({
+      id: "p",
+      title: "Metacognition",
+      area: "notes",
+      tags: ["Note", "Learning Science and Cognition"],
+      body: "[paper.pdf](Enhancing%20Metacognition/paper.pdf)\n\nRaw notes.",
+      connected: ["page_other"],
+      attachments: [attachment],
+      source: "hub",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      schema_version: 1,
+    }, {
+      title: null,
+      tags: ["Learning Science and Cognition"],
+      body: "Tidied prose.",
+    });
+    expect(next.body).toContain("[paper.pdf](Enhancing%20Metacognition/paper.pdf)");
+    expect(next.body).toContain("Tidied prose.");
+    expect(next.attachments).toEqual([attachment]);
+    expect(restoreDroppedFileLinks("[paper.pdf](folder/(2021) paper.pdf)", "Clean.")).toBe("[paper.pdf](folder/(2021) paper.pdf)\n\nClean.");
   });
 });

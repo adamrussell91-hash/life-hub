@@ -34,12 +34,56 @@ export function parseTidyProposal(raw: string): TidyProposal | null {
   }
 }
 
+export function extractMarkdownLinkMarkup(body: string) {
+  const text = String(body ?? "");
+  const found: string[] = [];
+  const opener = /!?\[(?:[^\]]*)\]\(/g;
+  let match: RegExpExecArray | null;
+  while ((match = opener.exec(text))) {
+    let depth = 1;
+    let end = match.index + match[0].length;
+    while (end < text.length && depth) {
+      if (text[end] === "(") depth += 1;
+      else if (text[end] === ")") depth -= 1;
+      end += 1;
+    }
+    if (depth) break;
+    found.push(text.slice(match.index, end));
+    opener.lastIndex = end;
+  }
+  return found;
+}
+
+function hrefOfLink(markup: string) {
+  const start = markup.indexOf("](");
+  if (start < 0 || !markup.endsWith(")")) return "";
+  return markup.slice(start + 2, -1);
+}
+
+export function isLocalFileLink(markup: string) {
+  const href = hrefOfLink(markup).split("#")[0];
+  return Boolean(href) && !/^(https?:|mailto:|#)/i.test(href);
+}
+
+/** Put back attachment / note-file links the model dropped. Web URLs stay a prompt rule. */
+export function restoreDroppedFileLinks(originalBody: string, nextBody: string) {
+  const next = String(nextBody ?? "");
+  const missing = extractMarkdownLinkMarkup(originalBody)
+    .filter(isLocalFileLink)
+    .filter(raw => {
+      const href = hrefOfLink(raw);
+      return !next.includes(raw) && !next.includes(`](${href})`);
+    });
+  if (!missing.length) return next;
+  return `${missing.join("\n")}\n\n${next}`.trim();
+}
+
 export function applyTidyProposal(page: Page, proposal: TidyProposal): Page {
   return {
     ...page,
     title: proposal.title ?? page.title,
     tags: applyTopicTags(page.tags, proposal.tags),
-    body: normalizeTidyBody(proposal.body),
+    body: restoreDroppedFileLinks(page.body, normalizeTidyBody(proposal.body)),
   };
 }
 
@@ -51,7 +95,6 @@ export function tidyQualityIssues(page: Page, proposal: TidyProposal) {
   if ((title.startsWith("'") && apostrophes % 2 !== 0) || /\bGif$/i.test(title.trim())) {
     issues.push("title looks incomplete");
   }
-  if (/%2f[^\s)]*\.md\b/i.test(proposal.body)) issues.push("contains an encoded local file path");
   if (/\b(?:APA 7 reference|Tracker record|Evidence contribution|HPGE connection):/i.test(proposal.body)) {
     issues.push("contains an extraction metadata dump");
   }
