@@ -48,8 +48,7 @@ export function beginChatTurnAnchor(list, userItem) {
   function follow() {
     if (!active || !userItem.isConnected) return;
     const userTop = userItem.offsetTop || 0;
-    const max = Math.max(0, (list.scrollHeight || 0) - (list.clientHeight || 0));
-    list.scrollTop = Math.min(max, Math.max(0, userTop - TOP_PAD));
+    list.scrollTop = Math.max(0, userTop - TOP_PAD);
   }
 
   follow();
