@@ -379,6 +379,9 @@ export function nextScrollHideState({
   const floor = Number(threshold);
   if (!Number.isFinite(y)) return Boolean(hidden);
   if (y <= (Number.isFinite(floor) ? floor : DEFAULT_SCROLL_HIDE_THRESHOLD)) return false;
+  // Layout / stick-to-bottom can nudge scrollTop by a couple of pixels.
+  // Treating that as a user scroll flips hide/show and bounces the scrollbar.
+  if (Number.isFinite(last) && Math.abs(y - last) < 4) return Boolean(hidden);
   if (Number.isFinite(last) && y > last) return true;
   if (Number.isFinite(last) && y < last) return false;
   return Boolean(hidden);

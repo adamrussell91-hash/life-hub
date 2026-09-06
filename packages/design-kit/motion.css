@@ -190,6 +190,8 @@
 }
 
 .hub-scroll-hide--overlay.is-hidden {
+  /* Keep in-flow size so the thread/scrollbar does not bounce. */
+  grid-template-rows: 1fr;
   transform: translateY(-100%);
 }
 
