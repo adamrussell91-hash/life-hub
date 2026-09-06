@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 async function browserAssetText() {
   const root = new URL('../../', import.meta.url);
@@ -68,6 +69,23 @@ test('authenticated shell provides a semantic sign-in gate and reachable control
   assert.match(html, /id="app-shell"[^>]*hidden/);
 });
 
+const TITLE_ROW_TILE = /class(?:Name)?=["']hub-mark["']|className\s*=\s*['"]hub-mark['"]/;
+
+async function walkSourceFiles(dirUrl, acc = []) {
+  const entries = await readdir(dirUrl, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'design-kit') continue;
+    const next = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, dirUrl);
+    if (entry.isDirectory()) {
+      await walkSourceFiles(next, acc);
+      continue;
+    }
+    if (/\.(test|spec)\.(html|js|ts|mjs)$/.test(entry.name)) continue;
+    if (/\.(html|js|ts|mjs|css)$/.test(entry.name)) acc.push(next);
+  }
+  return acc;
+}
+
 test('Life Hub tile is favicon and sign-in only, never beside the page title', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const copy = html.slice(html.indexOf('page-header__copy'), html.indexOf('page-header__actions'));
@@ -78,6 +96,25 @@ test('Life Hub tile is favicon and sign-in only, never beside the page title', a
   assert.match(html, /class="sign-in__mark"/);
   assert.match(html, /rel="icon"/);
   assert.match(html, /icons\/life-hub\.svg/);
+});
+
+test('no hub injects the favicon tile beside a page title', async () => {
+  const root = new URL('../../', import.meta.url);
+  const files = [
+    ...(await walkSourceFiles(new URL('apps/life/', root))),
+    ...(await walkSourceFiles(new URL('apps/tasks/src/', root))),
+    ...(await walkSourceFiles(new URL('apps/teaching/src/', root))),
+    ...(await walkSourceFiles(new URL('apps/knowledge/src/', root))),
+    ...(await walkSourceFiles(new URL('packages/design-kit/snippets/', root))),
+    new URL('packages/design-kit/chrome.css', root),
+    new URL('packages/design-kit/actions.css', root)
+  ];
+  const hits = [];
+  for (const file of files) {
+    const text = await readFile(file, 'utf8');
+    if (TITLE_ROW_TILE.test(text)) hits.push(fileURLToPath(file));
+  }
+  assert.deepEqual(hits, []);
 });
 
 test('Life chrome does not revive retired rail marks, gate copy, or the calorie slider', async () => {
@@ -174,6 +211,13 @@ test('short chat bubbles are sized by text, not Copy/Retry, and status lines do 
   assert.doesNotMatch(css, /chat-status-pulse/);
 });
 
+test('desktop overlay Chat locks its window height so a reply cannot grow the panel', async () => {
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+  const overlay = css.match(/\.chat-view\[data-panel-mode="overlay"\]\s*\{[^}]+\}/)?.[0] ?? '';
+  assert.match(overlay, /height:\s*min\(70vh,\s*40rem\)/);
+  assert.match(overlay, /max-height:\s*min\(70vh,\s*40rem\)/);
+});
+
 test('full-page Chat locks the canvas height and anchors the composer on the floor', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
@@ -247,7 +291,7 @@ test('service worker paints cached images immediately and keeps scripts network-
   assert.match(worker, /function staleWhileRevalidate/);
   assert.match(worker, /function networkFirst/);
   assert.match(worker, /isStaticImage\(url\.pathname\)/);
-  assert.match(worker, /life-hub-shell-v152/);
+  assert.match(worker, /life-hub-shell-v154/);
 });
 
 test('web app manifest is installable and uses only local icons', async () => {

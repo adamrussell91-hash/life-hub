@@ -12,10 +12,9 @@ function formatWeekLabel(dateKey) {
 }
 
 function weekShows(index, count) {
-  if (count <= 8) return true;
+  if (count <= 4) return true;
   if (index === 0 || index === count - 1) return true;
-  const step = Math.ceil(count / 6);
-  return index % step === 0;
+  return index % 2 === 0;
 }
 
 function trendDir(points) {
@@ -46,8 +45,12 @@ function nudgeLabels(lines) {
 export function buildBumpChart({
   ranks = [],
   weekly = null,
-  themes = []
+  themes = [],
+  width = WIDTH,
+  height = HEIGHT,
+  pad: padArg
 } = {}) {
+  const pad = { ...PAD, ...padArg };
   const rows = ranks ?? [];
   const keys = (themes.length ? themes : weekly?.themes ?? []).filter(Boolean);
   const weeks = rows.map(row => row.week);
@@ -57,14 +60,14 @@ export function buildBumpChart({
     1,
     ...rows.flatMap(row => Object.values(row.rankByTheme ?? {}).map(Number))
   );
-  const plotW = WIDTH - PAD.left - PAD.right;
-  const plotH = HEIGHT - PAD.top - PAD.bottom;
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
   const xAt = index => (
     weeks.length <= 1
-      ? PAD.left + plotW / 2
-      : PAD.left + (index / (weeks.length - 1)) * plotW
+      ? pad.left + plotW / 2
+      : pad.left + (index / (weeks.length - 1)) * plotW
   );
-  const yAt = rank => PAD.top + ((Number(rank) - 1) / Math.max(maxRank - 1, 1)) * plotH;
+  const yAt = rank => pad.top + ((Number(rank) - 1) / Math.max(maxRank - 1, 1)) * plotH;
   const maxCount = Math.max(
     1,
     ...(weekly?.series ?? []).flatMap(item => item.values ?? []).map(value => Number(value) || 0)
@@ -91,16 +94,16 @@ export function buildBumpChart({
       d: smoothLinePath(points),
       points,
       lastRank: last?.rank ?? null,
-      labelY: last?.y ?? PAD.top,
+      labelY: last?.y ?? pad.top,
       dir: trendDir(points)
     };
   });
   nudgeLabels(lines);
 
   return {
-    width: WIDTH,
-    height: HEIGHT,
-    pad: PAD,
+    width,
+    height,
+    pad,
     maxRank,
     weeks: weeks.map((week, index) => ({
       week,

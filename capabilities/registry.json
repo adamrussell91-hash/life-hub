@@ -275,6 +275,30 @@
         "governance_log"
       ],
       "tool_name": "os_run_promoted_shortcut"
+    },
+    "tasks.create": {
+      "file": "tasks/create-task.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "create_task"
+    },
+    "tasks.update": {
+      "file": "tasks/update-task.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "update_task"
     }
   }
 }

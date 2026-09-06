@@ -1,0 +1,15 @@
+{
+  "id": "tasks.update",
+  "tool_name": "update_task",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Patch an existing Tasks Hub row (or append_description). Call get_task first when you need the current shape. Confirm before writing.",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}

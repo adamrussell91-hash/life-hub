@@ -169,6 +169,18 @@ For non-trivial implementation work, do not call the task complete until:
 
 If 6 or 7 cannot be completed due to a genuine environment limitation, report not fully verified, not "done."
 
+## Live Anthropic / agent conversation
+
+`ANTHROPIC_API_KEY` may already be in the Cloud Agent environment or in gitignored `.env.local`.
+
+Before reporting conversational agent tests as Blocked:
+
+1. Check `process.env.ANTHROPIC_API_KEY`.
+2. Load gitignored `.env.local` if present.
+3. If a key exists, run the real `chat.mjs` path (`scripts/live-e2e-three-agents.mjs` or `scripts/live-agent-protocol-smoke.mjs`).
+
+Never commit the key. Never print it. Do not ask Adam to paste it again if either source is present.
+
 For AI-agent work, this expands to `.cursor/rules/agent-context-integrity.mdc`. An agent feature is not complete because data saved, retrieval returned it, an API returned 200, a prompt contained a field, or a model returned text.
 
 ## Final implementation reports

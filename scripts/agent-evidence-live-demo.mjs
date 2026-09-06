@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
  * Live evidence-pack demos against /agent/repos/life-hub-data (functioning store).
- * Conversational Anthropic turns are reported Blocked when ANTHROPIC_API_KEY is absent.
+ * Conversational Anthropic turns are reported Blocked only when ANTHROPIC_API_KEY
+ * is absent from both the environment and gitignored .env.local.
  */
+import { readFileSync } from 'node:fs';
 import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -14,6 +16,23 @@ const yaml = (await import('js-yaml')).default;
 const { assembleEvidencePack } = await import(
   pathToFileURL(join(root, 'netlify/functions/_shared/evidence-packs.mjs')).href
 );
+
+function loadLocalAnthropicKey() {
+  const fromEnv = typeof process.env.ANTHROPIC_API_KEY === 'string'
+    ? process.env.ANTHROPIC_API_KEY.trim()
+    : '';
+  if (fromEnv) return fromEnv;
+  try {
+    const text = readFileSync(join(root, '.env.local'), 'utf8');
+    for (const line of text.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('ANTHROPIC_API_KEY=')) return trimmed.slice('ANTHROPIC_API_KEY='.length).trim();
+    }
+  } catch {
+    // optional
+  }
+  return '';
+}
 
 const DATA_ROOT = process.env.LIFE_HUB_DATA_ROOT || '/agent/repos/life-hub-data/data';
 const OUT_DIR = process.env.EVIDENCE_DEMO_OUT || '/opt/cursor/artifacts/agent-evidence-live';
@@ -124,7 +143,8 @@ async function main() {
     loadErrors: {}
   };
 
-  const apiKeyPresent = Boolean(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.length > 8);
+  const apiKey = loadLocalAnthropicKey();
+  const apiKeyPresent = Boolean(apiKey && apiKey.length > 8);
   const results = [];
 
   for (const [slug, message] of Object.entries(PROMPTS)) {
