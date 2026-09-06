@@ -346,6 +346,87 @@ test('mobile full-page Chat docks the composer to the keyboard viewport', async 
   await context.close();
 });
 
+test('focusing the composer on phone hides the tab bar and frees reading room (iOS inset≈0)', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.hub-mobile-nav [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#agent-picker [data-agent-slug="brisket"]').click();
+  await page.locator('#chat-input').waitFor({ state: 'visible' });
+
+  // Reproduce Adam's iPhone: keyboard open, but innerHeight already matches vv.height
+  // so inset math stays ~0 and the old class never flipped.
+  await page.evaluate(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--vv-offset-top', '0px');
+    root.style.setProperty('--vv-height', '480px');
+    root.style.setProperty('--vv-offset-bottom', '0px');
+    root.classList.remove('vv-keyboard-open');
+    const frame = document.querySelector('.page-frame');
+    if (frame) {
+      frame.style.height = '480px';
+      frame.style.maxHeight = '480px';
+    }
+    const view = document.querySelector('#chat-view');
+    view.dataset.chrome = 'engaged';
+    const empty = document.querySelector('#chat-empty');
+    if (empty) empty.hidden = true;
+    const list = document.querySelector('#chat-messages');
+    list.replaceChildren();
+    const item = document.createElement('li');
+    item.className = 'chat-message chat-message--assistant';
+    item.dataset.agent = 'brisket';
+    const body = document.createElement('div');
+    body.className = 'chat-message__body';
+    body.textContent = 'Go on and confirm it whenever you are ready — I am right here.';
+    item.append(body);
+    list.append(item);
+  });
+
+  await page.locator('#chat-input').focus();
+
+  const layout = await page.evaluate(() => {
+    const root = document.documentElement;
+    const form = document.querySelector('#chat-form');
+    const frame = document.querySelector('.page-frame');
+    const nav = document.querySelector('.hub-mobile-nav');
+    const header = document.querySelector('.page-header');
+    const picker = document.querySelector('#agent-picker');
+    const messages = document.querySelector('#chat-messages');
+    const formBox = form.getBoundingClientRect();
+    const frameBox = frame.getBoundingClientRect();
+    const msgBox = messages.getBoundingClientRect();
+    const padBottom = parseFloat(getComputedStyle(frame).paddingBottom) || 0;
+    return {
+      keyboardOpen: root.classList.contains('vv-keyboard-open'),
+      navDisplay: getComputedStyle(nav).display,
+      headerDisplay: getComputedStyle(header).display,
+      pickerDisplay: getComputedStyle(picker).display,
+      padBottom,
+      formHeight: formBox.height,
+      gapFormToFrame: frameBox.bottom - formBox.bottom,
+      readingRoom: msgBox.height,
+      frameHeight: frameBox.height
+    };
+  });
+
+  assert.equal(layout.keyboardOpen, true, 'composer focus must set vv-keyboard-open');
+  assert.equal(layout.navDisplay, 'none', 'tab bar must hide like Messenger while typing');
+  assert.equal(layout.headerDisplay, 'none', 'page title must yield reading room while typing');
+  assert.equal(layout.pickerDisplay, 'none', 'agent strip must yield reading room while typing');
+  assert.ok(layout.padBottom < 8, `nav clearance padding must clear (padBottom=${layout.padBottom})`);
+  assert.ok(layout.gapFormToFrame < 8, 'no blank strip between composer and keyboard floor');
+  assert.ok(layout.formHeight < 72, `composer must stay slim (formHeight=${layout.formHeight})`);
+  assert.ok(
+    layout.readingRoom > layout.frameHeight * 0.55,
+    `messages need Messenger-like reading room (reading=${layout.readingRoom}, frame=${layout.frameHeight})`
+  );
+
+  await context.close();
+});
+
 test('make the workout shows a Confirm card', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
