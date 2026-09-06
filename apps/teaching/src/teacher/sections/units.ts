@@ -1,5 +1,6 @@
 import { navigate } from '@/app/router';
 import { cloneBlocksWithNewIds } from '@/blocks/clone-blocks';
+import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
 import type { Block } from '@/schemas';
 import { resolveCoverUrl } from '@/schemas';
 import { mountCreateControl } from '@/teacher/create/control';
@@ -503,7 +504,7 @@ export function renderUnitPage(
   });
 
   const lessons = curriculum.lessons
-    .filter((lesson) => lesson.unit_id === unitId && lesson.status === 'active')
+    .filter((lesson) => lesson.unit_id === unitId && isActiveLibraryStatus(lesson.status))
     .sort((a, b) => a.sequence - b.sequence);
 
   if (lessons.length === 0) {

@@ -1,6 +1,7 @@
 import { apiGet } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { PedagogicalMode } from '@/curriculum/pedagogical-mode';
+import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
 import type { Year, Subject, Unit, Class, ScheduledLesson, ScopeSequence, Media, CurriculumOutcome } from '@/schemas';
 
 export interface CurriculumLessonSummary {
@@ -238,8 +239,8 @@ export function renderCurriculumNav(
     wrapper.append(createToggleButton(unit.title, nodeId, 'nested-2'));
 
     if (isExpanded(nodeId)) {
-      const lessons = (lessonsByUnit.get(unit.id) ?? []).filter(
-        (lesson) => lesson.status === 'active'
+      const lessons = (lessonsByUnit.get(unit.id) ?? []).filter((lesson) =>
+        isActiveLibraryStatus(lesson.status)
       );
       const children = document.createElement('div');
       children.className = 'curriculum-nav__children';

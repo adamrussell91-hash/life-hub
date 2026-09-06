@@ -1,6 +1,7 @@
 import type { Unit } from '@/schemas';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { resolvePedagogicalMode } from '@/curriculum/pedagogical-mode';
+import { isActiveLibraryStatus } from '@/curriculum/with-entity-status';
 import { expandQueryTokens, semanticScore } from './semantic';
 import {
   DEFAULT_LESSONS_STATE,
@@ -55,13 +56,13 @@ function matchesQuery(haystack: string, query: string, lesson: LessonLibraryRow)
 }
 
 function matchesStatus(lesson: LessonLibraryRow, statuses: LessonsListState['statuses']): boolean {
-  if (statuses.length === 0) return lesson.status === 'active';
+  if (statuses.length === 0) return isActiveLibraryStatus(lesson.status);
   const badge = lessonBadge(lesson);
   return statuses.some((status) => {
     if (status === 'archived') return lesson.status === 'archived' || badge === 'archived';
     if (status === 'needs_review') return badge === 'needs_review';
-    if (status === 'published') return lesson.status === 'active' && lesson.published;
-    return lesson.status === 'active' && !lesson.published && badge !== 'needs_review';
+    if (status === 'published') return isActiveLibraryStatus(lesson.status) && lesson.published;
+    return isActiveLibraryStatus(lesson.status) && !lesson.published && badge !== 'needs_review';
   });
 }
 
@@ -138,7 +139,7 @@ export function applyLessonsQuery(
 ): LessonsQueryResult {
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
   const library = curriculum.lessons.map(asRow);
-  const activeLibrary = library.filter((lesson) => lesson.status === 'active');
+  const activeLibrary = library.filter((lesson) => isActiveLibraryStatus(lesson.status));
 
   let rows = library.filter((lesson) => matchesStatus(lesson, state.statuses));
 
