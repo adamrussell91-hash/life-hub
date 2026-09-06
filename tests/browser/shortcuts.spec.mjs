@@ -70,7 +70,7 @@ test('Shortcuts is reachable from the More sheet at 390 px', async () => {
     await page.locator('#more-nav-button').click();
     await page.locator('.hub-more-sheet [data-section="shortcuts"]').click();
     await page.locator('#shortcuts-dashboard:not([hidden])').waitFor();
-    assert.equal(await page.locator('#page-title').textContent(), 'Shortcuts');
+    await page.locator('#page-title', { hasText: 'Shortcuts' }).waitFor();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     assert.equal(overflow, false);
   } finally {
