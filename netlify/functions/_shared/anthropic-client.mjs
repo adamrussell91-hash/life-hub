@@ -25,7 +25,7 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch, baseUrl = ANT
   }
 
   return {
-    async *streamMessage({ system, messages, tools, signal, executeTools }) {
+    async *streamMessage({ system, messages, tools, signal, executeTools, toolChoice = null }) {
       let roundMessages = messages;
       let pauseContinuations = 0;
 
@@ -33,6 +33,12 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch, baseUrl = ANT
         const pendingResults = [];
         const roundState = { assistantBlocks: [], stopReason: null };
         let sawDone = false;
+        // Force a tool on round 0 only when activation requires retrieval.
+        // Strip server web_search for that forced round so "any" cannot dodge domain reads.
+        const forceRound = round === 0 && toolChoice;
+        const roundTools = forceRound
+          ? (tools ?? []).filter(tool => tool?.name !== 'web_search' && tool?.type !== 'web_search_20250305')
+          : tools;
 
         for await (const event of streamOnce({
           apiKey,
@@ -40,7 +46,8 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch, baseUrl = ANT
           baseUrl,
           system,
           messages: roundMessages,
-          tools,
+          tools: roundTools,
+          toolChoice: forceRound ? toolChoice : null,
           signal,
           roundState
         })) {
@@ -130,7 +137,17 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch, baseUrl = ANT
   };
 }
 
-async function* streamOnce({ apiKey, fetchImpl, baseUrl = ANTHROPIC_ORIGIN, system, messages, tools, signal, roundState }) {
+async function* streamOnce({
+  apiKey,
+  fetchImpl,
+  baseUrl = ANTHROPIC_ORIGIN,
+  system,
+  messages,
+  tools,
+  toolChoice = null,
+  signal,
+  roundState
+}) {
   let response;
   try {
     response = await fetchImpl(`${String(baseUrl).replace(/\/$/, '')}/v1/messages`, {
@@ -150,6 +167,7 @@ async function* streamOnce({ apiKey, fetchImpl, baseUrl = ANTHROPIC_ORIGIN, syst
         system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral', ttl: '1h' } }],
         messages,
         tools,
+        ...(toolChoice ? { tool_choice: toolChoice } : {}),
         stream: true
       }),
       signal

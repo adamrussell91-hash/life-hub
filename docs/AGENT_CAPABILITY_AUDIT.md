@@ -1,8 +1,28 @@
 # Life Hub agent capability audit
 
-Generated: 2026-09-06T07:54:23.358Z
+Generated: 2026-09-06T07:54:23.358Z  
+**Behaviour update:** 2026-09-06 — server-side evidence packs + domain analysis. See `docs/AGENT_BEHAVIOUR_ACCEPTANCE.md`.
 
-> **Provenance:** Generated 2026-09-06 from live `buildAgentTools` + `capabilities/registry.json` + allowlists/intuition/protocols on `main` at `6f40f51` (includes Chadwick Fitness/Body tool pack from #214).
+> **Corrective note:** Attached tools ≠ intelligence. Status words allowed: Demonstrated | Failed | Blocked | Not started. Do not use thin / partial / scaffolding / mostly / should work / capability counts as completion language.
+
+## Demonstrated jobs (2026-09-06 evidence packs)
+
+| Agent | Demonstrated job (pack layer) | Conversation E2E |
+| --- | --- | --- |
+| Chadwick | Broad “how is training going?” → fitness snapshot, window compare, volume, working weights, long-term, sessions, body | Blocked — no `ANTHROPIC_API_KEY` |
+| Brisket | Broad nutrition overview → snapshot, adherence, targets, remaining day, period compare | Blocked — same |
+| Sara | Weight/body questions → body state, weight trend (conflict-aware), medical search | Blocked — same |
+| Penelope | “Feeling like this often?” → diary search, period compare, themes, range | Blocked — same |
+| Vera | Cross-session patterns → mind search + multi-session compare + bounded diary | Blocked — same |
+| Hyaluronica | “Is my routine helping?” → adherence + response evidence + history search | Blocked — same |
+| Clare | “What should I focus on today?” → tasks focus + open loops (also Clare desk) | Blocked — same |
+| Ann | Improve tomorrow’s lesson → teaching search + context + diagnosis | Blocked — same |
+| Clementine | “What do I already know about X?” → knowledge search + synthesis (+ teaching bridge); Knowledge chat turn shares pack | Blocked — same |
+| Hammond | “What is slipping?” → hub inspect + attention/open-loop pack | Blocked — same |
+
+Proof: `tests/unit/agent-evidence-packs.test.js` (32 pass) + `scripts/agent-evidence-live-demo.mjs` against `/agent/repos/life-hub-data`.
+
+Do **not** treat the tool-count snapshot below as proof of the jobs above.
 
 Single-file audit of every roster agent: tools, capabilities, allowlists, intuition packs, protocols, and voices. Built from live `buildAgentTools` + registry/allowlists — not a wishlist.
 
@@ -1073,26 +1093,27 @@ Plus `log_entry` when the agent has record types for the turn.
 - Roster, agent directory, and allowlists cover the same 10 slugs: brisket, chadwick, hyaluronica, penelope, sara, vera, hammond, ann, clementine, clare.
 - Gap check: `{"inYmlNotDirectory":[],"inDirectoryNotYml":[],"inYmlNoAllowlist":[],"allowlistNoYml":[],"nameMismatches":[],"registryIdsNotInFloorOrExclusiveCheck":[]}`
 
-### Scope / asymmetry (not bugs unless marked)
+### Behaviour pass (2026-09-06) — closed vs open
 
-1. **Chadwick is the tool-richest domain agent** — Fitness/Body pack + exercise library + workout history (intentional after Fitness tile work).
-2. **Brisket** gets food library + week-meal plan + AU brand lookup; no symmetric Nutrition-tile tool pack yet (targets/adherence as tools).
-3. **Hyaluronica** gets skincare library/routine tools; no deep treatment-analytics tool pack.
-4. **Sara** gets medical search + appointment brief; body composition is prompt-loaded for Chadwick/Brisket/Sara, but only Chadwick exposes `get_body_state` as a callable tool.
-5. **Vera** gets mind session read/search; **Penelope** shares mind digest context but not those tools.
-6. **Hammond / Clare / Ann** share CN patch capacity; Hammond alone gets governance log append + widest read (`data/**`).
-7. **Clementine** is research/knowledge-lean: OS floor + research paths, claim-spine intuition, no domain log types.
-8. **Intent narrowing:** named shortcuts may be trimmed per turn by the intent router; domain tools stay when feature flags say so.
-9. **Promoted shortcuts:** `os_list_promoted_shortcuts` / `os_run_promoted_shortcut` / `os_promote_shortcut` can add dynamic aliases from `data/os/` at runtime — not enumerated here.
-10. **Cursor skills** (`.cursor/skills/*`) are **not** agent runtime skills.
+**Closed in Life chat runtime:**
 
-### Likely next scopes (if you want parity)
+1. Retrieval activation policy + source catalogue in system prompt (`activation-policy.mjs`).
+2. First-round `tool_choice: any` when evidence is required (web_search stripped that round).
+3. Brisket nutrition dashboard tools; Sara body/weight tools; Penelope diary search; Hyaluronica adherence/history; Clare tasks focus; Ann teaching search/context; Clementine knowledge search; Hammond hub inspect.
+4. Orchestration acceptance tests for the 14 required scenarios.
 
-- Brisket nutrition dashboard tools (targets, week adherence, challenge state).
-- Sara body-state tool parity with Chadwick’s `get_body_state`.
-- Hyaluronica treatment-timeline / routine-adherence tools.
-- Penelope diary search tool (symmetric to Vera mind search).
-- Clementine knowledge-corpus search tool if Knowledge Hub paths should be agent-callable.
+**Still open / partial:**
+
+1. Surface parity: Tasks SPA / Teaching SPA / Knowledge SPA still have separate tool spines (Chat audit §3.4).
+2. Ledger items 4 (partial accept), 8 (shortcut UI), 10 (page resurfacing), 11–14 as documented in `AGENT_BEHAVIOUR_ACCEPTANCE.md`.
+3. Multimodal evidence intake and visual catalogue requests (mining priority two) not in this pass.
+4. Live Anthropic behavioural eval not run in CI.
+
+### Scope / asymmetry (historical — superseded where noted above)
+
+1. **Chadwick** remains tool-richest; activation was the missing layer (now added).
+2. **Intent narrowing** still trims named shortcuts only; domain tools stay when flags/activation say so.
+3. **Cursor skills** remain coding-agent only.
 
 ## Sources
 

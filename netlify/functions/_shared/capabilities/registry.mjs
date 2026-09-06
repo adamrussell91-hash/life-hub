@@ -10,7 +10,7 @@ import {
   getRegionStrengthSchema,
   searchWorkoutRecordsSchema
 } from '../workout-history.mjs';
-import { chadwickFitnessToolSchemas } from '../fitness-tools.mjs';
+import { chadwickFitnessToolSchemas, getBodyStateSchema } from '../fitness-tools.mjs';
 import {
   listSkincareRoutinesSchema,
   searchSkincareLibrarySchema,
@@ -26,6 +26,7 @@ import { proposeCentralNodePatchSchema, appendGovernanceLogSchema } from '../ham
 import { proposeActionToolSchema } from './propose-action.mjs';
 import { shortcutSchemas } from './shortcuts.mjs';
 import { selectCapabilityIdsForTurn } from './intent-router.mjs';
+import { domainRetrievalSchemasFor } from '../domain-retrieval.mjs';
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -218,6 +219,7 @@ export function buildAgentTools({
   needsHammondTools = false,
   needsVeraMindTools = false,
   needsSaraMedicalTools = false,
+  needsPenelopeDiaryTools = false,
   message = null
 } = {}) {
   if (typeof slug !== 'string' || !slug) throw new TypeError('slug is required');
@@ -227,14 +229,13 @@ export function buildAgentTools({
     tools.push({ type: 'web_search_20250305', name: 'web_search' });
   }
 
-    const allIds = capabilityIdsForAgent(slug);
+  const allIds = capabilityIdsForAgent(slug);
   // Intent pass narrows Phase 1–3 shortcuts only; legacy/domain tools stay
   // available whenever their feature flags / allowlists say so.
   const selectedIds = message == null
     ? allIds
     : selectCapabilityIdsForTurn({ slug, message });
   const has = id => allIds.includes(id);
-  const hasShortcut = id => selectedIds.includes(id);
 
   if (has('os.propose-action')) {
     tools.push(proposeActionToolSchema());
@@ -274,8 +275,15 @@ export function buildAgentTools({
     tools.push(getMindSessionSchema(), searchMindRecordsSchema());
   }
 
+  if (needsPenelopeDiaryTools) {
+    // Penelope gets diary search; Vera mind_session get stays Vera-only.
+    tools.push(searchMindRecordsSchema());
+  }
+
   if (needsSaraMedicalTools) {
     tools.push(searchMedicalRecordsSchema(), briefMedicalAppointmentSchema());
+    // Body tools for Sara (Chadwick already has get_body_state via fitness pack).
+    if (!needsExerciseLibrary) tools.push(getBodyStateSchema());
   }
 
   if (needsSkincareLibrary) {
@@ -292,6 +300,14 @@ export function buildAgentTools({
   }
   if (has('publish.governance-log-entry') && needsHammondTools) {
     tools.push(appendGovernanceLogSchema());
+  }
+
+  // Domain retrieval parity tools (read-only). Skip names already attached.
+  const attached = new Set(tools.map(tool => tool.name).filter(Boolean));
+  for (const schema of domainRetrievalSchemasFor(slug)) {
+    if (!schema?.name || attached.has(schema.name)) continue;
+    tools.push(schema);
+    attached.add(schema.name);
   }
 
   const schemas = shortcutSchemas();

@@ -2982,7 +2982,7 @@ Rule one.
   assert.doesNotMatch(receivedArgs.system, /Stale April body/);
 });
 
-test('hub-agent-context loads only on Hammond turns, not Clare or Ann', async () => {
+test('hub-agent-context loads for Hammond, Clare, and Ann retrieval turns', async () => {
   const loadedFor = [];
   const run = async (message, priorAgentSlug) => {
     const handler = createChatHandler({
@@ -3003,7 +3003,7 @@ test('hub-agent-context loads only on Hammond turns, not Clare or Ann', async ()
   await run('Hammond, what is the mission today?', 'hammond');
   await run('Clare, triage this dump', 'clare');
   await run("Ann, how is Thursday looking?", 'ann');
-  assert.deepEqual(loadedFor, ['hammond']);
+  assert.deepEqual(loadedFor, ['hammond', 'clare', 'ann']);
 });
 
 test('hub-agent-context load throw is fail-visible on Hammond, not an empty Other hubs block', async () => {
