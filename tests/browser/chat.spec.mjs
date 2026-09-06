@@ -281,7 +281,7 @@ test('mobile full-page Chat docks the composer to the keyboard viewport', async 
 
   assert.equal(layout.navDisplay, 'none', 'tab bar hides while the keyboard is open');
   assert.ok(Math.abs(layout.frameHeight - 480) < 2, 'canvas height tracks the visual viewport');
-  assert.ok(layout.gap < 24, 'composer sits on the keyboard floor, not floating mid-canvas');
+  assert.ok(layout.gap < 8, 'composer sits on the keyboard floor, not floating mid-canvas');
   assert.ok(layout.formBottom <= layout.frameBottom + 1, 'composer stays inside the visible viewport');
 
   await context.close();

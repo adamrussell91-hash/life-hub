@@ -6317,9 +6317,9 @@ main { max-width: 76rem; margin: 0 auto; }
     overflow: hidden;
   }
 
-  /* Keyboard open: hide the tab bar and dock the composer to the keyboard. */
+  /* Keyboard open: hide the tab bar and dock the composer to the keyboard floor. */
   html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame {
-    padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
+    padding-bottom: 0;
   }
 
   html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .hub-mobile-nav {
