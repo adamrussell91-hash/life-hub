@@ -175,23 +175,38 @@ test('kit sheet and snippets exist and chrome loads them', async () => {
   assert.match(prose, /\.chat-md-h1/);
   assert.match(
     prose,
-    /\.chat-message--assistant \.chat-message__body,\s*\.coach-msg__body\s*\{[^}]*font-size:\s*var\(--text-base\)/,
+    /\.chat-message--user \.chat-message__body,\s*\.chat-message--assistant \.chat-message__body,\s*\.coach-msg__body\s*\{[^}]*font-size:\s*var\(--text-base\)/,
     'chat bubbles use Messenger-density body text, not reading-copy --text-md'
   );
   assert.match(
     prose,
-    /\.chat-message--assistant \.chat-message__body,\s*\.coach-msg__body\s*\{[^}]*line-height:\s*var\(--leading-snug\)/,
+    /\.chat-message--user \.chat-message__body,\s*\.chat-message--assistant \.chat-message__body,\s*\.coach-msg__body\s*\{[^}]*line-height:\s*var\(--leading-snug\)/,
     'chat bubbles use snug leading, not article --leading-normal'
+  );
+  assert.match(
+    prose,
+    /@media \(max-width:\s*720px\)\s*\{[^}]*\.chat-message__body[^}]*font-size:\s*16px/,
+    'phone chat locks Messenger 16px body across hubs'
   );
   assert.doesNotMatch(
     prose,
-    /\.chat-message--assistant \.chat-message__body,\s*\.coach-msg__body\s*\{[^}]*font-size:\s*var\(--text-md\)/
+    /\.chat-message--assistant \.chat-message__body[^{/\n]*\{[^}]*font-size:\s*var\(--text-md\)/
   );
   assert.match(chrome, /hub-interactions\.css/);
   assert.match(snippet, /hub-toast/);
   assert.match(agents, /hub-feedback\.js/);
   assert.match(agents, /chat-prose\.css/);
   assert.match(life, /chat-prose\.css/);
+  const knowledge = await readFile(new URL('../../apps/knowledge/src/style.css', import.meta.url), 'utf8');
+  const teaching = await readFile(new URL('../../apps/teaching/src/styles/app.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(
+    knowledge,
+    /\.chat-overlay \.chat-message--assistant \.chat-message__body\s*\{[^}]*font-size:\s*var\(--text-md\)/
+  );
+  assert.match(knowledge, /@media \(max-width:\s*720px\)[\s\S]*?\.chat-overlay \.chat-message__body[\s\S]*?font-size:\s*16px/);
+  assert.match(teaching, /\.ai-panel__bubble\s*\{[^}]*font-size:\s*var\(--text-base\)/);
+  assert.match(teaching, /\.lesson-builder__chat \.ai-panel__bubble[\s\S]*?font-size:\s*16px/);
+
   assert.match(worker, /chat-prose\.css/);
   assert.match(worker, /chat-blocks\.js/);
 });

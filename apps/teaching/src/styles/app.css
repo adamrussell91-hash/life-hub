@@ -1003,7 +1003,8 @@ a:hover {
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid var(--line);
   font-family: var(--font-ui);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
   white-space: pre-wrap;
 }
 
@@ -1075,7 +1076,8 @@ a:hover {
   min-height: 4rem;
   font: inherit;
   font-family: var(--font-ui);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
   padding: var(--space-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -8452,6 +8454,12 @@ input.scope-timeline__note-title:focus-visible {
     min-height: 0;
     min-width: 0;
     max-width: 100%;
+  }
+
+  .lesson-builder__chat .ai-panel__bubble,
+  .lesson-builder__chat .ai-panel__input {
+    font-size: 16px;
+    line-height: 1.25;
   }
 
   .lesson-builder__chat .ai-panel__input {

@@ -943,7 +943,7 @@
 .coach-msg__body {
   margin: 0;
   min-width: 0;
-  line-height: 1.5;
+  /* Size/leading come from design-kit/chat-prose.css (Messenger density). */
   overflow-wrap: anywhere;
 }
 
@@ -3156,8 +3156,7 @@ body.is-universe-fullscreen .local-banner {
 .chat-overlay .chat-message--assistant .chat-message__body {
   padding-left: var(--space-3);
   border-left: 0.2rem solid var(--wave);
-  font-size: var(--text-md);
-  line-height: 1.55;
+  /* Size/leading come from design-kit/chat-prose.css (Messenger density). */
 }
 
 .chat-overlay .chat-message--status .chat-message__body {
@@ -3303,6 +3302,16 @@ body.is-universe-fullscreen .local-banner {
     width: 100%;
     min-width: 0;
     max-width: 100%;
+    font-size: 16px;
+    line-height: 1.25;
+  }
+
+  .chat-overlay .chat-message__body,
+  .chat-overlay .chat-message--user .chat-message__body,
+  .chat-overlay .chat-message--assistant .chat-message__body,
+  .coach.chat .coach-msg__body {
+    font-size: 16px;
+    line-height: 1.25;
   }
 
   .chat-overlay .chat-form .btn,
