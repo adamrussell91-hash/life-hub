@@ -197,6 +197,37 @@ test('full-page Chat uses the canvas width and hides the Talking to chip while e
     css,
     /\.chat-view:not\(\[data-panel-mode\]\):not\(\[data-chrome='engaged'\]\)\s+#chat-who\s*\{\s*display:\s*none/
   );
+  assert.doesNotMatch(
+    css,
+    /\.chat-view\[data-chrome='engaged'\] #agent-picker\s*\{\s*display:\s*none/,
+    'engaged must not collapse the picker host — that bounced the thread scrollbar'
+  );
+});
+
+test('engaged phone Chat drops the page title stack and assistant left bar', async () => {
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+  const phoneChat = css.slice(css.indexOf('Engaged phone Chat already has Talking to'));
+  assert.ok(phoneChat.length > 80, 'engaged phone Chat chrome block exists');
+  assert.match(
+    phoneChat,
+    /#chat-view\[data-chrome='engaged'\][\s\S]*\.page-header__copy[\s\S]*display:\s*none/
+  );
+  assert.match(
+    phoneChat,
+    /#chat-view\[data-chrome='engaged'\][\s\S]*\.date-chip[\s\S]*display:\s*none/
+  );
+  assert.match(
+    css,
+    /\.chat-message--assistant\[data-agent\] \.chat-message__body\s*\{[^}]*border-left:\s*0/
+  );
+  assert.match(
+    css,
+    /\.chat-message--assistant\[data-agent\] \.chat-message__body\s*\{[^}]*padding-left:\s*var\(--space-3\)/
+  );
+  assert.doesNotMatch(
+    css,
+    /\.chat-message--assistant\[data-agent\] \.chat-message__body\s*\{[^}]*border-left:\s*0\.2rem solid var\(--agent-accent/
+  );
 });
 
 test('short chat bubbles are sized by text, not Copy/Retry, and status lines do not pulse', async () => {
@@ -303,7 +334,7 @@ test('service worker paints cached images immediately and keeps scripts network-
   assert.match(worker, /function staleWhileRevalidate/);
   assert.match(worker, /function networkFirst/);
   assert.match(worker, /isStaticImage\(url\.pathname\)/);
-  assert.match(worker, /life-hub-shell-v156/);
+  assert.match(worker, /life-hub-shell-v157/);
 });
 
 test('web app manifest is installable and uses only local icons', async () => {

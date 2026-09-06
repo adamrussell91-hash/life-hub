@@ -897,6 +897,75 @@ test('desktop first send does not strobe the Chat window', async () => {
   await context.close();
 });
 
+test('engaged phone Chat hides the title stack and has no assistant accent bar', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.hub-mobile-nav [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#agent-picker [data-agent-slug="clare"]').click();
+
+  const empty = await page.evaluate(() => {
+    const copy = document.querySelector('.page-header__copy');
+    return getComputedStyle(copy).display;
+  });
+  assert.notEqual(empty, 'none', 'empty Chat still shows the page title');
+
+  await seedEngagedThread(page);
+  await page.evaluate(() => {
+    const item = document.querySelector('.chat-message--assistant');
+    item.dataset.agent = 'clare';
+    const body = item.querySelector('.chat-message__body');
+    body.replaceChildren();
+    const list = document.createElement('ol');
+    list.start = 10;
+    for (const title of ['Pathfinders session', 'Reports, block two']) {
+      const li = document.createElement('li');
+      li.textContent = title;
+      list.append(li);
+    }
+    body.append(list);
+  });
+
+  const layout = await page.evaluate(() => {
+    const copy = document.querySelector('.page-header__copy');
+    const date = document.querySelector('.date-chip');
+    const refresh = document.querySelector('#refresh-button');
+    const who = document.querySelector('#chat-who');
+    const picker = document.querySelector('#agent-picker');
+    const body = document.querySelector('.chat-message--assistant[data-agent] .chat-message__body');
+    return {
+      copyDisplay: getComputedStyle(copy).display,
+      dateDisplay: getComputedStyle(date).display,
+      refreshDisplay: getComputedStyle(refresh).display,
+      whoDisplay: who.hidden ? 'hidden-attr' : getComputedStyle(who).display,
+      pickerDisplay: getComputedStyle(picker).display,
+      borderLeft: getComputedStyle(body).borderLeftWidth,
+      paddingLeft: parseFloat(getComputedStyle(body).paddingLeft) || 0,
+      listLeft: body.querySelector('ol')?.getBoundingClientRect().left ?? 0,
+      bodyLeft: body.getBoundingClientRect().left
+    };
+  });
+
+  assert.equal(layout.copyDisplay, 'none', 'engaged Chat must drop TALK TO YOUR AGENTS / Chat');
+  assert.equal(layout.dateDisplay, 'none', 'engaged Chat must drop the date chip');
+  assert.notEqual(layout.refreshDisplay, 'none', 'refresh must stay');
+  assert.notEqual(
+    layout.pickerDisplay,
+    'none',
+    'engaged must not display:none the picker — that collapses scroll-hide and bounces the thread'
+  );
+  assert.equal(layout.borderLeft, '0px', 'assistant body must not wear a leftover accent bar');
+  assert.ok(layout.paddingLeft >= 8, `list inset must remain (paddingLeft=${layout.paddingLeft})`);
+  assert.ok(
+    layout.listLeft > layout.bodyLeft,
+    'numbered markers must sit inside the body, not clip off the left edge'
+  );
+
+  await context.close();
+});
+
 test('make the workout shows a Confirm card', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
