@@ -9,7 +9,8 @@ import {
   backlogTasks,
   preferredDomains,
   searchEntities,
-  sortByPriorityThenDue
+  sortByPriorityThenDue,
+  todayPlateTasks
 } from '@/domain/queries';
 import type { Task } from '@/schemas/task';
 import { createBlock } from '@/blocks/create-block';
@@ -282,6 +283,20 @@ describe('queries', () => {
   it('adaptive today includes due tasks', () => {
     const day = new Date('2026-08-17T12:00:00');
     const list = adaptiveTodayTasks(seed.tasks, day);
+    expect(list.some((t) => t.id === 'task_demo_lesson_pack')).toBe(true);
+  });
+
+  it('today plate puts overdue ahead of due-today', () => {
+    const day = new Date('2026-08-17T12:00:00');
+    const late = {
+      ...seed.tasks.find((t) => t.id === 'task_demo_lesson_pack')!,
+      id: 'task_overdue_plate',
+      title: 'Late plate item',
+      due_date: '2026-08-10',
+      status: 'open' as const
+    };
+    const list = todayPlateTasks([...seed.tasks, late], day);
+    expect(list[0]?.id).toBe('task_overdue_plate');
     expect(list.some((t) => t.id === 'task_demo_lesson_pack')).toBe(true);
   });
 

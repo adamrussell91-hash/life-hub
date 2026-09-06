@@ -71,6 +71,22 @@ describe('Today view mutations', () => {
     vi.restoreAllMocks();
   });
 
+  it('shows overdue work on Today, not an empty plate', async () => {
+    const overdue = task({
+      id: 'task_overdue',
+      title: 'Plan Pathfinders STEAM',
+      due_date: '2026-08-01',
+      status: 'in_progress'
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([overdue]);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderDayView(canvas);
+    expect(canvas.textContent).toContain('Plan Pathfinders STEAM');
+    expect(canvas.textContent).not.toContain('Nothing due today');
+  });
+
   it('shows a newly added Today task without a second list fetch', async () => {
     const created = task({ id: 'task_today', title: 'Instant today', due_time: '11:00' });
     vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
