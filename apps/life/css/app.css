@@ -6255,10 +6255,6 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   display: none;
 }
 
-.chat-view[data-chrome='engaged'] #agent-picker {
-  display: none;
-}
-
 .chat-view[data-panel-mode="overlay"] {
   position: fixed;
   z-index: 25;
