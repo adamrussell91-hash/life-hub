@@ -3,6 +3,7 @@ import type { Origin } from "../domain/page";
 import notesPlace from "../origin/notesPlace.json";
 
 const COVERS: Record<string, string> = {
+  "Boy's Education": "./notebooks/boys-education.jpg",
   "Cognitive Psychology": "./notebooks/cognitive-psychology.jpg",
   "Gifted Education": "./notebooks/gifted-education.jpg",
   "Leadership and Innovation": "./notebooks/leadership-and-innovation.jpg",

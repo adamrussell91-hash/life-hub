@@ -25,8 +25,8 @@ describe("notebook catalog", () => {
       "./notebooks/leadership-and-innovation.jpg",
     );
     expect(catalog.find(item => item.label === "Gifted Education")?.image).toBe("./notebooks/gifted-education.jpg");
-    expect(catalog.filter(item => item.image)).toHaveLength(10);
-    expect(catalog.find(item => item.label === "Boy's Education")?.image).toBeUndefined();
+    expect(catalog.find(item => item.label === "Boy's Education")?.image).toBe("./notebooks/boys-education.jpg");
+    expect(catalog.filter(item => item.image)).toHaveLength(11);
     expect(catalog.find(item => item.label === "Educational Neuroscience")?.image).toBeUndefined();
   });
 
