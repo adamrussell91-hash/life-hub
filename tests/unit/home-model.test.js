@@ -114,15 +114,19 @@ test('overFatCeiling is false on Home when fat is within the ceiling', async () 
   assert.equal(model.overFatCeiling, false);
 });
 
-test('hammondLine surfaces the oldest open governance entry with age', () => {
+test('hammondLine surfaces the latest Hammond review note', () => {
   const log = [
     '# Governance Log',
     '',
-    '## 2026-05-24 — Drift Detection',
-    '**Title:** MEd Sem 2',
-    '**Status:** Still Active',
+    '## 2026-03-10 — Mind Insight',
+    '**Title:** Mar 2026 — Pattern Review: First Year',
     '',
-    'Unactioned.',
+    'Historical synthesis.',
+    '',
+    '## 2026-08-09 — Weekly Review',
+    '**Title:** Lock is marking',
+    '',
+    'Protein held; one lock.',
     ''
   ].join('\n');
   const model = buildHomeModel({
@@ -131,10 +135,10 @@ test('hammondLine surfaces the oldest open governance entry with age', () => {
     date: '2026-08-11',
     governanceLogMarkdown: log
   });
-  assert.equal(model.hammondLine, 'Hammond: MEd Sem 2 — 79d open.');
+  assert.equal(model.hammondLine, 'Hammond: Lock is marking');
 });
 
-test('hammondLine is null when there is no open governance entry', () => {
+test('hammondLine is null when there is no recent Hammond review', () => {
   const model = buildHomeModel({
     events: [],
     targetsConfig,
@@ -144,29 +148,32 @@ test('hammondLine is null when there is no open governance entry', () => {
   assert.equal(model.hammondLine, null);
 });
 
-test('hammondLine prefers an older Clare Later item over a newer governance entry', () => {
+test('hammondLine ignores a rotting Pattern Review and a stale review', () => {
   const log = [
     '# Governance Log',
+    '',
+    '## 2026-03-10 — Mind Insight',
+    '**Title:** Mar 2026 — Pattern Review: First Year',
+    '',
+    'Historical synthesis.',
     '',
     '## 2026-05-24 — Drift Detection',
     '**Title:** MEd Sem 2',
     '**Status:** Still Active',
     '',
     'Unactioned.',
+    '',
+    '## 2026-07-01 — Weekly Review',
+    '**Title:** Old week',
+    '',
+    'Too old to show on Home.',
     ''
   ].join('\n');
   const model = buildHomeModel({
     events: [],
     targetsConfig,
     date: '2026-08-11',
-    governanceLogMarkdown: log,
-    tasks: [{
-      title: 'Someday reading',
-      kind: 'task',
-      priority: 'low',
-      status: 'open',
-      created_at: '2026-01-01T00:00:00Z'
-    }]
+    governanceLogMarkdown: log
   });
-  assert.equal(model.hammondLine, 'Clare: Someday reading — 222d open.');
+  assert.equal(model.hammondLine, null);
 });

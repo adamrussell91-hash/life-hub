@@ -19,6 +19,22 @@ const GOV = [
   ''
 ].join('\n');
 
+test('collectOpenLoops does not treat a Pattern Review Mind Insight as a Hammond loop', () => {
+  const loops = collectOpenLoops({
+    today: TODAY,
+    governanceLogMarkdown: [
+      '# Governance Log',
+      '',
+      '## 2026-03-10 — Mind Insight',
+      '**Title:** Mar 2026 — Pattern Review: First Year',
+      '',
+      'Historical synthesis.',
+      ''
+    ].join('\n')
+  });
+  assert.deepEqual(loops, []);
+});
+
 test('collectOpenLoops includes the oldest open governance entry as Hammond', () => {
   const loops = collectOpenLoops({ today: TODAY, governanceLogMarkdown: GOV });
   assert.equal(loops.length, 1);
@@ -116,7 +132,7 @@ test('collectOpenLoops includes Tasks stress flags by created_at', () => {
   assert.equal(loops[0].ageDays, 41);
 });
 
-test('oldestOpenLoop prefers the earliest dated item and formatOpenLoopLine matches Home', () => {
+test('oldestOpenLoop prefers the earliest dated item', () => {
   const loops = collectOpenLoops({
     today: TODAY,
     governanceLogMarkdown: GOV,
