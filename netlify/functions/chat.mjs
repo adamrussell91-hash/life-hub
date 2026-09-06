@@ -129,8 +129,13 @@ import {
   parsePendingActions,
   serializePendingActions,
   addPendingAction,
-  validateProposeActionInput
+  validateProposeActionInput,
+  classifyWriteTarget,
+  snapshotGithubBases,
+  snapshotBlobBases
 } from './_shared/capabilities/propose-action.mjs';
+import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
+import { defaultGetContentStore as defaultGetTeachingStore } from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
 import { loadIntuitionFor, formatIntuitionForPrompt } from './_shared/capabilities/intuition.mjs';
 import {
@@ -234,7 +239,9 @@ export function createChatHandler({
   createGitHubClient: createClient = createGitHubClient,
   createAnthropicClient: createAnthropic = createAnthropicClient,
   now = Date.now,
-  loadHubAgentContext: loadHubContext = loadHubAgentContext
+  loadHubAgentContext: loadHubContext = loadHubAgentContext,
+  getTasksStore = defaultGetTasksStore,
+  getTeachingStore = defaultGetTeachingStore
 } = {}) {
   return async function chatHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -1041,7 +1048,20 @@ export function createChatHandler({
         const proposeOsAction = async proposal => {
           let persistedId = null;
           try {
-            const entry = { id: createPendingActionId(), createdAt: today, slug, proposal };
+            let bases = snapshotGithubBases(proposal.writes, repoTree);
+            try {
+              const needsTasks = proposal.writes.some(write => classifyWriteTarget(write.path).store === 'tasks');
+              const needsTeaching = proposal.writes.some(write => classifyWriteTarget(write.path).store === 'teaching');
+              if (needsTasks || needsTeaching) {
+                const blobStores = {};
+                if (needsTasks) blobStores.tasks = await getTasksStore(env);
+                if (needsTeaching) blobStores.teaching = await getTeachingStore(env);
+                bases = { ...bases, ...await snapshotBlobBases(proposal.writes, blobStores) };
+              }
+            } catch {
+              // Queue the GitHub write anyway; confirm skips the stale check without blob bases.
+            }
+            const entry = { id: createPendingActionId(), createdAt: today, slug, proposal, bases };
             const nextQueue = addPendingAction(pendingActions, entry);
             const result = await client.writeFile({
               path: PENDING_ACTIONS_PATH,

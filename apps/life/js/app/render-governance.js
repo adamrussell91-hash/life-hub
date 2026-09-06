@@ -1,5 +1,5 @@
 import { parseGovernanceEntries, recentGovernanceTail } from '../core/governance-log.js';
-import { daysBetween, getSydneyDateKey, isCalendarDate } from '../core/time.js';
+import { daysBetween, formatDisplayDate, getSydneyDateKey, isCalendarDate } from '../core/time.js';
 
 export function renderGovernance(root, governanceLogMarkdown, { today = getSydneyDateKey() } = {}) {
   const container = root.querySelector?.('[data-central-node="governance-log"]');
@@ -44,6 +44,18 @@ export function renderGovernance(root, governanceLogMarkdown, { today = getSydne
       status.dataset.status = entry.status.toLowerCase().replace(/\s+/g, '-');
       status.textContent = entry.status;
       block.append(status);
+    }
+
+    for (const [label, value, className] of [
+      ['Chosen', entry.chosen, 'governance-entry-chosen'],
+      ['Reasoning', entry.reasoning, 'governance-entry-reasoning'],
+      ['Revisit', entry.revisit ? formatDisplayDate(entry.revisit) : null, 'governance-entry-revisit']
+    ]) {
+      if (!value) continue;
+      const line = root.createElement('p');
+      line.className = `governance-entry-decision ${className}`;
+      line.textContent = `${label}: ${value}`;
+      block.append(line);
     }
 
     if (entry.body) {

@@ -972,6 +972,18 @@ main { max-width: 76rem; margin: 0 auto; }
   gap: 0.5rem;
 }
 
+.action-proposal__write {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.action-proposal__accept {
+  margin-top: 0.2rem;
+  accent-color: var(--high-sea);
+}
+
 .action-proposal__diffs code {
   font-size: var(--text-sm);
   word-break: break-all;
@@ -5934,6 +5946,7 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 700;
 }
 .governance-entry-status,
+.governance-entry-decision,
 .governance-entry-body {
   margin: 0.25rem 0 0;
   color: var(--muted);

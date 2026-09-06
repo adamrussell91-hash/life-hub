@@ -41,7 +41,7 @@ export function createChatApi(fetchImpl = fetch, { pollMs = CHAT_EVENTS_POLL_MS 
       yield* readSse(response.body);
     },
 
-    async confirm({ candidate, slug, overwrite = false, kind, id } = {}) {
+    async confirm({ candidate, slug, overwrite = false, kind, id, accept, reason, revisit } = {}) {
       const response = await fetchImpl('/api/chat/confirm', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -50,7 +50,10 @@ export function createChatApi(fetchImpl = fetch, { pollMs = CHAT_EVENTS_POLL_MS 
           slug,
           overwrite,
           ...(kind ? { kind } : {}),
-          ...(id ? { id } : {})
+          ...(id ? { id } : {}),
+          ...(Array.isArray(accept) ? { accept } : {}),
+          ...(typeof reason === 'string' && reason.trim() ? { reason: reason.trim() } : {}),
+          ...(typeof revisit === 'string' && revisit.trim() ? { revisit: revisit.trim() } : {})
         })
       });
       const payload = await response.json().catch(() => null);
