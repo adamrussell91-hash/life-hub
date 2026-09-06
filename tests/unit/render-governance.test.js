@@ -92,6 +92,27 @@ test('renderGovernance renders dated entry blocks with status badges', () => {
   assert.match(entry.textContent, /Stalled sleep goal/);
 });
 
+test('renderGovernance does not age Mind Insights or Weekly Reviews as open loops', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-03-10',
+    entryType: 'Mind Insight',
+    title: 'Mar 2026 — Pattern Review: First Year',
+    body: 'Historical synthesis.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-09',
+    entryType: 'Weekly Review',
+    title: 'Lock is marking',
+    body: 'Protein held.'
+  });
+  const { root, container } = fakeRoot();
+  renderGovernance(root, log, { today: '2026-09-06' });
+  assert.match(container.textContent, /Pattern Review: First Year/);
+  assert.match(container.textContent, /Weekly Review/);
+  assert.doesNotMatch(container.textContent, /d open/);
+});
+
 test('renderGovernance shows Chosen, Reasoning, and Revisit on decision records', () => {
   const log = appendGovernanceEntry(emptyGovernanceLog(), {
     dateKey: '2026-09-05',

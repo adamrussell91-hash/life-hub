@@ -95,6 +95,31 @@ test('buildBumpChart puts rank 1 at the top and sizes dots by weekly count', () 
   assert.ok(chart.ranks[0].y < chart.ranks[1].y);
 });
 
+test('buildBumpChart thins week labels and accepts a compact plot', () => {
+  const weeks = [
+    '2026-07-13', '2026-07-20', '2026-07-27', '2026-08-03',
+    '2026-08-10', '2026-08-17', '2026-08-24', '2026-08-31'
+  ];
+  const ranks = weeks.map((week, index) => ({
+    week,
+    rankByTheme: { squat: index % 2 === 0 ? 1 : 2, press: index % 2 === 0 ? 2 : 1 }
+  }));
+  const chart = buildBumpChart({
+    ranks,
+    themes: ['squat', 'press'],
+    width: 320,
+    height: 200,
+    pad: { top: 12, right: 16, bottom: 28, left: 24 }
+  });
+  assert.equal(chart.width, 320);
+  assert.equal(chart.height, 200);
+  assert.equal(chart.pad.right, 16);
+  assert.ok(chart.weeks.filter(week => week.show).length < 8);
+  assert.equal(chart.weeks[0].show, true);
+  assert.equal(chart.weeks.at(-1).show, true);
+  assert.ok(chart.lines[0].points[0].x >= 24);
+});
+
 test('buildRadialYear has 365 ticks', () => {
   const ticks = buildRadialYear({ year: 2026, byDate: { '2026-03-01': 'low' } });
   assert.equal(ticks.length, 365);

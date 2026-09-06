@@ -8,7 +8,8 @@
     "data/widgets/**",
     "data/os/**",
     "intuition/**",
-    "tasks:project:*"
+    "tasks:project:*",
+    "tasks:task:*"
   ],
   "read_globs": [
     "data/challenges/**",
@@ -18,7 +19,8 @@
     "data/os/**",
     "central-node.md",
     "intuition/**",
-    "tasks:project:*"
+    "tasks:project:*",
+    "tasks:task:*"
   ],
-  "notes": "Tasks specialist on the shared OS floor. Task mutations stay on the Tasks store via Clare desk or propose-action `tasks:project:<id>` writes; Life remember/track/research use propose-action."
+  "notes": "Tasks specialist on the shared OS floor. Task mutations stay on the Tasks store via create_task / update_task or propose-action `tasks:task:<id>` / `tasks:project:<id>` writes; Life remember/track/research use propose-action."
 }

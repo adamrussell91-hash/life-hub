@@ -510,22 +510,10 @@ export interface PageHeaderConfig {
   actions?: HTMLElement | null;
 }
 
-const TASKS_HUB_TILE = '/icons/tasks.svg';
-
-function createHubMark(): HTMLImageElement {
-  const mark = document.createElement('img');
-  mark.className = 'hub-mark';
-  mark.src = TASKS_HUB_TILE;
-  mark.alt = '';
-  mark.width = 32;
-  mark.height = 32;
-  return mark;
-}
-
 function createTitleRow(title: HTMLElement): HTMLElement {
   const row = document.createElement('div');
   row.className = 'page-header__title-row';
-  row.append(createHubMark(), title);
+  row.append(title);
   return row;
 }
 
@@ -552,9 +540,7 @@ function syncPageHeaderCopy(refs: HubShellRefs, config: PageHeaderConfig): boole
   eyebrow.textContent = config.eyebrow;
   const title = restoreHeaderTitle(existingTitle);
   title.textContent = config.title;
-  if (!titleRow.querySelector('.hub-mark')) {
-    titleRow.insertBefore(createHubMark(), title);
-  }
+  titleRow.querySelectorAll('.hub-mark').forEach((el) => el.remove());
   let supporting = copy.querySelector('.page-header__supporting');
   if (config.supporting) {
     if (!supporting) {
