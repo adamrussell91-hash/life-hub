@@ -9,7 +9,8 @@
     "data/os/**",
     "intuition/**",
     "tasks:project:*",
-    "tasks:task:*"
+    "tasks:task:*",
+    "apps/tasks/config/clare-protocol.md"
   ],
   "read_globs": [
     "data/challenges/**",
@@ -20,7 +21,8 @@
     "central-node.md",
     "intuition/**",
     "tasks:project:*",
-    "tasks:task:*"
+    "tasks:task:*",
+    "apps/tasks/config/clare-protocol.md"
   ],
-  "notes": "Tasks specialist on the shared OS floor. Task mutations stay on the Tasks store via create_task / update_task or propose-action `tasks:task:<id>` / `tasks:project:<id>` writes; Life remember/track/research use propose-action."
+  "notes": "Tasks specialist on the shared OS floor. Ordinary create/edit use create_task / update_task; other chat workbench writes use clare_mutate. Both go through propose-action `tasks:task:<id>` / `tasks:project:<id>` and wait for Confirm. Life remember/track/research use propose-action."
 }
