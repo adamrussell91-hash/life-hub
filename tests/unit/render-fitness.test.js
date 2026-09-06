@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import { renderFitness } from '../../apps/life/js/app/render-fitness.js';
 
 class FakeEl {
-  constructor() {
+  constructor(tag = 'div') {
+    this.tagName = tag;
     this.children = [];
     this.dataset = {};
     this.attributes = {};
     this.className = '';
     this.textContent = '';
+    this.src = '';
+    this.alt = '';
     this.style = {};
     this.classList = {
       add: (...names) => {
@@ -26,6 +29,7 @@ class FakeEl {
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = [...nodes]; }
   setAttribute(name, value) { this.attributes[name] = String(value); }
+  getAttribute(name) { return name === 'src' ? this.src : this.attributes[name]; }
   removeAttribute(name) { delete this.attributes[name]; }
   querySelector() { return null; }
   addEventListener() {}
@@ -40,7 +44,7 @@ function fitnessRoot() {
   return {
     nodes,
     ensure,
-    createElement: () => new FakeEl(),
+    createElement: tag => new FakeEl(tag),
     querySelector(selector) { return ensure(selector); }
   };
 }
@@ -344,6 +348,48 @@ test('Fitness run widget shows last-session distance only when a walk or run was
   assert.match(widgetText(host), /Last session/);
   assert.match(widgetText(host), /4\.2 km/);
   assert.doesNotMatch(widgetText(host), /Workouts/);
+});
+
+test('a second Fitness paint reuses muscle-map and region image nodes', () => {
+  const root = fitnessRoot();
+  const model = baseModel({
+    heroSession: heroSession({ muscleMapKeys: ['chest-whole', 'arm-bicep'] }),
+    regions: [{
+      key: 'chest',
+      label: 'Chest',
+      image: 'assets/fitness/regions/chest.png',
+      bestSetDeltaKg: 10,
+      volumeDeltaPct: 25,
+      currentBestKg: 50,
+      currentVolume: 1200,
+      colour: 'green'
+    }]
+  });
+
+  renderFitness(root, model);
+  const strip = root.ensure('#fitness-muscle-maps');
+  const regionImg = root.ensure('#fitness-region-grid').children[0].children[0].children[0];
+  const heroThumb = root.ensure('#fitness-exercise-list').children[0].children[0];
+  const firstMaps = [...strip.children];
+  assert.equal(firstMaps.length, 2);
+  assert.match(firstMaps[0].src, /chest-whole/);
+  assert.equal(regionImg.src, 'assets/fitness/regions/chest.png');
+  assert.match(heroThumb.src, /chest-whole/);
+
+  renderFitness(root, {
+    ...model,
+    regions: [{
+      ...model.regions[0],
+      bestSetDeltaKg: 12,
+      volumeDeltaPct: 30
+    }]
+  });
+
+  assert.equal(root.ensure('#fitness-muscle-maps').children[0], firstMaps[0]);
+  assert.equal(root.ensure('#fitness-muscle-maps').children[1], firstMaps[1]);
+  assert.equal(root.ensure('#fitness-region-grid').children[0].children[0].children[0], regionImg);
+  assert.equal(root.ensure('#fitness-exercise-list').children[0].children[0], heroThumb);
+  assert.equal(root.ensure('#fitness-region-grid').children[0].children[1].children[1].textContent, '+12 kg');
 });
 
 test('region cards prefer the 30-day delta when both current and delta exist', () => {

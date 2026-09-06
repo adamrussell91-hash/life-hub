@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v149';
+const CACHE_NAME = 'life-hub-shell-v150';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -266,21 +266,44 @@ self.addEventListener('fetch', event => {
 
   if (!SHELL_PATHS.has(url.pathname)) return;
 
-  // Network-first, cache as an offline fallback only. A cache-first strategy here
-  // meant every deploy needed a manual "clear site data" to actually reach returning
-  // users -- the cache only updates on install (i.e. when this file's own bytes
-  // change), so any deploy that didn't touch service-worker.js was invisible until
-  // then. Matches the navigate handler's existing philosophy below.
-  event.respondWith(
-    fetch(request)
-      .then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-        return response;
-      })
-      .catch(() => caches.match(request))
-  );
+  // Images: stale-while-revalidate so muscle maps, nav icons, and avatars
+  // paint from cache on load instead of waiting on the network (that wait
+  // was the load-up flicker). JS/CSS stay network-first so a deploy that
+  // does not touch this file still reaches returning users.
+  if (isStaticImage(url.pathname)) {
+    event.respondWith(staleWhileRevalidate(request));
+    return;
+  }
+
+  event.respondWith(networkFirst(request));
 });
+
+const IMAGE_PATH = /\.(?:png|jpe?g|gif|webp|svg|ico)$/i;
+
+function isStaticImage(pathname) {
+  return IMAGE_PATH.test(pathname);
+}
+
+function putInShellCache(request, response) {
+  const copy = response.clone();
+  caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+  return response;
+}
+
+function networkFirst(request) {
+  return fetch(request)
+    .then(response => putInShellCache(request, response))
+    .catch(() => caches.match(request));
+}
+
+function staleWhileRevalidate(request) {
+  return caches.match(request).then(cached => {
+    const fetched = fetch(request)
+      .then(response => putInShellCache(request, response))
+      .catch(() => cached);
+    return cached || fetched;
+  });
+}
 
 async function handleShareTarget(request, url) {
   try {
