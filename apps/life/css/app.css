@@ -2473,9 +2473,6 @@ main { max-width: 76rem; margin: 0 auto; }
 .skincare-drawer-track > .skincare-card[hidden] {
   display: none;
 }
-@media (prefers-reduced-motion: reduce) {
-  .skincare-drawer-track { transition: none; }
-}
 .skincare-card--current {
   box-shadow: 0 0 0 2px rgba(185, 158, 224, 0.55);
   background: rgba(185, 158, 224, 0.08);
