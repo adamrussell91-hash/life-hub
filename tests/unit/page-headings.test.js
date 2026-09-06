@@ -13,7 +13,8 @@ test('section dashboards do not repeat the page name as a kicker under the topba
     'body-bloods-dashboard',
     'body-medical-dashboard',
     'mind-dashboard',
-    'central-node-dashboard'
+    'central-node-dashboard',
+    'shortcuts-dashboard'
   ];
   for (const id of ids) {
     const start = html.indexOf(`id="${id}"`);

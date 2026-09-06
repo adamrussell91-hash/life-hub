@@ -230,7 +230,8 @@ test('the Life Hub tile does not sit beside any page title', async () => {
       ['mind', 'Mind'],
       ['skincare', 'Skincare'],
       ['calendar', 'Calendar'],
-      ['central-node', 'Central Node']
+      ['central-node', 'Central Node'],
+      ['shortcuts', 'Shortcuts']
     ];
     for (const [section, title] of sections) {
       await page.locator(`.desktop-rail button[data-section="${section}"]`).first().click();

@@ -828,6 +828,7 @@ async function handleOsListPromotedShortcuts(ctx, input) {
       summary: value.summary || null,
       risk: value.risk || 'confirm',
       status: value.status || null,
+      proposed_by: value.proposed_by || null,
       write_count: Array.isArray(value.example_writes) ? value.example_writes.length : 0
     });
   }

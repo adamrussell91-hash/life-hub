@@ -806,7 +806,7 @@ test('renderMind paints an interactive theme rank bump chart', () => {
 test('index.html Mind board has no Talk launchers or cadence heatmap', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const start = html.indexOf('id="mind-dashboard"');
-  const end = html.indexOf('id="central-node-dashboard"');
+  const end = html.indexOf('id="shortcuts-dashboard"');
   const mind = html.slice(start, end);
   assert.doesNotMatch(mind, /id="mind-launcher-vera"/);
   assert.doesNotMatch(mind, /id="mind-launcher-penelope"/);

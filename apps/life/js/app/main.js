@@ -44,6 +44,8 @@ import { createRepositoryCache } from './repository-cache.js';
 import { createSkincareApi } from './skincare-api.js';
 import { createKnowledgeApi } from './knowledge-api.js';
 import { createTasksApi } from './tasks-api.js';
+import { createShortcutsApi } from './shortcuts-api.js';
+import { renderShortcuts } from './render-shortcuts.js';
 import { createTeachingApi } from './teaching-api.js';
 import { createSkincareController } from './skincare-controller.js';
 import { buildSkincareModel } from './skincare-model.js';
@@ -103,6 +105,7 @@ const skincareApi = createSkincareApi(fetchImpl);
 const teachingApi = createTeachingApi(fetchImpl);
 const knowledgeApi = createKnowledgeApi(fetchImpl);
 const tasksApi = createTasksApi(fetchImpl);
+const shortcutsApi = createShortcutsApi(fetchImpl);
 
 let controller;
 let chatController;
@@ -169,6 +172,8 @@ controller = createAppController({
   teachingApi,
   knowledgeApi,
   tasksApi,
+  shortcutsApi,
+  renderShortcuts,
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,
@@ -211,7 +216,7 @@ document.addEventListener('keydown', (event) => {
     placeholder: 'Jump in Life Hub',
     groups: [{
       heading: 'Go to',
-      items: ['home', 'chat', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node'].map((id) => ({
+      items: ['home', 'chat', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node', 'shortcuts'].map((id) => ({
         id,
         label: id.replace(/-/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()),
         onSelect: () => document.querySelector(`[data-section="${id}"]`)?.click()
