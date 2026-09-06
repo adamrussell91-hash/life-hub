@@ -6228,6 +6228,7 @@ main { max-width: 76rem; margin: 0 auto; }
   max-height: none;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 /* Composer stays on the canvas floor — page-frame is already inset by --rail-width. */
@@ -6300,6 +6301,10 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 @media (max-width: 720px) {
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) {
+    padding-bottom: 0;
+  }
+
   .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame {
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
