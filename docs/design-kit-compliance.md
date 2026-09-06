@@ -9,9 +9,9 @@
 | Hub | Overall | Notes |
 |-----|---------|-------|
 | Life | **Pass** (chrome) | Favicon + sign-in mark only. No `.hub-mark` beside page titles (locked; do not re-add). Confirm-card actions, display dates fixed. Product chart hex retained as domain colour. |
-| Teaching | **Pass** (chrome) | Marks unhidden; title-row mark; labeled rail only; utilities in header actions; 720px breakpoint; confirm-card replaces `window.confirm`. |
-| Knowledge | **Pass** (chrome) | Marks on gate + title-row; capture titles `dd/mm/yy`; tidy confirm-card; primary `.btn` on quiz/podcast submits. |
-| Tasks | **Pass** (chrome) | Marks on gate + title-row; reminder labels via `formatDisplayDate`; dead mobile-rail CSS removed. |
+| Teaching | **Pass** (chrome) | Gate mark only; **no** title-row `.hub-mark`; labeled rail only; utilities in header actions; 720px breakpoint; confirm-card replaces `window.confirm`. |
+| Knowledge | **Pass** (chrome) | Gate mark only; **no** title-row `.hub-mark`; capture titles `dd/mm/yy`; tidy confirm-card; primary `.btn` on quiz/podcast submits. |
+| Tasks | **Pass** (chrome) | Gate mark only; **no** title-row `.hub-mark`; reminder labels via `formatDisplayDate`; dead mobile-rail CSS removed. |
 
 Locked chrome gaps from the prior audit are closed. Remaining hex lives in **product canvases** (charts, maps, quiz dump nodes, agent identity colours), not shared chrome — allowed as domain UI under kit rules (“product UI stays in the hub”).
 
@@ -50,25 +50,25 @@ Category 9 stays Partial on purpose: product viz / map / dump / agent brand colo
 - Flat path docs; `prepare-web` publishes `icons/`
 
 ### Life
-- Favicon + `.sign-in__mark` on the gate. **No** `.hub-mark` in `.page-header__title-row` (Adam; #26). Do not “fix” this.
+- Favicon + `.sign-in__mark` on the gate. **No** `.hub-mark` in `.page-header__title-row` on any hub. Do not “fix” this.
 - Proposals use `.confirm-card` + `.btn.btn--primary` / `.btn.btn--ghost`
 - Mind / fitness display dates via `formatDisplayDate`
 - Removed dead brand-mark / nav-dot chrome CSS
 
 ### Teaching
 - Removed mark `display: none !important`
-- Gate + title-row marks; utilities in `.page-header__actions`
+- Gate mark only; no title-row `.hub-mark`; utilities in `.page-header__actions`
 - Removed collapsed 5.75rem icon rail; rail hide at 720px
 - `askConfirmCard` modal for trash/archive/publish/AI stale accepts/history restore/bulk actions
 - Calendar day labels via `formatDisplayDate`
 
 ### Knowledge
-- Gate + title-row marks; capture titles `dd/mm/yy`
+- Gate mark only; no title-row `.hub-mark`; capture titles `dd/mm/yy`
 - Reader tidy uses `.confirm-card` before write
 - Removed icon-column rail CSS; quiz/podcast submits use `.btn.btn--primary`
 
 ### Tasks
-- Gate + title-row marks; reminder labels via `formatDisplayDate`
+- Gate mark only; no title-row `.hub-mark`; reminder labels via `formatDisplayDate`
 - Removed dead mobile-rail restyle CSS under 720px
 
 ---

@@ -91,8 +91,7 @@ Default stance: **use the product, then write the report, then stop.**
 | Auth | One Life passphrase session. Cookie `life_hub_session`. Never print it. |
 | Student URLs | `/teaching/s/…` stay unauthenticated |
 | Dates on screen | `dd/mm/yy` — never `YYYY-MM-DD` as a visible day |
-| Life title row | `h1` only. **No** `.hub-mark` beside Life headings |
-| Other hubs title row | `.hub-mark` left of the `h1` |
+| Title row (every hub) | `h1` only. **No** `.hub-mark` beside any heading |
 | Rail | 15rem, brand is a link home, icon + title-case label, no coloured dots |
 | Phone | Under 720px: rail hidden, four-slot bottom bar + More sheet |
 | Widgets proxy | Out of scope (`jade-melomakarona-ea20fe`) |
@@ -127,7 +126,7 @@ Run this on **every** page before the page-specific list. Fail any item that is 
 - [ ] Primary rail items are icon + title-case label. No coloured dots. No icon-only column. No uppercase item labels.
 - [ ] Current page is marked (`aria-current="page"` or `.is-current` / `.is-active`).
 - [ ] Refresh and Sign out sit in the canvas header as icon buttons, not labelled pills on the rail.
-- [ ] Teaching / Knowledge / Tasks: hub tile sits left of the page title. Life: title is `h1` only.
+- [ ] Title is `h1` only. **No** `.hub-mark` / favicon tile beside the heading on any hub.
 - [ ] Page header is eyebrow → title → optional supporting. Title is not blank, not `undefined`, not the previous page’s title.
 - [ ] Hub switcher / Hubs accordion lists the other three hubs. Expand each preview. Click through to the other hub and back.
 
@@ -686,8 +685,7 @@ CLEAN | ISSUES FOUND | BLOCKED
 - Stale hosts found:
 
 ## Kit chrome
-- Life missing title-row mark (required): yes
-- Other hubs have title-row mark: yes/no
+- Any hub has a title-row `.hub-mark` (must be none): yes/no
 - Phone rail hidden at 390: yes/no
 
 ## Notes for Cursor

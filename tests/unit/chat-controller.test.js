@@ -621,7 +621,7 @@ test('a second message within the memory window carries the prior turn as histor
   assert.equal(sendCalls[1].priorAgentSlug, 'brisket');
 });
 
-test('memory expires after the window so a stale conversation does not stick to the wrong agent', async () => {
+test('memory expires after the window but the thread stays with the same agent', async () => {
   const root = new FakeDocument();
   const sendCalls = [];
   let clock = Date.parse('2026-08-01T18:00:00Z');
@@ -640,7 +640,7 @@ test('memory expires after the window so a stale conversation does not stick to 
   await controller.send('what should I have for lunch');
 
   assert.deepEqual(sendCalls[1].history, []);
-  assert.equal(sendCalls[1].priorAgentSlug, undefined);
+  assert.equal(sendCalls[1].priorAgentSlug, 'brisket');
 });
 
 test('bold markdown in streamed text renders as a strong element, not literal asterisks', async () => {
@@ -706,7 +706,7 @@ test('a real recent agent reply still wins over the default hint', async () => {
   assert.equal(sendCalls[1].priorAgentSlug, 'brisket', 'the real conversation with Brisket must win over the Hammond default hint');
 });
 
-test('the default hint returns once the memory window lapses, instead of staying stuck or falling to undefined', async () => {
+test('a real agent reply still wins over the default hint after the memory window lapses', async () => {
   const root = new FakeDocument();
   const sendCalls = [];
   let clock = Date.parse('2026-08-01T18:00:00Z');
@@ -726,7 +726,28 @@ test('the default hint returns once the memory window lapses, instead of staying
   clock += 46 * 60_000;
   await controller.send('how is my week looking');
 
-  assert.equal(sendCalls[1].priorAgentSlug, 'hammond');
+  assert.equal(sendCalls[1].priorAgentSlug, 'brisket');
+});
+
+test('a selected agent keeps the thread even if the stream names someone else', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: 'Eat the protein, buddy.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  await controller.send('Chadwick said I should eat more protein');
+
+  const assistant = messageBubbles(root).find(bubble => bubble.dataset?.agent);
+  assert.equal(assistant?.dataset.agent, 'brisket');
+  assert.equal(controller.getSelectedAgentSlug(), 'brisket');
+  assert.equal(sendCalls[0].priorAgentSlug, 'brisket');
 });
 
 test('omitting the default hint entirely preserves today\'s existing behaviour (undefined when nothing is sticky)', async () => {
@@ -1733,7 +1754,7 @@ test('selecting another agent clears auditSession so later sends omit it', async
   assert.equal(sendCalls[1].auditSession, undefined);
 });
 
-test('stream naming a non-Hammond agent clears auditSession for the next send', async () => {
+test('stream naming a non-Hammond agent does not steal a Hammond thread or drop the audit', async () => {
   const root = new FakeDocument();
   const sendCalls = [];
   const chatApi = {
@@ -1742,12 +1763,9 @@ test('stream naming a non-Hammond agent clears auditSession for the next send', 
       if (sendCalls.length === 1) {
         yield { type: 'agent', slug: 'hammond' };
         yield { type: 'text', delta: 'Triage first.' };
-      } else if (sendCalls.length === 2) {
-        yield { type: 'agent', slug: 'brisket' };
-        yield { type: 'text', delta: 'Logging lunch instead.' };
       } else {
         yield { type: 'agent', slug: 'brisket' };
-        yield { type: 'text', delta: 'Done.' };
+        yield { type: 'text', delta: 'Logging lunch instead.' };
       }
       yield { type: 'done' };
     }
@@ -1759,7 +1777,10 @@ test('stream naming a non-Hammond agent clears auditSession for the next send', 
   await controller.send('and a snack');
 
   assert.ok(sendCalls[0].auditSession);
-  assert.equal(sendCalls[2].auditSession, undefined);
+  assert.equal(sendCalls[1].priorAgentSlug, 'hammond');
+  assert.equal(sendCalls[2].priorAgentSlug, 'hammond');
+  assert.ok(sendCalls[2].auditSession);
+  assert.equal(controller.getSelectedAgentSlug(), 'hammond');
 });
 
 test('cancel audit clears auditSession so the cancel send omits it', async () => {

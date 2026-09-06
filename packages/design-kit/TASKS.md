@@ -17,7 +17,7 @@ Load Inter, then kit `tokens.css`, `overlays.css`, `chrome.css` (new hub), then 
 
 `data-hub="tasks"` **clones Teaching**: more glass, more tiles, the same 15rem labeled rail as every other hub. Values live in `overlays.css` — do not retune them in the hub. Rail rules: `RAIL.md`.
 
-Page header stays kit: uppercase eyebrow → `h1` → optional supporting → actions on the right. Rail brand is `<a class="hub-rail__brand" href="…board…">` (single uppercase line, returns to the board from anywhere). Destinations are `.hub-rail__link` (outline icon + title-case label). Refresh and sign out use `.hub-utilities` / `.hub-icon-btn` at the canvas top-right. `.hub-mark` (`icons/tasks.svg`) sits left of the page title. Same tile is the favicon and the sign-in mark. No supporting copy on the gate. See `ICONS.md`.
+Page header stays kit: uppercase eyebrow → `h1` → optional supporting → actions on the right. Rail brand is `<a class="hub-rail__brand" href="…board…">` (single uppercase line, returns to the board from anywhere). Destinations are `.hub-rail__link` (outline icon + title-case label). Refresh and sign out use `.hub-utilities` / `.hub-icon-btn` at the canvas top-right. Title is `h1` only — never put `.hub-mark` beside it. The tile is the favicon and the sign-in mark. No supporting copy on the gate. See `ICONS.md`.
 
 Agent writes: propose → **confirm card** → apply.
 
