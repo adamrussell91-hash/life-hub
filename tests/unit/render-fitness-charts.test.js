@@ -129,3 +129,71 @@ test('when-you-train paints day-part counts and a typical-time caption', () => {
   assert.equal(root.ensure('[data-fitness="year-read"]').textContent, '4 sessions in 2026');
   assert.ok(texts(root.ensure('#fitness-year-chart')).includes('Aug'));
 });
+
+test('e1RM form paints one overlay with a legend, not a stack of lift charts', () => {
+  const root = chartRoot();
+  renderFitnessCharts(root, {
+    e1rmBands: [
+      {
+        name: 'Squat',
+        series: [{ date: '2026-07-01', value: 80 }, { date: '2026-07-30', value: 100 }],
+        pctSeries: [
+          { date: '2026-07-01', value: 80, kg: 80 },
+          { date: '2026-07-30', value: 100, kg: 100 }
+        ]
+      },
+      {
+        name: 'Press',
+        series: [{ date: '2026-07-08', value: 40 }, { date: '2026-07-22', value: 36 }],
+        pctSeries: [
+          { date: '2026-07-08', value: 100, kg: 40 },
+          { date: '2026-07-22', value: 90, kg: 36 }
+        ]
+      }
+    ]
+  });
+
+  const svg = root.ensure('#fitness-e1rm-chart');
+  const paths = [];
+  const labels = [];
+  walk(svg, node => {
+    if (node.name === 'path') paths.push(node);
+    if (node.name === 'text' && node.textContent) labels.push(node.textContent);
+  });
+  assert.equal(paths.length, 2);
+  assert.ok(labels.includes('100%'));
+  assert.ok(labels.includes('80%'));
+  assert.equal(root.ensure('#fitness-e1rm-card').attributes.hidden, undefined);
+  const legend = texts(root.ensure('#fitness-e1rm-card'));
+  assert.ok(legend.includes('Squat'));
+  assert.ok(legend.includes('Press'));
+});
+
+test('who-is-improving uses a legend and short week labels', () => {
+  const root = chartRoot();
+  renderFitnessCharts(root, {
+    bumpRanks: [
+      { week: '2026-07-13', rankByTheme: { Squat: 2, Press: 1 } },
+      { week: '2026-07-20', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-07-27', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-08-03', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-08-10', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-08-17', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-08-24', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-08-31', rankByTheme: { Squat: 1, Press: 2 } }
+    ]
+  });
+
+  const svg = root.ensure('#fitness-bump-chart');
+  const weekLabels = [];
+  walk(svg, node => {
+    if (node.name === 'text' && node.textContent) weekLabels.push(node.textContent);
+  });
+  assert.ok(weekLabels.includes('13/07'));
+  assert.ok(weekLabels.includes('31/08'));
+  assert.ok(!weekLabels.includes('Squat'));
+  assert.ok(weekLabels.length < 12);
+  const legend = texts(root.ensure('#fitness-bump-card'));
+  assert.ok(legend.includes('Squat'));
+  assert.ok(legend.includes('Press'));
+});

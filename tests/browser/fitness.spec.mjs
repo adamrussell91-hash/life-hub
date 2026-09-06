@@ -85,7 +85,13 @@ test('the Fitness tab renders the fixture workout and labeled analytics', async 
     assert.equal(await page.locator('#fitness-library-card').count(), 0);
     assert.equal(await page.locator('#fitness-push-pull-card').isVisible(), true);
     assert.equal(await page.locator('#fitness-rest-card').isVisible(), true);
-    assert.equal(await page.locator('#fitness-e1rm-card').isHidden(), true);
+    assert.equal(await page.locator('#fitness-e1rm-card').getAttribute('hidden'), null);
+    assert.match(await page.locator('#fitness-e1rm-card').textContent(), /percent of its best/i);
+    assert.ok(await page.locator('#fitness-e1rm-chart path').count() >= 2);
+    assert.match(await page.locator('#fitness-e1rm-card .mind-chart-legend').textContent(), /Chest Press|Bicep Curl/i);
+    assert.equal(await page.locator('#fitness-bump-card').getAttribute('hidden'), null);
+    assert.match(await page.locator('#fitness-bump-card .mind-chart-legend').textContent(), /Chest Press|Bicep Curl/i);
+    assert.ok(await page.locator('#fitness-bump-chart text').count() >= 2);
     assert.equal(await page.locator('#fitness-readings-card').getAttribute('hidden'), null);
     assert.match(await page.locator('#fitness-readings').textContent(), /Duration/);
     assert.equal(await page.locator('#fitness-clock-card').getAttribute('hidden'), null);
