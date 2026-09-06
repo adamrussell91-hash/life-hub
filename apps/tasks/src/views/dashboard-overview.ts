@@ -562,7 +562,7 @@ function overviewPeek(options: DashboardOverviewOptions, now: Date): string {
   const stats = dashboardFocusStats(options.tasks, options.projects, now);
   const parts = [
     stats.overdue ? `${stats.overdue} overdue` : null,
-    stats.today ? `${stats.today} due today` : null,
+    stats.today ? `${stats.today} today` : null,
     stats.needsAttention ? `${stats.needsAttention} need attention` : null,
     stats.activeProjects ? `${stats.activeProjects} active` : null
   ].filter(Boolean);
