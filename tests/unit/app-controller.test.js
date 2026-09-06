@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSessionApi } from '../../apps/life/js/app/api-session.js';
-import { createAppController } from '../../apps/life/js/app/app-controller.js';
+import { createAppController, sectionFromHash } from '../../apps/life/js/app/app-controller.js';
 
 const EXPIRY = '2026-08-01T18:00:00.000Z';
 const NOW = new Date('2026-08-01T01:00:00.000Z');
@@ -196,7 +196,7 @@ function liveData(overrides = {}) {
 function harness(options = {}) {
   const root = new FakeDocument();
   const windowTarget = new EventTarget();
-  windowTarget.location = { hostname: options.hostname ?? '' };
+  windowTarget.location = { hostname: options.hostname ?? '', hash: options.hash ?? '' };
   const clock = createClock();
   const sessionStorage = memoryStorage(options.sessionMarker
     ? { 'life-hub:session-expiry': options.sessionMarker }
@@ -1079,6 +1079,30 @@ test('a completed refresh while viewing Fitness re-renders the dashboard', async
   await state.controller.refresh();
 
   assert.equal(state.calls.fitnessRenders, 2);
+});
+
+test('sectionFromHash maps #central-node onto the Central Node section', () => {
+  assert.equal(sectionFromHash('#central-node'), 'central-node');
+  assert.equal(sectionFromHash('#central-node-dashboard'), 'central-node');
+  assert.equal(sectionFromHash('#home'), 'home');
+  assert.equal(sectionFromHash('#unknown'), null);
+});
+
+test('authenticated start honours #central-node instead of forcing Home', async () => {
+  const state = harness({ hash: '#central-node' });
+  await state.controller.start();
+  assert.equal(state.controller.getCurrentSection(), 'central-node');
+  assert.equal(state.root.querySelector('#central-node-dashboard').hidden, false);
+});
+
+test('hashchange after sign-in opens Central Node', async () => {
+  const state = harness();
+  await state.controller.start();
+  assert.equal(state.controller.getCurrentSection(), 'home');
+  state.windowTarget.location.hash = '#central-node';
+  state.windowTarget.dispatchEvent(new Event('hashchange'));
+  assert.equal(state.controller.getCurrentSection(), 'central-node');
+  assert.equal(state.root.querySelector('#central-node-dashboard').hidden, false);
 });
 
 test('clicking the Central Node nav item shows the dashboard and builds/renders it from the latest loaded sync data', async () => {

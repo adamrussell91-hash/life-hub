@@ -99,6 +99,7 @@ export async function loadLiveEvents({
       governanceLogMarkdown: parsedFiles.governanceLogMarkdown,
       weekFlags: parsedFiles.weekFlags,
       nutritionChallenges: parsedFiles.nutritionChallenges,
+      researchBriefs: parsedFiles.researchBriefs,
       warnings: [...warnings, ...parsedFiles.warnings],
       commitSha,
       changed,
@@ -153,6 +154,8 @@ function createValidator(loadYaml) {
         parseNutritionChallenges(file.content);
       } else if (file.path === WEEK_FLAGS_PATH) {
         parseWeekFlags(file.content);
+      } else if (file.path.startsWith('data/research/') && file.path.endsWith('.json')) {
+        JSON.parse(file.content);
       } else if (EVENT_PATH.test(file.path)) {
         parseEventDocument(file.content, file.path, loadYaml);
       } else {
@@ -182,6 +185,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
   let governanceLogMarkdown = null;
   let weekFlags = null;
   let nutritionChallenges = null;
+  const researchBriefs = [];
 
   for (const file of files) {
     const key = `${file.path}\0${file.sha}`;
@@ -200,6 +204,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
     else if (entry.kind === 'governance_log') governanceLogMarkdown = entry.value;
     else if (entry.kind === 'week_flags') weekFlags = entry.value;
     else if (entry.kind === 'nutrition_challenges') nutritionChallenges = entry.value;
+    else if (entry.kind === 'research_brief') researchBriefs.push(entry.value);
     else if (entry.kind === 'event') events.push(entry.value);
   }
 
@@ -214,6 +219,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
     governanceLogMarkdown,
     weekFlags,
     nutritionChallenges,
+    researchBriefs,
     warnings
   };
 }
@@ -227,6 +233,13 @@ function parseFile(file, loadYaml) {
     if (file.path === WEEK_FLAGS_PATH) return { kind: 'week_flags', value: parseWeekFlags(file.content) };
     if (file.path === NUTRITION_CHALLENGES_PATH) {
       return { kind: 'nutrition_challenges', value: parseNutritionChallenges(file.content) };
+    }
+    if (file.path.startsWith('data/research/') && file.path.endsWith('.json')) {
+      const parsed = JSON.parse(file.content);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return { kind: 'ignored' };
+      }
+      return { kind: 'research_brief', value: parsed };
     }
     if (EVENT_PATH.test(file.path)) {
       return { kind: 'event', value: parseEventDocument(file.content, file.path, loadYaml) };

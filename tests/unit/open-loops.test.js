@@ -119,6 +119,29 @@ test('oldestOpenLoop prefers the earliest dated item and formatOpenLoopLine matc
   assert.equal(formatOpenLoopLine(oldest), 'Clare: Someday reading — 222d open.');
 });
 
+test('collectOpenLoops surfaces research briefs that have expired or expire today', () => {
+  const loops = collectOpenLoops({
+    today: TODAY,
+    researchBriefs: [
+      {
+        title: 'Knee load after taper',
+        expires_at: '2026-08-11T00:00:00.000Z',
+        sources: ['https://example.edu/knee']
+      },
+      {
+        title: 'Fresh brief',
+        expires_at: '2026-09-01T00:00:00.000Z',
+        sources: ['https://example.edu/fresh']
+      }
+    ]
+  });
+  assert.equal(loops.length, 1);
+  assert.equal(loops[0].source, 'research_brief');
+  assert.equal(loops[0].owner, 'Research');
+  assert.equal(loops[0].title, 'Knee load after taper');
+  assert.equal(loops[0].dateKey, '2026-08-11');
+});
+
 test('oldestOpenLoop is null when nothing is open', () => {
   assert.equal(oldestOpenLoop(collectOpenLoops({ today: TODAY })), null);
   assert.equal(formatOpenLoopLine(null), null);

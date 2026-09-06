@@ -102,6 +102,8 @@ import { enterChatRail, leaveChatRail, renderChatRail } from "./chat/rail";
 import { ensureChatOverlay, hideChatOverlay, openChatOverlay, pinChatOverlayNote } from "./chat/overlay";
 import type { GraphPreviewNote } from "./archive/graphPreview";
 import { connectedLinksHtml } from "./wiki/connectedHtml";
+import { LIVE_UNAVAILABLE, LIVE_WORKOUT_TOKEN } from "./wiki/liveTokens";
+import { decisionTraceHtml, type DecisionTrace } from "./wiki/decisionTraceHtml";
 import { addOrigin, isOriginKind, originKey, removeOrigin } from "./origin/normalize";
 import { resolvedOrigins } from "./origin/notesPlace";
 import { originComposeFieldHtml, originPillsHtml, parseOriginRemoveValue } from "./origin/pills";
@@ -1287,7 +1289,18 @@ function findingCards(findings: ResearchFinding[]): string {
     .join("");
 }
 
-function renderPage(page: Page) {
+function livePageBody(body: string) {
+  if (!body.includes(LIVE_WORKOUT_TOKEN)) return body;
+  return body.split(LIVE_WORKOUT_TOKEN).join(LIVE_UNAVAILABLE);
+}
+
+type LivePage = Page & {
+  live_body?: string;
+  decision_traces?: DecisionTrace[];
+  decision_traces_status?: string;
+};
+
+function renderPage(page: LivePage) {
   const topics = topicKeywords(page.tags);
   const openCompose = (draft: Origin | null = null) => {
     compose = composeFromPage(page);
@@ -1321,7 +1334,8 @@ function renderPage(page: Page) {
       ${dueReviewsFor([page]).length ? pageReviewActionsHtml() : ""}
       ${originPillsHtml(resolvedOrigins(page), { openEdit: true })}
       ${readerTopicPillsHtml(topics.slice(0, 6))}
-      <div class="reader__body">${renderMarkdown(page.body)}</div>
+      <div class="reader__body">${renderMarkdown(page.live_body ?? livePageBody(page.body))}</div>
+      ${decisionTraceHtml(page.decision_traces, page.decision_traces_status)}
       ${connectedLinksHtml(page, entries)}
       ${renderAttachments(page)}
     </article>

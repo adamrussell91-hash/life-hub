@@ -103,6 +103,86 @@ test('Knowledge pages list titles from knowledge-hub-data, not life-hub-data', a
   assert.ok(urls.every(url => url.includes(DEFAULT_KNOWLEDGE_DATA_REPO)));
 });
 
+test('Knowledge page GET expands the live workout token and attaches decision traces', async () => {
+  const handler = createKnowledgePageHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    fetchImpl: async url => {
+      assert.match(String(url), /knowledge-hub-data\/contents\/pages\/page_training_pulse\.json/);
+      return jsonResponse({
+        sha: 'b'.repeat(40),
+        encoding: 'base64',
+        content: Buffer.from(JSON.stringify({
+          id: 'page_training_pulse',
+          title: 'Training pulse',
+          body: 'Pulse\n\n{{life:compare_workout_windows}}',
+          connected: ['life:decision:aotfw-sources']
+        })).toString('base64')
+      });
+    },
+    loadWorkoutCompare: async () => ({
+      ok: true,
+      weeks: 8,
+      current: { from: '2026-07-13', to: '2026-09-06', count: 11 },
+      previous: { from: '2026-05-18', to: '2026-07-12', count: 8 },
+      delta: 3
+    }),
+    loadDecisionTraces: async () => ([
+      {
+        title: 'AOTFW sources',
+        decisionId: 'aotfw-sources',
+        steps: [
+          { dateKey: '2026-08-01', chosen: 'Start the unit' },
+          { dateKey: '2026-09-06', chosen: 'Keep the unit linked' }
+        ]
+      }
+    ])
+  });
+  const response = await handler(
+    request({ url: 'https://api.adam-russell.com/api/knowledge/pages/page_training_pulse' })
+  );
+  assert.equal(response.status, 200);
+  const page = (await response.json()).data;
+  assert.match(page.body, /\{\{life:compare_workout_windows\}\}/);
+  assert.doesNotMatch(page.body, /11 completed workouts/);
+  assert.match(page.live_body, /11 completed workouts/);
+  assert.doesNotMatch(page.live_body, /\{\{life:compare_workout_windows\}\}/);
+  assert.equal(page.decision_traces[0].decisionId, 'aotfw-sources');
+  assert.equal(page.decision_traces_status, undefined);
+});
+
+test('Knowledge page GET keeps the token and is fail-visible when Life loaders miss', async () => {
+  const handler = createKnowledgePageHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    fetchImpl: async url => {
+      if (String(url).includes('knowledge-hub-data')) {
+        return jsonResponse({
+          sha: 'b'.repeat(40),
+          encoding: 'base64',
+          content: Buffer.from(JSON.stringify({
+            id: 'page_training_pulse',
+            title: 'Training pulse',
+            body: 'Pulse\n\n{{life:compare_workout_windows}}',
+            connected: ['life:decision:aotfw-sources']
+          })).toString('base64')
+        });
+      }
+      throw new Error('Life GitHub must not be reached from this test');
+    },
+    loadWorkoutCompare: async () => ({ ok: false }),
+    loadDecisionTraces: async () => ({ traces: [], status: 'unavailable' })
+  });
+  const response = await handler(
+    request({ url: 'https://api.adam-russell.com/api/knowledge/pages/page_training_pulse' })
+  );
+  assert.equal(response.status, 200);
+  const page = (await response.json()).data;
+  assert.match(page.body, /\{\{life:compare_workout_windows\}\}/);
+  assert.match(page.live_body, /unavailable/i);
+  assert.equal(page.decision_traces_status, 'unavailable');
+});
+
 test('Knowledge page GET uses the Life session and returns page JSON', async () => {
   const handler = createKnowledgePageHandler({
     env,

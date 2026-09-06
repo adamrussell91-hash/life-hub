@@ -43,6 +43,14 @@ class FakeElement extends EventTarget {
         for (const name of names) set.delete(name);
         this.className = [...set].join(' ');
       },
+      toggle: (name, force) => {
+        const set = new Set((this.className || '').split(/\s+/).filter(Boolean));
+        const shouldAdd = force ?? !set.has(name);
+        if (shouldAdd) set.add(name);
+        else set.delete(name);
+        this.className = [...set].join(' ');
+        return shouldAdd;
+      },
       contains: (name) => (this.className || '').split(/\s+/).includes(name)
     };
   }
@@ -925,6 +933,85 @@ test('applies the agent accent colour when the stream names the agent', async ()
   await controller.send('hey chadwick');
 
   assert.equal(root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'), '#D9683A');
+});
+
+function findChoiceCard(root) {
+  const list = root.querySelector('#chat-messages');
+  const item = list.children.find(child => String(child.className).includes('chat-message--structured'));
+  return item?.children?.[0] ?? null;
+}
+
+function findChoiceOption(card, id) {
+  const walk = (node) => {
+    if (node?.dataset?.choiceId === id) return node;
+    for (const child of node?.children ?? []) {
+      const hit = walk(child);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(card);
+}
+
+function findChoiceConfirm(card) {
+  const walk = (node) => {
+    if (String(node?.className || '').includes('btn--primary')) return node;
+    for (const child of node?.children ?? []) {
+      const hit = walk(child);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(card);
+}
+
+test('confirming a second-opinion choice pins that agent for the next send', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      if (sendCalls.length === 1) {
+        yield { type: 'agent', slug: 'hammond' };
+        yield {
+          type: 'choice',
+          title: 'Ask for a second look?',
+          hint: 'Another agent can append to “AOTFW sources”.',
+          confirmLabel: 'Ask',
+          choices: [
+            { id: 'sara', label: 'Ask Sara about AOTFW sources' },
+            { id: 'chadwick', label: 'Ask Chadwick about AOTFW sources' },
+            { id: 'clare', label: 'Ask Clare about AOTFW sources' },
+            { id: 'ann', label: 'Ask Ann about AOTFW sources' }
+          ]
+        };
+        yield { type: 'done' };
+        return;
+      }
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: 'Looking at the block.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({
+    root,
+    chatApi,
+    getDefaultAgentSlug: () => 'hammond'
+  });
+
+  await controller.send('Log the AOTFW decision');
+  assert.equal(sendCalls[0].priorAgentSlug, 'hammond');
+
+  const card = findChoiceCard(root);
+  assert.ok(card, 'a second-opinion choice card should have been appended');
+  findChoiceOption(card, 'chadwick').dispatchEvent(new Event('click'));
+  findChoiceConfirm(card).dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+  await flushMicrotasks();
+
+  assert.equal(sendCalls.length, 2);
+  assert.equal(sendCalls[1].priorAgentSlug, 'chadwick');
+  assert.equal(controller.getSelectedAgentSlug(), 'chadwick');
 });
 
 test('selectAgent updates accent immediately from roster even without agentsConfig', () => {

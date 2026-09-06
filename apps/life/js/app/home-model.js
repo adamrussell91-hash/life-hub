@@ -43,7 +43,8 @@ export function buildHomeModel({
   centralNodeMarkdown,
   weekFlags,
   tasks,
-  stressFlags
+  stressFlags,
+  researchBriefs
 } = {}) {
   if (!date) throw new RangeError('Home display date is unavailable');
 
@@ -69,7 +70,8 @@ export function buildHomeModel({
     centralNodeMarkdown,
     weekFlags,
     tasks,
-    stressFlags
+    stressFlags,
+    researchBriefs
   })));
 
   return {

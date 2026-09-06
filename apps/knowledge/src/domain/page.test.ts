@@ -52,6 +52,18 @@ describe("PageSchema", () => {
     expect(PageSchema.parse({ ...validPage, connected: ["page_b"] }).connected).toEqual(["page_b"]);
   });
 
+  it("keeps live expansions off the stored body", () => {
+    const parsed = PageSchema.parse({
+      ...validPage,
+      body: "Pulse\n\n{{life:compare_workout_windows}}",
+      live_body: "Pulse\n\nLast 8 weeks: 11 completed workouts.",
+      decision_traces_status: "unavailable",
+    });
+    expect(parsed.body).toContain("{{life:compare_workout_windows}}");
+    expect(parsed.live_body).toContain("11 completed workouts");
+    expect(parsed.decision_traces_status).toBe("unavailable");
+  });
+
   it("keeps connected refs that point at Teaching units and Tasks projects", () => {
     expect(
       PageSchema.parse({

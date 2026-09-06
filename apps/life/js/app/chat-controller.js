@@ -212,6 +212,13 @@ export function createChatController({
     return Promise.resolve();
   }
 
+  const SECOND_OPINION_SLUGS = new Set(['sara', 'chadwick', 'clare', 'ann']);
+
+  async function confirmSecondOpinion(slug, message) {
+    if (SECOND_OPINION_SLUGS.has(slug)) await selectAgent(slug);
+    return send(message);
+  }
+
   // A stream "ending" (real text, a proposal, a rejection, or an error/abort) is
   // what should surface an unread indicator -- but only if the user isn't already
   // looking at Chat, so an open panel or the Chat section itself never flags itself.
@@ -669,7 +676,7 @@ export function createChatController({
             onConfirm: picks => {
               const labels = picks.map(pick => pick.label).filter(Boolean);
               if (!labels.length || sending) return;
-              void send(labels.join(', '));
+              void confirmSecondOpinion(picks[0]?.id, labels.join(', '));
             },
             onDismiss: () => {}
           });

@@ -3,6 +3,8 @@ import { GOVERNANCE_LOG_PATH } from '../../../apps/life/js/core/governance-log.j
 import { WEEK_FLAGS_PATH } from '../../../apps/life/js/core/open-loops.js';
 import { isTemplatePath } from './workout-templates.mjs';
 
+export const RESEARCH_PATH = /^data\/research\/[A-Za-z0-9][A-Za-z0-9._-]*\.json$/;
+
 export const CONFIG_PATHS = new Set([
   'config/agents.yml',
   'config/targets.yml',
@@ -40,6 +42,7 @@ export function isAllowedRepositoryPath(path) {
     return false;
   }
   if (CONFIG_PATHS.has(path)) return true;
+  if (RESEARCH_PATH.test(path)) return true;
   if (isTemplatePath(path)) return true;
 
   const match = EVENT_PATH.exec(path);
@@ -58,7 +61,7 @@ export function selectManifestEntries(tree, range) {
 
   return tree
     .filter(isAllowedBlob)
-    .filter(entry => CONFIG_PATHS.has(entry.path) || isEventInRange(entry.path, range))
+    .filter(entry => CONFIG_PATHS.has(entry.path) || RESEARCH_PATH.test(entry.path) || isEventInRange(entry.path, range))
     .map(({ path, sha, size }) => ({ path, sha, size }))
     .sort((left, right) => left.path.localeCompare(right.path));
 }
@@ -76,5 +79,6 @@ function isEventInRange(path, range) {
 
 export function isClientFileInRange(path, range) {
   if (CONFIG_PATHS.has(path)) return true;
+  if (RESEARCH_PATH.test(path)) return true;
   return Boolean(isEventInRange(path, range));
 }

@@ -10,7 +10,8 @@ import {
   parseGovernanceEntries,
   openGovernanceEntries,
   oldestOpenGovernanceEntry,
-  decisionTraces
+  decisionTraces,
+  tracesForRef
 } from '../../apps/life/js/core/governance-log.js';
 
 test('path is data/governance/governance-log.md', () => {
@@ -77,6 +78,8 @@ test('parseGovernanceEntries extracts date, type, status, title, and body', () =
     chosen: null,
     reasoning: null,
     revisit: null,
+    decisionId: null,
+    about: [],
     body: 'Stalled sleep goal.'
   });
 });
@@ -188,6 +191,85 @@ test('format and parse keep chosen, reasoning, and revisit on a decision', () =>
   assert.equal(entry.reasoning, 'Two units plus teaching is too much.');
   assert.equal(entry.revisit, '2026-10-01');
   assert.equal(entry.body, 'Hold the extra unit for summer.');
+});
+
+test('format and parse keep a decision id and About hub-refs', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-09-01',
+    entryType: 'Major Decision',
+    title: 'AOTFW sources',
+    decisionId: 'aotfw-sources',
+    about: ['teaching:unit:unit_aotfw', 'knowledge:page:page_aotfw', 'life:decision:aotfw-sources'],
+    chosen: 'Keep the unit linked',
+    body: 'Identity lives on the Knowledge page.'
+  });
+  const [entry] = parseGovernanceEntries(log);
+  assert.equal(entry.decisionId, 'aotfw-sources');
+  assert.deepEqual(entry.about, [
+    'teaching:unit:unit_aotfw',
+    'page_aotfw',
+    'life:decision:aotfw-sources'
+  ]);
+});
+
+test('decisionTraces groups by decision id ahead of title', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-06',
+    entryType: 'Major Decision',
+    title: 'Later wording',
+    decisionId: 'med-load',
+    about: ['teaching:unit:unit_aotfw'],
+    chosen: 'Drop one elective',
+    body: 'Later take.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-01',
+    entryType: 'Major Decision',
+    title: 'First wording',
+    decisionId: 'med-load',
+    about: ['tasks:project:proj_aotfw'],
+    chosen: 'Take both units',
+    body: 'First take.'
+  });
+  const traces = decisionTraces(parseGovernanceEntries(log));
+  assert.equal(traces.length, 1);
+  assert.equal(traces[0].decisionId, 'med-load');
+  assert.deepEqual(traces[0].steps.map(step => step.chosen), [
+    'Take both units',
+    'Drop one elective'
+  ]);
+  assert.ok(traces[0].about.includes('teaching:unit:unit_aotfw'));
+  assert.ok(traces[0].about.includes('tasks:project:proj_aotfw'));
+});
+
+test('tracesForRef finds a thread by hub-ref or decision id', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-06',
+    entryType: 'Major Decision',
+    title: 'AOTFW sources',
+    decisionId: 'aotfw-sources',
+    about: ['teaching:unit:unit_aotfw', 'page_aotfw'],
+    chosen: 'Keep the unit linked',
+    body: 'Later.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-01',
+    entryType: 'Major Decision',
+    title: 'AOTFW sources',
+    decisionId: 'aotfw-sources',
+    about: ['teaching:unit:unit_aotfw'],
+    chosen: 'Start the unit',
+    body: 'First.'
+  });
+  const entries = parseGovernanceEntries(log);
+  const byUnit = tracesForRef(entries, 'teaching:unit:unit_aotfw');
+  assert.equal(byUnit.length, 1);
+  assert.equal(byUnit[0].steps.length, 2);
+  const byDecision = tracesForRef(entries, 'life:decision:aotfw-sources');
+  assert.equal(byDecision[0].decisionId, 'aotfw-sources');
+  assert.equal(tracesForRef(entries, 'tasks:project:missing').length, 0);
 });
 
 test('decisionTraces groups same-title entries oldest-first', () => {
