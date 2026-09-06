@@ -2,19 +2,26 @@ import { originLabelsForKind, pageMatchesOriginFilter } from "../archive/originF
 import type { Origin } from "../domain/page";
 import notesPlace from "../origin/notesPlace.json";
 
-const COVERS: Record<string, string> = {
-  "Boy's Education": "./notebooks/boys-education.jpg",
-  "Cognitive Psychology": "./notebooks/cognitive-psychology.jpg",
-  "Gifted Education": "./notebooks/gifted-education.jpg",
-  "Leadership and Innovation": "./notebooks/leadership-and-innovation.jpg",
-  Literacy: "./notebooks/literacy.jpg",
-  Mathematics: "./notebooks/mathematics.jpg",
-  Numeracy: "./notebooks/numeracy.jpg",
-  "Pedagogy and Planning": "./notebooks/pedagogy-and-planning.jpg",
-  Philosophy: "./notebooks/philosophy.jpg",
-  "Social and Political Thought": "./notebooks/social-and-political-thought.jpg",
-  Wellbeing: "./notebooks/wellbeing.jpg",
+const COVER_FILES: Record<string, string> = {
+  "Boy's Education": "boys-education.jpg",
+  "Cognitive Psychology": "cognitive-psychology.jpg",
+  "Gifted Education": "gifted-education.jpg",
+  "Leadership and Innovation": "leadership-and-innovation.jpg",
+  Literacy: "literacy.jpg",
+  Mathematics: "mathematics.jpg",
+  Numeracy: "numeracy.jpg",
+  "Pedagogy and Planning": "pedagogy-and-planning.jpg",
+  Philosophy: "philosophy.jpg",
+  "Social and Political Thought": "social-and-political-thought.jpg",
+  Wellbeing: "wellbeing.jpg",
 };
+
+/** Root-relative so `/knowledge` (no trailing slash) still finds `/knowledge/notebooks/…`. */
+export function notebookCoverSrc(file: string, base = import.meta.env.BASE_URL) {
+  const raw = String(base ?? "/");
+  const prefix = raw.endsWith("/") ? raw : `${raw}/`;
+  return `${prefix}notebooks/${file}`;
+}
 
 export type NotebookCover = {
   label: string;
@@ -52,7 +59,7 @@ export function notebookCatalog(): NotebookCover[] {
   return Object.keys(notesPlace.notebook).map(label => ({
     label,
     slug: notebookSlug(label),
-    ...(COVERS[label] ? { image: COVERS[label] } : {}),
+    ...(COVER_FILES[label] ? { image: notebookCoverSrc(COVER_FILES[label]) } : {}),
   }));
 }
 

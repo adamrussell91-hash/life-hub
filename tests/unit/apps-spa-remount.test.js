@@ -19,6 +19,11 @@ test('Teaching, Knowledge, and Tasks SPAs live under apps/', async () => {
   }
 });
 
+test('Knowledge SPA restore keeps a trailing slash on /knowledge', async () => {
+  const html = await readFile(new URL('apps/knowledge/index.html', root), 'utf8');
+  assert.match(html, /redirect === '\/knowledge' \? '\/knowledge\/' : redirect/);
+});
+
 test('umbrella Pages build uses subpath bases for the three SPAs', async () => {
   const teaching = await readFile(new URL('apps/teaching/vite.config.ts', root), 'utf8');
   const knowledge = await readFile(new URL('apps/knowledge/vite.config.ts', root), 'utf8');
