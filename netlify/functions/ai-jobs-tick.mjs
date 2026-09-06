@@ -15,7 +15,6 @@ import {
 
 export const config = {
   path: '/api/ai/jobs/tick',
-  schedule: '17 14 * * *',
   background: true
 };
 
