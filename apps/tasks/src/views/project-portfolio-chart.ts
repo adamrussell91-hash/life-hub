@@ -21,7 +21,8 @@ function setCenter(
   root: HTMLElement,
   running: number,
   dominantLabel: string | null,
-  empty: boolean
+  empty: boolean,
+  compact: boolean
 ): void {
   const value = root.querySelector<HTMLElement>('[data-mix="value"]');
   const name = root.querySelector<HTMLElement>('[data-mix="name"]');
@@ -36,6 +37,14 @@ function setCenter(
   value.textContent = String(running);
   name.textContent = 'running';
   const overBy = Math.max(0, running - SUSTAINABLE_RUNNING_LOAD);
+  if (compact) {
+    sub.textContent = overBy
+      ? `${overBy} over sustainable`
+      : dominantLabel
+        ? `${dominantLabel} leads`
+        : `of about ${SUSTAINABLE_RUNNING_LOAD}`;
+    return;
+  }
   sub.textContent = dominantLabel
     ? overBy
       ? `${overBy} over · ${dominantLabel} leads`
@@ -229,7 +238,7 @@ export function renderProjectPortfolioChart(
   );
   wrap.append(foot);
 
-  setCenter(wrap, options.running, donut.dominant?.label ?? null, donut.empty);
+  setCenter(wrap, options.running, donut.dominant?.label ?? null, donut.empty, compact);
   if (selected !== 'all') paintHover(wrap, selected);
   return wrap;
 }
