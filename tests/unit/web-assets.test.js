@@ -247,7 +247,7 @@ test('service worker paints cached images immediately and keeps scripts network-
   assert.match(worker, /function staleWhileRevalidate/);
   assert.match(worker, /function networkFirst/);
   assert.match(worker, /isStaticImage\(url\.pathname\)/);
-  assert.match(worker, /life-hub-shell-v152/);
+  assert.match(worker, /life-hub-shell-v153/);
 });
 
 test('web app manifest is installable and uses only local icons', async () => {

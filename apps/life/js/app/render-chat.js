@@ -6,6 +6,7 @@ import { appendWorkoutPlanCard } from './render-workout-plan.js';
 import { parseWorkoutChat, setsAreIdentical } from '../core/parse-workout-chat.js';
 import { formatDisplayDate } from '../core/time.js';
 import { syncChatChrome } from './chat-chrome.js';
+import { notifyChatViewport } from './visual-viewport.js';
 import { createAgentChoiceCard } from '../../../../packages/design-kit/js/agent-choice-card.js';
 import { createAgentSourcesCard } from '../../../../packages/design-kit/js/agent-sources-card.js';
 import { createAgentPlanCard } from '../../../../packages/design-kit/js/agent-plan-card.js';
@@ -835,7 +836,12 @@ export function setChatBusy(root, busy) {
   const button = root.querySelector('#chat-send');
   const stop = root.querySelector('#chat-stop');
   const view = root.querySelector('#chat-view') ?? root.querySelector?.('.chat-view');
-  if (input) input.disabled = busy;
+  if (input) {
+    // readOnly keeps iOS focus/keyboard. disabled blurs the field, drops
+    // :focus-within, and slams Chat chrome back for the whole reply.
+    input.readOnly = Boolean(busy);
+    if (input.disabled) input.disabled = false;
+  }
   if (button) {
     button.disabled = busy;
     button.hidden = Boolean(busy && stop);
@@ -845,6 +851,7 @@ export function setChatBusy(root, busy) {
     stop.disabled = !busy;
   }
   if (view) toggleClass(view, 'is-busy', Boolean(busy));
+  notifyChatViewport();
 }
 
 export function showChatError(root, message) {
