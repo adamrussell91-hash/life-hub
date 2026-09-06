@@ -314,6 +314,11 @@ test('chadwick prompt delivers Region strength and forbids claiming the Fitness 
   const fallback = buildSystemPrompt({ slug: 'chadwick' });
   assert.match(fallback, /get_region_strength/);
   assert.match(fallback, /never claim the tile is a computed widget you cannot read|never claim those tiles are UI-only/i);
+  assert.match(fallback, /get_fitness_snapshot/);
+  assert.match(fallback, /get_training_volume/);
+  assert.match(fallback, /get_body_state/);
+  assert.match(fallback, /get_workout_template/);
+  assert.match(fallback, /never claim those pages are UI-only widgets you cannot read/i);
 });
 
 test('non-chadwick agents never receive the Region strength block', () => {

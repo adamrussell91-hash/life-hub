@@ -10,6 +10,7 @@ import {
   getRegionStrengthSchema,
   searchWorkoutRecordsSchema
 } from '../workout-history.mjs';
+import { chadwickFitnessToolSchemas } from '../fitness-tools.mjs';
 import {
   listSkincareRoutinesSchema,
   searchSkincareLibrarySchema,
@@ -254,7 +255,8 @@ export function buildAgentTools({
       getLastWorkoutSchema(),
       searchWorkoutRecordsSchema(),
       compareWorkoutWindowsSchema(),
-      getRegionStrengthSchema()
+      getRegionStrengthSchema(),
+      ...chadwickFitnessToolSchemas()
     );
   } else if (needsExerciseLibrary) {
     // Search is resourcing, not yet a named capacity — keep available for Chadwick.
@@ -263,7 +265,8 @@ export function buildAgentTools({
       getLastWorkoutSchema(),
       searchWorkoutRecordsSchema(),
       compareWorkoutWindowsSchema(),
-      getRegionStrengthSchema()
+      getRegionStrengthSchema(),
+      ...chadwickFitnessToolSchemas()
     );
   }
 

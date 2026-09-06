@@ -166,11 +166,26 @@ test('buildAgentTools gives Chadwick last-workout read tools with the exercise l
   assert.ok(names.includes('search_workout_records'));
   assert.ok(names.includes('compare_workout_windows'));
   assert.ok(names.includes('get_region_strength'));
+  for (const name of [
+    'get_fitness_snapshot',
+    'get_training_volume',
+    'get_working_weights',
+    'get_long_term_fitness',
+    'get_session_comparisons',
+    'get_exercise_history',
+    'get_load_status',
+    'get_pain_training_summary',
+    'get_body_state',
+    'get_workout_template'
+  ]) {
+    assert.ok(names.includes(name), name);
+  }
   assert.ok(names.includes('search_exercise_library'));
   const brisket = buildAgentTools({ slug: 'brisket', allowedTypes: ['meal'] }).map(tool => tool.name);
   assert.ok(!brisket.includes('get_last_workout'));
   assert.ok(!brisket.includes('compare_workout_windows'));
   assert.ok(!brisket.includes('get_region_strength'));
+  assert.ok(!brisket.includes('get_fitness_snapshot'));
 });
 
 test('listNamedShortcuts exposes catalog entries without the promote/list/run trio', () => {
