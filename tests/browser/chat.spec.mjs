@@ -427,6 +427,165 @@ test('focusing the composer on phone hides the tab bar and frees reading room (i
   await context.close();
 });
 
+async function sampleChatWindow(page, ms) {
+  return page.evaluate(async duration => {
+    const samples = [];
+    const end = performance.now() + duration;
+    while (performance.now() < end) {
+      const frame = document.querySelector('.page-frame');
+      const view = document.querySelector('#chat-view');
+      const nav = document.querySelector('.hub-mobile-nav');
+      const header = document.querySelector('.page-header');
+      const picker = document.querySelector('#agent-picker');
+      const hide = document.querySelector('[data-hub-scroll-hide]');
+      const list = document.querySelector('#chat-messages');
+      const faded = [...(list?.querySelectorAll('.chat-message') ?? [])].filter(el => (
+        Number(getComputedStyle(el).opacity) < 0.95
+      )).length;
+      samples.push({
+        frameH: frame?.getBoundingClientRect().height ?? 0,
+        viewH: view?.getBoundingClientRect().height ?? 0,
+        nav: getComputedStyle(nav).display,
+        header: getComputedStyle(header).display,
+        picker: getComputedStyle(picker).display,
+        hide: hide?.classList.contains('is-hidden') ?? false,
+        kb: document.documentElement.classList.contains('vv-keyboard-open'),
+        faded
+      });
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    }
+    return samples;
+  }, ms);
+}
+
+function windowFlicker(samples) {
+  const range = arr => (arr.length ? Math.max(...arr) - Math.min(...arr) : 0);
+  let chromeFlips = 0;
+  let hideFlips = 0;
+  let kbFlips = 0;
+  for (let i = 1; i < samples.length; i += 1) {
+    if (samples[i].nav !== samples[i - 1].nav) chromeFlips += 1;
+    if (samples[i].header !== samples[i - 1].header) chromeFlips += 1;
+    if (samples[i].picker !== samples[i - 1].picker) chromeFlips += 1;
+    if (samples[i].hide !== samples[i - 1].hide) hideFlips += 1;
+    if (samples[i].kb !== samples[i - 1].kb) kbFlips += 1;
+  }
+  return {
+    frameHRange: range(samples.map(sample => sample.frameH)),
+    viewHRange: range(samples.map(sample => sample.viewH)),
+    chromeFlips,
+    hideFlips,
+    kbFlips,
+    faded: samples.some(sample => sample.faded > 0)
+  };
+}
+
+test('mobile Chat window does not strobe while a reply streams', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.hub-mobile-nav [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#agent-picker [data-agent-slug="brisket"]').click();
+  await page.locator('#chat-input').fill(
+    'Hi brisket, for dinner I had a big slice of home made lasagna, beef and pork'
+  );
+  await page.locator('#chat-input').focus();
+
+  const sampling = sampleChatWindow(page, 1800);
+  await page.locator('#chat-send').click();
+  const flicker = windowFlicker(await sampling);
+
+  assert.ok(
+    flicker.hideFlips <= 1,
+    `scroll-hide must not strobe the Chat window (hideFlips=${flicker.hideFlips})`
+  );
+  assert.ok(
+    flicker.chromeFlips <= 1,
+    `nav/header/picker must not slam in and out mid-reply (chromeFlips=${flicker.chromeFlips})`
+  );
+  assert.ok(
+    flicker.viewHRange < 40,
+    `Chat window height must stay put during the turn (viewHRange=${flicker.viewHRange})`
+  );
+  assert.equal(await page.locator('#chat-input').evaluate(el => el.disabled), false);
+  const stillBusy = await page.locator('#chat-view').evaluate(el => el.classList.contains('is-busy'));
+  if (stillBusy) {
+    assert.equal(await page.locator('#chat-input').evaluate(el => el.readOnly), true);
+  }
+
+  await page.locator('.record-proposal').waitFor({ timeout: 10_000 });
+  await context.close();
+});
+
+test('12px visualViewport jitter does not resize the Chat canvas', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.hub-mobile-nav [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#chat-input').focus();
+  await page.evaluate(() => {
+    let high = true;
+    const vv = window.visualViewport;
+    Object.defineProperty(vv, 'height', {
+      configurable: true,
+      get() { return high ? 844 : 832; }
+    });
+    window.__vvJitter = setInterval(() => {
+      high = !high;
+      vv.dispatchEvent(new Event('resize'));
+      vv.dispatchEvent(new Event('scroll'));
+    }, 32);
+  });
+
+  const flicker = windowFlicker(await sampleChatWindow(page, 800));
+  await page.evaluate(() => clearInterval(window.__vvJitter));
+
+  assert.ok(
+    flicker.frameHRange < 2,
+    `page-frame must ignore 12px vv jitter (frameHRange=${flicker.frameHRange})`
+  );
+  assert.equal(flicker.kbFlips, 0, 'keyboard mode must not flap on vv jitter');
+  await context.close();
+});
+
+test('refreshing the app state does not fade existing Chat messages', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.hub-mobile-nav [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.evaluate(() => {
+    const list = document.querySelector('#chat-messages');
+    const empty = document.querySelector('#chat-empty');
+    if (empty) empty.hidden = true;
+    document.querySelector('#chat-view').dataset.chrome = 'engaged';
+    for (let i = 0; i < 6; i += 1) {
+      const li = document.createElement('li');
+      li.className = 'chat-message chat-message--assistant';
+      const body = document.createElement('div');
+      body.className = 'chat-message__body';
+      body.textContent = `Existing bubble ${i}`;
+      li.append(body);
+      list.append(li);
+    }
+  });
+  await page.evaluate(() => {
+    document.querySelector('#app').dataset.state = 'refreshing';
+  });
+  const flicker = windowFlicker(await sampleChatWindow(page, 700));
+  await page.evaluate(() => {
+    document.querySelector('#app').dataset.state = 'ready';
+  });
+
+  assert.equal(flicker.faded, false, 'existing bubbles must not replay hub-list-in on data-state');
+  await context.close();
+});
+
 test('make the workout shows a Confirm card', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
