@@ -4,13 +4,21 @@ export const VV_KEYBOARD_OPEN_PX = 120;
 /** How far vv.height must fall from the closed baseline before we trust geometry alone. */
 export const VV_BASELINE_SHRINK_PX = 120;
 
+/** Ignore URL-bar / rubber-band jitter smaller than this once the keyboard is open. */
+export const VV_WRITE_DEADBAND_PX = 2;
+
 let attached = false;
 let composerFocused = false;
 let closedBaselineHeight = 0;
+let lastWritten = { top: Number.NaN, height: Number.NaN, bottom: Number.NaN };
 /** @type {Array<[string, EventListenerOrEventListenerObject]>} */
 let vvListeners = [];
 /** @type {Array<[string, EventListenerOrEventListenerObject]>} */
 let docListeners = [];
+
+function quantize(n) {
+  return Math.round(Number(n) || 0);
+}
 
 function keyboardOpenFromGeometry(vv) {
   const insetBottom = Math.max(0, globalThis.innerHeight - vv.height - vv.offsetTop);
@@ -27,6 +35,31 @@ function keyboardOpenFromGeometry(vv) {
   return { open: false, insetBottom };
 }
 
+function clearViewportVars(root) {
+  root.style.removeProperty('--vv-offset-top');
+  root.style.removeProperty('--vv-height');
+  root.style.removeProperty('--vv-offset-bottom');
+  lastWritten = { top: Number.NaN, height: Number.NaN, bottom: Number.NaN };
+}
+
+function writeViewportVars(root, { offsetTop, height, insetBottom }) {
+  const top = quantize(offsetTop);
+  const nextHeight = quantize(height);
+  const bottom = quantize(insetBottom);
+  if (
+    Number.isFinite(lastWritten.height)
+    && Math.abs(nextHeight - lastWritten.height) <= VV_WRITE_DEADBAND_PX
+    && Math.abs(top - lastWritten.top) <= VV_WRITE_DEADBAND_PX
+    && Math.abs(bottom - lastWritten.bottom) <= VV_WRITE_DEADBAND_PX
+  ) {
+    return;
+  }
+  lastWritten = { top, height: nextHeight, bottom };
+  root.style.setProperty('--vv-offset-top', `${top}px`);
+  root.style.setProperty('--vv-height', `${nextHeight}px`);
+  root.style.setProperty('--vv-offset-bottom', `${bottom}px`);
+}
+
 function syncVisualViewport() {
   const vv = globalThis.visualViewport;
   if (!vv) return;
@@ -36,14 +69,23 @@ function syncVisualViewport() {
   const { open: geometryOpen, insetBottom } = keyboardOpenFromGeometry(vv);
   const open = composerFocused || geometryOpen;
 
-  if (!open && vv.height > 0) {
-    closedBaselineHeight = Math.max(closedBaselineHeight, vv.height);
+  if (!open) {
+    if (vv.height > 0) {
+      closedBaselineHeight = Math.max(closedBaselineHeight, vv.height);
+    }
+    // Leave --vv-* unset so Chat can sit on 100dvh. Writing live vv.height here
+    // pins the window to URL-bar / rubber-band jitter (edges + scrollbar jump).
+    clearViewportVars(root);
+    root.classList.toggle('vv-keyboard-open', false);
+    return;
   }
 
-  root.style.setProperty('--vv-offset-top', `${vv.offsetTop}px`);
-  root.style.setProperty('--vv-height', `${vv.height}px`);
-  root.style.setProperty('--vv-offset-bottom', `${insetBottom}px`);
-  root.classList.toggle('vv-keyboard-open', open);
+  writeViewportVars(root, {
+    offsetTop: vv.offsetTop,
+    height: vv.height,
+    insetBottom
+  });
+  root.classList.toggle('vv-keyboard-open', true);
 }
 
 /** iOS updates visualViewport after focus/keyboard animation — resync a few times. */
@@ -94,11 +136,13 @@ export function attachVisualViewportInset() {
   attached = true;
   composerFocused = false;
   closedBaselineHeight = 0;
+  lastWritten = { top: Number.NaN, height: Number.NaN, bottom: Number.NaN };
   vvListeners = [];
   docListeners = [];
   syncVisualViewport();
+  // resize only — visualViewport.scroll is URL-bar / rubber-band noise and
+  // rewriting height from it makes the chat window and scrollbar flicker.
   bind(globalThis.visualViewport, 'resize', syncVisualViewport, vvListeners);
-  bind(globalThis.visualViewport, 'scroll', syncVisualViewport, vvListeners);
   bind(globalThis.document, 'focusin', onComposerFocusIn, docListeners);
   bind(globalThis.document, 'focusout', onComposerFocusOut, docListeners);
 }
@@ -108,6 +152,7 @@ export function detachVisualViewportInset() {
   attached = false;
   composerFocused = false;
   closedBaselineHeight = 0;
+  lastWritten = { top: Number.NaN, height: Number.NaN, bottom: Number.NaN };
   for (const [type, fn] of vvListeners) {
     globalThis.visualViewport?.removeEventListener?.(type, fn);
   }
