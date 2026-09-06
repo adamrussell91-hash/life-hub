@@ -162,6 +162,7 @@ const SHELL_FILES = [
   'js/core/constraints.js',
   'js/core/workout-plan-detect.js',
   'js/core/governance-log.js',
+  'js/core/open-loops.js',
   'js/core/records.js',
   'js/core/search.js',
   'js/core/targets.js',

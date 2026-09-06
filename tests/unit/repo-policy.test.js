@@ -10,13 +10,14 @@ import {
 const blob = (path, sha, size, type = 'blob') => ({ path, sha, size, type });
 
 test('manifest policy returns sorted config and in-range canonical events', () => {
-  const [MEAL, OLD, TARGETS, AGENTS, CENTRAL_NODE, SECRET] = ['a', 'b', 'c', 'd', 'e', 'f'].map(value => value.repeat(40));
+  const [MEAL, OLD, TARGETS, AGENTS, CENTRAL_NODE, WEEK_FLAGS, SECRET] = ['a', 'b', 'c', 'd', 'e', 'f', '1'].map(value => value.repeat(40));
   const tree = [
     blob('data/nutrition/2026/08/2026-08-01-breakfast.md', MEAL, 120),
     blob('data/nutrition/2026/07/2026-07-01-old.md', OLD, 100),
     blob('config/targets.yml', TARGETS, 90),
     blob('config/agents.yml', AGENTS, 80),
     blob('central-node.md', CENTRAL_NODE, 60),
+    blob('data/remember/week-flags.json', WEEK_FLAGS, 40),
     blob('private/secret.md', SECRET, 20)
   ];
 
@@ -24,7 +25,8 @@ test('manifest policy returns sorted config and in-range canonical events', () =
     { path: 'central-node.md', sha: CENTRAL_NODE, size: 60 },
     { path: 'config/agents.yml', sha: AGENTS, size: 80 },
     { path: 'config/targets.yml', sha: TARGETS, size: 90 },
-    { path: 'data/nutrition/2026/08/2026-08-01-breakfast.md', sha: MEAL, size: 120 }
+    { path: 'data/nutrition/2026/08/2026-08-01-breakfast.md', sha: MEAL, size: 120 },
+    { path: 'data/remember/week-flags.json', sha: WEEK_FLAGS, size: 40 }
   ]);
 });
 
@@ -56,7 +58,8 @@ test('repository path policy rejects noncanonical and nonallowlisted paths', () 
     'data/body/2026/08/2026-08-01-weight.md',
     'data/mind/2026/08/2026-08-01-diary.md',
     'data/skincare/2026/08/2026-08-01-morning.md',
-    'data/fitness/templates/chest-and-curls.md'
+    'data/fitness/templates/chest-and-curls.md',
+    'data/remember/week-flags.json'
   ]) assert.equal(isAllowedRepositoryPath(path), true, path);
 });
 

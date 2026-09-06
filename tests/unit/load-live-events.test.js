@@ -507,6 +507,24 @@ test('agentsConfig and centralNodeMarkdown default to null when neither file is 
   assert.equal(result.agentsConfig, null);
   assert.equal(result.centralNodeMarkdown, null);
   assert.equal(result.governanceLogMarkdown, null);
+  assert.equal(result.weekFlags, null);
+});
+
+test('exposes parsed week-flags.json when present in the sync batch', async () => {
+  const files = [raw('data/remember/week-flags.json', JSON.stringify({
+    weeks: { '2026-06-01': { exam: 'MEd sit' } }
+  }))];
+  const sync = async ({ validateFile }) => {
+    assert.deepEqual(validateFile(files[0]), { valid: true });
+    return {
+      files, warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+      changed: true, freshness: 'confirmed'
+    };
+  };
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', backfill: false });
+
+  assert.equal(result.weekFlags.weeks['2026-06-01'].exam, 'MEd sit');
 });
 
 test('exposes raw governance-log.md content when present in the sync batch', async () => {

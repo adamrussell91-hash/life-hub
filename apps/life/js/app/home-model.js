@@ -5,7 +5,7 @@ import {
   hasRecoveryBonus,
   resolveDayType
 } from '../core/aggregate.js';
-import { oldestOpenGovernanceEntry } from '../core/governance-log.js';
+import { collectOpenLoops, formatOpenLoopLine, oldestOpenLoop } from '../core/open-loops.js';
 import { getDayTargets } from '../core/targets.js';
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
 
@@ -35,7 +35,16 @@ export function selectDisplayDate(events) {
   return events.map(event => event.record.date).sort().at(-1) ?? null;
 }
 
-export function buildHomeModel({ events, targetsConfig, date, governanceLogMarkdown } = {}) {
+export function buildHomeModel({
+  events,
+  targetsConfig,
+  date,
+  governanceLogMarkdown,
+  centralNodeMarkdown,
+  weekFlags,
+  tasks,
+  stressFlags
+} = {}) {
   if (!date) throw new RangeError('Home display date is unavailable');
 
   const nutrition = aggregateNutrition(events, date);
@@ -54,10 +63,14 @@ export function buildHomeModel({ events, targetsConfig, date, governanceLogMarkd
     };
   });
   const loggedDays = weekDays.filter(day => day.logged).length;
-  const oldest = oldestOpenGovernanceEntry(governanceLogMarkdown ?? '', date);
-  const hammondLine = oldest
-    ? `Hammond: ${oldest.title || oldest.entryType || 'Open loop'}${typeof oldest.ageDays === 'number' ? ` — ${oldest.ageDays}d open.` : '.'}`
-    : null;
+  const hammondLine = formatOpenLoopLine(oldestOpenLoop(collectOpenLoops({
+    today: date,
+    governanceLogMarkdown,
+    centralNodeMarkdown,
+    weekFlags,
+    tasks,
+    stressFlags
+  })));
 
   return {
     date,
