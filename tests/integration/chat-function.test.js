@@ -2873,6 +2873,30 @@ test('hub-agent-context loads only on Hammond turns, not Clare or Ann', async ()
   assert.deepEqual(loadedFor, ['hammond']);
 });
 
+test('hub-agent-context load throw is fail-visible on Hammond, not an empty Other hubs block', async () => {
+  let receivedArgs;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    loadHubAgentContext: async () => {
+      throw new Error('unbound');
+    },
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+  await readSse(await handler(request({
+    message: 'Hammond, what is open this week?',
+    priorAgentSlug: 'hammond'
+  })));
+  assert.match(receivedArgs.system, /Other hubs unavailable this turn/);
+  assert.match(receivedArgs.system, /Do not invent Tasks or Teaching rows/);
+});
+
 test('non-hammond agents do not register Hammond CN or governance tools', async () => {
   let receivedArgs;
   const handler = createChatHandler({

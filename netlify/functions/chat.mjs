@@ -23,7 +23,7 @@ import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
 import { buildSystemPrompt } from './_shared/persona.mjs';
-import { CENTRAL_NODE_UNAVAILABLE_MARKER } from '../../apps/life/js/core/context-integrity.js';
+import { CENTRAL_NODE_UNAVAILABLE_MARKER, HUB_CONTEXT_UNAVAILABLE_MARKER } from '../../apps/life/js/core/context-integrity.js';
 import { loadHubAgentContext } from './_shared/hub-agent-context.mjs';
 import { normalizeProtocolId, protocolSteerBlock } from '../../apps/life/js/app/agent-protocols.js';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
@@ -308,7 +308,7 @@ export function createChatHandler({
     const needsTreatmentContext = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
     const hubContextPromise = needsHammondTools
-      ? loadHubContext({ env, now: new Date(now()) })
+      ? loadHubContext({ env, now: new Date(now()) }).catch(() => HUB_CONTEXT_UNAVAILABLE_MARKER)
       : Promise.resolve('');
     const needsNutritionChallenges = slug === 'brisket';
     // Brisket writes challenge scoreboards onto Central Node; keep markdown mutable.
