@@ -6300,13 +6300,49 @@ main { max-width: 76rem; margin: 0 auto; }
     overflow: hidden;
   }
 
-  /* Keyboard open: hide the tab bar and dock the composer to the keyboard floor. */
-  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame {
+  /*
+   * Keyboard open (Messenger-style): hide the tab bar and drop nav clearance so the
+   * thread keeps the visual viewport. Class comes from visual-viewport.js; :focus-within
+   * is the belt-and-suspenders path when iOS inset math stays ~0.
+   */
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode]) #chat-form:focus-within) .page-frame {
     padding-bottom: 0;
   }
 
-  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .hub-mobile-nav {
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .hub-mobile-nav,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode]) #chat-form:focus-within) .hub-mobile-nav {
     display: none;
+  }
+
+  /* Keep the composer one row tall while typing — no empty pillow under the field. */
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .chat-form.hub-ai-bar--thread,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode]) #chat-form:focus-within) .chat-form.hub-ai-bar--thread {
+    min-height: 0;
+    padding: 0.2rem;
+  }
+
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #chat-input,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode]) #chat-form:focus-within) #chat-input {
+    min-height: 2.35rem;
+    padding-block: 0.45rem;
+  }
+
+  /*
+   * Messenger-style reading room: while typing, drop the page title block and
+   * agent strip so the thread keeps the visual viewport above the keyboard.
+   */
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-header,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode]) #chat-form:focus-within) .page-header,
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #agent-picker,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode]) #chat-form:focus-within) #agent-picker {
+    display: none;
+  }
+
+  html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) #chat-who,
+  .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode]) #chat-form:focus-within) #chat-who {
+    margin-bottom: 0;
+    padding-block: 0.15rem;
   }
 
   .chat-view {
