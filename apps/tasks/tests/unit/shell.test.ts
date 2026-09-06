@@ -5,6 +5,7 @@ import {
   isSoftViewChange,
   parseHashRoute,
   railHighlightId,
+  knownHubViews,
   renderHubShell,
   renderPageHeader,
   renderPrimaryNav,
@@ -86,6 +87,16 @@ describe('hub shell chrome', () => {
     renderPageHeader(refs, { eyebrow: 'Home', title: 'Dashboard' });
     expect(refs.pageHeader.querySelector('.hub-mark')).toBeNull();
     expect(refs.pageHeader.querySelector('.page-header__title')?.textContent).toBe('Dashboard');
+  });
+
+  it('never puts a hub tile beside any view title', () => {
+    const root = document.createElement('div');
+    const refs = renderHubShell(root, { onLogout: vi.fn(), onRefresh: vi.fn() });
+    for (const view of knownHubViews()) {
+      renderPageHeader(refs, viewChrome(view));
+      expect(refs.pageHeader.querySelector('.hub-mark'), view).toBeNull();
+      expect(refs.pageHeader.querySelector('img'), view).toBeNull();
+    }
   });
 
   it('renders sectioned rail links with a distinct icon per destination', () => {

@@ -80,6 +80,7 @@ async function walkSourceFiles(dirUrl, acc = []) {
       await walkSourceFiles(next, acc);
       continue;
     }
+    if (/\.(test|spec)\.(html|js|ts|mjs)$/.test(entry.name)) continue;
     if (/\.(html|js|ts|mjs|css)$/.test(entry.name)) acc.push(next);
   }
   return acc;
