@@ -378,8 +378,11 @@ export function nextScrollHideState({
   const floor = Number(threshold);
   if (!Number.isFinite(y)) return Boolean(hidden);
   if (y <= (Number.isFinite(floor) ? floor : DEFAULT_SCROLL_HIDE_THRESHOLD)) return false;
-  if (Number.isFinite(last) && y > last) return true;
-  if (Number.isFinite(last) && y < last) return false;
+  // follow() rewrites scrollTop by a few pixels as the reply grows.
+  // Treating every 1px direction change as hide/reveal strobes Chat chrome.
+  const stick = 16;
+  if (Number.isFinite(last) && y > last + stick) return true;
+  if (Number.isFinite(last) && y < last - stick) return false;
   return Boolean(hidden);
 }
 
