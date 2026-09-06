@@ -72,8 +72,23 @@ const KEYWORD_HINTS = [
   {
     ids: ['os.list-promoted-shortcuts', 'os.run-promoted-shortcut'],
     patterns: [/promoted shortcut/i, /run (?:the |that |a )?promoted/i, /list promoted/i, /catalogued shortcut/i]
+  },
+  {
+    ids: ['tasks.create', 'tasks.update'],
+    patterns: [
+      /\b(?:add|create|write|make|capture|log)\b.{0,48}\b(?:task|tasks|todo|to-do|item)/i,
+      /\b(?:task|tasks|todo|appraisal)\b/i,
+      /brain ?dump/i,
+      /\bi (?:need|have) to\b/i,
+      /\badd (?:these|this|a)\b/i,
+      /\bupdate (?:the |this |my )?task\b/i,
+      /\bappend\b/i
+    ]
   }
 ];
+
+/** Domain write shortcuts that stay attached whenever the agent owns them. */
+const PINNED_CAPABILITY_IDS = ['tasks.create', 'tasks.update'];
 
 /**
  * Same-call intent pass (locked decision): narrow shortcuts from the user
@@ -82,7 +97,8 @@ const KEYWORD_HINTS = [
 export function selectCapabilityIdsForTurn({ slug, message, maxShortcuts = 8 } = {}) {
   const all = capabilityIdsForAgent(slug);
   const always = ['os.propose-action', 'os.capability-scoreboard'].filter(id => all.includes(id));
-  const selected = new Set(always);
+  const pinned = PINNED_CAPABILITY_IDS.filter(id => all.includes(id));
+  const selected = new Set([...always, ...pinned]);
 
   const text = typeof message === 'string' ? message : '';
   for (const hint of KEYWORD_HINTS) {
@@ -92,17 +108,21 @@ export function selectCapabilityIdsForTurn({ slug, message, maxShortcuts = 8 } =
     }
   }
 
-  // Domain defaults when nothing matched beyond always-on.
-  if (selected.size <= always.length) {
+  // Domain defaults when nothing matched beyond always-on + pinned writes.
+  if (selected.size <= always.length + pinned.length) {
     for (const id of all) {
-      if (id.startsWith('log.') || id.startsWith('lookup.save')) selected.add(id);
+      if (id.startsWith('log.') || id.startsWith('lookup.save') || id.startsWith('tasks.')) selected.add(id);
     }
   }
 
   const ordered = all.filter(id => selected.has(id));
   const propose = ordered.filter(id => id === 'os.propose-action');
-  const rest = ordered.filter(id => id !== 'os.propose-action').slice(0, maxShortcuts);
-  return [...propose, ...rest];
+  const keep = new Set([...always, ...pinned]);
+  const restKeep = ordered.filter(id => keep.has(id) && id !== 'os.propose-action');
+  const restOther = ordered
+    .filter(id => id !== 'os.propose-action' && !keep.has(id))
+    .slice(0, Math.max(0, maxShortcuts - restKeep.length));
+  return [...propose, ...restKeep, ...restOther];
 }
 
 export function scoreboardForAgent(slug, { message } = {}) {

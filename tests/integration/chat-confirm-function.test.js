@@ -1303,3 +1303,77 @@ test('action confirm writes a Tasks project blob and leaves GitHub files alone',
   assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('governance-log.md')));
   assert.equal(payload.data.results[0].path, 'tasks:project:proj_aotfw');
 });
+
+test('action confirm writes a Tasks task blob onto tasks/_index', async () => {
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const created = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: {
+      capability: 'os.propose-action',
+      agent: 'clare',
+      intent: 'Create task: Draft appraisal SMART goals',
+      reads: [],
+      writes: [{
+        path: 'tasks:task:task_appraisal',
+        mode: 'create',
+        content: JSON.stringify({
+          title: 'Draft appraisal SMART goals',
+          domain: 'teaching',
+          description: 'Existing goals draft',
+          status: 'open'
+        }),
+        diff: 'new task'
+      }],
+      surfaces: ['governance_log']
+    }
+  }));
+  const createdPayload = await created.json();
+  assert.equal(created.status, 200);
+  assert.equal(store.data['tasks/task_appraisal'].title, 'Draft appraisal SMART goals');
+  assert.deepEqual(store.data['tasks/_index'], ['task_appraisal']);
+  assert.equal(createdPayload.data.results[0].path, 'tasks:task:task_appraisal');
+
+  const appended = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: {
+      capability: 'os.propose-action',
+      agent: 'clare',
+      intent: 'Update task task_appraisal',
+      reads: [],
+      writes: [{
+        path: 'tasks:task:task_appraisal',
+        mode: 'append',
+        content: JSON.stringify({ append_description: 'Add evidence notes' }),
+        diff: 'append notes'
+      }],
+      surfaces: ['governance_log']
+    }
+  }));
+  assert.equal(appended.status, 200);
+  assert.equal(
+    store.data['tasks/task_appraisal'].description,
+    'Existing goals draft\n\nAdd evidence notes'
+  );
+});
