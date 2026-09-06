@@ -11,7 +11,10 @@
     "body": "string",
     "title": "string?",
     "status": "string?",
-    "dateKey": "YYYY-MM-DD?"
+    "dateKey": "YYYY-MM-DD?",
+    "chosen": "string?",
+    "reasoning": "string?",
+    "revisit": "YYYY-MM-DD?"
   },
   "side_effects": ["Appends a dated Governance Log entry"],
   "surfaces": ["governance_log"],
