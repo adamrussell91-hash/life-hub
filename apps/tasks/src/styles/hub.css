@@ -215,3 +215,14 @@
   outline-offset: 4px;
   border-radius: var(--radius-xs);
 }
+
+/* Tasks density — kit pills stay locked; this hub reads them smaller. */
+.hub-pills__btn {
+  min-height: 1.65rem;
+  padding: 0.15rem 0.55rem;
+  font-size: var(--text-xs);
+}
+
+.hub-pills:not(.hub-pills--loose) > .hub-pills__btn {
+  min-width: 2.5rem;
+}
