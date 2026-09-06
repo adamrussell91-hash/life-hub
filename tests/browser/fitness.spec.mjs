@@ -102,7 +102,8 @@ test('the Fitness tab renders the fixture workout and labeled analytics', async 
     assert.match(await page.locator('[data-fitness="orbit-read"]').textContent(), /2 sessions in the last 30 days/);
     assert.match(await page.locator('#fitness-year-card').textContent(), /2 sessions in 2026/);
     assert.match(await page.locator('#fitness-recent').textContent(), /Chest and Curls/);
-    assert.equal(await page.locator('#fitness-comparisons-card').isHidden(), true);
+    assert.equal(await page.locator('#fitness-comparisons-card').getAttribute('hidden'), null);
+    assert.match(await page.locator('#fitness-comparisons').textContent(), /Chest Press|Bicep Curl/i);
     assert.ok(await page.locator('#fitness-exercise-list .fitness-exercise').count() >= 2);
     assert.match(await page.locator('#fitness-exercise-list').textContent(), /kg/i);
     assert.match(await page.locator('#fitness-exercise-list').textContent(), /constant force|concentric|eccentric|elastic|rowing|none/i);
