@@ -116,10 +116,12 @@ const INTENT_RULES = [
     agents: ['hyaluronica'],
     requiredTools: ['get_skincare_adherence', 'list_skincare_routines', 'search_skincare_records'],
     patterns: [
-      /is (?:this |my )?routine help/i,
-      /routine (?:working|helping|adherence)/i,
-      /is (?:my )?(?:am|pm) (?:routine )?(?:helping|working)/i,
-      /treatment (?:timeline|helping|working)/i
+      /is (?:this |my )?routine\b.{0,40}\bhelp/i,
+      /routine\b.{0,40}\b(?:working|helping|adherence)/i,
+      /is (?:my )?(?:am|pm)\b.{0,20}\b(?:helping|working)/i,
+      /treatment\b.{0,40}\b(?:timeline|helping|working)/i,
+      /(?:skincare|skin care|skin)\b.{0,40}\b(?:help|working|better|worse|improv)/i,
+      /is (?:this|it|my (?:routine|treatment)) (?:actually )?help/i
     ]
   },
   {

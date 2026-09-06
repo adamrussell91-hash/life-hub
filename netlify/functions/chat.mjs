@@ -39,6 +39,7 @@ import {
   loadClementineProtocol
 } from './_shared/load-hub-protocols.mjs';
 import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
+import { assembleEvidencePack } from './_shared/evidence-packs.mjs';
 import {
   getNutritionSnapshot,
   getNutritionAdherence,
@@ -1249,6 +1250,38 @@ export function createChatHandler({
           message: parsed.message,
           sourceMeta
         });
+        const evidencePack = assembleEvidencePack({
+          slug,
+          message: parsed.message,
+          today,
+          sourceMeta,
+          now: nowInstant,
+          stores: {
+            workouts: workoutRecords,
+            meals: nutritionRecords,
+            composition: compositionRecords,
+            measurements: measurementRecords,
+            mindEvents,
+            skincare: skincareHistoryRecords,
+            medicalEvents,
+            tasks: hubTasks,
+            projects: hubProjects,
+            classes: hubClasses,
+            lessons: hubLessons,
+            units: hubUnits,
+            pages: knowledgePages,
+            loadErrors: hubLoadErrors,
+            hammondDigest,
+            nutritionChallenges,
+            templates: [],
+            stressFlags: [],
+            inbox: []
+          }
+        });
+        // Pack already retrieved domain evidence. Keep tools for continuation /
+        // writes, but do not force a tool round when the pack is answerable.
+        const forceToolChoice =
+          activation.forceToolChoice && !(evidencePack.active && evidencePack.answerable);
         const system = buildSystemPrompt({
           slug,
           digest,
@@ -1300,7 +1333,8 @@ export function createChatHandler({
           capacities: capacityOneLiners,
           hubContext,
           activationCatalogue: activation.catalogueBlock,
-          activationDirective: activation.activationBlock
+          activationDirective: activation.activationBlock,
+          evidencePackBlock: evidencePack.promptBlock
         });
 
         let pendingLogRejection = null;
@@ -1385,7 +1419,7 @@ export function createChatHandler({
             system,
             messages: [...parsed.history, { role: 'user', content: parsed.userContent ?? parsed.message }],
             tools,
-            toolChoice: activation.forceToolChoice ? { type: 'any' } : null,
+            toolChoice: forceToolChoice ? { type: 'any' } : null,
             signal: request.signal,
             executeTools: async event => {
               if (event.name === 'get_mind_session') {

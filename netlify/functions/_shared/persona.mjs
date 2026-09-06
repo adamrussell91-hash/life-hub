@@ -54,6 +54,7 @@ export function buildSystemPrompt({
   hubContext = '',
   activationCatalogue = '',
   activationDirective = '',
+  evidencePackBlock = '',
   clareProtocol = '',
   annProtocol = '',
   clementineProtocol = '',
@@ -326,6 +327,9 @@ export function buildSystemPrompt({
     capacityBlock,
     activationCatalogue,
     activationDirective,
+    evidencePackBlock
+      ? `Retrieved evidence pack (server-assembled before this reply — treat as primary evidence; label record vs calculation vs inference; call continuation tools only if a section is truncated/missing):\n${evidencePackBlock}`
+      : '',
     intuitionBlock,
     ...chadwickBlocks,
     ...hyaluronicaBlocks,

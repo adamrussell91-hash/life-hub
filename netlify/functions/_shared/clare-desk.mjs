@@ -236,17 +236,37 @@ export function buildHighStakesBrief(tasks, now = new Date()) {
   };
 }
 
-export function buildClareBriefing(tasks, protocolId, now = new Date()) {
-  switch (protocolId) {
-    case 'tomorrow-setup':
-      return buildTomorrowSetup(tasks, now);
-    case 'weekly-reset':
-      return buildWeeklyReset(tasks, now);
-    case 'high-stakes':
-      return buildHighStakesBrief(tasks, now);
-    default:
-      return buildMorningSweep(tasks, now);
-  }
+import { assembleClareEvidence } from './evidence-packs.mjs';
+
+export function buildClareBriefing(tasks, protocolId, now = new Date(), { projects = [] } = {}) {
+  const base = (() => {
+    switch (protocolId) {
+      case 'tomorrow-setup':
+        return buildTomorrowSetup(tasks, now);
+      case 'weekly-reset':
+        return buildWeeklyReset(tasks, now);
+      case 'high-stakes':
+        return buildHighStakesBrief(tasks, now);
+      default:
+        return buildMorningSweep(tasks, now);
+    }
+  })();
+
+  // Same read competence as Life-chat Clare: open loops / capacity / stalls.
+  const pack = assembleClareEvidence(
+    { tasks, projects },
+    { message: 'What should I focus on today?', now }
+  );
+  if (!pack.active || !pack.answerable) return base;
+  return {
+    ...base,
+    evidence_pack: {
+      intent: pack.intentClass,
+      tools: pack.toolsExecuted,
+      sections: pack.sections.map(s => ({ id: s.id, kind: s.kind, title: s.title }))
+    },
+    evidence_prompt: pack.promptBlock
+  };
 }
 
 function firstVerbCue(title) {

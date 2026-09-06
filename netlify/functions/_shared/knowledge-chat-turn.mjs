@@ -7,6 +7,7 @@ import {
   parseResearchResult,
   topicQuery
 } from './knowledge-research.mjs';
+import { assembleClementineEvidence } from './evidence-packs.mjs';
 
 const ARCHIVE_FAILED_NOTE =
   'The archive pull failed. Say so in character and continue with what you have. Do not empty the conversation.';
@@ -162,6 +163,21 @@ function assembledSystem(input, archive) {
   const grounding = input.hat === 'fromBook' || input.hat === 'makeNote'
     ? RESEARCH_THE_OPEN_WEB
     : `${ANSWER_FROM_ARCHIVE}\n${CITE_NOTES_AS_LINKS}`;
+  let evidenceBlock = '';
+  try {
+    const pages = Array.isArray(input.pages)
+      ? input.pages
+      : Array.isArray(archive?.pages)
+        ? archive.pages
+        : [];
+    const pack = assembleClementineEvidence(
+      { pages, classes: input.classes ?? [], lessons: input.lessons ?? [], units: input.units ?? [] },
+      { message: query || 'What do I already have about this?' }
+    );
+    if (pack.active && pack.promptBlock) evidenceBlock = pack.promptBlock;
+  } catch {
+    evidenceBlock = '';
+  }
   return {
     coverage,
     system: assembleClementinePrompt({
@@ -176,6 +192,9 @@ function assembledSystem(input, archive) {
         query ? `Latest question:\n${query}` : '',
         coverage
           ? `Coverage: ${coverage.distinctSources} distinct sources, ${coverage.gapCount} gaps, ${coverage.thin ? 'thin' : 'enough'}.`
+          : '',
+        evidenceBlock
+          ? `Server-assembled Knowledge evidence pack (same competence as Life-chat Clementine):\n${evidenceBlock}`
           : ''
       ].filter(Boolean).join('\n\n'),
       quality: formatKnowledgeQualityBlock()

@@ -1,27 +1,28 @@
 # Life Hub agent capability audit
 
 Generated: 2026-09-06T07:54:23.358Z  
-**Behaviour update:** 2026-09-06 — retrieval activation policy + domain read tools. See `docs/AGENT_BEHAVIOUR_ACCEPTANCE.md` for demonstrated behaviours (not tool counts).
+**Behaviour update:** 2026-09-06 — server-side evidence packs + domain analysis. See `docs/AGENT_BEHAVIOUR_ACCEPTANCE.md`.
 
-> **Provenance:** Generated 2026-09-06 from live `buildAgentTools` + `capabilities/registry.json` + allowlists/intuition/protocols on `main` at `6f40f51` (includes Chadwick Fitness/Body tool pack from #214).  
-> **Corrective note:** Attached tools ≠ intelligence. The 2026-09-06 behaviour pass adds activation catalogues, forced retrieval on evidence intents, and domain adapters for agents that previously had registration without autonomous retrieval.
+> **Corrective note:** Attached tools ≠ intelligence. Status words allowed: Demonstrated | Failed | Blocked | Not started. Do not use thin / partial / scaffolding / mostly / should work / capability counts as completion language.
 
-## Demonstrated behaviours (2026-09-06)
+## Demonstrated jobs (2026-09-06 evidence packs)
 
-| Agent | Demonstrated retrieval behaviour | Proof |
+| Agent | Demonstrated job (pack layer) | Conversation E2E |
 | --- | --- | --- |
-| Chadwick | Training overview / decline questions require fitness tools before answer | `agent-orchestration-acceptance` scenarios 1–2 |
-| Brisket | Nutrition overview requires snapshot + adherence | scenario nutrition + domain tools |
-| Sara | Weight questions require body state + trend (conflicts flagged) | scenarios 6, 14 |
-| Penelope | Pattern / “often” questions require diary search | scenario 7 |
-| Vera | Cross-session pattern questions require mind search | scenario 8 |
-| Hyaluronica | “Is this routine helping?” requires adherence/history | scenario 9 |
-| Clare | “What should I focus on today?” requires tasks focus | scenario 3 |
-| Ann | Improve tomorrow’s lesson requires teaching context | scenario 4 |
-| Clementine | “What do I already have about X?” requires knowledge search | scenario 5 |
-| Hammond | “What is slipping across my life?” requires hub inspect + unavailable hubs | scenarios 10–11 |
+| Chadwick | Broad “how is training going?” → fitness snapshot, window compare, volume, working weights, long-term, sessions, body | Blocked — no `ANTHROPIC_API_KEY` |
+| Brisket | Broad nutrition overview → snapshot, adherence, targets, remaining day, period compare | Blocked — same |
+| Sara | Weight/body questions → body state, weight trend (conflict-aware), medical search | Blocked — same |
+| Penelope | “Feeling like this often?” → diary search, period compare, themes, range | Blocked — same |
+| Vera | Cross-session patterns → mind search + multi-session compare + bounded diary | Blocked — same |
+| Hyaluronica | “Is my routine helping?” → adherence + response evidence + history search | Blocked — same |
+| Clare | “What should I focus on today?” → tasks focus + open loops (also Clare desk) | Blocked — same |
+| Ann | Improve tomorrow’s lesson → teaching search + context + diagnosis | Blocked — same |
+| Clementine | “What do I already know about X?” → knowledge search + synthesis (+ teaching bridge); Knowledge chat turn shares pack | Blocked — same |
+| Hammond | “What is slipping?” → hub inspect + attention/open-loop pack | Blocked — same |
 
-Do **not** treat the tool-count snapshot below as proof of the behaviours above.
+Proof: `tests/unit/agent-evidence-packs.test.js` (32 pass) + `scripts/agent-evidence-live-demo.mjs` against `/agent/repos/life-hub-data`.
+
+Do **not** treat the tool-count snapshot below as proof of the jobs above.
 
 Single-file audit of every roster agent: tools, capabilities, allowlists, intuition packs, protocols, and voices. Built from live `buildAgentTools` + registry/allowlists — not a wishlist.
 
