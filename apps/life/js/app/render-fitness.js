@@ -39,6 +39,22 @@ const formatKg = kg => {
   return `${text} kg`;
 };
 
+function createNode(host, name) {
+  if (host && typeof host.createElement === 'function') return host.createElement(name);
+  const doc = host?.ownerDocument;
+  if (doc && typeof doc.createElement === 'function') return doc.createElement(name);
+  return globalThis.document.createElement(name);
+}
+
+function assignedSrc(img) {
+  return img?.getAttribute?.('src') ?? img?.src ?? '';
+}
+
+function applyImgSrc(img, src) {
+  if (!img || assignedSrc(img) === src) return;
+  img.src = src;
+}
+
 export function renderFitness(root, model, { logger, templates, libraryByName, onSelectTemplate } = {}) {
   setText(root, '[data-fitness="streak"]', model.streak);
   setText(root, '[data-fitness="day-type"]', DAY_TYPE_LABELS[model.dayType] ?? model.dayType ?? '—');
@@ -55,7 +71,7 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
     empty?.removeAttribute('hidden');
     heroWrap?.setAttribute('hidden', '');
     logger?.unmount?.();
-    renderMuscleStrip(root.querySelector('#fitness-muscle-maps'), []);
+    renderMuscleStrip(root.querySelector('#fitness-muscle-maps'), [], root);
   } else {
     empty?.setAttribute('hidden', '');
     heroWrap?.removeAttribute('hidden');
@@ -83,25 +99,29 @@ function renderRunWidget(root, model) {
   createRunWidget({ root, wrap: host, distance: sessionKm, unit: 'km', label: 'Last session' });
 }
 
-export function renderMuscleStrip(container, keys) {
+export function renderMuscleStrip(container, keys, root) {
   if (!container) return;
-  container.replaceChildren();
-  const create = name => {
-    if (typeof container.createElement === 'function') return container.createElement(name);
-    const doc = container.ownerDocument;
-    if (doc && typeof doc.createElement === 'function') return doc.createElement(name);
-    return globalThis.document.createElement(name);
-  };
-  for (const key of keys ?? []) {
-    const img = create('img');
-    img.className = 'fitness-muscle-strip__img';
-    img.src = muscleAssetPath(key);
+  const wanted = Array.isArray(keys) ? keys : [];
+  const existing = [...(container.children ?? [])];
+  const unused = [...existing];
+  const next = [];
+  for (const key of wanted) {
+    const src = muscleAssetPath(key);
+    const reuseAt = unused.findIndex(node => assignedSrc(node) === src);
+    let img = reuseAt >= 0 ? unused.splice(reuseAt, 1)[0] : null;
+    if (!img) {
+      img = createNode(root ?? container, 'img');
+      img.className = 'fitness-muscle-strip__img';
+      img.decoding = 'async';
+      img.addEventListener?.('error', () => img.remove?.());
+    }
+    applyImgSrc(img, src);
     img.alt = key.replace(/-/g, ' ');
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    img.addEventListener?.('error', () => img.remove?.());
-    container.append(img);
+    next.push(img);
   }
+  const same = existing.length === next.length && existing.every((node, i) => node === next[i]);
+  if (same) return;
+  container.replaceChildren(...next);
 }
 
 export function renderTemplateRail(root, templatesState, { libraryByName, onSelectTemplate } = {}) {
@@ -136,7 +156,7 @@ export function renderTemplateRail(root, templatesState, { libraryByName, onSele
       exercises: template.exercises,
       libraryByName
     });
-    renderMuscleStrip(strip, keys);
+    renderMuscleStrip(strip, keys, root);
     card.append(strip);
 
     const title = root.createElement('strong');
@@ -263,62 +283,107 @@ function renderRecentSessions(root, sessions) {
   }
 }
 
+function regionCopyText(region) {
+  const volDelta = formatSignedPct(region.volumeDeltaPct);
+  const volNow = formatKg(region.currentVolume);
+  return volDelta !== '—'
+    ? `${volDelta} volume`
+    : volNow === '—' ? 'Volume —' : `${volNow} volume`;
+}
+
+function regionHeadlineText(region) {
+  return region.bestSetDeltaKg != null
+    ? formatSignedKg(region.bestSetDeltaKg)
+    : formatKg(region.currentBestKg);
+}
+
+function updateRegionCard(card, region) {
+  card.dataset.colour = region.colour ?? 'neutral';
+  const media = card.children?.[0];
+  const img = media?.children?.[0];
+  if (img && region.image) {
+    applyImgSrc(img, region.image);
+    img.alt = `${region.label} anatomy`;
+  }
+  const copy = card.children?.[1];
+  const label = copy?.children?.[0];
+  const headline = copy?.children?.[1];
+  const secondary = copy?.children?.[2];
+  if (label) label.textContent = region.label;
+  if (headline) {
+    headline.dataset.colour = region.colour ?? 'neutral';
+    headline.textContent = regionHeadlineText(region);
+  }
+  if (secondary) secondary.textContent = regionCopyText(region);
+}
+
+function createRegionCard(root, region) {
+  const card = root.createElement('div');
+  card.className = 'fitness-region-card';
+  card.dataset.region = region.key;
+  card.dataset.colour = region.colour ?? 'neutral';
+
+  const media = root.createElement('div');
+  media.className = 'fitness-region-card__media';
+  const img = root.createElement('img');
+  img.className = 'fitness-region-card__img';
+  img.src = region.image;
+  img.alt = `${region.label} anatomy`;
+  img.decoding = 'async';
+  img.addEventListener?.('error', () => {
+    media.classList.add('fitness-region-card__media--missing');
+    img.remove?.();
+  });
+  media.append(img);
+
+  const copy = root.createElement('div');
+  copy.className = 'fitness-region-card__copy';
+
+  const label = root.createElement('p');
+  label.className = 'metric-label';
+  label.textContent = region.label;
+
+  const headline = root.createElement('p');
+  headline.className = 'fitness-region-card__headline';
+  headline.dataset.colour = region.colour ?? 'neutral';
+  headline.textContent = regionHeadlineText(region);
+
+  const secondary = root.createElement('p');
+  secondary.className = 'metric-caption';
+  secondary.textContent = regionCopyText(region);
+
+  copy.append(label, headline, secondary);
+  card.append(media, copy);
+  return card;
+}
+
 function renderRegions(root, regions) {
   const grid = root.querySelector('#fitness-region-grid');
   const block = root.querySelector('.fitness-region-block');
   if (!grid) return;
-  grid.replaceChildren();
   const visible = (regions ?? []).filter(region => (
     region.currentBestKg != null || (Number(region.currentVolume) > 0)
   ));
   setHidden(block, visible.length === 0);
 
-  for (const region of visible) {
-    const card = root.createElement('div');
-    card.className = 'fitness-region-card';
-    card.dataset.region = region.key;
-    card.dataset.colour = region.colour ?? 'neutral';
-
-    const media = root.createElement('div');
-    media.className = 'fitness-region-card__media';
-    const img = root.createElement('img');
-    img.className = 'fitness-region-card__img';
-    img.src = region.image;
-    img.alt = `${region.label} anatomy`;
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    img.addEventListener?.('error', () => {
-      media.classList.add('fitness-region-card__media--missing');
-      img.remove?.();
-    });
-    media.append(img);
-
-    const copy = root.createElement('div');
-    copy.className = 'fitness-region-card__copy';
-
-    const label = root.createElement('p');
-    label.className = 'metric-label';
-    label.textContent = region.label;
-
-    const headline = root.createElement('p');
-    headline.className = 'fitness-region-card__headline';
-    headline.dataset.colour = region.colour ?? 'neutral';
-    headline.textContent = region.bestSetDeltaKg != null
-      ? formatSignedKg(region.bestSetDeltaKg)
-      : formatKg(region.currentBestKg);
-
-    const secondary = root.createElement('p');
-    secondary.className = 'metric-caption';
-    const volDelta = formatSignedPct(region.volumeDeltaPct);
-    const volNow = formatKg(region.currentVolume);
-    secondary.textContent = volDelta !== '—'
-      ? `${volDelta} volume`
-      : volNow === '—' ? 'Volume —' : `${volNow} volume`;
-
-    copy.append(label, headline, secondary);
-    card.append(media, copy);
-    grid.append(card);
+  const existingByKey = new Map();
+  for (const child of grid.children ?? []) {
+    const key = child.dataset?.region;
+    if (key) existingByKey.set(key, child);
   }
+
+  const next = visible.map(region => {
+    const card = existingByKey.get(region.key);
+    if (card) {
+      updateRegionCard(card, region);
+      return card;
+    }
+    return createRegionCard(root, region);
+  });
+
+  const current = [...(grid.children ?? [])];
+  if (current.length === next.length && current.every((node, i) => node === next[i])) return;
+  grid.replaceChildren(...next);
 }
 
 function setHidden(element, hidden) {
@@ -340,7 +405,7 @@ function renderHero(root, session, { logger, libraryByName } = {}) {
     exercises: session.exercises,
     libraryByName
   });
-  renderMuscleStrip(root.querySelector('#fitness-muscle-maps'), mapKeys);
+  renderMuscleStrip(root.querySelector('#fitness-muscle-maps'), mapKeys, root);
 
   const tags = root.querySelector('#fitness-focus-tags');
   if (tags) {
