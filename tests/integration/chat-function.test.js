@@ -1760,8 +1760,11 @@ test('Chadwick prompt and tools can read the last completed workout file, not ju
   assert.match(receivedArgs.system, /2026-08-01/);
   assert.match(receivedArgs.system, /Planned session/);
   assert.match(receivedArgs.system, /Bar Press/);
+  assert.match(receivedArgs.system, /Computed training volume/);
+  assert.match(receivedArgs.system, /1 completed workout/);
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'get_last_workout'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_workout_records'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'compare_workout_windows'));
   const last = JSON.parse(await receivedArgs.executeTools({
     name: 'get_last_workout',
     id: 'call_last',
@@ -1776,6 +1779,97 @@ test('Chadwick prompt and tools can read the last completed workout file, not ju
     input: { query: 'planned' }
   }));
   assert.equal(search.count, 1);
+  const compare = JSON.parse(await receivedArgs.executeTools({
+    name: 'compare_workout_windows',
+    id: 'call_compare',
+    input: {}
+  }));
+  assert.equal(compare.ok, true);
+  assert.equal(compare.weeks, 8);
+  assert.equal(compare.current.count, 1);
+  assert.equal(compare.previous.count, 0);
+  assert.equal(compare.delta, 1);
+});
+
+test('Chadwick 8-week compare counts a previous-window session the recent list would still see', async () => {
+  const currentPath = 'data/fitness/2026/08/2026-08-01-workout.md';
+  const previousPath = 'data/fitness/2026/05/2026-05-15-workout.md';
+  const currentSha = '1'.repeat(40);
+  const previousSha = '2'.repeat(40);
+  const workout = (date, title) => [
+    '---',
+    'schema_version: 1',
+    `id: "workout-${date}"`,
+    'type: workout',
+    `date: ${date}`,
+    'time: "16:28"',
+    `created_at: ${date}T16:28:00+10:00`,
+    `updated_at: ${date}T16:28:00+10:00`,
+    'source: chat',
+    `title: ${title}`,
+    'session_kind: strength',
+    'day_type: workout_30',
+    'status: completed',
+    'duration_min: 30',
+    'exercises:',
+    '  - name: Bar Press',
+    '    sets:',
+    '      - { reps: 10, weight_kg: 40, cable_type: constant_force }',
+    '---',
+    title
+  ].join('\n');
+  let receivedArgs;
+  const fetchImpl = async url => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: currentPath, type: 'blob', sha: currentSha, size: 400 },
+          { path: previousPath, type: 'blob', sha: previousSha, size: 400 }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${currentSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(workout('2026-08-01', 'Current block'), 'utf8').toString('base64')
+      });
+    }
+    if (url.includes(`/git/blobs/${previousSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(workout('2026-05-15', 'Prior block'), 'utf8').toString('base64')
+      });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-05T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: args => {
+        receivedArgs = args;
+        return mockedStream([{ type: 'done' }]);
+      }
+    })
+  });
+
+  await readSse(await handler(request({ message: 'Chadwick, how does this block compare to the last eight weeks?' })));
+
+  assert.match(receivedArgs.system, /Last 8 weeks \(2026-06-11 to 2026-08-05\): 1 completed workout/);
+  assert.match(receivedArgs.system, /Previous 8 weeks \(2026-04-16 to 2026-06-10\): 1 completed workout/);
+  assert.match(receivedArgs.system, /Delta: 0\./);
+  const compare = JSON.parse(await receivedArgs.executeTools({
+    name: 'compare_workout_windows',
+    id: 'call_compare',
+    input: {}
+  }));
+  assert.equal(compare.current.count, 1);
+  assert.equal(compare.previous.count, 1);
+  assert.equal(compare.delta, 0);
 });
 
 test('loads latest body composition/measurements into Chadwick\'s prompt via a bounded read (not a full history scan)', async () => {
