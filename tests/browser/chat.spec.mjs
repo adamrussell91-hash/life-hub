@@ -245,6 +245,65 @@ test('mobile Chat tab and overlay keep send beside the field', async () => {
   await context.close();
 });
 
+test('short user bubbles hug their text instead of stretching for Copy/Retry', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.hub-mobile-nav [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#agent-picker [data-agent-slug="brisket"]').click();
+
+  const metrics = await page.evaluate(() => {
+    const list = document.querySelector('#chat-messages');
+    const empty = document.querySelector('#chat-empty');
+    if (empty) empty.hidden = true;
+    list.replaceChildren();
+
+    const user = document.createElement('li');
+    user.className = 'chat-message chat-message--user chat-message--latest';
+    const body = document.createElement('div');
+    body.className = 'chat-message__body';
+    body.textContent = 'Yep';
+    user.append(body);
+    const actions = document.createElement('div');
+    actions.className = 'chat-message__actions';
+    for (const label of ['Copy', 'Retry']) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'chat-message__action';
+      button.textContent = label;
+      actions.append(button);
+    }
+    user.append(actions);
+    list.append(user);
+
+    const probe = document.createElement('span');
+    probe.textContent = 'Yep';
+    probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${getComputedStyle(body).font}`;
+    document.body.append(probe);
+    const textWidth = probe.getBoundingClientRect().width;
+    probe.remove();
+
+    const bodyBox = body.getBoundingClientRect();
+    const padL = parseFloat(getComputedStyle(body).paddingLeft) || 0;
+    const padR = parseFloat(getComputedStyle(body).paddingRight) || 0;
+    return {
+      bodyWidth: bodyBox.width,
+      blankAfter: bodyBox.width - textWidth - padL - padR,
+      textWidth
+    };
+  });
+
+  assert.ok(metrics.textWidth > 0, 'probe measured the word width');
+  assert.ok(
+    metrics.blankAfter < 12,
+    `short bubble must not keep a wide empty tail (blankAfter=${metrics.blankAfter.toFixed(1)}px, body=${metrics.bodyWidth.toFixed(1)}px)`
+  );
+
+  await context.close();
+});
+
 test('mobile full-page Chat docks the composer to the keyboard viewport', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
