@@ -158,6 +158,7 @@ export function createAppController(dependencies) {
   let teachingCalendarInFlight = null;
   let knowledgeEvents = [];
   let knowledgeCalendarInFlight = null;
+  let cnPanelsInFlight = null;
   let tasksEvents = [];
   let tasksCalendarInFlight = null;
   let homeOpenLoopTasks = [];
@@ -1298,6 +1299,30 @@ export function createAppController(dependencies) {
     (packCnBoardFn ?? packCnBoard)(root);
     const button = root.querySelector('#central-node-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
+    loadCnKnowledgePanels();
+  }
+
+  function loadCnKnowledgePanels() {
+    if (!knowledgeApi?.listBacklinks && !knowledgeApi?.listUrlWatches) return Promise.resolve();
+    if (cnPanelsInFlight) return cnPanelsInFlight;
+    const backlinks = knowledgeApi.listBacklinks
+      ? knowledgeApi.listBacklinks().catch(() => ({ groups: [], status: 'unavailable' }))
+      : Promise.resolve({ groups: [], status: 'unavailable' });
+    const watches = knowledgeApi.listUrlWatches
+      ? knowledgeApi.listUrlWatches().catch(() => ({ watches: [], status: 'unavailable' }))
+      : Promise.resolve({ watches: [], status: 'unavailable' });
+    cnPanelsInFlight = Promise.all([backlinks, watches])
+      .then(([inverseLinks, urlWatches]) => {
+        if (!latestResult) return;
+        latestResult = { ...latestResult, inverseLinks, urlWatches };
+        if (currentSection !== 'central-node' || !buildCentralNodeModel || !renderCentralNode) return;
+        renderCentralNode(root, buildCentralNodeModel(latestResult), { quiet: syncQuiet });
+        (packCnBoardFn ?? packCnBoard)(root);
+      })
+      .finally(() => {
+        cnPanelsInFlight = null;
+      });
+    return cnPanelsInFlight;
   }
 
   function showSignedOut(message = '') {
@@ -1463,6 +1488,7 @@ export function createAppController(dependencies) {
     teachingCalendarInFlight = null;
     knowledgeEvents = [];
     knowledgeCalendarInFlight = null;
+    cnPanelsInFlight = null;
     tasksEvents = [];
     tasksCalendarInFlight = null;
     homeOpenLoopTasks = [];

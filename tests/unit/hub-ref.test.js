@@ -78,7 +78,10 @@ test('hub ref hrefs point at the Teaching unit and Tasks project routes', () => 
     hrefForHubRef({ hub: 'tasks', kind: 'project', id: 'proj_aotfw' }),
     'https://tasks-hub.adam-russell.com/#/project/proj_aotfw'
   );
-  assert.equal(hrefForHubRef({ hub: 'knowledge', kind: 'page', id: 'page_aotfw' }), null);
+  assert.equal(
+    hrefForHubRef({ hub: 'knowledge', kind: 'page', id: 'page_aotfw' }),
+    'https://knowledge-hub.adam-russell.com/#page/page_aotfw'
+  );
   assert.equal(labelForHubRef({ hub: 'teaching', kind: 'unit', id: 'unit_aotfw' }), 'Teaching unit unit_aotfw');
 });
 

@@ -162,6 +162,7 @@ function summarizeManifestEntry(item) {
     excerpt: typeof item.excerpt === 'string' ? item.excerpt : '',
     created_at: typeof item.created_at === 'string' ? item.created_at : undefined,
     origins: Array.isArray(item.origins) ? item.origins : undefined,
+    connected: Array.isArray(item.connected) ? item.connected : undefined,
     path: typeof item.path === 'string' ? item.path : `pages/${id}.json`
   };
 }
@@ -358,7 +359,8 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
     excerpt: excerptFromBody(stored.body),
     created_at: stored.created_at,
     path: `pages/${id}.json`,
-    ...(stored.origins ? { origins: stored.origins } : {})
+    ...(stored.origins ? { origins: stored.origins } : {}),
+    ...(stored.connected?.length ? { connected: stored.connected } : {})
   };
   const merged = [...rows.filter(row => row?.id !== id), entry];
   await putWithRetry('manifest.json', JSON.stringify(merged), { env, fetchImpl }, `Upsert ${id}`, manifestFile?.sha);

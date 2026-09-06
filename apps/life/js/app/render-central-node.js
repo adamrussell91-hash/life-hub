@@ -21,7 +21,9 @@ const SECTION_SELECTORS = {
   longTermTrends: '[data-central-node="long-term-trends"]',
   crossAgentCoordination: '[data-central-node="cross-agent"]',
   recentAgentActions: '[data-central-node="recent-actions"]',
-  constraints: '[data-central-node="constraints"]'
+  constraints: '[data-central-node="constraints"]',
+  backlinks: '[data-central-node="backlinks"]',
+  urlWatches: '[data-central-node="url-watches"]'
 };
 
 export function renderCentralNode(root, model) {
@@ -42,6 +44,14 @@ export function renderCentralNode(root, model) {
         container.textContent = '';
         container.setAttribute('hidden', '');
       }
+      continue;
+    }
+    if (key === 'backlinks') {
+      renderBacklinks(root, container, model.inverseLinks);
+      continue;
+    }
+    if (key === 'urlWatches') {
+      renderUrlWatches(root, container, model.urlWatches);
       continue;
     }
     renderInlineMarkdown(root, container, model.sections[key], { multiline: true });
@@ -437,6 +447,63 @@ function renderDayProgress(root, completeness) {
     value: completeness.complete,
     max: completeness.total
   });
+}
+
+function renderBacklinks(root, container, inverseLinks) {
+  if (!container) return;
+  const status = inverseLinks?.status;
+  if (status === 'unavailable') {
+    container.textContent = 'Inbound links are unavailable.';
+    container.removeAttribute('hidden');
+    return;
+  }
+  const groups = Array.isArray(inverseLinks?.groups) ? inverseLinks.groups : [];
+  if (!groups.length) {
+    container.textContent = 'No Knowledge pages point at a Life decision yet.';
+    container.removeAttribute('hidden');
+    return;
+  }
+  container.textContent = '';
+  const list = root.createElement('ul');
+  list.className = 'cn-backlinks';
+  for (const group of groups) {
+    const item = root.createElement('li');
+    const target = String(group.target || 'decision');
+    const sources = Array.isArray(group.sources) ? group.sources : [];
+    const names = sources.map(source => source.title || source.id).filter(Boolean).join(', ');
+    item.textContent = `${target} ← ${names || 'unknown page'}`;
+    list.append(item);
+  }
+  container.append(list);
+  container.removeAttribute('hidden');
+}
+
+function renderUrlWatches(root, container, urlWatches) {
+  if (!container) return;
+  const status = urlWatches?.status;
+  if (status === 'unavailable') {
+    container.textContent = 'URL watch is unavailable.';
+    container.removeAttribute('hidden');
+    return;
+  }
+  const watches = Array.isArray(urlWatches?.watches) ? urlWatches.watches : [];
+  if (!watches.length) {
+    container.textContent = 'No watched URLs yet.';
+    container.removeAttribute('hidden');
+    return;
+  }
+  container.textContent = '';
+  const list = root.createElement('ul');
+  list.className = 'cn-url-watches';
+  for (const watch of watches) {
+    const item = root.createElement('li');
+    const state = watch.status === 'changed' ? 'Changed' : watch.status === 'unchanged' ? 'Unchanged' : 'Unavailable';
+    item.textContent = `${watch.url} — ${state}`;
+    item.dataset.watchStatus = watch.status === 'changed' || watch.status === 'unchanged' ? watch.status : 'unavailable';
+    list.append(item);
+  }
+  container.append(list);
+  container.removeAttribute('hidden');
 }
 
 function createSvg(root, tag) {

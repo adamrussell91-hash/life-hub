@@ -69,6 +69,9 @@ export function hrefForHubRef(ref) {
   if (ref?.hub === 'life' && ref.kind === 'decision') {
     return `${HUB_SITES.life}/#central-node`;
   }
+  if (ref?.hub === 'knowledge' && ref.kind === 'page') {
+    return `${HUB_SITES.knowledge}/#page/${encodeURIComponent(ref.id)}`;
+  }
   return null;
 }
 

@@ -1280,6 +1280,18 @@
               <p class="metric-label" id="central-node-recent-actions-label">Recent Agent Actions</p>
               <div data-central-node="recent-actions" class="prose-section"></div>
             </article>
+            <article id="cn-tile-backlinks" class="metric-card cn-tile" aria-labelledby="central-node-backlinks-label">
+              <p class="cn-tile__question">What points here?</p>
+              <p class="metric-label" id="central-node-backlinks-label">Inverse links</p>
+              <p class="cn-tile__legend">Knowledge pages that cite a Life decision.</p>
+              <div data-central-node="backlinks" class="prose-section"></div>
+            </article>
+            <article id="cn-tile-url-watches" class="metric-card cn-tile" aria-labelledby="central-node-url-watches-label">
+              <p class="cn-tile__question">Has a source changed?</p>
+              <p class="metric-label" id="central-node-url-watches-label">External URL watch</p>
+              <p class="cn-tile__legend">Polled with ETag and a stored fingerprint — not a search guess.</p>
+              <div data-central-node="url-watches" class="prose-section"></div>
+            </article>
 
             <details id="cn-tile-constraints" class="metric-card cn-tile constraints-card">
               <summary>
