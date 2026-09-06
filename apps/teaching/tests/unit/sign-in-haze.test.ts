@@ -13,19 +13,18 @@ describe('sign-in gate', () => {
     host.remove();
   });
 
-  it('renders a clean card with the hub tile first and no haze', () => {
+  it('renders a clean card with brand first and no hub tile', () => {
     renderSignIn(host);
 
     const card = host.querySelector('.sign-in__card');
-    const mark = host.querySelector('.sign-in__mark');
+    const brand = host.querySelector('.sign-in__brand');
 
     expect(host.querySelector('.sign-in__haze')).toBeNull();
     expect(host.querySelector('.sign-in__bubble')).toBeNull();
     expect(host.querySelector('.sign-in__sparkle')).toBeNull();
-    expect(mark).toBeInstanceOf(HTMLImageElement);
-    expect((mark as HTMLImageElement).src).toContain('/icons/teaching.svg');
-    expect(card?.firstElementChild).toBe(mark);
+    expect(host.querySelector('.sign-in__mark')).toBeNull();
+    expect(card?.firstElementChild).toBe(brand);
     expect(host.querySelector('#sign-in-passphrase')).toBeTruthy();
-    expect(host.querySelector('.sign-in__brand')?.textContent).toBe('Teaching Hub');
+    expect(brand?.textContent).toBe('Teaching Hub');
   });
 });

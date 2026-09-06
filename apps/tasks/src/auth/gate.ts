@@ -88,13 +88,6 @@ export function renderSignIn(container: HTMLElement, options?: SignInOptions): v
   form.className = 'sign-in__card';
   form.noValidate = true;
 
-  const mark = document.createElement('img');
-  mark.className = 'sign-in__mark';
-  mark.src = '/icons/tasks.svg';
-  mark.alt = '';
-  mark.width = 56;
-  mark.height = 56;
-
   const brand = document.createElement('p');
   brand.className = 'sign-in__brand';
   brand.textContent = 'Tasks Hub';
@@ -133,7 +126,7 @@ export function renderSignIn(container: HTMLElement, options?: SignInOptions): v
   submit.textContent = 'Sign in';
 
   field.append(label, input);
-  form.append(mark, brand, title, field, error, submit);
+  form.append(brand, title, field, error, submit);
   wrapper.append(form);
   container.append(wrapper);
 

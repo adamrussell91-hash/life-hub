@@ -126,7 +126,7 @@ Run this on **every** page before the page-specific list. Fail any item that is 
 - [ ] Primary rail items are icon + title-case label. No coloured dots. No icon-only column. No uppercase item labels.
 - [ ] Current page is marked (`aria-current="page"` or `.is-current` / `.is-active`).
 - [ ] Refresh and Sign out sit in the canvas header as icon buttons, not labelled pills on the rail.
-- [ ] Title is `h1` only. **No** `.hub-mark` / favicon tile beside the heading on any hub.
+- [ ] Title is `h1` only. **No** hub tile anywhere: no favicon, no `.sign-in__mark`, no title-row `.hub-mark`.
 - [ ] Page header is eyebrow → title → optional supporting. Title is not blank, not `undefined`, not the previous page’s title.
 - [ ] Hub switcher / Hubs accordion lists the other three hubs. Expand each preview. Click through to the other hub and back.
 
@@ -685,7 +685,7 @@ CLEAN | ISSUES FOUND | BLOCKED
 - Stale hosts found:
 
 ## Kit chrome
-- Any hub has a title-row `.hub-mark` (must be none): yes/no
+- Any hub still has favicon / `.sign-in__mark` / title-row `.hub-mark` (must be none): yes/no
 - Phone rail hidden at 390: yes/no
 
 ## Notes for Cursor

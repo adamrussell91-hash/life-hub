@@ -14,9 +14,9 @@ describe("Knowledge Hub sign-in gate", () => {
     expect(renderLogin).toContain("await login(");
     expect(renderLogin).toContain("fetchSession()");
     expect(renderLogin).toContain("addEventListener(\"submit\"");
-    expect(renderLogin).toContain("sign-in__mark");
-    expect(main).toContain("HUB_MARK_SRC");
-    expect(main).toContain("./icons/knowledge.svg");
+    expect(renderLogin).not.toContain("sign-in__mark");
+    expect(main).not.toContain("HUB_MARK_SRC");
+    expect(renderLogin).not.toContain("icons/knowledge.svg");
     expect(main).not.toContain("form.onsubmit");
   });
 
