@@ -162,6 +162,23 @@ test('manifest returns sorted allowlisted files and a quoted range-specific ETag
   assert.equal(JSON.stringify(body).includes('api.github.com'), false);
 });
 
+test('preflight allows If-None-Match from the Life origin', async () => {
+  const response = await createRepoManifestHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    fetchImpl: async () => new Response('unused')
+  })(new Request('https://api.adam-russell.com/api/repo/manifest', {
+    method: 'OPTIONS',
+    headers: {
+      origin: 'https://life-hub.adam-russell.com',
+      'access-control-request-method': 'GET',
+      'access-control-request-headers': 'if-none-match'
+    }
+  }));
+  assert.equal(response.status, 204);
+  assert.match(response.headers.get('access-control-allow-headers') ?? '', /if-none-match/i);
+});
+
 test('matching a range-specific ETag returns 304 without a body', async () => {
   const github = createGitHubFetch();
   const response = await createRepoManifestHandler({

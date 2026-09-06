@@ -11,7 +11,7 @@ import {
   renderClassCalendar,
   type ScheduleCalendarView
 } from '@/teacher/class-calendar';
-import { renderPageHeaderUtilities } from '@/teacher/page-header';
+import { renderPageHeader } from '@/teacher/page-header';
 import { openBlankLesson } from '@/teacher/create/blank-lesson';
 import { patchScheduledLesson, postScheduledLesson } from '@/teacher/schedule-api';
 import { mountCreateControl } from '@/teacher/create/control';
@@ -40,7 +40,7 @@ export function renderTeacherHome(
 ): { dispose: () => void } {
   canvas.replaceChildren();
 
-  renderPageHeaderUtilities(canvas);
+  renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Dashboard' });
 
   const classesById = new Map(curriculum.classes.map((cls) => [cls.id, cls]));
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));

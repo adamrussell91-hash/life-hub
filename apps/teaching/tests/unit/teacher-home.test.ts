@@ -145,7 +145,8 @@ describe('teacher home dashboard', () => {
     expect(canvas.querySelector('.home-today')).toBeNull();
     expect(canvas.querySelector('.class-calendar')).not.toBeNull();
     expect(canvas.querySelector('[data-home-panel="classes"]')).not.toBeNull();
-    expect(canvas.querySelector('.page-header__title')).toBeNull();
+    expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Dashboard');
+    expect(canvas.querySelector('.hub-mark')).toBeInstanceOf(HTMLImageElement);
   });
 
   it('opens the shared cover dialog from the dashboard banner', () => {

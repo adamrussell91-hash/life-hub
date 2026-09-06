@@ -112,6 +112,11 @@ describe('task tags', () => {
     expect(tagsForTask(task, 'MindWorks')).toEqual(['teaching', 'marking', 'MindWorks']);
   });
 
+  it('treats a missing tags field as an empty list', () => {
+    const task = { ...baseTask({ id: 't2', title: 'Breakfast', domain: 'life' }), tags: undefined } as Task;
+    expect(tagsForTask(task, null)).toEqual(['life']);
+  });
+
   it('drops dead tasks from the model', () => {
     const entries = entriesFromWork(
       [

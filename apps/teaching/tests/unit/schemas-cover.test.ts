@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CoverSchema, resolveCoverUrl, type Media } from '@/schemas';
+import { CoverSchema, resolveCoverUrl, rewriteLegacyApiHost, type Media } from '@/schemas';
 
 describe('CoverSchema', () => {
   it('accepts url covers', () => {
@@ -51,5 +51,18 @@ describe('resolveCoverUrl', () => {
     expect(resolveCoverUrl({ url: 'https://example.com/a.jpg' }, media)).toBe(
       'https://example.com/a.jpg'
     );
+  });
+
+  it('rewrites retired teaching-api cover hosts', () => {
+    expect(
+      rewriteLegacyApiHost(
+        'https://teaching-api.adam-russell.com/api/media/media_mt1hy3vq_eqrm4j/file'
+      )
+    ).toBe('https://api.adam-russell.com/api/media/media_mt1hy3vq_eqrm4j/file');
+    expect(
+      resolveCoverUrl({
+        url: 'https://teaching-api.adam-russell.com/api/media/media_1/file'
+      })
+    ).toBe('https://api.adam-russell.com/api/media/media_1/file');
   });
 });

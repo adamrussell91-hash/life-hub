@@ -2,7 +2,7 @@ import { USE_LOCAL_DATA, getPage } from "../api/client";
 import { getQuizItems, getQuizSchedule, saveQuiz } from "../api/quizClient";
 import type { PageManifestEntry } from "../domain/page";
 import { escapeHtml } from "../lib/dom";
-import { hubUtilitiesActionsHtml } from "../lib/hubChrome";
+import { hubUtilitiesActionsHtml, titleRowHtml } from "../lib/hubChrome";
 import { mountDumpSort } from "./dumpCanvas";
 import { dumpSessionToQuiz, sortThenDumpPeek, type DumpNode } from "./dumpSort";
 import { harvestPage, pagesToHarvest } from "./harvest";
@@ -362,7 +362,7 @@ function renderQuiz() {
     <header class="topbar page-header">
       <div class="page-header__copy">
         <p class="eyebrow page-header__eyebrow">${quizEyebrow()}</p>
-        <h1 class="page-header__title hub-kinetic">Quiz</h1>
+        ${titleRowHtml("Quiz")}
       </div>
       ${hubUtilitiesActionsHtml()}
     </header>

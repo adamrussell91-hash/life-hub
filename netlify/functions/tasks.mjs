@@ -6,6 +6,7 @@ import {
 } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
+import { normalizeTaskRecord } from './_shared/task-shape.mjs';
 import {
   defaultGetTasksStore,
   deleteKey,
@@ -53,10 +54,11 @@ export function createTasksHandler(deps = {}) {
           if (!task || typeof task !== 'object' || Array.isArray(task)) {
             return withCors(errorResponse(404, 'not_found', 'Task not found', false), request, env);
           }
-          return withCors(okResponse(200, task), request, env);
+          return withCors(okResponse(200, normalizeTaskRecord(task)), request, env);
         }
         const tasks = (await listJSON(store, TASK_PREFIX))
-          .filter(item => typeof item.id === 'string' && typeof item.title === 'string');
+          .filter(item => typeof item.id === 'string' && typeof item.title === 'string')
+          .map(normalizeTaskRecord);
         return withCors(okResponse(200, { tasks }), request, env);
       }
 
@@ -90,6 +92,9 @@ export function createTasksHandler(deps = {}) {
           created_at: timestamp,
           updated_at: timestamp,
           completed_at: null,
+          depends_on: [],
+          tags: [],
+          attachments: [],
           source: 'manual'
         };
         await setJSON(store, taskKey(id), task);
@@ -115,7 +120,7 @@ export function createTasksHandler(deps = {}) {
         }
         const parsed = await readJsonObject(request);
         if (parsed.error) return withCors(parsed.error, request, env);
-        const next = mergeTask(existing, parsed.value);
+        const next = normalizeTaskRecord(mergeTask(existing, parsed.value));
         await setJSON(store, taskKey(id), next);
         return withCors(okResponse(200, next), request, env);
       }

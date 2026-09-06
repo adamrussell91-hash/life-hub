@@ -29,6 +29,22 @@ export type Cover = z.infer<typeof CoverSchema>;
 /** Cover may be cleared with null on PATCH bodies. */
 export const CoverPatchSchema = CoverSchema.nullable();
 
+const LEGACY_API_HOSTS = new Set(['teaching-api.adam-russell.com']);
+const CURRENT_API_HOST = 'api.adam-russell.com';
+
+export function rewriteLegacyApiHost(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (LEGACY_API_HOSTS.has(parsed.hostname)) {
+      parsed.hostname = CURRENT_API_HOST;
+      return parsed.href;
+    }
+  } catch {
+    // keep the stored value
+  }
+  return url;
+}
+
 export function resolveCoverUrl(
   cover: Cover | null | undefined,
   mediaById?: ReadonlyMap<string, Media> | ReadonlyArray<Media>
@@ -42,10 +58,10 @@ export function resolveCoverUrl(
         : mediaById.find((entry) => entry.id === cover.media_id);
     const fromMedia =
       media?.preview_url ?? media?.thumbnail_url ?? media?.download_url;
-    if (fromMedia && isHttpUrl(fromMedia)) return fromMedia;
+    if (fromMedia && isHttpUrl(fromMedia)) return rewriteLegacyApiHost(fromMedia);
   }
 
-  if (cover.url && isHttpUrl(cover.url)) return cover.url;
+  if (cover.url && isHttpUrl(cover.url)) return rewriteLegacyApiHost(cover.url);
   return undefined;
 }
 
