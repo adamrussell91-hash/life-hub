@@ -3,8 +3,10 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { DEFAULT_KNOWLEDGE_DATA_REPO } from '../../netlify/functions/_shared/knowledge-data.mjs';
+import { createKnowledgeBacklinksHandler } from '../../netlify/functions/knowledge-backlinks.mjs';
 import { createKnowledgePageHandler } from '../../netlify/functions/knowledge-page.mjs';
 import { createKnowledgePagesHandler } from '../../netlify/functions/knowledge-pages.mjs';
+import { createKnowledgeUrlWatchesHandler } from '../../netlify/functions/knowledge-url-watches.mjs';
 import { createKnowledgeQuizHandler } from '../../netlify/functions/knowledge-quiz.mjs';
 import { createKnowledgeSearchHandler } from '../../netlify/functions/knowledge-search.mjs';
 
@@ -136,7 +138,11 @@ test('Knowledge page GET expands the live workout token and attaches decision tr
           { dateKey: '2026-09-06', chosen: 'Keep the unit linked' }
         ]
       }
-    ])
+    ]),
+    loadInverseLinks: async () => ({
+      links: [{ id: 'page_aotfw_notes', title: 'AOTFW teaching notes' }],
+      status: 'ready'
+    })
   });
   const response = await handler(
     request({ url: 'https://api.adam-russell.com/api/knowledge/pages/page_training_pulse' })
@@ -149,6 +155,7 @@ test('Knowledge page GET expands the live workout token and attaches decision tr
   assert.doesNotMatch(page.live_body, /\{\{life:compare_workout_windows\}\}/);
   assert.equal(page.decision_traces[0].decisionId, 'aotfw-sources');
   assert.equal(page.decision_traces_status, undefined);
+  assert.equal(page.inverse_links[0].id, 'page_aotfw_notes');
 });
 
 test('Knowledge page GET keeps the token and is fail-visible when Life loaders miss', async () => {
@@ -171,7 +178,9 @@ test('Knowledge page GET keeps the token and is fail-visible when Life loaders m
       throw new Error('Life GitHub must not be reached from this test');
     },
     loadWorkoutCompare: async () => ({ ok: false }),
-    loadDecisionTraces: async () => ({ traces: [], status: 'unavailable' })
+    loadDecisionTraces: async () => ({ traces: [], status: 'unavailable' }),
+    loadInverseLinks: async () => ({ links: [], status: 'unavailable' }),
+    loadUrlWatches: async () => ({ watches: [], status: 'unavailable' })
   });
   const response = await handler(
     request({ url: 'https://api.adam-russell.com/api/knowledge/pages/page_training_pulse' })
@@ -181,12 +190,14 @@ test('Knowledge page GET keeps the token and is fail-visible when Life loaders m
   assert.match(page.body, /\{\{life:compare_workout_windows\}\}/);
   assert.match(page.live_body, /unavailable/i);
   assert.equal(page.decision_traces_status, 'unavailable');
+  assert.equal(page.inverse_links_status, 'unavailable');
 });
 
 test('Knowledge page GET uses the Life session and returns page JSON', async () => {
   const handler = createKnowledgePageHandler({
     env,
     now: () => Date.parse('2026-08-01T01:00:00Z'),
+    loadInverseLinks: async () => ({ links: [], status: 'ready' }),
     fetchImpl: async url => {
       assert.match(String(url), /knowledge-hub-data\/contents\/pages\/note-1\.json/);
       return jsonResponse({
@@ -213,7 +224,9 @@ test('Knowledge handlers never read GITHUB_REPOSITORY', async () => {
     'netlify/functions/knowledge-quiz-items.mjs',
     'netlify/functions/knowledge-pages-save.mjs',
     'netlify/functions/knowledge-quiz-save.mjs',
-    'netlify/functions/knowledge-quiz-items-path.mjs'
+    'netlify/functions/knowledge-quiz-items-path.mjs',
+    'netlify/functions/knowledge-backlinks.mjs',
+    'netlify/functions/knowledge-url-watches.mjs'
   ];
   for (const file of files) {
     const source = await readFile(new URL(`../../${file}`, import.meta.url), 'utf8');
@@ -352,5 +365,70 @@ test('Knowledge quiz GET and POST stay on knowledge-hub-data', async () => {
   const payload = await saved.json();
   assert.equal(payload.data.schedule[0].page_id, 'note-1');
   assert.equal(payload.data.page_reviews[0].page_id, 'note-1');
+});
+
+test('Knowledge page GET polls an external URL and attaches the watch status', async () => {
+  const handler = createKnowledgePageHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    loadInverseLinks: async () => ({ links: [], status: 'ready' }),
+    loadUrlWatches: async () => ({
+      watches: [{ url: 'https://example.com/policy', status: 'changed' }],
+      status: 'ready'
+    }),
+    fetchImpl: async url => {
+      assert.match(String(url), /knowledge-hub-data\/contents\/pages\/page_policy\.json/);
+      return jsonResponse({
+        sha: 'b'.repeat(40),
+        encoding: 'base64',
+        content: Buffer.from(JSON.stringify({
+          id: 'page_policy',
+          title: 'Policy',
+          body: 'Read https://example.com/policy'
+        })).toString('base64')
+      });
+    }
+  });
+  const response = await handler(
+    request({ url: 'https://api.adam-russell.com/api/knowledge/pages/page_policy' })
+  );
+  assert.equal(response.status, 200);
+  const page = (await response.json()).data;
+  assert.equal(page.url_watches[0].status, 'changed');
+  assert.equal(page.url_watches_status, undefined);
+});
+
+test('Knowledge backlinks list Life decision inbound sources', async () => {
+  const handler = createKnowledgeBacklinksHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    loadInverseLinks: async () => ({
+      groups: [{
+        target: 'life:decision:aotfw-sources',
+        sources: [{ id: 'page_aotfw', title: 'Artist of the Floating World — sources' }]
+      }],
+      status: 'ready'
+    })
+  });
+  const response = await handler(
+    request({ url: 'https://api.adam-russell.com/api/knowledge/backlinks' })
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.data.groups[0].target, 'life:decision:aotfw-sources');
+  assert.equal(body.data.status, 'ready');
+});
+
+test('Knowledge URL watches are fail-visible when the poll cannot run', async () => {
+  const handler = createKnowledgeUrlWatchesHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    loadUrlWatches: async () => ({ watches: [], status: 'unavailable' })
+  });
+  const response = await handler(
+    request({ url: 'https://api.adam-russell.com/api/knowledge/url-watches' })
+  );
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.status, 'unavailable');
 });
 

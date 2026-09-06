@@ -124,6 +124,8 @@ const TILE_SPECS = [
   { id: 'cn-tile-governance', span: 1 },
   { id: 'cn-tile-cross-agent', span: 1 },
   { id: 'cn-tile-actions', span: 1 },
+  { id: 'cn-tile-backlinks', span: 1 },
+  { id: 'cn-tile-url-watches', span: 1 },
   { id: 'cn-tile-constraints', span: 1 }
 ];
 
@@ -140,6 +142,8 @@ function fakeCentralNodeRoot({ boardWidth = 900 } = {}) {
     'long-term-trends',
     'cross-agent',
     'recent-actions',
+    'backlinks',
+    'url-watches',
     'constraints'
   ]) {
     const el = new FakeElement('div');
@@ -209,6 +213,8 @@ function fakeCentralNodeRoot({ boardWidth = 900 } = {}) {
   tiles['cn-tile-governance'].append(governanceHeat, governanceLog);
   tiles['cn-tile-cross-agent'].append(chord, chordDetail, sections['cross-agent']);
   tiles['cn-tile-actions'].append(sections['recent-actions']);
+  tiles['cn-tile-backlinks'].append(sections.backlinks);
+  tiles['cn-tile-url-watches'].append(sections['url-watches']);
   tiles['cn-tile-constraints'].append(sections.constraints);
 
   const auditButton = new FakeElement('button');
@@ -243,6 +249,8 @@ function fakeCentralNodeRoot({ boardWidth = 900 } = {}) {
     '[data-central-node="long-term-trends"]': sections['long-term-trends'],
     '[data-central-node="cross-agent"]': sections['cross-agent'],
     '[data-central-node="recent-actions"]': sections['recent-actions'],
+    '[data-central-node="backlinks"]': sections.backlinks,
+    '[data-central-node="url-watches"]': sections['url-watches'],
     '[data-central-node="constraints"]': sections.constraints,
     '[data-live-snapshot]': liveSnapshot,
     '[data-cn="chord-detail"]': chordDetail,
@@ -325,6 +333,8 @@ test('central node board markup packs tiles and unmounts the protein line and he
   assert.match(block, /id="cn-tile-governance"[\s\S]*What's still open\?/);
   assert.match(block, /id="cn-tile-cross-agent"[\s\S]*Who is handing off to whom\?/);
   assert.match(block, /id="cn-tile-actions"[\s\S]*What just happened\?/);
+  assert.match(block, /id="cn-tile-backlinks"[\s\S]*What points here\?/);
+  assert.match(block, /id="cn-tile-url-watches"[\s\S]*Has a source changed\?/);
   assert.match(block, /id="cn-tile-constraints"[\s\S]*What still binds\?/);
   assert.match(block, /id="central-node-week-horizon"/);
   assert.match(block, /id="central-node-radial-year"/);
@@ -341,6 +351,37 @@ test('central node board markup packs tiles and unmounts the protein line and he
   assert.match(block, /id="central-node-chat-button"/);
   const week = block.slice(block.indexOf('id="cn-tile-week"'), block.indexOf('id="cn-tile-month"'));
   assert.ok(week.indexOf('central-node-week-horizon') < week.indexOf('data-central-node="this-week"'));
+});
+
+test('renderCentralNode shows inverse links and URL watch statuses', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel({
+    inverseLinks: {
+      status: 'ready',
+      groups: [{
+        target: 'life:decision:aotfw-sources',
+        sources: [{ id: 'page_aotfw', title: 'Artist of the Floating World — sources' }]
+      }]
+    },
+    urlWatches: {
+      status: 'ready',
+      watches: [{ url: 'https://example.com/policy', status: 'changed' }]
+    }
+  }));
+  assert.match(root._sections.backlinks.textContent, /life:decision:aotfw-sources/);
+  assert.match(root._sections.backlinks.textContent, /Artist of the Floating World/);
+  assert.match(root._sections['url-watches'].textContent, /https:\/\/example.com\/policy/);
+  assert.match(root._sections['url-watches'].textContent, /Changed/);
+});
+
+test('renderCentralNode is fail-visible when inverse links and URL watches miss', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel({
+    inverseLinks: { status: 'unavailable', groups: [] },
+    urlWatches: { status: 'unavailable', watches: [] }
+  }));
+  assert.match(root._sections.backlinks.textContent, /unavailable/i);
+  assert.match(root._sections['url-watches'].textContent, /unavailable/i);
 });
 
 test('renderCentralNode omits empty this-week prose', () => {
@@ -751,7 +792,7 @@ test('packCnBoard after governance height growth moves later tiles', () => {
   const constraints = root._tiles['cn-tile-constraints'];
   const leftBefore = constraints.style.left;
   const topBefore = constraints.style.top;
-  governance.offsetHeight = 480;
+  governance.offsetHeight = 800;
   packCnBoard(root);
   assert.ok(Number.parseFloat(board.style.minHeight) > minBefore);
   assert.equal(

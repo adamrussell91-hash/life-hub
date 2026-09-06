@@ -158,6 +158,8 @@ test('saveKnowledgePage keeps Teaching and Tasks refs on connected', async () =>
   assert.deepEqual(saved.connected, ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw', 'page_aotfw']);
   const stored = JSON.parse(files.get('pages/page_aotfw.json').text);
   assert.deepEqual(stored.connected, saved.connected);
+  const manifest = JSON.parse(files.get('manifest.json').text);
+  assert.deepEqual(manifest[0].connected, saved.connected);
 });
 
 test('saveKnowledgePage rejects an invalid connected ref', async () => {

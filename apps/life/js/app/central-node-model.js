@@ -45,7 +45,9 @@ export function buildCentralNodeModel({
   targetsConfig,
   centralNodeMarkdown,
   date,
-  governanceLogMarkdown
+  governanceLogMarkdown,
+  inverseLinks,
+  urlWatches
 }) {
   if (!date) throw new RangeError('Central Node display date is unavailable');
   const markdown = centralNodeMarkdown ?? '';
@@ -110,6 +112,12 @@ export function buildCentralNodeModel({
     domainWeekly,
     crossAgent,
     governanceOpen,
-    governanceHeat
+    governanceHeat,
+    inverseLinks: inverseLinks && typeof inverseLinks === 'object'
+      ? inverseLinks
+      : { groups: [], status: 'ready' },
+    urlWatches: urlWatches && typeof urlWatches === 'object'
+      ? urlWatches
+      : { watches: [], status: 'ready' }
   };
 }

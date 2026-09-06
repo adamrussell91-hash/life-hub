@@ -3,6 +3,7 @@ const REF_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 export const HUB_SITES = {
   life: "https://life-hub.adam-russell.com",
   teaching: "https://teaching-hub.adam-russell.com",
+  knowledge: "https://knowledge-hub.adam-russell.com",
   tasks: "https://tasks-hub.adam-russell.com",
 } as const;
 
@@ -38,6 +39,9 @@ export function hrefForHubRef(ref: HubRef): string | null {
   }
   if (ref.hub === "life" && ref.kind === "decision") {
     return `${HUB_SITES.life}/#central-node`;
+  }
+  if (ref.hub === "knowledge" && ref.kind === "page") {
+    return `${HUB_SITES.knowledge}/#page/${encodeURIComponent(ref.id)}`;
   }
   return null;
 }

@@ -104,6 +104,8 @@ import type { GraphPreviewNote } from "./archive/graphPreview";
 import { connectedLinksHtml } from "./wiki/connectedHtml";
 import { LIVE_UNAVAILABLE, LIVE_WORKOUT_TOKEN } from "./wiki/liveTokens";
 import { decisionTraceHtml, type DecisionTrace } from "./wiki/decisionTraceHtml";
+import { inverseLinksHtml } from "./wiki/inverseLinksHtml";
+import { urlWatchHtml } from "./wiki/urlWatchHtml";
 import { addOrigin, isOriginKind, originKey, removeOrigin } from "./origin/normalize";
 import { resolvedOrigins } from "./origin/notesPlace";
 import { originComposeFieldHtml, originPillsHtml, parseOriginRemoveValue } from "./origin/pills";
@@ -1298,6 +1300,10 @@ type LivePage = Page & {
   live_body?: string;
   decision_traces?: DecisionTrace[];
   decision_traces_status?: string;
+  inverse_links?: { id: string; title?: string }[];
+  inverse_links_status?: string;
+  url_watches?: { url: string; status?: string }[];
+  url_watches_status?: string;
 };
 
 function renderPage(page: LivePage) {
@@ -1337,6 +1343,8 @@ function renderPage(page: LivePage) {
       <div class="reader__body">${renderMarkdown(page.live_body ?? livePageBody(page.body))}</div>
       ${decisionTraceHtml(page.decision_traces, page.decision_traces_status)}
       ${connectedLinksHtml(page, entries)}
+      ${inverseLinksHtml(page.inverse_links, page.inverse_links_status)}
+      ${urlWatchHtml(page.url_watches, page.url_watches_status)}
       ${renderAttachments(page)}
     </article>
   `);

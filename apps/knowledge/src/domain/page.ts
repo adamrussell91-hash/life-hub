@@ -32,6 +32,7 @@ export const PageManifestEntrySchema = z.object({
   tags: z.array(z.string()),
   excerpt: z.string(),
   origins: z.array(OriginSchema).optional(),
+  connected: z.array(z.string()).optional(),
   source_notion_id: z.string().optional(),
   created_at: z.string().datetime().optional(),
 });
@@ -56,6 +57,10 @@ export const PageSchema = z
     live_body: z.string().optional(),
     decision_traces: z.array(z.unknown()).optional(),
     decision_traces_status: z.enum(["ready", "unavailable"]).optional(),
+    inverse_links: z.array(z.unknown()).optional(),
+    inverse_links_status: z.enum(["ready", "unavailable"]).optional(),
+    url_watches: z.array(z.unknown()).optional(),
+    url_watches_status: z.enum(["ready", "unavailable"]).optional(),
   })
   .superRefine((page, ctx) => {
     if (page.source === "hub") return;
