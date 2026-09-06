@@ -1,6 +1,6 @@
 /**
  * Live Anthropic smoke for agent protocols.
- * Loads ANTHROPIC_API_KEY from .env.local; GitHub is stubbed.
+ * Loads ANTHROPIC_API_KEY from the environment or .env.local; GitHub is stubbed.
  * Usage: node scripts/live-agent-protocol-smoke.mjs
  */
 import { readFileSync } from 'node:fs';
@@ -12,24 +12,27 @@ import { createChatHandler } from '../netlify/functions/chat.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SECRET = 's'.repeat(32);
 
-function loadEnvLocal() {
-  const path = resolve(root, '.env.local');
-  const text = readFileSync(path, 'utf8');
-  const env = {};
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq < 1) continue;
-    env[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
+function loadApiKey() {
+  const fromEnv = typeof process.env.ANTHROPIC_API_KEY === 'string'
+    ? process.env.ANTHROPIC_API_KEY.trim()
+    : '';
+  if (fromEnv) return fromEnv;
+  try {
+    const text = readFileSync(resolve(root, '.env.local'), 'utf8');
+    for (const line of text.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      if (trimmed.startsWith('ANTHROPIC_API_KEY=')) return trimmed.slice('ANTHROPIC_API_KEY='.length).trim();
+    }
+  } catch {
+    // .env.local is optional when the Cloud Agent environment already has the secret
   }
-  return env;
+  return null;
 }
 
-const local = loadEnvLocal();
-const apiKey = local.ANTHROPIC_API_KEY;
+const apiKey = loadApiKey();
 if (!apiKey) {
-  console.error('Missing ANTHROPIC_API_KEY in .env.local');
+  console.error('Missing ANTHROPIC_API_KEY in the environment or .env.local');
   process.exit(1);
 }
 
