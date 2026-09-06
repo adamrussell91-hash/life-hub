@@ -8,7 +8,11 @@ import {
   selectMidnightTidyIds,
   STALE_WORKING_JOB_MS
 } from '../../netlify/functions/_shared/ai-jobs-tick.mjs';
-import { createAiJobsTickHandler } from '../../netlify/functions/ai-jobs-tick.mjs';
+import { config as tickConfig, createAiJobsTickHandler } from '../../netlify/functions/ai-jobs-tick.mjs';
+import {
+  config as scheduledConfig,
+  createAiJobsScheduledHandler
+} from '../../netlify/functions/ai-jobs-scheduled.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -132,4 +136,46 @@ test('isScheduledTickRequest only trusts the Netlify schedule event', () => {
     headers: { 'x-nf-event': 'schedule' }
   })), true);
   assert.equal(isScheduledTickRequest(new Request('https://api.adam-russell.com/api/ai/jobs/tick')), false);
+});
+
+test('Netlify schedule and custom path stay on separate functions', () => {
+  assert.equal(tickConfig.path, '/api/ai/jobs/tick');
+  assert.equal(tickConfig.schedule, undefined);
+  assert.equal(scheduledConfig.schedule, '17 14 * * *');
+  assert.equal(scheduledConfig.path, undefined);
+});
+
+test('scheduled function kicks the background HTTP tick', async () => {
+  const calls = [];
+  const handler = createAiJobsScheduledHandler({
+    env: { URL: 'https://api.adam-russell.com' },
+    fetchImpl: async (url, init) => {
+      calls.push({ url: String(url), init });
+      return new Response(null, { status: 202 });
+    }
+  });
+  await handler();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://api.adam-russell.com/api/ai/jobs/tick');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(calls[0].init.headers['x-nf-event'], 'schedule');
+});
+
+test('scheduled function fails visibly when the HTTP tick is unbound or errors', async () => {
+  await assert.rejects(
+    createAiJobsScheduledHandler({
+      env: {},
+      fetchImpl: async () => {
+        throw new Error('should not fetch');
+      }
+    })(),
+    /missing URL/
+  );
+  await assert.rejects(
+    createAiJobsScheduledHandler({
+      env: { URL: 'https://api.adam-russell.com' },
+      fetchImpl: async () => new Response(null, { status: 500 })
+    })(),
+    /HTTP 500/
+  );
 });

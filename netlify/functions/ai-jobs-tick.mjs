@@ -13,9 +13,10 @@ import {
   withCors
 } from './_shared/http.mjs';
 
+// Netlify rejects schedule + path on one function (ntl.fyi/custom-path-scheduled-functions).
+// Cron lives on ai-jobs-scheduled.mjs and kicks this background HTTP tick.
 export const config = {
   path: '/api/ai/jobs/tick',
-  schedule: '17 14 * * *',
   background: true
 };
 
