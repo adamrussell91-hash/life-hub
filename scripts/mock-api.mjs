@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dump } from 'js-yaml';
 import { parseDateRange, CONFIG_PATHS } from '../netlify/functions/_shared/repo-policy.mjs';
 import { TYPE_DOMAINS } from '../apps/life/js/core/records.js';
+import { listNamedShortcuts } from '../netlify/functions/_shared/capabilities/registry.mjs';
 
 import { SESSION_MS } from '../netlify/functions/_shared/auth-security.mjs';
 
@@ -192,6 +193,56 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
         data: {
           commitSha: repository.commitSha,
           files: files.map(({ path, sha, content }) => ({ path, sha, content }))
+        }
+      });
+      return true;
+    }
+
+    if (url.pathname === '/api/shortcuts') {
+      if (request.method !== 'GET' && request.method !== 'POST') {
+        return methodNotAllowed(response, 'GET, POST');
+      }
+      if (!readSession(request)) return unauthenticated(response);
+      if (request.method === 'GET') {
+        json(response, 200, {
+          ok: true,
+          data: {
+            catalog: listNamedShortcuts(),
+            promoted: [{
+              proposed_id: 'track.morning-weigh-in',
+              tool_name: 'track_morning_weigh_in',
+              summary: 'Morning weigh-in tracker',
+              proposed_by: 'brisket',
+              write_count: 1,
+              risk: 'confirm',
+              status: 'ready'
+            }]
+          }
+        });
+        return true;
+      }
+      const body = await readJson(request);
+      const proposedId = typeof body?.proposed_id === 'string' ? body.proposed_id.trim() : '';
+      if (!proposedId) {
+        error(response, 400, 'invalid_input', 'proposed_id is required.', false);
+        return true;
+      }
+      const agentSlug = typeof body?.agent_slug === 'string' && body.agent_slug.trim()
+        ? body.agent_slug.trim()
+        : 'hammond';
+      json(response, 200, {
+        ok: true,
+        data: {
+          agent_slug: agentSlug,
+          proposal: {
+            intent: `Run promoted shortcut: ${proposedId}`,
+            agent: agentSlug,
+            writes: [{
+              path: 'data/challenges/2026-08-31-weigh-in.json',
+              mode: 'create',
+              content: '{\n  "title": "Morning weigh-in"\n}\n'
+            }]
+          }
         }
       });
       return true;

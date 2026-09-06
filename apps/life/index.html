@@ -83,6 +83,7 @@
               <button class="hub-nav-item" type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/skincare.png" alt=""></span><span>Skincare</span></button>
               <button class="hub-nav-item" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/calendar.png" alt=""></span><span>Calendar</span></button>
               <button class="hub-nav-item" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/central-node.png" alt=""></span><span>Central Node</span></button>
+              <button class="hub-nav-item" type="button" data-section="shortcuts"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 6 14h6l-1 7 7-11h-6l1-7Z"/></svg></span><span>Shortcuts</span></button>
             </div>
           </div>
         </div>
@@ -1184,6 +1185,20 @@
           </div>
         </section>
 
+        <section id="shortcuts-dashboard" class="dashboard" aria-label="Shortcuts" hidden>
+          <article class="metric-card" aria-labelledby="shortcuts-promoted-label">
+            <p class="metric-label" id="shortcuts-promoted-label">Promoted</p>
+            <p class="metric-context">Confirmed drafts. Run still shows a Confirm card before anything writes.</p>
+            <div data-shortcuts="promoted"></div>
+          </article>
+          <article class="metric-card" aria-labelledby="shortcuts-catalog-label">
+            <p class="metric-label" id="shortcuts-catalog-label">Catalog</p>
+            <p class="metric-context">Named shortcuts agents already have. Ask in chat to use one.</p>
+            <div data-shortcuts="catalog"></div>
+          </article>
+          <div data-shortcuts="confirm"></div>
+        </section>
+
         <section id="central-node-dashboard" class="dashboard" aria-label="Central Node" hidden>
           <div data-central-node="progress" class="hub-progress"></div>
           <div id="cn-board" class="cn-board">
@@ -1303,6 +1318,7 @@
           <button type="button" data-section="mind"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/mind.png" alt=""></span>Mind</button>
           <button type="button" data-section="skincare"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/skincare.png" alt=""></span>Skincare</button>
           <button type="button" data-section="central-node"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/central-node.png" alt=""></span>Central Node</button>
+          <button type="button" data-section="shortcuts"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 6 14h6l-1 7 7-11h-6l1-7Z"/></svg></span>Shortcuts</button>
           <p class="hub-more-sheet__section">Hubs</p>
           <a href="/teaching/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span>Teaching</a>
           <a href="/knowledge/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5h6.5A3.5 3.5 0 0 1 15 9v10H8.5A3.5 3.5 0 0 0 5 15.5V5.5Z"/><path d="M15 9h4v10h-4"/></svg></span>Knowledge</a>
