@@ -83,11 +83,17 @@ export const AGENTS = [
 
 export const ROUTER_SLUG = 'router';
 
+function hasSpokenName(normalized, trigger) {
+  const escaped = trigger.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`).test(normalized);
+}
+
 export function routeAgent(message, stickySlug) {
   if (typeof message !== 'string') throw new TypeError('message must be a string');
   const normalized = message.toLowerCase();
   for (const agent of AGENTS) {
-    if (agent.nameTriggers.some(trigger => normalized.includes(trigger))) return agent.slug;
+    // Word bounds, not includes(): "planning" is not Ann, "several" is not Vera.
+    if (agent.nameTriggers.some(trigger => hasSpokenName(normalized, trigger))) return agent.slug;
   }
   if (typeof stickySlug === 'string' && findAgent(stickySlug)) return stickySlug;
   return ROUTER_SLUG;

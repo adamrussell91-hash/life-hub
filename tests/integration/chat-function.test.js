@@ -229,6 +229,24 @@ test('an unnamed follow-up stays with the sticky agent instead of falling back t
   assert.deepEqual(events[0], { type: 'agent', slug: 'brisket' });
 });
 
+test('a Penelope follow-up that mentions planning stays with Penelope instead of jumping to Ann', async () => {
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: () => mockedStream([{ type: 'text', delta: 'Go on.' }, { type: 'done' }])
+    })
+  });
+
+  const response = await handler(request({
+    message: "they're planning a gifted education audit",
+    priorAgentSlug: 'penelope'
+  }));
+  const events = contentEvents(await readSse(response));
+  assert.deepEqual(events[0], { type: 'agent', slug: 'penelope' });
+});
+
 test('Brisket meal turns emit status heartbeats, only load today+yesterday blobs, and finish with a proposal', async () => {
   const todaySha = '1'.repeat(40);
   const yesterdaySha = '2'.repeat(40);
