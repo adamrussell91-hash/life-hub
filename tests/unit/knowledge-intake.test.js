@@ -94,6 +94,25 @@ test('accept applies the tidy proposal; reject leaves the page alone', async () 
   assert.equal(rejectedContext.saved.length, 0);
 });
 
+test('accept refuses when the page changed while the review card was open', async () => {
+  const context = deps({
+    getPage: async () => ({
+      ...page,
+      body: 'Edited while the card was open.',
+      updated_at: '2026-09-06T01:30:00.000Z'
+    })
+  });
+  const review = await runKnowledgeIntakeUntilReview(
+    createKnowledgeIntakeJob({ id: 'ai_job_1', page_id: 'note-1', now: '2026-09-06T01:00:00.000Z' }),
+    deps()
+  );
+  await assert.rejects(
+    () => resolveKnowledgeIntakeJob(review, 'accepted', context),
+    error => error.status === 409 && error.code === 'stale_page'
+  );
+  assert.equal(context.saved.length, 0);
+});
+
 test('unresolvedJobForPage finds working and awaiting-review intake jobs', () => {
   const inbox = {
     jobs: [
