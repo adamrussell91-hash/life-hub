@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { beginChatTurnAnchor, clearChatTurnAnchors } from '../../apps/life/js/app/chat-turn-anchor.js';
+import { appendChatThreadItem, beginChatTurnAnchor, clearChatTurnAnchors } from '../../apps/life/js/app/chat-turn-anchor.js';
 
 function fakeNode(tag = 'li', props = {}) {
   const node = {
@@ -29,6 +29,17 @@ function fakeNode(tag = 'li', props = {}) {
         this.children.push(child);
         child.parent = this;
       }
+    },
+    insertBefore(node, ref) {
+      if (node.parent) node.remove();
+      const idx = this.children.indexOf(ref);
+      if (idx === -1) {
+        this.append(node);
+        return node;
+      }
+      this.children.splice(idx, 0, node);
+      node.parent = this;
+      return node;
     },
     remove() {
       if (!this.parent) return;
@@ -85,6 +96,28 @@ test('beginChatTurnAnchor creates a spacer, follow scrolls to the user item, rel
   anchor.release();
   assert.equal(list.children.includes(spacer), false, 'release should remove the spacer');
   assert.equal(userItem.attributes.has('data-chat-turn-anchor'), false);
+});
+
+test('appendChatThreadItem keeps new cards above the turn spacer', () => {
+  const list = fakeNode('ul', { clientHeight: 400, scrollHeight: 200 });
+  const userItem = fakeNode('li', { offsetTop: 40 });
+  list.append(userItem);
+  const created = [];
+  const dom = {
+    createElement(tag) {
+      const el = fakeNode(tag);
+      created.push(el);
+      return el;
+    }
+  };
+  beginChatTurnAnchor(list, userItem, dom);
+  const spacer = list.children.find((child) => child.attributes.has('data-chat-turn-spacer'));
+  const card = fakeNode('li');
+  card.className = 'record-proposal confirm-card';
+  appendChatThreadItem(list, card);
+
+  assert.equal(list.children.at(-1), spacer, 'spacer must stay last');
+  assert.equal(list.children.at(-2), card, 'confirm card must land above the spacer');
 });
 
 test('clearChatTurnAnchors strips anchors and spacers', () => {
