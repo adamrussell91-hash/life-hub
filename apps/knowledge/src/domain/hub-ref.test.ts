@@ -42,5 +42,8 @@ describe("parseHubRef", () => {
     expect(hrefForHubRef({ hub: "tasks", kind: "project", id: "proj_aotfw" })).toBe(
       "https://tasks-hub.adam-russell.com/#/project/proj_aotfw",
     );
+    expect(hrefForHubRef({ hub: "knowledge", kind: "page", id: "page_aotfw" })).toBe(
+      "https://knowledge-hub.adam-russell.com/#page/page_aotfw",
+    );
   });
 });

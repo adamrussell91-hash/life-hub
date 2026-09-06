@@ -58,10 +58,14 @@ describe("PageSchema", () => {
       body: "Pulse\n\n{{life:compare_workout_windows}}",
       live_body: "Pulse\n\nLast 8 weeks: 11 completed workouts.",
       decision_traces_status: "unavailable",
+      inverse_links_status: "unavailable",
+      url_watches_status: "unavailable",
     });
     expect(parsed.body).toContain("{{life:compare_workout_windows}}");
     expect(parsed.live_body).toContain("11 completed workouts");
     expect(parsed.decision_traces_status).toBe("unavailable");
+    expect(parsed.inverse_links_status).toBe("unavailable");
+    expect(parsed.url_watches_status).toBe("unavailable");
   });
 
   it("keeps connected refs that point at Teaching units and Tasks projects", () => {
