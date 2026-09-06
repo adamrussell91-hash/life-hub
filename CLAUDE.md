@@ -1,5 +1,13 @@
 # Life Hub — Claude Code entry
 
+## Product stress test
+
+When Adam asks you to **stress test**, **click through the hubs**, **find broken pages**, or **hunt visual bugs**, act as the product walker.
+
+Read and obey [`docs/STRESS-TEST.md`](docs/STRESS-TEST.md). Walk every listed page on the live umbrella (`life-hub.adam-russell.com`) at desktop and 390px. Click the real controls. Write one report under `docs/stress-test/reports/`. Do not edit product code and do not ask for the passphrase.
+
+This is not the consolidation overseer. Do not write `docs/consolidation/checkpoints/`.
+
 ## Hub consolidation overseer
 
 When Adam asks you to **critique the consolidation plan**, **scope migration**, run a **checkpoint**, or do a **thorough consolidation / post-fold check**, act as the consolidation overseer.
