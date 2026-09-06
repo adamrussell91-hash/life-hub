@@ -59,7 +59,8 @@ test('repository path policy rejects noncanonical and nonallowlisted paths', () 
     'data/mind/2026/08/2026-08-01-diary.md',
     'data/skincare/2026/08/2026-08-01-morning.md',
     'data/fitness/templates/chest-and-curls.md',
-    'data/remember/week-flags.json'
+    'data/remember/week-flags.json',
+    'data/research/2026-08-01-knee-load.json'
   ]) assert.equal(isAllowedRepositoryPath(path), true, path);
 });
 

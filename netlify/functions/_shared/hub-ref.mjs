@@ -3,7 +3,8 @@ const REF_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 export const HUB_REF_KINDS = {
   knowledge: new Set(['page']),
   teaching: new Set(['unit']),
-  tasks: new Set(['project'])
+  tasks: new Set(['project']),
+  life: new Set(['decision'])
 };
 
 export const HUB_SITES = {
@@ -65,11 +66,15 @@ export function hrefForHubRef(ref) {
   if (ref?.hub === 'tasks' && ref.kind === 'project') {
     return `${HUB_SITES.tasks}/#/project/${encodeURIComponent(ref.id)}`;
   }
+  if (ref?.hub === 'life' && ref.kind === 'decision') {
+    return `${HUB_SITES.life}/#central-node`;
+  }
   return null;
 }
 
 export function labelForHubRef(ref) {
   if (ref?.hub === 'teaching' && ref.kind === 'unit') return `Teaching unit ${ref.id}`;
   if (ref?.hub === 'tasks' && ref.kind === 'project') return `Tasks project ${ref.id}`;
+  if (ref?.hub === 'life' && ref.kind === 'decision') return `Decision ${ref.id}`;
   return ref?.id ?? '';
 }

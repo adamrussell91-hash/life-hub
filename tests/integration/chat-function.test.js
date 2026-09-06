@@ -3324,6 +3324,48 @@ test('append_governance_log cold-starts empty log then writes governance-log.md'
   assert.match(written, /\*\*Title:\*\* Surplus hold/);
 });
 
+test('append_governance_log Major Decision offers a second-opinion choice', async () => {
+  const fetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ executeTools }) {
+        await executeTools({
+          id: 'call_1',
+          name: 'append_governance_log',
+          input: {
+            entry_type: 'Major Decision',
+            body: 'Hold the extra unit.',
+            title: 'MEd load',
+            chosen: 'Drop one elective',
+            decision_id: 'med-load'
+          }
+        });
+        yield { type: 'text', delta: 'Logged the decision.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({ message: 'Hammond, log the MEd decision' }))));
+  const choice = events.find(event => event.type === 'choice');
+  assert.ok(choice);
+  assert.match(choice.hint, /MEd load/);
+  assert.ok(choice.choices.some(item => /Sara/.test(item.label)));
+});
+
 test('propose_central_node_patch returns error JSON when central-node.md is missing', async () => {
   const handler = createChatHandler({
     env: validEnv,

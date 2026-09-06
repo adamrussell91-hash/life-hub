@@ -4,6 +4,7 @@ import {
   applyCentralNodePatch
 } from '../../../apps/life/js/core/central-node-patch.js';
 import { GOVERNANCE_ENTRY_TYPES } from '../../../apps/life/js/core/governance-log.js';
+import { formatHubRef, parseHubRef } from './hub-ref.mjs';
 
 export { classifyCentralNodePatchRisk, applyCentralNodePatch };
 
@@ -101,6 +102,15 @@ export function appendGovernanceLogSchema() {
         revisit: {
           type: 'string',
           description: 'Optional YYYY-MM-DD to look at this decision again'
+        },
+        decision_id: {
+          type: 'string',
+          description: 'Stable id for this thread. Knowledge cites it as life:decision:{id}.'
+        },
+        about: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Hub refs this decision is about (teaching:unit:…, tasks:project:…, page ids).'
         }
       },
       required: ['entry_type', 'body']
@@ -194,6 +204,22 @@ export function validateGovernanceLogAppendInput(input) {
   }
   if (typeof input.revisit === 'string' && input.revisit.trim()) {
     entry.revisit = input.revisit.trim();
+  }
+  if (typeof input.decision_id === 'string' && input.decision_id.trim()) {
+    entry.decisionId = input.decision_id.trim();
+  }
+  if (Array.isArray(input.about)) {
+    const about = [];
+    const seen = new Set();
+    for (const item of input.about) {
+      const parsed = parseHubRef(item);
+      if (!parsed) continue;
+      const stored = formatHubRef(parsed);
+      if (seen.has(stored)) continue;
+      seen.add(stored);
+      about.push(stored);
+    }
+    if (about.length) entry.about = about;
   }
 
   return entry;

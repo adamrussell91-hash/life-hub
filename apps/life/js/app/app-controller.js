@@ -36,6 +36,32 @@ const MORE_SECTIONS = new Set([
   'shortcuts'
 ]);
 
+const HASH_SECTIONS = new Set([
+  'home',
+  'chat',
+  'nutrition',
+  'fitness',
+  'skincare',
+  'calendar',
+  'body',
+  'body-bloods',
+  'body-medical',
+  'mind',
+  'central-node',
+  'shortcuts'
+]);
+
+export function sectionFromHash(hash) {
+  if (typeof hash !== 'string') return null;
+  const trimmed = hash.trim();
+  if (!trimmed) return null;
+  const withoutHash = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+  const section = withoutHash.split(/[/?#]/)[0].trim();
+  if (!section) return null;
+  if (section === 'central-node-dashboard') return 'central-node';
+  return HASH_SECTIONS.has(section) ? section : null;
+}
+
 function clampDateToYearMonth(date, yearMonth) {
   if (!date || date.slice(0, 7) === yearMonth) return date;
   const day = Number(date.slice(8, 10));
@@ -239,6 +265,11 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#clare-brief-button'), 'click', () => void submitClareBrief());
   bind(windowTarget, 'online', () => void handleOnline());
   bind(windowTarget, 'offline', () => handleOffline());
+  bind(windowTarget, 'hashchange', () => {
+    if (!authenticated) return;
+    const next = sectionFromHash(windowTarget.location?.hash);
+    if (next) showSection(next);
+  });
   bind(documentTarget, 'visibilitychange', () => void handleVisibilityChange());
 
   async function start() {
@@ -572,7 +603,7 @@ export function createAppController(dependencies) {
     const shell = root.querySelector('#app-shell');
     if (signInView) signInView.hidden = true;
     if (shell) shell.hidden = false;
-    showSection('home');
+    showSection(sectionFromHash(windowTarget.location?.hash) || 'home');
   }
 
   const SECTION_TITLES = {

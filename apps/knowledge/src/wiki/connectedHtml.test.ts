@@ -29,4 +29,14 @@ describe("connectedLinksHtml", () => {
     expect(html).not.toContain("data-open-page=\"teaching:unit:unit_aotfw\"");
     expect(html).not.toContain("data-open-page=\"tasks:project:proj_aotfw\"");
   });
+
+  it("renders Life decision refs as outbound Central Node links", () => {
+    const html = connectedLinksHtml(
+      { connected: ["life:decision:aotfw-sources"] },
+      [],
+    );
+    expect(html).toContain("href=\"https://life-hub.adam-russell.com/#central-node\"");
+    expect(html).toContain("Decision aotfw-sources");
+    expect(html).not.toContain("data-open-page=\"life:decision:aotfw-sources\"");
+  });
 });
