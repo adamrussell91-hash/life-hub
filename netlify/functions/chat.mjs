@@ -185,6 +185,7 @@ import {
 } from './_shared/capabilities/propose-action.mjs';
 import {
   TASK_PREFIX,
+  PROJECT_PREFIX,
   defaultGetTasksStore,
   listJSON as listTasksJSON
 } from './_shared/tasks-blobs.mjs';
@@ -752,9 +753,13 @@ export function createChatHandler({
                 getTasksStore(env),
                 getTeachingStore(env)
               ]);
-              const [tasks, classes, lessons, units, scheduled] = await Promise.all([
+              const [tasks, projects, classes, lessons, units, scheduled] = await Promise.all([
                 listTasksJSON(tasksStore, TASK_PREFIX).catch(err => {
                   hubLoadErrors.tasks = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, PROJECT_PREFIX).catch(err => {
+                  hubLoadErrors.projects = err?.code || 'load_failed';
                   return [];
                 }),
                 listTeachingJSON(teachingStore, CLASS_PREFIX).catch(err => {
@@ -775,6 +780,7 @@ export function createChatHandler({
                 })
               ]);
               hubTasks = Array.isArray(tasks) ? tasks : [];
+              hubProjects = Array.isArray(projects) ? projects : [];
               hubClasses = Array.isArray(classes) ? classes : [];
               hubLessons = [
                 ...(Array.isArray(lessons) ? lessons : []),
@@ -1229,6 +1235,9 @@ export function createChatHandler({
           } : {}),
           ...(needsHubRetrieval ? {
             tasks: hubLoadErrors.tasks ? { error: hubLoadErrors.tasks } : { count: hubTasks.length },
+            projects: hubLoadErrors.projects
+              ? { error: hubLoadErrors.projects }
+              : { count: hubProjects.length },
             teaching_classes: hubLoadErrors.classes
               ? { error: hubLoadErrors.classes }
               : { count: hubClasses.length },

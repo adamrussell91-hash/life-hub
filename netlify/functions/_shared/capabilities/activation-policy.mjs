@@ -219,6 +219,39 @@ const SHARED_RULES = [
   'Do not dump all records into chat. Progressive retrieval: metadata first, then tools for the relevant slice.'
 ];
 
+/**
+ * Specialist agents pack their domain on substantive turns even when no
+ * regex intent fires. Patterns refine tool sets; they are not a whitelist
+ * of the only sentences that may retrieve evidence.
+ */
+const DOMAIN_DEFAULTS = {
+  chadwick: ['get_fitness_snapshot', 'compare_workout_windows'],
+  brisket: ['get_nutrition_snapshot', 'get_nutrition_adherence'],
+  sara: ['get_body_state', 'get_weight_trend'],
+  penelope: ['search_diary_records'],
+  vera: ['search_mind_records'],
+  hyaluronica: ['get_skincare_adherence', 'search_skincare_records'],
+  clare: ['get_tasks_focus'],
+  ann: ['search_teaching', 'get_teaching_context'],
+  clementine: ['search_knowledge'],
+  hammond: ['inspect_hub_signals']
+};
+
+const SMALL_TALK_RE =
+  /^(hi|hey|hello|howdy|yo|thanks|thank you|ty|ok|okay|cheers|bye|good (?:morning|afternoon|evening|night)|just checking in|testing|ping)(?:[.!?\s]*)$/i;
+
+/** Ordinary greetings / acknowledgements — not domain work. */
+const SOCIAL_FILLER_RE =
+  /^(hey|hi|hello|howdy|yo)\b[\w\s,',.!?]{0,40}$/i;
+
+export function isSubstantiveTurn(message) {
+  const text = String(message ?? '').trim();
+  if (text.length < 12) return false;
+  if (SMALL_TALK_RE.test(text)) return false;
+  if (SOCIAL_FILLER_RE.test(text) && !/[?]/.test(text)) return false;
+  return true;
+}
+
 export function classifyIntent(slug, message) {
   const text = typeof message === 'string' ? message : '';
   for (const rule of INTENT_RULES) {
@@ -228,6 +261,10 @@ export function classifyIntent(slug, message) {
       ?? rule.requiredToolsByAgent?.[slug]
       ?? [];
     return { id: rule.id, requiredTools: [...requiredTools] };
+  }
+  const defaults = DOMAIN_DEFAULTS[slug];
+  if (defaults && isSubstantiveTurn(text)) {
+    return { id: 'domain_default', requiredTools: [...defaults] };
   }
   return { id: 'none', requiredTools: [] };
 }

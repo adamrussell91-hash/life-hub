@@ -1,30 +1,27 @@
 # Life Hub agent capability audit
 
-Generated: 2026-09-06T07:54:23.358Z  
-**Behaviour update:** 2026-09-06 — server-side evidence packs + domain analysis. See `docs/AGENT_BEHAVIOUR_ACCEPTANCE.md`.
+Generated: 2026-09-06  
+**Behaviour update:** 2026-09-06 — domain-default packing, Clare projects load, ranked search, Ann Teaching adapter, honest live demo.
 
 > **Corrective note:** Attached tools ≠ intelligence. Status words allowed: Demonstrated | Failed | Blocked | Not started. Do not use thin / partial / scaffolding / mostly / should work / capability counts as completion language.
 
-## Demonstrated jobs (2026-09-06 evidence packs)
+## Demonstrated / Blocked jobs (2026-09-06 corrective pass)
 
-| Agent | Demonstrated job (pack layer) | Conversation E2E |
+| Agent | Pack vs functioning store (this env) | Conversation E2E |
 | --- | --- | --- |
-| Chadwick | Broad “how is training going?” → fitness snapshot, window compare, volume, working weights, long-term, sessions, body | Blocked — no `ANTHROPIC_API_KEY` |
-| Brisket | Broad nutrition overview → snapshot, adherence, targets, remaining day, period compare | Blocked — same |
-| Sara | Weight/body questions → body state, weight trend (conflict-aware), medical search | Blocked — same |
-| Penelope | “Feeling like this often?” → diary search, period compare, themes, range | Blocked — same |
-| Vera | Cross-session patterns → mind search + multi-session compare + bounded diary | Blocked — same |
-| Hyaluronica | “Is my routine helping?” → adherence + response evidence + history search | Blocked — same |
-| Clare | “What should I focus on today?” → tasks focus + open loops (also Clare desk) | Blocked — same |
-| Ann | Improve tomorrow’s lesson → teaching search + context + diagnosis | Blocked — same |
-| Clementine | “What do I already know about X?” → knowledge search + synthesis (+ teaching bridge); Knowledge chat turn shares pack | Blocked — same |
-| Hammond | “What is slipping?” → hub inspect + attention/open-loop pack | Blocked — same |
+| Chadwick | **Demonstrated** — real Life fitness/body files | Blocked — no `ANTHROPIC_API_KEY` |
+| Brisket | **Demonstrated** — real nutrition files | Blocked — same |
+| Sara | **Demonstrated** — real body/medical files | Blocked — same |
+| Penelope | **Demonstrated** — real mind/diary files | Blocked — same |
+| Vera | **Demonstrated** — real mind session files | Blocked — same |
+| Hyaluronica | **Demonstrated** — real skincare files | Blocked — same |
+| Clare | **Blocked** — Tasks blob store not mounted; no invented tasks/projects in demo | Blocked — same |
+| Ann | **Blocked** — Teaching blob store not mounted; adapter unit-proven; production ai-chat.mts absent | Blocked — same |
+| Clementine | **Blocked** — Knowledge store not mounted | Blocked — same |
+| Hammond | **Blocked** — cross-hub stores not mounted | Blocked — same |
 
-Proof: `tests/unit/agent-evidence-packs.test.js` (32 pass) + `scripts/agent-evidence-live-demo.mjs` against `/agent/repos/life-hub-data`.
-
+Proof: `tests/unit/agent-evidence-packs.test.js` (38 pass) + honest `scripts/agent-evidence-live-demo.mjs`.  
 Do **not** treat the tool-count snapshot below as proof of the jobs above.
-
-Single-file audit of every roster agent: tools, capabilities, allowlists, intuition packs, protocols, and voices. Built from live `buildAgentTools` + registry/allowlists — not a wishlist.
 
 ## How to read this
 

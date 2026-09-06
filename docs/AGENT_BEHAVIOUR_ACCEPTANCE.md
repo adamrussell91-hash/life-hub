@@ -8,62 +8,60 @@
 
 ---
 
-## Live demonstration matrix (this environment)
+## Honest status (this Cloud Agent environment)
 
-| Agent | Ordinary prompt | Pack active | Tools executed (server) | Answerable | Conversational turn via `chat.mjs` | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| Chadwick | How has my training been going lately? | yes | 7 fitness/body tools | yes | Blocked — `ANTHROPIC_API_KEY` unset | Pack **Demonstrated**; conversation **Blocked** |
-| Brisket | How's my nutrition looking this week? | yes | 5 nutrition tools | yes | Blocked — same | Pack **Demonstrated**; conversation **Blocked** |
-| Sara | Is my weight change unusual lately? | yes | body + weight + medical | yes | Blocked — same | Pack **Demonstrated**; conversation **Blocked** |
-| Penelope | Have I been feeling like this often? | yes | diary search/range/themes | yes | Blocked — same | Pack **Demonstrated**; conversation **Blocked** |
-| Vera | What patterns across recent sessions? | yes | mind search + compare | yes | Blocked — same | Pack **Demonstrated**; conversation **Blocked** |
-| Hyaluronica | Is my routine actually helping? | yes | adherence + response evidence | yes | Blocked — same | Pack **Demonstrated**; conversation **Blocked** |
-| Clare | What should I focus on today? | yes | tasks focus + open loops | yes | Blocked — same | Pack **Demonstrated**; conversation **Blocked** |
-| Ann | Help me improve tomorrow's Year 10 lesson | yes | teaching search/context/diagnosis | yes | Blocked — same | Pack **Demonstrated**; conversation **Blocked** |
-| Clementine | What do I already know about cognitive load? | yes | knowledge search + synthesis | yes | Blocked — same | Pack **Demonstrated**; conversation **Blocked** |
-| Hammond | What is slipping across my life? | yes | hub inspect + attention pack | yes | Blocked — same | Pack **Demonstrated**; conversation **Blocked** |
-
-**Store used for pack demos:** `/agent/repos/life-hub-data/data` (local functioning Life Hub data clone) via `scripts/agent-evidence-live-demo.mjs`. Artifacts: `/opt/cursor/artifacts/agent-evidence-live/`.
-
-**Exact conversational blocker:** `ANTHROPIC_API_KEY` is not present in this Cloud Agent environment (`printenv` length 0). Without it, `chat.mjs` cannot run a genuine model turn. Pack assembly does not require the model and was run against the real store.
-
----
-
-## What changed (runtime)
-
-1. **Server-side evidence packs** (`netlify/functions/_shared/evidence-packs.mjs`) — on domain intents the runtime retrieves evidence *before* the model runs. Tool schemas are no longer the only activation path.
-2. **Domain analysis helpers** (`domain-analysis.mjs`) — remaining day macros, period compares, diary themes, mind multi-session compare, skincare response windows, tasks open loops, teaching diagnosis, knowledge synthesis, Hammond attention pack.
-3. **Activation policy** broadened (incl. hyaluronica “actually helping”).
-4. **`chat.mjs`** injects `evidencePackBlock` into the system prompt; forces `tool_choice: any` only when the pack is not yet answerable.
-5. **Surface unification** — `assembleClareEvidence` / `assembleAnnEvidence` / `assembleClementineEvidence` reused from Clare desk and Knowledge chat turn (same read competence as Life chat).
-
----
-
-## Automated proof
-
-| Suite | Result |
-| --- | --- |
-| `tests/unit/agent-evidence-packs.test.js` | 32/32 pass — broad retrieval, empty store honesty, small-talk negative control, weight conflict, surface adapters |
-| `tests/unit/agent-retrieval-behaviour.test.js` + orchestration acceptance | 31/31 pass (combined with evidence packs: 63/63) |
-
-These tests do **not** mock model tool selection as proof of activation. They assert server pack assembly from ordinary wording.
-
----
-
-## Traceability (mechanism → behaviour)
-
-| Mechanism | Runtime effect | Status |
+| Layer | Status | Evidence |
 | --- | --- | --- |
-| ECC iterative retrieval | Pack + continuationTools when truncated/missing | Demonstrated (pack layer) |
-| Evidence proof gates | Sections kind-tagged record/calculation/missing/truncated/conflict | Demonstrated |
-| Visible truncation | truncated kind + continuation candidates | Demonstrated |
-| User evidence > inference | Pack instructions + conflict flags | Demonstrated |
-| Deterministic calculations | Fitness/nutrition/tasks math via existing models | Demonstrated |
-| Surface unification Clare/Ann/Clementine | Shared pack adapters on desk / knowledge chat | Demonstrated (read path) |
+| Life evidence packs vs real Life files | **Demonstrated** | Chadwick, Brisket, Sara, Penelope, Vera, Hyaluronica — `scripts/agent-evidence-live-demo.mjs` against `/agent/repos/life-hub-data/data` |
+| Hub packs vs real Tasks/Teaching/Knowledge stores | **Blocked** | Clare, Ann, Clementine, Hammond — blob stores not mounted here; demo no longer invents rows |
+| Conversational turn via `chat.mjs` | **Blocked** | `ANTHROPIC_API_KEY` unset |
+| Model interpretation / competing evidence / continuation | **Not started** (not proven) | Unit tests deliberately do **not** mock model tool choice as proof of behaviour |
+
+Artifacts: `/opt/cursor/artifacts/agent-evidence-live/summary.json`.
+
+---
+
+## What this corrective pass fixed
+
+1. **Activation is no longer regex-only.** Specialists pack their domain on substantive turns via `domain_default` (`activation-policy.mjs`). Regex intents still refine tool sets. Paraphrases like “give me a read on gym progress…” now pack for Chadwick. Small-talk still does not.
+2. **Clare projects load in Life chat.** `chat.mjs` loads `PROJECT_PREFIX` (`projects/`) alongside tasks so open-loop / stall / overlapping-excursion analysis is not permanently blind.
+3. **Search is ranked OR, not brittle AND.** Nutrition / skincare / tasks search no longer require every query token to match; natural questions no longer false-empty as easily. Query extraction drops stopwords.
+4. **Ann Teaching surface contract.** `buildAiSystemPrompt` accepts `evidencePackBlock`; `ann-teaching-surface.mjs` exposes `buildAnnTeachingEvidence` / `loadAnnTeachingEvidence` for production Teaching AI routes. Production `apps/teaching/netlify/functions/ai-chat.mts` is still **missing from the tree** — adapter + prompt contract are Demonstrated in unit tests; live Teaching route wiring remains **Blocked** until that function exists and calls the adapter.
+5. **Live demo honesty.** Hub agents report **Blocked** with exact missing-store reasons. No synthetic Clare/Ann/Clementine/Hammond rows.
+
+---
+
+## What remains unproven (do not over-claim)
+
+- Model reading the pack and answering usefully (requires Anthropic).
+- Model retrieving an omitted slice or handling competing evidence.
+- Clare/Ann/Clementine/Hammond packs against **production** Tasks/Teaching/Knowledge blob stores in this environment.
+- Ann’s production Teaching `/api/ai/chat` route calling `loadAnnTeachingEvidence` (function file absent).
+- Shared competence across all three surfaces as a finished product claim — Clare desk + Knowledge turn are wired; Ann Teaching production route is not yet.
+
+---
+
+## Automated proof (what it is / is not)
+
+| Suite | Result | Proves | Does not prove |
+| --- | --- | --- | --- |
+| `tests/unit/agent-evidence-packs.test.js` | 38 pass | Pack activation, domain_default paraphrase, ranked search, Clare projects in pack, Ann Teaching adapter, empty-store honesty | Model behaviour |
+| Teaching `ai-agent` evidencePackBlock case | unit | Prompt includes Teaching evidence section when provided | Live Teaching route |
+
+---
+
+## Traceability
+
+| Mechanism | Effect | Status |
+| --- | --- | --- |
+| Domain-default packing | Substantive specialist turns retrieve without magic wording | Demonstrated (pack) |
+| Clare `hubProjects` load | Project-level open-loop analysis receives projects | Demonstrated (code + unit); live Tasks store Blocked here |
+| Ranked search | Natural questions less likely to false-empty | Demonstrated (unit) |
+| Ann Teaching adapter | Same pack competence callable outside Life chat | Demonstrated (unit); production route Blocked |
 | Live conversational E2E | Requires Anthropic | **Blocked** |
 
 ---
 
-## Honest completion line
+## Completion line
 
-**Not complete for Adam’s full bar** until each agent has a genuine conversational turn through its user-facing route with the model present. Pack retrieval against a functioning store is **Demonstrated** for all ten; conversation is **Blocked** on missing `ANTHROPIC_API_KEY`.
+**Not complete for Adam’s full bar.** Pack-layer competence is Demonstrated for the six Life agents against a real Life store. Hub agents are honestly **Blocked** here without invented data. Conversation remains **Blocked** without `ANTHROPIC_API_KEY`. Tests still do not prove agent behaviour at the model layer — that admission stands.

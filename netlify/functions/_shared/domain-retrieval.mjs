@@ -38,6 +38,25 @@ function truncatedMeta(total, kept) {
   return { truncated: true, kept, omitted: total - kept };
 }
 
+/**
+ * Ranked token match — prefer more overlapping tokens, but do not require
+ * every query token to hit (AND matching false-empties natural questions).
+ */
+function rankedTokenHits(items, toks, hayFor, tieBreak) {
+  if (!toks.length) return [];
+  return items
+    .map(item => {
+      const hay = hayFor(item);
+      const score = toks.reduce((n, t) => (hay.includes(t) ? n + 1 : n), 0);
+      return { item, score };
+    })
+    .filter(row => row.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return tieBreak ? tieBreak(a.item, b.item) : 0;
+    });
+}
+
 function mealEventsFromRecords(records) {
   return (Array.isArray(records) ? records : [])
     .filter(record => record?.type === 'meal')
@@ -126,34 +145,32 @@ export function searchNutritionRecords(records, { query, limit = DEFAULT_LIMIT }
   if (!toks.length) return { ok: false, error: 'empty_query', store: 'life_hub_nutrition' };
   const cap = capLimit(limit);
   const all = (records ?? []).filter(r => r?.type === 'meal');
-  const hits = all
-    .map(record => {
-      const hay = [
-        record.date,
-        record.meal,
-        record.notes,
-        record.calories,
-        record.protein_g
-      ].filter(Boolean).join(' ').toLowerCase();
-      const matched = toks.filter(t => hay.includes(t));
-      return { record, score: matched.length };
-    })
-    .filter(row => row.score === toks.length)
-    .sort((a, b) => String(b.record.date ?? '').localeCompare(String(a.record.date ?? '')));
+  const hits = rankedTokenHits(
+    all,
+    toks,
+    record =>
+      [record.date, record.meal, record.notes, record.calories, record.protein_g]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase(),
+    (a, b) => String(b.date ?? '').localeCompare(String(a.date ?? ''))
+  );
   const slice = hits.slice(0, cap);
   return {
     ok: true,
     store: 'life_hub_nutrition',
     query,
     count: slice.length,
+    match: 'ranked_or',
     ...truncatedMeta(hits.length, slice.length),
-    results: slice.map(({ record }) => ({
+    results: slice.map(({ item: record, score }) => ({
       date: record.date,
       meal: record.meal,
       calories: record.calories,
       protein_g: record.protein_g,
       fat_g: record.fat_g,
-      notes: record.notes
+      notes: record.notes,
+      match_score: score
     }))
   };
 }
@@ -240,29 +257,30 @@ export function searchSkincareRecords(records, { query, limit = DEFAULT_LIMIT } 
   if (!toks.length) return { ok: false, error: 'empty_query', store: 'life_hub_skincare' };
   const cap = capLimit(limit);
   const all = Array.isArray(records) ? records : [];
-  const hits = all
-    .map(record => {
-      const hay = [record.date, record.notes, record.routine, record.body, record.path]
+  const hits = rankedTokenHits(
+    all,
+    toks,
+    record =>
+      [record.date, record.notes, record.routine, record.body, record.path]
         .filter(Boolean)
         .join(' ')
-        .toLowerCase();
-      const matched = toks.filter(t => hay.includes(t));
-      return { record, score: matched.length };
-    })
-    .filter(row => row.score === toks.length)
-    .sort((a, b) => String(b.record.date ?? '').localeCompare(String(a.record.date ?? '')));
+        .toLowerCase(),
+    (a, b) => String(b.date ?? '').localeCompare(String(a.date ?? ''))
+  );
   const slice = hits.slice(0, cap);
   return {
     ok: true,
     store: 'life_hub_skincare',
     query,
     count: slice.length,
+    match: 'ranked_or',
     ...truncatedMeta(hits.length, slice.length),
-    results: slice.map(({ record }) => ({
+    results: slice.map(({ item: record, score }) => ({
       date: record.date,
       routine: record.routine ?? record.name,
       notes: record.notes,
-      is_procedure: Boolean(record.is_procedure)
+      is_procedure: Boolean(record.is_procedure),
+      match_score: score
     }))
   };
 }
@@ -359,25 +377,24 @@ export function searchTasks(tasks = [], { query, limit = DEFAULT_LIMIT } = {}) {
   const toks = tokens(query);
   if (!toks.length) return { ok: false, error: 'empty_query', store: 'tasks_hub' };
   const cap = capLimit(limit);
-  const hits = (tasks ?? [])
-    .filter(isOpenTask)
-    .map(task => {
-      const hay = [task.title, task.domain, task.status, task.notes, task.id]
+  const hits = rankedTokenHits(
+    (tasks ?? []).filter(isOpenTask),
+    toks,
+    task =>
+      [task.title, task.domain, task.status, task.notes, task.id]
         .filter(Boolean)
         .join(' ')
-        .toLowerCase();
-      const matched = toks.filter(t => hay.includes(t));
-      return { task, score: matched.length };
-    })
-    .filter(row => row.score === toks.length);
+        .toLowerCase()
+  );
   const slice = hits.slice(0, cap);
   return {
     ok: true,
     store: 'tasks_hub',
     query,
     count: slice.length,
+    match: 'ranked_or',
     ...truncatedMeta(hits.length, slice.length),
-    results: slice.map(({ task }) => summariseTask(task))
+    results: slice.map(({ item: task, score }) => ({ ...summariseTask(task), match_score: score }))
   };
 }
 

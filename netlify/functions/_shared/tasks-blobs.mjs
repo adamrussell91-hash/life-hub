@@ -6,6 +6,7 @@ export const TASKS_BLOBS_SITE_ID = 'c6696619-f478-4ac1-b0cd-1e4cfd3101df';
 export const TASKS_BLOBS_SITE_ID_ENV = 'TASKS_BLOBS_SITE_ID';
 export const TASKS_BLOBS_TOKEN_ENV = 'NETLIFY_BLOBS_TOKEN';
 export const TASK_PREFIX = 'tasks/';
+export const PROJECT_PREFIX = 'projects/';
 export const TASKS_INDEX_KEY = 'tasks/_index';
 
 export { UMBRELLA_BLOBS_SITE_ID };

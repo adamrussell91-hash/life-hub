@@ -75,6 +75,15 @@ function push(sections, tools, toolName, title, result, preferred = 'record') {
   );
 }
 
+const QUERY_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'have', 'has', 'had',
+  'been', 'being', 'what', 'when', 'where', 'which', 'who', 'whom', 'how',
+  'why', 'are', 'was', 'were', 'will', 'would', 'could', 'should', 'about',
+  'into', 'over', 'under', 'just', 'really', 'actually', 'lately', 'recently',
+  'going', 'looking', 'tell', 'please', 'does', 'did', 'doing', 'your', 'my',
+  'our', 'any', 'all', 'some', 'than', 'then', 'too', 'very', 'also', 'like'
+]);
+
 function queryFromMessage(message, fallback = '') {
   const text = String(message ?? '').trim();
   if (!text) return fallback;
@@ -82,7 +91,11 @@ function queryFromMessage(message, fallback = '') {
     .replace(/^(hey|hi|hello|please|can you|could you|what about|tell me|how about)\s+/i, '')
     .replace(/[?!.]+$/g, '')
     .trim();
-  const words = cleaned.split(/\s+/).filter(w => w.length >= 3).slice(0, 8);
+  const words = cleaned
+    .split(/\s+/)
+    .map(w => w.replace(/[^a-zA-Z0-9_-]/g, ''))
+    .filter(w => w.length >= 3 && !QUERY_STOPWORDS.has(w.toLowerCase()))
+    .slice(0, 6);
   return words.join(' ') || fallback || cleaned.slice(0, 80);
 }
 

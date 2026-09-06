@@ -11,8 +11,15 @@ import {
   assembleAnnEvidence,
   assembleClementineEvidence
 } from '../../netlify/functions/_shared/evidence-packs.mjs';
-import { activationForTurn } from '../../netlify/functions/_shared/capabilities/activation-policy.mjs';
+import {
+  activationForTurn,
+  classifyIntent,
+  isSubstantiveTurn
+} from '../../netlify/functions/_shared/capabilities/activation-policy.mjs';
 import { buildSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
+import { searchSkincareRecords } from '../../netlify/functions/_shared/domain-retrieval.mjs';
+import { buildAnnTeachingEvidence } from '../../netlify/functions/_shared/ann-teaching-surface.mjs';
+import { PROJECT_PREFIX } from '../../netlify/functions/_shared/tasks-blobs.mjs';
 
 const TODAY = '2026-08-20';
 
@@ -241,4 +248,80 @@ test('Clare / Ann / Clementine surface adapters share Life-chat pack competence'
   assert.ok(clare.toolsExecuted.includes('get_tasks_focus'));
   assert.ok(ann.toolsExecuted.includes('search_teaching'));
   assert.ok(clementine.toolsExecuted.includes('search_knowledge'));
+});
+
+test('paraphrase outside regex whitelist still packs via domain_default', () => {
+  const message = 'Give me a read on how gym progress looks over the past few weeks';
+  const intent = classifyIntent('chadwick', message);
+  assert.equal(intent.id, 'domain_default');
+  const pack = assembleEvidencePack({
+    slug: 'chadwick',
+    message,
+    today: TODAY,
+    stores: BASE_STORES
+  });
+  assert.equal(pack.active, true);
+  assert.ok(pack.toolsExecuted.includes('get_fitness_snapshot'));
+});
+
+test('small-talk still does not force domain_default packing', () => {
+  assert.equal(isSubstantiveTurn('hey just saying hi'), false);
+  const intent = classifyIntent('chadwick', 'hey just saying hi');
+  assert.equal(intent.id, 'none');
+  const pack = assembleEvidencePack({
+    slug: 'chadwick',
+    message: 'hey just saying hi',
+    today: TODAY,
+    stores: BASE_STORES
+  });
+  assert.equal(pack.active, false);
+});
+
+test('ranked search does not AND-false-empty natural questions', () => {
+  const skin = searchSkincareRecords(BASE_STORES.skincare, {
+    query: 'is this routine actually helping with redness'
+  });
+  assert.equal(skin.match, 'ranked_or');
+  assert.ok(skin.count > 0, 'natural wording must still hit skincare history');
+});
+
+test('Clare open-loop analysis sees projects when provided', () => {
+  const pack = assembleClareEvidence(
+    {
+      tasks: [
+        {
+          id: 't1',
+          title: 'Mark Year 10 essays',
+          status: 'open',
+          due_date: '2026-08-19',
+          parent_project_id: 'p1',
+          updated_at: '2026-05-01'
+        }
+      ],
+      projects: [
+        { id: 'p1', title: 'Unit redesign', status: 'active', updated_at: '2026-05-01' }
+      ]
+    },
+    { message: 'What projects are stalling my week?', today: TODAY }
+  );
+  assert.equal(pack.active, true);
+  const blob = JSON.stringify(pack.sections);
+  assert.match(blob, /Unit redesign/);
+});
+
+test('Ann Teaching surface adapter packs from Teaching stores', () => {
+  const surface = buildAnnTeachingEvidence({
+    message: "Help me improve tomorrow's Year 10 lesson",
+    today: TODAY,
+    classes: BASE_STORES.classes,
+    lessons: BASE_STORES.lessons,
+    units: BASE_STORES.units
+  });
+  assert.equal(surface.active, true);
+  assert.ok(surface.promptBlock.includes('Server-assembled evidence pack'));
+  assert.ok(surface.toolsExecuted.includes('search_teaching'));
+});
+
+test('PROJECT_PREFIX is exported for Life-chat Clare project loading', () => {
+  assert.equal(PROJECT_PREFIX, 'projects/');
 });

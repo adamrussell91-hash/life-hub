@@ -324,6 +324,22 @@ describe('AI context builder', () => {
     }
   });
 
+  it('includes Ann Teaching evidence pack when evidencePackBlock is provided', () => {
+    const lesson = lessonFixture({ title: 'Persuasive openings', id: 'lesson_ann_ev' });
+    const prompt = buildAiSystemPrompt({
+      agentName: "Ann O'Tation",
+      protocol: 'Be precise.',
+      lesson,
+      scope: 'lesson',
+      selectedBlockId: null,
+      searchPack: EMPTY_SEARCH_PACK,
+      evidencePackBlock: 'Server-assembled evidence pack for ann\n### Teaching search [record]'
+    });
+    expect(prompt).toContain('## Teaching evidence pack');
+    expect(prompt).toContain('Server-assembled evidence pack for ann');
+    expect(prompt).toContain('primary evidence for class/unit/lesson context');
+  });
+
   it('includes full lesson JSON when fullLesson is true', () => {
     const heading = createBlock('heading', 'h_full');
     if (heading.block_type !== 'heading') throw new Error('expected heading');

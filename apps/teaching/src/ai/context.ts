@@ -20,6 +20,8 @@ export interface AiContextInput {
   subjectLabel?: string;
   fullLesson?: boolean;
   compositionFill?: CompositionFillMatch;
+  /** Server-assembled Ann evidence pack (Teaching store retrieval). */
+  evidencePackBlock?: string;
 }
 
 function lessonOutline(blocks: Block[]): Array<{ id: string; block_type: string }> {
@@ -87,6 +89,15 @@ export function buildAiSystemPrompt(input: AiContextInput): string {
       'Keep this structure. Fill existing blocks from the selected text or lesson. Do not invent a new page architecture.',
       'Return schema-valid blocks that match this tree (preserve block_type sequence; you may replace ids when inserting).',
       JSON.stringify(input.compositionFill.root)
+    );
+  }
+
+  if (input.evidencePackBlock?.trim()) {
+    parts.push(
+      '',
+      '## Teaching evidence pack',
+      'Server-assembled from Teaching Hub stores before this reply. Treat as primary evidence for class/unit/lesson context. Label record vs calculation vs inference. Do not invent rows that are not here.',
+      input.evidencePackBlock.trim()
     );
   }
 
