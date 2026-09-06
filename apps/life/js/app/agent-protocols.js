@@ -239,7 +239,7 @@ export const AGENT_STATUS_LINES = {
     'Cutting what does not earn its keep…'
   ],
   clare: [
-    'Sorting the dump…',
+    'Sorting the list…',
     'Finding the smallest next move…',
     'Checking the clock…',
     'Clearing the open loops…',
