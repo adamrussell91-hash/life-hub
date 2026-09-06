@@ -215,6 +215,8 @@ test('buildAgentTools attaches domain retrieval for parity agents', () => {
   const clare = buildAgentTools({ slug: 'clare' }).map(t => t.name);
   assert.ok(clare.includes('get_tasks_focus'));
   assert.ok(clare.includes('search_tasks'));
+  assert.ok(clare.includes('create_task'));
+  assert.ok(clare.includes('update_task'));
 
   const ann = buildAgentTools({ slug: 'ann' }).map(t => t.name);
   assert.ok(ann.includes('search_teaching'));
