@@ -282,9 +282,17 @@ console.log('\n2) CHADWICK — workout log through Confirm');
     const newWrites = writes.slice(beforeWrites);
     check('wrote workout file', newWrites.some(w => w.path === turn.proposal.path),
       newWrites.map(w => w.path).join(', ') || 'no writes');
-    check('wrote central node or template',
-      newWrites.some(w => w.path === 'central-node.md') || newWrites.some(w => w.path.includes('templates')),
-      newWrites.map(w => w.path).join(', '));
+    const planned = String(turn.proposal.path).includes('workout-planned')
+      || turn.proposal.record?.status === 'planned';
+    if (planned) {
+      check('planned workout leaves central node alone',
+        !newWrites.some(w => w.path === 'central-node.md'),
+        newWrites.map(w => w.path).join(', '));
+    } else {
+      check('wrote central node or template',
+        newWrites.some(w => w.path === 'central-node.md') || newWrites.some(w => w.path.includes('templates')),
+        newWrites.map(w => w.path).join(', '));
+    }
     check('centralNodeUpdated reported', conf.payload?.data?.centralNodeUpdated === true
       || conf.payload?.data?.centralNodeUpdated === false,
       `centralNodeUpdated=${conf.payload?.data?.centralNodeUpdated}`);
