@@ -189,10 +189,15 @@
   min-width: 0;
 }
 
+.page-header:has(.page-header__status:not(:empty)) {
+  gap: var(--space-4);
+  align-items: center;
+}
+
 .page-header__status {
   display: flex;
   justify-content: flex-end;
-  align-items: flex-end;
+  align-items: stretch;
   flex: 1 1 16rem;
   min-width: 0;
 }
