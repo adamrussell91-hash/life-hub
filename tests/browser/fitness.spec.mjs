@@ -86,12 +86,13 @@ test('the Fitness tab renders the fixture workout and labeled analytics', async 
     assert.equal(await page.locator('#fitness-push-pull-card').isVisible(), true);
     assert.equal(await page.locator('#fitness-rest-card').isVisible(), true);
     assert.equal(await page.locator('#fitness-e1rm-card').isHidden(), true);
-    assert.equal(await page.locator('#fitness-readings-card').isHidden(), true);
-    assert.equal(await page.locator('#fitness-clock-card').isVisible(), true);
+    assert.equal(await page.locator('#fitness-readings-card').getAttribute('hidden'), null);
+    assert.match(await page.locator('#fitness-readings').textContent(), /Duration/);
+    assert.equal(await page.locator('#fitness-clock-card').getAttribute('hidden'), null);
     assert.match(await page.locator('[data-fitness="when-read"]').textContent(), /Split mornings and evenings · typical start 12:25/);
     assert.match(await page.locator('#fitness-clock-chart').textContent(), /Morning/);
     assert.match(await page.locator('#fitness-clock-chart').textContent(), /Evening/);
-    assert.equal(await page.locator('#fitness-orbit-card').isVisible(), true);
+    assert.equal(await page.locator('#fitness-orbit-card').getAttribute('hidden'), null);
     assert.match(await page.locator('[data-fitness="orbit-read"]').textContent(), /2 sessions in the last 30 days/);
     assert.match(await page.locator('#fitness-year-card').textContent(), /2 sessions in 2026/);
     assert.match(await page.locator('#fitness-recent').textContent(), /Chest and Curls/);
