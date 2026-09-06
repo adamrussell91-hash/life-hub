@@ -306,12 +306,20 @@
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    padding: var(--space-4) var(--space-3);
-    --dial-scale: 0.72;
+    padding: var(--space-3) 0;
+    gap: var(--space-3);
+    --dial-scale: 1;
+    overflow: visible;
+  }
+
+  .daily-dial__panel {
+    overflow: visible;
+    width: 100%;
   }
 
   .daily-dial__shell {
-    width: min(22.5rem, 100%);
+    width: 100%;
+    overflow: visible;
   }
 
   .daily-dial__chip {

@@ -50,8 +50,26 @@ const LEADER_ELBOW_R = 150;
 const LEADER_STUB = 12;
 /** Wide enough that scaled-down mobile dials still show a readable title. */
 const LEADER_CHIP_W = 148;
-const DIAL_VIEWBOX = '-40 0 600 520';
+const DIAL_VIEWBOX_DESKTOP = '-40 0 600 520';
+/** Phone: crop hard to the ring so hour detail fills the card. Leader chips may spill; shell allows overflow. */
+const DIAL_VIEWBOX_MOBILE = '90 95 340 340';
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+
+function dialIsCompact(): boolean {
+  return window.matchMedia('(max-width: 720px)').matches;
+}
+
+function dialViewBox(): string {
+  return dialIsCompact() ? DIAL_VIEWBOX_MOBILE : DIAL_VIEWBOX_DESKTOP;
+}
+
+function leaderLayout(): { elbowR: number; chipW: number; stub: number } {
+  if (!dialIsCompact()) {
+    return { elbowR: LEADER_ELBOW_R, chipW: LEADER_CHIP_W, stub: LEADER_STUB };
+  }
+  // Keep callouts near the rim so a tight mobile viewBox still leaves readable chips.
+  return { elbowR: 168, chipW: 120, stub: 8 };
+}
 
 const TINT_INK: Record<DialTint, string> = {
   blue: 'var(--pastel-blue-ink)',
@@ -198,9 +216,10 @@ type LeaderItem = {
 function drawLeaderBatch(host: SVGElement, items: LeaderItem[]): void {
   const chipH = 30;
   const minGap = chipH + 6;
+  const { elbowR, chipW, stub } = leaderLayout();
   const laid = items.map((item) => {
     const edge = point(item.edgeR, item.angle);
-    const elbow = point(LEADER_ELBOW_R, item.angle);
+    const elbow = point(elbowR, item.angle);
     return {
       ...item,
       edge,
@@ -221,7 +240,7 @@ function drawLeaderBatch(host: SVGElement, items: LeaderItem[]): void {
   }
 
   for (const row of laid) {
-    const stubX = row.elbowX + (row.right ? LEADER_STUB : -LEADER_STUB);
+    const stubX = row.elbowX + (row.right ? stub : -stub);
     host.append(
       svgEl('path', {
         class: 'daily-dial__leader',
@@ -236,9 +255,9 @@ function drawLeaderBatch(host: SVGElement, items: LeaderItem[]): void {
       })
     );
     const fo = svgEl('foreignObject', {
-      x: (row.right ? stubX : stubX - LEADER_CHIP_W).toFixed(1),
+      x: (row.right ? stubX : stubX - chipW).toFixed(1),
       y: (row.y - chipH / 2).toFixed(1),
-      width: LEADER_CHIP_W,
+      width: chipW,
       height: chipH
     });
     const chip = document.createElement('button');
@@ -381,7 +400,7 @@ function mountDayRing(
 ): { destroy: () => void; positionHand: () => void } {
   const occupancy = hourOccupancy(events);
   const clock = hubClockParts(now, timeZone);
-  const svg = svgEl('svg', { viewBox: DIAL_VIEWBOX, 'aria-hidden': 'true' });
+  const svg = svgEl('svg', { viewBox: dialViewBox(), 'aria-hidden': 'true' });
   svg.append(svgEl('circle', { class: 'daily-dial__rim', cx: CX, cy: CY, r: 146 }));
   const spokes = svgEl('g');
   const bars = svgEl('g');
@@ -543,7 +562,7 @@ function mountWeekRing(
   tasks: Task[],
   onOpen?: (task: Task) => void
 ): { destroy: () => void } {
-  const svg = svgEl('svg', { viewBox: DIAL_VIEWBOX, 'aria-hidden': 'true' });
+  const svg = svgEl('svg', { viewBox: dialViewBox(), 'aria-hidden': 'true' });
   svg.append(svgEl('circle', { class: 'daily-dial__rim', cx: CX, cy: CY, r: 146 }));
   const spokes = svgEl('g');
   const bars = svgEl('g');

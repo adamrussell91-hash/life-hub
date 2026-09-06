@@ -1,7 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Task } from '@/schemas/task';
 import { mountDailyDial, resetDailyDialSession } from '@/views/daily-dial';
 import { hubCalendarDate, toDateKey } from '@/domain/queries';
+
+function mockMatchMedia(matches: Record<string, boolean> = {}): void {
+  vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => {
+    const hit = Object.entries(matches).find(([key]) => query.includes(key));
+    return {
+      matches: hit ? hit[1] : false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    } as unknown as MediaQueryList;
+  });
+}
 
 function task(partial: Partial<Task> & Pick<Task, 'id' | 'title'>): Task {
   return {
@@ -38,16 +56,7 @@ function task(partial: Partial<Task> & Pick<Task, 'id' | 'title'>): Task {
 describe('daily dial view', () => {
   beforeEach(() => {
     resetDailyDialSession();
-    vi.spyOn(window, 'matchMedia').mockReturnValue({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    } as unknown as MediaQueryList);
+    mockMatchMedia({ 'prefers-reduced-motion': true });
   });
 
   afterEach(() => {
@@ -72,7 +81,23 @@ describe('daily dial view', () => {
     expect(host.textContent).toContain('Tap an hour to schedule');
     expect(host.querySelector('.daily-dial__label--focused')?.textContent).toBe('9 AM');
     expect(host.querySelector('.daily-dial__chip-title')?.textContent).toBe('Standup');
+    expect(host.querySelector('.daily-dial__shell svg')?.getAttribute('viewBox')).toBe('-40 0 600 520');
     handle.destroy();
+  });
+
+  it('crops the SVG viewBox on phones so the ring fills the card', () => {
+    mockMatchMedia({ 'prefers-reduced-motion': true, 'max-width: 720px': true });
+    const host = document.createElement('div');
+    document.body.append(host);
+    const now = new Date('2026-08-29T23:10:00.000Z');
+    mountDailyDial(host, {
+      tasks: [task({ id: 'task_standup', title: 'Standup', due_date: toDateKey(hubCalendarDate(now)) })],
+      projects: [],
+      now,
+      date: hubCalendarDate(now)
+    });
+    expect(host.querySelector('.daily-dial__shell svg')?.getAttribute('viewBox')).toBe('90 95 340 340');
+    expect(host.querySelector('.daily-dial__chip-title')?.textContent).toBe('Standup');
   });
 
   it('opens a task from a radial chip', () => {
@@ -125,5 +150,22 @@ describe('daily dial view', () => {
     const legend = host.querySelector('.daily-dial__legend')?.textContent ?? '';
     expect(legend).toContain('Life');
     expect(legend).not.toContain('Wedding');
+  });
+});
+
+describe('mobile daily dial CSS', () => {
+  const dialCss = readFileSync(resolve(process.cwd(), 'src/styles/daily-dial.css'), 'utf8');
+
+  it('lets the phone shell fill the card instead of capping at 22.5rem', () => {
+    expect(dialCss).toMatch(
+      /@media \(max-width:\s*720px\)[\s\S]*?\.daily-dial__shell\s*\{[^}]*width:\s*100%/
+    );
+    expect(dialCss).not.toMatch(/width:\s*min\(22\.5rem,\s*100%\)/);
+  });
+
+  it('keeps mobile centre readout at full scale', () => {
+    expect(dialCss).toMatch(
+      /@media \(max-width:\s*720px\)[\s\S]*?\.daily-dial\s*\{[^}]*--dial-scale:\s*1(?!\d)/
+    );
   });
 });
