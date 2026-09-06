@@ -143,6 +143,34 @@ describe('clare store dump + batch', () => {
     expect(tasks.some((t) => t.tags.includes('comms'))).toBe(true);
   });
 
+  it('rewrites wording corrections instead of proposing them as new tasks', async () => {
+    const kv = memoryKv();
+    await seedIfEmpty(kv, keys, seed);
+    const store = createTasksStore(kv, keys);
+    const priorTitle =
+      'At some point I need to put in the international neuroscience Olympiad encouraging request and the UN voice encouraging request as well';
+
+    const dump = await store.processDumpWithClare({
+      text: 'Encouraging is supposed to be incursion for both of those',
+      domain: 'teaching',
+      now: new Date('2026-09-06T09:00:00'),
+      judge: null,
+      recent_thread: [
+        { role: 'user', text: priorTitle },
+        {
+          role: 'assistant',
+          text: `Is “${priorTitle}” due this week or next week?`
+        }
+      ]
+    });
+
+    expect(dump.voice).toMatch(/Fixed|incursion/i);
+    expect(dump.proposals.length).toBeGreaterThanOrEqual(1);
+    expect(dump.proposals.every((p) => /incursion/i.test(p.title))).toBe(true);
+    expect(dump.proposals.every((p) => !/encouraging/i.test(p.title))).toBe(true);
+    expect(dump.proposals.every((p) => !/supposed to be/i.test(p.title))).toBe(true);
+  });
+
   it('remembers timezone from chat via hub prefs', async () => {
     const kv = memoryKv();
     await seedIfEmpty(kv, keys, seed);
