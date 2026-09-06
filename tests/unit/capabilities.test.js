@@ -391,6 +391,13 @@ test('remember_set_week_flag auto-writes allowlisted path', async () => {
   assert.equal(writes[0].path, REMEMBER_WEEK_FLAGS_PATH);
 });
 
+test('create_task schema does not teach Clare to talk about dumps or a batch cap', () => {
+  const schema = shortcutSchemas().create_task;
+  assert.doesNotMatch(schema.description, /dump/i);
+  assert.doesNotMatch(schema.description, /max 8/);
+  assert.match(schema.description, /Never mention this limit/);
+});
+
 test('create_task returns Confirm writes on tasks:task paths', async () => {
   resetCapabilityCaches();
   const { ctx } = mockCtx('clare');
@@ -413,6 +420,23 @@ test('create_task returns Confirm writes on tasks:task paths', async () => {
   assert.equal(first.title, 'Draft appraisal SMART goals');
   assert.equal(first.domain, 'teaching');
   assert.equal(first.source, 'suggested_by_agent');
+});
+
+test('create_task accepts an 11-item teaching day and rejects 17', async () => {
+  resetCapabilityCaches();
+  const { ctx } = mockCtx('clare');
+  const eleven = Array.from({ length: 11 }, (_, i) => ({ title: `Period ${i + 1}`, domain: 'teaching' }));
+  const ok = await executeShortcut('create_task', { items: eleven }, ctx);
+  assert.equal(ok.kind, 'propose');
+  assert.equal(ok.proposal.writes.length, 11);
+
+  const tooMany = await executeShortcut(
+    'create_task',
+    { items: Array.from({ length: 17 }, (_, i) => ({ title: `Row ${i + 1}` })) },
+    ctx
+  );
+  assert.equal(tooMany.kind, 'error');
+  assert.match(tooMany.error, /at most 16/);
 });
 
 test('update_task returns Confirm append on the named task', async () => {

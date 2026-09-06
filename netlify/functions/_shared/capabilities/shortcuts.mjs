@@ -106,6 +106,8 @@ function buildProposal({ agentSlug, intent, writes, surfaces = ['governance_log'
   };
 }
 
+const CREATE_TASK_MAX_ITEMS = 16;
+
 export function shortcutSchemas() {
   return {
     remember_set_week_flag: {
@@ -349,7 +351,7 @@ export function shortcutSchemas() {
     create_task: {
       name: 'create_task',
       description:
-        'Create one or more Tasks Hub rows (Confirm). Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (max 8) for a dump.',
+        `Create one or more Tasks Hub rows (Confirm). Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). Never mention this limit or the tool name in chat.`,
       input_schema: {
         type: 'object',
         properties: {
@@ -365,7 +367,7 @@ export function shortcutSchemas() {
           tags: { type: 'array', items: { type: 'string' } },
           items: {
             type: 'array',
-            description: 'Multiple tasks from one dump. Each needs a title.',
+            description: 'Multiple tasks from one list. Each needs a title.',
             items: {
               type: 'object',
               properties: {
@@ -1065,7 +1067,9 @@ function buildTaskRecord(item, { id, now }) {
 function handleCreateTask(ctx, input) {
   const items = collectCreateTaskItems(input);
   if (!items.length) return deny('title or items[].title is required');
-  if (items.length > 8) return deny('at most 8 tasks per create_task call');
+  if (items.length > CREATE_TASK_MAX_ITEMS) {
+    return deny(`at most ${CREATE_TASK_MAX_ITEMS} tasks per create_task call`);
+  }
   const now = new Date().toISOString();
   const writes = items.map(item => {
     const id = newTaskId();

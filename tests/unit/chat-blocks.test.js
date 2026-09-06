@@ -32,3 +32,23 @@ test('takeCompletedChatBlocks skips empty leading breaks', () => {
   assert.deepEqual(blocks, []);
   assert.equal(rest, 'Ready.');
 });
+
+test('takeCompletedChatBlocks keeps a continuing numbered list in one remainder', () => {
+  const list = [
+    '7. HSC Trials Catch up (Library) — 1:30–2:00',
+    '',
+    '8. Start preparing a note — 2:00–2:20',
+    '',
+    '9. Pathfinders session — 3:00–4:00'
+  ].join('\n');
+  const { blocks, rest } = takeCompletedChatBlocks(list);
+  assert.deepEqual(blocks, []);
+  assert.equal(rest, list.replace(/\n\n/g, '\n'));
+});
+
+test('takeCompletedChatBlocks still splits a numbered list from following prose', () => {
+  const text = '1. First row\n\n2. Second row\n\nThat is the lot — want me to add them?';
+  const { blocks, rest } = takeCompletedChatBlocks(text);
+  assert.deepEqual(blocks, ['1. First row\n2. Second row']);
+  assert.equal(rest, 'That is the lot — want me to add them?');
+});
