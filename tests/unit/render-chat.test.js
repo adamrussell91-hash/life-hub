@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, renderChatMarkdown, renderInlineMarkdown } from '../../apps/life/js/app/render-chat.js';
+import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, renderChatMarkdown, renderInlineMarkdown, scrollChatIfPinned } from '../../apps/life/js/app/render-chat.js';
 
 class FakeElement {
   constructor(tag) {
@@ -89,6 +89,27 @@ test('renderInlineMarkdown treats plain text with no markers as a single span', 
   assert.equal(bubble.children.length, 1);
   assert.equal(bubble.children[0].tagName, 'span');
   assert.equal(bubble.children[0].textContent, 'Just plain text here.');
+});
+
+test('scrollChatIfPinned does not jump to the floor while a turn is pinned', () => {
+  const list = {
+    scrollTop: 12,
+    scrollHeight: 800,
+    querySelector(selector) {
+      if (selector === '[data-chat-turn-anchor]') return { id: 'user-turn' };
+      return null;
+    }
+  };
+  scrollChatIfPinned(list, true);
+  assert.equal(list.scrollTop, 12, 'follow() owns scroll while the user turn is anchored');
+
+  const idle = {
+    scrollTop: 12,
+    scrollHeight: 800,
+    querySelector() { return null; }
+  };
+  scrollChatIfPinned(idle, true);
+  assert.equal(idle.scrollTop, 800);
 });
 
 test('appendMessage still sets plain textContent for simple system-style bubbles', () => {

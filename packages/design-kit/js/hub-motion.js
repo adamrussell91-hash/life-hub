@@ -36,7 +36,6 @@ const MAGNET_SELECTOR = [
 
 const LIST_SELECTOR = [
   '.logging-list',
-  '.chat-messages',
   '.meal-log',
   '.cards',
   '.nutrition-challenge-list',
@@ -379,9 +378,36 @@ export function nextScrollHideState({
   const floor = Number(threshold);
   if (!Number.isFinite(y)) return Boolean(hidden);
   if (y <= (Number.isFinite(floor) ? floor : DEFAULT_SCROLL_HIDE_THRESHOLD)) return false;
-  if (Number.isFinite(last) && y > last) return true;
-  if (Number.isFinite(last) && y < last) return false;
+  // follow() rewrites scrollTop by a few pixels as the reply grows.
+  // Treating every 1px direction change as hide/reveal strobes Chat chrome.
+  const stick = 16;
+  if (Number.isFinite(last) && y > last + stick) return true;
+  if (Number.isFinite(last) && y < last - stick) return false;
   return Boolean(hidden);
+}
+
+/**
+ * Scroll-hide for a live scroller. Content growth and in-flow collapse must
+ * not toggle hide — that loop made Life Chat's window strobe while a reply grew.
+ */
+export function scrollHideFromScroller({
+  current,
+  previous = 0,
+  threshold = DEFAULT_SCROLL_HIDE_THRESHOLD,
+  hidden = false,
+  overflowing = true,
+  contentGrew = false,
+  busy = false
+}) {
+  if (busy) return Boolean(hidden);
+  if (contentGrew) return Boolean(hidden);
+  if (!overflowing) {
+    const y = Number(current);
+    const floor = Number.isFinite(Number(threshold)) ? Number(threshold) : DEFAULT_SCROLL_HIDE_THRESHOLD;
+    if (Number.isFinite(y) && y <= floor) return false;
+    return Boolean(hidden);
+  }
+  return nextScrollHideState({ current, previous, threshold, hidden });
 }
 
 function scrollTopOf(scroller) {
@@ -432,12 +458,14 @@ function readThreshold(el) {
 export function applyHubScrollHide(el, scroll = {}) {
   if (!el?.classList) return false;
   el.classList.add('hub-scroll-hide');
-  const hidden = nextScrollHideState({
-    current: scroll.current,
-    previous: scroll.previous,
-    threshold: scroll.threshold ?? readThreshold(el),
-    hidden: el.classList.contains('is-hidden')
-  });
+  const hidden = scroll.force != null
+    ? Boolean(scroll.force)
+    : nextScrollHideState({
+      current: scroll.current,
+      previous: scroll.previous,
+      threshold: scroll.threshold ?? readThreshold(el),
+      hidden: el.classList.contains('is-hidden')
+    });
   el.classList.toggle('is-hidden', hidden);
   el.toggleAttribute?.('inert', hidden);
   if (hidden) el.setAttribute?.('aria-hidden', 'true');
@@ -467,18 +495,28 @@ function bindScrollHide(el) {
     const live = resolveScrollHideScroller(el);
     const current = scrollTopOf(live);
     const previous = scrollHideState.get(el)?.y ?? current;
-    if (!scrollerOverflows(live)) {
-      applyHubScrollHide(el, { current: 0, previous: 0 });
-      const next = scrollHideState.get(el);
-      if (next) next.y = current;
-      return;
-    }
-    applyHubScrollHide(el, { current, previous });
+    const height = Number(live.scrollHeight ?? 0);
+    const prevHeight = scrollHideState.get(el)?.h;
+    const contentGrew = Number.isFinite(prevHeight) && height !== prevHeight;
+    const view = el.closest?.('.chat-view, .chat-overlay, .coach.chat');
+    const hidden = scrollHideFromScroller({
+      current,
+      previous,
+      threshold: readThreshold(el),
+      hidden: el.classList.contains('is-hidden'),
+      overflowing: scrollerOverflows(live),
+      contentGrew,
+      busy: view?.classList?.contains('is-busy')
+    });
+    applyHubScrollHide(el, { force: hidden });
     const next = scrollHideState.get(el);
-    if (next) next.y = current;
+    if (next) {
+      next.y = current;
+      next.h = height;
+    }
   };
 
-  state = { scroller, y: scrollTopOf(scroller), onScroll };
+  state = { scroller, y: scrollTopOf(scroller), h: scroller?.scrollHeight, onScroll };
   scrollHideState.set(el, state);
   listenTarget(scroller).addEventListener?.('scroll', onScroll, { passive: true });
   return state;
