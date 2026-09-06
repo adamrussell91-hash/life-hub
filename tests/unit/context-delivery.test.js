@@ -11,9 +11,12 @@ import {
 import { trimCrossAgentSection } from '../../apps/life/js/core/central-node-write.js';
 import {
   CENTRAL_NODE_UNAVAILABLE_MARKER,
+  HUB_CONTEXT_UNAVAILABLE_MARKER,
+  HUB_TASKS_UNAVAILABLE_MARKER,
   assertContextDelivered,
   evaluateConstraintBehaviour
 } from '../../apps/life/js/core/context-integrity.js';
+import { formatHubAgentContext } from '../../netlify/functions/_shared/hub-agent-context.mjs';
 import { buildSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
 
 const PAIN_LINE =
@@ -85,6 +88,25 @@ test('Parity: empty CN path does not prove Chadwick Delivery', () => {
     () => assertContextDelivered(chadwickEmpty, PAIN_LINE, 'pain line'),
     /Delivery failed/
   );
+});
+
+test('Fail-visible: hub Tasks load failure marker reaches Hammond system prompt', () => {
+  const hubContext = formatHubAgentContext({
+    now: new Date('2026-09-04T02:00:00Z'),
+    loadErrors: { tasks: 'load_failed' }
+  });
+  const system = buildSystemPrompt({ slug: 'hammond', hubContext });
+  assertContextDelivered(system, HUB_TASKS_UNAVAILABLE_MARKER, 'hub Tasks unavailable marker');
+  assert.match(system, /Do not invent Tasks rows/);
+});
+
+test('Fail-visible: total hub-context load failure marker reaches Hammond system prompt', () => {
+  const system = buildSystemPrompt({
+    slug: 'hammond',
+    hubContext: HUB_CONTEXT_UNAVAILABLE_MARKER
+  });
+  assertContextDelivered(system, HUB_CONTEXT_UNAVAILABLE_MARKER, 'hub context unavailable marker');
+  assert.match(system, /Do not invent Tasks or Teaching rows/);
 });
 
 test('Fail-visible: CN load failure marker reaches Chadwick system prompt', () => {
