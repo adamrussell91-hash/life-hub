@@ -735,13 +735,21 @@
 }
 
 .reminder-card {
-  display: grid;
-  gap: var(--space-2);
-  max-width: 28rem;
-  padding: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: none;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--hub-glass-fill);
+}
+
+.reminder-card__body {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .reminder-strip__head {
@@ -776,9 +784,9 @@
 }
 
 .reminder-card__copy {
-  margin: var(--space-2) 0 0;
+  margin: 0.125rem 0 0;
   color: var(--muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
 .reminder-card__meta {
@@ -4660,8 +4668,9 @@ body.is-universe-fullscreen .page-header {
 
 .page-header__status .dashboard-focus {
   margin-bottom: 0;
-  justify-content: flex-end;
-  gap: var(--space-2) var(--space-5);
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--space-2) var(--space-4);
 }
 
 .dashboard-focus__tile {
