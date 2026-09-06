@@ -124,13 +124,28 @@ function fromStressFlags(flags, today) {
     }, today));
 }
 
+function fromExpiringBriefs(briefs, today) {
+  return (Array.isArray(briefs) ? briefs : [])
+    .filter(brief => {
+      const expires = dateKeyFrom(brief?.expires_at);
+      return expires && expires <= today && typeof brief.title === 'string' && brief.title.trim();
+    })
+    .map(brief => withAge({
+      source: 'research_brief',
+      owner: 'Research',
+      title: clipTitle(brief.title),
+      dateKey: dateKeyFrom(brief.expires_at)
+    }, today));
+}
+
 export function collectOpenLoops({
   today,
   governanceLogMarkdown = '',
   centralNodeMarkdown = '',
   weekFlags = null,
   tasks = [],
-  stressFlags = []
+  stressFlags = [],
+  researchBriefs = []
 } = {}) {
   if (!isCalendarDate(today)) return [];
   return [
@@ -138,7 +153,8 @@ export function collectOpenLoops({
     ...fromCrossAgent(centralNodeMarkdown, today),
     ...fromClareLater(tasks, today),
     ...fromStaleWeekFlags(weekFlags, today),
-    ...fromStressFlags(stressFlags, today)
+    ...fromStressFlags(stressFlags, today),
+    ...fromExpiringBriefs(researchBriefs, today)
   ].filter(loop => loop.title);
 }
 

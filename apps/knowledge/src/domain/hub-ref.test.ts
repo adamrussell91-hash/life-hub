@@ -19,6 +19,17 @@ describe("parseHubRef", () => {
     });
   });
 
+  it("parses Life decision refs", () => {
+    expect(parseHubRef("life:decision:aotfw-sources")).toEqual({
+      hub: "life",
+      kind: "decision",
+      id: "aotfw-sources",
+    });
+    expect(hrefForHubRef({ hub: "life", kind: "decision", id: "aotfw-sources" })).toBe(
+      "https://life-hub.adam-russell.com/#central-node",
+    );
+  });
+
   it("rejects unknown hubs and kinds", () => {
     expect(parseHubRef("life://diary/x")).toBeNull();
     expect(parseHubRef("teaching:lesson:lesson_1")).toBeNull();

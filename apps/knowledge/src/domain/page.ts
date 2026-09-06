@@ -53,6 +53,7 @@ export const PageSchema = z
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),
     schema_version: z.literal(1),
+    decision_traces: z.array(z.unknown()).optional(),
   })
   .superRefine((page, ctx) => {
     if (page.source === "hub") return;

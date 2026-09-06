@@ -102,6 +102,7 @@ import { enterChatRail, leaveChatRail, renderChatRail } from "./chat/rail";
 import { ensureChatOverlay, hideChatOverlay, openChatOverlay, pinChatOverlayNote } from "./chat/overlay";
 import type { GraphPreviewNote } from "./archive/graphPreview";
 import { connectedLinksHtml } from "./wiki/connectedHtml";
+import { decisionTraceHtml, type DecisionTrace } from "./wiki/decisionTraceHtml";
 import { addOrigin, isOriginKind, originKey, removeOrigin } from "./origin/normalize";
 import { resolvedOrigins } from "./origin/notesPlace";
 import { originComposeFieldHtml, originPillsHtml, parseOriginRemoveValue } from "./origin/pills";
@@ -1287,6 +1288,11 @@ function findingCards(findings: ResearchFinding[]): string {
     .join("");
 }
 
+function livePageBody(body: string) {
+  if (!body.includes("{{life:compare_workout_windows}}")) return body;
+  return body.split("{{life:compare_workout_windows}}").join("_Live workout compare unavailable._");
+}
+
 function renderPage(page: Page) {
   const topics = topicKeywords(page.tags);
   const openCompose = (draft: Origin | null = null) => {
@@ -1321,7 +1327,8 @@ function renderPage(page: Page) {
       ${dueReviewsFor([page]).length ? pageReviewActionsHtml() : ""}
       ${originPillsHtml(resolvedOrigins(page), { openEdit: true })}
       ${readerTopicPillsHtml(topics.slice(0, 6))}
-      <div class="reader__body">${renderMarkdown(page.body)}</div>
+      <div class="reader__body">${renderMarkdown(livePageBody(page.body))}</div>
+      ${decisionTraceHtml((page as Page & { decision_traces?: DecisionTrace[] }).decision_traces)}
       ${connectedLinksHtml(page, entries)}
       ${renderAttachments(page)}
     </article>

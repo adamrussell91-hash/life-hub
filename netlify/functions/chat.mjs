@@ -112,6 +112,7 @@ import {
   applyCentralNodePatch,
   assertAgentMayApplyCentralNodePatch
 } from './_shared/hammond-tools.mjs';
+import { buildSecondOpinionChoice } from './_shared/second-opinion.mjs';
 import {
   PENDING_CN_PATCHES_PATH,
   createPendingCnPatchId,
@@ -1478,6 +1479,13 @@ export function createChatHandler({
                   governanceLogSha = result.sha;
                   governanceLogAppendedThisTurn = true;
                   send({ type: 'governance_log_appended', entryType: dated.entryType });
+                  if (dated.entryType === 'Major Decision' || dated.chosen) {
+                    const choice = buildSecondOpinionChoice({
+                      title: dated.title || dated.entryType,
+                      decisionId: dated.decisionId
+                    });
+                    if (choice) send(choice);
+                  }
                   return JSON.stringify({ ok: true, path: GOVERNANCE_LOG_PATH });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });

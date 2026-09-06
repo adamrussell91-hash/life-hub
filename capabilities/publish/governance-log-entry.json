@@ -14,7 +14,9 @@
     "dateKey": "YYYY-MM-DD?",
     "chosen": "string?",
     "reasoning": "string?",
-    "revisit": "YYYY-MM-DD?"
+    "revisit": "YYYY-MM-DD?",
+    "decision_id": "string?",
+    "about": "hub-ref[]?"
   },
   "side_effects": ["Appends a dated Governance Log entry"],
   "surfaces": ["governance_log"],

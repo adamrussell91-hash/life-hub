@@ -527,6 +527,24 @@ test('exposes parsed week-flags.json when present in the sync batch', async () =
   assert.equal(result.weekFlags.weeks['2026-06-01'].exam, 'MEd sit');
 });
 
+test('exposes research briefs when present in the sync batch', async () => {
+  const files = [raw('data/research/2026-08-01-knee-load.json', JSON.stringify({
+    title: 'Knee load after taper',
+    expires_at: '2026-08-11T00:00:00.000Z',
+    sources: ['https://example.edu/knee']
+  }))];
+  const sync = async ({ validateFile }) => {
+    assert.deepEqual(validateFile(files[0]), { valid: true });
+    return {
+      files, warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+      changed: true, freshness: 'confirmed'
+    };
+  };
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', backfill: false });
+  assert.equal(result.researchBriefs[0].title, 'Knee load after taper');
+});
+
 test('exposes raw governance-log.md content when present in the sync batch', async () => {
   const governanceLogMarkdown = "# Governance Log\n\n## 2026-08-09 — Drift Detection\n**Status:** Still Active\n\nOpen loop.\n";
   const files = [raw('data/governance/governance-log.md', governanceLogMarkdown)];
