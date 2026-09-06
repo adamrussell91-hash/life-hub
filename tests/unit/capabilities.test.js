@@ -675,23 +675,39 @@ test('classifyWriteTarget routes typed refs to Tasks and Teaching blobs', () => 
     key: 'units/unit_aotfw',
     path: 'teaching:unit:unit_aotfw'
   });
-  assert.equal(classifyWriteTarget('tasks:task:task_1').store, 'unknown');
+  assert.deepEqual(classifyWriteTarget('tasks:task:task_1'), {
+    store: 'tasks',
+    kind: 'task',
+    id: 'task_1',
+    key: 'tasks/task_1',
+    path: 'tasks:task:task_1'
+  });
 });
 
 test('clare and hammond may write typed blob refs; brisket may not', () => {
   resetCapabilityCaches();
   assert.equal(isPathAllowedForAgent('clare', 'tasks:project:proj_aotfw'), true);
+  assert.equal(isPathAllowedForAgent('clare', 'tasks:task:task_1'), true);
+  assert.equal(isPathAllowedForAgent('clare', 'apps/tasks/config/clare-protocol.md'), true);
   assert.equal(isPathAllowedForAgent('clare', 'teaching:unit:unit_aotfw'), false);
   assert.equal(isPathAllowedForAgent('hammond', 'tasks:project:proj_aotfw'), true);
   assert.equal(isPathAllowedForAgent('hammond', 'teaching:unit:unit_aotfw'), true);
   assert.equal(isPathAllowedForAgent('brisket', 'tasks:project:proj_aotfw'), false);
+  assert.equal(isPathAllowedForAgent('brisket', 'tasks:task:task_1'), false);
 });
 
-test('validateProposeActionInput rejects unknown typed write targets', () => {
+test('validateProposeActionInput accepts Clare task writes and rejects unknown typed targets', () => {
   resetCapabilityCaches();
-  const result = validateProposeActionInput({
+  const allowed = validateProposeActionInput({
     intent: 'rewrite a task',
-    writes: [{ path: 'tasks:task:task_1', mode: 'overwrite', content: '{}' }]
+    writes: [{ path: 'tasks:task:task_1', mode: 'overwrite', content: '{"id":"task_1","title":"Mark essays"}' }]
+  }, { agentSlug: 'clare' });
+  assert.equal(allowed.ok, true);
+  assert.equal(allowed.proposal.writes[0].path, 'tasks:task:task_1');
+
+  const result = validateProposeActionInput({
+    intent: 'rewrite a mystery blob',
+    writes: [{ path: 'tasks:step:step_1', mode: 'overwrite', content: '{}' }]
   }, { agentSlug: 'clare' });
   assert.equal(result.ok, false);
   assert.equal(result.error, 'unknown_write_target');

@@ -54,6 +54,37 @@ const INTENT_RULES = [
     ]
   },
   {
+    id: 'clare_dump',
+    agents: ['clare'],
+    requiredTools: ['parse_dump'],
+    patterns: [
+      /brain ?dump/i,
+      /sort this dump/i,
+      /here(?:'s| is) (?:the |a )?dump/i,
+      /turn this into tasks/i
+    ]
+  },
+  {
+    id: 'clare_fetch_url',
+    agents: ['clare'],
+    requiredTools: ['fetch_url'],
+    patterns: [
+      /fetch (?:this |the )?url/i,
+      /open (?:this |the )?(?:link|page|url)/i,
+      /what does (?:this|the) (?:page|site|article) say/i
+    ]
+  },
+  {
+    id: 'clare_research',
+    agents: ['clare'],
+    requiredTools: ['research_topic'],
+    patterns: [
+      /research (?:this|that|it|the)/i,
+      /official (?:source|page|site|url)/i,
+      /find (?:me )?(?:the )?(?:official|gov(?:ernment)?) /i
+    ]
+  },
+  {
     id: 'improve_lesson',
     agents: ['ann'],
     requiredTools: ['search_teaching', 'get_teaching_context'],
@@ -209,7 +240,8 @@ const CATALOGUES = {
   ],
   clare: [
     'Tasks store — get_tasks_focus (open tasks, deadlines, capacity, stress), search_tasks, get_task',
-    'Inspect Tasks data before suggesting what Adam should do next. Do not invent rows.'
+    'Workbench (40 jobs): fetch_url, research_topic, lookup_au_dates, lookup_place, compare_options, clare_mutate, inspect_board, plan_work, run_desk_protocol, draft_comms, check_calendars, check_clock, parse_dump, read_protocol, update_protocol. web_search finds pages; fetch_url opens a specific URL.',
+    'Inspect Tasks data before suggesting what Adam should do next. Do not invent rows. Writes go through clare_mutate and wait for Confirm.'
   ],
   ann: [
     'Teaching store — search_teaching, get_teaching_context (class/unit/lesson/calendar window)',
