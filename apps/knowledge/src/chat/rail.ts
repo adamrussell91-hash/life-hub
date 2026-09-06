@@ -287,11 +287,12 @@ async function send(host: ChatRailHost, extras: { searchOutside?: boolean } = {}
     host.render();
     return;
   }
+  const continuing = Boolean(researchSessionId || writeSessionId);
   const history: ChatTurn[] =
-    extras.searchOutside || researchSessionId || writeSessionId
+    extras.searchOutside || continuing
       ? turns
       : [...turns, { role: "user", content: outgoing }];
-  if (!extras.searchOutside && !researchSessionId && !writeSessionId) {
+  if (!extras.searchOutside && !continuing) {
     turns = history;
     input = "";
     if (isWebFileNoteHat(hat)) fileAfterDone = true;
@@ -299,13 +300,14 @@ async function send(host: ChatRailHost, extras: { searchOutside?: boolean } = {}
   busy = true;
   error = "";
   const sittingLibrary = researchFromFindings(lastAssistant()?.findings ?? []);
-  if (!researchSessionId && !writeSessionId && !extras.searchOutside) {
+  if (!continuing && !extras.searchOutside) {
     ticks = [];
     if (sittingLibrary.findings.length) pushTick("library", sittingLibrary);
     else pushTick("searching");
   }
   persist();
-  host.render();
+  if (continuing) paintWorkingChrome(host);
+  else host.render();
   try {
     const result = await runChat(
       {
@@ -329,7 +331,7 @@ async function send(host: ChatRailHost, extras: { searchOutside?: boolean } = {}
         if (phase.status === "writing") pushTick("writing", phase.research);
         if (phase.status === "researching" && phase.research) pushTick("round", phase.research);
         persist();
-        host.render();
+        paintWorkingChrome(host);
       },
     );
     applyResult(history, result);
@@ -365,9 +367,11 @@ async function send(host: ChatRailHost, extras: { searchOutside?: boolean } = {}
     busy = false;
     if (!researchSessionId && !writeSessionId) waitLine = waitPool()[0]!;
     persist();
-    host.render();
     if (researchSessionId || writeSessionId) {
+      paintWorkingChrome(host);
       pollTimer = setTimeout(() => void send(host), 2000);
+    } else {
+      host.render();
     }
   }
 }
@@ -496,6 +500,65 @@ function noteComposerHtml(fileNote: boolean, placeholder: string, label: string,
     ${busy || researchSessionId || writeSessionId ? `<p class="chat__status" aria-live="polite">${escapeHtml(waitLine)}</p>` : ""}
     ${busy || researchSessionId || writeSessionId ? thinkingHistoryHtml(ticks, thinkingOpen) : ""}
   </form>`;
+}
+
+/** Update wait line / status / ticker / submit / error without remounting the shell. */
+function paintWorkingChrome(host: ChatRailHost) {
+  const root = host.app;
+  const form = root.querySelector("form");
+  if (!form) {
+    host.render();
+    return;
+  }
+  const working = busy || Boolean(researchSessionId) || Boolean(writeSessionId);
+  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+  const inputEl = form.querySelector<HTMLTextAreaElement>("#chat-input");
+  if (submit) {
+    if (working) submit.textContent = waitLine;
+    submit.disabled = working;
+  }
+  if (inputEl) inputEl.disabled = working;
+
+  let status = form.querySelector<HTMLElement>(".chat__status");
+  if (working) {
+    if (!status) {
+      form.insertAdjacentHTML("beforeend", `<p class="chat__status" aria-live="polite"></p>`);
+      status = form.querySelector(".chat__status");
+    }
+    if (status) status.textContent = waitLine;
+  } else {
+    status?.remove();
+  }
+
+  let thinking = form.querySelector<HTMLDetailsElement>("[data-thinking-history]");
+  if (working && ticks.length) {
+    if (!thinking) {
+      (status ?? form).insertAdjacentHTML(status ? "afterend" : "beforeend", thinkingHistoryHtml(ticks, thinkingOpen));
+      thinking = form.querySelector("[data-thinking-history]");
+      if (thinking) {
+        thinking.ontoggle = () => {
+          thinkingOpen = thinking!.open;
+        };
+      }
+    } else {
+      const list = thinking.querySelector(".chat__ticker");
+      if (list) list.innerHTML = ticks.map(line => `<li>${escapeHtml(line)}</li>`).join("");
+    }
+  } else if (!working) {
+    thinking?.remove();
+  }
+
+  let errEl = form.querySelector<HTMLElement>(".alchemist__error");
+  if (error) {
+    if (!errEl) {
+      const actions = form.querySelector(".alchemist__actions");
+      actions?.insertAdjacentHTML("afterend", `<p class="alchemist__error"></p>`);
+      errEl = form.querySelector(".alchemist__error");
+    }
+    if (errEl) errEl.textContent = error;
+  } else {
+    errEl?.remove();
+  }
 }
 
 function assistantPortrait() {

@@ -437,6 +437,29 @@ describe("overlay working status", () => {
     expect(CLEMENTINE_WAIT_LINES.some(item => (statusNodes()[0]?.textContent ?? "").includes(item))).toBe(true);
   });
 
+  it("does not remount overlay or status node on rotate and research poll", async () => {
+    runChatMock.mockResolvedValue({
+      status: "researching",
+      researchSessionId: "res_1",
+      research: sampleResearch,
+    });
+    openFreshOverlay();
+    submitOverlay("Keep looking");
+    await vi.advanceTimersByTimeAsync(0);
+    const overlay = document.querySelector(".chat-overlay");
+    const status = statusNodes()[0];
+    expect(overlay).toBeTruthy();
+    expect(status).toBeTruthy();
+
+    await vi.advanceTimersByTimeAsync(STATUS_ROTATE_MS);
+    expect(document.querySelector(".chat-overlay")).toBe(overlay);
+    expect(statusNodes()[0]).toBe(status);
+
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(document.querySelector(".chat-overlay")).toBe(overlay);
+    expect(statusNodes()[0]).toBe(status);
+  });
+
   it("clears temporary status on done and error", async () => {
     runChatMock.mockResolvedValueOnce({
       status: "done",
