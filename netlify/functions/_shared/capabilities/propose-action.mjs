@@ -1,6 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { isPathAllowedForAgent } from './registry.mjs';
-import { getJSON as getTasksJSON, readIndex, setJSON as setTasksJSON, writeIndex, TASKS_INDEX_KEY } from '../tasks-blobs.mjs';
+import {
+  getJSON as getTasksJSON,
+  readIndex,
+  setJSON as setTasksJSON,
+  TASKS_INDEX_KEY,
+  writeIndex
+} from '../tasks-blobs.mjs';
 import { getJSON as getTeachingJSON, setJSON as setTeachingJSON } from '../teaching-blobs.mjs';
 
 const BLOB_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;

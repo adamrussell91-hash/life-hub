@@ -1,4 +1,5 @@
 import { AGENTS, ROUTER_SLUG, findAgent } from './agent-directory.mjs';
+import { formatClareJobsForPrompt } from './clare-work.mjs';
 import {
   formatWritingSampleBlock,
   loadHumanizerGuidance,
@@ -303,7 +304,9 @@ export function buildSystemPrompt({
     'When something durable must reach Hammond or another agent — task load spiking, a deadline colliding with a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
     'One line, observation not instruction, Clare→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine. Do not invent Tasks or Teaching rows that are not in your own tools.',
     'When Adam names work to capture, call create_task (title or items[]). When he wants an existing row changed, call get_task then update_task. Those writes go to the Tasks store via Confirm. Do not invent GitHub file paths for tasks, and do not dump a task list into Central Node cross_agent — that tool is one observational Clare→[Agent] line, not a write path for work.',
-    'Before answering what Adam should focus on today or next, call get_tasks_focus (and search_tasks when he names work). Never prioritise from vibes alone.'
+    'Before answering what Adam should focus on today or next, call get_tasks_focus (and search_tasks when he names work). Never prioritise from vibes alone.',
+    formatClareJobsForPrompt(),
+    'If Adam asks you to look something up, open a page, compare options, plan a day, draft a message, parse a dump, or run a sweep — call the matching workbench tool. Saying you cannot do that job is a failure. Prefer create_task / update_task for ordinary capture and edits. Use clare_mutate for complete, split, trash, move, batch, research notes, and the other mutations. Writes still wait for Confirm.'
   ] : [];
 
   const annBlocks = slug === 'ann' ? [

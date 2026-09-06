@@ -749,6 +749,7 @@ test('clare and hammond may write typed blob refs; brisket may not', () => {
   resetCapabilityCaches();
   assert.equal(isPathAllowedForAgent('clare', 'tasks:project:proj_aotfw'), true);
   assert.equal(isPathAllowedForAgent('clare', 'tasks:task:task_1'), true);
+  assert.equal(isPathAllowedForAgent('clare', 'apps/tasks/config/clare-protocol.md'), true);
   assert.equal(isPathAllowedForAgent('clare', 'teaching:unit:unit_aotfw'), false);
   assert.equal(isPathAllowedForAgent('hammond', 'tasks:project:proj_aotfw'), true);
   assert.equal(isPathAllowedForAgent('hammond', 'teaching:unit:unit_aotfw'), true);
@@ -760,9 +761,10 @@ test('clare may propose tasks:task writes; unknown typed targets still reject', 
   resetCapabilityCaches();
   const clare = validateProposeActionInput({
     intent: 'rewrite a task',
-    writes: [{ path: 'tasks:task:task_1', mode: 'overwrite', content: '{}' }]
+    writes: [{ path: 'tasks:task:task_1', mode: 'overwrite', content: '{"id":"task_1","title":"Mark essays"}' }]
   }, { agentSlug: 'clare' });
   assert.equal(clare.ok, true);
+  assert.equal(clare.proposal.writes[0].path, 'tasks:task:task_1');
 
   const brisket = validateProposeActionInput({
     intent: 'rewrite a task',

@@ -27,6 +27,7 @@ import { proposeActionToolSchema } from './propose-action.mjs';
 import { shortcutSchemas } from './shortcuts.mjs';
 import { selectCapabilityIdsForTurn } from './intent-router.mjs';
 import { domainRetrievalSchemasFor } from '../domain-retrieval.mjs';
+import { clareWorkSchemas } from '../clare-work.mjs';
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -310,6 +311,14 @@ export function buildAgentTools({
     if (!schema?.name || attached.has(schema.name)) continue;
     tools.push(schema);
     attached.add(schema.name);
+  }
+
+  if (slug === 'clare') {
+    for (const schema of clareWorkSchemas()) {
+      if (!schema?.name || attached.has(schema.name)) continue;
+      tools.push(schema);
+      attached.add(schema.name);
+    }
   }
 
   const schemas = shortcutSchemas();
