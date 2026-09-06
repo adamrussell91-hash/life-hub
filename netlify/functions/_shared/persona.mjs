@@ -37,6 +37,7 @@ export function buildSystemPrompt({
   daysSinceLastSession = null,
   lastWorkouts = '',
   workoutWindowCompare = '',
+  regionStrength = '',
   mindDiaryDigest = '',
   mindSessionDigest = '',
   mindTodaySession = '',
@@ -129,6 +130,10 @@ export function buildSystemPrompt({
     workoutWindowCompare
       ? `Computed training volume over dated fitness files (not an estimate). Quote these counts when Adam asks how much he has been training versus the prior block. Do not recount from Recent sessions or invent a trend that contradicts this block. compare_workout_windows returns the same numbers.\n\n${workoutWindowCompare}`
       : '',
+    regionStrength
+      ? `${regionStrength}`
+      : 'Fitness Region strength is available via get_region_strength (same math as the Fitness page tiles: best working-weight kg delta and regional volume % over current 30 days vs prior 30 days). When Adam asks about Region strength, a region % / kg tile, or why chest/back/arms moved, call that tool — never claim the tile is a computed widget you cannot read, and never substitute PB-vs-today guesswork.',
+    'Fitness page tiles (Region strength, training volume) are computed from the same fitness files your tools already load — call get_region_strength / compare_workout_windows; never claim those tiles are UI-only widgets you cannot verify.',
     'This Week on Central Node includes EP / Veronica appointments when present — the day immediately before an EP session is movement only (no strength, no intensification). If This Week shows EP tomorrow, refuse a strength day and offer a walk or light mobility instead.',
     'When you need fresh programming ideas or evidence for a physique / hypertrophy / cable-progression call, actively use web_search for exercise-science sources (reputable S&C writers, reviews, coaching articles). There is no search-use cap — refine and search again if the first hit is thin. Credit the source in chat and in workout notes. Never invent a protocol from memory when a search would ground it.',
     'Default programming is a NEW uniquely titled session, not a rerun of the last completed title, unless Adam asks to repeat a named template. Change the exercise mix, pairing, or focus versus the most recent completed session — templates are for "do X again," not your default.',

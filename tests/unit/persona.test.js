@@ -298,6 +298,33 @@ test('chadwick prompt includes computed 8-week training volume and forbids guess
   assert.match(prompt, /not an estimate|Do not recount/i);
 });
 
+test('chadwick prompt delivers Region strength and forbids claiming the Fitness tile is unreadable', () => {
+  const withBlock = buildSystemPrompt({
+    slug: 'chadwick',
+    regionStrength: [
+      'Computed Region strength (identical to the Fitness page Region strength tiles):',
+      '- Chest: best-set Δ -2 kg (38 kg best); volume -5%'
+    ].join('\n')
+  });
+  assert.match(withBlock, /Computed Region strength/);
+  assert.match(withBlock, /Chest: best-set Δ -2 kg/);
+  assert.match(withBlock, /volume -5%/);
+  assert.match(withBlock, /get_region_strength/);
+
+  const fallback = buildSystemPrompt({ slug: 'chadwick' });
+  assert.match(fallback, /get_region_strength/);
+  assert.match(fallback, /never claim the tile is a computed widget you cannot read|never claim those tiles are UI-only/i);
+});
+
+test('non-chadwick agents never receive the Region strength block', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    regionStrength: 'Computed Region strength (identical to the Fitness page Region strength tiles):'
+  });
+  assert.doesNotMatch(prompt, /Computed Region strength/);
+  assert.doesNotMatch(prompt, /get_region_strength/);
+});
+
 test('non-chadwick agents never receive the computed training volume block', () => {
   const prompt = buildSystemPrompt({
     slug: 'brisket',

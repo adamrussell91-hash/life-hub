@@ -90,8 +90,10 @@ import {
   compareWorkoutWindows,
   daysSinceLastCompletedWorkout,
   formatRecentWorkoutsForPrompt,
+  formatRegionStrengthForPrompt,
   formatWorkoutWindowCompareForPrompt,
   getLastWorkout,
+  getRegionStrength,
   mergeWorkoutEntries,
   searchWorkoutRecords,
   selectRecentWorkoutEntries,
@@ -444,6 +446,7 @@ export function createChatHandler({
         let workoutTemplates = '';
         let lastWorkouts = '';
         let workoutWindowCompare = '';
+        let regionStrength = '';
         let workoutRecords = [];
         let bodyState = '';
         let treatmentState = '';
@@ -677,6 +680,9 @@ export function createChatHandler({
             if (slug === 'chadwick') {
               workoutWindowCompare = formatWorkoutWindowCompareForPrompt(
                 compareWorkoutWindows(workoutRecords, today)
+              );
+              regionStrength = formatRegionStrengthForPrompt(
+                getRegionStrength(workoutRecords, today)
               );
             }
             sessionAdherenceDays = combineSessionAdherenceDays(
@@ -923,6 +929,7 @@ export function createChatHandler({
           workoutTemplates = '';
           lastWorkouts = '';
           workoutWindowCompare = '';
+          regionStrength = '';
           workoutRecords = [];
           bodyState = '';
           treatmentState = '';
@@ -1014,6 +1021,7 @@ export function createChatHandler({
           workoutTemplates,
           lastWorkouts,
           workoutWindowCompare,
+          regionStrength,
           exerciseLibrary,
           skincareRoutines,
           treatmentState,
@@ -1164,6 +1172,10 @@ export function createChatHandler({
               if (event.name === 'compare_workout_windows') {
                 send({ type: 'status', text: 'Comparing training windows…' });
                 return JSON.stringify(compareWorkoutWindows(workoutRecords, today));
+              }
+              if (event.name === 'get_region_strength') {
+                send({ type: 'status', text: 'Reading region strength…' });
+                return JSON.stringify(getRegionStrength(workoutRecords, today, event.input ?? {}));
               }
               if (event.name === 'search_exercise_library') {
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});

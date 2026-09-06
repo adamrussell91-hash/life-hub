@@ -1765,6 +1765,8 @@ test('Chadwick prompt and tools can read the last completed workout file, not ju
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'get_last_workout'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_workout_records'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'compare_workout_windows'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'get_region_strength'));
+  assert.match(receivedArgs.system, /Computed Region strength|get_region_strength/);
   const last = JSON.parse(await receivedArgs.executeTools({
     name: 'get_last_workout',
     id: 'call_last',
@@ -1789,6 +1791,14 @@ test('Chadwick prompt and tools can read the last completed workout file, not ju
   assert.equal(compare.current.count, 1);
   assert.equal(compare.previous.count, 0);
   assert.equal(compare.delta, 1);
+  const regions = JSON.parse(await receivedArgs.executeTools({
+    name: 'get_region_strength',
+    id: 'call_regions',
+    input: { region: 'chest' }
+  }));
+  assert.equal(regions.ok, true);
+  assert.equal(regions.same_as, 'Fitness page Region strength tiles');
+  assert.ok(Array.isArray(regions.regions));
 });
 
 test('Chadwick 8-week compare counts a previous-window session the recent list would still see', async () => {
