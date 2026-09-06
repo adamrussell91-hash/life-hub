@@ -1,6 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { isPathAllowedForAgent } from './registry.mjs';
-import { getJSON as getTasksJSON, readIndex, setJSON as setTasksJSON, writeIndex } from '../tasks-blobs.mjs';
+import {
+  getJSON as getTasksJSON,
+  readIndex,
+  setJSON as setTasksJSON,
+  TASKS_INDEX_KEY,
+  writeIndex
+} from '../tasks-blobs.mjs';
 import { getJSON as getTeachingJSON, setJSON as setTeachingJSON } from '../teaching-blobs.mjs';
 
 const BLOB_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
@@ -218,6 +224,9 @@ export function classifyWriteTarget(path) {
   if (store === 'tasks' && kind === 'project' && BLOB_ID.test(id)) {
     return { store: 'tasks', kind, id, key: `projects/${id}`, path: raw };
   }
+  if (store === 'tasks' && kind === 'task' && BLOB_ID.test(id)) {
+    return { store: 'tasks', kind, id, key: `tasks/${id}`, path: raw };
+  }
   if (store === 'teaching' && kind === 'unit' && BLOB_ID.test(id)) {
     return { store: 'teaching', kind, id, key: `units/${id}`, path: raw };
   }
@@ -360,8 +369,9 @@ async function executeBlobWrite(write, target, {
   if (!record.created_at) record.created_at = existing?.created_at || timestamp;
   await setJSON(store, target.key, record);
   if (touchIndex && write.mode === 'create') {
-    const ids = await readIndex(store, TASKS_PROJECTS_INDEX);
-    await writeIndex(store, TASKS_PROJECTS_INDEX, [...ids, target.id]);
+    const indexKey = target.kind === 'task' ? TASKS_INDEX_KEY : TASKS_PROJECTS_INDEX;
+    const ids = await readIndex(store, indexKey);
+    await writeIndex(store, indexKey, [...ids, target.id]);
   }
   return {
     ok: true,

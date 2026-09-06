@@ -197,6 +197,7 @@ import {
   listJSON as listTeachingJSON
 } from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
+import { executeClareWork, isClareWorkTool } from './_shared/clare-work.mjs';
 import { loadIntuitionFor, formatIntuitionForPrompt } from './_shared/capabilities/intuition.mjs';
 import {
   GOVERNANCE_LOG_PATH,
@@ -761,9 +762,13 @@ export function createChatHandler({
                 getTasksStore(env),
                 getTeachingStore(env)
               ]);
-              const [tasks, classes, lessons, units, scheduled] = await Promise.all([
+              const [tasks, projects, classes, lessons, units, scheduled] = await Promise.all([
                 listTasksJSON(tasksStore, TASK_PREFIX).catch(err => {
                   hubLoadErrors.tasks = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'projects/').catch(err => {
+                  hubLoadErrors.projects = err?.code || 'load_failed';
                   return [];
                 }),
                 listTeachingJSON(teachingStore, CLASS_PREFIX).catch(err => {
@@ -784,6 +789,7 @@ export function createChatHandler({
                 })
               ]);
               hubTasks = Array.isArray(tasks) ? tasks : [];
+              hubProjects = Array.isArray(projects) ? projects : [];
               hubClasses = Array.isArray(classes) ? classes : [];
               hubLessons = [
                 ...(Array.isArray(lessons) ? lessons : []),
@@ -2103,6 +2109,39 @@ export function createChatHandler({
                   })),
                   ...(pendingId ? { pendingId } : {})
                 });
+              }
+              if (slug === 'clare' && isClareWorkTool(event.name)) {
+                send({ type: 'status', text: 'Working…' });
+                const result = await executeClareWork(event.name, event.input ?? {}, {
+                  tasks: hubTasks,
+                  projects: hubProjects,
+                  lessons: hubLessons,
+                  protocol: clareProtocol,
+                  now: nowInstant
+                });
+                if (result?.kind === 'propose' && result.proposal) {
+                  const validated = validateProposeActionInput(result.proposal, { agentSlug: slug });
+                  if (!validated.ok) {
+                    return JSON.stringify({
+                      ok: false,
+                      error: validated.error,
+                      ...(validated.detail ? { detail: validated.detail } : {})
+                    });
+                  }
+                  const pendingId = await proposeOsAction(validated.proposal);
+                  return JSON.stringify({
+                    ok: true,
+                    status: 'awaiting_confirm',
+                    intent: validated.proposal.intent,
+                    writes: validated.proposal.writes.map(write => ({
+                      path: write.path,
+                      mode: write.mode,
+                      diff: write.diff
+                    })),
+                    ...(pendingId ? { pendingId } : {})
+                  });
+                }
+                return JSON.stringify(result);
               }
               return null;
             }
