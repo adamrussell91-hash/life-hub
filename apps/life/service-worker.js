@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v148';
+const CACHE_NAME = 'life-hub-shell-v149';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -145,7 +145,9 @@ const SHELL_FILES = [
   'js/app/chart-kit/masonry.js',
   'js/app/mind-thread-sheet.js',
   'js/app/render-nutrition.js',
+  'js/app/render-shortcuts.js',
   'js/app/render-skincare.js',
+  'js/app/shortcuts-api.js',
   'js/app/skincare-api.js',
   'js/app/skincare-controller.js',
   'js/app/skincare-model.js',
