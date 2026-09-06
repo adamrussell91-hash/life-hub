@@ -427,6 +427,164 @@ test('focusing the composer on phone hides the tab bar and frees reading room (i
   await context.close();
 });
 
+test('overflowing Chat thread does not bounce height after scroll-to-bottom', async () => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+
+  const motion = await page.evaluate(async () => {
+    const list = document.querySelector('#chat-messages');
+    const hide = document.querySelector('[data-hub-scroll-hide]');
+    list.replaceChildren();
+    for (let i = 0; i < 24; i += 1) {
+      const item = document.createElement('li');
+      item.className = 'chat-message chat-message--assistant';
+      const body = document.createElement('div');
+      body.className = 'chat-message__body';
+      body.textContent = `Row ${i + 1} — overflow the thread so scroll-hide can fire.`;
+      item.append(body);
+      list.append(item);
+    }
+    list.scrollTop = list.scrollHeight;
+    list.dispatchEvent(new Event('scroll'));
+    await new Promise(resolve => setTimeout(resolve, 80));
+    const heights = new Set();
+    const hidden = new Set();
+    const start = performance.now();
+    while (performance.now() - start < 600) {
+      heights.add(list.clientHeight);
+      hidden.add(hide.classList.contains('is-hidden'));
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    }
+    return {
+      overlay: hide.classList.contains('hub-scroll-hide--overlay'),
+      heights: [...heights],
+      hidden: [...hidden]
+    };
+  });
+
+  assert.equal(motion.overlay, true, 'Chat chrome must overlay, not collapse the thread');
+  assert.ok(motion.heights.length <= 1, `thread height bounced: ${motion.heights.join(',')}`);
+  assert.ok(motion.hidden.length <= 1, `scroll-hide oscillated: ${motion.hidden.join(',')}`);
+
+  await context.close();
+});
+
+test('desktop Chat locks the document and only the thread scrolls', async () => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+
+  const layout = await page.evaluate(() => {
+    const list = document.querySelector('#chat-messages');
+    list.replaceChildren();
+    for (let i = 0; i < 20; i += 1) {
+      const item = document.createElement('li');
+      item.className = 'chat-message chat-message--assistant';
+      const body = document.createElement('div');
+      body.className = 'chat-message__body';
+      body.textContent = `Row ${i + 1} — enough copy to overflow the thread.`;
+      item.append(body);
+      list.append(item);
+    }
+    const html = document.documentElement;
+    const frame = document.querySelector('.page-frame');
+    const rail = document.querySelector('.desktop-rail');
+    return {
+      htmlOverflow: getComputedStyle(html).overflow,
+      bodyOverflow: getComputedStyle(document.body).overflow,
+      htmlScrollable: html.scrollHeight > html.clientHeight + 1,
+      frameHeight: frame.getBoundingClientRect().height,
+      railPosition: getComputedStyle(rail).position,
+      railTop: rail.getBoundingClientRect().top,
+      threadScrollable: list.scrollHeight > list.clientHeight + 8,
+      vvHeight: html.style.getPropertyValue('--vv-height')
+    };
+  });
+
+  assert.equal(layout.htmlOverflow, 'hidden');
+  assert.equal(layout.bodyOverflow, 'hidden');
+  assert.equal(layout.htmlScrollable, false, 'document must not grow the gray page scrollbar');
+  assert.equal(layout.railPosition, 'fixed');
+  assert.ok(Math.abs(layout.railTop) < 1, 'rail must stay pinned');
+  assert.ok(Math.abs(layout.frameHeight - 800) < 2, 'chat canvas must fill the viewport');
+  assert.equal(layout.threadScrollable, true, 'only the thread should scroll');
+  assert.equal(layout.vvHeight, '', 'closed keyboard must not pin live visualViewport height');
+
+  await context.close();
+});
+
+test('phone Chat window stays put when visualViewport height jitters', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.hub-mobile-nav [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+
+  await page.evaluate(() => {
+    const list = document.querySelector('#chat-messages');
+    list.replaceChildren();
+    for (let i = 0; i < 24; i += 1) {
+      const item = document.createElement('li');
+      item.className = 'chat-message chat-message--assistant';
+      const body = document.createElement('div');
+      body.className = 'chat-message__body';
+      body.textContent = `Line ${i + 1} — enough copy to make the thread overflow and show a scrollbar.`;
+      item.append(body);
+      list.append(item);
+    }
+  });
+
+  const before = await page.evaluate(() => {
+    const root = document.documentElement;
+    root.classList.remove('vv-keyboard-open');
+    root.style.setProperty('--vv-height', '844px');
+    root.style.setProperty('--vv-offset-top', '0px');
+    const frame = document.querySelector('.page-frame');
+    const list = document.querySelector('#chat-messages');
+    const frameBox = frame.getBoundingClientRect();
+    return {
+      top: frameBox.top,
+      bottom: frameBox.bottom,
+      height: frameBox.height,
+      listHeight: list.clientHeight,
+      overflowX: getComputedStyle(root).overflow,
+      overflowY: getComputedStyle(document.body).overflow
+    };
+  });
+
+  const after = await page.evaluate(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--vv-height', '790px');
+    root.style.setProperty('--vv-offset-top', '12px');
+    const frame = document.querySelector('.page-frame');
+    const list = document.querySelector('#chat-messages');
+    const frameBox = frame.getBoundingClientRect();
+    return {
+      top: frameBox.top,
+      bottom: frameBox.bottom,
+      height: frameBox.height,
+      listHeight: list.clientHeight
+    };
+  });
+
+  assert.equal(before.overflowX, 'hidden', 'document must not grow a moving page scrollbar');
+  assert.equal(before.overflowY, 'hidden');
+  assert.ok(Math.abs(after.top - before.top) < 1, `top edge moved ${after.top - before.top}`);
+  assert.ok(Math.abs(after.bottom - before.bottom) < 1, `bottom edge moved ${after.bottom - before.bottom}`);
+  assert.ok(Math.abs(after.height - before.height) < 1, `chat window height moved ${after.height - before.height}`);
+  assert.ok(Math.abs(after.listHeight - before.listHeight) < 1, `thread height moved ${after.listHeight - before.listHeight}`);
+
+  await context.close();
+});
+
 async function sampleChatWindow(page, ms) {
   return page.evaluate(async duration => {
     const samples = [];
