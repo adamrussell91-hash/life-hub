@@ -15,6 +15,7 @@ import {
 } from './tasks-stress.mjs';
 import { searchTeachingRecords } from './teaching-search.mjs';
 import { formatHubAgentContext } from './hub-agent-context.mjs';
+import { getWeekReviewSchema } from './hammond-week.mjs';
 import { rankKnowledgePages } from './knowledge-data.mjs';
 import { NUTRITION_LOG_PATH, SKINCARE_LOG_PATH } from './treatment-state.mjs';
 
@@ -740,7 +741,8 @@ export function domainRetrievalSchemasFor(slug) {
         description:
           'Cross-hub retrieval: Tasks focus, Teaching upcoming, Life digest presence, and explicit unavailable hubs. Required for "what is slipping across my life".',
         input_schema: { type: 'object', properties: {} }
-      }
+      },
+      getWeekReviewSchema()
     ]
   };
 

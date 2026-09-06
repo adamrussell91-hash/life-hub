@@ -48,6 +48,7 @@ import {
 import { searchMedicalRecords } from './medical-overview-read.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
 import { activationForTurn, classifyIntent } from './capabilities/activation-policy.mjs';
+import { getWeekReview } from './hammond-week.mjs';
 
 const PACK_CHAR_BUDGET = 14000;
 
@@ -125,6 +126,8 @@ export function assembleEvidencePack({
   const pages = stores.pages ?? stores.knowledgePages ?? [];
   const loadErrors = stores.loadErrors ?? stores.hubLoadErrors ?? {};
   const hammondDigest = stores.hammondDigest ?? '';
+  const hammondEvents = stores.hammondEvents ?? stores.events ?? [];
+  const centralNodeMarkdown = stores.centralNodeMarkdown ?? '';
   const nutritionChallenges = stores.nutritionChallenges ?? null;
   const templates = stores.templates ?? stores.workoutTemplates ?? [];
   const stressFlags = stores.stressFlags ?? [];
@@ -352,6 +355,26 @@ export function assembleEvidencePack({
         inbox,
         today,
         now
+      }),
+      'calculation'
+    );
+    push(
+      sections,
+      toolsExecuted,
+      'get_week_review',
+      'Week recap + forward plan',
+      getWeekReview({
+        events: hammondEvents.length ? hammondEvents : [
+          ...workouts.map(record => ({ record: { ...record, type: record.type || 'workout' } })),
+          ...meals.map(record => ({ record: { ...record, type: record.type || 'meal' } })),
+          ...mindEvents
+        ],
+        tasks,
+        lessons,
+        classes,
+        centralNodeMarkdown,
+        today,
+        loadErrors
       }),
       'calculation'
     );

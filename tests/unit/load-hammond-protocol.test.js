@@ -24,6 +24,14 @@ test('protocol documents phased Central Node audit', () => {
   assert.match(text, /triage/i);
 });
 
+test('protocol treats Weekly Review as recap plus forward plan, not the audit sequence', () => {
+  const text = loadHammondProtocol();
+  assert.match(text, /Sunday-night recap \+ forward plan/);
+  assert.match(text, /get_week_review/);
+  assert.match(text, /not a Central Node audit/);
+  assert.match(text, /A \*\*Weekly Review\*\* is the recap \+ forward-plan conversation/);
+});
+
 test('protocol points write-back at CN tools and Governance Log', () => {
   const text = loadHammondProtocol();
   assert.match(text, /append_governance_log/);

@@ -1802,8 +1802,10 @@ test('non-trigger Hammond messages without a session do not attach auditSession'
   });
 
   await controller.send('what is the protein target?');
+  await controller.send('Hammond, weekly review');
 
   assert.equal(sendCalls[0].auditSession, undefined);
+  assert.equal(sendCalls[1].auditSession, undefined, 'weekly review is recap+plan, not a CN audit');
 });
 
 test('startNewChat clears auditSession so the next send omits it', async () => {
