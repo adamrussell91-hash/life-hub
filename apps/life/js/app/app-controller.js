@@ -133,6 +133,8 @@ export function createAppController(dependencies) {
   let tasksCalendarInFlight = null;
   let homeOpenLoopTasks = [];
   let homeOpenLoopStressFlags = [];
+  let homeOpenLoopKey = '';
+  let hubPulseInFlight = null;
   let bodyRange = 'six_month';
   let bloodsRange = 'five_year';
   let mindRange = 'monthly';
@@ -761,7 +763,15 @@ export function createAppController(dependencies) {
     return tasksCalendarInFlight;
   }
 
-  async function loadHubPulse() {
+  function loadHubPulse() {
+    if (hubPulseInFlight) return hubPulseInFlight;
+    hubPulseInFlight = loadHubPulseNow().finally(() => {
+      hubPulseInFlight = null;
+    });
+    return hubPulseInFlight;
+  }
+
+  async function loadHubPulseNow() {
     renderHubPulse(root, {
       teaching: { status: 'loading' },
       knowledge: { status: 'loading' },
@@ -828,13 +838,19 @@ export function createAppController(dependencies) {
       knowledge: knowledgePulse,
       tasks: tasksPulse
     });
-    if ((tasksApi?.listTasks || tasksApi?.loadStressFlags) && latestResult) {
+    const extrasKey = homeOpenLoopExtrasKey();
+    if ((tasksApi?.listTasks || tasksApi?.loadStressFlags) && latestResult && extrasKey !== homeOpenLoopKey) {
       renderHome(root, buildHomeModel(homeModelInput(latestResult, latestResult.date)));
       setSectionVisibility(currentSection);
     }
   }
 
+  function homeOpenLoopExtrasKey() {
+    return JSON.stringify({ tasks: homeOpenLoopTasks, stressFlags: homeOpenLoopStressFlags });
+  }
+
   function homeModelInput(result, date) {
+    homeOpenLoopKey = homeOpenLoopExtrasKey();
     return {
       ...result,
       date,
@@ -1337,6 +1353,8 @@ export function createAppController(dependencies) {
     tasksCalendarInFlight = null;
     homeOpenLoopTasks = [];
     homeOpenLoopStressFlags = [];
+    homeOpenLoopKey = '';
+    hubPulseInFlight = null;
     clearRefreshTimer();
     clearSessionExpiry();
     abortActiveRefresh(new DOMException('Session invalidated', 'AbortError'));
