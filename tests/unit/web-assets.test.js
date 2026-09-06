@@ -216,6 +216,14 @@ test('full-page Chat on phone pins the canvas to the visual viewport and docks o
     mobile[0],
     /html\.vv-keyboard-open[\s\S]*:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)[\s\S]*\.hub-mobile-nav[\s\S]*display:\s*none/
   );
+  assert.match(
+    mobile[0],
+    /#chat-form:focus-within[\s\S]*\.hub-mobile-nav[\s\S]*display:\s*none/
+  );
+  assert.match(
+    mobile[0],
+    /#chat-form:focus-within[\s\S]*\.page-frame[\s\S]*padding-bottom:\s*0/
+  );
 });
 
 test('Mind fills the shared 76rem shell; only Chat lifts the canvas width', async () => {
@@ -239,7 +247,7 @@ test('service worker paints cached images immediately and keeps scripts network-
   assert.match(worker, /function staleWhileRevalidate/);
   assert.match(worker, /function networkFirst/);
   assert.match(worker, /isStaticImage\(url\.pathname\)/);
-  assert.match(worker, /life-hub-shell-v150/);
+  assert.match(worker, /life-hub-shell-v152/);
 });
 
 test('web app manifest is installable and uses only local icons', async () => {
