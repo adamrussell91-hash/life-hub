@@ -33,6 +33,34 @@ import { loadVeraProtocol, VERA_INTAKE_PATH } from './_shared/load-vera-protocol
 import { loadBrisketProtocol } from './_shared/load-brisket-protocol.mjs';
 import { loadSaraProtocol } from './_shared/load-sara-protocol.mjs';
 import { loadHammondProtocol } from './_shared/load-hammond-protocol.mjs';
+import {
+  loadClareProtocol,
+  loadAnnProtocol,
+  loadClementineProtocol
+} from './_shared/load-hub-protocols.mjs';
+import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
+import { assembleEvidencePack } from './_shared/evidence-packs.mjs';
+import {
+  getNutritionSnapshot,
+  getNutritionAdherence,
+  getNutritionTargets,
+  searchNutritionRecords,
+  getWeightTrend,
+  searchDiaryRecords,
+  getDiaryRange,
+  searchSkincareRecords,
+  getSkincareAdherence,
+  getTasksFocus,
+  searchTasks,
+  getTask,
+  searchTeaching,
+  getTeachingContext,
+  searchKnowledge,
+  inspectHubSignals,
+  selectNutritionEntries,
+  selectSkincareHistoryEntries
+} from './_shared/domain-retrieval.mjs';
+import { listKnowledgePages } from './_shared/knowledge-data.mjs';
 import { buildUserContent, normalizeChatAttachments } from '../../packages/design-kit/js/hub-chat-attachments.js';
 import {
   normalizeAuditSession,
@@ -155,8 +183,19 @@ import {
   snapshotGithubBases,
   snapshotBlobBases
 } from './_shared/capabilities/propose-action.mjs';
-import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
-import { defaultGetContentStore as defaultGetTeachingStore } from './_shared/teaching-blobs.mjs';
+import {
+  TASK_PREFIX,
+  defaultGetTasksStore,
+  listJSON as listTasksJSON
+} from './_shared/tasks-blobs.mjs';
+import {
+  CLASS_PREFIX,
+  DRAFT_LESSON_PREFIX,
+  SCHEDULED_LESSON_PREFIX,
+  UNIT_PREFIX,
+  defaultGetContentStore as defaultGetTeachingStore,
+  listJSON as listTeachingJSON
+} from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
 import { loadIntuitionFor, formatIntuitionForPrompt } from './_shared/capabilities/intuition.mjs';
 import {
@@ -328,7 +367,18 @@ export function createChatHandler({
     const needsSkincareLibrary = slug === 'hyaluronica';
     const needsTreatmentContext = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
-    const hubContextPromise = needsHammondTools
+    const needsHubRetrieval = needsHammondTools || slug === 'clare' || slug === 'ann';
+    // Nutrition history is for adherence/overview retrieval — not every meal log turn
+    // (those stay on the thin today+yesterday digest budget).
+    const nutritionHistoryNeeded = slug === 'brisket' && (
+      classifyIntent('brisket', parsed.message).id === 'nutrition_overview'
+      || classifyIntent('brisket', parsed.message).id === 'history_search'
+    );
+    const needsNutritionHistory = nutritionHistoryNeeded;
+    const needsSkincareHistory = slug === 'hyaluronica';
+    const needsKnowledgeSearch = slug === 'clementine';
+    const needsPenelopeDiaryTools = slug === 'penelope';
+    const hubContextPromise = needsHubRetrieval
       ? loadHubContext({ env, now: new Date(now()) }).catch(() => HUB_CONTEXT_UNAVAILABLE_MARKER)
       : Promise.resolve('');
     const needsNutritionChallenges = slug === 'brisket';
@@ -461,6 +511,24 @@ export function createChatHandler({
         let workoutWindowCompare = '';
         let regionStrength = '';
         let workoutRecords = [];
+        let nutritionRecords = [];
+        let skincareHistoryRecords = [];
+        let hubTasks = [];
+        let hubProjects = [];
+        let hubClasses = [];
+        let hubLessons = [];
+        let hubUnits = [];
+        let hubLoadErrors = {};
+        let knowledgePages = [];
+        let knowledgeLoadError = null;
+        let sourceMeta = {};
+        let activation = {
+          intentClass: 'none',
+          requiredTools: [],
+          forceToolChoice: false,
+          catalogueBlock: '',
+          activationBlock: ''
+        };
         let bodyState = '';
         let compositionRecords = [];
         let measurementRecords = [];
@@ -557,13 +625,19 @@ export function createChatHandler({
           // Chadwick's eyes on Adam's body: a bounded read (latest 1-2 per type from the
           // already-fetched tree, never a history scan) -- see body-state.mjs.
           const bodyEntries = needsBodyState
-            ? selectLatestBodyEntries(current.tree, { limit: 2 })
+            ? selectLatestBodyEntries(current.tree, { limit: needsSaraMedical ? 8 : 2 })
             : { composition: [], measurements: [] };
           const skincareLookbackEntries = needsTreatmentContext
             ? selectRecentSkincareEntries(current.tree, { today })
             : [];
+          const skincareHistoryEntries = needsSkincareHistory
+            ? selectSkincareHistoryEntries(current.tree, { today, lookbackDays: 30, limit: 40 })
+            : [];
           const nutritionWeekEntries = (needsTreatmentContext || needsSaraClinicalContext)
             ? selectRecentNutritionEntries(current.tree, { today })
+            : [];
+          const nutritionHistoryEntries = needsNutritionHistory
+            ? selectNutritionEntries(current.tree, { today, lookbackDays: 30, limit: 80 })
             : [];
           // Hammond's 90-day fitness reads: bounded to the wider hammondFrom window,
           // never a full-history scan -- see hammond-digest.mjs.
@@ -637,10 +711,107 @@ export function createChatHandler({
             veraIntakeEntry ? client.readBlob(veraIntakeEntry.sha) : null
           ]);
 
+          if (nutritionHistoryEntries.length || skincareHistoryEntries.length) {
+            const [nutritionHistoryBlobs, skincareHistoryBlobs] = await Promise.all([
+              Promise.all(nutritionHistoryEntries.map(entry => client.readBlob(entry.sha))),
+              Promise.all(skincareHistoryEntries.map(entry => client.readBlob(entry.sha)))
+            ]);
+            for (let index = 0; index < nutritionHistoryEntries.length; index += 1) {
+              try {
+                const content = decodeBlob(nutritionHistoryBlobs[index]);
+                if (content == null) continue;
+                const { record } = parseEventDocument(content, nutritionHistoryEntries[index].path, loadYaml);
+                if (record?.type === 'meal') nutritionRecords.push(record);
+              } catch {
+                // Skip unreadable meal files.
+              }
+            }
+            for (let index = 0; index < skincareHistoryEntries.length; index += 1) {
+              try {
+                const content = decodeBlob(skincareHistoryBlobs[index]);
+                if (content == null) continue;
+                const parsed = parseEventDocument(content, skincareHistoryEntries[index].path, loadYaml);
+                const body = typeof parsed.body === 'string' ? parsed.body : '';
+                skincareHistoryRecords.push({
+                  ...(parsed.record ?? {}),
+                  date: parsed.record?.date,
+                  notes: parsed.record?.notes,
+                  path: skincareHistoryEntries[index].path,
+                  body,
+                  is_procedure: isProcedureBody(body)
+                });
+              } catch {
+                // Skip unreadable skincare files.
+              }
+            }
+          }
+
+          if (needsHubRetrieval) {
+            try {
+              const [tasksStore, teachingStore] = await Promise.all([
+                getTasksStore(env),
+                getTeachingStore(env)
+              ]);
+              const [tasks, classes, lessons, units, scheduled] = await Promise.all([
+                listTasksJSON(tasksStore, TASK_PREFIX).catch(err => {
+                  hubLoadErrors.tasks = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTeachingJSON(teachingStore, CLASS_PREFIX).catch(err => {
+                  hubLoadErrors.classes = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTeachingJSON(teachingStore, DRAFT_LESSON_PREFIX).catch(err => {
+                  hubLoadErrors.lessons = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTeachingJSON(teachingStore, UNIT_PREFIX).catch(err => {
+                  hubLoadErrors.units = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTeachingJSON(teachingStore, SCHEDULED_LESSON_PREFIX).catch(err => {
+                  hubLoadErrors.scheduledLessons = err?.code || 'load_failed';
+                  return [];
+                })
+              ]);
+              hubTasks = Array.isArray(tasks) ? tasks : [];
+              hubClasses = Array.isArray(classes) ? classes : [];
+              hubLessons = [
+                ...(Array.isArray(lessons) ? lessons : []),
+                ...(Array.isArray(scheduled) ? scheduled : [])
+              ];
+              hubUnits = Array.isArray(units) ? units : [];
+            } catch (err) {
+              hubLoadErrors.hub = err?.code || 'load_failed';
+            }
+          }
+
+          if (needsKnowledgeSearch) {
+            try {
+              knowledgePages = await listKnowledgePages({ env, fetchImpl });
+              if (!Array.isArray(knowledgePages)) knowledgePages = [];
+            } catch (err) {
+              knowledgeLoadError = err?.code || 'load_failed';
+              knowledgePages = [];
+            }
+          }
+
           const files = dataEntries
             .map((entry, index) => ({ path: entry.path, content: decodeBlob(dataBlobs[index]) }))
             .filter(file => file.content !== null);
           digest = summarizeRecentHistory(files, TARGETS_CONFIG, today);
+
+          if (slug === 'brisket' && nutritionRecords.length === 0) {
+            for (const file of files) {
+              if (!file.path?.startsWith('data/nutrition/')) continue;
+              try {
+                const { record } = parseEventDocument(file.content, file.path, loadYaml);
+                if (record?.type === 'meal') nutritionRecords.push(record);
+              } catch {
+                // Skip unreadable thin-window meals.
+              }
+            }
+          }
 
           const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
           if (decodedCentralNode !== null) {
@@ -1003,6 +1174,7 @@ export function createChatHandler({
             needsHammondTools,
             needsVeraMindTools: slug === 'vera',
             needsSaraMedicalTools: needsSaraMedical,
+            needsPenelopeDiaryTools,
             message: parsed.message
           }),
           ...(needsNutritionChallenges
@@ -1022,13 +1194,94 @@ export function createChatHandler({
         const brisketProtocol = slug === 'brisket' ? loadBrisketProtocol() : '';
         const saraProtocol = slug === 'sara' ? loadSaraProtocol() : '';
         const hammondProtocol = slug === 'hammond' ? loadHammondProtocol() : '';
+        const clareProtocol = slug === 'clare' ? loadClareProtocol() : '';
+        const annProtocol = slug === 'ann' ? loadAnnProtocol() : '';
+        const clementineProtocol = slug === 'clementine' ? loadClementineProtocol() : '';
         const skincareRoutines = needsSkincareLibrary
           ? formatSkincareRoutinesForPrompt(skincareMembership, skincareLibrary)
           : '';
         const intuitionPacks = loadIntuitionFor({ agentSlug: slug });
         const intuitionPrompt = formatIntuitionForPrompt(intuitionPacks);
         const capacityOneLiners = promptOneLinersForAgent(slug);
-        const hubContext = needsHammondTools ? await hubContextPromise : '';
+        const hubContext = needsHubRetrieval ? await hubContextPromise : '';
+        sourceMeta = {
+          ...(slug === 'chadwick' ? {
+            fitness_sessions: {
+              count: workoutRecords.length,
+              note: 'bounded loaded window — call tools for dashboard/compare/pain/load'
+            }
+          } : {}),
+          ...(needsNutritionHistory ? {
+            nutrition_meals: { count: nutritionRecords.length, note: '≈30-day meal window loaded' }
+          } : {}),
+          ...(needsBodyState ? {
+            body_composition: { count: compositionRecords.length },
+            body_measurements: { count: measurementRecords.length }
+          } : {}),
+          ...(needsMindDigest ? {
+            mind_events: {
+              count: mindEvents.length,
+              note: thinMindLoad ? 'paths only (thin turn)' : 'bodies loaded'
+            }
+          } : {}),
+          ...(needsSkincareHistory ? {
+            skincare_history: { count: skincareHistoryRecords.length }
+          } : {}),
+          ...(needsHubRetrieval ? {
+            tasks: hubLoadErrors.tasks ? { error: hubLoadErrors.tasks } : { count: hubTasks.length },
+            teaching_classes: hubLoadErrors.classes
+              ? { error: hubLoadErrors.classes }
+              : { count: hubClasses.length },
+            teaching_lessons: (hubLoadErrors.lessons || hubLoadErrors.scheduledLessons)
+              ? { error: hubLoadErrors.lessons || hubLoadErrors.scheduledLessons }
+              : { count: hubLessons.length }
+          } : {}),
+          ...(needsKnowledgeSearch ? {
+            knowledge_pages: knowledgeLoadError
+              ? { error: knowledgeLoadError }
+              : { count: knowledgePages.length }
+          } : {}),
+          ...(hubContext === HUB_CONTEXT_UNAVAILABLE_MARKER
+            ? { other_hubs: { error: 'umbrella_store_load_failed' } }
+            : {})
+        };
+        activation = activationForTurn({
+          slug,
+          message: parsed.message,
+          sourceMeta
+        });
+        const evidencePack = assembleEvidencePack({
+          slug,
+          message: parsed.message,
+          today,
+          sourceMeta,
+          now: nowInstant,
+          stores: {
+            workouts: workoutRecords,
+            meals: nutritionRecords,
+            composition: compositionRecords,
+            measurements: measurementRecords,
+            mindEvents,
+            skincare: skincareHistoryRecords,
+            medicalEvents,
+            tasks: hubTasks,
+            projects: hubProjects,
+            classes: hubClasses,
+            lessons: hubLessons,
+            units: hubUnits,
+            pages: knowledgePages,
+            loadErrors: hubLoadErrors,
+            hammondDigest,
+            nutritionChallenges,
+            templates: [],
+            stressFlags: [],
+            inbox: []
+          }
+        });
+        // Pack already retrieved domain evidence. Keep tools for continuation /
+        // writes, but do not force a tool round when the pack is answerable.
+        const forceToolChoice =
+          activation.forceToolChoice && !(evidencePack.active && evidencePack.answerable);
         const system = buildSystemPrompt({
           slug,
           digest,
@@ -1050,6 +1303,9 @@ export function createChatHandler({
           brisketProtocol,
           saraProtocol,
           hammondProtocol,
+          clareProtocol,
+          annProtocol,
+          clementineProtocol,
           hammondAuditContract,
           workoutTemplates,
           lastWorkouts,
@@ -1075,7 +1331,10 @@ export function createChatHandler({
           protocolSteer: protocolSteerBlock(slug, parsed.protocolId),
           intuition: intuitionPrompt,
           capacities: capacityOneLiners,
-          hubContext
+          hubContext,
+          activationCatalogue: activation.catalogueBlock,
+          activationDirective: activation.activationBlock,
+          evidencePackBlock: evidencePack.promptBlock
         });
 
         let pendingLogRejection = null;
@@ -1160,6 +1419,7 @@ export function createChatHandler({
             system,
             messages: [...parsed.history, { role: 'user', content: parsed.userContent ?? parsed.message }],
             tools,
+            toolChoice: forceToolChoice ? { type: 'any' } : null,
             signal: request.signal,
             executeTools: async event => {
               if (event.name === 'get_mind_session') {
@@ -1177,6 +1437,114 @@ export function createChatHandler({
               if (event.name === 'search_mind_records') {
                 send({ type: 'status', text: 'Searching mind records…' });
                 return JSON.stringify(searchMindRecords(mindEvents, event.input ?? {}));
+              }
+              if (event.name === 'search_diary_records') {
+                send({ type: 'status', text: 'Searching diary history…' });
+                return JSON.stringify(searchDiaryRecords(mindEvents, event.input ?? {}));
+              }
+              if (event.name === 'get_diary_range') {
+                send({ type: 'status', text: 'Reading diary range…' });
+                return JSON.stringify(getDiaryRange(mindEvents, event.input ?? {}));
+              }
+              if (event.name === 'get_nutrition_snapshot') {
+                send({ type: 'status', text: 'Reading Nutrition dashboard…' });
+                return JSON.stringify(getNutritionSnapshot(nutritionRecords, today, {
+                  nutritionChallenges
+                }));
+              }
+              if (event.name === 'get_nutrition_adherence') {
+                send({ type: 'status', text: 'Reading nutrition adherence…' });
+                return JSON.stringify(getNutritionAdherence(nutritionRecords, today));
+              }
+              if (event.name === 'get_nutrition_targets') {
+                send({ type: 'status', text: 'Reading nutrition targets…' });
+                return JSON.stringify(getNutritionTargets(today));
+              }
+              if (event.name === 'search_nutrition_records') {
+                send({ type: 'status', text: 'Searching nutrition records…' });
+                return JSON.stringify(searchNutritionRecords(nutritionRecords, event.input ?? {}));
+              }
+              if (event.name === 'get_weight_trend') {
+                send({ type: 'status', text: 'Reading weight trend…' });
+                return JSON.stringify(getWeightTrend({ compositionRecords, measurementRecords }));
+              }
+              if (event.name === 'search_skincare_records') {
+                send({ type: 'status', text: 'Searching skincare history…' });
+                return JSON.stringify(searchSkincareRecords(skincareHistoryRecords, event.input ?? {}));
+              }
+              if (event.name === 'get_skincare_adherence') {
+                send({ type: 'status', text: 'Reading skincare adherence…' });
+                return JSON.stringify(getSkincareAdherence(
+                  skincareHistoryRecords,
+                  today,
+                  event.input ?? {}
+                ));
+              }
+              if (event.name === 'get_tasks_focus') {
+                send({ type: 'status', text: 'Reading Tasks focus…' });
+                if (hubLoadErrors.tasks) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: 'tasks_unavailable',
+                    detail: hubLoadErrors.tasks,
+                    store: 'tasks_hub'
+                  });
+                }
+                return JSON.stringify(getTasksFocus(hubTasks, hubProjects, { now: nowInstant }));
+              }
+              if (event.name === 'search_tasks') {
+                send({ type: 'status', text: 'Searching tasks…' });
+                if (hubLoadErrors.tasks) {
+                  return JSON.stringify({ ok: false, error: 'tasks_unavailable', store: 'tasks_hub' });
+                }
+                return JSON.stringify(searchTasks(hubTasks, event.input ?? {}));
+              }
+              if (event.name === 'get_task') {
+                send({ type: 'status', text: 'Reading task…' });
+                return JSON.stringify(getTask(hubTasks, event.input ?? {}));
+              }
+              if (event.name === 'search_teaching') {
+                send({ type: 'status', text: 'Searching Teaching…' });
+                return JSON.stringify(searchTeaching({
+                  query: event.input?.query,
+                  classes: hubClasses,
+                  lessons: hubLessons,
+                  units: hubUnits,
+                  limit: event.input?.limit
+                }));
+              }
+              if (event.name === 'get_teaching_context') {
+                send({ type: 'status', text: 'Reading Teaching context…' });
+                return JSON.stringify(getTeachingContext({
+                  classes: hubClasses,
+                  lessons: hubLessons,
+                  units: hubUnits,
+                  query: event.input?.query,
+                  now: nowInstant
+                }));
+              }
+              if (event.name === 'search_knowledge') {
+                send({ type: 'status', text: 'Searching Knowledge corpus…' });
+                if (knowledgeLoadError) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: 'knowledge_unavailable',
+                    detail: knowledgeLoadError,
+                    store: 'knowledge_hub'
+                  });
+                }
+                return JSON.stringify(searchKnowledge(knowledgePages, event.input ?? {}));
+              }
+              if (event.name === 'inspect_hub_signals') {
+                send({ type: 'status', text: 'Inspecting cross-hub signals…' });
+                return JSON.stringify(inspectHubSignals({
+                  tasks: hubTasks,
+                  classes: hubClasses,
+                  scheduledLessons: hubLessons,
+                  loadErrors: hubLoadErrors,
+                  hammondDigest,
+                  now: nowInstant
+                }));
               }
               if (event.name === 'search_medical_records') {
                 send({ type: 'status', text: 'Searching Medical Overview…' });

@@ -52,6 +52,12 @@ export function buildSystemPrompt({
   intuition = '',
   capacities = '',
   hubContext = '',
+  activationCatalogue = '',
+  activationDirective = '',
+  evidencePackBlock = '',
+  clareProtocol = '',
+  annProtocol = '',
+  clementineProtocol = '',
   writingSample,
   humanizerGuidance
 }) {
@@ -168,7 +174,8 @@ export function buildSystemPrompt({
     nutritionSkinWeek
       ? `Nutrition→skin weekly check:\n${nutritionSkinWeek}`
       : 'Nutrition→skin weekly check: no meal window computed this turn.',
-    'When giving product or routine advice, cite which live signal you used (treatment state, nutrition→skin week, Current AM/PM rotation, Constraints, or Adam\'s message).'
+    'When giving product or routine advice, cite which live signal you used (treatment state, nutrition→skin week, Current AM/PM rotation, Constraints, or Adam\'s message).',
+    'When Adam asks if a routine is helping, call get_skincare_adherence, list_skincare_routines, and search_skincare_records for history — do not invent adherence.'
   ] : [];
 
   const penelopeBlocks = slug === 'penelope' ? [
@@ -179,6 +186,7 @@ export function buildSystemPrompt({
     'Diary notes must be Adam\'s first-person voice, never theatrical Moira phrasing. Propose dayone_sent:false; Life Hub emails Day One after he confirms.',
     'When the day is clear enough — or when Adam says log / confirm logged / file it / did you log — you MUST call diary log_entry in that same turn. Chat text alone never lands on Mind; only a Confirm card does. Never say heading to the vault, filed, boarded, or sent through unless log_entry just returned awaiting_confirm.',
     'Read Central Node before deepening the interview. After diary confirm, Mood + Recent Actions update automatically — fill `cross_agent_note` on diary log_entry when another agent must act. Chat-only lines are not memory.',
+    'When Adam refers to patterns, recurrence, or earlier feelings, call search_diary_records or get_diary_range before answering — do not ask him to paste prior entries.',
     mindDiaryDigest ? `Mind diary digest:\n${mindDiaryDigest}` : '',
     mindSilence,
     onThisDay ? `On this day (his own past writing — you may open with it):\n${onThisDay}` : '',
@@ -196,6 +204,7 @@ export function buildSystemPrompt({
     'When Adam says log / confirm logged / record the session — or on a leave-chat flush — you MUST call mind_session log_entry in that same turn. Do not web_search first. Chat text alone never lands on Mind.',
     'Before answering whether today\'s session logged: call `get_mind_session` for the date in question (or read Today\'s mind_session / digest / CN). If the tool returns found: true, confirm yes and summarise — never deny a save visible in tool results or loaded context.',
     'When Adam asks what you logged or what you would log, call `get_mind_session` if a file exists; otherwise show theme / insight / observation / closing_question in chat, then `log_entry`. Use `search_mind_records` for past themes — `web_search` is for external facts only, not Life Hub records.',
+    'When Adam asks what pattern you have noticed across recent sessions, call search_mind_records across multiple sessions and ground every claimed pattern in retrieved evidence.',
     'Read Central Node before your opening question. When another agent must act, fill `cross_agent_note` on mind_session — chat-only lines are not memory.',
     mindTodaySession ? `Today's mind_session:\n${mindTodaySession}` : '',
     mindDiaryDigest ? `Mind diary digest:\n${mindDiaryDigest}` : '',
@@ -215,6 +224,7 @@ export function buildSystemPrompt({
     nutritionChallenges
       ? `Active nutrition challenge trackers (durable scoreboard — you own these; update with mark_nutrition_challenge_day):\n${nutritionChallenges}`
       : 'No active nutrition challenge trackers yet. When Adam sets a weekly or challenge goal (no refined sugar, protein streak, etc.), call upsert_nutrition_challenge in that same turn — never say you lack a counter or that he is the scoreboard.',
+    'When Adam asks how eating/nutrition is going, about weekly adherence, or meal patterns, call get_nutrition_snapshot and get_nutrition_adherence before answering — do not invent adherence from memory.',
     'Every meal log_entry MUST include notes in the form "[food] — [compact verdict]" (on track / protein short / fat risk / emulsifier flag, etc.). Life Hub copies that line into Central Node Flags and Recent Actions after confirm — a meal without a verdict leaves CN silent. Keep Cross-Agent directives rare; routine meal judgments stay in notes.',
     'One breakfast/lunch/dinner/snack file per day. If Adam corrects a meal already logged today, re-propose the same meal slot with updated macros/notes and say confirming will replace that slot (overwrite), not add another.',
     'Never claim today\'s meal is logged / in the books until log_entry returns awaiting_confirm; Food Library save is not a day log. When he says log / confirm logged / save it, call meal log_entry in that same turn — chat text alone never lands on Nutrition.',
@@ -235,6 +245,7 @@ export function buildSystemPrompt({
     'You may propose log_entry for weight, composition, measurements, and medical when Adam clearly reports those figures or a visit. Leave meals to Brisket and workouts to Chadwick.',
     'Medical Overview is the medical record in Life Hub — not Notion. Central Node Upcoming Appointments are reminders only, not visits on Medical Overview. You own create/edit/read/interpret on Medical Overview.',
     'When Adam asks about previous medical history, a clinician (e.g. Kate Semple), a past visit, cost, address, insurance, or an appointment brief: you MUST call `search_medical_records` and/or `brief_medical_appointment` in that same turn before answering. Never say you lack live read access to Medical Overview, that it lives at a Notion link, or that visit details were not surfaced — retrieve them with the tools. If a tool returns no match, say you checked Medical Overview and found nothing, then ask one clarifying question.',
+    'When Adam asks whether weight change is unusual or about body trends, call get_body_state and get_weight_trend before analysing — cite dates and deltas; if records conflict, say so rather than picking one silently.',
     'New visits need Confirm; appends to a matched visit save immediately. Never say a record is saved until log_entry returns status "written" — awaiting_confirm means only a Confirm card exists. When Adam names a future maintenance dose on a new day (e.g. next Stelara on 27/10), propose a new medical visit dated that day — do not fold it into follow_up_date on a prior dose unless he explicitly asks to set the follow-up field. If the prior dose is not already on Medical Overview, log it as its own visit first. When he says log / confirm logged / save it, call log_entry in that same turn. When log_entry returns ok:false, fix the payload and call log_entry again in the same turn before telling Adam anything failed; never quote schema errors to him. Appointment briefs stay in chat. Body and medical notes should be "[figure or visit] — [compact health verdict]" so save/confirm can land Flags on Central Node.'
   ] : [];
 
@@ -275,19 +286,35 @@ export function buildSystemPrompt({
       : '',
     'You do not propose log_entry. Coach and triage; specialists own domain logs. You still have `os_propose_action` for durable allowlisted writes Adam must Confirm, plus your Central Node / Governance shortcuts.',
     'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.',
+    'When Adam asks what is slipping across life, call inspect_hub_signals and state which hubs lacked usable evidence.',
     'Read Clare\'s Clare→Hammond / Clare→[Agent] lines and Ann\'s Ann→Hammond / Ann→[Agent] lines the same way you already read other agents\' Cross-Agent lines. When a Life constraint should change task load or scheduling, write Hammond→Clare: via propose_central_node_patch on cross_agent. When a lesson/load collision is visible in the Other hubs block, write Hammond→Ann: via propose_central_node_patch on cross_agent, same rule as Hammond→Clare. Do not invent Teaching facts beyond that block. Do not address Clementine.'
   ] : [];
 
   const clareBlocks = slug === 'clare' ? [
+    clareProtocol
+      ? `Clare operating manual (follow these Life Hub / Tasks rules):\n${clareProtocol}`
+      : '',
     'Read Central Node Cross-Agent for Hammond→Clare (and any other →Clare line) before triaging a dump or proposing task writes. Those lines are live directives, not background colour.',
     'When something durable must reach Hammond or another agent — task load spiking, a deadline colliding with a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
-    'One line, observation not instruction, Clare→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine. Do not invent Tasks or Teaching rows that are not in your own tools.'
+    'One line, observation not instruction, Clare→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine. Do not invent Tasks or Teaching rows that are not in your own tools.',
+    'Before answering what Adam should focus on today or next, call get_tasks_focus (and search_tasks when he names work). Never prioritise from vibes alone.'
   ] : [];
 
   const annBlocks = slug === 'ann' ? [
+    annProtocol
+      ? `Ann operating manual (follow these Teaching Hub rules):\n${annProtocol}`
+      : '',
     'Read Central Node Cross-Agent for Hammond→Ann (and any other →Ann line) before responding. Those lines are live directives, not background colour.',
     'When something durable must reach Hammond or another agent — a lesson/load collision, a teaching deadline hitting a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
-    'One line, observation not instruction, Ann→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine.'
+    'One line, observation not instruction, Ann→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine.',
+    'Before recommending or changing teaching work, call search_teaching and/or get_teaching_context for the relevant class, calendar lesson, and unit.'
+  ] : [];
+
+  const clementineBlocks = slug === 'clementine' ? [
+    clementineProtocol
+      ? `Clementine operating notes (Teaching workplace protocol path is intentional; Knowledge research spine remains separate):\n${clementineProtocol}`
+      : '',
+    'Before answering what Adam already knows about a topic, call search_knowledge. Distinguish retrieved notes from new synthesis. Never invent archive pages.'
   ] : [];
 
   return [
@@ -298,6 +325,11 @@ export function buildSystemPrompt({
     protocolSteer,
     capability,
     capacityBlock,
+    activationCatalogue,
+    activationDirective,
+    evidencePackBlock
+      ? `Retrieved evidence pack (server-assembled before this reply — treat as primary evidence; label record vs calculation vs inference; call continuation tools only if a section is truncated/missing):\n${evidencePackBlock}`
+      : '',
     intuitionBlock,
     ...chadwickBlocks,
     ...hyaluronicaBlocks,
@@ -308,6 +340,7 @@ export function buildSystemPrompt({
     ...hammondBlocks,
     ...clareBlocks,
     ...annBlocks,
+    ...clementineBlocks,
     humanizerBlock,
     // Last-read voice reinforcement: chadwickBlocks are a dense procedural wall that can drown the
     // earlier voice paragraph. Models weight end-of-prompt instructions more heavily; cause-2 fix
