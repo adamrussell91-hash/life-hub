@@ -854,6 +854,9 @@ test('clare prompt instructs Cross-Agent read before dump and a restricted CN pa
   assert.match(prompt, /propose_central_node_patch/);
   assert.match(prompt, /cross_agent/);
   assert.match(prompt, /Clare→\[Agent\]/);
+  assert.match(prompt, /create_task/);
+  assert.match(prompt, /update_task/);
+  assert.match(prompt, /Do not invent GitHub file paths for tasks/);
 });
 
 test('clare prompt does not include hubContext even when provided', () => {

@@ -1,0 +1,15 @@
+{
+  "id": "tasks.create",
+  "tool_name": "create_task",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Create one or more Tasks Hub rows. Prefer this over inventing a file path or dumping work into Central Node. Confirm before writing.",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}

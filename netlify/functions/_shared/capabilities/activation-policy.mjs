@@ -240,8 +240,9 @@ const CATALOGUES = {
   ],
   clare: [
     'Tasks store — get_tasks_focus (open tasks, deadlines, capacity, stress), search_tasks, get_task',
-    'Workbench (40 jobs): fetch_url, research_topic, lookup_au_dates, lookup_place, compare_options, clare_mutate, inspect_board, plan_work, run_desk_protocol, draft_comms, check_calendars, check_clock, parse_dump, read_protocol, update_protocol. web_search finds pages; fetch_url opens a specific URL.',
-    'Inspect Tasks data before suggesting what Adam should do next. Do not invent rows. Writes go through clare_mutate and wait for Confirm.'
+    'Write ordinary rows with create_task / update_task (Confirm). Do not invent GitHub paths or dump work into Central Node.',
+    'Workbench (40 jobs): fetch_url, research_topic, lookup_au_dates, lookup_place, compare_options, clare_mutate, inspect_board, plan_work, run_desk_protocol, draft_comms, check_calendars, check_clock, parse_dump, read_protocol, update_protocol. web_search finds pages; fetch_url opens a specific URL. Prefer create_task / update_task for capture and edits; clare_mutate for complete, split, trash, move, batch, research notes, and the rest.',
+    'Inspect Tasks data before suggesting what Adam should do next. Do not invent rows. Writes wait for Confirm.'
   ],
   ann: [
     'Teaching store — search_teaching, get_teaching_context (class/unit/lesson/calendar window)',
