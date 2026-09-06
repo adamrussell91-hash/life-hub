@@ -172,6 +172,36 @@ test('empty Chat names the agent once and uses the full canvas width', async () 
   await context.close();
 });
 
+test('full-page Chat composer sits on the canvas floor beside the rail', async () => {
+  const context = await browser.newContext({ viewport: { width: 1800, height: 1100 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.desktop-rail [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#chat-form').waitFor({ state: 'visible' });
+
+  const boxes = await page.evaluate(() => {
+    const rail = document.querySelector('.desktop-rail');
+    const form = document.querySelector('#chat-form');
+    const frame = document.querySelector('.page-frame');
+    return {
+      rail: rail.getBoundingClientRect(),
+      form: form.getBoundingClientRect(),
+      frame: frame.getBoundingClientRect(),
+      viewHeight: window.innerHeight
+    };
+  });
+
+  assert.ok(boxes.rail.width > 0, 'desktop rail is visible');
+  assert.ok(boxes.form.left + 1 >= boxes.rail.right, 'composer must not overlap the rail');
+  assert.ok(Math.abs(boxes.form.left - boxes.frame.left) < 80, 'composer stays on the canvas');
+  assert.ok(boxes.form.bottom <= boxes.viewHeight, 'composer stays inside the viewport');
+  assert.ok(boxes.viewHeight - boxes.form.bottom < 80, 'composer sits on the canvas floor');
+
+  await context.close();
+});
+
 test('mobile Chat tab and overlay keep send beside the field', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
@@ -185,9 +215,12 @@ test('mobile Chat tab and overlay keep send beside the field', async () => {
 
   let inputBox = await page.locator('#chat-input').boundingBox();
   let sendBox = await page.locator('#chat-send').boundingBox();
-  assert.ok(inputBox && sendBox);
+  const formBox = await page.locator('#chat-form').boundingBox();
+  const navBox = await page.locator('.hub-mobile-nav').boundingBox();
+  assert.ok(inputBox && sendBox && formBox && navBox);
   assert.ok(sendBox.x > inputBox.x, 'send stays beside the field on the Chat tab');
   assert.ok(Math.abs(sendBox.y - inputBox.y) < 48, 'send stays on the composer row');
+  assert.ok(formBox.bottom <= navBox.top + 2, 'composer stays above the mobile nav');
 
   await page.locator('#more-nav-button').click();
   await page.locator('#more-sheet [data-section="nutrition"]').click();

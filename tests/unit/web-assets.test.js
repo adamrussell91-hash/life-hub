@@ -162,6 +162,27 @@ test('full-page Chat uses the canvas width and hides the Talking to chip while e
   );
 });
 
+test('full-page Chat locks the canvas height and anchors the composer on the floor', async () => {
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
+
+  assert.match(
+    css,
+    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+\.page-frame[\s\S]*height:\s*100dvh/
+  );
+  assert.match(
+    css,
+    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+#chat-view \.chat-messages[\s\S]*min-height:\s*0/
+  );
+  assert.match(
+    css,
+    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+#chat-view \.chat-form[\s\S]*margin-top:\s*auto/
+  );
+  assert.doesNotMatch(
+    css,
+    /\.chat-view:not\(\[data-panel-mode\]\)[^{]*\.chat-form[\s\S]{0,200}left:\s*0/
+  );
+});
+
 test('Mind fills the shared 76rem shell; only Chat lifts the canvas width', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
