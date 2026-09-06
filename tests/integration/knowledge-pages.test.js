@@ -235,10 +235,13 @@ test('Knowledge quiz GET and POST stay on knowledge-hub-data', async () => {
     },
     body: JSON.stringify({
       schedule: [{ page_id: 'note-1' }],
-      items: [{ page_id: 'note-1', prompt: 'What is working memory?' }]
+      items: [{ page_id: 'note-1', prompt: 'What is working memory?' }],
+      page_reviews: [{ page_id: 'note-1', title: 'Working memory' }]
     })
   }));
   assert.equal(saved.status, 200);
-  assert.equal((await saved.json()).data.schedule[0].page_id, 'note-1');
+  const payload = await saved.json();
+  assert.equal(payload.data.schedule[0].page_id, 'note-1');
+  assert.equal(payload.data.page_reviews[0].page_id, 'note-1');
 });
 

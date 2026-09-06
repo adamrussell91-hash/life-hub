@@ -1,7 +1,7 @@
 import { USE_LOCAL_DATA } from "./client";
 import { API_BASE } from "./config";
 import { loadLocalQuiz, persistLocalQuiz } from "../quiz/localStore";
-import type { DumpSnapshot, QuizEdge, QuizItem, QuizScheduleEntry, QuizStore } from "../quiz/schema";
+import type { DumpSnapshot, PageReview, QuizEdge, QuizItem, QuizScheduleEntry, QuizStore } from "../quiz/schema";
 import { readApiError, unwrapApiPayload } from "./envelope";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -22,7 +22,13 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 export async function getQuizSchedule(): Promise<QuizStore> {
   if (USE_LOCAL_DATA) {
     const local = loadLocalQuiz();
-    return { schema_version: 1, schedule: local.schedule, edges: local.edges, dumps: local.dumps };
+    return {
+      schema_version: 1,
+      schedule: local.schedule,
+      edges: local.edges,
+      dumps: local.dumps,
+      page_reviews: local.page_reviews,
+    };
   }
   return apiFetch<QuizStore>("/quiz");
 }
@@ -40,14 +46,21 @@ export async function saveQuiz(input: {
   items: QuizItem[];
   edges?: QuizEdge[];
   dumps?: DumpSnapshot[];
+  page_reviews?: PageReview[];
 }): Promise<QuizStore> {
   if (USE_LOCAL_DATA) {
-    persistLocalQuiz(input.schedule, input.items, { edges: input.edges, dumps: input.dumps });
+    persistLocalQuiz(input.schedule, input.items, {
+      edges: input.edges,
+      dumps: input.dumps,
+      page_reviews: input.page_reviews,
+    });
+    const local = loadLocalQuiz();
     return {
       schema_version: 1,
       schedule: input.schedule,
-      edges: input.edges ?? loadLocalQuiz().edges,
-      dumps: input.dumps ?? loadLocalQuiz().dumps,
+      edges: input.edges ?? local.edges,
+      dumps: input.dumps ?? local.dumps,
+      page_reviews: input.page_reviews ?? local.page_reviews,
     };
   }
   return apiFetch<QuizStore>("/quiz-save", {
