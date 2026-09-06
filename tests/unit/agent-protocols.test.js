@@ -74,6 +74,12 @@ test('pickStatusLine stays in that agent’s voice and skips the previous line',
   assert.equal(isAgentStatusLine('brisket', first), false);
 });
 
+test('Clare status lines do not call the list a dump', () => {
+  for (const line of AGENT_STATUS_LINES.clare) {
+    assert.doesNotMatch(line, /dump/i);
+  }
+});
+
 test('normalizeProtocolId accepts kit-style ids only', () => {
   assert.equal(normalizeProtocolId('log-meal'), 'log-meal');
   assert.equal(normalizeProtocolId('  weekly-review  '), 'weekly-review');
