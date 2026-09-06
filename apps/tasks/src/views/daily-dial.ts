@@ -51,8 +51,8 @@ const LEADER_STUB = 12;
 /** Wide enough that scaled-down mobile dials still show a readable title. */
 const LEADER_CHIP_W = 148;
 const DIAL_VIEWBOX_DESKTOP = '-40 0 600 520';
-/** Phone: crop to the ring so hour detail fills the card. Leader chips may spill; shell allows overflow. */
-const DIAL_VIEWBOX_MOBILE = '78 88 364 364';
+/** Phone: crop hard to the ring so hour detail fills the card. Leader chips may spill; shell allows overflow. */
+const DIAL_VIEWBOX_MOBILE = '90 95 340 340';
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 function dialIsCompact(): boolean {

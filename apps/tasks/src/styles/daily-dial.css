@@ -306,9 +306,9 @@
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    padding: var(--space-3) var(--space-2);
+    padding: var(--space-3) 0;
     gap: var(--space-3);
-    --dial-scale: 0.95;
+    --dial-scale: 1;
     overflow: visible;
   }
 

@@ -96,7 +96,7 @@ describe('daily dial view', () => {
       now,
       date: hubCalendarDate(now)
     });
-    expect(host.querySelector('.daily-dial__shell svg')?.getAttribute('viewBox')).toBe('78 88 364 364');
+    expect(host.querySelector('.daily-dial__shell svg')?.getAttribute('viewBox')).toBe('90 95 340 340');
     expect(host.querySelector('.daily-dial__chip-title')?.textContent).toBe('Standup');
   });
 
@@ -163,9 +163,9 @@ describe('mobile daily dial CSS', () => {
     expect(dialCss).not.toMatch(/width:\s*min\(22\.5rem,\s*100%\)/);
   });
 
-  it('keeps mobile centre readout near full scale', () => {
+  it('keeps mobile centre readout at full scale', () => {
     expect(dialCss).toMatch(
-      /@media \(max-width:\s*720px\)[\s\S]*?\.daily-dial\s*\{[^}]*--dial-scale:\s*0\.95/
+      /@media \(max-width:\s*720px\)[\s\S]*?\.daily-dial\s*\{[^}]*--dial-scale:\s*1(?!\d)/
     );
   });
 });
