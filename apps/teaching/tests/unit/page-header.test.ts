@@ -18,9 +18,7 @@ describe('renderPageHeader', () => {
     expect(host.querySelector('.page-header__title')?.textContent).toBe('Class home');
     expect(host.querySelector('.page-header__supporting')?.textContent).toContain('unit sequence');
     expect(host.querySelector('.page-header__actions')?.contains(save)).toBe(true);
-    const mark = host.querySelector('.hub-mark');
-    expect(mark).toBeInstanceOf(HTMLImageElement);
-    expect((mark as HTMLImageElement).src).toContain('/icons/teaching.svg');
+    expect(host.querySelector('.hub-mark')).toBeNull();
   });
 
   it('omits supporting when not provided', () => {
