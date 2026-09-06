@@ -536,8 +536,16 @@ export function createChatController({
         body.textContent = text;
         const list = root.querySelector('#chat-messages');
         if (list) {
-          workingBubble.remove();
-          appendChatThreadItem(list, workingBubble);
+          // Only re-seat when something else slipped below the status bubble.
+          // Removing/reinserting every rotate restarts layout and looks like flicker.
+          const spacer = list.querySelector?.('[data-chat-turn-spacer]');
+          const alreadyLast = spacer
+            ? workingBubble.nextSibling === spacer
+            : workingBubble === list.lastElementChild;
+          if (!alreadyLast) {
+            workingBubble.remove();
+            appendChatThreadItem(list, workingBubble);
+          }
         }
       }
       addStatusClass(workingBubble);
