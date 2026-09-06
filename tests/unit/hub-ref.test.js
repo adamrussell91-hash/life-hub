@@ -33,6 +33,20 @@ test('parses Teaching unit and Tasks project refs', () => {
   assert.equal(formatHubRef({ hub: 'tasks', kind: 'project', id: 'proj_aotfw' }), 'tasks:project:proj_aotfw');
 });
 
+test('parses Life decision refs', () => {
+  assert.deepEqual(parseHubRef('life:decision:aotfw-sources'), {
+    hub: 'life',
+    kind: 'decision',
+    id: 'aotfw-sources'
+  });
+  assert.equal(formatHubRef({ hub: 'life', kind: 'decision', id: 'aotfw-sources' }), 'life:decision:aotfw-sources');
+  assert.equal(
+    hrefForHubRef({ hub: 'life', kind: 'decision', id: 'aotfw-sources' }),
+    'https://life-hub.adam-russell.com/#central-node'
+  );
+  assert.match(labelForHubRef({ hub: 'life', kind: 'decision', id: 'aotfw-sources' }), /aotfw-sources/);
+});
+
 test('rejects unknown hubs, kinds, and junk', () => {
   assert.equal(parseHubRef('life://diary/2026-09-05'), null);
   assert.equal(parseHubRef('teaching:lesson:lesson_aotfw_001'), null);
@@ -74,14 +88,17 @@ test('AOTFW seed page cites the Teaching unit and Tasks project that exist', () 
   const tasks = JSON.parse(readFileSync(join(root, 'apps/tasks/fixtures/seed.json'), 'utf8'));
   const page = knowledge.find(item => item.id === 'page_aotfw');
   assert.ok(page);
-  assert.deepEqual(page.connected, ['teaching:unit:unit_aotfw', 'tasks:project:proj_aotfw']);
+  assert.ok(page.connected.includes('teaching:unit:unit_aotfw'));
+  assert.ok(page.connected.includes('tasks:project:proj_aotfw'));
+  assert.ok(page.connected.includes('life:decision:aotfw-sources'));
   assert.ok(teaching.units.some(unit => unit.id === 'unit_aotfw'));
   assert.ok(tasks.projects.some(project => project.id === 'proj_aotfw'));
   assert.deepEqual(
     page.connected.map(parseHubRef),
     [
       { hub: 'teaching', kind: 'unit', id: 'unit_aotfw' },
-      { hub: 'tasks', kind: 'project', id: 'proj_aotfw' }
+      { hub: 'tasks', kind: 'project', id: 'proj_aotfw' },
+      { hub: 'life', kind: 'decision', id: 'aotfw-sources' }
     ]
   );
 });
