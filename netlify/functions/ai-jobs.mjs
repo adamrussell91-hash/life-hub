@@ -9,6 +9,12 @@ import {
   setJSON
 } from './_shared/teaching-blobs.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
+import {
+  createKnowledgeIntakeJob,
+  createKnowledgeIntakeRuntime,
+  runKnowledgeIntakeUntilReview,
+  unresolvedJobForPage
+} from './_shared/knowledge-intake.mjs';
 
 export const config = { path: '/api/ai/jobs' };
 
@@ -28,8 +34,11 @@ export async function writeJobInbox(store, job) {
   jobs.unshift({
     id: job.id,
     lesson_id: job.lesson_id,
+    page_id: job.page_id,
+    kind: job.kind,
     agent: job.agent,
     status: job.status,
+    phase: job.phase,
     created_at: job.created_at
   });
   await setJSON(store, aiJobsInboxKey(), inboxFrom(jobs.slice(0, 50)));
@@ -47,6 +56,45 @@ export function createAiJobsHandler(deps = {}) {
     }
     const parsed = await readJsonObject(request);
     if (parsed.error) return withCors(parsed.error, request, env);
+    const kind = typeof parsed.value.kind === 'string' ? parsed.value.kind : '';
+    if (kind === 'knowledge_intake') {
+      const page_id = typeof parsed.value.page_id === 'string' ? parsed.value.page_id.trim() : '';
+      const agent = typeof parsed.value.agent === 'string' && parsed.value.agent
+        ? parsed.value.agent
+        : 'clementine';
+      if (!page_id || !AGENTS.has(agent)) {
+        return withCors(errorResponse(400, 'validation_error', 'Invalid AI job request', false), request, env);
+      }
+      const inbox = (await getJSON(store, aiJobsInboxKey())) ?? { jobs: [] };
+      const existing = unresolvedJobForPage(inbox, page_id);
+      if (existing) {
+        return withCors(jsonResponse(409, {
+          ok: false,
+          error: {
+            code: 'conflict',
+            message: 'An unresolved job already exists for this page',
+            retryable: false,
+            details: { id: existing.id, status: existing.status, phase: existing.phase }
+          }
+        }), request, env);
+      }
+      const now = new Date().toISOString();
+      const created = createKnowledgeIntakeJob({
+        id: newId('ai_job'),
+        page_id,
+        agent,
+        now
+      });
+      const runtime = createKnowledgeIntakeRuntime({ ...deps, env });
+      const page = await runtime.getPage(page_id);
+      if (!page) {
+        return withCors(errorResponse(404, 'not_found', 'Page was not found', false), request, env);
+      }
+      const job = await runKnowledgeIntakeUntilReview(created, runtime);
+      await setJSON(store, aiJobKey(job.id), job);
+      await writeJobInbox(store, job);
+      return withCors(okResponse(202, job), request, env);
+    }
     const lesson_id = typeof parsed.value.lesson_id === 'string' ? parsed.value.lesson_id : '';
     const agent = typeof parsed.value.agent === 'string' ? parsed.value.agent : '';
     const message = typeof parsed.value.message === 'string' ? parsed.value.message : '';

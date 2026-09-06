@@ -286,6 +286,21 @@ export async function savePage(page: Page): Promise<Page> {
   });
 }
 
+export type KnowledgeIntakeJob = {
+  id: string;
+  kind: "knowledge_intake";
+  page_id: string;
+  status: "working" | "done" | "error";
+  phase?: "queued" | "extracting" | "classifying" | "awaiting_review" | "done" | "rejected";
+  proposal?: { tags: string[]; body: string; title: string | null };
+  extracted_title?: string;
+  extracted_tags?: string[];
+  extracted_text?: string;
+  applied_page?: Page;
+  resolution?: "accepted" | "rejected" | "dismissed";
+  error?: string;
+};
+
 export function tidyEndpoint(localData: boolean) {
   return localData ? "/local-data/tidy" : `${API_BASE}/tidy`;
 }
@@ -313,7 +328,7 @@ export async function tidyPage(id: string, previousUpdatedAt?: string): Promise<
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, apply: true }),
     });
   } catch (error) {
     const recovered = before ? await pageIfAlreadyTidied(id, before).catch(() => null) : null;
@@ -328,6 +343,68 @@ export async function tidyPage(id: string, previousUpdatedAt?: string): Promise<
   }
   if (!response.ok) throw new Error(await readTidyError(response));
   return unwrapApiPayload<Page>(await response.json());
+}
+
+export async function startTidyIntake(id: string): Promise<KnowledgeIntakeJob> {
+  if (USE_LOCAL_DATA) {
+    const page = await getPage(id);
+    return {
+      id: `local_${id}`,
+      kind: "knowledge_intake",
+      page_id: id,
+      status: "done",
+      phase: "awaiting_review",
+      extracted_title: page.title,
+      extracted_tags: page.tags,
+      extracted_text: page.body,
+      proposal: { title: page.title, tags: page.tags, body: page.body }
+    };
+  }
+  const response = await fetch(tidyEndpoint(false), {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  if (!response.ok && response.status !== 202) throw new Error(await readTidyError(response));
+  return unwrapApiPayload<KnowledgeIntakeJob>(await response.json());
+}
+
+export async function resolveTidyIntake(
+  jobId: string,
+  resolution: "accepted" | "rejected" | "dismissed",
+): Promise<KnowledgeIntakeJob> {
+  if (USE_LOCAL_DATA) {
+    const pageId = jobId.replace(/^local_/, "");
+    if (resolution === "accepted") {
+      const page = await tidyPage(pageId);
+      return {
+        id: jobId,
+        kind: "knowledge_intake",
+        page_id: pageId,
+        status: "done",
+        phase: "done",
+        resolution,
+        applied_page: page
+      };
+    }
+    return {
+      id: jobId,
+      kind: "knowledge_intake",
+      page_id: pageId,
+      status: "done",
+      phase: "rejected",
+      resolution
+    };
+  }
+  const response = await fetch(tidyEndpoint(false), {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_id: jobId, resolution }),
+  });
+  if (!response.ok) throw new Error(await readTidyError(response));
+  return unwrapApiPayload<KnowledgeIntakeJob>(await response.json());
 }
 
 export type SignAttachmentInput = {

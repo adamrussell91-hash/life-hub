@@ -128,7 +128,7 @@ test('Tidy rewrites a page on knowledge-hub-data behind the Life session', async
   const response = await handler(authed('https://api.adam-russell.com/api/knowledge/tidy', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ id: 'note-1' })
+    body: JSON.stringify({ id: 'note-1', apply: true })
   }));
   assert.equal(response.status, 200);
   const body = await response.json();
