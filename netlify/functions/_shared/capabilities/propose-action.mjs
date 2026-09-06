@@ -364,6 +364,14 @@ async function executeBlobWrite(write, target, {
     record.created_at = existing.created_at;
     if (existing.schema_version != null) record.schema_version = existing.schema_version;
   }
+  if (typeof incoming.append_description === 'string') {
+    const extra = incoming.append_description.trim();
+    const prior = typeof (existing?.description ?? record.description) === 'string'
+      ? String(existing?.description ?? record.description)
+      : '';
+    record.description = [prior, extra].filter(Boolean).join('\n\n');
+    delete record.append_description;
+  }
   record.id = target.id;
   record.updated_at = timestamp;
   if (!record.created_at) record.created_at = existing?.created_at || timestamp;

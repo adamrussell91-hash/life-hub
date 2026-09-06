@@ -202,7 +202,9 @@ const SHORTCUT_CAPABILITY_IDS = new Set([
   'intuition.edit-pack',
   'os.promote-shortcut',
   'os.list-promoted-shortcuts',
-  'os.run-promoted-shortcut'
+  'os.run-promoted-shortcut',
+  'tasks.create',
+  'tasks.update'
 ]);
 
 /**
