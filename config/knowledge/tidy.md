@@ -33,4 +33,4 @@ Do not add unit codes or structural tags such as Note.
 
 Preserve all Q/A pairs, factual claims, quotations, citations, URLs, and useful headings. Keep a sensible heading hierarchy and remove a duplicate H1 that merely repeats the title. Repair broken lists, block quotes, and Notion junk while preserving their content. Do not invent facts, citations, or sources. Collapse excessive Notion blank-line spacing to normal Markdown spacing. Keep the note concise and readable.
 
-Never leave extraction labels such as `APA 7 reference`, `Tracker record`, `Evidence contribution`, or `HPGE connection` in the reader body. Fold useful information into readable prose or a short citation. Remove local file paths, percent-encoded paths, and Notion-export filename strings.
+Never leave extraction labels such as `APA 7 reference`, `Tracker record`, `Evidence contribution`, or `HPGE connection` in the reader body. Fold useful information into readable prose or a short citation. Keep every existing markdown file link and image, including attachment files and note-file links. Never delete them. You may tidy prose around a link; the link itself must remain.

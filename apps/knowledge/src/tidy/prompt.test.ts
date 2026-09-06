@@ -14,5 +14,7 @@ describe("tidy prompt", () => {
     expect(prompt).toContain("Philosophy Knowledge and Society");
     expect(prompt).toContain("Technology AI and Digital Learning");
     expect(prompt).not.toMatch(/\bHistory\b.*\bClassics\b/s);
+    expect(prompt).toMatch(/Keep every existing markdown file link/);
+    expect(prompt).not.toMatch(/Remove local file paths/);
   });
 });
