@@ -190,9 +190,18 @@ function scheduleRotate() {
       line: nextWaitLine(working.line),
       lastChangedAt: Date.now(),
     };
-    paint();
+    paintWorkingStatus();
     scheduleRotate();
   }, STATUS_ROTATE_MS);
+}
+
+/** Update the temporary status bubble in place — do not remount the overlay root. */
+function paintWorkingStatus(): boolean {
+  if (!working) return false;
+  const body = document.querySelector<HTMLElement>(".chat-message--status .chat-message__body");
+  if (!body) return false;
+  body.textContent = overlayTickText(working);
+  return true;
 }
 
 function setWorking(phase: ChatTickPhase, research?: ResearchResult) {
@@ -316,13 +325,14 @@ async function send(outgoingOverride?: string) {
     input = "";
     if (webFileNoteSelected()) fileAfterDone = true;
   }
+  const continuing = Boolean(researchSessionId || writeSessionId);
   busy = true;
   error = "";
   if (!working) {
     setWorking(notes.length ? "library" : "searching");
   }
   persist();
-  paint();
+  if (!(continuing && paintWorkingStatus())) paint();
   try {
     const result = await runChat({
       hat: protocolHat(personality, selectedProtocolId),
@@ -361,10 +371,12 @@ async function send(outgoingOverride?: string) {
   } finally {
     busy = false;
     persist();
-    paint();
     if (researchSessionId || writeSessionId) {
+      if (!paintWorkingStatus()) paint();
       stopPoll();
       pollTimer = setTimeout(() => void send(), 2000);
+    } else {
+      paint();
     }
   }
 }
