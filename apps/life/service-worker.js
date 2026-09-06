@@ -174,8 +174,6 @@ const SHELL_FILES = [
   'js/core/nutrition-challenges.js',
   'vendor/js-yaml.mjs',
   'manifest.webmanifest',
-  'assets/icons/life-hub-192.png',
-  'assets/icons/life-hub-512.png',
   'assets/body/full-body-diagram.png',
   'assets/agents/brisket.jpg',
   'assets/agents/chadwick.jpg',

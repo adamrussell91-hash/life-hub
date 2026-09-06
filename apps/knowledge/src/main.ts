@@ -233,7 +233,6 @@ let activePage: Page | null = null;
 let pendingMorphOrigin: { left: number; top: number; width: number; height: number } | null = null;
 let tidyBusy = false;
 let tidyReviewJob: KnowledgeIntakeJob | null = null;
-const HUB_MARK_SRC = "./icons/knowledge.svg";
 let quizStore: QuizStore | null = null;
 let pageReviews: PageReview[] = [];
 let listScrollTop = 0;
@@ -1979,7 +1978,6 @@ function renderLogin(message?: string) {
   hideChatOverlay();
   app.innerHTML = `<div class="sign-in">
     <form class="sign-in__card" method="post" action="#" novalidate>
-      <img class="sign-in__mark" src="${HUB_MARK_SRC}" alt="" width="56" height="56" />
       <p class="sign-in__brand">Knowledge Hub</p>
       <h1 class="sign-in__title">Sign in</h1>
       <div class="sign-in__field">

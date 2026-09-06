@@ -1,13 +1,13 @@
-# Hub marks — locked
+# Hub marks — deleted from product chrome
 
-Every hub uses **one** instrument from `icons/`. Wave arcs, cardinal gaps, High Sea core. No colour outside the closed palette. Do not redraw a logo.
+Adam locked this: the hub tile / favicon mark is **gone from product UI**. Do not put it back.
 
-Read this before adding a favicon, a sign-in mark, or a header glyph.
+Read this before adding a favicon, a sign-in image, a title glyph, a rail logo, or any “hub mark” chrome.
 
-## Files
+## Files (archive only)
 
-| Hub | Tile (website) | Glyph (dark / transparent) |
-|-----|----------------|----------------------------|
+| Hub | Tile | Glyph |
+|-----|------|-------|
 | Life | `icons/life-hub.svg` | `icons/life-hub-glyph.svg` |
 | Knowledge | `icons/knowledge.svg` | `icons/knowledge-glyph.svg` |
 | Teaching | `icons/teaching.svg` | `icons/teaching-glyph.svg` |
@@ -15,36 +15,32 @@ Read this before adding a favicon, a sign-in mark, or a header glyph.
 | Careers | `icons/careers.svg` | `icons/careers-glyph.svg` |
 | Central Control | `icons/central-control.svg` | `icons/central-control-glyph.svg` |
 
-**Tile** = Depth→Marine rounded square + mark. This **is** the website icon.
-
-**Glyph** = the same mark without the square (for a dark field). Do not put it on the rail wordmark.
+These SVGs may stay in the kit as **archive / source art**. They are **not** product chrome.
 
 ## Where it goes
 
-| Place | File | Markup | Size |
-|-------|------|--------|------|
-| Browser tab / home screen | Tile | `<link rel="icon" href="…/icons/<hub>.svg" type="image/svg+xml">` | browser |
-| Sign-in card | Tile | `<img class="sign-in__mark" src="…/icons/<hub>.svg" alt="" width="56" height="56">` | `3.5rem` |
-| Signed-in canvas title row | — | **Never.** Title row is the `h1` only. Do not put `.hub-mark` beside any page title on any hub. | — |
+| Place | Rule |
+|-------|------|
+| Browser tab / home screen | **Never.** No `<link rel="icon">` pointing at a hub tile. No apple-touch-icon hub tile. |
+| PWA / web manifest | **Never.** No hub-tile `icons` entries. |
+| Sign-in card | **Never.** No `.sign-in__mark`. Gate is brand eyebrow + `Sign in` + passphrase + submit. |
+| Signed-in canvas title row | **Never.** Title row is the `h1` only. No `.hub-mark`. |
+| Left rail brand | **Never.** Text `<a class="hub-rail__brand">` only. |
 
-`alt=""` — the brand text / page title already names the hub.
-
-**Locked:** the tile is favicon + sign-in only. A later “kit compliance” pass must not re-add `.hub-mark` next to titles — Adam removed it and it must stay gone.
+**Locked:** deleted from absolutely everywhere in product chrome. A later “kit compliance” pass must not re-add favicon, sign-in mark, title-row tile, rail logo, or PWA hub icons — Adam removed them and they must stay gone.
 
 ## Sign-in
 
-Mark + brand eyebrow + title `Sign in` + passphrase + submit. Enter on the field must submit (form `submit`, not a click-only button).
+Brand eyebrow + title `Sign in` + passphrase + submit. Enter on the field must submit (form `submit`, not a click-only button).
 
-**No supporting line.** No purpose copy, privacy notes, taglines, or “private dashboard” sentences on the gate. That writing does not belong there.
-
-## Not on the rail
-
-The left rail brand stays a text `<a class="hub-rail__brand">` to home. The hub tile/glyph is **not** a rail logo. See `RAIL.md`.
+**No tile.** **No supporting line.** No purpose copy, privacy notes, taglines, or “private dashboard” sentences on the gate.
 
 ## Do not
 
+- Wire `<link rel="icon">` to any hub tile
+- Add `.sign-in__mark` (or any hub tile image) on the gate
+- Put `.hub-mark` beside any page title
+- Put the tile or glyph on the rail
+- Re-add PWA / manifest hub-tile icons
 - Invent a seventh mark or recolour arcs
-- Use the glyph as the favicon or login mark on the light wash
-- Place the tile on the rail
-- Place the tile beside any page title (favicon + sign-in only)
-- Add descriptive copy under the login mark
+- “Fix” a missing favicon by restoring the tile

@@ -8,10 +8,10 @@
 
 | Hub | Overall | Notes |
 |-----|---------|-------|
-| Life | **Pass** (chrome) | Favicon + sign-in mark only. No `.hub-mark` beside page titles (locked; do not re-add). Confirm-card actions, display dates fixed. Product chart hex retained as domain colour. |
-| Teaching | **Pass** (chrome) | Gate mark only; **no** title-row `.hub-mark`; labeled rail only; utilities in header actions; 720px breakpoint; confirm-card replaces `window.confirm`. |
-| Knowledge | **Pass** (chrome) | Gate mark only; **no** title-row `.hub-mark`; capture titles `dd/mm/yy`; tidy confirm-card; primary `.btn` on quiz/podcast submits. |
-| Tasks | **Pass** (chrome) | Gate mark only; **no** title-row `.hub-mark`; reminder labels via `formatDisplayDate`; dead mobile-rail CSS removed. |
+| Life | **Pass** (chrome) | Hub tile deleted everywhere (no favicon, no sign-in mark, no title-row `.hub-mark`). Confirm-card actions, display dates fixed. Product chart hex retained as domain colour. |
+| Teaching | **Pass** (chrome) | Hub tile deleted; **no** title-row `.hub-mark`; labeled rail only; utilities in header actions; 720px breakpoint; confirm-card replaces `window.confirm`. |
+| Knowledge | **Pass** (chrome) | Hub tile deleted; **no** title-row `.hub-mark`; capture titles `dd/mm/yy`; tidy confirm-card; primary `.btn` on quiz/podcast submits. |
+| Tasks | **Pass** (chrome) | Hub tile deleted; **no** title-row `.hub-mark`; reminder labels via `formatDisplayDate`; dead mobile-rail CSS removed. |
 
 Locked chrome gaps from the prior audit are closed. Remaining hex lives in **product canvases** (charts, maps, quiz dump nodes, agent identity colours), not shared chrome — allowed as domain UI under kit rules (“product UI stays in the hub”).
 
@@ -34,7 +34,7 @@ Legend: **P** = Pass · **~** = Partial (product-only debt) · **F** = Fail
 | 9 | Tokens / no ad-hoc hex | ~ | ~ | ~ | ~ |
 | 10 | Mobile chrome (≤720px) | P | P | P | P |
 | 11 | Confirm cards / agent UX | P | P | P | P |
-| 12 | Favicon / hub marks | P | P | P | P |
+| 12 | No hub tile chrome (favicon / marks) | P | P | P | P |
 | 13 | Motion (`startHubMotion`) | P | P | P | P |
 | 14 | Local kit vs `packages/design-kit` | P | P | P | P |
 | 15 | UI/UX polish | P | P | P | P |
@@ -46,29 +46,29 @@ Category 9 stays Partial on purpose: product viz / map / dump / agent brand colo
 ## What changed (this remediation)
 
 ### Kit SoT (prior commit)
-- Sign-in requires `.sign-in__mark`; supporting copy forbidden
+- Sign-in forbids `.sign-in__mark`; supporting copy forbidden
 - Flat path docs; `prepare-web` publishes `icons/`
 
 ### Life
-- Favicon + `.sign-in__mark` on the gate. **No** `.hub-mark` in `.page-header__title-row` on any hub. Do not “fix” this.
+- No favicon, no `.sign-in__mark`, no `.hub-mark` anywhere. Do not “fix” this by restoring the tile.
 - Proposals use `.confirm-card` + `.btn.btn--primary` / `.btn.btn--ghost`
 - Mind / fitness display dates via `formatDisplayDate`
 - Removed dead brand-mark / nav-dot chrome CSS
 
 ### Teaching
 - Removed mark `display: none !important`
-- Gate mark only; no title-row `.hub-mark`; utilities in `.page-header__actions`
+- No gate mark / favicon; no title-row `.hub-mark`; utilities in `.page-header__actions`
 - Removed collapsed 5.75rem icon rail; rail hide at 720px
 - `askConfirmCard` modal for trash/archive/publish/AI stale accepts/history restore/bulk actions
 - Calendar day labels via `formatDisplayDate`
 
 ### Knowledge
-- Gate mark only; no title-row `.hub-mark`; capture titles `dd/mm/yy`
+- No gate mark / favicon; no title-row `.hub-mark`; capture titles `dd/mm/yy`
 - Reader tidy uses `.confirm-card` before write
 - Removed icon-column rail CSS; quiz/podcast submits use `.btn.btn--primary`
 
 ### Tasks
-- Gate mark only; no title-row `.hub-mark`; reminder labels via `formatDisplayDate`
+- No gate mark / favicon; no title-row `.hub-mark`; reminder labels via `formatDisplayDate`
 - Removed dead mobile-rail restyle CSS under 720px
 
 ---
