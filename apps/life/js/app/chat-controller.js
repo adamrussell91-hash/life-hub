@@ -30,7 +30,7 @@ import {
   MISSING_LOG_NUDGE_TEXT,
   shouldNudgeMissingLogEntry
 } from '../core/log-finalize-detect.js';
-import { beginChatTurnAnchor, clearChatTurnAnchors } from './chat-turn-anchor.js';
+import { appendChatThreadItem, beginChatTurnAnchor, clearChatTurnAnchors } from './chat-turn-anchor.js';
 import { lockConfirmCardReceipt } from './confirm-card-receipt.js';
 
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
@@ -537,7 +537,7 @@ export function createChatController({
         const list = root.querySelector('#chat-messages');
         if (list) {
           workingBubble.remove();
-          list.append(workingBubble);
+          appendChatThreadItem(list, workingBubble);
         }
       }
       addStatusClass(workingBubble);

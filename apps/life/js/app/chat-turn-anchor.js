@@ -19,6 +19,18 @@ function noopAnchor() {
   return { follow() {}, measure() {}, release() {} };
 }
 
+export function appendChatThreadItem(list, item) {
+  if (!list || !item) return;
+  const spacer = typeof list.querySelector === 'function'
+    ? list.querySelector(`[${SPACER_ATTR}]`)
+    : null;
+  if (spacer && typeof list.insertBefore === 'function') {
+    list.insertBefore(item, spacer);
+    return;
+  }
+  if (typeof list.append === 'function') list.append(item);
+}
+
 export function beginChatTurnAnchor(list, userItem, dom = {}) {
   if (!list || !userItem) return noopAnchor();
   const create = dom.createElement?.bind(dom)
