@@ -187,7 +187,7 @@ test('full-page Chat locks the canvas height and anchors the composer on the flo
   );
   assert.match(
     css,
-    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+#chat-view \.chat-messages[\s\S]*scrollbar-gutter:\s*stable/
+    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+#chat-view \.chat-messages[\s\S]*overflow-anchor:\s*none[\s\S]*scrollbar-gutter:\s*stable/
   );
   assert.match(
     css,
@@ -201,27 +201,39 @@ test('full-page Chat locks the canvas height and anchors the composer on the flo
 
 test('full-page Chat on phone pins the canvas to the visual viewport and docks on keyboard', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
-  const mobile = css.match(/@media \(max-width:\s*720px\)\s*\{[\s\S]*$/);
-  assert.ok(mobile, 'mobile breakpoint exists');
+  const phoneChat = css.slice(css.indexOf('Full-page Chat must track the visual viewport'));
+  assert.ok(phoneChat.length > 80, 'mobile Chat viewport block exists');
+
+  const frameRule = phoneChat.match(
+    /\.app-shell:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+\.page-frame\s*\{([^}]+)\}/
+  );
+  assert.ok(frameRule, 'full-page Chat page-frame rule exists');
+  assert.match(frameRule[1], /height:\s*100dvh/);
+  assert.match(frameRule[1], /top:\s*0/);
+  assert.doesNotMatch(
+    frameRule[1],
+    /--vv-height/,
+    'closed keyboard must not pin the chat window to live visualViewport height'
+  );
 
   assert.match(
-    mobile[0],
-    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+\.page-frame[\s\S]*height:\s*var\(--vv-height/
+    phoneChat,
+    /html\.vv-keyboard-open[\s\S]*:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)[\s\S]*\.page-frame[\s\S]*height:\s*var\(--vv-height/
   );
   assert.match(
-    mobile[0],
-    /:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)\s+\.page-frame[\s\S]*top:\s*var\(--vv-offset-top/
+    phoneChat,
+    /html\.vv-keyboard-open[\s\S]*:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)[\s\S]*\.page-frame[\s\S]*top:\s*var\(--vv-offset-top/
   );
   assert.match(
-    mobile[0],
+    phoneChat,
     /html\.vv-keyboard-open[\s\S]*:has\(#chat-view:not\(\[hidden\]\):not\(\[data-panel-mode\]\)\)[\s\S]*\.hub-mobile-nav[\s\S]*display:\s*none/
   );
   assert.match(
-    mobile[0],
+    phoneChat,
     /#chat-form:focus-within[\s\S]*\.hub-mobile-nav[\s\S]*display:\s*none/
   );
   assert.match(
-    mobile[0],
+    phoneChat,
     /#chat-form:focus-within[\s\S]*\.page-frame[\s\S]*padding-bottom:\s*0/
   );
 });
@@ -247,7 +259,7 @@ test('service worker paints cached images immediately and keeps scripts network-
   assert.match(worker, /function staleWhileRevalidate/);
   assert.match(worker, /function networkFirst/);
   assert.match(worker, /isStaticImage\(url\.pathname\)/);
-  assert.match(worker, /life-hub-shell-v152/);
+  assert.match(worker, /life-hub-shell-v153/);
 });
 
 test('web app manifest is installable and uses only local icons', async () => {

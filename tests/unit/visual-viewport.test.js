@@ -103,6 +103,58 @@ test('vv-keyboard-open flips from closed baseline when iOS shrinks innerHeight w
   detachVisualViewportInset();
 });
 
+test('closed keyboard does not pin the canvas to live visualViewport jitter', () => {
+  const { style, classList } = mockDocument();
+  const vvListeners = new Map();
+  globalThis.innerHeight = 844;
+  mockVisualViewport({ offsetTop: 0, height: 844, listeners: vvListeners });
+
+  try {
+    attachVisualViewportInset();
+    assert.equal(classList.contains('vv-keyboard-open'), false);
+    assert.equal(style.has('--vv-height'), false, 'closed keyboard must leave --vv-height unset so CSS can use 100dvh');
+    assert.equal(style.has('--vv-offset-top'), false);
+
+    globalThis.visualViewport.height = 841.6;
+    globalThis.visualViewport.offsetTop = 2.4;
+    vvListeners.get('resize')();
+
+    assert.equal(classList.contains('vv-keyboard-open'), false);
+    assert.equal(style.has('--vv-height'), false, 'URL-bar jitter must not rewrite --vv-height');
+    assert.equal(style.has('--vv-offset-top'), false);
+  } finally {
+    detachVisualViewportInset();
+  }
+});
+
+test('keyboard-open writes are quantized and ignore sub-pixel scroll jitter', () => {
+  const { style, classList } = mockDocument();
+  const vvListeners = new Map();
+  globalThis.innerHeight = 844;
+  mockVisualViewport({ offsetTop: 0, height: 844, listeners: vvListeners });
+
+  try {
+    attachVisualViewportInset();
+    assert.equal(vvListeners.has('scroll'), false, 'must not layout from visualViewport.scroll');
+    globalThis.innerHeight = 480;
+    globalThis.visualViewport.height = 479.7;
+    globalThis.visualViewport.offsetTop = 0.4;
+    vvListeners.get('resize')();
+
+    assert.equal(classList.contains('vv-keyboard-open'), true);
+    assert.equal(style.get('--vv-height'), '480px');
+    assert.equal(style.get('--vv-offset-top'), '0px');
+
+    globalThis.visualViewport.height = 478.2;
+    globalThis.visualViewport.offsetTop = 1.1;
+    vvListeners.get('resize')();
+    assert.equal(style.get('--vv-height'), '480px', 'sub-pixel / 1px jitter must not move the chat window');
+    assert.equal(style.get('--vv-offset-top'), '0px');
+  } finally {
+    detachVisualViewportInset();
+  }
+});
+
 test('composer focus forces vv-keyboard-open even when inset math is zero', () => {
   const { classList, docListeners } = mockDocument();
   globalThis.innerHeight = 480;

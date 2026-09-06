@@ -6180,6 +6180,12 @@ main { max-width: 76rem; margin: 0 auto; }
   box-shadow: 0 0 0 2px var(--marine);
 }
 
+html:has(#chat-view:not([hidden]):not([data-panel-mode])),
+html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
+  height: 100%;
+  overflow: hidden;
+}
+
 .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) {
   height: 100dvh;
   overflow: hidden;
@@ -6218,6 +6224,7 @@ main { max-width: 76rem; margin: 0 auto; }
   max-height: none;
   min-height: 0;
   overflow-y: auto;
+  overflow-anchor: none;
   scrollbar-gutter: stable;
 }
 
@@ -6290,12 +6297,12 @@ main { max-width: 76rem; margin: 0 auto; }
   .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame {
     position: fixed;
     z-index: 20;
-    top: var(--vv-offset-top, 0px);
+    top: 0;
     left: 0;
     right: 0;
     box-sizing: border-box;
-    height: var(--vv-height, 100dvh);
-    max-height: var(--vv-height, 100dvh);
+    height: 100dvh;
+    max-height: 100dvh;
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
     overflow: hidden;
   }
@@ -6304,9 +6311,14 @@ main { max-width: 76rem; margin: 0 auto; }
    * Keyboard open (Messenger-style): hide the tab bar and drop nav clearance so the
    * thread keeps the visual viewport. Class comes from visual-viewport.js; :focus-within
    * is the belt-and-suspenders path when iOS inset math stays ~0.
+   * Height/top only switch here — tracking live --vv-height while the keyboard is
+   * closed made the chat window edges and the right-hand scrollbar flicker.
    */
   html.vv-keyboard-open .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode])) .page-frame,
   .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode]) #chat-form:focus-within) .page-frame {
+    top: var(--vv-offset-top, 0px);
+    height: var(--vv-height, 100dvh);
+    max-height: var(--vv-height, 100dvh);
     padding-bottom: 0;
   }
 
@@ -6397,14 +6409,14 @@ main { max-width: 76rem; margin: 0 auto; }
 
   .chat-view[data-panel-mode="overlay"] {
     inset: auto;
-    top: var(--vv-offset-top, 0px);
+    top: 0;
     right: 0;
     left: 0;
-    bottom: var(--vv-offset-bottom, 0px);
+    bottom: 0;
     width: 100%;
     max-width: 100%;
     max-height: none;
-    height: var(--vv-height, 100dvh);
+    height: 100dvh;
     padding: var(--space-3);
     padding-top: max(var(--space-3), env(safe-area-inset-top, 0px));
     padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
@@ -6417,6 +6429,13 @@ main { max-width: 76rem; margin: 0 auto; }
     display: flex;
     flex-direction: column;
     overscroll-behavior: contain;
+  }
+
+  html.vv-keyboard-open .chat-view[data-panel-mode="overlay"],
+  .chat-view[data-panel-mode="overlay"]:focus-within {
+    top: var(--vv-offset-top, 0px);
+    bottom: var(--vv-offset-bottom, 0px);
+    height: var(--vv-height, 100dvh);
   }
 
   .chat-view[data-panel-mode="overlay"] .chat-messages {
