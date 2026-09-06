@@ -80,6 +80,39 @@ test('defaultLoadInverseLinks uses connected on the list when present', async ()
   assert.equal(loaded.groups[0].target, 'life:decision:aotfw-sources');
 });
 
+test('defaultLoadInverseLinks hydrates page_aotfw on a large archive without connected rows', async () => {
+  const listed = Array.from({ length: 25 }, (_, i) => ({
+    id: `note-${i + 1}`,
+    title: `Note ${i + 1}`
+  }));
+  listed[0] = { id: 'page_aotfw', title: 'Artist of the Floating World — sources' };
+  const urls = [];
+  const loaded = await defaultLoadInverseLinks({
+    env: { GITHUB_TOKEN: 'token' },
+    listPages: async () => listed,
+    fetchImpl: async url => {
+      urls.push(String(url));
+      assert.match(String(url), /pages\/page_aotfw\.json/);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sha: 'a'.repeat(40),
+          encoding: 'base64',
+          content: Buffer.from(JSON.stringify({
+            id: 'page_aotfw',
+            title: 'Artist of the Floating World — sources',
+            connected: ['life:decision:aotfw-sources']
+          })).toString('base64')
+        })
+      };
+    }
+  });
+  assert.equal(loaded.status, 'ready');
+  assert.equal(loaded.groups[0].target, 'life:decision:aotfw-sources');
+  assert.equal(urls.length, 1);
+});
+
 test('defaultLoadInverseLinks is unavailable when the list fails', async () => {
   const loaded = await defaultLoadInverseLinks({
     page: { id: 'page_aotfw' },
