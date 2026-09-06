@@ -64,63 +64,72 @@ function matches(node, selector) {
   return false;
 }
 
-test('beginChatTurnAnchor creates a spacer, follow scrolls to the user item, release removes spacer', () => {
+test('beginChatTurnAnchor pins scroll to the user item without a layout spacer', () => {
   const list = fakeNode('ul', { clientHeight: 400, scrollHeight: 200 });
   const userItem = fakeNode('li', { offsetTop: 40 });
   list.append(userItem);
   list.scrollHeight = 200;
 
-  const created = [];
-  const dom = {
-    createElement(tag) {
-      const el = fakeNode(tag);
-      created.push(el);
-      return el;
-    }
-  };
-
-  const anchor = beginChatTurnAnchor(list, userItem, dom);
+  const anchor = beginChatTurnAnchor(list, userItem);
   assert.equal(typeof anchor.follow, 'function');
   assert.equal(typeof anchor.release, 'function');
-
-  const spacer = list.children.find((child) => child.attributes.has('data-chat-turn-spacer'));
-  assert.ok(spacer, 'expected a turn spacer in the list');
-  assert.equal(spacer.className, 'chat-turn-spacer');
+  assert.equal(
+    list.children.find((child) => child.attributes.has('data-chat-turn-spacer')),
+    undefined,
+    'must not insert a layout spacer — that yanks desktop and mobile threads'
+  );
   assert.equal(userItem.attributes.get('data-chat-turn-anchor'), '1');
 
   list.scrollTop = 999;
   userItem.offsetTop = 80;
+  list.scrollHeight = 400;
+  list.clientHeight = 400;
   anchor.follow();
   assert.equal(list.scrollTop, 72, 'follow should pin near the user item (offsetTop - 8)');
 
   anchor.release();
-  assert.equal(list.children.includes(spacer), false, 'release should remove the spacer');
   assert.equal(userItem.attributes.has('data-chat-turn-anchor'), false);
 });
 
-test('appendChatThreadItem keeps new cards above the turn spacer', () => {
+test('beginChatTurnAnchor strips a leftover spacer from an older shell', () => {
+  const list = fakeNode('ul', { clientHeight: 400, scrollHeight: 200 });
+  const userItem = fakeNode('li', { offsetTop: 40 });
+  const leftover = fakeNode('li');
+  leftover.setAttribute('data-chat-turn-spacer', '1');
+  leftover.className = 'chat-turn-spacer';
+  list.append(userItem, leftover);
+
+  beginChatTurnAnchor(list, userItem);
+  assert.equal(list.children.includes(leftover), false, 'leftover spacers still yank the thread');
+});
+
+test('appendChatThreadItem appends when there is no spacer', () => {
   const list = fakeNode('ul', { clientHeight: 400, scrollHeight: 200 });
   const userItem = fakeNode('li', { offsetTop: 40 });
   list.append(userItem);
-  const created = [];
-  const dom = {
-    createElement(tag) {
-      const el = fakeNode(tag);
-      created.push(el);
-      return el;
-    }
-  };
-  beginChatTurnAnchor(list, userItem, dom);
-  const spacer = list.children.find((child) => child.attributes.has('data-chat-turn-spacer'));
+  beginChatTurnAnchor(list, userItem);
   const card = fakeNode('li');
   card.className = 'record-proposal confirm-card';
   appendChatThreadItem(list, card);
 
-  assert.equal(list.children.at(-1), spacer, 'spacer must stay last');
-  assert.equal(list.children.at(-2), card, 'confirm card must land above the spacer');
+  assert.equal(list.children.at(-1), card);
 });
 
-test('clearChatTurnAnchors strips anchors and spacers', () => {
+test('appendChatThreadItem keeps new cards above a leftover turn spacer', () => {
+  const list = fakeNode('ul', { clientHeight: 400, scrollHeight: 200 });
+  const userItem = fakeNode('li', { offsetTop: 40 });
+  const spacer = fakeNode('li');
+  spacer.setAttribute('data-chat-turn-spacer', '1');
+  list.append(userItem, spacer);
+  const card = fakeNode('li');
+  card.className = 'record-proposal confirm-card';
+  appendChatThreadItem(list, card);
+
+  assert.equal(list.children.at(-1), spacer, 'leftover spacer must stay last');
+  assert.equal(list.children.at(-2), card, 'confirm card must land above the leftover spacer');
+});
+
+test('clearChatTurnAnchors strips anchors and leftover spacers', () => {
   const list = fakeNode('ul');
   const userItem = fakeNode('li');
   const spacer = fakeNode('li');

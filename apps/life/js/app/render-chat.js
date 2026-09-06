@@ -52,8 +52,8 @@ export function isChatPinned(list) {
 
 export function scrollChatIfPinned(list, pinned = true) {
   if (!list || !pinned) return;
-  // Turn spacer owns scroll while a reply is growing — jumping to scrollHeight
-  // lands in the empty spacer and fights follow().
+  // Older shells left a layout spacer in the list. Do not jump to
+  // scrollHeight while one is still attached — follow() owns that turn.
   if (typeof list.querySelector === 'function' && list.querySelector('[data-chat-turn-spacer]')) {
     return;
   }
