@@ -3,6 +3,11 @@ import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { aiJobKey, getJSON, readPublishedId, setJSON } from './_shared/teaching-blobs.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { writeJobInbox } from './ai-jobs.mjs';
+import {
+  createKnowledgeIntakeRuntime,
+  isKnowledgeIntakeJob,
+  resolveKnowledgeIntakeJob
+} from './_shared/knowledge-intake.mjs';
 
 export const config = { path: '/api/ai/jobs/:id' };
 
@@ -30,12 +35,30 @@ export function createAiJobHandler(deps = {}) {
     if (!RESOLUTIONS.has(parsed.value.resolution)) {
       return withCors(errorResponse(400, 'validation_error', 'resolution is required', false), request, env);
     }
-    const next = {
-      ...job,
-      resolution: parsed.value.resolution,
-      status: job.status === 'working' ? 'done' : job.status,
-      updated_at: new Date().toISOString()
-    };
+    let next;
+    if (isKnowledgeIntakeJob(job)) {
+      try {
+        next = await resolveKnowledgeIntakeJob(
+          job,
+          parsed.value.resolution,
+          createKnowledgeIntakeRuntime({ ...deps, env })
+        );
+      } catch (error) {
+        const status = Number.isInteger(error?.status) ? error.status : 400;
+        return withCors(
+          errorResponse(status, error?.code ?? 'validation_error', error.message, false),
+          request,
+          env
+        );
+      }
+    } else {
+      next = {
+        ...job,
+        resolution: parsed.value.resolution,
+        status: job.status === 'working' ? 'done' : job.status,
+        updated_at: new Date().toISOString()
+      };
+    }
     await setJSON(store, aiJobKey(id), next);
     await writeJobInbox(store, next);
     return withCors(okResponse(200, next), request, env);
