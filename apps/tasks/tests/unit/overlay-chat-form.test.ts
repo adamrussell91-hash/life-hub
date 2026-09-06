@@ -26,6 +26,15 @@ describe('mobile overlay chat form', () => {
     );
   });
 
+  it('matches Messenger bubble density on mobile (16px / 1.25, user + assistant)', () => {
+    expect(viewsCss).toMatch(
+      /\.chat-message__body,\s*\.chat-message--user \.chat-message__body,\s*\.chat-message--assistant \.chat-message__body\s*\{[^}]*font-size:\s*16px/
+    );
+    expect(viewsCss).toMatch(
+      /\.chat-message__body,\s*\.chat-message--user \.chat-message__body,\s*\.chat-message--assistant \.chat-message__body\s*\{[^}]*line-height:\s*1\.25/
+    );
+  });
+
   it('uses near-full-width bubbles on mobile instead of a 17.5rem desk card', () => {
     expect(viewsCss).toMatch(/max-width:\s*min\(92%,\s*100%\)/);
     expect(viewsCss).not.toMatch(/max-width:\s*min\(82%,\s*17\.5rem\)/);

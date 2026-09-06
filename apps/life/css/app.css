@@ -782,8 +782,8 @@ main { max-width: 76rem; margin: 0 auto; }
   padding: 0;
   background: transparent;
   color: var(--ink);
-  font-size: var(--text-md);
-  line-height: 1.55;
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
 }
 
 .chat-message--assistant[data-agent] .chat-message__body {
@@ -801,6 +801,8 @@ main { max-width: 76rem; margin: 0 auto; }
   max-width: 100%;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
 }
 
 .chat-message__actions {
@@ -6399,6 +6401,7 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
     width: 100%;
     min-width: 0;
     font-size: 16px;
+    line-height: 1.25;
   }
 
   .chat-view #chat-send,
@@ -6420,9 +6423,13 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
     padding-left: 2.1rem;
   }
 
+  /* Messenger body density: 16px / tight leading, user + assistant matched. */
+  .chat-message__body,
+  .chat-message--user .chat-message__body,
   .chat-message--assistant .chat-message__body {
-    font-size: var(--text-base);
-    line-height: 1.45;
+    font-size: 16px;
+    line-height: 1.25;
+    padding: 0.35rem 0.7rem;
   }
 
   .chat-view[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {

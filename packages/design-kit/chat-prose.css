@@ -1,6 +1,9 @@
 /* Shared chat reply typography. Transcripts, not chrome.
  * Load on any hub with .chat-message__body or .coach-msg__body.
  * Tokens only. Assistant / coach copy — user pills stay plain.
+ *
+ * Messaging density (Messenger-like), not article reading-copy:
+ * --text-md / --leading-normal is for cards and long prose.
  */
 
 .chat-message--assistant .chat-message__body,
@@ -8,13 +11,13 @@
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: var(--text-md);
-  line-height: var(--leading-normal);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
 }
 
 .chat-message--assistant .chat-message__body > * + *,
 .coach-msg__body > * + * {
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 .chat-message--assistant .chat-message__body p,
