@@ -40,6 +40,7 @@ import {
 } from '../../../../apps/life/js/core/central-node-patch.js';
 import { applyIntuitionEdit } from './intuition.mjs';
 import { validateProposeActionInput } from './propose-action.mjs';
+import { newTaskId } from '../tasks-blobs.mjs';
 
 const CN_OPS = ['upsert_field', 'append_line', 'replace_section', 'delete_lines', 'condense'];
 
@@ -342,6 +343,75 @@ export function shortcutSchemas() {
           }
         },
         required: ['proposed_id'],
+        additionalProperties: false
+      }
+    },
+    create_task: {
+      name: 'create_task',
+      description:
+        'Create one or more Tasks Hub rows (Confirm). Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (max 8) for a dump.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          description: { type: 'string' },
+          domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
+          priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
+          due_date: { type: 'string', description: 'YYYY-MM-DD' },
+          due_time: { type: 'string' },
+          parent_project_id: { type: 'string' },
+          parent_task_id: { type: 'string' },
+          estimated_duration: { type: 'number' },
+          tags: { type: 'array', items: { type: 'string' } },
+          items: {
+            type: 'array',
+            description: 'Multiple tasks from one dump. Each needs a title.',
+            items: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                description: { type: 'string' },
+                domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
+                priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
+                due_date: { type: 'string' },
+                due_time: { type: 'string' },
+                parent_project_id: { type: 'string' },
+                parent_task_id: { type: 'string' },
+                estimated_duration: { type: 'number' },
+                tags: { type: 'array', items: { type: 'string' } }
+              },
+              required: ['title'],
+              additionalProperties: false
+            }
+          }
+        },
+        additionalProperties: false
+      }
+    },
+    update_task: {
+      name: 'update_task',
+      description:
+        'Patch an existing Tasks Hub row (Confirm). Call get_task first when appending so you know the current shape. Use append_description to add notes without replacing the rest of the task.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          task_id: { type: 'string' },
+          title: { type: 'string' },
+          description: { type: 'string' },
+          append_description: { type: 'string', description: 'Appended to the existing description at Confirm time.' },
+          status: { type: 'string', enum: ['open', 'in_progress', 'done', 'deferred', 'dead'] },
+          priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
+          domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
+          due_date: { type: 'string' },
+          due_time: { type: 'string' },
+          parent_project_id: { type: 'string' },
+          parent_task_id: { type: 'string' },
+          estimated_duration: { type: 'number' },
+          kind: { type: 'string' },
+          bucket: { type: 'string' },
+          tags: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['task_id'],
         additionalProperties: false
       }
     }
@@ -916,6 +986,145 @@ async function handleOsPromoteShortcut(ctx, input) {
 }
 
 
+const TASK_DOMAINS = new Set(['teaching', 'life', 'wedding', 'health', 'other']);
+const TASK_PRIORITIES = new Set(['urgent', 'high', 'medium', 'low']);
+const TASK_STATUSES = new Set(['open', 'in_progress', 'done', 'deferred', 'dead']);
+
+function asOptionalString(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text || null;
+}
+
+function normalizeTaskItem(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const title = asOptionalString(raw.title);
+  if (!title) return null;
+  const domain = TASK_DOMAINS.has(raw.domain) ? raw.domain : 'other';
+  const priority = TASK_PRIORITIES.has(raw.priority) ? raw.priority : 'medium';
+  const tags = Array.isArray(raw.tags) ? raw.tags.map(String).filter(Boolean) : [];
+  const estimated = typeof raw.estimated_duration === 'number' && Number.isFinite(raw.estimated_duration)
+    ? raw.estimated_duration
+    : null;
+  return {
+    title,
+    description: typeof raw.description === 'string' ? raw.description : '',
+    domain,
+    priority,
+    due_date: asOptionalString(raw.due_date),
+    due_time: asOptionalString(raw.due_time),
+    parent_project_id: asOptionalString(raw.parent_project_id),
+    parent_task_id: asOptionalString(raw.parent_task_id),
+    estimated_duration: estimated,
+    tags
+  };
+}
+
+function collectCreateTaskItems(input) {
+  if (Array.isArray(input?.items) && input.items.length) {
+    return input.items.map(normalizeTaskItem).filter(Boolean);
+  }
+  const one = normalizeTaskItem(input);
+  return one ? [one] : [];
+}
+
+function buildTaskRecord(item, { id, now }) {
+  return {
+    schema_version: 1,
+    id,
+    title: item.title,
+    description: item.description,
+    kind: 'task',
+    bucket: 'active',
+    step_order: 0,
+    domain: item.domain,
+    framework_used: null,
+    estimated_duration: item.estimated_duration,
+    actual_duration: null,
+    due_date: item.due_date,
+    created_at: now,
+    updated_at: now,
+    completed_at: null,
+    status: 'open',
+    blocked_since: null,
+    priority: item.priority,
+    parent_project_id: item.parent_project_id,
+    parent_task_id: item.parent_task_id,
+    depends_on: [],
+    tags: item.tags,
+    recurrence_rule: null,
+    due_time: item.due_time,
+    remind_at: null,
+    remind_dismissed_at: null,
+    attachments: [],
+    source: 'suggested_by_agent',
+    page_blocks: []
+  };
+}
+
+function handleCreateTask(ctx, input) {
+  const items = collectCreateTaskItems(input);
+  if (!items.length) return deny('title or items[].title is required');
+  if (items.length > 8) return deny('at most 8 tasks per create_task call');
+  const now = new Date().toISOString();
+  const writes = items.map(item => {
+    const id = newTaskId();
+    return {
+      path: `tasks:task:${id}`,
+      mode: 'create',
+      content: serializeJson(buildTaskRecord(item, { id, now })),
+      diff: `new task: ${item.title}`
+    };
+  });
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: items.length === 1 ? `Create task: ${items[0].title}` : `Create ${items.length} tasks`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes
+    })
+  );
+}
+
+function handleUpdateTask(ctx, input) {
+  const taskId = asOptionalString(input?.task_id);
+  if (!taskId) return deny('task_id is required');
+  const patch = {};
+  const title = asOptionalString(input.title);
+  const description = typeof input.description === 'string' ? input.description : null;
+  const append = asOptionalString(input.append_description);
+  if (title) patch.title = title;
+  if (description != null) patch.description = description;
+  if (append) patch.append_description = append;
+  if (TASK_STATUSES.has(input.status)) patch.status = input.status;
+  if (TASK_PRIORITIES.has(input.priority)) patch.priority = input.priority;
+  if (TASK_DOMAINS.has(input.domain)) patch.domain = input.domain;
+  if (asOptionalString(input.due_date)) patch.due_date = asOptionalString(input.due_date);
+  if (asOptionalString(input.due_time)) patch.due_time = asOptionalString(input.due_time);
+  if (asOptionalString(input.parent_project_id)) patch.parent_project_id = asOptionalString(input.parent_project_id);
+  if (asOptionalString(input.parent_task_id)) patch.parent_task_id = asOptionalString(input.parent_task_id);
+  if (typeof input.estimated_duration === 'number' && Number.isFinite(input.estimated_duration)) {
+    patch.estimated_duration = input.estimated_duration;
+  }
+  if (asOptionalString(input.kind)) patch.kind = asOptionalString(input.kind);
+  if (asOptionalString(input.bucket)) patch.bucket = asOptionalString(input.bucket);
+  if (Array.isArray(input.tags)) patch.tags = input.tags.map(String).filter(Boolean);
+  if (!Object.keys(patch).length) return deny('update_task needs at least one field to change');
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Update task ${taskId}`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes: [{
+        path: `tasks:task:${taskId}`,
+        mode: 'append',
+        content: serializeJson(patch),
+        diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
+      }]
+    })
+  );
+}
+
 export async function executeShortcut(toolName, input, ctx) {
   if (!shortcutSchemas()[toolName]) return deny(`Unknown shortcut: ${toolName}`);
   try {
@@ -952,6 +1161,10 @@ export async function executeShortcut(toolName, input, ctx) {
         return await handleOsListPromotedShortcuts(ctx, input);
       case 'os_run_promoted_shortcut':
         return await handleOsRunPromotedShortcut(ctx, input);
+      case 'create_task':
+        return handleCreateTask(ctx, input);
+      case 'update_task':
+        return handleUpdateTask(ctx, input);
       default:
         return deny(`Unhandled shortcut: ${toolName}`);
     }

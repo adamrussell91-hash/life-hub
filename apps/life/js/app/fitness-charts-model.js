@@ -1,5 +1,6 @@
-import { addCalendarDays, enumerateDateKeys, getSydneyWeekStart } from '../core/time.js';
+import { addCalendarDays, daysBetween, enumerateDateKeys, formatWeekday, getSydneyWeekStart } from '../core/time.js';
 import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
+import { MONTHS, minutesFromTime } from './chart-kit/polar-clock.js';
 import {
   REGION_KEYS,
   REGION_LABELS,
@@ -37,11 +38,12 @@ export const REGION_COLOURS = {
   legs: CLINICAL_CHART_SLOTS[3],
   back: CLINICAL_CHART_SLOTS[4]
 };
-const DAY_TYPE_COLOURS = {
-  movement: CLINICAL_CHART_SLOTS[7],
-  workout_30: CLINICAL_CHART_SLOTS[0],
-  workout_45_60: CLINICAL_CHART_SLOTS[1]
-};
+const TRAIN_BANDS = [
+  { key: 'morning', label: 'Morning', adverb: 'mornings' },
+  { key: 'afternoon', label: 'Afternoon', adverb: 'afternoons' },
+  { key: 'evening', label: 'Evening', adverb: 'evenings' },
+  { key: 'night', label: 'Night', adverb: 'nights' }
+];
 const PUSH_NAME = /press|dip|push|fly|pec|bench/i;
 const PULL_NAME = /row|pull|curl|lat|chin/i;
 
@@ -287,10 +289,6 @@ function sessionRegions(record) {
   return [...regions];
 }
 
-function primaryRegion(record) {
-  return sessionRegions(record)[0] ?? null;
-}
-
 function mean(values) {
   const finite = (values ?? []).filter(Number.isFinite);
   if (!finite.length) return null;
@@ -304,55 +302,143 @@ export function acwrBand(ratio) {
   return 'medium';
 }
 
-function buildClockPoints(records) {
-  const dated = records.filter(record => record.time && minutesFromClock(record.time) != null);
-  if (dated.length < 2) return [];
-  const newest = dated.length - 1;
-  return dated.map((record, index) => ({
-    date: record.date,
-    time: record.time,
-    title: String(record.title ?? '').trim() || 'Session',
-    region: primaryRegion(record),
-    colour: REGION_COLOURS[primaryRegion(record)] ?? CLINICAL_CHART_SLOTS[7],
-    recency: newest === 0 ? 1 : index / newest
-  }));
+function trainBandForMinutes(minutes) {
+  if (minutes >= 5 * 60 && minutes < 12 * 60) return 'morning';
+  if (minutes >= 12 * 60 && minutes < 17 * 60) return 'afternoon';
+  if (minutes >= 17 * 60 && minutes < 21 * 60) return 'evening';
+  return 'night';
 }
 
-function minutesFromClock(time) {
-  const match = /^(\d{1,2}):(\d{2})/.exec(String(time ?? ''));
-  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+function formatClockMinutes(minutes) {
+  const clamped = ((Math.round(minutes) % 1440) + 1440) % 1440;
+  const hour = Math.floor(clamped / 60);
+  const minute = clamped % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-function buildOrbitDays(records, windowDates) {
-  const byDate = new Map(records.map(record => [record.date, record]));
-  const days = windowDates.map(date => {
-    const record = byDate.get(date);
-    return {
-      date,
-      volume: record ? sessionVolume(record) : 0,
-      dayType: record?.day_type ?? (record ? 'workout_30' : 'rest'),
-      colour: record ? (DAY_TYPE_COLOURS[record.day_type] ?? CLINICAL_CHART_SLOTS[0]) : CLINICAL_CHART_SLOTS[7]
-    };
-  });
-  return days.some(day => day.volume > 0) && days.filter(day => day.volume > 0).length >= 2 ? days : [];
+function medianMinutes(values) {
+  // ponytail: linear median; circular midnight wrap is the upgrade if night sessions dominate.
+  const sorted = [...values].sort((left, right) => left - right);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
-function buildE1rmRadial(trends) {
-  const points = [];
-  for (const lift of trends ?? []) {
-    const peak = Math.max(...lift.series.map(point => point.value), 0);
-    if (!(peak > 0) || lift.series.length < 2) continue;
-    for (const point of lift.series) {
-      points.push({
-        name: lift.name,
-        date: point.date,
-        value: point.value,
-        pct: (point.value / peak) * 100,
-        colour: CLINICAL_CHART_SLOTS[points.length % CLINICAL_CHART_SLOTS.length]
-      });
-    }
+function weekdayHabit(records) {
+  const counts = new Map();
+  for (const record of records) {
+    const day = formatWeekday(record.date);
+    if (!day) continue;
+    counts.set(day, (counts.get(day) ?? 0) + 1);
   }
-  return points.length >= 2 ? points : [];
+  const ranked = [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+  if (!ranked.length || ranked[0][1] < 2) return '';
+  const short = day => day.slice(0, 3);
+  const [topDay, topCount] = ranked[0];
+  const second = ranked[1];
+  if (second && second[1] >= 2 && second[1] >= topCount - 1) {
+    return `mostly ${short(topDay)} and ${short(second[0])}`;
+  }
+  if (topCount / records.length >= 0.4) return `mostly ${short(topDay)}`;
+  return '';
+}
+
+function trainWhenRead(buckets, typicalTime, weekday) {
+  const total = buckets.reduce((sum, band) => sum + band.value, 0);
+  const ranked = [...buckets].sort((left, right) => right.value - left.value);
+  const top = ranked[0];
+  const second = ranked[1];
+  const adverb = key => TRAIN_BANDS.find(band => band.key === key)?.adverb ?? key;
+  let head = `Typical start ${typicalTime}`;
+  if (top && total && top.value / total > 0.5) {
+    head = `Usually ${adverb(top.key)}, around ${typicalTime}`;
+  } else if (top && second?.value > 0 && (top.value + second.value) / total >= 0.75) {
+    head = `Split ${adverb(top.key)} and ${adverb(second.key)} · typical start ${typicalTime}`;
+  }
+  return weekday ? `${head} · ${weekday}` : head;
+}
+
+export function buildTrainWhen(records) {
+  const timed = (records ?? []).flatMap(record => {
+    const minutes = minutesFromTime(record?.time);
+    if (minutes == null) return [];
+    return [{ ...record, minutes, band: trainBandForMinutes(minutes) }];
+  });
+  if (timed.length < 2) return null;
+  const buckets = TRAIN_BANDS.map(band => ({
+    key: band.key,
+    label: band.label,
+    value: timed.filter(record => record.band === band.key).length
+  }));
+  const typicalTime = formatClockMinutes(medianMinutes(timed.map(record => record.minutes)));
+  return {
+    count: timed.length,
+    typicalTime,
+    typicalBand: [...buckets].sort((left, right) => right.value - left.value)[0]?.key ?? null,
+    buckets,
+    read: trainWhenRead(buckets, typicalTime, weekdayHabit(timed))
+  };
+}
+
+function longestRestGap(trained, date) {
+  const ordered = [...trained].sort();
+  let best = 0;
+  for (let index = 1; index < ordered.length; index += 1) {
+    best = Math.max(best, daysBetween(ordered[index - 1], ordered[index]) - 1);
+  }
+  if (ordered.length) best = Math.max(best, daysBetween(ordered.at(-1), date));
+  return best;
+}
+
+export function buildMonthRhythm(records, windowDates, date) {
+  const days = windowDates ?? [];
+  if (days.length < 2) return null;
+  const trained = new Set((records ?? []).map(record => record.date).filter(day => day >= days[0] && day <= days.at(-1)));
+  if (trained.size < 2) return null;
+  const endWeek = getSydneyWeekStart(date);
+  const weeks = [];
+  for (let offset = 4; offset >= 0; offset -= 1) {
+    const weekStart = addCalendarDays(endWeek, -7 * offset);
+    const weekEnd = addCalendarDays(weekStart, 6);
+    weeks.push({
+      key: weekStart,
+      value: [...trained].filter(day => day >= weekStart && day <= weekEnd && day <= date).length
+    });
+  }
+  const gap = longestRestGap(trained, date);
+  return {
+    count: trained.size,
+    days: days.length,
+    longestGap: gap,
+    weeks,
+    read: gap >= 3
+      ? `${trained.size} sessions in the last ${days.length} days · longest gap ${gap} days`
+      : `${trained.size} sessions in the last ${days.length} days`
+  };
+}
+
+export function buildE1rmVsBest(trends) {
+  const lifts = (trends ?? []).flatMap(lift => {
+    if (lift.series.length < 2) return [];
+    const peak = Math.max(...lift.series.map(point => point.value), 0);
+    const latest = lift.series.at(-1);
+    if (!(peak > 0) || !latest) return [];
+    return [{
+      key: lift.name,
+      label: lift.name,
+      value: Math.round((latest.value / peak) * 100),
+      kg: latest.value,
+      peak,
+      date: latest.date
+    }];
+  }).sort((left, right) => right.value - left.value || left.label.localeCompare(right.label));
+  if (!lifts.length) return null;
+  const closest = lifts[0];
+  const furthest = lifts.at(-1);
+  let read = `Closest to best: ${closest.label} · ${closest.value}%`;
+  if (lifts.length > 1 && furthest.value < closest.value) {
+    read += ` · furthest ${furthest.label} · ${furthest.value}%`;
+  }
+  return { lifts, read };
 }
 
 function buildBumpRanks(trends, date) {
@@ -487,18 +573,24 @@ function buildPriorRegionVolume(events, date) {
   return buildRegionVolume(completedRecords(events, priorFrom, priorTo));
 }
 
-function buildE1rmBands(trends) {
+export function buildE1rmBands(trends) {
   return (trends ?? []).map(lift => {
     const values = lift.series.map(point => point.value);
+    const peak = Math.max(...values);
     const bandLow = Math.min(...values);
-    const bandHigh = Math.max(...values);
     const latest = values.at(-1);
     return {
       ...lift,
+      peak,
       bandLow,
-      bandHigh,
-      outside: latest < bandLow || latest > bandHigh ? latest > bandHigh : false,
-      tone: latest > bandHigh ? 'up' : latest < bandLow ? 'down' : 'same'
+      bandHigh: peak,
+      pctSeries: lift.series.map(point => ({
+        date: point.date,
+        value: peak > 0 ? Math.round((point.value / peak) * 100) : 0,
+        kg: point.value
+      })),
+      outside: latest < bandLow || latest > peak ? latest > peak : false,
+      tone: latest > peak ? 'up' : latest < bandLow ? 'down' : 'same'
     };
   }).filter(lift => lift.series.length >= 2);
 }
@@ -522,18 +614,27 @@ function buildSessionGauge(records) {
   };
 }
 
-function buildYearDots(events, date) {
+export function buildYearMonths(events, date) {
   const year = String(date).slice(0, 4);
-  const dots = (events ?? [])
-    .map(({ record }) => record)
-    .filter(record => record?.status === 'completed' && String(record.date).startsWith(year) && record.date <= date)
-    .map(record => ({
-      date: record.date,
-      region: primaryRegion(record),
-      colour: REGION_COLOURS[primaryRegion(record)] ?? CLINICAL_CHART_SLOTS[7],
-      volume: sessionVolume(record)
-    }));
-  return dots.length >= 2 ? dots : [];
+  const counts = MONTHS.map(() => 0);
+  for (const { record } of events ?? []) {
+    if (record?.status !== 'completed' || !String(record.date).startsWith(year) || record.date > date) continue;
+    const month = Number(String(record.date).slice(5, 7)) - 1;
+    if (month >= 0 && month < 12) counts[month] += 1;
+  }
+  const total = counts.reduce((sum, value) => sum + value, 0);
+  if (total < 2) return null;
+  const through = Number(String(date).slice(5, 7));
+  return {
+    year,
+    count: total,
+    months: MONTHS.slice(0, through).map((label, index) => ({
+      key: String(index + 1),
+      label,
+      value: counts[index]
+    })),
+    read: `${total} sessions in ${year}`
+  };
 }
 
 function buildRepRead(items) {
@@ -635,9 +736,9 @@ export function buildFitnessCharts({
       readingFromSeries(hrSeries, { key: 'hr', label: 'Heart rate', unit: 'bpm' })
     ].filter(Boolean),
     painBySite: buildPainBySite(records),
-    clockPoints: buildClockPoints(history),
-    orbitDays: buildOrbitDays(records, windowDates),
-    e1rmRadial: buildE1rmRadial(buildE1rmTrends(history)),
+    trainWhen: buildTrainWhen(history),
+    monthRhythm: buildMonthRhythm(records, windowDates, date),
+    e1rmVsBest: buildE1rmVsBest(buildE1rmTrends(history)),
     bumpRanks: buildBumpRanks(buildE1rmTrends(history), date),
     regionStream: buildRegionStream(history, date),
     painHeat: buildPainHeat(history, date),
@@ -645,7 +746,7 @@ export function buildFitnessCharts({
     regionVolumePrior: buildPriorRegionVolume(events, date),
     e1rmBands: buildE1rmBands(buildE1rmTrends(history)),
     sessionGauge: buildSessionGauge(history),
-    yearDots: buildYearDots(events, date),
+    yearMonths: buildYearMonths(events, date),
     year: Number(String(date).slice(0, 4)),
     repRead: buildRepRead(buildRepRanges(records)),
     weekTarget

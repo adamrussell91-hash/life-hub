@@ -209,6 +209,7 @@ const CATALOGUES = {
   ],
   clare: [
     'Tasks store — get_tasks_focus (open tasks, deadlines, capacity, stress), search_tasks, get_task',
+    'Write tasks with create_task / update_task (Confirm). Do not invent GitHub paths or dump work into Central Node.',
     'Inspect Tasks data before suggesting what Adam should do next. Do not invent rows.'
   ],
   ann: [

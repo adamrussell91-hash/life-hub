@@ -5,7 +5,7 @@ import {
   hasRecoveryBonus,
   resolveDayType
 } from '../core/aggregate.js';
-import { collectOpenLoops, formatOpenLoopLine, oldestOpenLoop } from '../core/open-loops.js';
+import { formatHammondReviewLine, latestHammondReview } from '../core/governance-log.js';
 import { getDayTargets } from '../core/targets.js';
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
 
@@ -39,12 +39,7 @@ export function buildHomeModel({
   events,
   targetsConfig,
   date,
-  governanceLogMarkdown,
-  centralNodeMarkdown,
-  weekFlags,
-  tasks,
-  stressFlags,
-  researchBriefs
+  governanceLogMarkdown
 } = {}) {
   if (!date) throw new RangeError('Home display date is unavailable');
 
@@ -64,15 +59,7 @@ export function buildHomeModel({
     };
   });
   const loggedDays = weekDays.filter(day => day.logged).length;
-  const hammondLine = formatOpenLoopLine(oldestOpenLoop(collectOpenLoops({
-    today: date,
-    governanceLogMarkdown,
-    centralNodeMarkdown,
-    weekFlags,
-    tasks,
-    stressFlags,
-    researchBriefs
-  })));
+  const hammondLine = formatHammondReviewLine(latestHammondReview(governanceLogMarkdown, date));
 
   return {
     date,

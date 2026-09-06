@@ -14,16 +14,24 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SECRET = 's'.repeat(32);
 
 function loadApiKey() {
-  const text = readFileSync(resolve(root, '.env.local'), 'utf8');
-  for (const line of text.split('\n')) {
-    if (line.startsWith('ANTHROPIC_API_KEY=')) return line.slice('ANTHROPIC_API_KEY='.length).trim();
+  const fromEnv = typeof process.env.ANTHROPIC_API_KEY === 'string'
+    ? process.env.ANTHROPIC_API_KEY.trim()
+    : '';
+  if (fromEnv) return fromEnv;
+  try {
+    const text = readFileSync(resolve(root, '.env.local'), 'utf8');
+    for (const line of text.split('\n')) {
+      if (line.startsWith('ANTHROPIC_API_KEY=')) return line.slice('ANTHROPIC_API_KEY='.length).trim();
+    }
+  } catch {
+    // .env.local is optional when the Cloud Agent environment already has the secret
   }
   return null;
 }
 
 const apiKey = loadApiKey();
 if (!apiKey) {
-  console.error('Missing ANTHROPIC_API_KEY in .env.local');
+  console.error('Missing ANTHROPIC_API_KEY in the environment or .env.local');
   process.exit(1);
 }
 
@@ -274,9 +282,17 @@ console.log('\n2) CHADWICK — workout log through Confirm');
     const newWrites = writes.slice(beforeWrites);
     check('wrote workout file', newWrites.some(w => w.path === turn.proposal.path),
       newWrites.map(w => w.path).join(', ') || 'no writes');
-    check('wrote central node or template',
-      newWrites.some(w => w.path === 'central-node.md') || newWrites.some(w => w.path.includes('templates')),
-      newWrites.map(w => w.path).join(', '));
+    const planned = String(turn.proposal.path).includes('workout-planned')
+      || turn.proposal.record?.status === 'planned';
+    if (planned) {
+      check('planned workout leaves central node alone',
+        !newWrites.some(w => w.path === 'central-node.md'),
+        newWrites.map(w => w.path).join(', '));
+    } else {
+      check('wrote central node or template',
+        newWrites.some(w => w.path === 'central-node.md') || newWrites.some(w => w.path.includes('templates')),
+        newWrites.map(w => w.path).join(', '));
+    }
     check('centralNodeUpdated reported', conf.payload?.data?.centralNodeUpdated === true
       || conf.payload?.data?.centralNodeUpdated === false,
       `centralNodeUpdated=${conf.payload?.data?.centralNodeUpdated}`);

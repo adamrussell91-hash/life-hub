@@ -65,40 +65,135 @@ function chartRoot() {
   };
 }
 
-test('clock and orbit paint hour labels, legends, and hover tips', () => {
+test('when-you-train paints day-part counts and a typical-time caption', () => {
   const root = chartRoot();
   renderFitnessCharts(root, {
-    clockPoints: [
-      { date: '2026-09-01', time: '07:10', region: 'chest', colour: 'var(--wave)', recency: 1, title: 'Chest' },
-      { date: '2026-09-03', time: '18:20', region: 'back', colour: 'var(--marine)', recency: 0.4, title: 'Back' }
-    ],
-    orbitDays: [
-      { date: '2026-08-20', volume: 1200, dayType: 'workout_30', colour: 'var(--wave)' },
-      { date: '2026-09-01', volume: 2400, dayType: 'workout_45_60', colour: 'var(--marine)' }
+    trainWhen: {
+      count: 4,
+      typicalTime: '18:40',
+      typicalBand: 'evening',
+      read: 'Usually evenings, around 18:40 · mostly Tue',
+      buckets: [
+        { key: 'morning', label: 'Morning', value: 1 },
+        { key: 'afternoon', label: 'Afternoon', value: 0 },
+        { key: 'evening', label: 'Evening', value: 3 },
+        { key: 'night', label: 'Night', value: 0 }
+      ]
+    },
+    monthRhythm: {
+      count: 4,
+      days: 30,
+      longestGap: 8,
+      read: '4 sessions in the last 30 days · longest gap 8 days',
+      weeks: [
+        { key: '2026-08-04', value: 0 },
+        { key: '2026-08-11', value: 1 },
+        { key: '2026-08-18', value: 2 },
+        { key: '2026-08-25', value: 1 },
+        { key: '2026-09-01', value: 0 }
+      ]
+    },
+    e1rmVsBest: {
+      read: 'Closest to best: Squat · 98% · furthest Press · 72%',
+      lifts: [
+        { key: 'Squat', label: 'Squat', value: 98, kg: 80, peak: 82, date: '2026-09-01' },
+        { key: 'Press', label: 'Press', value: 72, kg: 40, peak: 55, date: '2026-08-20' }
+      ]
+    },
+    yearMonths: {
+      count: 4,
+      read: '4 sessions in 2026',
+      months: [
+        { key: '8', label: 'Aug', value: 3 },
+        { key: '9', label: 'Sep', value: 1 }
+      ]
+    }
+  });
+
+  assert.equal(root.ensure('[data-fitness="when-read"]').textContent, 'Usually evenings, around 18:40 · mostly Tue');
+  const clock = texts(root.ensure('#fitness-clock-chart'));
+  assert.ok(clock.includes('Morning'));
+  assert.ok(clock.includes('Evening'));
+  assert.ok(clock.includes('3'));
+  assert.equal(root.ensure('#fitness-clock-card').attributes.hidden, undefined);
+  assert.ok(root.ensure('#fitness-clock-card').children.some(node => node.dataset?.role === 'fitness-tip'));
+
+  assert.equal(root.ensure('[data-fitness="orbit-read"]').textContent, '4 sessions in the last 30 days · longest gap 8 days');
+  const rhythm = texts(root.ensure('#fitness-orbit-chart'));
+  assert.ok(rhythm.includes('11/08'));
+  assert.ok(rhythm.includes('2'));
+  assert.equal(root.ensure('[data-fitness="e1rm-best-read"]').textContent, 'Closest to best: Squat · 98% · furthest Press · 72%');
+  const best = texts(root.ensure('#fitness-e1rm-radial-chart'));
+  assert.ok(best.includes('Squat'));
+  assert.ok(best.includes('98%'));
+  assert.equal(root.ensure('[data-fitness="year-read"]').textContent, '4 sessions in 2026');
+  assert.ok(texts(root.ensure('#fitness-year-chart')).includes('Aug'));
+});
+
+test('e1RM form paints one overlay with a legend, not a stack of lift charts', () => {
+  const root = chartRoot();
+  renderFitnessCharts(root, {
+    e1rmBands: [
+      {
+        name: 'Squat',
+        series: [{ date: '2026-07-01', value: 80 }, { date: '2026-07-30', value: 100 }],
+        pctSeries: [
+          { date: '2026-07-01', value: 80, kg: 80 },
+          { date: '2026-07-30', value: 100, kg: 100 }
+        ]
+      },
+      {
+        name: 'Press',
+        series: [{ date: '2026-07-08', value: 40 }, { date: '2026-07-22', value: 36 }],
+        pctSeries: [
+          { date: '2026-07-08', value: 100, kg: 40 },
+          { date: '2026-07-22', value: 90, kg: 36 }
+        ]
+      }
     ]
   });
 
-  const clock = texts(root.ensure('#fitness-clock-chart'));
-  assert.ok(clock.includes('00:00'));
-  assert.ok(clock.includes('12:00'));
-  assert.ok(clock.includes('Older'));
-  assert.ok(clock.includes('Newer'));
-  let clockLeaders = 0;
-  walk(root.ensure('#fitness-clock-chart'), node => {
-    if (node.attributes?.['data-role'] === 'leader') clockLeaders += 1;
+  const svg = root.ensure('#fitness-e1rm-chart');
+  const paths = [];
+  const labels = [];
+  walk(svg, node => {
+    if (node.name === 'path') paths.push(node);
+    if (node.name === 'text' && node.textContent) labels.push(node.textContent);
   });
-  assert.ok(clockLeaders >= 6, 'clock hour and recency labels use leader lines');
-  const clockLegend = texts(root.ensure('#fitness-clock-card'));
-  assert.ok(clockLegend.some(text => /Chest|Back/.test(text)));
-  assert.ok(root.ensure('#fitness-clock-card').children.some(node => node.dataset?.role === 'fitness-tip'));
+  assert.equal(paths.length, 2);
+  assert.ok(labels.includes('100%'));
+  assert.ok(labels.includes('80%'));
+  assert.equal(root.ensure('#fitness-e1rm-card').attributes.hidden, undefined);
+  const legend = texts(root.ensure('#fitness-e1rm-card'));
+  assert.ok(legend.includes('Squat'));
+  assert.ok(legend.includes('Press'));
+});
 
-  const orbit = texts(root.ensure('#fitness-orbit-chart'));
-  assert.ok(orbit.includes('Lighter'));
-  assert.ok(orbit.includes('Heavier'));
-  let orbitLeaders = 0;
-  walk(root.ensure('#fitness-orbit-chart'), node => {
-    if (node.attributes?.['data-role'] === 'leader') orbitLeaders += 1;
+test('who-is-improving uses a legend and short week labels', () => {
+  const root = chartRoot();
+  renderFitnessCharts(root, {
+    bumpRanks: [
+      { week: '2026-07-13', rankByTheme: { Squat: 2, Press: 1 } },
+      { week: '2026-07-20', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-07-27', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-08-03', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-08-10', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-08-17', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-08-24', rankByTheme: { Squat: 1, Press: 2 } },
+      { week: '2026-08-31', rankByTheme: { Squat: 1, Press: 2 } }
+    ]
   });
-  assert.ok(orbitLeaders >= 3, 'orbit volume and date labels use leader lines');
-  assert.equal(root.ensure('[data-fitness="orbit-status"]').textContent, '2 sessions');
+
+  const svg = root.ensure('#fitness-bump-chart');
+  const weekLabels = [];
+  walk(svg, node => {
+    if (node.name === 'text' && node.textContent) weekLabels.push(node.textContent);
+  });
+  assert.ok(weekLabels.includes('13/07'));
+  assert.ok(weekLabels.includes('31/08'));
+  assert.ok(!weekLabels.includes('Squat'));
+  assert.ok(weekLabels.length < 12);
+  const legend = texts(root.ensure('#fitness-bump-card'));
+  assert.ok(legend.includes('Squat'));
+  assert.ok(legend.includes('Press'));
 });

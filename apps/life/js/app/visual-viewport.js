@@ -5,7 +5,7 @@ export const VV_KEYBOARD_OPEN_PX = 120;
 export const VV_BASELINE_SHRINK_PX = 120;
 
 /** Ignore URL-bar / rubber-band jitter smaller than this once the keyboard is open. */
-export const VV_WRITE_DEADBAND_PX = 2;
+export const VV_HEIGHT_STICK_PX = 16;
 
 let attached = false;
 let composerFocused = false;
@@ -35,6 +35,10 @@ function keyboardOpenFromGeometry(vv) {
   return { open: false, insetBottom };
 }
 
+function chatViewBusy() {
+  return Boolean(globalThis.document?.querySelector?.('.chat-view.is-busy'));
+}
+
 function clearViewportVars(root) {
   root.style.removeProperty('--vv-offset-top');
   root.style.removeProperty('--vv-height');
@@ -48,9 +52,9 @@ function writeViewportVars(root, { offsetTop, height, insetBottom }) {
   const bottom = quantize(insetBottom);
   if (
     Number.isFinite(lastWritten.height)
-    && Math.abs(nextHeight - lastWritten.height) <= VV_WRITE_DEADBAND_PX
-    && Math.abs(top - lastWritten.top) <= VV_WRITE_DEADBAND_PX
-    && Math.abs(bottom - lastWritten.bottom) <= VV_WRITE_DEADBAND_PX
+    && Math.abs(nextHeight - lastWritten.height) < VV_HEIGHT_STICK_PX
+    && Math.abs(top - lastWritten.top) < VV_HEIGHT_STICK_PX
+    && Math.abs(bottom - lastWritten.bottom) < VV_HEIGHT_STICK_PX
   ) {
     return;
   }
@@ -67,7 +71,7 @@ function syncVisualViewport() {
   if (!root?.style) return;
 
   const { open: geometryOpen, insetBottom } = keyboardOpenFromGeometry(vv);
-  const open = composerFocused || geometryOpen;
+  const open = composerFocused || geometryOpen || chatViewBusy();
 
   if (!open) {
     if (vv.height > 0) {
@@ -120,7 +124,7 @@ function onComposerFocusOut(event) {
   // Defer so focus moving Attach → input inside the form does not clear the mode.
   globalThis.setTimeout?.(() => {
     const active = globalThis.document?.activeElement;
-    if (isComposerTarget(active)) return;
+    if (isComposerTarget(active) || chatViewBusy()) return;
     composerFocused = false;
     syncVisualViewport();
   }, 0);
@@ -145,6 +149,16 @@ export function attachVisualViewportInset() {
   bind(globalThis.visualViewport, 'resize', syncVisualViewport, vvListeners);
   bind(globalThis.document, 'focusin', onComposerFocusIn, docListeners);
   bind(globalThis.document, 'focusout', onComposerFocusOut, docListeners);
+}
+
+/** Re-read busy/focus after Chat send/stop so keyboard chrome does not slam back. */
+export function notifyChatViewport() {
+  if (!attached) return;
+  if (!chatViewBusy()) {
+    const active = globalThis.document?.activeElement;
+    if (!isComposerTarget(active)) composerFocused = false;
+  }
+  syncVisualViewport();
 }
 
 export function detachVisualViewportInset() {

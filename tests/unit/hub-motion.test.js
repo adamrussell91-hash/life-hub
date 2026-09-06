@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises';
 import {
   applyHubScrollHide,
   nextScrollHideState,
-  parseCountable
+  parseCountable,
+  scrollHideFromScroller
 } from '../../packages/design-kit/js/hub-motion.js';
 import {
   DEFAULT_STAGGER_MS,
@@ -121,6 +122,8 @@ test('scroll-hide tucks away on the way down and comes back on the way up', () =
     true,
     '2px layout nudge must not reveal chrome'
   );
+  assert.equal(nextScrollHideState({ current: 848, previous: 842, threshold: 80, hidden: true }), true, '6px follow() jitter must not reveal');
+  assert.equal(nextScrollHideState({ current: 842, previous: 848, threshold: 80, hidden: false }), false, '6px follow() jitter must not hide');
 
   const el = {
     className: '',
@@ -141,6 +144,53 @@ test('scroll-hide tucks away on the way down and comes back on the way up', () =
   assert.equal(el.attributes.inert, '');
   assert.equal(applyHubScrollHide(el, { current: 40, previous: 160 }), false);
   assert.equal(el.classList.contains('is-hidden'), false);
+});
+
+test('scroll-hide ignores content growth and does not reveal just because overflow vanished', () => {
+  assert.equal(
+    scrollHideFromScroller({ current: 160, previous: 80, hidden: false, overflowing: true, contentGrew: true }),
+    false,
+    'growing the thread must not hide chrome'
+  );
+  assert.equal(
+    scrollHideFromScroller({ current: 40, previous: 160, hidden: true, overflowing: true, contentGrew: true }),
+    true,
+    'growing the thread must not reveal chrome either'
+  );
+  assert.equal(
+    scrollHideFromScroller({ current: 200, previous: 200, hidden: true, overflowing: false, contentGrew: false }),
+    true,
+    'in-flow collapse that removes overflow must not force a reveal loop'
+  );
+  assert.equal(
+    scrollHideFromScroller({ current: 0, previous: 200, hidden: true, overflowing: false, contentGrew: false }),
+    false,
+    'back at the top still reveals'
+  );
+  assert.equal(
+    scrollHideFromScroller({ current: 120, previous: 90, hidden: false, overflowing: true, contentGrew: false }),
+    true
+  );
+  assert.equal(
+    scrollHideFromScroller({ current: 400, previous: 0, hidden: false, overflowing: true, busy: true }),
+    false,
+    'a busy Chat turn must not tuck chrome from follow() scroll'
+  );
+  assert.equal(
+    scrollHideFromScroller({ current: 0, previous: 400, hidden: true, overflowing: true, busy: true }),
+    true,
+    'a busy Chat turn must not reveal chrome from follow() scroll either'
+  );
+});
+
+test('chat transcripts are not list-staggered — a data-state rescan must not fade them', async () => {
+  const motion = await readFile(new URL('../../packages/design-kit/js/hub-motion.js', import.meta.url), 'utf8');
+  assert.match(motion, /LIST_SELECTOR = \[[\s\S]*\.logging-list/);
+  assert.doesNotMatch(
+    motion,
+    /LIST_SELECTOR = \[[\s\S]*\.chat-messages/,
+    'hub-list-in on .chat-messages fades the whole Life Chat window on refresh'
+  );
 });
 
 test('kit documents kinetic as canvas-only motion', async () => {
