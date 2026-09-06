@@ -5,7 +5,7 @@ import { daysBetween, getSydneyWeekStart, isCalendarDate } from './time.js';
 export const WEEK_FLAGS_PATH = 'data/remember/week-flags.json';
 
 const TITLE_MAX = 80;
-const DATE_IN_TEXT = /(\d{4}-\d{2}-\d{2})/;
+const DATE_IN_TEXT = /(?:since|opened|from|due|until|by|as of)\s+(\d{4}-\d{2}-\d{2})/i;
 const EDGE_RE = /(?:\*\*)?([A-Za-z][A-Za-z .']*?)(?:\*\*)?\s*→\s*(?:\*\*)?([A-Za-z][A-Za-z .']*?)(?:\*\*)?\s*:/;
 
 function clipTitle(text) {

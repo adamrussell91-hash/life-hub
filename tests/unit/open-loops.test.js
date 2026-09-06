@@ -55,6 +55,16 @@ test('collectOpenLoops reads a date on a Cross-Agent line when present', () => {
   assert.equal(loops[0].ageDays, 41);
 });
 
+test('collectOpenLoops ignores a cited calendar date that is not the loop age', () => {
+  const cn = [
+    '## 🤝 Cross-Agent Coordination',
+    '- Hammond→Clare: revisit the 2023-03-21 bloods before next labs.'
+  ].join('\n');
+  const loops = collectOpenLoops({ today: TODAY, centralNodeMarkdown: cn });
+  assert.equal(loops[0].dateKey, TODAY);
+  assert.equal(loops[0].ageDays, 0);
+});
+
 test('collectOpenLoops treats Clare Later items as open loops', () => {
   const loops = collectOpenLoops({
     today: TODAY,
