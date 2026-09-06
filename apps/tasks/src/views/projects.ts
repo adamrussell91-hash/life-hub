@@ -74,7 +74,7 @@ function renderStatusChart(
 ): HTMLElement {
   const tile = el('section', 'hub-card projects-chart');
   tile.setAttribute('aria-label', 'Project status mix');
-  tile.append(el('p', 'hub-card__eyebrow', 'Status mix'));
+  tile.append(el('p', 'hub-card__eyebrow', 'What’s the mix?'));
   tile.append(
     renderProjectPortfolioChart(mix, {
       running,

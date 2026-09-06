@@ -547,7 +547,7 @@ button.status-badge,
 button.priority-chip,
 button.hub-chip {
   border: 0;
-  font: inherit;
+  font-family: inherit;
   cursor: pointer;
 }
 
@@ -910,6 +910,20 @@ button.hub-chip {
 
   .hub-row__title {
     overflow-wrap: anywhere;
+    font-size: var(--text-base);
+  }
+
+  .hub-canvas .hub-row .priority-chip,
+  .hub-canvas .hub-row .hub-chip,
+  .hub-canvas .hub-row .due-chip,
+  .hub-canvas .hub-row .status-badge {
+    font-size: var(--text-xs);
+    padding: 0.1rem 0.4rem;
+    line-height: 1.25;
+  }
+
+  .hub-row__updated {
+    font-size: var(--text-2xs);
   }
 
   .hub-card-slot .hub-row,

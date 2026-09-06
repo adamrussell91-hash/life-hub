@@ -40,7 +40,7 @@ function boardLedeSuffix(): string {
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(pointer: coarse)').matches;
   if (coarse) {
-    return 'drag a card to another column, or tap to expand · use the column tabs to browse';
+    return 'tap a card to expand · use the column tabs to move between lists';
   }
   return 'drag cards between columns, or focus one and press Space';
 }
