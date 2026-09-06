@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readdir, readFile } from 'node:fs/promises';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
+import { createAiJobsTickScheduledHandler } from '../../netlify/functions/ai-jobs-tick-scheduled.mjs';
 import {
   jobIsStale,
   isScheduledTickRequest,
@@ -132,4 +134,31 @@ test('isScheduledTickRequest only trusts the Netlify schedule event', () => {
     headers: { 'x-nf-event': 'schedule' }
   })), true);
   assert.equal(isScheduledTickRequest(new Request('https://api.adam-russell.com/api/ai/jobs/tick')), false);
+});
+
+test('scheduled tick runs without a session', async () => {
+  const handler = createAiJobsTickScheduledHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => memoryStore(),
+    listPages: async () => [],
+    tidyPage: async () => undefined,
+    readTidyState: async () => ({ text: '{"tidied":{}}' }),
+    writeTidyState: async () => undefined
+  });
+  const response = await handler();
+  assert.equal(response.status, 202);
+});
+
+test('no Netlify function sets both path and schedule', async () => {
+  const dir = new URL('../../netlify/functions/', import.meta.url);
+  const names = (await readdir(dir)).filter(name => name.endsWith('.mjs'));
+  for (const name of names) {
+    const source = await readFile(new URL(name, dir), 'utf8');
+    assert.equal(
+      /\bpath\s*:/.test(source) && /\bschedule\s*:/.test(source),
+      false,
+      `${name} sets both path and schedule; Netlify rejects that on deploy`
+    );
+  }
 });

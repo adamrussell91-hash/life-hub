@@ -8,10 +8,14 @@ import { createOperatorHandler } from './operator-gate.mjs';
 import { listJSON } from './teaching-blobs.mjs';
 import { readJsonObject } from './teaching-record-get.mjs';
 
-export function createTeachingCollectionHandler({ create, listPrefix, listKey }, deps = {}) {
+export function createTeachingCollectionHandler({ create, listPrefix, listKey, list }, deps = {}) {
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
     try {
+      if (request.method === 'GET' && typeof list === 'function') {
+        const data = await list(store, request);
+        return withCors(okResponse(200, data), request, env);
+      }
       if (request.method === 'GET' && listPrefix && listKey) {
         const items = await listJSON(store, listPrefix);
         return withCors(okResponse(200, { [listKey]: items }), request, env);

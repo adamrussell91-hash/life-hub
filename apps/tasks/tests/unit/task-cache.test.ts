@@ -65,6 +65,18 @@ describe('task cache', () => {
     expect(filterCachedTasks([doomed])).toEqual([]);
   });
 
+  it('fills missing depends_on and tags so board and universe can iterate them', () => {
+    const raw = {
+      ...task({ id: 'task_dirty', title: 'Breakfast' }),
+      depends_on: undefined,
+      tags: undefined
+    } as unknown as Task;
+    const [normalized] = mergeListedTasks([raw]);
+    expect(normalized.depends_on).toEqual([]);
+    expect(normalized.tags).toEqual([]);
+    expect(normalized.attachments).toEqual([]);
+  });
+
   it('restores a deleted task if the write fails', () => {
     const doomed = task({ id: 'task_gone', title: 'Gone' });
     rememberCreatedTask(doomed);

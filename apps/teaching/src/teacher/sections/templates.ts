@@ -116,6 +116,7 @@ export function renderTemplatesPage(
     list.replaceChildren();
     const rows = tab === 'lessons' ? lessonRows : unitRows;
     if (rows.length === 0) {
+      if (statusText) return;
       const empty = document.createElement('p');
       empty.className = 'teacher-layout__canvas-status';
       empty.textContent =
@@ -244,6 +245,7 @@ export function renderTemplatesPage(
       const [lessons, units] = await Promise.all([listLessonTemplates(), listUnitTemplates()]);
       lessonRows = lessons.templates;
       unitRows = units.templates;
+      setStatus('');
       paintTabs();
       renderList();
     } catch {

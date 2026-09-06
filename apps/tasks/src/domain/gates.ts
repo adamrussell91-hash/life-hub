@@ -1,3 +1,4 @@
+import { stringList } from '@/domain/task-shape';
 import type { Task } from '@/schemas/task';
 import { columnForTask } from '@/domain/board';
 
@@ -41,12 +42,13 @@ export function depIsDone(depId: string, byId: Map<string, Task>): boolean {
 
 export function isReadyGate(task: Task, byId: Map<string, Task>): boolean {
   if (!isRenderableGateTask(task)) return false;
-  if (task.depends_on.length === 0) return true;
-  return task.depends_on.every((depId) => depIsDone(depId, byId));
+  const deps = stringList(task.depends_on);
+  if (deps.length === 0) return true;
+  return deps.every((depId) => depIsDone(depId, byId));
 }
 
 export function orphanDepIds(task: Task, byId: Map<string, Task>): string[] {
-  return task.depends_on.filter((depId) => {
+  return stringList(task.depends_on).filter((depId) => {
     const dep = byId.get(depId);
     return !dep || dep.status === 'dead';
   });
@@ -133,7 +135,7 @@ export function analyzeFocus(focusId: string, tasks: Task[]): GateAnalysis {
   const orphans = orphanDepIds(focus, byId);
   const hasCycle = ancestors.size > 0 && ready.length === 0;
   const shouldRender =
-    columnForTask(focus, byId) === 'blocked' || ancestors.size > 0 || focus.depends_on.length > 0;
+    columnForTask(focus, byId) === 'blocked' || ancestors.size > 0 || stringList(focus.depends_on).length > 0;
 
   if (hasCycle) {
     warnings.push('Dependency cycle detected — no ready gate in this chain.');

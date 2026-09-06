@@ -1,3 +1,4 @@
+import { stringList } from '@/domain/task-shape';
 import type { Task, TaskDomain, TaskPriority, TaskStatus } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import type { BoardColumnId } from '@/domain/board';
@@ -308,7 +309,7 @@ export function renderTaskExpandedCard(task: Task, handlers: TaskCardHandlers = 
       handlers.onPatch ? (value) => void handlers.onPatch?.(task, { priority: value as TaskPriority }) : undefined
     )
   );
-  for (const tag of task.tags) chips.append(el('span', 'hub-chip', tag));
+  for (const tag of stringList(task.tags)) chips.append(el('span', 'hub-chip', tag));
   tags.append(chips);
   const due = dateBadge(task.due_date, 'Due ');
   if (due) tags.append(due);

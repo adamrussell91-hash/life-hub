@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/teacher/lifecycle-api', () => ({
-  listTrash: vi.fn().mockResolvedValue([])
+  listTrash: vi.fn().mockResolvedValue([]),
+  restoreFromTrash: vi.fn().mockResolvedValue({}),
+  permanentDelete: vi.fn().mockResolvedValue({ deleted: true }),
+  dependenciesFromError: () => [],
+  formatDependencyList: () => ''
+}));
+
+vi.mock('@/teacher/confirm-dialog', () => ({
+  askConfirmCard: vi.fn().mockResolvedValue(true)
 }));
 
 vi.mock('@/teacher/export-api', () => ({
@@ -13,6 +21,8 @@ vi.mock('@/teacher/export-api', () => ({
 }));
 
 import { downloadPortableExport, pushGithubBackup } from '@/teacher/export-api';
+import { askConfirmCard } from '@/teacher/confirm-dialog';
+import { listTrash, restoreFromTrash } from '@/teacher/lifecycle-api';
 import { renderTrashSection } from '@/teacher/sections/trash';
 
 describe('trash section backup', () => {
@@ -47,6 +57,35 @@ describe('trash section backup', () => {
     github!.click();
     await vi.waitFor(() => {
       expect(pushGithubBackup).toHaveBeenCalled();
+    });
+  });
+
+  it('asks a confirm card before restoring', async () => {
+    vi.mocked(listTrash).mockResolvedValue([
+      {
+        type: 'lesson_template',
+        id: 'lt_1',
+        title: 'Memory, Identity and Ono',
+        trashed_at: '2026-08-27T00:00:00.000Z'
+      }
+    ]);
+    vi.mocked(askConfirmCard).mockResolvedValue(false);
+    renderTrashSection(canvas);
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.trash-page__table')).not.toBeNull();
+    });
+    const restore = [...canvas.querySelectorAll('button')].find((btn) => btn.textContent === 'Restore');
+    expect(restore).toBeTruthy();
+    restore!.click();
+    await vi.waitFor(() => {
+      expect(askConfirmCard).toHaveBeenCalled();
+    });
+    expect(restoreFromTrash).not.toHaveBeenCalled();
+
+    vi.mocked(askConfirmCard).mockResolvedValue(true);
+    restore!.click();
+    await vi.waitFor(() => {
+      expect(restoreFromTrash).toHaveBeenCalledWith('lesson_template', 'lt_1');
     });
   });
 });

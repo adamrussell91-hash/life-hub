@@ -60,6 +60,15 @@ function setBeautyDrawerActive(segment, track, activeKey, {
     if (selected) tab.dataset.active = 'true';
     else delete tab.dataset.active;
   }
+  const cards = track?.children ?? [];
+  for (const card of cards) {
+    const key = card.dataset?.routine;
+    if (key !== 'am' && key !== 'pm') continue;
+    const selected = key === active;
+    card.hidden = !selected;
+    if (selected) card.removeAttribute?.('aria-hidden');
+    else card.setAttribute?.('aria-hidden', 'true');
+  }
 }
 
 function wireBeautyDrawer(root, segment, track, modelCurrent) {
