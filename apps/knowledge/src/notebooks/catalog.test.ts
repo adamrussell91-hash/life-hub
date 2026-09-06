@@ -11,7 +11,23 @@ describe("notebook catalog", () => {
       "./notebooks/cognitive-psychology.jpg",
     );
     expect(catalog.find(item => item.label === "Philosophy")?.image).toBe("./notebooks/philosophy.jpg");
-    expect(catalog.filter(item => item.image)).toHaveLength(2);
+    expect(catalog.find(item => item.label === "Wellbeing")?.image).toBe("./notebooks/wellbeing.jpg");
+    expect(catalog.find(item => item.label === "Social and Political Thought")?.image).toBe(
+      "./notebooks/social-and-political-thought.jpg",
+    );
+    expect(catalog.find(item => item.label === "Pedagogy and Planning")?.image).toBe(
+      "./notebooks/pedagogy-and-planning.jpg",
+    );
+    expect(catalog.find(item => item.label === "Numeracy")?.image).toBe("./notebooks/numeracy.jpg");
+    expect(catalog.find(item => item.label === "Mathematics")?.image).toBe("./notebooks/mathematics.jpg");
+    expect(catalog.find(item => item.label === "Literacy")?.image).toBe("./notebooks/literacy.jpg");
+    expect(catalog.find(item => item.label === "Leadership and Innovation")?.image).toBe(
+      "./notebooks/leadership-and-innovation.jpg",
+    );
+    expect(catalog.find(item => item.label === "Gifted Education")?.image).toBe("./notebooks/gifted-education.jpg");
+    expect(catalog.filter(item => item.image)).toHaveLength(10);
+    expect(catalog.find(item => item.label === "Boy's Education")?.image).toBeUndefined();
+    expect(catalog.find(item => item.label === "Educational Neuroscience")?.image).toBeUndefined();
   });
 
   it("slugs apostrophes out of Boy's Education", () => {

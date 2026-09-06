@@ -4,7 +4,15 @@ import notesPlace from "../origin/notesPlace.json";
 
 const COVERS: Record<string, string> = {
   "Cognitive Psychology": "./notebooks/cognitive-psychology.jpg",
+  "Gifted Education": "./notebooks/gifted-education.jpg",
+  "Leadership and Innovation": "./notebooks/leadership-and-innovation.jpg",
+  Literacy: "./notebooks/literacy.jpg",
+  Mathematics: "./notebooks/mathematics.jpg",
+  Numeracy: "./notebooks/numeracy.jpg",
+  "Pedagogy and Planning": "./notebooks/pedagogy-and-planning.jpg",
   Philosophy: "./notebooks/philosophy.jpg",
+  "Social and Political Thought": "./notebooks/social-and-political-thought.jpg",
+  Wellbeing: "./notebooks/wellbeing.jpg",
 };
 
 export type NotebookCover = {
