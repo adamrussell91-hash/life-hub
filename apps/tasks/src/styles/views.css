@@ -2676,6 +2676,79 @@
   gap: var(--space-2);
 }
 
+@media (max-width: 720px) {
+  .hub-canvas .task-stack,
+  .task-stack {
+    gap: var(--space-2);
+  }
+
+  .plus-add {
+    margin-bottom: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .quick-add,
+  .search-form {
+    margin-bottom: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .quick-add .hub-search,
+  .quick-add .hub-filter,
+  .quick-add .btn {
+    min-height: 2.25rem;
+    font-size: var(--text-sm);
+  }
+
+  .quick-add__when-field__label {
+    margin-bottom: 0.1rem;
+  }
+
+  .pinch-clear {
+    margin-bottom: var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  .pinch-list {
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .pinch-card,
+  .stall-card {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+  }
+
+  .pinch-card__summary {
+    margin: var(--space-1) 0 var(--space-2);
+    font-size: var(--text-sm);
+    line-height: 1.3;
+  }
+
+  .pinch-card__actions {
+    gap: var(--space-1);
+  }
+
+  .pinch-card__actions .btn {
+    width: 100%;
+    justify-content: flex-start;
+    font-size: var(--text-xs);
+    padding: 0.4rem 0.65rem;
+    line-height: 1.25;
+  }
+
+  .stall-card {
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .reminder-card {
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+}
+
 .pinch-confirm {
   margin-bottom: var(--space-3);
 }
