@@ -897,6 +897,53 @@ test('desktop first send does not strobe the Chat window', async () => {
   await context.close();
 });
 
+test('engaged phone Chat hides the title stack and has no assistant accent bar', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  await page.locator('.hub-mobile-nav [data-section="chat"]').click();
+  await page.locator('#chat-view').waitFor({ state: 'visible' });
+  await page.locator('#agent-picker [data-agent-slug="clare"]').click();
+
+  const empty = await page.evaluate(() => {
+    const copy = document.querySelector('.page-header__copy');
+    return getComputedStyle(copy).display;
+  });
+  assert.notEqual(empty, 'none', 'empty Chat still shows the page title');
+
+  await seedEngagedThread(page);
+  await page.evaluate(() => {
+    const item = document.querySelector('.chat-message--assistant');
+    item.dataset.agent = 'clare';
+  });
+
+  const layout = await page.evaluate(() => {
+    const copy = document.querySelector('.page-header__copy');
+    const date = document.querySelector('.date-chip');
+    const refresh = document.querySelector('#refresh-button');
+    const who = document.querySelector('#chat-who');
+    const picker = document.querySelector('#agent-picker');
+    const body = document.querySelector('.chat-message--assistant[data-agent] .chat-message__body');
+    return {
+      copyDisplay: getComputedStyle(copy).display,
+      dateDisplay: getComputedStyle(date).display,
+      refreshDisplay: getComputedStyle(refresh).display,
+      whoDisplay: who.hidden ? 'hidden-attr' : getComputedStyle(who).display,
+      pickerDisplay: getComputedStyle(picker).display,
+      borderLeft: getComputedStyle(body).borderLeftWidth
+    };
+  });
+
+  assert.equal(layout.copyDisplay, 'none', 'engaged Chat must drop TALK TO YOUR AGENTS / Chat');
+  assert.equal(layout.dateDisplay, 'none', 'engaged Chat must drop the date chip');
+  assert.notEqual(layout.refreshDisplay, 'none', 'refresh must stay');
+  assert.equal(layout.pickerDisplay, 'none', 'picker portraits yield to Talking to');
+  assert.equal(layout.borderLeft, '0px', 'assistant body must not wear a leftover accent bar');
+
+  await context.close();
+});
+
 test('make the workout shows a Confirm card', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();

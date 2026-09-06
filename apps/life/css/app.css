@@ -787,8 +787,10 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 
 .chat-message--assistant[data-agent] .chat-message__body {
-  border-left: 0.2rem solid var(--agent-accent, var(--wave));
-  padding-left: var(--space-3);
+  /* Avatar already carries the agent colour. A left bar next to lists
+     reads as a leftover quote and does not line up with the portrait. */
+  border-left: 0;
+  padding-left: 0;
 }
 
 .chat-message__body {
@@ -6253,6 +6255,10 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   display: none;
 }
 
+.chat-view[data-chrome='engaged'] #agent-picker {
+  display: none;
+}
+
 .chat-view[data-panel-mode="overlay"] {
   position: fixed;
   z-index: 25;
@@ -6361,6 +6367,20 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   .app-shell:has(#chat-view:not([hidden]):not([data-panel-mode]) #chat-form:focus-within) #chat-who {
     margin-bottom: 0;
     padding-block: 0.15rem;
+  }
+
+  /*
+   * Engaged phone Chat already has Talking to + Tools / New chat.
+   * Drop the redundant page title and date chip; keep refresh / sign-out.
+   */
+  .app-shell:has(#chat-view[data-chrome='engaged']:not([hidden]):not([data-panel-mode])) .page-header {
+    padding-block: 0.35rem;
+    align-items: center;
+  }
+
+  .app-shell:has(#chat-view[data-chrome='engaged']:not([hidden]):not([data-panel-mode])) .page-header__copy,
+  .app-shell:has(#chat-view[data-chrome='engaged']:not([hidden]):not([data-panel-mode])) .date-chip {
+    display: none;
   }
 
   .chat-view {
