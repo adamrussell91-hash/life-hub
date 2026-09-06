@@ -94,6 +94,7 @@ export async function advanceKnowledgeIntakeJob(job, deps) {
       phase: 'awaiting_review',
       status: 'done',
       proposal,
+      page_updated_at: page.updated_at,
       updated_at: now
     };
   }
@@ -128,6 +129,12 @@ export async function resolveKnowledgeIntakeJob(job, resolution, deps) {
     const page = await deps.getPage(job.page_id);
     if (!page) {
       throw Object.assign(new Error('Page was not found'), { status: 404, code: 'not_found' });
+    }
+    if (job.page_updated_at && page.updated_at && job.page_updated_at !== page.updated_at) {
+      throw Object.assign(new Error('Page changed while the review was open'), {
+        status: 409,
+        code: 'stale_page'
+      });
     }
     const saved = await deps.savePage(applyTidyProposal(page, job.proposal));
     return {

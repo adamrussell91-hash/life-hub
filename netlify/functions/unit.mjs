@@ -6,7 +6,8 @@ export const config = { path: '/api/units/:id' };
 export function createUnitHandler(deps = {}) {
   return createTeachingRecordHandler({
     keyFor: unitKey,
-    notFound: 'Unit not found'
+    notFound: 'Unit not found',
+    versionKind: 'unit'
   }, deps);
 }
 

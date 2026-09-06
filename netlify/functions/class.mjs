@@ -6,7 +6,8 @@ export const config = { path: '/api/classes/:id' };
 export function createClassHandler(deps = {}) {
   return createTeachingRecordHandler({
     keyFor: classKey,
-    notFound: 'Class not found'
+    notFound: 'Class not found',
+    versionKind: 'class_homepage'
   }, deps);
 }
 

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
+import { createClassHandler } from '../../netlify/functions/class.mjs';
 import { createLessonHandler } from '../../netlify/functions/lesson.mjs';
 import { createLessonPublishHandler } from '../../netlify/functions/lesson-publish.mjs';
 import { createTeachingVersionsHandler } from '../../netlify/functions/teaching-versions.mjs';
+import { createUnitHandler } from '../../netlify/functions/unit.mjs';
 import { parseVersionPath } from '../../netlify/functions/teaching-versions.mjs';
 
 const SECRET = 's'.repeat(32);
@@ -217,6 +219,66 @@ test('publish writes a publish checkpoint; AI accept writes ai_accepted', async 
     'https://api.adam-russell.com/api/lessons/lesson_1/versions'
   )));
   assert.equal(afterAccept.body.data.entries[0].reason, 'ai_accepted');
+});
+
+test('unit and class PUT write ai_accepted checkpoints', async () => {
+  const store = memoryStore({
+    'units/unit_1': {
+      id: 'unit_1',
+      type: 'unit',
+      title: 'Unit A',
+      lesson_ids: ['lesson_1']
+    },
+    'classes/class_1': {
+      id: 'class_1',
+      type: 'class',
+      title: '7A',
+      code: '7A',
+      meeting_days: [1],
+      homepage: { announcements: [], resources: [], custom: [] }
+    }
+  });
+  const versions = createTeachingVersionsHandler(deps(store));
+  const units = createUnitHandler(deps(store));
+  const classes = createClassHandler(deps(store));
+
+  const unitPut = await read(await units(request(
+    'https://api.adam-russell.com/api/units/unit_1',
+    {
+      method: 'PUT',
+      body: {
+        id: 'unit_1',
+        type: 'unit',
+        title: 'Unit accepted',
+        lesson_ids: ['lesson_1'],
+        checkpoint_reason: 'ai_accepted'
+      }
+    }
+  )));
+  assert.equal(unitPut.status, 200);
+  const unitList = await read(await versions(request(
+    'https://api.adam-russell.com/api/units/unit_1/versions'
+  )));
+  assert.equal(unitList.body.data.entries[0].reason, 'ai_accepted');
+
+  const classPut = await read(await classes(request(
+    'https://api.adam-russell.com/api/classes/class_1',
+    {
+      method: 'PUT',
+      body: {
+        id: 'class_1',
+        type: 'class',
+        title: '7A',
+        homepage: { announcements: [{ id: 'a1' }], resources: [], custom: [] },
+        checkpoint_reason: 'ai_accepted'
+      }
+    }
+  )));
+  assert.equal(classPut.status, 200);
+  const classList = await read(await versions(request(
+    'https://api.adam-russell.com/api/classes/class_1/versions'
+  )));
+  assert.equal(classList.body.data.entries[0].reason, 'ai_accepted');
 });
 
 test('unit and class version routes restore the right live object', async () => {
