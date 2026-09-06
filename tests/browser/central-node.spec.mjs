@@ -54,6 +54,16 @@ test('the Central Node tab renders its markdown sections and logging-completion 
     assert.match(await page.locator('[data-live-snapshot]').textContent(), /Protein/);
     assert.equal(await page.locator('#cn-board').count(), 1);
     assert.equal(await page.locator('#cn-tile-status').count(), 1);
+    assert.equal(await page.locator('#cn-tile-backlinks').count(), 1);
+    assert.match(
+      await page.locator('[data-central-node="backlinks"]').textContent(),
+      /No Knowledge pages point at a Life decision yet|Inbound links are unavailable|←/
+    );
+    assert.equal(await page.locator('#cn-tile-url-watches').count(), 1);
+    assert.match(
+      await page.locator('[data-central-node="url-watches"]').textContent(),
+      /No watched URLs yet|URL watch is unavailable|Changed|Unchanged|Unavailable/
+    );
     assert.equal(await page.locator('#central-node-week-chart').count(), 0);
     assert.equal(await page.locator('#central-node-logging-heatmap').count(), 0);
     assert.equal(await page.locator('#central-node-exercise-heatmap').count(), 0);
