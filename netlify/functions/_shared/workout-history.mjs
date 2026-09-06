@@ -1,9 +1,10 @@
-import { daysBetween } from '../../../apps/life/js/core/time.js';
+import { addCalendarDays, daysBetween, isCalendarDate } from '../../../apps/life/js/core/time.js';
 
 export const FITNESS_SESSION_PATH =
   /^data\/fitness\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
 export const MAX_RECENT_WORKOUTS = 20;
+export const WORKOUT_COMPARE_WEEKS = 8;
 const DEFAULT_SEARCH_LIMIT = 8;
 const MAX_SEARCH_LIMIT = 20;
 const SET_SUFFIX = /\s+set\s+\d+\s*$/i;
@@ -44,6 +45,74 @@ export function selectRecentWorkoutEntries(tree, { limit = MAX_RECENT_WORKOUTS }
     .filter(entry => entry && entry.type === 'blob' && FITNESS_SESSION_PATH.test(entry.path ?? ''))
     .sort((a, b) => String(b.path).localeCompare(String(a.path)))
     .slice(0, cap);
+}
+
+export function selectWorkoutEntriesInRange(tree, { from, to } = {}) {
+  if (!Array.isArray(tree) || !isCalendarDate(from) || !isCalendarDate(to) || from > to) return [];
+  return tree
+    .filter(entry => {
+      if (!entry || entry.type !== 'blob' || typeof entry.path !== 'string') return false;
+      const match = FITNESS_SESSION_PATH.exec(entry.path);
+      return Boolean(match && match.groups.date >= from && match.groups.date <= to);
+    })
+    .sort((a, b) => String(a.path).localeCompare(String(b.path)));
+}
+
+export function mergeWorkoutEntries(...lists) {
+  const map = new Map();
+  for (const list of lists) {
+    for (const entry of Array.isArray(list) ? list : []) {
+      if (entry?.path) map.set(entry.path, entry);
+    }
+  }
+  return [...map.values()];
+}
+
+export function workoutWindowBounds(today, { weeks = WORKOUT_COMPARE_WEEKS } = {}) {
+  if (!isCalendarDate(today) || !Number.isInteger(weeks) || weeks < 1) return null;
+  const currentTo = today;
+  const currentFrom = addCalendarDays(today, -(weeks * 7 - 1));
+  const previousTo = addCalendarDays(currentFrom, -1);
+  const previousFrom = addCalendarDays(previousTo, -(weeks * 7 - 1));
+  return { weeks, currentFrom, currentTo, previousFrom, previousTo };
+}
+
+function completedWorkouts(records) {
+  return (Array.isArray(records) ? records : []).filter(record =>
+    record?.type === 'workout'
+    && record.status === 'completed'
+    && isCalendarDate(record.date)
+  );
+}
+
+export function compareWorkoutWindows(records, today, { weeks = WORKOUT_COMPARE_WEEKS } = {}) {
+  const bounds = workoutWindowBounds(today, { weeks });
+  if (!bounds) return { ok: false, error: 'invalid_input' };
+  const sessions = completedWorkouts(records);
+  const countIn = (from, to) => sessions.filter(record => record.date >= from && record.date <= to).length;
+  const currentCount = countIn(bounds.currentFrom, bounds.currentTo);
+  const previousCount = countIn(bounds.previousFrom, bounds.previousTo);
+  return {
+    ok: true,
+    weeks: bounds.weeks,
+    current: { from: bounds.currentFrom, to: bounds.currentTo, count: currentCount },
+    previous: { from: bounds.previousFrom, to: bounds.previousTo, count: previousCount },
+    delta: currentCount - previousCount
+  };
+}
+
+export function formatWorkoutWindowCompareForPrompt(comparison) {
+  if (!comparison?.ok) return '';
+  const { weeks, current, previous, delta } = comparison;
+  const signed = delta > 0 ? `+${delta}` : String(delta);
+  const currentLabel = current.count === 1 ? '1 completed workout' : `${current.count} completed workouts`;
+  const previousLabel = previous.count === 1 ? '1 completed workout' : `${previous.count} completed workouts`;
+  return [
+    `Computed training volume (do not re-count or estimate — this is the number):`,
+    `Last ${weeks} weeks (${current.from} to ${current.to}): ${currentLabel}.`,
+    `Previous ${weeks} weeks (${previous.from} to ${previous.to}): ${previousLabel}.`,
+    `Delta: ${signed}.`
+  ].join('\n');
 }
 
 export function lastCompletedWorkout(records) {
@@ -279,6 +348,18 @@ export function searchWorkoutRecordsSchema() {
         limit: { type: 'number', description: 'Max results (default 8, max 20).' }
       },
       required: ['query']
+    }
+  };
+}
+
+export function compareWorkoutWindowsSchema() {
+  return {
+    name: 'compare_workout_windows',
+    description:
+      'Return the computed count of completed workouts in the last 8 weeks versus the previous 8 weeks. Use this (or the Computed training volume prompt block) whenever Adam asks how much he has been training versus the prior block. Do not estimate from Recent sessions lines.',
+    input_schema: {
+      type: 'object',
+      properties: {}
     }
   };
 }

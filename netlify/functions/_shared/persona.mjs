@@ -36,6 +36,7 @@ export function buildSystemPrompt({
   saraClinicalContext = '',
   daysSinceLastSession = null,
   lastWorkouts = '',
+  workoutWindowCompare = '',
   mindDiaryDigest = '',
   mindSessionDigest = '',
   mindTodaySession = '',
@@ -124,6 +125,9 @@ export function buildSystemPrompt({
       : '',
     lastWorkouts
       ? `Recent sessions (a bounded recent window of fitness files — not full history). "Last completed" is the answer to when Adam last trained and what it was — never use a Planned row for that. Planned rows are today's prescription, not history. When a row includes notes: or pain:, those are Adam's post-session verdict and pain flags — read them before programming the next session or answering how last time felt; never claim you cannot see them when they are listed. If Last completed is present, answer from it (or call get_last_workout for sets/notes/pain_flags). search_workout_records only sees this recent window. Never guess or claim you cannot see history when Last completed is listed.\n\n${lastWorkouts}`
+      : '',
+    workoutWindowCompare
+      ? `Computed training volume over dated fitness files (not an estimate). Quote these counts when Adam asks how much he has been training versus the prior block. Do not recount from Recent sessions or invent a trend that contradicts this block. compare_workout_windows returns the same numbers.\n\n${workoutWindowCompare}`
       : '',
     'This Week on Central Node includes EP / Veronica appointments when present — the day immediately before an EP session is movement only (no strength, no intensification). If This Week shows EP tomorrow, refuse a strength day and offer a walk or light mobility instead.',
     'When you need fresh programming ideas or evidence for a physique / hypertrophy / cable-progression call, actively use web_search for exercise-science sources (reputable S&C writers, reviews, coaching articles). There is no search-use cap — refine and search again if the first hit is thin. Credit the source in chat and in workout notes. Never invent a protocol from memory when a search would ground it.',
