@@ -839,6 +839,16 @@ export function setChatBusy(root, busy) {
   const button = root.querySelector('#chat-send');
   const stop = root.querySelector('#chat-stop');
   const view = root.querySelector('#chat-view') ?? root.querySelector?.('.chat-view');
+  // Clicking Send (or Stop) hands that button focus before this runs. Disabling
+  // the still-focused button below blurs focus to <body> -- visual-viewport.js
+  // reads that as "keyboard closed" and collapses the whole Chat layout (nav,
+  // header, agent picker all snap back) mid-turn, which is what reads as the
+  // window flickering. Hand focus back to the field first so it never leaves
+  // the composer.
+  const aboutToDisable = busy ? button : stop;
+  if (aboutToDisable && globalThis.document?.activeElement === aboutToDisable) {
+    input?.focus?.({ preventScroll: true });
+  }
   if (input) {
     // readOnly keeps iOS focus/keyboard. disabled blurs the field, drops
     // :focus-within, and slams Chat chrome back for the whole reply.
