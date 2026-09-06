@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { goHome } from "./goHome";
 
 describe("goHome", () => {
-  it("returns to the unfiltered archive list from an open page", () => {
+  it("returns to notebooks from an open page", () => {
     expect(
       goHome({
         view: "page",
@@ -13,7 +13,7 @@ describe("goHome", () => {
         compose: { id: "page_notion_abc" },
       }),
     ).toEqual({
-      view: "list",
+      view: "notebooks",
       query: "",
       keywordFilter: "",
       originFilter: { kind: "", label: "" },
@@ -22,7 +22,7 @@ describe("goHome", () => {
     });
   });
 
-  it("returns to the unfiltered archive list from the university timeline", () => {
+  it("returns to notebooks from the university timeline", () => {
     expect(
       goHome({
         view: "timeline",
@@ -32,10 +32,10 @@ describe("goHome", () => {
         activePage: null,
         compose: null,
       }),
-    ).toMatchObject({ view: "list", activePage: null, compose: null });
+    ).toMatchObject({ view: "notebooks", activePage: null, compose: null });
   });
 
-  it("returns to the unfiltered archive list from quiz", () => {
+  it("returns to notebooks from quiz", () => {
     expect(
       goHome({
         view: "quiz",
@@ -45,6 +45,6 @@ describe("goHome", () => {
         activePage: null,
         compose: null,
       }),
-    ).toMatchObject({ view: "list", keywordFilter: "", activePage: null, compose: null });
+    ).toMatchObject({ view: "notebooks", keywordFilter: "", activePage: null, compose: null });
   });
 });
