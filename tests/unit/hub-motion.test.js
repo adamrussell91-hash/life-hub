@@ -158,6 +158,16 @@ test('scroll-hide ignores content growth and does not reveal just because overfl
     scrollHideFromScroller({ current: 120, previous: 90, hidden: false, overflowing: true, contentGrew: false }),
     true
   );
+  assert.equal(
+    scrollHideFromScroller({ current: 400, previous: 0, hidden: false, overflowing: true, busy: true }),
+    false,
+    'a busy Chat turn must not tuck chrome from follow() scroll'
+  );
+  assert.equal(
+    scrollHideFromScroller({ current: 0, previous: 400, hidden: true, overflowing: true, busy: true }),
+    true,
+    'a busy Chat turn must not reveal chrome from follow() scroll either'
+  );
 });
 
 test('chat transcripts are not list-staggered — a data-state rescan must not fade them', async () => {

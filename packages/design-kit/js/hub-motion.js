@@ -393,8 +393,10 @@ export function scrollHideFromScroller({
   threshold = DEFAULT_SCROLL_HIDE_THRESHOLD,
   hidden = false,
   overflowing = true,
-  contentGrew = false
+  contentGrew = false,
+  busy = false
 }) {
+  if (busy) return Boolean(hidden);
   if (contentGrew) return Boolean(hidden);
   if (!overflowing) {
     const y = Number(current);
@@ -493,13 +495,15 @@ function bindScrollHide(el) {
     const height = Number(live.scrollHeight ?? 0);
     const prevHeight = scrollHideState.get(el)?.h;
     const contentGrew = Number.isFinite(prevHeight) && height !== prevHeight;
+    const view = el.closest?.('.chat-view, .chat-overlay, .coach.chat');
     const hidden = scrollHideFromScroller({
       current,
       previous,
       threshold: readThreshold(el),
       hidden: el.classList.contains('is-hidden'),
       overflowing: scrollerOverflows(live),
-      contentGrew
+      contentGrew,
+      busy: view?.classList?.contains('is-busy')
     });
     applyHubScrollHide(el, { force: hidden });
     const next = scrollHideState.get(el);
