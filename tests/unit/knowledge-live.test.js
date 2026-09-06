@@ -70,6 +70,34 @@ test('enrichKnowledgePage marks decision traces unavailable without inventing a 
   assert.equal(page.decision_traces_status, 'unavailable');
 });
 
+test('enrichKnowledgePage attaches inverse links and URL watches without inventing them', () => {
+  const page = enrichKnowledgePage({
+    id: 'page_aotfw',
+    body: 'See https://example.com/policy'
+  }, {
+    inverseLinks: [{ id: 'page_aotfw_notes', title: 'AOTFW teaching notes' }],
+    urlWatches: [{ url: 'https://example.com/policy', status: 'unchanged' }]
+  });
+  assert.equal(page.inverse_links[0].id, 'page_aotfw_notes');
+  assert.equal(page.url_watches[0].status, 'unchanged');
+  assert.equal(page.inverse_links_status, undefined);
+  assert.equal(page.url_watches_status, undefined);
+});
+
+test('enrichKnowledgePage is fail-visible when inverse or URL watch loaders miss', () => {
+  const page = enrichKnowledgePage({
+    id: 'page_aotfw',
+    body: 'See https://example.com/policy'
+  }, {
+    inverseStatus: 'unavailable',
+    urlWatchStatus: 'unavailable'
+  });
+  assert.equal(page.inverse_links, undefined);
+  assert.equal(page.url_watches, undefined);
+  assert.equal(page.inverse_links_status, 'unavailable');
+  assert.equal(page.url_watches_status, 'unavailable');
+});
+
 test('normalizeDecisionTraces accepts a bare array from an injected loader', () => {
   assert.deepEqual(normalizeDecisionTraces([{ decisionId: 'a' }]), {
     traces: [{ decisionId: 'a' }],

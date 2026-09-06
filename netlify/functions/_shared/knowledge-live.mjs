@@ -46,7 +46,11 @@ export function normalizeDecisionTraces(result) {
 export function enrichKnowledgePage(page, {
   compare = { ok: false },
   traces = [],
-  tracesStatus = 'ready'
+  tracesStatus = 'ready',
+  inverseLinks = [],
+  inverseStatus = 'ready',
+  urlWatches = [],
+  urlWatchStatus = 'ready'
 } = {}) {
   if (!page || typeof page !== 'object') return page;
   const next = { ...page };
@@ -56,6 +60,12 @@ export function enrichKnowledgePage(page, {
   const list = Array.isArray(traces) ? traces : [];
   if (list.length) next.decision_traces = list;
   if (tracesStatus === 'unavailable') next.decision_traces_status = 'unavailable';
+  const inbound = Array.isArray(inverseLinks) ? inverseLinks : [];
+  if (inbound.length) next.inverse_links = inbound;
+  if (inverseStatus === 'unavailable') next.inverse_links_status = 'unavailable';
+  const watches = Array.isArray(urlWatches) ? urlWatches : [];
+  if (watches.length) next.url_watches = watches;
+  if (urlWatchStatus === 'unavailable') next.url_watches_status = 'unavailable';
   return next;
 }
 

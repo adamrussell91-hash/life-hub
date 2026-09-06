@@ -1804,8 +1804,20 @@ body.is-universe-fullscreen .local-banner {
   padding: 0;
 }
 
-.decision-traces {
+.decision-traces,
+.inverse-links,
+.url-watches {
   color: var(--muted);
+}
+
+.inverse-links__unavailable,
+.url-watches__unavailable {
+  margin: 0;
+}
+
+.url-watches [data-watch-status="changed"] {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .decision-trace {
