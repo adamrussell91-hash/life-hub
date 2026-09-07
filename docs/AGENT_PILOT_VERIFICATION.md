@@ -126,14 +126,15 @@ Fresh preview after preview-only `LIFE_HUB_AGENT_KERNEL=1`:
 - PR **#246**, head `4f3028458118bb592b644b66114b039489a5a412`, deploy `6a9e8b8cef764f00081fc88b`, URL `https://deploy-preview-246--life-hub2.netlify.app`, Netlify SUCCESS 2026-09-07T10:02:12Z
 - `POST /api/auth` succeeded. `GET /api/session` → authenticated
 - `POST /api/chat` reached the deployed function (`202` job). Transport was the real job + `/api/chat/events` poll, not a local `createChatHandler()` call
-- Job finished with a single `error` / `turn_incomplete` and **no** `agent`, tools, usage, or final answer. The model was **not** invoked
-- Cause: deploy-preview GitHub bindings are missing, so the handler returns `503 misconfigured` JSON. The job runner previously swallowed that as `turn_incomplete`. A follow-up commit surfaces the JSON error code
+- Job finished with a single `error` and **no** `agent`, tools, usage, or final answer. The model was **not** invoked
+- Cause: deploy-preview GitHub bindings are missing, so the handler returns `503 misconfigured` JSON
+- On `4f30284` the job runner hid that as `turn_incomplete`. After `6d8f2b7` / deploy `6a9e8d049b9c6f0008b298d7` (SUCCESS 2026-09-07T10:08:36Z), the same probe reports `misconfigured` / `This service is not configured.`
 - Kernel enablement on the chat turn could **not** be verified because the stream never started. Production kernel was not changed
 - No Clare or Chadwick scenario was graded. None are `passed`
 
 | Scenario | Status | Trace |
 | --- | --- | --- |
-| Probe (harmless Clare pin) | blocked — deployed `/api/chat` job `3b5df5fb-9311-49f7-99a4-6f8b811a7d1a`, `turn_incomplete`, 1796ms, no model | captured locally; no private records |
+| Probe (harmless Clare pin) | blocked — first job `turn_incomplete`; rerun on `6d8f2b7` job error `misconfigured`, 1604ms, no model | captured locally; no private records |
 | Clare A–F | blocked (handler never reached the model) | none |
 | Chadwick A–F | blocked (GitHub/fitness unbound on preview) | none |
 | Confirm live continuation | blocked | none |

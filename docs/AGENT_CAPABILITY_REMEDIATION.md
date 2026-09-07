@@ -114,6 +114,6 @@ Those suites are **DETERMINISTIC TEST** only.
 
 Live conversational traces: **none that invoke a model**. A real `POST` to Deploy Preview `/api/chat` returned `202` then `turn_incomplete` because preview GitHub env is missing. That is **LIVE MODEL / DEPLOYED ROUTE** blocked, not a local-handler substitute.
 
-The job runner now publishes the underlying JSON error code (`misconfigured`) instead of hiding it as `turn_incomplete`.
+The job runner now publishes the underlying JSON error code (`misconfigured`) instead of hiding it as `turn_incomplete`. Rerun on deploy `6a9e8d049b9c6f0008b298d7` confirmed the probe error is now `misconfigured`.
 
 The harness still forwards one allowlisted runtime `env` to both `probeStores()` and `createChatHandler`. Secret values are not written into pilot traces.
