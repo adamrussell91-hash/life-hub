@@ -2,7 +2,7 @@
 
 Independent technical strategy. Prepared for Adam Russell. Current Life Hub main branch reviewed 7 September 2026.
 
-**Status:** adopted as the implementation reference for agent capability work. Phase 0 is in progress in this repository. Later phases stay gated on the exit conditions below.
+**Status:** adopted as the implementation reference for agent capability work. Phases 0–2 are implemented in this repository. Later phases stay gated on the exit conditions below.
 
 Life Hub should not replace its current runtime with any single upstream framework. The target is a Life Hub native agent kernel.
 
@@ -311,11 +311,13 @@ Exit: both agents pass varied paraphrases, missing data, conflicting data, trunc
 
 ### Phase 2 — Memory foundation
 
-- Define memory classes and authority rules.
-- Add user, agent, shared, and episodic namespaces.
-- Pilot Mem0-style semantic recall using a small self-owned interface.
-- Add Letta-style reflection proposals with human review.
-- Add memory write and correction evaluations.
+**Status (2026-09-07):** self-owned layered memory beside the existing remember store. No Mem0 install. Pilot write tool is Chadwick + Clare only.
+
+- Classes: `user`, `agent`, `shared`, `episodic` in `netlify/functions/_shared/agent-memory.mjs`.
+- Persist path: `data/remember/layered-memories.json` (already under `data/remember/**` allowlists).
+- Recall is token overlap with expiry, correction history, and agent visibility. Kernel compose labels memory as recall, never as a domain record.
+- `remember_write_memory` adds or corrects memories (auto) and proposes reflections (Confirm). Safety / permission reflections cannot apply.
+- Authoritative fitness, nutrition, medical, task, teaching, and knowledge stores remain source of truth.
 
 Exit: agents recall approved context, respect expiry, and never substitute memory for source records.
 

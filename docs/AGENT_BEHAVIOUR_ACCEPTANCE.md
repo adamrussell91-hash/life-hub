@@ -48,6 +48,7 @@ Remaining weakness is orchestration quality: 08:00 time-block, untimed tasks def
 5. **Surface unification** — `assembleClareEvidence` / `assembleAnnEvidence` / `assembleClementineEvidence` reused from Clare desk and Knowledge chat turn (same read competence as Life chat).
 6. **Deterministic claim compose** — `composeEvidenceClaims` maps retrieved evidence to claims and limitations. This is pack-layer compose, not a conversational answer. Incomplete / truncated / conflicted evidence cannot compose as complete.
 7. **Phase 1 kernel (flagged)** — `agent-kernel.mjs` plans, retrieves, assesses sufficiency, composes claims, and traces Chadwick training review and Clare daily focus. Off unless `LIFE_HUB_AGENT_KERNEL=1` or `agentKernel: true`. Regex activation remains the default path.
+8. **Phase 2 layered memory** — `agent-memory.mjs` recalls user/agent/shared/episodic items with expiry and correction history. Kernel compose labels them as recall, never as domain records. Safety/permission reflections cannot apply.
 
 ---
 
@@ -61,6 +62,7 @@ Remaining weakness is orchestration quality: 08:00 time-block, untimed tasks def
 | `tests/unit/clare-work.test.js` | Workbench schemas, writes, SSRF, selected helpers | Live multi-step Clare conversations |
 | `tests/unit/clare-adversarial.test.js` | Corrections, long lists, missing times, collisions, stale projects, partial tool failure | Live Clare planning quality |
 | `tests/unit/agent-kernel.test.js` | Phase 1 plan/retrieve/assess/compose/recovery + prompt Delivery for Chadwick and Clare | Live conversational behaviour |
+| `tests/unit/agent-memory.test.js` | Memory classes, expiry, corrections, admission, reflection Confirm, Chadwick/Clare Delivery | Live conversational behaviour |
 
 These tests do **not** mock model tool selection as proof of activation. They also do **not** count as agent behaviour proof.
 
@@ -77,6 +79,7 @@ These tests do **not** mock model tool selection as proof of activation. They al
 | Deterministic calculations | Fitness/nutrition/tasks math via existing models | Demonstrated |
 | Surface unification Clare/Ann/Clementine | Shared pack adapters on desk / knowledge chat | Demonstrated (read path) |
 | Claim compose from retrieved evidence | `composeEvidenceClaims` on the 14 scenarios | Demonstrated (pack layer) |
+| Layered memory recall + authority | Kernel prompt Delivery; expiry; corrections; never a record claim | Demonstrated (pack layer) |
 | Live conversational E2E | Requires Anthropic | **Blocked** |
 
 ---

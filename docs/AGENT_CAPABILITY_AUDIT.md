@@ -5,6 +5,8 @@ Generated: 2026-09-06T07:54:23.358Z
 **Pack-layer update:** 2026-09-06 — server-side evidence packs + domain analysis. See `docs/AGENT_BEHAVIOUR_ACCEPTANCE.md`.  
 **Clare correction:** 2026-09-07 — Clare is not a thin read adapter. Life chat loads Tasks and Projects. `clare-work.mjs` exposes 15 named tools covering 40 jobs. Full `buildAgentTools({ slug: 'clare' })` attaches 37 tools; an intent-trimmed “focus today” turn still attaches 24, including the workbench. The 17-tool snapshot below is a stale OS-floor count and must not be read as her current workbench.
 
+**Phase 2 memory:** 2026-09-07 — layered memory (`user` / `agent` / `shared` / `episodic`) lives in `data/remember/layered-memories.json`. Kernel compose labels it as recall, never as a domain record. Write tool `remember_write_memory` is Chadwick + Clare only, not OS floor. Per-agent tool snapshots below may omit it until regenerated.
+
 > **Corrective note:** Attached tools ≠ intelligence. Status words allowed: Demonstrated | Failed | Blocked | Not started. Do not use thin / partial / scaffolding / mostly / should work / capability counts as completion language. Pack/function tests are not conversational behaviour tests.
 
 ## Demonstrated jobs (2026-09-06 evidence packs)
@@ -90,6 +92,7 @@ Plus `log_entry` when the agent has record types for the turn.
 - **`lookup.save-exercise-library`** → tool `save_exercise_library_entry` · risk `auto` · agents: chadwick
 - **`remember.set-week-flag`** → tool `remember_set_week_flag` · risk `auto` · agents: all agents
 - **`remember.note-context`** → tool `remember_note_context` · risk `auto` · agents: all agents
+- **`remember.write-memory`** → tool `remember_write_memory` · risk `auto` · agents: chadwick, clare
 - **`track.open-challenge`** → tool `track_open_challenge` · risk `confirm` · agents: all agents
 - **`track.log-progress`** → tool `track_log_progress` · risk `auto` · agents: all agents
 - **`track.close-challenge`** → tool `track_close_challenge` · risk `confirm` · agents: all agents
