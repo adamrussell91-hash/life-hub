@@ -20,7 +20,7 @@ Production `LIFE_HUB_AGENT_KERNEL` remains **off**.
 - Specialist expansion was `not started`; Hammond rebuild remained `blocked`.
 - Branched `cursor/specialist-agents-expansion-b903` from current main.
 
-### Ann — failure → correction → regression
+### Ann — failure → correction → regression (tranche 1)
 
 | Step | Detail |
 | --- | --- |
@@ -31,7 +31,7 @@ Production `LIFE_HUB_AGENT_KERNEL` remains **off**.
 | Live rerun | pending deploy-preview-247 |
 | Status | `deterministic only` |
 
-### Clementine — correction → regression
+### Clementine — correction → regression (tranche 1)
 
 | Step | Detail |
 | --- | --- |
@@ -42,16 +42,61 @@ Production `LIFE_HUB_AGENT_KERNEL` remains **off**.
 | Live rerun | pending |
 | Status | `deterministic only` |
 
-### Sara — correction → regression
+### Sara — correction → regression (tranche 1)
 
 | Step | Detail |
 | --- | --- |
 | Failure | No temporal classifier; historical visits could be narrated as current. |
 | Root cause | Pack retrieved medical hits without recency labels or current-turn symptom provenance. |
-| Correction | `analyse_medical_evidence` + `statedHealthConstraints`; historical/current/missing_date; dated comparison claims. |
+| Correction | `analyse_medical_evidence` + `statedHealthConstraints`; historical/recent/missing_date; dated comparison claims. |
 | Deterministic regression | `tests/unit/sara-kernel.test.js` |
 | Live rerun | pending (local life-hub-data has body/weight, no medical visit files) |
 | Status | `deterministic only` |
+
+### Independent review defects (continuation) — failure → root cause → correction → regression → status
+
+These defects existed in the first tranche and were corrected before expanding Brisket / Hyaluronica / Penelope / Vera. History is preserved; they are not rewritten away.
+
+#### Ann — `outcome_ids` aliased as learning intentions
+
+| Step | Detail |
+| --- | --- |
+| Failure | `getTeachingDiagnosis` set `learning_intentions = outcome_ids`, so codes like `EN5-1A` were exposed as learning intentions. |
+| Root cause | Legacy alias treated syllabus outcome identifiers as intention text. |
+| Correction | Removed the alias. `learning_intentions` only from genuine stored intention fields/blocks. Gap text: no stored learning intention retrieved. Interpretation forbids describing outcome codes as intentions. `outcome_ids` remain their own record fact. |
+| Regression | `ann-kernel.test.js` — outcome_ids without intention field; genuine intention block; “What learning intentions are already attached?” |
+| Status | `deterministic only` |
+
+#### Sara — recent visits labelled `current_*`
+
+| Step | Detail |
+| --- | --- |
+| Failure | 14-day window used `current_window` / `current_visit_*`, promoting recent dated visits toward present status. |
+| Root cause | Recency classifier reused “current” language for any visit inside the window. |
+| Correction | Renamed to `recent_window_days` / `recent_window` / `recent_visit_*`. Interpretation: recent = recent historical evidence only. Current state needs `user_stated_current_turn` or explicit active stored evidence (none invented). |
+| Regression | `sara-kernel.test.js` Cases A–F (5-day pain, 7-day meds, 10-day labs, current-turn flare, months-old, undated). |
+| Status | `deterministic only` |
+
+#### Clementine — substring polarity conflicts
+
+| Step | Detail |
+| --- | --- |
+| Failure | `detectNoteConflicts` used raw `includes()`, so `disagree` matched `agree` and `ineffective` matched `effective`. |
+| Root cause | Substring polarity without word boundaries; suite only used supports/rejects. |
+| Correction | Word/token-aware polarity; require shared subject; kind `conflict_signal` (conservative). |
+| Regression | agree/disagree, effective/ineffective, works/fails, supports/rejects; negative mixed effective/ineffective vs unrelated note. |
+| Status | `deterministic only` |
+
+### Brisket / Hyaluronica / Penelope / Vera — continuation expansion
+
+| Specialist | Correction | Regression | Status |
+| --- | --- | --- | --- |
+| Brisket | `analyse_nutrition_evidence`; logging_status; no-log ≠ zero; today vs yesterday; targets/remaining/adherence/period compare provenance; interpretation boundaries | `tests/unit/brisket-kernel.test.js` | `deterministic only` |
+| Hyaluronica | `analyse_skincare_evidence`; routine vs response events; historical vs current-turn irritation; temporal association ≠ causation | `tests/unit/hyaluronica-kernel.test.js` | `deterministic only` |
+| Penelope | `analyse_diary_evidence`; focused diary query; recurrence_strength; current-turn vs historical mood; conflicting moods | `tests/unit/penelope-kernel.test.js` | `deterministic only` |
+| Vera | `analyse_mind_evidence`; recurring/changed themes; sparse + conflict_signal; no diagnosis | `tests/unit/vera-kernel.test.js` | `deterministic only` |
+
+Hammond remains **blocked** (architecture note only). Not rebuilt.
 
 ## Specialist inventory (current main + this branch)
 
@@ -60,10 +105,10 @@ Production `LIFE_HUB_AGENT_KERNEL` remains **off**.
 | ann | Ann O'Tation | teaching | `lesson_diagnosis` | search/context/diagnosis + hydrate | Teaching AI / Confirm for mutations (no new write path) | Teaching blobs | `ann-kernel` | med | deterministic only |
 | clementine | Prof. Clementine Haig | knowledge | `knowledge_research` | search + synthesis (+ teaching bridge) | Knowledge note writes stay Confirm/existing | knowledge-hub-data | `clementine-kernel` | med | deterministic only |
 | sara | Dr Sara Tonin | health | `health_timeline` | body/weight/medical search + analyse | medical `log_entry` Confirm (unchanged) | life-hub-data body | `sara-kernel` | high | deterministic only |
-| brisket | Brisket Lasso | nutrition | `nutrition_adherence` | snapshot/adherence/remaining/search | meal log Confirm (existing) | nutrition | Phase 3 specialists | med | deterministic only (Phase 3) |
-| hyaluronica | Hyaluronica St. Claire | skincare | `routine_response` | adherence/response/search | existing | skincare | Phase 3 | low | deterministic only (Phase 3) |
-| penelope | Penelope Rose Quillian | diary | `diary_recurrence` | search/range/themes/compare | existing | mind/diary | Phase 3 | med | deterministic only (Phase 3) |
-| vera | Dr Vera Lenz | mind | `mind_reflection` | search/compare sessions | existing | mind | Phase 3 | med | deterministic only (Phase 3) |
+| brisket | Brisket Lasso | nutrition | `nutrition_adherence` | snapshot/adherence/remaining/compare/analyse/search | meal log Confirm (existing) | nutrition | `brisket-kernel` | med | deterministic only |
+| hyaluronica | Hyaluronica St. Claire | skincare | `routine_response` | adherence/response/analyse/search | existing | skincare | `hyaluronica-kernel` | low | deterministic only |
+| penelope | Penelope Rose Quillian | diary | `diary_recurrence` | search/range/themes/compare/analyse | existing | mind/diary | `penelope-kernel` | med | deterministic only |
+| vera | Dr Vera Lenz | mind | `mind_reflection` | search/compare/analyse sessions | existing | mind | `vera-kernel` | med | deterministic only |
 | clare | Clare DeMind | tasks | `daily_focus` | focus/open loops/plan_work | Confirm | Tasks blobs | pilots | med | **passed** (#246) |
 | chadwick | Chadwick Flexington | fitness | `training_review` | fitness + analyse | Confirm where applicable | fitness | pilots | high | **passed** (#246) |
 | hammond | General Hammond | cross-hub | `cross_hub_supervision` | inspect signals / handoffs (canned) | Confirm | cross-hub | handoff unit | high | **blocked** — not rebuilt |
@@ -83,16 +128,17 @@ Status: architecture recorded; implementation **not started**.
 ## Generic kernel changes this tranche
 
 - Teaching hydrate + stated teaching constraints (`domain-retrieval.mjs`)
-- Teaching diagnosis against real schema (`domain-analysis.mjs`)
-- Knowledge synthesis conflicts / graph vs inference / themes
+- Teaching diagnosis against real schema; outcome_ids ≠ learning_intentions (`domain-analysis.mjs`)
+- Knowledge synthesis conflicts / graph vs inference / themes; word-aware `conflict_signal`
 - `rankKnowledgePages` preserves score
-- Medical `analyse_medical_evidence` + search truncation meta
-- Kernel interpretation lines for Ann / Clementine / Sara
-- Evidence claim compose for teaching / knowledge / medical temporal fields
+- Medical `analyse_medical_evidence` with recent_* (not current_*) visit language
+- Nutrition / skincare / diary / mind analyse helpers + claim compose + interpretation lines
+- Focused diary query (feel/felt/feeling expansion)
+- Evidence claim compose for teaching / knowledge / medical / nutrition / skincare / diary / mind fields
 
 ## Clare / Chadwick regressions
 
-Targeted suites re-run after Sara commit (preservation fixture updated for Ann schema). Must stay green before live specialist stress.
+Targeted suites re-run after defect fixes and specialist expansion. Must stay green before live specialist stress.
 
 ### Live results (2026-09-07)
 
@@ -102,7 +148,7 @@ Targeted suites re-run after Sara commit (preservation fixture updated for Ann s
 - `GET /` → 200
 - `POST /api/chat` without session → `401 unauthenticated`
 - **Blocked** in this environment: no Life Hub passphrase / session secret injected (only `ANTHROPIC_API_KEY`).
-- Therefore Ann / Clementine / Sara cannot be marked `passed` this tranche.
+- Therefore specialists cannot be marked `passed` this tranche. Deterministic development continued.
 
 #### LIVE MODEL / LOCAL HANDLER
 
@@ -118,12 +164,8 @@ Script: `scripts/live-specialist-verify.mjs` with `agentKernel: true`.
 | Brisket eating | exercised | `nutrition_adherence` |
 | Chadwick regression | exercised | `training_review` still fires under specialist branch |
 
-Traces: `/tmp/life-hub-specialist-traces/` (copied under `/opt/cursor/artifacts/`).
-
-## Clare / Chadwick regressions
-
-Targeted suites green after Ann preservation fixture update for real Teaching schema fields.
+Traces: `/tmp/life-hub-specialist-traces/` (copied under `/opt/cursor/artifacts/` when present).
 
 ## Production kernel
 
-Still **off**. `docs/AGENT_CAPABILITY_STRATEGY.md` **unchanged**. Hammond **not** rebuilt (architecture note only).
+Still **off**. `docs/AGENT_CAPABILITY_STRATEGY.md` **unchanged**. Hammond **not** rebuilt (architecture note only). PR #247 remains draft / unmerged.
