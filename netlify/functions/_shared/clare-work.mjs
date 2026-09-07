@@ -182,9 +182,14 @@ export function clareWorkSchemas() {
       project_id: { type: 'string' },
       query: { type: 'string' }
     }, ['view']),
-    tool('plan_work', 'Plan a day or week: time-block, free 15-minute slots, collisions, weekly load, or energy-aware order.', {
+    tool('plan_work', 'Plan a day or week: time-block, free 15-minute slots, collisions, weekly load, or energy-aware order. Pass energy, capacity_minutes, and workday_start/end when Adam stated them this turn. Do not invent a standing preference. If omitted, the planner uses labelled fallbacks (default 08:00–16:30 is a fallback, not a saved preference).', {
       view: { type: 'string', enum: ['time_block', 'free_slots', 'collisions', 'week_load', 'energy'] },
-      date: { type: 'string' }
+      date: { type: 'string' },
+      energy_level: { type: 'string', enum: ['low', 'medium', 'high'] },
+      cognitive_load: { type: 'number' },
+      capacity_minutes: { type: 'number' },
+      workday_start: { type: 'string', description: 'HH:MM when Adam stated a start. Omit to use the labelled fallback.' },
+      workday_end: { type: 'string', description: 'HH:MM when Adam stated an end. Omit to use the labelled fallback.' }
     }, ['view']),
     tool('run_desk_protocol', 'Run Morning Sweep, Tomorrow Setup, Weekly Reset, or High Stakes from chat — same briefing as the Clare desk.', {
       protocol_id: { type: 'string', enum: ['morning-sweep', 'tomorrow-setup', 'weekly-reset', 'high-stakes'] }
@@ -825,12 +830,12 @@ function resolveWorkday({ workday, now, date }) {
     return {
       start: minutesOf(workday.start) ?? WORKDAY.start,
       end: minutesOf(workday.end) ?? WORKDAY.end,
-      source: 'preference'
+      source: workday.source || 'tool_input'
     };
   }
   let start = WORKDAY.start;
   const end = WORKDAY.end;
-  let source = 'default_preference_fallback';
+  let source = 'default_workday_fallback';
   if (date && date === toHubDateKey(now, HUB_TZ)) {
     const current = hubMinutes(now);
     if (current != null && current > start && current < end) {
@@ -1106,7 +1111,25 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     return inspectBoard(input.view, { tasks, projects, project_id: input.project_id, query: input.query }, now);
   }
   if (name === 'plan_work') {
-    return planWork(input.view, { tasks, lessons, date: input.date, now });
+    const energyLevel = input.energy_level ?? input.energy?.level ?? ctx.energy?.level ?? null;
+    const cognitiveLoad = input.cognitive_load ?? input.energy?.cognitive_load ?? ctx.energy?.cognitive_load;
+    const energy = energyLevel || Number.isFinite(Number(cognitiveLoad))
+      ? { level: energyLevel, cognitive_load: cognitiveLoad }
+      : null;
+    const start = input.workday_start ?? input.workday?.start ?? ctx.workday?.start ?? null;
+    const end = input.workday_end ?? input.workday?.end ?? ctx.workday?.end ?? null;
+    const workday = start && end
+      ? { start, end, source: input.workday?.source ?? ctx.workday?.source ?? 'tool_input' }
+      : null;
+    return planWork(input.view, {
+      tasks,
+      lessons,
+      date: input.date,
+      now,
+      energy,
+      workday,
+      capacity_minutes: input.capacity_minutes ?? ctx.capacity_minutes ?? null
+    });
   }
   if (name === 'check_calendars') {
     const from = dayKey(input.from, now);
