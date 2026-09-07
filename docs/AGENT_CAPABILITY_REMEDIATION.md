@@ -75,9 +75,10 @@ Those cannot flip a requirement to `passed`.
 | Confirm ↔ persisted turn | `passed` | required checkpoint before `turnId`; `chat-confirm.mjs` reloads queue + turn | `tests/unit/agent-confirm.test.js` + `tests/integration/chat-confirm-turn-roundtrip.test.js` | kernel Confirm `turnResumed` + write + continuation | Duplicate Confirm `invalid_action`; no second write |
 | Post-confirm conversational continuation | `passed` | confirm reloads the turn, records the write, invokes one model continuation, persists `continuation` | confirm unit + roundtrip tests | two live kernel Confirm acknowledgements | Duplicate Confirm does not re-invoke |
 | Complete traces | `demonstrated` | `kernelTraceEvent` + Anthropic `usage` | loop tests + deployed `usage` + `kernel_trace` | `kernel2-*.json` and first kernel tranche | SSE still omits `tool_call` frames |
-| Clare operational planner | `passed` | `/api/chat` deployed + `agentKernel: true` | deterministic suites + deployed A–E + Confirm | `kernel2-clare-*.json` | Teaching-today N/A (no lessons 2026-09-07) |
-| Chadwick evidence reasoning | `demonstrated` | `/api/chat` deployed + `agentKernel: true` | deterministic suites + deployed A–F | `kernel2-chadwick-*.json` | First-tranche D invented a bench-skip reason; E not a real conflict |
-| Pilot behavioural gate (Clare, Chadwick) | `blocked` | deployed `/api/chat` on `deploy-preview-246--life-hub2` | `live-pilot-runtime-env` + `chat-job` | kernel A/B + rerun | Both pilots required; Chadwick not `passed` |
+| Clare live behavioural planner | `passed` | `/api/chat` deployed + `agentKernel: true` | deterministic suites + deployed A–E + Confirm | `kernel2-clare-*.json` | Teaching-today N/A (no lessons 2026-09-07) |
+| Clare full capability | `partial` | same path | same | same | Material kernel claims still `provenance: null` |
+| Chadwick evidence reasoning | `demonstrated` | `/api/chat` deployed + `agentKernel: true` | deterministic suites + deployed A–F | `kernel2-chadwick-*.json` | First-tranche D invented aching pecs / Bar Press PR as the bench cause; later clean D rerun does not erase that |
+| Pilot behavioural/capability gate (Clare, Chadwick) | `blocked` | deployed `/api/chat` on `deploy-preview-246--life-hub2` | `live-pilot-runtime-env` + `chat-job` | kernel A/B + rerun | Open until unsupported-cause inference and typed provenance are both repaired |
 | Specialist expansion | `not started` | — | — | — | Gated on pilots `passed` |
 | Hammond supervisor rebuild | `blocked` | old canned handoff remains prototype | — | — | Specialist reliability not `passed` |
 | Surface unification / kernel default | `not started` | kernel still flagged off | — | — | Gated on pilots + comparison |
@@ -85,7 +86,7 @@ Those cannot flip a requirement to `passed`.
 
 Hammond is **blocked**, not rebuilt. Specialist expansion was **not** started. `LIFE_HUB_AGENT_KERNEL` stays **off** on Production.
 
-Confirm after the kernel rerun: live `POST /api/chat` with `agentKernel: true` proposed `act_4c21adab64eb`, Confirm returned 200 with `turnResumed: true`, created `task_mtr965ls_ynh2y1`, invoked a model continuation, and the duplicate Confirm returned `invalid_action` without a second write. That sequence is `passed`. Clare is `passed`. Chadwick stays `demonstrated`. The combined pilot gate stays `blocked`.
+Confirm after the kernel rerun: live `POST /api/chat` with `agentKernel: true` proposed `act_4c21adab64eb`, Confirm returned 200 with `turnResumed: true`, created `task_mtr965ls_ynh2y1`, invoked a model continuation, and the duplicate Confirm returned `invalid_action` without a second write. That sequence is `passed`. Clare **live behavioural planner** is `passed`; Clare **full capability** is not, while claims lack typed provenance. Chadwick stays `demonstrated` because the first kernel D hallucination remains material. The combined pilot gate stays `blocked`.
 
 Live conversational traces: **model invoked** on Deploy Preview head `5cb4151` via real `POST /api/chat` jobs with `kernel_trace`. Baseline without the flag remains recorded on `0a9f450`. See `docs/AGENT_PILOT_VERIFICATION.md`. Not a local-handler substitute.
 
