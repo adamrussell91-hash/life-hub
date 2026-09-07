@@ -186,21 +186,21 @@ test('month shift applies forward/back motion on the grid', () => {
   assert.equal(root._host.querySelector('#calendar-month-grid')?.dataset.motion, undefined);
 });
 
-test('day agenda lists brief rows or empty copy', () => {
+test('selected event paints rail detail; empty day omits date and sources cards', () => {
   const root = fakeRoot();
   renderCalendar(root, model([
-    { record: { type: 'workout', date: '2026-08-05', title: 'Push', duration_min: 40, status: 'completed' }, body: '', path: 'w' }
-  ]), { view: 'week', expanded: true, scrollToDetail: true });
+    { record: { type: 'workout', date: '2026-08-05', title: 'Push', duration_min: 40, status: 'completed' }, body: 'Bench focus', path: 'w' }
+  ]), { view: 'week', selectedEventId: 'w', scrollToDetail: true });
   const detail = root._host.querySelector('#calendar-day-detail');
   assert.ok(detail);
-  const brief = collect(detail).find(node => node.className === 'calendar-event__brief');
-  assert.equal(brief?.textContent, '40 min · completed');
+  assert.equal(detail.querySelector('.hub-calendar__detail-heading')?.textContent, 'Push');
+  assert.match(collect(detail).map(node => node.textContent).join(' '), /40 min · completed/);
+  assert.equal(root._host.querySelector('#calendar-source-registry'), null);
 
-  renderCalendar(root, model(), { view: 'week', expanded: true });
-  assert.equal(
-    collect(root._host.querySelector('#calendar-day-detail')).some(node => node.textContent === 'Nothing logged this day.'),
-    true
-  );
+  renderCalendar(root, model(), { view: 'week' });
+  assert.equal(root._host.querySelector('#calendar-day-detail'), null);
+  assert.equal(root._host.querySelector('#calendar-source-registry'), null);
+  assert.ok(root._host.querySelector('[data-calendar="compose-title"]'));
 });
 
 test('compose submit calls onCreateLog with a diary candidate', () => {

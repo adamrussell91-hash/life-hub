@@ -151,6 +151,8 @@ export function createAppController(dependencies) {
   let calendarSelectedDate = null;
   let calendarViewMonth = null;
   let calendarView = 'week';
+  let calendarViewExplicit = false;
+  let calendarMobilePanel = 'schedule';
   let calendarCompose = { date: null, time: null, type: 'diary' };
   let calendarSelectedEventId = null;
   let calendarFocusCompose = false;
@@ -1084,6 +1086,12 @@ export function createAppController(dependencies) {
     if (!calendarSelectedDate) calendarSelectedDate = date;
     if (!calendarViewMonth) calendarViewMonth = calendarSelectedDate.slice(0, 7);
     if (!calendarCompose.date) calendarCompose = { ...calendarCompose, date: calendarSelectedDate };
+    if (
+      !calendarViewExplicit
+      && root.defaultView?.matchMedia?.('(max-width: 720px)')?.matches === true
+    ) {
+      calendarView = 'day';
+    }
     const model = buildCalendarModel({
       events: [...(latestResult.events ?? []), ...teachingEvents, ...knowledgeEvents, ...tasksEvents],
       date,
@@ -1097,6 +1105,7 @@ export function createAppController(dependencies) {
       monthDelta,
       expanded: true,
       view: calendarView,
+      mobilePanel: calendarMobilePanel,
       composeDraft: calendarCompose,
       selectedEventId: calendarSelectedEventId,
       focusCompose,
@@ -1121,7 +1130,12 @@ export function createAppController(dependencies) {
         });
       },
       onSwitchView: next => {
+        calendarViewExplicit = true;
         calendarView = next === 'day' || next === 'month' ? next : 'week';
+        renderCalendarSection();
+      },
+      onSwitchMobilePanel: panel => {
+        calendarMobilePanel = panel === 'tasks' ? 'tasks' : 'schedule';
         renderCalendarSection();
       },
       onShiftRange: delta => {

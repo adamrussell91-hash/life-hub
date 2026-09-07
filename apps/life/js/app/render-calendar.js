@@ -1,6 +1,4 @@
 import { formatDisplayDate } from '../core/time.js';
-import { listCalendarSources } from '../shell/calendar-sources.js';
-import { renderCalendarSources } from '../shell/render-calendar-sources.js';
 import { candidateForLog, inferMealSlot, isWritableCalendarType, slugForLog } from './calendar-write.js';
 import {
   blockStyle,
@@ -10,19 +8,11 @@ import {
   layoutTimedBlocks,
   nowLineOffset,
   parseGoToDate,
+  parseTimeHours,
   splitDayItems,
   timeGridHours,
   hourCaption
 } from '../../../../packages/design-kit/js/time-grid.js';
-
-const CATEGORY_CLASS = {
-  nutrition: 'nutrition',
-  fitness: 'fitness',
-  diary: 'mind',
-  body: 'body',
-  skincare: 'skincare',
-  sleep: 'body'
-};
 
 const TINT = {
   nutrition: 'gold',
@@ -58,17 +48,39 @@ const COMPOSE_TYPES = [
   { id: 'meal', label: 'Meal' }
 ];
 
+const TYPE_LABEL = {
+  task: 'Tasks',
+  scheduled_lesson: 'Teaching',
+  knowledge_page: 'Knowledge',
+  meal: 'Meal',
+  workout: 'Workout',
+  diary: 'Diary',
+  medical: 'Medical',
+  skincare: 'Skincare',
+  sleep: 'Sleep'
+};
+
+const TASK_STATUS_ORDER = ['in_progress', 'open'];
+const TASK_STATUS_LABEL = {
+  in_progress: 'In progress',
+  open: 'Open'
+};
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
 const handlersByRoot = new WeakMap();
 
 export function renderCalendar(root, model, {
   onSelectDate,
   onShiftRange,
   onSwitchView,
+  onSwitchMobilePanel,
   onCreateLog,
   scrollToDetail = false,
   monthDelta = 0,
   expanded = false,
   view = 'week',
+  mobilePanel = 'schedule',
   composeDraft = null,
   selectedEventId = null,
   focusCompose = false,
@@ -86,18 +98,43 @@ export function renderCalendar(root, model, {
   }
 
   const mode = VIEWS.some(item => item.id === view) ? view : 'week';
+  const mobileDay = mode === 'day' && isMobileViewport(root);
   handlersByRoot.set(calendar, {
     onSelectDate,
     onShiftRange,
     onSwitchView,
+    onSwitchMobilePanel,
     onCreateLog,
     view: mode,
     today: model.date,
-    selectedDate: model.selectedDate
+    selectedDate: model.selectedDate,
+    root
   });
 
   calendar.replaceChildren();
+  {
+    const classes = new Set(String(calendar.className || '').split(/\s+/).filter(Boolean));
+    if (mobileDay) classes.add('hub-calendar--mobile-day');
+    else classes.delete('hub-calendar--mobile-day');
+    calendar.className = [...classes].join(' ');
+  }
   calendar.append(renderNav(root, model, mode));
+
+  const draft = composeDraft ?? { date: model.selectedDate, time: null, type: 'diary' };
+
+  if (mobileDay) {
+    calendar.append(renderMobileDay(root, model, {
+      mobilePanel,
+      draft,
+      now
+    }));
+    bindNav(calendar);
+    bindKeys(calendar, root);
+    bindViewport(calendar, root);
+    if (focusCompose) openMobileComposeSheet(calendar);
+    dashboard.removeAttribute('hidden');
+    return;
+  }
 
   const workspace = root.createElement('div');
   workspace.className = 'hub-calendar__workspace';
@@ -112,17 +149,17 @@ export function renderCalendar(root, model, {
 
   const rail = root.createElement('div');
   rail.className = 'hub-calendar__rail';
-  const draft = composeDraft ?? { date: model.selectedDate, time: null, type: 'diary' };
   const selected = findEvent(model, selectedEventId);
   rail.append(renderCompose(root, draft, mode));
-  rail.append(renderAgenda(root, model, mode, selected, expanded, scrollToDetail));
-  rail.append(renderSources(root));
+  const agenda = renderAgenda(root, selected, scrollToDetail);
+  if (agenda) rail.append(agenda);
   rail.append(renderShortcutHint(root));
   workspace.append(body, rail);
   calendar.append(workspace);
 
   bindNav(calendar);
   bindKeys(calendar, root);
+  bindViewport(calendar, root);
 
   if (focusCompose) {
     const input = calendar.querySelector('[data-calendar="compose-title"]');
@@ -130,6 +167,22 @@ export function renderCalendar(root, model, {
   }
 
   dashboard.removeAttribute('hidden');
+}
+
+function isMobileViewport(root) {
+  return root.defaultView?.matchMedia?.('(max-width: 720px)')?.matches === true;
+}
+
+function bindViewport(calendar, root) {
+  if (calendar.dataset.viewportBound) return;
+  const mql = root.defaultView?.matchMedia?.('(max-width: 720px)');
+  if (!mql || typeof mql.addEventListener !== 'function') return;
+  calendar.dataset.viewportBound = '1';
+  mql.addEventListener('change', () => {
+    const handlers = handlersByRoot.get(calendar);
+    if (!handlers?.selectedDate) return;
+    handlers.onSelectDate?.(handlers.selectedDate);
+  });
 }
 
 function findEvent(model, id) {
@@ -614,76 +667,32 @@ function renderCompose(root, draft, view) {
   return card;
 }
 
-function renderAgenda(root, model, view, selected, expanded, scrollToDetail) {
+function renderAgenda(root, selected, scrollToDetail) {
+  if (!selected) return null;
   const detail = root.createElement('section');
   detail.className = 'hub-calendar__detail';
   detail.id = 'calendar-day-detail';
-  if (selected) {
-    const heading = root.createElement('h3');
-    heading.className = 'hub-calendar__detail-heading';
-    heading.textContent = selected.title;
-    const meta = root.createElement('p');
-    meta.className = 'hub-calendar__detail-empty';
-    meta.textContent = [
-      selected.time ? selected.time : 'All day',
-      selected.brief,
-      isWritableCalendarType(selected.type) ? 'Life log' : selected.type
-    ].filter(Boolean).join(' · ');
-    const snippet = root.createElement('p');
-    snippet.className = 'metric-caption';
-    snippet.textContent = selected.snippet || 'No notes.';
-    detail.append(heading, meta, snippet);
-    return detail;
-  }
-
   const heading = root.createElement('h3');
   heading.className = 'hub-calendar__detail-heading';
-  heading.textContent = formatDisplayDate(model.selectedDate);
-  detail.append(heading);
-  if (!model.dayEvents.length) {
-    const empty = root.createElement('p');
-    empty.className = 'hub-calendar__detail-empty';
-    empty.textContent = 'Nothing logged this day.';
-    detail.append(empty);
-  } else {
-    for (const event of model.dayEvents) {
-      detail.append(eventRow(root, event));
-    }
-  }
-  if (expanded && scrollToDetail) {
+  heading.textContent = selected.title;
+  const meta = root.createElement('p');
+  meta.className = 'hub-calendar__detail-empty';
+  meta.textContent = [
+    selected.time ? selected.time : 'All day',
+    selected.brief,
+    isWritableCalendarType(selected.type) ? 'Life log' : selected.type
+  ].filter(Boolean).join(' · ');
+  const snippet = root.createElement('p');
+  snippet.className = 'metric-caption';
+  snippet.textContent = selected.snippet || 'No notes.';
+  detail.append(heading, meta, snippet);
+  if (scrollToDetail) {
     delete detail.dataset.motion;
     void detail.offsetWidth;
     detail.dataset.motion = 'in';
     scrollDetailIntoView(root, detail);
   }
   return detail;
-}
-
-function renderSources(root) {
-  const card = root.createElement('article');
-  card.className = 'hub-calendar__detail';
-  card.id = 'calendar-source-registry';
-  card.setAttribute('aria-label', 'Shared calendar sources');
-  const label = root.createElement('p');
-  label.className = 'metric-label';
-  label.textContent = 'Shared sources';
-  const empty = root.createElement('p');
-  empty.className = 'metric-caption';
-  empty.dataset.calendar = 'sources-empty';
-  empty.textContent = 'No shared sources yet.';
-  const list = root.createElement('ul');
-  list.id = 'calendar-source-list';
-  list.setAttribute('hidden', '');
-  card.append(label, empty, list);
-  renderCalendarSources({
-    createElement: root.createElement.bind(root),
-    querySelector(selector) {
-      if (selector === '[data-calendar="sources-empty"]') return empty;
-      if (selector === '#calendar-source-list') return list;
-      return card.querySelector?.(selector) ?? null;
-    }
-  }, listCalendarSources());
-  return card;
 }
 
 function renderShortcutHint(root) {
@@ -698,37 +707,6 @@ function renderShortcutHint(root) {
     hint.append(item);
   }
   return hint;
-}
-
-function eventRow(root, event) {
-  const row = root.createElement('div');
-  row.className = 'calendar-event';
-
-  const affordance = root.createElement('span');
-  affordance.className = 'calendar-event__affordance';
-  const category = event.categories?.[0];
-  if (category) {
-    const dot = root.createElement('i');
-    dot.className = `calendar-dot ${CATEGORY_CLASS[category] ?? ''}`.trim();
-    dot.title = category;
-    affordance.append(dot);
-  }
-  row.append(affordance);
-
-  const meta = root.createElement('div');
-  meta.className = 'calendar-event__meta';
-  const title = root.createElement('strong');
-  title.className = 'calendar-event__title';
-  title.textContent = event.title;
-  meta.append(title);
-  if (event.brief) {
-    const brief = root.createElement('p');
-    brief.className = 'calendar-event__brief';
-    brief.textContent = event.brief;
-    meta.append(brief);
-  }
-  row.append(meta);
-  return row;
 }
 
 function applyMonthMotion(grid, monthDelta) {
@@ -746,4 +724,446 @@ function scrollDetailIntoView(root, detail) {
 
 function weekdayShort(date) {
   return new Intl.DateTimeFormat('en-AU', { weekday: 'short' }).format(new Date(`${date}T12:00:00+10:00`));
+}
+
+function taskStatusFromBrief(event) {
+  return event?.brief?.startsWith('Tasks · ') ? event.brief.slice('Tasks · '.length) : null;
+}
+
+function eventTint(event) {
+  return TYPE_TINT[event?.type] ?? TINT[event?.categories?.[0]] ?? 'sage';
+}
+
+function typeLabel(type) {
+  return TYPE_LABEL[type] ?? String(type ?? 'Event');
+}
+
+function nextTimedEvent(timed, now) {
+  const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  const upcoming = timed
+    .map(event => ({ event, start: parseTimeHours(event.time) }))
+    .filter(item => item.start != null && item.start > hours)
+    .sort((a, b) => a.start - b.start);
+  return upcoming[0]?.event ?? null;
+}
+
+function openTaskCount(allDay) {
+  return allDay.filter(event => event.type === 'task').length;
+}
+
+function renderMobileDay(root, model, { mobilePanel, draft, now }) {
+  const shell = root.createElement('div');
+  shell.className = 'hub-calendar__mobile-day';
+  shell.dataset.calendar = 'mobile-day';
+
+  const { timed, allDay } = splitDayItems(model.dayEvents);
+  const tasks = openTaskCount(allDay);
+  const panel = mobilePanel === 'tasks' ? 'tasks' : 'schedule';
+
+  shell.append(renderNowCard(root, { timed, tasks, now }));
+  shell.append(renderDayStrip(root, model));
+  shell.append(renderMobileSegmented(root, panel, tasks));
+  if (panel === 'tasks') shell.append(renderTasksList(root, allDay));
+  else shell.append(renderScheduleList(root, timed));
+
+  shell.append(renderMobileFab(root));
+  shell.append(renderEventSheet(root));
+  shell.append(renderMobileCompose(root, draft));
+  return shell;
+}
+
+function renderNowCard(root, { timed, tasks, now }) {
+  const card = root.createElement('section');
+  card.className = 'hub-calendar__now-card';
+  card.dataset.calendar = 'now-card';
+  card.setAttribute('aria-label', 'Now');
+
+  card.append(renderNowRing(root, now));
+
+  const next = nextTimedEvent(timed, now);
+  const copy = root.createElement('div');
+  copy.className = 'hub-calendar__now-card-copy';
+  const label = root.createElement('p');
+  label.className = 'hub-calendar__now-card-label';
+  label.textContent = next ? 'Next up' : 'Nothing else scheduled';
+  const title = root.createElement('p');
+  title.className = 'hub-calendar__now-card-title';
+  title.textContent = next ? next.title : 'Clear ahead';
+  const meta = root.createElement('p');
+  meta.className = 'hub-calendar__now-card-meta';
+  meta.textContent = next?.time ? next.time : `${timed.length} timed · ${tasks} open task${tasks === 1 ? '' : 's'}`;
+  copy.append(label, title, meta);
+  card.append(copy);
+
+  const taskBadge = root.createElement('div');
+  taskBadge.className = 'hub-calendar__now-card-tasks';
+  taskBadge.dataset.calendar = 'now-tasks';
+  const count = root.createElement('strong');
+  count.textContent = String(tasks);
+  const caption = root.createElement('span');
+  caption.textContent = 'Tasks';
+  taskBadge.append(count, caption);
+  card.append(taskBadge);
+  return card;
+}
+
+function renderNowRing(root, now) {
+  const wrap = root.createElement('div');
+  wrap.className = 'hub-calendar__now-card-ring';
+  wrap.setAttribute('aria-hidden', 'true');
+  const pct = (now.getHours() * 60 + now.getMinutes()) / 1440;
+  const size = 48;
+  const radius = 18;
+  const circumference = 2 * Math.PI * radius;
+  const dash = circumference * Math.min(Math.max(pct, 0), 1);
+
+  const svg = svgEl(root, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+  const track = svgEl(root, 'circle');
+  track.setAttribute('cx', String(size / 2));
+  track.setAttribute('cy', String(size / 2));
+  track.setAttribute('r', String(radius));
+  track.setAttribute('fill', 'none');
+  track.setAttribute('stroke', 'currentColor');
+  track.setAttribute('stroke-width', '3');
+  track.setAttribute('opacity', '0.28');
+  const arc = svgEl(root, 'circle');
+  arc.setAttribute('cx', String(size / 2));
+  arc.setAttribute('cy', String(size / 2));
+  arc.setAttribute('r', String(radius));
+  arc.setAttribute('fill', 'none');
+  arc.setAttribute('stroke', 'currentColor');
+  arc.setAttribute('stroke-width', '3');
+  arc.setAttribute('stroke-linecap', 'round');
+  arc.setAttribute('transform', `rotate(-90 ${size / 2} ${size / 2})`);
+  arc.setAttribute('stroke-dasharray', `${dash} ${circumference}`);
+  svg.append(track, arc);
+  wrap.append(svg);
+  return wrap;
+}
+
+function renderDayStrip(root, model) {
+  const strip = root.createElement('div');
+  strip.className = 'hub-calendar__day-strip';
+  strip.dataset.calendar = 'day-strip';
+  strip.setAttribute('role', 'tablist');
+  strip.setAttribute('aria-label', 'Days this week');
+  for (const day of model.weekDays ?? []) {
+    const pill = root.createElement('button');
+    pill.type = 'button';
+    pill.className = 'hub-calendar__day-pill';
+    pill.dataset.calendar = 'day-pill';
+    pill.dataset.date = day.date;
+    pill.setAttribute('role', 'tab');
+    pill.setAttribute('aria-selected', day.isSelected ? 'true' : 'false');
+    if (day.isToday) pill.dataset.today = 'true';
+    if (day.isSelected) pill.dataset.selected = 'true';
+    const letter = root.createElement('span');
+    letter.className = 'hub-calendar__day-pill-letter';
+    letter.textContent = day.letter || weekdayShort(day.date).slice(0, 1);
+    const num = root.createElement('span');
+    num.className = 'hub-calendar__day-pill-num';
+    num.textContent = String(Number(day.date.slice(8, 10)));
+    pill.append(letter, num);
+    pill.addEventListener('click', () => {
+      const calendar = pill.closest?.('.hub-calendar') ?? pill;
+      handlersByRoot.get(calendar)?.onSelectDate?.(day.date);
+    });
+    strip.append(pill);
+  }
+  return strip;
+}
+
+function renderMobileSegmented(root, panel, taskCount) {
+  const tabs = root.createElement('div');
+  tabs.className = 'hub-calendar__mobile-segments';
+  tabs.dataset.calendar = 'mobile-segments';
+  tabs.setAttribute('role', 'tablist');
+  tabs.setAttribute('aria-label', 'Schedule or tasks');
+
+  for (const item of [
+    { id: 'schedule', label: 'Schedule' },
+    { id: 'tasks', label: `Tasks · ${taskCount}` }
+  ]) {
+    const tab = root.createElement('button');
+    tab.type = 'button';
+    tab.className = 'hub-calendar__mobile-segment';
+    tab.dataset.calendar = 'mobile-panel';
+    tab.dataset.panel = item.id;
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', item.id === panel ? 'true' : 'false');
+    tab.textContent = item.label;
+    tab.addEventListener('click', () => {
+      const calendar = tab.closest?.('.hub-calendar') ?? tab;
+      handlersByRoot.get(calendar)?.onSwitchMobilePanel?.(item.id);
+    });
+    tabs.append(tab);
+  }
+  return tabs;
+}
+
+function renderScheduleList(root, timed) {
+  const list = root.createElement('div');
+  list.className = 'hub-calendar__mobile-list';
+  list.dataset.calendar = 'schedule-list';
+  const blocks = layoutTimedBlocks(timed);
+  if (!blocks.length) {
+    const empty = root.createElement('p');
+    empty.className = 'hub-calendar__mobile-empty';
+    empty.textContent = 'Nothing timed today.';
+    list.append(empty);
+    return list;
+  }
+  for (const block of blocks) {
+    list.append(renderMobileRow(root, {
+      event: block.item,
+      meta: formatBlockTime(block),
+      iconPaths: ['M12 7v5l3 2', 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z']
+    }));
+  }
+  return list;
+}
+
+function renderTasksList(root, allDay) {
+  const list = root.createElement('div');
+  list.className = 'hub-calendar__mobile-list';
+  list.dataset.calendar = 'tasks-list';
+
+  const tasks = allDay.filter(event => event.type === 'task');
+  const other = allDay.filter(event => event.type !== 'task');
+  const byStatus = new Map();
+  for (const event of tasks) {
+    const status = taskStatusFromBrief(event) || 'open';
+    if (!byStatus.has(status)) byStatus.set(status, []);
+    byStatus.get(status).push(event);
+  }
+
+  let painted = 0;
+  for (const status of TASK_STATUS_ORDER) {
+    const group = byStatus.get(status);
+    if (!group?.length) continue;
+    painted += appendTaskGroup(root, list, TASK_STATUS_LABEL[status] ?? status, group);
+    byStatus.delete(status);
+  }
+  for (const [status, group] of byStatus) {
+    if (!group.length) continue;
+    painted += appendTaskGroup(root, list, TASK_STATUS_LABEL[status] ?? status, group);
+  }
+  if (other.length) {
+    painted += appendTaskGroup(root, list, 'Other', other);
+  }
+  if (!painted) {
+    const empty = root.createElement('p');
+    empty.className = 'hub-calendar__mobile-empty';
+    empty.textContent = 'No open tasks today.';
+    list.append(empty);
+  }
+  return list;
+}
+
+function appendTaskGroup(root, list, heading, events) {
+  const label = root.createElement('p');
+  label.className = 'hub-calendar__mobile-group';
+  label.textContent = heading;
+  list.append(label);
+  for (const event of events) {
+    list.append(renderMobileRow(root, {
+      event,
+      meta: typeLabel(event.type),
+      iconPaths: event.type === 'task'
+        ? ['M8 7h11M8 12h11M8 17h11', 'm4.5 7 .8.8L7 6M4.5 12l.8.8L7 11']
+        : ['M8 7h11M8 12h11M8 17h11']
+    }));
+  }
+  return events.length;
+}
+
+function renderMobileRow(root, { event, meta, iconPaths }) {
+  const row = root.createElement('button');
+  row.type = 'button';
+  row.className = 'hub-calendar__mobile-row';
+  row.dataset.calendar = 'mobile-row';
+  row.dataset.eventId = event.id ?? event.path ?? '';
+
+  const icon = root.createElement('span');
+  icon.className = 'hub-calendar__mobile-row-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.append(svgFromPaths(root, iconPaths));
+
+  const copy = root.createElement('div');
+  copy.className = 'hub-calendar__mobile-row-copy';
+  const title = root.createElement('p');
+  title.className = 'hub-calendar__mobile-row-title';
+  title.textContent = event.title;
+  const caption = root.createElement('p');
+  caption.className = 'hub-calendar__mobile-row-meta';
+  caption.textContent = meta;
+  copy.append(title, caption);
+
+  const dot = root.createElement('span');
+  dot.className = 'hub-calendar__mobile-row-dot';
+  dot.dataset.tint = eventTint(event);
+  dot.setAttribute('aria-hidden', 'true');
+
+  row.append(icon, copy, dot);
+  row.addEventListener('click', () => {
+    const calendar = row.closest?.('.hub-calendar') ?? row;
+    openEventSheet(calendar, event);
+  });
+  return row;
+}
+
+function renderMobileFab(root) {
+  const fab = root.createElement('button');
+  fab.type = 'button';
+  fab.className = 'hub-calendar__fab';
+  fab.dataset.calendar = 'mobile-fab';
+  fab.setAttribute('aria-label', 'Add log');
+  fab.append(svgFromPaths(root, ['M12 5v14M5 12h14']));
+  fab.addEventListener('click', () => {
+    const calendar = fab.closest?.('.hub-calendar') ?? fab;
+    openMobileComposeSheet(calendar);
+  });
+  return fab;
+}
+
+function renderEventSheet(root) {
+  const sheet = root.createElement('dialog');
+  sheet.className = 'hub-more-sheet hub-calendar-sheet';
+  sheet.dataset.calendar = 'event-sheet';
+  sheet.setAttribute('aria-label', 'Event detail');
+
+  const panel = root.createElement('div');
+  panel.className = 'hub-more-sheet__panel';
+
+  const head = root.createElement('header');
+  head.className = 'hub-more-sheet__head';
+  const title = root.createElement('h2');
+  title.dataset.calendar = 'event-sheet-title';
+  title.textContent = 'Event';
+  const close = root.createElement('button');
+  close.type = 'button';
+  close.className = 'hub-calendar-sheet__close-x';
+  close.dataset.calendar = 'event-sheet-close';
+  close.setAttribute('aria-label', 'Close');
+  close.append(svgFromPaths(root, ['M6 6l12 12M18 6 6 18']));
+  head.append(title, close);
+
+  const body = root.createElement('div');
+  body.className = 'hub-calendar-sheet__body';
+  body.dataset.calendar = 'event-sheet-body';
+
+  panel.append(head, body);
+  sheet.append(panel);
+
+  const closeSheet = () => {
+    if (typeof sheet.close === 'function') sheet.close();
+    else sheet.removeAttribute?.('open');
+  };
+  close.addEventListener('click', closeSheet);
+  sheet.addEventListener('click', event => {
+    if (event.target === sheet) closeSheet();
+  });
+  return sheet;
+}
+
+function openEventSheet(calendar, event) {
+  const sheet = calendar.querySelector?.('[data-calendar="event-sheet"]');
+  const handlers = handlersByRoot.get(calendar);
+  const root = handlers?.root;
+  if (!sheet || !event || !root) return;
+  const title = sheet.querySelector?.('[data-calendar="event-sheet-title"]');
+  const body = sheet.querySelector?.('[data-calendar="event-sheet-body"]');
+  if (title) title.textContent = event.title || 'Event';
+  if (body?.replaceChildren) {
+    const meta = root.createElement('p');
+    meta.className = 'hub-calendar-sheet__meta';
+    meta.textContent = [
+      event.time ? event.time : 'All day',
+      typeLabel(event.type),
+      event.brief
+    ].filter(Boolean).join(' · ');
+    const snippet = root.createElement('p');
+    snippet.className = 'hub-calendar-sheet__snippet';
+    snippet.textContent = event.snippet || event.brief || 'No notes.';
+    body.replaceChildren(meta, snippet);
+  }
+  if (typeof sheet.showModal === 'function') sheet.showModal();
+  else sheet.setAttribute?.('open', '');
+}
+
+function renderMobileCompose(root, draft) {
+  const sheet = root.createElement('dialog');
+  sheet.className = 'hub-more-sheet hub-calendar-sheet';
+  sheet.dataset.calendar = 'compose-sheet';
+  sheet.setAttribute('aria-label', 'Add log');
+
+  const panel = root.createElement('div');
+  panel.className = 'hub-more-sheet__panel';
+
+  const head = root.createElement('header');
+  head.className = 'hub-more-sheet__head';
+  const title = root.createElement('h2');
+  title.textContent = 'Add';
+  const close = root.createElement('button');
+  close.type = 'button';
+  close.className = 'hub-calendar-sheet__close-x';
+  close.dataset.calendar = 'compose-sheet-close';
+  close.setAttribute('aria-label', 'Close');
+  close.append(svgFromPaths(root, ['M6 6l12 12M18 6 6 18']));
+  head.append(title, close);
+
+  const body = root.createElement('div');
+  body.className = 'hub-calendar-sheet__body';
+  body.dataset.calendar = 'compose-sheet-body';
+  body.append(renderCompose(root, draft, 'day'));
+
+  panel.append(head, body);
+  sheet.append(panel);
+
+  const closeSheet = () => {
+    if (typeof sheet.close === 'function') sheet.close();
+    else sheet.removeAttribute?.('open');
+  };
+  close.addEventListener('click', closeSheet);
+  sheet.addEventListener('click', event => {
+    if (event.target === sheet) closeSheet();
+  });
+  return sheet;
+}
+
+function openMobileComposeSheet(calendar) {
+  const sheet = calendar.querySelector?.('[data-calendar="compose-sheet"]');
+  if (!sheet) return;
+  if (typeof sheet.showModal === 'function') sheet.showModal();
+  else sheet.setAttribute?.('open', '');
+  sheet.querySelector?.('[data-calendar="compose-title"]')?.focus?.();
+}
+
+function svgEl(root, tag) {
+  if (typeof root.createElementNS === 'function') {
+    return root.createElementNS(SVG_NS, tag);
+  }
+  const doc = root.defaultView?.document;
+  if (typeof doc?.createElementNS === 'function') {
+    return doc.createElementNS(SVG_NS, tag);
+  }
+  return root.createElement(tag);
+}
+
+function svgFromPaths(root, paths) {
+  const svg = svgEl(root, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.75');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of paths) {
+    const path = svgEl(root, 'path');
+    path.setAttribute('d', d);
+    svg.append(path);
+  }
+  return svg;
 }
