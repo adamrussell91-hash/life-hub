@@ -1,9 +1,11 @@
 # Life Hub agent capability audit
 
 Generated: 2026-09-06T07:54:23.358Z  
-**Behaviour update:** 2026-09-06 — server-side evidence packs + domain analysis. See `docs/AGENT_BEHAVIOUR_ACCEPTANCE.md`.
+**Strategy:** `docs/AGENT_CAPABILITY_STRATEGY.md` (adopted 2026-09-07).  
+**Pack-layer update:** 2026-09-06 — server-side evidence packs + domain analysis. See `docs/AGENT_BEHAVIOUR_ACCEPTANCE.md`.  
+**Clare correction:** 2026-09-07 — Clare is not a thin read adapter. Life chat loads Tasks and Projects. `clare-work.mjs` exposes 15 named tools covering 40 jobs. Full `buildAgentTools({ slug: 'clare' })` attaches 37 tools; an intent-trimmed “focus today” turn still attaches 24, including the workbench. The 17-tool snapshot below is a stale OS-floor count and must not be read as her current workbench.
 
-> **Corrective note:** Attached tools ≠ intelligence. Status words allowed: Demonstrated | Failed | Blocked | Not started. Do not use thin / partial / scaffolding / mostly / should work / capability counts as completion language.
+> **Corrective note:** Attached tools ≠ intelligence. Status words allowed: Demonstrated | Failed | Blocked | Not started. Do not use thin / partial / scaffolding / mostly / should work / capability counts as completion language. Pack/function tests are not conversational behaviour tests.
 
 ## Demonstrated jobs (2026-09-06 evidence packs)
 
@@ -116,7 +118,7 @@ Plus `log_entry` when the agent has record types for the turn.
 | **General Hammond** (`hammond`) | life_coaching / Central Node | — | `publish.cn-patch`, `publish.governance-log-entry` | `propose_central_node_patch`, `append_governance_log` | — | `config/hammond-protocol.md` | `hammond.md` |
 | **Ann O'Tation** (`ann`) | teaching / Teaching | — | `publish.cn-patch` | `propose_central_node_patch` | `teaching-diagnosis-first` | `apps/teaching/config/ann-protocol.md` | `ann.md` |
 | **Professor Clementine Haig** (`clementine`) | knowledge / Knowledge | — | — | — | `knowledge-claim-spine` | `apps/teaching/config/clementine-protocol.md` | `clementine.md` |
-| **Clare DeMind** (`clare`) | tasks / Tasks | — | `publish.cn-patch` | `propose_central_node_patch` | `tasks-smallest-next-move` | `apps/tasks/config/clare-protocol.md` | `clare.md` |
+| **Clare DeMind** (`clare`) | tasks / Tasks | — | `publish.cn-patch` plus 15 workbench tools / 40 jobs; Life chat loads tasks **and** projects | `propose_central_node_patch`, `get_tasks_focus`, `search_tasks`, `create_task`, `update_task`, `get_task`, plus `clareWorkSchemas()` | `tasks-smallest-next-move` | `apps/tasks/config/clare-protocol.md` | `clare.md` |
 
 ## Tool count snapshot
 
@@ -131,7 +133,7 @@ Plus `log_entry` when the agent has record types for the turn.
 | General Hammond | 18 | 2 | 0 |
 | Ann O'Tation | 17 | 1 | 1 |
 | Professor Clementine Haig | 16 | 0 | 1 |
-| Clare DeMind | 17 | 1 | 1 |
+| Clare DeMind | 37 full / 24 on focus-today trim (was stale 17) | 1 | 1 |
 
 ## Brisket Lasso (`brisket`)
 
@@ -998,6 +1000,10 @@ Plus `log_entry` when the agent has record types for the turn.
 
 **Role:** tasks · tab Tasks · colour #F7DD4C
 
+**Current workbench (2026-09-07):** not a thin read adapter. `chat.mjs` loads Tasks and Projects for Life chat. `clare-work.mjs` catalogues 40 jobs on 15 tools: `fetch_url`, `research_topic`, `lookup_au_dates`, `lookup_place`, `compare_options`, `clare_mutate`, `inspect_board`, `plan_work`, `run_desk_protocol`, `draft_comms`, `check_calendars`, `check_clock`, `parse_dump`, `read_protocol`, `update_protocol`. Domain retrieval adds `get_tasks_focus`, `search_tasks`, `get_task`. Ordinary writes also expose `create_task` and `update_task`. Writes stay behind Confirm.
+
+**Remaining weakness is orchestration, not missing basic tools.** Time-block starts at 08:00 and defaults untimed tasks to 45 minutes. Teaching lessons are counted but their times do not reserve calendar space. Energy ranking does not read current energy. Duplicate detection is exact-title. Forced activation covers only a subset of likely requests. Pack/function tests prove schemas and helpers; they do not prove live multi-step conversations.
+
 **Record / log types:** _none_
 
 **Chat runtime flags (from `chat.mjs`):**
@@ -1015,7 +1021,7 @@ Plus `log_entry` when the agent has record types for the turn.
 - needsCentralNodeWrite: `true`
 - hasProtocolLoader: `true`
 
-**Capabilities (16):**
+**Capabilities (16 named registry IDs, plus workbench schemas attached in `buildAgentTools`):**
 
 - `os.propose-action`
 - `publish.cn-patch` *(exclusive)*
@@ -1034,25 +1040,7 @@ Plus `log_entry` when the agent has record types for the turn.
 - `os.list-promoted-shortcuts`
 - `os.run-promoted-shortcut`
 
-**Tools attached by `buildAgentTools` (17):**
-
-- `web_search`
-- `os_propose_action`
-- `propose_central_node_patch`
-- `remember_set_week_flag`
-- `remember_note_context`
-- `track_open_challenge`
-- `track_log_progress`
-- `track_close_challenge`
-- `coordinate_request_cn_write`
-- `research_save_brief`
-- `research_expiring_brief`
-- `publish_surface_widget`
-- `os_capability_scoreboard`
-- `intuition_edit_pack`
-- `os_promote_shortcut`
-- `os_list_promoted_shortcuts`
-- `os_run_promoted_shortcut`
+**Tools attached by `buildAgentTools({ slug: 'clare' })` (37).** Intent trim on “What should I focus on today?” still leaves 24, including the workbench. Do not use the old 17-tool OS-floor list as her current portfolio.
 
 **Allowlist writes:**
 
@@ -1100,7 +1088,7 @@ Plus `log_entry` when the agent has record types for the turn.
 1. Retrieval activation policy + source catalogue in system prompt (`activation-policy.mjs`).
 2. First-round `tool_choice: any` when evidence is required (web_search stripped that round).
 3. Brisket nutrition dashboard tools; Sara body/weight tools; Penelope diary search; Hyaluronica adherence/history; Clare tasks focus; Ann teaching search/context; Clementine knowledge search; Hammond hub inspect.
-4. Orchestration acceptance tests for the 14 required scenarios.
+4. Pack/function orchestration tests for the 14 required scenarios — activation, retrieval, and deterministic claim compose. These are **not** conversational behaviour tests.
 
 **Still open / partial:**
 

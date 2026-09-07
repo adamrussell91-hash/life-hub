@@ -475,3 +475,110 @@ export function assembleClementineEvidence(stores, { message = 'What do I alread
     now
   });
 }
+
+function formatClaimValue(value) {
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function pushClaim(claims, tool, fact, value, kind = 'record') {
+  if (value == null) return;
+  claims.push({
+    tool,
+    fact,
+    value,
+    kind,
+    text: `${fact}=${formatClaimValue(value)}`
+  });
+}
+
+/**
+ * Deterministic claim list from retrieved tool evidence.
+ * Pack/function compose only — not a conversational answer.
+ * Presence of a record is not completeness: limitations stay visible.
+ */
+export function composeEvidenceClaims(evidence = {}) {
+  const claims = [];
+  const limitations = [];
+
+  for (const [tool, result] of Object.entries(evidence)) {
+    if (result == null) {
+      limitations.push({ tool, kind: 'missing', text: `${tool} returned nothing` });
+      continue;
+    }
+    if (result.ok === false || result.error) {
+      limitations.push({
+        tool,
+        kind: 'failed',
+        text: String(result.error || `${tool} failed`)
+      });
+      continue;
+    }
+    if (result.truncated) {
+      limitations.push({
+        tool,
+        kind: 'truncated',
+        text: `${tool} truncated kept=${result.kept ?? '?'} omitted=${result.omitted ?? '?'}`
+      });
+    }
+    if (result.conflict) {
+      limitations.push({
+        tool,
+        kind: 'conflict',
+        text: result.conflict.kind || 'conflict'
+      });
+    }
+    if (Array.isArray(result.unavailable)) {
+      for (const item of result.unavailable) {
+        limitations.push({
+          tool,
+          kind: 'unavailable',
+          text: `${item.hub}:${item.error || 'unavailable'}`
+        });
+        pushClaim(claims, tool, 'unavailable_hub', item.hub);
+      }
+    }
+
+    pushClaim(claims, tool, 'last_completed_date', result.last_completed_date, 'calculation');
+    pushClaim(claims, tool, 'compare_current_from', result.current?.from, 'calculation');
+    pushClaim(claims, tool, 'compare_previous_from', result.previous?.from, 'calculation');
+    pushClaim(claims, tool, 'open_count', result.open_count, 'calculation');
+    pushClaim(claims, tool, 'overdue_title', result.overdue?.[0]?.title);
+    pushClaim(claims, tool, 'lesson_id', result.lesson?.id);
+    pushClaim(claims, tool, 'lesson_title', result.lesson?.title);
+    pushClaim(claims, tool, 'class_code', result.class?.code);
+    pushClaim(claims, tool, 'result_count', result.count);
+    pushClaim(claims, tool, 'first_result_id', result.results?.[0]?.id);
+    pushClaim(claims, tool, 'first_result_title', result.results?.[0]?.title);
+    pushClaim(claims, tool, 'delta_kg', result.delta_kg, 'calculation');
+    pushClaim(claims, tool, 'found', result.found);
+    pushClaim(claims, tool, 'days_with_log', result.days_with_log, 'calculation');
+    pushClaim(claims, tool, 'life_digest_present', result.life_digest_present);
+    if (Array.isArray(result.flags) && result.flags.length) {
+      pushClaim(claims, tool, 'pain_flag_count', result.flags.length);
+    }
+    if (Array.isArray(result.recent) && result.recent.length) {
+      pushClaim(claims, tool, 'pain_recent_count', result.recent.length);
+    }
+    if (result.ok === true && !claims.some(claim => claim.tool === tool)) {
+      pushClaim(claims, tool, 'ok', true);
+    }
+  }
+
+  return {
+    claims,
+    limitations,
+    complete: limitations.length === 0 && claims.length > 0
+  };
+}
+
+export function claimValue(composed, fact) {
+  return composed.claims.find(claim => claim.fact === fact)?.value;
+}
