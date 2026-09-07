@@ -15,3 +15,8 @@ test('rankKnowledgePages matches title, tags, origins, and prefers title hits', 
   assert.equal(titled[0].id, 'a');
   assert.deepEqual(rankKnowledgePages(pages, ''), []);
 });
+
+test('rankKnowledgePages matches topical tokens in a natural-language question', () => {
+  const hits = rankKnowledgePages(pages, 'what do I already know about working memory');
+  assert.equal(hits[0].id, 'a');
+});

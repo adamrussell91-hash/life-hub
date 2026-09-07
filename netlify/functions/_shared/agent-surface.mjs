@@ -66,7 +66,6 @@ export function runSurfaceAgentTurn({
   if (!AGENT_SURFACES.includes(surface)) {
     throw new TypeError(`unknown surface: ${surface}`);
   }
-  const pack = assembleEvidencePack({ slug, message, today, stores, now, sourceMeta });
   const kernelApplied = applyKernelToTurn({
     slug,
     message,
@@ -80,6 +79,15 @@ export function runSurfaceAgentTurn({
   });
   const kernelWorkflow = kernelApplied.kernel?.plan?.workflow;
   const kernelOwnsTurn = Boolean(kernelApplied.enabled && kernelWorkflow && kernelWorkflow !== 'none');
+  const pack = assembleEvidencePack({
+    slug,
+    message,
+    today,
+    stores,
+    now,
+    sourceMeta,
+    force: kernelOwnsTurn
+  });
   let memory = kernelApplied.kernel?.memory ?? [];
   let memoryMeta = kernelApplied.kernel?.memoryMeta ?? { kept: 0, omitted: 0 };
   let extraPrompt = '';
@@ -91,6 +99,9 @@ export function runSurfaceAgentTurn({
     extraPrompt = recalled.prompt;
     extraInterpretation = recalled.interpretation;
   }
+  const kernelAugment = kernelOwnsTurn
+    ? [kernelApplied.promptBlock, kernelApplied.interpretationBlock].filter(Boolean).join('\n\n')
+    : '';
   return {
     surface,
     slug,
@@ -99,7 +110,7 @@ export function runSurfaceAgentTurn({
     enabled: kernelApplied.enabled,
     tools: kernelOwnsTurn ? kernelApplied.tools : tools,
     forceToolChoice: kernelOwnsTurn ? kernelApplied.forceToolChoice : null,
-    promptBlock: [kernelApplied.promptBlock || pack.promptBlock, extraPrompt].filter(Boolean).join('\n\n'),
+    promptBlock: [pack.promptBlock, kernelAugment, extraPrompt].filter(Boolean).join('\n\n'),
     interpretationBlock: [kernelApplied.interpretationBlock, extraInterpretation].filter(Boolean).join('\n'),
     memory,
     memoryMeta,

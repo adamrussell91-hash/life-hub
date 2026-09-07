@@ -192,19 +192,51 @@ export function newKnowledgePageId() {
   return `page_hub_${crypto.randomUUID().replace(/-/g, '').toLowerCase()}`;
 }
 
+const KNOWLEDGE_STOP = new Set([
+  'what', 'do', 'did', 'does', 'i', 'already', 'know', 'about', 'the', 'a', 'an',
+  'my', 'me', 'have', 'has', 'is', 'are', 'of', 'on', 'in', 'to', 'for', 'and',
+  'or', 'this', 'that', 'with', 'from', 'you', 'can', 'please', 'tell'
+]);
+
+function knowledgeHaystack(entry) {
+  const originLabels = Array.isArray(entry?.origins)
+    ? entry.origins.map(origin => origin?.label).filter(Boolean)
+    : [];
+  return [entry?.title, entry?.excerpt, ...(entry?.tags ?? []), ...originLabels]
+    .filter(value => typeof value === 'string')
+    .join(' ')
+    .toLowerCase();
+}
+
+function knowledgeTerms(query) {
+  const needle = String(query ?? '').trim().toLowerCase();
+  if (!needle) return [];
+  const tokens = needle
+    .split(/\s+/)
+    .map(token => token.replace(/[^a-z0-9]/g, ''))
+    .filter(token => token.length >= 2 && !KNOWLEDGE_STOP.has(token));
+  return tokens.length ? tokens : [needle];
+}
+
 export function rankKnowledgePages(entries, query) {
   const needle = String(query ?? '').trim().toLowerCase();
   if (!needle) return [];
-  return entries
-    .filter(entry => {
-      const originLabels = Array.isArray(entry.origins)
-        ? entry.origins.map(origin => origin?.label).filter(Boolean)
-        : [];
-      return [entry.title, entry.excerpt, ...(entry.tags ?? []), ...originLabels]
-        .some(value => typeof value === 'string' && value.toLowerCase().includes(needle));
+  const terms = knowledgeTerms(needle);
+  return (entries ?? [])
+    .map(entry => {
+      const haystack = knowledgeHaystack(entry);
+      const title = String(entry?.title ?? '').toLowerCase();
+      const phrase = haystack.includes(needle);
+      const hits = terms.filter(term => haystack.includes(term)).length;
+      if (!phrase && hits === 0) return null;
+      return {
+        entry,
+        score: (phrase ? 100 : 0) + hits * 10 + (terms.some(term => title.includes(term)) ? 5 : 0)
+      };
     })
-    .sort((a, b) => Number(String(b.title ?? '').toLowerCase().includes(needle))
-      - Number(String(a.title ?? '').toLowerCase().includes(needle)));
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)
+    .map(row => row.entry);
 }
 
 export function parseQuizStore(raw) {

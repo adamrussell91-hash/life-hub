@@ -78,21 +78,22 @@ test('long list: parse_dump keeps a visible omitted count', async () => {
   assert.equal(dump.omitted, 5);
 });
 
-test('missing times: time-block starts at 08:00 and defaults untimed tasks to 45 minutes', () => {
+test('missing times: unknown duration is labelled; 11:00 lesson is reserved', () => {
   const plan = planWork('time_block', {
     tasks: TASKS,
     lessons: LESSONS,
     date: '2026-09-06',
-    now: NOW
+    now: NOW,
+    workday: { start: '08:00', end: '16:30' }
   });
-  assert.equal(plan.blocks[0].start, '08:00');
   const mark = plan.blocks.find(block => block.id === 'task_mark');
   assert.ok(mark);
-  assert.equal(mark.minutes, 45);
-  assert.equal(plan.lessons, 1);
+  assert.equal(mark.duration_unknown, true);
+  assert.equal(mark.estimate_source, 'unknown_fallback');
+  assert.ok(plan.reserved_lessons.some(item => item.start === '11:00'));
   assert.ok(
-    plan.blocks.every(block => !block.title?.includes('Year 10 essay')),
-    'lesson times are counted but not reserved on the workday'
+    plan.blocks.every(block => block.end <= '11:00' || block.start >= '12:00'),
+    'tasks must not sit on the reserved lesson'
   );
 });
 
@@ -110,22 +111,22 @@ test('calendar collisions: same-day teaching and tasks are named', () => {
     tasks: TASKS,
     lessons: LESSONS,
     date: '2026-09-06',
-    now: NOW
+    now: NOW,
+    workday: { start: '08:00', end: '16:30' }
   });
-  assert.equal(timed.blocks[0].start, '08:00');
+  assert.ok(timed.reserved_lessons.some(item => item.start === '11:00'));
   assert.ok(
-    !timed.blocks.some(block => block.start === '11:00'),
-    'current planner does not shift tasks around the 11:00 lesson'
+    timed.blocks.every(block => block.end <= '11:00' || block.start >= '12:00'),
+    'tasks move around the 11:00 lesson'
   );
 });
 
-test('stale projects: projects list includes the old project; stale view is tasks-only', () => {
+test('stale projects: stale view includes the old project and stale tasks', () => {
   const projects = inspectBoard('projects', { projects: [STALE_PROJECT], tasks: TASKS });
   assert.equal(projects.count, 1);
   assert.equal(projects.projects[0].id, 'proj_stale');
-  const stale = inspectBoard('stale', { projects: [STALE_PROJECT], tasks: TASKS });
-  assert.ok(stale.results.every(item => item.id !== 'proj_stale'));
-  assert.equal(stale.results[0].id, 'task_mark');
+  const stale = inspectBoard('stale', { projects: [STALE_PROJECT], tasks: TASKS }, NOW);
+  assert.ok(stale.results.some(item => item.id === 'proj_stale'));
 });
 
 test('partial tool failure: one dead URL stays visible beside a live source', async () => {

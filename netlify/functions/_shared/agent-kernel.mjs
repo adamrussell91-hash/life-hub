@@ -10,7 +10,8 @@ import {
   getTrainingVolume,
   getLoadStatus,
   getPainTrainingSummary,
-  getBodyState
+  getBodyState,
+  analyseTrainingEvidence
 } from './fitness-tools.mjs';
 import { compareWorkoutWindows } from './workout-history.mjs';
 import {
@@ -77,7 +78,8 @@ const TRAIN = new Set([
   'train', 'training', 'workout', 'workouts', 'gym', 'lift', 'lifting',
   'session', 'sessions', 'fitness', 'strength', 'progress', 'programme',
   'program', 'volume', 'weight', 'weights', 'exercise', 'exercises',
-  'stronger', 'recap', 'overview', 'gains', 'deload', 'programming'
+  'stronger', 'recap', 'overview', 'gains', 'deload', 'programming',
+  'substitute', 'swap', 'replace', 'progression'
 ]);
 const DECLINE = new Set([
   'decline', 'weaker', 'weak', 'stall', 'stalled', 'plateau', 'regress',
@@ -180,8 +182,8 @@ export function planTurn({ slug, message } = {}) {
       goal: decline ? 'Explain training status with load/pain coverage' : 'Review training across recent windows',
       domain: 'fitness',
       requiredSources: required,
-      optionalSources: decline ? ['get_training_volume'] : ['get_training_volume', 'get_body_state'],
-      tools: [...required, 'get_training_volume', 'get_body_state'],
+      optionalSources: decline ? ['get_training_volume', 'analyse_training_evidence'] : ['get_training_volume', 'get_body_state', 'analyse_training_evidence'],
+      tools: [...required, 'get_training_volume', 'get_body_state', 'analyse_training_evidence'],
       risk: decline ? 'high' : 'low',
       writeIntent: false,
       retrieve: true,
@@ -375,7 +377,7 @@ function emptyStores() {
   };
 }
 
-function runTool(name, stores, today, now, message) {
+function runTool(name, stores, today, now, message, options = {}) {
   const workouts = stores.workouts ?? [];
   const tasks = stores.tasks ?? [];
   const projects = stores.projects ?? [];
@@ -383,12 +385,16 @@ function runTool(name, stores, today, now, message) {
   const meals = stores.meals ?? [];
   const loadErrors = stores.loadErrors ?? {};
   const query = String(message ?? '').trim();
+  const limit = options.limit;
 
   if (name === 'get_fitness_snapshot') return getFitnessSnapshot(workouts, today);
   if (name === 'compare_workout_windows') return compareWorkoutWindows(workouts, today);
   if (name === 'get_training_volume') return getTrainingVolume(workouts, today);
   if (name === 'get_load_status') return getLoadStatus(workouts, today);
   if (name === 'get_pain_training_summary') return getPainTrainingSummary(workouts, today);
+  if (name === 'analyse_training_evidence') {
+    return analyseTrainingEvidence(workouts, today, { query: message });
+  }
   if (name === 'get_body_state') {
     return getBodyState({
       compositionRecords: stores.composition ?? [],
@@ -415,7 +421,7 @@ function runTool(name, stores, today, now, message) {
     return getNutritionDayRemaining(meals, today, { nutritionChallenges: stores.nutritionChallenges });
   }
   if (name === 'search_nutrition_records') {
-    return searchNutritionRecords(meals, { query: query || 'meal', limit: 8 });
+    return searchNutritionRecords(meals, { query: query || 'meal', limit: limit ?? 8 });
   }
   if (name === 'get_weight_trend') {
     return getWeightTrend({
@@ -424,7 +430,7 @@ function runTool(name, stores, today, now, message) {
     });
   }
   if (name === 'search_medical_records') {
-    return searchMedicalRecords(stores.medicalEvents ?? [], { query: query || 'medical', limit: 8 });
+    return searchMedicalRecords(stores.medicalEvents ?? [], { query: query || 'medical', limit: limit ?? 8 });
   }
   if (name === 'brief_medical_appointment') {
     return briefMedicalAppointment(stores.medicalEvents ?? [], { date: today });
@@ -435,7 +441,7 @@ function runTool(name, stores, today, now, message) {
       classes: stores.classes ?? [],
       lessons,
       units: stores.units ?? [],
-      limit: 10
+      limit: limit ?? 10
     });
   }
   if (name === 'get_teaching_context') {
@@ -457,7 +463,7 @@ function runTool(name, stores, today, now, message) {
     });
   }
   if (name === 'search_knowledge') {
-    return searchKnowledge(stores.pages ?? [], { query: query || 'notes', limit: 10 });
+    return searchKnowledge(stores.pages ?? [], { query: query || 'notes', limit: limit ?? 10 });
   }
   if (name === 'get_knowledge_synthesis') {
     return getKnowledgeSynthesis(stores.pages ?? [], { query: query || 'notes', limit: 10 });
@@ -467,10 +473,10 @@ function runTool(name, stores, today, now, message) {
     return getSkincareResponseEvidence(stores.skincare ?? [], today);
   }
   if (name === 'search_skincare_records') {
-    return searchSkincareRecords(stores.skincare ?? [], { query: query || 'routine', limit: 10 });
+    return searchSkincareRecords(stores.skincare ?? [], { query: query || 'routine', limit: limit ?? 10 });
   }
   if (name === 'search_diary_records') {
-    return searchDiaryRecords(stores.mindEvents ?? [], { query: query || 'feeling', limit: 10 });
+    return searchDiaryRecords(stores.mindEvents ?? [], { query: query || 'feeling', limit: limit ?? 10 });
   }
   if (name === 'compare_diary_periods') return compareDiaryPeriods(stores.mindEvents ?? [], today);
   if (name === 'extract_diary_themes') {
@@ -481,7 +487,7 @@ function runTool(name, stores, today, now, message) {
     return getDiaryRange(stores.mindEvents ?? [], { from, to: today, limit: 12 });
   }
   if (name === 'search_mind_records') {
-    return searchMindRecords(stores.mindEvents ?? [], { query: query || 'session', limit: 10 });
+    return searchMindRecords(stores.mindEvents ?? [], { query: query || 'session', limit: limit ?? 10 });
   }
   if (name === 'compare_mind_sessions') return compareMindSessions(stores.mindEvents ?? [], today);
   if (name === 'inspect_hub_signals') {
@@ -557,6 +563,12 @@ export function createTurnState({ slug, message, today, now = new Date(), stores
     memoryMeta: { kept: 0, omitted: 0 },
     memoryLoadError: stores?.memoryLoadError ?? null,
     handoffs: [],
+    retrieveRound: 0,
+    nextRetrievals: [],
+    deferredTools: [],
+    retrievalLimits: {},
+    exhausted: false,
+    unresolvedConflicts: [],
     actions: [],
     answer: null,
     claims: [],
@@ -604,28 +616,53 @@ function recallLayeredMemory(state) {
   return `memory=${recalled.kept}`;
 }
 
+const WIDEN_TOOLS = new Set([
+  'search_knowledge', 'search_teaching', 'search_medical_records',
+  'search_diary_records', 'search_mind_records', 'search_nutrition_records',
+  'search_skincare_records'
+]);
+
+function plannedRetrieveNames(state) {
+  const names = [...(state.plan.requiredSources ?? [])];
+  if (state.slug === 'clare' && (state.stores.lessons ?? []).length) names.push('plan_work');
+  if (state.slug === 'clare') names.push('get_tasks_open_loops');
+  if (state.slug === 'chadwick' && !names.includes('get_training_volume')) names.push('get_training_volume');
+  if (state.slug === 'chadwick' && !names.includes('analyse_training_evidence')) names.push('analyse_training_evidence');
+  if (state.slug === 'clementine' && ((state.stores.classes ?? []).length || (state.stores.lessons ?? []).length)) {
+    names.push('search_teaching');
+  }
+  return names;
+}
+
 function doRetrieve(state) {
   if (!state.plan?.retrieve) {
     state.stage = 'retrieved';
     return recordTrace(state, 'retrieve', 'skipped');
   }
-  const names = [...state.plan.requiredSources];
-  if (state.slug === 'clare' && (state.stores.lessons ?? []).length) names.push('plan_work');
-  if (state.slug === 'clare') names.push('get_tasks_open_loops');
-  if (state.slug === 'chadwick' && !names.includes('get_training_volume')) names.push('get_training_volume');
-  if (state.slug === 'clementine' && ((state.stores.classes ?? []).length || (state.stores.lessons ?? []).length)) {
-    names.push('search_teaching');
-  }
-  for (const name of names) {
-    if (state.evidence[name]) continue;
-    state.evidence[name] = runTool(name, state.stores, state.today, state.now, state.message);
+  const queued = state.nextRetrievals?.length
+    ? state.nextRetrievals.map(item => (typeof item === 'string' ? { tool: item } : item))
+    : plannedRetrieveNames(state).map(tool => ({ tool }));
+  state.nextRetrievals = [];
+  const defer = (state.retrieveRound ?? 0) === 0 ? (state.deferredTools ?? []) : [];
+  for (const item of queued) {
+    const name = item.tool;
+    if (defer.includes(name)) {
+      state.nextRetrievals.push({ tool: name });
+      continue;
+    }
+    if (state.evidence[name] && item.limit == null) continue;
+    if (item.limit != null) state.retrievalLimits = { ...(state.retrievalLimits ?? {}), [name]: item.limit };
+    state.evidence[name] = runTool(name, state.stores, state.today, state.now, state.message, {
+      limit: state.retrievalLimits?.[name]
+    });
   }
   const memoryNote = recallLayeredMemory(state);
-  if (state.slug === 'hammond' && state.plan?.workflow === 'cross_hub_supervision') {
+  if (state.slug === 'hammond' && state.plan?.workflow === 'cross_hub_supervision' && !(state.handoffs ?? []).length) {
     runHammondDelegation(state, runAgentKernel);
   }
+  state.retrieveRound = (state.retrieveRound ?? 0) + 1;
   state.stage = 'retrieved';
-  return recordTrace(state, 'retrieve', `${Object.keys(state.evidence).join(',')}|${memoryNote}|handoffs=${(state.handoffs ?? []).length}`);
+  return recordTrace(state, 'retrieve', `round=${state.retrieveRound}|${Object.keys(state.evidence).join(',')}|${memoryNote}|handoffs=${(state.handoffs ?? []).length}`);
 }
 
 function limitationFor(tool, result) {
@@ -859,13 +896,49 @@ export function assessEvidence(state) {
   state.complete = state.sufficient && coverage.truncated.length === 0 && conflicts.length === 0 && coverage.missing.length === 0;
   state.continuationTools = [...new Set([...coverage.truncated, ...coverage.missing, ...coverage.failed])];
   state.honest = state.sufficient || namedGaps;
+  const next = [];
+  for (const tool of coverage.truncated) {
+    if (!WIDEN_TOOLS.has(tool)) continue;
+    const result = state.evidence[tool];
+    const kept = Number(result?.kept ?? result?.results?.length ?? 0);
+    const omitted = Number(result?.omitted ?? 0);
+    if (omitted > 0) next.push({ tool, limit: Math.min(20, Math.max(kept + omitted, kept + 4)) });
+  }
+  for (const tool of required) {
+    if (!state.evidence[tool]) next.push({ tool });
+  }
+  state.nextRetrievals = next;
+  if (!state.complete && !next.length) state.exhausted = true;
   state.stage = 'assessed';
   return recordTrace(state, 'assess', state.complete ? 'complete' : `gaps=${limitations.map(item => item.kind).join(',') || 'none'}`);
 }
 
-function doResolve(state) {
+export function resolveConflict(state) {
+  const resolved = [];
+  for (const item of state.conflicts ?? []) {
+    const result = state.evidence[item.tool];
+    if (item.tool === 'get_weight_trend' && result?.latest?.date && result?.previous?.date) {
+      if (result.conflict && typeof result.conflict === 'object') {
+        result.conflict = {
+          ...result.conflict,
+          resolved: true,
+          method: 'recency',
+          winner_date: result.latest.date,
+          winner_kg: result.latest.weight_kg
+        };
+      }
+      resolved.push({ ...item, resolved: true, method: 'recency' });
+      continue;
+    }
+    if (result?.conflict && typeof result.conflict === 'object') {
+      result.conflict = { ...result.conflict, resolved: false, method: 'unresolved' };
+    }
+    resolved.push({ ...item, resolved: false, method: 'unresolved' });
+  }
+  state.conflicts = resolved;
+  state.unresolvedConflicts = resolved.filter(item => !item.resolved);
   state.stage = 'resolved';
-  return recordTrace(state, 'resolve', `${state.conflicts.length} conflicts`);
+  return recordTrace(state, 'resolve', `${state.unresolvedConflicts.length} unresolved / ${resolved.length} total`);
 }
 
 function doCompose(state) {
@@ -877,7 +950,13 @@ function doCompose(state) {
     }
   }
   state.complete = state.complete && composed.complete === true && state.limitations.length === 0;
-  const claimLines = state.claims.map(claim => `- ${claim.text} (via ${claim.tool}, ${claim.kind})`);
+  const claimLines = state.claims.map(claim => {
+    const prov = claim.provenance;
+    const cite = prov
+      ? ` store=${prov.store || 'unknown'} id=${prov.recordId || 'none'} authority=${prov.authority}`
+      : '';
+    return `- ${claim.text} (via ${claim.tool}, ${claim.kind}${cite})`;
+  });
   const limitLines = state.limitations.map(item => `- [${item.kind}] ${item.text}`);
   state.promptBlock = [
     `Agent kernel turn ${state.id}`,
@@ -981,7 +1060,14 @@ export function proposeAction(state, action) {
   if (state.idempotencyKeys.includes(key)) {
     return { state, duplicate: true, action: state.actions.find(item => item.idempotencyKey === key) ?? null };
   }
-  const entry = { ...action, idempotencyKey: key, status: 'pending' };
+  const entry = {
+    ...action,
+    id: action?.id || `act_${state.id.slice(0, 8)}_${state.actions.length}`,
+    turnId: state.id,
+    idempotencyKey: key,
+    status: 'pending',
+    snapshot: action?.snapshot ?? null
+  };
   state.idempotencyKeys.push(key);
   state.actions.push(entry);
   state.stage = 'proposed';
@@ -989,23 +1075,62 @@ export function proposeAction(state, action) {
   return { state, duplicate: false, action: entry };
 }
 
+export const MAX_RETRIEVE_ROUNDS = 3;
+
 export function runAgentKernel(input = {}) {
   const state = input.state ?? createTurnState(input);
-  const steps = {
-    plan: doPlan,
-    retrieve: doRetrieve,
-    assess: assessEvidence,
-    resolve: doResolve,
-    compose: doCompose
+  if (input.stores) state.stores = input.stores;
+  else if (!state.stores) state.stores = emptyStores();
+  if (input.deferTools && !(state.deferredTools ?? []).length) state.deferredTools = [...input.deferTools];
+  const persist = input.persist;
+
+  const halt = stage => {
+    state.halted = stage;
+    persist?.save?.(state);
+    return state;
   };
-  for (const stage of STAGES) {
-    if (stageCompleted(state, stage)) continue;
-    if (input.failAt === stage) {
-      state.halted = stage;
-      return state;
-    }
-    steps[stage](state);
+
+  if (!stageCompleted(state, 'plan')) {
+    if (input.failAt === 'plan') return halt('plan');
+    doPlan(state);
+    persist?.save?.(state);
   }
+
+  if (state.plan?.retrieve !== false) {
+    while ((state.retrieveRound ?? 0) < MAX_RETRIEVE_ROUNDS) {
+      const before = state.retrieveRound ?? 0;
+      if (!stageCompleted(state, 'retrieve') || (before > 0 && (state.nextRetrievals ?? []).length)) {
+        if (input.failAt === 'retrieve' && before === 0 && Object.keys(state.evidence).length === 0) {
+          return halt('retrieve');
+        }
+        doRetrieve(state);
+        persist?.save?.(state);
+      }
+      if (input.failAt === 'assess' && state.stage === 'retrieved') return halt('assess');
+      assessEvidence(state);
+      persist?.save?.(state);
+      if ((state.conflicts ?? []).length) resolveConflict(state);
+      else {
+        state.stage = 'resolved';
+        recordTrace(state, 'resolve', '0 conflicts');
+      }
+      persist?.save?.(state);
+      if (state.complete || state.exhausted || !(state.nextRetrievals ?? []).length) break;
+      state.stage = 'retrieved';
+    }
+  } else if (!stageCompleted(state, 'retrieve')) {
+    doRetrieve(state);
+    assessEvidence(state);
+    resolveConflict(state);
+  }
+
+  if (input.failAt === 'compose') return halt('compose');
+  if (input.failAt === 'action') {
+    persist?.save?.(state);
+    return halt('action');
+  }
+  doCompose(state);
+  persist?.save?.(state);
   return state;
 }
 
@@ -1072,6 +1197,22 @@ export function kernelTraceEvent(kernel) {
     stages: (kernel.trace ?? []).map(item => item.stage),
     memoryKept: kernel.memoryMeta?.kept ?? 0,
     memoryOmitted: kernel.memoryMeta?.omitted ?? 0,
-    handoffs: (kernel.handoffs ?? []).map(item => ({ to: item.to, status: item.status, reason: item.reason }))
+    handoffs: (kernel.handoffs ?? []).map(item => ({ to: item.to, status: item.status, reason: item.reason })),
+    retrieveRounds: kernel.retrieveRound ?? 0,
+    requiredSources: kernel.plan?.requiredSources ?? [],
+    claims: (kernel.claims ?? []).map(claim => ({
+      fact: claim.fact,
+      tool: claim.tool,
+      provenance: claim.provenance ?? null
+    })),
+    conflicts: kernel.conflicts ?? [],
+    unresolvedConflicts: kernel.unresolvedConflicts ?? [],
+    limitations: (kernel.limitations ?? []).map(item => ({ kind: item.kind, tool: item.tool })),
+    exhausted: kernel.exhausted === true,
+    actions: (kernel.actions ?? []).map(item => ({
+      intent: item.intent,
+      status: item.status,
+      idempotencyKey: item.idempotencyKey
+    }))
   };
 }

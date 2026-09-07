@@ -503,6 +503,123 @@ export function getWorkoutTemplateSchema() {
   };
 }
 
+const SUBSTITUTE_MAP = Object.freeze({
+  'bench press': { replacement: 'Dumbbell floor press', reason: 'Same horizontal press pattern with a shorter range if a bench is unavailable or the shoulder is irritated.' },
+  bench: { replacement: 'Dumbbell floor press', reason: 'Same horizontal press pattern with a shorter range if a bench is unavailable or the shoulder is irritated.' },
+  squat: { replacement: 'Leg press or goblet squat', reason: 'Keep a squat pattern without requiring a bar or if the knee needs a more supported path.' },
+  deadlift: { replacement: 'Romanian deadlift or hip hinge with dumbbells', reason: 'Keep the hinge if a bar or conventional pull is unavailable or the back is sore.' },
+  'overhead press': { replacement: 'Landmine press or seated dumbbell press', reason: 'Pressing without a full overhead lockout when the shoulder is limited.' }
+});
+
+function completedWorkouts(records) {
+  return (Array.isArray(records) ? records : [])
+    .filter(record => (record?.type === 'workout' || record?.type == null) && record.status === 'completed' && record.date)
+    .slice()
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
+function sessionSignature(record) {
+  const lifts = (record.exercises ?? []).map(exercise => String(exercise.name ?? '').toLowerCase()).sort().join('|');
+  const volume = (record.exercises ?? []).reduce((sum, exercise) => (
+    sum + (exercise.sets ?? []).reduce((inner, set) => inner + (Number(set.weight_kg) || 0) * (Number(set.reps) || 0), 0)
+  ), 0);
+  return { lifts, volume: Math.round(volume) };
+}
+
+/**
+ * Evidence-based training notes. Does not write a programme or invent missing sessions.
+ */
+export function analyseTrainingEvidence(records, today, { query, pain, snapshot, windows } = {}) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date', store: 'life_hub_fitness' };
+  const completed = completedWorkouts(records);
+  const snap = snapshot ?? getFitnessSnapshot(records, today);
+  const painSummary = pain ?? getPainTrainingSummary(records, today);
+  const compare = windows ?? null;
+  const needle = String(query ?? '').toLowerCase();
+  const recentCutoff = addCalendarDays(today, -14);
+  const recent = completed.filter(record => record.date >= recentCutoff);
+  const missingRecent = recent.length === 0;
+  const conflicts = [];
+  const byDate = new Map();
+  for (const record of completed.slice(0, 12)) {
+    const key = record.date;
+    const prev = byDate.get(key);
+    const sig = sessionSignature(record);
+    if (prev && (prev.lifts !== sig.lifts || Math.abs(prev.volume - sig.volume) > 200)) {
+      conflicts.push({
+        kind: 'session_disagreement',
+        date: key,
+        titles: [prev.title, record.title],
+        method: 'unresolved'
+      });
+    }
+    byDate.set(key, { ...sig, title: record.title });
+  }
+
+  const sites = Array.isArray(painSummary?.sites) ? painSummary.sites : [];
+  const painModifications = sites.map(site => ({
+    site: site.site,
+    latest_date: site.latest_date,
+    note: site.latest_note,
+    action: 'modify_or_skip',
+    boundary: 'Training modification only. Medical diagnosis stays with Sara.'
+  }));
+
+  let substitution = null;
+  if (/substitut|swap|replace|instead of|no bench|no bar|equipment/i.test(needle)) {
+    const hit = Object.entries(SUBSTITUTE_MAP).find(([name]) => needle.includes(name));
+    substitution = hit
+      ? { from: hit[0], ...hit[1], evidence: 'pattern_map_plus_recent_sessions', confirmation_required: true }
+      : { from: null, replacement: null, reason: 'No named lift to substitute. Ask which exercise and what equipment is missing.', confirmation_required: true };
+  }
+
+  let progression = null;
+  if (/progress|progressi|overload|increase|heavier|next (?:week|block)|programme change|program change/i.test(needle)) {
+    const last = recent[0] ?? completed[0] ?? null;
+    progression = missingRecent
+      ? { ok: false, reason: 'No completed sessions in the last 14 days. Do not progress from an empty window.' }
+      : {
+        ok: true,
+        last_date: last?.date ?? null,
+        last_title: last?.title ?? null,
+        note: 'Progress only the lifts that have recent completed evidence. Confirm before writing a programme change.',
+        confirmation_required: true
+      };
+  }
+
+  return {
+    ok: true,
+    store: 'life_hub_fitness',
+    kind: 'calculation',
+    date: today,
+    enough_evidence: !missingRecent && conflicts.length === 0,
+    missing_recent_sessions: missingRecent,
+    recent_count: recent.length,
+    last_completed_date: snap?.last_completed_date ?? completed[0]?.date ?? null,
+    days_since_last_completed: snap?.days_since_last_completed ?? null,
+    conflict: conflicts[0] ?? null,
+    conflicts,
+    pain_modifications: painModifications,
+    substitution,
+    progression,
+    compare_gap: compare && (compare.previous?.count === 0 || compare.current?.count === 0)
+      ? 'A comparison window has no sessions'
+      : null,
+    write_required: Boolean(substitution || progression),
+    confirmation_required: true,
+    how_to_read: 'Reasoning notes from retrieved sessions. Missing or conflicting sessions stay named. No write without Confirm.'
+  };
+}
+
+export function analyseTrainingEvidenceSchema() {
+  return {
+    name: 'analyse_training_evidence',
+    description:
+      'Interpret retrieved training, pain, and load evidence: missing sessions, conflicting logs, substitutions, pain-aware modifications, and whether a programme change is even licensed. Does not write a workout.',
+    input_schema: { type: 'object', properties: { query: { type: 'string' } } }
+  };
+}
+
 export function chadwickFitnessToolSchemas() {
   return [
     getFitnessSnapshotSchema(),
@@ -514,6 +631,40 @@ export function chadwickFitnessToolSchemas() {
     getLoadStatusSchema(),
     getPainTrainingSummarySchema(),
     getBodyStateSchema(),
-    getWorkoutTemplateSchema()
+    getWorkoutTemplateSchema(),
+    analyseTrainingEvidenceSchema()
   ];
+}
+
+export const FITNESS_READ_TOOL_NAMES = Object.freeze(chadwickFitnessToolSchemas().map(schema => schema.name));
+
+/**
+ * Chat / kernel executor for the Chadwick fitness read set.
+ * Every name in chadwickFitnessToolSchemas() must resolve here.
+ */
+export function executeFitnessReadTool(name, {
+  workouts = [],
+  today,
+  compositionRecords = [],
+  measurementRecords = [],
+  templates = [],
+  targetRatio,
+  input = {}
+} = {}) {
+  if (name === 'get_fitness_snapshot') return getFitnessSnapshot(workouts, today);
+  if (name === 'get_training_volume') return getTrainingVolume(workouts, today);
+  if (name === 'get_working_weights') return getWorkingWeights(workouts, today, input);
+  if (name === 'get_long_term_fitness') return getLongTermFitness(workouts, today);
+  if (name === 'get_session_comparisons') return getSessionComparisons(workouts, today);
+  if (name === 'get_exercise_history') return getExerciseHistory(workouts, today, input);
+  if (name === 'get_load_status') return getLoadStatus(workouts, today);
+  if (name === 'get_pain_training_summary') return getPainTrainingSummary(workouts, today, input);
+  if (name === 'get_body_state') {
+    return getBodyState({ compositionRecords, measurementRecords, targetRatio });
+  }
+  if (name === 'get_workout_template') return getWorkoutTemplate(templates, input);
+  if (name === 'analyse_training_evidence') {
+    return analyseTrainingEvidence(workouts, today, { query: input.query ?? input.message ?? '' });
+  }
+  return null;
 }
