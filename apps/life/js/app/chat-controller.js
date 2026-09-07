@@ -912,6 +912,13 @@ export function createChatController({
           : 'Action applied.',
         label: 'Confirmed'
       });
+      const continuationText = typeof result?.continuation?.text === 'string'
+        ? result.continuation.text.trim()
+        : '';
+      if (continuationText) {
+        appendMessage(root, { role: 'assistant', agentSlug: slug, text: continuationText });
+        remember('assistant', continuationText);
+      }
       onRecordWritten?.(result);
     } catch (error) {
       proposalUi.confirm.disabled = false;

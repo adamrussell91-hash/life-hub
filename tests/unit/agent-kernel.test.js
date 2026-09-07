@@ -178,6 +178,19 @@ test('greetings and off-domain asks do not retrieve', () => {
   assert.equal(planTurn({ slug: 'clare', message: 'create a task called buy milk' }).plan.workflow, 'none');
 });
 
+test('ambiguous bench-substitution phrasing still plans a training review', () => {
+  const messages = [
+    "I can't do bench press today. What should I substitute?",
+    'Bench is out today. Give me another option.',
+    "I don't want to bench today — what can I swap it for?",
+    'I need a replacement for bench press today.',
+    'What should I do instead of bench today?'
+  ];
+  for (const message of messages) {
+    assert.equal(planTurn({ slug: 'chadwick', message }).plan.workflow, 'training_review', message);
+  }
+});
+
 test('decline wording adds pain and load to the Chadwick plan', () => {
   const plan = planTurn({ slug: 'chadwick', message: 'why is my performance declining' }).plan;
   assert.ok(plan.requiredSources.includes('get_pain_training_summary'));
@@ -261,6 +274,43 @@ test('Clare daily focus names overdue work and same-day teaching collisions', ()
   assert.equal(kernel.claims.find(claim => claim.fact === 'overdue_title')?.value, 'Mark essays');
   assert.ok(kernel.evidence.plan_work.collisions.length >= 1);
   assert.ok(Number(kernel.claims.find(claim => claim.fact === 'collision_count')?.value) >= 1);
+});
+
+test('Clare kernel plan_work uses stated capacity from the message', () => {
+  const kernel = runAgentKernel({
+    slug: 'clare',
+    message: "I've only got about 90 minutes of proper work capacity left today. What should I do?",
+    today: TODAY,
+    now: NOW,
+    stores: {
+      tasks: [
+        { id: '1', title: 'Mark essays', status: 'open', due_date: '2026-08-10', estimated_duration: 60, priority: 'high' },
+        { id: '2', title: 'Newsletter', status: 'open', due_date: TODAY, estimated_duration: 60 }
+      ],
+      projects: [],
+      lessons: []
+    }
+  });
+  assert.equal(kernel.plan.workflow, 'daily_focus');
+  assert.equal(kernel.evidence.plan_work.view, 'time_block');
+  assert.ok(kernel.evidence.plan_work.deferred?.some(item => /capacity/i.test(item.reason)));
+});
+
+test('Clare kernel plan_work uses stated energy from the message', () => {
+  const kernel = runAgentKernel({
+    slug: 'clare',
+    message: 'My energy is low today. Reorder what I should tackle.',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      tasks: [
+        { id: 'long', title: 'Rewrite unit', status: 'open', estimated_duration: 90 },
+        { id: 'short', title: 'Send reminder', status: 'open', estimated_duration: 15, tags: ['comms'], priority: 'high' }
+      ]
+    }
+  });
+  assert.equal(kernel.evidence.plan_work.view, 'energy');
+  assert.equal(kernel.evidence.plan_work.energy_applied, true);
 });
 
 test('failed tasks store is fail-visible', () => {

@@ -148,6 +148,257 @@ test('every callable Chadwick fitness schema has an executeFitnessReadTool path'
   }
 });
 
+const GROIN_AND_RECENT = [
+  {
+    id: 'wo-upper',
+    path: 'data/fitness/2026-08-18-upper.md',
+    type: 'workout',
+    status: 'completed',
+    date: '2026-08-18',
+    title: 'Upper',
+    exercises: [
+      { name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] },
+      { name: 'Bar Press', sets: [{ weight_kg: 38, reps: 10 }] }
+    ]
+  },
+  {
+    id: 'wo-lower',
+    path: 'data/fitness/2026-08-16-lower.md',
+    type: 'workout',
+    status: 'completed',
+    date: '2026-08-16',
+    title: 'Lower',
+    pain_flags: [{ site: 'right groin', note: 'twinge on goblet squat' }],
+    exercises: [{ name: 'Goblet Squat', sets: [{ weight_kg: 24, reps: 8 }] }]
+  }
+];
+
+test('ambiguous bench substitution keeps the cause unknown and does not reuse groin or a PR', () => {
+  const note = analyseTrainingEvidence(GROIN_AND_RECENT, TODAY, {
+    query: "I can't do bench press today. What should I substitute?"
+  });
+  assert.equal(note.substitution.from, 'bench press');
+  assert.equal(note.cause.status, 'unknown');
+  assert.equal(note.cause.kind, 'unknown_cause');
+  assert.equal(note.cause.stored_reason, null);
+  assert.equal(note.cause.user_stated_reason, null);
+  assert.ok(note.cause.unrelated_pain.some(item => /groin/i.test(item.site)));
+  assert.equal(note.cause.unrelated_pain.some(item => /chest|pec|shoulder/i.test(item.site)), false);
+  assert.doesNotMatch(JSON.stringify(note.cause), /aching pecs|bar press pr|failed session/i);
+  assert.match(note.how_to_read, /unknown cause/i);
+});
+
+test('user-stated shoulder soreness is current-turn information, not a stored bench cause', () => {
+  const note = analyseTrainingEvidence(GROIN_AND_RECENT, TODAY, {
+    query: "My shoulder is sore today, so I don't want to bench. What should I substitute?"
+  });
+  assert.equal(note.cause.status, 'user_stated');
+  assert.equal(note.cause.kind, 'user_stated_current_turn');
+  assert.match(note.cause.user_stated_reason, /shoulder/i);
+  assert.equal(note.cause.stored_reason, null);
+  assert.ok(note.cause.unrelated_pain.some(item => /groin/i.test(item.site)));
+});
+
+test('historical matching shoulder pain is context, never a current bench cause', () => {
+  const weeksAgo = analyseTrainingEvidence([
+    {
+      id: 'wo-weeks-ago',
+      path: 'life/health/fitness/workouts/2026-07-28-upper.md',
+      type: 'workout',
+      status: 'completed',
+      date: '2026-07-28',
+      title: 'Upper',
+      pain_flags: [{ site: 'left shoulder', note: 'twinge on press' }],
+      exercises: [{ name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] }]
+    }
+  ], TODAY, { query: 'Bench is out today. Give me another option.' });
+  assert.equal(weeksAgo.cause.status, 'unknown');
+  assert.equal(weeksAgo.cause.kind, 'unknown_cause');
+  assert.equal(weeksAgo.cause.stored_reason, null);
+  assert.equal(weeksAgo.cause.current_active_constraint, null);
+  assert.equal(weeksAgo.cause.historical_relevant_pain[0].site, 'left shoulder');
+  assert.equal(weeksAgo.cause.historical_relevant_pain[0].id, 'wo-weeks-ago');
+  assert.equal(
+    weeksAgo.cause.historical_relevant_pain[0].path,
+    'life/health/fitness/workouts/2026-07-28-upper.md'
+  );
+  assert.equal(weeksAgo.cause.historical_relevant_pain[0].latest_date, '2026-07-28');
+  assert.doesNotMatch(weeksAgo.how_to_read, /cause is stored pain/i);
+  assert.match(weeksAgo.how_to_read, /historical .*context/i);
+  assert.doesNotMatch(JSON.stringify(weeksAgo.cause), /sore today|currently sore/i);
+
+  const yesterday = analyseTrainingEvidence([
+    {
+      id: 'wo-yesterday',
+      path: 'life/health/fitness/workouts/2026-08-19-upper.md',
+      type: 'workout',
+      status: 'completed',
+      date: '2026-08-19',
+      title: 'Upper',
+      pain_flags: [{ site: 'left shoulder', note: 'twinge on press' }],
+      exercises: [{ name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] }]
+    }
+  ], TODAY, { query: 'I need a replacement for bench press today.' });
+  assert.equal(yesterday.cause.status, 'unknown');
+  assert.equal(yesterday.cause.kind, 'unknown_cause');
+  assert.equal(yesterday.cause.current_active_constraint, null);
+  assert.equal(yesterday.cause.historical_relevant_pain[0].latest_date, '2026-08-19');
+});
+
+test('user-stated current-turn pain is not sourced from a stored workout record', () => {
+  const note = analyseTrainingEvidence([
+    {
+      id: 'wo-old-shoulder',
+      path: 'life/health/fitness/workouts/2026-07-28-upper.md',
+      type: 'workout',
+      status: 'completed',
+      date: '2026-07-28',
+      title: 'Upper',
+      pain_flags: [{ site: 'left shoulder', note: 'old flag' }],
+      exercises: [{ name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] }]
+    }
+  ], TODAY, { query: 'My shoulder is sore today, so bench is out.' });
+  assert.equal(note.cause.status, 'user_stated');
+  assert.equal(note.cause.kind, 'user_stated_current_turn');
+  assert.match(note.cause.user_stated_reason, /shoulder/i);
+  assert.equal(note.cause.stored_reason, null);
+  assert.equal(note.cause.current_active_constraint, null);
+  assert.equal(note.cause.historical_relevant_pain[0].id, 'wo-old-shoulder');
+});
+
+test('stored workout pain has no current_active_constraint model', () => {
+  const note = analyseTrainingEvidence([
+    {
+      id: 'wo-same-day',
+      type: 'workout',
+      status: 'completed',
+      date: TODAY,
+      title: 'Upper',
+      pain_flags: [{ site: 'left shoulder', note: 'same-day flag is still historical' }],
+      exercises: [{ name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] }]
+    }
+  ], TODAY, { query: 'Bench is out today.' });
+  assert.equal(note.cause.status, 'unknown');
+  assert.equal(note.cause.kind, 'unknown_cause');
+  assert.equal(note.cause.current_active_constraint, null);
+  assert.equal(note.cause.historical_relevant_pain[0].site, 'left shoulder');
+});
+
+test('unrelated historical pain stays off the requested lift', () => {
+  const ohp = analyseTrainingEvidence([
+    {
+      id: 'wo-knee',
+      type: 'workout',
+      status: 'completed',
+      date: '2026-08-16',
+      title: 'Lower',
+      pain_flags: [{ site: 'right knee', note: 'twinge on squat' }],
+      exercises: [{ name: 'Squat', sets: [{ weight_kg: 80, reps: 5 }] }]
+    }
+  ], TODAY, { query: 'Overhead press is out today. What should I do instead?' });
+  assert.equal(ohp.cause.status, 'unknown');
+  assert.equal(ohp.cause.historical_relevant_pain.length, 0);
+  assert.ok(ohp.cause.unrelated_pain.some(item => /knee/i.test(item.site)));
+
+  const squat = analyseTrainingEvidence([
+    {
+      id: 'wo-shoulder',
+      type: 'workout',
+      status: 'completed',
+      date: '2026-08-18',
+      title: 'Upper',
+      pain_flags: [{ site: 'left shoulder', note: 'twinge on press' }],
+      exercises: [{ name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] }]
+    }
+  ], TODAY, { query: 'Squat is out today.' });
+  assert.equal(squat.cause.status, 'unknown');
+  assert.equal(squat.cause.historical_relevant_pain.length, 0);
+  assert.ok(squat.cause.unrelated_pain.some(item => /shoulder/i.test(item.site)));
+});
+
+test('kernel interpretation forbids inventing a bench cause when evidence is silent', () => {
+  const kernel = runAgentKernel({
+    slug: 'chadwick',
+    message: "I can't do bench press today. What should I substitute?",
+    today: TODAY,
+    now: new Date('2026-08-20T01:00:00.000Z'),
+    stores: { workouts: GROIN_AND_RECENT }
+  });
+  const cause = kernel.claims.find(claim => claim.fact === 'unavailable_cause');
+  assert.equal(cause?.value, 'unknown');
+  assert.match(kernel.interpretationBlock, /unknown cause/i);
+  assert.match(kernel.interpretationBlock, /do not invent/i);
+  assert.match(kernel.interpretationBlock, /groin/i);
+  assert.match(kernel.interpretationBlock, /not evidence that .*sore/i);
+  assert.doesNotMatch(kernel.interpretationBlock, /aching pecs|bar press pr/i);
+});
+
+test('kernel treats historical matching pain as context, not a stored cause', () => {
+  const kernel = runAgentKernel({
+    slug: 'chadwick',
+    message: 'Bench is out today. Give me another option.',
+    today: TODAY,
+    now: new Date('2026-08-20T01:00:00.000Z'),
+    stores: {
+      workouts: [
+        {
+          id: 'wo-weeks-ago',
+          path: 'life/health/fitness/workouts/2026-07-28-upper.md',
+          type: 'workout',
+          status: 'completed',
+          date: '2026-07-28',
+          title: 'Upper',
+          pain_flags: [{ site: 'left shoulder', note: 'twinge on press' }],
+          exercises: [{ name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] }]
+        }
+      ]
+    }
+  });
+  const cause = kernel.claims.find(claim => claim.fact === 'unavailable_cause');
+  assert.equal(cause?.value, 'unknown');
+  assert.equal(cause?.provenance?.reason, 'inference');
+  assert.notEqual(cause?.provenance?.recordId, 'wo-weeks-ago');
+  const historical = kernel.claims.find(claim => claim.fact === 'historical_relevant_pain');
+  assert.ok(historical);
+  assert.match(String(historical.value), /shoulder/i);
+  assert.equal(historical.provenance.sourceType, 'record');
+  assert.equal(historical.provenance.recordId, 'wo-weeks-ago');
+  assert.equal(historical.provenance.recordPath, 'life/health/fitness/workouts/2026-07-28-upper.md');
+  assert.equal(historical.provenance.date, '2026-07-28');
+  assert.notEqual(historical.provenance.reason, 'unavailable_source');
+  assert.match(kernel.interpretationBlock, /unknown cause/i);
+  assert.match(kernel.interpretationBlock, /historical relevant pain/i);
+  assert.match(kernel.interpretationBlock, /not a current cause/i);
+  assert.doesNotMatch(kernel.interpretationBlock, /stored pain evidence may explain/i);
+});
+
+test('kernel user-stated cause is not attributed to a stored workout record', () => {
+  const kernel = runAgentKernel({
+    slug: 'chadwick',
+    message: 'My shoulder is sore today, so bench is out.',
+    today: TODAY,
+    now: new Date('2026-08-20T01:00:00.000Z'),
+    stores: {
+      workouts: [
+        {
+          id: 'wo-old-shoulder',
+          path: 'life/health/fitness/workouts/2026-07-28-upper.md',
+          type: 'workout',
+          status: 'completed',
+          date: '2026-07-28',
+          title: 'Upper',
+          pain_flags: [{ site: 'left shoulder', note: 'old flag' }],
+          exercises: [{ name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] }]
+        }
+      ]
+    }
+  });
+  const cause = kernel.claims.find(claim => claim.fact === 'unavailable_cause');
+  assert.equal(cause?.value, 'user_stated');
+  assert.equal(cause?.provenance?.reason, 'user_stated_current_turn');
+  assert.equal(cause?.provenance?.recordId, null);
+});
+
 test('analyse_training_evidence executor returns the evidence shape', () => {
   const result = executeFitnessReadTool('analyse_training_evidence', {
     workouts: ENOUGH,

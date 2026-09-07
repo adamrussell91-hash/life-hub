@@ -58,6 +58,7 @@ function baseMeta(today, sameAs) {
   return {
     ok: true,
     store: 'life_hub_fitness',
+    kind: 'calculation',
     same_as: sameAs,
     date: today
   };
@@ -68,8 +69,13 @@ export function getFitnessSnapshot(records, today) {
   if (!model) return { ok: false, error: 'invalid_date' };
   const charts = model.charts ?? {};
   const last = model.lastCompletedDate ?? null;
+  const lastRecord = last
+    ? (Array.isArray(records) ? records : []).find(record => record?.status === 'completed' && record.date === last)
+    : null;
   return {
     ...baseMeta(today, 'Fitness page header / week / month summary'),
+    last_completed_id: lastRecord?.id ?? null,
+    last_completed_path: lastRecord?.path ?? null,
     streak_days: model.streak ?? null,
     longest_streak_days: charts.longestStreak ?? null,
     last_completed_date: last,
@@ -367,6 +373,8 @@ export function getPainTrainingSummary(records, today, { limit = 20 } = {}) {
         entry.sessions.push({
           date: record.date,
           title: record.title,
+          id: record.id ?? null,
+          path: record.path ?? null,
           note: typeof flag.note === 'string' ? flag.note.trim() : null
         });
       }
@@ -504,12 +512,106 @@ export function getWorkoutTemplateSchema() {
 }
 
 const SUBSTITUTE_MAP = Object.freeze({
-  'bench press': { replacement: 'Dumbbell floor press', reason: 'Same horizontal press pattern with a shorter range if a bench is unavailable or the shoulder is irritated.' },
-  bench: { replacement: 'Dumbbell floor press', reason: 'Same horizontal press pattern with a shorter range if a bench is unavailable or the shoulder is irritated.' },
-  squat: { replacement: 'Leg press or goblet squat', reason: 'Keep a squat pattern without requiring a bar or if the knee needs a more supported path.' },
-  deadlift: { replacement: 'Romanian deadlift or hip hinge with dumbbells', reason: 'Keep the hinge if a bar or conventional pull is unavailable or the back is sore.' },
-  'overhead press': { replacement: 'Landmine press or seated dumbbell press', reason: 'Pressing without a full overhead lockout when the shoulder is limited.' }
+  'bench press': { replacement: 'Dumbbell floor press', reason: 'Same horizontal press pattern with a shorter range when a flat bench is unavailable.' },
+  bench: { replacement: 'Dumbbell floor press', reason: 'Same horizontal press pattern with a shorter range when a flat bench is unavailable.' },
+  squat: { replacement: 'Leg press or goblet squat', reason: 'Keep a squat pattern when a bar or conventional squat setup is unavailable.' },
+  deadlift: { replacement: 'Romanian deadlift or hip hinge with dumbbells', reason: 'Keep the hinge when a conventional bar pull is unavailable.' },
+  'overhead press': { replacement: 'Landmine press or seated dumbbell press', reason: 'Keep an overhead or incline press pattern when a standing bar press is unavailable.' }
 });
+
+const SUBSTITUTION_QUERY = /substitut|swap|replace|instead of|can'?t do|cannot do|is out|don'?t want to|need a replacement|another option|what should i do instead/i;
+
+const LIFT_PAIN_SITES = Object.freeze({
+  'bench press': ['chest', 'pec', 'pecs', 'shoulder', 'shoulders', 'wrist', 'elbow'],
+  bench: ['chest', 'pec', 'pecs', 'shoulder', 'shoulders', 'wrist', 'elbow'],
+  squat: ['knee', 'knees', 'hip', 'hips', 'groin', 'adductor', 'quad', 'quads'],
+  deadlift: ['back', 'spine', 'hamstring', 'hamstrings', 'hip', 'hips'],
+  'overhead press': ['shoulder', 'shoulders', 'wrist', 'elbow', 'neck']
+});
+
+function supportingPainSession(site) {
+  const sessions = Array.isArray(site.sessions) ? site.sessions : [];
+  if (site.id || site.path) {
+    return {
+      id: site.id ?? null,
+      path: site.path ?? null,
+      date: site.latest_date ?? site.date ?? null,
+      note: site.latest_note ?? site.note ?? null
+    };
+  }
+  return sessions.find(session => session.date === site.latest_date)
+    ?? sessions.slice().sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')))[0]
+    ?? null;
+}
+
+function compactPainSite(site) {
+  const session = supportingPainSession(site);
+  return {
+    site: site.site,
+    latest_date: site.latest_date ?? session?.date ?? null,
+    latest_note: site.latest_note ?? session?.note ?? null,
+    id: site.id ?? session?.id ?? null,
+    path: site.path ?? session?.path ?? null
+  };
+}
+
+function painAppliesToLift(site, lift) {
+  if (!lift || !site) return false;
+  const allowed = LIFT_PAIN_SITES[String(lift).toLowerCase()] ?? [];
+  const token = String(site).toLowerCase();
+  return allowed.some(part => token.includes(part));
+}
+
+function extractUserStatedCause(query) {
+  const lower = String(query ?? '').toLowerCase();
+  const body = lower.match(/\bmy\s+([a-z]+(?:\s+[a-z]+)?)\s+(?:is\s+)?(?:sore|hurts?|hurting|aching|pain(?:ful)?|tweaked|niggle|injured|irritat\w*|tender)/);
+  if (body) return body[0];
+  const because = lower.match(/\b(?:because|since)\s+([^.,;]+)/);
+  if (because) return because[1].trim();
+  const equipment = lower.match(/\b(?:no|missing|broken|taken|busy)\s+(bench|bar|rack|equipment)\b/);
+  if (equipment) return equipment[0];
+  return null;
+}
+
+function namedLiftInQuery(query) {
+  const needle = String(query ?? '').toLowerCase();
+  return Object.keys(SUBSTITUTE_MAP).find(name => needle.includes(name)) ?? null;
+}
+
+/**
+ * Shared evidence/interpretation boundary for substitution, pain, and progression.
+ * Only user_stated_current_turn or an explicit current_active_constraint may be a cause.
+ * Workout pain flags are historical_relevant_pain: context, never today's cause.
+ * There is no current-active-constraint persistence for workout pain in this kernel.
+ */
+export function classifyUnavailableCause(query, { lift = null, painSites = [] } = {}) {
+  const sites = Array.isArray(painSites) ? painSites : [];
+  const historical = sites.filter(site => painAppliesToLift(site.site, lift)).map(compactPainSite);
+  const unrelated = sites.filter(site => !painAppliesToLift(site.site, lift)).map(compactPainSite);
+  const userStated = extractUserStatedCause(query);
+  if (userStated) {
+    return {
+      status: 'user_stated',
+      kind: 'user_stated_current_turn',
+      user_stated_reason: userStated,
+      stored_reason: null,
+      current_active_constraint: null,
+      historical_relevant_pain: historical,
+      matching_stored_pain: historical,
+      unrelated_pain: unrelated
+    };
+  }
+  return {
+    status: 'unknown',
+    kind: 'unknown_cause',
+    user_stated_reason: null,
+    stored_reason: null,
+    current_active_constraint: null,
+    historical_relevant_pain: historical,
+    matching_stored_pain: historical,
+    unrelated_pain: unrelated
+  };
+}
 
 function completedWorkouts(records) {
   return (Array.isArray(records) ? records : [])
@@ -566,12 +668,15 @@ export function analyseTrainingEvidence(records, today, { query, pain, snapshot,
   }));
 
   let substitution = null;
-  if (/substitut|swap|replace|instead of|no bench|no bar|equipment/i.test(needle)) {
-    const hit = Object.entries(SUBSTITUTE_MAP).find(([name]) => needle.includes(name));
-    substitution = hit
-      ? { from: hit[0], ...hit[1], evidence: 'pattern_map_plus_recent_sessions', confirmation_required: true }
+  if (SUBSTITUTION_QUERY.test(needle) || /no bench|no bar|equipment/i.test(needle)) {
+    const lift = namedLiftInQuery(needle);
+    substitution = lift
+      ? { from: lift, ...SUBSTITUTE_MAP[lift], evidence: 'pattern_map_plus_recent_sessions', confirmation_required: true }
       : { from: null, replacement: null, reason: 'No named lift to substitute. Ask which exercise and what equipment is missing.', confirmation_required: true };
   }
+  const cause = substitution || namedLiftInQuery(needle)
+    ? classifyUnavailableCause(query, { lift: substitution?.from ?? namedLiftInQuery(needle), painSites: sites })
+    : null;
 
   let progression = null;
   if (/progress|progressi|overload|increase|heavier|next (?:week|block)|programme change|program change/i.test(needle)) {
@@ -601,13 +706,16 @@ export function analyseTrainingEvidence(records, today, { query, pain, snapshot,
     conflicts,
     pain_modifications: painModifications,
     substitution,
+    cause,
     progression,
     compare_gap: compare && (compare.previous?.count === 0 || compare.current?.count === 0)
       ? 'A comparison window has no sessions'
       : null,
     write_required: Boolean(substitution || progression),
     confirmation_required: true,
-    how_to_read: 'Reasoning notes from retrieved sessions. Missing or conflicting sessions stay named. No write without Confirm.'
+    how_to_read: cause
+      ? `Reasoning notes from retrieved sessions. ${cause.status === 'unknown' ? 'Unknown cause: do not invent why the lift is unavailable. Historical matching pain is context, not a current cause.' : cause.status === 'user_stated' ? 'Cause is user-stated in this turn, not a stored record. Historical matching pain remains context.' : cause.status === 'active' ? 'Cause is an explicit current active constraint.' : 'Historical matching pain is context, not a current cause.'} Unrelated pain is not an explanation. Missing or conflicting sessions stay named. No write without Confirm.`
+      : 'Reasoning notes from retrieved sessions. Missing or conflicting sessions stay named. No write without Confirm.'
   };
 }
 

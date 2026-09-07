@@ -196,7 +196,7 @@ import {
   listJSON as listTeachingJSON
 } from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
-import { executeClareWork, isClareWorkTool } from './_shared/clare-work.mjs';
+import { executeClareWork, isClareWorkTool, statedPlannerInputs } from './_shared/clare-work.mjs';
 import { loadIntuitionFor, formatIntuitionForPrompt } from './_shared/capabilities/intuition.mjs';
 import {
   GOVERNANCE_LOG_PATH,
@@ -2176,12 +2176,16 @@ export function createChatHandler({
               }
               if (slug === 'clare' && isClareWorkTool(event.name)) {
                 send({ type: 'status', text: 'Working…' });
+                const stated = statedPlannerInputs(parsed.message);
                 const result = await executeClareWork(event.name, event.input ?? {}, {
                   tasks: hubTasks,
                   projects: hubProjects,
                   lessons: hubLessons,
                   protocol: clareProtocol,
-                  now: nowInstant
+                  now: nowInstant,
+                  energy: stated.energy,
+                  capacity_minutes: stated.capacity_minutes,
+                  workday: stated.workday
                 });
                 if (result?.kind === 'propose' && result.proposal) {
                   const validated = validateProposeActionInput(result.proposal, { agentSlug: slug });
@@ -2613,7 +2617,8 @@ export function createChatStartHandler({
       ...(parsed.history?.length ? { history: parsed.history } : {}),
       ...(parsed.priorAgentSlug ? { priorAgentSlug: parsed.priorAgentSlug } : {}),
       ...(parsed.auditSession ? { auditSession: parsed.auditSession } : {}),
-      ...(parsed.protocolId ? { protocolId: parsed.protocolId } : {})
+      ...(parsed.protocolId ? { protocolId: parsed.protocolId } : {}),
+      ...(parsed.agentKernel ? { agentKernel: true } : {})
     });
 
     let kicked = false;
