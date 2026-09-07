@@ -8,7 +8,7 @@ Statuses: `not started` | `scaffolded` | `partial` | `blocked` | `demonstrated` 
 
 `LIFE_HUB_AGENT_KERNEL` stays **off by default**. This branch does not enable it.
 
-Hammond was **not** rebuilt. Specialist expansion was **not** started.
+Hammond was **not** rebuilt. Specialist expansion is underway on PR #247 (`deterministic only`; deployed-route `passed` still blocked without session auth).
 
 Live Clare / Chadwick conversational results live in `docs/AGENT_PILOT_VERIFICATION.md`. That file keeps `DETERMINISTIC TEST` totals separate from `LIVE MODEL TURN` totals.
 
@@ -79,12 +79,12 @@ Those cannot flip a requirement to `passed`.
 | Clare full capability | `passed` | same path | same + provenance tests | `kernel3b-clare-a.json`, `kernel3-clare-b.json` | Material claims now typed; limitations remain honest |
 | Chadwick evidence reasoning | `passed` | `/api/chat` deployed + `agentKernel: true` | cause + planner + provenance tests | `kernel3c-chadwick-s1`…`s5` + core reruns | First-tranche D hallucination remains on the record; 5/5 later stress turns invented no cause |
 | Pilot behavioural/capability gate (Clare, Chadwick) | `passed` | deployed `/api/chat` on `deploy-preview-246--life-hub2` | `live-pilot-runtime-env` + `chat-job` | kernel A/B + correction stress | Production kernel still off |
-| Specialist expansion | `not started` | — | — | — | Gated on pilots `passed` |
+| Specialist expansion | `deterministic only` | flagged kernel path | Ann/Clementine/Sara suites + remaining smoke | local handler traces for Sara/Brisket; deploy-preview-247 auth blocked | Deployed-route `passed` still blocked without session secret; Hammond still blocked |
 | Hammond supervisor rebuild | `blocked` | old canned handoff remains prototype | — | — | Specialist reliability not `passed` |
 | Surface unification / kernel default | `not started` | kernel still flagged off | — | — | Gated on pilots + comparison |
 | Kernel default on | `not started` | `LIFE_HUB_AGENT_KERNEL` remains off | — | — | Must not enable until evidence + pilots pass |
 
-Hammond is **blocked**, not rebuilt. Specialist expansion was **not** started. `LIFE_HUB_AGENT_KERNEL` stays **off** on Production.
+Hammond is **blocked**, not rebuilt. Specialist expansion is **deterministic only** on PR #247 (Ann / Clementine / Sara kernel capability + local-handler Sara/Brisket live). Deployed-route specialist `passed` remains blocked without Life Hub session auth in this environment. `LIFE_HUB_AGENT_KERNEL` stays **off** on Production.
 
 Confirm after the kernel rerun: live `POST /api/chat` with `agentKernel: true` proposed `act_4c21adab64eb`, Confirm returned 200 with `turnResumed: true`, created `task_mtr965ls_ynh2y1`, invoked a model continuation, and the duplicate Confirm returned `invalid_action` without a second write. That sequence stays `passed`. After the cause/provenance correction, Clare full capability and Chadwick are `passed`. The first kernel Chadwick D hallucination remains in the verification history. The combined pilot gate is `passed`. Production kernel stays off.
 
