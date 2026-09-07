@@ -189,6 +189,32 @@ test('runStoredChatJob publishes the full event list via put (no append RMW)', a
   assert.deepEqual(puts.at(-1), ['agent', 'text', 'text', 'done']);
 });
 
+test('runStoredChatJob surfaces JSON handler errors instead of turn_incomplete', async () => {
+  const store = createMemoryChatJobStore();
+  const jobId = '22222222-2222-4222-8222-222222222222';
+  await store.create(jobId, {
+    owner: 'owner',
+    body: '{"message":"What should I focus on today?","priorAgentSlug":"clare"}',
+    url: 'https://api.example/api/chat'
+  });
+
+  await runStoredChatJob({
+    jobId,
+    store,
+    createHandler: () => async () => Response.json({
+      ok: false,
+      error: { code: 'misconfigured', message: 'This service is not configured.', retryable: false }
+    }, { status: 503 })
+  });
+
+  const job = await store.get(jobId);
+  assert.equal(job.status, 'done');
+  assert.equal(job.events.length, 1);
+  assert.equal(job.events[0].type, 'error');
+  assert.equal(job.events[0].code, 'misconfigured');
+  assert.ok(!job.events.some(event => event.code === 'turn_incomplete'));
+});
+
 test('events endpoint hides another session\'s job', async () => {
   const store = createMemoryChatJobStore();
   await store.create('11111111-1111-4111-8111-111111111111', {

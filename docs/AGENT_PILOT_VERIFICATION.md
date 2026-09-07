@@ -85,21 +85,29 @@ The harness calls the handlers with `agentKernel: true` on the request body. It 
 
 Traces write to `$PILOT_TRACE_DIR` or `/tmp/life-hub-pilot-traces`. They keep bounded tool args and source references, not full private records or secret values.
 
-## Store availability (this environment)
+## Store availability
 
-Inspected from the execution environment used for this PR:
+### Local handler environment (this workspace)
 
-| Store | Available for live proof | Notes |
+| Store | Available for local-handler proof | Notes |
 | --- | --- | --- |
 | Fitness workouts | yes (file store) | `/agent/repos/life-hub-data/data/fitness` |
 | Training comparisons / load | yes if workouts load | Derived from those files |
-| Pain evidence | yes (1 recent file) | Live scenario still blocked without a model key |
-| Body evidence | files exist | Used only when the Chadwick path loads them |
-| Tasks | no | Netlify Tasks blobs unbound (`NETLIFY_BLOBS_TOKEN` unset) |
-| Projects | no | Same Tasks blob store |
-| Teaching lessons/calendar | no | Teaching blobs unbound |
+| Pain evidence | yes (1 recent file) | Not a deployed-route proof |
+| Tasks | no | Workspace `NETLIFY_BLOBS_TOKEN` unset |
+| Teaching lessons/calendar | no | Workspace Teaching blobs unbound |
 
-Unavailable stores are `not exercised`. Fixtures are not substituted for the real-store live gate.
+### Deploy preview `#246` (observed 2026-09-07)
+
+Authenticated `GET` against `https://deploy-preview-246--life-hub2.netlify.app` after preview rebuild `4f30284` / deploy `6a9e8b8cef764f00081fc88b`:
+
+| Store | Visible to deployed APIs | Notes |
+| --- | --- | --- |
+| Tasks | yes | `GET /api/tasks` → 17 records |
+| Teaching scheduled lessons | yes | `GET /api/scheduled-lessons` → 9 records; none dated 2026-09-07 |
+| Fitness / GitHub repo | no | `GET /api/repo/manifest?from=2026-09-01&to=2026-09-07` and `GET /api/fitness/templates` → `503 misconfigured` |
+
+The deploy-preview context is missing GitHub repository configuration (`GITHUB_REPOSITORY` / `GITHUB_BRANCH` / `GITHUB_TOKEN` / `GITHUB_TOKEN_EXPIRES`). `createChatHandler` requires that client before it opens the model stream, so Clare and Chadwick cannot be graded on this preview until those keys exist in **Deploy Preview** (not Production).
 
 ## DETERMINISTIC TEST
 
@@ -107,26 +115,30 @@ See the current remediation ledger for the suites run on this branch.
 
 These prove architecture, planner inputs, Confirm idempotency, and post-confirm continuation state. They do **not** prove Clare or Chadwick behave well in conversation.
 
-## LIVE MODEL TURN
+## LIVE MODEL / LOCAL HANDLER
 
-Mode for this environment: **LIVE MODEL / LOCAL HANDLER**. Deployed-route gate: **blocked**.
+Workspace `ANTHROPIC_API_KEY` was unset and `.env.local` was absent. Local-handler live model remains **blocked**. This is not the user-facing route gate.
 
-`ANTHROPIC_API_KEY` was unset in the environment and `.env.local` was absent.
+## LIVE MODEL / DEPLOYED ROUTE
+
+Fresh preview after preview-only `LIFE_HUB_AGENT_KERNEL=1`:
+
+- PR **#246**, head `4f3028458118bb592b644b66114b039489a5a412`, deploy `6a9e8b8cef764f00081fc88b`, URL `https://deploy-preview-246--life-hub2.netlify.app`, Netlify SUCCESS 2026-09-07T10:02:12Z
+- `POST /api/auth` succeeded. `GET /api/session` → authenticated
+- `POST /api/chat` reached the deployed function (`202` job). Transport was the real job + `/api/chat/events` poll, not a local `createChatHandler()` call
+- Job finished with a single `error` / `turn_incomplete` and **no** `agent`, tools, usage, or final answer. The model was **not** invoked
+- Cause: deploy-preview GitHub bindings are missing, so the handler returns `503 misconfigured` JSON. The job runner previously swallowed that as `turn_incomplete`. A follow-up commit surfaces the JSON error code
+- Kernel enablement on the chat turn could **not** be verified because the stream never started. Production kernel was not changed
+- No Clare or Chadwick scenario was graded. None are `passed`
 
 | Scenario | Status | Trace |
 | --- | --- | --- |
-| Clare A daily planning | blocked | none |
-| Clare B constrained capacity | blocked | none |
-| Clare C energy-aware | blocked | none |
-| Clare D calendar collision | not exercised (no Teaching store) + blocked | none |
-| Clare E missing duration | blocked | none |
-| Clare F write + Confirm continuation | blocked | none — deterministic continuation only |
-| Chadwick A recent training | blocked | none |
-| Chadwick B progression | blocked | none |
-| Chadwick C pain-aware | blocked (pain file exists; no model key) | none |
-| Chadwick D substitution | blocked | none |
-| Chadwick E conflicting evidence | not exercised as live + blocked | none |
-| Chadwick F missing evidence | blocked | none |
+| Probe (harmless Clare pin) | blocked — deployed `/api/chat` job `3b5df5fb-9311-49f7-99a4-6f8b811a7d1a`, `turn_incomplete`, 1796ms, no model | captured locally; no private records |
+| Clare A–F | blocked (handler never reached the model) | none |
+| Chadwick A–F | blocked (GitHub/fitness unbound on preview) | none |
+| Confirm live continuation | blocked | none |
+
+Adam action required: copy the existing Production GitHub repo settings into the **Deploy Preview** context on `life-hub2` (`GITHUB_REPOSITORY`, `GITHUB_BRANCH`, `GITHUB_TOKEN`, `GITHUB_TOKEN_EXPIRES`). Do not enable `LIFE_HUB_AGENT_KERNEL` on Production.
 
 Confirm continuation live sequence was **not** run. Deterministic proof covers:
 
