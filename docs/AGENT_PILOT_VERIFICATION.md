@@ -66,7 +66,7 @@ Inspected from the execution environment used for this PR:
 | --- | --- | --- |
 | Fitness workouts | yes (file store) | `/agent/repos/life-hub-data/data/fitness` |
 | Training comparisons / load | yes if workouts load | Derived from those files |
-| Pain evidence | no | Recent fitness files have empty `pain_flags` |
+| Pain evidence | yes (1 recent file) | Live scenario still blocked without a model key |
 | Body evidence | files exist | Used only when the Chadwick path loads them |
 | Tasks | no | Netlify Tasks blobs unbound (`NETLIFY_BLOBS_TOKEN` unset) |
 | Projects | no | Same Tasks blob store |
@@ -94,7 +94,7 @@ These prove architecture, planner inputs, Confirm idempotency, and post-confirm 
 | Clare F write + Confirm continuation | blocked | none — deterministic continuation only |
 | Chadwick A recent training | blocked | none |
 | Chadwick B progression | blocked | none |
-| Chadwick C pain-aware | not exercised (no real pain record) + blocked | none |
+| Chadwick C pain-aware | blocked (pain file exists; no model key) | none |
 | Chadwick D substitution | blocked | none |
 | Chadwick E conflicting evidence | not exercised as live + blocked | none |
 | Chadwick F missing evidence | blocked | none |
