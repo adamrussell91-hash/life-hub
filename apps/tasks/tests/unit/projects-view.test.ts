@@ -161,8 +161,9 @@ describe('projects view rebuild', () => {
 
     const chart = canvas.querySelector('.projects-chart');
     expect(chart).not.toBeNull();
-    expect(chart?.querySelector('.metric-ring')?.getAttribute('aria-label')).toMatch(/running/);
-    expect(chart?.querySelector('.column-chart')?.getAttribute('aria-label')).toMatch(/On the go/);
+    expect(chart?.querySelector('.projects-mix__pie')?.getAttribute('aria-label')).toMatch(/On the go/);
+    expect(chart?.textContent).toContain('What’s the mix?');
+    expect(chart?.textContent).toMatch(/running/);
     const legend = [...canvas.querySelectorAll('.projects-chart__slice')].map((btn) => btn.textContent);
     expect(legend.some((text) => text?.includes('On the go') && text.includes('1'))).toBe(true);
     expect(legend.some((text) => text?.includes('Planning') && text.includes('1'))).toBe(true);

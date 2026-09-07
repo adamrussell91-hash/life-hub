@@ -7,8 +7,6 @@ import {
   dashboardNextAction,
   dashboardTimeline,
   sourceChipClass,
-  trendLabel,
-  weeklyCompletionTrend,
   type DashboardHeatDay,
   type DashboardTimelineItem
 } from '@/domain/dashboard-overview';
@@ -21,8 +19,6 @@ import {
   runningProjectCount
 } from '@/domain/projects-pulse';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
-import { buildAreaLine } from '@/chart-kit/area-line';
-import { animateAreaReveal } from '@/chart-kit/animate';
 import { renderPressureStrips } from '@/views/pinch-strip';
 import { renderProjectPortfolioChart } from '@/views/project-portfolio-chart';
 import { el } from '@/views/hub-kit';
@@ -101,45 +97,6 @@ function renderTensionBanner(message: string, onDismiss: () => void): HTMLElemen
   dismiss.addEventListener('click', onDismiss);
   banner.append(dismiss);
   return banner;
-}
-
-function renderTrendChart(values: number[], dates: string[], delta: number): SVGSVGElement {
-  const series = values.map((value, index) => ({ date: dates[index], value }));
-  const chart = buildAreaLine(series, { width: 280, height: 72, padding: 8, paddingBottom: 18 });
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'dashboard-trend-chart');
-  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
-  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', 'Completions over the last 14 days');
-  svg.dataset.trend = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
-
-  const area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  area.setAttribute('data-role', 'area');
-  area.setAttribute('class', 'dashboard-trend-chart__area');
-  area.setAttribute('d', chart.areaPath);
-  const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  line.setAttribute('data-role', 'line');
-  line.setAttribute('class', 'dashboard-trend-chart__line');
-  line.setAttribute('d', chart.linePath);
-  line.setAttribute('fill', 'none');
-  svg.append(area, line);
-
-  const first = chart.dayLabels[0];
-  const last = chart.dayLabels[chart.dayLabels.length - 1];
-  for (const label of [first, last]) {
-    if (!label?.date) continue;
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('class', 'dashboard-trend-chart__label');
-    text.setAttribute('x', String(label.x));
-    text.setAttribute('y', String(chart.height - 4));
-    text.setAttribute('text-anchor', label === first ? 'start' : 'end');
-    text.textContent = formatDisplayDate(label.date);
-    svg.append(text);
-  }
-
-  queueMicrotask(() => animateAreaReveal(svg));
-  return svg;
 }
 
 function tileTone(id: string, value: number): string {
@@ -452,7 +409,6 @@ function renderProjectsCard(
   const stallIds = new Set(findStallCandidates(projects, tasks, now).map((c) => c.project.id));
   const mix = projectLifecycleMix(projects, tasks, stallIds, now);
   const running = runningProjectCount(mix);
-  const trend = weeklyCompletionTrend(tasks, now);
 
   const card = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--projects');
   card.setAttribute('aria-label', 'Projects');
@@ -471,15 +427,6 @@ function renderProjectsCard(
     })
   );
   card.append(portfolio);
-
-  const heatStart = addDays(startOfDay(now), -13);
-  const dates = trend.daily.map((_, index) => toDateKey(addDays(heatStart, index)));
-  const spark = el(
-    'div',
-    `dashboard-trend dashboard-trend--${trend.delta > 0 ? 'up' : trend.delta < 0 ? 'down' : 'flat'}`
-  );
-  spark.append(renderTrendChart(trend.daily, dates, trend.delta), el('p', 'dashboard-trend__label', trendLabel(trend)));
-  card.append(spark);
   return card;
 }
 
