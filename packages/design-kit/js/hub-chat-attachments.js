@@ -13,6 +13,9 @@
  * }} HubChatAttachment
  */
 
+/** Wire/model budget for a single inlined image (base64 transport). */
+export const MAX_CHAT_IMAGE_BYTES = 1_500_000;
+
 /**
  * @param {unknown} raw
  * @returns {HubChatAttachment | null}
@@ -47,6 +50,7 @@ export function normalizeChatAttachments(list) {
 
 /**
  * Provenance line agents must treat as delivery fact.
+ * Only call for attachments that actually became model content.
  * @param {HubChatAttachment[]} attachments
  */
 export function formatAttachmentProvenance(attachments) {
@@ -56,6 +60,18 @@ export function formatAttachmentProvenance(attachments) {
     .map(
       (item) =>
         `[Attachment delivered to model · id=${item.id} · kind=${item.kind} · mime=${item.mime} · name=${item.name}]`
+    )
+    .join('\n');
+}
+
+/**
+ * @param {HubChatAttachment[]} attachments
+ */
+function formatAttachmentUnavailable(attachments) {
+  return attachments
+    .map(
+      (item) =>
+        `[Attachment unavailable to model · id=${item.id} · kind=${item.kind} · mime=${item.mime} · name=${item.name} · reason=missing_bytes]`
     )
     .join('\n');
 }
@@ -71,16 +87,19 @@ export function buildUserContent(message, attachments = []) {
   const list = normalizeChatAttachments(attachments);
   if (!list.length) return text;
 
-  const provenance = formatAttachmentProvenance(list);
-  const blocks = [];
-  const combined = [text, provenance].filter(Boolean).join('\n\n');
-  if (combined) blocks.push({ type: 'text', text: combined });
+  /** @type {HubChatAttachment[]} */
+  const delivered = [];
+  /** @type {HubChatAttachment[]} */
+  const unavailable = [];
+  /** @type {Array<{ type: string, text?: string, source?: Record<string, string> }>} */
+  const mediaBlocks = [];
 
   for (const item of list) {
     if (item.kind === 'image' && item.dataUrl) {
       const match = /^data:([^;]+);base64,(.+)$/s.exec(item.dataUrl);
       if (match) {
-        blocks.push({
+        delivered.push(item);
+        mediaBlocks.push({
           type: 'image',
           source: {
             type: 'base64',
@@ -92,30 +111,113 @@ export function buildUserContent(message, attachments = []) {
       }
     }
     if (item.textExcerpt) {
-      blocks.push({
+      delivered.push(item);
+      mediaBlocks.push({
         type: 'text',
         text: `[Attachment excerpt · ${item.name}]\n${item.textExcerpt}`
       });
+      continue;
     }
+    unavailable.push(item);
   }
+
+  const notes = [text];
+  if (delivered.length) notes.push(formatAttachmentProvenance(delivered));
+  if (unavailable.length) notes.push(formatAttachmentUnavailable(unavailable));
+  const combined = notes.filter(Boolean).join('\n\n');
+
+  if (!mediaBlocks.length) return combined || text;
+
+  /** @type {Array<{ type: string, text?: string, source?: Record<string, string> }>} */
+  const blocks = [];
+  if (combined) blocks.push({ type: 'text', text: combined });
+  blocks.push(...mediaBlocks);
   return blocks;
+}
+
+/**
+ * HEIC → JPEG + compress/strip EXIF so phone photos fit the chat wire budget.
+ * @param {File} file
+ * @returns {Promise<File>}
+ */
+export async function prepareChatImage(file) {
+  if (!(file instanceof File)) throw new TypeError('prepareChatImage expects a File');
+  if (!String(file.type || '').startsWith('image/') && !/\.hei[cf]$/i.test(file.name || '')) {
+    return file;
+  }
+
+  let working = file;
+  try {
+    const { ensureWebImage } = await import('./hub-heic.js');
+    const ensured = await ensureWebImage(file, { enableLgplConverter: true });
+    working = ensured.file;
+  } catch {
+    /* keep original; compress may still succeed for JPEG/PNG */
+  }
+
+  try {
+    const { compressAndStripExif } = await import('./hub-image-pipeline.js');
+    const result = await compressAndStripExif(working, {
+      maxWidth: 1600,
+      maxHeight: 1600,
+      quality: 0.78,
+      mimeType: 'image/jpeg'
+    });
+    if (result.skipped && working.size <= MAX_CHAT_IMAGE_BYTES) return working;
+    const base = (working.name || file.name || 'photo').replace(/\.[^.]+$/, '') || 'photo';
+    let next = new File([result.blob], `${base}.jpg`, {
+      type: result.blob.type || 'image/jpeg',
+      lastModified: working.lastModified || Date.now()
+    });
+    // Second pass if still over the wire budget (very dense phone photos).
+    if (next.size > MAX_CHAT_IMAGE_BYTES) {
+      const tighter = await compressAndStripExif(next, {
+        maxWidth: 1280,
+        maxHeight: 1280,
+        quality: 0.7,
+        mimeType: 'image/jpeg'
+      });
+      next = new File([tighter.blob], `${base}.jpg`, {
+        type: tighter.blob.type || 'image/jpeg',
+        lastModified: next.lastModified
+      });
+    }
+    return next;
+  } catch {
+    return working;
+  }
 }
 
 /**
  * Read a browser File into a HubChatAttachment (base64 data URL for images).
  * @param {File} file
+ * @param {{ prepareImage?: (file: File) => Promise<File> }} [opts]
  * @returns {Promise<HubChatAttachment>}
  */
-export async function fileToChatAttachment(file) {
+export async function fileToChatAttachment(file, opts = {}) {
   if (!(file instanceof File)) throw new TypeError('fileToChatAttachment expects a File');
   const id = `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const kind = file.type.startsWith('image/') ? 'image' : 'file';
+  let working = file;
+  const looksImage = file.type.startsWith('image/') || /\.hei[cf]$/i.test(file.name || '');
+  if (looksImage) {
+    const prepare = opts.prepareImage || prepareChatImage;
+    working = await prepare(file);
+  }
+  const kind = working.type.startsWith('image/') || looksImage ? 'image' : 'file';
   /** @type {HubChatAttachment} */
-  const out = { id, kind, mime: file.type || 'application/octet-stream', name: file.name || 'file' };
-  if (kind === 'image' && file.size <= 1_500_000) {
-    out.dataUrl = await readAsDataUrl(file);
-  } else if (file.size <= 200_000 && file.type.startsWith('text/')) {
-    out.textExcerpt = await file.text();
+  const out = {
+    id,
+    kind,
+    mime: working.type || file.type || 'application/octet-stream',
+    name: working.name || file.name || 'file'
+  };
+  if (kind === 'image' && working.size <= MAX_CHAT_IMAGE_BYTES) {
+    out.dataUrl = await readAsDataUrl(working);
+  } else if (working.size <= 200_000 && working.type.startsWith('text/')) {
+    out.textExcerpt = await working.text();
+  }
+  if (kind === 'image' && !out.dataUrl) {
+    throw new Error('Photo is too large to send. Try a smaller image.');
   }
   return out;
 }

@@ -493,7 +493,11 @@ export function createChatController({
     turnFollow = false;
     if (!hiddenUser) {
       remember('user', message);
-      const userBubble = appendMessage(root, { role: 'user', text: message });
+      const userBubble = appendMessage(root, {
+        role: 'user',
+        text: message,
+        attachments
+      });
       stickToBottom = true;
       turnFollow = true;
       if (stickToBottom) {

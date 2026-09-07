@@ -73,7 +73,7 @@ function markLatestMessage(list) {
   if (last) toggleClass(last, 'chat-message--latest', true);
 }
 
-export function appendMessage(root, { role, agentSlug, text = '', actions = true } = {}) {
+export function appendMessage(root, { role, agentSlug, text = '', actions = true, attachments } = {}) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
   const pinned = isChatPinned(list);
@@ -87,12 +87,32 @@ export function appendMessage(root, { role, agentSlug, text = '', actions = true
   body.className = 'chat-message__body';
   body.textContent = text;
   item.append(body);
+  appendMessageAttachments(root, item, attachments);
   if (actions !== false) appendMessageActions(root, item, role);
   appendChatThreadItem(list, item);
   markLatestMessage(list);
   scrollChatIfPinned(list, pinned);
   syncChatChrome(root);
   return item;
+}
+
+function appendMessageAttachments(root, item, attachments) {
+  if (!Array.isArray(attachments) || !attachments.length) return;
+  const images = attachments.filter(
+    entry => entry && entry.kind === 'image' && typeof entry.dataUrl === 'string' && entry.dataUrl.startsWith('data:')
+  );
+  if (!images.length) return;
+  const gallery = root.createElement('div');
+  gallery.className = 'chat-message__attachments';
+  for (const entry of images) {
+    const img = root.createElement('img');
+    img.className = 'chat-message__attachment-image';
+    img.src = entry.dataUrl;
+    img.alt = entry.name || 'Attached image';
+    img.loading = 'lazy';
+    gallery.append(img);
+  }
+  item.append(gallery);
 }
 
 function appendMessageActions(root, item, role) {
@@ -839,21 +859,19 @@ export function setChatBusy(root, busy) {
   const button = root.querySelector('#chat-send');
   const stop = root.querySelector('#chat-stop');
   const view = root.querySelector('#chat-view') ?? root.querySelector?.('.chat-view');
-  // Clicking Send (or Stop) hands that button focus before this runs. Disabling
-  // the still-focused button below blurs focus to <body> -- visual-viewport.js
-  // reads that as "keyboard closed" and collapses the whole Chat layout (nav,
-  // header, agent picker all snap back) mid-turn, which is what reads as the
-  // window flickering. Hand focus back to the field first so it never leaves
-  // the composer.
+  // .chat-view.is-busy already keeps Messenger-style chrome via visual-viewport
+  // chatViewBusy(). Do not park focus on a readOnly composer: iOS shows AutoFill
+  // without a keyboard, and a later tap on an already-focused field never reopens it.
   const aboutToDisable = busy ? button : stop;
   if (aboutToDisable && globalThis.document?.activeElement === aboutToDisable) {
-    input?.focus?.({ preventScroll: true });
+    aboutToDisable.blur?.();
   }
   if (input) {
-    // readOnly keeps iOS focus/keyboard. disabled blurs the field, drops
-    // :focus-within, and slams Chat chrome back for the whole reply.
     input.readOnly = Boolean(busy);
     if (input.disabled) input.disabled = false;
+    if (busy && globalThis.document?.activeElement === input) {
+      input.blur?.();
+    }
   }
   if (button) {
     button.disabled = busy;

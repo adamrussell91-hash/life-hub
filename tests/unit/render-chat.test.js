@@ -121,6 +121,30 @@ test('appendMessage still sets plain textContent for simple system-style bubbles
   assert.match(item.className, /chat-message--latest/);
 });
 
+test('appendMessage keeps attached images visible in the user bubble', () => {
+  const root = new FakeDocument();
+  const item = appendMessage(root, {
+    role: 'user',
+    text: 'Can you read that image?',
+    attachments: [
+      {
+        id: 'att_1',
+        kind: 'image',
+        mime: 'image/jpeg',
+        name: 'board.jpg',
+        dataUrl: 'data:image/jpeg;base64,abc123'
+      }
+    ]
+  });
+  const gallery = item.children.find(child => child.className === 'chat-message__attachments');
+  assert.ok(gallery, 'user bubble must keep a visible attachment gallery');
+  const img = gallery.children[0];
+  assert.equal(img.tagName, 'img');
+  assert.equal(img.src, 'data:image/jpeg;base64,abc123');
+  assert.equal(img.alt, 'board.jpg');
+  assert.equal(img.className, 'chat-message__attachment-image');
+});
+
 test('renderInlineMarkdown turns headings, quotes, and fenced code into structured blocks', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');

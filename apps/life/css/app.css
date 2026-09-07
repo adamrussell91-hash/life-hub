@@ -7029,6 +7029,32 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   font-size: var(--text-sm);
   cursor: pointer;
 }
+.chat-attach-error {
+  margin: 0;
+  width: 100%;
+  color: var(--high-sea, #c45c26);
+  font-size: var(--text-sm);
+}
+.chat-message__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  max-width: min(100%, 18rem);
+}
+.chat-message--user .chat-message__attachments {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+.chat-message__attachment-image {
+  display: block;
+  max-width: 100%;
+  max-height: 14rem;
+  width: auto;
+  height: auto;
+  border-radius: var(--radius-md, 0.75rem);
+  object-fit: cover;
+}
 .hub-voice-wave,
 .compose__voice-wave {
   min-height: 56px;
