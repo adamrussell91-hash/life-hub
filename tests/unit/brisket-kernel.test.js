@@ -129,7 +129,7 @@ test('derived adherence and period comparison provenance', () => {
   const meals = [];
   for (let i = 0; i < 7; i++) {
     const date = `2026-08-${String(14 + i).padStart(2, '0')}`;
-    meals.push(meal(date, { meal: 'lunch', protein_g: 80, calories: 700, id: `w_${i}` }));
+    meals.push(meal(date, { meal: 'lunch', protein_g: 130, calories: 700, id: `w_${i}` }));
   }
   for (let i = 0; i < 7; i++) {
     const date = `2026-08-${String(7 + i).padStart(2, '0')}`;
@@ -143,9 +143,11 @@ test('derived adherence and period comparison provenance', () => {
     stores: { meals }
   });
   const hitRate = kernel.claims.find(claim => claim.fact === 'week_protein_hit_rate_pct');
+  const coverage = kernel.claims.find(claim => claim.fact === 'logging_coverage_pct');
   const delta = kernel.claims.find(claim => claim.fact === 'protein_hit_rate_delta_pp');
   assert.ok(hitRate);
   assert.ok(usableProvenance(hitRate.provenance));
+  assert.ok(coverage);
   assert.ok(delta);
   assert.equal(delta.provenance.calculation, 'week_vs_previous');
 });
@@ -167,50 +169,54 @@ test('no meal invention and meal claims keep record provenance', () => {
   assert.equal(kernel.claims.find(claim => claim.fact === 'invented_meal'), undefined);
 });
 
-test('Case A: later hit day is not selected as miss day', () => {
+test('Case A: later hit day is not selected as below-target day', () => {
   const analysis = analyseNutritionEvidence([
     meal('2026-08-18', { meal: 'monday_low', protein_g: 20, id: 'mon', path: 'data/n/mon.md' }),
     meal('2026-08-19', { meal: 'tuesday_hit', protein_g: 200, id: 'tue', path: 'data/n/tue.md' })
   ], TODAY, { message: 'what meals contributed most to a target miss' });
-  assert.equal(analysis.miss_day, '2026-08-18');
-  assert.deepEqual(analysis.confirmed_miss_days, ['2026-08-18']);
-  assert.equal(analysis.top_meals_on_miss_day[0]?.meal, 'monday_low');
-  assert.notEqual(analysis.miss_day, '2026-08-19');
+  assert.equal(analysis.below_target_day, '2026-08-18');
+  assert.deepEqual(analysis.observed_below_target_days, ['2026-08-18']);
+  assert.equal(analysis.top_meals_on_below_target_day[0]?.meal, 'monday_low');
+  assert.notEqual(analysis.below_target_day, '2026-08-19');
+  assert.equal(analysis.day_target_status.find(d => d.date === '2026-08-18')?.status, 'observed_below_target');
+  assert.equal(analysis.day_target_status.find(d => d.date === '2026-08-19')?.status, 'observed_hit');
+  assert.equal(analysis.confirmed_miss_days, undefined);
 });
 
-test('Case B: most recent confirmed miss day wins among multiple misses', () => {
+test('Case B: most recent observed-below-target day wins among multiple', () => {
   const analysis = analyseNutritionEvidence([
     meal('2026-08-17', { meal: 'older_miss', protein_g: 15, id: 'a' }),
     meal('2026-08-19', { meal: 'newer_miss', protein_g: 25, id: 'b' })
   ], TODAY, { message: 'target miss meals' });
-  assert.deepEqual(analysis.confirmed_miss_days, ['2026-08-19', '2026-08-17']);
-  assert.equal(analysis.miss_day, '2026-08-19');
-  assert.equal(analysis.miss_day_basis, 'most_recent_confirmed_protein_miss');
-  assert.equal(analysis.top_meals_on_miss_day[0]?.meal, 'newer_miss');
+  assert.deepEqual(analysis.observed_below_target_days, ['2026-08-19', '2026-08-17']);
+  assert.equal(analysis.below_target_day, '2026-08-19');
+  assert.equal(analysis.below_target_day_basis, 'most_recent_observed_below_target');
+  assert.equal(analysis.top_meals_on_below_target_day[0]?.meal, 'newer_miss');
 });
 
-test('Case C: unlogged days are not confirmed misses when logged days hit', () => {
+test('Case C: unlogged days are not below-target when logged days hit', () => {
   const analysis = analyseNutritionEvidence([
     meal('2026-08-18', { meal: 'hit', protein_g: 200, id: 'h1' }),
     meal('2026-08-19', { meal: 'hit2', protein_g: 180, id: 'h2' })
   ], TODAY, { message: 'am I hitting my targets' });
-  assert.equal(analysis.miss_day, null);
-  assert.deepEqual(analysis.confirmed_miss_days, []);
-  assert.equal(analysis.miss_day_basis, 'no_confirmed_miss_day');
-  assert.deepEqual(analysis.top_meals_on_miss_day, []);
+  assert.equal(analysis.below_target_day, null);
+  assert.deepEqual(analysis.observed_below_target_days, []);
+  assert.equal(analysis.below_target_day_basis, 'no_observed_below_target_day');
+  assert.deepEqual(analysis.top_meals_on_below_target_day, []);
   assert.ok((analysis.unlogged_week_days ?? []).length > 0);
 });
 
-test('Case D: partial today is not automatically a confirmed miss', () => {
+test('Case D: partial today is not automatically below-target', () => {
   const analysis = analyseNutritionEvidence([
     meal(TODAY, { meal: 'breakfast_only', protein_g: 20, id: 'p1' })
   ], TODAY, { message: 'what is left for today' });
   assert.equal(analysis.logging_status, 'partial_day');
-  assert.equal(analysis.target_miss_today, false);
-  assert.ok(!analysis.confirmed_miss_days.includes(TODAY));
+  assert.equal(analysis.target_below_today, false);
+  assert.ok(!analysis.observed_below_target_days.includes(TODAY));
+  assert.equal(analysis.day_target_status.find(d => d.date === TODAY)?.status, 'insufficient_logging');
 });
 
-test('Case E: miss-day meal contributors keep dated record provenance', () => {
+test('Case E: below-target meal contributors keep dated record provenance', () => {
   const kernel = runAgentKernel({
     slug: 'brisket',
     message: 'What meals contributed most to a target miss?',
@@ -223,16 +229,18 @@ test('Case E: miss-day meal contributors keep dated record provenance', () => {
       ]
     }
   });
-  assert.equal(kernel.evidence.analyse_nutrition_evidence.miss_day, '2026-08-18');
-  const top = kernel.claims.find(claim => claim.fact === 'top_meal_on_miss_day');
+  assert.equal(kernel.evidence.analyse_nutrition_evidence.below_target_day, '2026-08-18');
+  const top = kernel.claims.find(claim => claim.fact === 'top_meal_on_below_target_day');
   assert.equal(top.value, 'monday_low');
   assert.equal(top.kind, 'record');
   assert.equal(top.provenance.recordId, 'mon1');
   assert.equal(top.provenance.recordPath, 'data/nutrition/mon.md');
   assert.equal(top.provenance.date, '2026-08-18');
+  assert.match(kernel.interpretationBlock, /recorded protein remained below target/i);
+  assert.doesNotMatch(kernel.interpretationBlock, /These meals caused the miss/i);
 });
 
-test('Case F: no confirmed miss yields no contributor meals', () => {
+test('Case F: no observed-below-target yields no contributor meals', () => {
   const kernel = runAgentKernel({
     slug: 'brisket',
     message: 'What meals contributed most to a target miss?',
@@ -249,10 +257,102 @@ test('Case F: no confirmed miss yields no contributor meals', () => {
     }
   });
   const analysis = kernel.evidence.analyse_nutrition_evidence;
-  assert.equal(analysis.miss_day, null);
-  assert.deepEqual(analysis.top_meals_on_miss_day, []);
-  assert.equal(kernel.claims.find(claim => claim.fact === 'top_meal_on_miss_day'), undefined);
-  assert.match(kernel.interpretationBlock, /No defensible confirmed miss day/i);
+  assert.equal(analysis.below_target_day, null);
+  assert.deepEqual(analysis.top_meals_on_below_target_day, []);
+  assert.equal(kernel.claims.find(claim => claim.fact === 'top_meal_on_below_target_day'), undefined);
+  assert.match(kernel.interpretationBlock, /No defensible observed-below-target day/i);
+});
+
+test('Adherence Case A: 2/2 hits with incomplete coverage is 100 observed, not 2/7', () => {
+  const analysis = analyseNutritionEvidence([
+    meal('2026-08-18', { meal: 'a', protein_g: 130 }),
+    meal('2026-08-19', { meal: 'b', protein_g: 140 })
+  ], TODAY, { message: 'protein adherence this week' });
+  const week = analysis.week_adherence;
+  assert.equal(week.days_logged, 2);
+  assert.equal(week.protein_target_hits, 2);
+  assert.equal(week.observed_protein_hit_rate_pct, 100);
+  assert.equal(week.protein_hit_rate_pct, 100);
+  assert.ok(week.logging_coverage_pct >= 28 && week.logging_coverage_pct <= 29);
+  assert.equal(week.coverage_status, 'incomplete');
+  assert.doesNotMatch(JSON.stringify(week), /"protein_hit_rate_pct":29|"protein_hit_rate_pct":28/);
+});
+
+test('Adherence Case B: 1 hit 1 miss among 2 logged days is 50 observed', () => {
+  const analysis = analyseNutritionEvidence([
+    meal('2026-08-18', { meal: 'hit', protein_g: 130 }),
+    meal('2026-08-19', { meal: 'miss', protein_g: 40 })
+  ], TODAY, { message: 'am I hitting my targets' });
+  const week = analysis.week_adherence;
+  assert.equal(week.observed_protein_hit_rate_pct, 50);
+  assert.ok(week.logging_coverage_pct >= 28 && week.logging_coverage_pct <= 29);
+});
+
+test('Adherence Case C: full coverage with 5 hits is ~71 observed and 100 coverage', () => {
+  const meals = [
+    meal('2026-08-14', { protein_g: 130 }),
+    meal('2026-08-15', { protein_g: 130 }),
+    meal('2026-08-16', { protein_g: 130 }),
+    meal('2026-08-17', { protein_g: 130 }),
+    meal('2026-08-18', { protein_g: 130 }),
+    meal('2026-08-19', { protein_g: 40 }),
+    meal(TODAY, { meal: 'b', protein_g: 30 }),
+    meal(TODAY, { meal: 'l', protein_g: 30 }),
+    meal(TODAY, { meal: 'd', protein_g: 30 })
+  ];
+  const analysis = analyseNutritionEvidence(meals, TODAY, { message: 'weekly eating summary' });
+  const week = analysis.week_adherence;
+  assert.equal(week.days_logged, 7);
+  assert.equal(week.protein_target_hits, 5);
+  assert.equal(week.observed_protein_hit_rate_pct, 71);
+  assert.equal(week.logging_coverage_pct, 100);
+  assert.equal(week.coverage_status, 'complete');
+});
+
+test('Adherence Case D: no days logged yields null observed rate, not 0% adherence', () => {
+  const analysis = analyseNutritionEvidence([], TODAY, { message: 'am I hitting my targets' });
+  const week = analysis.week_adherence;
+  assert.equal(week.days_logged, 0);
+  assert.equal(week.observed_protein_hit_rate_pct, null);
+  assert.equal(week.protein_hit_rate_pct, null);
+  assert.equal(week.logging_coverage_pct, 0);
+  assert.equal(week.coverage_status, 'none');
+});
+
+test('Adherence Case E: period compare surfaces coverage limitation', () => {
+  const meals = [
+    meal('2026-08-18', { protein_g: 130 }),
+    meal('2026-08-19', { protein_g: 140 }),
+    meal('2026-08-07', { protein_g: 130 }),
+    meal('2026-08-08', { protein_g: 130 }),
+    meal('2026-08-09', { protein_g: 130 }),
+    meal('2026-08-10', { protein_g: 130 }),
+    meal('2026-08-11', { protein_g: 130 }),
+    meal('2026-08-12', { protein_g: 130 }),
+    meal('2026-08-13', { protein_g: 130 })
+  ];
+  const kernel = runAgentKernel({
+    slug: 'brisket',
+    message: 'how does this week compare with the previous period',
+    today: TODAY,
+    now: NOW,
+    stores: { meals }
+  });
+  const compare = kernel.evidence.analyse_nutrition_evidence.week_vs_previous;
+  assert.ok(compare.comparison_limitation);
+  assert.match(kernel.interpretationBlock, /Coverage incomplete|materially different/i);
+  assert.match(kernel.interpretationBlock, /Among logged days/i);
+});
+
+test('historical single breakfast below target is observed_below_target, not confirmed_miss', () => {
+  const analysis = analyseNutritionEvidence([
+    meal('2026-08-18', { meal: 'breakfast', protein_g: 25, id: 'b1' })
+  ], TODAY, { message: 'what meals contributed most to a miss' });
+  const row = analysis.day_target_status.find(d => d.date === '2026-08-18');
+  assert.equal(row.status, 'observed_below_target');
+  assert.ok(!Object.values(analysis).some(v => Array.isArray(v) && String(v).includes('confirmed_miss')));
+  assert.equal(analysis.confirmed_miss_days, undefined);
+  assert.equal(analysis.below_target_day, '2026-08-18');
 });
 
 test('current-turn intake note is user_stated_current_turn', () => {

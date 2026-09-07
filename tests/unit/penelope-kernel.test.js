@@ -149,6 +149,30 @@ test('Case E: empty diary has no supported recurrence', () => {
   assert.match(kernel.interpretationBlock, /No diary hits|Do not invent a recurring/i);
 });
 
+test('Case F: partial token matches do not establish recurrence', () => {
+  const analysis = analyseDiaryEvidence([
+    diary('2026-08-18', { notes: 'feeling hopeful after dinner', mood: 'hopeful' }),
+    diary('2026-08-17', { notes: 'feeling calm this morning', mood: 'calm' }),
+    diary('2026-08-16', { notes: 'feeling better after walk', mood: 'hopeful' })
+  ], TODAY, { message: 'feeling tired often', query: 'feeling tired' });
+  assert.equal(analysis.supported_match_count, 0);
+  assert.ok(analysis.partial_count >= 1);
+  assert.equal(analysis.recurrence_strength, 'insufficient_match');
+  assert.notEqual(analysis.recurrence_strength, 'multi_entry_recurrence');
+  assert.notEqual(analysis.recurrence_strength, 'weak_recurrence');
+});
+
+test('Case G: one full match plus partials stays single_entry', () => {
+  const analysis = analyseDiaryEvidence([
+    diary('2026-08-18', { notes: 'feeling tired after work', mood: 'tired' }),
+    diary('2026-08-17', { notes: 'feeling hopeful after dinner', mood: 'hopeful' }),
+    diary('2026-08-16', { notes: 'feeling calm', mood: 'calm' })
+  ], TODAY, { message: 'feeling tired before', query: 'feeling tired' });
+  assert.equal(analysis.supported_match_count, 1);
+  assert.ok(analysis.partial_count >= 1);
+  assert.equal(analysis.recurrence_strength, 'single_entry');
+});
+
 test('single genuine match is not a pattern', () => {
   const kernel = runAgentKernel({
     slug: 'penelope',
