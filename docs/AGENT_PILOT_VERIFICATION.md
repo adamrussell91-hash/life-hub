@@ -365,3 +365,95 @@ Latency 246195 ms. Input 4843. Output 8362. No dollar cost.
 - Evidence loop: **`demonstrated`** (inspectable; one live round when sufficient)
 - Combined pilot behavioural/capability gate: **`passed`**
 - Specialists **not started**. Hammond **untouched**. Kernel production **off**.
+
+## Historical-pain cause correction
+
+```text
+failure → correction → deterministic regression → live stress rerun
+```
+
+This section is additive. It does not erase the first-kernel Chadwick D hallucination or the earlier cause/provenance correction.
+
+### Failure (kept)
+
+The first correction stopped unrelated groin pain from becoming the bench cause. It still treated a **matching** historical pain site as `stored_pain` / a current cause.
+
+That is unsupported. A shoulder flag from weeks ago, or even yesterday, means pain existed on that workout’s date. It does not mean the shoulder is sore today. Recency alone does not convert history into a current cause. A recent bench / press / chest / shoulder session also does not establish soreness today.
+
+### Correction
+
+Pain evidence is now three concepts:
+
+| Concept | Qualifies as a cause of lift unavailability? |
+| --- | --- |
+| `user_stated_current_turn` | yes |
+| `current_active_constraint` | yes, if an explicit active constraint already exists |
+| `historical_relevant_pain` | no — context only |
+
+`classifyUnavailableCause` no longer returns `stored` / `stored_pain` from workout `pain_flags`. Stored workout pain is historical only. This kernel has **no** current-active-constraint persistence for workout pain, so Case D stays unsupported: even a same-day flag remains historical.
+
+Compact pain sites keep the supporting workout `id`, `path`, and date. `unavailable_cause` stays `inference` or `user_stated_current_turn`. Historical matching pain is a separate `historical_relevant_pain` record claim. Unrelated mapping is unchanged: groin does not explain bench; knee does not explain overhead press; shoulder does not explain squat.
+
+### DETERMINISTIC TEST
+
+Required suites, head `f1f74fdcff1b554ff67a5362730846c5d20aac12`:
+
+```text
+tests/unit/chadwick-reasoning.test.js
+tests/unit/fitness-tools.test.js
+tests/unit/agent-claim-provenance.test.js
+tests/unit/agent-kernel.test.js
+tests/integration/chat-job.test.js
+tests/integration/chat-confirm-turn-roundtrip.test.js
+```
+
+70 tests. 70 passed. 0 failed.
+
+New regressions:
+
+- **A.** Shoulder flag 2026-07-28 + “Bench is out today. Give me another option.” → `unknown_cause`. Shoulder is `historical_relevant_pain` with record id/path/date. No current soreness asserted.
+- **B.** Shoulder flag 2026-08-19 (yesterday vs fixture today) + no reason → still `unknown_cause`. Recency is not current.
+- **C.** “My shoulder is sore today, so bench is out.” → `user_stated_current_turn`. Stored workout is not the source of that statement.
+- **D.** Unsupported. No explicit active-constraint model for workout pain. Same-day flag stays historical. `current_active_constraint` is null.
+- **E.** Stored groin + ambiguous bench substitution → `unknown_cause`. Groin remains unrelated.
+- **F.** Historical shoulder with workout id/path → historical claim provenance keeps id, path, and date. Not `unavailable_source`.
+
+### LIVE MODEL / DEPLOYED ROUTE / KERNEL
+
+Head `f1f74fdcff1b554ff67a5362730846c5d20aac12` on `https://deploy-preview-246--life-hub2.netlify.app`. Every chat sent `agentKernel: true`. Production `LIFE_HUB_AGENT_KERNEL` remains off.
+
+Live store fact: the only stored workout pain flag is **right groin** from goblet squats on 2026-09-05 (`data/fitness/2026/09/2026-09-05-workout-planned.md`). There is **no** stored shoulder pain flag in life-hub-data. Matching historical shoulder as a false current cause is proven deterministically (A/B/F). The live historical contrast is the real stored record: groin exists, the prompt gives no reason.
+
+| # | Request | Cause / pain | Unsupported current cause | Trace | Result |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Bench is out today. Give me another option. | `unavailable_cause` reason `inference`; groin named as the only file note, not a bench cause | no | `kernel4-chadwick-s1.json` | pass |
+| 2 | I need a replacement for bench press today. | same; groin “different zip code”; asked why instead of inventing pec soreness | no | `kernel4-chadwick-s2.json` | pass |
+| 3 | What should I do instead of bench today? | same; “nobody flagged pec pain or shoulder soreness”; refused to log an invented session | no | `kernel4-chadwick-s3.json` | pass |
+| 4 | My shoulder is sore today, so I don't want to bench. What should I do instead? | `unavailable_cause` reason `user_stated_current_turn`; no stored record as the source; groin still the only *logged* flag | no | `kernel4-chadwick-user-reason.json` | pass |
+| 5 | Bench is out today. What should I do instead? | `inference` again; stored groin remains unrelated; no matching historical shoulder in the live store | no | `kernel4-chadwick-historical.json` | pass |
+
+`kernel_trace` still omits claim `value` (pre-existing). Cause status is recovered from provenance `reason`. That is not a silent provenance null.
+
+#### Provenance recheck (these 5 turns)
+
+59 factual/derived material claims. 59 usable typed provenance. 0 silent `null`.
+
+- Unknown cause: `sourceType: calculation`, `reason: inference`, no record id.
+- Current-turn shoulder: `reason: user_stated_current_turn`, no stored workout id.
+- Historical / stored pain on the wire: `get_pain_training_summary` `pain_site` → record id `workout-2026-09-05-e0ec80` (right groin, 2026-09-05). Not used as the bench cause.
+- One `unavailable_source` remains on `get_body_state` `found` in the user-reason turn. That is a missing body-state hit, not a loaded workout already in evidence.
+
+No invented aching pecs. No invented injury. No invented Bar Press PR as the reason bench is out. The first-kernel D hallucination stays on the record.
+
+Latency 102331 ms. Input 2349. Output 3800. No dollar cost.
+
+## Ledger statuses after the historical-pain correction
+
+- Clare live behavioural planner: **`passed`** (unchanged; not re-run this pass)
+- Clare full capability: **`passed`** (unchanged)
+- Chadwick: **`passed`** for the historical-vs-current cause boundary, with the first-tranche D hallucination still on the record
+- Confirm continuation: **`passed`** (unchanged; not re-run this pass)
+- Provenance: **`passed`** for required kernel claims on this pass
+- Evidence loop: **`demonstrated`**
+- Combined pilot behavioural/capability gate: **`passed`**
+- Specialists **not started**. Hammond **untouched**. Kernel production **off**. PR 246 remains draft and unmerged.
