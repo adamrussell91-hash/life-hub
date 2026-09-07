@@ -809,8 +809,8 @@ export function composeEvidenceClaims(evidence = {}) {
         store: result.store ?? 'life_hub_medical_overview'
       }));
     }
-    if (result.current_visit_count != null) {
-      pushClaim(claims, tool, 'current_visit_count', result.current_visit_count, 'calculation', calc('current_visit_count', 'current_visit_count', {
+    if (result.recent_visit_count != null) {
+      pushClaim(claims, tool, 'recent_visit_count', result.recent_visit_count, 'calculation', calc('recent_visit_count', 'recent_visit_count', {
         store: result.store ?? 'life_hub_medical_overview'
       }));
     }
@@ -826,11 +826,11 @@ export function composeEvidenceClaims(evidence = {}) {
         date: hist.date
       }));
     }
-    if (result.current_visits?.[0]) {
-      const cur = result.current_visits[0];
-      pushClaim(claims, tool, 'current_visit_title', cur.title, 'record', recordOf(cur, {
+    if (result.recent_visits?.[0]) {
+      const recent = result.recent_visits[0];
+      pushClaim(claims, tool, 'recent_visit_title', recent.title, 'record', recordOf(recent, {
         store: result.store ?? 'life_hub_medical_overview',
-        date: cur.date
+        date: recent.date
       }));
     }
     if (result.comparisons?.[0]) {

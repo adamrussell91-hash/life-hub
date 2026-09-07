@@ -1178,6 +1178,9 @@ function teachingInterpretationLines(state) {
   if (gaps.length) {
     lines.push('- diagnosis_gaps are derived from stored Teaching fields. They are not permission to invent missing content.');
   }
+  if (gaps.some(gap => /learning intention/i.test(gap))) {
+    lines.push('- No stored learning intention was retrieved. Syllabus outcome_ids are curriculum codes, not learning intentions.');
+  }
   if (statedMinutes) {
     lines.push(`- Adam stated a current-turn time budget (${statedMinutes} minutes). Treat it as user_stated_current_turn, not a stored timetable fact.`);
   }
@@ -1188,7 +1191,7 @@ function teachingInterpretationLines(state) {
   } else {
     lines.push('- Do not invent the next lesson, student needs, assessment deadlines, or prior outcomes.');
   }
-  lines.push('- Stored facts: schedule rows, draft titles, blocks, outcome_ids, unit links. Derived: diagnosis_gaps / preparation. Inference: any rewrite beyond those fields.');
+  lines.push('- Stored facts: schedule rows, draft titles, blocks, outcome_ids, unit links. Derived: diagnosis_gaps / preparation. Inference: any rewrite beyond those fields. Never describe an outcome code as a learning intention.');
   return lines;
 }
 
@@ -1209,7 +1212,7 @@ function knowledgeInterpretationLines(state) {
     lines.push('- inferred_relations are lexical/tag overlap only. Do not convert them into stored links.');
   }
   if (synthesis?.conflicts?.length) {
-    lines.push('- Retrieved notes disagree. Keep both sides visible; do not flatten disagreement.');
+    lines.push('- Retrieved notes show conflict_signal disagreement. Keep both sides visible; do not claim a proven contradiction or flatten disagreement.');
   }
   if (synthesis?.themes?.length) {
     lines.push('- Recurring themes are derived across notes. They are not themselves stored page titles.');
@@ -1236,12 +1239,15 @@ function saraInterpretationLines(state) {
     lines.push('- Weight readings conflict. Do not treat them as one clean trend.');
   }
   if (medicalHits) {
-    lines.push('- Medical hits are retrieved records with dates. Do not invent extra visits or results.');
+    lines.push('- Medical hits are retrieved dated records. Do not invent extra visits or results.');
   } else {
     lines.push('- No matching medical visits were retrieved. Do not invent an appointment or lab result.');
   }
+  if ((analysis?.recent_visit_count ?? 0) > 0) {
+    lines.push('- Recent-window visits are recent historical evidence only. Recency does not prove a current symptom, current diagnosis, current medication use, or current abnormality.');
+  }
   if ((analysis?.historical_visit_count ?? 0) > 0) {
-    lines.push('- Historical medical visits stay historical. Do not convert them into a present condition, current medication adherence, or current lab result.');
+    lines.push('- Older historical medical visits stay historical. Do not convert them into a present condition, current medication adherence, or current lab result.');
   }
   if ((analysis?.missing_date_count ?? 0) > 0) {
     lines.push('- Some medical records are missing dates. Keep the date missing — do not invent one.');
@@ -1252,7 +1258,7 @@ function saraInterpretationLines(state) {
   if (analysis?.comparisons?.length) {
     lines.push('- Dated comparisons must preserve both dates. Do not collapse two readings into one undated claim.');
   }
-  lines.push('- Do not use unrelated historical findings as causal explanations. Do not diagnose or prescribe.');
+  lines.push('- Current state requires user_stated_current_turn or explicit active stored evidence. Do not use unrelated historical findings as causal explanations. Do not diagnose or prescribe.');
   return lines;
 }
 

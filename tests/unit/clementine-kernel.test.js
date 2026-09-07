@@ -132,9 +132,88 @@ test('conflicting notes stay visible and are not flattened', () => {
     stores: { pages: PAGES }
   });
   assert.ok(kernel.limitations.some(item => item.kind === 'conflict'));
-  assert.match(kernel.interpretationBlock, /disagree|conflict/i);
+  assert.match(kernel.interpretationBlock, /conflict_signal|disagree|conflict/i);
   const conflict = kernel.claims.find(claim => claim.fact === 'note_conflict_count');
   assert.ok(conflict?.value >= 1);
+});
+
+test('word-aware polarity: agree/disagree and effective/ineffective do not false-fire on substrings', () => {
+  const agreeDisagree = getKnowledgeSynthesis([
+    {
+      id: 'n1',
+      title: 'Cognitive load agree note',
+      tags: ['cognitive-load'],
+      excerpt: 'I agree that worked examples help novices.',
+      claims: ['agree worked examples'],
+      connected: []
+    },
+    {
+      id: 'n2',
+      title: 'Cognitive load disagree note',
+      tags: ['cognitive-load'],
+      excerpt: 'I disagree that worked examples help novices.',
+      claims: ['disagree worked examples'],
+      connected: []
+    }
+  ], { query: 'cognitive load', limit: 10 });
+  assert.ok(agreeDisagree.conflicts.some(item => item.signal === 'agree/disagree'));
+
+  const effective = getKnowledgeSynthesis([
+    {
+      id: 'e1',
+      title: 'Effective load note',
+      tags: ['cognitive-load'],
+      excerpt: 'This method is effective for novices.',
+      claims: [],
+      connected: []
+    },
+    {
+      id: 'e2',
+      title: 'Ineffective load note',
+      tags: ['cognitive-load'],
+      excerpt: 'This method is ineffective for experts.',
+      claims: [],
+      connected: []
+    }
+  ], { query: 'cognitive load', limit: 10 });
+  assert.ok(effective.conflicts.some(item => item.signal === 'effective/ineffective'));
+  assert.ok(effective.conflicts.every(item => item.kind === 'conflict_signal'));
+});
+
+test('works/fails and supports/rejects conflict signals fire with shared subject', () => {
+  const worksFails = getKnowledgeSynthesis([
+    { id: 'w1', title: 'Memory note', tags: ['memory'], excerpt: 'Spaced practice works for retention.', claims: [], connected: [] },
+    { id: 'w2', title: 'Memory critique', tags: ['memory'], excerpt: 'Spaced practice fails for retention here.', claims: [], connected: [] }
+  ], { query: 'memory', limit: 10 });
+  assert.ok(worksFails.conflicts.some(item => item.signal === 'works/fails'));
+
+  const supportsRejects = getKnowledgeSynthesis([
+    { id: 's1', title: 'Load note', tags: ['cognitive-load'], excerpt: 'Evidence supports worked examples.', claims: ['supports worked examples'], connected: [] },
+    { id: 's2', title: 'Load critique', tags: ['cognitive-load'], excerpt: 'Evidence rejects worked examples.', claims: ['rejects worked examples'], connected: [] }
+  ], { query: 'cognitive load', limit: 10 });
+  assert.ok(supportsRejects.conflicts.some(item => item.signal === 'supports/rejects'));
+});
+
+test('negative: mixed effective/ineffective in one note does not invent cross-note conflict with unrelated page', () => {
+  const synthesis = getKnowledgeSynthesis([
+    {
+      id: 'mixed',
+      title: 'Nuanced cognitive load note',
+      tags: ['cognitive-load'],
+      excerpt: 'This method is ineffective in one context but effective in another.',
+      claims: [],
+      connected: []
+    },
+    {
+      id: 'garden',
+      title: 'Garden soil pH',
+      tags: ['gardening'],
+      excerpt: 'Tomatoes prefer slightly acidic soil.',
+      claims: [],
+      connected: []
+    }
+  ], { query: 'cognitive load', limit: 10 });
+  assert.equal(synthesis.conflicts.length, 0);
 });
 
 test('missing notes do not invent a page', () => {
