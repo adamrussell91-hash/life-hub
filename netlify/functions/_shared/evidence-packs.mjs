@@ -103,7 +103,8 @@ export function assembleEvidencePack({
   today,
   stores = {},
   sourceMeta = {},
-  now = new Date()
+  now = new Date(),
+  force = false
 } = {}) {
   const intent = classifyIntent(slug, message);
   const activation = activationForTurn({ slug, message, sourceMeta });
@@ -133,7 +134,7 @@ export function assembleEvidencePack({
   const stressFlags = stores.stressFlags ?? [];
   const inbox = stores.inbox ?? [];
 
-  const shouldPack = activation.forceToolChoice || intent.id !== 'none';
+  const shouldPack = force || activation.forceToolChoice || intent.id !== 'none';
   if (!shouldPack) {
     return {
       slug,
@@ -488,15 +489,39 @@ function formatClaimValue(value) {
   }
 }
 
-function pushClaim(claims, tool, fact, value, kind = 'record') {
+function pushClaim(claims, tool, fact, value, kind = 'record', provenance = null) {
   if (value == null) return;
   claims.push({
     tool,
     fact,
     value,
     kind,
-    text: `${fact}=${formatClaimValue(value)}`
+    text: `${fact}=${formatClaimValue(value)}`,
+    provenance: provenance ?? undefined
   });
+}
+
+export function claimProvenance(result, tool, extra = {}) {
+  const first = result?.results?.[0] ?? result?.lesson ?? result?.latest ?? null;
+  const provenance = {
+    sourceType: result?.kind === 'calculation' ? 'calculation' : 'record',
+    store: result?.store ?? extra.store ?? null,
+    tool,
+    recordId: extra.recordId ?? first?.id ?? first?.path ?? null,
+    recordPath: extra.recordPath ?? first?.path ?? result?.path ?? null,
+    retrievedAt: extra.retrievedAt ?? new Date().toISOString(),
+    authority: result?.store ? 'authoritative' : 'unknown',
+    modifiedAt: first?.updated_at ?? first?.version ?? result?.version ?? null
+  };
+  if (result?.kind === 'calculation' || extra.calculation) {
+    provenance.calculation = extra.calculation ?? result?.kind ?? 'calculation';
+    provenance.inputs = extra.inputs ?? (result?.store ? [result.store] : []);
+    provenance.output = extra.output ?? null;
+  }
+  if (!provenance.recordId && !provenance.recordPath && !provenance.store) {
+    provenance.authority = 'unavailable';
+  }
+  return provenance;
 }
 
 /**
@@ -551,14 +576,34 @@ export function composeEvidenceClaims(evidence = {}) {
     pushClaim(claims, tool, 'compare_previous_from', result.previous?.from, 'calculation');
     pushClaim(claims, tool, 'open_count', result.open_count, 'calculation');
     pushClaim(claims, tool, 'overdue_title', result.overdue?.[0]?.title);
-    pushClaim(claims, tool, 'lesson_id', result.lesson?.id);
-    pushClaim(claims, tool, 'lesson_title', result.lesson?.title);
-    pushClaim(claims, tool, 'class_code', result.class?.code);
-    pushClaim(claims, tool, 'result_count', result.count);
-    pushClaim(claims, tool, 'first_result_id', result.results?.[0]?.id);
-    pushClaim(claims, tool, 'first_result_title', result.results?.[0]?.title);
+    const provenance = claimProvenance(result, tool);
+    pushClaim(claims, tool, 'lesson_id', result.lesson?.id, 'record', provenance);
+    pushClaim(claims, tool, 'lesson_title', result.lesson?.title, 'record', provenance);
+    pushClaim(claims, tool, 'class_code', result.class?.code, 'record', provenance);
+    pushClaim(claims, tool, 'learning_intentions', result.lesson?.learning_intentions, 'record', provenance);
+    pushClaim(claims, tool, 'diagnosis_gaps', result.diagnosis_gaps, 'calculation', {
+      ...provenance,
+      calculation: 'teaching_diagnosis',
+      inputs: ['teaching_hub']
+    });
+    pushClaim(claims, tool, 'result_count', result.count, 'calculation', provenance);
+    pushClaim(claims, tool, 'first_result_id', result.results?.[0]?.id, 'record', provenance);
+    pushClaim(claims, tool, 'first_result_title', result.results?.[0]?.title, 'record', provenance);
+    pushClaim(claims, tool, 'first_result_excerpt', result.results?.[0]?.excerpt ?? result.results?.[0]?.notes_excerpt, 'record', provenance);
+    pushClaim(claims, tool, 'first_result_tags', result.results?.[0]?.tags, 'record', provenance);
+    pushClaim(claims, tool, 'first_result_connected', result.results?.[0]?.connected, 'record', provenance);
+    pushClaim(claims, tool, 'first_result_provider', result.results?.[0]?.provider, 'record', provenance);
+    pushClaim(claims, tool, 'first_result_notes', result.results?.[0]?.notes_excerpt ?? result.results?.[0]?.notes, 'record', provenance);
     pushClaim(claims, tool, 'delta_kg', result.delta_kg, 'calculation');
     pushClaim(claims, tool, 'found', result.found);
+    pushClaim(claims, tool, 'enough_evidence', result.enough_evidence, 'calculation', provenance);
+    pushClaim(claims, tool, 'missing_recent_sessions', result.missing_recent_sessions, 'calculation', provenance);
+    if (result.substitution?.replacement) {
+      pushClaim(claims, tool, 'substitution', result.substitution.replacement, 'calculation', provenance);
+    }
+    if (result.progression?.ok === false) {
+      pushClaim(claims, tool, 'progression_blocked', result.progression.reason, 'calculation', provenance);
+    }
     pushClaim(claims, tool, 'days_with_log', result.days_with_log, 'calculation');
     pushClaim(claims, tool, 'life_digest_present', result.life_digest_present);
     if (Array.isArray(result.flags) && result.flags.length) {
