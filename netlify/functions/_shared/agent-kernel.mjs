@@ -17,6 +17,12 @@ import { getTasksFocus } from './domain-retrieval.mjs';
 import { getTasksOpenLoops } from './domain-analysis.mjs';
 import { planWork } from './clare-work.mjs';
 import { composeEvidenceClaims } from './evidence-packs.mjs';
+import {
+  memoryInterpretationLines,
+  memoryPromptBlock,
+  parseMemoryStore,
+  searchMemories
+} from './agent-memory.mjs';
 
 export const KERNEL_PILOT_SLUGS = Object.freeze(['chadwick', 'clare']);
 export const WRITE_GATEWAY_TOOLS = Object.freeze([
@@ -24,7 +30,8 @@ export const WRITE_GATEWAY_TOOLS = Object.freeze([
   'create_task',
   'update_task',
   'clare_mutate',
-  'propose_central_node_patch'
+  'propose_central_node_patch',
+  'remember_write_memory'
 ]);
 
 const STAGES = ['plan', 'retrieve', 'assess', 'resolve', 'compose'];
@@ -213,6 +220,8 @@ export function createTurnState({ slug, message, today, now = new Date(), stores
     coverage: { missing: [], truncated: [], failed: [] },
     conflicts: [],
     memory: [],
+    memoryMeta: { kept: 0, omitted: 0 },
+    memoryLoadError: stores?.memoryLoadError ?? null,
     actions: [],
     answer: null,
     claims: [],
@@ -240,6 +249,26 @@ function doPlan(state) {
   return recordTrace(state, 'plan', state.plan.workflow);
 }
 
+function recallLayeredMemory(state) {
+  if (state.memoryLoadError) return 'memory_failed';
+  const loaded = parseMemoryStore(state.stores?.memories ?? []);
+  if (!loaded.ok) {
+    state.memoryLoadError = loaded.error;
+    state.memory = [];
+    state.memoryMeta = { kept: 0, omitted: 0 };
+    return 'memory_failed';
+  }
+  const recalled = searchMemories(loaded, state.message, {
+    agent: state.slug,
+    now: state.now instanceof Date ? state.now : new Date(state.now),
+    domain: state.plan?.domain,
+    limit: 8
+  });
+  state.memory = recalled.items;
+  state.memoryMeta = { kept: recalled.kept, omitted: recalled.omitted };
+  return `memory=${recalled.kept}`;
+}
+
 function doRetrieve(state) {
   if (!state.plan?.retrieve) {
     state.stage = 'retrieved';
@@ -253,8 +282,9 @@ function doRetrieve(state) {
     if (state.evidence[name]) continue;
     state.evidence[name] = runTool(name, state.stores, state.today, state.now);
   }
+  const memoryNote = recallLayeredMemory(state);
   state.stage = 'retrieved';
-  return recordTrace(state, 'retrieve', Object.keys(state.evidence).join(','));
+  return recordTrace(state, 'retrieve', `${Object.keys(state.evidence).join(',')}|${memoryNote}`);
 }
 
 function limitationFor(tool, result) {
@@ -328,6 +358,22 @@ export function assessEvidence(state) {
     }
   }
 
+  if (state.memoryLoadError) {
+    limitations.push({
+      tool: 'layered_memory',
+      kind: 'failed',
+      text: 'Layered memory store unavailable'
+    });
+    coverage.failed.push('layered_memory');
+  } else if ((state.memoryMeta?.omitted ?? 0) > 0) {
+    limitations.push({
+      tool: 'layered_memory',
+      kind: 'truncated',
+      text: `Memory recall truncated kept=${state.memoryMeta.kept} omitted=${state.memoryMeta.omitted}`
+    });
+    coverage.truncated.push('layered_memory');
+  }
+
   const required = state.plan?.requiredSources ?? [];
   const requiredPresent = required.every(tool => {
     const result = state.evidence[tool];
@@ -370,6 +416,7 @@ function doCompose(state) {
     ...(claimLines.length ? claimLines : ['- none']),
     'Limitations:',
     ...(limitLines.length ? limitLines : ['- none']),
+    memoryPromptBlock(state.memory, state.memoryMeta),
     state.complete
       ? 'Coverage is complete for the planned sources.'
       : 'Coverage is incomplete. Name every material limitation. Do not give a clean-sounding conclusion from missing, failed, truncated, or conflicted evidence.'
@@ -389,7 +436,8 @@ function doCompose(state) {
       : '- No overdue title was retrieved. Do not invent one.',
     collisions
       ? '- Teaching and tasks collide on the planned day. Do not present the day as an empty workday from 08:00.'
-      : ''
+      : '',
+    ...memoryInterpretationLines(state.memory)
   ].filter(Boolean).join('\n');
   state.answer = {
     claims: state.claims,
@@ -494,6 +542,8 @@ export function kernelTraceEvent(kernel) {
     complete: kernel.complete,
     tools: Object.keys(kernel.evidence ?? {}),
     limitationKinds: [...new Set((kernel.limitations ?? []).map(item => item.kind))],
-    stages: (kernel.trace ?? []).map(item => item.stage)
+    stages: (kernel.trace ?? []).map(item => item.stage),
+    memoryKept: kernel.memoryMeta?.kept ?? 0,
+    memoryOmitted: kernel.memoryMeta?.omitted ?? 0
   };
 }

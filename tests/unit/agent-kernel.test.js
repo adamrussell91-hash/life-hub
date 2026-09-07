@@ -382,7 +382,7 @@ test('flagged kernel trims Chadwick tools to the planned set plus write gateway'
     'get_fitness_snapshot', 'compare_workout_windows', 'get_training_volume',
     'get_body_state', 'get_load_status', 'get_pain_training_summary',
     'os_propose_action', 'create_task', 'update_task', 'clare_mutate',
-    'propose_central_node_patch'
+    'propose_central_node_patch', 'remember_write_memory'
   ].includes(tool.name)));
 });
 

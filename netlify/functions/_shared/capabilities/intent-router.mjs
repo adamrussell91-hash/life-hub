@@ -6,8 +6,8 @@ const KEYWORD_HINTS = [
     patterns: [/challenge/i, /tracker/i, /streak/i, /no sugar/i, /sugar[- ]free/i, /week of/i]
   },
   {
-    ids: ['remember.set-week-flag', 'remember.note-context'],
-    patterns: [/remember/i, /\bflag\b/i, /traveling/i, /this week/i, /note that/i]
+    ids: ['remember.set-week-flag', 'remember.note-context', 'remember.write-memory'],
+    patterns: [/remember/i, /\bflag\b/i, /traveling/i, /this week/i, /note that/i, /forget that/i, /correction:/i]
   },
   {
     ids: ['publish.surface-widget', 'plan.week-meals'],

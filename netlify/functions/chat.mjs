@@ -41,6 +41,8 @@ import {
 import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
 import { assembleEvidencePack } from './_shared/evidence-packs.mjs';
 import { applyKernelToTurn, kernelTraceEvent } from './_shared/agent-kernel.mjs';
+import { parseMemoryStore } from './_shared/agent-memory.mjs';
+import { REMEMBER_LAYERED_MEMORIES_PATH } from './_shared/capabilities/stores.mjs';
 import {
   getNutritionSnapshot,
   getNutritionAdherence,
@@ -1283,6 +1285,18 @@ export function createChatHandler({
           message: parsed.message,
           sourceMeta
         });
+        let layeredMemories = [];
+        let memoryLoadError = null;
+        const memoryEntry = repoTree.find(entry => entry.path === REMEMBER_LAYERED_MEMORIES_PATH && entry.type === 'blob');
+        if (memoryEntry?.sha) {
+          try {
+            const parsedMemory = parseMemoryStore(decodeBlob(await client.readBlob(memoryEntry.sha)));
+            if (!parsedMemory.ok) memoryLoadError = parsedMemory.error;
+            else layeredMemories = parsedMemory.items;
+          } catch {
+            memoryLoadError = 'memory_load_failed';
+          }
+        }
         const evidenceStores = {
           workouts: workoutRecords,
           meals: nutritionRecords,
@@ -1304,7 +1318,9 @@ export function createChatHandler({
           nutritionChallenges,
           templates: [],
           stressFlags: [],
-          inbox: []
+          inbox: [],
+          memories: layeredMemories,
+          memoryLoadError
         };
         const evidencePack = assembleEvidencePack({
           slug,

@@ -1,0 +1,17 @@
+{
+  "id": "remember.write-memory",
+  "tool_name": "remember_write_memory",
+  "verb": "Remember",
+  "agents": [
+    "chadwick",
+    "clare"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Write or correct layered memory (user/agent/shared/episodic). Never a domain record. Reflections that touch safety or permissions stay Confirm-only and cannot auto-apply.",
+  "surfaces": [
+    "governance_log",
+    "agent_context",
+    "confirm_card"
+  ]
+}
