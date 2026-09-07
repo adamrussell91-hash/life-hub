@@ -77,7 +77,7 @@ Those cannot flip a requirement to `passed`.
 | Complete traces | `partial` | `kernelTraceEvent` + optional Anthropic `usage` events | loop tests inspect trajectory | none | Latency/cost need a live model; final answer grading **blocked** |
 | Clare operational planner | `demonstrated` | `executeClareWork('plan_work')` used by `/api/chat`; stated energy/capacity also reach kernel retrieve | `clare-adversarial.test.js` + `clare-planner.test.js` + `chat-pilot-tools.test.js` | none | Live conversational gate **blocked** |
 | Chadwick evidence reasoning | `demonstrated` | `executeFitnessReadTool('analyse_training_evidence')` in `/api/chat` | `tests/unit/chadwick-reasoning.test.js` + `chat-pilot-tools.test.js` | none | Live gate **blocked** |
-| Pilot behavioural gate (Clare, Chadwick) | `blocked` | local `createChatHandler` via `scripts/live-pilot-verify.mjs` (not the deployed `/api/chat` route) | `tests/integration/live-pilot-runtime-env.test.js` | none | `ANTHROPIC_API_KEY` unset. Tasks/Teaching blobs unbound. Fitness files are present; one pain file exists. Local handler ≠ deployed route. Strict `/api/chat` route gate remains blocked. |
+| Pilot behavioural gate (Clare, Chadwick) | `blocked` | deployed `/api/chat` on `deploy-preview-246--life-hub2` | `tests/integration/live-pilot-runtime-env.test.js` + `tests/integration/chat-job.test.js` | probe job only — no model | Auth worked. Tasks 17 / Teaching 9 visible. GitHub/fitness `503 misconfigured` on Deploy Preview, so `createChatHandler` never opened a model stream. |
 | Specialist expansion | `not started` | — | — | — | Gated on pilots `passed` |
 | Hammond supervisor rebuild | `blocked` | old canned handoff remains prototype | — | — | Specialist reliability not `passed` |
 | Surface unification / kernel default | `not started` | kernel still flagged off | — | — | Gated on pilots + comparison |
@@ -112,6 +112,8 @@ Full `npm test` was not used as the sole proof. Pre-existing env/fixture failure
 
 Those suites are **DETERMINISTIC TEST** only.
 
-Live conversational traces: **none**. `ANTHROPIC_API_KEY` is unset. Run `node scripts/live-pilot-verify.mjs` when a key is present. That script is **LIVE MODEL / LOCAL HANDLER**. It does not satisfy **LIVE MODEL / DEPLOYED ROUTE**. Do not treat a mocked `streamMessage()` as either gate.
+Live conversational traces: **none that invoke a model**. A real `POST` to Deploy Preview `/api/chat` returned `202` then `turn_incomplete` because preview GitHub env is missing. That is **LIVE MODEL / DEPLOYED ROUTE** blocked, not a local-handler substitute.
 
-The harness now forwards one allowlisted runtime `env` to both `probeStores()` and `createChatHandler`, so Tasks/Teaching bindings visible to the probe are the same bindings the handler receives. Secret values are not written into pilot traces.
+The job runner now publishes the underlying JSON error code (`misconfigured`) instead of hiding it as `turn_incomplete`.
+
+The harness still forwards one allowlisted runtime `env` to both `probeStores()` and `createChatHandler`. Secret values are not written into pilot traces.

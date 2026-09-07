@@ -55,6 +55,22 @@ export async function runStoredChatJob({
       await publish('done');
       return true;
     }
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.includes('text/event-stream')) {
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+      events.push({
+        type: 'error',
+        code: payload?.error?.code || 'turn_incomplete',
+        ...(typeof payload?.error?.message === 'string' ? { message: payload.error.message } : {})
+      });
+      await publish('done');
+      return true;
+    }
     await drainSseIntoMemory(response.body, events, async () => {
       await publish('running');
     });
