@@ -178,3 +178,93 @@ and the negatives: failed write, duplicate Confirm, reject.
 - Chadwick evidence reasoning: `demonstrated` (deterministic) / live deployed turns **exercised, not `passed`** (no kernel trace)
 - Pilot behavioural gate: `blocked` (kernel off on preview turns; Confirm continuation not invoked)
 - Confirm conversational continuation: `demonstrated` (not `passed`)
+
+## LIVE MODEL / DEPLOYED ROUTE / KERNEL
+
+Kernel turns used explicit `agentKernel: true` on `POST /api/chat`. Preview env `LIFE_HUB_AGENT_KERNEL=1` still does **not** turn kernel on for job reconstructions; that is a deployment activation issue, not the pilot mechanism.
+
+Head `5cb41510195a84402184ff5774e5b3249b35945d` persists `agentKernel` on the background job body so `/api/chat-run` reconstructs the flag. Failed explicit-flag probe before that fix: `kernel-probe-clare.json` (job `d527a7c6-…`, `kernelEnabled` stayed false).
+
+Production kernel remains off. No specialist expansion. Hammond untouched.
+
+### First kernel tranche (same head, earlier the same day)
+
+All chat bodies included `agentKernel: true`. Every Clare A–E turn was `daily_focus` with 1 retrieve (`get_tasks_focus`, `plan_work`, `get_tasks_open_loops`) and a `truncated` limitation on `get_tasks_focus`. Every Chadwick A–F turn was `training_review` with 1 retrieve. Retrieve never ran a second round. SSE published `kernel_trace`, not `tool_call` frames. Claim `provenance` was usually `null`; Chadwick `sourceRefs` were calculation-level.
+
+Clare Confirm in this tranche: propose `act_5f5a00e7b849` → Confirm 200, `turnResumed: true`, continuation invoked (`Done — added "AGENT PILOT TEST — DELETE ME"…`) → duplicate `400 invalid_action` → deleted `task_mtr8xm2d_68s3er`.
+
+Material defect in this tranche: Chadwick D invented “aching pecs from Friday Bar Press PR” as the reason bench was out. Baseline had asked why bench was out and cited no chest/shoulder flag.
+
+| Scenario | Status | Notes | Trace |
+| --- | --- | --- | --- |
+| Clare A daily planning | exercised | Now/Later; named tool cutoff (12+2) | `kernel-probe-clare-2.json` |
+| Clare B 90-minute capacity | exercised | Constraint respected | `kernel-clare-b.json` |
+| Clare C low energy | exercised | Fixtures vs discretionary reorder | `kernel-clare-c.json` |
+| Clare D calendar | exercised | Explicitly no Teaching lessons today; Lunch/Reports clash | `kernel-clare-d.json` |
+| Clare E uncertainty | exercised | Honest about unknown durations | `kernel-clare-e.json` |
+| Clare F write + Confirm | exercised | Write once + live continuation | `kernel-clare-f.json`, `kernel-clare-f-confirm.json`, `kernel-clare-f-duplicate.json` |
+| Chadwick A–C, E–F | exercised | Genuine sessions / groin / missing abs-back | `kernel-chadwick-a.json` … `kernel-chadwick-f.json` |
+| Chadwick D substitution | exercised, regression | Invented bench-skip medical reason | `kernel-chadwick-d.json` |
+| Chadwick E conflict | not exercised as conflict | No genuine record disagreement | `kernel-chadwick-e.json` |
+
+### Kernel rerun (same head, 2026-09-07 ~13:01–13:05Z)
+
+Same prompts, same deployed URL, same head, new jobs. Traces: `/tmp/life-hub-pilot-traces/deployed/kernel2-*.json`.
+
+Stores at rerun: Tasks 17; Teaching scheduled lessons 9; none dated 2026-09-07.
+
+| Scenario | Status | Trajectory / answer (0–2, frozen rubric) | Trace / job |
+| --- | --- | --- | --- |
+| Clare A daily planning | exercised, meets planner bar | T 2 `daily_focus` + retrieve / A 2 Now-Later; named 12+2 cutoff | `kernel2-clare-a.json` job `175f0c77-…` |
+| Clare B 90-minute capacity | exercised, meets | T 2 / A 2 SMART goals in 90 min; STEAM deferred | `kernel2-clare-b.json` job `82684a73-…` |
+| Clare C low energy | exercised, meets | T 2 / A 2 short wins then SMART goals; fixtures later | `kernel2-clare-c.json` job `7d2135c6-…` |
+| Clare D calendar | exercised via Tasks timetable | T 2 / A 2 no Teaching lessons today; Lunch/Reports 11:50 clash | `kernel2-clare-d.json` job `1e894ec8-…` |
+| Clare E uncertainty | exercised, meets | T 2 / A 2 refused to invent durations; asked to estimate or take numbers | `kernel2-clare-e.json` job `1e48af47-…` |
+| Clare F write + Confirm | exercised, meets write bar | T 2 propose→resume→continuation / A 2 | see Confirm sequence below |
+| Chadwick A recent training | exercised | T 2 `training_review` / A 2 6 Sep + week tonnage spike | `kernel2-chadwick-a.json` job `67013081-…` |
+| Chadwick B progression | exercised | T 2 / A 2 selective yes; 36.5% adherence; groin caution | `kernel2-chadwick-b.json` job `824a3f5d-…` |
+| Chadwick C pain | exercised | T 2 / A 2 groin on goblet squat 5 Sep; cut goblet/Bulgarian | `kernel2-chadwick-c.json` job `7a0d2324-…` |
+| Chadwick D substitution | exercised, no medical invention this run | T 2 / A 2 no chest/shoulder flag; equipment-or-choice swap | `kernel2-chadwick-d.json` job `ebf07e72-…` |
+| Chadwick E conflict | not exercised as conflict | No genuine record disagreement | `kernel2-chadwick-e.json` job `14ba4376-…` |
+| Chadwick F missing evidence | exercised | T 2 / A 2 thin pain + ACWR spike + chest/legs caveats | `kernel2-chadwick-f.json` job `f60ab2e9-…` |
+
+Rerun Confirm live sequence:
+
+```text
+deployed /api/chat agentKernel:true → action_proposal act_4c21adab64eb
+turnId 10e444b4-fbf2-4eff-a118-6617755489ca
+→ POST /api/chat/confirm 200, intent Create task: AGENT PILOT TEST — DELETE ME
+→ turnResumed true, continuation invoked status done
+→ "Done — task created: AGENT PILOT TEST — DELETE ME (task_mtr965ls_ynh2y1), filed under Life."
+→ GET /api/tasks?id=task_mtr965ls_ynh2y1 200 (list /api/tasks still omitted the new row)
+→ duplicate Confirm 400 invalid_action (no second write, no second continuation)
+→ DELETE /api/tasks?id=task_mtr965ls_ynh2y1 200; find-pilot-task 0 hits; list count 17
+```
+
+Traces: `kernel2-clare-f.json`, `kernel2-clare-f-confirm.json`, `kernel2-clare-f-duplicate.json`.
+
+### Performance (Clare A–E + Chadwick A–F, excluding Confirm)
+
+| | Baseline | Kernel first | Kernel rerun | Rerun vs baseline |
+| --- | --- | --- | --- | --- |
+| Latency sum | 215735 ms | 201619 ms | 186895 ms | −13.4% |
+| Input tokens | 23596 | 8186 | 6539 | −72.3% |
+| Output tokens | 7616 | 6052 | 7217 | −5.2% |
+
+Do not invent dollar cost. Token/latency movement is not a pass criterion.
+
+### Defects still open after the rerun
+
+- **Behavioural (first kernel tranche only):** Chadwick D invented a bench-skip medical reason. The rerun did not repeat that; it stated there was no chest/shoulder pain flag.
+- **Kernel:** retrieve stayed at 1 round; no second-round observed. SSE still has no `tool_call` frames (tools only on `kernel_trace`). Most Clare claims have `provenance: null`.
+- **Deployment:** preview `LIFE_HUB_AGENT_KERNEL=1` does not enable kernel without the request flag. `/api/tasks` list missed the just-created pilot task; GET-by-id worked.
+
+## Ledger statuses after kernel rerun
+
+- Clare operational planner: **`passed`** — deployed route, live model, real Tasks, `kernel_trace`, useful planning on A–E, Confirm + live continuation, no critical regression vs baseline. Teaching-today N/A (no lessons on 2026-09-07).
+- Chadwick evidence reasoning: **`demonstrated`**, not `passed` — rerun D was honest; first-tranche D hallucination plus E never a genuine record conflict keep the pilot short of `passed`.
+- Pilot behavioural gate: **`blocked`** (both pilots required).
+- Confirm conversational continuation: **`passed`**.
+- Provenance: **`partial`**.
+- Kernel evidence loop: **`demonstrated`** (always 1 retrieve).
+- Specialists **not started**. Hammond **untouched**. Kernel production **off**.
