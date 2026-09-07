@@ -529,11 +529,29 @@ const LIFT_PAIN_SITES = Object.freeze({
   'overhead press': ['shoulder', 'shoulders', 'wrist', 'elbow', 'neck']
 });
 
+function supportingPainSession(site) {
+  const sessions = Array.isArray(site.sessions) ? site.sessions : [];
+  if (site.id || site.path) {
+    return {
+      id: site.id ?? null,
+      path: site.path ?? null,
+      date: site.latest_date ?? site.date ?? null,
+      note: site.latest_note ?? site.note ?? null
+    };
+  }
+  return sessions.find(session => session.date === site.latest_date)
+    ?? sessions.slice().sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')))[0]
+    ?? null;
+}
+
 function compactPainSite(site) {
+  const session = supportingPainSession(site);
   return {
     site: site.site,
-    latest_date: site.latest_date ?? null,
-    latest_note: site.latest_note ?? null
+    latest_date: site.latest_date ?? session?.date ?? null,
+    latest_note: site.latest_note ?? session?.note ?? null,
+    id: site.id ?? session?.id ?? null,
+    path: site.path ?? session?.path ?? null
   };
 }
 
@@ -562,12 +580,14 @@ function namedLiftInQuery(query) {
 
 /**
  * Shared evidence/interpretation boundary for substitution, pain, and progression.
- * A cause is a stored fact or a current-turn user statement — never an invented session.
+ * Only user_stated_current_turn or an explicit current_active_constraint may be a cause.
+ * Workout pain flags are historical_relevant_pain: context, never today's cause.
+ * There is no current-active-constraint persistence for workout pain in this kernel.
  */
 export function classifyUnavailableCause(query, { lift = null, painSites = [] } = {}) {
   const sites = Array.isArray(painSites) ? painSites : [];
-  const matching = sites.filter(site => painAppliesToLift(site.site, lift));
-  const unrelated = sites.filter(site => !painAppliesToLift(site.site, lift));
+  const historical = sites.filter(site => painAppliesToLift(site.site, lift)).map(compactPainSite);
+  const unrelated = sites.filter(site => !painAppliesToLift(site.site, lift)).map(compactPainSite);
   const userStated = extractUserStatedCause(query);
   if (userStated) {
     return {
@@ -575,20 +595,10 @@ export function classifyUnavailableCause(query, { lift = null, painSites = [] } 
       kind: 'user_stated_current_turn',
       user_stated_reason: userStated,
       stored_reason: null,
-      matching_stored_pain: matching.map(compactPainSite),
-      unrelated_pain: unrelated.map(compactPainSite)
-    };
-  }
-  if (matching[0]) {
-    return {
-      status: 'stored',
-      kind: 'stored_pain',
-      user_stated_reason: null,
-      stored_reason: matching[0].latest_note
-        ? `${matching[0].site} — ${matching[0].latest_note}`
-        : matching[0].site,
-      matching_stored_pain: matching.map(compactPainSite),
-      unrelated_pain: unrelated.map(compactPainSite)
+      current_active_constraint: null,
+      historical_relevant_pain: historical,
+      matching_stored_pain: historical,
+      unrelated_pain: unrelated
     };
   }
   return {
@@ -596,8 +606,10 @@ export function classifyUnavailableCause(query, { lift = null, painSites = [] } 
     kind: 'unknown_cause',
     user_stated_reason: null,
     stored_reason: null,
-    matching_stored_pain: [],
-    unrelated_pain: unrelated.map(compactPainSite)
+    current_active_constraint: null,
+    historical_relevant_pain: historical,
+    matching_stored_pain: historical,
+    unrelated_pain: unrelated
   };
 }
 
@@ -702,7 +714,7 @@ export function analyseTrainingEvidence(records, today, { query, pain, snapshot,
     write_required: Boolean(substitution || progression),
     confirmation_required: true,
     how_to_read: cause
-      ? `Reasoning notes from retrieved sessions. ${cause.status === 'unknown' ? 'Unknown cause: do not invent why the lift is unavailable.' : cause.status === 'user_stated' ? 'Cause is user-stated in this turn, not a stored record.' : 'Cause is stored pain that matches the requested lift.'} Unrelated pain is not an explanation. Missing or conflicting sessions stay named. No write without Confirm.`
+      ? `Reasoning notes from retrieved sessions. ${cause.status === 'unknown' ? 'Unknown cause: do not invent why the lift is unavailable. Historical matching pain is context, not a current cause.' : cause.status === 'user_stated' ? 'Cause is user-stated in this turn, not a stored record. Historical matching pain remains context.' : cause.status === 'active' ? 'Cause is an explicit current active constraint.' : 'Historical matching pain is context, not a current cause.'} Unrelated pain is not an explanation. Missing or conflicting sessions stay named. No write without Confirm.`
       : 'Reasoning notes from retrieved sessions. Missing or conflicting sessions stay named. No write without Confirm.'
   };
 }

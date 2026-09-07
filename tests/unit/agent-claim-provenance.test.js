@@ -99,6 +99,73 @@ test('Chadwick material claims carry session or calculation provenance', () => {
   assert.deepEqual(unexplained.map(claim => `${claim.tool}:${claim.fact}`), []);
 });
 
+test('historical relevant pain keeps source record provenance and is not the unavailable cause', () => {
+  const kernel = runAgentKernel({
+    slug: 'chadwick',
+    message: 'Bench is out today. Give me another option.',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      workouts: [{
+        id: 'wo-weeks-ago',
+        path: 'life/health/fitness/workouts/2026-07-28-upper.md',
+        type: 'workout',
+        status: 'completed',
+        date: '2026-07-28',
+        title: 'Upper',
+        pain_flags: [{ site: 'left shoulder', note: 'twinge on press' }],
+        exercises: [{ name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] }]
+      }]
+    }
+  });
+  const cause = kernel.claims.find(claim => claim.fact === 'unavailable_cause');
+  assert.equal(cause.value, 'unknown');
+  assert.equal(cause.kind, 'inference');
+  assert.equal(cause.provenance.reason, 'inference');
+  assert.equal(cause.provenance.recordId, null);
+  const historical = kernel.claims.find(claim => claim.fact === 'historical_relevant_pain');
+  assert.ok(historical);
+  assert.equal(historical.kind, 'record');
+  assert.equal(historical.provenance.sourceType, 'record');
+  assert.equal(historical.provenance.recordId, 'wo-weeks-ago');
+  assert.equal(historical.provenance.recordPath, 'life/health/fitness/workouts/2026-07-28-upper.md');
+  assert.equal(historical.provenance.date, '2026-07-28');
+  assert.notEqual(historical.provenance.reason, 'unavailable_source');
+  const unexplained = kernel.claims.filter(claim => !usableProvenance(claim.provenance));
+  assert.deepEqual(unexplained.map(claim => `${claim.tool}:${claim.fact}`), []);
+});
+
+test('user-stated unavailable cause does not claim a stored workout as its source', () => {
+  const composed = composeEvidenceClaims({
+    analyse_training_evidence: {
+      ok: true,
+      store: 'life_hub_fitness',
+      kind: 'calculation',
+      cause: {
+        status: 'user_stated',
+        kind: 'user_stated_current_turn',
+        user_stated_reason: 'my shoulder is sore',
+        stored_reason: null,
+        current_active_constraint: null,
+        historical_relevant_pain: [{
+          site: 'left shoulder',
+          latest_date: '2026-07-28',
+          latest_note: 'old flag',
+          id: 'wo-weeks-ago',
+          path: 'life/health/fitness/workouts/2026-07-28-upper.md'
+        }],
+        unrelated_pain: []
+      }
+    }
+  });
+  const cause = composed.claims.find(claim => claim.fact === 'unavailable_cause');
+  assert.equal(cause.value, 'user_stated');
+  assert.equal(cause.provenance.reason, 'user_stated_current_turn');
+  assert.equal(cause.provenance.recordId, null);
+  const historical = composed.claims.find(claim => claim.fact === 'historical_relevant_pain');
+  assert.equal(historical.provenance.recordId, 'wo-weeks-ago');
+});
+
 test('kernel_trace exposes retrieve rounds and an inspectable sufficiency decision', () => {
   const tasks = Array.from({ length: 14 }, (_, i) => ({
     id: `t${i}`,

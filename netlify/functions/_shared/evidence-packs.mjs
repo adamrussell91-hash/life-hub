@@ -683,23 +683,32 @@ export function composeEvidenceClaims(evidence = {}) {
       pushClaim(claims, tool, 'substitution', result.substitution.replacement, 'calculation', calc('substitution', 'substitution_map'));
     }
     if (result.cause?.status) {
-      const causeKind = result.cause.status === 'user_stated'
-        ? 'inference'
-        : result.cause.status === 'stored' ? 'record' : 'inference';
+      const isActive = result.cause.status === 'active' || result.cause.kind === 'current_active_constraint';
+      const causeKind = isActive ? 'record' : 'inference';
       const causeReason = result.cause.status === 'user_stated'
         ? 'user_stated_current_turn'
-        : result.cause.status === 'unknown'
-          ? 'inference'
-          : undefined;
-      const storedPain = result.cause.matching_stored_pain?.[0];
+        : isActive
+          ? undefined
+          : 'inference';
+      const activeRecord = result.cause.current_active_constraint;
       pushClaim(claims, tool, 'unavailable_cause', result.cause.status, causeKind, claimProvenance(result, tool, {
-        sourceType: result.cause.status === 'stored' ? 'record' : 'calculation',
+        sourceType: isActive ? 'record' : 'calculation',
         reason: causeReason,
-        record: result.cause.status === 'stored' ? storedPain : null,
-        date: storedPain?.latest_date,
+        record: isActive ? activeRecord : null,
+        date: isActive ? (activeRecord?.latest_date ?? activeRecord?.date) : undefined,
         calculation: 'unavailable_cause',
         kind: causeKind
       }));
+      for (const site of result.cause.historical_relevant_pain ?? []) {
+        const hasRecord = Boolean(site.id || site.path);
+        pushClaim(claims, tool, 'historical_relevant_pain', site.site, hasRecord ? 'record' : 'calculation', claimProvenance(result, tool, {
+          sourceType: hasRecord ? 'record' : 'calculation',
+          record: hasRecord ? site : null,
+          date: site.latest_date,
+          reason: hasRecord ? undefined : 'derived_from_aggregate',
+          calculation: hasRecord ? undefined : 'historical_relevant_pain'
+        }));
+      }
     }
     if (result.progression?.ok === false) {
       pushClaim(claims, tool, 'progression_blocked', result.progression.reason, 'calculation', calc('progression_blocked', 'progression_gate'));

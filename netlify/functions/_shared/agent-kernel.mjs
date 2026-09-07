@@ -1078,14 +1078,18 @@ function trainingCauseLines(state) {
   const cause = state.evidence.analyse_training_evidence?.cause;
   if (!cause) return [];
   const unrelated = (cause.unrelated_pain ?? []).map(item => item.site).filter(Boolean).join(', ');
+  const historical = (cause.historical_relevant_pain ?? []).map(item => item.site).filter(Boolean).join(', ');
   const lines = [];
   if (cause.status === 'unknown') {
     lines.push('- The reason the requested lift is unavailable is an unknown cause. Do not invent soreness, injury, a prior PR, or a failed session.');
     lines.push('- A recent completed session is stored fact. It is not evidence that pecs, chest, or shoulders are sore today unless Adam said so this turn.');
   } else if (cause.status === 'user_stated') {
     lines.push(`- Adam stated a current-turn reason (${cause.user_stated_reason}). Treat it as user_stated_current_turn, not a stored record.`);
-  } else if (cause.status === 'stored') {
-    lines.push(`- Stored pain evidence may explain the requested lift (${cause.stored_reason}). Do not invent additional causes.`);
+  } else if (cause.status === 'active' || cause.kind === 'current_active_constraint') {
+    lines.push(`- An explicit current_active_constraint may explain the requested lift (${cause.stored_reason || cause.current_active_constraint?.site || 'active constraint'}). Do not invent additional causes.`);
+  }
+  if (historical) {
+    lines.push(`- Historical relevant pain (${historical}) is stored context from a past workout flag. It is not a current cause and does not mean that site is sore today.`);
   }
   if (unrelated) {
     lines.push(`- Unrelated stored pain (${unrelated}) is not an explanation for the requested lift.`);
