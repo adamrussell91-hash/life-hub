@@ -737,6 +737,54 @@ export function composeEvidenceClaims(evidence = {}) {
       pushClaim(claims, tool, 'first_result_provider', first.provider, 'record', firstProv);
       pushClaim(claims, tool, 'first_result_notes', first.notes_excerpt ?? first.notes, 'record', firstProv);
     }
+    if (Array.isArray(result.hits) && result.hits[0]) {
+      for (const hit of result.hits.slice(0, 5)) {
+        const hitProv = recordOf(hit, { store: result.store ?? 'knowledge_hub' });
+        pushClaim(claims, tool, 'note_id', hit.id, 'record', hitProv);
+        pushClaim(claims, tool, 'note_title', hit.title, 'record', hitProv);
+        if (hit.path) pushClaim(claims, tool, 'note_path', hit.path, 'record', hitProv);
+      }
+    }
+    if (Array.isArray(result.graph_links)) {
+      pushClaim(claims, tool, 'graph_link_count', result.graph_links.length, 'calculation', calc('graph_link_count', 'graph_links', {
+        store: result.store ?? 'knowledge_hub',
+        inputs: ['knowledge_hub']
+      }));
+      if (result.graph_links[0]) {
+        pushClaim(claims, tool, 'graph_link', `${result.graph_links[0].from}->${result.graph_links[0].to}`, 'record', claimProvenance(result, tool, {
+          sourceType: 'record',
+          store: result.store ?? 'knowledge_hub',
+          recordId: result.graph_links[0].from,
+          reason: undefined
+        }));
+      }
+    }
+    if (Array.isArray(result.inferred_relations) && result.inferred_relations.length) {
+      pushClaim(claims, tool, 'inferred_relation_count', result.inferred_relations.length, 'inference', claimProvenance(result, tool, {
+        sourceType: 'calculation',
+        reason: 'inference',
+        calculation: 'inferred_note_overlap',
+        store: result.store ?? 'knowledge_hub',
+        kind: 'inference'
+      }));
+    }
+    if (Array.isArray(result.themes) && result.themes[0]) {
+      pushClaim(claims, tool, 'theme', result.themes[0].theme, 'calculation', calc('theme', 'derived_theme', {
+        store: result.store ?? 'knowledge_hub',
+        inputs: result.themes[0].page_ids ?? ['knowledge_hub']
+      }));
+    }
+    if (Array.isArray(result.conflicts) && result.conflicts.length) {
+      pushClaim(claims, tool, 'note_conflict_count', result.conflicts.length, 'calculation', calc('note_conflict_count', 'note_conflicts', {
+        store: result.store ?? 'knowledge_hub',
+        inputs: ['knowledge_hub']
+      }));
+    }
+    if (result.coverage?.weak_match) {
+      pushClaim(claims, tool, 'weak_match', true, 'calculation', calc('weak_match', 'weak_match', {
+        store: result.store ?? 'knowledge_hub'
+      }));
+    }
     pushClaim(claims, tool, 'delta_kg', result.delta_kg, 'calculation', calc('delta_kg', 'weight_delta'));
     if (result.found != null) {
       pushClaim(claims, tool, 'found', result.found, result.found ? 'record' : 'calculation', result.found

@@ -236,7 +236,7 @@ export function rankKnowledgePages(entries, query) {
     })
     .filter(Boolean)
     .sort((a, b) => b.score - a.score)
-    .map(row => row.entry);
+    .map(row => ({ ...row.entry, score: row.score }));
 }
 
 export function parseQuizStore(raw) {

@@ -765,9 +765,11 @@ export function searchKnowledge(pages = [], { query, limit = DEFAULT_LIMIT } = {
     results: slice.map(page => ({
       id: page.id,
       title: page.title,
+      path: page.path ?? null,
       tags: page.tags ?? [],
       excerpt: page.excerpt ?? null,
-      connected: page.connected ?? []
+      connected: page.connected ?? page.backlinks ?? [],
+      score: page.score ?? null
     })),
     how_to_read: 'Retrieved Knowledge notes. Distinguish these from any new synthesis you add.'
   };

@@ -375,6 +375,39 @@ export function getKnowledgeSynthesis(pages = [], { query = '', limit = 10 } = {
   }));
   const research = researchFromDocs({ query: q, docs, k: limit });
   const coverage = coverageFromResearch(research);
+
+  const hitIds = new Set(ranked.map(p => p.id));
+  const graphLinks = [];
+  const inferredRelations = [];
+  for (const page of ranked) {
+    const connected = normalizeConnectedList(page.connected ?? page.backlinks ?? []);
+    for (const target of connected) {
+      if (hitIds.has(target) && target !== page.id) {
+        graphLinks.push({ from: page.id, to: target, kind: 'graph_link' });
+      }
+    }
+    for (const other of ranked) {
+      if (other.id === page.id) continue;
+      const sharedTags = intersectTags(page.tags, other.tags);
+      if (sharedTags.length && !connected.includes(other.id)) {
+        inferredRelations.push({
+          from: page.id,
+          to: other.id,
+          kind: 'inferred_overlap',
+          shared_tags: sharedTags
+        });
+      }
+    }
+  }
+
+  const conflicts = detectNoteConflicts(ranked);
+  const themes = deriveRecurringThemes(ranked);
+  const weak = ranked.length > 0 && Math.max(...ranked.map(p => Number(p.score) || 0)) < 25;
+  const gaps = [...(research.gaps ?? [])];
+  if (weak) gaps.push('Matches look lexically weak — do not treat them as strong conceptual agreement.');
+  if (conflicts.length) gaps.push('Retrieved notes disagree — keep both sides visible.');
+  if (!ranked.length) gaps.push(`No archive notes matched “${q}”.`);
+
   return {
     ok: true,
     store: 'knowledge_hub',
@@ -383,14 +416,126 @@ export function getKnowledgeSynthesis(pages = [], { query = '', limit = 10 } = {
     hits: ranked.map(p => ({
       id: p.id,
       title: p.title,
+      path: p.path ?? null,
       tags: p.tags ?? [],
-      connected: p.connected ?? p.backlinks ?? [],
+      connected: normalizeConnectedList(p.connected ?? p.backlinks ?? []),
       claims: p.claims ?? [],
-      excerpt: p.excerpt ?? p.summary ?? null
+      excerpt: p.excerpt ?? p.summary ?? null,
+      score: p.score ?? null
     })),
-    coverage,
-    how_to_read: 'Synthesis must cite hit ids. Coverage gaps are missing evidence, not permission to invent sources.'
+    graph_links: dedupeLinks(graphLinks),
+    inferred_relations: dedupeLinks(inferredRelations).slice(0, 12),
+    conflicts,
+    themes,
+    coverage: {
+      ...coverage,
+      weak_match: weak,
+      graph_link_count: dedupeLinks(graphLinks).length,
+      inferred_relation_count: dedupeLinks(inferredRelations).length,
+      conflict_count: conflicts.length
+    },
+    gaps,
+    how_to_read:
+      'Cite hit ids for note facts. graph_links are stored connections. '
+      + 'inferred_relations are lexical/tag overlap only — not stored links. '
+      + 'themes and cross-note conclusions are derived. conflicts stay visible. Never invent pages.'
   };
+}
+
+function normalizeConnectedList(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(item => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object') return item.id || item.pageId || item.target || null;
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function intersectTags(a = [], b = []) {
+  const left = new Set((a ?? []).map(tag => String(tag).toLowerCase()));
+  return (b ?? []).map(tag => String(tag)).filter(tag => left.has(tag.toLowerCase()));
+}
+
+function dedupeLinks(links) {
+  const seen = new Set();
+  const out = [];
+  for (const link of links ?? []) {
+    const key = [link.kind, link.from, link.to, ...(link.shared_tags ?? [])].join(':');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(link);
+  }
+  return out;
+}
+
+function detectNoteConflicts(pages = []) {
+  const conflicts = [];
+  const polarity = [
+    ['supports', 'rejects'],
+    ['agree', 'disagree'],
+    ['works', 'fails'],
+    ['effective', 'ineffective'],
+    ['true', 'false'],
+    ['yes', 'no']
+  ];
+  for (let i = 0; i < pages.length; i++) {
+    for (let j = i + 1; j < pages.length; j++) {
+      const a = pages[i];
+      const b = pages[j];
+      const textA = [a.title, a.excerpt, a.summary, ...(a.claims ?? [])].join(' ').toLowerCase();
+      const textB = [b.title, b.excerpt, b.summary, ...(b.claims ?? [])].join(' ').toLowerCase();
+      for (const [pos, neg] of polarity) {
+        const aPos = textA.includes(pos) && !textA.includes(neg);
+        const aNeg = textA.includes(neg) && !textA.includes(pos);
+        const bPos = textB.includes(pos) && !textB.includes(neg);
+        const bNeg = textB.includes(neg) && !textB.includes(pos);
+        if ((aPos && bNeg) || (aNeg && bPos)) {
+          conflicts.push({
+            a: a.id,
+            b: b.id,
+            signal: `${pos}/${neg}`,
+            kind: 'content_conflict'
+          });
+        }
+      }
+      const claimsA = (a.claims ?? []).map(c => String(c).toLowerCase());
+      const claimsB = (b.claims ?? []).map(c => String(c).toLowerCase());
+      for (const ca of claimsA) {
+        for (const cb of claimsB) {
+          if (ca && cb && ca !== cb && (ca.includes('not ') && cb.replace(/^not\s+/, '') === ca.replace(/^not\s+/, '') || cb.includes('not ') && ca.replace(/^not\s+/, '') === cb.replace(/^not\s+/, ''))) {
+            conflicts.push({ a: a.id, b: b.id, signal: 'negated_claim', kind: 'claim_conflict' });
+          }
+        }
+      }
+    }
+  }
+  return conflicts.slice(0, 8);
+}
+
+function deriveRecurringThemes(pages = []) {
+  const counts = new Map();
+  for (const page of pages) {
+    for (const tag of page.tags ?? []) {
+      const key = String(tag).toLowerCase();
+      if (!key) continue;
+      const row = counts.get(key) ?? { tag, count: 0, page_ids: [] };
+      row.count += 1;
+      row.page_ids.push(page.id);
+      counts.set(key, row);
+    }
+  }
+  return [...counts.values()]
+    .filter(row => row.count >= 2)
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+    .slice(0, 8)
+    .map(row => ({
+      theme: row.tag,
+      count: row.count,
+      page_ids: row.page_ids,
+      kind: 'derived_theme'
+    }));
 }
 
 export function getHammondAttentionPack({

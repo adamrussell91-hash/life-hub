@@ -109,8 +109,10 @@ const LESSON = new Set([
   'planned', 'schedule', 'scheduled', 'resources', 'period', 'timetable'
 ]);
 const KNOW = new Set([
-  'know', 'notes', 'archive', 'research', 'already', 'corpus', 'knowledge',
-  'synthesis', 'topic', 'about'
+  'know', 'notes', 'note', 'archive', 'research', 'already', 'corpus', 'knowledge',
+  'synthesis', 'topic', 'about', 'theme', 'themes', 'connect', 'connected', 'link',
+  'links', 'disagree', 'conflict', 'evidence', 'project', 'written', 'wrote', 'gap',
+  'gaps', 'related', 'bridge', 'idea', 'ideas'
 ]);
 const FOOD = new Set([
   'eat', 'ate', 'eaten', 'meal', 'meals', 'nutrition', 'calorie', 'calories',
@@ -877,6 +879,7 @@ export function assessEvidence(state) {
 
   if (state.plan?.workflow === 'knowledge_research') {
     const notes = state.evidence.search_knowledge;
+    const synthesis = state.evidence.get_knowledge_synthesis;
     if (notes && notes.ok !== false && (notes.count ?? 0) === 0) {
       limitations.push({
         tool: 'search_knowledge',
@@ -884,6 +887,25 @@ export function assessEvidence(state) {
         text: 'No archive notes matched the query'
       });
       coverage.missing.push('knowledge_notes');
+    }
+    if (synthesis?.coverage?.weak_match) {
+      limitations.push({
+        tool: 'get_knowledge_synthesis',
+        kind: 'weak_match',
+        text: 'Knowledge matches are lexically weak — do not treat them as strong conceptual links'
+      });
+    }
+    if (synthesis?.conflicts?.length) {
+      conflicts.push({
+        tool: 'get_knowledge_synthesis',
+        kind: 'conflict',
+        text: `${synthesis.conflicts.length} note conflict(s) in the retrieved set`
+      });
+      limitations.push({
+        tool: 'get_knowledge_synthesis',
+        kind: 'conflict',
+        text: `${synthesis.conflicts.length} note conflict(s) stay visible — do not flatten disagreement`
+      });
     }
   }
 
@@ -1157,6 +1179,37 @@ function teachingInterpretationLines(state) {
   return lines;
 }
 
+function knowledgeInterpretationLines(state) {
+  if (state.plan?.workflow !== 'knowledge_research') return [];
+  const lines = [];
+  const noteCount = Number(state.claims.find(claim => claim.tool === 'search_knowledge' && claim.fact === 'result_count')?.value ?? 0);
+  const synthesis = state.evidence.get_knowledge_synthesis;
+  if (noteCount) {
+    lines.push('- Archive notes were retrieved. Distinguish note facts from derived synthesis. Never invent pages.');
+  } else {
+    lines.push('- No archive notes matched. Do not invent a page or citation.');
+  }
+  if (synthesis?.graph_links?.length) {
+    lines.push('- graph_links are stored Knowledge connections. Cite both ends.');
+  }
+  if (synthesis?.inferred_relations?.length) {
+    lines.push('- inferred_relations are lexical/tag overlap only. Do not convert them into stored links.');
+  }
+  if (synthesis?.conflicts?.length) {
+    lines.push('- Retrieved notes disagree. Keep both sides visible; do not flatten disagreement.');
+  }
+  if (synthesis?.themes?.length) {
+    lines.push('- Recurring themes are derived across notes. They are not themselves stored page titles.');
+  }
+  if (synthesis?.coverage?.weak_match) {
+    lines.push('- Matches are lexically weak. Do not treat weak overlap as a strong conceptual relationship.');
+  }
+  if (state.evidence.search_teaching?.count > 0) {
+    lines.push('- Teaching bridge hits are Teaching Hub records, not Knowledge pages. Keep store provenance separate.');
+  }
+  return lines;
+}
+
 function doCompose(state) {
   const composed = composeEvidenceClaims(state.evidence);
   state.claims = composed.claims;
@@ -1195,7 +1248,6 @@ function doCompose(state) {
   const workflow = state.plan?.workflow;
   const weightConflict = state.limitations.some(item => item.kind === 'conflict' && item.tool === 'get_weight_trend');
   const medicalHits = Number(state.claims.find(claim => claim.tool === 'search_medical_records' && claim.fact === 'result_count')?.value ?? 0);
-  const noteCount = Number(state.claims.find(claim => claim.tool === 'search_knowledge' && claim.fact === 'result_count')?.value ?? 0);
   const mealsToday = state.coverage.missing.includes('meals_today');
   const skinLogs = state.coverage.missing.includes('skincare_logs');
   const diaryHits = state.coverage.missing.includes('diary_hits');
@@ -1211,6 +1263,7 @@ function doCompose(state) {
       : '',
     ...trainingCauseLines(state),
     ...teachingInterpretationLines(state),
+    ...knowledgeInterpretationLines(state),
     workflow === 'daily_focus'
       ? (overdue
         ? `- Overdue work is present (${state.claims.find(claim => claim.fact === 'overdue_title')?.value}). Do not ignore it when naming the next move.`
@@ -1225,11 +1278,6 @@ function doCompose(state) {
         : medicalHits
           ? '- Medical hits are retrieved records. Do not invent extra visits or results.'
           : '- No matching medical visits were retrieved. Do not invent an appointment or lab result.')
-      : '',
-    workflow === 'knowledge_research'
-      ? (noteCount
-        ? '- Archive notes were retrieved. Distinguish them from new synthesis. Never invent pages.'
-        : '- No archive notes matched. Do not invent a page or citation.')
       : '',
     workflow === 'nutrition_adherence'
       ? (mealsToday
