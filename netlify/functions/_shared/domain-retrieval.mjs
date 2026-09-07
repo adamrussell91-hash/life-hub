@@ -105,18 +105,33 @@ export function getNutritionAdherence(records, today, { targetsConfig = TARGETS_
     date: today
   });
   const summarise = days => {
+    const daysInWindow = days.length;
     const withLogs = days.filter(d => d.calories > 0 || d.protein_g > 0);
-    const proteinHits = days.filter(d => d.hitProtein).length;
+    const daysLogged = withLogs.length;
+    const proteinHits = withLogs.filter(d => d.hitProtein).length;
+    const observedHitRate = daysLogged
+      ? Math.round((proteinHits / daysLogged) * 100)
+      : null;
+    const loggingCoverage = daysInWindow
+      ? Math.round((daysLogged / daysInWindow) * 100)
+      : 0;
     return {
-      days_logged: withLogs.length,
+      days_in_window: daysInWindow,
+      days_logged: daysLogged,
       protein_target_hits: proteinHits,
-      protein_hit_rate_pct: days.length
-        ? Math.round((proteinHits / days.length) * 100)
-        : 0,
-      over_fat_days: days.filter(d => d.overFatCeiling).length,
-      avg_protein_g: withLogs.length
-        ? Math.round(withLogs.reduce((s, d) => s + d.protein_g, 0) / withLogs.length)
-        : 0
+      // Observed rate among logged days only — never divide by unlogged window days.
+      protein_hit_rate_pct: observedHitRate,
+      observed_protein_hit_rate_pct: observedHitRate,
+      logging_coverage_pct: loggingCoverage,
+      coverage_status: daysLogged === 0
+        ? 'none'
+        : daysLogged < daysInWindow
+          ? 'incomplete'
+          : 'complete',
+      over_fat_days: withLogs.filter(d => d.overFatCeiling).length,
+      avg_protein_g: daysLogged
+        ? Math.round(withLogs.reduce((s, d) => s + d.protein_g, 0) / daysLogged)
+        : null
     };
   };
   const weekDays = model.week ?? [];
@@ -133,8 +148,10 @@ export function getNutritionAdherence(records, today, { targetsConfig = TARGETS_
     month: summarise(model.month),
     unlogged_week_days: unloggedWeekDays,
     how_to_read:
-      'Deterministic counts from meal files — not an estimate. '
-      + 'Unlogged days are missing evidence, not zero intake. Do not infer adherence from incomplete logging.'
+      'observed_protein_hit_rate_pct is hits among logged days only. '
+      + 'logging_coverage_pct is days_logged / days_in_window. '
+      + 'Unlogged days are missing evidence, not zero intake or failed adherence. '
+      + 'Do not infer full-window adherence from incomplete logging.'
   };
 }
 
@@ -276,21 +293,20 @@ export function searchDiaryRecords(events, input = {}) {
 function focusDiaryQuery(query = '') {
   const text = String(query ?? '');
   const mood = text.match(
-    /\b(anxious|anxiety|flat|low|sad|angry|anger|overwhelmed|tired|hopeful|calm|stress|grief|shame|sleep|feeling|feelings|felt|feel|mood|theme|themes|pattern|patterns)\b/gi
+    /\b(anxious|anxiety|flat|low|sad|angry|anger|overwhelmed|tired|hopeful|calm|stress|grief|shame|sleep|feeling|feelings|felt|feel|mood|theme|themes|pattern|patterns|work)\b/gi
   ) || [];
   if (mood.length) {
-    const expanded = new Set();
+    // Keep unique surface terms; feel-stem synonymy is handled in searchMindRecords matching.
+    const unique = [];
+    const seen = new Set();
     for (const raw of mood) {
       const w = raw.toLowerCase();
-      expanded.add(w);
-      if (w === 'felt' || w === 'feel' || w === 'feeling' || w === 'feelings') {
-        expanded.add('feel');
-        expanded.add('felt');
-        expanded.add('feeling');
-        expanded.add('feelings');
-      }
+      const key = ['feel', 'felt', 'feeling', 'feelings'].includes(w) ? '__feel__' : w;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(w);
     }
-    return [...expanded].join(' ');
+    return unique.join(' ');
   }
   const stop = new Set([
     'have', 'has', 'had', 'what', 'when', 'where', 'which', 'this', 'that', 'with', 'from',

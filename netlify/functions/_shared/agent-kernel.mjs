@@ -1037,7 +1037,7 @@ export function assessEvidence(state) {
       limitations.push({
         tool: 'analyse_diary_evidence',
         kind: 'insufficient_match',
-        text: 'Fallback diary context is present but no supported recurrence matched the query'
+        text: 'No supported full diary matches — partial or fallback context only'
       });
     }
     if (analysis?.recurrence_strength === 'single_entry') {
@@ -1383,16 +1383,43 @@ function brisketInterpretationLines(state) {
   } else {
     lines.push('- Intake claims must come from logged meals only.');
   }
+  const week = analysis?.week_adherence;
+  if (week && typeof week === 'object') {
+    const hits = week.protein_target_hits;
+    const logged = week.days_logged;
+    const window = week.days_in_window;
+    const observed = week.observed_protein_hit_rate_pct ?? week.protein_hit_rate_pct;
+    const coverage = week.logging_coverage_pct;
+    if (logged === 0) {
+      lines.push('- No days were logged in the window. Observed protein hit rate is unavailable — do not report 0% adherence as if zero intake was observed.');
+    } else if (week.coverage_status === 'incomplete' || (coverage != null && coverage < 100)) {
+      lines.push(
+        `- Among logged days, ${hits}/${logged} hit the protein target`
+        + (observed != null ? ` (observed hit rate ${observed}%)` : '')
+        + `. Only ${logged}/${window} days were logged`
+        + (coverage != null ? ` (coverage ${coverage}%)` : '')
+        + ', so full-week adherence cannot be established.'
+      );
+    } else if (observed != null) {
+      lines.push(`- Observed protein hit rate among logged days is ${observed}% with full logging coverage in the window.`);
+    }
+  }
   if ((analysis?.unlogged_week_days ?? []).length) {
     lines.push('- Some recent days have no meal log. Do not infer adherence from incomplete logging and do not invent those meals.');
   }
   if ((analysis?.yesterday_meal_count ?? 0) > 0) {
     lines.push('- Yesterday\'s meals stay on yesterday. Do not convert them into today\'s intake.');
   }
-  if (analysis?.miss_day) {
-    lines.push(`- Miss-day meal contributions are from confirmed miss date ${analysis.miss_day} only. They are meals logged that day, not a causal explanation.`);
-  } else if (analysis?.miss_day_basis === 'no_confirmed_miss_day') {
-    lines.push('- No defensible confirmed miss day was identified. Do not attribute arbitrary meals as contributors to a target miss.');
+  if (analysis?.week_vs_previous?.comparison_limitation) {
+    lines.push(`- Period comparison limitation: ${analysis.week_vs_previous.comparison_limitation}`);
+  }
+  if (analysis?.below_target_day) {
+    lines.push(
+      `- On the most recent logged day where recorded protein remained below target (${analysis.below_target_day}), `
+      + 'these meals were logged. They are stored meal facts for that date, not proof the day is complete and not a causal explanation of a confirmed miss.'
+    );
+  } else if (analysis?.below_target_day_basis === 'no_observed_below_target_day') {
+    lines.push('- No defensible observed-below-target day was identified. Do not attribute arbitrary meals as contributors to a target miss.');
   }
   if (analysis?.stated_constraints?.current_intake_note) {
     lines.push(`- Adam stated a current-turn intake note (${analysis.stated_constraints.current_intake_note}). Treat it as user_stated_current_turn, not a stored meal row.`);
@@ -1430,7 +1457,9 @@ function penelopeInterpretationLines(state) {
   const strength = analysis?.recurrence_strength;
   const supported = analysis?.supported_match_count ?? analysis?.hit_count ?? 0;
   if (!supported) {
-    if ((analysis?.fallback_count ?? 0) > 0 || strength === 'insufficient_match') {
+    if ((analysis?.partial_count ?? 0) > 0) {
+      lines.push('- No supported full diary matches. Partial token matches are context only and do not establish recurrence.');
+    } else if ((analysis?.fallback_count ?? 0) > 0 || strength === 'insufficient_match') {
       lines.push('- No supported recurrence matched the requested feeling, theme, or situation.');
       lines.push('- Recent diary entries retrieved as fallback context are context only. They are not evidence that the requested feeling recurred.');
     } else {
@@ -1442,6 +1471,9 @@ function penelopeInterpretationLines(state) {
     lines.push('- Recurrence evidence is weak. Do not overstate the pattern.');
   } else if (strength === 'multi_entry_recurrence') {
     lines.push('- Recurrence must stay grounded in genuine retrieved diary matches. Themes are derived frequency, not stored facts.');
+  }
+  if ((analysis?.partial_count ?? 0) > 0 && supported > 0) {
+    lines.push('- Partial token matches remain context only and do not increase recurrence strength.');
   }
   if ((analysis?.fallback_count ?? 0) > 0 && supported > 0) {
     lines.push('- Fallback recent entries remain context only and do not increase recurrence strength.');

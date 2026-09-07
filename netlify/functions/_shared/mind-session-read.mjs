@@ -120,54 +120,131 @@ function queryTokens(query) {
   return String(query ?? '')
     .toLowerCase()
     .split(/\s+/)
-    .map(token => token.trim())
+    .map(token => token.trim().replace(/[^a-z0-9_]+/g, ''))
     .filter(token => token.length >= 2);
 }
 
+const SEARCH_STOP = new Set([
+  'have', 'has', 'had', 'what', 'when', 'where', 'which', 'this', 'that', 'with', 'from',
+  'about', 'like', 'before', 'after', 'often', 'please', 'across', 'there', 'their',
+  'would', 'could', 'should', 'does', 'did', 'the', 'and', 'for', 'are', 'was', 'were',
+  'been', 'being', 'into', 'your', 'mine', 'just', 'very', 'much', 'more', 'some',
+  'than', 'then', 'them', 'they', 'will', 'can', 'how', 'why', 'who', 'whom',
+  'repeatedly', 'discuss', 'discussed', 'already', 'still', 'again', 'only', 'also'
+]);
+
+const FEEL_STEMS = new Set(['feel', 'felt', 'feeling', 'feelings']);
+
+function focusMeaningfulTokens(tokens) {
+  const focused = [];
+  const seen = new Set();
+  for (const token of tokens) {
+    if (SEARCH_STOP.has(token)) continue;
+    if (token.length < 2) continue;
+    // Collapse feel/felt/feeling/feelings to one required token group.
+    const key = FEEL_STEMS.has(token) ? '__feel__' : token;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    focused.push(token);
+  }
+  return focused;
+}
+
+function tokenMatchesHaystack(haystack, token) {
+  if (haystack.includes(token)) return true;
+  if (FEEL_STEMS.has(token)) {
+    for (const stem of FEEL_STEMS) {
+      if (haystack.includes(stem)) return true;
+    }
+  }
+  return false;
+}
+
+function formatHit(event, score, matchedTokenCount, queryTokenCount, matchKind) {
+  const r = event.record;
+  const base = {
+    score,
+    matched_token_count: matchedTokenCount,
+    query_token_count: queryTokenCount,
+    match_kind: matchKind,
+    path: event.path,
+    id: r.id ?? null
+  };
+  if (r.type === 'mind_session' || r.type === 'session') {
+    return {
+      ...base,
+      type: r.type === 'session' ? 'session' : 'mind_session',
+      date: r.date,
+      theme: r.theme,
+      themes: r.themes,
+      title: r.title,
+      insight: r.insight,
+      notes: typeof r.notes === 'string' ? r.notes.slice(0, 240) : undefined,
+      closing_question: r.closing_question
+    };
+  }
+  return {
+    ...base,
+    type: 'diary',
+    date: r.date,
+    mood: r.mood,
+    tags: r.tags,
+    notes: typeof r.notes === 'string' ? r.notes.slice(0, 240) : undefined,
+    system_note: r.system_note
+  };
+}
+
 export function searchMindRecords(events, { query, record_types, limit = 8 } = {}) {
-  const tokens = queryTokens(query);
+  const rawTokens = queryTokens(query);
+  if (!rawTokens.length) {
+    return { ok: false, error: 'empty_query' };
+  }
+  let tokens = focusMeaningfulTokens(rawTokens);
+  if (!tokens.length) tokens = rawTokens.filter(token => token.length >= 3).slice(0, 5);
   if (!tokens.length) {
     return { ok: false, error: 'empty_query' };
   }
   const types = normalizeTypes(record_types);
+  // Accept both mind_session and session labels for session search.
+  const expandedTypes = types.includes('mind_session')
+    ? [...new Set([...types, 'session'])]
+    : types;
   const cap = Math.min(Math.max(Number(limit) || 8, 1), 20);
-  const hits = (events ?? [])
-    .filter(e => e?.record && types.includes(e.record.type))
+  const scored = (events ?? [])
+    .filter(e => e?.record && expandedTypes.includes(e.record.type))
     .map(event => {
       const haystack = searchHaystack(event);
-      const matched = tokens.filter(token => haystack.includes(token));
-      return { event, score: matched.length };
+      const matched = tokens.filter(token => tokenMatchesHaystack(haystack, token));
+      return { event, matched, score: matched.length };
     })
     .filter(row => row.score > 0)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return (b.event.record.date ?? '').localeCompare(a.event.record.date ?? '');
-    })
-    .slice(0, cap)
-    .map(({ event, score }) => {
-      const r = event.record;
-      if (r.type === 'mind_session') {
-        return {
-          type: 'mind_session',
-          date: r.date,
-          path: event.path,
-          score,
-          theme: r.theme,
-          insight: r.insight,
-          closing_question: r.closing_question
-        };
-      }
-      return {
-        type: 'diary',
-        date: r.date,
-        path: event.path,
-        score,
-        mood: r.mood,
-        tags: r.tags,
-        system_note: r.system_note
-      };
     });
-  return { ok: true, query, count: hits.length, results: hits };
+
+  const full = scored.filter(row => row.score === tokens.length);
+  const partial = scored.filter(row => row.score > 0 && row.score < tokens.length);
+  const results = full.slice(0, cap).map(({ event, score, matched }) =>
+    formatHit(event, score, matched.length, tokens.length, 'full')
+  );
+  const partial_results = partial.slice(0, Math.min(cap, 8)).map(({ event, score, matched }) =>
+    formatHit(event, score, matched.length, tokens.length, 'partial')
+  );
+
+  return {
+    ok: true,
+    query,
+    focused_tokens: tokens,
+    query_token_count: tokens.length,
+    count: results.length,
+    partial_count: partial_results.length,
+    results,
+    partial_results,
+    how_to_read:
+      'results are full AND matches of focused query tokens. '
+      + 'partial_results matched some tokens only and are context, not supported matches.'
+  };
 }
 
 export async function resolveMindSessionEvent({

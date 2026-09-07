@@ -269,3 +269,45 @@ test('Case E: missing identity uses explicit unavailable_source', () => {
   assert.equal(claim.provenance.recordPath, null);
   assert.equal(claim.provenance.reason, 'unavailable_source');
 });
+
+test('natural session search still retrieves work stress after shared AND semantics', () => {
+  const kernel = runAgentKernel({
+    slug: 'vera',
+    message: 'what did I repeatedly discuss about work stress',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      mindEvents: [
+        session('2026-08-18', {
+          themes: ['work stress'],
+          notes: 'work stress discussion',
+          id: 'sess_ws',
+          path: 'data/mind/2026-08-18-session.md'
+        }),
+        session('2026-08-11', {
+          themes: ['work stress'],
+          notes: 'work stress returned',
+          id: 'sess_ws2'
+        }),
+        session('2026-08-04', {
+          themes: ['sleep'],
+          notes: 'sleep only',
+          id: 'sess_sleep'
+        })
+      ]
+    }
+  });
+  assert.equal(kernel.plan.workflow, 'mind_reflection');
+  const analysis = kernel.evidence.analyse_mind_evidence;
+  assert.ok(analysis.search_count >= 1);
+  const searched = kernel.evidence.search_mind_records;
+  assert.ok(searched?.ok);
+  assert.ok(searched.count >= 1);
+  assert.equal(searched.results[0].match_kind, 'full');
+  assert.ok(searched.focused_tokens.includes('work'));
+  assert.ok(searched.focused_tokens.includes('stress'));
+  const theme = kernel.claims.find(claim => claim.fact === 'mind_theme');
+  assert.ok(theme);
+  assert.equal(theme.kind, 'calculation');
+  assert.equal(theme.provenance.sourceType, 'calculation');
+});

@@ -940,14 +940,27 @@ export function composeEvidenceClaims(evidence = {}) {
         }));
       }
     }
-    if (result.week_adherence?.protein_hit_rate_pct != null) {
-      pushClaim(claims, tool, 'week_protein_hit_rate_pct', result.week_adherence.protein_hit_rate_pct, 'calculation', calc('week_protein_hit_rate_pct', 'week_adherence', {
+    if (result.week_adherence?.observed_protein_hit_rate_pct != null || result.week_adherence?.protein_hit_rate_pct != null) {
+      pushClaim(
+        claims,
+        tool,
+        'week_protein_hit_rate_pct',
+        result.week_adherence.observed_protein_hit_rate_pct ?? result.week_adherence.protein_hit_rate_pct,
+        'calculation',
+        calc('week_protein_hit_rate_pct', 'observed_week_adherence', {
+          store: result.store ?? 'life_hub_nutrition',
+          inputs: ['days_logged', 'protein_target_hits']
+        })
+      );
+    }
+    if (result.week_adherence?.logging_coverage_pct != null) {
+      pushClaim(claims, tool, 'logging_coverage_pct', result.week_adherence.logging_coverage_pct, 'calculation', calc('logging_coverage_pct', 'logging_coverage', {
         store: result.store ?? 'life_hub_nutrition',
-        inputs: ['life_hub_nutrition']
+        inputs: ['days_logged', 'days_in_window']
       }));
     }
     if (result.week?.protein_hit_rate_pct != null && result.week_adherence == null) {
-      pushClaim(claims, tool, 'week_protein_hit_rate_pct', result.week.protein_hit_rate_pct, 'calculation', calc('week_protein_hit_rate_pct', 'week_adherence', {
+      pushClaim(claims, tool, 'week_protein_hit_rate_pct', result.week.protein_hit_rate_pct, 'calculation', calc('week_protein_hit_rate_pct', 'observed_week_adherence', {
         store: result.store ?? 'life_hub_nutrition'
       }));
     }
@@ -957,32 +970,37 @@ export function composeEvidenceClaims(evidence = {}) {
         inputs: ['week', 'previous_week']
       }));
     }
+    if (result.week_vs_previous?.comparison_limitation) {
+      pushClaim(claims, tool, 'period_comparison_limitation', result.week_vs_previous.comparison_limitation, 'calculation', calc('period_comparison_limitation', 'coverage_limitation', {
+        store: result.store ?? 'life_hub_nutrition'
+      }));
+    }
     if (Array.isArray(result.unlogged_week_days)) {
       pushClaim(claims, tool, 'unlogged_week_day_count', result.unlogged_week_days.length, 'calculation', calc('unlogged_week_day_count', 'unlogged_week_days', {
         store: result.store ?? 'life_hub_nutrition'
       }));
     }
-    if (Array.isArray(result.top_meals_on_miss_day) && result.top_meals_on_miss_day[0] && result.miss_day) {
-      const top = result.top_meals_on_miss_day[0];
-      pushClaim(claims, tool, 'top_meal_on_miss_day', top.meal, 'record', recordOf(top, {
+    if (Array.isArray(result.top_meals_on_below_target_day) && result.top_meals_on_below_target_day[0] && result.below_target_day) {
+      const top = result.top_meals_on_below_target_day[0];
+      pushClaim(claims, tool, 'top_meal_on_below_target_day', top.meal, 'record', recordOf(top, {
         store: result.store ?? 'life_hub_nutrition',
-        date: top.date ?? result.miss_day
+        date: top.date ?? result.below_target_day
       }));
     }
-    if (result.miss_day) {
-      pushClaim(claims, tool, 'miss_day', result.miss_day, 'calculation', calc('miss_day', 'confirmed_protein_miss_day', {
+    if (result.below_target_day) {
+      pushClaim(claims, tool, 'below_target_day', result.below_target_day, 'calculation', calc('below_target_day', 'observed_below_target_day', {
         store: result.store ?? 'life_hub_nutrition',
-        date: result.miss_day,
-        inputs: result.confirmed_miss_days ?? [result.miss_day]
+        date: result.below_target_day,
+        inputs: result.observed_below_target_days ?? [result.below_target_day]
       }));
     }
-    if (Array.isArray(result.confirmed_miss_days)) {
-      pushClaim(claims, tool, 'confirmed_miss_day_count', result.confirmed_miss_days.length, 'calculation', calc('confirmed_miss_day_count', 'confirmed_miss_days', {
+    if (Array.isArray(result.observed_below_target_days)) {
+      pushClaim(claims, tool, 'observed_below_target_day_count', result.observed_below_target_days.length, 'calculation', calc('observed_below_target_day_count', 'observed_below_target_days', {
         store: result.store ?? 'life_hub_nutrition'
       }));
     }
-    if (result.miss_day_basis) {
-      pushClaim(claims, tool, 'miss_day_basis', result.miss_day_basis, 'calculation', calc('miss_day_basis', 'miss_day_basis', {
+    if (result.below_target_day_basis) {
+      pushClaim(claims, tool, 'below_target_day_basis', result.below_target_day_basis, 'calculation', calc('below_target_day_basis', 'below_target_day_basis', {
         store: result.store ?? 'life_hub_nutrition'
       }));
     }

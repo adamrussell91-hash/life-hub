@@ -76,6 +76,22 @@ export function compareNutritionPeriods(records, today, { targetsConfig = TARGET
   const weekDays = (model.week ?? []).filter(d => (d.calories ?? 0) > 0 || (d.protein_g ?? 0) > 0);
   const week = adherence.week ?? {};
   const previous = adherence.previous_week ?? {};
+  const weekRate = week.observed_protein_hit_rate_pct ?? week.protein_hit_rate_pct;
+  const prevRate = previous.observed_protein_hit_rate_pct ?? previous.protein_hit_rate_pct;
+  const weekCov = week.logging_coverage_pct ?? 0;
+  const prevCov = previous.logging_coverage_pct ?? 0;
+  const rateDelta = weekRate != null && prevRate != null ? weekRate - prevRate : null;
+  const coverageDelta = weekCov - prevCov;
+  const coverageMateriallyDifferent = Math.abs(coverageDelta) >= 25;
+  const incomplete =
+    week.coverage_status === 'incomplete'
+    || week.coverage_status === 'none'
+    || previous.coverage_status === 'incomplete'
+    || previous.coverage_status === 'none';
+  const avgProteinDelta =
+    week.avg_protein_g != null && previous.avg_protein_g != null
+      ? week.avg_protein_g - previous.avg_protein_g
+      : null;
   return {
     ok: true,
     store: 'life_hub_nutrition',
@@ -85,11 +101,20 @@ export function compareNutritionPeriods(records, today, { targetsConfig = TARGET
     previous_week: previous,
     month: adherence.month,
     week_vs_previous: {
-      protein_hit_rate_delta_pp: (week.protein_hit_rate_pct ?? 0) - (previous.protein_hit_rate_pct ?? 0),
-      avg_protein_delta_g: (week.avg_protein_g ?? 0) - (previous.avg_protein_g ?? 0)
+      // Observed logged-day hit-rate delta only; null when either side lacks logged days.
+      observed_protein_hit_rate_delta_pp: rateDelta,
+      protein_hit_rate_delta_pp: rateDelta,
+      logging_coverage_delta_pp: coverageDelta,
+      avg_protein_delta_g: avgProteinDelta,
+      comparison_limitation: incomplete || coverageMateriallyDifferent
+        ? 'Coverage incomplete or materially different — do not treat hit-rate delta as full-week adherence change.'
+        : null
     },
     days_with_meals_this_week: weekDays.map(d => d.date),
-    how_to_read: 'Week vs previous-week deltas are calculated from meal files.'
+    how_to_read:
+      'Compare observed hit rates among logged days plus logging coverage. '
+      + 'Do not treat unlogged days as failed adherence. '
+      + 'When coverage differs materially, surface that limitation.'
   };
 }
 
@@ -351,14 +376,16 @@ export function analyseNutritionEvidence(records, today, {
     targetsConfig,
     date: today
   });
+  // No genuine historical day-completeness signal exists in the nutrition model.
+  // Do not invent confirmed_miss / confirmed_hit without completeness.
   const dayRows = (model.week ?? []).map(day => {
     const logged = (day.calories ?? 0) > 0 || (day.protein_g ?? 0) > 0;
-    let status = 'unknown';
-    if (!logged) status = 'insufficient_logging';
+    let status = 'partial_or_unknown_completeness';
+    if (!logged) status = 'no_log';
     else if (day.date === today && snap.logging_status === 'partial_day') status = 'insufficient_logging';
-    else if ((day.proteinTarget ?? 0) <= 0) status = 'unknown';
-    else if (day.hitProtein) status = 'hit';
-    else status = 'miss';
+    else if ((day.proteinTarget ?? 0) <= 0) status = 'partial_or_unknown_completeness';
+    else if (day.hitProtein) status = 'observed_hit';
+    else status = 'observed_below_target';
     return {
       date: day.date,
       status,
@@ -367,14 +394,14 @@ export function analyseNutritionEvidence(records, today, {
       logged
     };
   });
-  const confirmedMissDays = dayRows
-    .filter(day => day.status === 'miss')
+  const observedBelowTargetDays = dayRows
+    .filter(day => day.status === 'observed_below_target')
     .map(day => day.date)
     .sort((a, b) => b.localeCompare(a));
-  const missDay = confirmedMissDays[0] ?? null;
-  const missMeals = missDay
+  const belowTargetDay = observedBelowTargetDays[0] ?? null;
+  const belowTargetMeals = belowTargetDay
     ? (Array.isArray(records) ? records : [])
-      .filter(r => r?.type === 'meal' && r.date === missDay)
+      .filter(r => r?.type === 'meal' && r.date === belowTargetDay)
       .slice()
       .sort((a, b) => Number(b.protein_g ?? 0) - Number(a.protein_g ?? 0))
       .slice(0, 5)
@@ -388,10 +415,8 @@ export function analyseNutritionEvidence(records, today, {
         kind: 'stored_meal_fact'
       }))
     : [];
-  const proteinTarget = Number(targets.targets?.protein_g ?? 0);
-  const proteinLogged = Number(snap.today?.protein_g ?? 0);
   const todayRow = dayRows.find(day => day.date === today);
-  const targetMiss = todayRow?.status === 'miss';
+  const targetBelowToday = todayRow?.status === 'observed_below_target';
   return {
     ok: true,
     store: 'life_hub_nutrition',
@@ -411,20 +436,21 @@ export function analyseNutritionEvidence(records, today, {
     week_vs_previous: compare.week_vs_previous ?? null,
     unlogged_week_days: adherence.unlogged_week_days ?? [],
     day_target_status: dayRows,
-    confirmed_miss_days: confirmedMissDays,
-    miss_day: missDay,
-    miss_day_basis: missDay
-      ? 'most_recent_confirmed_protein_miss'
-      : 'no_confirmed_miss_day',
-    target_miss_today: targetMiss,
-    top_meals_on_miss_day: missMeals,
+    observed_below_target_days: observedBelowTargetDays,
+    below_target_day: belowTargetDay,
+    below_target_day_basis: belowTargetDay
+      ? 'most_recent_observed_below_target'
+      : 'no_observed_below_target_day',
+    target_below_today: targetBelowToday,
+    top_meals_on_below_target_day: belowTargetMeals,
     incomplete_logging: (adherence.unlogged_week_days ?? []).length > 0 || snap.logging_status !== 'logged_today',
     how_to_read:
       'Separate stored meal facts, nutrition target facts, derived adherence, and derived remaining macros. '
       + 'No meal log is missing evidence — never treat it as zero intake. '
-      + 'A miss day is only a dated day independently below its protein target with enough logged evidence. '
+      + 'observed_protein_hit_rate_pct is hits among logged days only; logging_coverage_pct is separate. '
+      + 'observed_below_target means logged protein for that date is below target — not a proven complete-day miss. '
       + 'Unlogged and partial days are not automatic misses. '
-      + 'Meals listed for a miss day are contributions logged that day, not causal blame. '
+      + 'Meals listed for a below-target day are records logged that day, not causal blame. '
       + 'Do not invent meals, convert planned meals into consumed food, or move yesterday\'s intake onto today. '
       + 'Current-turn intake notes are user_stated_current_turn only.'
   };
@@ -462,11 +488,29 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
     id: e.id,
     notes: e.notes,
     score: e.score ?? 1,
+    match_kind: e.match_kind ?? 'full',
     kind: 'matched_entry'
+  }));
+  const partial_context_entries = (searched?.partial_results ?? []).map(e => ({
+    date: e.date,
+    mood: e.mood,
+    path: e.path,
+    id: e.id,
+    notes: e.notes,
+    score: e.score ?? 0,
+    matched_token_count: e.matched_token_count,
+    query_token_count: e.query_token_count,
+    match_kind: 'partial',
+    kind: 'partial_match_context'
   }));
   let fallback_context_entries = [];
   // Pattern questions with a lexical miss may still surface recent entries as context only.
-  if (!matched_entries.length && entries.length && /\b(before|often|recur|theme|pattern|felt|feeling)\b/i.test(q)) {
+  if (
+    !matched_entries.length
+    && !partial_context_entries.length
+    && entries.length
+    && /\b(before|often|recur|theme|pattern|felt|feeling)\b/i.test(q)
+  ) {
     fallback_context_entries = entries.slice(0, 8).map(e => ({
       date: e.date,
       mood: e.mood,
@@ -479,16 +523,19 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
     }));
   }
   const supported_match_count = matched_entries.length;
+  const partial_count = partial_context_entries.length;
   const fallback_count = fallback_context_entries.length;
   let recurrence_strength = 'none';
   if (supported_match_count === 1) recurrence_strength = 'single_entry';
   else if (supported_match_count === 2) recurrence_strength = 'weak_recurrence';
   else if (supported_match_count >= 3) recurrence_strength = 'multi_entry_recurrence';
-  else if (fallback_count > 0) recurrence_strength = 'insufficient_match';
+  else if (partial_count > 0 || fallback_count > 0) recurrence_strength = 'insufficient_match';
   const conflicting = uniqueMoods.length >= 2;
   const sampleSource = matched_entries.length
     ? matched_entries
-    : fallback_context_entries;
+    : partial_context_entries.length
+      ? partial_context_entries
+      : fallback_context_entries;
   return {
     ok: true,
     store: 'life_hub_diary',
@@ -497,8 +544,10 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
     stated_constraints: stated,
     entry_count: entries.length,
     matched_entries,
+    partial_context_entries,
     fallback_context_entries,
     supported_match_count,
+    partial_count,
     fallback_count,
     hit_count: supported_match_count,
     recurrence_strength,
@@ -512,8 +561,13 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
       notes: typeof e.notes === 'string' ? e.notes.slice(0, 160) : undefined,
       path: e.path ?? null,
       id: e.id ?? null,
-      kind: e.kind === 'context_only' ? 'fallback_context_entry' : 'stored_diary_entry',
-      context_only: e.kind === 'context_only',
+      kind: e.kind === 'context_only'
+        ? 'fallback_context_entry'
+        : e.kind === 'partial_match_context'
+          ? 'partial_match_context'
+          : 'stored_diary_entry',
+      context_only: e.kind === 'context_only' || e.kind === 'partial_match_context',
+      match_kind: e.match_kind ?? (e.kind === 'matched_entry' ? 'full' : undefined),
       recency: e.date === today ? 'today' : 'historical'
     })),
     truncated: Boolean(searched?.truncated),
@@ -521,8 +575,8 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
     omitted: searched?.omitted ?? null,
     how_to_read:
       'Separate stored diary entries from derived recurring themes and frequencies. '
-      + 'Recurrence strength counts genuine query matches only. '
-      + 'Fallback recent entries are context_only and never establish recurrence. '
+      + 'Recurrence strength counts full supported search matches only. '
+      + 'Partial token matches and fallback recent entries are context_only and never establish recurrence. '
       + 'Semantic similarity is not a stored fact. Do not label patterns as causal. '
       + 'Do not convert old mood states into current mood. Current mood requires user_stated_current_turn.'
   };
@@ -597,6 +651,8 @@ export function analyseMindEvidence(events, today, { message = '', query = '' } 
     stated_constraints: stated,
     session_count: sessions.length,
     search_count: searched?.count ?? 0,
+    search_partial_count: searched?.partial_count ?? 0,
+    focused_tokens: searched?.focused_tokens ?? [],
     recent_sessions: compare.recent_sessions ?? [],
     prior_sessions: compare.prior_sessions ?? [],
     recurring_themes: recurring,
@@ -608,6 +664,7 @@ export function analyseMindEvidence(events, today, { message = '', query = '' } 
     omitted: ((compare.omitted ?? 0) + (searched?.omitted ?? 0)) || null,
     how_to_read:
       'Separate stored session statements from derived recurring themes and period comparisons. '
+      + 'Mind search results are full AND matches of focused tokens; partial_results are context only. '
       + 'Do not diagnose. Do not convert therapist notes into current clinical state. '
       + 'Do not invent therapist conclusions. Current-turn themes are user_stated_current_turn only.'
   };
