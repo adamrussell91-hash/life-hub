@@ -62,23 +62,57 @@ test('Penelope paraphrases route into diary_recurrence (≥90%)', () => {
   assert.ok(hits.length / messages.length >= 0.9);
 });
 
-test('single entry is not a pattern', () => {
+test('Case A: unmatched pattern with fallback context is insufficient_match, not multi_entry', () => {
   const kernel = runAgentKernel({
     slug: 'penelope',
-    message: 'have I felt like this before',
+    message: 'Have I felt like this before?',
     today: TODAY,
     now: NOW,
-    stores: { mindEvents: [diary('2026-08-18', { notes: 'feeling flat', mood: 'flat' })] }
+    stores: {
+      mindEvents: [
+        diary('2026-08-19', { notes: 'garden planting', mood: 'calm' }),
+        diary('2026-08-18', { notes: 'bought groceries', mood: 'calm' }),
+        diary('2026-08-17', { notes: 'watched a film', mood: 'hopeful' }),
+        diary('2026-08-16', { notes: 'walked the dog', mood: 'calm' }),
+        diary('2026-08-15', { notes: 'fixed a shelf', mood: 'tired' })
+      ]
+    }
   });
-  const strength = kernel.claims.find(claim => claim.fact === 'recurrence_strength');
-  assert.equal(strength.value, 'single_entry');
-  assert.match(kernel.interpretationBlock, /One diary hit is not a pattern/i);
+  const analysis = kernel.evidence.analyse_diary_evidence;
+  assert.equal(analysis.supported_match_count, 0);
+  assert.ok(analysis.fallback_count > 0);
+  assert.equal(analysis.recurrence_strength, 'insufficient_match');
+  assert.notEqual(analysis.recurrence_strength, 'multi_entry_recurrence');
+  assert.match(kernel.interpretationBlock, /fallback context are context only/i);
+  assert.match(kernel.interpretationBlock, /No supported recurrence/i);
 });
 
-test('multi entry recurrence stays derived', () => {
+test('Case B: one genuine match plus unrelated fallback context stays single_entry', () => {
+  const analysis = analyseDiaryEvidence([
+    diary('2026-08-18', { notes: 'feeling flat about work', mood: 'flat' }),
+    diary('2026-08-17', { notes: 'garden planting only', mood: 'calm' }),
+    diary('2026-08-16', { notes: 'bought groceries', mood: 'calm' })
+  ], TODAY, { message: 'feeling flat before', query: 'feeling flat' });
+  assert.equal(analysis.supported_match_count, 1);
+  assert.equal(analysis.recurrence_strength, 'single_entry');
+  // Unrelated rows must not be counted as matches even if present in the store.
+  assert.ok(analysis.entry_count >= 3);
+});
+
+test('Case C: two genuine matches are weak_recurrence', () => {
+  const analysis = analyseDiaryEvidence([
+    diary('2026-08-18', { notes: 'feeling tired after work', mood: 'tired' }),
+    diary('2026-08-10', { notes: 'feeling tired again', mood: 'tired' })
+  ], TODAY, { message: 'feeling like this often', query: 'feeling tired' });
+  assert.equal(analysis.supported_match_count, 2);
+  assert.equal(analysis.recurrence_strength, 'weak_recurrence');
+  assert.equal(analysis.fallback_count, 0);
+});
+
+test('Case D: three genuine matches are multi_entry_recurrence', () => {
   const kernel = runAgentKernel({
     slug: 'penelope',
-    message: 'what themes recur',
+    message: 'feeling flat often',
     today: TODAY,
     now: NOW,
     stores: {
@@ -89,13 +123,44 @@ test('multi entry recurrence stays derived', () => {
       ]
     }
   });
+  const analysis = kernel.evidence.analyse_diary_evidence;
+  assert.ok(analysis.supported_match_count >= 3);
+  assert.equal(analysis.recurrence_strength, 'multi_entry_recurrence');
   const strength = kernel.claims.find(claim => claim.fact === 'recurrence_strength');
   assert.equal(strength.value, 'multi_entry_recurrence');
   const theme = kernel.claims.find(claim => claim.fact === 'diary_theme');
   assert.ok(theme);
-      assert.equal(theme.kind, 'calculation');
-      assert.equal(theme.provenance.sourceType, 'calculation');
-      assert.match(kernel.interpretationBlock, /Themes are derived frequency/i);
+  assert.equal(theme.kind, 'calculation');
+  assert.equal(theme.provenance.sourceType, 'calculation');
+});
+
+test('Case E: empty diary has no supported recurrence', () => {
+  const kernel = runAgentKernel({
+    slug: 'penelope',
+    message: 'Have I felt like this before?',
+    today: TODAY,
+    now: NOW,
+    stores: { mindEvents: [] }
+  });
+  const analysis = kernel.evidence.analyse_diary_evidence;
+  assert.equal(analysis.supported_match_count, 0);
+  assert.equal(analysis.fallback_count, 0);
+  assert.equal(analysis.recurrence_strength, 'none');
+  assert.match(kernel.interpretationBlock, /No diary hits|Do not invent a recurring/i);
+});
+
+test('single genuine match is not a pattern', () => {
+  const kernel = runAgentKernel({
+    slug: 'penelope',
+    message: 'have I felt like this before',
+    today: TODAY,
+    now: NOW,
+    stores: { mindEvents: [diary('2026-08-18', { notes: 'feeling flat', mood: 'flat' })] }
+  });
+  const strength = kernel.claims.find(claim => claim.fact === 'recurrence_strength');
+  assert.equal(strength.value, 'single_entry');
+  assert.equal(kernel.evidence.analyse_diary_evidence.supported_match_count, 1);
+  assert.match(kernel.interpretationBlock, /One genuine diary match is not a pattern/i);
 });
 
 test('current turn mood versus historical diary state', () => {
@@ -115,14 +180,6 @@ test('current turn mood versus historical diary state', () => {
   assert.equal(stated.value, 'anxious');
   assert.equal(stated.provenance.reason, 'user_stated_current_turn');
   assert.match(kernel.interpretationBlock, /Do not convert historical moods into that present state/i);
-});
-
-test('weak recurrence evidence stays weak', () => {
-  const analysis = analyseDiaryEvidence([
-    diary('2026-08-18', { notes: 'feeling tired after work', mood: 'tired' }),
-    diary('2026-08-10', { notes: 'feeling tired again', mood: 'tired' })
-  ], TODAY, { message: 'feeling like this often', query: 'feeling tired' });
-  assert.equal(analysis.recurrence_strength, 'weak_recurrence');
 });
 
 test('conflicting diary moods stay visible', () => {

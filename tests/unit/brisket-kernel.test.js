@@ -167,6 +167,94 @@ test('no meal invention and meal claims keep record provenance', () => {
   assert.equal(kernel.claims.find(claim => claim.fact === 'invented_meal'), undefined);
 });
 
+test('Case A: later hit day is not selected as miss day', () => {
+  const analysis = analyseNutritionEvidence([
+    meal('2026-08-18', { meal: 'monday_low', protein_g: 20, id: 'mon', path: 'data/n/mon.md' }),
+    meal('2026-08-19', { meal: 'tuesday_hit', protein_g: 200, id: 'tue', path: 'data/n/tue.md' })
+  ], TODAY, { message: 'what meals contributed most to a target miss' });
+  assert.equal(analysis.miss_day, '2026-08-18');
+  assert.deepEqual(analysis.confirmed_miss_days, ['2026-08-18']);
+  assert.equal(analysis.top_meals_on_miss_day[0]?.meal, 'monday_low');
+  assert.notEqual(analysis.miss_day, '2026-08-19');
+});
+
+test('Case B: most recent confirmed miss day wins among multiple misses', () => {
+  const analysis = analyseNutritionEvidence([
+    meal('2026-08-17', { meal: 'older_miss', protein_g: 15, id: 'a' }),
+    meal('2026-08-19', { meal: 'newer_miss', protein_g: 25, id: 'b' })
+  ], TODAY, { message: 'target miss meals' });
+  assert.deepEqual(analysis.confirmed_miss_days, ['2026-08-19', '2026-08-17']);
+  assert.equal(analysis.miss_day, '2026-08-19');
+  assert.equal(analysis.miss_day_basis, 'most_recent_confirmed_protein_miss');
+  assert.equal(analysis.top_meals_on_miss_day[0]?.meal, 'newer_miss');
+});
+
+test('Case C: unlogged days are not confirmed misses when logged days hit', () => {
+  const analysis = analyseNutritionEvidence([
+    meal('2026-08-18', { meal: 'hit', protein_g: 200, id: 'h1' }),
+    meal('2026-08-19', { meal: 'hit2', protein_g: 180, id: 'h2' })
+  ], TODAY, { message: 'am I hitting my targets' });
+  assert.equal(analysis.miss_day, null);
+  assert.deepEqual(analysis.confirmed_miss_days, []);
+  assert.equal(analysis.miss_day_basis, 'no_confirmed_miss_day');
+  assert.deepEqual(analysis.top_meals_on_miss_day, []);
+  assert.ok((analysis.unlogged_week_days ?? []).length > 0);
+});
+
+test('Case D: partial today is not automatically a confirmed miss', () => {
+  const analysis = analyseNutritionEvidence([
+    meal(TODAY, { meal: 'breakfast_only', protein_g: 20, id: 'p1' })
+  ], TODAY, { message: 'what is left for today' });
+  assert.equal(analysis.logging_status, 'partial_day');
+  assert.equal(analysis.target_miss_today, false);
+  assert.ok(!analysis.confirmed_miss_days.includes(TODAY));
+});
+
+test('Case E: miss-day meal contributors keep dated record provenance', () => {
+  const kernel = runAgentKernel({
+    slug: 'brisket',
+    message: 'What meals contributed most to a target miss?',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      meals: [
+        meal('2026-08-18', { meal: 'monday_low', protein_g: 20, id: 'mon1', path: 'data/nutrition/mon.md' }),
+        meal('2026-08-19', { meal: 'tuesday_hit', protein_g: 200, id: 'tue1', path: 'data/nutrition/tue.md' })
+      ]
+    }
+  });
+  assert.equal(kernel.evidence.analyse_nutrition_evidence.miss_day, '2026-08-18');
+  const top = kernel.claims.find(claim => claim.fact === 'top_meal_on_miss_day');
+  assert.equal(top.value, 'monday_low');
+  assert.equal(top.kind, 'record');
+  assert.equal(top.provenance.recordId, 'mon1');
+  assert.equal(top.provenance.recordPath, 'data/nutrition/mon.md');
+  assert.equal(top.provenance.date, '2026-08-18');
+});
+
+test('Case F: no confirmed miss yields no contributor meals', () => {
+  const kernel = runAgentKernel({
+    slug: 'brisket',
+    message: 'What meals contributed most to a target miss?',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      meals: [
+        meal('2026-08-18', { meal: 'hit', protein_g: 200, id: 'h1' }),
+        meal('2026-08-19', { meal: 'hit2', protein_g: 180, id: 'h2' }),
+        meal(TODAY, { meal: 'b', protein_g: 50 }),
+        meal(TODAY, { meal: 'l', protein_g: 50 }),
+        meal(TODAY, { meal: 'd', protein_g: 50 })
+      ]
+    }
+  });
+  const analysis = kernel.evidence.analyse_nutrition_evidence;
+  assert.equal(analysis.miss_day, null);
+  assert.deepEqual(analysis.top_meals_on_miss_day, []);
+  assert.equal(kernel.claims.find(claim => claim.fact === 'top_meal_on_miss_day'), undefined);
+  assert.match(kernel.interpretationBlock, /No defensible confirmed miss day/i);
+});
+
 test('current-turn intake note is user_stated_current_turn', () => {
   const kernel = runAgentKernel({
     slug: 'brisket',
@@ -200,7 +288,8 @@ test('bounded second retrieve when nutrition search truncates', () => {
     meal: 'protein bowl',
     protein_g: 40,
     notes: 'protein bowl lunch',
-    id: `p${i}`
+    id: `p${i}`,
+    path: `data/nutrition/p${i}.md`
   }));
   const kernel = runAgentKernel({
     slug: 'brisket',
@@ -209,8 +298,11 @@ test('bounded second retrieve when nutrition search truncates', () => {
     now: NOW,
     stores: { meals }
   });
-  assert.ok(kernel.evidence.search_nutrition_records);
-  if (kernel.evidence.search_nutrition_records.truncated) {
-    assert.ok((kernel.retrieveLog?.length ?? 0) >= 1);
-  }
+  const round1 = kernel.retrieveLog[0]?.tools?.find(tool => tool.name === 'search_nutrition_records');
+  assert.ok(round1?.truncated, 'round 1 search must truncate');
+  assert.ok(kernel.retrieveLog.length >= 2, 'bounded second retrieve required');
+  const round2 = kernel.retrieveLog[1]?.tools?.find(tool => tool.name === 'search_nutrition_records');
+  assert.ok(round2, 'second round must re-retrieve search_nutrition_records');
+  assert.ok(round2.intent?.limit > (round1.kept ?? 0), 'second round must widen limit');
+  assert.equal(kernel.sufficiencyDecision.anotherRound, false);
 });

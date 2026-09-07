@@ -1024,8 +1024,8 @@ export function assessEvidence(state) {
   if (state.plan?.workflow === 'diary_recurrence') {
     const diary = state.evidence.search_diary_records;
     const analysis = state.evidence.analyse_diary_evidence;
-    const hits = analysis?.hit_count ?? diary?.count ?? 0;
-    if (diary && diary.ok !== false && hits === 0) {
+    const hits = analysis?.supported_match_count ?? analysis?.hit_count ?? diary?.count ?? 0;
+    if (diary && diary.ok !== false && hits === 0 && !(analysis?.fallback_count > 0)) {
       limitations.push({
         tool: 'search_diary_records',
         kind: 'missing',
@@ -1033,11 +1033,18 @@ export function assessEvidence(state) {
       });
       coverage.missing.push('diary_hits');
     }
+    if (analysis?.recurrence_strength === 'insufficient_match') {
+      limitations.push({
+        tool: 'analyse_diary_evidence',
+        kind: 'insufficient_match',
+        text: 'Fallback diary context is present but no supported recurrence matched the query'
+      });
+    }
     if (analysis?.recurrence_strength === 'single_entry') {
       limitations.push({
         tool: 'analyse_diary_evidence',
         kind: 'weak_match',
-        text: 'Only one diary hit — not enough for a recurrence pattern'
+        text: 'Only one genuine diary match — not enough for a recurrence pattern'
       });
     }
   }
@@ -1141,7 +1148,11 @@ export function assessEvidence(state) {
     const result = state.evidence[tool];
     const kept = Number(result?.kept ?? result?.results?.length ?? 0);
     const omitted = Number(result?.omitted ?? 0);
-    if (omitted > 0) next.push({ tool, limit: Math.min(20, Math.max(kept + omitted, kept + 4)) });
+    if (omitted <= 0) continue;
+    const widenTo = Math.min(20, Math.max(kept + omitted, kept + 4));
+    // Already at the bounded max — further rounds cannot resolve truncation.
+    if (widenTo <= kept) continue;
+    next.push({ tool, limit: widenTo });
   }
   for (const tool of required) {
     if (!state.evidence[tool]) next.push({ tool });
@@ -1368,7 +1379,7 @@ function brisketInterpretationLines(state) {
   if (status === 'no_log_today' || state.coverage.missing.includes('meals_today')) {
     lines.push('- No meals are logged today. That is missing evidence, not zero intake. Do not claim adherence or remaining macros as if the day is complete.');
   } else if (status === 'partial_day') {
-    lines.push('- Today\'s log looks partial. Do not treat partial logging as full-day adherence.');
+    lines.push('- Today\'s log looks partial. Do not treat partial logging as full-day adherence or as a confirmed target miss.');
   } else {
     lines.push('- Intake claims must come from logged meals only.');
   }
@@ -1377,6 +1388,11 @@ function brisketInterpretationLines(state) {
   }
   if ((analysis?.yesterday_meal_count ?? 0) > 0) {
     lines.push('- Yesterday\'s meals stay on yesterday. Do not convert them into today\'s intake.');
+  }
+  if (analysis?.miss_day) {
+    lines.push(`- Miss-day meal contributions are from confirmed miss date ${analysis.miss_day} only. They are meals logged that day, not a causal explanation.`);
+  } else if (analysis?.miss_day_basis === 'no_confirmed_miss_day') {
+    lines.push('- No defensible confirmed miss day was identified. Do not attribute arbitrary meals as contributors to a target miss.');
   }
   if (analysis?.stated_constraints?.current_intake_note) {
     lines.push(`- Adam stated a current-turn intake note (${analysis.stated_constraints.current_intake_note}). Treat it as user_stated_current_turn, not a stored meal row.`);
@@ -1412,14 +1428,23 @@ function penelopeInterpretationLines(state) {
   const lines = [];
   const analysis = state.evidence.analyse_diary_evidence;
   const strength = analysis?.recurrence_strength;
-  if (!analysis?.hit_count) {
-    lines.push('- No diary hits. Do not invent a recurring feeling or pattern.');
+  const supported = analysis?.supported_match_count ?? analysis?.hit_count ?? 0;
+  if (!supported) {
+    if ((analysis?.fallback_count ?? 0) > 0 || strength === 'insufficient_match') {
+      lines.push('- No supported recurrence matched the requested feeling, theme, or situation.');
+      lines.push('- Recent diary entries retrieved as fallback context are context only. They are not evidence that the requested feeling recurred.');
+    } else {
+      lines.push('- No diary hits. Do not invent a recurring feeling or pattern.');
+    }
   } else if (strength === 'single_entry') {
-    lines.push('- One diary hit is not a pattern. Keep recurrence weak or absent.');
+    lines.push('- One genuine diary match is not a pattern. Keep recurrence weak or absent.');
   } else if (strength === 'weak_recurrence') {
     lines.push('- Recurrence evidence is weak. Do not overstate the pattern.');
-  } else {
-    lines.push('- Recurrence must stay grounded in retrieved diary hits. Themes are derived frequency, not stored facts.');
+  } else if (strength === 'multi_entry_recurrence') {
+    lines.push('- Recurrence must stay grounded in genuine retrieved diary matches. Themes are derived frequency, not stored facts.');
+  }
+  if ((analysis?.fallback_count ?? 0) > 0 && supported > 0) {
+    lines.push('- Fallback recent entries remain context only and do not increase recurrence strength.');
   }
   if ((analysis?.conflicting_moods ?? []).length) {
     lines.push('- Diary moods conflict across entries. Keep disagreement visible.');

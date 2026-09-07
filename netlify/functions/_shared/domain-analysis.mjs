@@ -164,11 +164,20 @@ export function compareMindSessions(events, today) {
       const t = e?.record?.type ?? e?.type;
       return t === 'mind_session' || t === 'session';
     })
-    .map(e => e.record ?? e)
+    .map(e => {
+      const record = e?.record ?? e;
+      return {
+        ...record,
+        id: record?.id ?? null,
+        path: record?.path ?? e?.path ?? null
+      };
+    })
     .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
   const recent = sessions.slice(0, 5);
   const prior = sessions.slice(5, 10);
   const summarise = s => ({
+    id: s.id ?? null,
+    path: s.path ?? null,
     date: s.date,
     title: s.title,
     working_model: s.working_model ?? s.model ?? null,
@@ -337,26 +346,52 @@ export function analyseNutritionEvidence(records, today, {
   const yesterdayMeals = (Array.isArray(records) ? records : []).filter(
     r => r?.type === 'meal' && r.date === yesterday
   );
-  const missDay = (adherence.week?.protein_target_hits ?? 0) < 7
-    ? (compare.days_with_meals_this_week ?? []).slice(-1)[0] ?? today
-    : today;
-  const missMeals = (Array.isArray(records) ? records : [])
-    .filter(r => r?.type === 'meal' && r.date === missDay)
-    .slice()
-    .sort((a, b) => Number(b.protein_g ?? 0) - Number(a.protein_g ?? 0))
-    .slice(0, 5)
-    .map(r => ({
-      date: r.date,
-      meal: r.meal,
-      protein_g: r.protein_g ?? 0,
-      calories: r.calories ?? 0,
-      id: r.id ?? null,
-      path: r.path ?? null,
-      kind: 'stored_meal_fact'
-    }));
+  const model = buildNutritionModel({
+    events: mealEvents(records),
+    targetsConfig,
+    date: today
+  });
+  const dayRows = (model.week ?? []).map(day => {
+    const logged = (day.calories ?? 0) > 0 || (day.protein_g ?? 0) > 0;
+    let status = 'unknown';
+    if (!logged) status = 'insufficient_logging';
+    else if (day.date === today && snap.logging_status === 'partial_day') status = 'insufficient_logging';
+    else if ((day.proteinTarget ?? 0) <= 0) status = 'unknown';
+    else if (day.hitProtein) status = 'hit';
+    else status = 'miss';
+    return {
+      date: day.date,
+      status,
+      protein_g: day.protein_g ?? 0,
+      protein_target_g: day.proteinTarget ?? 0,
+      logged
+    };
+  });
+  const confirmedMissDays = dayRows
+    .filter(day => day.status === 'miss')
+    .map(day => day.date)
+    .sort((a, b) => b.localeCompare(a));
+  const missDay = confirmedMissDays[0] ?? null;
+  const missMeals = missDay
+    ? (Array.isArray(records) ? records : [])
+      .filter(r => r?.type === 'meal' && r.date === missDay)
+      .slice()
+      .sort((a, b) => Number(b.protein_g ?? 0) - Number(a.protein_g ?? 0))
+      .slice(0, 5)
+      .map(r => ({
+        date: r.date,
+        meal: r.meal,
+        protein_g: r.protein_g ?? 0,
+        calories: r.calories ?? 0,
+        id: r.id ?? null,
+        path: r.path ?? null,
+        kind: 'stored_meal_fact'
+      }))
+    : [];
   const proteinTarget = Number(targets.targets?.protein_g ?? 0);
   const proteinLogged = Number(snap.today?.protein_g ?? 0);
-  const targetMiss = proteinTarget > 0 && proteinLogged < proteinTarget;
+  const todayRow = dayRows.find(day => day.date === today);
+  const targetMiss = todayRow?.status === 'miss';
   return {
     ok: true,
     store: 'life_hub_nutrition',
@@ -375,13 +410,21 @@ export function analyseNutritionEvidence(records, today, {
     previous_week_adherence: adherence.previous_week ?? null,
     week_vs_previous: compare.week_vs_previous ?? null,
     unlogged_week_days: adherence.unlogged_week_days ?? [],
+    day_target_status: dayRows,
+    confirmed_miss_days: confirmedMissDays,
+    miss_day: missDay,
+    miss_day_basis: missDay
+      ? 'most_recent_confirmed_protein_miss'
+      : 'no_confirmed_miss_day',
     target_miss_today: targetMiss,
     top_meals_on_miss_day: missMeals,
-    miss_day: missDay,
     incomplete_logging: (adherence.unlogged_week_days ?? []).length > 0 || snap.logging_status !== 'logged_today',
     how_to_read:
       'Separate stored meal facts, nutrition target facts, derived adherence, and derived remaining macros. '
       + 'No meal log is missing evidence — never treat it as zero intake. '
+      + 'A miss day is only a dated day independently below its protein target with enough logged evidence. '
+      + 'Unlogged and partial days are not automatic misses. '
+      + 'Meals listed for a miss day are contributions logged that day, not causal blame. '
       + 'Do not invent meals, convert planned meals into consumed food, or move yesterday\'s intake onto today. '
       + 'Current-turn intake notes are user_stated_current_turn only.'
   };
@@ -412,25 +455,40 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
     .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
   const moods = entries.map(e => e.mood).filter(Boolean);
   const uniqueMoods = [...new Set(moods.map(m => String(m).toLowerCase()))];
-  let hitRows = searched?.results ?? [];
-  // Pattern questions with a lexical miss still surface recent stored entries as weak evidence.
-  if (!hitRows.length && entries.length && /\b(before|often|recur|theme|pattern|felt|feeling)\b/i.test(q)) {
-    hitRows = entries.slice(0, 8).map(e => ({
+  const matched_entries = (searched?.results ?? []).map(e => ({
+    date: e.date,
+    mood: e.mood,
+    path: e.path,
+    id: e.id,
+    notes: e.notes,
+    score: e.score ?? 1,
+    kind: 'matched_entry'
+  }));
+  let fallback_context_entries = [];
+  // Pattern questions with a lexical miss may still surface recent entries as context only.
+  if (!matched_entries.length && entries.length && /\b(before|often|recur|theme|pattern|felt|feeling)\b/i.test(q)) {
+    fallback_context_entries = entries.slice(0, 8).map(e => ({
       date: e.date,
       mood: e.mood,
       path: e.path,
       id: e.id,
       notes: e.notes,
       score: 0,
-      weak_fallback: true
+      weak_fallback: true,
+      kind: 'context_only'
     }));
   }
-  const hitCount = hitRows.length;
+  const supported_match_count = matched_entries.length;
+  const fallback_count = fallback_context_entries.length;
   let recurrence_strength = 'none';
-  if (hitCount === 1) recurrence_strength = 'single_entry';
-  else if (hitCount === 2) recurrence_strength = 'weak_recurrence';
-  else if (hitCount >= 3) recurrence_strength = 'multi_entry_recurrence';
+  if (supported_match_count === 1) recurrence_strength = 'single_entry';
+  else if (supported_match_count === 2) recurrence_strength = 'weak_recurrence';
+  else if (supported_match_count >= 3) recurrence_strength = 'multi_entry_recurrence';
+  else if (fallback_count > 0) recurrence_strength = 'insufficient_match';
   const conflicting = uniqueMoods.length >= 2;
+  const sampleSource = matched_entries.length
+    ? matched_entries
+    : fallback_context_entries;
   return {
     ok: true,
     store: 'life_hub_diary',
@@ -438,19 +496,24 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
     date: today,
     stated_constraints: stated,
     entry_count: entries.length,
-    hit_count: hitCount,
+    matched_entries,
+    fallback_context_entries,
+    supported_match_count,
+    fallback_count,
+    hit_count: supported_match_count,
     recurrence_strength,
     recurring_terms: themes.recurring_terms ?? [],
     recent_14d: compare.recent_14d,
     previous_14d: compare.previous_14d,
     conflicting_moods: conflicting ? uniqueMoods.slice(0, 6) : [],
-    sample_entries: hitRows.slice(0, 5).map(e => ({
+    sample_entries: sampleSource.slice(0, 5).map(e => ({
       date: e.date,
       mood: e.mood ?? null,
       notes: typeof e.notes === 'string' ? e.notes.slice(0, 160) : undefined,
       path: e.path ?? null,
       id: e.id ?? null,
-      kind: 'stored_diary_entry',
+      kind: e.kind === 'context_only' ? 'fallback_context_entry' : 'stored_diary_entry',
+      context_only: e.kind === 'context_only',
       recency: e.date === today ? 'today' : 'historical'
     })),
     truncated: Boolean(searched?.truncated),
@@ -458,6 +521,8 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
     omitted: searched?.omitted ?? null,
     how_to_read:
       'Separate stored diary entries from derived recurring themes and frequencies. '
+      + 'Recurrence strength counts genuine query matches only. '
+      + 'Fallback recent entries are context_only and never establish recurrence. '
       + 'Semantic similarity is not a stored fact. Do not label patterns as causal. '
       + 'Do not convert old mood states into current mood. Current mood requires user_stated_current_turn.'
   };

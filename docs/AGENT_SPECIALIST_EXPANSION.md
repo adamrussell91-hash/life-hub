@@ -87,6 +87,38 @@ These defects existed in the first tranche and were corrected before expanding B
 | Regression | agree/disagree, effective/ineffective, works/fails, supports/rejects; negative mixed effective/ineffective vs unrelated note. |
 | Status | `deterministic only` |
 
+### Independent review defects (continuation 2) — failure → root cause → correction → regression → status
+
+#### Penelope — fallback entries inflated recurrence strength
+
+| Step | Detail |
+| --- | --- |
+| Failure | When diary search returned no hits, fallback recent entries were counted in `hitRows.length`, so five unrelated entries became `multi_entry_recurrence`. |
+| Root cause | `recurrence_strength` was derived from combined match+fallback row count. |
+| Correction | Split `matched_entries` vs `fallback_context_entries`. Strength uses `supported_match_count` only. Zero matches with fallback → `insufficient_match`. Interpretation: fallback is context only. |
+| Regression | `penelope-kernel.test.js` Cases A–E. |
+| Status | `deterministic only` |
+
+#### Brisket — miss day taken from last logged day
+
+| Step | Detail |
+| --- | --- |
+| Failure | `missDay` used the last `days_with_meals_this_week` date whenever weekly protein hits were under 7, so a later hit day could be labelled the miss day. |
+| Root cause | Weekly aggregate substituted for per-day hit/miss classification. |
+| Correction | Classify each week day via existing nutrition model targets (`hit` / `miss` / `insufficient_logging`). Only confirmed misses qualify. Most recent confirmed miss wins. Partial today is not an automatic miss. No miss → empty contributors. |
+| Regression | `brisket-kernel.test.js` Cases A–F; second-retrieve test now requires `retrieveLog.length >= 2` and `anotherRound === false`. |
+| Status | `deterministic only` |
+
+#### Vera — compare summarisation dropped source id/path
+
+| Step | Detail |
+| --- | --- |
+| Failure | `compareMindSessions` stripped sessions to date/title/themes/notes, dropping `id`/`path`, so `recent_session_date` provenance fell back to `unavailable_source`. |
+| Root cause | Summarisation discarded event/record identity before claim composition. |
+| Correction | Preserve `id` and `path` (event.path fallback) through summarise → analyse → claims. |
+| Regression | `vera-kernel.test.js` Cases A–E. |
+| Status | `deterministic only` |
+
 ### Brisket / Hyaluronica / Penelope / Vera — continuation expansion
 
 | Specialist | Correction | Regression | Status |

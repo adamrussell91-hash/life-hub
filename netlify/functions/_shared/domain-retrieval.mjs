@@ -155,7 +155,8 @@ export function getNutritionTargets(today, { targetsConfig = TARGETS_CONFIG, day
 }
 
 export function searchNutritionRecords(records, { query, limit = DEFAULT_LIMIT } = {}) {
-  const toks = tokens(query);
+  const focused = focusNutritionQuery(query);
+  const toks = tokens(focused || query);
   if (!toks.length) return { ok: false, error: 'empty_query', store: 'life_hub_nutrition' };
   const cap = capLimit(limit);
   const all = (records ?? []).filter(r => r?.type === 'meal');
@@ -178,6 +179,7 @@ export function searchNutritionRecords(records, { query, limit = DEFAULT_LIMIT }
     ok: true,
     store: 'life_hub_nutrition',
     query,
+    focused_query: focused || query,
     count: slice.length,
     ...truncatedMeta(hits.length, slice.length),
     results: slice.map(({ record }) => ({
@@ -186,9 +188,35 @@ export function searchNutritionRecords(records, { query, limit = DEFAULT_LIMIT }
       calories: record.calories,
       protein_g: record.protein_g,
       fat_g: record.fat_g,
-      notes: record.notes
+      notes: record.notes,
+      id: record.id ?? null,
+      path: record.path ?? null
     }))
   };
+}
+
+function focusNutritionQuery(query = '') {
+  const text = String(query ?? '');
+  const food = (text.match(
+    /\b(protein|meal|meals|calorie|calories|macro|macros|egg|eggs|bowl|lunch|dinner|breakfast|snack|fat|carb|carbs)\b/gi
+  ) || []).map(w => w.toLowerCase());
+  if (!food.length) {
+    const stop = new Set([
+      'search', 'find', 'what', 'when', 'which', 'that', 'this', 'with', 'from', 'about',
+      'most', 'more', 'have', 'been', 'been', 'please', 'contributed', 'contribute',
+      'left', 'today', 'lately', 'hitting', 'targets', 'target'
+    ]);
+    return text
+      .toLowerCase()
+      .split(/\s+/)
+      .map(t => t.replace(/[^a-z0-9]/g, ''))
+      .filter(t => t.length >= 4 && !stop.has(t))
+      .slice(0, 3)
+      .join(' ');
+  }
+  if (food.includes('protein')) return 'protein';
+  if (food.includes('meal') || food.includes('meals')) return 'meal';
+  return [...new Set(food)].slice(0, 2).join(' ');
 }
 
 export function getWeightTrend({ compositionRecords = [], measurementRecords = [] } = {}) {
