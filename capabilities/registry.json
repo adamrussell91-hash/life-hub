@@ -109,6 +109,20 @@
       ],
       "tool_name": "remember_note_context"
     },
+    "remember.write-memory": {
+      "file": "remember/write-memory.json",
+      "agents": [
+        "chadwick",
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log",
+        "agent_context",
+        "confirm_card"
+      ],
+      "tool_name": "remember_write_memory"
+    },
     "track.open-challenge": {
       "file": "track/open-challenge.json",
       "agents": [

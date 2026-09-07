@@ -10,6 +10,7 @@ import {
   toDateKey,
   weekDays
 } from './clare-dates.mjs';
+import { runSurfaceAgentTurn } from './agent-surface.mjs';
 
 const MS_DAY = 24 * 60 * 60 * 1000;
 
@@ -236,9 +237,8 @@ export function buildHighStakesBrief(tasks, now = new Date()) {
   };
 }
 
-import { assembleClareEvidence } from './evidence-packs.mjs';
-
-export function buildClareBriefing(tasks, protocolId, now = new Date(), { projects = [] } = {}) {
+export function buildClareBriefing(tasks, protocolId, now = new Date(), extra = {}) {
+  const { projects = [], memories = [], memoryLoadError = null, env = {}, flag } = extra;
   const base = (() => {
     switch (protocolId) {
       case 'tomorrow-setup':
@@ -252,20 +252,27 @@ export function buildClareBriefing(tasks, protocolId, now = new Date(), { projec
     }
   })();
 
-  // Same read competence as Life-chat Clare: open loops / capacity / stalls.
-  const pack = assembleClareEvidence(
-    { tasks, projects },
-    { message: 'What should I focus on today?', now }
-  );
-  if (!pack.active || !pack.answerable) return base;
+  const surface = runSurfaceAgentTurn({
+    surface: 'tasks',
+    slug: 'clare',
+    message: 'What should I focus on today?',
+    today: now.toISOString().slice(0, 10),
+    now,
+    stores: { tasks, projects, memories, memoryLoadError },
+    env,
+    flag
+  });
+  if (!surface.pack.active || !surface.pack.answerable) return base;
   return {
     ...base,
     evidence_pack: {
-      intent: pack.intentClass,
-      tools: pack.toolsExecuted,
-      sections: pack.sections.map(s => ({ id: s.id, kind: s.kind, title: s.title }))
+      intent: surface.pack.intentClass,
+      tools: surface.pack.toolsExecuted,
+      sections: surface.pack.sections.map(s => ({ id: s.id, kind: s.kind, title: s.title }))
     },
-    evidence_prompt: pack.promptBlock
+    evidence_prompt: surface.promptBlock,
+    interpretation: surface.interpretationBlock,
+    memory_kept: surface.memoryMeta.kept
   };
 }
 

@@ -39,7 +39,9 @@ import {
   loadClementineProtocol
 } from './_shared/load-hub-protocols.mjs';
 import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
-import { assembleEvidencePack } from './_shared/evidence-packs.mjs';
+import { runSurfaceAgentTurn } from './_shared/agent-surface.mjs';
+import { parseMemoryStore } from './_shared/agent-memory.mjs';
+import { REMEMBER_LAYERED_MEMORIES_PATH } from './_shared/capabilities/stores.mjs';
 import {
   getNutritionSnapshot,
   getNutritionAdherence,
@@ -1282,40 +1284,67 @@ export function createChatHandler({
           message: parsed.message,
           sourceMeta
         });
-        const evidencePack = assembleEvidencePack({
+        let layeredMemories = [];
+        let memoryLoadError = null;
+        const memoryEntry = repoTree.find(entry => entry.path === REMEMBER_LAYERED_MEMORIES_PATH && entry.type === 'blob');
+        if (memoryEntry?.sha) {
+          try {
+            const parsedMemory = parseMemoryStore(decodeBlob(await client.readBlob(memoryEntry.sha)));
+            if (!parsedMemory.ok) memoryLoadError = parsedMemory.error;
+            else layeredMemories = parsedMemory.items;
+          } catch {
+            memoryLoadError = 'memory_load_failed';
+          }
+        }
+        const evidenceStores = {
+          workouts: workoutRecords,
+          meals: nutritionRecords,
+          composition: compositionRecords,
+          measurements: measurementRecords,
+          mindEvents,
+          skincare: skincareHistoryRecords,
+          medicalEvents,
+          tasks: hubTasks,
+          projects: hubProjects,
+          classes: hubClasses,
+          lessons: hubLessons,
+          units: hubUnits,
+          pages: knowledgePages,
+          loadErrors: hubLoadErrors,
+          hammondDigest,
+          hammondEvents,
+          centralNodeMarkdown,
+          nutritionChallenges,
+          templates: [],
+          stressFlags: [],
+          inbox: [],
+          memories: layeredMemories,
+          memoryLoadError
+        };
+        const surfaceTurn = runSurfaceAgentTurn({
+          surface: 'life',
           slug,
           message: parsed.message,
           today,
           sourceMeta,
           now: nowInstant,
-          stores: {
-            workouts: workoutRecords,
-            meals: nutritionRecords,
-            composition: compositionRecords,
-            measurements: measurementRecords,
-            mindEvents,
-            skincare: skincareHistoryRecords,
-            medicalEvents,
-            tasks: hubTasks,
-            projects: hubProjects,
-            classes: hubClasses,
-            lessons: hubLessons,
-            units: hubUnits,
-            pages: knowledgePages,
-            loadErrors: hubLoadErrors,
-            hammondDigest,
-            hammondEvents,
-            centralNodeMarkdown,
-            nutritionChallenges,
-            templates: [],
-            stressFlags: [],
-            inbox: []
-          }
+          stores: evidenceStores,
+          tools,
+          env,
+          flag: parsed.agentKernel
         });
+        const evidencePack = surfaceTurn.pack;
+        if (surfaceTurn.enabled && surfaceTurn.kernel?.plan?.workflow !== 'none') {
+          tools = surfaceTurn.tools;
+        }
+        const kernelEvent = surfaceTurn.trace;
+        if (kernelEvent) send(kernelEvent);
         // Pack already retrieved domain evidence. Keep tools for continuation /
         // writes, but do not force a tool round when the pack is answerable.
-        const forceToolChoice =
-          activation.forceToolChoice && !(evidencePack.active && evidencePack.answerable);
+        // Kernel sufficiency replaces “any section present” for Chadwick/Clare pilots.
+        const forceToolChoice = surfaceTurn.enabled && surfaceTurn.kernel?.plan?.workflow !== 'none'
+          ? surfaceTurn.forceToolChoice
+          : activation.forceToolChoice && !(evidencePack.active && evidencePack.answerable);
         const system = buildSystemPrompt({
           slug,
           digest,
@@ -1369,7 +1398,8 @@ export function createChatHandler({
           hubContext,
           activationCatalogue: activation.catalogueBlock,
           activationDirective: activation.activationBlock,
-          evidencePackBlock: evidencePack.promptBlock
+          evidencePackBlock: surfaceTurn.promptBlock,
+          kernelBlock: surfaceTurn.interpretationBlock || ''
         });
 
         let pendingLogRejection = null;
@@ -2401,7 +2431,8 @@ async function parseRequest(request) {
     history: sanitizeHistory(body.history),
     priorAgentSlug: typeof body.priorAgentSlug === 'string' ? body.priorAgentSlug : undefined,
     auditSession: normalizeAuditSession(body.auditSession),
-    protocolId: normalizeProtocolId(body.protocolId)
+    protocolId: normalizeProtocolId(body.protocolId),
+    agentKernel: body.agentKernel === true
   };
 }
 

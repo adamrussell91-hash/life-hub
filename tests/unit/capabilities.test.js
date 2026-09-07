@@ -361,6 +361,7 @@ test('shortcutSchemas covers Phase 1-3 tool names', () => {
   const names = Object.keys(shortcutSchemas());
   for (const name of [
     'remember_set_week_flag',
+    'remember_write_memory',
     'track_open_challenge',
     'coordinate_request_cn_write',
     'research_save_brief',

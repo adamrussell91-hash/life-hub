@@ -189,6 +189,7 @@ export function isPathAllowedForAgent(slug, path, { mode = 'write' } = {}) {
 const SHORTCUT_CAPABILITY_IDS = new Set([
   'remember.set-week-flag',
   'remember.note-context',
+  'remember.write-memory',
   'track.open-challenge',
   'track.log-progress',
   'track.close-challenge',

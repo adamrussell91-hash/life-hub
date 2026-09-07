@@ -1,7 +1,9 @@
 /**
- * Orchestration acceptance: activation → tools attached → required tools executed
- * → evidence present → answer may cite it. Mocks model decisions only at the
- * tool-selection boundary (unavoidable without a live Anthropic key).
+ * Pack/function orchestration: activation → tools attached → required tools
+ * executed → evidence present → deterministic claims composed from that evidence.
+ *
+ * This is not a conversational behaviour test. It does not run chat.mjs or a
+ * model. Mocks stay only at the tool-selection boundary.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,6 +29,29 @@ import {
 } from '../../netlify/functions/_shared/domain-retrieval.mjs';
 import { searchMindRecords } from '../../netlify/functions/_shared/mind-session-read.mjs';
 import { buildSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
+import { claimValue, composeEvidenceClaims } from '../../netlify/functions/_shared/evidence-packs.mjs';
+
+function assertComposedAnswer(evidence, { must = [], limitations = [], complete } = {}) {
+  const composed = composeEvidenceClaims(evidence);
+  for (const { fact, value } of must) {
+    const actual = claimValue(composed, fact);
+    assert.equal(actual, value, `claim ${fact}: expected ${value}, got ${actual}`);
+  }
+  for (const kind of limitations) {
+    assert.ok(
+      composed.limitations.some(item => item.kind === kind),
+      `expected limitation ${kind}; have ${composed.limitations.map(item => item.kind).join(',') || 'none'}`
+    );
+  }
+  if (complete === false) {
+    assert.equal(composed.complete, false);
+    assert.ok(composed.limitations.length >= 1, 'incomplete evidence must name a limitation');
+  }
+  if (complete === true) {
+    assert.equal(composed.complete, true);
+  }
+  return composed;
+}
 
 const TODAY = '2026-08-20';
 
@@ -130,6 +155,14 @@ test('scenario 1: Chadwick training overview retrieves snapshot + compare', () =
   assert.equal(evidence.compare_workout_windows.ok, true);
   assert.ok(evidence.compare_workout_windows.current.from);
   assert.ok(evidence.compare_workout_windows.previous.from);
+  assertComposedAnswer(evidence, {
+    must: [
+      { fact: 'last_completed_date', value: '2026-08-18' },
+      { fact: 'compare_current_from', value: evidence.compare_workout_windows.current.from },
+      { fact: 'compare_previous_from', value: evidence.compare_workout_windows.previous.from }
+    ],
+    complete: true
+  });
 });
 
 test('scenario 2: Chadwick decline checks load, pain, snapshot, body', () => {
@@ -165,6 +198,11 @@ test('scenario 2: Chadwick decline checks load, pain, snapshot, body', () => {
       ?? 0) >= 0
   );
   assert.equal(evidence.get_body_state.ok, true);
+  const composed = assertComposedAnswer(evidence, { complete: true });
+  assert.ok(
+    composed.claims.some(claim => claim.fact === 'pain_flag_count' || claim.fact === 'ok'),
+    'decline path must compose a claim from pain or load evidence'
+  );
 });
 
 test('scenario 3: Clare focus today retrieves tasks focus', () => {
@@ -185,6 +223,13 @@ test('scenario 3: Clare focus today retrieves tasks focus', () => {
   });
   assert.equal(evidence.get_tasks_focus.open_count, 2);
   assert.ok(evidence.get_tasks_focus.overdue.length >= 1);
+  assertComposedAnswer(evidence, {
+    must: [
+      { fact: 'open_count', value: 2 },
+      { fact: 'overdue_title', value: 'Mark essays' }
+    ],
+    complete: true
+  });
 });
 
 test('scenario 4: Ann improve lesson retrieves teaching context', () => {
@@ -213,6 +258,13 @@ test('scenario 4: Ann improve lesson retrieves teaching context', () => {
   });
   assert.equal(evidence.get_teaching_context.lesson.id, 'l1');
   assert.equal(evidence.get_teaching_context.class.code, '10ENG');
+  assertComposedAnswer(evidence, {
+    must: [
+      { fact: 'lesson_id', value: 'l1' },
+      { fact: 'lesson_title', value: 'Essay structure' },
+      { fact: 'class_code', value: '10ENG' }
+    ]
+  });
 });
 
 test('scenario 5: Clementine knowledge lookup searches corpus', () => {
@@ -233,6 +285,14 @@ test('scenario 5: Clementine knowledge lookup searches corpus', () => {
   });
   assert.equal(evidence.search_knowledge.count, 1);
   assert.equal(evidence.search_knowledge.results[0].id, 'page_hub_clt');
+  assertComposedAnswer(evidence, {
+    must: [
+      { fact: 'result_count', value: 1 },
+      { fact: 'first_result_id', value: 'page_hub_clt' },
+      { fact: 'first_result_title', value: 'Cognitive load theory' }
+    ],
+    complete: true
+  });
 });
 
 test('scenario 6: Sara weight question retrieves body trend', () => {
@@ -269,6 +329,13 @@ test('scenario 6: Sara weight question retrieves body trend', () => {
   });
   assert.equal(evidence.get_weight_trend.found, true);
   assert.equal(evidence.get_weight_trend.delta_kg, 0.4);
+  assertComposedAnswer(evidence, {
+    must: [
+      { fact: 'found', value: true },
+      { fact: 'delta_kg', value: 0.4 }
+    ],
+    complete: true
+  });
 });
 
 test('scenario 7: Penelope pattern question searches diary', () => {
@@ -293,6 +360,9 @@ test('scenario 7: Penelope pattern question searches diary', () => {
     }
   });
   assert.ok(evidence.search_diary_records.count >= 1);
+  assertComposedAnswer(evidence, {
+    must: [{ fact: 'result_count', value: evidence.search_diary_records.count }]
+  });
 });
 
 test('scenario 8: Vera pattern question searches mind records', () => {
@@ -317,6 +387,9 @@ test('scenario 8: Vera pattern question searches mind records', () => {
     }
   });
   assert.ok(evidence.search_mind_records.count >= 2);
+  assertComposedAnswer(evidence, {
+    must: [{ fact: 'result_count', value: evidence.search_mind_records.count }]
+  });
 });
 
 test('scenario 9: Hyaluronica routine question retrieves adherence', () => {
@@ -345,6 +418,9 @@ test('scenario 9: Hyaluronica routine question retrieves adherence', () => {
   });
   assert.equal(evidence.get_skincare_adherence.ok, true);
   assert.ok(evidence.get_skincare_adherence.days_with_log >= 1);
+  assertComposedAnswer(evidence, {
+    must: [{ fact: 'days_with_log', value: evidence.get_skincare_adherence.days_with_log }]
+  });
 });
 
 test('scenario 10: Hammond life slipping inspects hubs', () => {
@@ -372,6 +448,14 @@ test('scenario 10: Hammond life slipping inspects hubs', () => {
   });
   assert.ok(evidence.inspect_hub_signals.unavailable.some(u => u.hub === 'classes'));
   assert.ok(evidence.inspect_hub_signals.life_digest_present);
+  assertComposedAnswer(evidence, {
+    must: [
+      { fact: 'unavailable_hub', value: 'classes' },
+      { fact: 'life_digest_present', value: true }
+    ],
+    limitations: ['unavailable'],
+    complete: false
+  });
 });
 
 test('scenario 11: retrieval failure is explicit, not empty success', () => {
@@ -384,6 +468,11 @@ test('scenario 11: retrieval failure is explicit, not empty success', () => {
   assert.equal(failed.tasks_focus.error, 'tasks_unavailable');
   assert.ok(failed.unavailable.some(u => u.hub === 'tasks'));
   assert.notEqual(failed.tasks_focus.ok, true);
+  assertComposedAnswer({ inspect_hub_signals: failed }, {
+    must: [{ fact: 'unavailable_hub', value: 'tasks' }],
+    limitations: ['unavailable'],
+    complete: false
+  });
 });
 
 test('scenario 12: truncated results expose truncated=true', () => {
@@ -397,12 +486,21 @@ test('scenario 12: truncated results expose truncated=true', () => {
   assert.equal(result.truncated, true);
   assert.equal(result.kept, 5);
   assert.ok(result.omitted >= 1);
+  const composed = assertComposedAnswer({ search_knowledge: result }, {
+    limitations: ['truncated'],
+    complete: false
+  });
+  assert.equal(claimValue(composed, 'result_count'), 5);
+  assert.ok(!composed.complete, 'truncated corpus must not compose as a complete answer');
 });
 
 test('scenario 13: irrelevant tool stays unused for greeting', () => {
   const act = activationForTurn({ slug: 'chadwick', message: 'hey bro' });
   assert.equal(act.forceToolChoice, false);
   assert.deepEqual(act.requiredTools, []);
+  const composed = composeEvidenceClaims({});
+  assert.equal(composed.claims.length, 0);
+  assert.equal(composed.complete, false);
 });
 
 test('scenario 14: conflicting weight readings are flagged', () => {
@@ -414,6 +512,11 @@ test('scenario 14: conflicting weight readings are flagged', () => {
   });
   assert.ok(trend.conflict);
   assert.equal(trend.conflict.kind, 'large_weight_delta');
+  assertComposedAnswer({ get_weight_trend: trend }, {
+    must: [{ fact: 'delta_kg', value: 8 }],
+    limitations: ['conflict'],
+    complete: false
+  });
 });
 
 test('scenario nutrition overview for Brisket', () => {
@@ -437,4 +540,5 @@ test('scenario nutrition overview for Brisket', () => {
   });
   assert.equal(evidence.get_nutrition_snapshot.ok, true);
   assert.equal(evidence.get_nutrition_adherence.ok, true);
+  assertComposedAnswer(evidence, { complete: true });
 });
