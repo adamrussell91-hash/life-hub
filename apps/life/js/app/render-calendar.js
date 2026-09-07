@@ -1,6 +1,4 @@
 import { formatDisplayDate } from '../core/time.js';
-import { listCalendarSources } from '../shell/calendar-sources.js';
-import { renderCalendarSources } from '../shell/render-calendar-sources.js';
 import { candidateForLog, inferMealSlot, isWritableCalendarType, slugForLog } from './calendar-write.js';
 import {
   blockStyle,
@@ -15,15 +13,6 @@ import {
   timeGridHours,
   hourCaption
 } from '../../../../packages/design-kit/js/time-grid.js';
-
-const CATEGORY_CLASS = {
-  nutrition: 'nutrition',
-  fitness: 'fitness',
-  diary: 'mind',
-  body: 'body',
-  skincare: 'skincare',
-  sleep: 'body'
-};
 
 const TINT = {
   nutrition: 'gold',
@@ -162,8 +151,8 @@ export function renderCalendar(root, model, {
   rail.className = 'hub-calendar__rail';
   const selected = findEvent(model, selectedEventId);
   rail.append(renderCompose(root, draft, mode));
-  rail.append(renderAgenda(root, model, mode, selected, expanded, scrollToDetail));
-  rail.append(renderSources(root));
+  const agenda = renderAgenda(root, selected, scrollToDetail);
+  if (agenda) rail.append(agenda);
   rail.append(renderShortcutHint(root));
   workspace.append(body, rail);
   calendar.append(workspace);
@@ -678,76 +667,32 @@ function renderCompose(root, draft, view) {
   return card;
 }
 
-function renderAgenda(root, model, view, selected, expanded, scrollToDetail) {
+function renderAgenda(root, selected, scrollToDetail) {
+  if (!selected) return null;
   const detail = root.createElement('section');
   detail.className = 'hub-calendar__detail';
   detail.id = 'calendar-day-detail';
-  if (selected) {
-    const heading = root.createElement('h3');
-    heading.className = 'hub-calendar__detail-heading';
-    heading.textContent = selected.title;
-    const meta = root.createElement('p');
-    meta.className = 'hub-calendar__detail-empty';
-    meta.textContent = [
-      selected.time ? selected.time : 'All day',
-      selected.brief,
-      isWritableCalendarType(selected.type) ? 'Life log' : selected.type
-    ].filter(Boolean).join(' · ');
-    const snippet = root.createElement('p');
-    snippet.className = 'metric-caption';
-    snippet.textContent = selected.snippet || 'No notes.';
-    detail.append(heading, meta, snippet);
-    return detail;
-  }
-
   const heading = root.createElement('h3');
   heading.className = 'hub-calendar__detail-heading';
-  heading.textContent = formatDisplayDate(model.selectedDate);
-  detail.append(heading);
-  if (!model.dayEvents.length) {
-    const empty = root.createElement('p');
-    empty.className = 'hub-calendar__detail-empty';
-    empty.textContent = 'Nothing logged this day.';
-    detail.append(empty);
-  } else {
-    for (const event of model.dayEvents) {
-      detail.append(eventRow(root, event));
-    }
-  }
-  if (expanded && scrollToDetail) {
+  heading.textContent = selected.title;
+  const meta = root.createElement('p');
+  meta.className = 'hub-calendar__detail-empty';
+  meta.textContent = [
+    selected.time ? selected.time : 'All day',
+    selected.brief,
+    isWritableCalendarType(selected.type) ? 'Life log' : selected.type
+  ].filter(Boolean).join(' · ');
+  const snippet = root.createElement('p');
+  snippet.className = 'metric-caption';
+  snippet.textContent = selected.snippet || 'No notes.';
+  detail.append(heading, meta, snippet);
+  if (scrollToDetail) {
     delete detail.dataset.motion;
     void detail.offsetWidth;
     detail.dataset.motion = 'in';
     scrollDetailIntoView(root, detail);
   }
   return detail;
-}
-
-function renderSources(root) {
-  const card = root.createElement('article');
-  card.className = 'hub-calendar__detail';
-  card.id = 'calendar-source-registry';
-  card.setAttribute('aria-label', 'Shared calendar sources');
-  const label = root.createElement('p');
-  label.className = 'metric-label';
-  label.textContent = 'Shared sources';
-  const empty = root.createElement('p');
-  empty.className = 'metric-caption';
-  empty.dataset.calendar = 'sources-empty';
-  empty.textContent = 'No shared sources yet.';
-  const list = root.createElement('ul');
-  list.id = 'calendar-source-list';
-  list.setAttribute('hidden', '');
-  card.append(label, empty, list);
-  renderCalendarSources({
-    createElement: root.createElement.bind(root),
-    querySelector(selector) {
-      if (selector === '[data-calendar="sources-empty"]') return empty;
-      if (selector === '#calendar-source-list') return list;
-      return card.querySelector?.(selector) ?? null;
-    }
-  }, listCalendarSources());
-  return card;
 }
 
 function renderShortcutHint(root) {
@@ -762,37 +707,6 @@ function renderShortcutHint(root) {
     hint.append(item);
   }
   return hint;
-}
-
-function eventRow(root, event) {
-  const row = root.createElement('div');
-  row.className = 'calendar-event';
-
-  const affordance = root.createElement('span');
-  affordance.className = 'calendar-event__affordance';
-  const category = event.categories?.[0];
-  if (category) {
-    const dot = root.createElement('i');
-    dot.className = `calendar-dot ${CATEGORY_CLASS[category] ?? ''}`.trim();
-    dot.title = category;
-    affordance.append(dot);
-  }
-  row.append(affordance);
-
-  const meta = root.createElement('div');
-  meta.className = 'calendar-event__meta';
-  const title = root.createElement('strong');
-  title.className = 'calendar-event__title';
-  title.textContent = event.title;
-  meta.append(title);
-  if (event.brief) {
-    const brief = root.createElement('p');
-    brief.className = 'calendar-event__brief';
-    brief.textContent = event.brief;
-    meta.append(brief);
-  }
-  row.append(meta);
-  return row;
 }
 
 function applyMonthMotion(grid, monthDelta) {
