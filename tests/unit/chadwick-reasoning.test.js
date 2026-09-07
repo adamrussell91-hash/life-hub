@@ -229,6 +229,7 @@ test('kernel interpretation forbids inventing a bench cause when evidence is sil
   assert.match(kernel.interpretationBlock, /unknown cause/i);
   assert.match(kernel.interpretationBlock, /do not invent/i);
   assert.match(kernel.interpretationBlock, /groin/i);
+  assert.match(kernel.interpretationBlock, /not evidence that .*sore/i);
   assert.doesNotMatch(kernel.interpretationBlock, /aching pecs|bar press pr/i);
 });
 
