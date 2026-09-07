@@ -54,7 +54,8 @@ test('chadwickFitnessToolSchemas registers the Fitness/Body pack under stable na
     'get_load_status',
     'get_pain_training_summary',
     'get_body_state',
-    'get_workout_template'
+    'get_workout_template',
+    'analyse_training_evidence'
   ]);
 });
 

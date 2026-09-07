@@ -502,24 +502,45 @@ function pushClaim(claims, tool, fact, value, kind = 'record', provenance = null
 }
 
 export function claimProvenance(result, tool, extra = {}) {
-  const first = result?.results?.[0] ?? result?.lesson ?? result?.latest ?? null;
+  const record = extra.record && typeof extra.record === 'object' ? extra.record : null;
+  const hasRecord = Boolean(extra.recordId || extra.recordPath || record?.id || record?.path);
+  const sourceType = extra.sourceType
+    ?? (extra.reason === 'user_stated_current_turn'
+      ? 'record'
+      : extra.reason === 'inference' || extra.kind === 'inference'
+        ? 'calculation'
+        : extra.calculation || extra.reason === 'derived_from_aggregate' || result?.kind === 'calculation' || !hasRecord
+          ? 'calculation'
+          : 'record');
+  const store = extra.store ?? result?.store ?? null;
   const provenance = {
-    sourceType: result?.kind === 'calculation' ? 'calculation' : 'record',
-    store: result?.store ?? extra.store ?? null,
+    sourceType,
+    store,
     tool,
-    recordId: extra.recordId ?? first?.id ?? first?.path ?? null,
-    recordPath: extra.recordPath ?? first?.path ?? result?.path ?? null,
+    recordId: extra.recordId ?? record?.id ?? null,
+    recordPath: extra.recordPath ?? record?.path ?? result?.path ?? null,
     retrievedAt: extra.retrievedAt ?? new Date().toISOString(),
-    authority: result?.store ? 'authoritative' : 'unknown',
-    modifiedAt: first?.updated_at ?? first?.version ?? result?.version ?? null
+    authority: extra.authority ?? (store ? 'authoritative' : extra.reason === 'user_stated_current_turn' ? 'user_stated' : 'unknown'),
+    modifiedAt: extra.modifiedAt ?? record?.updated_at ?? record?.version ?? result?.version ?? null
   };
-  if (result?.kind === 'calculation' || extra.calculation) {
+  const date = extra.date ?? record?.date ?? record?.due_date ?? result?.date ?? result?.last_completed_date ?? null;
+  if (date) provenance.date = date;
+  if (extra.window) provenance.window = extra.window;
+  if (sourceType === 'calculation' || extra.calculation) {
     provenance.calculation = extra.calculation ?? result?.kind ?? 'calculation';
-    provenance.inputs = extra.inputs ?? (result?.store ? [result.store] : []);
-    provenance.output = extra.output ?? null;
+    provenance.inputs = extra.inputs ?? (store ? [store] : []);
+    provenance.output = extra.output ?? extra.fact ?? null;
   }
-  if (!provenance.recordId && !provenance.recordPath && !provenance.store) {
+  if (!provenance.recordId && !provenance.recordPath) {
+    provenance.reason = extra.reason
+      ?? (extra.kind === 'inference' ? 'inference'
+        : extra.reason === 'user_stated_current_turn' ? 'user_stated_current_turn'
+        : sourceType === 'calculation' ? 'derived_from_aggregate'
+        : 'unavailable_source');
+  }
+  if (!provenance.recordId && !provenance.recordPath && !provenance.store && !provenance.reason) {
     provenance.authority = 'unavailable';
+    provenance.reason = 'unavailable_source';
   }
   return provenance;
 }
@@ -567,62 +588,179 @@ export function composeEvidenceClaims(evidence = {}) {
           kind: 'unavailable',
           text: `${item.hub}:${item.error || 'unavailable'}`
         });
-        pushClaim(claims, tool, 'unavailable_hub', item.hub);
+        pushClaim(claims, tool, 'unavailable_hub', item.hub, 'record', claimProvenance(result, tool, {
+          reason: 'unavailable_source',
+          store: item.hub
+        }));
       }
     }
 
-    pushClaim(claims, tool, 'last_completed_date', result.last_completed_date, 'calculation');
-    pushClaim(claims, tool, 'compare_current_from', result.current?.from, 'calculation');
-    pushClaim(claims, tool, 'compare_previous_from', result.previous?.from, 'calculation');
-    pushClaim(claims, tool, 'open_count', result.open_count, 'calculation');
-    pushClaim(claims, tool, 'overdue_title', result.overdue?.[0]?.title);
-    const provenance = claimProvenance(result, tool);
-    pushClaim(claims, tool, 'lesson_id', result.lesson?.id, 'record', provenance);
-    pushClaim(claims, tool, 'lesson_title', result.lesson?.title, 'record', provenance);
-    pushClaim(claims, tool, 'class_code', result.class?.code, 'record', provenance);
-    pushClaim(claims, tool, 'learning_intentions', result.lesson?.learning_intentions, 'record', provenance);
-    pushClaim(claims, tool, 'diagnosis_gaps', result.diagnosis_gaps, 'calculation', {
-      ...provenance,
-      calculation: 'teaching_diagnosis',
-      inputs: ['teaching_hub']
+    const calc = (fact, calculation, extra = {}) => claimProvenance(result, tool, {
+      reason: extra.reason ?? 'derived_from_aggregate',
+      calculation,
+      store: extra.store ?? result.store,
+      inputs: extra.inputs,
+      window: extra.window,
+      date: extra.date,
+      output: extra.output ?? fact
     });
-    pushClaim(claims, tool, 'result_count', result.count, 'calculation', provenance);
-    pushClaim(claims, tool, 'first_result_id', result.results?.[0]?.id, 'record', provenance);
-    pushClaim(claims, tool, 'first_result_title', result.results?.[0]?.title, 'record', provenance);
-    pushClaim(claims, tool, 'first_result_excerpt', result.results?.[0]?.excerpt ?? result.results?.[0]?.notes_excerpt, 'record', provenance);
-    pushClaim(claims, tool, 'first_result_tags', result.results?.[0]?.tags, 'record', provenance);
-    pushClaim(claims, tool, 'first_result_connected', result.results?.[0]?.connected, 'record', provenance);
-    pushClaim(claims, tool, 'first_result_provider', result.results?.[0]?.provider, 'record', provenance);
-    pushClaim(claims, tool, 'first_result_notes', result.results?.[0]?.notes_excerpt ?? result.results?.[0]?.notes, 'record', provenance);
-    pushClaim(claims, tool, 'delta_kg', result.delta_kg, 'calculation');
-    pushClaim(claims, tool, 'found', result.found);
-    pushClaim(claims, tool, 'enough_evidence', result.enough_evidence, 'calculation', provenance);
-    pushClaim(claims, tool, 'missing_recent_sessions', result.missing_recent_sessions, 'calculation', provenance);
+    const recordOf = (record, extra = {}) => claimProvenance(result, tool, {
+      record,
+      sourceType: 'record',
+      store: extra.store ?? result.store,
+      date: extra.date ?? record?.date ?? record?.due_date,
+      modifiedAt: record?.updated_at
+    });
+
+    const lastSession = result.last_completed_id || result.last_completed_path
+      ? { id: result.last_completed_id, path: result.last_completed_path, date: result.last_completed_date }
+      : null;
+    pushClaim(
+      claims,
+      tool,
+      'last_completed_date',
+      result.last_completed_date,
+      lastSession ? 'record' : 'calculation',
+      lastSession
+        ? recordOf(lastSession, { date: result.last_completed_date })
+        : calc('last_completed_date', 'last_completed_date', { date: result.last_completed_date })
+    );
+    pushClaim(claims, tool, 'compare_current_from', result.current?.from, 'calculation', calc('compare_current_from', 'workout_window', {
+      window: result.current ?? null
+    }));
+    pushClaim(claims, tool, 'compare_previous_from', result.previous?.from, 'calculation', calc('compare_previous_from', 'workout_window', {
+      window: result.previous ?? null
+    }));
+    pushClaim(claims, tool, 'open_count', result.open_count, 'calculation', calc('open_count', 'open_count', {
+      store: result.store ?? 'tasks_hub'
+    }));
+    if (result.overdue?.[0]?.title) {
+      pushClaim(claims, tool, 'overdue_title', result.overdue[0].title, 'record', recordOf(result.overdue[0], {
+        store: result.store ?? 'tasks_hub'
+      }));
+    }
+    if (result.due_soon?.[0]?.title) {
+      pushClaim(claims, tool, 'due_soon_title', result.due_soon[0].title, 'record', recordOf(result.due_soon[0], {
+        store: result.store ?? 'tasks_hub'
+      }));
+    }
+    if (result.lesson) {
+      const lessonProv = recordOf(result.lesson, { store: result.store ?? 'teaching_hub' });
+      pushClaim(claims, tool, 'lesson_id', result.lesson.id, 'record', lessonProv);
+      pushClaim(claims, tool, 'lesson_title', result.lesson.title, 'record', lessonProv);
+      pushClaim(claims, tool, 'learning_intentions', result.lesson.learning_intentions, 'record', lessonProv);
+    }
+    if (result.class?.code) {
+      pushClaim(claims, tool, 'class_code', result.class.code, 'record', recordOf(result.class, {
+        store: result.store ?? 'teaching_hub'
+      }));
+    }
+    pushClaim(claims, tool, 'diagnosis_gaps', result.diagnosis_gaps, 'calculation', calc('diagnosis_gaps', 'teaching_diagnosis', {
+      store: 'teaching_hub',
+      inputs: ['teaching_hub']
+    }));
+    const first = result.results?.[0] ?? null;
+    pushClaim(claims, tool, 'result_count', result.count, 'calculation', calc('result_count', 'result_count'));
+    if (first) {
+      const firstProv = recordOf(first);
+      pushClaim(claims, tool, 'first_result_id', first.id, 'record', firstProv);
+      pushClaim(claims, tool, 'first_result_title', first.title, 'record', firstProv);
+      pushClaim(claims, tool, 'first_result_excerpt', first.excerpt ?? first.notes_excerpt, 'record', firstProv);
+      pushClaim(claims, tool, 'first_result_tags', first.tags, 'record', firstProv);
+      pushClaim(claims, tool, 'first_result_connected', first.connected, 'record', firstProv);
+      pushClaim(claims, tool, 'first_result_provider', first.provider, 'record', firstProv);
+      pushClaim(claims, tool, 'first_result_notes', first.notes_excerpt ?? first.notes, 'record', firstProv);
+    }
+    pushClaim(claims, tool, 'delta_kg', result.delta_kg, 'calculation', calc('delta_kg', 'weight_delta'));
+    if (result.found != null) {
+      pushClaim(claims, tool, 'found', result.found, result.found ? 'record' : 'calculation', result.found
+        ? recordOf(result.latest ?? result, { store: result.store ?? 'life_hub_body' })
+        : calc('found', 'body_state_found', { reason: 'unavailable_source' }));
+    }
+    pushClaim(claims, tool, 'enough_evidence', result.enough_evidence, 'calculation', calc('enough_evidence', 'enough_evidence'));
+    pushClaim(claims, tool, 'missing_recent_sessions', result.missing_recent_sessions, 'calculation', calc('missing_recent_sessions', 'recent_session_window'));
     if (result.substitution?.replacement) {
-      pushClaim(claims, tool, 'substitution', result.substitution.replacement, 'calculation', provenance);
+      pushClaim(claims, tool, 'substitution', result.substitution.replacement, 'calculation', calc('substitution', 'substitution_map'));
+    }
+    if (result.cause?.status) {
+      const isActive = result.cause.status === 'active' || result.cause.kind === 'current_active_constraint';
+      const causeKind = isActive ? 'record' : 'inference';
+      const causeReason = result.cause.status === 'user_stated'
+        ? 'user_stated_current_turn'
+        : isActive
+          ? undefined
+          : 'inference';
+      const activeRecord = result.cause.current_active_constraint;
+      pushClaim(claims, tool, 'unavailable_cause', result.cause.status, causeKind, claimProvenance(result, tool, {
+        sourceType: isActive ? 'record' : 'calculation',
+        reason: causeReason,
+        record: isActive ? activeRecord : null,
+        date: isActive ? (activeRecord?.latest_date ?? activeRecord?.date) : undefined,
+        calculation: 'unavailable_cause',
+        kind: causeKind
+      }));
+      for (const site of result.cause.historical_relevant_pain ?? []) {
+        const hasRecord = Boolean(site.id || site.path);
+        pushClaim(claims, tool, 'historical_relevant_pain', site.site, hasRecord ? 'record' : 'calculation', claimProvenance(result, tool, {
+          sourceType: hasRecord ? 'record' : 'calculation',
+          record: hasRecord ? site : null,
+          date: site.latest_date,
+          reason: hasRecord ? undefined : 'derived_from_aggregate',
+          calculation: hasRecord ? undefined : 'historical_relevant_pain'
+        }));
+      }
     }
     if (result.progression?.ok === false) {
-      pushClaim(claims, tool, 'progression_blocked', result.progression.reason, 'calculation', provenance);
+      pushClaim(claims, tool, 'progression_blocked', result.progression.reason, 'calculation', calc('progression_blocked', 'progression_gate'));
     }
-    pushClaim(claims, tool, 'days_with_log', result.days_with_log, 'calculation');
-    pushClaim(claims, tool, 'life_digest_present', result.life_digest_present);
+    pushClaim(claims, tool, 'days_with_log', result.days_with_log, 'calculation', calc('days_with_log', 'days_with_log'));
+    if (result.life_digest_present != null) {
+      pushClaim(claims, tool, 'life_digest_present', result.life_digest_present, 'calculation', calc('life_digest_present', 'life_digest_present'));
+    }
+    if (result.long_term?.adherence_pct != null) {
+      pushClaim(claims, tool, 'adherence_pct', result.long_term.adherence_pct, 'calculation', calc('adherence_pct', 'adherence_pct', {
+        window: result.long_term
+      }));
+    }
+    if (result.this_week_volume_kg != null) {
+      pushClaim(claims, tool, 'week_volume_kg', result.this_week_volume_kg, 'calculation', calc('week_volume_kg', 'week_volume'));
+    } else if (result.week?.volume_kg != null) {
+      pushClaim(claims, tool, 'week_volume_kg', result.week.volume_kg, 'calculation', calc('week_volume_kg', 'week_volume'));
+    }
     if (Array.isArray(result.flags) && result.flags.length) {
-      pushClaim(claims, tool, 'pain_flag_count', result.flags.length);
+      pushClaim(claims, tool, 'pain_flag_count', result.flags.length, 'calculation', calc('pain_flag_count', 'pain_flag_count'));
     }
     if (Array.isArray(result.recent) && result.recent.length) {
-      pushClaim(claims, tool, 'pain_recent_count', result.recent.length);
+      pushClaim(claims, tool, 'pain_recent_count', result.recent.length, 'calculation', calc('pain_recent_count', 'pain_recent_count'));
     }
     if (Array.isArray(result.sites) && result.sites.length) {
-      pushClaim(claims, tool, 'pain_site', result.sites[0].site);
-      pushClaim(claims, tool, 'pain_site_count', result.site_count ?? result.sites.length);
+      const site = result.sites[0];
+      const session = site.sessions?.[0];
+      pushClaim(claims, tool, 'pain_site', site.site, 'record', claimProvenance(result, tool, {
+        record: session?.id || session?.path ? session : null,
+        date: site.latest_date,
+        reason: session?.id || session?.path ? undefined : 'derived_from_aggregate',
+        calculation: session?.id || session?.path ? undefined : 'pain_site_rollup'
+      }));
+      pushClaim(claims, tool, 'pain_site_count', result.site_count ?? result.sites.length, 'calculation', calc('pain_site_count', 'pain_site_count'));
     }
     if (Array.isArray(result.collisions)) {
-      pushClaim(claims, tool, 'collision_count', result.collisions.length, 'calculation');
+      pushClaim(claims, tool, 'collision_count', result.collisions.length, 'calculation', calc('collision_count', 'plan_work_collisions', {
+        store: result.store ?? 'tasks_hub',
+        inputs: ['tasks_hub', 'teaching_hub']
+      }));
     }
-    pushClaim(claims, tool, 'lesson_count', result.lesson_count, 'calculation');
-    pushClaim(claims, tool, 'stall_title', result.stall_candidates?.[0]?.title);
+    pushClaim(claims, tool, 'lesson_count', result.lesson_count, 'calculation', calc('lesson_count', 'lesson_count', {
+      store: result.store ?? 'teaching_hub'
+    }));
+    if (result.stall_candidates?.[0]?.title) {
+      pushClaim(claims, tool, 'stall_title', result.stall_candidates[0].title, 'record', recordOf({
+        id: result.stall_candidates[0].project_id,
+        title: result.stall_candidates[0].title
+      }, { store: result.store ?? 'tasks_hub' }));
+    }
     if (result.ok === true && !claims.some(claim => claim.tool === tool)) {
-      pushClaim(claims, tool, 'ok', true);
+      pushClaim(claims, tool, 'ok', true, 'calculation', calc('ok', 'tool_ok'));
     }
   }
 
