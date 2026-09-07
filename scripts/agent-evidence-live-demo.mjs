@@ -142,6 +142,9 @@ async function main() {
     ],
     loadErrors: {}
   };
+  // Tasks / Teaching / Knowledge live in blob stores, not life-hub-data markdown.
+  // These four hub slices are labelled synthetic until a genuine fixture path exists.
+  const syntheticStores = ['tasks', 'projects', 'classes', 'lessons', 'units', 'pages'];
 
   const apiKey = loadLocalAnthropicKey();
   const apiKeyPresent = Boolean(apiKey && apiKey.length > 8);
@@ -160,6 +163,7 @@ async function main() {
       body_composition_loaded: stores.composition.length,
       pack_active: pack.active,
       intent: pack.intentClass,
+      synthetic_stores: syntheticStores,
       tools_executed: pack.toolsExecuted,
       section_kinds: pack.sections.map(s => ({ id: s.id, kind: s.kind })),
       answerable: pack.answerable,

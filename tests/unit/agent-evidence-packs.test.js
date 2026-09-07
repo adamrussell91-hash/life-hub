@@ -1,7 +1,11 @@
 /**
- * Evidence-pack competence tests.
+ * Evidence-pack competence tests (pack/function layer, not conversational behaviour).
  * Proves server-side autonomous retrieval for ordinary wording across all ten
  * agents — without mocking the model's tool choice.
+ *
+ * BASE_STORES.tasks / projects / classes / lessons / units / pages are synthetic
+ * hub fixtures. Fitness, nutrition, body, mind, and skincare shapes match the
+ * live markdown records; they are still in-test fixtures, not a live store clone.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
