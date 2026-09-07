@@ -43,7 +43,11 @@ import {
   getTasksOpenLoops,
   getTeachingDiagnosis,
   getKnowledgeSynthesis,
-  getHammondAttentionPack
+  getHammondAttentionPack,
+  analyseNutritionEvidence,
+  analyseSkincareEvidence,
+  analyseDiaryEvidence,
+  analyseMindEvidence
 } from './domain-analysis.mjs';
 import { searchMedicalRecords, analyseMedicalEvidence } from './medical-overview-read.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
@@ -188,6 +192,14 @@ export function assembleEvidencePack({
     push(sections, toolsExecuted, 'get_nutrition_targets', 'Nutrition targets', getNutritionTargets(today), 'record');
     push(sections, toolsExecuted, 'get_nutrition_day_remaining', 'Remaining day macros', getNutritionDayRemaining(meals, today, { nutritionChallenges }), 'calculation');
     push(sections, toolsExecuted, 'compare_nutrition_periods', 'Period compare', compareNutritionPeriods(meals, today), 'calculation');
+    push(
+      sections,
+      toolsExecuted,
+      'analyse_nutrition_evidence',
+      'Nutrition evidence analysis',
+      analyseNutritionEvidence(meals, today, { nutritionChallenges, message }),
+      'calculation'
+    );
     if (composition.length || measurements.length) {
       storesTouched.push('life_hub_body');
       push(
@@ -199,7 +211,7 @@ export function assembleEvidencePack({
         'record'
       );
     }
-    if (/search|find|when did|ate|meal/i.test(message)) {
+    if (/search|find|when did|ate|meal|miss|contribut/i.test(message)) {
       push(
         sections,
         toolsExecuted,
@@ -266,6 +278,14 @@ export function assembleEvidencePack({
     push(sections, toolsExecuted, 'search_diary_records', 'Diary search', searchDiaryRecords(mindEvents, { query: q, limit: 10 }), 'record');
     push(sections, toolsExecuted, 'compare_diary_periods', 'Diary period compare', compareDiaryPeriods(mindEvents, today), 'calculation');
     push(sections, toolsExecuted, 'extract_diary_themes', 'Diary themes', extractDiaryThemes(mindEvents, { query: q, limit: 12 }), 'calculation');
+    push(
+      sections,
+      toolsExecuted,
+      'analyse_diary_evidence',
+      'Diary recurrence analysis',
+      analyseDiaryEvidence(mindEvents, today, { message, query: q }),
+      'calculation'
+    );
     const from = `${String(today).slice(0, 8)}01`;
     push(sections, toolsExecuted, 'get_diary_range', 'Diary range (month-to-date)', getDiaryRange(mindEvents, { from, to: today, limit: 12 }), 'record');
   }
@@ -275,6 +295,14 @@ export function assembleEvidencePack({
     const q = queryFromMessage(message, 'session');
     push(sections, toolsExecuted, 'search_mind_records', 'Mind session search', searchMindRecords(mindEvents, { query: q, limit: 10 }), 'record');
     push(sections, toolsExecuted, 'compare_mind_sessions', 'Multi-session compare', compareMindSessions(mindEvents, today), 'calculation');
+    push(
+      sections,
+      toolsExecuted,
+      'analyse_mind_evidence',
+      'Mind reflection analysis',
+      analyseMindEvidence(mindEvents, today, { message, query: q }),
+      'calculation'
+    );
     push(sections, toolsExecuted, 'search_diary_records', 'Bounded diary evidence', searchDiaryRecords(mindEvents, { query: q, limit: 6 }), 'record');
   }
 
@@ -282,6 +310,14 @@ export function assembleEvidencePack({
     storesTouched.push('life_hub_skincare');
     push(sections, toolsExecuted, 'get_skincare_adherence', 'Skincare adherence', getSkincareAdherence(skincare, today), 'calculation');
     push(sections, toolsExecuted, 'get_skincare_response_evidence', 'Response evidence', getSkincareResponseEvidence(skincare, today), 'calculation');
+    push(
+      sections,
+      toolsExecuted,
+      'analyse_skincare_evidence',
+      'Skincare evidence analysis',
+      analyseSkincareEvidence(skincare, today, { message }),
+      'calculation'
+    );
     push(
       sections,
       toolsExecuted,
@@ -859,6 +895,228 @@ export function composeEvidenceClaims(evidence = {}) {
         calculation: 'stated_health_constraint',
         authority: 'user_stated',
         kind: 'inference'
+      }));
+    }
+    if (result.logging_status) {
+      pushClaim(claims, tool, 'logging_status', result.logging_status, 'calculation', calc('logging_status', 'nutrition_logging_status', {
+        store: result.store ?? 'life_hub_nutrition',
+        date: result.date
+      }));
+    }
+    if (result.meals_today_count != null) {
+      pushClaim(claims, tool, 'meals_today_count', result.meals_today_count, 'calculation', calc('meals_today_count', 'meals_today_count', {
+        store: result.store ?? 'life_hub_nutrition',
+        date: result.date
+      }));
+    }
+    if (Array.isArray(result.meals_today) && result.meals_today[0]) {
+      const meal = result.meals_today[0];
+      pushClaim(claims, tool, 'meal_today', meal.meal ?? meal.summary, 'record', recordOf(meal, {
+        store: result.store ?? 'life_hub_nutrition',
+        date: meal.date ?? result.date
+      }));
+    }
+    if (result.targets && typeof result.targets === 'object') {
+      if (result.targets.protein_g != null) {
+        pushClaim(claims, tool, 'protein_target_g', result.targets.protein_g, 'calculation', calc('protein_target_g', 'nutrition_targets_config', {
+          store: result.store ?? 'life_hub_nutrition',
+          date: result.date
+        }));
+      }
+    }
+    if (result.remaining && typeof result.remaining === 'object') {
+      if (result.remaining.protein_g != null) {
+        pushClaim(claims, tool, 'protein_remaining_g', result.remaining.protein_g, 'calculation', calc('protein_remaining_g', 'targets_minus_logged', {
+          store: result.store ?? 'life_hub_nutrition',
+          date: result.date,
+          inputs: ['targets', 'meals_today']
+        }));
+      }
+      if (result.remaining.calories != null) {
+        pushClaim(claims, tool, 'calories_remaining', result.remaining.calories, 'calculation', calc('calories_remaining', 'targets_minus_logged', {
+          store: result.store ?? 'life_hub_nutrition',
+          date: result.date,
+          inputs: ['targets', 'meals_today']
+        }));
+      }
+    }
+    if (result.week_adherence?.protein_hit_rate_pct != null) {
+      pushClaim(claims, tool, 'week_protein_hit_rate_pct', result.week_adherence.protein_hit_rate_pct, 'calculation', calc('week_protein_hit_rate_pct', 'week_adherence', {
+        store: result.store ?? 'life_hub_nutrition',
+        inputs: ['life_hub_nutrition']
+      }));
+    }
+    if (result.week?.protein_hit_rate_pct != null && result.week_adherence == null) {
+      pushClaim(claims, tool, 'week_protein_hit_rate_pct', result.week.protein_hit_rate_pct, 'calculation', calc('week_protein_hit_rate_pct', 'week_adherence', {
+        store: result.store ?? 'life_hub_nutrition'
+      }));
+    }
+    if (result.week_vs_previous?.protein_hit_rate_delta_pp != null) {
+      pushClaim(claims, tool, 'protein_hit_rate_delta_pp', result.week_vs_previous.protein_hit_rate_delta_pp, 'calculation', calc('protein_hit_rate_delta_pp', 'week_vs_previous', {
+        store: result.store ?? 'life_hub_nutrition',
+        inputs: ['week', 'previous_week']
+      }));
+    }
+    if (Array.isArray(result.unlogged_week_days)) {
+      pushClaim(claims, tool, 'unlogged_week_day_count', result.unlogged_week_days.length, 'calculation', calc('unlogged_week_day_count', 'unlogged_week_days', {
+        store: result.store ?? 'life_hub_nutrition'
+      }));
+    }
+    if (Array.isArray(result.top_meals_on_miss_day) && result.top_meals_on_miss_day[0]) {
+      const top = result.top_meals_on_miss_day[0];
+      pushClaim(claims, tool, 'top_meal_on_miss_day', top.meal, 'record', recordOf(top, {
+        store: result.store ?? 'life_hub_nutrition',
+        date: top.date
+      }));
+    }
+    if (result.stated_constraints?.current_intake_note) {
+      pushClaim(claims, tool, 'stated_intake_note', result.stated_constraints.current_intake_note, 'inference', claimProvenance(result, tool, {
+        sourceType: 'calculation',
+        reason: 'user_stated_current_turn',
+        calculation: 'stated_nutrition_constraint',
+        authority: 'user_stated',
+        kind: 'inference'
+      }));
+    }
+    if (result.routine_event_count != null) {
+      pushClaim(claims, tool, 'routine_event_count', result.routine_event_count, 'calculation', calc('routine_event_count', 'routine_event_count', {
+        store: result.store ?? 'life_hub_skincare'
+      }));
+    }
+    if (result.response_event_count != null) {
+      pushClaim(claims, tool, 'response_event_count', result.response_event_count, 'calculation', calc('response_event_count', 'response_event_count', {
+        store: result.store ?? 'life_hub_skincare'
+      }));
+    }
+    if (result.adherence_pct != null && result.long_term == null) {
+      pushClaim(claims, tool, 'skincare_adherence_pct', result.adherence_pct, 'calculation', calc('skincare_adherence_pct', 'skincare_adherence', {
+        store: result.store ?? 'life_hub_skincare',
+        window: { from: result.from, to: result.to ?? result.date }
+      }));
+    }
+    if (Array.isArray(result.routine_events) && result.routine_events[0]) {
+      const routine = result.routine_events[0];
+      pushClaim(claims, tool, 'recent_routine', routine.routine ?? routine.product, 'record', recordOf(routine, {
+        store: result.store ?? 'life_hub_skincare',
+        date: routine.date
+      }));
+    }
+    if (Array.isArray(result.historical_irritation) && result.historical_irritation[0]) {
+      const irr = result.historical_irritation[0];
+      pushClaim(claims, tool, 'historical_irritation_date', irr.date, 'record', recordOf(irr, {
+        store: result.store ?? 'life_hub_skincare',
+        date: irr.date
+      }));
+    }
+    if (Array.isArray(result.temporal_associations) && result.temporal_associations[0]) {
+      const assoc = result.temporal_associations[0];
+      pushClaim(claims, tool, 'temporal_association', `${assoc.product}@${assoc.prior_routine_date}->${assoc.flare_date}`, 'inference', claimProvenance(result, tool, {
+        sourceType: 'calculation',
+        reason: 'inference',
+        calculation: 'temporal_association_only',
+        store: result.store ?? 'life_hub_skincare',
+        kind: 'inference',
+        inputs: [assoc.prior_routine_date, assoc.flare_date]
+      }));
+    }
+    if (result.stated_constraints?.current_irritation) {
+      pushClaim(claims, tool, 'stated_current_irritation', result.stated_constraints.current_irritation, 'inference', claimProvenance(result, tool, {
+        sourceType: 'calculation',
+        reason: 'user_stated_current_turn',
+        calculation: 'stated_skincare_constraint',
+        authority: 'user_stated',
+        kind: 'inference'
+      }));
+    }
+    if (result.recurrence_strength) {
+      pushClaim(claims, tool, 'recurrence_strength', result.recurrence_strength, 'calculation', calc('recurrence_strength', 'diary_recurrence_strength', {
+        store: result.store ?? 'life_hub_diary'
+      }));
+    }
+    if (result.hit_count != null) {
+      pushClaim(claims, tool, 'diary_hit_count', result.hit_count, 'calculation', calc('diary_hit_count', 'diary_hit_count', {
+        store: result.store ?? 'life_hub_diary'
+      }));
+    }
+    if (Array.isArray(result.recurring_terms) && result.recurring_terms[0]) {
+      pushClaim(claims, tool, 'diary_theme', result.recurring_terms[0].term, 'calculation', calc('diary_theme', 'derived_diary_theme', {
+        store: result.store ?? 'life_hub_diary',
+        inputs: ['life_hub_diary']
+      }));
+    }
+    if (Array.isArray(result.sample_entries) && result.sample_entries[0]) {
+      const entry = result.sample_entries[0];
+      pushClaim(claims, tool, 'diary_entry_mood', entry.mood, 'record', recordOf(entry, {
+        store: result.store ?? 'life_hub_diary',
+        date: entry.date
+      }));
+    }
+    if (Array.isArray(result.conflicting_moods) && result.conflicting_moods.length) {
+      pushClaim(claims, tool, 'conflicting_mood_count', result.conflicting_moods.length, 'calculation', calc('conflicting_mood_count', 'conflicting_moods', {
+        store: result.store ?? 'life_hub_diary'
+      }));
+    }
+    if (result.stated_constraints?.current_mood) {
+      pushClaim(claims, tool, 'stated_current_mood', result.stated_constraints.current_mood, 'inference', claimProvenance(result, tool, {
+        sourceType: 'calculation',
+        reason: 'user_stated_current_turn',
+        calculation: 'stated_diary_constraint',
+        authority: 'user_stated',
+        kind: 'inference'
+      }));
+    }
+    if (result.session_count != null) {
+      pushClaim(claims, tool, 'mind_session_count', result.session_count, 'calculation', calc('mind_session_count', 'mind_session_count', {
+        store: result.store ?? 'life_hub_mind'
+      }));
+    }
+    if (Array.isArray(result.recent_sessions) && result.recent_sessions[0]) {
+      const session = result.recent_sessions[0];
+      pushClaim(claims, tool, 'recent_session_date', session.date, 'record', recordOf(session, {
+        store: result.store ?? 'life_hub_mind',
+        date: session.date
+      }));
+    }
+    if (Array.isArray(result.recurring_themes) && result.recurring_themes[0]) {
+      pushClaim(claims, tool, 'mind_theme', result.recurring_themes[0].term, 'calculation', calc('mind_theme', 'derived_mind_theme', {
+        store: result.store ?? 'life_hub_mind',
+        inputs: ['life_hub_mind']
+      }));
+    }
+    if (result.changed_themes?.appeared_recently?.[0]) {
+      pushClaim(claims, tool, 'theme_appeared_recently', result.changed_themes.appeared_recently[0], 'calculation', calc('theme_appeared_recently', 'mind_theme_change', {
+        store: result.store ?? 'life_hub_mind',
+        inputs: ['recent_sessions', 'prior_sessions']
+      }));
+    }
+    if (result.changed_themes?.not_appeared_recently?.[0]) {
+      pushClaim(claims, tool, 'theme_not_recent', result.changed_themes.not_appeared_recently[0], 'calculation', calc('theme_not_recent', 'mind_theme_change', {
+        store: result.store ?? 'life_hub_mind',
+        inputs: ['recent_sessions', 'prior_sessions']
+      }));
+    }
+    if (Array.isArray(result.conflict_signals) && result.conflict_signals.length) {
+      pushClaim(claims, tool, 'mind_conflict_signal_count', result.conflict_signals.length, 'calculation', calc('mind_conflict_signal_count', 'mind_conflict_signals', {
+        store: result.store ?? 'life_hub_mind'
+      }));
+    }
+    if (result.stated_constraints?.current_theme) {
+      pushClaim(claims, tool, 'stated_current_theme', result.stated_constraints.current_theme, 'inference', claimProvenance(result, tool, {
+        sourceType: 'calculation',
+        reason: 'user_stated_current_turn',
+        calculation: 'stated_mind_constraint',
+        authority: 'user_stated',
+        kind: 'inference'
+      }));
+    }
+    if (result.early_window?.count != null) {
+      pushClaim(claims, tool, 'skincare_early_count', result.early_window.count, 'calculation', calc('skincare_early_count', 'skincare_early_window', {
+        store: result.store ?? 'life_hub_skincare'
+      }));
+    }
+    if (result.late_window?.count != null) {
+      pushClaim(claims, tool, 'skincare_late_count', result.late_window.count, 'calculation', calc('skincare_late_count', 'skincare_late_window', {
+        store: result.store ?? 'life_hub_skincare'
       }));
     }
     pushClaim(claims, tool, 'enough_evidence', result.enough_evidence, 'calculation', calc('enough_evidence', 'enough_evidence'));
