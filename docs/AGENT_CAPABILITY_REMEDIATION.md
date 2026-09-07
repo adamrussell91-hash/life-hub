@@ -67,25 +67,27 @@ Those cannot flip a requirement to `passed`.
 
 | Requirement | Status | Production path | Tests | Live trace | Remaining gap |
 | --- | --- | --- | --- | --- | --- |
-| Rich evidence preserved when kernel owns turn | `demonstrated` | `runSurfaceAgentTurn` → `chat.mjs` `evidencePackBlock` | `tests/unit/agent-evidence-preservation.test.js` | none — no API key | Live model turn |
-| Bounded assess→retrieve loop | `demonstrated` | flagged kernel only | `tests/unit/agent-evidence-loop.test.js` | none | Default-off; live turn |
-| Conflict resolution (not a count) | `demonstrated` | flagged kernel `resolveConflict` | loop tests | none | Live turn |
-| Typed claim provenance | `demonstrated` | claim objects + prompt | preservation + loop tests | none | Live citation in a model answer |
-| Durable AgentTurnState | `demonstrated` | compact `data/os/agent-turns.json`; chat checkpoints when a kernel id exists | loop persist/restart + compact-store tests | none | No live chat request against GitHub |
-| Confirm ↔ persisted turn | `demonstrated` | required checkpoint before `turnId`; `chat-confirm.mjs` reloads queue + turn | `tests/unit/agent-confirm.test.js` + `tests/integration/chat-confirm-turn-roundtrip.test.js` | none | Route updates workflow state, executes the write, and can invoke a continuation. A later **live** model continuation is **not** proven. |
-| Post-confirm conversational continuation | `demonstrated` | confirm reloads the turn, records the write, invokes one model continuation, persists `continuation` | confirm unit + roundtrip tests | none | Live model acknowledgement after Confirm is **blocked** without `ANTHROPIC_API_KEY`. Duplicate Confirm does not re-invoke. Failed writes do not get a success continuation. |
-| Complete traces | `partial` | `kernelTraceEvent` + Anthropic `usage` | loop tests + deployed `usage` events | deployed answers, no `kernel_trace` | Live `/api/chat` on DP `0a9f450` invoked the model. Kernel traces did not appear. |
-| Clare operational planner | `demonstrated` | `/api/chat` deployed | deterministic suites + deployed A–E | deployed answers | Useful grounded replies; no kernel retrieve; not `passed` |
-| Chadwick evidence reasoning | `demonstrated` | `/api/chat` deployed | deterministic suites + deployed A–F | deployed answers | Genuine fitness/pain cited; no kernel retrieve; not `passed` |
-| Pilot behavioural gate (Clare, Chadwick) | `blocked` | deployed `/api/chat` on `deploy-preview-246--life-hub2` | `live-pilot-runtime-env` + `chat-job` | model turns, no kernel_trace | GitHub/Tasks/Teaching now load. Kernel stayed off. Confirm wrote once but did not invoke a live continuation. |
+| Rich evidence preserved when kernel owns turn | `demonstrated` | `runSurfaceAgentTurn` → `chat.mjs` `evidencePackBlock` | `tests/unit/agent-evidence-preservation.test.js` | deployed `kernel_trace` claims on DP `5cb4151` | Live claims exist; most Clare `provenance` null |
+| Bounded assess→retrieve loop | `demonstrated` | flagged kernel only | `tests/unit/agent-evidence-loop.test.js` | deployed A–F always 1 retrieve | Second retrieve round never observed live |
+| Conflict resolution (not a count) | `demonstrated` | flagged kernel `resolveConflict` | loop tests | Chadwick E both kernel runs | No genuine record disagreement in the live store window |
+| Typed claim provenance | `partial` | claim objects + prompt | preservation + loop tests | deployed claims; IDs often null | Calculation-level `sourceRefs` only on some Chadwick analyse claims |
+| Durable AgentTurnState | `demonstrated` | compact `data/os/agent-turns.json`; chat checkpoints when a kernel id exists | loop persist/restart + compact-store tests | live `turnId` on every kernel chat + Confirm resume | Compact store not inspected on GitHub after the live turns |
+| Confirm ↔ persisted turn | `passed` | required checkpoint before `turnId`; `chat-confirm.mjs` reloads queue + turn | `tests/unit/agent-confirm.test.js` + `tests/integration/chat-confirm-turn-roundtrip.test.js` | kernel Confirm `turnResumed` + write + continuation | Duplicate Confirm `invalid_action`; no second write |
+| Post-confirm conversational continuation | `passed` | confirm reloads the turn, records the write, invokes one model continuation, persists `continuation` | confirm unit + roundtrip tests | two live kernel Confirm acknowledgements | Duplicate Confirm does not re-invoke |
+| Complete traces | `demonstrated` | `kernelTraceEvent` + Anthropic `usage` | loop tests + deployed `usage` + `kernel_trace` | `kernel2-*.json` and first kernel tranche | SSE still omits `tool_call` frames |
+| Clare operational planner | `passed` | `/api/chat` deployed + `agentKernel: true` | deterministic suites + deployed A–E + Confirm | `kernel2-clare-*.json` | Teaching-today N/A (no lessons 2026-09-07) |
+| Chadwick evidence reasoning | `demonstrated` | `/api/chat` deployed + `agentKernel: true` | deterministic suites + deployed A–F | `kernel2-chadwick-*.json` | First-tranche D invented a bench-skip reason; E not a real conflict |
+| Pilot behavioural gate (Clare, Chadwick) | `blocked` | deployed `/api/chat` on `deploy-preview-246--life-hub2` | `live-pilot-runtime-env` + `chat-job` | kernel A/B + rerun | Both pilots required; Chadwick not `passed` |
 | Specialist expansion | `not started` | — | — | — | Gated on pilots `passed` |
 | Hammond supervisor rebuild | `blocked` | old canned handoff remains prototype | — | — | Specialist reliability not `passed` |
 | Surface unification / kernel default | `not started` | kernel still flagged off | — | — | Gated on pilots + comparison |
 | Kernel default on | `not started` | `LIFE_HUB_AGENT_KERNEL` remains off | — | — | Must not enable until evidence + pilots pass |
 
-Hammond is **blocked**, not rebuilt.
+Hammond is **blocked**, not rebuilt. Specialist expansion was **not** started. `LIFE_HUB_AGENT_KERNEL` stays **off** on Production.
 
-Confirm after this revision: the handlers can propose → checkpoint → queue → confirm → execute-once → persist executed/rejected → invoke one continuation → persist the reply. Deterministic tests prove that state machine. That is **not** a live conversational continuation. Status stays `demonstrated`. The live pilot remains `blocked`.
+Confirm after the kernel rerun: live `POST /api/chat` with `agentKernel: true` proposed `act_4c21adab64eb`, Confirm returned 200 with `turnResumed: true`, created `task_mtr965ls_ynh2y1`, invoked a model continuation, and the duplicate Confirm returned `invalid_action` without a second write. That sequence is `passed`. Clare is `passed`. Chadwick stays `demonstrated`. The combined pilot gate stays `blocked`.
+
+Live conversational traces: **model invoked** on Deploy Preview head `5cb4151` via real `POST /api/chat` jobs with `kernel_trace`. Baseline without the flag remains recorded on `0a9f450`. See `docs/AGENT_PILOT_VERIFICATION.md`. Not a local-handler substitute.
 
 ## Tests run this branch
 
@@ -112,8 +114,6 @@ Full `npm test` was not used as the sole proof. Pre-existing env/fixture failure
 
 Those suites are **DETERMINISTIC TEST** only.
 
-Live conversational traces: **model invoked** on Deploy Preview head `0a9f450` via real `POST /api/chat` jobs. No `kernel_trace`. Confirm created the disposable task once; duplicate Confirm did not write again; live continuation did not run. Pilot gate stays **blocked**. Not a local-handler substitute.
-
-Earlier on this PR, missing preview GitHub env produced `turn_incomplete` then `misconfigured`. That is fixed. The job runner still publishes JSON error codes.
+Earlier on this PR, missing preview GitHub env produced `turn_incomplete` then `misconfigured`. That is fixed. The job runner still publishes JSON error codes. `createChatStartHandler` now persists `agentKernel` on the job body so reconstructed `/api/chat-run` turns can emit `kernel_trace`.
 
 The harness still forwards one allowlisted runtime `env` to both `probeStores()` and `createChatHandler`. Secret values are not written into pilot traces.
