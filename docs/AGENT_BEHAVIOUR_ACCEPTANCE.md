@@ -45,11 +45,12 @@ Remaining weakness is orchestration quality: 08:00 time-block, untimed tasks def
 2. **Domain analysis helpers** (`domain-analysis.mjs`) — remaining day macros, period compares, diary themes, mind multi-session compare, skincare response windows, tasks open loops, teaching diagnosis, knowledge synthesis, Hammond attention pack.
 3. **Activation policy** broadened (incl. hyaluronica “actually helping”).
 4. **`chat.mjs`** injects `evidencePackBlock` into the system prompt; forces `tool_choice: any` only when the pack is not yet answerable.
-5. **Surface unification** — Life, Tasks, Teaching, and Knowledge call `runSurfaceAgentTurn`. Clare desk and Knowledge chat use the same kernel/memory path as Life chat. Pack-only `assemble*Evidence` helpers remain for pack tests.
+5. **Surface unification** — Life, Tasks, Teaching, and Knowledge call `runSurfaceAgentTurn`. Clare desk, Knowledge chat, and `runTeachingAnnTurn` use the same kernel/memory path as Life. Pack-only `assemble*Evidence` helpers remain for pack tests.
 6. **Deterministic claim compose** — `composeEvidenceClaims` maps retrieved evidence to claims and limitations. This is pack-layer compose, not a conversational answer. Incomplete / truncated / conflicted evidence cannot compose as complete.
 7. **Phase 1 kernel (flagged)** — `agent-kernel.mjs` plans, retrieves, assesses sufficiency, composes claims, and traces Chadwick training review and Clare daily focus. Off unless `LIFE_HUB_AGENT_KERNEL=1` or `agentKernel: true`. Regex activation remains the default path.
 8. **Phase 2 layered memory** — `agent-memory.mjs` recalls user/agent/shared/episodic items with expiry and correction history. Kernel compose labels them as recall, never as domain records. Safety/permission reflections cannot apply.
-9. **Phase 3 specialist workflows** — Sara, Ann, Clementine, Brisket, Hyaluronica, Penelope, and Vera plan/retrieve/assess on the flagged kernel. Hammond is still Phase 4.
+9. **Phase 3 specialist workflows** — Sara, Ann, Clementine, Brisket, Hyaluronica, Penelope, and Vera plan/retrieve/assess on the flagged kernel.
+10. **Phase 4 Hammond supervisor** — `cross_hub_supervision` delegates to specialists, verifies returns, names unavailable hubs, and keeps decision records pending Confirm.
 
 ---
 
@@ -66,6 +67,7 @@ Remaining weakness is orchestration quality: 08:00 time-block, untimed tasks def
 | `tests/unit/agent-memory.test.js` | Memory classes, expiry, corrections, admission, reflection Confirm, Chadwick/Clare Delivery | Live conversational behaviour |
 | `tests/unit/agent-surface.test.js` | Same Clare/Ann/Clementine read + memory on Life, Tasks, Teaching, Knowledge | Live conversational behaviour |
 | `tests/unit/agent-specialists.test.js` | Phase 3 plan/retrieve/assess + prompt Delivery for Sara, Ann, Clementine, Brisket, Hyaluronica, Penelope, Vera | Live conversational behaviour |
+| `tests/unit/agent-handoff.test.js` | Phase 4 Hammond handoff contracts, open-vs-verified returns, unavailable hubs, Confirm-pending writes | Live conversational behaviour |
 
 These tests do **not** mock model tool selection as proof of activation. They also do **not** count as agent behaviour proof.
 

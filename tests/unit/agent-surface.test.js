@@ -6,6 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runSurfaceAgentTurn } from '../../netlify/functions/_shared/agent-surface.mjs';
 import { buildClareBriefing } from '../../netlify/functions/_shared/clare-desk.mjs';
+import { runTeachingAnnTurn } from '../../netlify/functions/_shared/teaching-ann-turn.mjs';
 
 const TODAY = '2026-08-20';
 const NOW = new Date('2026-08-20T01:00:00.000Z');
@@ -81,6 +82,10 @@ test('Ann read + memory match on Life and Teaching', () => {
   assert.deepEqual(texts(life), texts(teaching));
   assert.match(life.promptBlock, /not source records/);
   assert.match(teaching.promptBlock, /not source records/);
+  const named = runTeachingAnnTurn(shared);
+  assert.equal(named.surface, 'teaching');
+  assert.deepEqual(named.pack.toolsExecuted, teaching.pack.toolsExecuted);
+  assert.deepEqual(texts(named), texts(teaching));
 });
 
 test('Clementine read + memory match on Life and Knowledge', () => {

@@ -176,11 +176,10 @@ function hitRate(slug, messages, workflow) {
   return hits.length / messages.length;
 }
 
-test('Phase 3 specialists are kernel-enabled; Hammond is not', () => {
+test('Phase 3 specialists are kernel-enabled', () => {
   for (const slug of ['sara', 'ann', 'clementine', 'brisket', 'hyaluronica', 'penelope', 'vera']) {
     assert.equal(agentKernelEnabled({ slug, flag: true }), true, slug);
   }
-  assert.equal(agentKernelEnabled({ slug: 'hammond', flag: true }), false);
 });
 
 test('specialist paraphrases select the named workflow (≥95% of 20)', () => {
