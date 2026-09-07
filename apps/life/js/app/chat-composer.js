@@ -48,15 +48,23 @@ export function bindChatComposer(root, { onSend, onStop } = {}) {
       attachInput.value = '';
       if (!files.length) return;
       const { fileToChatAttachment } = await import('../../../packages/design-kit/js/hub-chat-attachments.js');
+      let lastError = '';
       for (const file of files.slice(0, 3)) {
         try {
           pendingAttachments.push(await fileToChatAttachment(file));
-        } catch {
-          /* skip unreadable */
+        } catch (error) {
+          lastError = error?.message || 'Could not attach that file.';
         }
       }
       pendingAttachments = pendingAttachments.slice(-3);
       void refreshAttachList();
+      if (lastError && attachList) {
+        attachList.hidden = false;
+        const note = document.createElement('p');
+        note.className = 'chat-attach-error';
+        note.textContent = lastError;
+        attachList.append(note);
+      }
     });
   }
 
