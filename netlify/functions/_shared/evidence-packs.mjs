@@ -45,7 +45,7 @@ import {
   getKnowledgeSynthesis,
   getHammondAttentionPack
 } from './domain-analysis.mjs';
-import { searchMedicalRecords } from './medical-overview-read.mjs';
+import { searchMedicalRecords, analyseMedicalEvidence } from './medical-overview-read.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
 import { activationForTurn, classifyIntent } from './capabilities/activation-policy.mjs';
 import { getWeekReview } from './hammond-week.mjs';
@@ -236,6 +236,19 @@ export function assembleEvidencePack({
       'Medical records',
       searchMedicalRecords(medicalEvents, { query: queryFromMessage(message, 'medical'), limit: 8 }),
       'record'
+    );
+    push(
+      sections,
+      toolsExecuted,
+      'analyse_medical_evidence',
+      'Medical temporal analysis',
+      analyseMedicalEvidence(medicalEvents, {
+        today,
+        message,
+        compositionRecords: composition,
+        measurementRecords: measurements
+      }),
+      'calculation'
     );
     if (meals.length) {
       storesTouched.push('life_hub_nutrition');
@@ -790,6 +803,63 @@ export function composeEvidenceClaims(evidence = {}) {
       pushClaim(claims, tool, 'found', result.found, result.found ? 'record' : 'calculation', result.found
         ? recordOf(result.latest ?? result, { store: result.store ?? 'life_hub_body' })
         : calc('found', 'body_state_found', { reason: 'unavailable_source' }));
+    }
+    if (result.historical_visit_count != null) {
+      pushClaim(claims, tool, 'historical_visit_count', result.historical_visit_count, 'calculation', calc('historical_visit_count', 'historical_visit_count', {
+        store: result.store ?? 'life_hub_medical_overview'
+      }));
+    }
+    if (result.current_visit_count != null) {
+      pushClaim(claims, tool, 'current_visit_count', result.current_visit_count, 'calculation', calc('current_visit_count', 'current_visit_count', {
+        store: result.store ?? 'life_hub_medical_overview'
+      }));
+    }
+    if (result.missing_date_count != null) {
+      pushClaim(claims, tool, 'missing_date_count', result.missing_date_count, 'calculation', calc('missing_date_count', 'missing_date_count', {
+        store: result.store ?? 'life_hub_medical_overview'
+      }));
+    }
+    if (result.historical_visits?.[0]) {
+      const hist = result.historical_visits[0];
+      pushClaim(claims, tool, 'historical_visit_title', hist.title, 'record', recordOf(hist, {
+        store: result.store ?? 'life_hub_medical_overview',
+        date: hist.date
+      }));
+    }
+    if (result.current_visits?.[0]) {
+      const cur = result.current_visits[0];
+      pushClaim(claims, tool, 'current_visit_title', cur.title, 'record', recordOf(cur, {
+        store: result.store ?? 'life_hub_medical_overview',
+        date: cur.date
+      }));
+    }
+    if (result.comparisons?.[0]) {
+      const cmp = result.comparisons[0];
+      pushClaim(claims, tool, 'comparison_kind', cmp.kind, 'calculation', calc('comparison_kind', 'dated_comparison', {
+        store: result.store ?? 'life_hub_medical_overview',
+        inputs: [cmp.latest?.date, cmp.previous?.date].filter(Boolean)
+      }));
+      if (cmp.latest?.date) {
+        pushClaim(claims, tool, 'comparison_latest_date', cmp.latest.date, 'record', recordOf(cmp.latest, {
+          store: result.store ?? 'life_hub_body',
+          date: cmp.latest.date
+        }));
+      }
+      if (cmp.previous?.date) {
+        pushClaim(claims, tool, 'comparison_previous_date', cmp.previous.date, 'record', recordOf(cmp.previous, {
+          store: result.store ?? 'life_hub_body',
+          date: cmp.previous.date
+        }));
+      }
+    }
+    if (result.stated_constraints?.current_symptom) {
+      pushClaim(claims, tool, 'stated_current_symptom', result.stated_constraints.current_symptom, 'inference', claimProvenance(result, tool, {
+        sourceType: 'calculation',
+        reason: 'user_stated_current_turn',
+        calculation: 'stated_health_constraint',
+        authority: 'user_stated',
+        kind: 'inference'
+      }));
     }
     pushClaim(claims, tool, 'enough_evidence', result.enough_evidence, 'calculation', calc('enough_evidence', 'enough_evidence'));
     pushClaim(claims, tool, 'missing_recent_sessions', result.missing_recent_sessions, 'calculation', calc('missing_recent_sessions', 'recent_session_window'));

@@ -43,7 +43,7 @@ import {
   getHammondAttentionPack
 } from './domain-analysis.mjs';
 import { getWeekReview } from './hammond-week.mjs';
-import { searchMedicalRecords, briefMedicalAppointment } from './medical-overview-read.mjs';
+import { searchMedicalRecords, briefMedicalAppointment, analyseMedicalEvidence, statedHealthConstraints } from './medical-overview-read.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
 import { planWork, statedPlannerInputs } from './clare-work.mjs';
 import { composeEvidenceClaims } from './evidence-packs.mjs';
@@ -98,8 +98,9 @@ const CAPTURE = new Set(['create', 'add', 'dump', 'inbox', 'capture']);
 const GREET = new Set(['hi', 'hey', 'hello', 'yo', 'thanks', 'cheers', 'bro', 'mate', 'just', 'saying']);
 const HEALTH = new Set([
   'health', 'medical', 'appointment', 'timeline', 'weight', 'flare',
-  'bloods', 'visit', 'clinic', 'gp', 'doctor', 'symptom', 'medication',
-  'body', 'unusual'
+  'bloods', 'visit', 'clinic', 'gp', 'doctor', 'symptom', 'symptoms', 'medication',
+  'medications', 'meds', 'body', 'unusual', 'history', 'pathology', 'lab', 'labs',
+  'brief', 'result', 'results', 'compare', 'trend'
 ]);
 const LESSON = new Set([
   'lesson', 'lessons', 'class', 'unit', 'teach', 'teaching', 'improve',
@@ -217,13 +218,14 @@ export function planTurn({ slug, message } = {}) {
 
   if (slug === 'sara' && !greetingOnly && hits(words, HEALTH)) {
     const appointment = words.some(word => ['appointment', 'visit', 'clinic', 'gp', 'doctor'].includes(word));
-    const required = ['get_body_state', 'get_weight_trend', 'search_medical_records'];
+    const required = ['get_body_state', 'get_weight_trend', 'search_medical_records', 'analyse_medical_evidence'];
     if (appointment) required.push('brief_medical_appointment');
+    const stated = statedHealthConstraints(message);
     return validatePlan({
       workflow: 'health_timeline',
       goal: appointment
         ? 'Brief the appointment from medical records with provenance'
-        : 'Build a health timeline from body, weight, and medical records',
+        : 'Build a health timeline from body, weight, and medical records without temporal leakage',
       domain: 'health',
       requiredSources: required,
       optionalSources: [],
@@ -231,7 +233,10 @@ export function planTurn({ slug, message } = {}) {
       risk: 'high',
       writeIntent: false,
       retrieve: true,
-      completion: ['body_or_named_gap', 'medical_or_named_gap']
+      completion: ['body_or_named_gap', 'medical_or_named_gap'],
+      statedConstraints: {
+        current_symptom: stated.current_symptom
+      }
     });
   }
 
@@ -477,6 +482,14 @@ function runTool(name, stores, today, now, message, options = {}) {
   }
   if (name === 'brief_medical_appointment') {
     return briefMedicalAppointment(stores.medicalEvents ?? [], { date: today });
+  }
+  if (name === 'analyse_medical_evidence') {
+    return analyseMedicalEvidence(stores.medicalEvents ?? [], {
+      today,
+      message,
+      compositionRecords: stores.composition ?? [],
+      measurementRecords: stores.measurements ?? []
+    });
   }
   if (name === 'search_teaching') {
     return searchTeaching({
@@ -1210,6 +1223,39 @@ function knowledgeInterpretationLines(state) {
   return lines;
 }
 
+function saraInterpretationLines(state) {
+  if (state.plan?.workflow !== 'health_timeline') return [];
+  const lines = [];
+  const analysis = state.evidence.analyse_medical_evidence;
+  const weightConflict = state.limitations.some(item => item.kind === 'conflict' && item.tool === 'get_weight_trend');
+  const medicalHits = Number(state.claims.find(claim => claim.tool === 'search_medical_records' && claim.fact === 'result_count')?.value ?? 0);
+  const statedSymptom = analysis?.stated_constraints?.current_symptom
+    ?? state.plan?.statedConstraints?.current_symptom
+    ?? null;
+  if (weightConflict) {
+    lines.push('- Weight readings conflict. Do not treat them as one clean trend.');
+  }
+  if (medicalHits) {
+    lines.push('- Medical hits are retrieved records with dates. Do not invent extra visits or results.');
+  } else {
+    lines.push('- No matching medical visits were retrieved. Do not invent an appointment or lab result.');
+  }
+  if ((analysis?.historical_visit_count ?? 0) > 0) {
+    lines.push('- Historical medical visits stay historical. Do not convert them into a present condition, current medication adherence, or current lab result.');
+  }
+  if ((analysis?.missing_date_count ?? 0) > 0) {
+    lines.push('- Some medical records are missing dates. Keep the date missing — do not invent one.');
+  }
+  if (statedSymptom) {
+    lines.push(`- Adam stated a current-turn symptom/context (${statedSymptom}). Treat it as user_stated_current_turn, not a stored Medical Overview fact.`);
+  }
+  if (analysis?.comparisons?.length) {
+    lines.push('- Dated comparisons must preserve both dates. Do not collapse two readings into one undated claim.');
+  }
+  lines.push('- Do not use unrelated historical findings as causal explanations. Do not diagnose or prescribe.');
+  return lines;
+}
+
 function doCompose(state) {
   const composed = composeEvidenceClaims(state.evidence);
   state.claims = composed.claims;
@@ -1246,8 +1292,6 @@ function doCompose(state) {
   const overdue = state.claims.some(claim => claim.fact === 'overdue_title');
   const collisions = Number(state.claims.find(claim => claim.fact === 'collision_count')?.value ?? 0) > 0;
   const workflow = state.plan?.workflow;
-  const weightConflict = state.limitations.some(item => item.kind === 'conflict' && item.tool === 'get_weight_trend');
-  const medicalHits = Number(state.claims.find(claim => claim.tool === 'search_medical_records' && claim.fact === 'result_count')?.value ?? 0);
   const mealsToday = state.coverage.missing.includes('meals_today');
   const skinLogs = state.coverage.missing.includes('skincare_logs');
   const diaryHits = state.coverage.missing.includes('diary_hits');
@@ -1264,6 +1308,7 @@ function doCompose(state) {
     ...trainingCauseLines(state),
     ...teachingInterpretationLines(state),
     ...knowledgeInterpretationLines(state),
+    ...saraInterpretationLines(state),
     workflow === 'daily_focus'
       ? (overdue
         ? `- Overdue work is present (${state.claims.find(claim => claim.fact === 'overdue_title')?.value}). Do not ignore it when naming the next move.`
@@ -1271,13 +1316,6 @@ function doCompose(state) {
       : '',
     workflow === 'daily_focus' && collisions
       ? '- Teaching and tasks collide on the planned day. Do not present the day as an empty workday from 08:00.'
-      : '',
-    workflow === 'health_timeline'
-      ? (weightConflict
-        ? '- Weight readings conflict. Do not treat them as one clean trend.'
-        : medicalHits
-          ? '- Medical hits are retrieved records. Do not invent extra visits or results.'
-          : '- No matching medical visits were retrieved. Do not invent an appointment or lab result.')
       : '',
     workflow === 'nutrition_adherence'
       ? (mealsToday
