@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyseMindEvidence } from '../../netlify/functions/_shared/domain-analysis.mjs';
+import { analyseMindEvidence, compareMindSessions } from '../../netlify/functions/_shared/domain-analysis.mjs';
 import {
   kernelTraceEvent,
   planTurn,
@@ -171,4 +171,101 @@ test('no diagnostic invention and provenance usable', () => {
   const unexplained = kernel.claims.filter(claim => !usableProvenance(claim.provenance));
   assert.deepEqual(unexplained.map(claim => `${claim.tool}:${claim.fact}`), []);
   assert.ok(kernelTraceEvent(kernel).sufficiencyDecision);
+});
+
+test('Case A: compareMindSessions retains id and path from event wrapper', () => {
+  const compared = compareMindSessions([
+    {
+      path: 'data/mind/2026-08-10-session.md',
+      record: {
+        type: 'session',
+        id: 'sess_123',
+        date: '2026-08-10',
+        title: 'Session',
+        themes: ['anxiety'],
+        notes: 'discussed anxiety'
+      }
+    }
+  ], TODAY);
+  assert.equal(compared.recent_sessions[0].id, 'sess_123');
+  assert.equal(compared.recent_sessions[0].path, 'data/mind/2026-08-10-session.md');
+});
+
+test('Case B: recent_session_date provenance keeps record identity', () => {
+  const kernel = runAgentKernel({
+    slug: 'vera',
+    message: 'what patterns recur across sessions',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      mindEvents: [{
+        path: 'data/mind/2026-08-10-session.md',
+        record: {
+          type: 'session',
+          id: 'sess_123',
+          date: '2026-08-10',
+          themes: ['anxiety'],
+          notes: 'anxiety session'
+        }
+      }]
+    }
+  });
+  const claim = kernel.claims.find(c => c.fact === 'recent_session_date');
+  assert.ok(claim);
+  assert.equal(claim.kind, 'record');
+  assert.equal(claim.provenance.sourceType, 'record');
+  assert.equal(claim.provenance.recordId, 'sess_123');
+  assert.equal(claim.provenance.recordPath, 'data/mind/2026-08-10-session.md');
+  assert.notEqual(claim.provenance.reason, 'unavailable_source');
+});
+
+test('Case C: path-only session still preserves recordPath', () => {
+  const compared = compareMindSessions([
+    {
+      path: 'data/mind/2026-08-09-session.md',
+      record: { type: 'mind_session', date: '2026-08-09', themes: ['sleep'], notes: 'sleep talk' }
+    }
+  ], TODAY);
+  assert.equal(compared.recent_sessions[0].id, null);
+  assert.equal(compared.recent_sessions[0].path, 'data/mind/2026-08-09-session.md');
+});
+
+test('Case D: id-only session still preserves recordId', () => {
+  const compared = compareMindSessions([
+    {
+      record: {
+        type: 'session',
+        id: 'sess_only',
+        date: '2026-08-08',
+        themes: ['grief'],
+        notes: 'grief note'
+      }
+    }
+  ], TODAY);
+  assert.equal(compared.recent_sessions[0].id, 'sess_only');
+  assert.equal(compared.recent_sessions[0].path, null);
+});
+
+test('Case E: missing identity uses explicit unavailable_source', () => {
+  const kernel = runAgentKernel({
+    slug: 'vera',
+    message: 'what patterns recur across sessions',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      mindEvents: [{
+        record: {
+          type: 'session',
+          date: '2026-08-07',
+          themes: ['anger'],
+          notes: 'anger note'
+        }
+      }]
+    }
+  });
+  const claim = kernel.claims.find(c => c.fact === 'recent_session_date');
+  assert.ok(claim);
+  assert.equal(claim.provenance.recordId, null);
+  assert.equal(claim.provenance.recordPath, null);
+  assert.equal(claim.provenance.reason, 'unavailable_source');
 });
