@@ -77,7 +77,7 @@ Those cannot flip a requirement to `passed`.
 | Complete traces | `partial` | `kernelTraceEvent` + optional Anthropic `usage` events | loop tests inspect trajectory | none | Latency/cost need a live model; final answer grading **blocked** |
 | Clare operational planner | `demonstrated` | `executeClareWork('plan_work')` used by `/api/chat`; stated energy/capacity also reach kernel retrieve | `clare-adversarial.test.js` + `clare-planner.test.js` + `chat-pilot-tools.test.js` | none | Live conversational gate **blocked** |
 | Chadwick evidence reasoning | `demonstrated` | `executeFitnessReadTool('analyse_training_evidence')` in `/api/chat` | `tests/unit/chadwick-reasoning.test.js` + `chat-pilot-tools.test.js` | none | Live gate **blocked** |
-| Pilot behavioural gate (Clare, Chadwick) | `blocked` | `/api/chat` via `scripts/live-pilot-verify.mjs` | n/a | none | `ANTHROPIC_API_KEY` unset. Tasks/Teaching blobs unbound. Fitness files are present; one pain file exists. |
+| Pilot behavioural gate (Clare, Chadwick) | `blocked` | local `createChatHandler` via `scripts/live-pilot-verify.mjs` (not the deployed `/api/chat` route) | `tests/integration/live-pilot-runtime-env.test.js` | none | `ANTHROPIC_API_KEY` unset. Tasks/Teaching blobs unbound. Fitness files are present; one pain file exists. Local handler ≠ deployed route. Strict `/api/chat` route gate remains blocked. |
 | Specialist expansion | `not started` | — | — | — | Gated on pilots `passed` |
 | Hammond supervisor rebuild | `blocked` | old canned handoff remains prototype | — | — | Specialist reliability not `passed` |
 | Surface unification / kernel default | `not started` | kernel still flagged off | — | — | Gated on pilots + comparison |
@@ -106,9 +106,12 @@ Targeted Node suites (all passing on the latest revision):
 - `tests/integration/chat-confirm-turn-roundtrip.test.js`
 - `tests/integration/chat-function.test.js`
 - `tests/integration/chat-pilot-tools.test.js`
+- `tests/integration/live-pilot-runtime-env.test.js`
 
 Full `npm test` was not used as the sole proof. Pre-existing env/fixture failures on the full suite are out of scope.
 
 Those suites are **DETERMINISTIC TEST** only.
 
-Live conversational traces: **none**. `ANTHROPIC_API_KEY` is unset. Run `node scripts/live-pilot-verify.mjs` when a key is present. Do not treat a mocked `streamMessage()` as that gate.
+Live conversational traces: **none**. `ANTHROPIC_API_KEY` is unset. Run `node scripts/live-pilot-verify.mjs` when a key is present. That script is **LIVE MODEL / LOCAL HANDLER**. It does not satisfy **LIVE MODEL / DEPLOYED ROUTE**. Do not treat a mocked `streamMessage()` as either gate.
+
+The harness now forwards one allowlisted runtime `env` to both `probeStores()` and `createChatHandler`, so Tasks/Teaching bindings visible to the probe are the same bindings the handler receives. Secret values are not written into pilot traces.
