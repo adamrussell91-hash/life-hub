@@ -297,9 +297,17 @@ export function createClareHandler(deps = {}) {
       }
 
       if (action === 'brief') {
-        const tasks = await listJSON(store, TASK_PREFIX);
+        const [tasks, projects] = await Promise.all([
+          listJSON(store, TASK_PREFIX),
+          listJSON(store, PROJECT_PREFIX)
+        ]);
         return withCors(
-          okResponse(200, buildClareBriefing(tasks, readProtocolId(body.protocol_id), new Date(nowIso))),
+          okResponse(200, buildClareBriefing(
+            tasks,
+            readProtocolId(body.protocol_id),
+            new Date(nowIso),
+            { projects, env, flag: body.agentKernel }
+          )),
           request,
           env
         );
