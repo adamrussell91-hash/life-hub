@@ -279,7 +279,7 @@ export function statedHealthConstraints(message) {
   };
 }
 
-const CURRENT_WINDOW_DAYS = 14;
+const RECENT_WINDOW_DAYS = 14;
 
 function daysBetweenYmd(from, to) {
   if (!isCalendarDate(from) || !isCalendarDate(to)) return null;
@@ -294,13 +294,13 @@ function classifyRecency(date, today) {
   const age = daysBetweenYmd(date, today);
   if (age == null) return 'missing_date';
   if (age < 0) return 'future';
-  if (age <= CURRENT_WINDOW_DAYS) return 'current_window';
+  if (age <= RECENT_WINDOW_DAYS) return 'recent_window';
   return 'historical';
 }
 
 /**
- * Temporal discipline for Sara: historical records stay historical.
- * Never promotes old symptoms/meds/labs into current status without evidence.
+ * Temporal discipline for Sara: recent dated records stay recent historical evidence.
+ * Recency alone never proves a current symptom, diagnosis, medication use, or abnormality.
  */
 export function analyseMedicalEvidence(events = [], {
   today,
@@ -340,8 +340,9 @@ export function analyseMedicalEvidence(events = [], {
   });
 
   const historicalVisits = visits.filter(v => v.recency === 'historical');
-  const currentVisits = visits.filter(v => v.recency === 'current_window');
+  const recentVisits = visits.filter(v => v.recency === 'recent_window');
   const undated = visits.filter(v => v.recency === 'missing_date');
+  const futureVisits = visits.filter(v => v.recency === 'future');
 
   const datedWeights = (compositionRecords ?? [])
     .filter(r => typeof r.weight_kg === 'number')
@@ -379,26 +380,30 @@ export function analyseMedicalEvidence(events = [], {
     store: 'life_hub_medical_overview',
     kind: 'calculation',
     today,
-    current_window_days: CURRENT_WINDOW_DAYS,
+    recent_window_days: RECENT_WINDOW_DAYS,
     stated_constraints: stated,
     visits,
     labs,
     historical_visit_count: historicalVisits.length,
-    current_visit_count: currentVisits.length,
+    recent_visit_count: recentVisits.length,
     missing_date_count: undated.length,
+    future_visit_count: futureVisits.length,
     historical_visits: historicalVisits.slice(0, 8),
-    current_visits: currentVisits.slice(0, 8),
+    recent_visits: recentVisits.slice(0, 8),
     comparisons,
     temporal_rules: [
+      'A recent dated visit is recent historical evidence, not a current condition.',
       'Historical visits are not current conditions.',
-      'Historical medications are not current adherence.',
-      'Historical abnormal labs are not current results.',
+      'Medications listed on a dated visit are not current adherence.',
+      'Abnormal labs on a dated visit are not today\'s results.',
       'Current-turn symptoms are user_stated_current_turn until Confirm writes them.',
       'Missing dates stay missing — do not invent them.',
       'Unrelated historical findings are not causal explanations.'
     ],
     how_to_read:
-      'Use recency labels. Do not convert historical_* into current_*. '
+      'Use recency labels (recent_window / historical / missing_date / future). '
+      + 'Recency alone does not establish a current symptom, diagnosis, medication use, or abnormality. '
+      + 'Current state needs user_stated_current_turn or an explicit active stored state (none invented here). '
       + 'Stated current symptoms are user input this turn, not Medical Overview facts.'
   };
 }

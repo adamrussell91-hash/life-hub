@@ -318,7 +318,63 @@ test('Ann diagnosis uses outcome_ids/blocks, not invented learning_intentions', 
   });
   assert.ok(diagnosis.diagnosis_gaps.some(gap => /outcome_ids/.test(gap)));
   assert.ok(diagnosis.diagnosis_gaps.some(gap => /blocks/.test(gap)));
+  assert.ok(diagnosis.diagnosis_gaps.some(gap => /learning intention/i.test(gap)));
   assert.ok(!diagnosis.diagnosis_gaps.some(gap => /learning intentions\/objectives/.test(gap)));
+});
+
+test('outcome_ids are not aliased as learning_intentions', () => {
+  const diagnosis = getTeachingDiagnosis({
+    classes: [CLASS],
+    lessons: [DRAFT, SCHEDULED],
+    units: [UNIT],
+    query: 'Year 10 essay hinge',
+    message: 'What learning intentions are already attached?',
+    now: NOW
+  });
+  assert.deepEqual(diagnosis.lesson.outcome_ids, ['EN5-1A']);
+  assert.deepEqual(diagnosis.lesson.learning_intentions, []);
+  assert.ok(diagnosis.diagnosis_gaps.some(gap => /No stored learning intention/i.test(gap)));
+
+  const kernel = runAgentKernel({
+    slug: 'ann',
+    message: 'What learning intentions are already attached to the Year 10 essay hinge lesson?',
+    today: TODAY,
+    now: NOW,
+    stores: teachingStores()
+  });
+  const outcomes = kernel.claims.find(claim => claim.fact === 'outcome_ids');
+  assert.ok(outcomes);
+  assert.deepEqual(outcomes.value, ['EN5-1A']);
+  assert.equal(kernel.claims.find(claim => claim.fact === 'learning_intentions'), undefined);
+  assert.doesNotMatch(kernel.interpretationBlock, /learning intention.*EN5-1A|EN5-1A.*learning intention/i);
+  assert.match(kernel.interpretationBlock, /No stored learning intention|outcome_ids are curriculum codes/i);
+});
+
+test('genuine learning-intention block stays record-based when present', () => {
+  const lesson = {
+    ...DRAFT,
+    blocks: [
+      ...DRAFT.blocks,
+      {
+        id: 'li1',
+        block_type: 'callout',
+        style: 'learning_intention',
+        content: { text: 'Students can craft a thesis that answers the prompt' }
+      }
+    ]
+  };
+  const diagnosis = getTeachingDiagnosis({
+    classes: [CLASS],
+    lessons: [lesson, SCHEDULED],
+    units: [UNIT],
+    query: 'Year 10 essay hinge',
+    now: NOW
+  });
+  assert.deepEqual(diagnosis.lesson.outcome_ids, ['EN5-1A']);
+  assert.deepEqual(diagnosis.lesson.learning_intentions, [
+    'Students can craft a thesis that answers the prompt'
+  ]);
+  assert.ok(!diagnosis.diagnosis_gaps.some(gap => /No stored learning intention/i.test(gap)));
 });
 
 test('token teaching search finds Year 10 essay inside a natural question', () => {

@@ -282,12 +282,16 @@ export function getTeachingDiagnosis({
     : null;
 
   const gaps = [];
+  const learningIntentions = extractStoredLearningIntentions(matchLesson);
   if (!matchLesson) {
     gaps.push('No upcoming lesson matched — cannot diagnose delivery sequence.');
   } else {
     const outcomes = matchLesson.outcome_ids ?? [];
     if (!outcomes.length) {
       gaps.push('Lesson has no stored outcome_ids / syllabus_outcomes.');
+    }
+    if (!learningIntentions.length) {
+      gaps.push('No stored learning intention was retrieved (syllabus outcome_ids are not learning intentions).');
     }
     if (!(matchLesson.blocks?.length)) {
       gaps.push('Lesson has no stored blocks to inspect before recommending changes.');
@@ -306,6 +310,9 @@ export function getTeachingDiagnosis({
   const prep = [];
   if (matchLesson && !(matchLesson.blocks?.length)) prep.push('Draft or attach lesson blocks before class.');
   if (matchLesson && !(matchLesson.outcome_ids?.length)) prep.push('Attach syllabus outcomes / outcome_ids.');
+  if (matchLesson && !learningIntentions.length) {
+    prep.push('No learning-intention text is stored on this lesson (do not treat outcome codes as intentions).');
+  }
   if (matchLesson && !matchLesson.start_time) prep.push('No start_time on the scheduled lesson row.');
 
   return {
@@ -338,8 +345,8 @@ export function getTeachingDiagnosis({
           title: matchLesson.title,
           path: matchLesson.path,
           outcome_ids: matchLesson.outcome_ids ?? [],
-          // Legacy alias only when outcomes exist — do not invent intentions.
-          learning_intentions: matchLesson.outcome_ids ?? [],
+          // Only genuine learning-intention text — never alias of outcome_ids.
+          learning_intentions: learningIntentions,
           block_count: matchLesson.blocks?.length ?? 0,
           sequence: matchLesson.sequence,
           unit_id: matchLesson.unit_id,
@@ -356,10 +363,42 @@ export function getTeachingDiagnosis({
     draft_count: drafts.length,
     how_to_read:
       'Diagnose from stored Teaching fields (schedule, draft blocks, outcome_ids, unit.lesson_ids). '
+      + 'Syllabus outcome_ids are curriculum codes, not learning intentions. '
+      + 'learning_intentions are only present when genuine intention text is stored (for example a learning_intention block). '
       + 'Unit sequence next is a stored curriculum order when next_in_unit_basis=unit_lesson_ids. '
       + 'A pedagogical rewrite beyond those fields is inference. Current-turn time budgets are user_stated_current_turn. '
       + 'Propose writes only via Teaching confirm / os_propose_action.'
   };
+}
+
+/** Genuine learning-intention text only — never syllabus outcome codes. */
+function extractStoredLearningIntentions(lesson) {
+  if (!lesson || typeof lesson !== 'object') return [];
+  const direct = [];
+  for (const field of ['learning_intentions', 'learning_intention', 'intentions']) {
+    const value = lesson[field];
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === 'string' && item.trim()) direct.push(item.trim());
+        else if (item && typeof item === 'object' && typeof item.text === 'string' && item.text.trim()) {
+          direct.push(item.text.trim());
+        }
+      }
+    } else if (typeof value === 'string' && value.trim()) {
+      direct.push(value.trim());
+    }
+  }
+  const fromBlocks = [];
+  for (const block of lesson.blocks ?? []) {
+    const style = String(block?.style ?? block?.block_type ?? block?.type ?? '').toLowerCase();
+    if (!style.includes('learning_intention') && style !== 'intention') continue;
+    const content = block?.content && typeof block.content === 'object' ? block.content : {};
+    const text = content.text ?? content.html ?? content.title ?? block.text ?? null;
+    if (typeof text === 'string' && text.trim()) fromBlocks.push(text.trim());
+  }
+  const merged = [...direct, ...fromBlocks];
+  // Drop values that are only syllabus outcome codes (e.g. EN5-1A).
+  return merged.filter(text => !/^[A-Z]{1,6}\d/i.test(text) || text.includes(' '));
 }
 
 export function getKnowledgeSynthesis(pages = [], { query = '', limit = 10 } = {}) {
@@ -480,32 +519,66 @@ function detectNoteConflicts(pages = []) {
     ['true', 'false'],
     ['yes', 'no']
   ];
+
+  function tokensOf(text) {
+    return new Set(
+      String(text ?? '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean)
+    );
+  }
+
+  function hasWord(tokens, word) {
+    return tokens.has(String(word).toLowerCase());
+  }
+
+  function sharedSubjectSignal(a, b) {
+    const tagsA = new Set((a.tags ?? []).map(tag => String(tag).toLowerCase()));
+    const tagOverlap = (b.tags ?? []).some(tag => tagsA.has(String(tag).toLowerCase()));
+    if (tagOverlap) return true;
+    const wordsA = tokensOf([a.title, a.excerpt, ...(a.claims ?? [])].join(' '));
+    const wordsB = tokensOf([b.title, b.excerpt, ...(b.claims ?? [])].join(' '));
+    let shared = 0;
+    for (const word of wordsA) {
+      if (word.length < 4) continue;
+      if (wordsB.has(word)) shared += 1;
+      if (shared >= 2) return true;
+    }
+    return false;
+  }
+
   for (let i = 0; i < pages.length; i++) {
     for (let j = i + 1; j < pages.length; j++) {
       const a = pages[i];
       const b = pages[j];
-      const textA = [a.title, a.excerpt, a.summary, ...(a.claims ?? [])].join(' ').toLowerCase();
-      const textB = [b.title, b.excerpt, b.summary, ...(b.claims ?? [])].join(' ').toLowerCase();
+      if (!sharedSubjectSignal(a, b)) continue;
+      const tokensA = tokensOf([a.title, a.excerpt, a.summary, ...(a.claims ?? [])].join(' '));
+      const tokensB = tokensOf([b.title, b.excerpt, b.summary, ...(b.claims ?? [])].join(' '));
       for (const [pos, neg] of polarity) {
-        const aPos = textA.includes(pos) && !textA.includes(neg);
-        const aNeg = textA.includes(neg) && !textA.includes(pos);
-        const bPos = textB.includes(pos) && !textB.includes(neg);
-        const bNeg = textB.includes(neg) && !textB.includes(pos);
+        const aPos = hasWord(tokensA, pos) && !hasWord(tokensA, neg);
+        const aNeg = hasWord(tokensA, neg) && !hasWord(tokensA, pos);
+        const bPos = hasWord(tokensB, pos) && !hasWord(tokensB, neg);
+        const bNeg = hasWord(tokensB, neg) && !hasWord(tokensB, pos);
         if ((aPos && bNeg) || (aNeg && bPos)) {
           conflicts.push({
             a: a.id,
             b: b.id,
             signal: `${pos}/${neg}`,
-            kind: 'content_conflict'
+            kind: 'conflict_signal'
           });
         }
       }
-      const claimsA = (a.claims ?? []).map(c => String(c).toLowerCase());
-      const claimsB = (b.claims ?? []).map(c => String(c).toLowerCase());
+      const claimsA = (a.claims ?? []).map(c => String(c).toLowerCase().trim());
+      const claimsB = (b.claims ?? []).map(c => String(c).toLowerCase().trim());
       for (const ca of claimsA) {
         for (const cb of claimsB) {
-          if (ca && cb && ca !== cb && (ca.includes('not ') && cb.replace(/^not\s+/, '') === ca.replace(/^not\s+/, '') || cb.includes('not ') && ca.replace(/^not\s+/, '') === cb.replace(/^not\s+/, ''))) {
-            conflicts.push({ a: a.id, b: b.id, signal: 'negated_claim', kind: 'claim_conflict' });
+          if (!ca || !cb || ca === cb) continue;
+          const aNegated = ca.startsWith('not ') ? ca.slice(4) : null;
+          const bNegated = cb.startsWith('not ') ? cb.slice(4) : null;
+          if ((aNegated && aNegated === cb) || (bNegated && bNegated === ca)) {
+            conflicts.push({ a: a.id, b: b.id, signal: 'negated_claim', kind: 'conflict_signal' });
           }
         }
       }
