@@ -150,7 +150,7 @@ const CLARE_PARAPHRASES = [
 ];
 
 test('kernel flag stays off for other agents and when unset', () => {
-  assert.equal(agentKernelEnabled({ slug: 'brisket', flag: true }), false);
+  assert.equal(agentKernelEnabled({ slug: 'hammond', flag: true }), false);
   assert.equal(agentKernelEnabled({ slug: 'chadwick', env: {} }), false);
   assert.equal(agentKernelEnabled({ slug: 'clare', env: { LIFE_HUB_AGENT_KERNEL: '1' } }), true);
   assert.equal(agentKernelEnabled({ slug: 'chadwick', flag: true }), true);
