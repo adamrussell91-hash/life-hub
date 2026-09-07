@@ -10,6 +10,7 @@ import {
   addDays,
   formatDisplayDate,
   HUB_TZ,
+  overdueTasks,
   parseDue,
   startOfDay,
   tasksForDay,
@@ -508,6 +509,28 @@ function readClock(now = new Date(), timeZone = HUB_TZ) {
   };
 }
 
+function titleTokens(title) {
+  return String(title ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !['the', 'and', 'for', 'with'].includes(word));
+}
+
+function tokenOverlap(a, b) {
+  const left = new Set(titleTokens(a));
+  const right = new Set(titleTokens(b));
+  if (!left.size || !right.size) return 0;
+  let hit = 0;
+  for (const word of left) if (right.has(word)) hit += 1;
+  return hit / Math.min(left.size, right.size);
+}
+
+function titlesAreDuplicates(a, b) {
+  const exact = String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
+  return exact || tokenOverlap(a, b) >= 0.6;
+}
+
 function minutesOf(hhmm) {
   const match = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm ?? '').trim());
   if (!match) return null;
@@ -550,12 +573,27 @@ export function inspectBoard(view, { tasks = [], projects = [], project_id, quer
   }
   const open = (tasks ?? []).filter(isOpen);
   if (view === 'stale') {
-    const stale = open
+    const staleTasks = open
       .filter(task => task.updated_at || task.created_at)
       .slice()
       .sort((a, b) => String(a.updated_at || a.created_at).localeCompare(String(b.updated_at || b.created_at)))
-      .slice(0, 12);
-    return ok({ view, count: stale.length, results: stale.map(compact) });
+      .slice(0, 12)
+      .map(compact);
+    const staleCutoff = (now instanceof Date ? now.getTime() : Date.parse(now)) - 60 * 24 * 60 * 60 * 1000;
+    const staleProjects = (projects ?? [])
+      .filter(project => {
+        const last = project.updated_at || project.last_active || project.created_at;
+        return last && Date.parse(last) < staleCutoff;
+      })
+      .map(project => ({
+        id: project.id,
+        title: project.title,
+        kind: 'project',
+        updated_at: project.updated_at,
+        health: 'stale'
+      }));
+    const results = [...staleProjects, ...staleTasks].slice(0, 16);
+    return ok({ view, count: results.length, results });
   }
   if (view === 'blocked') {
     const blocked = open.filter(task =>
@@ -567,24 +605,45 @@ export function inspectBoard(view, { tasks = [], projects = [], project_id, quer
   }
   if (view === 'duplicates') {
     const needle = String(query ?? '').trim().toLowerCase();
-    const groups = new Map();
-    for (const task of open) {
-      const key = String(task.title ?? '').trim().toLowerCase();
-      if (!key) continue;
-      if (needle && !key.includes(needle)) continue;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(compact(task));
+    const pool = open.filter(task => {
+      const title = String(task.title ?? '').toLowerCase();
+      return !needle || title.includes(needle) || tokenOverlap(title, needle) >= 0.4;
+    });
+    const groups = [];
+    const used = new Set();
+    for (let i = 0; i < pool.length; i += 1) {
+      if (used.has(pool[i].id)) continue;
+      const group = [compact(pool[i])];
+      used.add(pool[i].id);
+      for (let j = i + 1; j < pool.length; j += 1) {
+        if (used.has(pool[j].id)) continue;
+        if (titlesAreDuplicates(pool[i].title, pool[j].title)) {
+          group.push(compact(pool[j]));
+          used.add(pool[j].id);
+        }
+      }
+      if (group.length > 1) groups.push(group);
     }
-    const duplicates = [...groups.values()].filter(group => group.length > 1).slice(0, 12);
-    return ok({ view, count: duplicates.length, results: duplicates });
+    return ok({ view, count: groups.length, results: groups.slice(0, 12), method: 'token_overlap' });
   }
   return deny('unknown_view');
 }
 
-export function planWork(view, { tasks = [], lessons = [], date, now = new Date() } = {}) {
+export function planWork(view, {
+  tasks = [],
+  lessons = [],
+  date,
+  now = new Date(),
+  energy = null,
+  workday = null,
+  capacity_minutes = null
+} = {}) {
   const key = dayKey(date, now);
   const day = parseDue(key) ?? startOfDay(now);
-  const dayTasks = tasksForDay(tasks, day);
+  const dueToday = tasksForDay(tasks, day);
+  const overdue = overdueTasks(tasks, day);
+  const seen = new Set(dueToday.map(task => task.id));
+  const dayTasks = [...overdue.filter(task => !seen.has(task.id)), ...dueToday];
   const dayLessons = (lessons ?? []).filter(lesson => String(lessonDate(lesson) ?? '') === key);
 
   if (view === 'collisions') {
@@ -616,7 +675,10 @@ export function planWork(view, { tasks = [], lessons = [], date, now = new Date(
       view,
       days: days.map(item => {
         const items = tasksForDay(tasks, item);
-        const minutes = items.reduce((sum, task) => sum + (Number(task.estimated_duration) || 45), 0);
+        const minutes = items.reduce((sum, task) => {
+          const known = Number(task.estimated_duration);
+          return sum + (Number.isFinite(known) && known > 0 ? known : 30);
+        }, 0);
         return {
           date: toDateKey(item),
           label: formatDisplayDate(item),
@@ -630,56 +692,194 @@ export function planWork(view, { tasks = [], lessons = [], date, now = new Date(
 
   if (view === 'energy') {
     const open = (tasks ?? []).filter(isOpen);
+    const level = String(energy?.level ?? energy ?? '').toLowerCase();
+    const load = Number(energy?.cognitive_load);
     const scored = open.map(task => {
       const due = parseDue(task.due_date);
       const overdue = due ? startOfDay(due).getTime() < startOfDay(now).getTime() : false;
-      const minutes = Number(task.estimated_duration) || 45;
+      const known = Number(task.estimated_duration);
+      const minutes = Number.isFinite(known) && known > 0 ? known : 30;
       const comms = Array.isArray(task.tags) && task.tags.includes('comms');
       let rank = 50;
       if (task.priority === 'urgent') rank -= 20;
       if (task.priority === 'high') rank -= 12;
       if (overdue) rank -= 15;
-      if (minutes <= 20) rank -= 8;
-      if (comms) rank -= 4;
-      return { ...compact(task), energy_rank: rank, overdue, short_win: minutes <= 20 };
+      if (level === 'low') {
+        if (minutes <= 20) rank -= 16;
+        if (comms) rank -= 8;
+        if (minutes >= 60) rank += 10;
+      } else {
+        if (minutes <= 20) rank -= 8;
+        if (comms) rank -= 4;
+      }
+      if (Number.isFinite(load) && load >= 7 && minutes >= 60) rank += 8;
+      return {
+        ...compact(task),
+        energy_rank: rank,
+        overdue,
+        short_win: minutes <= 20,
+        energy_level_used: level || null
+      };
     }).sort((a, b) => a.energy_rank - b.energy_rank);
     return ok({
       view,
       sequence: scored.slice(0, 10),
-      note: 'Overdue and short wins first. Confirm before moving dates.'
+      energy_applied: Boolean(level),
+      note: level
+        ? `Sequenced for ${level} energy. Confirm before moving dates.`
+        : 'No current energy supplied. Overdue and short wins first. Confirm before moving dates.'
     });
   }
 
-  const blocks = [];
-  let cursor = WORKDAY.start;
-  for (const task of dayTasks.slice(0, 10)) {
-    const minutes = Math.max(15, Number(task.estimated_duration) || 45);
-    const start = cursor;
-    const end = Math.min(WORKDAY.end, start + minutes);
-    blocks.push({
-      ...compact(task),
-      start: formatMinutes(start),
-      end: formatMinutes(end),
-      minutes: end - start
-    });
-    cursor = end + 10;
-  }
-  const used = blocks.flatMap(block => {
-    const start = minutesOf(block.start);
-    const end = minutesOf(block.end);
-    return start == null || end == null ? [] : [{ start, end }];
+  const bounds = resolveWorkday({ workday, now, date: key });
+  const reserved = dayLessons.map(lessonBusy).filter(Boolean);
+  const capacity = capacity_minutes == null || capacity_minutes === ''
+    ? Number.NaN
+    : Number(capacity_minutes);
+  const planned = [];
+  let usedMinutes = 0;
+  const deferred = [];
+  const sortedTasks = [...dayTasks].sort((a, b) => {
+    const aOver = parseDue(a.due_date) && startOfDay(parseDue(a.due_date)).getTime() < startOfDay(now).getTime();
+    const bOver = parseDue(b.due_date) && startOfDay(parseDue(b.due_date)).getTime() < startOfDay(now).getTime();
+    if (aOver !== bOver) return aOver ? -1 : 1;
+    return 0;
   });
-  const slots = [];
-  let scan = WORKDAY.start;
-  const busy = [...used].sort((a, b) => a.start - b.start);
+  for (const task of sortedTasks.slice(0, 12)) {
+    if (task.blocked_by || task.depends_on) {
+      deferred.push({
+        ...compact(task),
+        reason: `Blocked by ${task.blocked_by || task.depends_on}`
+      });
+      continue;
+    }
+    const known = Number(task.estimated_duration);
+    const durationUnknown = !(Number.isFinite(known) && known > 0);
+    const minutes = durationUnknown ? 30 : Math.max(15, known);
+    if (Number.isFinite(capacity) && usedMinutes + minutes > capacity) {
+      deferred.push({ ...compact(task), reason: 'Insufficient remaining capacity' });
+      continue;
+    }
+    const slot = firstFreeSlot(bounds, reserved, planned, minutes);
+    if (!slot) {
+      deferred.push({ ...compact(task), reason: 'No free slot around reserved commitments' });
+      continue;
+    }
+    planned.push({
+      ...compact(task),
+      start: formatMinutes(slot.start),
+      end: formatMinutes(slot.end),
+      minutes: slot.end - slot.start,
+      duration_unknown: durationUnknown,
+      estimate_source: durationUnknown ? 'unknown_fallback' : 'task.estimated_duration'
+    });
+    usedMinutes += minutes;
+  }
+  const used = [
+    ...reserved,
+    ...planned.map(block => ({ start: minutesOf(block.start), end: minutesOf(block.end) }))
+  ].filter(item => item.start != null && item.end != null);
+  const slots = freeSlots(bounds, used);
+  const workdayLabel = `${formatMinutes(bounds.start)}–${formatMinutes(bounds.end)} ${bounds.source}`;
+  if (view === 'free_slots') {
+    return ok({
+      view,
+      date: key,
+      slots,
+      workday: workdayLabel,
+      reserved_lessons: reserved.map(item => ({ start: formatMinutes(item.start), end: formatMinutes(item.end), title: item.title }))
+    });
+  }
+  return ok({
+    view: 'time_block',
+    date: key,
+    blocks: planned,
+    leftover_slots: slots,
+    lessons: dayLessons.length,
+    reserved_lessons: reserved.map(item => ({
+      start: formatMinutes(item.start),
+      end: formatMinutes(item.end),
+      title: item.title
+    })),
+    deferred,
+    workday: workdayLabel,
+    insufficient_capacity: Number.isFinite(capacity) && deferred.some(item => item.reason.includes('capacity'))
+  });
+}
+
+function hubMinutes(now) {
+  const parts = new Intl.DateTimeFormat('en-AU', {
+    timeZone: HUB_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(now instanceof Date ? now : new Date(now));
+  const hour = Number(parts.find(part => part.type === 'hour')?.value);
+  const minute = Number(parts.find(part => part.type === 'minute')?.value);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+function resolveWorkday({ workday, now, date }) {
+  if (workday?.start && workday?.end) {
+    return {
+      start: minutesOf(workday.start) ?? WORKDAY.start,
+      end: minutesOf(workday.end) ?? WORKDAY.end,
+      source: 'preference'
+    };
+  }
+  let start = WORKDAY.start;
+  const end = WORKDAY.end;
+  let source = 'default_preference_fallback';
+  if (date && date === toHubDateKey(now, HUB_TZ)) {
+    const current = hubMinutes(now);
+    if (current != null && current > start && current < end) {
+      start = current;
+      source = 'interrupted_today';
+    }
+  }
+  return { start, end, source };
+}
+
+function lessonBusy(lesson) {
+  const start = minutesOf(lesson.starts_at || lesson.start || lesson.start_time);
+  if (start == null) return null;
+  const minutes = Number(lesson.duration_minutes || lesson.minutes) || 60;
+  return { start, end: start + minutes, title: lesson.title, kind: 'lesson' };
+}
+
+function overlaps(a, b) {
+  return a.start < b.end && b.start < a.end;
+}
+
+function firstFreeSlot(bounds, reserved, planned, minutes) {
+  const busy = [
+    ...reserved,
+    ...planned.map(block => ({ start: minutesOf(block.start), end: minutesOf(block.end) }))
+  ]
+    .filter(item => item.start != null && item.end != null)
+    .sort((a, b) => a.start - b.start);
+  let cursor = bounds.start;
   for (const block of busy) {
+    if (block.start - cursor >= minutes) {
+      return { start: cursor, end: cursor + minutes };
+    }
+    cursor = Math.max(cursor, block.end);
+  }
+  if (bounds.end - cursor >= minutes) return { start: cursor, end: cursor + minutes };
+  return null;
+}
+
+function freeSlots(bounds, busy) {
+  const slots = [];
+  let scan = bounds.start;
+  const ordered = [...busy].sort((a, b) => a.start - b.start);
+  for (const block of ordered) {
     if (block.start - scan >= 15) slots.push({ start: formatMinutes(scan), end: formatMinutes(block.start) });
     scan = Math.max(scan, block.end);
   }
-  if (WORKDAY.end - scan >= 15) slots.push({ start: formatMinutes(scan), end: formatMinutes(WORKDAY.end) });
-
-  if (view === 'free_slots') return ok({ view, date: key, slots, workday: '08:00–16:30 Australia/Sydney' });
-  return ok({ view: 'time_block', date: key, blocks, leftover_slots: slots, lessons: dayLessons.length });
+  if (bounds.end - scan >= 15) slots.push({ start: formatMinutes(scan), end: formatMinutes(bounds.end) });
+  return slots;
 }
 
 function buildTaskRecord(input, existing, nowIso) {
