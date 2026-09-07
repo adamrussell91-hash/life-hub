@@ -79,7 +79,8 @@ const TRAIN = new Set([
   'session', 'sessions', 'fitness', 'strength', 'progress', 'programme',
   'program', 'volume', 'weight', 'weights', 'exercise', 'exercises',
   'stronger', 'recap', 'overview', 'gains', 'deload', 'programming',
-  'substitute', 'swap', 'replace', 'progression'
+  'substitute', 'swap', 'replace', 'replacement', 'instead', 'option',
+  'bench', 'press', 'progression'
 ]);
 const DECLINE = new Set([
   'decline', 'weaker', 'weak', 'stall', 'stalled', 'plateau', 'regress',
