@@ -201,3 +201,7 @@ Traces: `/tmp/life-hub-specialist-traces/` (copied under `/opt/cursor/artifacts/
 ## Production kernel
 
 Still **off**. `docs/AGENT_CAPABILITY_STRATEGY.md` **unchanged**. Hammond **not** rebuilt (architecture note only). PR #247 remains draft / unmerged.
+
+### Deterministic correction pass (continuation 2)
+
+Local Cursor unit execution after Penelope / Brisket / Vera fixes: **245 pass / 0 fail** across Ann–Vera + Clare/Chadwick + evidence/provenance/kernel + Confirm/chat-job/compact-turn + fitness/workout confirm suites. Deployed specialist live gate still blocked without authenticated session.
