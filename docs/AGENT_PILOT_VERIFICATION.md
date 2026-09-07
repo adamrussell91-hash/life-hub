@@ -272,12 +272,96 @@ These statuses describe the live A/B already exercised. They are not erased by a
 - Combined pilot behavioural/capability gate: **`blocked`** until Chadwick unsupported-cause inference and typed provenance are both repaired.
 - Specialists **not started**. Hammond **untouched**. Kernel production **off**.
 
-## Correction pass (in progress)
+## Correction pass
 
 ```text
 failure → correction → deterministic regression → live stress rerun
 ```
 
-- **Failure:** first kernel Chadwick D invented a medical/training cause for an ambiguous “can’t bench” request.
-- **Also open:** silent `provenance: null` on most factual/derived kernel claims.
-- Production kernel stays off. Explicit `agentKernel: true` remains the verified pilot mechanism. Preview env-flag activation is out of scope for this pass.
+### Failure (kept)
+
+First kernel Chadwick D (`kernel-chadwick-d.json`) invented “aching pecs from Friday Bar Press PR” as the reason bench was out. The later clean Chadwick D rerun did not make that turn irrelevant.
+
+### Correction
+
+- `analyseTrainingEvidence` now classifies an unavailable-lift **cause** as `unknown`, `user_stated_current_turn`, or `stored_pain`. Groin does not apply to bench.
+- Kernel interpretation forbids inventing soreness, a prior PR, or treating yesterday’s session as today’s ache.
+- `composeEvidenceClaims` attaches typed provenance to every factual/derived claim. Aggregate counts use `reason: derived_from_aggregate`. They do not inherit an unrelated first-record id.
+- `kernel_trace` now includes `retrieveLog` and an inspectable `sufficiencyDecision`.
+
+Deterministic regressions: `tests/unit/chadwick-reasoning.test.js`, `tests/unit/agent-claim-provenance.test.js`, planner coverage in `tests/unit/agent-kernel.test.js`.
+
+### LIVE MODEL / DEPLOYED ROUTE / KERNEL — stress rerun
+
+Head `6d70375f74c859e3086966e00cdd4a26f50cbb71` on `https://deploy-preview-246--life-hub2.netlify.app`. Every chat sent `agentKernel: true`.
+
+Earlier same-day stress turns on `a9d8787` / `18df0b0` remain on disk. Three first-pass prompts (`Bench is out…`, `replacement for bench`, `instead of bench`) planned as `workflow: none` until the planner learned those phrases. Those missed-kernel traces are history, not the scored set.
+
+#### Ambiguous substitution (5/5, no unsupported cause)
+
+| # | Request | Evidence | Unsupported causal claim | Trace | Result |
+| --- | --- | --- | --- | --- | --- |
+| 1 | I can't do bench press today. What should I substitute? | recent training + groin only; `unavailable_cause=unknown` | no | `kernel3c-chadwick-s1.json` | pass |
+| 2 | Bench is out today. Give me another option. | same | no | `kernel3c-chadwick-s2.json` | pass |
+| 3 | I don't want to bench today — what can I swap it for? | same; groin named as unrelated | no | `kernel3c-chadwick-s3.json` | pass |
+| 4 | I need a replacement for bench press today. | same | no | `kernel3c-chadwick-s4.json` | pass |
+| 5 | What should I do instead of bench today? | same | no | `kernel3c-chadwick-s5.json` | pass |
+
+An earlier s5 on `18df0b0` guessed “pecs are probably still filing a noise complaint.” That is why the unknown-cause line now says a recent session is not evidence of today’s soreness. The scored s5 is `kernel3c-chadwick-s5.json`.
+
+#### Contrast cases
+
+- **User-stated reason** (`kernel3-chadwick-user-reason.json`): “My shoulder is sore today…” treated as `user_stated_current_turn`. Explicitly not in the stored record. Groin not used as the bench reason.
+- **Stored unrelated pain** (`kernel3-chadwick-groin-contrast.json`): groin remains on file; Chadwick said it does not explain bench and refused to write “sore pecs” into the file.
+
+#### Clare provenance check (A/B only)
+
+| Scenario | Claims | Usable provenance | Null/unexplained | Trace |
+| --- | --- | --- | --- | --- |
+| Clare A | 6 | 6 | 0 | `kernel3b-clare-a.json` |
+| Clare B | 5 | 5 | 0 | `kernel3-clare-b.json` |
+
+Overdue STEAM is `record` id `task_3331404cea02`. Due-today SMART goals is `record` id `task_ca7d9c87d7ca`. Open counts and plan collisions are `derived_from_aggregate`. Truncation stayed honest (12 kept / 2 omitted).
+
+#### Chadwick core reruns
+
+| Scenario | Result | Trace |
+| --- | --- | --- |
+| Recent training | 6 Sep session, week tonnage, 36.5% adherence | `kernel3-chadwick-a.json` |
+| Readiness to progress | selective yes; groin caution | `kernel3-chadwick-b.json` |
+| Genuine groin/pain | goblet squat 5 Sep; cut/swap that pattern | `kernel3-chadwick-c.json` |
+| Missing-evidence sufficiency | history enough; ACWR/groin warnings named | `kernel3-chadwick-f.json` |
+| Conflict E | not exercised | no genuine record disagreement |
+
+#### Evidence loop (Clare A truncated `get_tasks_focus`)
+
+```text
+sufficient=true complete=false anotherRound=false retrieveRounds=1
+required 1/1 present
+get_tasks_focus truncated kept=12 omitted=2
+overdue slice present; due-soon slice present
+plan_work retrieved; open_loops retrieved
+omitted open items are outside the 12-cap
+another round is not required
+```
+
+Deterministic suites still prove a second retrieve when a widenable source can resolve a gap.
+
+#### Provenance counts (this pass’s 13 kernel turns)
+
+136 factual/derived material claims. 136 with usable typed provenance. 0 silent `null`.
+
+#### Performance (this pass only)
+
+Latency 246195 ms. Input 4843. Output 8362. No dollar cost.
+
+## Ledger statuses after the correction pass
+
+- Clare live behavioural planner: **`passed`**
+- Clare full capability: **`passed`**
+- Chadwick: **`passed`**
+- Confirm continuation: **`passed`**
+- Provenance: **`passed`** for required kernel claims
+- Evidence loop: **`demonstrated`** (inspectable; one live round when sufficient)
+- Combined pilot behavioural/capability gate: **`passed`**
+- Specialists **not started**. Hammond **untouched**. Kernel production **off**.
