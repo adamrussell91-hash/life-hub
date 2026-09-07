@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clareWorkSchemas, executeClareWork, inspectBoard, planWork } from '../../netlify/functions/_shared/clare-work.mjs';
+import { clareWorkSchemas, executeClareWork, inspectBoard, planWork, statedPlannerInputs } from '../../netlify/functions/_shared/clare-work.mjs';
 import { proposeAction, runAgentKernel } from '../../netlify/functions/_shared/agent-kernel.mjs';
 import { createMemoryTurnStore } from '../../netlify/functions/_shared/agent-turn-store.mjs';
 import { bindPendingToTurn, resumeConfirmedTurn } from '../../netlify/functions/_shared/agent-confirm.mjs';
@@ -180,6 +180,17 @@ test('write proposal binds to a persisted turn and resumes once', () => {
     currentRecords: { title: 'Mark essays' }
   });
   assert.equal(second.duplicate, true);
+});
+
+test('statedPlannerInputs reads conversational energy and capacity', () => {
+  const energy = statedPlannerInputs('My energy is low today. Reorder what I should tackle.');
+  assert.equal(energy.energy.level, 'low');
+  assert.equal(energy.capacity_minutes, null);
+  const capacity = statedPlannerInputs("I've only got about 90 minutes of proper work capacity left today. What should I do?");
+  assert.equal(capacity.capacity_minutes, 90);
+  const none = statedPlannerInputs('What should I focus on today?');
+  assert.equal(none.energy, null);
+  assert.equal(none.capacity_minutes, null);
 });
 
 test('plan_work schema exposes energy, capacity, and workday inputs', () => {

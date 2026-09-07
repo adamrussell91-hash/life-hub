@@ -60,7 +60,8 @@ import {
   parseTurnStoreFile,
   persistTurnWithClient
 } from './_shared/agent-turn-store.mjs';
-import { resumeConfirmedTurn } from './_shared/agent-confirm.mjs';
+import { continueAfterConfirm, resumeConfirmedTurn } from './_shared/agent-confirm.mjs';
+import { createAnthropicClient } from './_shared/anthropic-client.mjs';
 import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
 import { defaultGetContentStore as defaultGetTeachingStore } from './_shared/teaching-blobs.mjs';
 import {
@@ -84,6 +85,8 @@ export function createChatConfirmHandler({
   verifySessionToken: verify = verifySessionToken,
   serializeExpiredSessionCookie: clearCookie = serializeExpiredSessionCookie,
   createGitHubClient: createClient = createGitHubClient,
+  createAnthropicClient: createAnthropic = createAnthropicClient,
+  continueConversation,
   now = Date.now,
   getTasksStore = defaultGetTasksStore,
   getTeachingStore = defaultGetTeachingStore
@@ -636,6 +639,7 @@ export function createChatConfirmHandler({
     }
 
     let turnResume = null;
+    let continuation = null;
     if (stored?.turnId) {
       try {
         const turnEntry = tree.find(item => item.path === AGENT_TURNS_PATH && item.type === 'blob');
@@ -651,11 +655,37 @@ export function createChatConfirmHandler({
           currentRecords: stored.bases ?? {}
         });
         if (turnResume.state) {
+          const continued = await continueAfterConfirm({
+            persist,
+            state: turnResume.state,
+            writeOk: writeResult.ok === true && accepted.length > 0,
+            writeResult,
+            reloaded: {
+              writes: writeResult.results?.length ?? 0,
+              intent: proposal.intent
+            },
+            duplicate: turnResume.duplicate === true,
+            rejected: false,
+            now: new Date(now()),
+            invokeModel: turnResume.duplicate
+              ? undefined
+              : (continueConversation ?? (args => invokeConfirmContinuation(args, {
+                env,
+                fetchImpl,
+                createAnthropic
+              })))
+          });
+          continuation = {
+            status: continued.status,
+            reason: continued.reason ?? null,
+            text: continued.text || '',
+            invoked: continued.invoked === true
+          };
           await persistTurnWithClient({
             client,
             existingTurns: JSON.parse(persist.exportJson()),
             existingSha: turnEntry?.sha,
-            state: turnResume.state
+            state: continued.state || turnResume.state
           });
         }
       } catch {
@@ -668,7 +698,8 @@ export function createChatConfirmHandler({
       data: {
         intent: proposal.intent,
         results: writeResult.results,
-        ...(turnResume?.state?.id ? { turnId: turnResume.state.id, turnResumed: true } : {})
+        ...(turnResume?.state?.id ? { turnId: turnResume.state.id, turnResumed: true } : {}),
+        ...(continuation ? { continuation } : {})
       }
     }, PRIVATE_CACHE);
   }
@@ -934,6 +965,33 @@ async function readAtMost(stream, limit) {
     offset += chunk.byteLength;
   }
   return bytes;
+}
+
+async function invokeConfirmContinuation({ state, writeResult, reloaded, messages }, {
+  env,
+  fetchImpl,
+  createAnthropic
+}) {
+  const apiKey = typeof env?.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY : '';
+  if (!apiKey) return { text: '', error: 'no_api_key' };
+  let text = '';
+  let usage = null;
+  try {
+    const client = createAnthropic({ apiKey, fetchImpl });
+    const packed = messages || { system: '', messages: [] };
+    for await (const event of client.streamMessage({
+      system: packed.system,
+      messages: packed.messages,
+      tools: [],
+      executeTools: async () => null
+    })) {
+      if (event.type === 'text' && typeof event.delta === 'string') text += event.delta;
+      if (event.type === 'usage') usage = event;
+    }
+  } catch {
+    return { text: '', error: 'model_failed', usage };
+  }
+  return { text: text.trim(), usage, error: text.trim() ? null : 'empty_continuation' };
 }
 
 function mapRepositoryError(error) {

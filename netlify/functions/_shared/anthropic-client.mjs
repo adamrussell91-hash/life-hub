@@ -342,6 +342,14 @@ function* interpretEvent(event, toolBuffers, roundState) {
   if (event.name === 'message_delta') {
     const reason = event.payload.delta?.stop_reason;
     if (reason != null && roundState) roundState.stopReason = reason;
+    const usage = event.payload.usage;
+    if (usage && (usage.input_tokens != null || usage.output_tokens != null)) {
+      yield {
+        type: 'usage',
+        inputTokens: Number(usage.input_tokens) || 0,
+        outputTokens: Number(usage.output_tokens) || 0
+      };
+    }
     return;
   }
   if (event.name === 'message_stop') yield { type: 'done' };

@@ -634,6 +634,21 @@ export function inspectBoard(view, { tasks = [], projects = [], project_id, quer
   return deny('unknown_view');
 }
 
+export function statedPlannerInputs(message) {
+  const text = String(message ?? '');
+  const lower = text.toLowerCase();
+  const energyWord = lower.match(/\benergy\s+(?:is\s+(?:really\s+|quite\s+)?)?(low|medium|high)\b/)
+    ?? lower.match(/\b(low|medium|high)\s+energy\b/);
+  const energy = energyWord ? { level: energyWord[1] } : null;
+  const minuteMatch = lower.match(/\b(?:only\s+(?:got\s+|have\s+)?(?:about\s+|around\s+)?)?(\d{1,3})\s*(?:minutes|mins|min)\b/);
+  const hourMatch = lower.match(/\b(?:only\s+(?:got\s+|have\s+)?(?:about\s+|around\s+)?)?(\d(?:\.\d+)?)\s*hours?\b/);
+  let capacity_minutes = null;
+  if (minuteMatch) capacity_minutes = Number(minuteMatch[1]);
+  else if (hourMatch) capacity_minutes = Math.round(Number(hourMatch[1]) * 60);
+  if (!Number.isFinite(capacity_minutes) || capacity_minutes <= 0) capacity_minutes = null;
+  return { energy, capacity_minutes, workday: null };
+}
+
 export function planWork(view, {
   tasks = [],
   lessons = [],

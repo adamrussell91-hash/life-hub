@@ -263,6 +263,43 @@ test('Clare daily focus names overdue work and same-day teaching collisions', ()
   assert.ok(Number(kernel.claims.find(claim => claim.fact === 'collision_count')?.value) >= 1);
 });
 
+test('Clare kernel plan_work uses stated capacity from the message', () => {
+  const kernel = runAgentKernel({
+    slug: 'clare',
+    message: "I've only got about 90 minutes of proper work capacity left today. What should I do?",
+    today: TODAY,
+    now: NOW,
+    stores: {
+      tasks: [
+        { id: '1', title: 'Mark essays', status: 'open', due_date: '2026-08-10', estimated_duration: 60, priority: 'high' },
+        { id: '2', title: 'Newsletter', status: 'open', due_date: TODAY, estimated_duration: 60 }
+      ],
+      projects: [],
+      lessons: []
+    }
+  });
+  assert.equal(kernel.plan.workflow, 'daily_focus');
+  assert.equal(kernel.evidence.plan_work.view, 'time_block');
+  assert.ok(kernel.evidence.plan_work.deferred?.some(item => /capacity/i.test(item.reason)));
+});
+
+test('Clare kernel plan_work uses stated energy from the message', () => {
+  const kernel = runAgentKernel({
+    slug: 'clare',
+    message: 'My energy is low today. Reorder what I should tackle.',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      tasks: [
+        { id: 'long', title: 'Rewrite unit', status: 'open', estimated_duration: 90 },
+        { id: 'short', title: 'Send reminder', status: 'open', estimated_duration: 15, tags: ['comms'], priority: 'high' }
+      ]
+    }
+  });
+  assert.equal(kernel.evidence.plan_work.view, 'energy');
+  assert.equal(kernel.evidence.plan_work.energy_applied, true);
+});
+
 test('failed tasks store is fail-visible', () => {
   const kernel = runAgentKernel({
     slug: 'clare',
