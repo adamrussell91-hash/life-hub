@@ -178,6 +178,19 @@ test('greetings and off-domain asks do not retrieve', () => {
   assert.equal(planTurn({ slug: 'clare', message: 'create a task called buy milk' }).plan.workflow, 'none');
 });
 
+test('ambiguous bench-substitution phrasing still plans a training review', () => {
+  const messages = [
+    "I can't do bench press today. What should I substitute?",
+    'Bench is out today. Give me another option.',
+    "I don't want to bench today — what can I swap it for?",
+    'I need a replacement for bench press today.',
+    'What should I do instead of bench today?'
+  ];
+  for (const message of messages) {
+    assert.equal(planTurn({ slug: 'chadwick', message }).plan.workflow, 'training_review', message);
+  }
+});
+
 test('decline wording adds pain and load to the Chadwick plan', () => {
   const plan = planTurn({ slug: 'chadwick', message: 'why is my performance declining' }).plan;
   assert.ok(plan.requiredSources.includes('get_pain_training_summary'));
