@@ -74,10 +74,10 @@ Those cannot flip a requirement to `passed`.
 | Durable AgentTurnState | `demonstrated` | compact `data/os/agent-turns.json`; chat checkpoints when a kernel id exists | loop persist/restart + compact-store tests | none | No live chat request against GitHub |
 | Confirm ↔ persisted turn | `demonstrated` | required checkpoint before `turnId`; `chat-confirm.mjs` reloads queue + turn | `tests/unit/agent-confirm.test.js` + `tests/integration/chat-confirm-turn-roundtrip.test.js` | none | Route updates workflow state, executes the write, and can invoke a continuation. A later **live** model continuation is **not** proven. |
 | Post-confirm conversational continuation | `demonstrated` | confirm reloads the turn, records the write, invokes one model continuation, persists `continuation` | confirm unit + roundtrip tests | none | Live model acknowledgement after Confirm is **blocked** without `ANTHROPIC_API_KEY`. Duplicate Confirm does not re-invoke. Failed writes do not get a success continuation. |
-| Complete traces | `partial` | `kernelTraceEvent` + optional Anthropic `usage` events | loop tests inspect trajectory | none | Latency/cost need a live model; final answer grading **blocked** |
-| Clare operational planner | `demonstrated` | `executeClareWork('plan_work')` used by `/api/chat`; stated energy/capacity also reach kernel retrieve | `clare-adversarial.test.js` + `clare-planner.test.js` + `chat-pilot-tools.test.js` | none | Live conversational gate **blocked** |
-| Chadwick evidence reasoning | `demonstrated` | `executeFitnessReadTool('analyse_training_evidence')` in `/api/chat` | `tests/unit/chadwick-reasoning.test.js` + `chat-pilot-tools.test.js` | none | Live gate **blocked** |
-| Pilot behavioural gate (Clare, Chadwick) | `blocked` | deployed `/api/chat` on `deploy-preview-246--life-hub2` | `tests/integration/live-pilot-runtime-env.test.js` + `tests/integration/chat-job.test.js` | probe job only — no model | Auth worked. Tasks 17 / Teaching 9 visible. GitHub/fitness `503 misconfigured` on Deploy Preview, so `createChatHandler` never opened a model stream. |
+| Complete traces | `partial` | `kernelTraceEvent` + Anthropic `usage` | loop tests + deployed `usage` events | deployed answers, no `kernel_trace` | Live `/api/chat` on DP `0a9f450` invoked the model. Kernel traces did not appear. |
+| Clare operational planner | `demonstrated` | `/api/chat` deployed | deterministic suites + deployed A–E | deployed answers | Useful grounded replies; no kernel retrieve; not `passed` |
+| Chadwick evidence reasoning | `demonstrated` | `/api/chat` deployed | deterministic suites + deployed A–F | deployed answers | Genuine fitness/pain cited; no kernel retrieve; not `passed` |
+| Pilot behavioural gate (Clare, Chadwick) | `blocked` | deployed `/api/chat` on `deploy-preview-246--life-hub2` | `live-pilot-runtime-env` + `chat-job` | model turns, no kernel_trace | GitHub/Tasks/Teaching now load. Kernel stayed off. Confirm wrote once but did not invoke a live continuation. |
 | Specialist expansion | `not started` | — | — | — | Gated on pilots `passed` |
 | Hammond supervisor rebuild | `blocked` | old canned handoff remains prototype | — | — | Specialist reliability not `passed` |
 | Surface unification / kernel default | `not started` | kernel still flagged off | — | — | Gated on pilots + comparison |
@@ -112,8 +112,8 @@ Full `npm test` was not used as the sole proof. Pre-existing env/fixture failure
 
 Those suites are **DETERMINISTIC TEST** only.
 
-Live conversational traces: **none that invoke a model**. A real `POST` to Deploy Preview `/api/chat` returned `202` then `turn_incomplete` because preview GitHub env is missing. That is **LIVE MODEL / DEPLOYED ROUTE** blocked, not a local-handler substitute.
+Live conversational traces: **model invoked** on Deploy Preview head `0a9f450` via real `POST /api/chat` jobs. No `kernel_trace`. Confirm created the disposable task once; duplicate Confirm did not write again; live continuation did not run. Pilot gate stays **blocked**. Not a local-handler substitute.
 
-The job runner now publishes the underlying JSON error code (`misconfigured`) instead of hiding it as `turn_incomplete`. Rerun on deploy `6a9e8d049b9c6f0008b298d7` confirmed the probe error is now `misconfigured`.
+Earlier on this PR, missing preview GitHub env produced `turn_incomplete` then `misconfigured`. That is fixed. The job runner still publishes JSON error codes.
 
 The harness still forwards one allowlisted runtime `env` to both `probeStores()` and `createChatHandler`. Secret values are not written into pilot traces.
