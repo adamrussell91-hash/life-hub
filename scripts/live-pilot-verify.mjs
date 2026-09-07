@@ -1,17 +1,22 @@
 /**
  * Live Clare / Chadwick pilot harness.
- * Calls the real createChatHandler / createChatConfirmHandler chain.
+ *
+ * Two live-model modes, never mixed:
+ *   LIVE MODEL / LOCAL HANDLER  — createChatHandler in-process (optional GitHub stub)
+ *   LIVE MODEL / DEPLOYED ROUTE — the user-facing deployed /api/chat network request
+ *
+ * This script is LOCAL HANDLER only. A live Anthropic key here does not satisfy
+ * the strict user-facing deployed-route gate.
  *
  * DETERMINISTIC TEST results are produced by node:test suites, not this script.
- * This script is LIVE MODEL TURN only. If ANTHROPIC_API_KEY is missing, it
- * reports blocked and does not invent a pass.
+ * If ANTHROPIC_API_KEY is missing, it reports blocked and does not invent a pass.
  *
  * Usage: node scripts/live-pilot-verify.mjs
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createSessionToken } from '../netlify/functions/_shared/auth-security.mjs';
 import { createChatHandler } from '../netlify/functions/chat.mjs';
 import { createChatConfirmHandler } from '../netlify/functions/chat-confirm.mjs';
@@ -26,7 +31,49 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_ROOT = process.env.LIFE_HUB_DATA_ROOT || '/agent/repos/life-hub-data';
 const OUT_DIR = process.env.PILOT_TRACE_DIR || '/tmp/life-hub-pilot-traces';
-const SECRET = 's'.repeat(32);
+const LOCAL_SESSION_FALLBACK = 's'.repeat(32);
+const LOCAL_PASSPHRASE_FALLBACK = 'configured';
+const SECRET_REDACT_MIN_LENGTH = 16;
+
+export const PILOT_ROUTE_MODE = Object.freeze({
+  LOCAL_HANDLER: 'LIVE MODEL / LOCAL HANDLER',
+  DEPLOYED_ROUTE: 'LIVE MODEL / DEPLOYED ROUTE'
+});
+
+export const LOCAL_GITHUB_STUB = Object.freeze({
+  GITHUB_REPOSITORY: 'life-owner/life-repo',
+  GITHUB_BRANCH: 'main',
+  GITHUB_TOKEN: 'github-secret-token',
+  GITHUB_TOKEN_EXPIRES: '2099-01-01'
+});
+
+/** Bounded keys copied from the harness environment into createChatHandler. */
+export const PILOT_RUNTIME_ENV_KEYS = Object.freeze([
+  'ANTHROPIC_API_KEY',
+  'LIFE_HUB_PASSPHRASE_HASH',
+  'SESSION_SECRET',
+  'SITE_ORIGIN',
+  'LIFE_HUB_AGENT_KERNEL',
+  'GITHUB_REPOSITORY',
+  'GITHUB_BRANCH',
+  'GITHUB_TOKEN',
+  'GITHUB_TOKEN_EXPIRES',
+  'KNOWLEDGE_GITHUB_REPOSITORY',
+  'TASKS_BLOBS_SITE_ID',
+  'TEACHING_BLOBS_SITE_ID',
+  'NETLIFY_BLOBS_TOKEN',
+  'NETLIFY_BLOBS_CONTEXT',
+  'NETLIFY_SITE_ID'
+]);
+
+export const PILOT_SECRET_ENV_KEYS = Object.freeze([
+  'ANTHROPIC_API_KEY',
+  'SESSION_SECRET',
+  'LIFE_HUB_PASSPHRASE_HASH',
+  'GITHUB_TOKEN',
+  'NETLIFY_BLOBS_TOKEN',
+  'NETLIFY_BLOBS_CONTEXT'
+]);
 
 const RUBRIC = Object.freeze({
   trajectory: [
@@ -53,7 +100,70 @@ const RUBRIC = Object.freeze({
   scale: '0-2 per criterion. 0 = fail, 1 = partial, 2 = meets. Do not retune after seeing results.'
 });
 
-function loadApiKey() {
+function copyDefinedEnv(source, keys) {
+  const env = {};
+  for (const key of keys) {
+    const value = source?.[key];
+    if (typeof value === 'string' && value.length > 0) env[key] = value;
+  }
+  return env;
+}
+
+function hasCompleteGitHub(env) {
+  return Boolean(
+    env.GITHUB_REPOSITORY
+    && env.GITHUB_BRANCH
+    && env.GITHUB_TOKEN
+    && env.GITHUB_TOKEN_EXPIRES
+  );
+}
+
+export function buildPilotRuntime(source = process.env, options = {}) {
+  const forwarded = copyDefinedEnv(source, PILOT_RUNTIME_ENV_KEYS);
+  const env = { ...forwarded };
+  if (typeof options.apiKey === 'string' && options.apiKey && !env.ANTHROPIC_API_KEY) {
+    env.ANTHROPIC_API_KEY = options.apiKey;
+  }
+  if (!env.LIFE_HUB_PASSPHRASE_HASH) env.LIFE_HUB_PASSPHRASE_HASH = LOCAL_PASSPHRASE_FALLBACK;
+  if (!env.SESSION_SECRET) env.SESSION_SECRET = LOCAL_SESSION_FALLBACK;
+  const githubBinding = hasCompleteGitHub(forwarded) ? 'runtime' : 'local-stub';
+  if (githubBinding === 'local-stub') Object.assign(env, LOCAL_GITHUB_STUB);
+  return {
+    env,
+    githubBinding,
+    routeMode: PILOT_ROUTE_MODE.LOCAL_HANDLER,
+    forwardedKeys: Object.keys(forwarded).sort()
+  };
+}
+
+export function buildPilotRuntimeEnv(source = process.env, options = {}) {
+  return buildPilotRuntime(source, options).env;
+}
+
+export function collectPilotSecrets(env = {}) {
+  const secrets = [];
+  for (const key of PILOT_SECRET_ENV_KEYS) {
+    const value = env[key];
+    if (typeof value === 'string' && value.length >= SECRET_REDACT_MIN_LENGTH) secrets.push(value);
+  }
+  return secrets;
+}
+
+function redactString(text, secrets) {
+  let out = text;
+  for (const secret of secrets) {
+    out = out.split(secret).join('[redacted]');
+  }
+  return out;
+}
+
+export function sanitizePilotTrace(value, env) {
+  const secrets = collectPilotSecrets(env);
+  if (secrets.length === 0) return value;
+  return JSON.parse(redactString(JSON.stringify(value), secrets));
+}
+
+export function loadApiKey() {
   const fromEnv = typeof process.env.ANTHROPIC_API_KEY === 'string'
     ? process.env.ANTHROPIC_API_KEY.trim()
     : '';
@@ -196,7 +306,13 @@ async function readSse(response) {
   return text.trim().split('\n\n').map(frame => JSON.parse(frame.replace(/^data: /, '')));
 }
 
-async function probeStores() {
+export async function probeStores(env, {
+  getTasksStore = defaultGetTasksStore,
+  getTeachingStore = defaultGetTeachingStore
+} = {}) {
+  if (!env || typeof env !== 'object') {
+    throw new Error('probeStores requires the same env object passed to createChatHandler.');
+  }
   const stores = {
     fitness: { available: false, count: 0 },
     tasks: { available: false, count: 0 },
@@ -216,13 +332,13 @@ async function probeStores() {
     stores.pain = { available: pain > 0, count: pain, source: 'life-hub-data fitness files' };
   }
   try {
-    const tasks = await listTasksJSON(await defaultGetTasksStore(process.env), TASK_PREFIX);
+    const tasks = await listTasksJSON(await getTasksStore(env), TASK_PREFIX);
     stores.tasks = { available: tasks.length > 0, count: tasks.length, source: 'tasks blobs' };
   } catch (error) {
     stores.tasks = { available: false, count: 0, error: error?.code || 'unavailable' };
   }
   try {
-    const store = await defaultGetTeachingStore(process.env);
+    const store = await getTeachingStore(env);
     const lessons = [
       ...await listTeachingJSON(store, DRAFT_LESSON_PREFIX),
       ...await listTeachingJSON(store, SCHEDULED_LESSON_PREFIX)
@@ -238,41 +354,42 @@ function emptyScore(kind) {
   return Object.fromEntries((RUBRIC[kind] ?? []).map(key => [key, null]));
 }
 
+function writeJson(path, value, env) {
+  writeFileSync(path, `${JSON.stringify(sanitizePilotTrace(value, env), null, 2)}\n`);
+}
+
 async function main() {
   const apiKey = loadApiKey();
-  const stores = await probeStores();
+  const runtime = buildPilotRuntime(process.env, { apiKey });
+  const { env } = runtime;
+  const stores = await probeStores(env);
   const report = {
-    kind: apiKey ? 'LIVE MODEL TURN' : 'LIVE MODEL TURN',
-    gate: apiKey ? 'ready' : 'blocked',
+    kind: PILOT_ROUTE_MODE.LOCAL_HANDLER,
+    routeMode: runtime.routeMode,
+    deployedRouteGate: 'blocked',
+    localHandlerGate: apiKey ? 'ready' : 'blocked',
+    githubBinding: runtime.githubBinding,
+    forwardedEnvKeys: runtime.forwardedKeys,
     model: apiKey ? 'claude-sonnet-5' : null,
     rubric: RUBRIC,
     stores,
     turns: [],
     note: apiKey
-      ? 'Real /api/chat handler with a live Anthropic key.'
-      : 'ANTHROPIC_API_KEY missing from the environment and .env.local. Live gate remains blocked. Deterministic suites are a separate category.'
+      ? 'LIVE MODEL / LOCAL HANDLER: in-process createChatHandler with a live Anthropic key. This is not a deployed /api/chat network request. Only LIVE MODEL / DEPLOYED ROUTE satisfies the strict user-facing route gate.'
+      : 'ANTHROPIC_API_KEY missing from the environment and .env.local. Local-handler live model remains blocked. The deployed-route gate stays blocked. Deterministic suites are a separate category.'
   };
 
   if (!apiKey) {
-    console.log(JSON.stringify(report, null, 2));
+    console.log(JSON.stringify(sanitizePilotTrace(report, env), null, 2));
     process.exitCode = 2;
     return;
   }
 
   const files = loadRepoFiles();
-  const env = {
-    LIFE_HUB_PASSPHRASE_HASH: 'configured',
-    SESSION_SECRET: SECRET,
-    GITHUB_REPOSITORY: 'life-owner/life-repo',
-    GITHUB_BRANCH: 'main',
-    GITHUB_TOKEN: 'github-secret-token',
-    GITHUB_TOKEN_EXPIRES: '2099-01-01',
-    ANTHROPIC_API_KEY: apiKey
-  };
   const session = createSessionToken({
     now: Date.now(),
     randomBytes: () => Buffer.alloc(16, 11)
-  }, SECRET).token;
+  }, env.SESSION_SECRET).token;
   const fetchImpl = githubStub(files);
   const chat = createChatHandler({ env, fetchImpl, now: () => Date.now() });
   const confirm = createChatConfirmHandler({ env, fetchImpl, now: () => Date.now() });
@@ -299,7 +416,7 @@ async function main() {
     if (!store?.available) {
       report.turns.push({
         id: scenario.id,
-        category: 'LIVE MODEL TURN',
+        category: PILOT_ROUTE_MODE.LOCAL_HANDLER,
         status: 'not exercised',
         reason: `${scenario.needs} store unavailable`,
         userRequest: scenario.message,
@@ -339,12 +456,14 @@ async function main() {
       }));
       confirmResult = await confirmed.json();
     }
-    const trace = {
-      category: 'LIVE MODEL TURN',
+    const trace = sanitizePilotTrace({
+      category: PILOT_ROUTE_MODE.LOCAL_HANDLER,
+      routeMode: PILOT_ROUTE_MODE.LOCAL_HANDLER,
+      deployedRoute: false,
       scenario: scenario.id,
       surface: 'life',
       userRequest: scenario.message,
-      route: '/api/chat',
+      route: 'local createChatHandler (not deployed /api/chat)',
       latencyMs: Date.now() - started,
       ...summary,
       confirm: confirmResult ? {
@@ -353,15 +472,15 @@ async function main() {
         text: confirmResult?.data?.continuation?.text ?? '',
         turnResumed: confirmResult?.data?.turnResumed === true
       } : null
-    };
+    }, env);
     const tracePath = join(OUT_DIR, `${scenario.id}.json`);
-    writeFileSync(tracePath, `${JSON.stringify(trace, null, 2)}\n`);
+    writeJson(tracePath, trace, env);
     report.turns.push({
       id: scenario.id,
-      category: 'LIVE MODEL TURN',
+      category: PILOT_ROUTE_MODE.LOCAL_HANDLER,
       status: summary.errors.length ? 'fail' : 'recorded',
       userRequest: scenario.message,
-      route: '/api/chat',
+      route: 'local createChatHandler (not deployed /api/chat)',
       workflow: summary.workflow,
       sources: summary.requiredSources,
       retrieveRounds: summary.retrieveRounds,
@@ -374,17 +493,28 @@ async function main() {
     });
   }
 
-  writeFileSync(join(OUT_DIR, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
-  console.log(JSON.stringify({
-    category: 'LIVE MODEL TURN',
-    gate: report.gate,
+  writeJson(join(OUT_DIR, 'report.json'), report, env);
+  console.log(JSON.stringify(sanitizePilotTrace({
+    category: PILOT_ROUTE_MODE.LOCAL_HANDLER,
+    routeMode: report.routeMode,
+    deployedRouteGate: report.deployedRouteGate,
+    localHandlerGate: report.localHandlerGate,
+    forwardedEnvKeys: report.forwardedEnvKeys,
     turns: report.turns.map(item => ({
       id: item.id,
       status: item.status,
       workflow: item.workflow,
       trace: item.trace ?? null
     }))
-  }, null, 2));
+  }, env), null, 2));
 }
 
-await main();
+function isMainModule() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return import.meta.url === pathToFileURL(resolve(entry)).href;
+}
+
+if (isMainModule()) {
+  await main();
+}
