@@ -148,6 +148,90 @@ test('every callable Chadwick fitness schema has an executeFitnessReadTool path'
   }
 });
 
+const GROIN_AND_RECENT = [
+  {
+    id: 'wo-upper',
+    path: 'data/fitness/2026-08-18-upper.md',
+    type: 'workout',
+    status: 'completed',
+    date: '2026-08-18',
+    title: 'Upper',
+    exercises: [
+      { name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] },
+      { name: 'Bar Press', sets: [{ weight_kg: 38, reps: 10 }] }
+    ]
+  },
+  {
+    id: 'wo-lower',
+    path: 'data/fitness/2026-08-16-lower.md',
+    type: 'workout',
+    status: 'completed',
+    date: '2026-08-16',
+    title: 'Lower',
+    pain_flags: [{ site: 'right groin', note: 'twinge on goblet squat' }],
+    exercises: [{ name: 'Goblet Squat', sets: [{ weight_kg: 24, reps: 8 }] }]
+  }
+];
+
+test('ambiguous bench substitution keeps the cause unknown and does not reuse groin or a PR', () => {
+  const note = analyseTrainingEvidence(GROIN_AND_RECENT, TODAY, {
+    query: "I can't do bench press today. What should I substitute?"
+  });
+  assert.equal(note.substitution.from, 'bench press');
+  assert.equal(note.cause.status, 'unknown');
+  assert.equal(note.cause.kind, 'unknown_cause');
+  assert.equal(note.cause.stored_reason, null);
+  assert.equal(note.cause.user_stated_reason, null);
+  assert.ok(note.cause.unrelated_pain.some(item => /groin/i.test(item.site)));
+  assert.equal(note.cause.unrelated_pain.some(item => /chest|pec|shoulder/i.test(item.site)), false);
+  assert.doesNotMatch(JSON.stringify(note.cause), /aching pecs|bar press pr|failed session/i);
+  assert.match(note.how_to_read, /unknown cause/i);
+});
+
+test('user-stated shoulder soreness is current-turn information, not a stored bench cause', () => {
+  const note = analyseTrainingEvidence(GROIN_AND_RECENT, TODAY, {
+    query: "My shoulder is sore today, so I don't want to bench. What should I substitute?"
+  });
+  assert.equal(note.cause.status, 'user_stated');
+  assert.equal(note.cause.kind, 'user_stated_current_turn');
+  assert.match(note.cause.user_stated_reason, /shoulder/i);
+  assert.equal(note.cause.stored_reason, null);
+  assert.ok(note.cause.unrelated_pain.some(item => /groin/i.test(item.site)));
+});
+
+test('stored shoulder pain can be a stored cause only for a matching lift', () => {
+  const note = analyseTrainingEvidence([
+    {
+      id: 'wo-press',
+      type: 'workout',
+      status: 'completed',
+      date: '2026-08-18',
+      title: 'Upper',
+      pain_flags: [{ site: 'left shoulder', note: 'twinge on press' }],
+      exercises: [{ name: 'Bench Press', sets: [{ weight_kg: 60, reps: 8 }] }]
+    }
+  ], TODAY, { query: "I can't do bench press today. What should I substitute?" });
+  assert.equal(note.cause.status, 'stored');
+  assert.equal(note.cause.kind, 'stored_pain');
+  assert.match(note.cause.stored_reason, /shoulder/i);
+});
+
+test('kernel interpretation forbids inventing a bench cause when evidence is silent', () => {
+  const kernel = runAgentKernel({
+    slug: 'chadwick',
+    message: "I can't do bench press today. What should I substitute?",
+    today: TODAY,
+    now: new Date('2026-08-20T01:00:00.000Z'),
+    stores: { workouts: GROIN_AND_RECENT }
+  });
+  const cause = kernel.claims.find(claim => claim.fact === 'unavailable_cause');
+  assert.equal(cause?.value, 'unknown');
+  assert.match(kernel.interpretationBlock, /unknown cause/i);
+  assert.match(kernel.interpretationBlock, /do not invent/i);
+  assert.match(kernel.interpretationBlock, /groin/i);
+  assert.doesNotMatch(kernel.interpretationBlock, /aching pecs|bar press pr/i);
+});
+
 test('analyse_training_evidence executor returns the evidence shape', () => {
   const result = executeFitnessReadTool('analyse_training_evidence', {
     workouts: ENOUGH,

@@ -261,10 +261,23 @@ Do not invent dollar cost. Token/latency movement is not a pass criterion.
 
 ## Ledger statuses after kernel rerun
 
-- Clare operational planner: **`passed`** — deployed route, live model, real Tasks, `kernel_trace`, useful planning on A–E, Confirm + live continuation, no critical regression vs baseline. Teaching-today N/A (no lessons on 2026-09-07).
-- Chadwick evidence reasoning: **`demonstrated`**, not `passed` — rerun D was honest; first-tranche D hallucination plus E never a genuine record conflict keep the pilot short of `passed`.
-- Pilot behavioural gate: **`blocked`** (both pilots required).
+These statuses describe the live A/B already exercised. They are not erased by a later clean substitution turn.
+
+- Clare **live behavioural planner**: **`passed`** — deployed route, live model, real Tasks, `kernel_trace`, useful planning on A–E, Confirm + live continuation, no critical planning regression vs baseline. Teaching-today N/A (no lessons on 2026-09-07).
+- Clare **full capability**: **not `passed`** while material kernel claims still show `provenance: null`. Behavioural planning success is not the whole contract.
+- Chadwick evidence reasoning: **`demonstrated`**, not `passed`. The first kernel Chadwick D turn invented “aching pecs from Friday Bar Press PR” as the reason bench was out. That unsupported causal hallucination remains on the record. The later clean Chadwick D rerun did not make the first turn irrelevant.
 - Confirm conversational continuation: **`passed`**.
 - Provenance: **`partial`**.
-- Kernel evidence loop: **`demonstrated`** (always 1 retrieve).
+- Kernel evidence loop: **`demonstrated`** (always 1 retrieve; sufficiency after truncated `get_tasks_focus` was not inspectable).
+- Combined pilot behavioural/capability gate: **`blocked`** until Chadwick unsupported-cause inference and typed provenance are both repaired.
 - Specialists **not started**. Hammond **untouched**. Kernel production **off**.
+
+## Correction pass (in progress)
+
+```text
+failure → correction → deterministic regression → live stress rerun
+```
+
+- **Failure:** first kernel Chadwick D invented a medical/training cause for an ambiguous “can’t bench” request.
+- **Also open:** silent `provenance: null` on most factual/derived kernel claims.
+- Production kernel stays off. Explicit `agentKernel: true` remains the verified pilot mechanism. Preview env-flag activation is out of scope for this pass.

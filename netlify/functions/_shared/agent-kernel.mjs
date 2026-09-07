@@ -353,6 +353,11 @@ export function planTurn({ slug, message } = {}) {
   });
 }
 
+function withStore(result, store) {
+  if (!result || typeof result !== 'object') return result;
+  return result.store ? result : { store, kind: result.kind ?? 'calculation', ...result };
+}
+
 function emptyStores() {
   return {
     workouts: [],
@@ -412,25 +417,25 @@ function runTool(name, stores, today, now, message, options = {}) {
   if (name === 'plan_work') {
     const stated = statedPlannerInputs(message);
     if (stated.energy?.level) {
-      return planWork('energy', {
+      return withStore(planWork('energy', {
         tasks,
         lessons,
         date: today,
         now,
         energy: stated.energy,
         capacity_minutes: stated.capacity_minutes
-      });
+      }), 'tasks_hub');
     }
     if (stated.capacity_minutes) {
-      return planWork('time_block', {
+      return withStore(planWork('time_block', {
         tasks,
         lessons,
         date: today,
         now,
         capacity_minutes: stated.capacity_minutes
-      });
+      }), 'tasks_hub');
     }
-    return planWork('collisions', { tasks, lessons, date: today, now });
+    return withStore(planWork('collisions', { tasks, lessons, date: today, now }), 'tasks_hub');
   }
   if (name === 'get_nutrition_snapshot') {
     return getNutritionSnapshot(meals, today, { nutritionChallenges: stores.nutritionChallenges });
@@ -584,6 +589,8 @@ export function createTurnState({ slug, message, today, now = new Date(), stores
     memoryLoadError: stores?.memoryLoadError ?? null,
     handoffs: [],
     retrieveRound: 0,
+    retrieveLog: [],
+    sufficiencyDecision: null,
     nextRetrievals: [],
     deferredTools: [],
     retrievalLimits: {},
@@ -684,8 +691,61 @@ function doRetrieve(state) {
     runHammondDelegation(state, runAgentKernel);
   }
   state.retrieveRound = (state.retrieveRound ?? 0) + 1;
+  const toolEntries = queued
+    .filter(item => !defer.includes(item.tool))
+    .map(item => boundRetrieveTool(item, state.evidence[item.tool], state.retrieveRound));
+  state.retrieveLog = [...(state.retrieveLog ?? []), {
+    round: state.retrieveRound,
+    tools: toolEntries,
+    coverage: null,
+    whyAnotherRound: null
+  }];
   state.stage = 'retrieved';
   return recordTrace(state, 'retrieve', `round=${state.retrieveRound}|${Object.keys(state.evidence).join(',')}|${memoryNote}|handoffs=${(state.handoffs ?? []).length}`);
+}
+
+function boundSourceRefs(result) {
+  if (!result || typeof result !== 'object') return [];
+  const rows = [
+    ...(Array.isArray(result.results) ? result.results : []),
+    ...(Array.isArray(result.overdue) ? result.overdue : []),
+    ...(Array.isArray(result.due_soon) ? result.due_soon : []),
+    result.lesson,
+    result.latest
+  ].filter(Boolean);
+  const refs = [];
+  for (const row of rows.slice(0, 6)) {
+    if (row.id || row.path) {
+      refs.push({
+        id: row.id ?? null,
+        path: row.path ?? null,
+        date: row.date ?? row.due_date ?? null
+      });
+    }
+  }
+  if (result.last_completed_id || result.last_completed_path) {
+    refs.push({
+      id: result.last_completed_id ?? null,
+      path: result.last_completed_path ?? null,
+      date: result.last_completed_date ?? null
+    });
+  }
+  return refs.slice(0, 6);
+}
+
+function boundRetrieveTool(item, result, round) {
+  const limit = limitationFor(item.tool, result);
+  return {
+    round,
+    name: item.tool,
+    intent: item.limit != null ? { limit: item.limit } : null,
+    kind: limit?.kind ?? (result == null ? 'missing' : result.ok === false || result.error ? 'failed' : 'ok'),
+    status: result == null ? 'missing' : result.ok === false || result.error ? 'error' : 'ok',
+    truncated: Boolean(result?.truncated),
+    kept: result?.kept ?? null,
+    omitted: result?.omitted ?? null,
+    sourceRefs: boundSourceRefs(result)
+  };
 }
 
 function limitationFor(tool, result) {
@@ -932,8 +992,56 @@ export function assessEvidence(state) {
   }
   state.nextRetrievals = next;
   if (!state.complete && !next.length) state.exhausted = true;
+  const anotherRound = Boolean(next.length) && !state.complete && !state.exhausted;
+  state.sufficiencyDecision = {
+    sufficient: state.sufficient,
+    complete: state.complete,
+    exhausted: state.exhausted === true,
+    anotherRound,
+    reason: describeSufficiency(state, anotherRound),
+    coverage: {
+      missing: [...coverage.missing],
+      truncated: [...coverage.truncated],
+      failed: [...coverage.failed]
+    }
+  };
+  const lastLog = (state.retrieveLog ?? []).at(-1);
+  if (lastLog) {
+    lastLog.coverage = state.sufficiencyDecision.coverage;
+    lastLog.whyAnotherRound = anotherRound
+      ? `further bounded retrieve: ${next.map(item => item.tool).join(',')}`
+      : state.sufficiencyDecision.reason;
+  }
   state.stage = 'assessed';
   return recordTrace(state, 'assess', state.complete ? 'complete' : `gaps=${limitations.map(item => item.kind).join(',') || 'none'}`);
+}
+
+function describeSufficiency(state, anotherRound) {
+  const required = state.plan?.requiredSources ?? [];
+  const present = required.filter(tool => {
+    const result = state.evidence[tool];
+    return result && result.ok !== false && !result.error;
+  });
+  const parts = [`required ${present.length}/${required.length} present`];
+  const focus = state.evidence.get_tasks_focus;
+  if (focus?.truncated) {
+    parts.push(`get_tasks_focus truncated kept=${focus.kept ?? '?'} omitted=${focus.omitted ?? '?'}`);
+    if (focus.overdue?.length) parts.push('overdue slice present');
+    if (focus.due_soon?.length) parts.push('due-soon slice present');
+    if (state.evidence.plan_work) parts.push('plan_work retrieved');
+    if (state.evidence.get_tasks_open_loops) parts.push('open_loops retrieved');
+    if (!anotherRound) {
+      parts.push('omitted open items are outside the 12-cap; overdue and due-soon windows already retrieved so another round is not required');
+    }
+  }
+  if (anotherRound) {
+    parts.push(`next=${(state.nextRetrievals ?? []).map(item => item.tool || item).join(',')}`);
+  } else if (state.exhausted) {
+    parts.push('no further bounded retrieval can resolve remaining gaps');
+  } else if (state.sufficient) {
+    parts.push('planned sources sufficient for the goal');
+  }
+  return parts.join('; ');
 }
 
 export function resolveConflict(state) {
@@ -962,6 +1070,26 @@ export function resolveConflict(state) {
   state.unresolvedConflicts = resolved.filter(item => !item.resolved);
   state.stage = 'resolved';
   return recordTrace(state, 'resolve', `${state.unresolvedConflicts.length} unresolved / ${resolved.length} total`);
+}
+
+function trainingCauseLines(state) {
+  if (state.plan?.workflow !== 'training_review') return [];
+  const cause = state.evidence.analyse_training_evidence?.cause;
+  if (!cause) return [];
+  const unrelated = (cause.unrelated_pain ?? []).map(item => item.site).filter(Boolean).join(', ');
+  const lines = [];
+  if (cause.status === 'unknown') {
+    lines.push('- The reason the requested lift is unavailable is an unknown cause. Do not invent soreness, injury, a prior PR, or a failed session.');
+  } else if (cause.status === 'user_stated') {
+    lines.push(`- Adam stated a current-turn reason (${cause.user_stated_reason}). Treat it as user_stated_current_turn, not a stored record.`);
+  } else if (cause.status === 'stored') {
+    lines.push(`- Stored pain evidence may explain the requested lift (${cause.stored_reason}). Do not invent additional causes.`);
+  }
+  if (unrelated) {
+    lines.push(`- Unrelated stored pain (${unrelated}) is not an explanation for the requested lift.`);
+  }
+  lines.push('- Offer evidence-compatible substitutions. Ask why the lift is unavailable when that reason would change the recommendation.');
+  return lines;
 }
 
 function doCompose(state) {
@@ -1014,9 +1142,10 @@ function doCompose(state) {
     '- Limitations outrank a tidy narrative. If a required source failed or is empty, say so.',
     workflow === 'training_review'
       ? (pain
-        ? '- Active pain evidence is present. Do not programme or recommend as if that constraint is absent.'
+        ? '- Active pain evidence is present. Do not programme or recommend as if that constraint is absent. Unrelated pain is not a cause for a different lift.'
         : '- No pain claim was retrieved this turn. Do not invent a pain constraint.')
       : '',
+    ...trainingCauseLines(state),
     workflow === 'daily_focus'
       ? (overdue
         ? `- Overdue work is present (${state.claims.find(claim => claim.fact === 'overdue_title')?.value}). Do not ignore it when naming the next move.`
@@ -1226,7 +1355,23 @@ export function kernelTraceEvent(kernel) {
     claims: (kernel.claims ?? []).map(claim => ({
       fact: claim.fact,
       tool: claim.tool,
+      kind: claim.kind ?? null,
       provenance: claim.provenance ?? null
+    })),
+    sufficiencyDecision: kernel.sufficiencyDecision ?? null,
+    retrieveLog: (kernel.retrieveLog ?? []).map(round => ({
+      round: round.round,
+      tools: (round.tools ?? []).map(item => ({
+        name: item.name,
+        kind: item.kind,
+        status: item.status,
+        truncated: item.truncated === true,
+        kept: item.kept ?? null,
+        omitted: item.omitted ?? null,
+        sourceRefs: (item.sourceRefs ?? []).slice(0, 6)
+      })),
+      coverage: round.coverage ?? null,
+      whyAnotherRound: round.whyAnotherRound ?? null
     })),
     conflicts: kernel.conflicts ?? [],
     unresolvedConflicts: kernel.unresolvedConflicts ?? [],
