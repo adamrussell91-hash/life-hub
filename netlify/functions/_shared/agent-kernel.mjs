@@ -44,7 +44,7 @@ import {
 import { getWeekReview } from './hammond-week.mjs';
 import { searchMedicalRecords, briefMedicalAppointment } from './medical-overview-read.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
-import { planWork } from './clare-work.mjs';
+import { planWork, statedPlannerInputs } from './clare-work.mjs';
 import { composeEvidenceClaims } from './evidence-packs.mjs';
 import {
   memoryInterpretationLines,
@@ -410,6 +410,26 @@ function runTool(name, stores, today, now, message, options = {}) {
     return getTasksOpenLoops(tasks, projects, { now });
   }
   if (name === 'plan_work') {
+    const stated = statedPlannerInputs(message);
+    if (stated.energy?.level) {
+      return planWork('energy', {
+        tasks,
+        lessons,
+        date: today,
+        now,
+        energy: stated.energy,
+        capacity_minutes: stated.capacity_minutes
+      });
+    }
+    if (stated.capacity_minutes) {
+      return planWork('time_block', {
+        tasks,
+        lessons,
+        date: today,
+        now,
+        capacity_minutes: stated.capacity_minutes
+      });
+    }
     return planWork('collisions', { tasks, lessons, date: today, now });
   }
   if (name === 'get_nutrition_snapshot') {
@@ -1213,6 +1233,12 @@ export function kernelTraceEvent(kernel) {
       intent: item.intent,
       status: item.status,
       idempotencyKey: item.idempotencyKey
-    }))
+    })),
+    continuation: kernel.continuation
+      ? { status: kernel.continuation.status, reason: kernel.continuation.reason ?? null }
+      : null,
+    writeOutcome: kernel.writeOutcome
+      ? { ok: kernel.writeOutcome.ok === true }
+      : null
   };
 }

@@ -138,10 +138,15 @@ test('chat proposal checkpoints a turn, confirm reloads it, write runs once', as
   assert.equal(turns[pending[0].turnId].stores, undefined);
   assert.equal(turns[pending[0].turnId].actions[0].status, 'pending');
 
+  let continuationCalls = 0;
   const confirm = createChatConfirmHandler({
     env: validEnv,
     fetchImpl: github.fetchImpl,
-    now: NOW
+    now: NOW,
+    continueConversation: async () => {
+      continuationCalls += 1;
+      return { text: 'Done. The tracker is open.' };
+    }
   });
   const first = await confirm(confirmRequest({
     kind: 'action',
@@ -152,10 +157,15 @@ test('chat proposal checkpoints a turn, confirm reloads it, write runs once', as
   assert.equal(first.status, 200);
   assert.equal(firstPayload.data.intent, proposalInput.intent);
   assert.equal(firstPayload.data.turnResumed, true);
+  assert.equal(firstPayload.data.continuation.invoked, true);
+  assert.match(firstPayload.data.continuation.text, /tracker is open/i);
   assert.ok(github.puts.some(put => put.path === CHALLENGE));
   const afterTurns = JSON.parse(github.blobs.get(AGENT_TURNS_PATH).content);
   assert.equal(afterTurns[pending[0].turnId].actions[0].status, 'executed');
+  assert.equal(afterTurns[pending[0].turnId].continuation.status, 'done');
+  assert.equal(afterTurns[pending[0].turnId].stores, undefined);
   const challengeWrites = github.puts.filter(put => put.path === CHALLENGE).length;
+  assert.equal(continuationCalls, 1);
 
   const second = await confirm(confirmRequest({
     kind: 'action',
@@ -164,6 +174,7 @@ test('chat proposal checkpoints a turn, confirm reloads it, write runs once', as
   }));
   assert.notEqual(second.status, 200);
   assert.equal(github.puts.filter(put => put.path === CHALLENGE).length, challengeWrites);
+  assert.equal(continuationCalls, 1);
 });
 
 test('chat dismiss rejects the persisted turn and does not write the proposal', async () => {
