@@ -567,6 +567,15 @@ export function composeEvidenceClaims(evidence = {}) {
     if (Array.isArray(result.recent) && result.recent.length) {
       pushClaim(claims, tool, 'pain_recent_count', result.recent.length);
     }
+    if (Array.isArray(result.sites) && result.sites.length) {
+      pushClaim(claims, tool, 'pain_site', result.sites[0].site);
+      pushClaim(claims, tool, 'pain_site_count', result.site_count ?? result.sites.length);
+    }
+    if (Array.isArray(result.collisions)) {
+      pushClaim(claims, tool, 'collision_count', result.collisions.length, 'calculation');
+    }
+    pushClaim(claims, tool, 'lesson_count', result.lesson_count, 'calculation');
+    pushClaim(claims, tool, 'stall_title', result.stall_candidates?.[0]?.title);
     if (result.ok === true && !claims.some(claim => claim.tool === tool)) {
       pushClaim(claims, tool, 'ok', true);
     }

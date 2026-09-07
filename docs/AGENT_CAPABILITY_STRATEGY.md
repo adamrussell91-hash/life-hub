@@ -299,11 +299,13 @@ Exit: documentation matches observed evidence.
 
 ### Phase 1 — Shared kernel pilot with Chadwick and Clare
 
-- Define `AgentTurnState` and the common evidence loop.
-- Run the new kernel beside the existing path behind a feature flag.
-- Build Chadwick training review and Clare daily focus workflows.
-- Add traces for plan, retrieval, sufficiency, answer, and action.
-- Run live conversations against real stores.
+**Status (2026-09-07):** implemented beside the existing path. Off unless `LIFE_HUB_AGENT_KERNEL=1` or the chat body sets `agentKernel: true`. Pilot slugs: Chadwick and Clare only.
+
+- `AgentTurnState` and the evidence loop live in `netlify/functions/_shared/agent-kernel.mjs`.
+- Chadwick `training_review` and Clare `daily_focus` are token-planned workflows (not one regex per paraphrase).
+- Traces record plan, retrieve, assess, resolve, compose, and idempotent actions.
+- Sufficiency replaces “any evidence section is answerable” on the flagged path.
+- Live conversational turns still need `ANTHROPIC_API_KEY`.
 
 Exit: both agents pass varied paraphrases, missing data, conflicting data, truncation, and recovery tests.
 
