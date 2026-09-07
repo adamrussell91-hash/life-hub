@@ -105,9 +105,7 @@ Authenticated `GET` against `https://deploy-preview-246--life-hub2.netlify.app` 
 | --- | --- | --- |
 | Tasks | yes | `GET /api/tasks` → 17 records |
 | Teaching scheduled lessons | yes | `GET /api/scheduled-lessons` → 9 records; none dated 2026-09-07 |
-| Fitness / GitHub repo | no | `GET /api/repo/manifest?from=2026-09-01&to=2026-09-07` and `GET /api/fitness/templates` → `503 misconfigured` |
-
-The deploy-preview context is missing GitHub repository configuration (`GITHUB_REPOSITORY` / `GITHUB_BRANCH` / `GITHUB_TOKEN` / `GITHUB_TOKEN_EXPIRES`). `createChatHandler` requires that client before it opens the model stream, so Clare and Chadwick cannot be graded on this preview until those keys exist in **Deploy Preview** (not Production).
+| Fitness / GitHub repo | yes after preview GitHub env fix | On head `0a9f450`, `GET /api/repo/manifest?from=2026-09-01&to=2026-09-07` → 200 (30 files); `GET /api/fitness/templates` → 200 |
 
 ## DETERMINISTIC TEST
 
@@ -121,27 +119,52 @@ Workspace `ANTHROPIC_API_KEY` was unset and `.env.local` was absent. Local-handl
 
 ## LIVE MODEL / DEPLOYED ROUTE
 
-Fresh preview after preview-only `LIFE_HUB_AGENT_KERNEL=1`:
+Exercised on head `0a9f450fae624507caaf0fb8ff82019bcca4f1b3` after preview GitHub env was set. URL `https://deploy-preview-246--life-hub2.netlify.app`. Netlify `deploy-preview` SUCCESS. Production kernel unchanged.
 
-- PR **#246**, head `4f3028458118bb592b644b66114b039489a5a412`, deploy `6a9e8b8cef764f00081fc88b`, URL `https://deploy-preview-246--life-hub2.netlify.app`, Netlify SUCCESS 2026-09-07T10:02:12Z
-- `POST /api/auth` succeeded. `GET /api/session` → authenticated
-- `POST /api/chat` reached the deployed function (`202` job). Transport was the real job + `/api/chat/events` poll, not a local `createChatHandler()` call
-- Job finished with a single `error` and **no** `agent`, tools, usage, or final answer. The model was **not** invoked
-- Cause: deploy-preview GitHub bindings are missing, so the handler returns `503 misconfigured` JSON
-- On `4f30284` the job runner hid that as `turn_incomplete`. After `6d8f2b7` / deploy `6a9e8d049b9c6f0008b298d7` (SUCCESS 2026-09-07T10:08:36Z), the same probe reports `misconfigured` / `This service is not configured.`
-- Kernel enablement on the chat turn could **not** be verified because the stream never started. Production kernel was not changed
-- No Clare or Chadwick scenario was graded. None are `passed`
+Probe `probe-clare-3` (job `228a9ceb-6286-4906-9bd2-9461d0657bfc`, 14341ms):
 
-| Scenario | Status | Trace |
-| --- | --- | --- |
-| Probe (harmless Clare pin) | blocked — first job `turn_incomplete`; rerun on `6d8f2b7` job error `misconfigured`, 1604ms, no model | captured locally; no private records |
-| Clare A–F | blocked (handler never reached the model) | none |
-| Chadwick A–F | blocked (GitHub/fitness unbound on preview) | none |
-| Confirm live continuation | blocked | none |
+- `POST /api/chat` → `202` job + `/api/chat/events` (not local `createChatHandler`)
+- Agent `clare`
+- Anthropic invoked (`usage` 82 / 661)
+- GitHub client initialised (manifest/templates 200; Clare cited real due-today Tasks)
+- Tasks evidence present (17 records; answer named 12 due-today items)
+- Teaching store visible (9 scheduled lessons; none dated 2026-09-07)
+- **No `kernel_trace`.** `kernelEnabled` stayed false on every turn. No `tool_call` events were published. Evidence reached the model through the existing hub digest / prompt path, not the kernel retrieve loop.
 
-Adam action required: copy the existing Production GitHub repo settings into the **Deploy Preview** context on `life-hub2` (`GITHUB_REPOSITORY`, `GITHUB_BRANCH`, `GITHUB_TOKEN`, `GITHUB_TOKEN_EXPIRES`). Do not enable `LIFE_HUB_AGENT_KERNEL` on Production.
+Earlier failed probes on this PR (kept for the record): `turn_incomplete` then `misconfigured` before GitHub preview env existed.
 
-Confirm continuation live sequence was **not** run. Deterministic proof covers:
+None of the live scenarios are `passed`. Kernel traces and a live Confirm continuation are still missing.
+
+| Scenario | Status | Trajectory / answer (0–2, frozen rubric) | Trace |
+| --- | --- | --- | --- |
+| Clare A daily planning | exercised, not passed | T 1 (no kernel/tools) / A 2 grounded Now-Later | `/tmp/life-hub-pilot-traces/deployed/probe-clare-3.json` |
+| Clare B 90-minute capacity | exercised, not passed | T 1 / A 2 plan narrowed, overflow deferred | `clare-b.json` |
+| Clare C low energy | exercised, not passed | T 1 / A 2 reorder; no saved-preference claim | `clare-c.json` |
+| Clare D calendar | exercised via Tasks timetable; no Teaching lessons dated today | T 1 / A 2 named Lunch/Reports clash | `clare-d.json` |
+| Clare E uncertainty | exercised, not passed | T 1 / A 2 refused invented durations | `clare-e.json` |
+| Clare F write + Confirm | partial — write once, no live continuation | T 1 (propose→confirm→no continuation) / A 1 | `clare-f.json`, `clare-f2-confirm.json` |
+| Chadwick A recent training | exercised, not passed | T 1 / A 2 cited 6 Sep session and week tonnage | `chadwick-a.json` |
+| Chadwick B progression | exercised, not passed | T 1 / A 2 partial green light; groin/ACWR caution | `chadwick-b.json` |
+| Chadwick C pain | exercised | T 1 / A 2 groin on goblet squat 5 Sep; Confirm for plan | `chadwick-c.json` |
+| Chadwick D substitution | exercised, not passed | T 1 / A 2 options, asked why bench is out; no mutation | `chadwick-d.json` |
+| Chadwick E conflict | not exercised as conflict (no genuine record disagreement) | — | `chadwick-e.json` |
+| Chadwick F missing evidence | exercised, not passed | T 1 / A 2 named thin abs/back + sparse adherence | `chadwick-f.json` |
+
+Confirm live sequence:
+
+```text
+deployed /api/chat → action_proposal act_b2372758375c
+→ POST /api/chat/confirm 200, intent Create task: AGENT PILOT TEST — DELETE ME
+→ task created
+→ duplicate Confirm 400 invalid_action (not a second write)
+→ no continuation (no kernel turnId)
+```
+
+Disposable rows `task_mtr8b23w_fpu4je` and `task_mtr8caxo_3tdf88` were deleted via `DELETE /api/tasks`. Follow-up list: 0 hits.
+
+Recorded Anthropic usage across exercised turns: 24300 input / 7754 output tokens. Latencies 8–52s.
+
+Confirm continuation live sequence still lacks a model acknowledgement. Deterministic proof covers:
 
 ```text
 proposal → checkpoint → queue → confirm → execute once → persist → continuation invoked once
@@ -151,7 +174,7 @@ and the negatives: failed write, duplicate Confirm, reject.
 
 ## Ledger statuses after this tranche
 
-- Clare operational planner: `demonstrated` (deterministic) / live gate `blocked`
-- Chadwick evidence reasoning: `demonstrated` (deterministic) / live gate `blocked`
-- Pilot behavioural gate: `blocked`
+- Clare operational planner: `demonstrated` (deterministic) / live deployed turns **exercised, not `passed`** (no kernel trace)
+- Chadwick evidence reasoning: `demonstrated` (deterministic) / live deployed turns **exercised, not `passed`** (no kernel trace)
+- Pilot behavioural gate: `blocked` (kernel off on preview turns; Confirm continuation not invoked)
 - Confirm conversational continuation: `demonstrated` (not `passed`)
