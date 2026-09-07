@@ -1081,6 +1081,7 @@ function trainingCauseLines(state) {
   const lines = [];
   if (cause.status === 'unknown') {
     lines.push('- The reason the requested lift is unavailable is an unknown cause. Do not invent soreness, injury, a prior PR, or a failed session.');
+    lines.push('- A recent completed session is stored fact. It is not evidence that pecs, chest, or shoulders are sore today unless Adam said so this turn.');
   } else if (cause.status === 'user_stated') {
     lines.push(`- Adam stated a current-turn reason (${cause.user_stated_reason}). Treat it as user_stated_current_turn, not a stored record.`);
   } else if (cause.status === 'stored') {
