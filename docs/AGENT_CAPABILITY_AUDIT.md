@@ -7,6 +7,8 @@ Generated: 2026-09-06T07:54:23.358Z
 
 **Phase 2 memory:** 2026-09-07 — layered memory (`user` / `agent` / `shared` / `episodic`) lives in `data/remember/layered-memories.json`. Kernel compose labels it as recall, never as a domain record. Write tool `remember_write_memory` is Chadwick + Clare only, not OS floor. Per-agent tool snapshots below may omit it until regenerated.
 
+**Phase 5 surfaces:** 2026-09-07 — Life, Tasks, Teaching, and Knowledge call `runSurfaceAgentTurn`. Same agent, same pack/kernel/memory. Hats, briefings, and Confirm cards stay per surface.
+
 > **Corrective note:** Attached tools ≠ intelligence. Status words allowed: Demonstrated | Failed | Blocked | Not started. Do not use thin / partial / scaffolding / mostly / should work / capability counts as completion language. Pack/function tests are not conversational behaviour tests.
 
 ## Demonstrated jobs (2026-09-06 evidence packs)

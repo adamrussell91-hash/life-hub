@@ -39,8 +39,7 @@ import {
   loadClementineProtocol
 } from './_shared/load-hub-protocols.mjs';
 import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
-import { assembleEvidencePack } from './_shared/evidence-packs.mjs';
-import { applyKernelToTurn, kernelTraceEvent } from './_shared/agent-kernel.mjs';
+import { runSurfaceAgentTurn } from './_shared/agent-surface.mjs';
 import { parseMemoryStore } from './_shared/agent-memory.mjs';
 import { REMEMBER_LAYERED_MEMORIES_PATH } from './_shared/capabilities/stores.mjs';
 import {
@@ -1322,35 +1321,29 @@ export function createChatHandler({
           memories: layeredMemories,
           memoryLoadError
         };
-        const evidencePack = assembleEvidencePack({
+        const surfaceTurn = runSurfaceAgentTurn({
+          surface: 'life',
           slug,
           message: parsed.message,
           today,
           sourceMeta,
-          now: nowInstant,
-          stores: evidenceStores
-        });
-        const kernelApplied = applyKernelToTurn({
-          slug,
-          message: parsed.message,
-          today,
           now: nowInstant,
           stores: evidenceStores,
-          sourceMeta,
           tools,
           env,
           flag: parsed.agentKernel
         });
-        if (kernelApplied.enabled && kernelApplied.kernel?.plan?.workflow !== 'none') {
-          tools = kernelApplied.tools;
+        const evidencePack = surfaceTurn.pack;
+        if (surfaceTurn.enabled && surfaceTurn.kernel?.plan?.workflow !== 'none') {
+          tools = surfaceTurn.tools;
         }
-        const kernelEvent = kernelTraceEvent(kernelApplied.kernel);
+        const kernelEvent = surfaceTurn.trace;
         if (kernelEvent) send(kernelEvent);
         // Pack already retrieved domain evidence. Keep tools for continuation /
         // writes, but do not force a tool round when the pack is answerable.
-        // Kernel sufficiency replaces "any section present" for Chadwick/Clare pilots.
-        const forceToolChoice = kernelApplied.enabled && kernelApplied.kernel?.plan?.workflow !== 'none'
-          ? kernelApplied.forceToolChoice
+        // Kernel sufficiency replaces “any section present” for Chadwick/Clare pilots.
+        const forceToolChoice = surfaceTurn.enabled && surfaceTurn.kernel?.plan?.workflow !== 'none'
+          ? surfaceTurn.forceToolChoice
           : activation.forceToolChoice && !(evidencePack.active && evidencePack.answerable);
         const system = buildSystemPrompt({
           slug,
@@ -1405,8 +1398,8 @@ export function createChatHandler({
           hubContext,
           activationCatalogue: activation.catalogueBlock,
           activationDirective: activation.activationBlock,
-          evidencePackBlock: kernelApplied.promptBlock || evidencePack.promptBlock,
-          kernelBlock: kernelApplied.interpretationBlock || ''
+          evidencePackBlock: surfaceTurn.promptBlock,
+          kernelBlock: surfaceTurn.interpretationBlock || ''
         });
 
         let pendingLogRejection = null;

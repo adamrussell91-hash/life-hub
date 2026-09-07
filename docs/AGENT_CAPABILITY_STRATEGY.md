@@ -2,7 +2,7 @@
 
 Independent technical strategy. Prepared for Adam Russell. Current Life Hub main branch reviewed 7 September 2026.
 
-**Status:** adopted as the implementation reference for agent capability work. Phases 0–2 are implemented in this repository. Later phases stay gated on the exit conditions below.
+**Status:** adopted as the implementation reference for agent capability work. Phases 0–2 and 5 are implemented in this repository. Phases 3–4 stay gated on the exit conditions below.
 
 Life Hub should not replace its current runtime with any single upstream framework. The target is a Life Hub native agent kernel.
 
@@ -335,7 +335,13 @@ Exit: Hammond completes cross-hub scenarios using verified specialist evidence, 
 
 ### Phase 5 — Surface unification and optimisation
 
-Route Life, Tasks, Teaching, and Knowledge surfaces through the same agent kernel. Keep surface-specific presentation and action affordances. Remove duplicate prompts, retrieval adapters, and unused tools.
+**Status (2026-09-07):** Life, Tasks, Teaching, and Knowledge call `runSurfaceAgentTurn` in `netlify/functions/_shared/agent-surface.mjs`. Presentation stays on each surface.
+
+- Life chat (`chat.mjs`) uses surface `life`.
+- Tasks Clare briefing (`clare-desk.mjs` / `/api/clare` brief) uses surface `tasks` and the same kernel + memory as Life Clare.
+- Knowledge Clementine chat uses surface `knowledge`.
+- Teaching Ann uses the same runner with surface `teaching` (same pack + memory as Life Ann).
+- Surface-specific hats, briefings, and Confirm cards stay. Retrieval and layered memory do not fork.
 
 Exit: the same agent demonstrates the same read competence and memory across every surface.
 
