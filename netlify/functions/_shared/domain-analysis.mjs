@@ -17,7 +17,11 @@ import {
   getNutritionAdherence,
   getNutritionTargets,
   getDiaryRange,
-  searchDiaryRecords
+  searchDiaryRecords,
+  hydrateTeachingSchedule,
+  partitionTeachingLessons,
+  statedTeachingConstraints,
+  getTeachingContext
 } from './domain-retrieval.mjs';
 import { topicQuery, researchFromDocs, coverageFromResearch } from './knowledge-research.mjs';
 import { rankKnowledgePages } from './knowledge-data.mjs';
@@ -259,34 +263,50 @@ export function getTeachingDiagnosis({
   lessons = [],
   units = [],
   query = '',
-  now = new Date()
+  now = new Date(),
+  message = ''
 } = {}) {
-  const today = now.toISOString().slice(0, 10);
-  const q = String(query ?? '').trim().toLowerCase();
-  const upcoming = (lessons ?? [])
-    .filter(l => l?.date && l.date >= today && l.delivery_status !== 'cancelled')
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const matchLesson =
-    upcoming.find(l => [l.title, l.display_title, l.id].some(v => String(v ?? '').toLowerCase().includes(q))) ??
-    upcoming[0] ??
-    null;
-  const matchClass = matchLesson?.class_id
-    ? (classes ?? []).find(c => c.id === matchLesson.class_id)
-    : (classes ?? []).find(c =>
-        [c.code, c.display_name, c.title].some(v => String(v ?? '').toLowerCase().includes(q))
-      );
-  const matchUnit = matchLesson?.unit_id
-    ? (units ?? []).find(u => u.id === matchLesson.unit_id)
-    : (units ?? []).find(u => [u.title, u.code, u.id].some(v => String(v ?? '').toLowerCase().includes(q)));
+  const today = (now instanceof Date ? now : new Date(now)).toISOString().slice(0, 10);
+  const stated = statedTeachingConstraints(message || query);
+  const ctx = getTeachingContext({ classes, lessons, units, query, now, message: message || query });
+  const upcoming = hydrateTeachingSchedule(lessons, { now, windowDays: 21 });
+  const { drafts } = partitionTeachingLessons(lessons);
+  const matchLesson = upcoming.find(l => l.id === ctx.lesson?.id && l.date === ctx.lesson?.date)
+    ?? upcoming.find(l => l.id === ctx.lesson?.id)
+    ?? null;
+  const matchClass = ctx.class
+    ? (classes ?? []).find(c => c.id === ctx.class.id) ?? ctx.class
+    : null;
+  const matchUnit = ctx.unit
+    ? (units ?? []).find(u => u.id === ctx.unit.id) ?? ctx.unit
+    : null;
 
   const gaps = [];
-  if (!matchLesson) gaps.push('No upcoming lesson matched — cannot diagnose delivery sequence.');
-  if (matchLesson && !matchLesson.learning_intentions?.length && !matchLesson.objectives?.length) {
-    gaps.push('Lesson lacks learning intentions/objectives in the stored record.');
+  if (!matchLesson) {
+    gaps.push('No upcoming lesson matched — cannot diagnose delivery sequence.');
+  } else {
+    const outcomes = matchLesson.outcome_ids ?? [];
+    if (!outcomes.length) {
+      gaps.push('Lesson has no stored outcome_ids / syllabus_outcomes.');
+    }
+    if (!(matchLesson.blocks?.length)) {
+      gaps.push('Lesson has no stored blocks to inspect before recommending changes.');
+    }
+    if (!matchLesson.unit_id) {
+      gaps.push('Lesson is not linked to a unit_id in the stored record.');
+    }
+    if (!matchLesson.title) {
+      gaps.push('Scheduled lesson has no resolvable draft title.');
+    }
+    if (stated.minutes && matchLesson.blocks?.length) {
+      gaps.push(`Current-turn time budget is ${stated.minutes} minutes — check whether stored blocks fit that constraint.`);
+    }
   }
-  if (matchLesson && !matchLesson.blocks?.length && !matchLesson.activities?.length) {
-    gaps.push('Lesson has no stored blocks/activities to inspect before recommending changes.');
-  }
+
+  const prep = [];
+  if (matchLesson && !(matchLesson.blocks?.length)) prep.push('Draft or attach lesson blocks before class.');
+  if (matchLesson && !(matchLesson.outcome_ids?.length)) prep.push('Attach syllabus outcomes / outcome_ids.');
+  if (matchLesson && !matchLesson.start_time) prep.push('No start_time on the scheduled lesson row.');
 
   return {
     ok: true,
@@ -294,23 +314,51 @@ export function getTeachingDiagnosis({
     kind: 'calculation',
     today,
     query: query || null,
+    stated_constraints: {
+      minutes: stated.minutes,
+      class_hint: stated.classHint,
+      year_hint: stated.yearHint
+    },
     class: matchClass
       ? { id: matchClass.id, code: matchClass.code, display_name: matchClass.display_name ?? matchClass.title }
       : null,
-    unit: matchUnit ? { id: matchUnit.id, title: matchUnit.title, code: matchUnit.code } : null,
+    unit: matchUnit
+      ? {
+          id: matchUnit.id,
+          title: matchUnit.title,
+          code: matchUnit.code,
+          lesson_ids: Array.isArray(matchUnit.lesson_ids) ? matchUnit.lesson_ids : []
+        }
+      : null,
     lesson: matchLesson
       ? {
           id: matchLesson.id,
+          scheduled_id: matchLesson.scheduled_id,
           date: matchLesson.date,
-          title: matchLesson.title ?? matchLesson.display_title,
-          learning_intentions: matchLesson.learning_intentions ?? matchLesson.objectives ?? [],
-          block_count: matchLesson.blocks?.length ?? matchLesson.activities?.length ?? 0,
-          version: matchLesson.version ?? matchLesson.revision ?? null
+          title: matchLesson.title,
+          path: matchLesson.path,
+          outcome_ids: matchLesson.outcome_ids ?? [],
+          // Legacy alias only when outcomes exist — do not invent intentions.
+          learning_intentions: matchLesson.outcome_ids ?? [],
+          block_count: matchLesson.blocks?.length ?? 0,
+          sequence: matchLesson.sequence,
+          unit_id: matchLesson.unit_id,
+          class_id: matchLesson.class_id,
+          version: matchLesson.version ?? null
         }
       : null,
+    previous_lesson: ctx.previous_lesson,
+    next_scheduled: ctx.next_scheduled,
+    next_in_unit: ctx.next_in_unit,
+    next_in_unit_basis: ctx.next_in_unit_basis,
     diagnosis_gaps: gaps,
+    preparation: prep,
+    draft_count: drafts.length,
     how_to_read:
-      'Diagnose from these stored fields before proposing lesson changes. Propose only via Teaching confirm / os_propose_action.'
+      'Diagnose from stored Teaching fields (schedule, draft blocks, outcome_ids, unit.lesson_ids). '
+      + 'Unit sequence next is a stored curriculum order when next_in_unit_basis=unit_lesson_ids. '
+      + 'A pedagogical rewrite beyond those fields is inference. Current-turn time budgets are user_stated_current_turn. '
+      + 'Propose writes only via Teaching confirm / os_propose_action.'
   };
 }
 
