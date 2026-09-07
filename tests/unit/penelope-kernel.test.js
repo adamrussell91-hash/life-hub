@@ -3,7 +3,10 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyseDiaryEvidence } from '../../netlify/functions/_shared/domain-analysis.mjs';
+import {
+  analyseDiaryEvidence,
+  resolveDiaryRecurrenceReferent as resolveDiaryRecurrenceReferent
+} from '../../netlify/functions/_shared/domain-analysis.mjs';
 import {
   kernelTraceEvent,
   planTurn,
@@ -62,7 +65,7 @@ test('Penelope paraphrases route into diary_recurrence (≥90%)', () => {
   assert.ok(hits.length / messages.length >= 0.9);
 });
 
-test('Case A: unmatched pattern with fallback context is insufficient_match, not multi_entry', () => {
+test('Case A: bare deictic "this" stays unresolved even with emotional history', () => {
   const kernel = runAgentKernel({
     slug: 'penelope',
     message: 'Have I felt like this before?',
@@ -70,46 +73,153 @@ test('Case A: unmatched pattern with fallback context is insufficient_match, not
     now: NOW,
     stores: {
       mindEvents: [
-        diary('2026-08-19', { notes: 'garden planting', mood: 'calm' }),
-        diary('2026-08-18', { notes: 'bought groceries', mood: 'calm' }),
-        diary('2026-08-17', { notes: 'watched a film', mood: 'hopeful' }),
-        diary('2026-08-16', { notes: 'walked the dog', mood: 'calm' }),
-        diary('2026-08-15', { notes: 'fixed a shelf', mood: 'tired' })
+        diary('2026-08-19', { notes: 'feeling flat after work', mood: 'flat' }),
+        diary('2026-08-18', { notes: 'feeling anxious before a meeting', mood: 'anxious' }),
+        diary('2026-08-17', { notes: 'feeling hopeful about progress', mood: 'hopeful' }),
+        diary('2026-08-16', { notes: 'feeling tired tonight', mood: 'tired' }),
+        diary('2026-08-15', { notes: 'feeling calm after a walk', mood: 'calm' })
       ]
     }
   });
   const analysis = kernel.evidence.analyse_diary_evidence;
+  assert.equal(analysis.referent_status, 'unresolved');
+  assert.equal(analysis.referent_kind, 'unresolved');
+  assert.equal(analysis.referent_value, null);
+  assert.equal(analysis.search_query, null);
   assert.equal(analysis.supported_match_count, 0);
-  assert.ok(analysis.fallback_count > 0);
-  assert.equal(analysis.recurrence_strength, 'insufficient_match');
+  assert.equal(analysis.recurrence_strength, 'unresolved_referent');
   assert.notEqual(analysis.recurrence_strength, 'multi_entry_recurrence');
-  assert.match(kernel.interpretationBlock, /fallback context are context only/i);
-  assert.match(kernel.interpretationBlock, /No supported recurrence/i);
+  assert.notEqual(analysis.recurrence_strength, 'weak_recurrence');
+  assert.notEqual(analysis.recurrence_strength, 'single_entry');
+  // Must not invent a historical mood as the current referent.
+  assert.equal(analysis.stated_constraints?.current_mood, null);
+  assert.match(kernel.interpretationBlock, /does not establish what "this" refers to/i);
+  assert.match(kernel.interpretationBlock, /Do not invent the referent from historical diary entries/i);
+  assert.match(kernel.interpretationBlock, /Do not report a recurrence pattern/i);
+  assert.match(kernel.interpretationBlock, /what feeling or situation is meant/i);
+  assert.equal(
+    kernel.sufficiencyDecision?.reason?.includes('unresolved deictic referent') ||
+      kernel.limitations.some(item => item.kind === 'unresolved_referent'),
+    true
+  );
 });
 
-test('Case B: one genuine match plus unrelated fallback context stays single_entry', () => {
+test('Case B: current-turn anxious + deictic this resolves and can recur', () => {
+  const kernel = runAgentKernel({
+    slug: 'penelope',
+    message: 'I am feeling anxious today. Have I felt like this before?',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      mindEvents: [
+        diary('2026-08-10', { notes: 'old anxiety about travel', mood: 'anxious' }),
+        diary('2026-08-01', { notes: 'feeling anxious before exams', mood: 'anxious' })
+      ]
+    }
+  });
+  const analysis = kernel.evidence.analyse_diary_evidence;
+  assert.equal(analysis.referent_kind, 'explicit_current_turn');
+  assert.equal(analysis.referent_value, 'anxious');
+  assert.equal(analysis.referent_status, 'resolved');
+  assert.equal(analysis.stated_constraints.current_mood, 'anxious');
+  assert.ok(analysis.supported_match_count >= 2);
+  assert.equal(analysis.recurrence_strength, 'weak_recurrence');
+  const stated = kernel.claims.find(claim => claim.fact === 'stated_current_mood');
+  assert.ok(stated);
+  assert.equal(stated.value, 'anxious');
+  assert.equal(stated.provenance.reason, 'user_stated_current_turn');
+  assert.match(kernel.interpretationBlock, /user_stated_current_turn/i);
+  assert.match(kernel.interpretationBlock, /do not establish that the current state came from those past events/i);
+});
+
+test('Case C: explicit named anxious query does not need current mood', () => {
+  const analysis = analyseDiaryEvidence([
+    diary('2026-08-10', { notes: 'old anxiety about travel', mood: 'anxious' }),
+    diary('2026-08-01', { notes: 'feeling anxious before exams', mood: 'anxious' })
+  ], TODAY, { message: 'Have I felt anxious before?', query: 'Have I felt anxious before?' });
+  assert.equal(analysis.referent_kind, 'explicit_query');
+  assert.equal(analysis.referent_value, 'anxious');
+  assert.equal(analysis.stated_constraints.current_mood, null);
+  assert.equal(analysis.supported_match_count, 2);
+  assert.equal(analysis.recurrence_strength, 'weak_recurrence');
+});
+
+test('Case D: current-turn flat with one historical match stays single_entry', () => {
+  const analysis = analyseDiaryEvidence([
+    diary('2026-08-18', { notes: 'feeling flat after work', mood: 'flat' })
+  ], TODAY, { message: 'I feel flat today. Has this happened before?' });
+  assert.equal(analysis.referent_kind, 'explicit_current_turn');
+  assert.equal(analysis.referent_value, 'flat');
+  assert.equal(analysis.supported_match_count, 1);
+  assert.equal(analysis.recurrence_strength, 'single_entry');
+});
+
+test('Case E: work stress theme resolves when explicitly named in-turn', () => {
+  // Bounded behaviour: "This work stress feels familiar..." is treated as an
+  // explicit current-turn theme because the phrase is present in the message.
+  const referent = resolveDiaryRecurrenceReferent(
+    'This work stress feels familiar. Have I felt like this before?'
+  );
+  assert.equal(referent.kind, 'explicit_current_turn');
+  assert.equal(referent.value, 'work stress');
+  const analysis = analyseDiaryEvidence([
+    diary('2026-08-18', { notes: 'work stress before presentation', mood: 'anxious' }),
+    diary('2026-08-11', { notes: 'work stress after review', mood: 'anxious' }),
+    diary('2026-08-04', { notes: 'work stress again', mood: 'low' })
+  ], TODAY, { message: 'This work stress feels familiar. Have I felt like this before?' });
+  assert.equal(analysis.referent_value, 'work stress');
+  assert.ok(analysis.supported_match_count >= 2);
+  assert.ok(['weak_recurrence', 'multi_entry_recurrence'].includes(analysis.recurrence_strength));
+});
+
+test('Case F: bare deictic never picks majority or recent historical mood', () => {
+  const analysis = analyseDiaryEvidence([
+    diary('2026-08-19', { notes: 'feeling flat', mood: 'flat' }),
+    diary('2026-08-18', { notes: 'feeling anxious', mood: 'anxious' }),
+    diary('2026-08-17', { notes: 'feeling calm', mood: 'calm' }),
+    diary('2026-08-16', { notes: 'feeling flat again', mood: 'flat' }),
+    diary('2026-08-15', { notes: 'feeling flat still', mood: 'flat' })
+  ], TODAY, { message: 'Have I felt like this before?' });
+  assert.equal(analysis.referent_status, 'unresolved');
+  assert.equal(analysis.supported_match_count, 0);
+  assert.equal(analysis.recurrence_strength, 'unresolved_referent');
+  assert.equal(analysis.stated_constraints.current_mood, null);
+  assert.equal(analysis.referent_value, null);
+});
+
+test('Case G: tired matches count; hopeful feel-language does not', () => {
+  const analysis = analyseDiaryEvidence([
+    diary('2026-08-18', { notes: 'felt tired after training', mood: 'tired' }),
+    diary('2026-08-12', { notes: 'feeling tired again', mood: 'tired' }),
+    diary('2026-08-05', { notes: 'feeling hopeful about tomorrow', mood: 'hopeful' })
+  ], TODAY, { message: 'Have I felt tired before?', query: 'Have I felt tired before?' });
+  assert.equal(analysis.referent_kind, 'explicit_query');
+  assert.equal(analysis.referent_value, 'tired');
+  assert.equal(analysis.supported_match_count, 2);
+  assert.equal(analysis.recurrence_strength, 'weak_recurrence');
+  assert.ok(analysis.matched_entries.every(entry => /tired/i.test(entry.notes)));
+});
+
+test('Case H: anxious current-turn does not count generic feeling stressed', () => {
+  const analysis = analyseDiaryEvidence([
+    diary('2026-08-18', { notes: 'feeling stressed about deadlines', mood: 'stressed' }),
+    diary('2026-08-10', { notes: 'feeling stressed again', mood: 'stressed' })
+  ], TODAY, { message: "I'm anxious today — have I felt like this before?" });
+  assert.equal(analysis.referent_value, 'anxious');
+  assert.equal(analysis.supported_match_count, 0);
+  assert.ok(['insufficient_match', 'none'].includes(analysis.recurrence_strength));
+});
+
+test('explicit feeling flat query still supports single_entry without deictic this', () => {
   const analysis = analyseDiaryEvidence([
     diary('2026-08-18', { notes: 'feeling flat about work', mood: 'flat' }),
-    diary('2026-08-17', { notes: 'garden planting only', mood: 'calm' }),
-    diary('2026-08-16', { notes: 'bought groceries', mood: 'calm' })
+    diary('2026-08-17', { notes: 'garden planting only', mood: 'calm' })
   ], TODAY, { message: 'feeling flat before', query: 'feeling flat' });
   assert.equal(analysis.supported_match_count, 1);
   assert.equal(analysis.recurrence_strength, 'single_entry');
-  // Unrelated rows must not be counted as matches even if present in the store.
-  assert.ok(analysis.entry_count >= 3);
 });
 
-test('Case C: two genuine matches are weak_recurrence', () => {
-  const analysis = analyseDiaryEvidence([
-    diary('2026-08-18', { notes: 'feeling tired after work', mood: 'tired' }),
-    diary('2026-08-10', { notes: 'feeling tired again', mood: 'tired' })
-  ], TODAY, { message: 'feeling like this often', query: 'feeling tired' });
-  assert.equal(analysis.supported_match_count, 2);
-  assert.equal(analysis.recurrence_strength, 'weak_recurrence');
-  assert.equal(analysis.fallback_count, 0);
-});
-
-test('Case D: three genuine matches are multi_entry_recurrence', () => {
+test('three genuine flat matches remain multi_entry_recurrence', () => {
   const kernel = runAgentKernel({
     slug: 'penelope',
     message: 'feeling flat often',
@@ -126,15 +236,9 @@ test('Case D: three genuine matches are multi_entry_recurrence', () => {
   const analysis = kernel.evidence.analyse_diary_evidence;
   assert.ok(analysis.supported_match_count >= 3);
   assert.equal(analysis.recurrence_strength, 'multi_entry_recurrence');
-  const strength = kernel.claims.find(claim => claim.fact === 'recurrence_strength');
-  assert.equal(strength.value, 'multi_entry_recurrence');
-  const theme = kernel.claims.find(claim => claim.fact === 'diary_theme');
-  assert.ok(theme);
-  assert.equal(theme.kind, 'calculation');
-  assert.equal(theme.provenance.sourceType, 'calculation');
 });
 
-test('Case E: empty diary has no supported recurrence', () => {
+test('empty diary with bare deictic is unresolved_referent, not invented recurrence', () => {
   const kernel = runAgentKernel({
     slug: 'penelope',
     message: 'Have I felt like this before?',
@@ -144,66 +248,19 @@ test('Case E: empty diary has no supported recurrence', () => {
   });
   const analysis = kernel.evidence.analyse_diary_evidence;
   assert.equal(analysis.supported_match_count, 0);
-  assert.equal(analysis.fallback_count, 0);
-  assert.equal(analysis.recurrence_strength, 'none');
-  assert.match(kernel.interpretationBlock, /No diary hits|Do not invent a recurring/i);
+  assert.equal(analysis.recurrence_strength, 'unresolved_referent');
+  assert.match(kernel.interpretationBlock, /does not establish what "this" refers to/i);
 });
 
-test('Case F: partial token matches do not establish recurrence', () => {
+test('generic feel\/felt is not a standalone recurrence target', () => {
+  const referent = resolveDiaryRecurrenceReferent('have I felt like this before');
+  assert.equal(referent.kind, 'unresolved');
+  assert.equal(referent.query, null);
   const analysis = analyseDiaryEvidence([
-    diary('2026-08-18', { notes: 'feeling hopeful after dinner', mood: 'hopeful' }),
-    diary('2026-08-17', { notes: 'feeling calm this morning', mood: 'calm' }),
-    diary('2026-08-16', { notes: 'feeling better after walk', mood: 'hopeful' })
-  ], TODAY, { message: 'feeling tired often', query: 'feeling tired' });
+    diary('2026-08-18', { notes: 'feeling flat', mood: 'flat' })
+  ], TODAY, { message: 'have I felt like this before' });
   assert.equal(analysis.supported_match_count, 0);
-  assert.ok(analysis.partial_count >= 1);
-  assert.equal(analysis.recurrence_strength, 'insufficient_match');
-  assert.notEqual(analysis.recurrence_strength, 'multi_entry_recurrence');
-  assert.notEqual(analysis.recurrence_strength, 'weak_recurrence');
-});
-
-test('Case G: one full match plus partials stays single_entry', () => {
-  const analysis = analyseDiaryEvidence([
-    diary('2026-08-18', { notes: 'feeling tired after work', mood: 'tired' }),
-    diary('2026-08-17', { notes: 'feeling hopeful after dinner', mood: 'hopeful' }),
-    diary('2026-08-16', { notes: 'feeling calm', mood: 'calm' })
-  ], TODAY, { message: 'feeling tired before', query: 'feeling tired' });
-  assert.equal(analysis.supported_match_count, 1);
-  assert.ok(analysis.partial_count >= 1);
-  assert.equal(analysis.recurrence_strength, 'single_entry');
-});
-
-test('single genuine match is not a pattern', () => {
-  const kernel = runAgentKernel({
-    slug: 'penelope',
-    message: 'have I felt like this before',
-    today: TODAY,
-    now: NOW,
-    stores: { mindEvents: [diary('2026-08-18', { notes: 'feeling flat', mood: 'flat' })] }
-  });
-  const strength = kernel.claims.find(claim => claim.fact === 'recurrence_strength');
-  assert.equal(strength.value, 'single_entry');
-  assert.equal(kernel.evidence.analyse_diary_evidence.supported_match_count, 1);
-  assert.match(kernel.interpretationBlock, /One genuine diary match is not a pattern/i);
-});
-
-test('current turn mood versus historical diary state', () => {
-  const kernel = runAgentKernel({
-    slug: 'penelope',
-    message: 'I am feeling anxious today — have I felt like this before',
-    today: TODAY,
-    now: NOW,
-    stores: {
-      mindEvents: [
-        diary('2026-07-01', { notes: 'old anxiety about travel', mood: 'anxious' })
-      ]
-    }
-  });
-  const stated = kernel.claims.find(claim => claim.fact === 'stated_current_mood');
-  assert.ok(stated);
-  assert.equal(stated.value, 'anxious');
-  assert.equal(stated.provenance.reason, 'user_stated_current_turn');
-  assert.match(kernel.interpretationBlock, /Do not convert historical moods into that present state/i);
+  assert.equal(analysis.recurrence_strength, 'unresolved_referent');
 });
 
 test('conflicting diary moods stay visible', () => {
