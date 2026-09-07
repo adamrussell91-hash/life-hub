@@ -1,6 +1,6 @@
 /**
- * Remaining specialist provenance smoke. DETERMINISTIC only.
- * Does not invent write paths. Hammond remains blocked.
+ * Remaining specialist smoke + Hammond block. DETERMINISTIC only.
+ * Full capability suites live in brisket/hyaluronica/penelope/vera-kernel tests.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -20,18 +20,21 @@ const REMAINING = [
     slug: 'brisket',
     message: 'how am I eating lately',
     workflow: 'nutrition_adherence',
-    stores: { meals: [{ type: 'meal', date: TODAY, protein_g: 40, notes: 'eggs' }] }
+    analysisTool: 'analyse_nutrition_evidence',
+    stores: { meals: [{ type: 'meal', date: TODAY, protein_g: 40, calories: 300, notes: 'eggs', id: 'm1', path: 'data/n/m1.md' }] }
   },
   {
     slug: 'hyaluronica',
     message: 'is my routine helping',
     workflow: 'routine_response',
-    stores: { skincare: [{ date: TODAY, notes: 'serum applied', routine: 'pm' }] }
+    analysisTool: 'analyse_skincare_evidence',
+    stores: { skincare: [{ date: TODAY, notes: 'serum applied', routine: 'pm', id: 's1', path: 'data/s/s1.md' }] }
   },
   {
     slug: 'penelope',
     message: 'feeling like this often',
     workflow: 'diary_recurrence',
+    analysisTool: 'analyse_diary_evidence',
     stores: {
       mindEvents: [{
         path: 'data/mind/2026-08-18-diary.md',
@@ -43,16 +46,17 @@ const REMAINING = [
     slug: 'vera',
     message: 'what patterns across sessions',
     workflow: 'mind_reflection',
+    analysisTool: 'analyse_mind_evidence',
     stores: {
       mindEvents: [{
         path: 'data/mind/2026-08-10-session.md',
-        record: { type: 'session', date: '2026-08-10', notes: 'therapy note' }
+        record: { type: 'session', date: '2026-08-10', notes: 'therapy note', themes: ['anxiety'] }
       }]
     }
   }
 ];
 
-test('remaining specialists still route and leave no silent null provenance', () => {
+test('remaining specialists route, analyse, and leave no silent null provenance', () => {
   for (const row of REMAINING) {
     assert.equal(planTurn({ slug: row.slug, message: row.message }).plan.workflow, row.workflow, row.slug);
     const kernel = runAgentKernel({
@@ -63,10 +67,12 @@ test('remaining specialists still route and leave no silent null provenance', ()
       stores: row.stores
     });
     assert.equal(kernel.plan.workflow, row.workflow, row.slug);
+    assert.ok(kernel.evidence[row.analysisTool], `${row.slug} missing ${row.analysisTool}`);
     const unexplained = kernel.claims.filter(claim => !usableProvenance(claim.provenance));
     assert.deepEqual(unexplained.map(claim => `${row.slug}:${claim.tool}:${claim.fact}`), []);
     const trace = kernelTraceEvent(kernel);
     assert.ok(trace.sufficiencyDecision, row.slug);
+    assert.ok(kernel.interpretationBlock.length > 40, row.slug);
   }
 });
 

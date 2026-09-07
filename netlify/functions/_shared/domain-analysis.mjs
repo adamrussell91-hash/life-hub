@@ -18,11 +18,13 @@ import {
   getNutritionTargets,
   getDiaryRange,
   searchDiaryRecords,
+  getSkincareAdherence,
   hydrateTeachingSchedule,
   partitionTeachingLessons,
   statedTeachingConstraints,
   getTeachingContext
 } from './domain-retrieval.mjs';
+import { searchMindRecords } from './mind-session-read.mjs';
 import { topicQuery, researchFromDocs, coverageFromResearch } from './knowledge-research.mjs';
 import { rankKnowledgePages } from './knowledge-data.mjs';
 
@@ -201,7 +203,9 @@ export function getSkincareResponseEvidence(records, today, { lookbackDays = 28 
         routine: r.routine ?? r.name,
         notes: r.notes,
         is_procedure: Boolean(r.is_procedure),
-        response_tags: r.response_tags ?? r.effects ?? []
+        response_tags: r.response_tags ?? r.effects ?? [],
+        id: r.id ?? null,
+        path: r.path ?? null
       }))
       .slice(0, 8);
   return {
@@ -215,7 +219,332 @@ export function getSkincareResponseEvidence(records, today, { lookbackDays = 28 
     late_window: { count: late.length, samples: noteSignal(late) },
     procedure_count: all.filter(r => r.is_procedure).length,
     how_to_read:
-      'Helping/not-helping judgments must cite early vs late log notes and procedures. Missing response notes = missing evidence, not proof of failure.'
+      'Helping/not-helping judgments must cite early vs late log notes and procedures. Missing response notes = missing evidence, not proof of failure. '
+      + 'Temporal association is not causation.'
+  };
+}
+
+const IRRITATION_RE = /\b(irritat\w*|flare\w*|flaring|redness|sting\w*|burn\w*|react\w*|breakout|rash)\b/i;
+const RESPONSE_POS_RE = /\b(helped|better|calmer|improved|cleared|tolerated)\b/i;
+const RESPONSE_NEG_RE = /\b(worse|worsened|irritated|irritation|flare|stung|burned|reacted|broke out)\b/i;
+
+export function statedSkincareConstraints(message = '') {
+  const text = String(message || '');
+  const current = IRRITATION_RE.test(text) && /\b(today|now|currently|this morning|tonight)\b/i.test(text);
+  return {
+    current_irritation: current ? (text.match(IRRITATION_RE)?.[0] ?? 'irritation') : null
+  };
+}
+
+export function analyseSkincareEvidence(records, today, { message = '', lookbackDays = 28 } = {}) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date', store: 'life_hub_skincare' };
+  const stated = statedSkincareConstraints(message);
+  const adherence = getSkincareAdherence(records, today, { lookbackDays: Math.min(lookbackDays, 14) });
+  const from = addCalendarDays(today, -(lookbackDays - 1));
+  const all = (Array.isArray(records) ? records : [])
+    .filter(r => r?.date && r.date >= from && r.date <= today)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const routine_events = all.map(r => ({
+    kind: 'stored_routine_event',
+    date: r.date,
+    routine: r.routine ?? r.name ?? null,
+    product: r.product ?? r.routine ?? r.name ?? null,
+    notes: r.notes ?? null,
+    response_tags: r.response_tags ?? r.effects ?? [],
+    id: r.id ?? null,
+    path: r.path ?? null,
+    recency: r.date === today ? 'today' : r.date >= addCalendarDays(today, -6) ? 'recent_window' : 'historical'
+  }));
+  const response_events = all
+    .filter(r => {
+      const hay = [r.notes, ...(r.response_tags ?? []), ...(r.effects ?? [])].filter(Boolean).join(' ');
+      return IRRITATION_RE.test(hay) || RESPONSE_POS_RE.test(hay) || RESPONSE_NEG_RE.test(hay)
+        || (Array.isArray(r.response_tags) && r.response_tags.length);
+    })
+    .map(r => ({
+      kind: 'stored_response_event',
+      date: r.date,
+      notes: r.notes ?? null,
+      response_tags: r.response_tags ?? r.effects ?? [],
+      product: r.product ?? r.routine ?? r.name ?? null,
+      id: r.id ?? null,
+      path: r.path ?? null,
+      recency: r.date === today ? 'today' : 'historical'
+    }));
+  const historical_irritation = response_events.filter(e =>
+    e.recency === 'historical' && (IRRITATION_RE.test(String(e.notes || '')) || RESPONSE_NEG_RE.test(String(e.notes || '')))
+  );
+  const associations = [];
+  for (const flare of historical_irritation.slice(0, 5)) {
+    const prior = routine_events.find(r => r.date < flare.date && r.date >= addCalendarDays(flare.date, -3));
+    if (prior) {
+      associations.push({
+        kind: 'temporal_association',
+        flare_date: flare.date,
+        prior_routine_date: prior.date,
+        product: prior.product,
+        claim: 'temporal_only',
+        how_to_read: 'Product appeared before a response log. This is association, not causation.'
+      });
+    }
+  }
+  return {
+    ok: true,
+    store: 'life_hub_skincare',
+    kind: 'calculation',
+    date: today,
+    from,
+    stated_constraints: stated,
+    routine_event_count: routine_events.length,
+    response_event_count: response_events.length,
+    days_with_log: adherence.days_with_log ?? 0,
+    adherence_pct: adherence.adherence_pct ?? 0,
+    routine_events: routine_events.slice(0, 12),
+    response_events: response_events.slice(0, 12),
+    historical_irritation: historical_irritation.slice(0, 8),
+    temporal_associations: associations,
+    missing_logs: (adherence.days_with_log ?? 0) === 0,
+    how_to_read:
+      'Separate stored routine events, stored response events, derived adherence, and temporal associations. '
+      + 'Do not claim causation from association. Do not describe past irritation as current irritation. '
+      + 'Do not infer product effectiveness from adherence alone. Current irritation requires user_stated_current_turn.'
+  };
+}
+
+export function statedNutritionConstraints(message = '') {
+  const text = String(message || '');
+  const ate = /\b(just ate|i ate|i've eaten|had breakfast|had lunch|had dinner)\b/i.test(text);
+  const hungry = /\b(hungry|starving|skipped|forgot to log)\b/i.test(text);
+  return {
+    current_intake_note: ate ? 'ate_this_turn' : hungry ? 'intake_gap_this_turn' : null
+  };
+}
+
+export function analyseNutritionEvidence(records, today, {
+  targetsConfig = TARGETS_CONFIG,
+  nutritionChallenges = null,
+  message = ''
+} = {}) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date', store: 'life_hub_nutrition' };
+  const stated = statedNutritionConstraints(message);
+  const snap = getNutritionSnapshot(records, today, { targetsConfig, nutritionChallenges });
+  const adherence = getNutritionAdherence(records, today, { targetsConfig });
+  const remaining = getNutritionDayRemaining(records, today, { targetsConfig, nutritionChallenges });
+  const compare = compareNutritionPeriods(records, today, { targetsConfig });
+  const targets = getNutritionTargets(today, { targetsConfig });
+  const mealsToday = Array.isArray(snap.meals_today) ? snap.meals_today : [];
+  const yesterday = addCalendarDays(today, -1);
+  const yesterdayMeals = (Array.isArray(records) ? records : []).filter(
+    r => r?.type === 'meal' && r.date === yesterday
+  );
+  const missDay = (adherence.week?.protein_target_hits ?? 0) < 7
+    ? (compare.days_with_meals_this_week ?? []).slice(-1)[0] ?? today
+    : today;
+  const missMeals = (Array.isArray(records) ? records : [])
+    .filter(r => r?.type === 'meal' && r.date === missDay)
+    .slice()
+    .sort((a, b) => Number(b.protein_g ?? 0) - Number(a.protein_g ?? 0))
+    .slice(0, 5)
+    .map(r => ({
+      date: r.date,
+      meal: r.meal,
+      protein_g: r.protein_g ?? 0,
+      calories: r.calories ?? 0,
+      id: r.id ?? null,
+      path: r.path ?? null,
+      kind: 'stored_meal_fact'
+    }));
+  const proteinTarget = Number(targets.targets?.protein_g ?? 0);
+  const proteinLogged = Number(snap.today?.protein_g ?? 0);
+  const targetMiss = proteinTarget > 0 && proteinLogged < proteinTarget;
+  return {
+    ok: true,
+    store: 'life_hub_nutrition',
+    kind: 'calculation',
+    date: today,
+    stated_constraints: stated,
+    logging_status: snap.logging_status,
+    meals_today_count: mealsToday.length,
+    meals_today: mealsToday.map(m => ({ ...m, kind: 'stored_meal_fact' })),
+    yesterday_meal_count: yesterdayMeals.length,
+    targets: targets.targets ?? null,
+    day_type: snap.day_type,
+    consumed: snap.today ?? null,
+    remaining: remaining.remaining ?? null,
+    week_adherence: adherence.week ?? null,
+    previous_week_adherence: adherence.previous_week ?? null,
+    week_vs_previous: compare.week_vs_previous ?? null,
+    unlogged_week_days: adherence.unlogged_week_days ?? [],
+    target_miss_today: targetMiss,
+    top_meals_on_miss_day: missMeals,
+    miss_day: missDay,
+    incomplete_logging: (adherence.unlogged_week_days ?? []).length > 0 || snap.logging_status !== 'logged_today',
+    how_to_read:
+      'Separate stored meal facts, nutrition target facts, derived adherence, and derived remaining macros. '
+      + 'No meal log is missing evidence — never treat it as zero intake. '
+      + 'Do not invent meals, convert planned meals into consumed food, or move yesterday\'s intake onto today. '
+      + 'Current-turn intake notes are user_stated_current_turn only.'
+  };
+}
+
+export function statedDiaryConstraints(message = '') {
+  const text = String(message || '');
+  const mood = text.match(/\b(feel(?:ing)?|felt)\s+(anxious|flat|low|sad|angry|overwhelmed|tired|hopeful|calm)\b/i);
+  const todayish = /\b(today|tonight|right now|this morning)\b/i.test(text);
+  return {
+    current_mood: mood && todayish ? mood[2].toLowerCase() : null
+  };
+}
+
+export function analyseDiaryEvidence(events, today, { message = '', query = '' } = {}) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date', store: 'life_hub_diary' };
+  const stated = statedDiaryConstraints(message);
+  const q = query || message || 'feeling';
+  const searched = searchDiaryRecords(events, { query: q, limit: 12 });
+  const themes = extractDiaryThemes(events, { query: q, limit: 12 });
+  const compare = compareDiaryPeriods(events, today);
+  const entries = diaryRows(events)
+    .map(e => ({
+      ...(e.record ?? e),
+      path: e.path ?? e.record?.path ?? null,
+      body: e.body
+    }))
+    .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
+  const moods = entries.map(e => e.mood).filter(Boolean);
+  const uniqueMoods = [...new Set(moods.map(m => String(m).toLowerCase()))];
+  let hitRows = searched?.results ?? [];
+  // Pattern questions with a lexical miss still surface recent stored entries as weak evidence.
+  if (!hitRows.length && entries.length && /\b(before|often|recur|theme|pattern|felt|feeling)\b/i.test(q)) {
+    hitRows = entries.slice(0, 8).map(e => ({
+      date: e.date,
+      mood: e.mood,
+      path: e.path,
+      id: e.id,
+      notes: e.notes,
+      score: 0,
+      weak_fallback: true
+    }));
+  }
+  const hitCount = hitRows.length;
+  let recurrence_strength = 'none';
+  if (hitCount === 1) recurrence_strength = 'single_entry';
+  else if (hitCount === 2) recurrence_strength = 'weak_recurrence';
+  else if (hitCount >= 3) recurrence_strength = 'multi_entry_recurrence';
+  const conflicting = uniqueMoods.length >= 2;
+  return {
+    ok: true,
+    store: 'life_hub_diary',
+    kind: 'calculation',
+    date: today,
+    stated_constraints: stated,
+    entry_count: entries.length,
+    hit_count: hitCount,
+    recurrence_strength,
+    recurring_terms: themes.recurring_terms ?? [],
+    recent_14d: compare.recent_14d,
+    previous_14d: compare.previous_14d,
+    conflicting_moods: conflicting ? uniqueMoods.slice(0, 6) : [],
+    sample_entries: hitRows.slice(0, 5).map(e => ({
+      date: e.date,
+      mood: e.mood ?? null,
+      notes: typeof e.notes === 'string' ? e.notes.slice(0, 160) : undefined,
+      path: e.path ?? null,
+      id: e.id ?? null,
+      kind: 'stored_diary_entry',
+      recency: e.date === today ? 'today' : 'historical'
+    })),
+    truncated: Boolean(searched?.truncated),
+    kept: searched?.kept ?? null,
+    omitted: searched?.omitted ?? null,
+    how_to_read:
+      'Separate stored diary entries from derived recurring themes and frequencies. '
+      + 'Semantic similarity is not a stored fact. Do not label patterns as causal. '
+      + 'Do not convert old mood states into current mood. Current mood requires user_stated_current_turn.'
+  };
+}
+
+export function statedMindConstraints(message = '') {
+  const text = String(message || '');
+  const todayish = /\b(today|tonight|right now|this session)\b/i.test(text);
+  const theme = text.match(/\b(anxiety|grief|anger|shame|avoidance|sleep|work stress)\b/i);
+  return {
+    current_theme: todayish && theme ? theme[1].toLowerCase() : null
+  };
+}
+
+export function analyseMindEvidence(events, today, { message = '', query = '' } = {}) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date', store: 'life_hub_mind' };
+  const stated = statedMindConstraints(message);
+  const compare = compareMindSessions(events, today);
+  const q = query || message || 'session';
+  const searched = searchMindRecords(events, { query: q, limit: 10 });
+  const sessions = [
+    ...(compare.recent_sessions ?? []).map(s => ({ ...s, window: 'recent' })),
+    ...(compare.prior_sessions ?? []).map(s => ({ ...s, window: 'prior' }))
+  ];
+  const termBag = new Map();
+  for (const s of sessions) {
+    for (const theme of s.themes ?? []) {
+      const key = String(theme).toLowerCase();
+      if (key.length < 3) continue;
+      const row = termBag.get(key) ?? { term: key, count: 0, windows: new Set() };
+      row.count += 1;
+      row.windows.add(s.window);
+      termBag.set(key, row);
+    }
+    const text = String(s.notes_excerpt ?? s.title ?? '').toLowerCase();
+    for (const word of text.split(/[^a-z0-9_]+/).filter(w => w.length >= 5)) {
+      const row = termBag.get(word) ?? { term: word, count: 0, windows: new Set() };
+      row.count += 1;
+      row.windows.add(s.window);
+      termBag.set(word, row);
+    }
+  }
+  const recurring = [...termBag.values()]
+    .filter(t => t.count >= 2)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8)
+    .map(t => ({ term: t.term, count: t.count, windows: [...t.windows] }));
+  const recentTerms = new Set(
+    [...termBag.values()].filter(t => t.windows.has('recent')).map(t => t.term)
+  );
+  const priorTerms = new Set(
+    [...termBag.values()].filter(t => t.windows.has('prior')).map(t => t.term)
+  );
+  const changed_themes = {
+    appeared_recently: [...recentTerms].filter(t => !priorTerms.has(t)).slice(0, 6),
+    not_appeared_recently: [...priorTerms].filter(t => !recentTerms.has(t)).slice(0, 6)
+  };
+  const conflict_signals = [];
+  const recentNotes = (compare.recent_sessions ?? []).map(s => String(s.notes_excerpt ?? '').toLowerCase());
+  if (recentNotes.some(n => /\bimproved\b|\bbetter\b/.test(n)) && recentNotes.some(n => /\bworse\b|\bstuck\b/.test(n))) {
+    conflict_signals.push({
+      kind: 'conflict_signal',
+      text: 'Recent session notes include both improvement and stuck/worse language'
+    });
+  }
+  return {
+    ok: true,
+    store: 'life_hub_mind',
+    kind: 'calculation',
+    date: today,
+    query: q,
+    stated_constraints: stated,
+    session_count: sessions.length,
+    search_count: searched?.count ?? 0,
+    recent_sessions: compare.recent_sessions ?? [],
+    prior_sessions: compare.prior_sessions ?? [],
+    recurring_themes: recurring,
+    changed_themes,
+    conflict_signals,
+    sparse: sessions.length < 2,
+    truncated: Boolean(compare.truncated) || Boolean(searched?.truncated),
+    kept: compare.kept ?? searched?.kept ?? null,
+    omitted: ((compare.omitted ?? 0) + (searched?.omitted ?? 0)) || null,
+    how_to_read:
+      'Separate stored session statements from derived recurring themes and period comparisons. '
+      + 'Do not diagnose. Do not convert therapist notes into current clinical state. '
+      + 'Do not invent therapist conclusions. Current-turn themes are user_stated_current_turn only.'
   };
 }
 

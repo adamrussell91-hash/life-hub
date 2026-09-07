@@ -53,6 +53,22 @@ export function getNutritionSnapshot(records, today, { targetsConfig = TARGETS_C
     date: today,
     nutritionChallenges
   });
+  const byKey = new Map();
+  for (const record of Array.isArray(records) ? records : []) {
+    if (record?.type !== 'meal' || record.date !== today) continue;
+    const key = `${record.meal ?? ''}|${record.time ?? ''}|${record.protein_g ?? ''}|${record.calories ?? ''}`;
+    if (!byKey.has(key)) byKey.set(key, record);
+  }
+  const mealsToday = (model.mealsToday ?? []).map(meal => {
+    const key = `${meal.meal ?? ''}|${meal.time ?? ''}|${meal.protein_g ?? ''}|${meal.calories ?? ''}`;
+    const source = byKey.get(key);
+    return {
+      ...meal,
+      id: source?.id ?? meal.id ?? null,
+      path: source?.path ?? meal.path ?? null,
+      date: today
+    };
+  });
   return {
     ok: true,
     store: 'life_hub_nutrition',
@@ -60,7 +76,13 @@ export function getNutritionSnapshot(records, today, { targetsConfig = TARGETS_C
     date: today,
     day_type: model.dayType,
     today: model.macroSplit,
-    meals_today: model.mealsToday,
+    meals_today: mealsToday,
+    meals_today_count: mealsToday.length,
+    logging_status: mealsToday.length === 0
+      ? 'no_log_today'
+      : mealsToday.length < 3
+        ? 'partial_day'
+        : 'logged_today',
     advice: model.advice || null,
     challenges: (model.challenges ?? []).map(c => ({
       id: c.id,
@@ -68,7 +90,10 @@ export function getNutritionSnapshot(records, today, { targetsConfig = TARGETS_C
       status: c.status,
       tally: c.tally
     })),
-    protein_trend: model.proteinTrend
+    protein_trend: model.proteinTrend,
+    how_to_read:
+      'Logged meals are stored facts for today only. No log is missing evidence, not zero intake. '
+      + 'Do not convert yesterday\'s meals or planned meals into today\'s consumed food.'
   };
 }
 
@@ -94,15 +119,22 @@ export function getNutritionAdherence(records, today, { targetsConfig = TARGETS_
         : 0
     };
   };
+  const weekDays = model.week ?? [];
+  const unloggedWeekDays = weekDays
+    .filter(d => !(d.calories > 0 || d.protein_g > 0))
+    .map(d => d.date);
   return {
     ok: true,
     store: 'life_hub_nutrition',
     same_as: 'Nutrition page week/month adherence',
     date: today,
-    week: summarise(model.week),
+    week: summarise(weekDays),
     previous_week: summarise(model.previousWeek),
     month: summarise(model.month),
-    how_to_read: 'Deterministic counts from meal files — not an estimate.'
+    unlogged_week_days: unloggedWeekDays,
+    how_to_read:
+      'Deterministic counts from meal files — not an estimate. '
+      + 'Unlogged days are missing evidence, not zero intake. Do not infer adherence from incomplete logging.'
   };
 }
 
@@ -197,16 +229,55 @@ export function getWeightTrend({ compositionRecords = [], measurementRecords = [
 }
 
 export function searchDiaryRecords(events, input = {}) {
+  const focused = focusDiaryQuery(input.query);
   const result = searchMindRecords(events, {
     ...input,
+    query: focused || input.query,
     record_types: ['diary']
   });
   if (!result?.ok) return result;
   return {
     ...result,
+    query: input.query,
+    focused_query: focused || input.query,
     store: 'life_hub_diary',
     how_to_read: 'Diary metadata/search hits from Mind files — retrieve before asking Adam to paste prior entries.'
   };
+}
+
+function focusDiaryQuery(query = '') {
+  const text = String(query ?? '');
+  const mood = text.match(
+    /\b(anxious|anxiety|flat|low|sad|angry|anger|overwhelmed|tired|hopeful|calm|stress|grief|shame|sleep|feeling|feelings|felt|feel|mood|theme|themes|pattern|patterns)\b/gi
+  ) || [];
+  if (mood.length) {
+    const expanded = new Set();
+    for (const raw of mood) {
+      const w = raw.toLowerCase();
+      expanded.add(w);
+      if (w === 'felt' || w === 'feel' || w === 'feeling' || w === 'feelings') {
+        expanded.add('feel');
+        expanded.add('felt');
+        expanded.add('feeling');
+        expanded.add('feelings');
+      }
+    }
+    return [...expanded].join(' ');
+  }
+  const stop = new Set([
+    'have', 'has', 'had', 'what', 'when', 'where', 'which', 'this', 'that', 'with', 'from',
+    'about', 'like', 'before', 'after', 'often', 'please', 'across', 'there', 'their',
+    'would', 'could', 'should', 'does', 'did', 'the', 'and', 'for', 'are', 'was', 'were',
+    'been', 'being', 'into', 'your', 'mine', 'just', 'very', 'much', 'more', 'some',
+    'than', 'then', 'them', 'they', 'will', 'can', 'recurring', 'history', 'overview'
+  ]);
+  return text
+    .toLowerCase()
+    .split(/\s+/)
+    .map(t => t.replace(/[^a-z0-9]/g, ''))
+    .filter(t => t.length >= 4 && !stop.has(t))
+    .slice(0, 5)
+    .join(' ');
 }
 
 export function getDiaryRange(events, { from, to, limit = DEFAULT_LIMIT } = {}) {
