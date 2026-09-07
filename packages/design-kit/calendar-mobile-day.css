@@ -16,7 +16,8 @@
     padding-bottom: var(--space-16);
   }
 
-  .hub-calendar__now {
+  /* Not `.hub-calendar__now` — that class is the time-grid now-line in calendar.css. */
+  .hub-calendar__now-card {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
@@ -28,25 +29,25 @@
     box-shadow: var(--elev-2);
   }
 
-  .hub-calendar__now-ring {
+  .hub-calendar__now-card-ring {
     width: var(--space-12);
     height: var(--space-12);
     flex: 0 0 var(--space-12);
   }
 
-  .hub-calendar__now-ring svg {
+  .hub-calendar__now-card-ring svg {
     display: block;
     width: 100%;
     height: 100%;
   }
 
-  .hub-calendar__now-copy {
+  .hub-calendar__now-card-copy {
     min-width: 0;
     display: grid;
     gap: var(--space-1);
   }
 
-  .hub-calendar__now-label {
+  .hub-calendar__now-card-label {
     margin: 0;
     font-family: var(--font-ui);
     font-size: var(--text-2xs);
@@ -56,7 +57,7 @@
     color: var(--on-dark-muted);
   }
 
-  .hub-calendar__now-title {
+  .hub-calendar__now-card-title {
     margin: 0;
     font-family: var(--font-ui);
     font-size: var(--text-md);
@@ -65,14 +66,14 @@
     color: var(--on-dark);
   }
 
-  .hub-calendar__now-meta {
+  .hub-calendar__now-card-meta {
     margin: 0;
     font-family: var(--font-ui);
     font-size: var(--text-xs);
     color: var(--on-dark-muted);
   }
 
-  .hub-calendar__now-tasks {
+  .hub-calendar__now-card-tasks {
     display: grid;
     place-items: center;
     min-width: var(--space-10);
@@ -82,7 +83,7 @@
     text-align: center;
   }
 
-  .hub-calendar__now-tasks strong {
+  .hub-calendar__now-card-tasks strong {
     display: block;
     font-family: var(--font-ui);
     font-size: var(--text-lg);
@@ -91,7 +92,7 @@
     color: var(--on-dark);
   }
 
-  .hub-calendar__now-tasks span {
+  .hub-calendar__now-card-tasks span {
     font-family: var(--font-ui);
     font-size: var(--text-2xs);
     font-weight: var(--weight-semibold);

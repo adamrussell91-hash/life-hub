@@ -846,7 +846,7 @@ function renderMobileDay(root, model, { mobilePanel, draft, now }) {
 
 function renderNowCard(root, { timed, tasks, now }) {
   const card = root.createElement('section');
-  card.className = 'hub-calendar__now';
+  card.className = 'hub-calendar__now-card';
   card.dataset.calendar = 'now-card';
   card.setAttribute('aria-label', 'Now');
 
@@ -854,21 +854,21 @@ function renderNowCard(root, { timed, tasks, now }) {
 
   const next = nextTimedEvent(timed, now);
   const copy = root.createElement('div');
-  copy.className = 'hub-calendar__now-copy';
+  copy.className = 'hub-calendar__now-card-copy';
   const label = root.createElement('p');
-  label.className = 'hub-calendar__now-label';
+  label.className = 'hub-calendar__now-card-label';
   label.textContent = next ? 'Next up' : 'Nothing else scheduled';
   const title = root.createElement('p');
-  title.className = 'hub-calendar__now-title';
+  title.className = 'hub-calendar__now-card-title';
   title.textContent = next ? next.title : 'Clear ahead';
   const meta = root.createElement('p');
-  meta.className = 'hub-calendar__now-meta';
+  meta.className = 'hub-calendar__now-card-meta';
   meta.textContent = next?.time ? next.time : `${timed.length} timed · ${tasks} open task${tasks === 1 ? '' : 's'}`;
   copy.append(label, title, meta);
   card.append(copy);
 
   const taskBadge = root.createElement('div');
-  taskBadge.className = 'hub-calendar__now-tasks';
+  taskBadge.className = 'hub-calendar__now-card-tasks';
   taskBadge.dataset.calendar = 'now-tasks';
   const count = root.createElement('strong');
   count.textContent = String(tasks);
@@ -881,7 +881,7 @@ function renderNowCard(root, { timed, tasks, now }) {
 
 function renderNowRing(root, now) {
   const wrap = root.createElement('div');
-  wrap.className = 'hub-calendar__now-ring';
+  wrap.className = 'hub-calendar__now-card-ring';
   wrap.setAttribute('aria-hidden', 'true');
   const pct = (now.getHours() * 60 + now.getMinutes()) / 1440;
   const size = 48;
