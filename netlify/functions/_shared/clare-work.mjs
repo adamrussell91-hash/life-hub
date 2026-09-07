@@ -889,7 +889,14 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       tasks,
       projects
     });
-    return ok({ count: items.length, items: items.slice(0, 20) });
+    const kept = items.slice(0, 20);
+    return ok({
+      count: items.length,
+      items: kept,
+      kept: kept.length,
+      omitted: Math.max(0, items.length - kept.length),
+      truncated: items.length > kept.length
+    });
   }
   if (name === 'run_desk_protocol') {
     const briefing = buildClareBriefing(tasks, input.protocol_id, now, { projects });

@@ -7,7 +7,7 @@ import {
   parseResearchResult,
   topicQuery
 } from './knowledge-research.mjs';
-import { assembleClementineEvidence } from './evidence-packs.mjs';
+import { runSurfaceAgentTurn } from './agent-surface.mjs';
 
 const ARCHIVE_FAILED_NOTE =
   'The archive pull failed. Say so in character and continue with what you have. Do not empty the conversation.';
@@ -164,17 +164,34 @@ function assembledSystem(input, archive) {
     ? RESEARCH_THE_OPEN_WEB
     : `${ANSWER_FROM_ARCHIVE}\n${CITE_NOTES_AS_LINKS}`;
   let evidenceBlock = '';
+  let interpretationBlock = '';
   try {
-    const pages = Array.isArray(input.pages)
+    const pages = Array.isArray(input.pages) && input.pages.length
       ? input.pages
-      : Array.isArray(archive?.pages)
+      : Array.isArray(archive?.pages) && archive.pages.length
         ? archive.pages
-        : [];
-    const pack = assembleClementineEvidence(
-      { pages, classes: input.classes ?? [], lessons: input.lessons ?? [], units: input.units ?? [] },
-      { message: query || 'What do I already have about this?' }
-    );
-    if (pack.active && pack.promptBlock) evidenceBlock = pack.promptBlock;
+        : (archive?.research?.findings ?? []).map(finding => ({
+          id: finding.pageId,
+          title: finding.title,
+          excerpt: finding.excerpt
+        }));
+    const surface = runSurfaceAgentTurn({
+      surface: 'knowledge',
+      slug: input.personality || 'clementine',
+      message: query || 'What do I already have about this?',
+      stores: {
+        pages,
+        classes: input.classes ?? [],
+        lessons: input.lessons ?? [],
+        units: input.units ?? [],
+        memories: input.memories ?? [],
+        memoryLoadError: input.memoryLoadError ?? null
+      },
+      env: input.env ?? {},
+      flag: input.agentKernel
+    });
+    if (surface.promptBlock) evidenceBlock = surface.promptBlock;
+    interpretationBlock = surface.interpretationBlock;
   } catch {
     evidenceBlock = '';
   }
@@ -194,7 +211,10 @@ function assembledSystem(input, archive) {
           ? `Coverage: ${coverage.distinctSources} distinct sources, ${coverage.gapCount} gaps, ${coverage.thin ? 'thin' : 'enough'}.`
           : '',
         evidenceBlock
-          ? `Server-assembled Knowledge evidence pack (same competence as Life-chat Clementine):\n${evidenceBlock}`
+          ? `Server-assembled Knowledge evidence (same kernel as Life-chat Clementine):\n${evidenceBlock}`
+          : '',
+        interpretationBlock
+          ? interpretationBlock
           : ''
       ].filter(Boolean).join('\n\n'),
       quality: formatKnowledgeQualityBlock()

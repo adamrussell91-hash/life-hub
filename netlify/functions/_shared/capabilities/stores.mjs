@@ -10,6 +10,7 @@ export const OS_DIR = 'data/os';
 export const CN_LOANS_PATH = `${OS_DIR}/cn-loans.json`;
 export const REMEMBER_WEEK_FLAGS_PATH = `${REMEMBER_DIR}/week-flags.json`;
 export const REMEMBER_CONTEXT_NOTES_PATH = `${REMEMBER_DIR}/context-notes.json`;
+export const REMEMBER_LAYERED_MEMORIES_PATH = `${REMEMBER_DIR}/layered-memories.json`;
 
 export const RESEARCH_TTL_DAYS = Object.freeze({
   clinical: 90,

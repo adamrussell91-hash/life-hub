@@ -11,6 +11,7 @@ import {
   RESEARCH_DIR,
   REMEMBER_WEEK_FLAGS_PATH,
   REMEMBER_CONTEXT_NOTES_PATH,
+  REMEMBER_LAYERED_MEMORIES_PATH,
   CN_LOANS_PATH,
   WIDGETS_DIR,
   OS_DIR,
@@ -41,6 +42,15 @@ import {
 import { applyIntuitionEdit } from './intuition.mjs';
 import { validateProposeActionInput } from './propose-action.mjs';
 import { newTaskId } from '../tasks-blobs.mjs';
+import {
+  addMemory,
+  applyReflection,
+  correctMemory,
+  createMemoryStore,
+  parseMemoryStore,
+  proposeReflection,
+  serializeMemoryStore
+} from '../agent-memory.mjs';
 
 const CN_OPS = ['upsert_field', 'append_line', 'replace_section', 'delete_lines', 'condense'];
 
@@ -135,6 +145,26 @@ export function shortcutSchemas() {
           tags: { type: 'array', items: { type: 'string' } }
         },
         required: ['note'],
+        additionalProperties: false
+      }
+    },
+    remember_write_memory: {
+      name: 'remember_write_memory',
+      description: 'Write or correct layered memory (user/agent/shared/episodic). Not a domain record. mode=reflect always waits for Confirm and cannot change safety or write permissions.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          mode: { type: 'string', enum: ['add', 'correct', 'reflect'] },
+          class: { type: 'string', enum: ['user', 'agent', 'shared', 'episodic'] },
+          text: { type: 'string' },
+          domain: { type: 'string' },
+          expires_at: { type: 'string', description: 'ISO timestamp; omitted means no expiry' },
+          memory_id: { type: 'string', description: 'Required for mode=correct' },
+          reason: { type: 'string' },
+          target: { type: 'string', enum: ['memory', 'protocol', 'eval_case'] },
+          impact: { type: 'string', enum: ['low', 'high', 'safety', 'permissions', 'write_allowlist'] }
+        },
+        required: ['mode', 'text'],
         additionalProperties: false
       }
     },
@@ -470,6 +500,85 @@ async function handleRememberNoteContext(ctx, input) {
     sha
   );
   return ok('Context note saved', { path });
+}
+
+async function handleRememberWriteMemory(ctx, input) {
+  const mode = String(input.mode || 'add').trim();
+  const text = String(input.text || '').trim();
+  if (!text) return deny('text is required');
+  if (mode === 'reflect') {
+    const reflection = proposeReflection({
+      target: input.target || 'memory',
+      impact: input.impact || 'low',
+      reason: input.reason || text,
+      payload: {
+        text,
+        class: input.class || 'agent',
+        domain: input.domain || null,
+        expires_at: input.expires_at || null
+      },
+      agent: ctx.agentSlug
+    });
+    if (reflection.forbidden) {
+      return deny(reflection.message);
+    }
+    if (reflection.target !== 'memory') {
+      return deny('Reflection of protocol or eval_case cannot write those files from this tool. Use os_propose_action after Adam confirms.');
+    }
+    const path = REMEMBER_LAYERED_MEMORIES_PATH;
+    const { value: data, sha } = await readJson(ctx, path, { version: 1, items: [] });
+    const store = createMemoryStore(parseMemoryStore(data).items);
+    const applied = applyReflection(store, reflection, { actor: ctx.agentSlug });
+    if (!applied.ok) return deny(applied.error);
+    return propose(
+      buildProposal({
+        agentSlug: ctx.agentSlug,
+        intent: reflection.message,
+        surfaces: ['confirm_card', 'governance_log'],
+        writes: [{
+          path,
+          mode: sha ? 'overwrite' : 'create',
+          content: serializeMemoryStore(applied.store),
+          diff: `reflection ${reflection.target}: ${text.slice(0, 80)}`
+        }]
+      })
+    );
+  }
+
+  const path = REMEMBER_LAYERED_MEMORIES_PATH;
+  const { value: data, sha } = await readJson(ctx, path, { version: 1, items: [] });
+  const store = createMemoryStore(parseMemoryStore(data).items);
+  let result;
+  if (mode === 'correct') {
+    result = correctMemory(store, {
+      id: input.memory_id,
+      text,
+      reason: input.reason
+    }, { actor: ctx.agentSlug });
+  } else {
+    result = addMemory(store, {
+      class: input.class || 'user',
+      agent: ctx.agentSlug,
+      domain: input.domain || null,
+      text,
+      expires_at: input.expires_at || null,
+      source: 'user'
+    }, { actor: ctx.agentSlug });
+  }
+  if (!result.ok) return deny(result.error);
+  await writeAllowlisted(
+    ctx.client,
+    ctx.agentSlug,
+    path,
+    serializeMemoryStore(result.store),
+    mode === 'correct' ? 'remember: correct layered memory' : 'remember: write layered memory',
+    sha
+  );
+  return ok(mode === 'correct' ? 'Memory corrected' : 'Memory saved', {
+    path,
+    memory_id: result.item.id,
+    class: result.item.class
+  });
 }
 
 async function handleTrackOpenChallenge(ctx, input) {
@@ -1137,6 +1246,8 @@ export async function executeShortcut(toolName, input, ctx) {
         return await handleRememberSetWeekFlag(ctx, input);
       case 'remember_note_context':
         return await handleRememberNoteContext(ctx, input);
+      case 'remember_write_memory':
+        return await handleRememberWriteMemory(ctx, input);
       case 'track_open_challenge':
         return await handleTrackOpenChallenge(ctx, input);
       case 'track_log_progress':
@@ -1182,6 +1293,7 @@ export {
   RESEARCH_DIR,
   REMEMBER_WEEK_FLAGS_PATH,
   REMEMBER_CONTEXT_NOTES_PATH,
+  REMEMBER_LAYERED_MEMORIES_PATH,
   CN_LOANS_PATH,
   WIDGETS_DIR,
   OS_DIR
