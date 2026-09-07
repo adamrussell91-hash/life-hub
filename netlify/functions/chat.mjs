@@ -2617,7 +2617,8 @@ export function createChatStartHandler({
       ...(parsed.history?.length ? { history: parsed.history } : {}),
       ...(parsed.priorAgentSlug ? { priorAgentSlug: parsed.priorAgentSlug } : {}),
       ...(parsed.auditSession ? { auditSession: parsed.auditSession } : {}),
-      ...(parsed.protocolId ? { protocolId: parsed.protocolId } : {})
+      ...(parsed.protocolId ? { protocolId: parsed.protocolId } : {}),
+      ...(parsed.agentKernel ? { agentKernel: true } : {})
     });
 
     let kicked = false;
