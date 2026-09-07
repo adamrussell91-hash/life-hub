@@ -28,7 +28,8 @@ import {
   searchTeaching,
   getTeachingContext,
   searchKnowledge,
-  inspectHubSignals
+  inspectHubSignals,
+  statedTeachingConstraints
 } from './domain-retrieval.mjs';
 import {
   getTasksOpenLoops,
@@ -102,7 +103,10 @@ const HEALTH = new Set([
 ]);
 const LESSON = new Set([
   'lesson', 'lessons', 'class', 'unit', 'teach', 'teaching', 'improve',
-  'hinge', 'tomorrow', 'curriculum', 'year', 'pupil', 'student', 'repair'
+  'hinge', 'tomorrow', 'today', 'curriculum', 'year', 'pupil', 'student', 'repair',
+  'prepare', 'preparation', 'intention', 'intentions', 'outcome', 'outcomes',
+  'sequence', 'follow', 'following', 'missing', 'gap', 'gaps', 'next', 'previous',
+  'planned', 'schedule', 'scheduled', 'resources', 'period', 'timetable'
 ]);
 const KNOW = new Set([
   'know', 'notes', 'archive', 'research', 'already', 'corpus', 'knowledge',
@@ -230,9 +234,15 @@ export function planTurn({ slug, message } = {}) {
   }
 
   if (slug === 'ann' && !greetingOnly && hits(words, LESSON)) {
+    const stated = statedTeachingConstraints(message);
+    const dayFocus = stated.wantsToday || stated.wantsTomorrow || stated.wantsNext;
     return validatePlan({
       workflow: 'lesson_diagnosis',
-      goal: 'Diagnose the lesson from class, unit, and calendar context before proposing a repair',
+      goal: dayFocus
+        ? 'Resolve what is scheduled and what comes next from Teaching Hub records'
+        : stated.wantsGaps
+          ? 'Diagnose stored lesson gaps before proposing a repair'
+          : 'Diagnose the lesson from class, unit, and calendar context before proposing a repair',
       domain: 'teaching',
       requiredSources: ['search_teaching', 'get_teaching_context', 'get_teaching_diagnosis'],
       optionalSources: [],
@@ -240,7 +250,12 @@ export function planTurn({ slug, message } = {}) {
       risk: 'low',
       writeIntent: false,
       retrieve: true,
-      completion: ['context_or_named_gap']
+      completion: ['context_or_named_gap'],
+      statedConstraints: {
+        minutes: stated.minutes,
+        classHint: stated.classHint,
+        yearHint: stated.yearHint
+      }
     });
   }
 
@@ -463,7 +478,7 @@ function runTool(name, stores, today, now, message, options = {}) {
   }
   if (name === 'search_teaching') {
     return searchTeaching({
-      query: query || 'lesson',
+      query: query || message || 'lesson',
       classes: stores.classes ?? [],
       lessons,
       units: stores.units ?? [],
@@ -475,7 +490,8 @@ function runTool(name, stores, today, now, message, options = {}) {
       classes: stores.classes ?? [],
       lessons,
       units: stores.units ?? [],
-      query,
+      query: query || message,
+      message,
       now
     });
   }
@@ -484,7 +500,8 @@ function runTool(name, stores, today, now, message, options = {}) {
       classes: stores.classes ?? [],
       lessons,
       units: stores.units ?? [],
-      query,
+      query: query || message,
+      message,
       now
     });
   }
@@ -843,6 +860,7 @@ export function assessEvidence(state) {
 
   if (state.plan?.workflow === 'lesson_diagnosis') {
     const ctx = state.evidence.get_teaching_context;
+    const diagnosis = state.evidence.get_teaching_diagnosis;
     if (ctx && ctx.ok !== false && !ctx.lesson) {
       limitations.push({
         tool: 'get_teaching_context',
@@ -850,6 +868,10 @@ export function assessEvidence(state) {
         text: 'No matching lesson in the loaded teaching window'
       });
       coverage.missing.push('lesson');
+    }
+    if (diagnosis?.diagnosis_gaps?.length && ctx?.lesson) {
+      // Gaps are derived evidence, not a retrieve failure — do not force another round.
+      coverage.missing = coverage.missing.filter(item => item !== 'lesson');
     }
   }
 
@@ -1098,6 +1120,43 @@ function trainingCauseLines(state) {
   return lines;
 }
 
+function teachingInterpretationLines(state) {
+  if (state.plan?.workflow !== 'lesson_diagnosis') return [];
+  const lines = [];
+  const lessonTitle = state.claims.find(claim => claim.fact === 'lesson_title')?.value;
+  const gaps = state.evidence.get_teaching_diagnosis?.diagnosis_gaps ?? [];
+  const statedMinutes = state.evidence.get_teaching_context?.stated_constraints?.minutes
+    ?? state.evidence.get_teaching_diagnosis?.stated_constraints?.minutes
+    ?? state.plan?.statedConstraints?.minutes
+    ?? null;
+  const nextBasis = state.evidence.get_teaching_diagnosis?.next_in_unit_basis
+    ?? state.evidence.get_teaching_context?.next_in_unit_basis
+    ?? null;
+  const nextScheduled = state.evidence.get_teaching_context?.next_scheduled
+    ?? state.evidence.get_teaching_diagnosis?.next_scheduled
+    ?? null;
+  if (lessonTitle) {
+    lines.push(`- Lesson context is ${lessonTitle}. Diagnose that lesson; do not invent another class.`);
+  } else {
+    lines.push('- No matching lesson was retrieved. Do not invent a class, unit, hinge, or timetable.');
+  }
+  if (gaps.length) {
+    lines.push('- diagnosis_gaps are derived from stored Teaching fields. They are not permission to invent missing content.');
+  }
+  if (statedMinutes) {
+    lines.push(`- Adam stated a current-turn time budget (${statedMinutes} minutes). Treat it as user_stated_current_turn, not a stored timetable fact.`);
+  }
+  if (nextBasis === 'unit_lesson_ids') {
+    lines.push('- next_in_unit comes from stored unit.lesson_ids order. That is curriculum record fact, not a free-form teaching recommendation.');
+  } else if (nextScheduled?.title || nextScheduled?.id) {
+    lines.push('- Prefer next_scheduled from the Teaching calendar when answering what comes next.');
+  } else {
+    lines.push('- Do not invent the next lesson, student needs, assessment deadlines, or prior outcomes.');
+  }
+  lines.push('- Stored facts: schedule rows, draft titles, blocks, outcome_ids, unit links. Derived: diagnosis_gaps / preparation. Inference: any rewrite beyond those fields.');
+  return lines;
+}
+
 function doCompose(state) {
   const composed = composeEvidenceClaims(state.evidence);
   state.claims = composed.claims;
@@ -1136,7 +1195,6 @@ function doCompose(state) {
   const workflow = state.plan?.workflow;
   const weightConflict = state.limitations.some(item => item.kind === 'conflict' && item.tool === 'get_weight_trend');
   const medicalHits = Number(state.claims.find(claim => claim.tool === 'search_medical_records' && claim.fact === 'result_count')?.value ?? 0);
-  const lessonTitle = state.claims.find(claim => claim.fact === 'lesson_title')?.value;
   const noteCount = Number(state.claims.find(claim => claim.tool === 'search_knowledge' && claim.fact === 'result_count')?.value ?? 0);
   const mealsToday = state.coverage.missing.includes('meals_today');
   const skinLogs = state.coverage.missing.includes('skincare_logs');
@@ -1152,6 +1210,7 @@ function doCompose(state) {
         : '- No pain claim was retrieved this turn. Do not invent a pain constraint.')
       : '',
     ...trainingCauseLines(state),
+    ...teachingInterpretationLines(state),
     workflow === 'daily_focus'
       ? (overdue
         ? `- Overdue work is present (${state.claims.find(claim => claim.fact === 'overdue_title')?.value}). Do not ignore it when naming the next move.`
@@ -1166,11 +1225,6 @@ function doCompose(state) {
         : medicalHits
           ? '- Medical hits are retrieved records. Do not invent extra visits or results.'
           : '- No matching medical visits were retrieved. Do not invent an appointment or lab result.')
-      : '',
-    workflow === 'lesson_diagnosis'
-      ? (lessonTitle
-        ? `- Lesson context is ${lessonTitle}. Diagnose that lesson; do not invent another class.`
-        : '- No matching lesson was retrieved. Do not invent a class, unit, or hinge.')
       : '',
     workflow === 'knowledge_research'
       ? (noteCount

@@ -306,8 +306,8 @@ export function assembleEvidencePack({
     storesTouched.push('teaching_hub');
     const q = queryFromMessage(message, 'lesson');
     push(sections, toolsExecuted, 'search_teaching', 'Teaching search', searchTeaching({ query: q, classes, lessons, units, limit: 10 }), 'record');
-    push(sections, toolsExecuted, 'get_teaching_context', 'Teaching context', getTeachingContext({ classes, lessons, units, query: q, now }), 'record');
-    push(sections, toolsExecuted, 'get_teaching_diagnosis', 'Teaching diagnosis', getTeachingDiagnosis({ classes, lessons, units, query: q, now }), 'calculation');
+    push(sections, toolsExecuted, 'get_teaching_context', 'Teaching context', getTeachingContext({ classes, lessons, units, query: q, message, now }), 'record');
+    push(sections, toolsExecuted, 'get_teaching_diagnosis', 'Teaching diagnosis', getTeachingDiagnosis({ classes, lessons, units, query: q, message, now }), 'calculation');
   }
 
   if (slug === 'clementine') {
@@ -648,17 +648,83 @@ export function composeEvidenceClaims(evidence = {}) {
       const lessonProv = recordOf(result.lesson, { store: result.store ?? 'teaching_hub' });
       pushClaim(claims, tool, 'lesson_id', result.lesson.id, 'record', lessonProv);
       pushClaim(claims, tool, 'lesson_title', result.lesson.title, 'record', lessonProv);
-      pushClaim(claims, tool, 'learning_intentions', result.lesson.learning_intentions, 'record', lessonProv);
+      pushClaim(claims, tool, 'lesson_date', result.lesson.date, 'record', lessonProv);
+      if (result.lesson.path) {
+        pushClaim(claims, tool, 'lesson_path', result.lesson.path, 'record', lessonProv);
+      }
+      if (result.lesson.sequence != null) {
+        pushClaim(claims, tool, 'lesson_sequence', result.lesson.sequence, 'record', lessonProv);
+      }
+      if (Array.isArray(result.lesson.outcome_ids)) {
+        pushClaim(claims, tool, 'outcome_ids', result.lesson.outcome_ids, 'record', lessonProv);
+      }
+      if (Array.isArray(result.lesson.learning_intentions) && result.lesson.learning_intentions.length) {
+        pushClaim(claims, tool, 'learning_intentions', result.lesson.learning_intentions, 'record', lessonProv);
+      }
+      if (result.lesson.block_count != null) {
+        pushClaim(claims, tool, 'block_count', result.lesson.block_count, 'record', lessonProv);
+      }
     }
     if (result.class?.code) {
       pushClaim(claims, tool, 'class_code', result.class.code, 'record', recordOf(result.class, {
         store: result.store ?? 'teaching_hub'
       }));
     }
+    if (result.unit?.title || result.unit?.id) {
+      pushClaim(claims, tool, 'unit_title', result.unit.title ?? result.unit.id, 'record', recordOf(result.unit, {
+        store: result.store ?? 'teaching_hub'
+      }));
+    }
+    if (result.next_scheduled?.id) {
+      pushClaim(claims, tool, 'next_scheduled_title', result.next_scheduled.title ?? result.next_scheduled.id, 'record', recordOf(result.next_scheduled, {
+        store: result.store ?? 'teaching_hub',
+        date: result.next_scheduled.date
+      }));
+    }
+    if (result.previous_lesson?.id) {
+      pushClaim(claims, tool, 'previous_lesson_title', result.previous_lesson.title ?? result.previous_lesson.id, 'record', recordOf(result.previous_lesson, {
+        store: result.store ?? 'teaching_hub',
+        date: result.previous_lesson.date
+      }));
+    }
+    if (result.next_in_unit?.id) {
+      const basis = result.next_in_unit_basis === 'unit_lesson_ids' ? 'record' : 'inference';
+      pushClaim(
+        claims,
+        tool,
+        'next_in_unit_title',
+        result.next_in_unit.title ?? result.next_in_unit.id,
+        basis === 'record' ? 'record' : 'inference',
+        basis === 'record'
+          ? recordOf(result.next_in_unit, { store: result.store ?? 'teaching_hub' })
+          : claimProvenance(result, tool, {
+              sourceType: 'calculation',
+              reason: 'inference',
+              calculation: 'next_in_unit_inference',
+              store: result.store ?? 'teaching_hub',
+              kind: 'inference'
+            })
+      );
+    }
+    if (result.stated_constraints?.minutes != null) {
+      pushClaim(claims, tool, 'stated_time_minutes', result.stated_constraints.minutes, 'inference', claimProvenance(result, tool, {
+        sourceType: 'calculation',
+        reason: 'user_stated_current_turn',
+        calculation: 'stated_teaching_constraint',
+        authority: 'user_stated',
+        kind: 'inference'
+      }));
+    }
     pushClaim(claims, tool, 'diagnosis_gaps', result.diagnosis_gaps, 'calculation', calc('diagnosis_gaps', 'teaching_diagnosis', {
       store: 'teaching_hub',
       inputs: ['teaching_hub']
     }));
+    if (Array.isArray(result.preparation) && result.preparation.length) {
+      pushClaim(claims, tool, 'preparation', result.preparation, 'calculation', calc('preparation', 'teaching_preparation', {
+        store: 'teaching_hub',
+        inputs: ['teaching_hub']
+      }));
+    }
     const first = result.results?.[0] ?? null;
     pushClaim(claims, tool, 'result_count', result.count, 'calculation', calc('result_count', 'result_count'));
     if (first) {
