@@ -2,7 +2,7 @@
 
 Independent technical strategy. Prepared for Adam Russell. Current Life Hub main branch reviewed 7 September 2026.
 
-**Status:** adopted as the implementation reference for agent capability work. Phases 0–3 and 5 are implemented in this repository. Phase 4 (Hammond supervisor) stays gated.
+**Status:** adopted as the implementation reference for agent capability work. Phases 0–5 are implemented in this repository. Live conversational E2E remains Blocked (no `ANTHROPIC_API_KEY`).
 
 Life Hub should not replace its current runtime with any single upstream framework. The target is a Life Hub native agent kernel.
 
@@ -333,9 +333,14 @@ Exit: each specialist passes domain-specific live datasets and end-to-end tests.
 
 ### Phase 4 — Hammond supervisor
 
-Specialist handoff contracts. Parallel delegation and return verification. Shared mission memory and decision records. Cross-hub conflict resolution. Open-loop monitoring.
+**Status (2026-09-07):** flagged kernel workflow `cross_hub_supervision`. Pack-layer handoffs, verification, unavailable hubs, and Confirm-pending writes are Demonstrated. Live conversational E2E remains Blocked.
 
-Exit: Hammond completes cross-hub scenarios using verified specialist evidence, names unavailable domains, and preserves confirmation boundaries.
+- Hammond plans, retrieves hub signals + attention pack, then delegates canned specialist questions.
+- Each handoff has objective, question, evidence pointers, constraints, expected output, and return status.
+- Specialists return findings, confidence, limitations, and proposed action. Missing returns stay `open`.
+- Delivery forbids inventing specialist rows and treating a drafted decision record as user truth before Confirm.
+
+Exit: Hammond completes cross-hub scenarios using verified specialist evidence, names unavailable domains, and preserves confirmation boundaries. Pack-layer exit is met. Live conversational exit is still Blocked.
 
 ### Phase 5 — Surface unification and optimisation
 
@@ -344,7 +349,7 @@ Exit: Hammond completes cross-hub scenarios using verified specialist evidence, 
 - Life chat (`chat.mjs`) uses surface `life`.
 - Tasks Clare briefing (`clare-desk.mjs` / `/api/clare` brief) uses surface `tasks` and the same kernel + memory as Life Clare.
 - Knowledge Clementine chat uses surface `knowledge`.
-- Teaching Ann uses the same runner with surface `teaching` (same pack + memory as Life Ann).
+- Teaching Ann uses `runTeachingAnnTurn` (`teaching-ann-turn.mjs`) — same runner with surface `teaching`.
 - Surface-specific hats, briefings, and Confirm cards stay. Retrieval and layered memory do not fork.
 
 Exit: the same agent demonstrates the same read competence and memory across every surface.

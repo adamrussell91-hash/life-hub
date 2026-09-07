@@ -149,8 +149,9 @@ const CLARE_PARAPHRASES = [
   'smallest next move today'
 ];
 
-test('kernel flag stays off for other agents and when unset', () => {
-  assert.equal(agentKernelEnabled({ slug: 'hammond', flag: true }), false);
+test('kernel flag stays off for unknown agents and when unset', () => {
+  assert.equal(agentKernelEnabled({ slug: 'sterling', flag: true }), false);
+  assert.equal(agentKernelEnabled({ slug: 'hammond', flag: true }), true);
   assert.equal(agentKernelEnabled({ slug: 'chadwick', env: {} }), false);
   assert.equal(agentKernelEnabled({ slug: 'clare', env: { LIFE_HUB_AGENT_KERNEL: '1' } }), true);
   assert.equal(agentKernelEnabled({ slug: 'chadwick', flag: true }), true);

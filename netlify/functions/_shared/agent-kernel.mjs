@@ -1,6 +1,6 @@
 /**
  * Agent kernel — typed turn state beside the existing chat path.
- * Phases 1 and 3: Chadwick, Clare, and the remaining specialists. Hammond is Phase 4.
+ * Phases 1, 3, and 4: specialists plus Hammond supervisor.
  * ponytail: classifier is token lexicons, not one regex per paraphrase.
  * Upgrade: small model planTurn when a cheap classifier is available.
  */
@@ -26,7 +26,8 @@ import {
   searchSkincareRecords,
   searchTeaching,
   getTeachingContext,
-  searchKnowledge
+  searchKnowledge,
+  inspectHubSignals
 } from './domain-retrieval.mjs';
 import {
   getTasksOpenLoops,
@@ -36,8 +37,10 @@ import {
   compareMindSessions,
   getSkincareResponseEvidence,
   getTeachingDiagnosis,
-  getKnowledgeSynthesis
+  getKnowledgeSynthesis,
+  getHammondAttentionPack
 } from './domain-analysis.mjs';
+import { getWeekReview } from './hammond-week.mjs';
 import { searchMedicalRecords, briefMedicalAppointment } from './medical-overview-read.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
 import { planWork } from './clare-work.mjs';
@@ -48,10 +51,16 @@ import {
   parseMemoryStore,
   searchMemories
 } from './agent-memory.mjs';
+import {
+  hammondShouldSupervise,
+  handoffInterpretationLines,
+  handoffPromptBlock,
+  runHammondDelegation
+} from './agent-handoff.mjs';
 
 export const KERNEL_PILOT_SLUGS = Object.freeze([
   'chadwick', 'clare', 'sara', 'ann', 'clementine', 'brisket',
-  'hyaluronica', 'penelope', 'vera'
+  'hyaluronica', 'penelope', 'vera', 'hammond'
 ]);
 export const WRITE_GATEWAY_TOOLS = Object.freeze([
   'os_propose_action',
@@ -310,6 +319,24 @@ export function planTurn({ slug, message } = {}) {
     });
   }
 
+  if (slug === 'hammond' && hammondShouldSupervise(message)) {
+    const week = words.some(word => ['week', 'weekly', 'sunday', 'review'].includes(word));
+    const required = ['inspect_hub_signals', 'get_hammond_attention_pack'];
+    if (week) required.push('get_week_review');
+    return validatePlan({
+      workflow: 'cross_hub_supervision',
+      goal: 'Delegate to specialists, verify returns, and name unavailable hubs before synthesis',
+      domain: 'cross_hub',
+      requiredSources: required,
+      optionalSources: week ? [] : ['get_week_review'],
+      tools: [...required, 'get_week_review', 'propose_central_node_patch', 'append_governance_log'],
+      risk: 'high',
+      writeIntent: false,
+      retrieve: true,
+      completion: ['attention_or_named_gap', 'handoffs_verified_or_open']
+    });
+  }
+
   return validatePlan({
     workflow: 'none',
     goal: 'no_retrieval',
@@ -339,7 +366,12 @@ function emptyStores() {
     pages: [],
     classes: [],
     units: [],
-    loadErrors: {}
+    loadErrors: {},
+    hammondDigest: '',
+    hammondEvents: [],
+    centralNodeMarkdown: '',
+    stressFlags: [],
+    inbox: []
   };
 }
 
@@ -452,6 +484,50 @@ function runTool(name, stores, today, now, message) {
     return searchMindRecords(stores.mindEvents ?? [], { query: query || 'session', limit: 10 });
   }
   if (name === 'compare_mind_sessions') return compareMindSessions(stores.mindEvents ?? [], today);
+  if (name === 'inspect_hub_signals') {
+    return inspectHubSignals({
+      tasks,
+      classes: stores.classes ?? [],
+      scheduledLessons: lessons,
+      loadErrors,
+      hammondDigest: stores.hammondDigest ?? '',
+      now
+    });
+  }
+  if (name === 'get_hammond_attention_pack') {
+    return getHammondAttentionPack({
+      tasks,
+      projects,
+      classes: stores.classes ?? [],
+      lessons,
+      mindEvents: stores.mindEvents ?? [],
+      workouts,
+      meals,
+      loadErrors,
+      stressFlags: stores.stressFlags ?? [],
+      inbox: stores.inbox ?? [],
+      today,
+      now
+    });
+  }
+  if (name === 'get_week_review') {
+    const events = (stores.hammondEvents ?? []).length
+      ? stores.hammondEvents
+      : [
+          ...workouts.map(record => ({ record: { ...record, type: record.type || 'workout' } })),
+          ...meals.map(record => ({ record: { ...record, type: record.type || 'meal' } })),
+          ...(stores.mindEvents ?? [])
+        ];
+    return getWeekReview({
+      events,
+      tasks,
+      lessons,
+      classes: stores.classes ?? [],
+      centralNodeMarkdown: stores.centralNodeMarkdown ?? '',
+      today,
+      loadErrors
+    });
+  }
   return { ok: false, error: 'unknown_tool' };
 }
 
@@ -480,6 +556,7 @@ export function createTurnState({ slug, message, today, now = new Date(), stores
     memory: [],
     memoryMeta: { kept: 0, omitted: 0 },
     memoryLoadError: stores?.memoryLoadError ?? null,
+    handoffs: [],
     actions: [],
     answer: null,
     claims: [],
@@ -544,8 +621,11 @@ function doRetrieve(state) {
     state.evidence[name] = runTool(name, state.stores, state.today, state.now, state.message);
   }
   const memoryNote = recallLayeredMemory(state);
+  if (state.slug === 'hammond' && state.plan?.workflow === 'cross_hub_supervision') {
+    runHammondDelegation(state, runAgentKernel);
+  }
   state.stage = 'retrieved';
-  return recordTrace(state, 'retrieve', `${Object.keys(state.evidence).join(',')}|${memoryNote}`);
+  return recordTrace(state, 'retrieve', `${Object.keys(state.evidence).join(',')}|${memoryNote}|handoffs=${(state.handoffs ?? []).length}`);
 }
 
 function limitationFor(tool, result) {
@@ -716,6 +796,40 @@ export function assessEvidence(state) {
     }
   }
 
+  if (state.plan?.workflow === 'cross_hub_supervision') {
+    const signals = state.evidence.inspect_hub_signals;
+    const unavailable = [
+      ...(signals?.unavailable ?? []),
+      ...(state.evidence.get_hammond_attention_pack?.unavailable_hubs ?? [])
+    ];
+    for (const item of unavailable) {
+      limitations.push({
+        tool: 'inspect_hub_signals',
+        kind: 'unavailable',
+        text: `${item.hub}:${item.error || 'unavailable'}`
+      });
+      coverage.failed.push(item.hub);
+    }
+    for (const handoff of state.handoffs ?? []) {
+      if (handoff.status === 'open') {
+        limitations.push({
+          tool: `handoff_${handoff.to}`,
+          kind: 'open_handoff',
+          text: `Handoff to ${handoff.to} is open (${handoff.reason || 'no return'})`
+        });
+        coverage.missing.push(`handoff_${handoff.to}`);
+      }
+    }
+    if (!(state.handoffs ?? []).length) {
+      limitations.push({
+        tool: 'handoff',
+        kind: 'missing',
+        text: 'No specialist handoffs were requested'
+      });
+      coverage.missing.push('handoffs');
+    }
+  }
+
   if (state.memoryLoadError) {
     limitations.push({
       tool: 'layered_memory',
@@ -775,6 +889,7 @@ function doCompose(state) {
     'Limitations:',
     ...(limitLines.length ? limitLines : ['- none']),
     memoryPromptBlock(state.memory, state.memoryMeta),
+    handoffPromptBlock(state.handoffs),
     state.complete
       ? 'Coverage is complete for the planned sources.'
       : 'Coverage is incomplete. Name every material limitation. Do not give a clean-sounding conclusion from missing, failed, truncated, or conflicted evidence.'
@@ -845,6 +960,10 @@ function doCompose(state) {
         ? '- No mind sessions were retrieved. Do not invent a longitudinal pattern.'
         : '- Interpret only from retrieved sessions. Do not diagnose beyond those records.')
       : '',
+    workflow === 'cross_hub_supervision'
+      ? '- Cross-hub synthesis is only as good as verified specialist returns.'
+      : '',
+    ...(workflow === 'cross_hub_supervision' ? handoffInterpretationLines(state.handoffs) : []),
     ...memoryInterpretationLines(state.memory)
   ].filter(Boolean).join('\n');
   state.answer = {
@@ -952,6 +1071,7 @@ export function kernelTraceEvent(kernel) {
     limitationKinds: [...new Set((kernel.limitations ?? []).map(item => item.kind))],
     stages: (kernel.trace ?? []).map(item => item.stage),
     memoryKept: kernel.memoryMeta?.kept ?? 0,
-    memoryOmitted: kernel.memoryMeta?.omitted ?? 0
+    memoryOmitted: kernel.memoryMeta?.omitted ?? 0,
+    handoffs: (kernel.handoffs ?? []).map(item => ({ to: item.to, status: item.status, reason: item.reason }))
   };
 }
