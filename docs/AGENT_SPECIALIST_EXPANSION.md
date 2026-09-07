@@ -205,3 +205,31 @@ Still **off**. `docs/AGENT_CAPABILITY_STRATEGY.md` **unchanged**. Hammond **not*
 ### Deterministic correction pass (continuation 2)
 
 Local Cursor unit execution after Penelope / Brisket / Vera fixes: **245 pass / 0 fail** across Ann–Vera + Clare/Chadwick + evidence/provenance/kernel + Confirm/chat-job/compact-turn + fitness/workout confirm suites. Deployed specialist live gate still blocked without authenticated session.
+
+### Independent review defects (continuation 3) — failure → root cause → correction → regression → status
+
+#### Defect 1 — searchMindRecords advertised AND but accepted partial token matches
+
+| Step | Detail |
+| --- | --- |
+| Failure | Schema said query words are ANDed, but implementation kept any record with `score > 0`, so one token (e.g. `feeling`) could count as a supported hit for a multi-token query (`feeling tired`). Penelope could then promote three partial hits into `multi_entry_recurrence`. |
+| Root cause | OR / partial filtering (`score > 0`) instead of full focused-token coverage. |
+| Correction | Focus natural-language queries to meaningful tokens (strip filler; collapse feel-stem variants), then require all focused tokens for `results` (`match_kind: full`). Expose bounded `partial_results` as context only. Penelope `supported_match_count` / recurrence strength use full matches only; partials and fallback remain context. Vera natural session queries still retrieve after focusing (e.g. work stress). |
+| Regression | `mind-session-read.test.js` Cases A–E + AND partials; `penelope-kernel.test.js` Cases F–G; `vera-kernel.test.js` natural work-stress search. |
+| Status | `deterministic only` |
+
+#### Defect 2 — nutrition adherence denominator + historical “confirmed miss”
+
+| Step | Detail |
+| --- | --- |
+| Failure | `getNutritionAdherence` divided protein hits by all window days (unlogged days as failures), contradicting “unlogged ≠ zero”. Historical days with any logged meals below target were labelled `confirmed_miss` without a completeness signal. |
+| Root cause | Window-day denominator plus lack of historical day-completeness semantics. |
+| Correction | Separate `observed_protein_hit_rate_pct` (hits / logged days; null when none logged) from `logging_coverage_pct`. Redefine `protein_hit_rate_pct` as the observed logged-day rate. Rename miss fields to `observed_below_target_days` / `below_target_day` / `top_meals_on_below_target_day` — observed logged protein below target, not a proven complete-day miss. Period compare surfaces coverage limitations. Interpretation: “Among logged days…” when coverage is incomplete. |
+| Regression | `brisket-kernel.test.js` Adherence Cases A–E; historical breakfast below-target status; updated Cases A–F field names. |
+| Status | `deterministic only` |
+
+Hammond remains **blocked**. Production kernel remains **off**. `docs/AGENT_CAPABILITY_STRATEGY.md` **unchanged**.
+
+### Deterministic correction pass (continuation 3)
+
+Local Cursor unit execution after search AND + nutrition adherence/observed-below-target fixes: **342 pass / 0 fail** across Ann–Vera + mind-session-read + Clare/Chadwick + evidence/provenance/kernel + Confirm/chat-job/compact-turn + fitness/workout confirm + context-delivery suites. Deployed specialist live gate still blocked without authenticated session.
