@@ -8,9 +8,9 @@ export function dragThresholdFor(event: Pick<PointerEvent, 'pointerType'>): numb
     : DRAG_THRESHOLD;
 }
 
-/** Mice and fingers both drag; fingers use the wider lift in `dragThresholdFor`. */
-export function boardPointerDragEnabled(_event: Pick<PointerEvent, 'pointerType'>): boolean {
-  return true;
+/** Mice drag; fingers and pens do not — mobile column tabs + tap-to-expand own the card. */
+export function boardPointerDragEnabled(event: Pick<PointerEvent, 'pointerType'>): boolean {
+  return event.pointerType !== 'touch' && event.pointerType !== 'pen';
 }
 
 export type BoardMoveDetail = {

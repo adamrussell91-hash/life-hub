@@ -231,7 +231,7 @@ describe('dashboard focus model', () => {
 });
 
 describe('renderProjectPortfolioChart', () => {
-  it('renders a Life Hub load ring and mix bars', () => {
+  it('renders a mood-mix donut with running load in the centre', () => {
     const mix = projectLifecycleMix(
       [
         project({ id: 'p1', title: 'Live', status: 'active' }),
@@ -242,13 +242,14 @@ describe('renderProjectPortfolioChart', () => {
       now
     );
     const chart = renderProjectPortfolioChart(mix, { running: 1, compact: true, href: '#/projects' });
-    expect(chart.querySelector('.metric-ring')).not.toBeNull();
+    expect(chart.querySelector('.projects-mix__pie')).not.toBeNull();
     expect(chart.querySelector('a[href="#/projects"]')).not.toBeNull();
+    expect(chart.textContent).toContain('What’s the mix?');
     expect(chart.textContent).toContain('running');
-    expect(chart.querySelector('.column-bar--row')).not.toBeNull();
+    expect(chart.querySelector('.projects-mix__legend-row')).not.toBeNull();
   });
 
-  it('colors the ring by load and treats a click as a filter action', () => {
+  it('tones the centre by load and treats a click as a filter action', () => {
     const onActivate = vi.fn();
     const chart = renderProjectPortfolioChart([], {
       running: 5,
@@ -256,8 +257,8 @@ describe('renderProjectPortfolioChart', () => {
       onActivate,
       active: true
     });
-    expect(chart.querySelector('.metric-ring--over')).not.toBeNull();
     const btn = chart.querySelector<HTMLButtonElement>('.metric-ring-wrap--action');
+    expect(btn?.dataset.tone).toBe('over');
     expect(btn?.getAttribute('aria-pressed')).toBe('true');
     btn?.click();
     expect(onActivate).toHaveBeenCalledOnce();
@@ -313,7 +314,8 @@ describe('renderDashboardOverview', () => {
     expect(host.querySelector('[aria-label="Today"]')).toBeNull();
     expect(host.querySelector('[aria-label="Excursions"]')).toBeNull();
     expect(host.querySelector('[aria-label="Projects"] .project-pulse-chart')).not.toBeNull();
-    expect(host.querySelector('.dashboard-trend-chart [data-role="line"]')).not.toBeNull();
+    expect(host.querySelector('.projects-mix__pie')).not.toBeNull();
+    expect(host.querySelector('.dashboard-trend-chart')).toBeNull();
     expect(host.querySelector('[aria-label="Next 14 days"] .dashboard-heat__cell')).not.toBeNull();
     expect(host.querySelector('.due-soon-strip')).toBeNull();
     expect(host.querySelector('.dashboard-row__grip')).not.toBeNull();
