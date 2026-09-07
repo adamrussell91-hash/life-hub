@@ -116,31 +116,34 @@ test('empty medical store exhausts without unbounded retries', () => {
 
 test('durable persist survives process restart after retrieve halt', () => {
   const persist = createMemoryTurnStore();
+  const stores = {
+    workouts: [{
+      type: 'workout',
+      status: 'completed',
+      date: '2026-08-18',
+      title: 'Upper',
+      exercises: [{ name: 'Bench', sets: [{ weight_kg: 60, reps: 8 }] }]
+    }]
+  };
   const halted = runAgentKernel({
     slug: 'chadwick',
     message: 'training recap',
     today: TODAY,
     now: NOW,
-    stores: {
-      workouts: [{
-        type: 'workout',
-        status: 'completed',
-        date: '2026-08-18',
-        title: 'Upper',
-        exercises: [{ name: 'Bench', sets: [{ weight_kg: 60, reps: 8 }] }]
-      }]
-    },
+    stores,
     persist,
     failAt: 'retrieve'
   });
   assert.equal(halted.halted, 'retrieve');
   const snap = persist.exportJson();
+  assert.doesNotMatch(snap, /"stores"\s*:/);
   const restarted = createMemoryTurnStore();
   restarted.importJson(snap);
   const loaded = restarted.load(halted.id);
   assert.ok(loaded);
+  assert.equal(loaded.stores, undefined);
   assert.notEqual(loaded, halted);
-  const resumed = resumeAgentKernel(loaded, { persist: restarted });
+  const resumed = resumeAgentKernel(loaded, { persist: restarted, stores });
   assert.equal(resumed.stage, 'composed');
   assert.ok(resumed.evidence.get_fitness_snapshot.last_completed_date);
   assert.equal(resumed.trace.filter(item => item.stage === 'retrieve').length, 1);
@@ -160,7 +163,64 @@ test('resume after plan halt does not lose the plan', () => {
   const snap = persist.exportJson();
   const restarted = createMemoryTurnStore();
   restarted.importJson(snap);
-  const resumed = resumeAgentKernel(restarted.load(halted.id), { persist: restarted });
+  const resumed = resumeAgentKernel(restarted.load(halted.id), {
+    persist: restarted,
+    stores: { tasks: [{ id: '1', title: 'Mark essays', status: 'open', due_date: '2026-08-10' }] }
+  });
   assert.equal(resumed.plan.workflow, 'daily_focus');
   assert.ok(resumed.evidence.get_tasks_focus);
+});
+
+test('persisted turn omits large source stores and still resumes from gathered evidence', () => {
+  const persist = createMemoryTurnStore();
+  const pages = Array.from({ length: 80 }, (_, i) => ({
+    id: `note-${i}`,
+    title: `Cognitive load note ${i}`,
+    excerpt: `Working memory excerpt ${i} `.repeat(40),
+    tags: ['memory'],
+    body: 'x'.repeat(800)
+  }));
+  const fat = runAgentKernel({
+    slug: 'clementine',
+    message: 'what do I already know about cognitive load',
+    today: TODAY,
+    now: NOW,
+    stores: { pages },
+    persist
+  });
+  const saved = persist.load(fat.id);
+  assert.equal(saved.stores, undefined);
+  assert.ok(saved.sourceRefs.pages.count === 80);
+  assert.ok(saved.evidence.search_knowledge);
+  const raw = persist.exportJson();
+  assert.doesNotMatch(raw, /"stores"\s*:/);
+  assert.ok(!raw.includes(pages[0].body));
+  const fatJson = JSON.stringify(fat);
+  assert.ok(raw.length < fatJson.length / 2, `compact ${raw.length} should be much smaller than live ${fatJson.length}`);
+  const resumed = resumeAgentKernel(saved, { persist });
+  assert.ok((resumed.evidence.search_knowledge.results ?? []).length > 0);
+  assert.equal(resumed.actions.length, fat.actions.length);
+});
+
+test('turn store evicts the oldest of 40 compact turns', () => {
+  const persist = createMemoryTurnStore();
+  const ids = [];
+  for (let i = 0; i < 41; i += 1) {
+    const kernel = runAgentKernel({
+      slug: 'clare',
+      message: 'What should I focus on today?',
+      today: TODAY,
+      now: NOW,
+      stores: { tasks: [{ id: String(i), title: `Task ${i}`, status: 'open', due_date: '2026-08-10' }] },
+      persist
+    });
+    ids.push(kernel.id);
+  }
+  assert.equal(persist.load(ids[0]), null);
+  assert.ok(persist.load(ids[40]));
+  const dump = JSON.parse(persist.exportJson());
+  assert.equal(Object.keys(dump).length, 40);
+  for (const turn of Object.values(dump)) {
+    assert.equal(turn.stores, undefined);
+  }
 });

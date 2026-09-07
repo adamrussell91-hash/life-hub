@@ -1079,6 +1079,8 @@ export const MAX_RETRIEVE_ROUNDS = 3;
 
 export function runAgentKernel(input = {}) {
   const state = input.state ?? createTurnState(input);
+  if (input.stores) state.stores = input.stores;
+  else if (!state.stores) state.stores = emptyStores();
   if (input.deferTools && !(state.deferredTools ?? []).length) state.deferredTools = [...input.deferTools];
   const persist = input.persist;
 

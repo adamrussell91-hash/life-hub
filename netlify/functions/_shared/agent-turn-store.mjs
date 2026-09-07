@@ -27,8 +27,31 @@ function dehydrate(value) {
   return value;
 }
 
+export function sourceRefsFromStores(stores = {}) {
+  const refs = {};
+  for (const [key, value] of Object.entries(stores)) {
+    if (Array.isArray(value)) refs[key] = { kind: 'collection', count: value.length };
+    else if (typeof value === 'string') refs[key] = { kind: 'text', chars: value.length };
+    else if (value && typeof value === 'object' && value.error) refs[key] = { kind: 'error', error: String(value.error) };
+    else if (value == null) refs[key] = { kind: 'empty' };
+    else refs[key] = { kind: typeof value };
+  }
+  return refs;
+}
+
+export function compactTurnState(state) {
+  if (!state || typeof state !== 'object') return state;
+  const { stores, ...rest } = state;
+  return {
+    ...rest,
+    sourceRefs: rest.sourceRefs && Object.keys(rest.sourceRefs).length
+      ? rest.sourceRefs
+      : sourceRefsFromStores(stores)
+  };
+}
+
 export function serializeTurnState(state) {
-  return JSON.stringify(dehydrate(state));
+  return JSON.stringify(dehydrate(compactTurnState(state)));
 }
 
 export function parseTurnState(raw) {
