@@ -54,6 +54,13 @@ import {
   getTasksJSON,
   getTeachingJSON
 } from './_shared/capabilities/propose-action.mjs';
+import {
+  AGENT_TURNS_PATH,
+  createMemoryTurnStore,
+  parseTurnStoreFile,
+  persistTurnWithClient
+} from './_shared/agent-turn-store.mjs';
+import { resumeConfirmedTurn } from './_shared/agent-confirm.mjs';
 import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
 import { defaultGetContentStore as defaultGetTeachingStore } from './_shared/teaching-blobs.mjs';
 import {
@@ -628,11 +635,40 @@ export function createChatConfirmHandler({
       }
     }
 
+    let turnResume = null;
+    if (stored?.turnId) {
+      try {
+        const turnEntry = tree.find(item => item.path === AGENT_TURNS_PATH && item.type === 'blob');
+        const turns = turnEntry
+          ? parseTurnStoreFile(decodeBlob(await client.readBlob(turnEntry.sha)))
+          : {};
+        const persist = createMemoryTurnStore(turns);
+        turnResume = resumeConfirmedTurn({
+          persist,
+          turnId: stored.turnId,
+          actionId: stored.actionId || stored.id,
+          decision: 'confirm',
+          currentRecords: stored.bases ?? {}
+        });
+        if (turnResume.state) {
+          await persistTurnWithClient({
+            client,
+            existingTurns: JSON.parse(persist.exportJson()),
+            existingSha: turnEntry?.sha,
+            state: turnResume.state
+          });
+        }
+      } catch {
+        // Writes already landed; turn resume is best-effort.
+      }
+    }
+
     return jsonResponse(200, {
       ok: true,
       data: {
         intent: proposal.intent,
-        results: writeResult.results
+        results: writeResult.results,
+        ...(turnResume?.state?.id ? { turnId: turnResume.state.id, turnResumed: true } : {})
       }
     }, PRIVATE_CACHE);
   }
@@ -661,6 +697,33 @@ export function createChatConfirmHandler({
           sha: entry.sha,
           message: `chore(propose-action): dismiss ${parsed.id}`
         });
+      }
+
+      try {
+        const stored = findPendingActionById(queue, parsed.id);
+        if (stored?.turnId) {
+          const turnEntry = current.tree.find(item => item.path === AGENT_TURNS_PATH && item.type === 'blob');
+          const turns = turnEntry
+            ? parseTurnStoreFile(decodeBlob(await client.readBlob(turnEntry.sha)))
+            : {};
+          const persist = createMemoryTurnStore(turns);
+          const rejected = resumeConfirmedTurn({
+            persist,
+            turnId: stored.turnId,
+            actionId: stored.actionId || stored.id,
+            decision: 'reject'
+          });
+          if (rejected.state) {
+            await persistTurnWithClient({
+              client,
+              existingTurns: JSON.parse(persist.exportJson()),
+              existingSha: turnEntry?.sha,
+              state: rejected.state
+            });
+          }
+        }
+      } catch {
+        // Dismissal of the pending card is enough if the turn file is missing.
       }
 
       // Log rejection for the audit trail.

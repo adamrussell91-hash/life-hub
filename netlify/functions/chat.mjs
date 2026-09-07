@@ -40,6 +40,12 @@ import {
 } from './_shared/load-hub-protocols.mjs';
 import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
 import { runSurfaceAgentTurn } from './_shared/agent-surface.mjs';
+import { proposeAction } from './_shared/agent-kernel.mjs';
+import {
+  AGENT_TURNS_PATH,
+  parseTurnStoreFile,
+  persistTurnWithClient
+} from './_shared/agent-turn-store.mjs';
 import { parseMemoryStore } from './_shared/agent-memory.mjs';
 import { REMEMBER_LAYERED_MEMORIES_PATH } from './_shared/capabilities/stores.mjs';
 import {
@@ -132,16 +138,7 @@ import {
 } from './_shared/workout-history.mjs';
 import {
   fitnessHistoryBounds,
-  getBodyState,
-  getExerciseHistory,
-  getFitnessSnapshot,
-  getLoadStatus,
-  getLongTermFitness,
-  getPainTrainingSummary,
-  getSessionComparisons,
-  getTrainingVolume,
-  getWorkingWeights,
-  getWorkoutTemplate
+  executeFitnessReadTool
 } from './_shared/fitness-tools.mjs';
 import {
   applySaveSkincareLibraryEntry,
@@ -1339,6 +1336,32 @@ export function createChatHandler({
         }
         const kernelEvent = surfaceTurn.trace;
         if (kernelEvent) send(kernelEvent);
+        let agentTurns = {};
+        let agentTurnsSha;
+        const persistKernelTurn = async ({ required = false } = {}) => {
+          if (!surfaceTurn.kernel?.id) {
+            return required ? { ok: false, error: 'no_kernel_turn' } : { ok: true, skipped: true };
+          }
+          try {
+            const entry = repoTree.find(item => item.path === AGENT_TURNS_PATH && item.type === 'blob');
+            if (entry && !agentTurnsSha) {
+              agentTurns = parseTurnStoreFile(decodeBlob(await client.readBlob(entry.sha)));
+              agentTurnsSha = entry.sha;
+            }
+            const saved = await persistTurnWithClient({
+              client,
+              existingTurns: agentTurns,
+              existingSha: agentTurnsSha,
+              state: surfaceTurn.kernel
+            });
+            agentTurns = saved.turns;
+            agentTurnsSha = saved.sha;
+            return { ok: true };
+          } catch {
+            return { ok: false, error: 'checkpoint_failed' };
+          }
+        };
+        await persistKernelTurn();
         // Pack already retrieved domain evidence. Keep tools for continuation /
         // writes, but do not force a tool round when the pack is answerable.
         // Kernel sufficiency replaces “any section present” for Chadwick/Clare pilots.
@@ -1448,7 +1471,36 @@ export function createChatHandler({
             } catch {
               // Queue the GitHub write anyway; confirm skips the stale check without blob bases.
             }
-            const entry = { id: createPendingActionId(), createdAt: today, slug, proposal, bases };
+            const pendingId = createPendingActionId();
+            let turnId = null;
+            let actionId = null;
+            let resumeUnavailable = false;
+            let checkpointError = null;
+            if (surfaceTurn.kernel) {
+              proposeAction(surfaceTurn.kernel, {
+                intent: proposal.intent,
+                snapshot: bases,
+                idempotencyKey: pendingId
+              });
+              const checkpoint = await persistKernelTurn({ required: true });
+              if (checkpoint.ok) {
+                turnId = surfaceTurn.kernel.id;
+                actionId = surfaceTurn.kernel.actions?.at(-1)?.id ?? null;
+              } else {
+                resumeUnavailable = true;
+                checkpointError = checkpoint.error;
+              }
+            }
+            const entry = {
+              id: pendingId,
+              createdAt: today,
+              slug,
+              proposal,
+              bases,
+              turnId,
+              actionId,
+              ...(resumeUnavailable ? { resumeUnavailable, checkpointError } : {})
+            };
             const nextQueue = addPendingAction(pendingActions, entry);
             const result = await client.writeFile({
               path: PENDING_ACTIONS_PATH,
@@ -1459,8 +1511,16 @@ export function createChatHandler({
             pendingActions = nextQueue;
             pendingActionsSha = result.sha;
             persistedId = entry.id;
+            send({
+              type: 'action_proposal',
+              proposal,
+              id: persistedId,
+              turnBound: Boolean(turnId),
+              ...(resumeUnavailable ? { resumeUnavailable: true } : {})
+            });
+            return persistedId;
           } catch {
-            // Same-turn Confirm still works if the queue write fails.
+            // Queue write failed — same-turn Confirm card still emits without a durable id.
           }
           send({ type: 'action_proposal', proposal, id: persistedId });
           return persistedId;
@@ -1658,49 +1718,23 @@ export function createChatHandler({
                 send({ type: 'status', text: 'Reading region strength…' });
                 return JSON.stringify(getRegionStrength(workoutRecords, today, event.input ?? {}));
               }
-              if (event.name === 'get_fitness_snapshot') {
-                send({ type: 'status', text: 'Reading Fitness dashboard…' });
-                return JSON.stringify(getFitnessSnapshot(workoutRecords, today));
-              }
-              if (event.name === 'get_training_volume') {
-                send({ type: 'status', text: 'Reading training volume…' });
-                return JSON.stringify(getTrainingVolume(workoutRecords, today));
-              }
-              if (event.name === 'get_working_weights') {
-                send({ type: 'status', text: 'Reading working weights…' });
-                return JSON.stringify(getWorkingWeights(workoutRecords, today, event.input ?? {}));
-              }
-              if (event.name === 'get_long_term_fitness') {
-                send({ type: 'status', text: 'Reading long-term fitness…' });
-                return JSON.stringify(getLongTermFitness(workoutRecords, today));
-              }
-              if (event.name === 'get_session_comparisons') {
-                send({ type: 'status', text: 'Comparing session lifts…' });
-                return JSON.stringify(getSessionComparisons(workoutRecords, today));
-              }
-              if (event.name === 'get_exercise_history') {
-                send({ type: 'status', text: 'Reading exercise history…' });
-                return JSON.stringify(getExerciseHistory(workoutRecords, today, event.input ?? {}));
-              }
-              if (event.name === 'get_load_status') {
-                send({ type: 'status', text: 'Reading load status…' });
-                return JSON.stringify(getLoadStatus(workoutRecords, today));
-              }
-              if (event.name === 'get_pain_training_summary') {
-                send({ type: 'status', text: 'Reading training pain flags…' });
-                return JSON.stringify(getPainTrainingSummary(workoutRecords, today, event.input ?? {}));
-              }
-              if (event.name === 'get_body_state') {
-                send({ type: 'status', text: 'Reading body state…' });
-                return JSON.stringify(getBodyState({
-                  compositionRecords,
-                  measurementRecords,
-                  targetRatio: physiqueTargetRatio
-                }));
-              }
-              if (event.name === 'get_workout_template') {
-                send({ type: 'status', text: 'Looking up workout template…' });
-                return JSON.stringify(getWorkoutTemplate(templateContents, event.input ?? {}));
+              const fitnessRead = executeFitnessReadTool(event.name, {
+                workouts: workoutRecords,
+                today,
+                compositionRecords,
+                measurementRecords,
+                templates: templateContents,
+                targetRatio: physiqueTargetRatio,
+                input: event.input ?? {}
+              });
+              if (fitnessRead != null) {
+                send({
+                  type: 'status',
+                  text: event.name === 'analyse_training_evidence'
+                    ? 'Interpreting training evidence…'
+                    : 'Reading Fitness records…'
+                });
+                return JSON.stringify(fitnessRead);
               }
               if (event.name === 'search_exercise_library') {
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
