@@ -50,22 +50,26 @@ function memoryStore(records = {}) {
   };
 }
 
-function workoutMarkdown({ date, title, exercises }) {
+function workoutMarkdown({ date, title, exercises, shaName }) {
   const exerciseYaml = exercises.map(exercise => [
     `  - name: ${exercise.name}`,
     '    sets:',
-    `      - { reps: ${exercise.reps}, weight_kg: ${exercise.weight} }`
+    `      - { reps: ${exercise.reps}, weight_kg: ${exercise.weight}, cable_type: constant_force }`
   ].join('\n')).join('\n');
   return [
     '---',
     'schema_version: 1',
-    `id: "workout-${date}"`,
-    'type: workout',
-    `date: ${date}`,
-    'status: completed',
+    `id: "workout-${shaName || date}"`,
+    'type: "workout"',
+    `date: "${date}"`,
+    'time: "16:28"',
+    'created_at: 2026-08-18T18:26:45+10:00',
+    'updated_at: 2026-08-18T18:26:45+10:00',
+    'source: chat',
     `title: ${title}`,
     'session_kind: strength',
     'day_type: workout_30',
+    'status: completed',
     'duration_min: 30',
     'exercises:',
     exerciseYaml,
@@ -76,7 +80,7 @@ function workoutMarkdown({ date, title, exercises }) {
 
 function githubWithWorkouts(files) {
   const blobs = new Map(Object.entries(files).map(([path, content], index) => {
-    const sha = String(index + 1).padStart(40, 'a');
+    const sha = String.fromCharCode(97 + index).repeat(40);
     return [path, { sha, content }];
   }));
   return async url => {
@@ -93,14 +97,13 @@ function githubWithWorkouts(files) {
         }))
       });
     }
-    const blobMatch = /\/git\/blobs\/([0-9a-f]{40})/.exec(url);
-    if (blobMatch) {
-      const found = [...blobs.values()].find(item => item.sha === blobMatch[1]);
-      if (!found) return Response.json({ message: 'not found' }, { status: 404 });
-      return Response.json({
-        encoding: 'base64',
-        content: Buffer.from(found.content, 'utf8').toString('base64')
-      });
+    for (const blob of blobs.values()) {
+      if (url.includes(`/git/blobs/${blob.sha}`)) {
+        return Response.json({
+          encoding: 'base64',
+          content: Buffer.from(blob.content, 'utf8').toString('base64')
+        });
+      }
     }
     return Response.json({ message: 'not found' }, { status: 404 });
   };
@@ -112,7 +115,7 @@ test('production chat route passes Clare planner inputs', async () => {
       id: 'overdue',
       title: 'Reports',
       status: 'open',
-      due_date: '2026-09-01',
+      due_date: '2026-08-10',
       estimated_duration: 30,
       priority: 'high'
     },
@@ -239,9 +242,9 @@ test('production chat route executes Chadwick analysis tool', async () => {
     agentKernel: true
   })));
   assert.ok(events.some(event => event.type === 'kernel_trace' && event.workflow === 'training_review'));
-  assert.equal(analysis.ok, true);
+  assert.equal(analysis?.ok, true, JSON.stringify(analysis));
   assert.equal(analysis.store, 'life_hub_fitness');
-  assert.equal(analysis.enough_evidence, true);
+  assert.equal(analysis.enough_evidence, true, JSON.stringify(analysis));
   assert.equal(analysis.recent_count, 2);
   assert.equal(analysis.last_completed_date, '2026-08-18');
   assert.ok(!analysis.invented);

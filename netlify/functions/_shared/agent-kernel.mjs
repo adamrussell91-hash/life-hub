@@ -644,7 +644,10 @@ const WIDEN_TOOLS = new Set([
 
 function plannedRetrieveNames(state) {
   const names = [...(state.plan.requiredSources ?? [])];
-  if (state.slug === 'clare' && (state.stores.lessons ?? []).length) names.push('plan_work');
+  const stated = state.slug === 'clare' ? statedPlannerInputs(state.message) : null;
+  if (state.slug === 'clare' && ((state.stores.lessons ?? []).length || stated?.energy || stated?.capacity_minutes)) {
+    names.push('plan_work');
+  }
   if (state.slug === 'clare') names.push('get_tasks_open_loops');
   if (state.slug === 'chadwick' && !names.includes('get_training_volume')) names.push('get_training_volume');
   if (state.slug === 'chadwick' && !names.includes('analyse_training_evidence')) names.push('analyse_training_evidence');

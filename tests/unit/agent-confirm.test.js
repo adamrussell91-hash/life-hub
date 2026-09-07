@@ -164,7 +164,7 @@ test('failed write does not generate a success continuation', async () => {
   assert.equal(result.invoked, false);
   assert.equal(result.reason, 'write_failed');
   assert.equal(invocations, 0);
-  assert.notMatch(result.state.continuation?.text ?? '', /done/i);
+  assert.doesNotMatch(result.state.continuation?.text ?? '', /done/i);
 });
 
 test('reject does not execute and does not continue', async () => {

@@ -77,7 +77,7 @@ Those cannot flip a requirement to `passed`.
 | Complete traces | `partial` | `kernelTraceEvent` + optional Anthropic `usage` events | loop tests inspect trajectory | none | Latency/cost need a live model; final answer grading **blocked** |
 | Clare operational planner | `demonstrated` | `executeClareWork('plan_work')` used by `/api/chat`; stated energy/capacity also reach kernel retrieve | `clare-adversarial.test.js` + `clare-planner.test.js` + `chat-pilot-tools.test.js` | none | Live conversational gate **blocked** |
 | Chadwick evidence reasoning | `demonstrated` | `executeFitnessReadTool('analyse_training_evidence')` in `/api/chat` | `tests/unit/chadwick-reasoning.test.js` + `chat-pilot-tools.test.js` | none | Live gate **blocked** |
-| Pilot behavioural gate (Clare, Chadwick) | `blocked` | `/api/chat` via `scripts/live-pilot-verify.mjs` | n/a | none | `ANTHROPIC_API_KEY` unset. Tasks/Teaching blobs unbound. Pain flags empty in recent fitness files. |
+| Pilot behavioural gate (Clare, Chadwick) | `blocked` | `/api/chat` via `scripts/live-pilot-verify.mjs` | n/a | none | `ANTHROPIC_API_KEY` unset. Tasks/Teaching blobs unbound. Fitness files are present; one pain file exists. |
 | Specialist expansion | `not started` | — | — | — | Gated on pilots `passed` |
 | Hammond supervisor rebuild | `blocked` | old canned handoff remains prototype | — | — | Specialist reliability not `passed` |
 | Surface unification / kernel default | `not started` | kernel still flagged off | — | — | Gated on pilots + comparison |
