@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { inspectBoard, planWork } from '../../netlify/functions/_shared/clare-work.mjs';
+import { clareWorkSchemas, executeClareWork, inspectBoard, planWork } from '../../netlify/functions/_shared/clare-work.mjs';
 import { proposeAction, runAgentKernel } from '../../netlify/functions/_shared/agent-kernel.mjs';
 import { createMemoryTurnStore } from '../../netlify/functions/_shared/agent-turn-store.mjs';
 import { bindPendingToTurn, resumeConfirmedTurn } from '../../netlify/functions/_shared/agent-confirm.mjs';
@@ -140,7 +140,7 @@ test('interrupted today starts after the current hub time', () => {
     now: NOW,
     tasks: [task({ id: 't1', title: 'Mark essays', due_date: DATE, estimated_duration: 30 })]
   });
-  assert.match(plan.workday, /interrupted_today|preference|fallback/);
+  assert.match(plan.workday, /interrupted_today|tool_input|fallback/);
   assert.ok(plan.blocks[0].start >= '11:00', `expected start at or after 11:00, got ${plan.blocks[0].start}`);
 });
 
@@ -180,4 +180,53 @@ test('write proposal binds to a persisted turn and resumes once', () => {
     currentRecords: { title: 'Mark essays' }
   });
   assert.equal(second.duplicate, true);
+});
+
+test('plan_work schema exposes energy, capacity, and workday inputs', () => {
+  const schema = clareWorkSchemas().find(item => item.name === 'plan_work');
+  assert.ok(schema.input_schema.properties.energy_level);
+  assert.ok(schema.input_schema.properties.capacity_minutes);
+  assert.ok(schema.input_schema.properties.workday_start);
+  assert.ok(schema.input_schema.properties.workday_end);
+});
+
+test('executeClareWork plan_work passes energy, capacity, and workday through', async () => {
+  const tasks = [
+    task({ id: 'overdue', title: 'Reports', due_date: '2026-09-01', estimated_duration: 30, priority: 'high' }),
+    task({ id: 'later', title: 'Newsletter', due_date: DATE, estimated_duration: 30 })
+  ];
+  const energy = await executeClareWork('plan_work', {
+    view: 'energy',
+    energy_level: 'low',
+    cognitive_load: 8
+  }, {
+    now: NOW,
+    tasks: [
+      task({ id: 'long', title: 'Rewrite unit', estimated_duration: 90 }),
+      task({ id: 'short', title: 'Send reminder', estimated_duration: 15, tags: ['comms'], priority: 'high' })
+    ]
+  });
+  assert.equal(energy.energy_applied, true);
+  assert.equal(energy.sequence[0].id, 'short');
+
+  const tight = await executeClareWork('plan_work', {
+    view: 'time_block',
+    date: DATE,
+    capacity_minutes: 40,
+    workday_start: '09:00',
+    workday_end: '12:00'
+  }, { now: NOW, tasks });
+  assert.match(tight.workday, /09:00–12:00 tool_input/);
+  assert.ok(tight.blocks.some(block => block.id === 'overdue'));
+  assert.ok(tight.deferred.some(item => item.id === 'later' && /capacity/i.test(item.reason)));
+
+  const fallback = await executeClareWork('plan_work', {
+    view: 'time_block',
+    date: '2026-09-08'
+  }, {
+    now: NOW,
+    tasks: [task({ id: 't1', title: 'Mark essays', due_date: '2026-09-08', estimated_duration: 30 })]
+  });
+  assert.match(fallback.workday, /default_workday_fallback/);
+  assert.doesNotMatch(fallback.workday, /preference/);
 });
