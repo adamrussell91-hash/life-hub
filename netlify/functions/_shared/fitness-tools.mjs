@@ -635,3 +635,36 @@ export function chadwickFitnessToolSchemas() {
     analyseTrainingEvidenceSchema()
   ];
 }
+
+export const FITNESS_READ_TOOL_NAMES = Object.freeze(chadwickFitnessToolSchemas().map(schema => schema.name));
+
+/**
+ * Chat / kernel executor for the Chadwick fitness read set.
+ * Every name in chadwickFitnessToolSchemas() must resolve here.
+ */
+export function executeFitnessReadTool(name, {
+  workouts = [],
+  today,
+  compositionRecords = [],
+  measurementRecords = [],
+  templates = [],
+  targetRatio,
+  input = {}
+} = {}) {
+  if (name === 'get_fitness_snapshot') return getFitnessSnapshot(workouts, today);
+  if (name === 'get_training_volume') return getTrainingVolume(workouts, today);
+  if (name === 'get_working_weights') return getWorkingWeights(workouts, today, input);
+  if (name === 'get_long_term_fitness') return getLongTermFitness(workouts, today);
+  if (name === 'get_session_comparisons') return getSessionComparisons(workouts, today);
+  if (name === 'get_exercise_history') return getExerciseHistory(workouts, today, input);
+  if (name === 'get_load_status') return getLoadStatus(workouts, today);
+  if (name === 'get_pain_training_summary') return getPainTrainingSummary(workouts, today, input);
+  if (name === 'get_body_state') {
+    return getBodyState({ compositionRecords, measurementRecords, targetRatio });
+  }
+  if (name === 'get_workout_template') return getWorkoutTemplate(templates, input);
+  if (name === 'analyse_training_evidence') {
+    return analyseTrainingEvidence(workouts, today, { query: input.query ?? input.message ?? '' });
+  }
+  return null;
+}

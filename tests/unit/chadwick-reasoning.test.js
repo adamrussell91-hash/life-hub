@@ -4,7 +4,12 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyseTrainingEvidence } from '../../netlify/functions/_shared/fitness-tools.mjs';
+import {
+  analyseTrainingEvidence,
+  chadwickFitnessToolSchemas,
+  executeFitnessReadTool,
+  FITNESS_READ_TOOL_NAMES
+} from '../../netlify/functions/_shared/fitness-tools.mjs';
 import { runAgentKernel } from '../../netlify/functions/_shared/agent-kernel.mjs';
 import { proposeAction } from '../../netlify/functions/_shared/agent-kernel.mjs';
 
@@ -123,4 +128,35 @@ test('proposed training change stays pending until confirm', () => {
   });
   assert.equal(proposed.action.status, 'pending');
   assert.equal(kernel.evidence.analyse_training_evidence.confirmation_required, true);
+});
+
+test('every callable Chadwick fitness schema has an executeFitnessReadTool path', () => {
+  const names = chadwickFitnessToolSchemas().map(schema => schema.name);
+  assert.ok(names.includes('analyse_training_evidence'));
+  assert.deepEqual(names, [...FITNESS_READ_TOOL_NAMES]);
+  for (const name of names) {
+    const result = executeFitnessReadTool(name, {
+      workouts: ENOUGH,
+      today: TODAY,
+      compositionRecords: [{ date: TODAY, weight_kg: 90 }],
+      measurementRecords: [],
+      templates: [{ title: 'Upper', exercises: [{ name: 'Bench Press', sets: 3 }] }],
+      input: { query: 'bench press' }
+    });
+    assert.ok(result, `missing executor for ${name}`);
+    assert.notEqual(result, null);
+  }
+});
+
+test('analyse_training_evidence executor returns the evidence shape', () => {
+  const result = executeFitnessReadTool('analyse_training_evidence', {
+    workouts: ENOUGH,
+    today: TODAY,
+    input: { query: 'substitute bench press in training' }
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.store, 'life_hub_fitness');
+  assert.equal(result.enough_evidence, true);
+  assert.equal(result.substitution.from, 'bench press');
+  assert.equal(result.confirmation_required, true);
 });
