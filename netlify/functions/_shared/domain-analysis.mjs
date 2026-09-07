@@ -456,21 +456,141 @@ export function analyseNutritionEvidence(records, today, {
   };
 }
 
-export function statedDiaryConstraints(message = '') {
-  const text = String(message || '');
-  const mood = text.match(/\b(feel(?:ing)?|felt)\s+(anxious|flat|low|sad|angry|overwhelmed|tired|hopeful|calm)\b/i);
-  const todayish = /\b(today|tonight|right now|this morning)\b/i.test(text);
+const DIARY_MOOD_PATTERN =
+  'anxious|anxiety|flat|low|sad|angry|anger|overwhelmed|tired|hopeful|calm|stressed|stress';
+
+const GENERIC_FEEL_WORDS = new Set([
+  'feel', 'felt', 'feeling', 'feelings', 'this', 'like', 'way', 'again', 'before', 'often', 'happened', 'familiar'
+]);
+
+function normalizeDiaryMood(raw) {
+  const word = String(raw ?? '').toLowerCase();
+  if (word === 'anxiety') return 'anxious';
+  if (word === 'anger') return 'angry';
+  if (word === 'stressed' || word === 'stress') return 'stress';
+  return word;
+}
+
+function diaryMoodSearchVariants(value) {
+  switch (String(value ?? '').toLowerCase()) {
+    case 'anxious':
+      return ['anxious', 'anxiety'];
+    case 'angry':
+      return ['angry', 'anger'];
+    case 'stress':
+      return ['stress', 'stressed'];
+    case 'work stress':
+      return ['work stress'];
+    default:
+      return [String(value ?? '').trim()].filter(Boolean);
+  }
+}
+
+function isDeicticDiaryRecurrenceQuestion(text) {
+  return /\b(like this|this way|felt like this|feeling like this|feel like this|has this happened|this happened|this feels|feels familiar)\b/i.test(
+    text
+  );
+}
+
+/**
+ * Resolve what a Penelope recurrence question is actually comparing.
+ * Generic feel/felt/this language is relational, not a referent.
+ */
+export function resolveDiaryRecurrenceReferent(message = '', { boundReferent = null } = {}) {
+  const text = String(message ?? '');
+  const todayish = /\b(today|tonight|right now|this morning|this afternoon|this evening)\b/i.test(text);
+  const deictic = isDeicticDiaryRecurrenceQuestion(text);
+
+  // 1. Explicit current-turn mood/state.
+  const currentMood = text.match(
+    new RegExp(`\\b(?:i(?:'m|\\s+am)|i\\s+feel(?:ing)?|feeling)\\s+(${DIARY_MOOD_PATTERN})\\b`, 'i')
+  );
+  if (currentMood && todayish) {
+    const value = normalizeDiaryMood(currentMood[1]);
+    return { kind: 'explicit_current_turn', value, query: value, status: 'resolved' };
+  }
+
+  // Bounded theme: "This work stress feels familiar..."
+  if (/\bwork\s+stress\b/i.test(text) && (deictic || /\bfeels familiar\b/i.test(text) || todayish)) {
+    return {
+      kind: 'explicit_current_turn',
+      value: 'work stress',
+      query: 'work stress',
+      status: 'resolved'
+    };
+  }
+
+  // 2. Explicit named recurrence target: "Have I felt anxious before?"
+  const explicit = text.match(
+    new RegExp(`\\b(?:felt|feeling|feel)\\s+(?!like\\b)(${DIARY_MOOD_PATTERN})\\b`, 'i')
+  );
+  if (explicit) {
+    const value = normalizeDiaryMood(explicit[1]);
+    return { kind: 'explicit_query', value, query: value, status: 'resolved' };
+  }
+
+  // 3. Genuinely bound conversational referent only when caller supplies one.
+  if (boundReferent && String(boundReferent).trim()) {
+    const value = normalizeDiaryMood(String(boundReferent).trim());
+    if (value && !GENERIC_FEEL_WORDS.has(value)) {
+      return { kind: 'bound_current_context', value, query: value, status: 'resolved' };
+    }
+  }
+
+  // 4. Deictic / bare feel recurrence without a concept → unresolved.
+  if (deictic) {
+    return { kind: 'unresolved', value: null, query: null, status: 'unresolved' };
+  }
+
+  // Non-deictic theme queries keep ordinary focused-query search.
   return {
-    current_mood: mood && todayish ? mood[2].toLowerCase() : null
+    kind: 'explicit_query',
+    value: null,
+    query: null,
+    status: 'resolved_via_query',
+    use_message_query: true
   };
 }
 
-export function analyseDiaryEvidence(events, today, { message = '', query = '' } = {}) {
+function searchDiaryForReferent(events, referentValue, limit = 12) {
+  const variants = diaryMoodSearchVariants(referentValue);
+  const fullByKey = new Map();
+  const partialByKey = new Map();
+  for (const variant of variants) {
+    const searched = searchDiaryRecords(events, { query: variant, limit });
+    for (const hit of searched?.results ?? []) {
+      fullByKey.set(hit.id ?? hit.path ?? `${hit.date}:${hit.notes}`, hit);
+    }
+    for (const hit of searched?.partial_results ?? []) {
+      const key = hit.id ?? hit.path ?? `${hit.date}:${hit.notes}`;
+      if (!fullByKey.has(key)) partialByKey.set(key, hit);
+    }
+  }
+  return {
+    ok: true,
+    query: referentValue,
+    focused_query: variants.join(' | '),
+    results: [...fullByKey.values()],
+    partial_results: [...partialByKey.values()],
+    count: fullByKey.size,
+    partial_count: partialByKey.size,
+    truncated: false,
+    kept: fullByKey.size,
+    omitted: 0
+  };
+}
+
+export function statedDiaryConstraints(message = '') {
+  const referent = resolveDiaryRecurrenceReferent(message);
+  return {
+    current_mood: referent.kind === 'explicit_current_turn' ? referent.value : null
+  };
+}
+
+export function analyseDiaryEvidence(events, today, { message = '', query = '', boundReferent = null } = {}) {
   if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date', store: 'life_hub_diary' };
   const stated = statedDiaryConstraints(message);
-  const q = query || message || 'feeling';
-  const searched = searchDiaryRecords(events, { query: q, limit: 12 });
-  const themes = extractDiaryThemes(events, { query: q, limit: 12 });
+  const referent = resolveDiaryRecurrenceReferent(message, { boundReferent });
   const compare = compareDiaryPeriods(events, today);
   const entries = diaryRows(events)
     .map(e => ({
@@ -481,6 +601,70 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
     .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
   const moods = entries.map(e => e.mood).filter(Boolean);
   const uniqueMoods = [...new Set(moods.map(m => String(m).toLowerCase()))];
+
+  if (referent.kind === 'unresolved') {
+    // Missing referent is not a retrieval-depth problem — do not search generic feel/felt.
+    const fallback_context_entries = entries.slice(0, 8).map(e => ({
+      date: e.date,
+      mood: e.mood,
+      path: e.path,
+      id: e.id,
+      notes: e.notes,
+      score: 0,
+      weak_fallback: true,
+      kind: 'context_only'
+    }));
+    return {
+      ok: true,
+      store: 'life_hub_diary',
+      kind: 'calculation',
+      date: today,
+      stated_constraints: stated,
+      referent_status: 'unresolved',
+      referent_kind: 'unresolved',
+      referent_value: null,
+      search_query: null,
+      entry_count: entries.length,
+      matched_entries: [],
+      partial_context_entries: [],
+      fallback_context_entries,
+      supported_match_count: 0,
+      partial_count: 0,
+      fallback_count: fallback_context_entries.length,
+      hit_count: 0,
+      recurrence_strength: 'unresolved_referent',
+      recurring_terms: [],
+      recent_14d: compare.recent_14d,
+      previous_14d: compare.previous_14d,
+      conflicting_moods: uniqueMoods.length >= 2 ? uniqueMoods.slice(0, 6) : [],
+      sample_entries: fallback_context_entries.slice(0, 5).map(e => ({
+        date: e.date,
+        mood: e.mood ?? null,
+        notes: typeof e.notes === 'string' ? e.notes.slice(0, 160) : undefined,
+        path: e.path ?? null,
+        id: e.id ?? null,
+        kind: 'fallback_context_entry',
+        context_only: true,
+        recency: e.date === today ? 'today' : 'historical'
+      })),
+      truncated: false,
+      kept: null,
+      omitted: null,
+      how_to_read:
+        'Deictic recurrence questions need a resolvable referent before historical matches can establish recurrence. '
+        + 'Generic feel/felt/this language is not a referent. '
+        + 'Fallback recent entries are context_only and never establish recurrence or invent the missing referent. '
+        + 'Do not convert old mood states into current mood. Current mood requires user_stated_current_turn.'
+    };
+  }
+
+  const q = referent.use_message_query
+    ? (query || message || 'feeling')
+    : (referent.query || query || message);
+  const searched = referent.value && !referent.use_message_query
+    ? searchDiaryForReferent(events, referent.value, 12)
+    : searchDiaryRecords(events, { query: q, limit: 12 });
+  const themes = extractDiaryThemes(events, { query: q, limit: 12 });
   const matched_entries = (searched?.results ?? []).map(e => ({
     date: e.date,
     mood: e.mood,
@@ -542,6 +726,10 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
     kind: 'calculation',
     date: today,
     stated_constraints: stated,
+    referent_status: 'resolved',
+    referent_kind: referent.kind,
+    referent_value: referent.value,
+    search_query: q,
     entry_count: entries.length,
     matched_entries,
     partial_context_entries,
@@ -575,7 +763,8 @@ export function analyseDiaryEvidence(events, today, { message = '', query = '' }
     omitted: searched?.omitted ?? null,
     how_to_read:
       'Separate stored diary entries from derived recurring themes and frequencies. '
-      + 'Recurrence strength counts full supported search matches only. '
+      + 'Recurrence strength counts full supported search matches for a resolved referent only. '
+      + 'Generic feel/felt/this words are not themselves a recurrence target. '
       + 'Partial token matches and fallback recent entries are context_only and never establish recurrence. '
       + 'Semantic similarity is not a stored fact. Do not label patterns as causal. '
       + 'Do not convert old mood states into current mood. Current mood requires user_stated_current_turn.'

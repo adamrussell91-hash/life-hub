@@ -1025,7 +1025,15 @@ export function assessEvidence(state) {
     const diary = state.evidence.search_diary_records;
     const analysis = state.evidence.analyse_diary_evidence;
     const hits = analysis?.supported_match_count ?? analysis?.hit_count ?? diary?.count ?? 0;
-    if (diary && diary.ok !== false && hits === 0 && !(analysis?.fallback_count > 0)) {
+    if (analysis?.recurrence_strength === 'unresolved_referent' || analysis?.referent_status === 'unresolved') {
+      limitations.push({
+        tool: 'analyse_diary_evidence',
+        kind: 'unresolved_referent',
+        text: 'Deictic recurrence question has no resolvable current-turn referent — not a retrieval-depth problem'
+      });
+      // Missing referent cannot be fixed by widening feel/felt search.
+      coverage.truncated = coverage.truncated.filter(tool => tool !== 'search_diary_records');
+    } else if (diary && diary.ok !== false && hits === 0 && !(analysis?.fallback_count > 0)) {
       limitations.push({
         tool: 'search_diary_records',
         kind: 'missing',
@@ -1200,6 +1208,10 @@ function describeSufficiency(state, anotherRound) {
     if (!anotherRound) {
       parts.push('omitted open items are outside the 12-cap; overdue and due-soon windows already retrieved so another round is not required');
     }
+  }
+  const diaryAnalysis = state.evidence?.analyse_diary_evidence;
+  if (diaryAnalysis?.recurrence_strength === 'unresolved_referent' || diaryAnalysis?.referent_status === 'unresolved') {
+    parts.push('unresolved deictic referent — further diary search cannot invent what "this" means');
   }
   if (anotherRound) {
     parts.push(`next=${(state.nextRetrievals ?? []).map(item => item.tool || item).join(',')}`);
@@ -1456,7 +1468,15 @@ function penelopeInterpretationLines(state) {
   const analysis = state.evidence.analyse_diary_evidence;
   const strength = analysis?.recurrence_strength;
   const supported = analysis?.supported_match_count ?? analysis?.hit_count ?? 0;
-  if (!supported) {
+  if (strength === 'unresolved_referent' || analysis?.referent_status === 'unresolved') {
+    lines.push('- Adam asked a deictic recurrence question, but this turn does not establish what "this" refers to.');
+    lines.push('- Do not invent the referent from historical diary entries.');
+    lines.push('- Do not report a recurrence pattern.');
+    lines.push('- Ask a minimal clarification: what feeling or situation is meant?');
+    if ((analysis?.fallback_count ?? 0) > 0) {
+      lines.push('- Recent diary entries may appear as context only. They do not resolve the missing referent.');
+    }
+  } else if (!supported) {
     if ((analysis?.partial_count ?? 0) > 0) {
       lines.push('- No supported full diary matches. Partial token matches are context only and do not establish recurrence.');
     } else if ((analysis?.fallback_count ?? 0) > 0 || strength === 'insufficient_match') {
@@ -1482,7 +1502,13 @@ function penelopeInterpretationLines(state) {
     lines.push('- Diary moods conflict across entries. Keep disagreement visible.');
   }
   if (analysis?.stated_constraints?.current_mood) {
-    lines.push(`- Adam stated a current-turn mood (${analysis.stated_constraints.current_mood}). Do not convert historical moods into that present state.`);
+    lines.push(
+      `- Adam stated a current-turn mood (${analysis.stated_constraints.current_mood}). `
+      + 'Treat it as user_stated_current_turn. Historical matches may be searched for that mood, '
+      + 'but historical entries do not establish that the current state came from those past events.'
+    );
+  } else if (analysis?.referent_kind === 'explicit_query' && analysis?.referent_value) {
+    lines.push(`- Recurrence search targets the explicitly named feeling/theme (${analysis.referent_value}).`);
   }
   lines.push('- Do not turn semantic similarity into a stored fact, label patterns as causal, or invent emotional states from unrelated text.');
   return lines;

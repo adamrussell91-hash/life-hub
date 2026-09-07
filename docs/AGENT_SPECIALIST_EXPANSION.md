@@ -233,3 +233,21 @@ Hammond remains **blocked**. Production kernel remains **off**. `docs/AGENT_CAPA
 ### Deterministic correction pass (continuation 3)
 
 Local Cursor unit execution after search AND + nutrition adherence/observed-below-target fixes: **342 pass / 0 fail** across Ann–Vera + mind-session-read + Clare/Chadwick + evidence/provenance/kernel + Confirm/chat-job/compact-turn + fitness/workout confirm + context-delivery suites. Deployed specialist live gate still blocked without authenticated session.
+
+### Independent review defects (continuation 4) — failure → root cause → correction → regression → status
+
+#### Defect 3 — Penelope unresolved deictic referent
+
+| Step | Detail |
+| --- | --- |
+| Failure | Bare “Have I felt like this before?” was reduced by query focusing to generic `felt`, then feel-stem synonymy made historical “feeling flat” a full supported match even though the current turn never established flat (or any other mood). |
+| Root cause | Recurrence search started before resolving what “this” referred to. Generic feel/felt/this language was treated as if it were a semantic target. |
+| Correction | Penelope-specific `resolveDiaryRecurrenceReferent`: explicit current-turn mood/theme, explicit named query target, optional bound context, otherwise `unresolved`. Generic feel words are not a referent. Unresolved → `supported_match_count = 0`, `recurrence_strength = unresolved_referent`, no historical mood invented as current state, sufficiency treats it as missing referent (not retrieval depth). |
+| Regression | `penelope-kernel.test.js` Cases A–H (bare deictic; current-turn anxious; explicit anxious; flat single_entry; work stress; no majority/recent pick; tired vs hopeful; anxious vs generic stressed). Mind search / Vera / Brisket suites remain green. |
+| Status | `deterministic only` |
+
+Hammond remains **blocked**. Production kernel remains **off**. `docs/AGENT_CAPABILITY_STRATEGY.md` **unchanged**.
+
+### Deterministic correction pass (continuation 4)
+
+Local Cursor unit execution after Penelope deictic-referent fix: **345 pass / 0 fail** across Ann–Vera + mind-session-read + Clare/Chadwick + evidence/provenance/kernel + Confirm/chat-job/compact-turn + fitness/workout confirm + context-delivery suites. Deployed specialist live gate still blocked without authenticated session.

@@ -1068,6 +1068,26 @@ export function composeEvidenceClaims(evidence = {}) {
         store: result.store ?? 'life_hub_diary'
       }));
     }
+    if (result.referent_status) {
+      pushClaim(claims, tool, 'referent_status', result.referent_status, 'calculation', calc('referent_status', 'diary_referent_resolution', {
+        store: result.store ?? 'life_hub_diary'
+      }));
+    }
+    if (result.referent_kind) {
+      pushClaim(claims, tool, 'referent_kind', result.referent_kind, 'calculation', calc('referent_kind', 'diary_referent_resolution', {
+        store: result.store ?? 'life_hub_diary'
+      }));
+    }
+    if (result.referent_value) {
+      pushClaim(claims, tool, 'referent_value', result.referent_value, 'calculation', calc('referent_value', 'diary_referent_resolution', {
+        store: result.store ?? 'life_hub_diary'
+      }));
+    }
+    if (result.search_query) {
+      pushClaim(claims, tool, 'search_query', result.search_query, 'calculation', calc('search_query', 'diary_referent_search_query', {
+        store: result.store ?? 'life_hub_diary'
+      }));
+    }
     if (result.supported_match_count != null) {
       pushClaim(claims, tool, 'supported_match_count', result.supported_match_count, 'calculation', calc('supported_match_count', 'supported_match_count', {
         store: result.store ?? 'life_hub_diary'
