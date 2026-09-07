@@ -97,6 +97,60 @@ test('Hammond CN audit, Clare, and Ann turns enqueue on /api/chat 202', async ()
   }
 });
 
+test('agentKernel survives start → persisted job body → reconstructed chat-run request', async () => {
+  const store = createMemoryChatJobStore();
+  let reconstructed = null;
+  const start = createChatStartHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getStore: async () => store,
+    invokeBackground: async (_request, jobId) => {
+      await runStoredChatJob({
+        jobId,
+        store,
+        createHandler: () => async request => {
+          reconstructed = await request.clone().json();
+          const encoder = new TextEncoder();
+          return new Response(new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode('data: {"type":"agent","slug":"clare"}\n\n'));
+              controller.enqueue(encoder.encode('data: {"type":"kernel_trace","workflow":"daily_focus"}\n\n'));
+              controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+              controller.close();
+            }
+          }), { headers: { 'content-type': 'text/event-stream' } });
+        }
+      });
+      return true;
+    }
+  });
+
+  const started = await start(startRequest({
+    message: 'What should I focus on today?',
+    priorAgentSlug: 'clare',
+    agentKernel: true
+  }));
+  assert.equal(started.status, 202);
+  const { data } = await started.json();
+  const job = await store.get(data.jobId);
+  assert.equal(JSON.parse(job.body).agentKernel, true);
+  assert.equal(JSON.parse(job.body).priorAgentSlug, 'clare');
+  assert.equal(reconstructed?.agentKernel, true);
+  assert.equal(reconstructed?.priorAgentSlug, 'clare');
+
+  const events = createChatEventsHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getStore: async () => store
+  });
+  const polled = await events(new Request(
+    `https://life.example/api/chat/events?job=${data.jobId}&after=0`,
+    { headers: { cookie: `life_hub_session=${session}` } }
+  ));
+  const payload = await polled.json();
+  assert.ok(payload.data.events.some(event => event.type === 'kernel_trace'));
+});
+
 test('POST /api/chat streams live when the background job cannot start', async () => {
   const start = createChatStartHandler({
     env: validEnv,
