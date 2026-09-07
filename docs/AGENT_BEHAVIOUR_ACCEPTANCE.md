@@ -47,6 +47,7 @@ Remaining weakness is orchestration quality: 08:00 time-block, untimed tasks def
 4. **`chat.mjs`** injects `evidencePackBlock` into the system prompt; forces `tool_choice: any` only when the pack is not yet answerable.
 5. **Surface unification** — `assembleClareEvidence` / `assembleAnnEvidence` / `assembleClementineEvidence` reused from Clare desk and Knowledge chat turn (same read competence as Life chat).
 6. **Deterministic claim compose** — `composeEvidenceClaims` maps retrieved evidence to claims and limitations. This is pack-layer compose, not a conversational answer. Incomplete / truncated / conflicted evidence cannot compose as complete.
+7. **Phase 1 kernel (flagged)** — `agent-kernel.mjs` plans, retrieves, assesses sufficiency, composes claims, and traces Chadwick training review and Clare daily focus. Off unless `LIFE_HUB_AGENT_KERNEL=1` or `agentKernel: true`. Regex activation remains the default path.
 
 ---
 
@@ -59,6 +60,7 @@ Remaining weakness is orchestration quality: 08:00 time-block, untimed tasks def
 | `tests/unit/agent-orchestration-acceptance.test.js` | 14 scenarios: activation → required tools executed → evidence present → composed claims / limitations | Conversational behaviour |
 | `tests/unit/clare-work.test.js` | Workbench schemas, writes, SSRF, selected helpers | Live multi-step Clare conversations |
 | `tests/unit/clare-adversarial.test.js` | Corrections, long lists, missing times, collisions, stale projects, partial tool failure | Live Clare planning quality |
+| `tests/unit/agent-kernel.test.js` | Phase 1 plan/retrieve/assess/compose/recovery + prompt Delivery for Chadwick and Clare | Live conversational behaviour |
 
 These tests do **not** mock model tool selection as proof of activation. They also do **not** count as agent behaviour proof.
 
