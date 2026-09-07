@@ -29,14 +29,15 @@ Hammond was **not** rebuilt. Specialist expansion was **not** started.
 - `agent-surface.mjs` — pack + kernel augment; pack is forced when the kernel owns the turn
 - `evidence-packs.mjs` — claim provenance; pack `force` flag
 - `knowledge-data.mjs` — token ranking so a natural-language question can hit a note
-- `agent-kernel.mjs` — bounded retrieve loop, `resolveConflict`, checkpoints, richer traces, Chadwick analysis tool
-- `clare-work.mjs` — lesson-aware planner, energy, semantic duplicates, stale projects, overdue-in-day, capacity
-- `fitness-tools.mjs` — `analyseTrainingEvidence`
-- `chat.mjs` / `chat-confirm.mjs` — checkpoint turns; bind pending actions to turn id; resume on Confirm
+- `agent-kernel.mjs` — bounded retrieve loop, `resolveConflict`, checkpoints, richer traces, Chadwick analysis tool; resume reattaches stores from the caller
+- `clare-work.mjs` — lesson-aware planner; `plan_work` schema and `executeClareWork` pass energy / capacity / workday
+- `fitness-tools.mjs` — `analyseTrainingEvidence` + `executeFitnessReadTool` (chat executor parity)
+- `agent-turn-store.mjs` — compact checkpoints omit `stores`
+- `chat.mjs` / `chat-confirm.mjs` — checkpoint turns; required checkpoint before a turn-bound pending action; Confirm reloads the turn
 
 ### Persistence
 
-Existing GitHub JSON queues (`data/os/pending-actions.json`). New durable turn store: `data/os/agent-turns.json` with an injectable memory adapter for restart tests. No Mastra / LangGraph / Letta / Mem0.
+Existing GitHub JSON queues (`data/os/pending-actions.json`). Durable turn store: `data/os/agent-turns.json`. Checkpoints keep plan, evidence, claims, actions, trace, and `sourceRefs` (counts only). They do **not** copy loaded Tasks / Teaching / Knowledge / fitness / health stores. Resume reloads stores through the existing adapters when another retrieve is needed. No Mastra / LangGraph / Letta / Mem0.
 
 ### Where rich evidence was lost
 
@@ -68,11 +69,11 @@ Those cannot flip a requirement to `passed`.
 | Bounded assess→retrieve loop | `demonstrated` | flagged kernel only | `tests/unit/agent-evidence-loop.test.js` | none | Default-off; live turn |
 | Conflict resolution (not a count) | `demonstrated` | flagged kernel `resolveConflict` | loop tests | none | Live turn |
 | Typed claim provenance | `demonstrated` | claim objects + prompt | preservation + loop tests | none | Live citation in a model answer |
-| Durable AgentTurnState | `demonstrated` | `agent-turn-store.mjs` (`data/os/agent-turns.json`); chat checkpoints when a kernel id exists | loop persist/restart tests | none | No proof the GitHub write lands in a real chat request |
-| Confirm ↔ persisted turn | `demonstrated` | `agent-confirm.mjs`; `turnId` on pending actions; `chat-confirm.mjs` resume hook | `tests/unit/agent-confirm.test.js` | none | No browser Confirm on production; handler hook is untested against a real queue+turn file |
+| Durable AgentTurnState | `demonstrated` | compact `data/os/agent-turns.json`; chat checkpoints when a kernel id exists | loop persist/restart + compact-store tests | none | No live chat request against GitHub |
+| Confirm ↔ persisted turn | `demonstrated` | required checkpoint before `turnId`; `chat-confirm.mjs` reloads queue + turn | `tests/unit/agent-confirm.test.js` + `tests/integration/chat-confirm-turn-roundtrip.test.js` | none | Route updates workflow state and executes the write. A later live model turn after Confirm is **not** proven. |
 | Complete traces | `partial` | `kernelTraceEvent` expanded | loop tests inspect trajectory | none | Latency/cost need a live model; final answer grading **blocked** |
-| Clare operational planner | `demonstrated` | `planWork` / `inspectBoard` used by Clare tools and kernel | `clare-adversarial.test.js` + `clare-planner.test.js` | none | Live conversational gate **blocked** |
-| Chadwick evidence reasoning | `demonstrated` | `analyseTrainingEvidence` on flagged kernel training review | `tests/unit/chadwick-reasoning.test.js` | none | Live gate **blocked** |
+| Clare operational planner | `demonstrated` | `executeClareWork('plan_work')` used by `/api/chat` | `clare-adversarial.test.js` + `clare-planner.test.js` (includes tool path) | none | Live conversational gate **blocked** |
+| Chadwick evidence reasoning | `demonstrated` | `executeFitnessReadTool('analyse_training_evidence')` in `/api/chat` | `tests/unit/chadwick-reasoning.test.js` | none | Live gate **blocked** |
 | Pilot behavioural gate (Clare, Chadwick) | `blocked` | `/api/chat` | n/a | n/a | `ANTHROPIC_API_KEY` unset |
 | Specialist expansion | `not started` | — | — | — | Gated on pilots `passed` |
 | Hammond supervisor rebuild | `blocked` | old canned handoff remains prototype | — | — | Specialist reliability not `passed` |
@@ -81,26 +82,26 @@ Those cannot flip a requirement to `passed`.
 
 Hammond is **blocked**, not rebuilt.
 
+Confirm after this revision: the handlers can propose → checkpoint → queue → confirm → execute-once → persist executed/rejected. That is route-level workflow state, **not** a live conversational continuation. Status stays `demonstrated`.
+
 ## Tests run this branch
 
-Targeted Node suites (all passing):
+Targeted Node suites (all passing on the latest revision):
 
 - `tests/unit/agent-evidence-preservation.test.js`
 - `tests/unit/agent-evidence-loop.test.js`
 - `tests/unit/agent-confirm.test.js`
 - `tests/unit/clare-adversarial.test.js`
 - `tests/unit/clare-planner.test.js`
+- `tests/unit/clare-work.test.js`
 - `tests/unit/chadwick-reasoning.test.js`
 - `tests/unit/agent-kernel.test.js`
 - `tests/unit/agent-surface.test.js`
 - `tests/unit/agent-evidence-packs.test.js`
-- `tests/unit/knowledge-search.test.js`
-- `tests/unit/clare-work.test.js`
-- `tests/unit/agent-retrieval-behaviour.test.js`
-- `tests/unit/agent-specialists.test.js`
-- `tests/unit/agent-handoff.test.js`
-- `tests/unit/agent-orchestration-acceptance.test.js`
+- `tests/unit/capabilities.test.js`
 - `tests/integration/chat-confirm-function.test.js`
+- `tests/integration/chat-confirm-turn-roundtrip.test.js`
+- `tests/integration/chat-function.test.js`
 
 Full `npm test` was not used as the sole proof. Pre-existing env/fixture failures on the full suite are out of scope.
 
