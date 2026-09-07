@@ -141,6 +141,7 @@ export function renderCalendar(root, model, {
     }));
     bindNav(calendar);
     bindKeys(calendar, root);
+    bindViewport(calendar, root);
     if (focusCompose) openMobileComposeSheet(calendar);
     dashboard.removeAttribute('hidden');
     return;
@@ -169,6 +170,7 @@ export function renderCalendar(root, model, {
 
   bindNav(calendar);
   bindKeys(calendar, root);
+  bindViewport(calendar, root);
 
   if (focusCompose) {
     const input = calendar.querySelector('[data-calendar="compose-title"]');
@@ -180,6 +182,18 @@ export function renderCalendar(root, model, {
 
 function isMobileViewport(root) {
   return root.defaultView?.matchMedia?.('(max-width: 720px)')?.matches === true;
+}
+
+function bindViewport(calendar, root) {
+  if (calendar.dataset.viewportBound) return;
+  const mql = root.defaultView?.matchMedia?.('(max-width: 720px)');
+  if (!mql || typeof mql.addEventListener !== 'function') return;
+  calendar.dataset.viewportBound = '1';
+  mql.addEventListener('change', () => {
+    const handlers = handlersByRoot.get(calendar);
+    if (!handlers?.selectedDate) return;
+    handlers.onSelectDate?.(handlers.selectedDate);
+  });
 }
 
 function findEvent(model, id) {
