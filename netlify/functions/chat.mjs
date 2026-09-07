@@ -40,6 +40,12 @@ import {
 } from './_shared/load-hub-protocols.mjs';
 import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
 import { runSurfaceAgentTurn } from './_shared/agent-surface.mjs';
+import { proposeAction } from './_shared/agent-kernel.mjs';
+import {
+  AGENT_TURNS_PATH,
+  parseTurnStoreFile,
+  persistTurnWithClient
+} from './_shared/agent-turn-store.mjs';
 import { parseMemoryStore } from './_shared/agent-memory.mjs';
 import { REMEMBER_LAYERED_MEMORIES_PATH } from './_shared/capabilities/stores.mjs';
 import {
@@ -1339,6 +1345,29 @@ export function createChatHandler({
         }
         const kernelEvent = surfaceTurn.trace;
         if (kernelEvent) send(kernelEvent);
+        let agentTurns = {};
+        let agentTurnsSha;
+        const persistKernelTurn = async () => {
+          if (!surfaceTurn.kernel?.id) return;
+          try {
+            const entry = repoTree.find(item => item.path === AGENT_TURNS_PATH && item.type === 'blob');
+            if (entry && !agentTurnsSha) {
+              agentTurns = parseTurnStoreFile(decodeBlob(await client.readBlob(entry.sha)));
+              agentTurnsSha = entry.sha;
+            }
+            const saved = await persistTurnWithClient({
+              client,
+              existingTurns: agentTurns,
+              existingSha: agentTurnsSha,
+              state: surfaceTurn.kernel
+            });
+            agentTurns = saved.turns;
+            agentTurnsSha = saved.sha;
+          } catch {
+            // Same-turn Confirm still works if the turn checkpoint write fails.
+          }
+        };
+        await persistKernelTurn();
         // Pack already retrieved domain evidence. Keep tools for continuation /
         // writes, but do not force a tool round when the pack is answerable.
         // Kernel sufficiency replaces “any section present” for Chadwick/Clare pilots.
@@ -1448,7 +1477,24 @@ export function createChatHandler({
             } catch {
               // Queue the GitHub write anyway; confirm skips the stale check without blob bases.
             }
-            const entry = { id: createPendingActionId(), createdAt: today, slug, proposal, bases };
+            const pendingId = createPendingActionId();
+            if (surfaceTurn.kernel) {
+              proposeAction(surfaceTurn.kernel, {
+                intent: proposal.intent,
+                snapshot: bases,
+                idempotencyKey: pendingId
+              });
+            }
+            const entry = {
+              id: pendingId,
+              createdAt: today,
+              slug,
+              proposal,
+              bases,
+              turnId: surfaceTurn.kernel?.id ?? null,
+              actionId: surfaceTurn.kernel?.actions?.at(-1)?.id ?? null
+            };
+            await persistKernelTurn();
             const nextQueue = addPendingAction(pendingActions, entry);
             const result = await client.writeFile({
               path: PENDING_ACTIONS_PATH,
