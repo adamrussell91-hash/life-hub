@@ -2,7 +2,7 @@
 
 Independent technical strategy. Prepared for Adam Russell. Current Life Hub main branch reviewed 7 September 2026.
 
-**Status:** adopted as the implementation reference for agent capability work. Phases 0–2 and 5 are implemented in this repository. Phases 3–4 stay gated on the exit conditions below.
+**Status:** adopted as the implementation reference for agent capability work. Phases 0–3 and 5 are implemented in this repository. Phase 4 (Hammond supervisor) stays gated.
 
 Life Hub should not replace its current runtime with any single upstream framework. The target is a Life Hub native agent kernel.
 
@@ -323,9 +323,13 @@ Exit: agents recall approved context, respect expiry, and never substitute memor
 
 ### Phase 3 — Remaining specialist workflows
 
-Sara health timeline and appointment brief. Ann lesson diagnosis. Clementine iterative research. Brisket adherence and completeness. Hyaluronica routine response. Penelope recurrence search. Vera longitudinal reflection.
+**Status (2026-09-07):** flagged kernel workflows for the remaining specialists, beside Chadwick and Clare. Pack-layer paraphrases, named gaps, and Delivery are Demonstrated. Live conversational E2E remains Blocked (no `ANTHROPIC_API_KEY`). Hammond stays Phase 4.
 
-Exit: each specialist passes domain-specific live datasets and end-to-end tests.
+- Sara `health_timeline`, Ann `lesson_diagnosis`, Clementine `knowledge_research`, Brisket `nutrition_adherence`, Hyaluronica `routine_response`, Penelope `diary_recurrence`, Vera `mind_reflection`.
+- Same plan → retrieve → assess → compose loop. Empty stores and conflicts are named gaps.
+- Delivery forbids invented visits, lessons, archive pages, complete adherence, routine improvement, diary patterns, and longitudinal mind claims.
+
+Exit: each specialist passes domain-specific live datasets and end-to-end tests. Pack-layer exit is met. Live conversational exit is still Blocked.
 
 ### Phase 4 — Hammond supervisor
 
