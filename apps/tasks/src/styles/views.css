@@ -5530,11 +5530,6 @@ button.projects-mix__legend-row:focus-visible {
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-.dashboard-row .task-check .check-box {
-  border-color: color-mix(in srgb, var(--navy) 28%, var(--line));
-  background: color-mix(in srgb, var(--paper) 70%, white);
-}
-
 .dashboard-row__when {
   font-size: var(--text-2xs);
 }
