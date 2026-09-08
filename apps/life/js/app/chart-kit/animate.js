@@ -2,6 +2,9 @@ export function prefersReducedMotion(media = globalThis.matchMedia) {
   return typeof media === 'function' && Boolean(media('(prefers-reduced-motion: reduce)')?.matches);
 }
 
+const DEFAULT_SETTLE_MS = 800;
+const settleTimers = new WeakMap();
+
 function motionIsQuiet(node, options = {}) {
   if (options.quiet === true) return true;
   let el = node;
@@ -10,6 +13,26 @@ function motionIsQuiet(node, options = {}) {
     el = el.parentElement || el.parentNode;
   }
   return options.reducedMotion ?? prefersReducedMotion();
+}
+
+function clearSettleTimer(svg) {
+  const prior = settleTimers.get(svg);
+  if (prior != null) {
+    clearTimeout(prior);
+    settleTimers.delete(svg);
+  }
+}
+
+function settleAreaReveal(svg, line) {
+  clearSettleTimer(svg);
+  if (line?.style) {
+    line.style.strokeDasharray = '';
+    line.style.strokeDashoffset = '';
+  }
+  // Leave charts in chart-static. chart-animating must not linger — a later
+  // data-sync-quiet refresh would cancel area-fade and pin areas at opacity 0.
+  svg.classList?.remove?.('chart-animating');
+  svg.classList?.add?.('chart-static');
 }
 
 export function animateRingFill(circle, { circumference, dashoffset }, options = {}) {
@@ -31,6 +54,7 @@ export function animateRingFill(circle, { circumference, dashoffset }, options =
 export function animateAreaReveal(svg, options = {}) {
   if (!svg) return;
   const reduced = motionIsQuiet(svg, options);
+  clearSettleTimer(svg);
   svg.classList?.remove?.('chart-animating', 'chart-static');
 
   const line = svg.querySelector('[data-role="line"]');
@@ -48,16 +72,31 @@ export function animateAreaReveal(svg, options = {}) {
     }
   }
 
-  svg.classList?.add?.(reduced ? 'chart-static' : 'chart-animating');
+  if (reduced) {
+    svg.classList?.add?.('chart-static');
+    return;
+  }
 
-  if (!reduced && line && typeof line.addEventListener === 'function') {
+  svg.classList?.add?.('chart-animating');
+
+  const settleMs = Number.isFinite(options.settleMs) ? options.settleMs : DEFAULT_SETTLE_MS;
+  const finish = () => settleAreaReveal(svg, line);
+
+  if (line && typeof line.addEventListener === 'function') {
     const onEnd = event => {
       if (event?.animationName && event.animationName !== 'line-draw') return;
-      line.style.strokeDasharray = '';
-      line.style.strokeDashoffset = '';
       line.removeEventListener?.('animationend', onEnd);
+      finish();
     };
     line.addEventListener('animationend', onEnd);
+  }
+
+  // iOS Safari and hidden-tab paints sometimes skip animationend. Fall back so
+  // charts are never left mid-draw (invisible line / opacity-0 area).
+  if (settleMs > 0) {
+    settleTimers.set(svg, setTimeout(finish, settleMs));
+  } else if (settleMs === 0) {
+    // Tests that drive animationend directly can opt out of the timer.
   }
 }
 
