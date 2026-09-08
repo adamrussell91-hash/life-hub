@@ -232,6 +232,7 @@
   resize: none;
   overflow: hidden;
   field-sizing: content;
+  cursor: text;
 }
 
 .page-header__title-input:focus-visible {
