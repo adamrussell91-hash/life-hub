@@ -7,6 +7,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSessionToken } from '../netlify/functions/_shared/auth-security.mjs';
 import { createChatHandler } from '../netlify/functions/chat.mjs';
+import { createChatConfirmHandler } from '../netlify/functions/chat-confirm.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SECRET = 's'.repeat(32);
@@ -235,11 +236,21 @@ function githubStub(url, options = {}) {
   return Response.json({ message: 'not found' }, { status: 404 });
 }
 
+const tasksMap = { ...TASKS };
+const teachingMap = { ...TEACHING };
+const tasksStore = memoryStore(tasksMap);
+const teachingStore = memoryStore(teachingMap);
 const handler = createChatHandler({
   env,
   fetchImpl: githubStub,
-  getTasksStore: async () => memoryStore(TASKS),
-  getTeachingStore: async () => memoryStore(TEACHING)
+  getTasksStore: async () => tasksStore,
+  getTeachingStore: async () => teachingStore
+});
+const confirmHandler = createChatConfirmHandler({
+  env,
+  fetchImpl: githubStub,
+  getTasksStore: async () => tasksStore,
+  getTeachingStore: async () => teachingStore
 });
 
 async function chat(slug, message, protocolId) {
@@ -296,7 +307,7 @@ const scenarios = [
     slug: 'clare',
     message:
       'Sort this brain dump: email the parent about homework; waiting on Acme for the quote; someday learn pottery; trash this random note',
-    expectTools: ['clarify_dump']
+    expectTools: ['clarify_dump', 'parse_dump']
   },
   {
     id: 'clare-health',
@@ -319,14 +330,16 @@ const scenarios = [
   {
     id: 'clare-schedule',
     slug: 'clare',
-    message: 'Plan tomorrow around my classes using protected evenings. Compose an actual schedule.',
+    message:
+      'Plan tomorrow around my classes using protected evenings. Call compose_schedule and return a Confirmable schedule diff.',
     expectTools: ['compose_schedule'],
     expectProposal: true
   },
   {
     id: 'clare-runway',
     slug: 'clare',
-    message: 'Marking is due Friday. Work backwards from the hard deadline.',
+    message:
+      'Marking is due Friday. Use the deadline_runway tool to work backwards from that hard deadline and show the runway.',
     expectTools: ['deadline_runway']
   },
   {
@@ -338,7 +351,8 @@ const scenarios = [
   {
     id: 'clare-weekly',
     slug: 'clare',
-    message: 'Start Weekly Review',
+    message:
+      'Start Weekly Review now. Call the weekly_review tool immediately and advance from the capture stage.',
     protocolId: 'weekly-review',
     expectTools: ['weekly_review']
   },
@@ -357,13 +371,15 @@ const scenarios = [
   {
     id: 'hammond-depth',
     slug: 'hammond',
-    message: 'What is my deep work capacity next week?',
+    message:
+      'What is my deep work capacity next week? Call the capacity_day tool using my stored planning profile work windows.',
     expectTools: ['capacity_day', 'depth_budget']
   },
   {
     id: 'hammond-mission',
     slug: 'hammond',
-    message: 'Create a week mission and hand it to Clare to schedule.',
+    message:
+      'Create a week mission and hand it to Clare to schedule. Call week_mission_handoff with protected outcomes and depth expectations.',
     expectTools: ['week_mission_handoff']
   }
 ];
@@ -414,6 +430,80 @@ for (const scenario of scenarios) {
   } catch (err) {
     failed += 1;
     log(JSON.stringify({ id: scenario.id, ok: false, error: String(err?.message || err) }));
+  }
+}
+
+// Deterministic Confirm proof (no model): compose → propose → confirm selected write.
+{
+  try {
+    const { executeClareWork } = await import('../netlify/functions/_shared/clare-work.mjs');
+    const beforeBlocks = Object.keys(tasksMap).filter(
+      (key) => key.startsWith('work_blocks/') && !key.endsWith('/_index')
+    ).length;
+    const composed = await executeClareWork(
+      'compose_schedule',
+      { date: '2026-09-09', task_ids: ['task_mark'] },
+      {
+        now: new Date('2026-09-08T08:00:00Z'),
+        tasks: [tasksMap['tasks/task_mark']],
+        projects: [tasksMap['projects/proj_unit']],
+        lessons: Object.values(teachingMap),
+        workBlocks: [],
+        planning_profile: tasksMap['meta/planning_profile'],
+        tasksStore
+      }
+    );
+    const proposal = composed?.proposal;
+    const writePaths = (proposal?.writes || []).map((write) => write.path);
+    if (!proposal || !writePaths.length) {
+      failed += 1;
+      log(JSON.stringify({ id: 'clare-schedule-confirm', ok: false, error: 'compose_did_not_propose' }));
+    } else {
+      const accept = writePaths.slice(0, 1);
+      const confirmResponse = await confirmHandler(
+        new Request('https://life-hub.test/api/chat/confirm', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie: `life_hub_session=${session}`,
+            origin: 'https://life-hub.test'
+          },
+          body: JSON.stringify({
+            kind: 'action',
+            slug: 'clare',
+            candidate: proposal,
+            accept
+          })
+        })
+      );
+      const confirmBody = await confirmResponse.json().catch(() => ({}));
+      const afterBlocks = Object.keys(tasksMap).filter(
+        (key) => key.startsWith('work_blocks/') && !key.endsWith('/_index')
+      ).length;
+      const acceptedKey = accept[0].replace(/^tasks:work_block:/, 'work_blocks/');
+      const confirmOk =
+        confirmResponse.status === 200 &&
+        confirmBody?.ok !== false &&
+        afterBlocks === beforeBlocks + accept.length &&
+        Object.hasOwn(tasksMap, acceptedKey);
+      if (!confirmOk) failed += 1;
+      log(
+        JSON.stringify({
+          id: 'clare-schedule-confirm',
+          ok: confirmOk,
+          status: confirmResponse.status,
+          accepted: accept,
+          acceptedKey,
+          beforeBlocks,
+          afterBlocks,
+          bodyOk: confirmBody?.ok ?? null,
+          error: confirmBody?.error || null
+        })
+      );
+    }
+  } catch (err) {
+    failed += 1;
+    log(JSON.stringify({ id: 'clare-schedule-confirm', ok: false, error: String(err?.message || err) }));
   }
 }
 
