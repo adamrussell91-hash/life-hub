@@ -18,10 +18,12 @@ import {
   createHubFilter,
   createHubTextarea,
   domainFilterOptions,
+  labeledField,
   priorityFilterOptions,
   statusFilterOptions,
   type HubFilterOption
 } from '@/views/hub-kit';
+import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -150,6 +152,8 @@ function paintTaskPage(
           priority: current.priority,
           status: current.status,
           due_date: current.due_date,
+          due_time: current.due_time,
+          estimated_duration: current.estimated_duration,
           parent_project_id: current.parent_project_id,
           page_blocks: current.page_blocks
         })
@@ -207,6 +211,44 @@ function paintTaskPage(
     className: 'page-card__due',
     onChange: (value) => persist({ due_date: value || null })
   });
+  const start = createHubField({
+    type: 'time',
+    ariaLabel: 'Start time',
+    value: task.due_time ?? '',
+    className: 'page-card__start'
+  });
+  const end = createHubField({
+    type: 'time',
+    ariaLabel: 'End time',
+    value: endTimeFromStart(task.due_time, task.estimated_duration),
+    className: 'page-card__end'
+  });
+  start.input.addEventListener('change', () => {
+    const due_time = start.input.value || null;
+    persist({ due_time });
+    end.input.value = endTimeFromStart(due_time, current.estimated_duration);
+  });
+  end.input.addEventListener('change', () => {
+    const value = end.input.value;
+    if (!value) {
+      persist({ estimated_duration: null });
+      return;
+    }
+    const startVal = start.input.value || current.due_time;
+    if (!startVal) {
+      // End alone is not a span — treat it as the start (point in time).
+      persist({ due_time: value, estimated_duration: null });
+      start.input.value = value;
+      end.input.value = '';
+      return;
+    }
+    const minutes = durationMinutesBetween(startVal, value);
+    if (minutes == null) {
+      end.input.value = endTimeFromStart(startVal, current.estimated_duration);
+      return;
+    }
+    persist({ estimated_duration: minutes });
+  });
   const project = pageFilter(
     'page-card__project',
     'Project',
@@ -220,7 +262,14 @@ function paintTaskPage(
     (value) => persist({ parent_project_id: value || null })
   );
 
-  fields.append(status.el, domain.el, priority.el, due.el, project.el);
+  const dueField = labeledField('Due', due.el);
+  dueField.classList.add('page-card__when');
+  const startField = labeledField('Start', start.el);
+  startField.classList.add('page-card__when');
+  const endField = labeledField('End', end.el);
+  endField.classList.add('page-card__when');
+
+  fields.append(status.el, domain.el, priority.el, dueField, startField, endField, project.el);
 
   const notes = createHubTextarea({
     ariaLabel: 'Notes',

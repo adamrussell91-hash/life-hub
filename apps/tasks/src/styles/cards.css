@@ -783,6 +783,14 @@ button.hub-chip {
   gap: var(--space-2);
 }
 
+.page-card__when {
+  align-self: flex-end;
+}
+
+.page-card__when .hub-search {
+  min-width: 7.5rem;
+}
+
 .page-card__back {
   font-family: var(--font-ui);
   font-size: var(--text-xs);
