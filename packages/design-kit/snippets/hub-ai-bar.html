@@ -8,3 +8,17 @@
   </div>
   <button class="btn btn--primary" type="submit">Send</button>
 </form>
+
+<!-- Thread composer with attachments: chips sit in __aside above Attach/Send. -->
+<form class="hub-ai-bar hub-ai-bar--thread" data-hub-ai-bar>
+  <div class="hub-ai-bar__field">
+    <textarea class="hub-ai-bar__input" rows="1" placeholder="Message…" aria-label="Message"></textarea>
+  </div>
+  <div class="hub-ai-bar__aside">
+    <div class="chat-attach-list" hidden></div>
+    <div class="hub-ai-bar__tools">
+      <button class="btn btn--ghost" type="button">Attach</button>
+      <button class="btn btn--primary" type="submit">Send</button>
+    </div>
+  </div>
+</form>
