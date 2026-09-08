@@ -10,7 +10,7 @@ import {
   type DashboardHeatDay,
   type DashboardTimelineItem
 } from '@/domain/dashboard-overview';
-import { addDays, preferredDomains, startOfDay, toDateKey } from '@/domain/queries';
+import { preferredDomains, toDateKey } from '@/domain/queries';
 import { findStallCandidates } from '@/domain/stall';
 import {
   findPortfolioTension,
@@ -40,7 +40,7 @@ const OVERVIEW_OPEN_KEY = 'tasks-hub:dashboard-overview-open';
 const SELECTED_DAY_KEY = 'tasks-hub:dashboard-selected-day';
 const MOBILE_OVERVIEW_QUERY = '(max-width: 720px)';
 const TASK_DRAG_MIME = 'application/x-tasks-hub-task';
-const RAIL_DAYS = 31;
+const WEEK_DAYS = 7;
 
 let tensionDismissed = false;
 let draggingTaskId: string | null = null;
@@ -313,59 +313,6 @@ function itemsForDay(items: DashboardTimelineItem[], dateKey: string, todayKey: 
   return items.filter((item) => item.due_date === dateKey);
 }
 
-function renderTimelineRail(
-  items: DashboardTimelineItem[],
-  selectedKey: string,
-  now: Date,
-  onSelect: (dateKey: string) => void
-): HTMLElement {
-  const todayKey = toDateKey(now);
-  const start = startOfDay(now);
-  const byDay = new Map<string, DashboardTimelineItem[]>();
-  for (const item of items) {
-    const key = item.daysOut <= 0 ? todayKey : item.due_date;
-    const bucket = byDay.get(key) ?? [];
-    bucket.push(item);
-    byDay.set(key, bucket);
-  }
-
-  const rail = el('div', 'dashboard-rail');
-  rail.setAttribute('role', 'list');
-  rail.setAttribute('aria-label', 'Work on a 31-day timeline');
-
-  for (let index = 0; index < RAIL_DAYS; index++) {
-    const date = addDays(start, index);
-    const dateKey = toDateKey(date);
-    const dayItems = byDay.get(dateKey) ?? [];
-    const cell = el('button', 'dashboard-rail__day');
-    cell.type = 'button';
-    cell.setAttribute('role', 'listitem');
-    cell.dataset.date = dateKey;
-    if (dateKey === todayKey) cell.dataset.today = 'true';
-    if (dateKey === selectedKey) cell.dataset.selected = 'true';
-    if (dayItems.some((item) => item.daysOut < 0)) cell.dataset.overdue = 'true';
-    const spoken = dayItems.length
-      ? `${dayItems.length} on ${formatDisplayDate(dateKey)}: ${dayItems.map((item) => item.title).join(', ')}`
-      : `Nothing on ${formatDisplayDate(dateKey)}`;
-    cell.setAttribute('aria-label', spoken);
-    cell.setAttribute('aria-pressed', dateKey === selectedKey ? 'true' : 'false');
-    cell.addEventListener('click', () => onSelect(dateKey));
-
-    const stack = el('span', 'dashboard-rail__stack');
-    for (const item of dayItems.slice(0, 4)) {
-      const mark = el('span', `dashboard-rail__mark dashboard-rail__mark--${item.source}`);
-      mark.title = item.title;
-      stack.append(mark);
-    }
-    if (dayItems.length > 4) {
-      stack.append(el('span', 'dashboard-rail__more', `+${dayItems.length - 4}`));
-    }
-    cell.append(stack, el('span', 'dashboard-rail__tick', String(date.getDate())));
-    rail.append(cell);
-  }
-  return rail;
-}
-
 function renderTimelineGroup(
   label: string,
   items: DashboardTimelineItem[],
@@ -386,20 +333,17 @@ function renderTimelineCard(
   items: DashboardTimelineItem[],
   options: DashboardOverviewOptions,
   now: Date,
-  selectedKey: string,
-  onSelectDay: (dateKey: string) => void
+  selectedKey: string
 ): HTMLElement {
   const card = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--timeline');
-  card.setAttribute('aria-label', 'Timeline');
+  card.setAttribute('aria-label', 'Agenda');
   const head = el('div', 'dashboard-overview__head');
-  head.append(el('p', 'hub-card__eyebrow', 'Timeline'));
+  head.append(el('p', 'hub-card__eyebrow', 'Agenda'));
   head.append(viewLink('#/timeline', 'Open Timeline'));
   card.append(head);
 
   const next = renderNextAction(options, now);
   if (next) card.append(next);
-
-  card.append(renderTimelineRail(items, selectedKey, now, onSelectDay));
 
   const todayKey = toDateKey(now);
   const dayItems = itemsForDay(items, selectedKey, todayKey);
@@ -493,9 +437,9 @@ function renderHeatCard(
 ): HTMLElement {
   const selected = days.find((day) => day.date_key === selectedKey) ?? days[0];
   const card = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--heat');
-  card.setAttribute('aria-label', 'Next 14 days');
+  card.setAttribute('aria-label', 'This week');
   const head = el('div', 'dashboard-overview__head');
-  head.append(el('p', 'hub-card__eyebrow', 'This fortnight'));
+  head.append(el('p', 'hub-card__eyebrow', 'This week'));
   if (selected) head.append(viewLink(`#/week?date=${selected.date_key}`, 'Open week'));
   card.append(head);
 
@@ -525,7 +469,7 @@ function renderHeatCard(
   if (!selected?.items.length) {
     peek.textContent = selected
       ? `Nothing dated ${selected.isToday ? 'today' : formatDisplayDate(selected.date_key)}.`
-      : 'Nothing dated in the next fortnight.';
+      : 'Nothing dated this week.';
   } else {
     const titles = selected.items.map((item) => item.title);
     const shown = titles.slice(0, 3);
@@ -557,7 +501,7 @@ function setOverviewOpen(root: HTMLElement, open: boolean): void {
   if (peek) peek.hidden = open;
 }
 
-/** Overview band for the home dashboard — focus, timeline, load, heat. */
+/** Overview band for the home dashboard — focus, week strip, agenda, projects. */
 export function renderDashboardOverview(host: HTMLElement, options: DashboardOverviewOptions): void {
   const now = options.now ?? new Date();
   const { tasks, projects, onChanged } = options;
@@ -570,7 +514,10 @@ export function renderDashboardOverview(host: HTMLElement, options: DashboardOve
   const prefs = preferredDomains(now);
   const stats = dashboardFocusStats(tasks, projects, now);
   const todayKey = toDateKey(now);
-  const selectedKey = readSelectedDay(todayKey);
+  const heatDays = dashboardHeatDays(tasks, projects, now, WEEK_DAYS);
+  const weekKeys = new Set(heatDays.map((day) => day.date_key));
+  const storedDay = readSelectedDay(todayKey);
+  const selectedKey = weekKeys.has(storedDay) ? storedDay : todayKey;
   const selectDay = (dateKey: string): void => {
     writeSelectedDay(dateKey);
     writeOverviewOpen(true);
@@ -635,7 +582,6 @@ export function renderDashboardOverview(host: HTMLElement, options: DashboardOve
     );
   }
 
-  const heatDays = dashboardHeatDays(tasks, projects, now);
   const rail = el('div', 'dashboard-overview__rail');
   rail.append(
     renderHeatCard(heatDays, selectedKey, options, selectDay),
@@ -644,7 +590,7 @@ export function renderDashboardOverview(host: HTMLElement, options: DashboardOve
 
   const grid = el('div', 'dashboard-overview__grid dashboard-overview__grid--merged');
   const timeline = dashboardTimeline(tasks, projects, now);
-  grid.append(rail, renderTimelineCard(timeline, options, now, selectedKey, selectDay));
+  grid.append(rail, renderTimelineCard(timeline, options, now, selectedKey));
   panel.append(grid);
 
   const pressure = el('div', 'dashboard-overview__pressure');

@@ -179,4 +179,44 @@ describe('board view mutations', () => {
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
     expect(canvas.querySelector('.dashboard-board .view-lede')?.textContent).toMatch(/^0 open in scope/);
   });
+
+  it('completes an overview task without remounting the board', async () => {
+    const open = task({ id: 'task_tick', title: 'Tick me', status: 'open', due_date: '2026-08-27' });
+    const done = task({ id: 'task_tick', title: 'Tick me', status: 'done', due_date: '2026-08-27' });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(done);
+    vi.mocked(tasksApi.getTask).mockResolvedValue(done);
+    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)' || query === '(max-width: 720px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }) as unknown as MediaQueryList);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    const board = canvas.querySelector('.board');
+    expect(board).not.toBeNull();
+    expect(canvas.querySelector('.dashboard-row .task-check')).not.toBeNull();
+
+    const box = canvas.querySelector<HTMLInputElement>('.dashboard-row .task-check input');
+    expect(box).not.toBeNull();
+    box!.checked = true;
+    box!.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith('task_tick', { status: 'done' });
+      expect(vi.mocked(tasksApi.getTask)).toHaveBeenCalledWith('task_tick');
+    });
+    expect(canvas.querySelector('.canvas-status')).toBeNull();
+    expect(canvas.querySelector('.board')).toBe(board);
+    expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
+    expect(canvas.querySelector('.column[data-col="done"] [data-id="task_tick"]')).not.toBeNull();
+  });
 });

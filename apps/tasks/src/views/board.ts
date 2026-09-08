@@ -188,28 +188,47 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
   const overviewHost = el('div', 'dashboard-overview');
   const header = canvas.closest('.hub-canvas')?.querySelector('.page-header');
   const statusHost = header instanceof HTMLElement ? pageHeaderStatusSlot(header) : undefined;
-  renderDashboardOverview(overviewHost, {
-    tasks,
-    projects,
-    statusHost,
-    runningFilterActive: boardRunningOnly,
-    onChanged: reloadBoard,
-    onFilterRunning: () => {
-      boardRunningOnly = !boardRunningOnly;
-      reloadBoard();
-    },
-    onCompleteTask: (task) => requestToggleDone(confirmHost, task, async () => reloadBoard()),
-    onStartTask: (task) => {
-      void tasksApi.updateTask(task.id, { status: 'in_progress' }).then(reloadBoard, (err: unknown) => {
-        confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not start')));
-      });
-    },
-    onRescheduleTask: (task, dateKey) => {
-      void tasksApi.updateTask(task.id, { due_date: dateKey }).then(reloadBoard, (err: unknown) => {
-        confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not reschedule')));
-      });
-    }
-  });
+
+  /** Keep overview + board cards in sync without wiping the canvas (avoids the full-screen flash). */
+  let paintOverview: () => void = () => undefined;
+  let applyTask: (task: Task) => void = () => undefined;
+
+  paintOverview = (): void => {
+    renderDashboardOverview(overviewHost, {
+      tasks,
+      projects,
+      statusHost,
+      runningFilterActive: boardRunningOnly,
+      onChanged: reloadBoard,
+      onFilterRunning: () => {
+        boardRunningOnly = !boardRunningOnly;
+        reloadBoard();
+      },
+      onCompleteTask: (task) =>
+        requestToggleDone(confirmHost, task, async () => {
+          const fresh = await tasksApi.getTask(task.id);
+          applyTask(fresh);
+        }),
+      onStartTask: (task) => {
+        void tasksApi.updateTask(task.id, { status: 'in_progress' }).then(
+          (updated) => applyTask(updated),
+          (err: unknown) => {
+            confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not start')));
+          }
+        );
+      },
+      onRescheduleTask: (task, dateKey) => {
+        void tasksApi.updateTask(task.id, { due_date: dateKey }).then(
+          (updated) => applyTask(updated),
+          (err: unknown) => {
+            confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not reschedule')));
+          }
+        );
+      }
+    });
+  };
+
+  paintOverview();
   canvas.append(overviewHost);
 
   const boardSection = el('section', 'dashboard-board');
@@ -305,6 +324,7 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     if (!inScope(task, runningIds)) {
       existing?.remove();
       syncChrome();
+      paintOverview();
       return;
     }
     const column = columnForTask(task, byId);
@@ -330,7 +350,10 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     if (hint) list.insertBefore(card, hint);
     syncChrome();
     showBoardColumn?.(column);
+    paintOverview();
   }
+
+  applyTask = upsertTask;
 
   function dropBoardTask(task: Task): void {
     const card = board.querySelector<HTMLElement>(`[data-id="${task.id}"]`);
