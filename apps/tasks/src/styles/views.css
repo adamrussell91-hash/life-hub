@@ -2294,6 +2294,10 @@
   grid-column: 1 / -1;
 }
 
+.chat-form .hub-ai-bar__field {
+  min-width: 0;
+}
+
 .chat-form__tools {
   display: flex;
   flex-wrap: nowrap;
