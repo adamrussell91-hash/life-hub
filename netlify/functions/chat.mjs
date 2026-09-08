@@ -215,6 +215,10 @@ import {
 } from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
 import { executeClareWork, isClareWorkTool, statedPlannerInputs } from './_shared/clare-work.mjs';
+import {
+  executeHammondProductivity,
+  isHammondProductivityTool
+} from './_shared/hammond-productivity.mjs';
 import { loadIntuitionFor, formatIntuitionForPrompt } from './_shared/capabilities/intuition.mjs';
 import {
   GOVERNANCE_LOG_PATH,
@@ -1758,6 +1762,14 @@ export function createChatHandler({
                     ...hubLoadErrors,
                     ...(hammondLifeLoadFailed ? { life: 'load_failed' } : {})
                   }
+                }));
+              }
+              if (slug === 'hammond' && isHammondProductivityTool(event.name)) {
+                send({ type: 'status', text: 'Working…' });
+                return JSON.stringify(executeHammondProductivity(event.name, event.input ?? {}, {
+                  tasks: hubTasks,
+                  projects: hubProjects,
+                  now: nowInstant
                 }));
               }
               if (event.name === 'search_medical_records') {

@@ -1,0 +1,15 @@
+{
+  "id": "hammond.threefold",
+  "tool_name": "threefold_audit",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Predefined reactive defining work audit.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

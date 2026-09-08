@@ -51,6 +51,10 @@ import {
   skippedDiaryThemeExtraction
 } from './domain-analysis.mjs';
 import { getWeekReview } from './hammond-week.mjs';
+import {
+  executeHammondProductivity,
+  isHammondProductivityTool
+} from './hammond-productivity.mjs';
 import { searchMedicalRecords, briefMedicalAppointment, analyseMedicalEvidence, statedHealthConstraints } from './medical-overview-read.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
 import { planWork, statedPlannerInputs } from './clare-work.mjs';
@@ -661,6 +665,18 @@ function runTool(name, stores, today, now, message, options = {}) {
       centralNodeMarkdown: stores.centralNodeMarkdown ?? '',
       today,
       loadErrors
+    });
+  }
+  if (isHammondProductivityTool(name)) {
+    return executeHammondProductivity(name, options.input ?? {}, {
+      tasks,
+      projects: stores.projects ?? [],
+      areas: stores.areas ?? [],
+      goals: stores.goals ?? [],
+      sessions: stores.workSessions ?? [],
+      blocks: stores.workBlocks ?? [],
+      planning_profile: stores.planningProfile ?? null,
+      planning_direction: stores.planningDirection ?? null
     });
   }
   return { ok: false, error: 'unknown_tool' };

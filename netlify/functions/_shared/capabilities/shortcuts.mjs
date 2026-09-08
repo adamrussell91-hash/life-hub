@@ -395,6 +395,24 @@ export function shortcutSchemas() {
           parent_task_id: { type: 'string' },
           estimated_duration: { type: 'number' },
           tags: { type: 'array', items: { type: 'string' } },
+          waiting_on: { type: 'string' },
+          waiting_since: { type: 'string' },
+          follow_up_at: { type: 'string' },
+          waiting_status: { type: 'string', enum: ['waiting', 'follow_up_due', 'resolved'] },
+          target_date: { type: 'string' },
+          review_at: { type: 'string' },
+          contexts: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                kind: { type: 'string' },
+                value: { type: 'string' }
+              }
+            }
+          },
+          cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
+          depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] },
           items: {
             type: 'array',
             description: 'Multiple tasks from one list. Each needs a title.',
@@ -410,7 +428,16 @@ export function shortcutSchemas() {
                 parent_project_id: { type: 'string' },
                 parent_task_id: { type: 'string' },
                 estimated_duration: { type: 'number' },
-                tags: { type: 'array', items: { type: 'string' } }
+                tags: { type: 'array', items: { type: 'string' } },
+                waiting_on: { type: 'string' },
+                waiting_since: { type: 'string' },
+                follow_up_at: { type: 'string' },
+                waiting_status: { type: 'string', enum: ['waiting', 'follow_up_due', 'resolved'] },
+                target_date: { type: 'string' },
+                review_at: { type: 'string' },
+                contexts: { type: 'array', items: { type: 'object' } },
+                cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
+                depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] }
               },
               required: ['title'],
               additionalProperties: false
@@ -436,12 +463,21 @@ export function shortcutSchemas() {
           domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
           due_date: { type: 'string' },
           due_time: { type: 'string' },
+          target_date: { type: 'string' },
+          review_at: { type: 'string' },
           parent_project_id: { type: 'string' },
           parent_task_id: { type: 'string' },
           estimated_duration: { type: 'number' },
           kind: { type: 'string' },
           bucket: { type: 'string' },
-          tags: { type: 'array', items: { type: 'string' } }
+          tags: { type: 'array', items: { type: 'string' } },
+          waiting_on: { type: 'string' },
+          waiting_since: { type: 'string' },
+          follow_up_at: { type: 'string' },
+          waiting_status: { type: 'string', enum: ['waiting', 'follow_up_due', 'resolved'] },
+          contexts: { type: 'array', items: { type: 'object' } },
+          cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
+          depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] }
         },
         required: ['task_id'],
         additionalProperties: false
@@ -1127,7 +1163,16 @@ function normalizeTaskItem(raw) {
     parent_project_id: asOptionalString(raw.parent_project_id),
     parent_task_id: asOptionalString(raw.parent_task_id),
     estimated_duration: estimated,
-    tags
+    tags,
+    waiting_on: asOptionalString(raw.waiting_on),
+    waiting_since: asOptionalString(raw.waiting_since),
+    follow_up_at: asOptionalString(raw.follow_up_at),
+    waiting_status: asOptionalString(raw.waiting_status),
+    target_date: asOptionalString(raw.target_date),
+    review_at: asOptionalString(raw.review_at),
+    contexts: Array.isArray(raw.contexts) ? raw.contexts : undefined,
+    cognitive_load: asOptionalString(raw.cognitive_load),
+    depth: asOptionalString(raw.depth)
   };
 }
 
@@ -1140,7 +1185,7 @@ function collectCreateTaskItems(input) {
 }
 
 function buildTaskRecord(item, { id, now }) {
-  return {
+  const record = {
     schema_version: 1,
     id,
     title: item.title,
@@ -1171,6 +1216,16 @@ function buildTaskRecord(item, { id, now }) {
     source: 'suggested_by_agent',
     page_blocks: []
   };
+  if (item.waiting_on) record.waiting_on = item.waiting_on;
+  if (item.waiting_since) record.waiting_since = item.waiting_since;
+  if (item.follow_up_at) record.follow_up_at = item.follow_up_at;
+  if (item.waiting_status) record.waiting_status = item.waiting_status;
+  if (item.target_date) record.target_date = item.target_date;
+  if (item.review_at) record.review_at = item.review_at;
+  if (item.contexts) record.contexts = item.contexts;
+  if (item.cognitive_load) record.cognitive_load = item.cognitive_load;
+  if (item.depth) record.depth = item.depth;
+  return record;
 }
 
 function handleCreateTask(ctx, input) {
@@ -1222,6 +1277,15 @@ function handleUpdateTask(ctx, input) {
   if (asOptionalString(input.kind)) patch.kind = asOptionalString(input.kind);
   if (asOptionalString(input.bucket)) patch.bucket = asOptionalString(input.bucket);
   if (Array.isArray(input.tags)) patch.tags = input.tags.map(String).filter(Boolean);
+  if (asOptionalString(input.waiting_on)) patch.waiting_on = asOptionalString(input.waiting_on);
+  if (asOptionalString(input.waiting_since)) patch.waiting_since = asOptionalString(input.waiting_since);
+  if (asOptionalString(input.follow_up_at)) patch.follow_up_at = asOptionalString(input.follow_up_at);
+  if (asOptionalString(input.waiting_status)) patch.waiting_status = asOptionalString(input.waiting_status);
+  if (asOptionalString(input.target_date)) patch.target_date = asOptionalString(input.target_date);
+  if (asOptionalString(input.review_at)) patch.review_at = asOptionalString(input.review_at);
+  if (Array.isArray(input.contexts)) patch.contexts = input.contexts;
+  if (asOptionalString(input.cognitive_load)) patch.cognitive_load = asOptionalString(input.cognitive_load);
+  if (asOptionalString(input.depth)) patch.depth = asOptionalString(input.depth);
   if (!Object.keys(patch).length) return deny('update_task needs at least one field to change');
   return propose(
     buildProposal({

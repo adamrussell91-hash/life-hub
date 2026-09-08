@@ -11,7 +11,10 @@
     "data/os/**",
     "intuition/**",
     "teaching:unit:*",
-    "tasks:project:*"
+    "tasks:project:*",
+    "tasks:task:*",
+    "tasks:work_block:*",
+    "tasks:work_session:*"
   ],
   "read_globs": [
     "central-node.md",
@@ -20,7 +23,10 @@
     "data/os/**",
     "intuition/**",
     "teaching:unit:*",
-    "tasks:project:*"
+    "tasks:project:*",
+    "tasks:task:*",
+    "tasks:work_block:*",
+    "tasks:work_session:*"
   ],
-  "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1."
+  "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1. May read/write Tasks work blocks when reconciling Clare schedules."
 }

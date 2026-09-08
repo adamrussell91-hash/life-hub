@@ -18,6 +18,28 @@ import {
   toHubDateKey,
   weekDays
 } from './clare-dates.mjs';
+import {
+  clarifyDump,
+  reclassifyItem,
+  inspectProjectHealth,
+  inspectActiveProjectsHealth,
+  listWaitingItems,
+  waitingPatch,
+  matchActionsNow,
+  composeDaySchedule,
+  validateProposedBlocks,
+  FALLBACK_WORKDAY,
+  computeDeadlineRunway,
+  createFocusBlock,
+  startFocusBlock,
+  finishFocusBlock,
+  buildShutdown,
+  createWeeklyReview,
+  runWeeklyReviewStage,
+  WEEKLY_REVIEW_STAGES,
+  createProjectPlan,
+  updateProjectPlanStage
+} from './productivity-os.mjs';
 const MAX_PROTOCOL_CHARS = 24_000;
 
 function applyProtocolUpdate(current, input) {
@@ -92,7 +114,17 @@ export const CLARE_JOBS = Object.freeze([
   { id: 37, tool: 'check_calendars', job: 'Check Teaching calendar' },
   { id: 38, tool: 'check_calendars', job: 'Check Life / task calendar' },
   { id: 39, tool: 'check_clock', job: 'Read the hub clock in Australia/Sydney' },
-  { id: 40, tool: 'parse_dump', job: 'Parse a dump into task proposals; read or update your protocol' }
+  { id: 40, tool: 'parse_dump', job: 'Parse a dump into task proposals; read or update your protocol' },
+  { id: 41, tool: 'clarify_dump', job: 'Classify a brain dump into destinations before writing' },
+  { id: 42, tool: 'project_health', job: 'Inspect next-action coverage for active projects' },
+  { id: 43, tool: 'waiting_review', job: 'List waiting items and propose waiting patches' },
+  { id: 44, tool: 'weekly_review', job: 'Run Clare weekly review stages' },
+  { id: 45, tool: 'project_plan', job: 'Natural project planning stages' },
+  { id: 46, tool: 'context_match', job: 'Match open actions to current constraints' },
+  { id: 47, tool: 'compose_schedule', job: 'Compose a day around lessons and protected time' },
+  { id: 48, tool: 'focus_block', job: 'Create, start, or finish a focus block' },
+  { id: 49, tool: 'shutdown_day', job: 'Build end-of-day shutdown decisions' },
+  { id: 50, tool: 'deadline_runway', job: 'Backward-plan from a hard deadline without moving it' }
 ]);
 
 const MUTATE_OPS = [
@@ -114,9 +146,10 @@ const OFFICIAL_AU = [
 
 export function formatClareJobsForPrompt() {
   return [
-    'Clare workbench — 40 jobs you can actually do from this chat. Use the named tool. Do not say you cannot do these.',
+    `Clare workbench — ${CLARE_JOBS.length} jobs you can actually do from this chat. Use the named tool. Do not say you cannot do these.`,
     'Internet research: web_search finds pages; fetch_url opens a specific URL; research_topic cites sources; lookup_au_dates / lookup_place / compare_options for dates, venues, and options.',
     'Prefer create_task / update_task for ordinary capture and edits. Other writes (complete/reschedule/split/trash/move/estimate/tag/waiting-on/research notes/batch/pin/create project) go through clare_mutate. Writes wait for Adam to Confirm. Never claim a write landed until the tool returns awaiting_confirm or applied.',
+    'Productivity OS: clarify_dump before capture writes; project_health / waiting_review / context_match / compose_schedule / deadline_runway / focus_block / shutdown_day / weekly_review / project_plan for deterministic planning. Hard deadlines never move via schedule tools.',
     'You cannot send email. draft_comms writes a draft only.',
     ...CLARE_JOBS.map(item => `${item.id}. ${item.job} — ${item.tool}`)
   ].join('\n');
@@ -168,10 +201,27 @@ export function clareWorkSchemas() {
       priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
       due_date: { type: 'string' },
       due_time: { type: 'string' },
+      target_date: { type: 'string' },
+      review_at: { type: 'string' },
       status: { type: 'string' },
       estimated_duration: { type: 'number' },
       tags: { type: 'array', items: { type: 'string' } },
       waiting_on: { type: 'string' },
+      waiting_since: { type: 'string' },
+      follow_up_at: { type: 'string' },
+      waiting_status: { type: 'string', enum: ['waiting', 'follow_up_due', 'resolved'] },
+      contexts: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            kind: { type: 'string', enum: ['device', 'place', 'person', 'energy', 'other'] },
+            value: { type: 'string' }
+          }
+        }
+      },
+      cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
+      depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] },
       notes: { type: 'string' },
       subtasks: { type: 'array', items: { type: 'string' } },
       task_ids: { type: 'array', items: { type: 'string' } },
@@ -182,15 +232,142 @@ export function clareWorkSchemas() {
       project_id: { type: 'string' },
       query: { type: 'string' }
     }, ['view']),
-    tool('plan_work', 'Plan a day or week: time-block, free 15-minute slots, collisions, weekly load, or energy-aware order. Pass energy, capacity_minutes, and workday_start/end when Adam stated them this turn. Do not invent a standing preference. If omitted, the planner uses labelled fallbacks (default 08:00–16:30 is a fallback, not a saved preference).', {
-      view: { type: 'string', enum: ['time_block', 'free_slots', 'collisions', 'week_load', 'energy'] },
+    tool('plan_work', 'Plan a day or week: time-block, free slots, collisions, weekly load, energy order, compose (calendar-aware), or schedule_diff. Pass energy, capacity_minutes, workday_start/end, protected_windows, and confirmed_blocks when known. Do not invent standing preferences. Hard deadlines never move.', {
+      view: { type: 'string', enum: ['time_block', 'free_slots', 'collisions', 'week_load', 'energy', 'compose', 'schedule_diff'] },
       date: { type: 'string' },
       energy_level: { type: 'string', enum: ['low', 'medium', 'high'] },
       cognitive_load: { type: 'number' },
       capacity_minutes: { type: 'number' },
       workday_start: { type: 'string', description: 'HH:MM when Adam stated a start. Omit to use the labelled fallback.' },
-      workday_end: { type: 'string', description: 'HH:MM when Adam stated an end. Omit to use the labelled fallback.' }
+      workday_end: { type: 'string', description: 'HH:MM when Adam stated an end. Omit to use the labelled fallback.' },
+      protected_windows: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            start: { type: 'number', description: 'Minutes from midnight' },
+            end: { type: 'number' },
+            title: { type: 'string' }
+          }
+        }
+      },
+      confirmed_blocks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            start: { type: 'number' },
+            end: { type: 'number' },
+            title: { type: 'string' }
+          }
+        }
+      },
+      task_ids: { type: 'array', items: { type: 'string' } }
     }, ['view']),
+    tool('clarify_dump', 'Classify a brain dump into structured destinations (next_action, project, waiting, calendar, someday, reference, trash) before any write. Reclassify one item when Adam corrects.', {
+      text: { type: 'string' },
+      reclassify_item_id: { type: 'string' },
+      reclassify_destination: {
+        type: 'string',
+        enum: ['next_action', 'project', 'waiting', 'calendar', 'someday', 'reference', 'trash']
+      },
+      stack: { type: 'object' }
+    }),
+    tool('project_health', 'Inspect next-action coverage for one project or all active projects.', {
+      project_id: { type: 'string' },
+      all_active: { type: 'boolean' }
+    }),
+    tool('waiting_review', 'List waiting items with age and follow-up needs. Optionally propose a waiting patch (Confirm).', {
+      today_key: { type: 'string' },
+      action: { type: 'string', enum: ['list', 'follow_up', 'move_follow_up', 'resolved', 'return_to_active'] },
+      task_id: { type: 'string' },
+      follow_up_at: { type: 'string' },
+      waiting_on: { type: 'string' }
+    }),
+    tool('weekly_review', 'Create or advance Clare weekly review stages. Deterministic capture → calendars → waiting → projects → someday → build → confirm.', {
+      review_id: { type: 'string' },
+      state: { type: 'object' },
+      dump_text: { type: 'string' },
+      past_notes: { type: 'array', items: { type: 'string' } },
+      upcoming_notes: { type: 'array', items: { type: 'string' } },
+      today_key: { type: 'string' },
+      advance: { type: 'boolean' }
+    }),
+    tool('project_plan', 'Natural project planning: purpose → desired outcome → brainstorm → organise → next action.', {
+      project_title: { type: 'string' },
+      project_id: { type: 'string' },
+      state: { type: 'object' },
+      purpose: { type: 'string' },
+      constraints: { type: 'string' },
+      desired_outcome: { type: 'string' },
+      brainstorm: { type: 'array', items: { type: 'string' } },
+      organised: { type: 'array', items: { type: 'object' } },
+      next_actions: { type: 'array', items: { type: 'string' } },
+      milestones: { type: 'array', items: { type: 'string' } },
+      advance: { type: 'boolean' }
+    }),
+    tool('context_match', 'Match open actionable work to current constraints. Does not invent energy.', {
+      available_minutes: { type: 'number' },
+      energy_level: { type: 'string', enum: ['low', 'medium', 'high'] },
+      cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
+      device: { type: 'string' },
+      place: { type: 'string' },
+      person: { type: 'string' },
+      deep_work_ok: { type: 'boolean' },
+      now_key: { type: 'string' }
+    }),
+    tool('compose_schedule', 'Compose a day schedule around lessons, events, confirmed blocks, and protected windows. Never moves due_date.', {
+      date: { type: 'string' },
+      energy_level: { type: 'string', enum: ['low', 'medium', 'high'] },
+      workday_start: { type: 'string' },
+      workday_end: { type: 'string' },
+      task_ids: { type: 'array', items: { type: 'string' } },
+      protected_windows: { type: 'array', items: { type: 'object' } },
+      confirmed_blocks: { type: 'array', items: { type: 'object' } },
+      validate_proposed: { type: 'array', items: { type: 'object' } }
+    }),
+    tool('focus_block', 'Create, start, or finish a focus block. Returns deterministic focus state / session payloads.', {
+      action: { type: 'string', enum: ['create', 'start', 'finish'] },
+      state: { type: 'object' },
+      outcome: { type: 'string' },
+      task_id: { type: 'string' },
+      project_id: { type: 'string' },
+      work_block_id: { type: 'string' },
+      planned_duration_minutes: { type: 'number' },
+      finish_condition: { type: 'string' },
+      depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] },
+      start_time: { type: 'string' },
+      result: { type: 'string', enum: ['done', 'partial', 'stopped'] },
+      session_id: { type: 'string' }
+    }, ['action']),
+    tool('shutdown_day', 'Build end-of-day shutdown decisions: loose ends, unresolved today, waiting follow-ups, tomorrow.', {
+      today_key: { type: 'string' },
+      tomorrow_key: { type: 'string' },
+      loose_texts: { type: 'array', items: { type: 'string' } },
+      unconfirmed_titles: { type: 'array', items: { type: 'string' } },
+      tomorrow_events: { type: 'array', items: { type: 'object' } },
+      protected_tomorrow: { type: 'object' }
+    }),
+    tool('deadline_runway', 'Backward-plan from a hard deadline. Never moves the deadline. Reports clear / tight / impossible.', {
+      deadline: { type: 'string' },
+      remaining_minutes: { type: 'number' },
+      calibration_factor: { type: 'number' },
+      already_scheduled_minutes: { type: 'number' },
+      available_minutes_until_deadline: { type: 'number' },
+      buffer_minutes: { type: 'number' },
+      today: { type: 'string' },
+      dependencies: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            title: { type: 'string' },
+            satisfied: { type: 'boolean' }
+          }
+        }
+      }
+    }, ['deadline', 'remaining_minutes']),
     tool('run_desk_protocol', 'Run Morning Sweep, Tomorrow Setup, Weekly Reset, or High Stakes from chat — same briefing as the Clare desk.', {
       protocol_id: { type: 'string', enum: ['morning-sweep', 'tomorrow-setup', 'weekly-reset', 'high-stakes'] }
     }, ['protocol_id']),
@@ -656,7 +833,10 @@ export function planWork(view, {
   now = new Date(),
   energy = null,
   workday = null,
-  capacity_minutes = null
+  capacity_minutes = null,
+  protected_windows = null,
+  confirmed_blocks = null,
+  task_ids = null
 } = {}) {
   const key = dayKey(date, now);
   const day = parseDue(key) ?? startOfDay(now);
@@ -665,6 +845,63 @@ export function planWork(view, {
   const seen = new Set(dueToday.map(task => task.id));
   const dayTasks = [...overdue.filter(task => !seen.has(task.id)), ...dueToday];
   const dayLessons = (lessons ?? []).filter(lesson => String(lessonDate(lesson) ?? '') === key);
+
+  if (view === 'compose' || view === 'schedule_diff') {
+    const idFilter = Array.isArray(task_ids) && task_ids.length
+      ? new Set(task_ids.map(String))
+      : null;
+    const pool = (idFilter
+      ? tasks.filter(task => idFilter.has(String(task.id)))
+      : dayTasks
+    ).filter(task => task.status !== 'done' && task.status !== 'dead');
+    const lessonSpans = dayLessons.map(lesson => {
+      const start = Number(lesson.start_minutes ?? lesson.start ?? NaN);
+      const end = Number(lesson.end_minutes ?? lesson.end ?? NaN);
+      if (Number.isFinite(start) && Number.isFinite(end)) {
+        return { start, end, title: lesson.title ?? 'Lesson', kind: 'lesson' };
+      }
+      return null;
+    }).filter(Boolean);
+    const composed = composeDaySchedule({
+      date: key,
+      tasks: pool.map(task => ({
+        id: task.id,
+        title: task.title,
+        estimated_duration: task.estimated_duration,
+        depth: task.depth ?? null,
+        cognitive_load: task.cognitive_load ?? null,
+        priority: task.priority ?? null,
+        due_date: task.due_date ?? null,
+        target_date: task.target_date ?? null,
+        depends_on: task.depends_on ?? [],
+        blocked: Boolean(task.blocked_since || task.waiting_on)
+      })),
+      lessons: lessonSpans,
+      protected_windows: Array.isArray(protected_windows) ? protected_windows.map(span => ({
+        start: Number(span.start),
+        end: Number(span.end),
+        title: span.title ?? 'Protected',
+        kind: 'protected'
+      })) : [],
+      confirmed_blocks: Array.isArray(confirmed_blocks) ? confirmed_blocks.map(span => ({
+        start: Number(span.start),
+        end: Number(span.end),
+        title: span.title ?? 'Confirmed',
+        kind: 'locked'
+      })) : [],
+      workday: workday?.start && workday?.end
+        ? { start: workday.start, end: workday.end, source: workday.source || 'tool_input' }
+        : null,
+      energy: energy?.level ?? null
+    });
+    return ok({
+      view,
+      ...composed,
+      note: view === 'schedule_diff'
+        ? 'Proposed ghost blocks vs hard busy. Confirm before writing work blocks. Deadlines unchanged.'
+        : 'Compose uses hard constraints first. Deadlines unchanged.'
+    });
+  }
 
   if (view === 'collisions') {
     const collisions = [];
@@ -930,6 +1167,24 @@ function buildTaskRecord(input, existing, nowIso) {
     base.tags = [...new Set([...(base.tags ?? []), ...input.tags.map(tag => String(tag).trim()).filter(Boolean)])];
   }
   if (typeof input.waiting_on === 'string') base.waiting_on = input.waiting_on.trim();
+  if (typeof input.waiting_since === 'string' || input.waiting_since === null) {
+    base.waiting_since = input.waiting_since;
+  }
+  if (typeof input.follow_up_at === 'string' || input.follow_up_at === null) {
+    base.follow_up_at = input.follow_up_at;
+  }
+  if (typeof input.waiting_status === 'string' || input.waiting_status === null) {
+    base.waiting_status = input.waiting_status;
+  }
+  if (typeof input.target_date === 'string' || input.target_date === null) {
+    base.target_date = input.target_date;
+  }
+  if (typeof input.review_at === 'string' || input.review_at === null) {
+    base.review_at = input.review_at;
+  }
+  if (Array.isArray(input.contexts)) base.contexts = input.contexts;
+  if (typeof input.cognitive_load === 'string') base.cognitive_load = input.cognitive_load;
+  if (typeof input.depth === 'string') base.depth = input.depth;
   base.updated_at = nowIso;
   return base;
 }
@@ -1025,6 +1280,12 @@ export function buildClareMutation(input, { tasks = [], projects = [], nowIso = 
   if (op === 'pin_focus') {
     patch.tags = [...(existing.tags ?? []), 'clare-focus'];
     patch.priority = existing.priority === 'low' ? 'high' : existing.priority;
+  }
+  if (op === 'set_waiting_on') {
+    if (typeof patch.waiting_on === 'string' && patch.waiting_on.trim()) {
+      if (!patch.waiting_since) patch.waiting_since = stamp;
+      if (!patch.waiting_status) patch.waiting_status = 'waiting';
+    }
   }
   if (op === 'attach_research') {
     const notes = String(input.notes ?? '').trim();
@@ -1143,8 +1404,182 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       now,
       energy,
       workday,
-      capacity_minutes: input.capacity_minutes ?? ctx.capacity_minutes ?? null
+      capacity_minutes: input.capacity_minutes ?? ctx.capacity_minutes ?? null,
+      protected_windows: input.protected_windows ?? null,
+      confirmed_blocks: input.confirmed_blocks ?? null,
+      task_ids: input.task_ids ?? null
     });
+  }
+  if (name === 'clarify_dump') {
+    if (input.reclassify_item_id && input.reclassify_destination && input.stack) {
+      return ok(reclassifyItem(input.stack, input.reclassify_item_id, input.reclassify_destination));
+    }
+    const text = String(input.text ?? '').trim();
+    if (!text) return deny('missing_text');
+    return ok(clarifyDump(text));
+  }
+  if (name === 'project_health') {
+    if (input.all_active || !input.project_id) {
+      return ok({
+        results: inspectActiveProjectsHealth(projects, tasks, now.toISOString())
+      });
+    }
+    const project = findProject(projects, input.project_id);
+    if (!project) return deny('project_not_found', { project_id: input.project_id });
+    return ok(inspectProjectHealth(project, tasks, now.toISOString()));
+  }
+  if (name === 'waiting_review') {
+    const todayKey = input.today_key || toHubDateKey(now) || now.toISOString().slice(0, 10);
+    const action = input.action || 'list';
+    if (action === 'list') {
+      return ok({ today_key: todayKey, items: listWaitingItems(tasks, todayKey) });
+    }
+    const existing = findTask(tasks, input.task_id);
+    if (!existing) return deny('task_not_found', { task_id: input.task_id ?? null });
+    const patch = waitingPatch(action, {
+      follow_up_at: input.follow_up_at,
+      waiting_on: input.waiting_on,
+      nowIso: now.toISOString()
+    });
+    if (typeof input.waiting_on === 'string') patch.waiting_on = input.waiting_on.trim();
+    const record = buildTaskRecord(patch, existing, now.toISOString());
+    return propose(`Waiting ${action}: ${existing.title}`, [
+      writeEntry(`tasks:task:${record.id}`, 'overwrite', record, `waiting ${action} — ${existing.title}`)
+    ]);
+  }
+  if (name === 'weekly_review') {
+    let state = input.state && typeof input.state === 'object'
+      ? input.state
+      : createWeeklyReview(input.review_id);
+    if (input.advance !== false) {
+      state = runWeeklyReviewStage(state, {
+        dump_text: input.dump_text,
+        past_notes: input.past_notes,
+        upcoming_notes: input.upcoming_notes,
+        tasks,
+        projects,
+        today_key: input.today_key || toHubDateKey(now) || now.toISOString().slice(0, 10),
+        schedule: input.schedule ?? null
+      });
+    }
+    return ok({ stages: WEEKLY_REVIEW_STAGES, state });
+  }
+  if (name === 'project_plan') {
+    let state = input.state && typeof input.state === 'object'
+      ? input.state
+      : null;
+    if (!state) {
+      const title = String(input.project_title ?? '').trim();
+      if (!title) return deny('missing_project_title');
+      state = createProjectPlan({
+        project_title: title,
+        project_id: input.project_id ?? null,
+        purpose: input.purpose,
+        desired_outcome: input.desired_outcome
+      });
+    }
+    const patch = {};
+    for (const key of ['purpose', 'constraints', 'desired_outcome', 'brainstorm', 'organised', 'next_actions', 'milestones']) {
+      if (input[key] !== undefined) patch[key] = input[key];
+    }
+    state = updateProjectPlanStage(state, patch, Boolean(input.advance));
+    return ok({ state });
+  }
+  if (name === 'context_match') {
+    return ok(matchActionsNow(tasks, {
+      available_minutes: input.available_minutes,
+      energy_level: input.energy_level,
+      cognitive_load: input.cognitive_load,
+      device: input.device,
+      place: input.place,
+      person: input.person,
+      deep_work_ok: input.deep_work_ok,
+      now_key: input.now_key || toHubDateKey(now) || now.toISOString().slice(0, 10)
+    }));
+  }
+  if (name === 'compose_schedule') {
+    if (Array.isArray(input.validate_proposed) && input.validate_proposed.length) {
+      const hardBusy = [
+        ...(Array.isArray(input.protected_windows) ? input.protected_windows : []),
+        ...(Array.isArray(input.confirmed_blocks) ? input.confirmed_blocks : [])
+      ];
+      const workday = input.workday_start && input.workday_end
+        ? { start: input.workday_start, end: input.workday_end, source: 'tool_input' }
+        : FALLBACK_WORKDAY;
+      return ok(validateProposedBlocks(input.validate_proposed, hardBusy, workday));
+    }
+    return planWork('compose', {
+      tasks,
+      lessons,
+      date: input.date,
+      now,
+      energy: input.energy_level ? { level: input.energy_level } : null,
+      workday: input.workday_start && input.workday_end
+        ? { start: input.workday_start, end: input.workday_end, source: 'tool_input' }
+        : null,
+      protected_windows: input.protected_windows,
+      confirmed_blocks: input.confirmed_blocks,
+      task_ids: input.task_ids
+    });
+  }
+  if (name === 'focus_block') {
+    const action = input.action || 'create';
+    if (action === 'create') {
+      const outcome = String(input.outcome ?? '').trim();
+      if (!outcome) return deny('missing_outcome');
+      const state = createFocusBlock({
+        outcome,
+        task_id: input.task_id ?? null,
+        project_id: input.project_id ?? null,
+        work_block_id: input.work_block_id ?? null,
+        planned_duration_minutes: Number(input.planned_duration_minutes) || 50,
+        finish_condition: String(input.finish_condition ?? 'Outcome met'),
+        depth: input.depth || 'shallow',
+        start_time: input.start_time ?? null
+      });
+      return ok({ state });
+    }
+    if (!input.state || typeof input.state !== 'object') return deny('missing_focus_state');
+    if (action === 'start') {
+      const started = startFocusBlock(input.state, now.toISOString());
+      return ok({ state: started.state, sessionCreate: started.sessionCreate });
+    }
+    if (action === 'finish') {
+      const finished = finishFocusBlock(input.state, input.result || 'done', now.toISOString());
+      return ok({ state: finished.state, sessionPatch: finished.sessionPatch });
+    }
+    return deny('unknown_focus_action');
+  }
+  if (name === 'shutdown_day') {
+    const todayKey = input.today_key || toHubDateKey(now) || now.toISOString().slice(0, 10);
+    const tomorrowKey = input.tomorrow_key || (() => {
+      const d = parseDue(todayKey);
+      return d ? toDateKey(addDays(d, 1)) : todayKey;
+    })();
+    return ok(buildShutdown({
+      today_key: todayKey,
+      tomorrow_key: tomorrowKey,
+      tasks,
+      loose_texts: input.loose_texts,
+      unconfirmed_titles: input.unconfirmed_titles,
+      tomorrow_events: input.tomorrow_events,
+      protected_tomorrow: input.protected_tomorrow ?? null
+    }));
+  }
+  if (name === 'deadline_runway') {
+    if (!input.deadline || !Number.isFinite(Number(input.remaining_minutes))) {
+      return deny('missing_runway_inputs');
+    }
+    return ok(computeDeadlineRunway({
+      deadline: input.deadline,
+      remaining_minutes: Number(input.remaining_minutes),
+      calibration_factor: input.calibration_factor,
+      already_scheduled_minutes: input.already_scheduled_minutes,
+      available_minutes_until_deadline: input.available_minutes_until_deadline,
+      buffer_minutes: input.buffer_minutes,
+      today: input.today || toHubDateKey(now) || now.toISOString().slice(0, 10),
+      dependencies: input.dependencies
+    }));
   }
   if (name === 'check_calendars') {
     const from = dayKey(input.from, now);

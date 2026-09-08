@@ -227,6 +227,12 @@ export function classifyWriteTarget(path) {
   if (store === 'tasks' && kind === 'task' && BLOB_ID.test(id)) {
     return { store: 'tasks', kind, id, key: `tasks/${id}`, path: raw };
   }
+  if (store === 'tasks' && kind === 'work_block' && BLOB_ID.test(id)) {
+    return { store: 'tasks', kind, id, key: `work_blocks/${id}`, path: raw };
+  }
+  if (store === 'tasks' && kind === 'work_session' && BLOB_ID.test(id)) {
+    return { store: 'tasks', kind, id, key: `work_sessions/${id}`, path: raw };
+  }
   if (store === 'teaching' && kind === 'unit' && BLOB_ID.test(id)) {
     return { store: 'teaching', kind, id, key: `units/${id}`, path: raw };
   }
@@ -377,7 +383,14 @@ async function executeBlobWrite(write, target, {
   if (!record.created_at) record.created_at = existing?.created_at || timestamp;
   await setJSON(store, target.key, record);
   if (touchIndex && write.mode === 'create') {
-    const indexKey = target.kind === 'task' ? TASKS_INDEX_KEY : TASKS_PROJECTS_INDEX;
+    const indexKey =
+      target.kind === 'task'
+        ? TASKS_INDEX_KEY
+        : target.kind === 'work_block'
+          ? 'work_blocks/_index'
+          : target.kind === 'work_session'
+            ? 'work_sessions/_index'
+            : TASKS_PROJECTS_INDEX;
     const ids = await readIndex(store, indexKey);
     await writeIndex(store, indexKey, [...ids, target.id]);
   }

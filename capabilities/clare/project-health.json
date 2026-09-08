@@ -1,0 +1,15 @@
+{
+  "id": "clare.project-health",
+  "tool_name": "project_health",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Inspect next-action coverage for active projects.",
+  "surfaces": [
+    "chat",
+    "confirm_card"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "clare.clarify",
+  "tool_name": "clarify_dump",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Classify a brain dump into destinations before writing.",
+  "surfaces": [
+    "chat",
+    "confirm_card"
+  ]
+}

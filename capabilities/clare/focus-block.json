@@ -1,0 +1,15 @@
+{
+  "id": "clare.focus-block",
+  "tool_name": "focus_block",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Create, start, or finish a focus block.",
+  "surfaces": [
+    "chat",
+    "confirm_card"
+  ]
+}
