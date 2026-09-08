@@ -12,6 +12,11 @@ vi.mock('@/services/client-api', () => ({
   }
 }));
 
+const offerTimedUndo = vi.fn();
+vi.mock('../../design-kit/js/hub-feedback.js', () => ({
+  offerTimedUndo: (...args: unknown[]) => offerTimedUndo(...args)
+}));
+
 function sampleTask(overrides: Partial<Task> = {}): Task {
   return {
     schema_version: 1,
@@ -128,31 +133,39 @@ describe('requestToggleDone', () => {
   beforeEach(() => {
     vi.mocked(tasksApi.updateTask).mockReset();
     vi.mocked(tasksApi.recordClareActual).mockReset();
+    offerTimedUndo.mockReset();
   });
 
-  it('leaves status unchanged when Discard is clicked on a Clare-estimated task', async () => {
-    const host = document.createElement('div');
-    const onDone = vi.fn();
-    requestToggleDone(host, sampleTask(), onDone);
-
-    expect(host.querySelector('.confirm-card')).not.toBeNull();
-    host.querySelector<HTMLButtonElement>('.btn--ghost')?.click();
-
-    expect(onDone).not.toHaveBeenCalled();
-    expect(tasksApi.updateTask).not.toHaveBeenCalled();
-    expect(tasksApi.recordClareActual).not.toHaveBeenCalled();
-    expect(host.querySelector('.confirm-card')).toBeNull();
-  });
-
-  it('records actual minutes only after Confirm', async () => {
-    vi.mocked(tasksApi.recordClareActual).mockResolvedValue(sampleTask({ status: 'done' }) as never);
+  it('marks a Clare-estimated task done immediately without a confirm card', async () => {
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(sampleTask({ status: 'done' }) as never);
     const host = document.createElement('div');
     const onDone = vi.fn().mockResolvedValue(undefined);
+
     requestToggleDone(host, sampleTask(), onDone);
-    host.querySelector<HTMLButtonElement>('.btn--primary')?.click();
+
+    expect(host.querySelector('.confirm-card')).toBeNull();
     await vi.waitFor(() => {
-      expect(tasksApi.recordClareActual).toHaveBeenCalledWith('task_audit', 55);
+      expect(tasksApi.updateTask).toHaveBeenCalledWith('task_audit', { status: 'done' });
       expect(onDone).toHaveBeenCalledTimes(1);
     });
+    expect(tasksApi.recordClareActual).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(offerTimedUndo).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining('Done cancel check') })
+      );
+    });
+  });
+
+  it('reopens a done task without prompting', async () => {
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(sampleTask({ status: 'open' }) as never);
+    const host = document.createElement('div');
+    const onDone = vi.fn().mockResolvedValue(undefined);
+    requestToggleDone(host, sampleTask({ status: 'done' }), onDone);
+    await vi.waitFor(() => {
+      expect(tasksApi.updateTask).toHaveBeenCalledWith('task_audit', { status: 'open' });
+      expect(onDone).toHaveBeenCalledTimes(1);
+    });
+    expect(host.querySelector('.confirm-card')).toBeNull();
+    expect(offerTimedUndo).not.toHaveBeenCalled();
   });
 });
