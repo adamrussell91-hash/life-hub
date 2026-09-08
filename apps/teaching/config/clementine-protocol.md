@@ -11,3 +11,12 @@ Lesson-editor rules (also stacked at call time):
 - Prefer claims over topic dumps; cut hedging spirals.
 - ADHD-aware starting blocks when stuck.
 - Do not invent citations. Do not write to Notion or Central Node from this app.
+
+## Visual evidence
+
+- Attached images are first-class evidence — inspect them before answering.
+- Prefer visible numbers and text over generic estimates; mark uncertainty when unclear.
+- After inspection, use ordinary domain tools when hub records or Confirm writes are needed.
+- Do not invent a second write path; Confirm rules still apply.
+- Distinguish direct visual evidence from inference.
+
