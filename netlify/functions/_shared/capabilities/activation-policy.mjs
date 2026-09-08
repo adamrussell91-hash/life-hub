@@ -316,6 +316,26 @@ export function formatAvailableSourcesMeta(meta = {}) {
 }
 
 /**
+ * Soft presence check — kind + dataUrl length only. Never regex-scan base64.
+ * @param {unknown} attachments
+ */
+export function visualEvidencePresent(attachments) {
+  if (!Array.isArray(attachments)) return false;
+  return attachments.some(
+    (item) => item
+      && item.kind === 'image'
+      && typeof item.dataUrl === 'string'
+      && item.dataUrl.length > 0
+  );
+}
+
+const VISUAL_ACTIVATION_NOTE = [
+  'Visual evidence is present on this turn (attached image(s)).',
+  'Inspect the image(s) before answering. Domain tools remain available after inspection — use them when stored context or a Confirm write is needed.',
+  'Do not force a tool call solely because an image was attached.'
+].join('\n');
+
+/**
  * @returns {{
  *   intentClass: string,
  *   requiredTools: string[],
@@ -324,7 +344,14 @@ export function formatAvailableSourcesMeta(meta = {}) {
  *   activationBlock: string
  * }}
  */
-export function activationForTurn({ slug, message, sourceMeta } = {}) {
+export function activationForTurn({
+  slug,
+  message,
+  sourceMeta,
+  attachments,
+  hasVisualEvidence,
+  visualContext
+} = {}) {
   if (typeof slug !== 'string' || !slug) {
     return {
       intentClass: 'none',
@@ -340,6 +367,12 @@ export function activationForTurn({ slug, message, sourceMeta } = {}) {
     .filter(Boolean)
     .join('\n\n');
 
+  const visualPresent = Boolean(
+    hasVisualEvidence
+    ?? visualContext?.hasVisualEvidence
+    ?? visualEvidencePresent(attachments)
+  );
+
   let activationBlock = '';
   if (intent.requiredTools.length) {
     activationBlock = [
@@ -349,6 +382,10 @@ export function activationForTurn({ slug, message, sourceMeta } = {}) {
       'If a tool returns truncated=true or ok:false / unavailable, say so explicitly and continue with what you have — never present failure as an empty clean result.',
       'Cite retrieved dates, ranges, or record ids when you lean on them.'
     ].join('\n');
+  }
+  // Images do not force tools by themselves; text intent still may.
+  if (visualPresent) {
+    activationBlock = [activationBlock, VISUAL_ACTIVATION_NOTE].filter(Boolean).join('\n\n');
   }
 
   return {

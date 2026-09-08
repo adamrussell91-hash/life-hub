@@ -72,8 +72,19 @@ import { listKnowledgePages } from './_shared/knowledge-data.mjs';
 import {
   buildUserContent,
   MAX_CHAT_IMAGE_BYTES,
+  MAX_CHAT_BODY_BYTES,
   normalizeChatAttachments
 } from '../../packages/design-kit/js/hub-chat-attachments.js';
+import {
+  visualActivationContext,
+  sharedVisualIntelligenceBlock,
+  agentVisualCueBlock,
+  materializeHistoryWithVisualEvidence,
+  collectVisualEvidenceFromHistory,
+  normalizeVisualEvidenceList,
+  recordVisualEvidenceToolSchema,
+  visualTraceFields
+} from '../../packages/design-kit/js/hub-visual-evidence.js';
 import {
   normalizeAuditSession,
   buildHammondAuditContract,
@@ -299,7 +310,7 @@ const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 // function payload while fitting up to three MAX_CHAT_IMAGE_BYTES images.
 const MAX_ATTACHMENT_WIRE_BYTES = Math.ceil(MAX_CHAT_IMAGE_BYTES * 4 / 3) + 256;
 const MAX_BODY_BYTES = Math.min(
-  5 * 1024 * 1024,
+  MAX_CHAT_BODY_BYTES,
   48 * 1024 + 3 * MAX_ATTACHMENT_WIRE_BYTES
 );
 const MAX_MESSAGE_LENGTH = 4000;
@@ -464,7 +475,10 @@ export function createChatHandler({
           slug,
           userMessage: parsed.message,
           today,
-          messages: [...parsed.history, { role: 'user', content: parsed.userContent ?? parsed.message }]
+          messages: [
+            ...materializeHistoryWithVisualEvidence(parsed.history),
+            { role: 'user', content: parsed.userContent ?? parsed.message }
+          ]
         });
         if (forcedPlan) {
           send({ type: 'status', text: 'Locking the plan onto Fitness…' });
@@ -1191,6 +1205,10 @@ export function createChatHandler({
         } catch {
           promotedShortcutDrafts = [];
         }
+        const visualCtx = visualActivationContext(parsed.message, parsed.attachments);
+        const priorVisualEvidence = collectVisualEvidenceFromHistory(parsed.history);
+        const needsVisualEvidenceTool = visualCtx.hasVisualEvidence || priorVisualEvidence.length > 0;
+        let recordedVisualEvidence = [];
         tools = [
           ...buildAgentTools({
             slug,
@@ -1203,7 +1221,9 @@ export function createChatHandler({
             needsVeraMindTools: slug === 'vera',
             needsSaraMedicalTools: needsSaraMedical,
             needsPenelopeDiaryTools,
-            message: parsed.message
+            message: visualCtx.hasVisualEvidence ? null : parsed.message,
+            attachments: parsed.attachments,
+            keepFullDomainTools: visualCtx.keepFullDomainTools
           }),
           ...(needsNutritionChallenges
             ? [
@@ -1212,7 +1232,8 @@ export function createChatHandler({
                 markNutritionChallengeDaySchema()
               ]
             : []),
-          ...buildPromotedShortcutToolSchemas(promotedShortcutDrafts)
+          ...buildPromotedShortcutToolSchemas(promotedShortcutDrafts),
+          ...(needsVisualEvidenceTool ? [recordVisualEvidenceToolSchema()] : [])
         ];
 
         const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
@@ -1289,7 +1310,10 @@ export function createChatHandler({
         activation = activationForTurn({
           slug,
           message: parsed.message,
-          sourceMeta
+          sourceMeta,
+          attachments: parsed.attachments,
+          hasVisualEvidence: visualCtx.hasVisualEvidence,
+          visualContext: visualCtx
         });
         let layeredMemories = [];
         let memoryLoadError = null;
@@ -1431,6 +1455,8 @@ export function createChatHandler({
           hubContext,
           activationCatalogue: activation.catalogueBlock,
           activationDirective: activation.activationBlock,
+          visualIntelligenceBlock: sharedVisualIntelligenceBlock(),
+          agentVisualCueBlock: agentVisualCueBlock(slug),
           evidencePackBlock: surfaceTurn.promptBlock,
           kernelBlock: surfaceTurn.interpretationBlock || ''
         });
@@ -1545,18 +1571,51 @@ export function createChatHandler({
 
           send({
             type: 'status',
-            text: (logFinalize || veraFlush) ? forceStatusFor(slug) : 'Thinking…'
+            text: (logFinalize || veraFlush) ? forceStatusFor(slug) : 'Thinking…',
+            ...(visualCtx.hasVisualEvidence || priorVisualEvidence.length
+              ? {
+                  visual: visualTraceFields({
+                    attachments: parsed.attachments,
+                    visualEvidence: recordedVisualEvidence.length
+                      ? recordedVisualEvidence
+                      : priorVisualEvidence,
+                    visualContextRestored: priorVisualEvidence.length > 0,
+                    toolsUnnarrowed: visualCtx.keepFullDomainTools,
+                    modelHasImageBlocks: visualCtx.hasVisualEvidence
+                  })
+                }
+              : {})
           });
           const streamOpts = {
             slug,
             userMessage: parsed.message,
             today,
             system,
-            messages: [...parsed.history, { role: 'user', content: parsed.userContent ?? parsed.message }],
+            messages: [
+              ...materializeHistoryWithVisualEvidence(parsed.history),
+              { role: 'user', content: parsed.userContent ?? parsed.message }
+            ],
             tools,
             toolChoice: forceToolChoice ? { type: 'any' } : null,
             signal: request.signal,
             executeTools: async event => {
+              if (event.name === 'record_visual_evidence') {
+                const items = normalizeVisualEvidenceList(event.input?.items);
+                recordedVisualEvidence = items;
+                send({ type: 'visual_evidence', items });
+                send({
+                  type: 'status',
+                  text: 'Noted visual evidence…',
+                  visual: visualTraceFields({
+                    attachments: parsed.attachments,
+                    visualEvidence: items,
+                    visualContextRestored: priorVisualEvidence.length > 0,
+                    toolsUnnarrowed: visualCtx.keepFullDomainTools,
+                    modelHasImageBlocks: visualCtx.hasVisualEvidence
+                  })
+                });
+                return JSON.stringify({ ok: true, recorded: items.length });
+              }
               if (event.name === 'get_mind_session') {
                 send({ type: 'status', text: 'Checking Life Hub records…' });
                 const date = typeof event.input?.date === 'string' ? event.input.date.trim() : '';
