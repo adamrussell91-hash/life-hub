@@ -235,7 +235,8 @@ function placeTaskBlocks(
   return {
     proposed,
     remaining,
-    reason: remaining > 0 ? 'No free window under hard constraints' : null
+    reason: remaining > 0 ? 'No free window under hard constraints' : null,
+    complete: remaining === 0 && proposed.length > 0
   };
 }
 
@@ -325,9 +326,11 @@ export function composeDaySchedule(input: {
       energy: input.energy,
       profile
     });
-    proposed.push(...placed.proposed);
-    if (placed.proposed.length) doneIds.add(task.id);
-    if (placed.reason) {
+    if (placed.complete) {
+      proposed.push(...placed.proposed);
+      doneIds.add(task.id);
+    } else if (placed.reason) {
+      for (let i = 0; i < placed.proposed.length; i += 1) plannedSpans.pop();
       unscheduled.push({
         task_id: task.id,
         title: task.title,
@@ -361,9 +364,11 @@ export function composeDaySchedule(input: {
       energy: input.energy,
       profile
     });
-    proposed.push(...placed.proposed);
-    if (placed.proposed.length) doneIds.add(task.id);
-    if (placed.reason) {
+    if (placed.complete) {
+      proposed.push(...placed.proposed);
+      doneIds.add(task.id);
+    } else if (placed.reason) {
+      for (let i = 0; i < placed.proposed.length; i += 1) plannedSpans.pop();
       stillUnsched.push({
         task_id: task.id,
         title: task.title,
