@@ -750,6 +750,8 @@ export function createChatController({
                 text: EMPTY_TURN_RECOVERY
               });
             }
+          } else if (event.code === 'request_too_large') {
+            showChatError(root, 'That photo is too large to send. Try a smaller image.');
           } else {
             showChatError(root, 'Chat is unavailable right now. Please try again.');
           }
@@ -836,6 +838,8 @@ export function createChatController({
         if (!abortedForNewChat && abort.signal.reason !== 'stop') {
           showChatError(root, 'That search took too long. Try again in a moment.');
         }
+      } else if (error?.code === 'request_too_large' || error?.status === 413) {
+        showChatError(root, 'That photo is too large to send. Try a smaller image.');
       } else {
         showChatError(root, 'Chat is unavailable right now. Please try again.');
       }
