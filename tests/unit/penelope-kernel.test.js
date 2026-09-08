@@ -12,6 +12,10 @@ import {
   planTurn,
   runAgentKernel
 } from '../../netlify/functions/_shared/agent-kernel.mjs';
+import {
+  assembleEvidencePack,
+  composeEvidenceClaims
+} from '../../netlify/functions/_shared/evidence-packs.mjs';
 
 const TODAY = '2026-08-20';
 const NOW = new Date('2026-08-20T01:00:00.000Z');
@@ -299,4 +303,137 @@ test('no causal invention and no silent null provenance', () => {
   const unexplained = kernel.claims.filter(claim => !usableProvenance(claim.provenance));
   assert.deepEqual(unexplained.map(claim => `${claim.tool}:${claim.fact}`), []);
   assert.ok(kernelTraceEvent(kernel).retrieveLog?.length);
+});
+
+test('whole-kernel unresolved deictic skips semantic search/theme and leaks no match claims', () => {
+  const kernel = runAgentKernel({
+    slug: 'penelope',
+    message: 'Have I felt like this before?',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      mindEvents: [
+        diary('2026-08-19', { notes: 'feeling flat after work', mood: 'flat' }),
+        diary('2026-08-18', { notes: 'feeling anxious before meeting', mood: 'anxious' }),
+        diary('2026-08-17', { notes: 'feeling hopeful today', mood: 'hopeful' }),
+        diary('2026-08-16', { notes: 'feeling tired after training', mood: 'tired' })
+      ]
+    }
+  });
+  assert.equal(kernel.plan.workflow, 'diary_recurrence');
+  const analysis = kernel.evidence.analyse_diary_evidence;
+  assert.equal(analysis.referent_status, 'unresolved');
+  assert.equal(analysis.supported_match_count, 0);
+  assert.equal(analysis.recurrence_strength, 'unresolved_referent');
+  assert.equal(kernel.evidence.search_diary_records.skipped, true);
+  assert.equal(kernel.evidence.search_diary_records.reason, 'unresolved_referent');
+  assert.equal(kernel.evidence.extract_diary_themes.skipped, true);
+  assert.equal(kernel.evidence.get_diary_range.context_only, true);
+  const facts = kernel.claims.map((c) => `${c.tool}:${c.fact}`);
+  assert.ok(facts.includes('search_diary_records:search_skipped_reason'));
+  assert.equal(facts.some((f) => f.startsWith('search_diary_records:first_result_')), false);
+  assert.equal(facts.some((f) => f.endsWith(':diary_theme')), false);
+  assert.equal(facts.some((f) => f.endsWith(':diary_entry_mood')), false);
+  assert.equal(facts.some((f) => f === 'search_diary_records:result_count'), false);
+  const skipped = (kernel.retrieveLog?.[0]?.tools ?? []).filter((t) => t.skipped);
+  assert.ok(skipped.some((t) => t.name === 'search_diary_records' && t.skip_reason === 'unresolved_referent'));
+  assert.ok(skipped.some((t) => t.name === 'extract_diary_themes' && t.skip_reason === 'unresolved_referent'));
+  assert.equal(kernel.sufficiencyDecision.anotherRound, false);
+  assert.match(String(kernel.sufficiencyDecision.reason), /unresolved deictic referent/i);
+});
+
+test('whole-kernel resolved anxious deictic still runs semantic diary search', () => {
+  const kernel = runAgentKernel({
+    slug: 'penelope',
+    message: 'I am feeling anxious today. Have I felt like this before?',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      mindEvents: [
+        diary('2026-08-10', { notes: 'old anxiety about travel', mood: 'anxious' }),
+        diary('2026-08-01', { notes: 'feeling anxious before exams', mood: 'anxious' }),
+        diary('2026-08-05', { notes: 'feeling hopeful about tomorrow', mood: 'hopeful' })
+      ]
+    }
+  });
+  const analysis = kernel.evidence.analyse_diary_evidence;
+  assert.equal(analysis.referent_value, 'anxious');
+  assert.equal(analysis.referent_status, 'resolved');
+  assert.notEqual(kernel.evidence.search_diary_records?.skipped, true);
+  assert.ok((kernel.evidence.search_diary_records?.count ?? 0) >= 1);
+  assert.ok(analysis.supported_match_count >= 1);
+  const stated = kernel.claims.find((c) => c.fact === 'stated_current_mood');
+  assert.ok(stated);
+  assert.equal(stated.value, 'anxious');
+  assert.equal(stated.provenance.reason, 'user_stated_current_turn');
+});
+
+test('whole-kernel explicit tired query searches and ignores hopeful feeling noise', () => {
+  const kernel = runAgentKernel({
+    slug: 'penelope',
+    message: 'Have I felt tired before?',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      mindEvents: [
+        diary('2026-08-18', { notes: 'felt tired after training', mood: 'tired' }),
+        diary('2026-08-12', { notes: 'feeling tired again', mood: 'tired' }),
+        diary('2026-08-05', { notes: 'feeling hopeful about tomorrow', mood: 'hopeful' })
+      ]
+    }
+  });
+  const analysis = kernel.evidence.analyse_diary_evidence;
+  assert.equal(analysis.referent_value, 'tired');
+  assert.notEqual(kernel.evidence.search_diary_records?.skipped, true);
+  assert.equal(analysis.supported_match_count, 2);
+  assert.equal(analysis.matched_entries.length, 2);
+  assert.ok(analysis.matched_entries.every((e) => /tired/i.test(e.notes)));
+});
+
+test('non-deictic theme query still runs search and theme extraction', () => {
+  const kernel = runAgentKernel({
+    slug: 'penelope',
+    message: 'what themes recur in my diary',
+    today: TODAY,
+    now: NOW,
+    stores: {
+      mindEvents: [
+        diary('2026-08-18', { notes: 'work stress before presentation', mood: 'anxious' }),
+        diary('2026-08-11', { notes: 'work stress after review', mood: 'anxious' }),
+        diary('2026-08-04', { notes: 'calm afternoon walk helped', mood: 'calm' })
+      ]
+    }
+  });
+  assert.notEqual(kernel.evidence.extract_diary_themes?.skipped, true);
+  assert.notEqual(kernel.evidence.search_diary_records?.skipped, true);
+});
+
+test('assembleEvidencePack unresolved Penelope turn skips semantic search/theme claims', () => {
+  const pack = assembleEvidencePack({
+    slug: 'penelope',
+    message: 'Have I felt like this before?',
+    today: TODAY,
+    stores: {
+      mindEvents: [
+        diary('2026-08-19', { notes: 'feeling flat after work', mood: 'flat' }),
+        diary('2026-08-18', { notes: 'feeling anxious before meeting', mood: 'anxious' }),
+        diary('2026-08-17', { notes: 'feeling hopeful today', mood: 'hopeful' }),
+        diary('2026-08-16', { notes: 'feeling tired after training', mood: 'tired' })
+      ]
+    },
+    force: true
+  });
+  const search = pack.sections.find((s) => s.id === 'search_diary_records');
+  const themes = pack.sections.find((s) => s.id === 'extract_diary_themes');
+  const range = pack.sections.find((s) => s.id === 'get_diary_range');
+  assert.equal(search?.data?.skipped, true);
+  assert.equal(themes?.data?.skipped, true);
+  assert.equal(range?.data?.context_only, true);
+  const evidence = Object.fromEntries(pack.sections.map((s) => [s.id, s.data]));
+  const composed = composeEvidenceClaims(evidence);
+  const facts = composed.claims.map((c) => `${c.tool}:${c.fact}`);
+  assert.ok(facts.includes('search_diary_records:search_skipped_reason'));
+  assert.equal(facts.some((f) => f.startsWith('search_diary_records:first_result_')), false);
+  assert.equal(facts.some((f) => f.endsWith(':diary_theme')), false);
+  assert.equal(facts.some((f) => f.endsWith(':diary_entry_mood')), false);
 });

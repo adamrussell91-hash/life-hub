@@ -251,3 +251,21 @@ Hammond remains **blocked**. Production kernel remains **off**. `docs/AGENT_CAPA
 ### Deterministic correction pass (continuation 4)
 
 Local Cursor unit execution after Penelope deictic-referent fix: **345 pass / 0 fail** across Ann–Vera + mind-session-read + Clare/Chadwick + evidence/provenance/kernel + Confirm/chat-job/compact-turn + fitness/workout confirm + context-delivery suites. Deployed specialist live gate still blocked without authenticated session.
+
+### Independent review defects (continuation 5) — failure → root cause → correction → regression → status
+
+#### Defect 4 — unresolved deictic still leaked raw feel/felt search evidence
+
+| Step | Detail |
+| --- | --- |
+| Failure | Penelope analysis correctly marked bare deictic referent unresolved, but independent raw diary search and theme extraction still ran on generic feel/felt language, injecting misleading historical match claims into the same evidence pack. |
+| Root cause | Referent resolution happened inside analyseDiaryEvidence after the retrieval plan had already scheduled semantic diary search. |
+| Correction | Referent resolution now gates semantic search/theme extraction. Unresolved deictic turns skip semantic matching and expose only explicit unresolved status plus optional context-only range. `composeEvidenceClaims` emits skip-reason status only (no `first_result_*` / `diary_theme` / match counts from skipped tools). |
+| Regression | whole-kernel unresolved-turn claim audit + resolved-turn searches + alternate evidence-pack path (`penelope-kernel.test.js`). |
+| Status | `deterministic only` |
+
+Hammond remains **blocked**. Production kernel remains **off**. `docs/AGENT_CAPABILITY_STRATEGY.md` **unchanged**.
+
+### Deterministic correction pass (continuation 5)
+
+Local Cursor unit execution after unresolved-referent retrieval gating: see final report count after full specialist + Clare/Chadwick regression suite. Deployed specialist live gate still blocked without authenticated session.
