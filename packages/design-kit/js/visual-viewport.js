@@ -32,18 +32,29 @@ function quantize(n) {
 }
 
 function keyboardOpenFromGeometry(vv) {
-  const insetBottom = Math.max(0, globalThis.innerHeight - vv.height - vv.offsetTop);
-  if (insetBottom > VV_KEYBOARD_OPEN_PX) return { open: true, insetBottom };
+  const rawInset = Math.max(0, globalThis.innerHeight - vv.height - vv.offsetTop);
 
-  // iOS Safari often shrinks innerHeight with the keyboard, so inset stays ~0.
-  // Compare against the tallest recent closed height instead.
+  // Primary signal (iOS Safari): visualViewport.height collapses vs the closed
+  // baseline. Prefer this — innerHeight−vv.height alone false-fires in desktop
+  // Chrome DevTools device mode (large inset, vv.height still full device).
   if (closedBaselineHeight > 0) {
     const shrunk = closedBaselineHeight - vv.height;
     if (shrunk > VV_BASELINE_SHRINK_PX) {
-      return { open: true, insetBottom: Math.max(insetBottom, shrunk) };
+      return { open: true, insetBottom: Math.max(rawInset, shrunk) };
     }
   }
-  return { open: false, insetBottom };
+
+  // Secondary: large layout inset only when the visual viewport also moved
+  // (offsetTop) or clearly collapsed vs the screen — not DevTools chrome noise.
+  if (rawInset > VV_KEYBOARD_OPEN_PX) {
+    const screenH = Number(globalThis.screen?.height) || 0;
+    const collapsedVsScreen = screenH > 0 && screenH - vv.height > VV_KEYBOARD_OPEN_PX;
+    if (vv.offsetTop > 8 || collapsedVsScreen) {
+      return { open: true, insetBottom: rawInset };
+    }
+  }
+
+  return { open: false, insetBottom: 0 };
 }
 
 function chatViewBusy() {
@@ -98,7 +109,9 @@ function syncVisualViewport() {
   writeViewportVars(root, {
     offsetTop: vv.offsetTop,
     height: vv.height,
-    insetBottom
+    // Composer focus alone must not invent a bottom inset from DevTools
+    // innerHeight−vv.height noise — only real geometry may set it.
+    insetBottom: geometryOpen ? insetBottom : 0
   });
   root.classList.toggle('vv-keyboard-open', true);
 }

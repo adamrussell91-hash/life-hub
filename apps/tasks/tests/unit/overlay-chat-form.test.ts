@@ -83,6 +83,9 @@ describe('mobile overlay chat form', () => {
 
   it('pins full-page Clare to the visual viewport and docks on keyboard', () => {
     expect(viewsCss).toMatch(
+      /html\.vv-keyboard-open[\s\S]*data-hub-view='clare'[\s\S]*position:\s*fixed/
+    );
+    expect(viewsCss).toMatch(
       /html\.vv-keyboard-open[\s\S]*data-hub-view='clare'[\s\S]*height:\s*var\(--vv-height/
     );
     expect(viewsCss).toMatch(

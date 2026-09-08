@@ -99,4 +99,23 @@ describe('visual viewport inset', () => {
     form.remove();
     vi.useRealTimers();
   });
+
+  it('does not treat DevTools innerHeight−vv.height noise as a keyboard', () => {
+    const listeners: Record<string, Set<() => void>> = { resize: new Set() };
+    const vv = {
+      height: 844,
+      offsetTop: 0,
+      addEventListener: (type: string, fn: () => void) => listeners[type]?.add(fn),
+      removeEventListener: (type: string, fn: () => void) => listeners[type]?.delete(fn)
+    };
+    vi.stubGlobal('innerHeight', 1012);
+    vi.stubGlobal('screen', { height: 844 });
+    vi.stubGlobal('visualViewport', vv);
+
+    attachVisualViewportInset();
+
+    expect(document.documentElement.classList.contains('vv-keyboard-open')).toBe(false);
+    expect(document.documentElement.style.getPropertyValue('--vv-height')).toBe('');
+    expect(document.documentElement.style.getPropertyValue('--vv-offset-bottom')).toBe('');
+  });
 });

@@ -88,6 +88,19 @@ test('vv-keyboard-open stays off when the visual viewport barely shrinks', () =>
   detachVisualViewportInset();
 });
 
+test('DevTools innerHeight−vv.height noise does not open keyboard mode', () => {
+  const { style, classList } = mockDocument();
+  globalThis.innerHeight = 1012;
+  globalThis.screen = { height: 844 };
+  mockVisualViewport({ offsetTop: 0, height: 844 });
+
+  attachVisualViewportInset();
+  assert.equal(classList.contains('vv-keyboard-open'), false);
+  assert.equal(style.has('--vv-height'), false);
+  assert.equal(style.has('--vv-offset-bottom'), false);
+  detachVisualViewportInset();
+});
+
 test('vv-keyboard-open flips from closed baseline when iOS shrinks innerHeight with the keyboard', () => {
   const { classList } = mockDocument();
   const vvListeners = new Map();

@@ -2509,6 +2509,9 @@
    * sat mid-screen above the locked nav. Class comes from design-kit
    * visual-viewport.js; :focus-within is the belt-and-suspenders path when iOS
    * inset math stays ~0.
+   *
+   * position:fixed pins the canvas to the visual frame — a plain height shrink
+   * left a cotton gap under the composer when the outer shell was taller.
    */
   .hub-layout[data-hub-view='clare'] {
     position: relative;
@@ -2519,6 +2522,12 @@
 
   html.vv-keyboard-open .hub-layout[data-hub-view='clare'],
   .hub-layout[data-hub-view='clare']:has(#chat-form:focus-within) {
+    position: fixed;
+    z-index: 20;
+    top: var(--vv-offset-top, 0px);
+    left: 0;
+    right: 0;
+    width: 100%;
     height: var(--vv-height, 100dvh);
     max-height: var(--vv-height, 100dvh);
   }
