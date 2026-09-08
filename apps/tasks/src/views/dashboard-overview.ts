@@ -212,10 +212,18 @@ function renderNextAction(
     event.preventDefault();
     openAction();
   });
-  card.append(el('p', 'hub-card__eyebrow', 'Next action'));
+  const ring = el('span', 'dashboard-next__ring');
+  ring.setAttribute('aria-hidden', 'true');
+  ring.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"/><path d="M12 8v4l2.5 2.5"/></svg>';
+
+  const body = el('div', 'dashboard-next__body');
+  body.append(el('p', 'hub-card__eyebrow dashboard-next__eyebrow', 'Next up'));
   const row = el('div', 'dashboard-next__row');
   const title = el('p', 'dashboard-next__title', action.title);
   row.append(title, el('span', sourceChipClass(action.source), action.source));
+  body.append(row);
+
   const go = el(
     'button',
     action.kind === 'complete' ? 'btn btn--primary' : 'btn btn--decisive',
@@ -234,8 +242,7 @@ function renderNextAction(
     }
     openAction();
   });
-  row.append(go);
-  card.append(row);
+  card.append(ring, body, go);
   return card;
 }
 
@@ -359,6 +366,22 @@ function renderTimelineRail(
   return rail;
 }
 
+function renderTimelineGroup(
+  label: string,
+  items: DashboardTimelineItem[],
+  options: DashboardOverviewOptions,
+  danger = false
+): HTMLElement {
+  const group = el('div', 'dashboard-timeline__group');
+  group.append(
+    el('h3', `dashboard-timeline__label${danger ? ' dashboard-timeline__label--danger' : ''}`, label)
+  );
+  const list = el('ul', 'dashboard-overview__list dashboard-timeline__list');
+  for (const item of items) list.append(renderTimelineRow(item, options));
+  group.append(list);
+  return group;
+}
+
 function renderTimelineCard(
   items: DashboardTimelineItem[],
   options: DashboardOverviewOptions,
@@ -382,19 +405,27 @@ function renderTimelineCard(
   const dayItems = itemsForDay(items, selectedKey, todayKey);
   const agenda = el('div', 'dashboard-timeline');
   if (selectedKey === todayKey) agenda.id = 'timeline-today';
-  agenda.append(
-    el(
-      'h3',
-      'dashboard-timeline__label',
-      selectedKey === todayKey ? 'Today' : formatDisplayDate(selectedKey)
-    )
-  );
+
   if (!dayItems.length) {
-    agenda.append(el('p', 'empty-state empty-state--compact', 'Clear.'));
+    agenda.append(
+      el(
+        'h3',
+        'dashboard-timeline__label',
+        selectedKey === todayKey ? 'Today' : formatDisplayDate(selectedKey)
+      ),
+      el('p', 'empty-state empty-state--compact', 'Clear.')
+    );
+  } else if (selectedKey === todayKey) {
+    const overdueItems = dayItems.filter((item) => item.daysOut < 0);
+    const todayItems = dayItems.filter((item) => item.daysOut >= 0);
+    if (overdueItems.length) {
+      agenda.append(renderTimelineGroup('Overdue', overdueItems, options, true));
+    }
+    if (todayItems.length) {
+      agenda.append(renderTimelineGroup('Today', todayItems, options));
+    }
   } else {
-    const list = el('ul', 'dashboard-overview__list dashboard-timeline__list');
-    for (const item of dayItems) list.append(renderTimelineRow(item, options));
-    agenda.append(list);
+    agenda.append(renderTimelineGroup(formatDisplayDate(selectedKey), dayItems, options));
   }
   card.append(agenda);
   return card;
@@ -605,14 +636,15 @@ export function renderDashboardOverview(host: HTMLElement, options: DashboardOve
   }
 
   const heatDays = dashboardHeatDays(tasks, projects, now);
-  panel.append(renderHeatCard(heatDays, selectedKey, options, selectDay));
+  const rail = el('div', 'dashboard-overview__rail');
+  rail.append(
+    renderHeatCard(heatDays, selectedKey, options, selectDay),
+    renderProjectsCard(projects, tasks, now, options)
+  );
 
   const grid = el('div', 'dashboard-overview__grid dashboard-overview__grid--merged');
   const timeline = dashboardTimeline(tasks, projects, now);
-  grid.append(
-    renderTimelineCard(timeline, options, now, selectedKey, selectDay),
-    renderProjectsCard(projects, tasks, now, options)
-  );
+  grid.append(rail, renderTimelineCard(timeline, options, now, selectedKey, selectDay));
   panel.append(grid);
 
   const pressure = el('div', 'dashboard-overview__pressure');
