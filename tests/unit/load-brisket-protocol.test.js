@@ -8,6 +8,7 @@ test('loads the checked-in Brisket protocol markdown', () => {
   assert.match(text, /Logging protocol|Central Node after meal/i);
   assert.match(text, /compact verdict|on track/i);
   assert.match(text, /Corrections \(same slot\)|replace/i);
+  assert.match(text, /Deletions \(remove the slot\)|delete_meal/i);
   assert.match(text, /Confirm card|awaiting confirm|not logged until/i);
   assert.match(text, /do not (say|claim).{0,40}logged/i);
   assert.match(text, /partial (panel|NIP|nutrition)|re-search|ask.{0,20}(label|wrapper)/i);
