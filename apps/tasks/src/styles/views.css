@@ -4367,6 +4367,40 @@ html.is-map-fullscreen .map-page .map-preview {
   color: var(--danger);
 }
 
+.calendar-touched-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.calendar-touched-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--warm-white);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.calendar-touched-chip__name {
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+.calendar-touched-chip__age {
+  color: var(--muted);
+}
+.calendar-touched-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  flex: 0 0 auto;
+}
+.calendar-touched-dot--ok { background: var(--success); }
+.calendar-touched-dot--watch { background: var(--warning); }
+.calendar-touched-dot--stale { background: var(--danger); }
+
 .calendar-filters {
   align-items: stretch;
   margin-bottom: var(--space-4);

@@ -240,6 +240,38 @@ describe('calendar productivity layer', () => {
     expect(location.hash).toContain('proj_x');
   });
 
+  it('shows real per-domain last-touched chips, most-stale first, honestly labeled', async () => {
+    const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([
+      task({ id: 'task_fresh', title: 'Mark essays', domain: 'teaching', due_date: null, updated_at: daysAgo(2) }),
+      task({ id: 'task_stale', title: 'Book venue', domain: 'wedding', due_date: null, updated_at: daysAgo(30) })
+      // health, life, other: no tasks at all — should read "no activity yet".
+    ]);
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([]);
+
+    location.hash = '#/month?date=2026-08-17';
+    const canvas = document.createElement('main');
+    await renderMonthView(canvas);
+
+    const chips = [...canvas.querySelectorAll<HTMLElement>('.calendar-touched-chip')];
+    const byLabel = (label: string) => chips.find((c) => c.textContent?.startsWith(label));
+
+    const wedding = byLabel('wedding');
+    expect(wedding?.textContent).toContain('30d ago');
+    expect(wedding?.querySelector('.calendar-touched-dot')?.className).toContain('--stale');
+
+    const teaching = byLabel('teaching');
+    expect(teaching?.textContent).toContain('2d ago');
+    expect(teaching?.querySelector('.calendar-touched-dot')?.className).toContain('--ok');
+
+    const health = byLabel('health');
+    expect(health?.textContent).toContain('no activity yet');
+
+    // Most-stale first: wedding (30d) before teaching (2d).
+    const order = chips.map((c) => c.textContent ?? '');
+    expect(order.indexOf(wedding!.textContent!)).toBeLessThan(order.indexOf(teaching!.textContent!));
+  });
+
   it('flags real stalled projects with a link to Projects', async () => {
     vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
     vi.mocked(tasksApi.listProjects).mockResolvedValue([
