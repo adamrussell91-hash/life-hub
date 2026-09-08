@@ -971,7 +971,7 @@ async function loadBlobStoresForWrites(writes, { env, getTasksStore, getTeaching
     || writes.some(write => classifyWriteTarget(write.path).kind === 'work_block');
   try {
     if (needsTasks) stores.tasks = await getTasksStore(env);
-    if (needsTeaching || needsTasks) stores.teaching = await getTeachingStore(env);
+    if (needsTeaching) stores.teaching = await getTeachingStore(env);
   } catch {
     return { ok: false, error: 'blobs_unavailable' };
   }
