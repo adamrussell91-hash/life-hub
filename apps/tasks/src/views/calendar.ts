@@ -1,9 +1,15 @@
 import type { Task, TaskDomain } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
+import type { ClareDumpResult, ClareProposal } from '@/domain/clare';
 import { tasksApi } from '@/services/client-api';
 import { hashQuery } from '@/shell/shell';
-import { toDateKey } from '@/domain/queries';
-import { detectPinchPoints } from '@/domain/pinch';
+import { backlogTasks, toDateKey } from '@/domain/queries';
+import { somedayTasks } from '@/domain/hierarchy';
+import { detectPinchPoints, type PinchPoint } from '@/domain/pinch';
+import { buildDayCapacity } from '@/domain/capacity';
+import { findStallCandidates } from '@/domain/stall';
+import { buildProjectPulseCard } from '@/domain/projects-pulse';
+import { projectPageHash } from '@/domain/cards';
 import {
   addCalendarRange,
   calendarHash,
@@ -308,16 +314,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       }
     }
     if (task) {
-      preview.replaceChildren();
-      await renderTaskEditor(preview, task, projects, () => void reload());
-      const actions = el('div', 'calendar-preview__actions');
-      const done = el('button', 'btn btn--secondary', task.status === 'done' ? 'Reopen' : 'Done');
-      done.type = 'button';
-      done.addEventListener('click', () => {
-        requestToggleDone(preview, task, () => reload());
-      });
-      actions.append(done);
-      preview.append(actions);
+      await openBacklogTask(task, preview, projects, reload);
       return;
     }
     preview.replaceChildren(
@@ -556,6 +553,10 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     const workspace = el('div', 'hub-calendar__workspace');
     const body = el('div', 'hub-calendar__body');
     if (session.mode === 'month') {
+      const stallBanner = renderStalledProjectsBanner(projects, tasks);
+      if (stallBanner) body.append(stallBanner);
+      const pulseStrip = renderProjectPulseStrip(projects, tasks);
+      if (pulseStrip) body.append(pulseStrip);
       body.append(
         renderMonthGrid(
           days,
@@ -580,7 +581,9 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
           today,
           showPreview,
           selectDay,
-          dropTask
+          dropTask,
+          tasks,
+          pinchesByKey
         )
       );
     }
@@ -596,6 +599,14 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       () => void reload()
     );
     rail.append(renderStandingCompose(composeDraft, onCreated), agenda, preview, renderShortcutHint());
+    if (session.mode === 'week') {
+      rail.append(renderLocksWidget(days, items, showPreview));
+      rail.append(
+        renderNextActionsWidget(tasks, (task) => openBacklogTask(task, preview, projects, reload))
+      );
+      rail.append(renderDumpWidget(onCreated));
+      rail.append(renderQuickLinksWidget(tasks));
+    }
     workspace.append(body, rail);
     calendar.append(workspace);
     canvas.append(calendar);
@@ -994,7 +1005,9 @@ function renderTimeGrid(
   now: Date,
   onOpen: (item: CalendarItem) => void,
   onSelect: (day: Date, dueTime?: string | null, focusCompose?: boolean) => void,
-  onDrop: (taskId: string, dateKey: string, dueTime?: string | null) => void
+  onDrop: (taskId: string, dateKey: string, dueTime?: string | null) => void,
+  tasks: Task[] = [],
+  pinchesByKey: Map<string, PinchPoint> = new Map()
 ): HTMLElement {
   const grid = el('div', 'hub-calendar__timegrid');
   grid.style.setProperty('--days', String(days.length));
@@ -1009,7 +1022,16 @@ function renderTimeGrid(
     heading.dataset.date = key;
     if (key === todayKey) heading.dataset.today = 'true';
     if (key === selectedKey) heading.dataset.selected = 'true';
+    const pinch = pinchesByKey.get(key);
+    if (pinch) {
+      heading.dataset.pinch = pinch.severity;
+      heading.title = pinch.summary;
+    }
+    const capacity = buildDayCapacity(tasks, day);
+    const capDot = el('span', `calendar-cap-dot calendar-cap-dot--${capacity.level}`);
+    capDot.setAttribute('aria-hidden', 'true');
     heading.append(
+      capDot,
       el('span', 'hub-calendar__week-weekday', weekdayShort(day)),
       el('span', 'hub-calendar__day-num', String(day.getDate()))
     );
@@ -1199,6 +1221,238 @@ function openCalendarCommand(
   overlay.append(panel);
   document.body.append(overlay);
   overlay.querySelector('input')?.focus();
+}
+
+/** Open a raw Task (no due date — not a CalendarItem) in the preview pane. Shared by
+ *  `openItem`'s task branch and every rail widget that lists undated tasks. */
+async function openBacklogTask(
+  task: Task,
+  preview: HTMLElement,
+  projects: Project[],
+  reload: () => Promise<void>
+): Promise<void> {
+  preview.hidden = false;
+  preview.replaceChildren();
+  await renderTaskEditor(preview, task, projects, () => void reload());
+  const actions = el('div', 'calendar-preview__actions');
+  const done = el('button', 'btn btn--secondary', task.status === 'done' ? 'Reopen' : 'Done');
+  done.type = 'button';
+  done.addEventListener('click', () => {
+    requestToggleDone(preview, task, () => reload());
+  });
+  actions.append(done);
+  preview.append(actions);
+}
+
+/** The single highest-priority dated task per visible day — real data, not invented. */
+function renderLocksWidget(
+  days: Date[],
+  items: CalendarItem[],
+  onOpen: (item: CalendarItem) => void
+): HTMLElement {
+  const card = el('section', 'hub-calendar__detail calendar-locks');
+  card.append(el('h3', 'hub-calendar__detail-heading', "This week's locks"));
+  card.append(
+    el('p', 'hub-calendar__detail-empty', "Each day's single highest-priority dated task.")
+  );
+  const list = el('div', 'calendar-locks__list');
+  for (const day of days) {
+    const lock = itemsForDay(items, day).find((item) => item.kind === 'task' && item.task);
+    const row = el('button', `calendar-lock-row${lock ? ' is-locked' : ''}`);
+    row.type = 'button';
+    row.disabled = !lock;
+    row.append(
+      el('span', 'calendar-lock-row__day', weekdayShort(day).slice(0, 3).toUpperCase()),
+      el('span', 'calendar-lock-row__task', lock ? lock.title : 'Nothing due')
+    );
+    if (lock) row.addEventListener('click', () => onOpen(lock));
+    list.append(row);
+  }
+  card.append(list);
+  return card;
+}
+
+/** GTD-style next actions: real backlog tasks (open/deferred, no due date), grouped by
+ *  whatever tag they actually carry — there is no reserved "context" convention in this
+ *  app, so this groups on real data rather than inventing a taxonomy. */
+function renderNextActionsWidget(tasks: Task[], openTask: (task: Task) => void): HTMLElement {
+  const card = el('section', 'hub-calendar__detail calendar-next-actions');
+  card.append(el('h3', 'hub-calendar__detail-heading', 'Next actions'));
+  const backlog = backlogTasks(tasks);
+  if (!backlog.length) {
+    card.append(
+      el('p', 'hub-calendar__detail-empty', 'Backlog is empty — everything has a date or is done.')
+    );
+    return card;
+  }
+  const groups = new Map<string, Task[]>();
+  for (const task of backlog.slice(0, 12)) {
+    const tag = task.tags[0] ?? 'No tag';
+    if (!groups.has(tag)) groups.set(tag, []);
+    groups.get(tag)!.push(task);
+  }
+  const stack = el('div', 'task-stack');
+  for (const [tag, group] of groups) {
+    stack.append(el('p', 'calendar-next-actions__group', tag));
+    for (const task of group) {
+      mountTaskCard(stack, task, { onEdit: () => openTask(task) });
+    }
+  }
+  card.append(stack);
+  if (backlog.length > 12) {
+    const more = el('a', 'calendar-next-actions__more', `+${backlog.length - 12} more in Backlog →`);
+    more.href = '#/backlog';
+    card.append(more);
+  }
+  return card;
+}
+
+/** Clare's real dump → propose → accept flow, embedded in the calendar rail instead of
+ *  the full chat UI. No LLM required — `processDumpWithClare` runs the same rule-based
+ *  parser Clare's desk uses; `acceptClareProposal` is the same Confirm-before-write call
+ *  that creates a real task. */
+function renderDumpWidget(onCreated: (task: Task) => void): HTMLElement {
+  const card = el('section', 'hub-calendar__detail calendar-dump');
+  card.append(el('h3', 'hub-calendar__detail-heading', 'Brain dump'));
+  const form = el('form', 'calendar-dump__form');
+  const textarea = document.createElement('textarea');
+  textarea.className = 'hub-search__input calendar-dump__input';
+  textarea.rows = 2;
+  textarea.placeholder = 'Dump away.';
+  textarea.setAttribute('aria-label', 'Brain dump');
+  const submit = el('button', 'btn btn--primary', 'Sort it');
+  submit.type = 'submit';
+  form.append(textarea, submit);
+  const results = el('div', 'calendar-dump__results');
+  card.append(form, results);
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const text = textarea.value.trim();
+    if (!text) return;
+    submit.disabled = true;
+    const previousLabel = submit.textContent ?? 'Sort it';
+    submit.textContent = 'Sorting…';
+    tasksApi.processDumpWithClare({ text }).then(
+      (result) => {
+        submit.disabled = false;
+        submit.textContent = previousLabel;
+        textarea.value = '';
+        renderDumpResults(results, result, onCreated);
+      },
+      (err: unknown) => {
+        submit.disabled = false;
+        submit.textContent = previousLabel;
+        results.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not process that dump')));
+      }
+    );
+  });
+  return card;
+}
+
+function renderDumpResults(
+  host: HTMLElement,
+  result: ClareDumpResult,
+  onCreated: (task: Task) => void
+): void {
+  host.replaceChildren();
+  if (!result.proposals.length) {
+    const note =
+      result.questions[0] ?? result.notes[0] ?? 'Nothing actionable in that — try naming a concrete next step.';
+    host.append(el('p', 'hub-calendar__detail-empty', note));
+    return;
+  }
+  for (const proposal of result.proposals) {
+    host.append(renderDumpProposalRow(proposal, onCreated));
+  }
+}
+
+function renderDumpProposalRow(proposal: ClareProposal, onCreated: (task: Task) => void): HTMLElement {
+  const row = el('div', 'calendar-dump__proposal');
+  row.append(el('p', 'calendar-dump__proposal-title', proposal.title));
+  const meta = el('div', 'hub-chips');
+  const priority = el('span', 'priority-chip', proposal.priority);
+  priority.dataset.priority = proposal.priority;
+  meta.append(el('span', 'hub-chip', proposal.domain), priority);
+  if (proposal.due_date) meta.append(el('span', 'hub-chip', formatDisplayDate(proposal.due_date)));
+  row.append(meta);
+
+  const actions = el('div', 'calendar-dump__proposal-actions');
+  const discard = el('button', 'btn btn--ghost', 'Discard');
+  discard.type = 'button';
+  discard.addEventListener('click', () => row.remove());
+  const confirm = el('button', 'btn btn--primary', 'Add');
+  confirm.type = 'button';
+  confirm.addEventListener('click', () => {
+    confirm.disabled = true;
+    discard.disabled = true;
+    tasksApi.acceptClareProposal({ proposal, accepted_minutes: proposal.suggested_accepted_minutes }).then(
+      (accepted) => {
+        row.remove();
+        onCreated(accepted.task);
+      },
+      (err: unknown) => {
+        confirm.disabled = false;
+        discard.disabled = false;
+        row.append(el('p', 'empty-state', errorMessage(err, 'Could not save that task')));
+      }
+    );
+  });
+  actions.append(discard, confirm);
+  row.append(actions);
+  return row;
+}
+
+/** Real, always-live counts — clicking always lands on the real route, never a stub. */
+function renderQuickLinksWidget(tasks: Task[]): HTMLElement {
+  const card = el('section', 'hub-calendar__detail calendar-quick-links');
+  const row = el('div', 'calendar-quick-links__row');
+  const someday = el('a', 'btn btn--secondary', `Someday · ${somedayTasks(tasks).length}`);
+  someday.href = '#/someday';
+  const backlog = el('a', 'btn btn--secondary', `Backlog · ${backlogTasks(tasks).length}`);
+  backlog.href = '#/backlog';
+  row.append(someday, backlog);
+  card.append(row);
+  return card;
+}
+
+/** Real project-pulse cards (energy, drift vs. plan) — reuses the same domain logic the
+ *  Projects view renders, so the numbers always match. Omitted entirely when there are
+ *  no active projects, rather than showing an empty strip. */
+function renderProjectPulseStrip(projects: Project[], tasks: Task[]): HTMLElement | null {
+  const active = projects.filter((p) => p.status !== 'archived_dead');
+  if (!active.length) return null;
+  const stallIds = new Set(findStallCandidates(projects, tasks).map((c) => c.project.id));
+  const strip = el('div', 'calendar-pulse-strip');
+  for (const project of active.slice(0, 8)) {
+    const card = buildProjectPulseCard(project, tasks, stallIds);
+    const btn = el('button', 'calendar-pulse-card');
+    btn.type = 'button';
+    btn.append(
+      el('span', 'calendar-pulse-card__name', card.project.title),
+      el('span', 'calendar-pulse-card__meta', card.energyLabel),
+      el('span', `calendar-pulse-card__drift calendar-pulse-card__drift--${card.driftKind}`, card.driftLabel)
+    );
+    btn.addEventListener('click', () => {
+      location.hash = projectPageHash(card.project.id);
+    });
+    strip.append(btn);
+  }
+  return strip;
+}
+
+/** Real stalled-project count from the same `findStallCandidates` the Projects view
+ *  uses for its own stall flagging. Omitted when nothing is stalled. */
+function renderStalledProjectsBanner(projects: Project[], tasks: Task[]): HTMLElement | null {
+  const stalled = findStallCandidates(projects, tasks);
+  if (!stalled.length) return null;
+  const banner = el('a', 'calendar-stall-banner');
+  banner.href = '#/projects';
+  banner.append(
+    el('span', '', `${stalled.length} project${stalled.length === 1 ? '' : 's'} stalled`),
+    el('span', 'calendar-stall-banner__cta', 'Review →')
+  );
+  return banner;
 }
 
 export async function renderWeekView(canvas: HTMLElement): Promise<void> {
