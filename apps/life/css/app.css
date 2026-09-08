@@ -1198,6 +1198,9 @@ main { max-width: 76rem; margin: 0 auto; }
   flex: 1;
   min-width: 0;
 }
+.chat-form .hub-ai-bar__aside {
+  flex: 0 0 auto;
+}
 .chat-input,
 #chat-input {
   width: 100%;
@@ -7031,27 +7034,8 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 }
 
 
-.chat-attach-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  padding: 0 0.25rem 0.35rem;
-}
-.chat-attach-chip {
-  border: 1px solid color-mix(in srgb, var(--ink-1, #0a1536) 18%, transparent);
-  background: color-mix(in srgb, var(--ink-1, #0a1536) 6%, transparent);
-  border-radius: 999px;
-  padding: 0.15rem 0.6rem;
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-.chat-attach-error {
-  margin: 0;
-  width: 100%;
-  color: var(--high-sea, #c45c26);
-  font-size: var(--text-sm);
-}
+/* Attachment chip layout lives in design-kit hub-interactions.css
+   (.hub-ai-bar__aside stacks chips above Attach/Send). */
 .chat-message__attachments {
   display: flex;
   flex-wrap: wrap;

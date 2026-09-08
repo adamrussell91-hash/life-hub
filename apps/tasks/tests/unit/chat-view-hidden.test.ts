@@ -17,6 +17,10 @@ describe('parked Clare chat', () => {
     expect(hide?.querySelector('#agent-picker')).toBeTruthy();
     expect(hide?.getAttribute('data-hub-scroll-scroller')).toBe('#chat-messages');
     expect(view.querySelector('.chat-form__tools .hub-filter')).toBeNull();
+    const aside = view.querySelector('.hub-ai-bar__aside');
+    expect(aside?.querySelector('#chat-attach-list')).toBeTruthy();
+    expect(aside?.querySelector('.chat-form__tools #chat-send')).toBeTruthy();
+    expect(view.querySelector('.hub-ai-bar__field #chat-input')).toBeTruthy();
   });
 
   it('closes the overlay back into a host that does not take layout', () => {
