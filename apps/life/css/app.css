@@ -994,15 +994,18 @@ main { max-width: 76rem; margin: 0 auto; }
   accent-color: var(--high-sea);
 }
 
-.action-proposal__diffs code {
+.action-proposal__title {
   font-size: var(--text-sm);
-  word-break: break-all;
+  font-weight: 600;
+  color: var(--depth);
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .action-proposal__diff {
   color: var(--muted);
   font-size: var(--text-sm);
-  margin-top: 0.15rem;
+  margin: 0.15rem 0 0 calc(1rem + var(--space-2));
 }
 
 .record-proposal__eyebrow {

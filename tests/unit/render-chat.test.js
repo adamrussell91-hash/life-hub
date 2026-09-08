@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, renderChatMarkdown, renderInlineMarkdown, scrollChatIfPinned } from '../../apps/life/js/app/render-chat.js';
+import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, formatActionWriteLines, renderChatMarkdown, renderInlineMarkdown, scrollChatIfPinned } from '../../apps/life/js/app/render-chat.js';
 
 class FakeElement {
   constructor(tag) {
@@ -525,7 +525,38 @@ test('renderChatMarkdown leaves ordinary chat as multiline markdown', () => {
   assert.equal(container.children[1].children[0].textContent, 'Second.');
 });
 
-test('appendActionProposal renders intent, path diffs, and Confirm/Discard', () => {
+test('formatActionWriteLines prefers task titles over blob paths', () => {
+  assert.deepEqual(
+    formatActionWriteLines({
+      path: 'tasks:task:task_mtsnw74u_6jekrv',
+      mode: 'create',
+      diff: 'new task: Email all teachers re: tomorrow\'s arrangements'
+    }),
+    {
+      primary: 'Email all teachers re: tomorrow\'s arrangements',
+      secondary: 'New task',
+      path: 'tasks:task:task_mtsnw74u_6jekrv'
+    }
+  );
+  assert.equal(
+    formatActionWriteLines({
+      path: 'tasks:task:task_1',
+      mode: 'create',
+      diff: 'new task “Mark essays”'
+    }).primary,
+    'Mark essays'
+  );
+  assert.equal(
+    formatActionWriteLines({
+      path: 'tasks:task:task_2',
+      mode: 'create',
+      content: JSON.stringify({ title: 'From content only' })
+    }).primary,
+    'From content only'
+  );
+});
+
+test('appendActionProposal renders intent, human write titles, and Confirm/Discard', () => {
   const root = new FakeDocument();
   const { card, confirm, discard, acceptedPaths } = appendActionProposal(root, {
     proposal: {
@@ -556,13 +587,36 @@ test('appendActionProposal renders intent, path diffs, and Confirm/Discard', () 
   assert.equal(writeRow.children[0].type, 'checkbox');
   assert.equal(writeRow.children[0].checked, true);
   assert.equal(writeRow.children[0].value, 'data/challenges/2026-08-01-no-sugar.json');
-  assert.match(writeRow.children[1].textContent, /data\/challenges\/2026-08-01-no-sugar\.json/);
-  assert.match(diffs.children[0].children[1].textContent, /create: new challenge file/);
+  assert.equal(writeRow.children[1].className, 'action-proposal__title');
+  assert.equal(writeRow.children[1].textContent, 'new challenge file');
+  assert.equal(diffs.children[0].children[1].textContent, 'Create');
   assert.deepEqual(acceptedPaths(), ['data/challenges/2026-08-01-no-sugar.json']);
   writeRow.children[0].checked = false;
   assert.deepEqual(acceptedPaths(), []);
   assert.equal(confirm.textContent, 'Confirm');
   assert.equal(discard.textContent, 'Discard');
+});
+
+test('appendActionProposal shows Clare batch task titles, not tasks:task ids', () => {
+  const root = new FakeDocument();
+  const { card, acceptedPaths } = appendActionProposal(root, {
+    proposal: {
+      agent: 'clare',
+      intent: 'Create 5 tasks',
+      writes: [
+        { path: 'tasks:task:task_a', mode: 'create', diff: 'new task: Email all teachers re: tomorrow\'s arrangements' },
+        { path: 'tasks:task:task_b', mode: 'create', diff: 'new task: Block lunch tomorrow' }
+      ]
+    }
+  });
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  const titles = diffs.children.map(item => item.children[0].children[1].textContent);
+  assert.deepEqual(titles, [
+    'Email all teachers re: tomorrow\'s arrangements',
+    'Block lunch tomorrow'
+  ]);
+  assert.equal(titles.some(title => title.includes('tasks:task:')), false);
+  assert.deepEqual(acceptedPaths(), ['tasks:task:task_a', 'tasks:task:task_b']);
 });
 
 test('appendCnPatchProposal renders structured diff rows for match/text payloads', () => {

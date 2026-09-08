@@ -710,6 +710,86 @@ export function appendCnPatchProposal(root, { patch }) {
   return { card, confirm, discard };
 }
 
+/** Mode verb shown under a write when the primary line already carries the meaning. */
+function modeVerb(mode) {
+  switch (String(mode || '').toLowerCase()) {
+    case 'create':
+      return 'Create';
+    case 'overwrite':
+      return 'Update';
+    case 'append':
+      return 'Append';
+    case 'delete':
+      return 'Delete';
+    default:
+      return mode ? String(mode) : 'Write';
+  }
+}
+
+/**
+ * Human lines for one Confirm-card write. Blob paths stay as the checkbox value;
+ * Adam sees the title / diff, not `tasks:task:task_…`.
+ */
+export function formatActionWriteLines(write) {
+  const path = typeof write?.path === 'string' ? write.path.trim() : '';
+  const mode = typeof write?.mode === 'string' ? write.mode.trim() : 'write';
+  const diff = typeof write?.diff === 'string' ? write.diff.trim() : '';
+
+  // create_task / create_project / split: "new task: Title" or `new task “Title”`
+  const colon = diff.match(/^(new task|new project|subtask)\s*:\s*(.+)$/i);
+  if (colon) {
+    return { primary: colon[2].trim(), secondary: titleCaseKind(colon[1]), path };
+  }
+  const quoted = diff.match(/^(new task|new project|subtask)\s+[“"'](.+?)[”"']\s*$/i);
+  if (quoted) {
+    return { primary: quoted[2].trim(), secondary: titleCaseKind(quoted[1]), path };
+  }
+
+  if (diff) {
+    return { primary: diff, secondary: modeVerb(mode), path };
+  }
+
+  const fromContent = titleFromWriteContent(write?.content);
+  if (fromContent) {
+    return { primary: fromContent, secondary: modeVerb(mode), path };
+  }
+
+  return {
+    primary: friendlyWritePath(path) || '(unknown write)',
+    secondary: modeVerb(mode),
+    path
+  };
+}
+
+function titleCaseKind(kind) {
+  const lower = String(kind || '').toLowerCase();
+  if (lower === 'new task') return 'New task';
+  if (lower === 'new project') return 'New project';
+  if (lower === 'subtask') return 'Subtask';
+  return kind;
+}
+
+function titleFromWriteContent(content) {
+  if (typeof content !== 'string' || !content.trim()) return '';
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed.title === 'string' && parsed.title.trim()) {
+      return parsed.title.trim();
+    }
+  } catch {
+    // content is not always JSON
+  }
+  return '';
+}
+
+function friendlyWritePath(path) {
+  if (!path) return '';
+  // tasks:task:task_xxx → hide internal id; caller already preferred diff/title
+  if (/^tasks:(task|project):/i.test(path)) return '';
+  const slash = path.lastIndexOf('/');
+  return slash >= 0 ? path.slice(slash + 1) : path;
+}
+
 export function appendActionProposal(root, { proposal }) {
   const list = root.querySelector('#chat-messages');
   if (!list) return null;
@@ -743,28 +823,29 @@ export function appendActionProposal(root, { proposal }) {
     const diffs = root.createElement('ul');
     diffs.className = 'action-proposal__diffs';
     for (const write of writes) {
+      const lines = formatActionWriteLines(write);
       const item = root.createElement('li');
       const row = root.createElement('label');
       row.className = 'action-proposal__write';
+      if (lines.path) row.title = lines.path;
       const box = root.createElement('input');
       box.type = 'checkbox';
       box.className = 'action-proposal__accept';
       box.checked = true;
-      box.value = typeof write?.path === 'string' ? write.path : '';
-      box.setAttribute('aria-label', `Accept ${box.value || 'write'}`);
+      box.value = lines.path || (typeof write?.path === 'string' ? write.path : '');
+      box.setAttribute('aria-label', `Accept ${lines.primary}`);
       acceptBoxes.push(box);
-      const path = root.createElement('code');
-      path.textContent = box.value || '(unknown path)';
-      row.append(box, path);
+      const title = root.createElement('span');
+      title.className = 'action-proposal__title';
+      title.textContent = lines.primary;
+      row.append(box, title);
       item.append(row);
-      const detail = root.createElement('div');
-      detail.className = 'action-proposal__diff';
-      const mode = typeof write?.mode === 'string' ? write.mode : 'write';
-      const diff = typeof write?.diff === 'string' && write.diff.trim()
-        ? write.diff.trim()
-        : mode;
-      detail.textContent = `${mode}: ${diff}`;
-      item.append(detail);
+      if (lines.secondary) {
+        const detail = root.createElement('div');
+        detail.className = 'action-proposal__diff';
+        detail.textContent = lines.secondary;
+        item.append(detail);
+      }
       diffs.append(item);
     }
     card.append(diffs);
