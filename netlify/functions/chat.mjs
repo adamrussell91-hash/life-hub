@@ -1272,6 +1272,7 @@ export function createChatHandler({
         tools = [
           ...buildAgentTools({
             slug,
+            protocolId: typeof protocolId === 'string' ? protocolId : null,
             allowedTypes,
             stripWebSearch,
             needsFoodLibrary,
@@ -1816,6 +1817,12 @@ export function createChatHandler({
                 }));
               }
               if (slug === 'hammond' && isHammondProductivityTool(event.name)) {
+                send({
+                  type: 'tool_call',
+                  id: event.id,
+                  name: event.name,
+                  input: event.input ?? {}
+                });
                 send({ type: 'status', text: 'Working…' });
                 const hammondResult = await executeHammondProductivity(event.name, event.input ?? {}, {
                   tasks: hubTasks,
@@ -2326,6 +2333,14 @@ export function createChatHandler({
                 });
               }
               if (slug === 'clare' && isClareWorkTool(event.name)) {
+                // executeTools swallows tool_call events; re-emit so clients/live
+                // acceptance can observe the deterministic productivity trajectory.
+                send({
+                  type: 'tool_call',
+                  id: event.id,
+                  name: event.name,
+                  input: event.input ?? {}
+                });
                 send({ type: 'status', text: 'Working…' });
                 const stated = statedPlannerInputs(parsed.message);
                 const result = await executeClareWork(event.name, event.input ?? {}, {

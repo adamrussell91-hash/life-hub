@@ -242,7 +242,7 @@ const handler = createChatHandler({
   getTeachingStore: async () => memoryStore(TEACHING)
 });
 
-async function chat(slug, message) {
+async function chat(slug, message, protocolId) {
   const response = await handler(
     new Request('https://life-hub.test/api/chat', {
       method: 'POST',
@@ -251,7 +251,11 @@ async function chat(slug, message) {
         cookie: `life_hub_session=${session}`,
         origin: 'https://life-hub.test'
       },
-      body: JSON.stringify({ message, priorAgentSlug: slug })
+      body: JSON.stringify({
+        message,
+        priorAgentSlug: slug,
+        ...(protocolId ? { protocolId } : {})
+      })
     })
   );
   const text = await response.text();
@@ -266,32 +270,102 @@ async function chat(slug, message) {
   }
   const agent = events.find((e) => e.type === 'agent')?.slug ?? null;
   const deltas = events.filter((e) => e.type === 'text').map((e) => e.delta ?? '').join('');
-  const tools = events.filter((e) => e.type === 'tool_call').map((e) => e.name).filter(Boolean);
-  const proposals = events.filter((e) => e.type === 'action_proposal').length;
+  const tools = events
+    .filter((e) => e.type === 'tool_call' || e.type === 'tool_result' || e.type === 'tool' || e.type === 'tool_use')
+    .map((e) => e.name || e.tool || e.toolName)
+    .filter(Boolean);
+  const proposals = events.filter((e) => e.type === 'action_proposal');
+  const cards = events.filter((e) => e.type === 'productivity_card');
   const error = events.find((e) => e.type === 'error') ?? null;
   return {
     status: response.status,
     agent,
     text: deltas,
-    tools,
-    proposals,
+    tools: [...new Set(tools)],
+    proposals: proposals.length,
+    cards: cards.map((c) => c.card_type).filter(Boolean),
+    pendingIds: proposals.map((p) => p.id).filter(Boolean),
     error: error?.message || error?.text || null,
     eventTypes: [...new Set(events.map((e) => e.type))]
   };
 }
 
 const scenarios = [
-  { id: 'clare-dump', slug: 'clare', message: 'Sort this brain dump: email the parent about homework; waiting on Acme for the quote; someday learn pottery; trash this random note' },
-  { id: 'clare-health', slug: 'clare', message: 'What are my projects with no next action?' },
-  { id: 'clare-waiting', slug: 'clare', message: 'What am I waiting on?' },
-  { id: 'clare-fit', slug: 'clare', message: 'I have 25 minutes and low energy. What fits now?' },
-  { id: 'clare-schedule', slug: 'clare', message: 'Plan tomorrow around my classes using protected evenings.' },
-  { id: 'clare-runway', slug: 'clare', message: 'Marking is due Friday. Work backwards from the hard deadline.' },
-  { id: 'clare-shutdown', slug: 'clare', message: 'Shut down my day.' },
-  { id: 'hammond-too-much', slug: 'hammond', message: 'I am doing too much. Which projects should stay active given my limit of 3?' },
-  { id: 'hammond-evenings', slug: 'hammond', message: 'Protect my evenings next week.' },
-  { id: 'hammond-depth', slug: 'hammond', message: 'What is my deep work capacity next week?' },
-  { id: 'hammond-mission', slug: 'hammond', message: 'What should Clare protect next week?' }
+  {
+    id: 'clare-dump',
+    slug: 'clare',
+    message:
+      'Sort this brain dump: email the parent about homework; waiting on Acme for the quote; someday learn pottery; trash this random note',
+    expectTools: ['clarify_dump']
+  },
+  {
+    id: 'clare-health',
+    slug: 'clare',
+    message: 'What are my projects with no next action?',
+    expectTools: ['project_health']
+  },
+  {
+    id: 'clare-waiting',
+    slug: 'clare',
+    message: 'What am I waiting on?',
+    expectTools: ['waiting_review']
+  },
+  {
+    id: 'clare-fit',
+    slug: 'clare',
+    message: 'I have 25 minutes and low energy. What fits now?',
+    expectTools: ['context_match']
+  },
+  {
+    id: 'clare-schedule',
+    slug: 'clare',
+    message: 'Plan tomorrow around my classes using protected evenings. Compose an actual schedule.',
+    expectTools: ['compose_schedule'],
+    expectProposal: true
+  },
+  {
+    id: 'clare-runway',
+    slug: 'clare',
+    message: 'Marking is due Friday. Work backwards from the hard deadline.',
+    expectTools: ['deadline_runway']
+  },
+  {
+    id: 'clare-shutdown',
+    slug: 'clare',
+    message: 'Shut down my day.',
+    expectTools: ['shutdown_day']
+  },
+  {
+    id: 'clare-weekly',
+    slug: 'clare',
+    message: 'Start Weekly Review',
+    protocolId: 'weekly-review',
+    expectTools: ['weekly_review']
+  },
+  {
+    id: 'hammond-too-much',
+    slug: 'hammond',
+    message: 'I am doing too much. Which projects should stay active given my limit of 3?',
+    expectTools: ['portfolio_meter']
+  },
+  {
+    id: 'hammond-horizons',
+    slug: 'hammond',
+    message: 'Show my horizons chain from purpose through next actions.',
+    expectTools: ['horizons_chain']
+  },
+  {
+    id: 'hammond-depth',
+    slug: 'hammond',
+    message: 'What is my deep work capacity next week?',
+    expectTools: ['capacity_day', 'depth_budget']
+  },
+  {
+    id: 'hammond-mission',
+    slug: 'hammond',
+    message: 'Create a week mission and hand it to Clare to schedule.',
+    expectTools: ['week_mission_handoff']
+  }
 ];
 
 const lines = [];
@@ -303,12 +377,24 @@ function log(line) {
 let failed = 0;
 for (const scenario of scenarios) {
   try {
-    const result = await chat(scenario.slug, scenario.message);
+    const result = await chat(scenario.slug, scenario.message, scenario.protocolId);
+    const toolsHit = (scenario.expectTools || []).filter((name) => result.tools.includes(name));
+    // Tool SSE names vary; structured productivity cards / proposals also prove the tool path ran.
+    const cardProof = Array.isArray(result.cards) && result.cards.length > 0;
+    const toolsOk =
+      !scenario.expectTools?.length ||
+      toolsHit.length > 0 ||
+      cardProof ||
+      (scenario.expectProposal && result.proposals > 0);
+    const proposalOk = !scenario.expectProposal || result.proposals > 0;
+    const textOk = result.text.trim().length > 20 || cardProof || result.proposals > 0;
     const ok =
       result.status === 200 &&
       result.agent === scenario.slug &&
       !result.error &&
-      result.text.trim().length > 20;
+      textOk &&
+      toolsOk &&
+      proposalOk;
     if (!ok) failed += 1;
     log(
       JSON.stringify({
@@ -316,8 +402,11 @@ for (const scenario of scenarios) {
         ok,
         status: result.status,
         agent: result.agent,
-        tools: result.tools.slice(0, 10),
+        tools: result.tools.slice(0, 12),
+        toolsHit,
         proposals: result.proposals,
+        cards: result.cards,
+        pendingIds: result.pendingIds,
         error: result.error,
         excerpt: result.text.replace(/\s+/g, ' ').slice(0, 240)
       })

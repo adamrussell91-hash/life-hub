@@ -1124,6 +1124,38 @@ function advanceWeekly(state, stage) {
   };
 }
 
+
+function buildWeeklyPendingChanges(state) {
+  return [
+    ...(state.capture?.items
+      ?.filter((i) => i.destination !== 'trash' && i.destination !== 'reference')
+      .map((i) => ({
+        id: i.id,
+        kind: 'capture',
+        destination: i.destination,
+        summary: `Clarify → ${i.destination}: ${i.text.slice(0, 60)}`,
+        selected: true
+      })) ?? []),
+    ...(state.project_health ?? [])
+      .filter((h) => h.health === 'missing_next_action')
+      .map((h) => ({
+        id: `project_health:${h.project_id}`,
+        kind: 'project_health',
+        project_id: h.project_id,
+        summary: `Project ${h.project_id} needs a next action`,
+        selected: true
+      })),
+    ...((state.schedule?.proposed ?? state.schedule?.blocks ?? [])
+      .filter((b) => b && b.selected !== false)
+      .map((b, index) => ({
+        id: b.write_path || b.id || `schedule:${index}`,
+        kind: 'schedule_block',
+        summary: `Schedule ${b.date || ''} ${b.start_time || b.start || ''} · ${b.title || 'block'}`.trim(),
+        selected: true
+      })))
+  ];
+}
+
 export function runWeeklyReviewStage(state, input) {
   const stage = state.current_stage;
   if (stage === 'capture') {
@@ -1173,7 +1205,14 @@ export function runWeeklyReviewStage(state, input) {
     return advanceWeekly({ ...state, someday_due }, 'someday');
   }
   if (stage === 'build_week') {
-    return advanceWeekly({ ...state, schedule: input.schedule ?? null }, 'build_week');
+    const withSchedule = { ...state, schedule: input.schedule ?? null };
+    const advanced = advanceWeekly(withSchedule, 'build_week');
+    return {
+      ...advanced,
+      pending_changes: advanced.pending_changes?.length
+        ? advanced.pending_changes
+        : buildWeeklyPendingChanges(withSchedule)
+    };
   }
   return {
     ...state,
@@ -1181,20 +1220,7 @@ export function runWeeklyReviewStage(state, input) {
     completed: [...new Set([...state.completed, 'confirm'])],
     pending_changes: state.pending_changes.length
       ? state.pending_changes
-      : [
-          ...(state.capture?.items
-            .filter((i) => i.destination !== 'trash' && i.destination !== 'reference')
-            .map((i) => ({
-              summary: `Clarify → ${i.destination}: ${i.text.slice(0, 60)}`,
-              selected: true
-            })) ?? []),
-          ...state.project_health
-            .filter((h) => h.health === 'missing_next_action')
-            .map((h) => ({
-              summary: `Project ${h.project_id} needs a next action`,
-              selected: true
-            }))
-        ],
+      : buildWeeklyPendingChanges(state),
     updated_at: new Date().toISOString()
   };
 }

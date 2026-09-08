@@ -256,3 +256,200 @@ describe('G: focus block session persistence via propose', () => {
     assert.equal(body.actual_duration_minutes, 40);
   });
 });
+
+describe('compose_schedule Confirmable proposal', () => {
+  it('proposes work_block writes and persists schedule_diff:current', async () => {
+    const saved = new Map();
+    const tasksStore = {
+      async get(key, options = {}) {
+        if (!saved.has(key)) return null;
+        return saved.get(key);
+      },
+      async setJSON(key, value) {
+        saved.set(key, value);
+      },
+      async set(key, value) {
+        saved.set(key, typeof value === 'string' ? JSON.parse(value) : value);
+      }
+    };
+    const result = await executeClareWork(
+      'compose_schedule',
+      { date: '2026-09-08', task_ids: ['task_a'] },
+      {
+        now: new Date('2026-09-08T08:00:00Z'),
+        tasks: [
+          {
+            id: 'task_a',
+            title: 'Write report',
+            status: 'open',
+            estimated_duration: 90,
+            depth: 'shallow'
+          }
+        ],
+        projects: [],
+        lessons: [],
+        workBlocks: [],
+        planning_profile: {
+          work_windows: {
+            mon: [],
+            tue: [{ start: '09:00', end: '12:00' }],
+            wed: [],
+            thu: [],
+            fri: [],
+            sat: [],
+            sun: []
+          },
+          protected_windows: {
+            mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: []
+          }
+        },
+        tasksStore
+      }
+    );
+    assert.equal(result.kind, 'propose');
+    assert.ok(result.proposal?.writes?.length >= 1);
+    assert.ok(result.proposal.writes.every((w) => String(w.path).includes('work_block')));
+    assert.ok(result.proposed.every((b) => b.task_id === 'task_a'));
+    assert.ok(saved.has('workflow_state/schedule_diff:current'));
+  });
+});
+
+describe('weekly_review confirm proposes durable writes', () => {
+  it('finalize on confirm stage returns kind propose with capture/schedule writes', async () => {
+    const { createWeeklyReview, runWeeklyReviewStage } = await import(
+      '../../netlify/functions/_shared/productivity-os.mjs'
+    );
+    let state = createWeeklyReview('wr_confirm');
+    state = runWeeklyReviewStage(state, {
+      dump_text: 'Email parent about homework\nWaiting on Acme for quote'
+    });
+    while (state.current_stage !== 'confirm') {
+      state = runWeeklyReviewStage(state, {
+        tasks: [],
+        projects: [],
+        today_key: '2026-09-08',
+        past_notes: ['taught P1'],
+        upcoming_notes: ['staff meeting'],
+        schedule: {
+          proposed: [
+            {
+              title: 'Email parent',
+              date: '2026-09-09',
+              start_time: '09:00',
+              duration_minutes: 30,
+              task_id: null,
+              selected: true
+            }
+          ]
+        }
+      });
+    }
+    assert.ok(state.pending_changes.length >= 2);
+
+    const result = await executeClareWork(
+      'weekly_review',
+      { review_id: 'wr_confirm', state, advance: false, confirm: true },
+      {
+        now: new Date('2026-09-08T12:00:00Z'),
+        tasks: [],
+        projects: [],
+        lessons: [],
+        workBlocks: [],
+        tasksStore: {
+          async get() { return null; },
+          async set() {},
+          async setJSON() {}
+        }
+      }
+    );
+    assert.equal(result.kind, 'propose');
+    assert.ok(result.proposal.writes.length >= 2);
+    assert.ok(result.proposal.writes.some((w) => String(w.path).includes('tasks:task:')));
+    assert.ok(result.proposal.writes.some((w) => String(w.path).includes('tasks:work_block:')));
+  });
+});
+
+describe('K/L/M/N: schedule_diff preview vs confirm selected vs discard', () => {
+  it('K: compose preview does not write work_blocks into the tasks store', async () => {
+    const saved = new Map();
+    const tasksStore = {
+      async get(key) { return saved.has(key) ? saved.get(key) : null; },
+      async setJSON(key, value) { saved.set(key, value); },
+      async set(key, value) { saved.set(key, typeof value === 'string' ? JSON.parse(value) : value); }
+    };
+    const result = await executeClareWork(
+      'compose_schedule',
+      { date: '2026-09-08', task_ids: ['task_a'] },
+      {
+        now: new Date('2026-09-08T08:00:00Z'),
+        tasks: [{ id: 'task_a', title: 'Write report', status: 'open', estimated_duration: 60, depth: 'shallow' }],
+        projects: [],
+        lessons: [],
+        workBlocks: [],
+        planning_profile: {
+          work_windows: { mon: [], tue: [{ start: '09:00', end: '12:00' }], wed: [], thu: [], fri: [], sat: [], sun: [] },
+          protected_windows: { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] }
+        },
+        tasksStore
+      }
+    );
+    assert.equal(result.kind, 'propose');
+    assert.ok(saved.has('workflow_state/schedule_diff:current'));
+    assert.equal([...saved.keys()].some((k) => k.startsWith('work_blocks/')), false);
+  });
+
+  it('L/N: proposed block ids are write paths for Confirm Selected accept binding', async () => {
+    const saved = new Map();
+    const tasksStore = {
+      async get(key) { return saved.has(key) ? saved.get(key) : null; },
+      async setJSON(key, value) { saved.set(key, value); },
+      async set(key, value) { saved.set(key, typeof value === 'string' ? JSON.parse(value) : value); }
+    };
+    const result = await executeClareWork(
+      'compose_schedule',
+      { date: '2026-09-08', task_ids: ['task_a'] },
+      {
+        now: new Date('2026-09-08T08:00:00Z'),
+        tasks: [{ id: 'task_a', title: 'Write report', status: 'open', estimated_duration: 90, depth: 'shallow' }],
+        projects: [],
+        lessons: [],
+        workBlocks: [],
+        planning_profile: {
+          work_windows: { mon: [], tue: [{ start: '09:00', end: '12:00' }], wed: [], thu: [], fri: [], sat: [], sun: [] },
+          protected_windows: { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] }
+        },
+        tasksStore
+      }
+    );
+    assert.equal(result.kind, 'propose');
+    const paths = result.proposal.writes.map((w) => w.path);
+    assert.ok(result.proposed.length >= 1);
+    for (const block of result.proposed) {
+      assert.ok(paths.includes(block.id), `block.id ${block.id} missing from writes`);
+      assert.equal(block.write_path, block.id);
+    }
+    const { selectAcceptedWrites } = await import(
+      '../../netlify/functions/_shared/capabilities/propose-action.mjs'
+    );
+    const selectedPath = paths[0];
+    const accepted = selectAcceptedWrites(result.proposal.writes, [selectedPath]);
+    assert.equal(accepted.ok, true);
+    assert.equal(accepted.accepted.length, 1);
+    assert.equal(accepted.accepted[0].path, selectedPath);
+    assert.equal(accepted.rejected.length, paths.length - 1);
+  });
+
+  it('M: discard accept=[] keeps writes rejected / nothing to apply', async () => {
+    const { selectAcceptedWrites } = await import(
+      '../../netlify/functions/_shared/capabilities/propose-action.mjs'
+    );
+    const writes = [
+      { path: 'tasks:work_block:a', mode: 'create', content: '{}', diff: 'a' },
+      { path: 'tasks:work_block:b', mode: 'create', content: '{}', diff: 'b' }
+    ];
+    const discarded = selectAcceptedWrites(writes, []);
+    assert.equal(discarded.ok, true);
+    assert.equal(discarded.accepted.length, 0);
+    assert.equal(discarded.rejected.length, 2);
+  });
+});

@@ -808,11 +808,30 @@ export function createAppController(dependencies) {
     const missionP = typeof tasksApi.getWorkflowState === 'function'
       ? tasksApi.getWorkflowState('week_mission:current').catch(() => null)
       : Promise.resolve(null);
-    tasksCalendarInFlight = Promise.all([tasksApi.listTasks(), listBlocks, profileP, missionP])
-      .then(([tasks, blocks, profile, mission]) => {
+    const scheduleDiffP = typeof tasksApi.getWorkflowState === 'function'
+      ? tasksApi.getWorkflowState('schedule_diff:current').catch(() => null)
+      : Promise.resolve(null);
+    tasksCalendarInFlight = Promise.all([
+      tasksApi.listTasks(),
+      listBlocks,
+      profileP,
+      missionP,
+      scheduleDiffP
+    ])
+      .then(([tasks, blocks, profile, mission, scheduleDiff]) => {
+        const ghostBlocks = Array.isArray(scheduleDiff?.proposed)
+          ? scheduleDiff.proposed.map((block, index) => ({
+              ...block,
+              id: block.id || block.temp_id || `ghost_${index}`,
+              status: 'proposed',
+              ghost: true,
+              source: block.source || 'clare'
+            }))
+          : [];
         tasksEvents = [
           ...tasksEventsFromTasks(tasks),
-          ...tasksEventsFromWorkBlocks(blocks)
+          ...tasksEventsFromWorkBlocks(blocks),
+          ...tasksEventsFromWorkBlocks(ghostBlocks)
         ];
         calendarPlanningProfile = profile;
         calendarWeekMission = mission;

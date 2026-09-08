@@ -27,8 +27,8 @@ import { proposeActionToolSchema } from './propose-action.mjs';
 import { shortcutSchemas } from './shortcuts.mjs';
 import { selectCapabilityIdsForTurn } from './intent-router.mjs';
 import { domainRetrievalSchemasFor } from '../domain-retrieval.mjs';
-import { clareWorkSchemas } from '../clare-work.mjs';
-import { hammondProductivitySchemas } from '../hammond-productivity.mjs';
+import { selectClareWorkSchemas } from '../clare-work.mjs';
+import { selectHammondProductivitySchemas } from '../hammond-productivity.mjs';
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -227,6 +227,7 @@ export function buildAgentTools({
   needsSaraMedicalTools = false,
   needsPenelopeDiaryTools = false,
   message = null,
+  protocolId = null,
   attachments,
   keepFullDomainTools = false
 } = {}) {
@@ -323,7 +324,7 @@ export function buildAgentTools({
   }
 
   if (slug === 'clare') {
-    for (const schema of clareWorkSchemas()) {
+    for (const schema of selectClareWorkSchemas({ message, protocolId })) {
       if (!schema?.name || attached.has(schema.name)) continue;
       tools.push(schema);
       attached.add(schema.name);
@@ -331,7 +332,7 @@ export function buildAgentTools({
   }
 
   if (slug === 'hammond' || needsHammondTools) {
-    for (const schema of hammondProductivitySchemas()) {
+    for (const schema of selectHammondProductivitySchemas({ message, protocolId })) {
       if (!schema?.name || attached.has(schema.name)) continue;
       tools.push(schema);
       attached.add(schema.name);

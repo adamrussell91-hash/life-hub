@@ -138,6 +138,33 @@ export function isHammondProductivityTool(name) {
   return NAMES.has(name);
 }
 
+const HAMMOND_TOOL_HINTS = [
+  { names: ['portfolio_meter'], patterns: [/portfolio/i, /active project/i, /what should stay/i, /capacity limit/i] },
+  { names: ['horizons_chain'], patterns: [/horizon/i, /purpose/i, /vision/i, /principle/i, /area.*goal/i] },
+  { names: ['capacity_day'], patterns: [/capacity/i, /work window/i, /protected window/i, /how much time/i] },
+  { names: ['threefold_audit'], patterns: [/threefold/i, /predefined/i, /reactive/i, /defining/i] },
+  { names: ['depth_budget'], patterns: [/depth/i, /deep work/i, /shallow/i] },
+  { names: ['pace_audit'], patterns: [/pace/i, /natural pace/i, /overloaded/i] },
+  { names: ['strategic_review'], patterns: [/strategic review/i, /week review/i, /what moved/i] },
+  { names: ['attention_audit'], patterns: [/attention/i, /interrupt/i, /communication protocol/i] },
+  { names: ['multiscale_plan'], patterns: [/multiscale/i, /quarter/i, /month plan/i] },
+  { names: ['week_mission_handoff'], patterns: [/week mission/i, /handoff/i, /send to clare/i, /mission/i] },
+  { names: ['reconcile_clare_schedule'], patterns: [/reconcile/i, /insufficient capacity/i, /clare returned/i] }
+];
+
+export function selectHammondProductivitySchemas({ message = '', protocolId = null } = {}) {
+  const all = hammondProductivitySchemas();
+  const text = `${protocolId || ''} ${message || ''}`.trim();
+  if (!text) return all;
+  const selected = new Set();
+  for (const hint of HAMMOND_TOOL_HINTS) {
+    if (hint.patterns.some(re => re.test(text))) hint.names.forEach(n => selected.add(n));
+  }
+  if (!selected.size) return all;
+  return all.filter(schema => selected.has(schema.name));
+}
+
+
 function ok(data) {
   return { ok: true, ...data };
 }

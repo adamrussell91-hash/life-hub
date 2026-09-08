@@ -16,6 +16,8 @@ import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createHubField, createHubFilter } from '@/views/hub-kit';
 import { tasksApi } from '@/services/client-api';
 import { confirmChat, streamChat } from '@/services/chat-api';
+import { setCalendarGhostBlocks } from '@/views/calendar';
+import type { WorkBlock } from '@/schemas/work-block';
 import { agentBySlug, DEFAULT_AGENT_SLUG, type ChatAgentSlug } from '@/chat/agents';
 import { paintProtocolTrays } from '@/chat/build-chat-view';
 import {
@@ -513,13 +515,15 @@ export function createClareChatController({
         ...(Array.isArray(accept)
           ? {
               accept: accept
-                .map((item) =>
-                  typeof item === 'string'
-                    ? item
-                    : typeof (item as { id?: string })?.id === 'string'
-                      ? (item as { id: string }).id
-                      : null
-                )
+                .map((item) => {
+                  if (typeof item === 'string') return item;
+                  if (!item || typeof item !== 'object') return null;
+                  const row = item as { write_path?: string; path?: string; id?: string };
+                  if (typeof row.write_path === 'string' && row.write_path) return row.write_path;
+                  if (typeof row.path === 'string' && row.path) return row.path;
+                  if (typeof row.id === 'string' && row.id) return row.id;
+                  return null;
+                })
                 .filter((value): value is string => Boolean(value))
             }
           : {})
@@ -544,21 +548,71 @@ export function createClareChatController({
         ? payload.pendingId.trim()
         : lastPendingActionId;
     if (pendingFromCard) lastPendingActionId = pendingFromCard;
+
+    if (type === 'schedule-diff') {
+      const rawBlocks = Array.isArray(payload.blocks)
+        ? payload.blocks
+        : Array.isArray(payload.proposed)
+          ? payload.proposed
+          : [];
+      const ghosts = rawBlocks
+        .filter((block): block is Record<string, unknown> => Boolean(block) && typeof block === 'object')
+        .map((block, index) => {
+          const id =
+            typeof block.id === 'string' && block.id
+              ? block.id
+              : typeof block.temp_id === 'string' && block.temp_id
+                ? block.temp_id
+                : `ghost_${index}`;
+          return {
+            schema_version: 1,
+            id,
+            task_id: typeof block.task_id === 'string' ? block.task_id : null,
+            project_id: typeof block.project_id === 'string' ? block.project_id : null,
+            title: typeof block.title === 'string' ? block.title : 'Planned work',
+            date: typeof block.date === 'string' ? block.date : '',
+            start_time:
+              typeof block.start_time === 'string'
+                ? block.start_time
+                : typeof block.start === 'string'
+                  ? block.start
+                  : '09:00',
+            duration_minutes: Number(block.duration_minutes) || 30,
+            depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
+            status: 'proposed',
+            source: 'clare',
+            locked: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } satisfies WorkBlock;
+        })
+        .filter((block) => Boolean(block.date));
+      setCalendarGhostBlocks(ghosts);
+    }
+
     appendProductivityCard(root, type, {
       ...payload,
       title,
       hint,
       onConfirmSelected: (picks: unknown) => {
-        void confirmPendingAction(picks);
+        void confirmPendingAction(picks).then(() => {
+          if (type === 'schedule-diff') setCalendarGhostBlocks([]);
+        });
       },
       onConfirmAll: (picks: unknown) => {
-        void confirmPendingAction(picks);
+        void confirmPendingAction(picks).then(() => {
+          if (type === 'schedule-diff') setCalendarGhostBlocks([]);
+        });
       },
       onConfirm: (picks: unknown) => {
-        void confirmPendingAction(picks);
+        void confirmPendingAction(picks).then(() => {
+          if (type === 'schedule-diff') setCalendarGhostBlocks([]);
+        });
       },
       onDiscard: () => {
-        void confirmPendingAction(undefined, { dismiss: true });
+        void confirmPendingAction(undefined, { dismiss: true }).then(() => {
+          setCalendarGhostBlocks([]);
+        });
       },
       onPreview: () => {},
       onClose: (payloadClose: unknown) => {

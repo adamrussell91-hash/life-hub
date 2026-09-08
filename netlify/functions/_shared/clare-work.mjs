@@ -408,6 +408,40 @@ export function isClareWorkTool(name) {
   return CLARE_WORK_NAMES.has(name);
 }
 
+/** Intent-sensitive Clare productivity subset. Full set only when message is broad/unspecified. */
+const CLARE_TOOL_HINTS = [
+  { names: ['clarify_dump'], patterns: [/dump/i, /capture/i, /inbox/i, /clarify/i, /triage/i] },
+  { names: ['weekly_review'], patterns: [/weekly review/i, /week review/i, /weekly-review/i] },
+  { names: ['compose_schedule', 'plan_work'], patterns: [/plan (?:my |the )?day/i, /schedule/i, /time block/i, /compose/i, /plan-day/i] },
+  { names: ['project_plan'], patterns: [/project plan/i, /natural plan/i, /project-plan/i, /plan (?:this |the )?project/i] },
+  { names: ['waiting_review'], patterns: [/waiting/i, /follow[- ]?up/i, /blocked on/i] },
+  { names: ['shutdown_day'], patterns: [/shutdown/i, /close (?:the )?day/i, /wrap up/i] },
+  { names: ['focus_block'], patterns: [/focus/i, /deep work/i, /pomodoro/i, /start (?:a )?block/i] },
+  { names: ['deadline_runway'], patterns: [/runway/i, /deadline/i, /due date/i, /hard date/i] },
+  { names: ['context_match'], patterns: [/fit/i, /energy/i, /\d+\s*min/i, /what can i do/i, /context/i] },
+  { names: ['project_health'], patterns: [/project health/i, /stuck project/i, /next action/i] }
+];
+
+export function selectClareWorkSchemas({ message = '', protocolId = null } = {}) {
+  const all = clareWorkSchemas();
+  const text = `${protocolId || ''} ${message || ''}`.trim();
+  if (!text) return all;
+  const selected = new Set();
+  if (protocolId === 'weekly-review') selected.add('weekly_review');
+  if (protocolId === 'plan-day') ['compose_schedule', 'plan_work', 'context_match'].forEach(n => selected.add(n));
+  if (protocolId === 'project-plan') selected.add('project_plan');
+  if (protocolId === 'waiting') selected.add('waiting_review');
+  if (protocolId === 'shutdown') selected.add('shutdown_day');
+  for (const hint of CLARE_TOOL_HINTS) {
+    if (hint.patterns.some(re => re.test(text))) hint.names.forEach(n => selected.add(n));
+  }
+  if (!selected.size) return all;
+  // Always keep clarify_dump available for capture turns.
+  selected.add('clarify_dump');
+  return all.filter(schema => selected.has(schema.name));
+}
+
+
 function deny(error, extra = {}) {
   return { ok: false, error, ...extra };
 }
@@ -1390,6 +1424,94 @@ export function formatClareDraft({ task, audience, intent, points }) {
   ].filter(line => line !== null).join('\n');
 }
 
+
+function writesFromClarifyItems(items, stamp) {
+  const writes = [];
+  for (const item of items ?? []) {
+    if (!item || item.selected === false) continue;
+    const destination = item.destination;
+    if (destination === 'trash' || destination === 'reference') continue;
+    const title = String(item.text ?? '').trim();
+    if (!title) continue;
+    if (destination === 'project') {
+      const projectId = newRecordId('proj');
+      const project = {
+        schema_version: 1,
+        id: projectId,
+        title,
+        status: 'active',
+        created_at: stamp,
+        updated_at: stamp
+      };
+      writes.push(writeEntry(
+        `tasks:project:${projectId}`,
+        'create',
+        project,
+        `weekly capture project — ${title}`
+      ));
+      const nextTitle = String(item.project_next_action ?? '').trim() || `First next action for ${title}`;
+      const task = buildTaskRecord({
+        title: nextTitle,
+        project_id: projectId,
+        bucket: 'active'
+      }, null, stamp);
+      writes.push(writeEntry(
+        `tasks:task:${task.id}`,
+        'create',
+        task,
+        `weekly capture next action — ${nextTitle}`
+      ));
+      continue;
+    }
+    const patch = { title, bucket: destination === 'someday' ? 'someday' : 'active' };
+    if (destination === 'waiting') {
+      patch.waiting_on = item.waiting_on || 'Unknown';
+      patch.waiting_status = 'waiting';
+      patch.waiting_since = stamp;
+    }
+    if (destination === 'calendar' && item.calendar_date) {
+      patch.due_date = item.calendar_date;
+    }
+    const task = buildTaskRecord(patch, null, stamp);
+    writes.push(writeEntry(
+      `tasks:task:${task.id}`,
+      'create',
+      task,
+      `weekly capture → ${destination}: ${title}`
+    ));
+  }
+  return writes;
+}
+
+function writesFromScheduleProposed(proposed, stamp) {
+  const writes = [];
+  const blocks = [];
+  for (const block of proposed ?? []) {
+    if (!block || block.selected === false) continue;
+    const id = newRecordId('wblock');
+    const record = {
+      schema_version: 1,
+      id,
+      task_id: block.task_id ?? null,
+      project_id: block.project_id ?? null,
+      title: block.title || 'Planned work',
+      date: block.date,
+      start_time: block.start_time || block.start || '09:00',
+      duration_minutes: Number(block.duration_minutes) || 30,
+      depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
+      status: 'proposed',
+      source: 'clare',
+      locked: false,
+      created_at: stamp,
+      updated_at: stamp
+    };
+    const path = `tasks:work_block:${id}`;
+    writes.push(writeEntry(path, 'create', record, `schedule ${record.date} ${record.start_time} · ${record.title}`));
+    blocks.push({ ...block, ...record, id: path, write_path: path, selected: true });
+  }
+  return { writes, blocks };
+}
+
 export async function executeClareWork(name, input = {}, ctx = {}) {
   const now = ctx.now ?? new Date();
   const fetchImpl = ctx.fetchImpl ?? fetch;
@@ -1520,6 +1642,18 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     if (!state.id) state = { ...state, id: reviewId };
     const todayKey = input.today_key || toHubDateKey(now) || now.toISOString().slice(0, 10);
     if (input.advance !== false) {
+      let schedule = input.schedule ?? null;
+      if (state.current_stage === 'build_week' && !schedule) {
+        const composed = planWork('compose', {
+          tasks,
+          lessons,
+          date: todayKey,
+          now,
+          planning_profile: planningProfile,
+          confirmed_blocks: workBlocks.filter(b => b.status === 'confirmed' || b.status === 'in_progress')
+        });
+        schedule = composed;
+      }
       const stageInput = {
         dump_text: input.dump_text,
         past_notes: input.past_notes
@@ -1533,11 +1667,61 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
         tasks,
         projects,
         today_key: todayKey,
-        schedule: input.schedule ?? null
+        schedule
       };
       state = runWeeklyReviewStage(state, stageInput);
     }
     state = await saveWorkflowState(tasksStore, reviewId, state);
+
+    const finalize = Boolean(input.confirm || input.finalize);
+    if (finalize && state.current_stage === 'confirm') {
+      const stamp = now.toISOString();
+      const selectedSummaries = new Set(
+        (Array.isArray(input.selected_changes) ? input.selected_changes : [])
+          .map(item => typeof item === 'string' ? item : item?.summary)
+          .filter(Boolean)
+      );
+      const captureItems = (state.capture?.items ?? []).filter(item => {
+        if (item.destination === 'trash' || item.destination === 'reference') return false;
+        if (!selectedSummaries.size) return item.selected !== false;
+        const summary = `Clarify → ${item.destination}: ${String(item.text ?? '').slice(0, 60)}`;
+        return selectedSummaries.has(summary) || selectedSummaries.has(item.id);
+      });
+      const writes = writesFromClarifyItems(captureItems, stamp);
+      const scheduleProposed = state.schedule?.proposed ?? state.schedule?.blocks ?? [];
+      const scheduleWrites = writesFromScheduleProposed(
+        selectedSummaries.size
+          ? scheduleProposed.filter(block => selectedSummaries.has(block.write_path || block.id || block.title))
+          : scheduleProposed,
+        stamp
+      );
+      writes.push(...scheduleWrites.writes);
+      if (writes.length) {
+        state = await saveWorkflowState(tasksStore, reviewId, {
+          ...state,
+          pending_changes: writes.map(w => ({
+            summary: w.diff,
+            selected: true,
+            id: w.path,
+            write_path: w.path
+          })),
+          status: 'awaiting_confirm',
+          updated_at: stamp
+        });
+        const proposal = propose(
+          `Weekly review confirm (${writes.length} change${writes.length === 1 ? '' : 's'})`,
+          writes,
+          ['confirm_card', 'tasks_hub', 'weekly_review']
+        );
+        return {
+          ...proposal,
+          stages: WEEKLY_REVIEW_STAGES,
+          state,
+          workflow_state_key: workflowStateKey(reviewId)
+        };
+      }
+    }
+
     return ok({ stages: WEEKLY_REVIEW_STAGES, state, workflow_state_key: workflowStateKey(reviewId) });
   }
   if (name === 'project_plan') {
@@ -1562,6 +1746,73 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     }
     state = updateProjectPlanStage(state, patch, Boolean(input.advance));
     state = await saveWorkflowState(tasksStore, stateId, state);
+
+    const finalize = Boolean(input.confirm || input.finalize);
+    const onNext = state.current_stage === 'next_action';
+    const actions = Array.isArray(state.next_actions) ? state.next_actions.filter(Boolean) : [];
+    if (finalize && onNext) {
+      const stamp = now.toISOString();
+      const writes = [];
+      let projectId = state.project_id ? String(state.project_id) : '';
+      const existing = projectId ? findProject(projects, projectId) : null;
+      if (!existing) {
+        projectId = newRecordId('proj');
+        const project = {
+          schema_version: 1,
+          id: projectId,
+          title: state.project_title || 'Untitled project',
+          status: 'active',
+          purpose: state.purpose || '',
+          desired_outcome: state.desired_outcome || '',
+          notes: Array.isArray(state.brainstorm) ? state.brainstorm.join('\n') : '',
+          created_at: stamp,
+          updated_at: stamp
+        };
+        writes.push(writeEntry(
+          `tasks:project:${projectId}`,
+          'create',
+          project,
+          `create project — ${project.title}`
+        ));
+      } else {
+        const project = {
+          ...existing,
+          purpose: state.purpose || existing.purpose || '',
+          desired_outcome: state.desired_outcome || existing.desired_outcome || '',
+          updated_at: stamp
+        };
+        writes.push(writeEntry(
+          `tasks:project:${projectId}`,
+          'append',
+          project,
+          `update project plan — ${project.title}`
+        ));
+      }
+      for (const action of actions) {
+        const title = typeof action === 'string' ? action.trim() : String(action?.title ?? '').trim();
+        if (!title) continue;
+        const task = buildTaskRecord({
+          title,
+          project_id: projectId,
+          bucket: 'active'
+        }, null, stamp);
+        writes.push(writeEntry(
+          `tasks:task:${task.id}`,
+          'create',
+          task,
+          `next action — ${title}`
+        ));
+      }
+      if (writes.length) {
+        const proposal = propose(
+          `Confirm project plan: ${state.project_title || projectId}`,
+          writes,
+          ['confirm_card', 'tasks_hub', 'project_plan']
+        );
+        return { ...proposal, state, workflow_state_key: workflowStateKey(stateId) };
+      }
+    }
+
     return ok({ state, workflow_state_key: workflowStateKey(stateId) });
   }
   if (name === 'context_match') {
@@ -1597,7 +1848,7 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     const authoritativeBlocks = Array.isArray(input.confirmed_blocks)
       ? input.confirmed_blocks
       : workBlocks.filter(b => b.status === 'confirmed' || b.status === 'in_progress');
-    return planWork('compose', {
+    const composed = planWork('compose', {
       tasks,
       lessons,
       date: input.date,
@@ -1611,6 +1862,71 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       task_ids: input.task_ids,
       planning_profile: planningProfile
     });
+    const rawProposed = Array.isArray(composed?.proposed) ? composed.proposed : [];
+    const selected = rawProposed.filter(block => block && block.selected !== false);
+    if (!selected.length) return composed;
+
+    const stamp = now.toISOString();
+    const writes = [];
+    const proposed = [];
+    for (const block of selected) {
+      const id = newRecordId('wblock');
+      const record = {
+        schema_version: 1,
+        id,
+        task_id: block.task_id ?? null,
+        project_id: block.project_id ?? null,
+        title: block.title || 'Planned work',
+        date: block.date || dayKey(input.date, now),
+        start_time: block.start_time || block.start || '09:00',
+        duration_minutes: Number(block.duration_minutes) || 30,
+        depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
+        status: 'proposed',
+        source: 'clare',
+        locked: false,
+        created_at: stamp,
+        updated_at: stamp
+      };
+      const path = `tasks:work_block:${id}`;
+      writes.push(writeEntry(
+        path,
+        'create',
+        record,
+        `schedule ${record.date} ${record.start_time} · ${record.title}`
+      ));
+      // Card Confirm Selected uses item.id as accept path.
+      proposed.push({
+        ...block,
+        ...record,
+        id: path,
+        write_path: path,
+        selected: true
+      });
+    }
+
+    const proposal = propose(
+      `Schedule ${writes.length} work block${writes.length === 1 ? '' : 's'}`,
+      writes,
+      ['confirm_card', 'tasks_hub', 'schedule_diff', 'calendar_ghost']
+    );
+
+    // Shared preview identity for Tasks + Life calendars (ghosts until Confirm).
+    await saveWorkflowState(tasksStore, 'schedule_diff:current', {
+      id: 'schedule_diff:current',
+      kind: 'schedule_diff',
+      date: dayKey(input.date, now),
+      proposed,
+      writes: writes.map(w => ({ path: w.path, diff: w.diff })),
+      status: 'awaiting_confirm',
+      updated_at: stamp
+    });
+
+    return {
+      ...proposal,
+      ...composed,
+      proposed,
+      note: 'Ghost blocks only until Confirm. Deadlines unchanged.'
+    };
   }
   if (name === 'focus_block') {
     const action = input.action || 'create';
