@@ -22,7 +22,8 @@ const setProgress = (root, name, value) => {
   element.setAttribute('aria-valuenow', String(Math.min(Math.max(value, 0), 100)));
 };
 
-export function renderHome(root, model) {
+export function renderHome(root, model, options = {}) {
+  const quiet = options.quiet === true;
   const app = root.querySelector('#app');
   if (app) app.dataset.state = 'ready';
 
@@ -74,7 +75,11 @@ export function renderHome(root, model) {
     fat: { value: model.nutrition.fat_g, target: model.targets.fat_ceiling_g }
   };
   for (const [name, config] of Object.entries(ringMap)) {
-    applyRingTarget(root.querySelector(`[data-ring="${name}"]`), config, { size: 72, strokeWidth: 7 });
+    applyRingTarget(root.querySelector(`[data-ring="${name}"]`), config, {
+      size: 72,
+      strokeWidth: 7,
+      quiet
+    });
     setText(root, `[data-percent="${name}"]`, `${model.progress[name]}%`);
   }
   setProgress(root, 'logging', model.progress.logging);
