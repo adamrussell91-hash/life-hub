@@ -132,8 +132,12 @@ test('structured-output and fact-preservation contracts are in the shared layer'
 
 test('chat runtime still streams in one model pass and does not import a Humanizer rewriter', () => {
   const chat = readFileSync(join(process.cwd(), 'netlify/functions/chat.mjs'), 'utf8');
+  const capture = readFileSync(join(process.cwd(), 'netlify/functions/_shared/visual-evidence-capture.mjs'), 'utf8');
   const persona = readFileSync(join(process.cwd(), 'netlify/functions/_shared/persona.mjs'), 'utf8');
-  assert.match(chat, /streamWithAgentLogForce/);
+  // chat streams via visual-evidence capture, which still wraps the single-pass log force helper
+  assert.match(chat, /streamWithVisualEvidenceCapture/);
+  assert.match(capture, /streamWithAgentLogForce/);
+  assert.doesNotMatch(capture, /humanize|loadHumanizerGuidance|second rewrite/i);
   assert.match(chat, /buildSystemPrompt/);
   assert.doesNotMatch(chat, /humanize|loadHumanizerGuidance|second rewrite/i);
   assert.match(persona, /loadHumanizerGuidance/);

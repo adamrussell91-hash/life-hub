@@ -29,7 +29,7 @@ import {
   normalizeVisualEvidenceList,
   visualEvidenceStubFromAttachment,
   mergeVisualEvidenceLists
-} from '../../../packages/design-kit/js/hub-visual-evidence.js';
+} from '../../../../packages/design-kit/js/hub-visual-evidence.js';
 import { shouldNudgeUnsavedWorkoutPlan } from '../core/workout-plan-detect.js';
 import {
   MISSING_LOG_NUDGE_TEXT,

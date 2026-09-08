@@ -26,7 +26,6 @@ import { DEFAULT_EXCURSION_TITLE } from '@/domain/excursion-catalog';
 import type { TaskDomain, TaskPriority } from '@/schemas/task';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
 import {
-  createHubField,
   createHubFilter,
   createHubPills,
   createHubSearch,
@@ -100,7 +99,7 @@ export async function markTaskDone(task: Task, actualMinutes?: number): Promise<
   await tasksApi.updateTask(task.id, { status: 'done' });
 }
 
-/** Done that needs an actual: confirm card. Discard / cancel leaves status unchanged. */
+/** Tick / Complete marks done immediately. Undo toast reverses it. */
 export function requestToggleDone(
   host: HTMLElement,
   task: Task,
@@ -112,69 +111,21 @@ export function requestToggleDone(
     });
     return;
   }
-  if (!(task.estimated_duration && task.actual_duration == null)) {
-    void markTaskDone(task)
-      .then(async () => {
-        await onDone();
-        const { offerTimedUndo } = await import('../../design-kit/js/hub-feedback.js');
-        offerTimedUndo({
-          message: `Completed “${task.title}”`,
-          onUndo: () => {
-            void markTaskOpen(task).then(onDone);
-          }
-        });
-      })
-      .catch((err) => {
-        host.append(el('p', 'empty-state', errorMessage(err)));
-      });
-    return;
-  }
 
-  host.replaceChildren();
-  const card = el('section', 'confirm-card');
-  card.setAttribute('role', 'region');
-  card.setAttribute('aria-label', 'Confirm done');
-  card.append(el('p', 'page-header__eyebrow', 'Proposed write'));
-  card.append(el('h2', 'page-header__title', `Done — ${task.title}`));
-  card.append(
-    el(
-      'p',
-      'page-header__supporting',
-      `Clare guessed ${task.estimated_duration} minutes. Discard leaves this task open.`
-    )
-  );
-  const minutes = createHubField({
-    type: 'number',
-    ariaLabel: 'Actual minutes',
-    min: '1',
-    step: '5',
-    value: String(task.estimated_duration)
-  });
-  const actions = el('div', 'confirm-card__actions');
-  const discard = el('button', 'btn btn--ghost', 'Discard');
-  discard.type = 'button';
-  const confirm = el('button', 'btn btn--primary', 'Confirm');
-  confirm.type = 'button';
-  discard.addEventListener('click', () => host.replaceChildren());
-  confirm.addEventListener('click', async () => {
-    const value = Number(minutes.input.value);
-    if (!value || Number.isNaN(value)) {
-      host.append(el('p', 'empty-state', 'Enter actual minutes, or Discard.'));
-      return;
-    }
-    confirm.disabled = true;
-    discard.disabled = true;
-    try {
-      await markTaskDone(task, value);
+  void markTaskDone(task)
+    .then(async () => {
       await onDone();
-    } catch (err) {
-      host.replaceChildren(el('p', 'empty-state', errorMessage(err)));
-    }
-  });
-  actions.append(discard, confirm);
-  card.append(minutes.el, actions);
-  host.append(card);
-  card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const { offerTimedUndo } = await import('../../design-kit/js/hub-feedback.js');
+      offerTimedUndo({
+        message: `Completed “${task.title}”`,
+        onUndo: () => {
+          void markTaskOpen(task).then(onDone);
+        }
+      });
+    })
+    .catch((err) => {
+      host.append(el('p', 'empty-state', errorMessage(err)));
+    });
 }
 
 export async function renderDayView(canvas: HTMLElement): Promise<void> {

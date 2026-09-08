@@ -35,10 +35,27 @@ function settleAreaReveal(svg, line) {
   svg.classList?.add?.('chart-static');
 }
 
+/** Jump metric rings to their stamped fill after a mid-flight sync-quiet freeze. */
+export function settleMetricRings(root) {
+  if (!root?.querySelectorAll) return;
+  for (const circle of root.querySelectorAll('.metric-ring-fill[data-ring-dashoffset]')) {
+    const target = circle.dataset.ringDashoffset;
+    if (target == null || target === '') continue;
+    circle.style.transition = 'none';
+    // Attribute may already equal the target while a cancelled CSS transition left
+    // the used value empty — nudge via the track length, then stamp the fill.
+    const circ = circle.getAttribute('stroke-dasharray') || target;
+    circle.setAttribute('stroke-dashoffset', circ);
+    void circle.getBoundingClientRect?.();
+    circle.setAttribute('stroke-dashoffset', target);
+  }
+}
+
 export function animateRingFill(circle, { circumference, dashoffset }, options = {}) {
   if (!circle) return;
   const reduced = motionIsQuiet(circle, options);
   circle.setAttribute('stroke-dasharray', String(circumference));
+  if (circle.dataset) circle.dataset.ringDashoffset = String(dashoffset);
   if (reduced) {
     circle.style.transition = 'none';
     circle.setAttribute('stroke-dashoffset', String(dashoffset));
@@ -47,6 +64,12 @@ export function animateRingFill(circle, { circumference, dashoffset }, options =
   circle.style.transition = 'none';
   circle.setAttribute('stroke-dashoffset', String(circumference));
   void circle.getBoundingClientRect();
+  // Re-check: a sync-quiet flag can land between the empty frame and the fill.
+  if (motionIsQuiet(circle, options)) {
+    circle.style.transition = 'none';
+    circle.setAttribute('stroke-dashoffset', String(dashoffset));
+    return;
+  }
   circle.style.transition = 'stroke-dashoffset 700ms cubic-bezier(.2,.8,.2,1)';
   circle.setAttribute('stroke-dashoffset', String(dashoffset));
 }

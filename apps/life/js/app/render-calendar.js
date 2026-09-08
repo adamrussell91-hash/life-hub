@@ -1,5 +1,6 @@
 import { formatDisplayDate } from '../core/time.js';
 import { candidateForLog, inferMealSlot, isWritableCalendarType, slugForLog } from './calendar-write.js';
+import { buildRingTarget } from './chart-kit/ring.js';
 import {
   blockStyle,
   formatBlockTime,
@@ -98,7 +99,7 @@ export function renderCalendar(root, model, {
   }
 
   const mode = VIEWS.some(item => item.id === view) ? view : 'week';
-  const mobileDay = mode === 'day' && isMobileViewport(root);
+  const mobile = isMobileViewport(root);
   handlersByRoot.set(calendar, {
     onSelectDate,
     onShiftRange,
@@ -114,20 +115,31 @@ export function renderCalendar(root, model, {
   calendar.replaceChildren();
   {
     const classes = new Set(String(calendar.className || '').split(/\s+/).filter(Boolean));
-    if (mobileDay) classes.add('hub-calendar--mobile-day');
-    else classes.delete('hub-calendar--mobile-day');
+    for (const name of ['hub-calendar--mobile', 'hub-calendar--mobile-day', 'hub-calendar--mobile-week', 'hub-calendar--mobile-month']) {
+      classes.delete(name);
+    }
+    if (mobile) {
+      classes.add('hub-calendar--mobile');
+      classes.add(`hub-calendar--mobile-${mode}`);
+    }
     calendar.className = [...classes].join(' ');
   }
   calendar.append(renderNav(root, model, mode));
 
   const draft = composeDraft ?? { date: model.selectedDate, time: null, type: 'diary' };
 
-  if (mobileDay) {
-    calendar.append(renderMobileDay(root, model, {
-      mobilePanel,
-      draft,
-      now
-    }));
+  if (mobile) {
+    if (mode === 'week') {
+      calendar.append(renderMobileWeek(root, model, { draft, now }));
+    } else if (mode === 'month') {
+      calendar.append(renderMobileMonth(root, model, { draft, monthDelta, now, mobilePanel }));
+    } else {
+      calendar.append(renderMobileDay(root, model, {
+        mobilePanel,
+        draft,
+        now
+      }));
+    }
     bindNav(calendar);
     bindKeys(calendar, root);
     bindViewport(calendar, root);
@@ -751,47 +763,178 @@ function openTaskCount(allDay) {
   return allDay.filter(event => event.type === 'task').length;
 }
 
+/** Timed items whose start has passed ÷ total timed — chart-kit ring progress. */
+function scheduleRingProgress(timed, now) {
+  const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  let done = 0;
+  let total = 0;
+  for (const event of timed) {
+    const start = parseTimeHours(event.time);
+    if (start == null) continue;
+    total += 1;
+    if (start <= hours) done += 1;
+  }
+  return { value: done, target: total };
+}
+
+function flattenWeekTimed(model) {
+  const timed = [];
+  for (const day of model.weekDays ?? []) {
+    const split = splitDayItems(day.events ?? []);
+    for (const event of split.timed) timed.push({ ...event, _date: day.date });
+  }
+  return timed;
+}
+
+function weekOpenTaskCount(model) {
+  let count = 0;
+  for (const day of model.weekDays ?? []) {
+    count += openTaskCount(splitDayItems(day.events ?? []).allDay);
+  }
+  return count;
+}
+
+function nextWeekTimedEvent(model, now) {
+  const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  const today = model.date;
+  const upcoming = [];
+  for (const day of model.weekDays ?? []) {
+    if (day.date < today) continue;
+    const { timed } = splitDayItems(day.events ?? []);
+    for (const event of timed) {
+      const start = parseTimeHours(event.time);
+      if (start == null) continue;
+      if (day.date === today && start <= hours) continue;
+      upcoming.push({ event, date: day.date, start });
+    }
+  }
+  upcoming.sort((a, b) => (a.date === b.date ? a.start - b.start : a.date < b.date ? -1 : 1));
+  return upcoming[0] ?? null;
+}
+
 function renderMobileDay(root, model, { mobilePanel, draft, now }) {
   const shell = root.createElement('div');
-  shell.className = 'hub-calendar__mobile-day';
+  shell.className = 'hub-calendar__mobile-shell hub-calendar__mobile-day';
   shell.dataset.calendar = 'mobile-day';
 
   const { timed, allDay } = splitDayItems(model.dayEvents);
   const tasks = openTaskCount(allDay);
   const panel = mobilePanel === 'tasks' ? 'tasks' : 'schedule';
 
-  shell.append(renderNowCard(root, { timed, tasks, now }));
+  shell.append(renderNowCard(root, {
+    timed,
+    tasks,
+    now,
+    emptyTitle: 'Clear ahead',
+    emptyMeta: `${timed.length} timed · ${tasks} open task${tasks === 1 ? '' : 's'}`
+  }));
   shell.append(renderDayStrip(root, model));
   shell.append(renderMobileSegmented(root, panel, tasks));
   if (panel === 'tasks') shell.append(renderTasksList(root, allDay));
   else shell.append(renderScheduleList(root, timed));
 
-  shell.append(renderMobileFab(root));
-  shell.append(renderEventSheet(root));
-  shell.append(renderMobileCompose(root, draft));
+  appendMobileChrome(shell, root, draft);
   return shell;
 }
 
-function renderNowCard(root, { timed, tasks, now }) {
+function renderMobileWeek(root, model, { draft, now }) {
+  const shell = root.createElement('div');
+  shell.className = 'hub-calendar__mobile-shell hub-calendar__mobile-week';
+  shell.dataset.calendar = 'mobile-week';
+
+  const timed = flattenWeekTimed(model);
+  const tasks = weekOpenTaskCount(model);
+  const next = nextWeekTimedEvent(model, now);
+
+  shell.append(renderNowCard(root, {
+    timed,
+    tasks,
+    now,
+    nextOverride: next?.event ?? null,
+    nextMeta: next
+      ? `${formatDisplayDate(next.date)}${next.event.time ? ` · ${next.event.time}` : ''}`
+      : null,
+    emptyTitle: 'Clear week',
+    emptyMeta: `${timed.length} timed · ${tasks} open task${tasks === 1 ? '' : 's'}`,
+    labelWhenNext: 'Next up',
+    labelWhenEmpty: 'Nothing else this week'
+  }));
+  shell.append(renderDayStrip(root, model));
+  shell.append(renderWeekAgenda(root, model));
+  appendMobileChrome(shell, root, draft);
+  return shell;
+}
+
+function renderMobileMonth(root, model, { draft, monthDelta, now, mobilePanel }) {
+  const shell = root.createElement('div');
+  shell.className = 'hub-calendar__mobile-shell hub-calendar__mobile-month';
+  shell.dataset.calendar = 'mobile-month';
+
+  const { timed, allDay } = splitDayItems(model.dayEvents);
+  const tasks = openTaskCount(allDay);
+  const panel = mobilePanel === 'tasks' ? 'tasks' : 'schedule';
+
+  shell.append(renderNowCard(root, {
+    timed,
+    tasks,
+    now,
+    emptyTitle: 'Clear day',
+    emptyMeta: `${timed.length} timed · ${tasks} open task${tasks === 1 ? '' : 's'}`
+  }));
+  shell.append(renderMobileMonthGrid(root, model, monthDelta));
+  shell.append(renderMobileSegmented(root, panel, tasks));
+  if (panel === 'tasks') shell.append(renderTasksList(root, allDay));
+  else shell.append(renderScheduleList(root, timed));
+
+  appendMobileChrome(shell, root, draft);
+  return shell;
+}
+
+function appendMobileChrome(shell, root, draft) {
+  shell.append(renderMobileFab(root));
+  shell.append(renderEventSheet(root));
+  shell.append(renderMobileCompose(root, draft));
+}
+
+function renderNowCard(root, {
+  timed,
+  tasks,
+  now,
+  nextOverride,
+  nextMeta,
+  emptyTitle = 'Clear ahead',
+  emptyMeta,
+  labelWhenNext = 'Next up',
+  labelWhenEmpty = 'Nothing else scheduled'
+}) {
   const card = root.createElement('section');
   card.className = 'hub-calendar__now-card';
   card.dataset.calendar = 'now-card';
   card.setAttribute('aria-label', 'Now');
 
-  card.append(renderNowRing(root, now));
+  const progress = scheduleRingProgress(timed, now);
+  card.append(renderNowRing(root, progress));
 
-  const next = nextTimedEvent(timed, now);
+  const next = nextOverride !== undefined ? nextOverride : nextTimedEvent(timed, now);
   const copy = root.createElement('div');
   copy.className = 'hub-calendar__now-card-copy';
   const label = root.createElement('p');
   label.className = 'hub-calendar__now-card-label';
-  label.textContent = next ? 'Next up' : 'Nothing else scheduled';
+  label.textContent = next ? labelWhenNext : labelWhenEmpty;
   const title = root.createElement('p');
   title.className = 'hub-calendar__now-card-title';
-  title.textContent = next ? next.title : 'Clear ahead';
+  title.textContent = next ? next.title : emptyTitle;
   const meta = root.createElement('p');
   meta.className = 'hub-calendar__now-card-meta';
-  meta.textContent = next?.time ? next.time : `${timed.length} timed · ${tasks} open task${tasks === 1 ? '' : 's'}`;
+  if (next && nextMeta) meta.textContent = nextMeta;
+  else if (next?.time) meta.textContent = next.time;
+  else {
+    const base = emptyMeta
+      ?? `${timed.length} timed · ${tasks} open task${tasks === 1 ? '' : 's'}`;
+    meta.textContent = progress.target > 0
+      ? `${base} · ${progress.value}/${progress.target} done`
+      : base;
+  }
   copy.append(label, title, meta);
   card.append(copy);
 
@@ -807,36 +950,48 @@ function renderNowCard(root, { timed, tasks, now }) {
   return card;
 }
 
-function renderNowRing(root, now) {
+function renderNowRing(root, { value, target }) {
   const wrap = root.createElement('div');
   wrap.className = 'hub-calendar__now-card-ring';
+  wrap.dataset.calendar = 'now-ring';
+  wrap.dataset.value = String(value);
+  wrap.dataset.target = String(target);
   wrap.setAttribute('aria-hidden', 'true');
-  const pct = (now.getHours() * 60 + now.getMinutes()) / 1440;
-  const size = 48;
-  const radius = 18;
-  const circumference = 2 * Math.PI * radius;
-  const dash = circumference * Math.min(Math.max(pct, 0), 1);
+
+  const ring = buildRingTarget(
+    { value, target: target > 0 ? target : 1 },
+    { size: 48, strokeWidth: 5 }
+  );
+  const fraction = target > 0 ? ring.fraction : 0;
+  const dashoffset = ring.circumference * (1 - fraction);
 
   const svg = svgEl(root, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+  svg.setAttribute('viewBox', `0 0 ${ring.size} ${ring.size}`);
+  svg.dataset.ringKey = `${value}\0${target}\0${ring.size}\0${ring.strokeWidth}`;
+
   const track = svgEl(root, 'circle');
-  track.setAttribute('cx', String(size / 2));
-  track.setAttribute('cy', String(size / 2));
-  track.setAttribute('r', String(radius));
+  track.setAttribute('data-role', 'track');
+  track.setAttribute('cx', String(ring.center));
+  track.setAttribute('cy', String(ring.center));
+  track.setAttribute('r', String(ring.radius));
   track.setAttribute('fill', 'none');
   track.setAttribute('stroke', 'currentColor');
-  track.setAttribute('stroke-width', '3');
+  track.setAttribute('stroke-width', String(ring.strokeWidth));
   track.setAttribute('opacity', '0.28');
+
   const arc = svgEl(root, 'circle');
-  arc.setAttribute('cx', String(size / 2));
-  arc.setAttribute('cy', String(size / 2));
-  arc.setAttribute('r', String(radius));
+  arc.setAttribute('data-role', 'fill');
+  arc.setAttribute('cx', String(ring.center));
+  arc.setAttribute('cy', String(ring.center));
+  arc.setAttribute('r', String(ring.radius));
   arc.setAttribute('fill', 'none');
   arc.setAttribute('stroke', 'currentColor');
-  arc.setAttribute('stroke-width', '3');
+  arc.setAttribute('stroke-width', String(ring.strokeWidth));
   arc.setAttribute('stroke-linecap', 'round');
-  arc.setAttribute('transform', `rotate(-90 ${size / 2} ${size / 2})`);
-  arc.setAttribute('stroke-dasharray', `${dash} ${circumference}`);
+  arc.setAttribute('transform', `rotate(-90 ${ring.center} ${ring.center})`);
+  arc.setAttribute('stroke-dasharray', String(ring.circumference));
+  arc.setAttribute('stroke-dashoffset', String(dashoffset));
+
   svg.append(track, arc);
   wrap.append(svg);
   return wrap;
@@ -865,6 +1020,18 @@ function renderDayStrip(root, model) {
     num.className = 'hub-calendar__day-pill-num';
     num.textContent = String(Number(day.date.slice(8, 10)));
     pill.append(letter, num);
+    if ((day.events ?? []).length) {
+      const marks = root.createElement('span');
+      marks.className = 'hub-calendar__day-pill-marks';
+      marks.setAttribute('aria-hidden', 'true');
+      for (const event of (day.events ?? []).slice(0, 3)) {
+        const dot = root.createElement('span');
+        dot.className = 'hub-calendar__day-pill-dot';
+        dot.dataset.tint = eventTint(event);
+        marks.append(dot);
+      }
+      pill.append(marks);
+    }
     pill.addEventListener('click', () => {
       const calendar = pill.closest?.('.hub-calendar') ?? pill;
       handlersByRoot.get(calendar)?.onSelectDate?.(day.date);
@@ -872,6 +1039,100 @@ function renderDayStrip(root, model) {
     strip.append(pill);
   }
   return strip;
+}
+
+function renderWeekAgenda(root, model) {
+  const list = root.createElement('div');
+  list.className = 'hub-calendar__mobile-list';
+  list.dataset.calendar = 'week-agenda';
+
+  let painted = 0;
+  for (const day of model.weekDays ?? []) {
+    const events = day.events ?? [];
+    if (!events.length) continue;
+    const heading = root.createElement('p');
+    heading.className = 'hub-calendar__mobile-group';
+    heading.textContent = `${weekdayShort(day.date)} · ${formatDisplayDate(day.date)}`;
+    list.append(heading);
+    const { timed, allDay } = splitDayItems(events);
+    for (const block of layoutTimedBlocks(timed)) {
+      list.append(renderMobileRow(root, {
+        event: block.item,
+        meta: formatBlockTime(block),
+        iconPaths: ['M12 7v5l3 2', 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z']
+      }));
+      painted += 1;
+    }
+    for (const event of allDay) {
+      list.append(renderMobileRow(root, {
+        event,
+        meta: typeLabel(event.type),
+        iconPaths: event.type === 'task'
+          ? ['M8 7h11M8 12h11M8 17h11', 'm4.5 7 .8.8L7 6M4.5 12l.8.8L7 11']
+          : ['M8 7h11M8 12h11M8 17h11']
+      }));
+      painted += 1;
+    }
+  }
+  if (!painted) {
+    const empty = root.createElement('p');
+    empty.className = 'hub-calendar__mobile-empty';
+    empty.textContent = 'Nothing scheduled this week.';
+    list.append(empty);
+  }
+  return list;
+}
+
+function renderMobileMonthGrid(root, model, monthDelta) {
+  const grid = root.createElement('div');
+  grid.className = 'hub-calendar__mobile-month-grid';
+  grid.dataset.calendar = 'mobile-month-grid';
+  grid.setAttribute('role', 'grid');
+  grid.setAttribute('aria-label', 'Month grid');
+  if (monthDelta > 0) grid.dataset.motion = 'forward';
+  if (monthDelta < 0) grid.dataset.motion = 'back';
+
+  for (const heading of ['M', 'T', 'W', 'T', 'F', 'S', 'S']) {
+    const cell = root.createElement('span');
+    cell.className = 'hub-calendar__mobile-month-weekday';
+    cell.textContent = heading;
+    grid.append(cell);
+  }
+
+  for (const day of model.monthDays ?? []) {
+    const cell = root.createElement('button');
+    cell.type = 'button';
+    cell.className = 'hub-calendar__mobile-month-day';
+    cell.setAttribute('role', 'gridcell');
+    cell.dataset.date = day.date;
+    cell.dataset.calendar = 'mobile-month-day';
+    if (!day.inMonth) cell.dataset.outside = 'true';
+    if (day.isToday) cell.dataset.today = 'true';
+    if (day.isSelected) cell.dataset.selected = 'true';
+    const num = root.createElement('span');
+    num.className = 'hub-calendar__mobile-month-num';
+    num.textContent = String(day.day);
+    cell.append(num);
+    if ((day.events ?? []).length) {
+      const marks = root.createElement('span');
+      marks.className = 'hub-calendar__mobile-month-marks';
+      marks.setAttribute('aria-hidden', 'true');
+      for (const event of (day.events ?? []).slice(0, 3)) {
+        const dot = root.createElement('span');
+        dot.className = 'hub-calendar__mobile-month-dot';
+        dot.dataset.tint = eventTint(event);
+        marks.append(dot);
+      }
+      cell.append(marks);
+    }
+    cell.addEventListener('click', () => {
+      const calendar = cell.closest?.('.hub-calendar') ?? cell;
+      handlersByRoot.get(calendar)?.onSelectDate?.(day.date);
+    });
+    grid.append(cell);
+  }
+  applyMonthMotion(grid, monthDelta);
+  return grid;
 }
 
 function renderMobileSegmented(root, panel, taskCount) {
