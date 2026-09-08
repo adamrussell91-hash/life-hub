@@ -208,10 +208,24 @@ function paintTaskPage(
   );
   const due = createHubField({
     type: 'date',
-    ariaLabel: 'Due date',
+    ariaLabel: 'Deadline',
     value: task.due_date ?? '',
     className: 'page-card__due',
     onChange: (value) => persist({ due_date: value || null })
+  });
+  const target = createHubField({
+    type: 'date',
+    ariaLabel: 'Target date',
+    value: task.target_date ?? '',
+    className: 'page-card__target',
+    onChange: (value) => persist({ target_date: value || null })
+  });
+  const review = createHubField({
+    type: 'date',
+    ariaLabel: 'Review date',
+    value: task.review_at ?? '',
+    className: 'page-card__review',
+    onChange: (value) => persist({ review_at: value || null })
   });
   const start = createHubField({
     type: 'time',
@@ -268,14 +282,28 @@ function paintTaskPage(
     (value) => persist({ parent_project_id: value || null })
   );
 
-  const dueField = labeledField('Due', due.el);
+  const dueField = labeledField('Deadline', due.el);
   dueField.classList.add('page-card__when');
+  const targetField = labeledField('Target', target.el);
+  targetField.classList.add('page-card__when');
+  const reviewField = labeledField('Review', review.el);
+  reviewField.classList.add('page-card__when');
   const startField = labeledField('Start', start.el);
   startField.classList.add('page-card__when');
   const endField = labeledField('End', end.el);
   endField.classList.add('page-card__when');
 
-  fields.append(status.el, domain.el, priority.el, dueField, startField, endField, project.el);
+  fields.append(
+    status.el,
+    domain.el,
+    priority.el,
+    dueField,
+    targetField,
+    reviewField,
+    startField,
+    endField,
+    project.el
+  );
 
   const notes = createHubTextarea({
     ariaLabel: 'Notes',
