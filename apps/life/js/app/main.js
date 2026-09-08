@@ -242,7 +242,7 @@ const calHost = document.querySelector('[data-calendar="schedule"]');
 if (calHost) {
   createScheduleButton({
     wrap: calHost,
-    onSchedule: () => document.querySelector('[data-hub-compose-cal]')?.click()
+    onSchedule: () => controller.openCalendarCompose?.()
   });
 }
 
