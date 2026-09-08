@@ -19,9 +19,42 @@ export function truncateHistoryEntry(text, max = MAX_HISTORY_ENTRY_CHARS) {
   return `${text.slice(0, head)}${ELLIPSIS}${text.slice(-tail)}`;
 }
 
+function compactVisualEvidence(value) {
+  if (!Array.isArray(value) || !value.length) return undefined;
+  // Lazy import avoided — keep this file dependency-free for browser+server.
+  // chat.mjs / controller normalize via hub-visual-evidence before persist.
+  const items = [];
+  for (const raw of value.slice(0, 4)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const attachmentId = typeof raw.attachmentId === 'string' ? raw.attachmentId.trim() : '';
+    if (!attachmentId) continue;
+    const item = { attachmentId };
+    for (const key of [
+      'name', 'mime', 'evidenceType', 'transcribedText', 'documentType',
+      'tableNotes', 'chartNotes', 'sceneNotes', 'strength'
+    ]) {
+      if (typeof raw[key] === 'string' && raw[key].trim()) {
+        item[key] = raw[key].trim().slice(0, key === 'transcribedText' ? 1200 : 400);
+      }
+    }
+    if (raw.structuredFields && typeof raw.structuredFields === 'object') {
+      item.structuredFields = raw.structuredFields;
+    }
+    for (const key of ['entities', 'objects', 'dates', 'uncertainties', 'agentCues']) {
+      if (Array.isArray(raw[key])) {
+        item[key] = raw[key].filter((v) => typeof v === 'string').slice(0, 12);
+      }
+    }
+    if (Array.isArray(raw.numbers)) item.numbers = raw.numbers.slice(0, 20);
+    items.push(item);
+  }
+  return items.length ? items : undefined;
+}
+
 /**
  * Keep a contiguous recent suffix that fits the char budget.
  * Walking oldest-first drops the last plan once earlier lectures fill the cap.
+ * Preserves compact visualEvidence on user turns (never base64).
  */
 export function keepNewestHistory(entries, {
   maxMessages = MAX_HISTORY_MESSAGES,
@@ -33,7 +66,10 @@ export function keepNewestHistory(entries, {
     if (!entry || typeof entry !== 'object') continue;
     if (entry.role !== 'user' && entry.role !== 'assistant') continue;
     if (typeof entry.content !== 'string' || entry.content.trim() === '') continue;
-    valid.push({ role: entry.role, content: entry.content.trim() });
+    const row = { role: entry.role, content: entry.content.trim() };
+    const visualEvidence = compactVisualEvidence(entry.visualEvidence);
+    if (visualEvidence) row.visualEvidence = visualEvidence;
+    valid.push(row);
   }
 
   const windowed = valid.slice(-maxMessages);
@@ -41,9 +77,13 @@ export function keepNewestHistory(entries, {
   let total = 0;
   for (let i = windowed.length - 1; i >= 0; i -= 1) {
     const content = truncateHistoryEntry(windowed[i].content, maxEntryChars);
-    if (total + content.length > maxTotalChars) break;
-    total += content.length;
-    kept.unshift({ role: windowed[i].role, content });
+    const evidence = windowed[i].visualEvidence;
+    const evidenceTax = evidence ? Math.min(800, JSON.stringify(evidence).length) : 0;
+    if (total + content.length + evidenceTax > maxTotalChars) break;
+    total += content.length + evidenceTax;
+    const row = { role: windowed[i].role, content };
+    if (evidence) row.visualEvidence = evidence;
+    kept.unshift(row);
   }
   return kept;
 }
