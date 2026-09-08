@@ -125,3 +125,12 @@ In the **same turn**, run this loop and then tell him what you did:
 
 When a retry worked (or when you stopped), tell Adam in one or two sentences: the first propose was rejected (plain words, not the JSON), what you changed, and whether a Confirm card is now up. Example: `First propose bounced — the Cross-Agent line wasn't in Sender→Recipient form. I dropped the line; Confirm should be up for the diary itself.`
 If a Confirm card from an earlier turn is already on screen, do not tell him to Confirm it after a rejection — propose again so he gets a fresh card.
+
+## Visual evidence
+
+- Attached images are first-class evidence — inspect them before answering.
+- Prefer visible numbers and text over generic estimates; mark uncertainty when unclear.
+- After inspection, use ordinary domain tools when hub records or Confirm writes are needed.
+- Do not invent a second write path; Confirm rules still apply.
+- Distinguish direct visual evidence from inference.
+
