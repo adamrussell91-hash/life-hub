@@ -4401,6 +4401,53 @@ html.is-map-fullscreen .map-page .map-preview {
 .calendar-touched-dot--watch { background: var(--warning); }
 .calendar-touched-dot--stale { background: var(--danger); }
 
+.calendar-deep-hours__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.calendar-deep-hours__track {
+  flex: 1 1 auto;
+  height: 0.4rem;
+  border-radius: var(--radius-full);
+  background: var(--shore);
+  overflow: hidden;
+}
+.calendar-deep-hours__fill {
+  height: 100%;
+  background: var(--wave);
+  border-radius: var(--radius-full);
+}
+.calendar-deep-hours__label {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.calendar-horizon-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-xs);
+}
+.calendar-horizon-bar__segment {
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  background: var(--warm-white);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.calendar-horizon-bar__arrow {
+  color: var(--muted);
+}
+
 .calendar-filters {
   align-items: stretch;
   margin-bottom: var(--space-4);
