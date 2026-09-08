@@ -22,7 +22,8 @@ import {
   EXERCISE_LIBRARY_PATH,
   parseExerciseLibrary
 } from './_shared/exercise-library.mjs';
-import { persistLogEntry, renderMarkdown } from './_shared/persist-log.mjs';
+import { persistLogEntry, renderMarkdown, syncCentralNodeAfterMealDeletes } from './_shared/persist-log.mjs';
+import { mealDeletesFromWrites } from './_shared/delete-meal.mjs';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
 import {
@@ -590,6 +591,17 @@ export function createChatConfirmHandler({
       }
     }
 
+    let centralNodeUpdated = null;
+    const mealDeletions = mealDeletesFromWrites(accepted);
+    if (mealDeletions.length) {
+      try {
+        const cn = await syncCentralNodeAfterMealDeletes(client, mealDeletions);
+        centralNodeUpdated = cn?.updated === true;
+      } catch {
+        centralNodeUpdated = false;
+      }
+    }
+
     const decision = decisionFieldsFromAction({
       proposal,
       accepted,
@@ -709,6 +721,7 @@ export function createChatConfirmHandler({
       data: {
         intent: proposal.intent,
         results: writeResult.results,
+        ...(centralNodeUpdated != null ? { centralNodeUpdated } : {}),
         ...(turnResume?.state?.id ? { turnId: turnResume.state.id, turnResumed: true } : {}),
         ...(continuation ? { continuation } : {})
       }

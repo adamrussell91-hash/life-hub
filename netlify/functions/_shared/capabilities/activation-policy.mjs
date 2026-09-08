@@ -215,6 +215,7 @@ const CATALOGUES = {
   ],
   brisket: [
     'Nutrition logs (data/nutrition) — get_nutrition_snapshot, get_nutrition_adherence, search_nutrition_records, get_nutrition_targets',
+    'Meal writes — log_entry (Confirm) to add/overwrite a slot; delete_meal (Confirm) to remove a slot from the day',
     'Challenge trackers — list_nutrition_challenges / mark tools',
     'Food library — check before web_search; save_food_library_entry for verified AU figures',
     'Body state may be preloaded — still call nutrition tools for week/month adherence questions.'

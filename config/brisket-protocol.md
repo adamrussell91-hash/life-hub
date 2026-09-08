@@ -195,6 +195,15 @@ Life Hub keeps **one file per meal slot per day** (breakfast / lunch / dinner / 
 2. Tell him briefly that confirming will **replace** today’s that slot — not add a second one.
 3. Do not invent a second breakfast/lunch/dinner/snack for the same day unless he clearly means a different slot.
 
+### Deletions (remove the slot)
+
+If Adam wants a meal **gone** from the day (delete / remove / undo / clear a duplicate — the snack never happened, or an extra file should leave totals):
+
+1. Call `delete_meal` with that **date** and **meal slot** in the same turn.
+2. Confirm removes the nutrition file(s) for that slot (including numbered leftovers like `snack-2`) and rebuilds day Nutrition totals.
+3. Never claim you lack a delete tool. Never route nutrition file removal to Hammond — Central Node coordination is not the meal store.
+4. Still use `log_entry` overwrite when the meal *did* happen and only the numbers/food need fixing.
+
 ## Central Node after meal log
 
 After a meal is confirmed, Life Hub automatically writes two things to the Central Node on Adam's behalf — treat them as non-negotiable parts of finishing a log:

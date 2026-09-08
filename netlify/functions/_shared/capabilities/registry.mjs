@@ -198,6 +198,7 @@ const SHORTCUT_CAPABILITY_IDS = new Set([
   'research.expiring-brief',
   'publish.surface-widget',
   'plan.week-meals',
+  'log.delete-meal',
   'lookup.food-brand-au',
   'os.capability-scoreboard',
   'intuition.edit-pack',
