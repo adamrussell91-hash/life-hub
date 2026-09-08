@@ -51,7 +51,7 @@ export function bindChatComposer(root, { onSend, onStop } = {}) {
       const {
         attachmentsFitChatBody,
         EFFECTIVE_MAX_CHAT_IMAGE_BYTES
-      } = await import('../../../packages/design-kit/js/hub-visual-evidence.js');
+      } = await import('../../../../packages/design-kit/js/hub-visual-evidence.js');
       let lastError = '';
       for (const file of files.slice(0, 3)) {
         try {

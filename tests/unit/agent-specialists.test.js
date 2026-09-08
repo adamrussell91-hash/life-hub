@@ -279,7 +279,8 @@ test('Hyaluronica Delivery: empty routine window cannot claim help', () => {
 test('Penelope Delivery: no diary hits does not invent recurrence', () => {
   const kernel = runAgentKernel({
     slug: 'penelope',
-    message: 'feeling like this often',
+    // Avoid deictic "this" so the empty-store path is the no-hits branch, not referent clarification.
+    message: 'feeling anxious often',
     today: TODAY,
     now: NOW,
     stores: { mindEvents: [] }
