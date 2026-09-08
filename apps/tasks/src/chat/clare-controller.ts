@@ -16,7 +16,11 @@ import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createHubField, createHubFilter } from '@/views/hub-kit';
 import { tasksApi } from '@/services/client-api';
 import { confirmChat, streamChat } from '@/services/chat-api';
-import { setCalendarGhostBlocks } from '@/views/calendar';
+import { ApiClientError } from '@/api/client';
+import {
+  setCalendarGhostBlocksForProposal,
+  clearCalendarGhostBlocksForProposal
+} from '@/views/calendar';
 import type { WorkBlock } from '@/schemas/work-block';
 import { agentBySlug, DEFAULT_AGENT_SLUG, type ChatAgentSlug } from '@/chat/agents';
 import { paintProtocolTrays } from '@/chat/build-chat-view';
@@ -445,6 +449,34 @@ export type ClareChatController = {
   send: (text?: string) => Promise<void>;
 };
 
+
+/** Resolve Confirm accept paths and reject anything outside this proposal's write set. */
+export function assertAcceptPathsForProposal(
+  accept: unknown,
+  allowedWritePaths?: ReadonlySet<string> | null
+): string[] {
+  if (!Array.isArray(accept)) return [];
+  const paths = accept
+    .map((item) => {
+      if (typeof item === 'string') return item.trim();
+      if (!item || typeof item !== 'object') return '';
+      const row = item as { write_path?: string; path?: string; id?: string };
+      if (typeof row.write_path === 'string' && row.write_path.trim()) return row.write_path.trim();
+      if (typeof row.path === 'string' && row.path.trim()) return row.path.trim();
+      if (typeof row.id === 'string' && row.id.trim()) return row.id.trim();
+      return '';
+    })
+    .filter(Boolean);
+  if (allowedWritePaths && paths.length) {
+    for (const path of paths) {
+      if (!allowedWritePaths.has(path)) {
+        throw new Error(`Write path is not part of this proposal: ${path}`);
+      }
+    }
+  }
+  return paths;
+}
+
 export function createClareChatController({
   root,
   isVisible,
@@ -494,47 +526,67 @@ export function createClareChatController({
   }
 
   async function confirmPendingAction(
+    pendingId: string,
     accept?: unknown,
-    options: { dismiss?: boolean } = {}
+    options: { dismiss?: boolean; allowedWritePaths?: ReadonlySet<string> } = {}
   ): Promise<void> {
-    const id = lastPendingActionId;
+    const id = typeof pendingId === 'string' ? pendingId.trim() : '';
     if (!id) {
-      showChatError(root, 'Nothing pending to confirm. Run the protocol again.');
-      return;
+      throw new Error('This card has no proposal id. Re-run the protocol.');
     }
+    const resolvePaths = (value: unknown): string[] => assertAcceptPathsForProposal(value, options.allowedWritePaths);
     try {
       if (options.dismiss) {
         await confirmChat({ kind: 'action_dismiss', id, slug: 'clare' });
-        lastPendingActionId = null;
+        if (lastPendingActionId === id) lastPendingActionId = null;
         return;
       }
+      const paths = resolvePaths(accept);
       await confirmChat({
         kind: 'action',
         id,
         slug: 'clare',
-        ...(Array.isArray(accept)
-          ? {
-              accept: accept
-                .map((item) => {
-                  if (typeof item === 'string') return item;
-                  if (!item || typeof item !== 'object') return null;
-                  const row = item as { write_path?: string; path?: string; id?: string };
-                  if (typeof row.write_path === 'string' && row.write_path) return row.write_path;
-                  if (typeof row.path === 'string' && row.path) return row.path;
-                  if (typeof row.id === 'string' && row.id) return row.id;
-                  return null;
-                })
-                .filter((value): value is string => Boolean(value))
-            }
-          : {})
+        ...(paths.length ? { accept: paths } : {})
       });
-      lastPendingActionId = null;
+      if (lastPendingActionId === id) lastPendingActionId = null;
     } catch (err) {
-      showChatError(
-        root,
-        err instanceof Error ? err.message : 'Confirm failed. You can try again.'
-      );
+      let message = err instanceof Error ? err.message : 'Confirm failed. You can try again.';
+      if (err instanceof ApiClientError && err.code === 'stale_schedule_collision') {
+        message =
+          'Schedule collision — nothing was written. Ghosts kept. Review the revised schedule and confirm again.';
+      }
+      showChatError(root, message);
+      throw err instanceof Error ? err : new Error(message);
     }
+  }
+
+  function collectAllowedWritePaths(payload: Record<string, unknown>): Set<string> {
+    const allowed = new Set<string>();
+    const add = (value: unknown) => {
+      if (typeof value === 'string' && value.trim()) allowed.add(value.trim());
+    };
+    const writes = Array.isArray(payload.writes)
+      ? payload.writes
+      : Array.isArray((payload.proposal as { writes?: unknown } | undefined)?.writes)
+        ? ((payload.proposal as { writes: unknown[] }).writes)
+        : [];
+    for (const write of writes) {
+      if (!write || typeof write !== 'object') continue;
+      add((write as { path?: string }).path);
+      add((write as { write_path?: string }).write_path);
+    }
+    const blocks = Array.isArray(payload.blocks)
+      ? payload.blocks
+      : Array.isArray(payload.proposed)
+        ? payload.proposed
+        : [];
+    for (const block of blocks) {
+      if (!block || typeof block !== 'object') continue;
+      add((block as { write_path?: string }).write_path);
+      add((block as { path?: string }).path);
+      add((block as { id?: string }).id);
+    }
+    return allowed;
   }
 
   function paintProductivityCard(
@@ -543,11 +595,12 @@ export function createClareChatController({
     title?: string,
     hint?: string
   ): void {
-    const pendingFromCard =
+    // Cards bind only their own SSE pendingId — never the conversation's latest proposal.
+    const cardPendingId =
       typeof payload.pendingId === 'string' && payload.pendingId.trim()
         ? payload.pendingId.trim()
-        : lastPendingActionId;
-    if (pendingFromCard) lastPendingActionId = pendingFromCard;
+        : null;
+    const allowedWritePaths = collectAllowedWritePaths(payload);
 
     if (type === 'schedule-diff') {
       const rawBlocks = Array.isArray(payload.blocks)
@@ -587,37 +640,31 @@ export function createClareChatController({
           } satisfies WorkBlock;
         })
         .filter((block) => Boolean(block.date));
-      setCalendarGhostBlocks(ghosts);
+      if (cardPendingId) setCalendarGhostBlocksForProposal(cardPendingId, ghosts);
     }
+
+    const runBoundConfirm = async (picks?: unknown, dismiss = false): Promise<void> => {
+      if (!cardPendingId) {
+        throw new Error('This card has no proposal id. Re-run the protocol.');
+      }
+      await confirmPendingAction(cardPendingId, picks, {
+        dismiss,
+        allowedWritePaths
+      });
+      if (type === 'schedule-diff') clearCalendarGhostBlocksForProposal(cardPendingId);
+    };
 
     appendProductivityCard(root, type, {
       ...payload,
+      pendingId: cardPendingId ?? undefined,
       title,
       hint,
-      onConfirmSelected: (picks: unknown) => {
-        void confirmPendingAction(picks).then(() => {
-          if (type === 'schedule-diff') setCalendarGhostBlocks([]);
-        });
-      },
-      onConfirmAll: (picks: unknown) => {
-        void confirmPendingAction(picks).then(() => {
-          if (type === 'schedule-diff') setCalendarGhostBlocks([]);
-        });
-      },
-      onConfirm: (picks: unknown) => {
-        void confirmPendingAction(picks).then(() => {
-          if (type === 'schedule-diff') setCalendarGhostBlocks([]);
-        });
-      },
-      onDiscard: () => {
-        void confirmPendingAction(undefined, { dismiss: true }).then(() => {
-          setCalendarGhostBlocks([]);
-        });
-      },
+      onConfirmSelected: (picks: unknown) => runBoundConfirm(picks),
+      onConfirmAll: (picks: unknown) => runBoundConfirm(picks),
+      onConfirm: (picks: unknown) => runBoundConfirm(picks),
+      onDiscard: () => runBoundConfirm(undefined, true),
       onPreview: () => {},
-      onClose: (payloadClose: unknown) => {
-        void confirmPendingAction(payloadClose);
-      }
+      onClose: (payloadClose: unknown) => runBoundConfirm(payloadClose)
     });
   }
 

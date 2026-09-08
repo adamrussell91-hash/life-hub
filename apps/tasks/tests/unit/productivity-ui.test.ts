@@ -84,6 +84,7 @@ describe('clarify stack card', () => {
   it('edits destinations and confirms selected only', () => {
     const confirmed: unknown[] = [];
     const card = createDecisionStackCard(document, {
+      pendingId: 'pending_clarify_test',
       items: [
         { id: 'a', text: 'Buy milk', destination: 'next_action' },
         { id: 'b', text: 'Someday trip', destination: 'someday' }
@@ -118,6 +119,7 @@ describe('schedule diff ghost', () => {
     const writes: string[] = [];
     const previews: boolean[] = [];
     const { card, isPreview } = createScheduleDiffCard(document, {
+      pendingId: 'pending_schedule_test',
       blocks: [
         { id: 'g1', title: 'Deep block', start_time: '09:00', duration_minutes: 90, ghost: true }
       ],

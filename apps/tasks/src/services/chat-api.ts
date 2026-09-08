@@ -6,8 +6,32 @@ import { ApiClientError } from '@/api/client';
 
 export const CHAT_EVENTS_POLL_MS = 400;
 
-function httpError(message: string, status: number, code: string): ApiClientError {
-  return new ApiClientError({ code, message }, status);
+function httpError(
+  message: string,
+  status: number,
+  code: string,
+  details?: unknown
+): ApiClientError {
+  return new ApiClientError({ code, message, ...(details !== undefined ? { details } : {}) }, status);
+}
+
+function confirmErrorCode(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return 'request_failed';
+  const error = (payload as { error?: unknown }).error;
+  if (typeof error === 'string' && error.trim()) return error.trim();
+  if (error && typeof error === 'object' && typeof (error as { code?: unknown }).code === 'string') {
+    const code = (error as { code: string }).code.trim();
+    if (code) return code;
+  }
+  return 'request_failed';
+}
+
+function confirmErrorMessage(code: string, status: number): string {
+  if (code === 'stale_schedule_collision') {
+    return 'Schedule changed since this proposal. Ghosts kept — confirm a revised proposal.';
+  }
+  if (status === 409) return 'Confirm conflict. The card stays actionable.';
+  return 'Confirm request failed';
 }
 
 export type ChatHistoryEntry = { role: 'user' | 'assistant'; content: string };
@@ -186,9 +210,10 @@ export function createChatApi(
       const payload = await response.json().catch(() => null);
       if (!response.ok || payload?.ok !== true) {
         throw httpError(
-          'Confirm request failed',
+          confirmErrorMessage(confirmErrorCode(payload), response.status),
           response.status,
-          payload?.error?.code ?? 'request_failed'
+          confirmErrorCode(payload),
+          payload?.data ?? payload
         );
       }
       return payload.data;

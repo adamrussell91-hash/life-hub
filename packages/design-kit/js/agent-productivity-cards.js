@@ -73,6 +73,61 @@ function srText(create, text) {
   return p;
 }
 
+function setCardState(card, state) {
+  card.dataset.state = state;
+  card.classList.toggle('is-submitting', state === 'submitting');
+  card.classList.toggle('is-receipt', state === 'confirmed' || state === 'discarded');
+  card.classList.toggle('is-failed', state === 'failed');
+}
+
+function showCardFailure(create, card, message) {
+  let note = card.querySelector('.prod-card__failure');
+  if (!note) {
+    note = create('p');
+    note.className = 'prod-card__failure';
+    note.setAttribute('role', 'alert');
+    card.append(note);
+  }
+  note.textContent = message || 'Could not save. Try again.';
+}
+
+function clearCardFailure(card) {
+  card.querySelector('.prod-card__failure')?.remove();
+}
+
+/**
+ * Run a durable card action without claiming success until the callback resolves.
+ * Callbacks may return a Promise. Failure restores controls.
+ */
+async function runDurableCardAction(card, create, actions, {
+  action,
+  successText,
+  failureText,
+  successState = 'confirmed',
+  controls
+} = {}) {
+  if (card.dataset.state === 'submitting') return false;
+  clearCardFailure(card);
+  const nodes = [...(controls ?? card.querySelectorAll('button, input, select'))];
+  setCardState(card, 'submitting');
+  for (const el of nodes) el.disabled = true;
+  try {
+    await Promise.resolve(typeof action === 'function' ? action() : action);
+    setCardState(card, successState);
+    receipt(create, actions, successText);
+    return true;
+  } catch (err) {
+    setCardState(card, 'failed');
+    for (const el of nodes) el.disabled = false;
+    showCardFailure(
+      create,
+      card,
+      err instanceof Error && err.message ? err.message : failureText || 'Could not save. Try again.'
+    );
+    return false;
+  }
+}
+
 const DESTINATIONS = [
   { id: 'next_action', label: 'Next action' },
   { id: 'project', label: 'Project' },
@@ -211,29 +266,38 @@ export function createDecisionStackCard(root, options = {}) {
     )
   );
 
+  setCardState(card, options.pendingId || options.allowUnbound ? 'ready' : 'failed');
+  if (!options.pendingId && !options.allowUnbound) {
+    showCardFailure(create, card, 'This card has no proposal id. Re-run the protocol.');
+  }
+
   const actions = actionsRow(create, [
     {
       label: 'Confirm selected',
       className: 'btn btn--secondary',
+      disabled: !options.pendingId && !options.allowUnbound,
       onClick: (btn, host) => {
         const picks = snapshot().filter((item) => item.selected);
         if (!picks.length) return;
-        options.onConfirmSelected?.(picks);
-        card.classList.add('is-receipt');
-        receipt(create, host, `Confirmed ${picks.length} selected.`);
-        for (const el of list.querySelectorAll('button, input, select')) el.disabled = true;
+        void runDurableCardAction(card, create, host, {
+          action: () => options.onConfirmSelected?.(picks),
+          successText: `Confirmed ${picks.length} selected.`,
+          controls: card.querySelectorAll('button, input, select')
+        });
       }
     },
     {
       label: 'Confirm All',
       className: 'btn btn--primary',
+      disabled: !options.pendingId && !options.allowUnbound,
       onClick: (btn, host) => {
         const picks = snapshot();
         if (!picks.length) return;
-        options.onConfirmAll?.(picks);
-        card.classList.add('is-receipt');
-        receipt(create, host, `Confirmed all ${picks.length}.`);
-        for (const el of list.querySelectorAll('button, input, select')) el.disabled = true;
+        void runDurableCardAction(card, create, host, {
+          action: () => options.onConfirmAll?.(picks),
+          successText: `Confirmed all ${picks.length}.`,
+          controls: card.querySelectorAll('button, input, select')
+        });
       }
     }
   ]);
@@ -429,14 +493,23 @@ export function createScheduleDiffCard(root, options = {}) {
 
   let previewActive = Boolean(options.previewActive);
 
+  setCardState(card, options.pendingId || options.allowUnbound ? 'ready' : 'failed');
+  if (!options.pendingId && !options.allowUnbound) {
+    showCardFailure(create, card, 'This schedule has no proposal id. Re-run Plan Day.');
+  }
+
   const actions = actionsRow(create, [
     {
       label: 'Discard',
       className: 'btn btn--ghost',
+      disabled: !options.pendingId && !options.allowUnbound,
       onClick: (btn, host) => {
-        options.onDiscard?.();
-        card.classList.add('is-receipt');
-        receipt(create, host, 'Discarded.');
+        void runDurableCardAction(card, create, host, {
+          action: () => options.onDiscard?.(),
+          successText: 'Discarded.',
+          successState: 'discarded',
+          controls: card.querySelectorAll('button, input, select')
+        });
       }
     },
     {
@@ -453,12 +526,15 @@ export function createScheduleDiffCard(root, options = {}) {
     {
       label: 'Confirm Selected',
       className: 'btn btn--primary',
+      disabled: !options.pendingId && !options.allowUnbound,
       onClick: (btn, host) => {
         const picks = selectedBlocks();
         if (!picks.length) return;
-        options.onConfirm?.(picks);
-        card.classList.add('is-receipt');
-        receipt(create, host, `Confirmed ${picks.length} block${picks.length === 1 ? '' : 's'}.`);
+        void runDurableCardAction(card, create, host, {
+          action: () => options.onConfirm?.(picks),
+          successText: `Confirmed ${picks.length} block${picks.length === 1 ? '' : 's'}.`,
+          controls: card.querySelectorAll('button, input, select')
+        });
       }
     }
   ]);
@@ -793,9 +869,11 @@ export function createShutdownCard(root, options = {}) {
             id: item.id,
             decision: decisions.get(item.id) || 'leave'
           }));
-          options.onClose?.(payload);
-          card.classList.add('is-receipt');
-          receipt(create, host, 'Day closed.');
+          void runDurableCardAction(card, create, host, {
+            action: () => options.onClose?.(payload),
+            successText: 'Day closed.',
+            controls: card.querySelectorAll('button, input, select')
+          });
         }
       }
     ])

@@ -193,7 +193,40 @@ const cnSha = 'c'.repeat(40);
 const treeSha = 'd'.repeat(40);
 const commitSha = 'a'.repeat(40);
 
-function githubStub(url, options = {}) {
+const githubBlobs = new Map();
+let githubSeq = 1;
+
+function sha40(n) {
+  return String(n).padStart(40, '0');
+}
+
+function putGithubBlob(filePath, content) {
+  const sha = sha40(githubSeq);
+  githubSeq += 1;
+  githubBlobs.set(filePath, { sha, content });
+  return sha;
+}
+
+// Seed protocol docs so chat can load Clare/Hammond instructions.
+try {
+  putGithubBlob(
+    'apps/tasks/config/clare-protocol.md',
+    readFileSync(resolve(root, 'apps/tasks/config/clare-protocol.md'), 'utf8')
+  );
+} catch {
+  putGithubBlob('apps/tasks/config/clare-protocol.md', '# clare\n');
+}
+try {
+  putGithubBlob(
+    'config/hammond-protocol.md',
+    readFileSync(resolve(root, 'config/hammond-protocol.md'), 'utf8')
+  );
+} catch {
+  putGithubBlob('config/hammond-protocol.md', '# hammond\n');
+}
+putGithubBlob('central-node.md', CENTRAL_NODE);
+
+async function githubStub(url, options = {}) {
   const u = String(url);
   if (u.includes('api.anthropic.com')) return fetch(url, options);
   if (u.includes('/commits/')) {
@@ -201,40 +234,37 @@ function githubStub(url, options = {}) {
   }
   if (u.includes('/git/trees/')) {
     return Response.json({
-      tree: [
-        { path: 'central-node.md', type: 'blob', sha: cnSha },
-        { path: 'apps/tasks/config/clare-protocol.md', type: 'blob', sha: '1'.repeat(40) },
-        { path: 'config/hammond-protocol.md', type: 'blob', sha: '2'.repeat(40) }
-      ]
+      tree: [...githubBlobs.entries()].map(([filePath, blob]) => ({
+        path: filePath,
+        type: 'blob',
+        sha: blob.sha
+      }))
     });
   }
-  if (u.includes(`/git/blobs/${cnSha}`)) {
-    return Response.json({ encoding: 'base64', content: b64(CENTRAL_NODE) });
-  }
-  if (u.includes('/git/blobs/')) {
-    try {
-      if (u.includes('1'.repeat(40))) {
-        return Response.json({
-          encoding: 'base64',
-          content: b64(readFileSync(resolve(root, 'apps/tasks/config/clare-protocol.md'), 'utf8'))
-        });
-      }
-      if (u.includes('2'.repeat(40))) {
-        return Response.json({
-          encoding: 'base64',
-          content: b64(readFileSync(resolve(root, 'config/hammond-protocol.md'), 'utf8'))
-        });
-      }
-    } catch {
-      /* fall through */
-    }
-    return Response.json({ encoding: 'base64', content: b64('# protocol\n') });
+  const blobMatch = /\/git\/blobs\/([0-9a-f]{40})/.exec(u);
+  if (blobMatch) {
+    const found = [...githubBlobs.values()].find((item) => item.sha === blobMatch[1]);
+    if (!found) return Response.json({ message: 'not found' }, { status: 404 });
+    return Response.json({
+      encoding: 'base64',
+      content: Buffer.from(found.content, 'utf8').toString('base64')
+    });
   }
   if (options.method === 'PUT' || u.includes('/contents/')) {
-    return Response.json({ content: { sha: '3'.repeat(40) }, commit: { sha: '4'.repeat(40) } });
+    const filePath = decodeURIComponent(u.split('/contents/')[1] ?? '');
+    let content = '';
+    try {
+      const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+      content = Buffer.from(body.content, 'base64').toString('utf8');
+    } catch {
+      content = '';
+    }
+    const sha = putGithubBlob(filePath, content);
+    return Response.json({ content: { sha }, commit: { sha: '4'.repeat(40) } });
   }
   return Response.json({ message: 'not found' }, { status: 404 });
 }
+
 
 const tasksMap = { ...TASKS };
 const teachingMap = { ...TEACHING };
@@ -294,8 +324,14 @@ async function chat(slug, message, protocolId) {
     text: deltas,
     tools: [...new Set(tools)],
     proposals: proposals.length,
+    proposalEvents: proposals,
     cards: cards.map((c) => c.card_type).filter(Boolean),
+    cardEvents: cards,
     pendingIds: proposals.map((p) => p.id).filter(Boolean),
+    cardPendingIds: cards
+      .map((c) => c.payload?.pendingId || c.pendingId)
+      .filter((id) => typeof id === 'string' && id.trim()),
+    events,
     error: error?.message || error?.text || null,
     eventTypes: [...new Set(events.map((e) => e.type))]
   };
@@ -433,7 +469,7 @@ for (const scenario of scenarios) {
   }
 }
 
-// Deterministic Confirm proof (no model): compose → propose → confirm selected write.
+// Deterministic Confirm proof (additional coverage, not the live acceptance gate).
 {
   try {
     const { executeClareWork } = await import('../netlify/functions/_shared/clare-work.mjs');
@@ -457,7 +493,7 @@ for (const scenario of scenarios) {
     const writePaths = (proposal?.writes || []).map((write) => write.path);
     if (!proposal || !writePaths.length) {
       failed += 1;
-      log(JSON.stringify({ id: 'clare-schedule-confirm', ok: false, error: 'compose_did_not_propose' }));
+      log(JSON.stringify({ id: 'clare-schedule-confirm-deterministic', ok: false, error: 'compose_did_not_propose' }));
     } else {
       const accept = writePaths.slice(0, 1);
       const confirmResponse = await confirmHandler(
@@ -489,7 +525,7 @@ for (const scenario of scenarios) {
       if (!confirmOk) failed += 1;
       log(
         JSON.stringify({
-          id: 'clare-schedule-confirm',
+          id: 'clare-schedule-confirm-deterministic',
           ok: confirmOk,
           status: confirmResponse.status,
           accepted: accept,
@@ -503,9 +539,151 @@ for (const scenario of scenarios) {
     }
   } catch (err) {
     failed += 1;
-    log(JSON.stringify({ id: 'clare-schedule-confirm', ok: false, error: String(err?.message || err) }));
+    log(
+      JSON.stringify({
+        id: 'clare-schedule-confirm-deterministic',
+        ok: false,
+        error: String(err?.message || err)
+      })
+    );
   }
 }
+
+// LIVE acceptance gate: /api/chat → compose_schedule → pending id on SSE → confirm by that id.
+{
+  try {
+    const { PENDING_ACTIONS_PATH } = await import(
+      '../netlify/functions/_shared/capabilities/propose-action.mjs'
+    );
+    const beforeBlocks = Object.keys(tasksMap).filter(
+      (key) => key.startsWith('work_blocks/') && !key.endsWith('/_index')
+    ).length;
+
+    const first = await chat(
+      'clare',
+      'Plan tomorrow around my classes using protected evenings. Call compose_schedule and return a Confirmable schedule diff with pending proposal id.'
+    );
+    const firstProposal = first.proposalEvents?.[0] ?? null;
+    const firstPendingId =
+      first.cardPendingIds?.[0] ||
+      first.pendingIds?.[0] ||
+      (typeof firstProposal?.id === 'string' ? firstProposal.id : null);
+    const firstWrites = Array.isArray(firstProposal?.proposal?.writes)
+      ? firstProposal.proposal.writes.map((write) => write.path).filter(Boolean)
+      : [];
+
+    // Second live proposal before confirming the first — identity isolation.
+    const second = await chat(
+      'clare',
+      'Compose another schedule proposal for Wednesday around marking. Call compose_schedule again and return a second Confirmable schedule diff.'
+    );
+    const secondProposal = second.proposalEvents?.[0] ?? null;
+    const secondPendingId =
+      second.cardPendingIds?.[0] ||
+      second.pendingIds?.[0] ||
+      (typeof secondProposal?.id === 'string' ? secondProposal.id : null);
+
+    const queueBefore = githubBlobs.has(PENDING_ACTIONS_PATH)
+      ? JSON.parse(githubBlobs.get(PENDING_ACTIONS_PATH).content)
+      : [];
+    const queueIds = Array.isArray(queueBefore) ? queueBefore.map((entry) => entry.id) : [];
+
+    if (!firstPendingId || !firstWrites.length) {
+      failed += 1;
+      log(
+        JSON.stringify({
+          id: 'clare-live-pending-confirm',
+          ok: false,
+          error: 'live_compose_missing_pending_or_writes',
+          firstPendingId,
+          firstWrites,
+          cards: first.cards,
+          tools: first.tools,
+          eventTypes: first.eventTypes
+        })
+      );
+    } else {
+      const accept = firstWrites.slice(0, 1);
+      const confirmResponse = await confirmHandler(
+        new Request('https://life-hub.test/api/chat/confirm', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie: `life_hub_session=${session}`,
+            origin: 'https://life-hub.test'
+          },
+          body: JSON.stringify({
+            kind: 'action',
+            slug: 'clare',
+            id: firstPendingId,
+            accept
+          })
+        })
+      );
+      const confirmBody = await confirmResponse.json().catch(() => ({}));
+      const afterBlocks = Object.keys(tasksMap).filter(
+        (key) => key.startsWith('work_blocks/') && !key.endsWith('/_index')
+      ).length;
+      const acceptedKey = accept[0].replace(/^tasks:work_block:/, 'work_blocks/');
+      const queueAfter = githubBlobs.has(PENDING_ACTIONS_PATH)
+        ? JSON.parse(githubBlobs.get(PENDING_ACTIONS_PATH).content)
+        : [];
+      const queueAfterIds = Array.isArray(queueAfter) ? queueAfter.map((entry) => entry.id) : [];
+      const firstConsumed = !queueAfterIds.includes(firstPendingId);
+      const secondStillPending =
+        !secondPendingId ||
+        secondPendingId === firstPendingId ||
+        queueAfterIds.includes(secondPendingId);
+      const isolationOk =
+        Boolean(secondPendingId) &&
+        secondPendingId !== firstPendingId &&
+        queueIds.includes(firstPendingId) &&
+        queueIds.includes(secondPendingId) &&
+        firstConsumed &&
+        queueAfterIds.includes(secondPendingId);
+
+      const confirmOk =
+        confirmResponse.status === 200 &&
+        confirmBody?.ok !== false &&
+        afterBlocks >= beforeBlocks + accept.length &&
+        Object.hasOwn(tasksMap, acceptedKey) &&
+        firstConsumed;
+
+      if (!confirmOk || !isolationOk) failed += 1;
+      log(
+        JSON.stringify({
+          id: 'clare-live-pending-confirm',
+          ok: confirmOk && isolationOk,
+          status: confirmResponse.status,
+          firstPendingId,
+          secondPendingId,
+          accepted: accept,
+          acceptedKey,
+          beforeBlocks,
+          afterBlocks,
+          firstConsumed,
+          secondStillPending: queueAfterIds.includes(secondPendingId),
+          isolationOk,
+          queueBeforeCount: queueIds.length,
+          queueAfterCount: queueAfterIds.length,
+          cardPendingIds: first.cardPendingIds,
+          bodyOk: confirmBody?.ok ?? null,
+          error: confirmBody?.error || null
+        })
+      );
+    }
+  } catch (err) {
+    failed += 1;
+    log(
+      JSON.stringify({
+        id: 'clare-live-pending-confirm',
+        ok: false,
+        error: String(err?.message || err)
+      })
+    );
+  }
+}
+
 
 mkdirSync('/opt/cursor/artifacts', { recursive: true });
 writeFileSync(OUT, `${lines.join('\n')}\nfailed=${failed}\n`, 'utf8');

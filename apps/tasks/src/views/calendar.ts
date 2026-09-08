@@ -93,18 +93,46 @@ const sessionFilters: CalendarFilters = {
   layers: ['hard_deadline', 'planned_work', 'protected_time', 'target', 'review']
 };
 
-/** Pending schedule-diff ghost blocks (preview only — no write). */
-let pendingGhostBlocks: WorkBlock[] = [];
-let planWorkMode = false;
+/** Pending schedule-diff ghosts keyed by immutable proposal id (preview only — no write). */
+const ghostBlocksByProposalId = new Map<string, WorkBlock[]>();
 
+function rebuildCalendarGhostBlocks(): WorkBlock[] {
+  const merged: WorkBlock[] = [];
+  for (const blocks of ghostBlocksByProposalId.values()) merged.push(...blocks);
+  return merged;
+}
+
+let pendingGhostBlocks: WorkBlock[] = [];
+
+/** Replace all ghosts (legacy). Prefer proposal-scoped helpers for Productivity OS. */
 export function setCalendarGhostBlocks(blocks: WorkBlock[]): void {
-  pendingGhostBlocks = blocks;
+  ghostBlocksByProposalId.clear();
+  if (blocks.length) ghostBlocksByProposalId.set('__legacy__', blocks);
+  pendingGhostBlocks = rebuildCalendarGhostBlocks();
+}
+
+export function setCalendarGhostBlocksForProposal(proposalId: string, blocks: WorkBlock[]): void {
+  const id = proposalId.trim();
+  if (!id) return;
+  if (!blocks.length) ghostBlocksByProposalId.delete(id);
+  else ghostBlocksByProposalId.set(id, blocks);
+  pendingGhostBlocks = rebuildCalendarGhostBlocks();
+}
+
+export function clearCalendarGhostBlocksForProposal(proposalId: string): void {
+  const id = proposalId.trim();
+  if (!id) return;
+  ghostBlocksByProposalId.delete(id);
+  pendingGhostBlocks = rebuildCalendarGhostBlocks();
 }
 
 export function getCalendarGhostBlocks(): WorkBlock[] {
   return pendingGhostBlocks;
 }
 
+export function getCalendarGhostBlocksForProposal(proposalId: string): WorkBlock[] {
+  return ghostBlocksByProposalId.get(proposalId.trim()) ?? [];
+}
 let selectedDateKey: string | null = null;
 let selectedItemId: string | null = null;
 let composeDraft: { dateKey: string; dueTime: string | null } = { dateKey: '', dueTime: null };
@@ -1764,6 +1792,7 @@ export function resetCalendarSession(): void {
     'review'
   ];
   planWorkMode = false;
+  ghostBlocksByProposalId.clear();
   pendingGhostBlocks = [];
   selectedDateKey = null;
   selectedItemId = null;
