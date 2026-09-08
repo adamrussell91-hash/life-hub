@@ -12,6 +12,7 @@ import { upgradeOtherProductCategories } from './skincare-product-library.js';
 import { renderFitnessSurfaceWidgets, renderNutritionSurfaceWidgets } from './render-surface-widgets.js';
 import { readHubCompose } from '../../../../packages/design-kit/js/hub-compose.js';
 import { packCnBoard } from './render-central-node.js';
+import { settleMetricRings } from './chart-kit/animate.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
 const LAST_SUCCESS_KEY = 'life-hub:last-success';
@@ -432,8 +433,12 @@ export function createAppController(dependencies) {
           if (syncQuiet) app.dataset.syncQuiet = 'true';
           else delete app.dataset.syncQuiet;
         }
+        // Post-log quiet refresh cancels ring transitions mid-flight; jump Home
+        // rings (and any other metric rings) to their stamped fill before/after paint.
+        if (syncQuiet) settleMetricRings(root);
         const model = buildHomeModel({ ...result, date });
-        renderHome(root, model);
+        renderHome(root, model, { quiet: syncQuiet });
+        if (syncQuiet) settleMetricRings(root);
         if (currentSection === 'home') void loadHubPulse();
         if (currentSection === 'nutrition') renderNutritionSection();
         if (currentSection === 'fitness') renderFitnessSection();
