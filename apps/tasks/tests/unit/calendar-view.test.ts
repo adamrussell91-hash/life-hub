@@ -9,6 +9,8 @@ vi.mock('@/services/client-api', () => ({
   tasksApi: {
     listTasks: vi.fn(),
     listProjects: vi.fn(),
+    listAreas: vi.fn().mockResolvedValue([]),
+    listGoals: vi.fn().mockResolvedValue([]),
     updateTask: vi.fn(),
     createTask: vi.fn(),
     deleteTask: vi.fn()
