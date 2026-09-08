@@ -86,6 +86,7 @@ function showCardFailure(create, card, message) {
     note = create('p');
     note.className = 'prod-card__failure';
     note.setAttribute('role', 'alert');
+    note.style.whiteSpace = 'pre-wrap';
     card.append(note);
   }
   note.textContent = message || 'Could not save. Try again.';
@@ -98,6 +99,7 @@ function clearCardFailure(card) {
 /**
  * Run a durable card action without claiming success until the callback resolves.
  * Callbacks may return a Promise. Failure restores controls.
+ * Structured errors (e.g. stale_schedule_collision) keep their full message/details on the card.
  */
 async function runDurableCardAction(card, create, actions, {
   action,
@@ -119,11 +121,11 @@ async function runDurableCardAction(card, create, actions, {
   } catch (err) {
     setCardState(card, 'failed');
     for (const el of nodes) el.disabled = false;
-    showCardFailure(
-      create,
-      card,
-      err instanceof Error && err.message ? err.message : failureText || 'Could not save. Try again.'
-    );
+    const message =
+      err instanceof Error && err.message
+        ? err.message
+        : failureText || 'Could not save. Try again.';
+    showCardFailure(create, card, message);
     return false;
   }
 }

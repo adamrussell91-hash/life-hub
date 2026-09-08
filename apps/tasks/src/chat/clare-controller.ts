@@ -221,6 +221,99 @@ function paintScheduleGhostWeek(host: HTMLElement, diff: ScheduleDiffItem): void
   }
 }
 
+function clearActionProposalFailure(card: HTMLElement): void {
+  card.querySelector('.confirm-card__failure')?.remove();
+}
+
+function showActionProposalFailure(card: HTMLElement, message: string): void {
+  clearActionProposalFailure(card);
+  const note = el('p', 'confirm-card__failure', message);
+  note.setAttribute('role', 'alert');
+  card.append(note);
+}
+
+/**
+ * Format server-provided stale_schedule_collision details for the same Schedule Diff card.
+ * Only surfaces fields that actually exist — never invents revised times.
+ */
+export function formatStaleScheduleCollisionDetails(details: unknown): string {
+  const root =
+    details && typeof details === 'object' && !Array.isArray(details)
+      ? (details as Record<string, unknown>)
+      : null;
+  if (!root) {
+    return 'Schedule collision — nothing was written. Ghosts kept. Review the revised schedule and confirm again.';
+  }
+  const revised =
+    root.revised && typeof root.revised === 'object' && !Array.isArray(root.revised)
+      ? (root.revised as Record<string, unknown>)
+      : root;
+  const lines: string[] = [
+    'Schedule collision — nothing was written. This proposal is stale. Ghosts kept. The revision below is informational; create or confirm a new valid proposal before anything persists.'
+  ];
+  if (typeof revised.note === 'string' && revised.note.trim()) {
+    lines.push(revised.note.trim());
+  } else if (typeof revised.status === 'string' && revised.status.trim()) {
+    lines.push(`Status: ${revised.status.trim()}`);
+  }
+  const conflicts = Array.isArray(revised.conflicts)
+    ? revised.conflicts
+    : Array.isArray(root.conflicts)
+      ? root.conflicts
+      : [];
+  for (const raw of conflicts) {
+    if (!raw || typeof raw !== 'object') continue;
+    const conflict = raw as Record<string, unknown>;
+    const blockId =
+      (typeof conflict.temp_id === 'string' && conflict.temp_id) ||
+      (typeof conflict.block_id === 'string' && conflict.block_id) ||
+      (typeof conflict.id === 'string' && conflict.id) ||
+      (typeof conflict.title === 'string' && conflict.title) ||
+      'block';
+    const reason =
+      (typeof conflict.reason === 'string' && conflict.reason) ||
+      (typeof conflict.message === 'string' && conflict.message) ||
+      'conflicts with calendar';
+    lines.push(`Conflict: ${blockId} — ${reason}`);
+  }
+  const revisedBlocks = Array.isArray(revised.revised_blocks)
+    ? revised.revised_blocks
+    : Array.isArray(revised.suggested_blocks)
+      ? revised.suggested_blocks
+      : Array.isArray(revised.blocks)
+        ? revised.blocks
+        : [];
+  for (const raw of revisedBlocks) {
+    if (!raw || typeof raw !== 'object') continue;
+    const block = raw as Record<string, unknown>;
+    const title =
+      (typeof block.title === 'string' && block.title) ||
+      (typeof block.temp_id === 'string' && block.temp_id) ||
+      (typeof block.id === 'string' && block.id) ||
+      'block';
+    const when = [
+      typeof block.date === 'string' ? block.date : '',
+      typeof block.start_time === 'string'
+        ? block.start_time
+        : typeof block.suggested_start === 'string'
+          ? block.suggested_start
+          : typeof block.start === 'string'
+            ? block.start
+            : ''
+    ]
+      .filter(Boolean)
+      .join(' ');
+    if (when) lines.push(`Revised timing: ${title} → ${when}`);
+  }
+  if (typeof revised.suggested_start === 'string' && revised.suggested_start.trim()) {
+    lines.push(`Suggested start: ${revised.suggested_start.trim()}`);
+  }
+  if (typeof revised.suggested_end === 'string' && revised.suggested_end.trim()) {
+    lines.push(`Suggested end: ${revised.suggested_end.trim()}`);
+  }
+  return lines.join('\n');
+}
+
 function appendActionProposalCard(
   root: ParentNode,
   proposal: { intent?: string; writes?: Array<{ path?: string; mode?: string; diff?: string }> },
@@ -230,6 +323,7 @@ function appendActionProposalCard(
   const list = root.querySelector('#chat-messages');
   if (!list) return;
   const card = el('li', 'record-proposal action-proposal confirm-card');
+  card.dataset.state = 'ready';
   card.setAttribute('role', 'region');
   card.setAttribute('aria-label', 'Confirm change');
   card.append(el('p', 'page-header__eyebrow', 'Proposed action'));
@@ -263,20 +357,50 @@ function appendActionProposalCard(
   discard.type = 'button';
   const confirm = el('button', 'btn btn--primary record-proposal__confirm', 'Confirm');
   confirm.type = 'button';
+
+  const setActionButtons = (busy: boolean, confirmLabel = 'Confirm') => {
+    setConfirmBusy(confirm, busy, confirmLabel);
+    discard.disabled = busy;
+    discard.textContent = busy ? 'Discarding…' : 'Discard';
+  };
+
   discard.addEventListener('click', () => {
-    card.remove();
-    if (pendingId) {
-      void confirmChat({ kind: 'action_dismiss', id: pendingId, slug: 'clare' }).catch(() => undefined);
+    if (card.dataset.state === 'submitting') return;
+    if (!pendingId) {
+      card.dataset.state = 'discarded';
+      card.remove();
+      return;
     }
+    clearActionProposalFailure(card);
+    const previousConfirm = confirm.textContent || 'Confirm';
+    card.dataset.state = 'submitting';
+    setActionButtons(true);
+    void (async () => {
+      try {
+        await confirmChat({ kind: 'action_dismiss', id: pendingId, slug: 'clare' });
+        card.dataset.state = 'discarded';
+        card.remove();
+      } catch (err) {
+        card.dataset.state = 'failed';
+        setActionButtons(false, previousConfirm);
+        const message =
+          err instanceof Error ? err.message : 'Discard failed. The proposal is still available.';
+        showActionProposalFailure(card, message);
+        showChatError(root, message);
+      }
+    })();
   });
+
   confirm.addEventListener('click', async () => {
+    if (card.dataset.state === 'submitting') return;
     if (!pendingId) {
       showChatError(root, 'That proposal has no pending id. Discard and ask again.');
       return;
     }
     const previous = confirm.textContent || 'Confirm';
-    setConfirmBusy(confirm, true);
-    discard.disabled = true;
+    clearActionProposalFailure(card);
+    card.dataset.state = 'submitting';
+    setActionButtons(true);
     try {
       await confirmChat({
         kind: 'action',
@@ -284,15 +408,16 @@ function appendActionProposalCard(
         slug: 'clare',
         candidate: proposal
       });
+      card.dataset.state = 'confirmed';
       appendSavedCard(card);
       onSaved();
     } catch (err) {
-      setConfirmBusy(confirm, false, previous);
-      discard.disabled = false;
-      showChatError(
-        root,
-        err instanceof Error ? err.message : 'Confirming that action failed. You can try again.'
-      );
+      card.dataset.state = 'failed';
+      setActionButtons(false, previous);
+      const message =
+        err instanceof Error ? err.message : 'Confirming that action failed. You can try again.';
+      showActionProposalFailure(card, message);
+      showChatError(root, message);
     }
   });
   actions.append(discard, confirm);
@@ -552,8 +677,12 @@ export function createClareChatController({
     } catch (err) {
       let message = err instanceof Error ? err.message : 'Confirm failed. You can try again.';
       if (err instanceof ApiClientError && err.code === 'stale_schedule_collision') {
-        message =
-          'Schedule collision — nothing was written. Ghosts kept. Review the revised schedule and confirm again.';
+        message = formatStaleScheduleCollisionDetails(err.details);
+        showChatError(root, message);
+        throw new ApiClientError(
+          { code: err.code, message, details: err.details },
+          err.status
+        );
       }
       showChatError(root, message);
       throw err instanceof Error ? err : new Error(message);

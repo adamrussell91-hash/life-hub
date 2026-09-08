@@ -5,7 +5,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   assertAcceptPathsForProposal,
-  createClareChatController
+  createClareChatController,
+  formatStaleScheduleCollisionDetails
 } from '@/chat/clare-controller';
 import { buildChatView } from '@/chat/build-chat-view';
 import { tasksApi } from '@/services/client-api';
@@ -96,6 +97,21 @@ function clickLabel(card: HTMLElement, label: string) {
   expect(btn).toBeTruthy();
   btn!.click();
 }
+
+
+async function* streamWithActionProposal(
+  id: string,
+  proposal: { intent?: string; writes?: Array<{ path?: string; mode?: string; diff?: string }> }
+) {
+  yield { type: 'text', delta: 'Proposed action.' };
+  yield { type: 'action_proposal', id, proposal };
+  yield { type: 'done' };
+}
+
+function actionProposalCard(root: ParentNode) {
+  return root.querySelector<HTMLElement>('li.action-proposal.confirm-card');
+}
+
 
 describe('Confirm proposal identity binding', () => {
   beforeEach(() => {
@@ -312,6 +328,77 @@ describe('Confirm proposal identity binding', () => {
     ).toBe(false);
   });
 
+  it('M: stale_schedule_collision renders exact revised server details on the Schedule Diff card', async () => {
+    const revised = {
+      status: 'needs_recompose',
+      note: 'Calendar changed since proposal — confirm blocked. Recompose against current hard busy.',
+      conflicts: [
+        {
+          temp_id: 'wb_mark_essays',
+          reason: 'Collides with Year 10 Pastoral'
+        }
+      ],
+      suggested_blocks: [
+        {
+          temp_id: 'wb_mark_essays',
+          title: 'Mark essays',
+          date: '2026-09-09',
+          start_time: '14:30'
+        }
+      ],
+      suggested_start: '14:30',
+      suggested_end: '15:15'
+    };
+    confirmChat.mockRejectedValueOnce(
+      new ApiClientError(
+        {
+          code: 'stale_schedule_collision',
+          message: 'collision',
+          details: revised
+        },
+        409
+      )
+    );
+    streamChat.mockImplementation(() =>
+      streamWithCards([
+        {
+          card_type: 'schedule-diff',
+          payload: {
+            pendingId: 'pending_stale_detail',
+            blocks: [block('tasks:work_block:s1', 'Mark essays')]
+          }
+        }
+      ])
+    );
+    const root = buildChatView();
+    document.body.replaceChildren(root);
+    const controller = createClareChatController({ root, isVisible: () => true });
+    await controller.start();
+    controller.pickProtocol('plan-day');
+    await controller.send('Plan');
+    await vi.waitFor(() => expect(cardNodes(root).length).toBe(1));
+    const card = cardNodes(root)[0];
+    clickLabel(card, 'Confirm Selected');
+    await vi.waitFor(() => expect(card.dataset.state).toBe('failed'));
+    const cardText = card.textContent ?? '';
+    expect(cardText).toContain('wb_mark_essays');
+    expect(cardText).toContain('Collides with Year 10 Pastoral');
+    expect(cardText).toContain('Mark essays → 2026-09-09 14:30');
+    expect(cardText).toContain('14:30');
+    expect(cardText).toContain('15:15');
+    expect(cardText).toMatch(/nothing was written|stale/i);
+    expect(getCalendarGhostBlocksForProposal('pending_stale_detail').length).toBe(1);
+    expect(
+      [...card.querySelectorAll('button')].find((btn) => btn.textContent?.includes('Confirm Selected'))
+        ?.disabled
+    ).toBe(false);
+    // Formatter itself preserves the same concrete values.
+    const formatted = formatStaleScheduleCollisionDetails(revised);
+    expect(formatted).toContain('wb_mark_essays');
+    expect(formatted).toContain('Collides with Year 10 Pastoral');
+    expect(formatted).toContain('Mark essays → 2026-09-09 14:30');
+  });
+
   it('H: successful schedule Confirm becomes receipt only after persistence and clears that proposal ghosts', async () => {
     let resolveConfirm!: (value: unknown) => void;
     confirmChat.mockImplementationOnce(
@@ -368,6 +455,102 @@ describe('Confirm proposal identity binding', () => {
     expect(getCalendarGhostBlocksForProposal('pending_a')).toEqual([]);
     expect(getCalendarGhostBlocksForProposal('pending_b').length).toBeGreaterThan(0);
   });
+
+  it('J: legacy action_proposal failed Confirm keeps the card actionable with no Saved state', async () => {
+    confirmChat.mockRejectedValueOnce(
+      new ApiClientError({ code: 'request_failed', message: 'confirm boom' }, 500)
+    );
+    streamChat.mockImplementation(() =>
+      streamWithActionProposal('pending_action_j', {
+        intent: 'Create task Alpha',
+        writes: [{ path: 'tasks:task:task_alpha', mode: 'create', diff: 'new task Alpha' }]
+      })
+    );
+    const root = buildChatView();
+    document.body.replaceChildren(root);
+    const controller = createClareChatController({ root, isVisible: () => true });
+    await controller.start();
+    controller.pickProtocol('plan-day');
+    await controller.send('Propose');
+    await vi.waitFor(() => expect(actionProposalCard(root)).toBeTruthy());
+    const card = actionProposalCard(root)!;
+    clickLabel(card, 'Confirm');
+    await vi.waitFor(() => expect(card.dataset.state).toBe('failed'));
+    expect(card.isConnected).toBe(true);
+    expect(card.textContent).not.toMatch(/^\s*Saved\.?\s*$/m);
+    expect(card.querySelector('.record-proposal__saved')).toBeNull();
+    expect(card.textContent).toMatch(/confirm boom|failed/i);
+    const confirmBtn = [...card.querySelectorAll('button')].find((btn) => btn.textContent?.trim() === 'Confirm');
+    const discardBtn = [...card.querySelectorAll('button')].find((btn) => btn.textContent?.trim() === 'Discard');
+    expect(confirmBtn?.disabled).toBe(false);
+    expect(discardBtn?.disabled).toBe(false);
+  });
+
+  it('K: legacy action_proposal failed Discard keeps the card and leaves the proposal actionable', async () => {
+    confirmChat.mockRejectedValueOnce(
+      new ApiClientError({ code: 'request_failed', message: 'discard boom' }, 500)
+    );
+    streamChat.mockImplementation(() =>
+      streamWithActionProposal('pending_action_k', {
+        intent: 'Create task Beta',
+        writes: [{ path: 'tasks:task:task_beta', mode: 'create', diff: 'new task Beta' }]
+      })
+    );
+    const root = buildChatView();
+    document.body.replaceChildren(root);
+    const controller = createClareChatController({ root, isVisible: () => true });
+    await controller.start();
+    controller.pickProtocol('plan-day');
+    await controller.send('Propose');
+    await vi.waitFor(() => expect(actionProposalCard(root)).toBeTruthy());
+    const card = actionProposalCard(root)!;
+    clickLabel(card, 'Discard');
+    await vi.waitFor(() => expect(card.dataset.state).toBe('failed'));
+    expect(card.isConnected).toBe(true);
+    expect(card.dataset.state).not.toBe('discarded');
+    expect(card.textContent).toMatch(/discard boom|failed/i);
+    expect([...card.querySelectorAll('button')].find((btn) => btn.textContent?.trim() === 'Confirm')?.disabled).toBe(
+      false
+    );
+    expect([...card.querySelectorAll('button')].find((btn) => btn.textContent?.trim() === 'Discard')?.disabled).toBe(
+      false
+    );
+  });
+
+  it('L: legacy action_proposal successful Discard removes the card only after the request resolves', async () => {
+    let resolveDiscard!: (value: unknown) => void;
+    confirmChat.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveDiscard = resolve;
+        })
+    );
+    streamChat.mockImplementation(() =>
+      streamWithActionProposal('pending_action_l', {
+        intent: 'Create task Gamma',
+        writes: [{ path: 'tasks:task:task_gamma', mode: 'create', diff: 'new task Gamma' }]
+      })
+    );
+    const root = buildChatView();
+    document.body.replaceChildren(root);
+    const controller = createClareChatController({ root, isVisible: () => true });
+    await controller.start();
+    controller.pickProtocol('plan-day');
+    await controller.send('Propose');
+    await vi.waitFor(() => expect(actionProposalCard(root)).toBeTruthy());
+    const card = actionProposalCard(root)!;
+    clickLabel(card, 'Discard');
+    await vi.waitFor(() => expect(card.dataset.state).toBe('submitting'));
+    expect(card.isConnected).toBe(true);
+    expect(confirmChat).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'action_dismiss', id: 'pending_action_l' })
+    );
+    resolveDiscard({ ok: true });
+    await vi.waitFor(() => expect(actionProposalCard(root)).toBeNull());
+    expect(card.isConnected).toBe(false);
+  });
+
+
 });
 
 describe('Durable card async receipts (kit)', () => {

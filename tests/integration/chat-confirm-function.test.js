@@ -1404,3 +1404,241 @@ test('action confirm writes a Tasks task blob onto tasks/_index', async () => {
     'Existing goals draft\n\nAdd evidence notes'
   );
 });
+
+
+test('N: confirming pending A with B\'s write path is rejected; neither proposal is consumed or written', async () => {
+  const pathA = 'tasks:task:task_a';
+  const pathB = 'tasks:task:task_b';
+  const proposalA = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task A',
+    reads: [],
+    writes: [{
+      path: pathA,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task A', status: 'open' }),
+      diff: 'new task A'
+    }],
+    surfaces: ['governance_log']
+  };
+  const proposalB = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task B',
+    reads: [],
+    writes: [{
+      path: pathB,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task B', status: 'open' }),
+      diff: 'new task B'
+    }],
+    surfaces: ['governance_log']
+  };
+  const queue = [
+    { id: 'act_a', createdAt: '2026-08-01', slug: 'clare', proposal: proposalA },
+    { id: 'act_b', createdAt: '2026-08-01', slug: 'clare', proposal: proposalB }
+  ];
+  const queueSha = 'e'.repeat(40);
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'data/os/pending-actions.json', type: 'blob', sha: queueSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_a',
+    accept: [pathB]
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'unknown_accept_path');
+  assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 0);
+  assert.equal(store.data['tasks/task_a'], undefined);
+  assert.equal(store.data['tasks/task_b'], undefined);
+  assert.equal(queue.map(entry => entry.id).join(','), 'act_a,act_b');
+});
+
+test('O: mixed accept list [A path, B path] fails atomically; A is not partially written', async () => {
+  const pathA = 'tasks:task:task_a';
+  const pathB = 'tasks:task:task_b';
+  const proposalA = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task A',
+    reads: [],
+    writes: [{
+      path: pathA,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task A', status: 'open' }),
+      diff: 'new task A'
+    }],
+    surfaces: ['governance_log']
+  };
+  const proposalB = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task B',
+    reads: [],
+    writes: [{
+      path: pathB,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task B', status: 'open' }),
+      diff: 'new task B'
+    }],
+    surfaces: ['governance_log']
+  };
+  const queue = [
+    { id: 'act_a', createdAt: '2026-08-01', slug: 'clare', proposal: proposalA },
+    { id: 'act_b', createdAt: '2026-08-01', slug: 'clare', proposal: proposalB }
+  ];
+  const queueSha = 'e'.repeat(40);
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'data/os/pending-actions.json', type: 'blob', sha: queueSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_a',
+    accept: [pathA, pathB]
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'unknown_accept_path');
+  assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 0);
+  assert.equal(store.data['tasks/task_a'], undefined);
+  assert.equal(store.data['tasks/task_b'], undefined);
+});
+
+test('P: valid confirm of A persists A, consumes A, and leaves B pending', async () => {
+  const pathA = 'tasks:task:task_a';
+  const pathB = 'tasks:task:task_b';
+  const proposalA = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task A',
+    reads: [],
+    writes: [{
+      path: pathA,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task A', status: 'open' }),
+      diff: 'new task A'
+    }],
+    surfaces: ['governance_log']
+  };
+  const proposalB = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task B',
+    reads: [],
+    writes: [{
+      path: pathB,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task B', status: 'open' }),
+      diff: 'new task B'
+    }],
+    surfaces: ['governance_log']
+  };
+  let queue = [
+    { id: 'act_a', createdAt: '2026-08-01', slug: 'clare', proposal: proposalA },
+    { id: 'act_b', createdAt: '2026-08-01', slug: 'clare', proposal: proposalB }
+  ];
+  const queueSha = 'e'.repeat(40);
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'data/os/pending-actions.json', type: 'blob', sha: queueSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      if (url.includes('pending-actions.json')) {
+        queue = JSON.parse(Buffer.from(JSON.parse(options.body).content, 'base64').toString('utf8'));
+      }
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_a',
+    accept: [pathA]
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(store.data['tasks/task_a'].title, 'Task A');
+  assert.equal(store.data['tasks/task_b'], undefined);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, 'act_b');
+  assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('pending-actions.json')));
+});
