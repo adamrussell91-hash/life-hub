@@ -1979,10 +1979,21 @@
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .hub-layout[data-hub-view='clare'] .chat-messages {
   max-height: none;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+
+.hub-layout[data-hub-view='clare'] .chat-form {
+  flex: 0 0 auto;
+  margin-top: auto;
 }
 
 .hub-layout[data-hub-view='clare'] .chat-message {
@@ -2490,23 +2501,83 @@
 }
 
 @media (max-width: 720px) {
+  /*
+   * Full-page Chat must track the visual viewport (same contract as Life Hub).
+   * height:100dvh does not shrink when the iOS keyboard opens, so the composer
+   * sat mid-screen above the locked nav. Class comes from design-kit
+   * visual-viewport.js; :focus-within is the belt-and-suspenders path when iOS
+   * inset math stays ~0.
+   *
+   * position:fixed pins the canvas to the visual frame — a plain height shrink
+   * left a cotton gap under the composer when the outer shell was taller.
+   *
+   * mobile.css already pads .hub-layout for the locked nav; Clare must not also
+   * pad the canvas or the composer sits one nav-height above the bar.
+   */
+  .hub-layout[data-hub-view='clare'] {
+    position: relative;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
   .hub-layout[data-hub-view='clare'] .hub-canvas {
     padding: var(--space-4);
-    /* Clear locked .hub-mobile-nav (MOBILE.md) — do not rely on outer shell padding alone. */
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 0;
+  }
+
+  html.vv-keyboard-open .hub-layout[data-hub-view='clare'],
+  .hub-layout[data-hub-view='clare']:has(#chat-form:focus-within) {
+    position: fixed;
+    z-index: 20;
+    top: var(--vv-offset-top, 0px);
+    left: 0;
+    right: 0;
+    width: 100%;
+    /* min-height:100dvh from the mobile shell must not beat --vv-height. */
+    min-height: 0;
+    height: var(--vv-height, 100dvh);
+    max-height: var(--vv-height, 100dvh);
+    padding-bottom: 0;
+  }
+
+  html.vv-keyboard-open .hub-layout[data-hub-view='clare'] .hub-canvas,
+  .hub-layout[data-hub-view='clare']:has(#chat-form:focus-within) .hub-canvas {
+    padding-bottom: 0;
+  }
+
+  /* Messenger-style: drop chrome that steals the visual viewport while typing. */
+  html.vv-keyboard-open .hub-layout[data-hub-view='clare'] .page-header,
+  .hub-layout[data-hub-view='clare']:has(#chat-form:focus-within) .page-header,
+  html.vv-keyboard-open .hub-layout[data-hub-view='clare'] .agent-picker,
+  .hub-layout[data-hub-view='clare']:has(#chat-form:focus-within) .agent-picker {
+    display: none;
+  }
+
+  html.vv-keyboard-open .hub-layout[data-hub-view='clare'] .chat-form.hub-ai-bar--thread,
+  .hub-layout[data-hub-view='clare']:has(#chat-form:focus-within) .chat-form.hub-ai-bar--thread {
+    min-height: 0;
+    padding: 0.2rem;
+  }
+
+  html.vv-keyboard-open .hub-layout[data-hub-view='clare'] #chat-input,
+  .hub-layout[data-hub-view='clare']:has(#chat-form:focus-within) #chat-input {
+    min-height: 2.35rem;
+    padding-block: 0.45rem;
   }
 
   .chat-view[data-panel-mode='overlay'] {
     inset: auto;
-    top: var(--vv-offset-top, 0px);
+    top: 0;
     left: 0;
     right: 0;
-    bottom: var(--vv-offset-bottom, 0px);
+    bottom: 0;
     width: 100%;
     max-width: 100%;
     min-width: 0;
     max-height: none;
-    height: var(--vv-height, 100dvh);
+    height: 100dvh;
     padding: var(--space-3);
     padding-top: max(var(--space-3), env(safe-area-inset-top, 0px));
     padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
@@ -2516,7 +2587,16 @@
     background: var(--paper);
     z-index: 50;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
     overscroll-behavior: contain;
+  }
+
+  html.vv-keyboard-open .chat-view[data-panel-mode='overlay'],
+  .chat-view[data-panel-mode='overlay']:focus-within {
+    top: var(--vv-offset-top, 0px);
+    bottom: var(--vv-offset-bottom, 0px);
+    height: var(--vv-height, 100dvh);
   }
 
   /* Match Knowledge: cover the locked bottom bar while chat is open. */
@@ -2526,6 +2606,7 @@
 
   .chat-view[data-panel-mode='overlay'] .chat-form {
     flex: 0 0 auto;
+    margin-top: auto;
   }
 
   .chat-view[data-panel-mode='overlay'] .chat-message {

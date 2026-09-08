@@ -176,7 +176,11 @@ export function installClareSession(root: HTMLElement): ClareSession {
       empty.textContent = 'Could not load the framework library.';
       extras.append(empty);
     }
-    host.append(extras);
+    if (host.querySelector('#chat-form')) {
+      host.querySelector('#chat-form')!.before(extras);
+    } else {
+      host.append(extras);
+    }
   }
 
   session = {
