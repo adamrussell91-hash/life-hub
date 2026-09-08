@@ -129,7 +129,7 @@ describe('Clare protocol controls', () => {
     expect(canvas.querySelector('#chat-skip-reasoning')).not.toBeNull();
     expect(canvas.querySelector('.clare-prefs')).toBeNull();
     const pills = [...canvas.querySelectorAll<HTMLButtonElement>('[aria-label="Clare protocols"] [data-protocol-id]')];
-    expect(pills).toHaveLength(5);
+    expect(pills).toHaveLength(9);
     for (const pill of pills) {
       expect(pill.title).toBe('');
       const tipId = pill.getAttribute('aria-describedby');
@@ -257,15 +257,15 @@ describe('Clare protocol controls', () => {
   it('runs a sprint briefing when the dump is empty', async () => {
     vi.mocked(tasksApi.briefWithClare).mockResolvedValue({
       ...briefing,
-      protocol_id: 'weekly-reset',
+      protocol_id: 'tomorrow-setup',
       lead: 'Wednesday is the day to protect.',
       closer: 'That is the shape of the week. Dump the rest and I will sort it.'
     });
     const canvas = document.createElement('main');
     await renderClareView(canvas);
     vi.mocked(tasksApi.briefWithClare).mockClear();
-    canvas.querySelector<HTMLButtonElement>('[data-protocol-id="weekly-reset"]')!.click();
-    await vi.waitFor(() => expect(tasksApi.briefWithClare).toHaveBeenCalledWith('weekly-reset'));
+    canvas.querySelector<HTMLButtonElement>('[data-protocol-id="tomorrow-setup"]')!.click();
+    await vi.waitFor(() => expect(tasksApi.briefWithClare).toHaveBeenCalledWith('tomorrow-setup'));
   });
 
   it('switches the picker to Hammond and chats through the shared agent path', async () => {
