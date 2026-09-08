@@ -24,6 +24,16 @@ import { TransitMapSchema } from '@/schemas/map';
 import { ProgramSchema } from '@/schemas/program';
 import { AreaSchema } from '@/schemas/area';
 import { GoalSchema } from '@/schemas/goal';
+import { WorkBlockSchema } from '@/schemas/work-block';
+import { WorkSessionSchema } from '@/schemas/work-session';
+import {
+  DEFAULT_PLANNING_PROFILE,
+  PlanningProfileSchema
+} from '@/schemas/planning-profile';
+import {
+  DEFAULT_PLANNING_DIRECTION,
+  PlanningDirectionSchema
+} from '@/schemas/planning-direction';
 import {
   advanceRecurrence,
   hasMoreOccurrences,
@@ -137,6 +147,13 @@ export interface KeyBuilders {
   areasIndexKey: () => string;
   goalKey: (id: string) => string;
   goalsIndexKey: () => string;
+  workBlockKey: (id: string) => string;
+  workBlocksIndexKey: () => string;
+  workSessionKey: (id: string) => string;
+  workSessionsIndexKey: () => string;
+  planningProfileKey: () => string;
+  planningDirectionKey: () => string;
+  workflowStateKey: (id: string) => string;
 }
 
 function nowIso(): string {
@@ -304,7 +321,16 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         attachments: input.attachments ?? [],
         source: input.source ?? classifierDefault(props.sources, 'manual'),
         blocked_since: null,
-        page_blocks: input.page_blocks ?? []
+        page_blocks: input.page_blocks ?? [],
+        target_date: input.target_date ?? null,
+        review_at: input.review_at ?? null,
+        waiting_on: input.waiting_on ?? null,
+        waiting_since: input.waiting_since ?? null,
+        follow_up_at: input.follow_up_at ?? null,
+        waiting_status: input.waiting_status ?? null,
+        contexts: input.contexts ?? [],
+        cognitive_load: input.cognitive_load ?? null,
+        depth: input.depth ?? null
       });
       await kv.setJSON(keys.taskKey(task.id), task);
       const ids = await readIndex(kv, keys.tasksIndexKey());
@@ -397,6 +423,10 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         parent_goal_id: input.parent_goal_id ?? null,
         tags: input.tags ?? [],
         arc_summary: input.arc_summary ?? '',
+        purpose: input.purpose ?? '',
+        desired_outcome: input.desired_outcome ?? '',
+        quality_bar: input.quality_bar ?? null,
+        review_at: input.review_at ?? null,
         type: input.type ?? 'standard',
         milestones: input.milestones ?? [],
         status: input.status ?? 'active',
@@ -1681,6 +1711,163 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
       const parsed = validateTaskPropertyConfig(TaskPropertyConfigSchema.parse(config));
       await kv.setJSON(keys.taskPropertiesKey(), parsed);
       return parsed;
+    },
+
+    async listWorkBlocks() {
+      return listByIndex(kv, keys.workBlocksIndexKey(), keys.workBlockKey, (raw) =>
+        WorkBlockSchema.parse(raw)
+      );
+    },
+    async getWorkBlock(id) {
+      const raw = await kv.getJSON(keys.workBlockKey(id));
+      return raw ? WorkBlockSchema.parse(raw) : null;
+    },
+    async createWorkBlock(input) {
+      const stamp = nowIso();
+      const block = WorkBlockSchema.parse({
+        schema_version: 1,
+        id: newId('wblock'),
+        task_id: input.task_id ?? null,
+        project_id: input.project_id ?? null,
+        title: input.title,
+        date: input.date,
+        start_time: input.start_time,
+        duration_minutes: input.duration_minutes,
+        depth: input.depth ?? 'shallow',
+        status: input.status ?? 'confirmed',
+        source: input.source ?? 'manual',
+        locked: input.locked ?? false,
+        created_at: stamp,
+        updated_at: stamp
+      });
+      await kv.setJSON(keys.workBlockKey(block.id), block);
+      const ids = await readIndex(kv, keys.workBlocksIndexKey());
+      ids.push(block.id);
+      await writeIndex(kv, keys.workBlocksIndexKey(), ids);
+      return block;
+    },
+    async updateWorkBlock(id, patch) {
+      const existing = await this.getWorkBlock(id);
+      if (!existing) throw new Error(`Work block not found: ${id}`);
+      // Moving a planned block must never touch task due_date — only block fields.
+      const next = WorkBlockSchema.parse({
+        ...existing,
+        ...patch,
+        id: existing.id,
+        schema_version: 1,
+        created_at: existing.created_at,
+        updated_at: nowIso()
+      });
+      await kv.setJSON(keys.workBlockKey(id), next);
+      return next;
+    },
+    async deleteWorkBlock(id) {
+      await kv.delete(keys.workBlockKey(id));
+      const ids = (await readIndex(kv, keys.workBlocksIndexKey())).filter((x) => x !== id);
+      await writeIndex(kv, keys.workBlocksIndexKey(), ids);
+    },
+
+    async listWorkSessions() {
+      return listByIndex(kv, keys.workSessionsIndexKey(), keys.workSessionKey, (raw) =>
+        WorkSessionSchema.parse(raw)
+      );
+    },
+    async getWorkSession(id) {
+      const raw = await kv.getJSON(keys.workSessionKey(id));
+      return raw ? WorkSessionSchema.parse(raw) : null;
+    },
+    async createWorkSession(input) {
+      const stamp = nowIso();
+      const session = WorkSessionSchema.parse({
+        schema_version: 1,
+        id: newId('wsession'),
+        task_id: input.task_id ?? null,
+        project_id: input.project_id ?? null,
+        work_block_id: input.work_block_id ?? null,
+        started_at: input.started_at,
+        finished_at: input.finished_at ?? null,
+        actual_duration_minutes: input.actual_duration_minutes ?? null,
+        depth: input.depth ?? 'shallow',
+        work_mode: input.work_mode ?? null,
+        work_mode_confidence: input.work_mode_confidence ?? 'unknown',
+        result: input.result ?? 'open',
+        source: input.source ?? 'manual',
+        notes: input.notes ?? '',
+        created_at: stamp,
+        updated_at: stamp
+      });
+      await kv.setJSON(keys.workSessionKey(session.id), session);
+      const ids = await readIndex(kv, keys.workSessionsIndexKey());
+      ids.push(session.id);
+      await writeIndex(kv, keys.workSessionsIndexKey(), ids);
+      return session;
+    },
+    async updateWorkSession(id, patch) {
+      const existing = await this.getWorkSession(id);
+      if (!existing) throw new Error(`Work session not found: ${id}`);
+      const next = WorkSessionSchema.parse({
+        ...existing,
+        ...patch,
+        id: existing.id,
+        schema_version: 1,
+        created_at: existing.created_at,
+        updated_at: nowIso()
+      });
+      await kv.setJSON(keys.workSessionKey(id), next);
+      return next;
+    },
+    async deleteWorkSession(id) {
+      await kv.delete(keys.workSessionKey(id));
+      const ids = (await readIndex(kv, keys.workSessionsIndexKey())).filter((x) => x !== id);
+      await writeIndex(kv, keys.workSessionsIndexKey(), ids);
+    },
+
+    async getPlanningProfile() {
+      const raw = await kv.getJSON(keys.planningProfileKey());
+      if (!raw) return { ...DEFAULT_PLANNING_PROFILE };
+      return PlanningProfileSchema.parse({ ...DEFAULT_PLANNING_PROFILE, ...raw, id: 'default' });
+    },
+    async updatePlanningProfile(patch) {
+      const existing = await this.getPlanningProfile();
+      const next = PlanningProfileSchema.parse({
+        ...existing,
+        ...patch,
+        id: 'default',
+        schema_version: 1,
+        updated_at: nowIso()
+      });
+      await kv.setJSON(keys.planningProfileKey(), next);
+      return next;
+    },
+
+    async getPlanningDirection() {
+      const raw = await kv.getJSON(keys.planningDirectionKey());
+      if (!raw) return { ...DEFAULT_PLANNING_DIRECTION };
+      return PlanningDirectionSchema.parse({
+        ...DEFAULT_PLANNING_DIRECTION,
+        ...raw,
+        id: 'default'
+      });
+    },
+    async updatePlanningDirection(patch) {
+      const existing = await this.getPlanningDirection();
+      const next = PlanningDirectionSchema.parse({
+        ...existing,
+        ...patch,
+        id: 'default',
+        schema_version: 1,
+        updated_at: nowIso()
+      });
+      await kv.setJSON(keys.planningDirectionKey(), next);
+      return next;
+    },
+
+    async getWorkflowState(id) {
+      return (await kv.getJSON(keys.workflowStateKey(id))) as Record<string, unknown> | null;
+    },
+    async setWorkflowState(id, state) {
+      await kv.setJSON(keys.workflowStateKey(id), { ...state, id, updated_at: nowIso() });
+      return { ...(await kv.getJSON(keys.workflowStateKey(id))) } as Record<string, unknown>;
     }
   };
 }

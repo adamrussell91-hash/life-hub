@@ -24,7 +24,8 @@ export const PageCoverSchema = z.object({
 });
 
 export const ProjectTypeSchema = z.enum(['standard', 'excursion', 'academic_program']);
-export const ProjectStatusSchema = z.enum(['active', 'stalled', 'revived', 'archived_dead']);
+export const ProjectStatusSchema = z.enum(['active', 'stalled', 'revived', 'archived_dead', 'paused']);
+export const QualityBarSchema = z.enum(['good_enough', 'high_quality', 'exceptional']);
 
 export const ProjectSchema = z.object({
   schema_version: schemaVersion,
@@ -34,6 +35,12 @@ export const ProjectSchema = z.object({
   parent_goal_id: z.string().nullable().default(null),
   tags: z.array(z.string()).default([]),
   arc_summary: z.string().default(''),
+  /** Why this project exists — distinct from description. */
+  purpose: z.string().default(''),
+  desired_outcome: z.string().default(''),
+  quality_bar: QualityBarSchema.nullable().default(null),
+  /** When the project should return for review. */
+  review_at: z.string().nullable().default(null),
   type: ProjectTypeSchema.default('standard'),
   milestones: z.array(MilestoneSchema).default([]),
   status: ProjectStatusSchema.default('active'),
@@ -70,6 +77,7 @@ export const ProjectSchema = z.object({
 
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
+export type QualityBar = z.infer<typeof QualityBarSchema>;
 export type Milestone = z.infer<typeof MilestoneSchema>;
 export type PermissionNote = z.infer<typeof PermissionNoteSchema>;
 export type PageCover = z.infer<typeof PageCoverSchema>;
@@ -84,6 +92,10 @@ export const ProjectCreateSchema = ProjectSchema.omit({
   parent_goal_id: true,
   tags: true,
   arc_summary: true,
+  purpose: true,
+  desired_outcome: true,
+  quality_bar: true,
+  review_at: true,
   type: true,
   milestones: true,
   status: true,

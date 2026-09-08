@@ -9,6 +9,10 @@ import { ProgramCreateSchema, ProgramUpdateSchema } from '../src/schemas/program
 import { AreaCreateSchema, AreaUpdateSchema } from '../src/schemas/area';
 import { GoalCreateSchema, GoalUpdateSchema } from '../src/schemas/goal';
 import { TaskPropertyConfigSchema } from '../src/schemas/task-properties';
+import { WorkBlockCreateSchema, WorkBlockUpdateSchema } from '../src/schemas/work-block';
+import { WorkSessionCreateSchema, WorkSessionUpdateSchema } from '../src/schemas/work-session';
+import { PlanningProfileUpdateSchema } from '../src/schemas/planning-profile';
+import { PlanningDirectionUpdateSchema } from '../src/schemas/planning-direction';
 
 export function createMemoryKv(): KvAdapter & { map: Map<string, unknown> } {
   const map = new Map<string, unknown>();
@@ -592,6 +596,72 @@ export function createMockApi({ seed }: MockApiOptions) {
       if (method === 'PUT') {
         const parsed = TaskPropertyConfigSchema.parse(body);
         return json(200, { ok: true, data: await s.updateTaskProperties(parsed) });
+      }
+    }
+
+    if (path === '/api/work-blocks') {
+      if (method === 'GET') {
+        if (id) {
+          const block = await s.getWorkBlock(id);
+          if (!block) return json(404, { ok: false, error: { code: 'not_found', message: 'Work block not found' } });
+          return json(200, { ok: true, data: block });
+        }
+        return json(200, { ok: true, data: { work_blocks: await s.listWorkBlocks() } });
+      }
+      if (method === 'POST') {
+        const parsed = WorkBlockCreateSchema.parse(body);
+        return json(201, { ok: true, data: await s.createWorkBlock(parsed) });
+      }
+      if (method === 'PATCH' && id) {
+        const parsed = WorkBlockUpdateSchema.parse(body);
+        return json(200, { ok: true, data: await s.updateWorkBlock(id, parsed) });
+      }
+      if (method === 'DELETE' && id) {
+        await s.deleteWorkBlock(id);
+        return json(200, { ok: true, data: { deleted: true } });
+      }
+    }
+
+    if (path === '/api/work-sessions') {
+      if (method === 'GET') {
+        if (id) {
+          const session = await s.getWorkSession(id);
+          if (!session) return json(404, { ok: false, error: { code: 'not_found', message: 'Work session not found' } });
+          return json(200, { ok: true, data: session });
+        }
+        return json(200, { ok: true, data: { work_sessions: await s.listWorkSessions() } });
+      }
+      if (method === 'POST') {
+        const parsed = WorkSessionCreateSchema.parse(body);
+        return json(201, { ok: true, data: await s.createWorkSession(parsed) });
+      }
+      if (method === 'PATCH' && id) {
+        const parsed = WorkSessionUpdateSchema.parse(body);
+        return json(200, { ok: true, data: await s.updateWorkSession(id, parsed) });
+      }
+      if (method === 'DELETE' && id) {
+        await s.deleteWorkSession(id);
+        return json(200, { ok: true, data: { deleted: true } });
+      }
+    }
+
+    if (path === '/api/planning-profile') {
+      if (method === 'GET') {
+        return json(200, { ok: true, data: await s.getPlanningProfile() });
+      }
+      if (method === 'PATCH' || method === 'PUT') {
+        const parsed = PlanningProfileUpdateSchema.parse(body ?? {});
+        return json(200, { ok: true, data: await s.updatePlanningProfile(parsed) });
+      }
+    }
+
+    if (path === '/api/planning-direction') {
+      if (method === 'GET') {
+        return json(200, { ok: true, data: await s.getPlanningDirection() });
+      }
+      if (method === 'PATCH' || method === 'PUT') {
+        const parsed = PlanningDirectionUpdateSchema.parse(body ?? {});
+        return json(200, { ok: true, data: await s.updatePlanningDirection(parsed) });
       }
     }
 
