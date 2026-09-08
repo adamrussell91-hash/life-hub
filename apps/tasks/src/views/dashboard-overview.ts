@@ -10,7 +10,7 @@ import {
   type DashboardHeatDay,
   type DashboardTimelineItem
 } from '@/domain/dashboard-overview';
-import { preferredDomains, toDateKey } from '@/domain/queries';
+import { preferredDomains, toDateKey, todayPlateTasks } from '@/domain/queries';
 import { findStallCandidates } from '@/domain/stall';
 import {
   findPortfolioTension,
@@ -18,6 +18,7 @@ import {
   projectLifecycleMix,
   runningProjectCount
 } from '@/domain/projects-pulse';
+import { formatTaskTimeRange } from '@/domain/time-grid';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { renderPressureStrips } from '@/views/pinch-strip';
 import { renderProjectPortfolioChart } from '@/views/project-portfolio-chart';
@@ -223,6 +224,10 @@ function renderNextAction(
   const title = el('p', 'dashboard-next__title', action.title);
   row.append(title, el('span', sourceChipClass(action.source), action.source));
   body.append(row);
+  if (action.task) {
+    const when = formatTaskTimeRange(action.task);
+    if (when) body.append(el('p', 'dashboard-next__time', when));
+  }
 
   const go = el(
     'button',
@@ -300,6 +305,10 @@ function renderTimelineRow(
     el('span', sourceChipClass(item.source), item.source),
     el('span', `${chipUrgencyClass(item.urgency)} dashboard-row__when`, when)
   );
+  if (item.task) {
+    const time = formatTaskTimeRange(item.task);
+    if (time) meta.append(el('span', 'dashboard-row__time', time));
+  }
   if (item.source === 'task' && item.meta && item.meta !== when) {
     meta.append(el('span', 'dashboard-row__date', item.meta));
   }
@@ -308,9 +317,35 @@ function renderTimelineRow(
   return row;
 }
 
-function itemsForDay(items: DashboardTimelineItem[], dateKey: string, todayKey: string): DashboardTimelineItem[] {
-  if (dateKey === todayKey) return items.filter((item) => item.daysOut <= 0);
-  return items.filter((item) => item.due_date === dateKey);
+function itemsForDay(
+  items: DashboardTimelineItem[],
+  dateKey: string,
+  todayKey: string,
+  plateOrder: Map<string, number>
+): DashboardTimelineItem[] {
+  const dayItems =
+    dateKey === todayKey
+      ? items.filter((item) => item.daysOut <= 0)
+      : items.filter((item) => item.due_date === dateKey);
+  return [...dayItems].sort((a, b) => {
+    if (a.source === 'task' && b.source === 'task' && a.task && b.task) {
+      if (dateKey === todayKey) {
+        const ao = plateOrder.get(a.task.id) ?? Number.POSITIVE_INFINITY;
+        const bo = plateOrder.get(b.task.id) ?? Number.POSITIVE_INFINITY;
+        if (ao !== bo) return ao - bo;
+      }
+      const pr =
+        ({ urgent: 0, high: 1, medium: 2, low: 3 } as const)[a.task.priority] -
+        ({ urgent: 0, high: 1, medium: 2, low: 3 } as const)[b.task.priority];
+      if (pr !== 0) return pr;
+      const at = a.task.due_time ?? '99:99';
+      const bt = b.task.due_time ?? '99:99';
+      return at.localeCompare(bt);
+    }
+    if (a.source === 'task') return -1;
+    if (b.source === 'task') return 1;
+    return a.title.localeCompare(b.title);
+  });
 }
 
 function renderTimelineGroup(
@@ -336,7 +371,8 @@ function renderAgendaBody(
   selectedKey: string
 ): HTMLElement {
   const todayKey = toDateKey(now);
-  const dayItems = itemsForDay(items, selectedKey, todayKey);
+  const plateOrder = new Map(todayPlateTasks(options.tasks, now).map((task, index) => [task.id, index]));
+  const dayItems = itemsForDay(items, selectedKey, todayKey, plateOrder);
   const agenda = el('div', 'dashboard-timeline');
   if (selectedKey === todayKey) agenda.id = 'timeline-today';
 
@@ -452,8 +488,11 @@ function renderWeekCard(
       `${day.count} item${day.count === 1 ? '' : 's'} on ${formatDisplayDate(day.date_key)}`
     );
     cell.setAttribute('aria-pressed', day.date_key === selectedKey ? 'true' : 'false');
-    cell.append(el('span', 'dashboard-heat__weekday', day.weekday), el('span', 'dashboard-heat__day', String(day.day)));
-    if (day.count) cell.append(el('span', 'dashboard-heat__count', String(day.count)));
+    cell.append(
+      el('span', 'dashboard-heat__weekday', day.weekday),
+      el('span', 'dashboard-heat__day', String(day.day)),
+      el('span', day.count ? 'dashboard-heat__count' : 'dashboard-heat__count dashboard-heat__count--empty', day.count ? String(day.count) : '')
+    );
     cell.addEventListener('click', () => onSelectDay(day.date_key));
     bindHeatDrop(cell, day, options);
     row.append(cell);
