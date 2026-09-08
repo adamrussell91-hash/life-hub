@@ -732,7 +732,8 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
           dropTask,
           tasks,
           pinchesByKey,
-          sessionFilters.planningLens && sessionFilters.layers.includes('protected_time')
+          sessionFilters.planningLens &&
+          (sessionFilters.layers ?? []).includes('protected_time')
             ? planningProfile
             : null
         )
