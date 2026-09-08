@@ -108,7 +108,7 @@ const CASES = [
   },
   {
     slug: 'penelope',
-    broad: 'Have I felt anxious before?',
+    broad: 'Have I been feeling anxious often?',
     expectTools: ['search_diary_records']
   },
   {
