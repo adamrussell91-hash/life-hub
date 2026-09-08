@@ -90,12 +90,36 @@ const KEYWORD_HINTS = [
 /** Domain write shortcuts that stay attached whenever the agent owns them. */
 const PINNED_CAPABILITY_IDS = ['tasks.create', 'tasks.update'];
 
+/** Soft image presence — never inspect base64 contents. */
+function hasVisualAttachmentSignal(attachments) {
+  if (!Array.isArray(attachments)) return false;
+  return attachments.some(
+    (item) => item
+      && item.kind === 'image'
+      && typeof item.dataUrl === 'string'
+      && item.dataUrl.length > 0
+  );
+}
+
 /**
  * Same-call intent pass (locked decision): narrow shortcuts from the user
  * message; always keep os.propose-action.
+ * When visual attachments are present (or keepFullDomainTools), return the
+ * full agent capability set so text-only narrowing cannot strip tools needed
+ * after inspecting an image.
  */
-export function selectCapabilityIdsForTurn({ slug, message, maxShortcuts = 8 } = {}) {
+export function selectCapabilityIdsForTurn({
+  slug,
+  message,
+  maxShortcuts = 8,
+  attachments,
+  keepFullDomainTools = false
+} = {}) {
   const all = capabilityIdsForAgent(slug);
+  if (keepFullDomainTools || message == null || hasVisualAttachmentSignal(attachments)) {
+    return all;
+  }
+
   const always = ['os.propose-action', 'os.capability-scoreboard'].filter(id => all.includes(id));
   const pinned = PINNED_CAPABILITY_IDS.filter(id => all.includes(id));
   const selected = new Set([...always, ...pinned]);

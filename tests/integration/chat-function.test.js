@@ -735,6 +735,98 @@ test('accepts a phone-photo attachment and delivers image blocks to the model', 
   );
 });
 
+test('visual turn keeps image blocks, records visual evidence, and restores it on follow-up', async () => {
+  let firstMessages = null;
+  let secondMessages = null;
+  let firstSystem = null;
+  let secondSystem = null;
+  let call = 0;
+  const dataUrl = `data:image/png;base64,${Buffer.alloc(12_000, 7).toString('base64')}`;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ messages, system, tools, executeTools }) {
+        call += 1;
+        if (call === 1) {
+          firstMessages = messages;
+          firstSystem = system;
+          assert.ok(tools?.some(tool => tool.name === 'record_visual_evidence'));
+          yield { type: 'agent', slug: 'brisket' };
+          await executeTools({
+            type: 'tool_call',
+            id: 'tool_ve_1',
+            name: 'record_visual_evidence',
+            input: {
+              items: [{
+                attachmentId: 'att_lunch',
+                name: 'lunch.png',
+                strength: 'direct_visual',
+                transcribedText: 'Protein: 42.0 g\nSodium: 780 mg',
+                structuredFields: { protein_g: 42.0, sodium_mg: 780 },
+                numbers: [{ label: 'Protein', value: 42.0, unit: 'g' }]
+              }]
+            }
+          });
+          yield { type: 'text', delta: 'Looks like 42g protein. Whole tray?' };
+          yield { type: 'done' };
+          return;
+        }
+        secondMessages = messages;
+        secondSystem = system;
+        yield { type: 'agent', slug: 'brisket' };
+        yield { type: 'text', delta: 'Logging the tray with the label numbers.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const first = await handler(request({
+    message: "Here's my lunch.",
+    priorAgentSlug: 'brisket',
+    attachments: [{
+      id: 'att_lunch',
+      kind: 'image',
+      mime: 'image/png',
+      name: 'lunch.png',
+      dataUrl
+    }]
+  }));
+  assert.equal(first.status, 200);
+  const firstEvents = contentEvents(await readSse(first));
+  assert.ok(firstEvents.some(event => event.type === 'visual_evidence'));
+  const ve = firstEvents.find(event => event.type === 'visual_evidence');
+  assert.equal(ve.items[0].attachmentId, 'att_lunch');
+  assert.equal(ve.items[0].structuredFields.protein_g, 42);
+  const firstUser = firstMessages.find(entry => entry.role === 'user');
+  assert.ok(Array.isArray(firstUser.content));
+  assert.ok(firstUser.content.some(block => block.type === 'image'));
+  assert.match(String(firstSystem), /Visual evidence|first-class evidence|DIRECT VISUAL/i);
+
+  const second = await handler(request({
+    message: 'Yep. Log it.',
+    priorAgentSlug: 'brisket',
+    history: [
+      {
+        role: 'user',
+        content: "Here's my lunch.",
+        visualEvidence: ve.items
+      },
+      { role: 'assistant', content: 'Looks like 42g protein. Whole tray?' }
+    ]
+  }));
+  assert.equal(second.status, 200);
+  await readSse(second);
+  const historyText = secondMessages
+    .filter(entry => entry.role === 'user')
+    .map(entry => typeof entry.content === 'string' ? entry.content : JSON.stringify(entry.content))
+    .join('\n');
+  assert.match(historyText, /42\.0 g|protein_g|att_lunch/i);
+  assert.doesNotMatch(historyText, /base64,[A-Za-z0-9+/]{80,}/);
+  assert.match(String(secondSystem), /Visual evidence|first-class evidence/i);
+});
+
 test('reports misconfiguration when ANTHROPIC_API_KEY is absent', async () => {
   const { ANTHROPIC_API_KEY, ...withoutKey } = validEnv;
   const handler = createChatHandler({ env: withoutKey });

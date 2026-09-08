@@ -13,8 +13,15 @@
  * }} HubChatAttachment
  */
 
-/** Wire/model budget for a single inlined image (base64 transport). */
-export const MAX_CHAT_IMAGE_BYTES = 1_500_000;
+/**
+ * Wire/model budget for a single inlined image (raw bytes before base64).
+ * Sized so three max images always fit the 5MB /api/chat envelope after
+ * base64 (~4/3) plus JSON/history reserve — see hub-visual-evidence.js.
+ */
+export const MAX_CHAT_IMAGE_BYTES = 1_250_000;
+
+/** Hard ceiling for /api/chat JSON bodies (Netlify-safe under ~6MB). */
+export const MAX_CHAT_BODY_BYTES = 5 * 1024 * 1024;
 
 /**
  * @param {unknown} raw

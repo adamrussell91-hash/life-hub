@@ -25,7 +25,7 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch, baseUrl = ANT
   }
 
   return {
-    async *streamMessage({ system, messages, tools, signal, executeTools, toolChoice = null }) {
+    async *streamMessage({ system, messages, tools, signal, executeTools, toolChoice = null, maxTokens = null }) {
       let roundMessages = messages;
       let pauseContinuations = 0;
 
@@ -49,7 +49,8 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch, baseUrl = ANT
           tools: roundTools,
           toolChoice: forceRound ? toolChoice : null,
           signal,
-          roundState
+          roundState,
+          maxTokens
         })) {
           if (event.type === 'done') {
             sawDone = true;
@@ -146,7 +147,8 @@ async function* streamOnce({
   tools,
   toolChoice = null,
   signal,
-  roundState
+  roundState,
+  maxTokens = null
 }) {
   let response;
   try {
@@ -159,7 +161,7 @@ async function* streamOnce({
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: MAX_TOKENS,
+        max_tokens: Number(maxTokens) > 0 ? Number(maxTokens) : MAX_TOKENS,
         // Sonnet 5 thinks by default; thinking tokens count toward max_tokens and
         // routinely burn 40s+ before the first visible token on CN audits — past
         // Netlify's function budget, which surfaces as a stalled/empty chat turn.

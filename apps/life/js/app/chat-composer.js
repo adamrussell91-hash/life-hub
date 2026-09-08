@@ -48,10 +48,23 @@ export function bindChatComposer(root, { onSend, onStop } = {}) {
       attachInput.value = '';
       if (!files.length) return;
       const { fileToChatAttachment } = await import('../../../packages/design-kit/js/hub-chat-attachments.js');
+      const {
+        attachmentsFitChatBody,
+        EFFECTIVE_MAX_CHAT_IMAGE_BYTES
+      } = await import('../../../packages/design-kit/js/hub-visual-evidence.js');
       let lastError = '';
       for (const file of files.slice(0, 3)) {
         try {
-          pendingAttachments.push(await fileToChatAttachment(file));
+          const next = await fileToChatAttachment(file);
+          if (!attachmentsFitChatBody([...pendingAttachments, next], {
+            messageBytes: input?.value?.length || 0
+          })) {
+            lastError = pendingAttachments.length
+              ? 'Those photos together are too large to send. Remove one or use a smaller image.'
+              : `That photo is too large to send (max ~${Math.round(EFFECTIVE_MAX_CHAT_IMAGE_BYTES / 1000)}KB after compress). Try a smaller image.`;
+            continue;
+          }
+          pendingAttachments.push(next);
         } catch (error) {
           lastError = error?.message || 'Could not attach that file.';
         }
