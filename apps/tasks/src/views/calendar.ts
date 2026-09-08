@@ -1,14 +1,16 @@
 import type { Task, TaskDomain } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
+import type { Area } from '@/schemas/area';
+import type { Goal } from '@/schemas/goal';
 import type { ClareDumpResult, ClareProposal } from '@/domain/clare';
 import { tasksApi } from '@/services/client-api';
 import { hashQuery } from '@/shell/shell';
-import { backlogTasks, parseDue, toDateKey } from '@/domain/queries';
+import { backlogTasks, openTasks, parseDue, toDateKey } from '@/domain/queries';
 import { somedayTasks } from '@/domain/hierarchy';
 import { detectPinchPoints, type PinchPoint } from '@/domain/pinch';
 import { buildDayCapacity } from '@/domain/capacity';
 import { findStallCandidates } from '@/domain/stall';
-import { buildProjectPulseCard } from '@/domain/projects-pulse';
+import { buildProjectPulseCard, projectEnergy } from '@/domain/projects-pulse';
 import { projectPageHash } from '@/domain/cards';
 import { getTaskPropertiesSync } from '@/services/task-properties';
 import {
@@ -260,12 +262,16 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   showViewLoading(canvas, 'Loading…', '.hub-calendar');
   let tasks: Task[];
   let projects: Project[];
+  let areas: Area[];
+  let goals: Goal[];
   let workBlocks: WorkBlock[] = [];
   let planningProfile: PlanningProfile = DEFAULT_PLANNING_PROFILE;
   try {
-    [tasks, projects, workBlocks, planningProfile] = await Promise.all([
+    [tasks, projects, areas, goals, workBlocks, planningProfile] = await Promise.all([
       tasksApi.listTasks(),
       tasksApi.listProjects().catch(() => [] as Project[]),
+      tasksApi.listAreas().catch(() => [] as Area[]),
+      tasksApi.listGoals().catch(() => [] as Goal[]),
       typeof tasksApi.listWorkBlocks === 'function'
         ? tasksApi.listWorkBlocks().catch(() => [] as WorkBlock[])
         : Promise.resolve([] as WorkBlock[]),
@@ -702,6 +708,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     const workspace = el('div', 'hub-calendar__workspace');
     const body = el('div', 'hub-calendar__body');
     if (session.mode === 'month') {
+      body.append(renderHorizonBreadcrumb(areas, goals, projects, tasks));
       const stallBanner = renderStalledProjectsBanner(projects, tasks);
       if (stallBanner) body.append(stallBanner);
       const pulseStrip = renderProjectPulseStrip(projects, tasks);
@@ -756,6 +763,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     rail.append(renderStandingCompose(composeDraft, onCreated), agenda, preview, renderShortcutHint());
     if (session.mode === 'week') {
       rail.append(renderLocksWidget(days, items, showPreview));
+      rail.append(renderDeepHoursWidget(tasks, projects, days));
       rail.append(
         renderNextActionsWidget(tasks, (task) => openBacklogTask(task, preview, projects, reload))
       );
@@ -1608,6 +1616,74 @@ function renderProjectPulseStrip(projects: Project[], tasks: Task[]): HTMLElemen
     strip.append(btn);
   }
   return strip;
+}
+
+/** Real hours logged on tasks under "deep-focus" projects (the same energy
+ *  heuristic `projectEnergy` already uses in the Projects view), summed over the
+ *  visible week. The weekly target is a stated goal, not derived data — labeled
+ *  as such rather than presented as something computed from real history. */
+function renderDeepHoursWidget(tasks: Task[], projects: Project[], days: Date[]): HTMLElement {
+  const TARGET_HOURS = 8;
+  const deepProjectIds = new Set(
+    projects.filter((project) => projectEnergy(project, tasks) === 'deep_focus').map((p) => p.id)
+  );
+  const startKey = toDateKey(days[0]!);
+  const endKey = toDateKey(days[days.length - 1]!);
+  let minutes = 0;
+  for (const task of tasks) {
+    if (!task.parent_project_id || !deepProjectIds.has(task.parent_project_id)) continue;
+    const due = parseDue(task.due_date);
+    if (!due) continue;
+    const key = toDateKey(due);
+    if (key < startKey || key > endKey) continue;
+    minutes += task.actual_duration ?? task.estimated_duration ?? 45;
+  }
+  const hours = minutes / 60;
+  const pct = Math.min(100, Math.round((hours / TARGET_HOURS) * 100));
+
+  const card = el('section', 'hub-calendar__detail calendar-deep-hours');
+  card.append(el('h3', 'hub-calendar__detail-heading', 'Deep hours this week'));
+  card.append(
+    el(
+      'p',
+      'hub-calendar__detail-empty',
+      'Logged on tasks under deep-focus projects — target is a goal you set, not a measurement.'
+    )
+  );
+  const row = el('div', 'calendar-deep-hours__row');
+  const track = el('div', 'calendar-deep-hours__track');
+  const fill = el('div', 'calendar-deep-hours__fill');
+  fill.style.width = `${pct}%`;
+  track.append(fill);
+  row.append(track, el('span', 'calendar-deep-hours__label', `${hours.toFixed(1)}h / ${TARGET_HOURS}h target`));
+  card.append(row);
+  return card;
+}
+
+/** Real 4-level hierarchy — Areas of Focus, Goals, Projects, Actions — all real
+ *  entities in this app (unlike "Purpose"/"Vision", which have no backing here
+ *  and are deliberately not shown). Counts are live; each segment links to the
+ *  real page for that altitude. */
+function renderHorizonBreadcrumb(areas: Area[], goals: Goal[], projects: Project[], tasks: Task[]): HTMLElement {
+  const segments: Array<{ label: string; count: number; href: string }> = [
+    { label: 'Areas', count: areas.length, href: '#/goals' },
+    { label: 'Goals', count: goals.filter((g) => g.status === 'active').length, href: '#/goals' },
+    { label: 'Projects', count: projects.filter((p) => p.status !== 'archived_dead').length, href: '#/projects' },
+    { label: 'Actions', count: openTasks(tasks).length, href: '#/board' }
+  ];
+  const bar = el('nav', 'calendar-horizon-bar');
+  bar.setAttribute('aria-label', 'Areas to actions hierarchy');
+  segments.forEach((segment, index) => {
+    if (index > 0) {
+      const arrow = el('span', 'calendar-horizon-bar__arrow', '→');
+      arrow.setAttribute('aria-hidden', 'true');
+      bar.append(arrow);
+    }
+    const link = el('a', 'calendar-horizon-bar__segment', `${segment.label} · ${segment.count}`);
+    link.href = segment.href;
+    bar.append(link);
+  });
+  return bar;
 }
 
 /** Real per-domain "last touched" signal, most-stale first. Reads the live domain

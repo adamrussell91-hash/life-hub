@@ -9,6 +9,8 @@ vi.mock('@/services/client-api', () => ({
   tasksApi: {
     listTasks: vi.fn(),
     listProjects: vi.fn(),
+    listAreas: vi.fn().mockResolvedValue([]),
+    listGoals: vi.fn().mockResolvedValue([]),
     listWorkBlocks: vi.fn(async () => []),
     getPlanningProfile: vi.fn(async () => ({
       schema_version: 1,

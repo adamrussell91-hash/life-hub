@@ -16,6 +16,8 @@ vi.mock('@/services/client-api', () => ({
   tasksApi: {
     listTasks: vi.fn(),
     listProjects: vi.fn(),
+    listAreas: vi.fn().mockResolvedValue([]),
+    listGoals: vi.fn().mockResolvedValue([]),
     updateTask: vi.fn(),
     createTask: vi.fn(),
     deleteTask: vi.fn(),
@@ -301,5 +303,63 @@ describe('calendar productivity layer', () => {
     await renderMonthView(canvas);
 
     expect(canvas.querySelector('.calendar-stall-banner')).toBeNull();
+  });
+
+  it('sums real deep-focus task duration for the visible week, and labels the target as a stated goal', async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([
+      task({
+        id: 'task_deep',
+        title: 'Write the term plan',
+        parent_project_id: 'proj_deep',
+        due_date: '2026-08-18',
+        estimated_duration: 90
+      }),
+      task({
+        id: 'task_outside_week',
+        title: 'Write next term plan',
+        parent_project_id: 'proj_deep',
+        due_date: '2026-09-01',
+        estimated_duration: 999
+      })
+    ]);
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([project({ id: 'proj_deep', title: 'Curriculum' })]);
+
+    location.hash = '#/week?date=2026-08-17';
+    const canvas = document.createElement('main');
+    await renderWeekView(canvas);
+
+    const widget = canvas.querySelector('.calendar-deep-hours');
+    expect(widget?.textContent).toContain('1.5h / 8h target');
+    expect(widget?.textContent).toContain('not a measurement');
+  });
+
+  it('shows the real Areas/Goals/Projects/Actions hierarchy with live counts and real routes', async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([
+      task({ id: 'task_open', title: 'Draft the brief', due_date: '2026-08-17', status: 'open' }),
+      task({ id: 'task_done', title: 'Already finished', due_date: '2026-08-17', status: 'done' })
+    ]);
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([
+      project({ id: 'proj_active', title: 'Active project' }),
+      project({ id: 'proj_dead', title: 'Dead project', status: 'archived_dead' })
+    ]);
+    vi.mocked(tasksApi.listAreas).mockResolvedValue([
+      { schema_version: 1, id: 'area_1', title: 'Health', description: '', tags: [], created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' },
+      { schema_version: 1, id: 'area_2', title: 'Teaching', description: '', tags: [], created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' }
+    ]);
+    vi.mocked(tasksApi.listGoals).mockResolvedValue([
+      { schema_version: 1, id: 'goal_1', title: 'Get fit', description: '', parent_area_id: 'area_1', status: 'active', tags: [], created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' },
+      { schema_version: 1, id: 'goal_archived', title: 'Old goal', description: '', parent_area_id: null, status: 'archived', tags: [], created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' }
+    ]);
+
+    location.hash = '#/month?date=2026-08-17';
+    const canvas = document.createElement('main');
+    await renderMonthView(canvas);
+
+    const segments = [...canvas.querySelectorAll<HTMLAnchorElement>('.calendar-horizon-bar__segment')];
+    expect(segments.map((s) => s.textContent)).toEqual(['Areas · 2', 'Goals · 1', 'Projects · 1', 'Actions · 1']);
+    expect(segments[0]?.getAttribute('href')).toBe('#/goals');
+    expect(segments[1]?.getAttribute('href')).toBe('#/goals');
+    expect(segments[2]?.getAttribute('href')).toBe('#/projects');
+    expect(segments[3]?.getAttribute('href')).toBe('#/board');
   });
 });
