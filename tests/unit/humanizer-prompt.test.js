@@ -137,6 +137,7 @@ test('chat runtime still streams in one model pass and does not import a Humaniz
   // chat streams via visual-evidence capture, which still wraps the single-pass log force helper
   assert.match(chat, /streamWithVisualEvidenceCapture/);
   assert.match(capture, /streamWithAgentLogForce/);
+  assert.doesNotMatch(capture, /humanize|loadHumanizerGuidance|second rewrite/i);
   assert.match(chat, /buildSystemPrompt/);
   assert.doesNotMatch(chat, /humanize|loadHumanizerGuidance|second rewrite/i);
   assert.match(persona, /loadHumanizerGuidance/);

@@ -279,8 +279,9 @@ test('Hyaluronica Delivery: empty routine window cannot claim help', () => {
 test('Penelope Delivery: no diary hits does not invent recurrence', () => {
   const kernel = runAgentKernel({
     slug: 'penelope',
-    // Avoid deictic "this" so the empty-store path is the no-hits branch, not referent clarification.
-    message: 'feeling anxious often',
+    // A resolved referent ("felt anxious"), not the bare deictic "like this" —
+    // that unresolved-referent path is covered separately in penelope-kernel.test.js.
+    message: 'have I felt anxious before',
     today: TODAY,
     now: NOW,
     stores: { mindEvents: [] }

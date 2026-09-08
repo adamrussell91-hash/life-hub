@@ -389,7 +389,8 @@ test('service worker paints cached images immediately and keeps scripts network-
   assert.match(worker, /function staleWhileRevalidate/);
   assert.match(worker, /function networkFirst/);
   assert.match(worker, /isStaticImage\(url\.pathname\)/);
-  assert.match(worker, /life-hub-shell-v161/);
+  // The version number bumps on every shell-asset change — pin the pattern, not a version.
+  assert.match(worker, /life-hub-shell-v\d+/);
 });
 
 test('web app manifest stays installable without hub-tile icons', async () => {

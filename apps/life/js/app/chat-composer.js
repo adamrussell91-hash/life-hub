@@ -19,7 +19,7 @@ export function bindChatComposer(root, { onSend, onStop } = {}) {
   const attachBtn = root.querySelector?.('#chat-attach');
   const attachInput = root.querySelector?.('#chat-attach-input');
   const attachList = root.querySelector?.('#chat-attach-list');
-  /** @type {import('../../../packages/design-kit/js/hub-chat-attachments.js').HubChatAttachment[]} */
+  /** @type {import('../../../../packages/design-kit/js/hub-chat-attachments.js').HubChatAttachment[]} */
   let pendingAttachments = [];
 
   async function refreshAttachList() {
@@ -47,7 +47,7 @@ export function bindChatComposer(root, { onSend, onStop } = {}) {
       const files = [...(attachInput.files || [])];
       attachInput.value = '';
       if (!files.length) return;
-      const { fileToChatAttachment } = await import('../../../packages/design-kit/js/hub-chat-attachments.js');
+      const { fileToChatAttachment } = await import('../../../../packages/design-kit/js/hub-chat-attachments.js');
       const {
         attachmentsFitChatBody,
         EFFECTIVE_MAX_CHAT_IMAGE_BYTES
