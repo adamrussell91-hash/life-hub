@@ -30,9 +30,126 @@ export type WeeklyReviewState = {
   project_health: ProjectHealthResult[];
   someday_due: Array<{ task_id: string; title: string; review_at: string }>;
   schedule: ScheduleComposeResult | null;
-  pending_changes: Array<{ summary: string; selected: boolean }>;
+  next_action_titles?: Record<string, string>;
+  waiting_decisions?: Record<string, { action: string; follow_up_at?: string | null }>;
+  someday_decisions?: Record<string, { action: string; review_at?: string | null }>;
+  status?: 'in_progress' | 'awaiting_confirm' | 'complete';
+  pending_changes: Array<{
+    id?: string;
+    kind?: string;
+    summary: string;
+    selected: boolean;
+    confirmable?: boolean;
+    project_id?: string;
+    title?: string;
+    task_id?: string;
+    action?: string;
+    follow_up_at?: string | null;
+    review_at?: string | null;
+    destination?: string;
+  }>;
   updated_at: string;
 };
+
+
+export function buildWeeklyPendingChanges(state: WeeklyReviewState) {
+  const nextTitles = state.next_action_titles ?? {};
+  const waitingDecisions = state.waiting_decisions ?? {};
+  const somedayDecisions = state.someday_decisions ?? {};
+  const capture = (state.capture?.items ?? [])
+    .filter((i) => i.destination !== 'trash' && i.destination !== 'reference')
+    .map((i) => ({
+      id: i.id,
+      kind: 'capture',
+      destination: i.destination,
+      summary: `Clarify → ${i.destination}: ${i.text.slice(0, 60)}`,
+      selected: true,
+      confirmable: true
+    }));
+  const nextActions = (state.project_health ?? [])
+    .filter((h) => h.health === 'missing_next_action')
+    .map((h) => {
+      const title = (nextTitles[h.project_id] ?? '').trim();
+      if (!title) {
+        return {
+          id: `project_health:${h.project_id}`,
+          kind: 'informational',
+          project_id: h.project_id,
+          summary: `Project ${h.project_id} needs a next action — provide a concrete next action before Confirm`,
+          selected: false,
+          confirmable: false
+        };
+      }
+      return {
+        id: `next_action:${h.project_id}`,
+        kind: 'next_action',
+        project_id: h.project_id,
+        title,
+        summary: `Create next action “${title}” for project ${h.project_id}`,
+        selected: true,
+        confirmable: true
+      };
+    });
+  const waiting = (state.waiting ?? []).flatMap((item) => {
+    const decision = waitingDecisions[item.task_id];
+    if (!decision?.action) {
+      if (!item.needs_action) return [];
+      return [{
+        id: `waiting:${item.task_id}:needs_decision`,
+        kind: 'informational',
+        task_id: item.task_id,
+        summary: `Waiting “${item.title}” needs a decision`,
+        selected: false,
+        confirmable: false
+      }];
+    }
+    return [{
+      id: `waiting:${item.task_id}:${decision.action}`,
+      kind: 'waiting',
+      task_id: item.task_id,
+      action: decision.action,
+      follow_up_at: decision.follow_up_at ?? null,
+      summary: `Waiting ${decision.action}: ${item.title}`,
+      selected: true,
+      confirmable: true
+    }];
+  });
+  const someday = (state.someday_due ?? []).map((item) => {
+    const decision = somedayDecisions[item.task_id];
+    if (!decision?.action) {
+      return {
+        id: `someday:${item.task_id}:needs_decision`,
+        kind: 'informational',
+        task_id: item.task_id,
+        summary: `Someday “${item.title}” is due for review`,
+        selected: false,
+        confirmable: false
+      };
+    }
+    return {
+      id: `someday:${item.task_id}:${decision.action}`,
+      kind: 'someday',
+      task_id: item.task_id,
+      action: decision.action,
+      review_at: decision.review_at ?? null,
+      summary: `Someday ${decision.action}: ${item.title}`,
+      selected: true,
+      confirmable: true
+    };
+  });
+  const schedule = ((state.schedule as { proposed?: Array<Record<string, unknown>>; blocks?: Array<Record<string, unknown>> } | null)?.proposed
+    ?? (state.schedule as { blocks?: Array<Record<string, unknown>> } | null)?.blocks
+    ?? [])
+    .filter((b) => b && b.selected !== false)
+    .map((b, index) => ({
+      id: String(b.write_path || b.id || `schedule:${index}`),
+      kind: 'schedule_block',
+      summary: `Schedule ${String(b.date || '')} ${String(b.start_time || b.start || '')} · ${String(b.title || 'block')}`.trim(),
+      selected: true,
+      confirmable: true
+    }));
+  return [...capture, ...nextActions, ...waiting, ...someday, ...schedule];
+}
 
 export function createWeeklyReview(id = `wr_${Date.now()}`): WeeklyReviewState {
   return {
@@ -47,6 +164,10 @@ export function createWeeklyReview(id = `wr_${Date.now()}`): WeeklyReviewState {
     someday_due: [],
     schedule: null,
     pending_changes: [],
+    next_action_titles: {},
+    waiting_decisions: {},
+    someday_decisions: {},
+    status: 'in_progress',
     updated_at: new Date().toISOString()
   };
 }
@@ -73,8 +194,17 @@ export function runWeeklyReviewStage(
     projects?: Project[];
     today_key?: string;
     schedule?: ScheduleComposeResult | null;
+    next_action_titles?: Record<string, string>;
+    waiting_decisions?: Record<string, { action: string; follow_up_at?: string | null }>;
+    someday_decisions?: Record<string, { action: string; review_at?: string | null }>;
   }
 ): WeeklyReviewState {
+  state = {
+    ...state,
+    next_action_titles: { ...(state.next_action_titles ?? {}), ...(input.next_action_titles ?? {}) },
+    waiting_decisions: { ...(state.waiting_decisions ?? {}), ...(input.waiting_decisions ?? {}) },
+    someday_decisions: { ...(state.someday_decisions ?? {}), ...(input.someday_decisions ?? {}) }
+  };
   const stage = state.current_stage;
   if (stage === 'capture') {
     const capture = clarifyDump(input.dump_text ?? '');
@@ -132,20 +262,7 @@ export function runWeeklyReviewStage(
     completed: [...new Set([...state.completed, 'confirm' as WeeklyReviewStage])],
     pending_changes: state.pending_changes.length
       ? state.pending_changes
-      : [
-          ...(state.capture?.items
-            .filter((i) => i.destination !== 'trash' && i.destination !== 'reference')
-            .map((i) => ({
-              summary: `Clarify → ${i.destination}: ${i.text.slice(0, 60)}`,
-              selected: true
-            })) ?? []),
-          ...state.project_health
-            .filter((h) => h.health === 'missing_next_action')
-            .map((h) => ({
-              summary: `Project ${h.project_id} needs a next action`,
-              selected: true
-            }))
-        ],
+      : buildWeeklyPendingChanges(state),
     updated_at: new Date().toISOString()
   };
 }

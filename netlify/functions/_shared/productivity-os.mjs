@@ -1108,6 +1108,10 @@ export function createWeeklyReview(id = `wr_${Date.now()}`) {
     someday_due: [],
     schedule: null,
     pending_changes: [],
+    next_action_titles: {},
+    waiting_decisions: {},
+    someday_decisions: {},
+    status: 'in_progress',
     updated_at: new Date().toISOString()
   };
 }
@@ -1125,38 +1129,140 @@ function advanceWeekly(state, stage) {
 }
 
 
-function buildWeeklyPendingChanges(state) {
-  return [
-    ...(state.capture?.items
-      ?.filter((i) => i.destination !== 'trash' && i.destination !== 'reference')
-      .map((i) => ({
-        id: i.id,
-        kind: 'capture',
-        destination: i.destination,
-        summary: `Clarify → ${i.destination}: ${i.text.slice(0, 60)}`,
-        selected: true
-      })) ?? []),
-    ...(state.project_health ?? [])
-      .filter((h) => h.health === 'missing_next_action')
-      .map((h) => ({
-        id: `project_health:${h.project_id}`,
-        kind: 'project_health',
-        project_id: h.project_id,
-        summary: `Project ${h.project_id} needs a next action`,
-        selected: true
-      })),
-    ...((state.schedule?.proposed ?? state.schedule?.blocks ?? [])
-      .filter((b) => b && b.selected !== false)
-      .map((b, index) => ({
-        id: b.write_path || b.id || `schedule:${index}`,
-        kind: 'schedule_block',
-        summary: `Schedule ${b.date || ''} ${b.start_time || b.start || ''} · ${b.title || 'block'}`.trim(),
-        selected: true
-      })))
-  ];
+export function buildWeeklyPendingChanges(state) {
+  const nextTitles = state.next_action_titles && typeof state.next_action_titles === 'object'
+    ? state.next_action_titles
+    : {};
+  const waitingDecisions = state.waiting_decisions && typeof state.waiting_decisions === 'object'
+    ? state.waiting_decisions
+    : {};
+  const somedayDecisions = state.someday_decisions && typeof state.someday_decisions === 'object'
+    ? state.someday_decisions
+    : {};
+
+  const capture = (state.capture?.items ?? [])
+    .filter((i) => i.destination !== 'trash' && i.destination !== 'reference')
+    .map((i) => ({
+      id: i.id,
+      kind: 'capture',
+      destination: i.destination,
+      summary: `Clarify → ${i.destination}: ${i.text.slice(0, 60)}`,
+      selected: true,
+      confirmable: true
+    }));
+
+  const nextActions = [];
+  for (const h of state.project_health ?? []) {
+    if (h.health !== 'missing_next_action') continue;
+    const projectId = h.project_id;
+    const title = typeof nextTitles[projectId] === 'string' ? nextTitles[projectId].trim() : '';
+    if (!title) {
+      nextActions.push({
+        id: `project_health:${projectId}`,
+        kind: 'informational',
+        project_id: projectId,
+        summary: `Project ${projectId} needs a next action — provide a concrete next action before Confirm`,
+        selected: false,
+        confirmable: false
+      });
+      continue;
+    }
+    nextActions.push({
+      id: `next_action:${projectId}`,
+      kind: 'next_action',
+      project_id: projectId,
+      title,
+      summary: `Create next action “${title}” for project ${projectId}`,
+      selected: true,
+      confirmable: true
+    });
+  }
+
+  const waiting = [];
+  for (const item of state.waiting ?? []) {
+    const decision = waitingDecisions[item.task_id];
+    if (!decision || !decision.action) {
+      if (item.needs_action) {
+        waiting.push({
+          id: `waiting:${item.task_id}:needs_decision`,
+          kind: 'informational',
+          task_id: item.task_id,
+          summary: `Waiting “${item.title}” needs a decision (follow_up / move_follow_up / resolved / return_to_active)`,
+          selected: false,
+          confirmable: false
+        });
+      }
+      continue;
+    }
+    const action = decision.action;
+    waiting.push({
+      id: `waiting:${item.task_id}:${action}`,
+      kind: 'waiting',
+      task_id: item.task_id,
+      action,
+      follow_up_at: decision.follow_up_at ?? null,
+      summary: `Waiting ${action}: ${item.title}`,
+      selected: true,
+      confirmable: true
+    });
+  }
+
+  const someday = [];
+  for (const item of state.someday_due ?? []) {
+    const decision = somedayDecisions[item.task_id];
+    if (!decision || !decision.action) {
+      someday.push({
+        id: `someday:${item.task_id}:needs_decision`,
+        kind: 'informational',
+        task_id: item.task_id,
+        summary: `Someday “${item.title}” is due for review — choose keep / activate / remove`,
+        selected: false,
+        confirmable: false
+      });
+      continue;
+    }
+    someday.push({
+      id: `someday:${item.task_id}:${decision.action}`,
+      kind: 'someday',
+      task_id: item.task_id,
+      action: decision.action,
+      review_at: decision.review_at ?? null,
+      summary: `Someday ${decision.action}: ${item.title}`,
+      selected: true,
+      confirmable: true
+    });
+  }
+
+  const schedule = (state.schedule?.proposed ?? state.schedule?.blocks ?? [])
+    .filter((b) => b && b.selected !== false)
+    .map((b, index) => ({
+      id: b.write_path || b.id || `schedule:${index}`,
+      kind: 'schedule_block',
+      summary: `Schedule ${b.date || ''} ${b.start_time || b.start || ''} · ${b.title || 'block'}`.trim(),
+      selected: true,
+      confirmable: true
+    }));
+
+  return [...capture, ...nextActions, ...waiting, ...someday, ...schedule];
 }
 
 export function runWeeklyReviewStage(state, input) {
+  // Merge durable decision maps before stage work so resume keeps titles/choices.
+  state = {
+    ...state,
+    next_action_titles: {
+      ...(state.next_action_titles && typeof state.next_action_titles === 'object' ? state.next_action_titles : {}),
+      ...(input.next_action_titles && typeof input.next_action_titles === 'object' ? input.next_action_titles : {})
+    },
+    waiting_decisions: {
+      ...(state.waiting_decisions && typeof state.waiting_decisions === 'object' ? state.waiting_decisions : {}),
+      ...(input.waiting_decisions && typeof input.waiting_decisions === 'object' ? input.waiting_decisions : {})
+    },
+    someday_decisions: {
+      ...(state.someday_decisions && typeof state.someday_decisions === 'object' ? state.someday_decisions : {}),
+      ...(input.someday_decisions && typeof input.someday_decisions === 'object' ? input.someday_decisions : {})
+    }
+  };
   const stage = state.current_stage;
   if (stage === 'capture') {
     const capture = clarifyDump(input.dump_text ?? '');

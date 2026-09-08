@@ -36,6 +36,7 @@ import {
   buildShutdown,
   createWeeklyReview,
   runWeeklyReviewStage,
+  buildWeeklyPendingChanges,
   WEEKLY_REVIEW_STAGES,
   createProjectPlan,
   updateProjectPlanStage,
@@ -1258,10 +1259,13 @@ function buildTaskRecord(input, existing, nowIso) {
   if (typeof input.status === 'string') base.status = input.status;
   if (Number.isFinite(Number(input.estimated_duration))) base.estimated_duration = Number(input.estimated_duration);
   if (typeof input.project_id === 'string') base.parent_project_id = input.project_id;
+  if (typeof input.bucket === 'string') base.bucket = input.bucket;
+  if (typeof input.review_at === 'string' || input.review_at === null) base.review_at = input.review_at;
   if (Array.isArray(input.tags)) {
     base.tags = [...new Set([...(base.tags ?? []), ...input.tags.map(tag => String(tag).trim()).filter(Boolean)])];
   }
   if (typeof input.waiting_on === 'string') base.waiting_on = input.waiting_on.trim();
+  else if (input.waiting_on === null) base.waiting_on = null;
   if (typeof input.waiting_since === 'string' || input.waiting_since === null) {
     base.waiting_since = input.waiting_since;
   }
@@ -1424,6 +1428,99 @@ export function formatClareDraft({ task, audience, intent, points }) {
   ].filter(line => line !== null).join('\n');
 }
 
+
+
+function selectWeeklyPendingChanges(pending, input) {
+  const selectedIds = new Set(
+    (Array.isArray(input.selected_changes) ? input.selected_changes : [])
+      .map((item) => (typeof item === 'string' ? item : item?.id))
+      .filter(Boolean)
+  );
+  return (pending ?? []).filter((change) => {
+    if (!change || change.confirmable === false || change.kind === 'informational') return false;
+    if (selectedIds.size) return selectedIds.has(change.id);
+    return change.selected !== false;
+  });
+}
+
+function writesFromWeeklyPendingChanges(selected, state, tasks, stamp) {
+  const writes = [];
+  const captureIds = new Set(selected.filter((c) => c.kind === 'capture').map((c) => c.id));
+  if (captureIds.size) {
+    const captureItems = (state.capture?.items ?? []).filter((item) => captureIds.has(item.id));
+    writes.push(...writesFromClarifyItems(captureItems, stamp));
+  }
+
+  for (const change of selected) {
+    if (change.kind === 'next_action') {
+      const title = String(change.title ?? '').trim();
+      const projectId = String(change.project_id ?? '').trim();
+      if (!title || !projectId) {
+        return { ok: false, error: 'invalid_next_action', detail: change.id };
+      }
+      const task = buildTaskRecord({ title, project_id: projectId, bucket: 'active' }, null, stamp);
+      writes.push(writeEntry(
+        `tasks:task:${task.id}`,
+        'create',
+        task,
+        `weekly review next action — ${title}`
+      ));
+      continue;
+    }
+    if (change.kind === 'waiting') {
+      const existing = findTask(tasks, change.task_id);
+      if (!existing) return { ok: false, error: 'waiting_task_not_found', detail: change.task_id };
+      const patch = waitingPatch(change.action, {
+        follow_up_at: change.follow_up_at,
+        nowIso: stamp
+      });
+      if (!patch || !Object.keys(patch).length) {
+        return { ok: false, error: 'invalid_waiting_action', detail: change.action };
+      }
+      const record = buildTaskRecord(patch, existing, stamp);
+      writes.push(writeEntry(
+        `tasks:task:${record.id}`,
+        'overwrite',
+        record,
+        `weekly review waiting ${change.action} — ${existing.title}`
+      ));
+      continue;
+    }
+    if (change.kind === 'someday') {
+      const existing = findTask(tasks, change.task_id);
+      if (!existing) return { ok: false, error: 'someday_task_not_found', detail: change.task_id };
+      let patch;
+      if (change.action === 'keep') {
+        patch = { review_at: change.review_at || stamp.slice(0, 10) };
+      } else if (change.action === 'activate') {
+        patch = { bucket: 'active', review_at: null };
+      } else if (change.action === 'remove') {
+        patch = { bucket: 'trash' };
+      } else {
+        return { ok: false, error: 'invalid_someday_action', detail: change.action };
+      }
+      const record = buildTaskRecord(patch, existing, stamp);
+      writes.push(writeEntry(
+        `tasks:task:${record.id}`,
+        'overwrite',
+        record,
+        `weekly review someday ${change.action} — ${existing.title}`
+      ));
+      continue;
+    }
+  }
+
+  const scheduleIds = new Set(selected.filter((c) => c.kind === 'schedule_block').map((c) => c.id));
+  if (scheduleIds.size) {
+    const proposed = (state.schedule?.proposed ?? state.schedule?.blocks ?? []).filter((block, index) => {
+      const id = block.write_path || block.id || `schedule:${index}`;
+      return scheduleIds.has(id) && block.selected !== false;
+    });
+    writes.push(...writesFromScheduleProposed(proposed, stamp).writes);
+  }
+
+  return { ok: true, writes };
+}
 
 function writesFromClarifyItems(items, stamp) {
   const writes = [];
@@ -1656,6 +1753,9 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       }
       const stageInput = {
         dump_text: input.dump_text,
+        next_action_titles: input.next_action_titles,
+        waiting_decisions: input.waiting_decisions,
+        someday_decisions: input.someday_decisions,
         past_notes: input.past_notes
           ?? (state.current_stage === 'past_calendar'
             ? calendarNotesFromCtx({ lessons, workBlocks, tasks, todayKey, past: true })
@@ -1673,53 +1773,68 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     }
     state = await saveWorkflowState(tasksStore, reviewId, state);
 
+    // Keep decision maps from this turn even when not advancing.
+    state = {
+      ...state,
+      next_action_titles: {
+        ...(state.next_action_titles ?? {}),
+        ...(input.next_action_titles && typeof input.next_action_titles === 'object' ? input.next_action_titles : {})
+      },
+      waiting_decisions: {
+        ...(state.waiting_decisions ?? {}),
+        ...(input.waiting_decisions && typeof input.waiting_decisions === 'object' ? input.waiting_decisions : {})
+      },
+      someday_decisions: {
+        ...(state.someday_decisions ?? {}),
+        ...(input.someday_decisions && typeof input.someday_decisions === 'object' ? input.someday_decisions : {})
+      }
+    };
+    if ((!state.pending_changes || !state.pending_changes.length) && state.current_stage === 'confirm') {
+      state = { ...state, pending_changes: buildWeeklyPendingChanges(state) };
+    } else if (state.current_stage === 'confirm') {
+      // Rebuild when decisions/titles arrived so informational rows can become confirmable.
+      state = { ...state, pending_changes: buildWeeklyPendingChanges(state) };
+    }
+
     const finalize = Boolean(input.confirm || input.finalize);
     if (finalize && state.current_stage === 'confirm') {
-      const stamp = now.toISOString();
-      const selectedSummaries = new Set(
-        (Array.isArray(input.selected_changes) ? input.selected_changes : [])
-          .map(item => typeof item === 'string' ? item : item?.summary)
-          .filter(Boolean)
-      );
-      const captureItems = (state.capture?.items ?? []).filter(item => {
-        if (item.destination === 'trash' || item.destination === 'reference') return false;
-        if (!selectedSummaries.size) return item.selected !== false;
-        const summary = `Clarify → ${item.destination}: ${String(item.text ?? '').slice(0, 60)}`;
-        return selectedSummaries.has(summary) || selectedSummaries.has(item.id);
-      });
-      const writes = writesFromClarifyItems(captureItems, stamp);
-      const scheduleProposed = state.schedule?.proposed ?? state.schedule?.blocks ?? [];
-      const scheduleWrites = writesFromScheduleProposed(
-        selectedSummaries.size
-          ? scheduleProposed.filter(block => selectedSummaries.has(block.write_path || block.id || block.title))
-          : scheduleProposed,
-        stamp
-      );
-      writes.push(...scheduleWrites.writes);
-      if (writes.length) {
-        state = await saveWorkflowState(tasksStore, reviewId, {
-          ...state,
-          pending_changes: writes.map(w => ({
-            summary: w.diff,
-            selected: true,
-            id: w.path,
-            write_path: w.path
-          })),
-          status: 'awaiting_confirm',
-          updated_at: stamp
-        });
-        const proposal = propose(
-          `Weekly review confirm (${writes.length} change${writes.length === 1 ? '' : 's'})`,
-          writes,
-          ['confirm_card', 'tasks_hub', 'weekly_review']
-        );
-        return {
-          ...proposal,
+      if (state.status === 'awaiting_confirm' && !input.repropose) {
+        return ok({
           stages: WEEKLY_REVIEW_STAGES,
           state,
-          workflow_state_key: workflowStateKey(reviewId)
-        };
+          workflow_state_key: workflowStateKey(reviewId),
+          already_awaiting_confirm: true
+        });
       }
+      const stamp = now.toISOString();
+      const selected = selectWeeklyPendingChanges(state.pending_changes, input);
+      const invalid = selected.find((c) => c.kind === 'next_action' && !String(c.title ?? '').trim());
+      if (invalid) {
+        return deny('invalid_weekly_pending_change', { id: invalid.id, reason: 'next_action_missing_title' });
+      }
+      const built = writesFromWeeklyPendingChanges(selected, state, tasks, stamp);
+      if (!built.ok) return deny(built.error, { detail: built.detail ?? null });
+      const writes = built.writes;
+      if (!writes.length) {
+        return deny('no_selected_weekly_changes');
+      }
+      state = await saveWorkflowState(tasksStore, reviewId, {
+        ...state,
+        pending_changes: selected,
+        status: 'awaiting_confirm',
+        updated_at: stamp
+      });
+      const proposal = propose(
+        `Weekly review confirm (${writes.length} change${writes.length === 1 ? '' : 's'})`,
+        writes,
+        ['confirm_card', 'tasks_hub', 'weekly_review']
+      );
+      return {
+        ...proposal,
+        stages: WEEKLY_REVIEW_STAGES,
+        state,
+        workflow_state_key: workflowStateKey(reviewId)
+      };
     }
 
     return ok({ stages: WEEKLY_REVIEW_STAGES, state, workflow_state_key: workflowStateKey(reviewId) });
