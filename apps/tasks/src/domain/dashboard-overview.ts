@@ -299,7 +299,7 @@ export function dashboardHeatDays(
   tasks: Task[],
   projects: Project[],
   now: Date = new Date(),
-  days = 14
+  days = 7
 ): DashboardHeatDay[] {
   const start = startOfDay(now);
   const timeline = dashboardTimeline(tasks, projects, now);

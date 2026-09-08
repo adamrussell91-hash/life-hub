@@ -184,13 +184,13 @@ describe('dashboard focus model', () => {
     expect(items[2]?.bucket).toBe('this_week');
   });
 
-  it('builds a 14-day heat row and weekly completion trend', () => {
+  it('builds a 7-day heat row and weekly completion trend', () => {
     const days = dashboardHeatDays(
       [task({ id: 't1', title: 'Mark essays', due_date: '2026-08-27' })],
       [],
       now
     );
-    expect(days).toHaveLength(14);
+    expect(days).toHaveLength(7);
     expect(days[0]?.isToday).toBe(true);
     expect(days[0]?.count).toBe(1);
 
@@ -284,7 +284,7 @@ describe('renderDashboardOverview', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders focus tiles, a dated timeline rail, heat row, and no due-soon pills', () => {
+  it('renders focus tiles, week strip, agenda, and no due-soon pills', () => {
     const host = document.createElement('div');
     renderDashboardOverview(host, {
       now,
@@ -303,27 +303,22 @@ describe('renderDashboardOverview', () => {
     expect(host.querySelector('.dashboard-focus')?.textContent).toContain('Overdue');
     expect(host.querySelector('.dashboard-focus')?.textContent).toContain('Today');
     expect(host.querySelector('.dashboard-focus__value')?.textContent).toBeTruthy();
-    expect(host.querySelector('[aria-label="Timeline"]')?.textContent).toContain('Mark essays');
-    expect(host.querySelector('.dashboard-rail')).not.toBeNull();
-    expect(
-      host.querySelector('.dashboard-rail__day[data-date="2026-09-01"]')?.getAttribute('aria-label')
-    ).toContain('Permission note');
-    expect(
-      host.querySelector('.dashboard-rail__day[data-date="2026-09-02"]')?.getAttribute('aria-label')
-    ).toContain('MindWorks');
+    expect(host.querySelector('[aria-label="Agenda"]')?.textContent).toContain('Mark essays');
+    expect(host.querySelector('.dashboard-rail')).toBeNull();
+    expect(host.querySelectorAll('.dashboard-heat__cell')).toHaveLength(7);
     expect(host.querySelector('[aria-label="Today"]')).toBeNull();
     expect(host.querySelector('[aria-label="Excursions"]')).toBeNull();
     expect(host.querySelector('[aria-label="Projects"] .project-pulse-chart')).not.toBeNull();
     expect(host.querySelector('.projects-mix__pie')).not.toBeNull();
     expect(host.querySelector('.dashboard-trend-chart')).toBeNull();
-    expect(host.querySelector('[aria-label="Next 14 days"] .dashboard-heat__cell')).not.toBeNull();
+    expect(host.querySelector('[aria-label="This week"] .dashboard-heat__cell')).not.toBeNull();
     expect(host.querySelector('.due-soon-strip')).toBeNull();
     expect(host.querySelector('.dashboard-row__grip')).not.toBeNull();
     expect(host.querySelector('.dashboard-row .task-check')).not.toBeNull();
     expect(host.querySelector('.chip--source-task')).not.toBeNull();
     expect(host.querySelector('.chip--urgency-warning')?.textContent).toBe('Today');
     expect(host.querySelector('.dashboard-next')?.textContent).toContain('Mark essays');
-    expect(host.querySelector('[aria-label="Next 14 days"] a')?.getAttribute('href')).toContain(
+    expect(host.querySelector('[aria-label="This week"] a')?.getAttribute('href')).toContain(
       '#/week?date='
     );
     expect(host.querySelector('.dashboard-heat__peek')?.textContent).toContain('Mark essays');
@@ -445,12 +440,9 @@ describe('renderDashboardOverview', () => {
     );
     expect(host.querySelector('.dashboard-heat__peek')?.textContent).toContain('MindWorks');
     expect(host.querySelector('.dashboard-timeline')?.textContent).toContain('MindWorks');
-    expect(host.querySelector('.dashboard-rail__day[data-selected="true"]')?.getAttribute('data-date')).toBe(
-      '2026-09-02'
-    );
   });
 
-  it('keeps the fortnight peek to three titles plus a remainder', () => {
+  it('keeps the week peek to three titles plus a remainder', () => {
     const host = document.createElement('div');
     renderDashboardOverview(host, {
       now,

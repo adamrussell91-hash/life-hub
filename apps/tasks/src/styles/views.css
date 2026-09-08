@@ -5019,7 +5019,7 @@ body.is-universe-fullscreen .page-header {
   min-width: 0;
 }
 
-/* Fortnight heat strip reads better as a compact 7-wide block when it's
+/* Week heat strip reads as a compact 7-wide block when it's
    sharing the narrow rail column with the projects card. */
 .dashboard-overview__rail .dashboard-heat {
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -5048,7 +5048,7 @@ body.is-universe-fullscreen .page-header {
   }
 
   .dashboard-overview__rail .dashboard-heat {
-    grid-template-columns: repeat(14, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 }
 
@@ -5547,109 +5547,6 @@ button.projects-mix__legend-row:focus-visible {
 
 .dashboard-timeline__label--danger {
   color: var(--danger);
-}
-
-.dashboard-rail {
-  display: grid;
-  grid-template-columns: repeat(31, minmax(0.9rem, 1fr));
-  gap: 2px;
-  min-width: 0;
-  overflow-x: auto;
-  padding: var(--space-1) var(--space-1) var(--space-2);
-}
-
-.dashboard-rail__day {
-  display: grid;
-  grid-template-rows: 2rem auto;
-  align-items: end;
-  gap: 0.2rem;
-  min-width: 0.9rem;
-  margin: 0;
-  padding: 0.1rem;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.dashboard-rail__day:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.dashboard-rail__stack {
-  display: flex;
-  flex-direction: column-reverse;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 1px;
-  min-height: 2rem;
-  width: 100%;
-  border-radius: var(--radius-xs);
-  background: var(--warm-white);
-  border: 1px solid var(--line);
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.dashboard-rail__day[data-today='true'] .dashboard-rail__stack {
-  border-color: var(--wave);
-}
-
-.dashboard-rail__day[data-selected='true'] .dashboard-rail__stack {
-  background: var(--navy);
-  border-color: var(--navy);
-}
-
-.dashboard-rail__day[data-overdue='true']:not([data-selected='true']) .dashboard-rail__stack {
-  background: color-mix(in srgb, var(--pastel-peach) 45%, var(--warm-white));
-}
-
-.dashboard-rail__mark {
-  display: block;
-  width: 60%;
-  height: 0.22rem;
-  border-radius: var(--radius-full);
-  background: var(--wave);
-}
-
-.dashboard-rail__mark--project {
-  background: var(--pastel-gold-ink);
-}
-
-.dashboard-rail__mark--excursion {
-  background: var(--pastel-sage-ink);
-}
-
-.dashboard-rail__day[data-selected='true'] .dashboard-rail__mark {
-  background: var(--on-dark);
-}
-
-.dashboard-rail__more {
-  font-size: 0.5rem;
-  line-height: 1;
-  color: var(--muted);
-}
-
-.dashboard-rail__day[data-selected='true'] .dashboard-rail__more {
-  color: var(--on-dark-muted);
-}
-
-.dashboard-rail__tick {
-  font-size: var(--text-2xs);
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  text-align: center;
-}
-
-.dashboard-rail__day[data-today='true'] .dashboard-rail__tick {
-  color: var(--wave);
-  font-weight: var(--weight-semibold);
-}
-
-.dashboard-rail__day[data-selected='true'] .dashboard-rail__tick {
-  color: var(--depth);
-  font-weight: var(--weight-semibold);
 }
 
 .dashboard-row {
@@ -6303,10 +6200,6 @@ button.column-bar--row.is-active {
 
   .dashboard-heat {
     grid-template-columns: repeat(7, minmax(0, 1fr));
-  }
-
-  .dashboard-rail {
-    grid-template-columns: repeat(31, minmax(1.1rem, 1fr));
   }
 
   .dashboard-board .section-title {
