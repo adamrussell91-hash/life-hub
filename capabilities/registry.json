@@ -33,6 +33,20 @@
       "tool_name": "log_entry",
       "legacy_tool": "log_entry"
     },
+    "log.delete-meal": {
+      "file": "log/delete-meal.json",
+      "agents": [
+        "brisket"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "central_node",
+        "nutrition_tab",
+        "governance_log"
+      ],
+      "tool_name": "delete_meal"
+    },
     "publish.cn-patch": {
       "file": "publish/cn-patch.json",
       "agents": [
