@@ -268,4 +268,4 @@ Hammond remains **blocked**. Production kernel remains **off**. `docs/AGENT_CAPA
 
 ### Deterministic correction pass (continuation 5)
 
-Local Cursor unit execution after unresolved-referent retrieval gating: see final report count after full specialist + Clare/Chadwick regression suite. Deployed specialist live gate still blocked without authenticated session.
+Local Cursor unit execution after unresolved-referent retrieval gating: **358 pass / 0 fail** across Ann–Vera + mind-session-read + Clare/Chadwick + evidence/provenance/kernel + Confirm/chat-job/compact-turn + fitness/workout confirm + context-delivery suites. Deployed specialist live gate still blocked without authenticated session.
