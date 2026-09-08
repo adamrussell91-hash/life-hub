@@ -215,6 +215,7 @@ import {
 } from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
 import { executeClareWork, isClareWorkTool, statedPlannerInputs } from './_shared/clare-work.mjs';
+import { buildProductivityCardEvent } from './_shared/productivity-card-map.mjs';
 import {
   executeHammondProductivity,
   isHammondProductivityTool
@@ -1766,11 +1767,14 @@ export function createChatHandler({
               }
               if (slug === 'hammond' && isHammondProductivityTool(event.name)) {
                 send({ type: 'status', text: 'Working…' });
-                return JSON.stringify(executeHammondProductivity(event.name, event.input ?? {}, {
+                const hammondResult = executeHammondProductivity(event.name, event.input ?? {}, {
                   tasks: hubTasks,
                   projects: hubProjects,
                   now: nowInstant
-                }));
+                });
+                const hammondCard = buildProductivityCardEvent(event.name, hammondResult);
+                if (hammondCard) send(hammondCard);
+                return JSON.stringify(hammondResult);
               }
               if (event.name === 'search_medical_records') {
                 send({ type: 'status', text: 'Searching Medical Overview…' });
@@ -2283,6 +2287,10 @@ export function createChatHandler({
                     });
                   }
                   const pendingId = await proposeOsAction(validated.proposal);
+                  const proposeCard = buildProductivityCardEvent(event.name, result, {
+                    pendingId: pendingId || undefined
+                  });
+                  if (proposeCard) send(proposeCard);
                   return JSON.stringify({
                     ok: true,
                     status: 'awaiting_confirm',
@@ -2295,6 +2303,8 @@ export function createChatHandler({
                     ...(pendingId ? { pendingId } : {})
                   });
                 }
+                const card = buildProductivityCardEvent(event.name, result);
+                if (card) send(card);
                 return JSON.stringify(result);
               }
               return null;

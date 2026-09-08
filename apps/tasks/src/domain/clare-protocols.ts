@@ -181,6 +181,25 @@ export function isBriefingProtocol(id: ClareProtocolId | undefined): boolean {
   );
 }
 
+export function isProductivityProtocol(id: ClareProtocolId | string | undefined): id is ClareProductivityId {
+  return (
+    id === 'weekly-review' ||
+    id === 'plan-day' ||
+    id === 'project-plan' ||
+    id === 'waiting' ||
+    id === 'shutdown'
+  );
+}
+
+/** Launch copy for empty-composer productivity protocol pills → /api/chat. */
+export const PRODUCTIVITY_LAUNCH_MESSAGES: Record<ClareProductivityId, string> = {
+  'weekly-review': 'Start Weekly Review',
+  'plan-day': 'Plan my day',
+  'project-plan': 'Start project planning',
+  waiting: 'Review waiting items',
+  shutdown: 'Run shutdown'
+};
+
 export const CLARE_WAIT_LINES = [
   'Untangling the moving parts…',
   'Putting a timer on the chaos…',
