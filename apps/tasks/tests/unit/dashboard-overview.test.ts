@@ -465,6 +465,72 @@ describe('renderDashboardOverview', () => {
     expect(host.querySelector('.dashboard-heat__peek')).toBeNull();
   });
 
+  it('keeps week-strip day numbers aligned with a count slot on every cell', () => {
+    const host = document.createElement('div');
+    renderDashboardOverview(host, {
+      now,
+      tasks: [task({ id: 't1', title: 'Mark essays', due_date: '2026-08-27', domain: 'teaching' })],
+      projects: []
+    });
+    const cells = [...host.querySelectorAll('.dashboard-heat__cell')];
+    expect(cells).toHaveLength(7);
+    for (const cell of cells) {
+      expect(cell.querySelector('.dashboard-heat__count')).not.toBeNull();
+      expect(cell.querySelectorAll('.dashboard-heat__weekday, .dashboard-heat__day, .dashboard-heat__count')).toHaveLength(3);
+    }
+    expect(host.querySelectorAll('.dashboard-heat__count--empty').length).toBeGreaterThan(0);
+  });
+
+  it('makes Next up match the first Today agenda task, not a later list item', () => {
+    const host = document.createElement('div');
+    const email = task({
+      id: 'email',
+      title: 'Email all teachers',
+      due_date: '2026-08-27',
+      domain: 'teaching',
+      priority: 'high',
+      due_time: '08:00',
+      estimated_duration: 30
+    });
+    const lunch = task({
+      id: 'lunch',
+      title: 'Block lunch tomorrow',
+      due_date: '2026-08-27',
+      domain: 'life',
+      priority: 'medium',
+      due_time: '12:00',
+      estimated_duration: 45
+    });
+    const mark = task({
+      id: 'mark',
+      title: 'Mark Year 11 papers',
+      due_date: '2026-08-27',
+      domain: 'teaching',
+      priority: 'medium',
+      due_time: '14:00',
+      estimated_duration: 90
+    });
+    // Insertion order puts Mark first in the raw array; plate order must still prefer Email.
+    renderDashboardOverview(host, {
+      now,
+      tasks: [mark, lunch, email],
+      projects: []
+    });
+
+    expect(dashboardNextAction([mark, lunch, email], [], now)?.title).toBe('Email all teachers');
+    expect(host.querySelector('.dashboard-next')?.textContent).toContain('Email all teachers');
+    expect(host.querySelector('.dashboard-next__time')?.textContent).toContain('8 AM');
+    const todayTitles = [...host.querySelectorAll('#timeline-today .dashboard-row__title')].map(
+      (node) => node.textContent
+    );
+    expect(todayTitles[0]).toBe('Email all teachers');
+    expect(todayTitles).toContain('Block lunch tomorrow');
+    expect(todayTitles).toContain('Mark Year 11 papers');
+    expect(
+      [...host.querySelectorAll('#timeline-today .dashboard-row__time')].map((node) => node.textContent)
+    ).toEqual(expect.arrayContaining(['8 AM – 8:30 AM', '12 PM – 12:45 PM', '2 PM – 3:30 PM']));
+  });
+
   it('collapses and expands the overview panel on mobile', () => {
     vi.mocked(window.matchMedia).mockReturnValue({
       matches: true,

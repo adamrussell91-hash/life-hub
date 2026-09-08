@@ -5508,21 +5508,29 @@ body.is-universe-fullscreen .page-header {
 
 .projects-mix__center {
   position: absolute;
-  inset: 0;
+  inset: 18%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   gap: var(--space-px);
-  margin: 18%;
+  margin: 0;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: inherit;
   font: inherit;
-  padding: var(--space-2);
+  padding: var(--space-1);
+  box-sizing: border-box;
   text-decoration: none;
+}
+
+.projects-mix__value,
+.projects-mix__name,
+.projects-mix__sub {
+  width: 100%;
+  text-align: center;
 }
 
 button.projects-mix__center,
@@ -5576,7 +5584,7 @@ a.projects-mix__center:focus-visible {
 }
 
 .projects-mix__sub {
-  margin: var(--space-1) 0 0;
+  margin: 0;
   font-size: var(--text-2xs);
   color: var(--shallow);
   max-width: 7.5rem;
@@ -5837,6 +5845,14 @@ button.projects-mix__legend-row:focus-visible {
   white-space: nowrap;
 }
 
+.dashboard-next__time {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--on-dark) 72%, transparent);
+}
+
 /* Navy-on-navy is unreadable — the hero already supplies the dark ground. */
 .dashboard-next .btn--primary,
 .dashboard-next .btn--decisive {
@@ -5974,6 +5990,13 @@ button.projects-mix__legend-row:focus-visible {
   color: var(--muted);
 }
 
+.dashboard-row__time {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--depth);
+}
+
 .dashboard-row__meta .chip {
   font-size: var(--text-2xs);
 }
@@ -6027,7 +6050,9 @@ button.projects-mix__legend-row:focus-visible {
 
 .dashboard-heat__cell {
   display: grid;
+  grid-template-rows: auto auto 1.1em;
   justify-items: center;
+  align-content: start;
   gap: 0.125rem;
   min-width: 0;
   padding: var(--space-2) var(--space-1);
@@ -6075,6 +6100,13 @@ button.projects-mix__legend-row:focus-visible {
   letter-spacing: var(--tracking-wide);
   color: var(--muted);
   text-transform: uppercase;
+  line-height: 1.1;
+  min-height: 1.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-heat__count--empty {
+  visibility: hidden;
 }
 
 .dashboard-heat__day {
@@ -6082,6 +6114,7 @@ button.projects-mix__legend-row:focus-visible {
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
   color: var(--depth);
+  line-height: 1.2;
 }
 
 .dashboard-trend {
