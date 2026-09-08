@@ -260,15 +260,21 @@ describe('schedule compose', () => {
     }
   });
 
-  it('supports several blocks for one task via multiple schedule inputs', () => {
+  it('splits one task across multiple blocks with the same task_id', () => {
     const result = composeDaySchedule({
       date: '2026-09-08',
-      tasks: [
-        { id: 't1a', title: 'Essay part 1', estimated_duration: 60, depth: 'deep' },
-        { id: 't1b', title: 'Essay part 2', estimated_duration: 60, depth: 'deep' }
-      ]
+      workday: { start: '08:00', end: '12:00', source: 'profile' },
+      // 90m deep work cannot fit contiguous between two 60m hard busy slots → split
+      lessons: [
+        { start: 9 * 60, end: 10 * 60, title: 'Period 1', kind: 'lesson' },
+        { start: 10 * 60 + 45, end: 11 * 60 + 45, title: 'Period 2', kind: 'lesson' }
+      ],
+      tasks: [{ id: 't1', title: 'Essay', estimated_duration: 90, depth: 'shallow' }],
+      planning_profile: { deep_work_preference: { min_block_minutes: 90 } }
     });
-    expect(result.proposed.length).toBe(2);
+    expect(result.proposed.length).toBeGreaterThanOrEqual(2);
+    expect(result.proposed.every((b) => b.task_id === 't1')).toBe(true);
+    expect(result.proposed.reduce((s, b) => s + b.duration_minutes, 0)).toBe(90);
   });
 
   it('returns partial and impossible states', () => {

@@ -22,6 +22,14 @@ import {
   reconcileClareReturn,
   buildStrategicReview
 } from './productivity-os.mjs';
+import { setJSON } from './tasks-blobs.mjs';
+
+/** Prefer store/ctx arrays over model-supplied source-of-truth payloads. */
+function preferCtxArray(ctxVal, inputVal) {
+  if (Array.isArray(ctxVal)) return ctxVal;
+  if (Array.isArray(inputVal)) return inputVal;
+  return [];
+}
 
 function tool(name, description, properties, required = []) {
   return {
@@ -141,17 +149,29 @@ function deny(error, extra = {}) {
 export function executeHammondProductivity(name, input = {}, ctx = {}) {
   const projects = ctx.projects ?? [];
   const tasks = ctx.tasks ?? [];
-  const areas = ctx.areas ?? input.areas ?? [];
-  const goals = ctx.goals ?? input.goals ?? [];
-  const sessions = ctx.sessions ?? input.sessions ?? [];
-  const blocks = ctx.blocks ?? input.blocks ?? [];
-  const profile = input.profile ?? ctx.planning_profile ?? null;
+  const areas = preferCtxArray(ctx.areas, input.areas);
+  const goals = preferCtxArray(ctx.goals, input.goals);
+  const sessions = preferCtxArray(
+    ctx.sessions ?? ctx.workSessions ?? ctx.work_sessions,
+    input.sessions
+  );
+  const blocks = preferCtxArray(
+    ctx.blocks ?? ctx.workBlocks ?? ctx.work_blocks,
+    input.blocks
+  );
+  // Profile/direction: ctx store wins when present (model may still pass filters).
+  const profile =
+    ctx.planning_profile != null ? ctx.planning_profile : (input.profile ?? null);
+  const storedDirection = ctx.planning_direction ?? null;
 
   if (name === 'horizons_chain') {
     const direction = {
-      purpose: input.purpose ?? ctx.planning_direction?.purpose ?? '',
-      principles: input.principles ?? ctx.planning_direction?.principles ?? [],
-      vision: input.vision ?? ctx.planning_direction?.vision ?? ''
+      purpose: storedDirection?.purpose || input.purpose || '',
+      principles: Array.isArray(storedDirection?.principles) && storedDirection.principles.length
+        ? storedDirection.principles
+        : (input.principles ?? []),
+      vision: storedDirection?.vision || input.vision || '',
+      ...(storedDirection?.id ? { id: storedDirection.id } : {})
     };
     const focus = input.focus_type && input.focus_id
       ? { type: input.focus_type, id: input.focus_id }
@@ -168,7 +188,8 @@ export function executeHammondProductivity(name, input = {}, ctx = {}) {
 
   if (name === 'portfolio_meter') {
     const limitProfile = {
-      active_project_limit: input.active_project_limit ?? profile?.active_project_limit ?? null
+      active_project_limit:
+        profile?.active_project_limit ?? input.active_project_limit ?? null
     };
     const meter = activeProjectMeter(projects, limitProfile);
     const out = {
@@ -281,6 +302,16 @@ export function executeHammondProductivity(name, input = {}, ctx = {}) {
   }
 
   if (name === 'week_mission_handoff') {
+    // Chat passes executeClareWork / tasksStore and awaits the Promise.
+    if (typeof ctx.executeClareWork === 'function' || ctx.tasksStore) {
+      return runWeekMissionHandoff(input, {
+        ...ctx,
+        projects,
+        tasks,
+        blocks,
+        profile
+      });
+    }
     const start = input.week_start;
     const end = input.week_end;
     if (!start || !end) return deny('missing_week_window');
@@ -290,7 +321,9 @@ export function executeHammondProductivity(name, input = {}, ctx = {}) {
       linked_projects: input.linked_projects ?? [],
       hard_constraints: input.hard_constraints ?? [],
       fixed_schedule: input.fixed_schedule ?? [],
-      protected_windows: input.protected_windows ?? [],
+      protected_windows: input.protected_windows?.length
+        ? input.protected_windows
+        : protectedSpansForDate(start, profile),
       active_project_decisions: input.active_project_decisions ?? [],
       depth_allocation: input.depth_allocation ?? [],
       quality_expectations: input.quality_expectations ?? [],
@@ -311,4 +344,145 @@ export function executeHammondProductivity(name, input = {}, ctx = {}) {
   }
 
   return deny('unknown_tool', { name });
+}
+
+async function runWeekMissionHandoff(input, ctx) {
+  const start = input.week_start;
+  const end = input.week_end;
+  if (!start || !end) return deny('missing_week_window');
+  const projects = ctx.projects ?? [];
+  const tasks = ctx.tasks ?? [];
+  const blocks = ctx.blocks ?? [];
+  const profile = ctx.profile ?? null;
+  const handoff = createWeekMissionHandoff({
+    week_window: { start, end },
+    selected_outcomes: input.selected_outcomes ?? [],
+    linked_projects: input.linked_projects ?? [],
+    hard_constraints: input.hard_constraints ?? [],
+    fixed_schedule: input.fixed_schedule ?? [],
+    protected_windows: input.protected_windows?.length
+      ? input.protected_windows
+      : protectedSpansForDate(start, profile),
+    active_project_decisions: input.active_project_decisions ?? [],
+    depth_allocation: input.depth_allocation ?? [],
+    quality_expectations: input.quality_expectations ?? [],
+    explicit_deferrals: input.explicit_deferrals ?? [],
+    evidence_pointers: input.evidence_pointers ?? []
+  });
+
+  const missionId = String(input.mission_id || handoff.id || `wm_${start}`).trim();
+  const workflowKey = `workflow_state/week_mission:${missionId}`;
+
+  let clareResult = null;
+  if (typeof ctx.executeClareWork === 'function') {
+    const taskIds = [
+      ...new Set(
+        (handoff.selected_outcomes ?? []).flatMap((o) => (o.task_ids ?? []).map(String))
+      )
+    ];
+    const projectIds = new Set(
+      (handoff.linked_projects ?? [])
+        .filter((p) => p.decision !== 'pause')
+        .map((p) => String(p.id))
+    );
+    const missionTasks = taskIds.length
+      ? tasks.filter((t) => taskIds.includes(String(t.id)))
+      : tasks.filter(
+          (t) =>
+            t.parent_project_id &&
+            projectIds.has(String(t.parent_project_id)) &&
+            t.status !== 'done' &&
+            t.status !== 'dead'
+        );
+    const confirmed = blocks
+      .filter((b) => b.date === start && b.status === 'confirmed')
+      .map((b) => {
+        const m = String(b.start_time ?? '').match(/^(\d{1,2}):(\d{2})$/);
+        if (!m) return null;
+        const s = Number(m[1]) * 60 + Number(m[2]);
+        return {
+          start: s,
+          end: s + (Number(b.duration_minutes) || 60),
+          title: b.title,
+          kind: 'locked'
+        };
+      })
+      .filter(Boolean);
+    clareResult = await ctx.executeClareWork(
+      'compose_schedule',
+      {
+        date: start,
+        task_ids: missionTasks.map((t) => t.id),
+        protected_windows: handoff.protected_windows,
+        confirmed_blocks: confirmed
+      },
+      {
+        tasks: missionTasks.length ? missionTasks : tasks,
+        projects,
+        lessons: ctx.lessons ?? [],
+        workBlocks: blocks,
+        planning_profile: profile,
+        now: ctx.now,
+        tasksStore: ctx.tasksStore
+      }
+    );
+  }
+
+  const composed = clareResult && clareResult.ok !== false ? clareResult : null;
+  const insufficient =
+    composed?.insufficient_capacity === true ||
+    composed?.status === 'impossible' ||
+    composed?.status === 'partially_scheduled' ||
+    (Array.isArray(composed?.unscheduled) && composed.unscheduled.length > 0);
+
+  let reconcile = null;
+  if (insufficient) {
+    const clareReturn = createClareScheduleReturn({
+      week_window: handoff.week_window,
+      planned_work_blocks: composed?.proposed ?? [],
+      unscheduled_work: (composed?.unscheduled ?? []).map((u) => ({
+        id: u.task_id,
+        title: u.title,
+        reason: u.reason
+      })),
+      collisions: composed?.collisions ?? [],
+      deadline_risk: [],
+      dependency_risk: [],
+      fallback_assumptions: composed?.workday?.source === 'fallback'
+        ? ['workday fallback 08:00–16:30']
+        : [],
+      confidence: 'medium',
+      insufficient_capacity: true
+    });
+    reconcile = reconcileClareReturn(handoff, clareReturn);
+  }
+
+  const trace = {
+    id: missionId,
+    type: 'week_mission',
+    handoff,
+    clare: composed,
+    reconcile,
+    updated_at: new Date().toISOString()
+  };
+  if (ctx.tasksStore) {
+    await setJSON(ctx.tasksStore, workflowKey, trace);
+  }
+
+  if (reconcile && reconcile.status !== 'accepted') {
+    return ok({
+      handoff,
+      clare_schedule: composed,
+      reconcile,
+      workflow_state_key: workflowKey,
+      note: 'Insufficient capacity — Hammond must decide cuts. Clare must not override protected outcomes.'
+    });
+  }
+
+  return ok({
+    handoff,
+    clare_schedule: composed,
+    reconcile: reconcile ?? { status: 'accepted', remove_outcomes: [], note: 'Schedule fits.' },
+    workflow_state_key: workflowKey
+  });
 }

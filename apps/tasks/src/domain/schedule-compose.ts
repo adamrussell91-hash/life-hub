@@ -2,6 +2,7 @@
  * Calendar-aware schedule composition.
  * Hard constraints first; soft preferences second.
  * Never mutates due_date. Never compresses past capacity.
+ * May split one task across multiple blocks with the same task_id.
  */
 
 export type TimedSpan = {
@@ -39,6 +40,7 @@ export type UnscheduledItem = {
   task_id: string;
   title: string;
   reason: string;
+  remaining_minutes?: number;
 };
 
 export type ScheduleComposeResult = {
@@ -51,7 +53,7 @@ export type ScheduleComposeResult = {
   collisions: string[];
 };
 
-function minutesOf(hhmm: string | null | undefined): number | null {
+export function minutesOf(hhmm: string | null | undefined): number | null {
   if (!hhmm) return null;
   const m = String(hhmm).match(/^(\d{1,2}):(\d{2})$/);
   if (!m) return null;
@@ -105,11 +107,137 @@ function firstFit(
   return null;
 }
 
+/** Teaching lessons: date + start_time (HH:MM); default duration 60. */
+export function lessonToBusySpan(lesson: {
+  title?: string;
+  start?: number;
+  end?: number;
+  start_minutes?: number;
+  end_minutes?: number;
+  starts_at?: string;
+  start_time?: string;
+  duration_minutes?: number;
+  minutes?: number;
+  duration?: number;
+}): TimedSpan | null {
+  if (!lesson) return null;
+  if (Number.isFinite(Number(lesson.start)) && Number.isFinite(Number(lesson.end))) {
+    return {
+      start: Number(lesson.start),
+      end: Number(lesson.end),
+      title: lesson.title ?? 'Lesson',
+      kind: 'lesson'
+    };
+  }
+  if (
+    Number.isFinite(Number(lesson.start_minutes)) &&
+    Number.isFinite(Number(lesson.end_minutes))
+  ) {
+    return {
+      start: Number(lesson.start_minutes),
+      end: Number(lesson.end_minutes),
+      title: lesson.title ?? 'Lesson',
+      kind: 'lesson'
+    };
+  }
+  const start =
+    minutesOf(lesson.starts_at || lesson.start_time) ??
+    (Number.isFinite(Number(lesson.start_minutes)) ? Number(lesson.start_minutes) : null);
+  if (start == null) return null;
+  const minutes = Number(lesson.duration_minutes || lesson.minutes || lesson.duration) || 60;
+  return {
+    start,
+    end: start + Math.max(1, Math.round(minutes)),
+    title: lesson.title ?? 'Lesson',
+    kind: 'lesson'
+  };
+}
+
+function minBlockMinutesForDepth(
+  depth: string,
+  profile: { deep_work_preference?: { min_block_minutes?: number } } | null | undefined
+): number {
+  if (depth === 'deep') {
+    const pref = Number(profile?.deep_work_preference?.min_block_minutes);
+    return Number.isFinite(pref) && pref > 0 ? pref : 90;
+  }
+  return 25;
+}
+
 export const FALLBACK_WORKDAY = {
   start: '08:00',
   end: '16:30',
   source: 'fallback'
 } as const;
+
+function placeTaskBlocks(
+  task: ScheduleTaskInput,
+  opts: {
+    date: string;
+    bounds: { start: number; end: number };
+    hardBusy: TimedSpan[];
+    plannedSpans: TimedSpan[];
+    energy?: 'low' | 'medium' | 'high' | null;
+    profile?: { deep_work_preference?: { min_block_minutes?: number } } | null;
+  }
+): { proposed: ProposedBlock[]; remaining: number; reason: string | null } {
+  const known = Number(task.estimated_duration);
+  if (!Number.isFinite(known) || known <= 0) {
+    return {
+      proposed: [],
+      remaining: 0,
+      reason: 'Missing required duration estimate'
+    };
+  }
+  let remaining = Math.max(15, Math.round(known));
+  const depth = (task.depth ?? 'shallow') as ProposedBlock['depth'];
+  const minBlock = minBlockMinutesForDepth(depth, opts.profile);
+  const preferDeep = depth === 'deep' && opts.energy !== 'low';
+  const proposed: ProposedBlock[] = [];
+
+  while (remaining > 0) {
+    const busy = [...opts.hardBusy, ...opts.plannedSpans];
+    const gaps = freeSlots(opts.bounds, busy, Math.min(minBlock, remaining));
+    let slot = firstFit(gaps, remaining, preferDeep);
+    let chunk = remaining;
+    if (!slot) {
+      const ordered = preferDeep
+        ? [...gaps].sort((a, b) => b.end - b.start - (a.end - a.start))
+        : gaps;
+      const fit = ordered.find((g) => {
+        const size = g.end - g.start;
+        return size >= Math.min(minBlock, remaining);
+      });
+      if (!fit) break;
+      chunk = Math.min(remaining, fit.end - fit.start);
+      if (chunk < remaining && chunk < minBlock) break;
+      slot = { start: fit.start, end: fit.start + chunk };
+    }
+    proposed.push({
+      temp_id: `ghost_${task.id}_${formatMinutes(slot.start)}`,
+      task_id: task.id,
+      title: task.title,
+      date: opts.date,
+      start_time: formatMinutes(slot.start),
+      duration_minutes: chunk,
+      depth,
+      selected: true
+    });
+    opts.plannedSpans.push({
+      start: slot.start,
+      end: slot.end,
+      title: task.title,
+      kind: 'work_block'
+    });
+    remaining -= chunk;
+  }
+
+  return {
+    proposed,
+    remaining,
+    reason: remaining > 0 ? 'No free window under hard constraints' : null
+  };
+}
 
 export function composeDaySchedule(input: {
   date: string;
@@ -120,6 +248,8 @@ export function composeDaySchedule(input: {
   protected_windows?: TimedSpan[];
   workday?: { start: string; end: string; source?: string } | null;
   energy?: 'low' | 'medium' | 'high' | null;
+  planning_profile?: { deep_work_preference?: { min_block_minutes?: number } } | null;
+  profile?: { deep_work_preference?: { min_block_minutes?: number } } | null;
 }): ScheduleComposeResult {
   const workday = input.workday?.start && input.workday?.end
     ? {
@@ -156,6 +286,7 @@ export function composeDaySchedule(input: {
   const unscheduled: UnscheduledItem[] = [];
   const plannedSpans: TimedSpan[] = [];
   const doneIds = new Set<string>();
+  const profile = input.planning_profile ?? input.profile ?? null;
 
   const sorted = [...input.tasks].sort((a, b) => {
     const depthScore = (d: string | null | undefined) =>
@@ -175,7 +306,6 @@ export function composeDaySchedule(input: {
     }
     const deps = task.depends_on ?? [];
     if (deps.some((id) => !doneIds.has(id) && sorted.some((t) => t.id === id))) {
-      // Dependency among this batch not yet placed — still try later pass; for now defer.
       const unmet = deps.filter((id) => sorted.some((t) => t.id === id) && !doneIds.has(id));
       if (unmet.length) {
         unscheduled.push({
@@ -187,45 +317,26 @@ export function composeDaySchedule(input: {
       }
     }
 
-    const known = Number(task.estimated_duration);
-    if (!Number.isFinite(known) || known <= 0) {
-      unscheduled.push({
-        task_id: task.id,
-        title: task.title,
-        reason: 'Missing required duration estimate'
-      });
-      continue;
-    }
-    const minutes = Math.max(15, Math.round(known));
-    const depth = task.depth ?? 'shallow';
-    const preferDeep = depth === 'deep' && input.energy !== 'low';
-    const busy = [...hardBusy, ...plannedSpans];
-    const gaps = freeSlots(bounds, busy);
-    const slot = firstFit(gaps, minutes, preferDeep);
-    if (!slot) {
-      unscheduled.push({
-        task_id: task.id,
-        title: task.title,
-        reason: 'No free window under hard constraints'
-      });
-      continue;
-    }
-    const block: ProposedBlock = {
-      temp_id: `ghost_${task.id}_${formatMinutes(slot.start)}`,
-      task_id: task.id,
-      title: task.title,
+    const placed = placeTaskBlocks(task, {
       date: input.date,
-      start_time: formatMinutes(slot.start),
-      duration_minutes: minutes,
-      depth,
-      selected: true
-    };
-    proposed.push(block);
-    plannedSpans.push({ start: slot.start, end: slot.end, title: task.title, kind: 'work_block' });
-    doneIds.add(task.id);
+      bounds,
+      hardBusy,
+      plannedSpans,
+      energy: input.energy,
+      profile
+    });
+    proposed.push(...placed.proposed);
+    if (placed.proposed.length) doneIds.add(task.id);
+    if (placed.reason) {
+      unscheduled.push({
+        task_id: task.id,
+        title: task.title,
+        reason: placed.reason,
+        remaining_minutes: placed.remaining || undefined
+      });
+    }
   }
 
-  // Remove dependency-deferred items that became schedulable — second pass
   const stillUnsched: UnscheduledItem[] = [];
   for (const item of unscheduled) {
     if (!item.reason.startsWith('Depends on')) {
@@ -242,26 +353,24 @@ export function composeDaySchedule(input: {
       stillUnsched.push(item);
       continue;
     }
-    const known = Number(task.estimated_duration);
-    const minutes = Math.max(15, Math.round(known));
-    const gaps = freeSlots(bounds, [...hardBusy, ...plannedSpans]);
-    const slot = firstFit(gaps, minutes, task.depth === 'deep');
-    if (!slot) {
-      stillUnsched.push({ ...item, reason: 'No free window under hard constraints' });
-      continue;
-    }
-    proposed.push({
-      temp_id: `ghost_${task.id}_${formatMinutes(slot.start)}`,
-      task_id: task.id,
-      title: task.title,
+    const placed = placeTaskBlocks(task, {
       date: input.date,
-      start_time: formatMinutes(slot.start),
-      duration_minutes: minutes,
-      depth: task.depth ?? 'shallow',
-      selected: true
+      bounds,
+      hardBusy,
+      plannedSpans,
+      energy: input.energy,
+      profile
     });
-    plannedSpans.push({ start: slot.start, end: slot.end, title: task.title, kind: 'work_block' });
-    doneIds.add(task.id);
+    proposed.push(...placed.proposed);
+    if (placed.proposed.length) doneIds.add(task.id);
+    if (placed.reason) {
+      stillUnsched.push({
+        task_id: task.id,
+        title: task.title,
+        reason: placed.reason,
+        remaining_minutes: placed.remaining || undefined
+      });
+    }
   }
 
   const finalGaps = freeSlots(bounds, [...hardBusy, ...plannedSpans]);
@@ -329,4 +438,38 @@ export function validateProposedBlocks(
     accepted.push(span);
   }
   return { ok: conflicts.length === 0, conflicts };
+}
+
+export function detectStaleScheduleCollisions(input: {
+  proposedBlocks: ProposedBlock[];
+  hardBusy: TimedSpan[];
+  workday?: { start: string; end: string; source?: string };
+}): {
+  ok: boolean;
+  error?: string;
+  conflicts: Array<{ temp_id: string; reason: string }>;
+  revised?: {
+    status: string;
+    note: string;
+    conflicts: Array<{ temp_id: string; reason: string }>;
+    hard_busy: TimedSpan[];
+  };
+} {
+  const check = validateProposedBlocks(
+    input.proposedBlocks ?? [],
+    input.hardBusy ?? [],
+    input.workday ?? FALLBACK_WORKDAY
+  );
+  if (check.ok) return { ok: true, conflicts: [] };
+  return {
+    ok: false,
+    error: 'stale_schedule_collision',
+    conflicts: check.conflicts,
+    revised: {
+      status: 'needs_recompose',
+      note: 'Calendar changed since proposal — confirm blocked. Recompose against current hard busy.',
+      conflicts: check.conflicts,
+      hard_busy: input.hardBusy
+    }
+  };
 }

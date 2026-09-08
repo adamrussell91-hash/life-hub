@@ -3,7 +3,7 @@
  * Reads execute immediately. Writes return { kind: 'propose', proposal }
  * for the existing Confirm card / tasks:task:* blob path.
  */
-import { newRecordId, newTaskId } from './tasks-blobs.mjs';
+import { newRecordId, newTaskId, getJSON, setJSON } from './tasks-blobs.mjs';
 import { parseBrainDump } from './clare-dump.mjs';
 import { buildClareBriefing } from './clare-desk.mjs';
 import {
@@ -38,7 +38,8 @@ import {
   runWeeklyReviewStage,
   WEEKLY_REVIEW_STAGES,
   createProjectPlan,
-  updateProjectPlanStage
+  updateProjectPlanStage,
+  lessonToBusySpan
 } from './productivity-os.mjs';
 const MAX_PROTOCOL_CHARS = 24_000;
 
@@ -836,7 +837,8 @@ export function planWork(view, {
   capacity_minutes = null,
   protected_windows = null,
   confirmed_blocks = null,
-  task_ids = null
+  task_ids = null,
+  planning_profile = null
 } = {}) {
   const key = dayKey(date, now);
   const day = parseDue(key) ?? startOfDay(now);
@@ -854,14 +856,7 @@ export function planWork(view, {
       ? tasks.filter(task => idFilter.has(String(task.id)))
       : dayTasks
     ).filter(task => task.status !== 'done' && task.status !== 'dead');
-    const lessonSpans = dayLessons.map(lesson => {
-      const start = Number(lesson.start_minutes ?? lesson.start ?? NaN);
-      const end = Number(lesson.end_minutes ?? lesson.end ?? NaN);
-      if (Number.isFinite(start) && Number.isFinite(end)) {
-        return { start, end, title: lesson.title ?? 'Lesson', kind: 'lesson' };
-      }
-      return null;
-    }).filter(Boolean);
+    const lessonSpans = dayLessons.map(lessonToBusySpan).filter(Boolean);
     const composed = composeDaySchedule({
       date: key,
       tasks: pool.map(task => ({
@@ -877,22 +872,48 @@ export function planWork(view, {
         blocked: Boolean(task.blocked_since || task.waiting_on)
       })),
       lessons: lessonSpans,
-      protected_windows: Array.isArray(protected_windows) ? protected_windows.map(span => ({
-        start: Number(span.start),
-        end: Number(span.end),
-        title: span.title ?? 'Protected',
-        kind: 'protected'
-      })) : [],
-      confirmed_blocks: Array.isArray(confirmed_blocks) ? confirmed_blocks.map(span => ({
-        start: Number(span.start),
-        end: Number(span.end),
-        title: span.title ?? 'Confirmed',
-        kind: 'locked'
-      })) : [],
+      protected_windows: Array.isArray(protected_windows) ? protected_windows.map(span => {
+        if (Number.isFinite(Number(span.start)) && Number.isFinite(Number(span.end))) {
+          return {
+            start: Number(span.start),
+            end: Number(span.end),
+            title: span.title ?? 'Protected',
+            kind: 'protected'
+          };
+        }
+        const start = minutesOf(span.start);
+        const end = minutesOf(span.end);
+        if (start == null || end == null) return null;
+        return {
+          start,
+          end,
+          title: span.title ?? span.label ?? 'Protected',
+          kind: 'protected'
+        };
+      }).filter(Boolean) : [],
+      confirmed_blocks: Array.isArray(confirmed_blocks) ? confirmed_blocks.map(span => {
+        if (Number.isFinite(Number(span.start)) && Number.isFinite(Number(span.end))) {
+          return {
+            start: Number(span.start),
+            end: Number(span.end),
+            title: span.title ?? 'Confirmed',
+            kind: 'locked'
+          };
+        }
+        const start = minutesOf(span.start_time || span.start);
+        if (start == null) return null;
+        return {
+          start,
+          end: start + (Number(span.duration_minutes) || 60),
+          title: span.title ?? 'Confirmed',
+          kind: 'locked'
+        };
+      }).filter(Boolean) : [],
       workday: workday?.start && workday?.end
         ? { start: workday.start, end: workday.end, source: workday.source || 'tool_input' }
         : null,
-      energy: energy?.level ?? null
+      energy: energy?.level ?? null,
+      planning_profile
     });
     return ok({
       view,
@@ -1099,10 +1120,50 @@ function resolveWorkday({ workday, now, date }) {
 }
 
 function lessonBusy(lesson) {
-  const start = minutesOf(lesson.starts_at || lesson.start || lesson.start_time);
-  if (start == null) return null;
-  const minutes = Number(lesson.duration_minutes || lesson.minutes) || 60;
-  return { start, end: start + minutes, title: lesson.title, kind: 'lesson' };
+  return lessonToBusySpan(lesson);
+}
+
+function workflowStateKey(id) {
+  return `workflow_state/${id}`;
+}
+
+async function loadWorkflowState(store, id) {
+  if (!store || !id) return null;
+  try {
+    const raw = await getJSON(store, workflowStateKey(id));
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveWorkflowState(store, id, state) {
+  if (!store || !id || !state) return state;
+  const next = { ...state, id, updated_at: new Date().toISOString() };
+  await setJSON(store, workflowStateKey(id), next);
+  return next;
+}
+
+function calendarNotesFromCtx({ lessons = [], workBlocks = [], tasks = [], todayKey, past = false }) {
+  const day = parseDue(todayKey);
+  if (!day) return [];
+  const notes = [];
+  for (let i = 1; i <= 7; i += 1) {
+    const d = addDays(day, past ? -i : i);
+    const key = toDateKey(d);
+    const dayLessons = (lessons ?? []).filter(l => String(lessonDate(l) ?? '') === key);
+    const dayBlocks = (workBlocks ?? []).filter(b => b.date === key && b.status !== 'cancelled');
+    const dayTasks = tasksForDay(tasks, d);
+    if (!dayLessons.length && !dayBlocks.length && !dayTasks.length) continue;
+    const bits = [
+      key,
+      dayLessons.length ? `${dayLessons.length} lesson(s)` : null,
+      dayBlocks.length ? `${dayBlocks.length} work block(s)` : null,
+      dayTasks.length ? `${dayTasks.length} task(s)` : null
+    ].filter(Boolean);
+    notes.push(bits.join(' · '));
+  }
+  return notes;
 }
 
 function overlaps(a, b) {
@@ -1335,6 +1396,9 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
   const tasks = ctx.tasks ?? [];
   const projects = ctx.projects ?? [];
   const lessons = ctx.lessons ?? [];
+  const workBlocks = ctx.workBlocks ?? ctx.work_blocks ?? [];
+  const planningProfile = ctx.planning_profile ?? null;
+  const tasksStore = ctx.tasksStore ?? null;
 
   if (name === 'check_clock') {
     return ok({ ...readClock(now, ctx.timezone || HUB_TZ), reason: input.reason ?? null });
@@ -1407,7 +1471,8 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       capacity_minutes: input.capacity_minutes ?? ctx.capacity_minutes ?? null,
       protected_windows: input.protected_windows ?? null,
       confirmed_blocks: input.confirmed_blocks ?? null,
-      task_ids: input.task_ids ?? null
+      task_ids: input.task_ids ?? null,
+      planning_profile: planningProfile
     });
   }
   if (name === 'clarify_dump') {
@@ -1448,26 +1513,39 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     ]);
   }
   if (name === 'weekly_review') {
+    const reviewId = String(input.review_id || 'weekly_review').trim() || 'weekly_review';
     let state = input.state && typeof input.state === 'object'
       ? input.state
-      : createWeeklyReview(input.review_id);
+      : (await loadWorkflowState(tasksStore, reviewId)) || createWeeklyReview(reviewId);
+    if (!state.id) state = { ...state, id: reviewId };
+    const todayKey = input.today_key || toHubDateKey(now) || now.toISOString().slice(0, 10);
     if (input.advance !== false) {
-      state = runWeeklyReviewStage(state, {
+      const stageInput = {
         dump_text: input.dump_text,
-        past_notes: input.past_notes,
-        upcoming_notes: input.upcoming_notes,
+        past_notes: input.past_notes
+          ?? (state.current_stage === 'past_calendar'
+            ? calendarNotesFromCtx({ lessons, workBlocks, tasks, todayKey, past: true })
+            : undefined),
+        upcoming_notes: input.upcoming_notes
+          ?? (state.current_stage === 'upcoming_calendar'
+            ? calendarNotesFromCtx({ lessons, workBlocks, tasks, todayKey, past: false })
+            : undefined),
         tasks,
         projects,
-        today_key: input.today_key || toHubDateKey(now) || now.toISOString().slice(0, 10),
+        today_key: todayKey,
         schedule: input.schedule ?? null
-      });
+      };
+      state = runWeeklyReviewStage(state, stageInput);
     }
-    return ok({ stages: WEEKLY_REVIEW_STAGES, state });
+    state = await saveWorkflowState(tasksStore, reviewId, state);
+    return ok({ stages: WEEKLY_REVIEW_STAGES, state, workflow_state_key: workflowStateKey(reviewId) });
   }
   if (name === 'project_plan') {
+    const projectId = input.project_id ? String(input.project_id).trim() : '';
+    const stateId = projectId ? `project_plan:${projectId}` : 'project_plan';
     let state = input.state && typeof input.state === 'object'
       ? input.state
-      : null;
+      : await loadWorkflowState(tasksStore, stateId);
     if (!state) {
       const title = String(input.project_title ?? '').trim();
       if (!title) return deny('missing_project_title');
@@ -1483,7 +1561,8 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       if (input[key] !== undefined) patch[key] = input[key];
     }
     state = updateProjectPlanStage(state, patch, Boolean(input.advance));
-    return ok({ state });
+    state = await saveWorkflowState(tasksStore, stateId, state);
+    return ok({ state, workflow_state_key: workflowStateKey(stateId) });
   }
   if (name === 'context_match') {
     return ok(matchActionsNow(tasks, {
@@ -1501,13 +1580,23 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     if (Array.isArray(input.validate_proposed) && input.validate_proposed.length) {
       const hardBusy = [
         ...(Array.isArray(input.protected_windows) ? input.protected_windows : []),
-        ...(Array.isArray(input.confirmed_blocks) ? input.confirmed_blocks : [])
+        ...(Array.isArray(input.confirmed_blocks) ? input.confirmed_blocks : []),
+        ...(lessons ?? [])
+          .filter(lesson => {
+            const key = dayKey(input.date, now);
+            return String(lessonDate(lesson) ?? '') === key;
+          })
+          .map(lessonToBusySpan)
+          .filter(Boolean)
       ];
       const workday = input.workday_start && input.workday_end
         ? { start: input.workday_start, end: input.workday_end, source: 'tool_input' }
         : FALLBACK_WORKDAY;
       return ok(validateProposedBlocks(input.validate_proposed, hardBusy, workday));
     }
+    const authoritativeBlocks = Array.isArray(input.confirmed_blocks)
+      ? input.confirmed_blocks
+      : workBlocks.filter(b => b.status === 'confirmed' || b.status === 'in_progress');
     return planWork('compose', {
       tasks,
       lessons,
@@ -1518,8 +1607,9 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
         ? { start: input.workday_start, end: input.workday_end, source: 'tool_input' }
         : null,
       protected_windows: input.protected_windows,
-      confirmed_blocks: input.confirmed_blocks,
-      task_ids: input.task_ids
+      confirmed_blocks: authoritativeBlocks,
+      task_ids: input.task_ids,
+      planning_profile: planningProfile
     });
   }
   if (name === 'focus_block') {
@@ -1542,11 +1632,76 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     if (!input.state || typeof input.state !== 'object') return deny('missing_focus_state');
     if (action === 'start') {
       const started = startFocusBlock(input.state, now.toISOString());
-      return ok({ state: started.state, sessionCreate: started.sessionCreate });
+      const sessionId = String(input.session_id || newRecordId('wsession')).trim();
+      const record = {
+        schema_version: 1,
+        id: sessionId,
+        task_id: started.sessionCreate.task_id ?? null,
+        project_id: started.sessionCreate.project_id ?? null,
+        work_block_id: started.sessionCreate.work_block_id ?? null,
+        started_at: started.sessionCreate.started_at,
+        finished_at: null,
+        actual_duration_minutes: null,
+        depth: started.sessionCreate.depth ?? 'shallow',
+        work_mode: started.sessionCreate.work_mode ?? 'predefined',
+        work_mode_confidence: started.sessionCreate.work_mode_confidence ?? 'explicit',
+        result: 'open',
+        source: 'focus_block',
+        notes: ''
+      };
+      const proposal = propose(`Start focus session: ${input.state?.spec?.outcome || sessionId}`, [
+        writeEntry(`tasks:work_session:${sessionId}`, 'create', record, `focus session start — ${sessionId}`)
+      ]);
+      return {
+        ...proposal,
+        session_id: sessionId,
+        state: {
+          ...started.state,
+          session: { ...started.state.session, id: sessionId }
+        }
+      };
     }
     if (action === 'finish') {
       const finished = finishFocusBlock(input.state, input.result || 'done', now.toISOString());
-      return ok({ state: finished.state, sessionPatch: finished.sessionPatch });
+      const sessionId = String(
+        input.session_id || input.state?.session?.id || newRecordId('wsession')
+      ).trim();
+      const patch = {
+        id: sessionId,
+        ...finished.sessionPatch,
+        result: finished.sessionPatch.result || input.result || 'done'
+      };
+      // Prefer Confirm path: append/overwrite existing session.
+      const mode = input.session_id || input.state?.session?.id ? 'append' : 'create';
+      const record = mode === 'create'
+        ? {
+            schema_version: 1,
+            id: sessionId,
+            task_id: input.state?.spec?.task_id ?? null,
+            project_id: input.state?.spec?.project_id ?? null,
+            work_block_id: input.state?.spec?.work_block_id ?? null,
+            started_at: input.state?.session?.started_at || now.toISOString(),
+            depth: input.state?.spec?.depth || 'shallow',
+            work_mode: 'predefined',
+            work_mode_confidence: 'explicit',
+            source: 'focus_block',
+            notes: '',
+            ...patch
+          }
+        : patch;
+      const proposal = propose(`Finish focus session: ${input.state?.spec?.outcome || sessionId}`, [
+        writeEntry(
+          `tasks:work_session:${sessionId}`,
+          mode === 'create' ? 'create' : 'append',
+          record,
+          `focus session finish — ${sessionId}`
+        )
+      ]);
+      return {
+        ...proposal,
+        session_id: sessionId,
+        state: finished.state
+      };
     }
     return deny('unknown_focus_action');
   }

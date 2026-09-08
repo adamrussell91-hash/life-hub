@@ -63,8 +63,17 @@ import {
 } from './_shared/agent-turn-store.mjs';
 import { continueAfterConfirm, resumeConfirmedTurn } from './_shared/agent-confirm.mjs';
 import { createAnthropicClient } from './_shared/anthropic-client.mjs';
-import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
-import { defaultGetContentStore as defaultGetTeachingStore } from './_shared/teaching-blobs.mjs';
+import { defaultGetTasksStore, listJSON as listTasksJSON, getJSON as getTasksMetaJSON } from './_shared/tasks-blobs.mjs';
+import {
+  defaultGetContentStore as defaultGetTeachingStore,
+  listJSON as listTeachingJSON,
+  SCHEDULED_LESSON_PREFIX
+} from './_shared/teaching-blobs.mjs';
+import {
+  buildAuthoritativeHardBusy,
+  detectStaleScheduleCollisions,
+  FALLBACK_WORKDAY
+} from './_shared/productivity-os.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -522,6 +531,15 @@ export function createChatConfirmHandler({
     }
     const blobStores = blobStoresResult.stores;
 
+    const scheduleCollision = await checkStaleWorkBlockCollisions(accepted, blobStores);
+    if (scheduleCollision && !scheduleCollision.ok) {
+      return jsonResponse(409, {
+        ok: false,
+        error: 'stale_schedule_collision',
+        data: scheduleCollision.revised
+      }, PRIVATE_CACHE);
+    }
+
     const storedBases = stored?.bases && typeof stored.bases === 'object' && !Array.isArray(stored.bases)
       ? stored.bases
       : null;
@@ -949,16 +967,83 @@ function parseActionDecisionFields(body) {
 async function loadBlobStoresForWrites(writes, { env, getTasksStore, getTeachingStore }) {
   const stores = {};
   const needsTasks = writes.some(write => classifyWriteTarget(write.path).store === 'tasks');
-  const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching');
+  const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching')
+    || writes.some(write => classifyWriteTarget(write.path).kind === 'work_block');
   try {
     if (needsTasks) stores.tasks = await getTasksStore(env);
-    if (needsTeaching) stores.teaching = await getTeachingStore(env);
+    if (needsTeaching || needsTasks) stores.teaching = await getTeachingStore(env);
   } catch {
     return { ok: false, error: 'blobs_unavailable' };
   }
   if (needsTasks && !stores.tasks) return { ok: false, error: 'tasks_blobs_unbound' };
   if (needsTeaching && !stores.teaching) return { ok: false, error: 'teaching_blobs_unbound' };
   return { ok: true, stores };
+}
+
+function proposedBlocksFromWrites(writes) {
+  const blocks = [];
+  for (const write of writes ?? []) {
+    const target = classifyWriteTarget(write.path);
+    if (target.kind !== 'work_block') continue;
+    let record;
+    try {
+      record = JSON.parse(write.content);
+    } catch {
+      continue;
+    }
+    if (!record || typeof record !== 'object') continue;
+    if (!record.start_time || !record.date) continue;
+    blocks.push({
+      temp_id: record.id || target.id,
+      task_id: record.task_id ?? '',
+      title: record.title ?? 'Work block',
+      date: record.date,
+      start_time: record.start_time,
+      duration_minutes: Number(record.duration_minutes) || 60,
+      depth: record.depth || 'shallow',
+      selected: true
+    });
+  }
+  return blocks;
+}
+
+async function checkStaleWorkBlockCollisions(writes, blobStores) {
+  const proposed = proposedBlocksFromWrites(writes);
+  if (!proposed.length) return { ok: true };
+  const dates = [...new Set(proposed.map((b) => b.date).filter(Boolean))];
+  const tasksStore = blobStores.tasks;
+  const teachingStore = blobStores.teaching;
+  let lessons = [];
+  let workBlocks = [];
+  let profile = null;
+  try {
+    if (teachingStore) {
+      lessons = await listTeachingJSON(teachingStore, SCHEDULED_LESSON_PREFIX);
+    }
+    if (tasksStore) {
+      workBlocks = await listTasksJSON(tasksStore, 'work_blocks/');
+      profile = await getTasksMetaJSON(tasksStore, 'meta/planning_profile');
+    }
+  } catch {
+    return { ok: true };
+  }
+
+  for (const date of dates) {
+    const dayProposed = proposed.filter((b) => b.date === date);
+    const hardBusy = buildAuthoritativeHardBusy({
+      date,
+      lessons,
+      workBlocks,
+      planningProfile: profile && typeof profile === 'object' ? profile : null
+    });
+    const check = detectStaleScheduleCollisions({
+      proposedBlocks: dayProposed,
+      hardBusy,
+      workday: FALLBACK_WORKDAY
+    });
+    if (!check.ok) return check;
+  }
+  return { ok: true };
 }
 
 async function readAtMost(stream, limit) {

@@ -2,6 +2,8 @@ import type { Area } from '@/schemas/area';
 import type { Goal } from '@/schemas/goal';
 import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
+import type { PlanningDirection } from '@/schemas/planning-direction';
+import type { PlanningProfile } from '@/schemas/planning-profile';
 import { tasksApi } from '@/services/client-api';
 import { deleteProjectNow } from '@/views/card-actions';
 import { renderCardMenu } from '@/views/card-menu';
@@ -14,11 +16,11 @@ import { createHubFilter, createHubPills, createHubSearch, createHubToolbar, el 
 import { createPlusAdd } from '@/views/plus-add';
 import { createHierarchyTraceCard, createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
 import { activeProjectMeter } from '@/domain/hammond-portfolio';
-import { DEFAULT_PLANNING_PROFILE } from '@/schemas/planning-profile';
 
 let goalArea = 'all';
 let goalQuery = '';
 let horizonsMode = false;
+let horizonsFocusProjectId: string | null = null;
 
 function tagRow(tags: string[]): HTMLElement {
   const row = el('div', 'hierarchy-tags');
@@ -153,13 +155,15 @@ function renderGoalSection(
 export async function renderGoalsView(canvas: HTMLElement): Promise<void> {
   showViewLoading(canvas, 'Loading hierarchy…', '.hierarchy-toolbar');
   try {
-    const [areas, goals, projects, tasks] = await Promise.all([
+    const [areas, goals, projects, tasks, direction, profile] = await Promise.all([
       tasksApi.listAreas(),
       tasksApi.listGoals(),
       tasksApi.listProjects(),
-      tasksApi.listTasks()
+      tasksApi.listTasks(),
+      tasksApi.getPlanningDirection().catch(() => null),
+      tasksApi.getPlanningProfile().catch(() => null)
     ]);
-    paintGoals(canvas, areas, goals, projects, tasks);
+    paintGoals(canvas, areas, goals, projects, tasks, direction, profile);
   } catch (err) {
     canvas.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not load hierarchy.')));
   }
@@ -170,7 +174,9 @@ function paintGoals(
   areas: Area[],
   goals: Goal[],
   projects: Project[],
-  tasks: Task[]
+  tasks: Task[],
+  direction: PlanningDirection | null,
+  profile: PlanningProfile | null
 ): void {
   const restoreSearch =
     document.activeElement instanceof HTMLInputElement &&
@@ -192,7 +198,7 @@ function paintGoals(
     value: goalQuery,
     onInput: (value) => {
       goalQuery = value;
-      paintGoals(canvas, areas, goals, projects, tasks);
+      paintGoals(canvas, areas, goals, projects, tasks, direction, profile);
     }
   });
   const areaFilter = createHubFilter({
@@ -206,7 +212,7 @@ function paintGoals(
     value: goalArea,
     onChange: (value) => {
       goalArea = value;
-      paintGoals(canvas, areas, goals, projects, tasks);
+      paintGoals(canvas, areas, goals, projects, tasks, direction, profile);
     }
   });
   const addGoal = el('button', 'btn btn--secondary', 'New goal');
@@ -248,7 +254,7 @@ function paintGoals(
       value: horizonsMode ? (['horizons'] as const) : [],
       onSelect: () => {
         horizonsMode = !horizonsMode;
-        paintGoals(canvas, areas, goals, projects, tasks);
+        paintGoals(canvas, areas, goals, projects, tasks, direction, profile);
       }
     }),
     createPlusAdd({
@@ -277,7 +283,7 @@ function paintGoals(
   const meterHost = el('div', 'goals-meter-host');
   meterHost.append(
     createActiveProjectsMeter(document, {
-      meter: activeProjectMeter(projects, DEFAULT_PLANNING_PROFILE)
+      meter: activeProjectMeter(projects, profile)
     })
   );
   canvas.append(meterHost);
@@ -292,10 +298,30 @@ function paintGoals(
         'Purpose → Vision → Area → Goal → Project → Next Action'
       )
     );
-    const focusProject = projects.find((p) => p.status === 'active') ?? null;
+    const activeProjects = projects.filter((p) => p.status === 'active');
+    const focusSelect = el('select', 'hub-filter__select') as HTMLSelectElement;
+    focusSelect.setAttribute('aria-label', 'Focus project for horizons');
+    const placeholder = el('option', '', 'Select a project…') as HTMLOptionElement;
+    placeholder.value = '';
+    focusSelect.append(placeholder);
+    for (const project of activeProjects) {
+      const opt = el('option', '', project.title) as HTMLOptionElement;
+      opt.value = project.id;
+      if (horizonsFocusProjectId === project.id) opt.selected = true;
+      focusSelect.append(opt);
+    }
+    focusSelect.addEventListener('change', () => {
+      horizonsFocusProjectId = focusSelect.value || null;
+      paintGoals(canvas, areas, goals, projects, tasks, direction, profile);
+    });
+    lens.append(focusSelect);
+
+    const focusProject = horizonsFocusProjectId
+      ? activeProjects.find((p) => p.id === horizonsFocusProjectId) ?? null
+      : null;
     const focusGoal = focusProject
       ? goals.find((g) => g.id === focusProject.parent_goal_id) ?? null
-      : activeGoals[0] ?? null;
+      : null;
     const focusArea = focusGoal?.parent_area_id
       ? areasById.get(focusGoal.parent_area_id)
       : undefined;
@@ -307,14 +333,22 @@ function paintGoals(
             !t.waiting_on
         )
       : null;
+    const purpose = direction?.purpose?.trim() || 'Purpose not set';
+    const vision = direction?.vision?.trim() || 'Vision not set';
+    const principles = (direction?.principles ?? []).filter(Boolean);
+    if (principles.length) {
+      lens.append(el('p', 'hierarchy-meta', `Principles: ${principles.join(' · ')}`));
+    }
     lens.append(
       createHierarchyTraceCard(document, {
-        purpose: 'Purpose (set in planning direction)',
-        vision: 'Vision (set in planning direction)',
+        purpose,
+        vision,
         area: focusArea?.title,
         goal: focusGoal?.title,
-        project: focusProject?.title,
-        nextAction: next?.title ?? 'Add next action'
+        project: focusProject?.title ?? (horizonsFocusProjectId ? undefined : 'Select a project'),
+        nextAction: focusProject
+          ? (next?.title ?? 'Add next action')
+          : 'Select a project to see next action'
       })
     );
     canvas.append(lens);

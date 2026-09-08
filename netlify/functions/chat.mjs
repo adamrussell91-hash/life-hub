@@ -203,7 +203,8 @@ import {
 import {
   TASK_PREFIX,
   defaultGetTasksStore,
-  listJSON as listTasksJSON
+  listJSON as listTasksJSON,
+  getJSON as getTasksJSON
 } from './_shared/tasks-blobs.mjs';
 import {
   CLASS_PREFIX,
@@ -555,6 +556,13 @@ export function createChatHandler({
         let skincareHistoryRecords = [];
         let hubTasks = [];
         let hubProjects = [];
+        let hubAreas = [];
+        let hubGoals = [];
+        let hubWorkBlocks = [];
+        let hubWorkSessions = [];
+        let hubPlanningProfile = null;
+        let hubPlanningDirection = null;
+        let hubTasksStore = null;
         let hubClasses = [];
         let hubLessons = [];
         let hubUnits = [];
@@ -792,7 +800,21 @@ export function createChatHandler({
                 getTasksStore(env),
                 getTeachingStore(env)
               ]);
-              const [tasks, projects, classes, lessons, units, scheduled] = await Promise.all([
+              hubTasksStore = tasksStore;
+              const [
+                tasks,
+                projects,
+                areas,
+                goals,
+                workBlocks,
+                workSessions,
+                planningProfile,
+                planningDirection,
+                classes,
+                lessons,
+                units,
+                scheduled
+              ] = await Promise.all([
                 listTasksJSON(tasksStore, TASK_PREFIX).catch(err => {
                   hubLoadErrors.tasks = err?.code || 'load_failed';
                   return [];
@@ -801,6 +823,24 @@ export function createChatHandler({
                   hubLoadErrors.projects = err?.code || 'load_failed';
                   return [];
                 }),
+                listTasksJSON(tasksStore, 'areas/').catch(err => {
+                  hubLoadErrors.areas = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'goals/').catch(err => {
+                  hubLoadErrors.goals = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'work_blocks/').catch(err => {
+                  hubLoadErrors.work_blocks = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'work_sessions/').catch(err => {
+                  hubLoadErrors.work_sessions = err?.code || 'load_failed';
+                  return [];
+                }),
+                getTasksJSON(tasksStore, 'meta/planning_profile').catch(() => null),
+                getTasksJSON(tasksStore, 'meta/planning_direction').catch(() => null),
                 listTeachingJSON(teachingStore, CLASS_PREFIX).catch(err => {
                   hubLoadErrors.classes = err?.code || 'load_failed';
                   return [];
@@ -820,6 +860,16 @@ export function createChatHandler({
               ]);
               hubTasks = Array.isArray(tasks) ? tasks : [];
               hubProjects = Array.isArray(projects) ? projects : [];
+              hubAreas = Array.isArray(areas) ? areas : [];
+              hubGoals = Array.isArray(goals) ? goals : [];
+              hubWorkBlocks = Array.isArray(workBlocks) ? workBlocks : [];
+              hubWorkSessions = Array.isArray(workSessions) ? workSessions : [];
+              hubPlanningProfile =
+                planningProfile && typeof planningProfile === 'object' ? planningProfile : null;
+              hubPlanningDirection =
+                planningDirection && typeof planningDirection === 'object'
+                  ? planningDirection
+                  : null;
               hubClasses = Array.isArray(classes) ? classes : [];
               hubLessons = [
                 ...(Array.isArray(lessons) ? lessons : []),
@@ -1767,10 +1817,21 @@ export function createChatHandler({
               }
               if (slug === 'hammond' && isHammondProductivityTool(event.name)) {
                 send({ type: 'status', text: 'Working…' });
-                const hammondResult = executeHammondProductivity(event.name, event.input ?? {}, {
+                const hammondResult = await executeHammondProductivity(event.name, event.input ?? {}, {
                   tasks: hubTasks,
                   projects: hubProjects,
-                  now: nowInstant
+                  areas: hubAreas,
+                  goals: hubGoals,
+                  sessions: hubWorkSessions,
+                  workSessions: hubWorkSessions,
+                  blocks: hubWorkBlocks,
+                  workBlocks: hubWorkBlocks,
+                  planning_profile: hubPlanningProfile,
+                  planning_direction: hubPlanningDirection,
+                  lessons: hubLessons,
+                  now: nowInstant,
+                  tasksStore: hubTasksStore,
+                  executeClareWork
                 });
                 const hammondCard = buildProductivityCardEvent(event.name, hammondResult);
                 if (hammondCard) send(hammondCard);
@@ -2271,11 +2332,15 @@ export function createChatHandler({
                   tasks: hubTasks,
                   projects: hubProjects,
                   lessons: hubLessons,
+                  workBlocks: hubWorkBlocks,
+                  work_blocks: hubWorkBlocks,
+                  planning_profile: hubPlanningProfile,
                   protocol: clareProtocol,
                   now: nowInstant,
                   energy: stated.energy,
                   capacity_minutes: stated.capacity_minutes,
-                  workday: stated.workday
+                  workday: stated.workday,
+                  tasksStore: hubTasksStore
                 });
                 if (result?.kind === 'propose' && result.proposal) {
                   const validated = validateProposeActionInput(result.proposal, { agentSlug: slug });
@@ -2300,7 +2365,9 @@ export function createChatHandler({
                       mode: write.mode,
                       diff: write.diff
                     })),
-                    ...(pendingId ? { pendingId } : {})
+                    ...(pendingId ? { pendingId } : {}),
+                    ...(result.session_id ? { session_id: result.session_id } : {}),
+                    ...(result.state ? { state: result.state } : {})
                   });
                 }
                 const card = buildProductivityCardEvent(event.name, result);
