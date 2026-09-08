@@ -167,9 +167,10 @@
     justify-content: flex-start;
   }
 
-  /* Utility-app title (~21px, near iOS Title 3). Leave the title input alone so
-     task/project editors stay readable while editing. */
-  .page-header__title:not(.page-header__title-input) {
+  /* Utility-app title (~21px, near iOS Title 3). Same size for the editable
+     title — long task names were blowing the first screen as --text-2xl. */
+  .page-header__title,
+  .page-header__title-input {
     font-size: var(--text-lg);
   }
 
@@ -231,6 +232,7 @@
   resize: none;
   overflow: hidden;
   field-sizing: content;
+  cursor: text;
 }
 
 .page-header__title-input:focus-visible {

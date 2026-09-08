@@ -6,7 +6,9 @@ import {
   formatRelativeUpdated,
   projectPageHash,
   projectProgress,
+  alignStockStatusLabelsWithBoard,
   statusBadgeClass,
+  statusLabel,
   taskPageHash
 } from '@/domain/cards';
 import type { Task } from '@/schemas/task';
@@ -69,6 +71,23 @@ const project: Project = {
 };
 
 describe('card domain helpers', () => {
+  it('labels stock statuses like Board columns', () => {
+    expect(statusLabel('open')).toBe('To do');
+    expect(statusLabel('in_progress')).toBe('Doing');
+    expect(statusLabel('done')).toBe('Done');
+  });
+
+  it('rewrites legacy stock status labels without touching custom ones', () => {
+    const aligned = alignStockStatusLabelsWithBoard({
+      statuses: [
+        { id: 'open', label: 'open' },
+        { id: 'in_progress', label: 'in progress' },
+        { id: 'done', label: 'Ship it' }
+      ]
+    });
+    expect(aligned.statuses.map((s) => s.label)).toEqual(['To do', 'Doing', 'Ship it']);
+  });
+
   it('formats relative updated copy', () => {
     const now = new Date('2026-08-17T12:00:00.000Z');
     expect(formatRelativeUpdated('2026-08-17T11:59:30.000Z', now)).toBe('Updated just now');

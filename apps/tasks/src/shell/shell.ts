@@ -179,7 +179,8 @@ export function bindEditablePageTitle(
   input.className = 'page-header__title page-header__title-input';
   input.value = value;
   input.rows = 1;
-  input.setAttribute('aria-label', 'Title');
+  input.setAttribute('aria-label', 'Edit title');
+  input.title = 'Edit title';
   input.addEventListener('input', () => {
     const cleaned = input.value.replace(/[\r\n]+/g, ' ');
     if (input.value !== cleaned) input.value = cleaned;

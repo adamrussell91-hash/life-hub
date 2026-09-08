@@ -1,4 +1,5 @@
 import { DEFAULT_TASK_PROPERTY_CONFIG } from '@/domain/task-properties-defaults';
+import { alignStockStatusLabelsWithBoard } from '@/domain/cards';
 import type { TaskPropertyConfig } from '@/schemas/task-properties';
 import { propertyIds, propertyLabel } from '@/schemas/task-properties';
 import { tasksApi } from '@/services/client-api';
@@ -17,8 +18,8 @@ export async function loadTaskProperties(force = false): Promise<TaskPropertyCon
   loadPromise = tasksApi
     .getTaskProperties()
     .then((config) => {
-      cache = config;
-      return config;
+      cache = alignStockStatusLabelsWithBoard(config);
+      return cache;
     })
     .catch(() => {
       cache = DEFAULT_TASK_PROPERTY_CONFIG;

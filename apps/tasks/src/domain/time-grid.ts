@@ -33,6 +33,27 @@ export function hoursToDueTime(hours: number): string {
   return `${String(Math.min(hour, 23)).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+/** End clock from start `HH:mm` + duration minutes. Empty when either is missing. */
+export function endTimeFromStart(
+  start: string | null | undefined,
+  durationMinutes: number | null | undefined
+): string {
+  const hours = parseDueTimeHours(start);
+  if (hours == null || durationMinutes == null || durationMinutes <= 0) return '';
+  return hoursToDueTime(hours + durationMinutes / 60);
+}
+
+/** Whole minutes between two `HH:mm` clocks. Null when either is bad or end ≤ start. */
+export function durationMinutesBetween(
+  start: string | null | undefined,
+  end: string | null | undefined
+): number | null {
+  const startHours = parseDueTimeHours(start);
+  const endHours = parseDueTimeHours(end);
+  if (startHours == null || endHours == null || endHours <= startHours) return null;
+  return Math.round((endHours - startHours) * 60);
+}
+
 export function snapHours(hours: number, minutes = TIME_GRID_SNAP_MINUTES): number {
   const step = minutes / 60;
   const snapped = Math.round(hours / step) * step;
