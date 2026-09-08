@@ -194,6 +194,7 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
   let applyTask: (task: Task) => void = () => undefined;
 
   paintOverview = (): void => {
+    const scrollTop = canvas.scrollTop;
     renderDashboardOverview(overviewHost, {
       tasks,
       projects,
@@ -226,6 +227,7 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
         );
       }
     });
+    canvas.scrollTop = scrollTop;
   };
 
   paintOverview();
@@ -349,7 +351,8 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     const hint = list.querySelector('.empty-hint');
     if (hint) list.insertBefore(card, hint);
     syncChrome();
-    showBoardColumn?.(column);
+    // Completing jumps the mobile column tabs to Done and feels like a full-screen flash.
+    if (column !== 'done') showBoardColumn?.(column);
     paintOverview();
   }
 

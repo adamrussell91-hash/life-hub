@@ -218,5 +218,8 @@ describe('board view mutations', () => {
     expect(canvas.querySelector('.board')).toBe(board);
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
     expect(canvas.querySelector('.column[data-col="done"] [data-id="task_tick"]')).not.toBeNull();
+    // Completing must not jump the mobile column tabs to Done (that reads as a flash).
+    const activeTab = canvas.querySelector('.board-col-nav [aria-selected="true"]');
+    expect(activeTab?.textContent ?? '').not.toMatch(/Done/i);
   });
 });
