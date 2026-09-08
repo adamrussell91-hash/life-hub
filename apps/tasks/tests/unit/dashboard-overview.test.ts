@@ -284,7 +284,7 @@ describe('renderDashboardOverview', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders focus tiles, week strip, agenda, and no due-soon pills', () => {
+  it('renders one week card with strip and agenda, and no due-soon pills', () => {
     const host = document.createElement('div');
     renderDashboardOverview(host, {
       now,
@@ -303,7 +303,8 @@ describe('renderDashboardOverview', () => {
     expect(host.querySelector('.dashboard-focus')?.textContent).toContain('Overdue');
     expect(host.querySelector('.dashboard-focus')?.textContent).toContain('Today');
     expect(host.querySelector('.dashboard-focus__value')?.textContent).toBeTruthy();
-    expect(host.querySelector('[aria-label="Agenda"]')?.textContent).toContain('Mark essays');
+    expect(host.querySelector('[aria-label="This week"]')?.textContent).toContain('Mark essays');
+    expect(host.querySelector('[aria-label="Agenda"]')).toBeNull();
     expect(host.querySelector('.dashboard-rail')).toBeNull();
     expect(host.querySelectorAll('.dashboard-heat__cell')).toHaveLength(7);
     expect(host.querySelector('[aria-label="Today"]')).toBeNull();
@@ -311,8 +312,8 @@ describe('renderDashboardOverview', () => {
     expect(host.querySelector('[aria-label="Projects"] .project-pulse-chart')).not.toBeNull();
     expect(host.querySelector('.projects-mix__pie')).not.toBeNull();
     expect(host.querySelector('.dashboard-trend-chart')).toBeNull();
-    expect(host.querySelector('[aria-label="This week"] .dashboard-heat__cell')).not.toBeNull();
     expect(host.querySelector('.due-soon-strip')).toBeNull();
+    expect(host.querySelector('.dashboard-heat__peek')).toBeNull();
     expect(host.querySelector('.dashboard-row__grip')).not.toBeNull();
     expect(host.querySelector('.dashboard-row .task-check')).not.toBeNull();
     expect(host.querySelector('.chip--source-task')).not.toBeNull();
@@ -321,8 +322,10 @@ describe('renderDashboardOverview', () => {
     expect(host.querySelector('[aria-label="This week"] a')?.getAttribute('href')).toContain(
       '#/week?date='
     );
-    expect(host.querySelector('.dashboard-heat__peek')?.textContent).toContain('Mark essays');
-    expect(host.querySelector('.dashboard-heat__peek')?.textContent).not.toMatch(/\+\d+ more/);
+    expect(host.querySelector('.dashboard-timeline')?.textContent).toContain('Mark essays');
+    // One week card only — not a separate timeline/agenda card beside the strip.
+    expect(host.querySelectorAll('.dashboard-overview__tile--week')).toHaveLength(1);
+    expect(host.querySelector('.dashboard-overview__tile--timeline')).toBeNull();
   });
 
   it('makes every focus tile and the next-action card activate on click', () => {
@@ -438,11 +441,11 @@ describe('renderDashboardOverview', () => {
     expect(host.querySelector('.dashboard-heat__cell[data-selected="true"]')?.getAttribute('aria-label')).toContain(
       '02/09/26'
     );
-    expect(host.querySelector('.dashboard-heat__peek')?.textContent).toContain('MindWorks');
     expect(host.querySelector('.dashboard-timeline')?.textContent).toContain('MindWorks');
+    expect(host.querySelector('[aria-label="This week"] .dashboard-timeline')?.textContent).toContain('MindWorks');
   });
 
-  it('keeps the week peek to three titles plus a remainder', () => {
+  it('lists the selected day agenda under the week strip', () => {
     const host = document.createElement('div');
     renderDashboardOverview(host, {
       now,
@@ -454,12 +457,12 @@ describe('renderDashboardOverview', () => {
       ],
       projects: []
     });
-    const peek = host.querySelector('.dashboard-heat__peek')?.textContent ?? '';
-    expect(peek).toContain('Alpha');
-    expect(peek).toContain('Bravo');
-    expect(peek).toContain('Charlie');
-    expect(peek).toContain('+1 more');
-    expect(peek).not.toContain('Delta');
+    const agenda = host.querySelector('[aria-label="This week"] .dashboard-timeline')?.textContent ?? '';
+    expect(agenda).toContain('Alpha');
+    expect(agenda).toContain('Bravo');
+    expect(agenda).toContain('Charlie');
+    expect(agenda).toContain('Delta');
+    expect(host.querySelector('.dashboard-heat__peek')).toBeNull();
   });
 
   it('collapses and expands the overview panel on mobile', () => {
