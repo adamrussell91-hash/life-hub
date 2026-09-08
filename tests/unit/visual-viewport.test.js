@@ -6,7 +6,7 @@ import {
   notifyChatViewport,
   VV_HEIGHT_STICK_PX,
   VV_KEYBOARD_OPEN_PX
-} from '../../apps/life/js/app/visual-viewport.js';
+} from '../../packages/design-kit/js/visual-viewport.js';
 
 function mockDocument() {
   const style = new Map();

@@ -1,0 +1,24 @@
+/* Shared chat canvas: composer on the floor, keyboard docks the thread.
+ *
+ * JS: js/visual-viewport.js → html.vv-keyboard-open + --vv-* while typing.
+ * Each hub still pins its own chat host to --vv-height (Life .page-frame,
+ * Tasks .hub-layout[data-hub-view='clare'], overlay .chat-view). Do not fork
+ * a second keyboard inset helper per hub.
+ */
+
+.chat-view:not([hidden]) > .chat-form,
+.chat-view:not([hidden]) > .hub-ai-bar--thread {
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+
+@media (max-width: 720px) {
+  /* Hide the locked bottom bar while any visible chat thread is typing. */
+  html.vv-keyboard-open:has(.chat-view:not([hidden])) .hub-mobile-nav,
+  body:has(.chat-view:not([hidden]) .chat-form:focus-within) .hub-mobile-nav,
+  body:has(.chat-view:not([hidden]) .hub-ai-bar--thread:focus-within) .hub-mobile-nav,
+  body:has(.chat-overlay:not([hidden]) .chat-form:focus-within) .hub-mobile-nav,
+  body:has(.coach.chat .chat__composer:focus-within) .hub-mobile-nav {
+    display: none;
+  }
+}

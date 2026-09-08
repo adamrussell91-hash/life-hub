@@ -7,6 +7,14 @@ const visualViewport = readFileSync(
   path.resolve(process.cwd(), 'src/chat/visual-viewport.ts'),
   'utf8'
 );
+const kitViewport = readFileSync(
+  path.resolve(process.cwd(), 'design-kit/js/visual-viewport.js'),
+  'utf8'
+);
+const kitChatCss = readFileSync(
+  path.resolve(process.cwd(), 'design-kit/hub-chat-viewport.css'),
+  'utf8'
+);
 
 describe('mobile overlay chat form', () => {
   it('keeps Send beside the textarea on mobile instead of stacking the composer', () => {
@@ -62,9 +70,34 @@ describe('mobile overlay chat form', () => {
     );
   });
 
-  it('re-syncs visual viewport when the composer focuses (iOS keyboard)', () => {
-    expect(visualViewport).toMatch(/focusin/);
-    expect(visualViewport).toMatch(/scrollIntoView/);
+  it('re-exports the shared design-kit visual-viewport module (no per-hub fork)', () => {
+    expect(visualViewport).toMatch(/design-kit\/js\/visual-viewport\.js/);
+    expect(kitViewport).toMatch(/vv-keyboard-open/);
+    expect(kitViewport).not.toMatch(/scrollIntoView/);
+  });
+
+  it('shares composer floor + keyboard nav hide in the design kit', () => {
+    expect(kitChatCss).toMatch(/margin-top:\s*auto/);
+    expect(kitChatCss).toMatch(/vv-keyboard-open[\s\S]*hub-mobile-nav/);
+  });
+
+  it('pins full-page Clare to the visual viewport and docks on keyboard', () => {
+    expect(viewsCss).toMatch(
+      /html\.vv-keyboard-open[\s\S]*data-hub-view='clare'[\s\S]*height:\s*var\(--vv-height/
+    );
+    expect(viewsCss).toMatch(
+      /\[data-hub-view='clare'\]:has\(#chat-form:focus-within\)[\s\S]*\.hub-canvas[\s\S]*padding-bottom:\s*0/
+    );
+    expect(viewsCss).toMatch(
+      /\.hub-layout\[data-hub-view='clare'\]\s+\.chat-form\s*\{[^}]*margin-top:\s*auto/
+    );
+  });
+
+  it('only shrinks the mobile overlay to --vv-height while the keyboard is open', () => {
+    const overlayBlock = viewsCss.slice(viewsCss.indexOf(".chat-view[data-panel-mode='overlay'] {"));
+    expect(overlayBlock).toMatch(
+      /html\.vv-keyboard-open[\s\S]*data-panel-mode='overlay'[\s\S]*height:\s*var\(--vv-height/
+    );
   });
 });
 
