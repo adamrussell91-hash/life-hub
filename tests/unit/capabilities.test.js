@@ -367,6 +367,7 @@ test('shortcutSchemas covers Phase 1-3 tool names', () => {
     'research_save_brief',
     'publish_surface_widget',
     'plan_week_meals',
+    'delete_meal',
     'lookup_food_brand_au',
     'os_capability_scoreboard',
     'intuition_edit_pack',

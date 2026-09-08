@@ -51,6 +51,7 @@ import {
   proposeReflection,
   serializeMemoryStore
 } from '../agent-memory.mjs';
+import { findMealDeletePaths, isMealSlot } from '../delete-meal.mjs';
 
 const CN_OPS = ['upsert_field', 'append_line', 'replace_section', 'delete_lines', 'condense'];
 
@@ -288,6 +289,24 @@ export function shortcutSchemas() {
           notes: { type: 'string' }
         },
         required: ['week_id', 'meals'],
+        additionalProperties: false
+      }
+    },
+    delete_meal: {
+      name: 'delete_meal',
+      description:
+        'Propose deleting a confirmed meal slot for a date (Confirm). Removes the nutrition file(s) for that breakfast/lunch/dinner/snack — including numbered duplicates like snack-2 — and refreshes day Nutrition totals. Use when Adam asks to delete, remove, undo, or clear a meal/duplicate. Not for macro corrections (use log_entry overwrite for those).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'YYYY-MM-DD' },
+          meal: {
+            type: 'string',
+            enum: ['breakfast', 'lunch', 'dinner', 'snack'],
+            description: 'Meal slot to remove for that date'
+          }
+        },
+        required: ['date', 'meal'],
         additionalProperties: false
       }
     },
@@ -891,6 +910,36 @@ async function handlePlanWeekMeals(ctx, input) {
   );
 }
 
+async function handleDeleteMeal(ctx, input) {
+  if (ctx.agentSlug !== 'brisket') {
+    return deny('Only Brisket can delete nutrition meal records');
+  }
+  const date = String(input.date || '').trim();
+  const meal = String(input.meal || '').trim();
+  if (!isCalendarDate(date)) return deny('date must be YYYY-MM-DD');
+  if (!isMealSlot(meal)) return deny('meal must be breakfast, lunch, dinner, or snack');
+
+  const paths = findMealDeletePaths(repoTreeOf(ctx), date, meal);
+  if (paths.length === 0) {
+    return deny(`No ${meal} record found for ${date}`);
+  }
+
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Delete ${meal} for ${date}`,
+      surfaces: ['confirm_card', 'nutrition_tab', 'central_node', 'governance_log'],
+      reads: paths,
+      writes: paths.map(path => ({
+        path,
+        mode: 'delete',
+        content: '',
+        diff: `Remove ${path.split('/').pop()}`
+      }))
+    })
+  );
+}
+
 async function handleLookupFoodBrandAu(_ctx, input) {
   const brand = String(input.brand || '').trim();
   const product = String(input.product || '').trim();
@@ -1264,6 +1313,8 @@ export async function executeShortcut(toolName, input, ctx) {
         return await handlePublishSurfaceWidget(ctx, input);
       case 'plan_week_meals':
         return await handlePlanWeekMeals(ctx, input);
+      case 'delete_meal':
+        return await handleDeleteMeal(ctx, input);
       case 'lookup_food_brand_au':
         return await handleLookupFoodBrandAu(ctx, input);
       case 'os_capability_scoreboard':
