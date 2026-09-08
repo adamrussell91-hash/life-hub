@@ -74,6 +74,11 @@ export const KERNEL_PILOT_SLUGS = Object.freeze([
 ]);
 export const WRITE_GATEWAY_TOOLS = Object.freeze([
   'os_propose_action',
+  // Domain Confirm writes must survive kernel tool trim — otherwise a photo
+  // lunch / "log it" turn can retrieve nutrition evidence and still have no
+  // log_entry, so nothing reaches Nutrition graphs after Confirm.
+  'log_entry',
+  'record_visual_evidence',
   'create_task',
   'update_task',
   'clare_mutate',

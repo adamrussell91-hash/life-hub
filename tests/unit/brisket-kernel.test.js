@@ -5,10 +5,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { analyseNutritionEvidence } from '../../netlify/functions/_shared/domain-analysis.mjs';
 import {
+  applyKernelToTurn,
   kernelTraceEvent,
   planTurn,
-  runAgentKernel
+  runAgentKernel,
+  WRITE_GATEWAY_TOOLS
 } from '../../netlify/functions/_shared/agent-kernel.mjs';
+import { buildAgentTools } from '../../netlify/functions/_shared/capabilities/registry.mjs';
+import { recordVisualEvidenceToolSchema } from '../../packages/design-kit/js/hub-visual-evidence.js';
 
 const TODAY = '2026-08-20';
 const NOW = new Date('2026-08-20T01:00:00.000Z');
@@ -405,4 +409,34 @@ test('bounded second retrieve when nutrition search truncates', () => {
   assert.ok(round2, 'second round must re-retrieve search_nutrition_records');
   assert.ok(round2.intent?.limit > (round1.kept ?? 0), 'second round must widen limit');
   assert.equal(kernel.sufficiencyDecision.anotherRound, false);
+});
+
+test('WRITE_GATEWAY keeps log_entry and record_visual_evidence', () => {
+  assert.ok(WRITE_GATEWAY_TOOLS.includes('log_entry'));
+  assert.ok(WRITE_GATEWAY_TOOLS.includes('record_visual_evidence'));
+});
+
+test('photo lunch under nutrition_adherence keeps log_entry for Confirm → graphs', () => {
+  const tools = [
+    ...buildAgentTools({
+      slug: 'brisket',
+      allowedTypes: ['meal'],
+      message: null,
+      keepFullDomainTools: true
+    }),
+    recordVisualEvidenceToolSchema()
+  ];
+  const turn = applyKernelToTurn({
+    slug: 'brisket',
+    message: 'This is my lunch — log it from the photo',
+    today: TODAY,
+    now: NOW,
+    stores: { meals: [] },
+    tools,
+    flag: true
+  });
+  assert.equal(turn.kernel?.plan?.workflow, 'nutrition_adherence');
+  const names = turn.tools.map(tool => tool.name || tool.type);
+  assert.ok(names.includes('log_entry'), 'kernel must not strip log_entry on photo lunch turns');
+  assert.ok(names.includes('record_visual_evidence'), 'kernel must not strip visual evidence capture');
 });
