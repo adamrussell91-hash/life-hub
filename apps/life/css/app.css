@@ -977,7 +977,8 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .action-proposal__diffs {
   margin: 0.75rem 0;
-  padding-left: 1.1rem;
+  padding-left: 0;
+  list-style: none;
   display: grid;
   gap: 0.5rem;
 }
@@ -997,6 +998,14 @@ main { max-width: 76rem; margin: 0 auto; }
 .action-proposal__diffs code {
   font-size: var(--text-sm);
   word-break: break-all;
+}
+
+.action-proposal__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--depth);
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .action-proposal__diff {

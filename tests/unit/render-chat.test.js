@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, renderChatMarkdown, renderInlineMarkdown, scrollChatIfPinned } from '../../apps/life/js/app/render-chat.js';
+import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, formatActionWriteDisplay, renderChatMarkdown, renderInlineMarkdown, scrollChatIfPinned } from '../../apps/life/js/app/render-chat.js';
 
 class FakeElement {
   constructor(tag) {
@@ -563,6 +563,85 @@ test('appendActionProposal renders intent, path diffs, and Confirm/Discard', () 
   assert.deepEqual(acceptedPaths(), []);
   assert.equal(confirm.textContent, 'Confirm');
   assert.equal(discard.textContent, 'Discard');
+});
+
+test('appendActionProposal shows task titles, not blob ids or create: new task noise', () => {
+  const root = new FakeDocument();
+  const { card, acceptedPaths } = appendActionProposal(root, {
+    proposal: {
+      agent: 'clare',
+      intent: 'Create 5 tasks',
+      writes: [
+        {
+          path: 'tasks:task:task_mtsnw74u_6jekrv',
+          mode: 'create',
+          content: JSON.stringify({ id: 'task_mtsnw74u_6jekrv', title: 'Email all teachers re: tomorrow\'s arrangements' }),
+          diff: 'new task: Email all teachers re: tomorrow\'s arrangements'
+        },
+        {
+          path: 'tasks:task:task_mtsnw74u_pq8qvd',
+          mode: 'create',
+          content: JSON.stringify({ id: 'task_mtsnw74u_pq8qvd', title: 'Block lunch tomorrow' }),
+          diff: 'new task: Block lunch tomorrow'
+        }
+      ]
+    }
+  });
+
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  assert.ok(diffs);
+  assert.equal(diffs.children.length, 2);
+
+  const first = diffs.children[0];
+  const firstRow = first.children[0];
+  assert.equal(firstRow.children[0].value, 'tasks:task:task_mtsnw74u_6jekrv');
+  assert.equal(firstRow.children[1].tagName, 'span');
+  assert.equal(firstRow.children[1].className, 'action-proposal__label');
+  assert.equal(firstRow.children[1].textContent, 'Email all teachers re: tomorrow\'s arrangements');
+  assert.equal(firstRow.children[0].attributes.get('aria-label'), 'Accept Email all teachers re: tomorrow\'s arrangements');
+  // No secondary "create: new task: …" line for plain creates.
+  assert.equal(first.children.length, 1);
+
+  const second = diffs.children[1];
+  assert.equal(second.children[0].children[1].textContent, 'Block lunch tomorrow');
+
+  // Visible labels are titles only; accept values keep the blob path for Confirm.
+  assert.deepEqual(
+    diffs.children.map(li => li.children[0].children[1].textContent),
+    [
+      'Email all teachers re: tomorrow\'s arrangements',
+      'Block lunch tomorrow'
+    ]
+  );
+  assert.deepEqual(acceptedPaths(), [
+    'tasks:task:task_mtsnw74u_6jekrv',
+    'tasks:task:task_mtsnw74u_pq8qvd'
+  ]);
+});
+
+test('formatActionWriteDisplay falls back to cleaned diff when content has no title', () => {
+  const display = formatActionWriteDisplay({
+    path: 'tasks:task:task_abc',
+    mode: 'create',
+    content: '{}',
+    diff: 'new task: Mark Year 11 papers'
+  });
+  assert.equal(display.label, 'Mark Year 11 papers');
+  assert.equal(display.detail, null);
+  assert.equal(display.useCode, false);
+  assert.equal(display.path, 'tasks:task:task_abc');
+});
+
+test('formatActionWriteDisplay keeps useful update detail without dumping the blob id', () => {
+  const display = formatActionWriteDisplay({
+    path: 'tasks:task:task_appraisal',
+    mode: 'overwrite',
+    content: JSON.stringify({ id: 'task_appraisal', title: 'Appraisal prep' }),
+    diff: 'reschedule Appraisal prep → 2026-09-10'
+  });
+  assert.equal(display.label, 'Appraisal prep');
+  assert.equal(display.detail, 'reschedule Appraisal prep → 2026-09-10');
+  assert.equal(display.useCode, false);
 });
 
 test('appendCnPatchProposal renders structured diff rows for match/text payloads', () => {
