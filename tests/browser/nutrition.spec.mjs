@@ -87,6 +87,38 @@ test('the Nutrition tab renders today\'s macros from the fixture repository', as
     await page.locator('#nutrition-challenges').waitFor({ state: 'visible' });
     assert.match(await page.locator('.nutrition-challenge__heading strong').textContent(), /No refined sugar/);
     assert.equal(await page.locator('.nutrition-challenge__day').count(), 7);
+
+    // Post-log refresh sets data-sync-quiet. Charts must stay settled/visible —
+    // a leftover chart-animating class used to pin areas at opacity 0.
+    await page.waitForTimeout(850);
+    const settled = await page.evaluate(() => {
+      const svg = document.querySelector('#nutrition-protein-chart');
+      const area = svg?.querySelector('[data-role="area"]');
+      return {
+        static: svg?.classList?.contains('chart-static') === true,
+        animating: svg?.classList?.contains('chart-animating') === true,
+        areaOpacity: area ? getComputedStyle(area).opacity : null,
+        dLen: svg?.querySelector('[data-role="line"]')?.getAttribute('d')?.length ?? 0
+      };
+    });
+    assert.equal(settled.static, true);
+    assert.equal(settled.animating, false);
+    assert.equal(settled.areaOpacity, '1');
+    assert.ok(settled.dLen > 0);
+
+    await page.locator('.desktop-rail [data-section="chat"]').click();
+    await page.evaluate(() => { document.querySelector('#app').dataset.syncQuiet = 'true'; });
+    const duringQuiet = await page.evaluate(() => {
+      const area = document.querySelector('#nutrition-protein-chart [data-role="area"]');
+      return area ? getComputedStyle(area).opacity : null;
+    });
+    assert.equal(duringQuiet, '1');
+    await page.evaluate(() => { delete document.querySelector('#app').dataset.syncQuiet; });
+    const afterQuiet = await page.evaluate(() => {
+      const area = document.querySelector('#nutrition-protein-chart [data-role="area"]');
+      return area ? getComputedStyle(area).opacity : null;
+    });
+    assert.equal(afterQuiet, '1');
   } finally {
     await context.close();
   }

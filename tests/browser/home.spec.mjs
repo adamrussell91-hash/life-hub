@@ -449,3 +449,68 @@ test('rapid sign-in waits behind a delayed logout request', async () => {
   assert.equal(await page.evaluate(() => localStorage.getItem('life-hub:logout-pending')), null);
   await context.close();
 });
+
+test('home metric rings recover from a mid-flight data-sync-quiet freeze', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  try {
+    await signIn(page);
+    await page.locator('#home-dashboard .metric-ring-fill').first().waitFor();
+    await page.waitForFunction(() => {
+      const fill = document.querySelector('#home-dashboard [data-ring="calories"] .metric-ring-fill');
+      const stamp = fill?.dataset?.ringDashoffset;
+      const offset = fill?.getAttribute('stroke-dashoffset');
+      const circ = fill?.getAttribute('stroke-dasharray');
+      return Boolean(stamp && circ && offset != null && Number(offset) < Number(circ));
+    });
+
+    // Reproduce the post-log blank-ring state: stamps still name the intended fill,
+    // but the rings are empty under data-sync-quiet (Safari freezes mid-transition;
+    // Chromium can also be left empty if quiet lands before the fill is committed).
+    await page.evaluate(() => {
+      document.querySelector('#app').dataset.syncQuiet = 'true';
+      for (const fill of document.querySelectorAll('#home-dashboard .metric-ring-fill')) {
+        fill.style.transition = 'none';
+        fill.setAttribute('stroke-dashoffset', fill.getAttribute('stroke-dasharray'));
+      }
+    });
+
+    const frozen = await page.evaluate(() => {
+      const fill = document.querySelector('#home-dashboard [data-ring="calories"] .metric-ring-fill');
+      const circ = Number(fill.getAttribute('stroke-dasharray'));
+      const used = Number.parseFloat(getComputedStyle(fill).strokeDashoffset);
+      return {
+        hasStamp: Boolean(fill.dataset.ringDashoffset),
+        usedNearEmpty: used > circ * 0.85,
+        calories: document.querySelector('[data-value="calories"]')?.textContent
+      };
+    });
+    assert.equal(frozen.hasStamp, true);
+    assert.equal(frozen.usedNearEmpty, true);
+    assert.equal(frozen.calories, '1,130');
+
+    await page.evaluate(async () => {
+      const { settleMetricRings } = await import('/js/app/chart-kit/animate.js');
+      settleMetricRings(document);
+    });
+
+    const recovered = await page.evaluate(() => {
+      return [...document.querySelectorAll('#home-dashboard .metric-ring-fill')].map(fill => {
+        const circ = Number(fill.getAttribute('stroke-dasharray'));
+        const used = Number.parseFloat(getComputedStyle(fill).strokeDashoffset);
+        return {
+          attr: fill.getAttribute('stroke-dashoffset'),
+          stamp: fill.dataset.ringDashoffset,
+          filledPct: circ > 0 ? Math.round((1 - used / circ) * 100) : 0
+        };
+      });
+    });
+    assert.ok(recovered.length >= 3);
+    for (const ring of recovered) {
+      assert.equal(ring.attr, ring.stamp);
+      assert.ok(ring.filledPct > 0, `expected a visible fill, got ${ring.filledPct}`);
+    }
+  } finally {
+    await context.close();
+  }
+});

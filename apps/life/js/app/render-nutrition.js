@@ -15,7 +15,8 @@ const weekdayLetter = date => new Intl.DateTimeFormat('en-AU', {
   weekday: 'narrow'
 }).format(new Date(`${date}T12:00:00+10:00`));
 
-export function renderNutrition(root, model) {
+export function renderNutrition(root, model, options = {}) {
+  const quiet = options.quiet === true;
   setText(root, '[data-nutrition="sodium"]', `${model.nutrition.sodium_mg} mg`);
   setText(root, '[data-target="nutrition-sodium"]', `/ ${model.targets.sodium_ceiling_mg} mg`);
   setText(root, '[data-nutrition="calcium"]', `${model.nutrition.calcium_mg} mg`);
@@ -32,7 +33,7 @@ export function renderNutrition(root, model) {
   renderMacroSplit(root, model);
   renderMealsToday(root, model.mealsToday);
   renderChallengeTrackers(root, model.challenges);
-  renderMacroRings(root, model);
+  renderMacroRings(root, model, { quiet });
   const proteinGuide = model.week.find(day => day.proteinTarget > 0)?.proteinTarget ?? model.targets.protein_g;
   const fatGuide = model.week.find(day => day.fatCeiling > 0)?.fatCeiling ?? model.targets.fat_ceiling_g;
   renderNamedAreaChart(root, '#nutrition-protein-chart', model.week, 'protein_g', {
@@ -40,19 +41,23 @@ export function renderNutrition(root, model) {
     guideValue: proteinGuide,
     valueLabels: true,
     guideLabel: 'goal',
-    rollingLabel: 'avg'
+    rollingLabel: 'avg',
+    quiet
   });
   renderNamedAreaChart(root, '#nutrition-calories-chart', model.week, 'calories', {
-    valueLabels: true
+    valueLabels: true,
+    quiet
   });
   renderNamedAreaChart(root, '#nutrition-fat-chart', model.week, 'fat_g', {
     markOverage: true,
     guideValue: fatGuide,
     valueLabels: true,
-    guideLabel: 'ceiling'
+    guideLabel: 'ceiling',
+    quiet
   });
   renderNamedAreaChart(root, '#nutrition-carbs-chart', model.week, 'carbs_g', {
-    valueLabels: true
+    valueLabels: true,
+    quiet
   });
   renderHeatmap(root, model.month);
   renderProteinTrend(root, model.proteinTrend);
@@ -64,13 +69,18 @@ export function renderNutrition(root, model) {
   root.querySelector('#nutrition-dashboard')?.removeAttribute('hidden');
 }
 
-function renderMacroRings(root, model) {
+function renderMacroRings(root, model, options = {}) {
+  const quiet = options.quiet === true;
   const rings = {
     sodium: { value: model.nutrition.sodium_mg, target: model.targets.sodium_ceiling_mg },
     calcium: { value: model.nutrition.calcium_mg, target: model.targets.calcium_target_mg }
   };
   for (const [name, config] of Object.entries(rings)) {
-    applyRingTarget(root.querySelector(`[data-nutrition-ring="${name}"]`), config, { size: 56, strokeWidth: 6 });
+    applyRingTarget(root.querySelector(`[data-nutrition-ring="${name}"]`), config, {
+      size: 56,
+      strokeWidth: 6,
+      quiet
+    });
   }
 }
 
@@ -81,7 +91,8 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
     guideValue = null,
     valueLabels = false,
     guideLabel = null,
-    rollingLabel = null
+    rollingLabel = null,
+    quiet = false
   } = options;
   const svg = root.querySelector(selector);
   if (!svg) return;
@@ -210,7 +221,7 @@ function renderNamedAreaChart(root, selector, series, valueKey, options = {}) {
     }
   }
 
-  animateAreaReveal(svg);
+  animateAreaReveal(svg, { quiet });
 }
 
 export function renderMealProteinPie(root, meals) {

@@ -4412,6 +4412,8 @@ main { max-width: 76rem; margin: 0 auto; }
   opacity: 0.85;
 }
 
+/* Quiet sync must jump to the finished frame. Cancelling animation alone leaves
+   area-fade at opacity:0 and line-draw at full dashoffset — empty-looking charts. */
 [data-sync-quiet] .chart-animating [data-role="line"],
 [data-sync-quiet] .chart-animating [data-role="area"],
 [data-sync-quiet] .mind-mood-dot,
@@ -4426,6 +4428,12 @@ main { max-width: 76rem; margin: 0 auto; }
 [data-sync-quiet] .metric-ring-fill {
   animation: none !important;
   transition: none !important;
+}
+[data-sync-quiet] .chart-animating [data-role="line"] {
+  stroke-dashoffset: 0 !important;
+}
+[data-sync-quiet] .chart-animating [data-role="area"] {
+  opacity: 1 !important;
 }
 .mind-board {
   position: relative;
