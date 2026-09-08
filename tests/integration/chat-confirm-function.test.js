@@ -67,6 +67,33 @@ test('validates, writes, and returns the canonical path for a new record', async
   assert.equal(JSON.parse(calls[0].options.body).sha, undefined);
 });
 
+test('meal confirm derives path from meal slot even when request slug is the agent id', async () => {
+  // Photo Confirm often sends slug=brisket (agent id). Path must still be …-lunch.md.
+  const { calls, fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T16:00:00+10:00')
+  });
+  const lunch = {
+    type: 'meal',
+    date: '2026-08-01',
+    fields: {
+      meal: 'lunch', calories: 514, protein_g: 42, fat_g: 14.5, sodium_mg: 780,
+      calcium_mg: 30, polyphenol_score: 1, omega3: 'none'
+    }
+  };
+
+  const response = await handler(request({ candidate: lunch, slug: 'brisket' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-lunch.md');
+  assert.ok(!String(payload.data.path).includes('brisket'));
+  assert.equal(calls[0].options.method, 'PUT');
+  assert.match(String(calls[0].url), /2026-08-01-lunch\.md/);
+});
+
 test('reports a validation failure without contacting GitHub', async () => {
   const { calls, fetchImpl } = githubFetchStub();
   // NOTE: `now` must be mocked here too. The fixed `session` token above was issued at

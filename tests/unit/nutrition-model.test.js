@@ -91,6 +91,36 @@ test('compares this week\'s average protein against the previous week\'s using t
   assert.deepEqual(model.proteinTrend, comparePeriods(40, 30, PROTEIN_TREND_CONFIG));
 });
 
+test('photo-logged meal macros land on the week chart series', () => {
+  // Same shape as live Brisket photo → Confirm (nutrition-label fixture).
+  const photoMeal = [{
+    record: {
+      type: 'meal',
+      date: '2026-07-30',
+      meal: 'lunch',
+      calories: 514,
+      protein_g: 42,
+      fat_g: 14.5,
+      carbs_g: 55,
+      sodium_mg: 780,
+      calcium_mg: 30,
+      polyphenol_score: 1,
+      omega3: 'none'
+    },
+    body: 'Test Chicken Pasta from photo — on track',
+    path: 'data/nutrition/2026/07/2026-07-30-lunch.md',
+    legacy: false
+  }];
+  const model = buildNutritionModel({ events: photoMeal, targetsConfig, date: '2026-07-30' });
+  const today = model.week.find(day => day.date === '2026-07-30');
+  assert.equal(today.protein_g, 42);
+  assert.equal(today.calories, 514);
+  assert.equal(today.carbs_g, 55);
+  assert.equal(today.fat_g, 14.5);
+  assert.equal(model.mealsToday.length, 1);
+  assert.equal(model.nutrition.protein_g, 42);
+});
+
 test('polyphenolVsAim labels score against aim without pretending it is a percent', () => {
   assert.deepEqual(polyphenolVsAim(14, 10), { delta: 4, label: '+4 vs aim', colour: 'green' });
   assert.deepEqual(polyphenolVsAim(8, 10), { delta: -2, label: '−2 vs aim', colour: 'muted' });

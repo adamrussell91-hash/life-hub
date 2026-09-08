@@ -14,7 +14,7 @@ import {
 } from './_shared/http.mjs';
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
-import { buildCanonicalPath, validateLogEntry } from './_shared/chat-schema.mjs';
+import { buildCanonicalPath, buildRecordSlug, validateLogEntry } from './_shared/chat-schema.mjs';
 import { resolveWorkoutConfirmTarget } from './_shared/workout-confirm-path.mjs';
 import { buildTemplateRecord, renderTemplateMarkdown, templatePathForTitle } from './_shared/workout-templates.mjs';
 import {
@@ -141,7 +141,18 @@ export function createChatConfirmHandler({
 
     let path;
     try {
-      path = buildCanonicalPath({ type: validation.record.type, date: validation.record.date, slug: parsed.slug });
+      // Meals always use the meal-slot slug from the record (breakfast/lunch/…).
+      // Never trust the request `slug` here — that field is overloaded as the
+      // agent id on other confirm kinds, and a photo Confirm with slug=brisket
+      // would write data/nutrition/…/…-brisket.md instead of …-lunch.md.
+      const pathSlug = validation.record.type === 'meal'
+        ? buildRecordSlug(validation.record)
+        : parsed.slug;
+      path = buildCanonicalPath({
+        type: validation.record.type,
+        date: validation.record.date,
+        slug: pathSlug
+      });
     } catch {
       return errorResponse(400, 'invalid_record', 'This record could not be validated.', false, PRIVATE_CACHE);
     }
