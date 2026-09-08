@@ -69,7 +69,11 @@ import {
   selectSkincareHistoryEntries
 } from './_shared/domain-retrieval.mjs';
 import { listKnowledgePages } from './_shared/knowledge-data.mjs';
-import { buildUserContent, normalizeChatAttachments } from '../../packages/design-kit/js/hub-chat-attachments.js';
+import {
+  buildUserContent,
+  MAX_CHAT_IMAGE_BYTES,
+  normalizeChatAttachments
+} from '../../packages/design-kit/js/hub-chat-attachments.js';
 import {
   normalizeAuditSession,
   buildHammondAuditContract,
@@ -291,7 +295,13 @@ import { parseEventDocument } from '../../apps/life/js/core/records.js';
 import { load as loadYaml } from 'js-yaml';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
-const MAX_BODY_BYTES = 24 * 1024;
+// Phone photos ship as base64 data URLs (≈4/3 of raw). Cap under Netlify's ~6MB
+// function payload while fitting up to three MAX_CHAT_IMAGE_BYTES images.
+const MAX_ATTACHMENT_WIRE_BYTES = Math.ceil(MAX_CHAT_IMAGE_BYTES * 4 / 3) + 256;
+const MAX_BODY_BYTES = Math.min(
+  5 * 1024 * 1024,
+  48 * 1024 + 3 * MAX_ATTACHMENT_WIRE_BYTES
+);
 const MAX_MESSAGE_LENGTH = 4000;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 
@@ -2614,6 +2624,7 @@ export function createChatStartHandler({
 
     const jobBody = JSON.stringify({
       message: parsed.message,
+      ...(parsed.attachments?.length ? { attachments: parsed.attachments } : {}),
       ...(parsed.history?.length ? { history: parsed.history } : {}),
       ...(parsed.priorAgentSlug ? { priorAgentSlug: parsed.priorAgentSlug } : {}),
       ...(parsed.auditSession ? { auditSession: parsed.auditSession } : {}),
