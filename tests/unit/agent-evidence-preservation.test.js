@@ -47,23 +47,25 @@ test('Ann kernel turn still contains lesson structure and diagnosis gaps', () =>
     flag: true,
     stores: {
       classes: [{ id: 'c1', code: '10ENG', display_name: 'Year 10 English' }],
-      units: [{ id: 'u1', title: 'Essay unit', class_id: 'c1' }],
+      units: [{ id: 'u1', title: 'Essay unit', class_id: 'c1', lesson_ids: ['l1'] }],
       lessons: [{
         id: 'l1',
+        type: 'lesson',
         title: 'Year 10 essay',
         date: TODAY,
         class_id: 'c1',
         unit_id: 'u1',
-        learning_intentions: ['Write a thesis that answers the prompt'],
-        blocks: [{ type: 'model', minutes: 15 }]
+        outcome_ids: ['EN5-1A'],
+        blocks: [{ id: 'b1', block_type: 'heading', content: { text: 'Write a thesis that answers the prompt' } }]
       }]
     }
   });
   assert.equal(turn.kernel.plan.workflow, 'lesson_diagnosis');
   assert.match(turn.promptBlock, /Year 10 essay/);
-  assert.match(turn.promptBlock, /Write a thesis that answers the prompt/);
+  assert.match(turn.promptBlock, /EN5-1A/);
   assert.match(turn.promptBlock, /10ENG|Essay unit/);
   assert.match(turn.promptBlock, /Claims:/);
+  assert.match(turn.promptBlock, /lesson_title=Year 10 essay|outcome_ids/);
 });
 
 test('Sara kernel turn still contains medical visit details, not only found=true', () => {

@@ -53,6 +53,22 @@ export function getNutritionSnapshot(records, today, { targetsConfig = TARGETS_C
     date: today,
     nutritionChallenges
   });
+  const byKey = new Map();
+  for (const record of Array.isArray(records) ? records : []) {
+    if (record?.type !== 'meal' || record.date !== today) continue;
+    const key = `${record.meal ?? ''}|${record.time ?? ''}|${record.protein_g ?? ''}|${record.calories ?? ''}`;
+    if (!byKey.has(key)) byKey.set(key, record);
+  }
+  const mealsToday = (model.mealsToday ?? []).map(meal => {
+    const key = `${meal.meal ?? ''}|${meal.time ?? ''}|${meal.protein_g ?? ''}|${meal.calories ?? ''}`;
+    const source = byKey.get(key);
+    return {
+      ...meal,
+      id: source?.id ?? meal.id ?? null,
+      path: source?.path ?? meal.path ?? null,
+      date: today
+    };
+  });
   return {
     ok: true,
     store: 'life_hub_nutrition',
@@ -60,7 +76,13 @@ export function getNutritionSnapshot(records, today, { targetsConfig = TARGETS_C
     date: today,
     day_type: model.dayType,
     today: model.macroSplit,
-    meals_today: model.mealsToday,
+    meals_today: mealsToday,
+    meals_today_count: mealsToday.length,
+    logging_status: mealsToday.length === 0
+      ? 'no_log_today'
+      : mealsToday.length < 3
+        ? 'partial_day'
+        : 'logged_today',
     advice: model.advice || null,
     challenges: (model.challenges ?? []).map(c => ({
       id: c.id,
@@ -68,7 +90,10 @@ export function getNutritionSnapshot(records, today, { targetsConfig = TARGETS_C
       status: c.status,
       tally: c.tally
     })),
-    protein_trend: model.proteinTrend
+    protein_trend: model.proteinTrend,
+    how_to_read:
+      'Logged meals are stored facts for today only. No log is missing evidence, not zero intake. '
+      + 'Do not convert yesterday\'s meals or planned meals into today\'s consumed food.'
   };
 }
 
@@ -80,29 +105,53 @@ export function getNutritionAdherence(records, today, { targetsConfig = TARGETS_
     date: today
   });
   const summarise = days => {
+    const daysInWindow = days.length;
     const withLogs = days.filter(d => d.calories > 0 || d.protein_g > 0);
-    const proteinHits = days.filter(d => d.hitProtein).length;
+    const daysLogged = withLogs.length;
+    const proteinHits = withLogs.filter(d => d.hitProtein).length;
+    const observedHitRate = daysLogged
+      ? Math.round((proteinHits / daysLogged) * 100)
+      : null;
+    const loggingCoverage = daysInWindow
+      ? Math.round((daysLogged / daysInWindow) * 100)
+      : 0;
     return {
-      days_logged: withLogs.length,
+      days_in_window: daysInWindow,
+      days_logged: daysLogged,
       protein_target_hits: proteinHits,
-      protein_hit_rate_pct: days.length
-        ? Math.round((proteinHits / days.length) * 100)
-        : 0,
-      over_fat_days: days.filter(d => d.overFatCeiling).length,
-      avg_protein_g: withLogs.length
-        ? Math.round(withLogs.reduce((s, d) => s + d.protein_g, 0) / withLogs.length)
-        : 0
+      // Observed rate among logged days only — never divide by unlogged window days.
+      protein_hit_rate_pct: observedHitRate,
+      observed_protein_hit_rate_pct: observedHitRate,
+      logging_coverage_pct: loggingCoverage,
+      coverage_status: daysLogged === 0
+        ? 'none'
+        : daysLogged < daysInWindow
+          ? 'incomplete'
+          : 'complete',
+      over_fat_days: withLogs.filter(d => d.overFatCeiling).length,
+      avg_protein_g: daysLogged
+        ? Math.round(withLogs.reduce((s, d) => s + d.protein_g, 0) / daysLogged)
+        : null
     };
   };
+  const weekDays = model.week ?? [];
+  const unloggedWeekDays = weekDays
+    .filter(d => !(d.calories > 0 || d.protein_g > 0))
+    .map(d => d.date);
   return {
     ok: true,
     store: 'life_hub_nutrition',
     same_as: 'Nutrition page week/month adherence',
     date: today,
-    week: summarise(model.week),
+    week: summarise(weekDays),
     previous_week: summarise(model.previousWeek),
     month: summarise(model.month),
-    how_to_read: 'Deterministic counts from meal files — not an estimate.'
+    unlogged_week_days: unloggedWeekDays,
+    how_to_read:
+      'observed_protein_hit_rate_pct is hits among logged days only. '
+      + 'logging_coverage_pct is days_logged / days_in_window. '
+      + 'Unlogged days are missing evidence, not zero intake or failed adherence. '
+      + 'Do not infer full-window adherence from incomplete logging.'
   };
 }
 
@@ -123,7 +172,8 @@ export function getNutritionTargets(today, { targetsConfig = TARGETS_CONFIG, day
 }
 
 export function searchNutritionRecords(records, { query, limit = DEFAULT_LIMIT } = {}) {
-  const toks = tokens(query);
+  const focused = focusNutritionQuery(query);
+  const toks = tokens(focused || query);
   if (!toks.length) return { ok: false, error: 'empty_query', store: 'life_hub_nutrition' };
   const cap = capLimit(limit);
   const all = (records ?? []).filter(r => r?.type === 'meal');
@@ -146,6 +196,7 @@ export function searchNutritionRecords(records, { query, limit = DEFAULT_LIMIT }
     ok: true,
     store: 'life_hub_nutrition',
     query,
+    focused_query: focused || query,
     count: slice.length,
     ...truncatedMeta(hits.length, slice.length),
     results: slice.map(({ record }) => ({
@@ -154,9 +205,35 @@ export function searchNutritionRecords(records, { query, limit = DEFAULT_LIMIT }
       calories: record.calories,
       protein_g: record.protein_g,
       fat_g: record.fat_g,
-      notes: record.notes
+      notes: record.notes,
+      id: record.id ?? null,
+      path: record.path ?? null
     }))
   };
+}
+
+function focusNutritionQuery(query = '') {
+  const text = String(query ?? '');
+  const food = (text.match(
+    /\b(protein|meal|meals|calorie|calories|macro|macros|egg|eggs|bowl|lunch|dinner|breakfast|snack|fat|carb|carbs)\b/gi
+  ) || []).map(w => w.toLowerCase());
+  if (!food.length) {
+    const stop = new Set([
+      'search', 'find', 'what', 'when', 'which', 'that', 'this', 'with', 'from', 'about',
+      'most', 'more', 'have', 'been', 'been', 'please', 'contributed', 'contribute',
+      'left', 'today', 'lately', 'hitting', 'targets', 'target'
+    ]);
+    return text
+      .toLowerCase()
+      .split(/\s+/)
+      .map(t => t.replace(/[^a-z0-9]/g, ''))
+      .filter(t => t.length >= 4 && !stop.has(t))
+      .slice(0, 3)
+      .join(' ');
+  }
+  if (food.includes('protein')) return 'protein';
+  if (food.includes('meal') || food.includes('meals')) return 'meal';
+  return [...new Set(food)].slice(0, 2).join(' ');
 }
 
 export function getWeightTrend({ compositionRecords = [], measurementRecords = [] } = {}) {
@@ -197,16 +274,54 @@ export function getWeightTrend({ compositionRecords = [], measurementRecords = [
 }
 
 export function searchDiaryRecords(events, input = {}) {
+  const focused = focusDiaryQuery(input.query);
   const result = searchMindRecords(events, {
     ...input,
+    query: focused || input.query,
     record_types: ['diary']
   });
   if (!result?.ok) return result;
   return {
     ...result,
+    query: input.query,
+    focused_query: focused || input.query,
     store: 'life_hub_diary',
     how_to_read: 'Diary metadata/search hits from Mind files — retrieve before asking Adam to paste prior entries.'
   };
+}
+
+function focusDiaryQuery(query = '') {
+  const text = String(query ?? '');
+  const mood = text.match(
+    /\b(anxious|anxiety|flat|low|sad|angry|anger|overwhelmed|tired|hopeful|calm|stress|grief|shame|sleep|feeling|feelings|felt|feel|mood|theme|themes|pattern|patterns|work)\b/gi
+  ) || [];
+  if (mood.length) {
+    // Keep unique surface terms; feel-stem synonymy is handled in searchMindRecords matching.
+    const unique = [];
+    const seen = new Set();
+    for (const raw of mood) {
+      const w = raw.toLowerCase();
+      const key = ['feel', 'felt', 'feeling', 'feelings'].includes(w) ? '__feel__' : w;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(w);
+    }
+    return unique.join(' ');
+  }
+  const stop = new Set([
+    'have', 'has', 'had', 'what', 'when', 'where', 'which', 'this', 'that', 'with', 'from',
+    'about', 'like', 'before', 'after', 'often', 'please', 'across', 'there', 'their',
+    'would', 'could', 'should', 'does', 'did', 'the', 'and', 'for', 'are', 'was', 'were',
+    'been', 'being', 'into', 'your', 'mine', 'just', 'very', 'much', 'more', 'some',
+    'than', 'then', 'them', 'they', 'will', 'can', 'recurring', 'history', 'overview'
+  ]);
+  return text
+    .toLowerCase()
+    .split(/\s+/)
+    .map(t => t.replace(/[^a-z0-9]/g, ''))
+    .filter(t => t.length >= 4 && !stop.has(t))
+    .slice(0, 5)
+    .join(' ');
 }
 
 export function getDiaryRange(events, { from, to, limit = DEFAULT_LIMIT } = {}) {
@@ -390,15 +505,233 @@ export function getTask(tasks = [], { task_id } = {}) {
   return { ok: true, found: true, store: 'tasks_hub', task };
 }
 
+/** Split mixed Teaching hub loads (draft lessons + scheduled_lesson rows). */
+export function partitionTeachingLessons(records = []) {
+  const drafts = [];
+  const scheduled = [];
+  for (const item of records ?? []) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    if (item.type === 'scheduled_lesson') {
+      scheduled.push(item);
+      continue;
+    }
+    if (item.type === 'lesson') {
+      drafts.push(item);
+      continue;
+    }
+    // chat.mjs merges both prefixes without always preserving type.
+    if (item.lesson_id && item.date && !Array.isArray(item.blocks)) {
+      scheduled.push(item);
+      continue;
+    }
+    drafts.push(item);
+  }
+  return { drafts, scheduled };
+}
+
+/**
+ * Join scheduled_lesson rows to draft lesson content so Ann can reason over
+ * real titles, blocks, outcomes, and unit sequence — not bare schedule ids.
+ */
+export function hydrateTeachingSchedule(lessons = [], { now = new Date(), windowDays = 14 } = {}) {
+  const today = (now instanceof Date ? now : new Date(now)).toISOString().slice(0, 10);
+  const until = addCalendarDays(today, windowDays);
+  const { drafts, scheduled } = partitionTeachingLessons(lessons);
+  const byId = new Map();
+  for (const draft of drafts) {
+    if (draft?.id) byId.set(draft.id, draft);
+  }
+
+  const hydrated = [];
+  for (const row of scheduled) {
+    if (!row?.date || row.date < today || row.date > until) continue;
+    if (row.delivery_status === 'cancelled' || row.delivery_status === 'skipped') continue;
+    const draft = byId.get(row.lesson_id) ?? null;
+    hydrated.push({
+      id: draft?.id ?? row.lesson_id ?? row.id,
+      scheduled_id: row.id ?? null,
+      lesson_id: row.lesson_id ?? draft?.id ?? null,
+      date: row.date,
+      start_time: row.start_time ?? null,
+      schedule_order: row.schedule_order ?? null,
+      delivery_status: row.delivery_status ?? null,
+      class_id: row.class_id ?? draft?.class_id ?? null,
+      unit_id: row.unit_id ?? draft?.unit_id ?? null,
+      title: draft?.title ?? draft?.display_title ?? row.title ?? null,
+      path: draft?.path ?? row.path ?? null,
+      blocks: Array.isArray(draft?.blocks) ? draft.blocks : [],
+      outcome_ids: draft?.outcome_ids ?? draft?.syllabus_outcomes ?? [],
+      sequence: Number.isFinite(draft?.sequence) ? draft.sequence : null,
+      source: 'scheduled',
+      version: draft?.version ?? draft?.revision ?? null,
+      updated_at: draft?.updated_at ?? row.updated_at ?? null
+    });
+  }
+
+  for (const draft of drafts) {
+    if (!draft?.date || draft.date < today || draft.date > until) continue;
+    if (draft.delivery_status === 'cancelled' || draft.delivery_status === 'skipped') continue;
+    if (hydrated.some(item => item.id === draft.id && item.date === draft.date)) continue;
+    hydrated.push({
+      id: draft.id,
+      scheduled_id: null,
+      lesson_id: draft.id,
+      date: draft.date,
+      start_time: draft.start_time ?? null,
+      schedule_order: draft.schedule_order ?? null,
+      delivery_status: draft.delivery_status ?? null,
+      class_id: draft.class_id ?? null,
+      unit_id: draft.unit_id ?? null,
+      title: draft.title ?? draft.display_title ?? null,
+      path: draft.path ?? null,
+      blocks: Array.isArray(draft.blocks) ? draft.blocks : [],
+      outcome_ids: draft.outcome_ids ?? draft.syllabus_outcomes ?? [],
+      sequence: Number.isFinite(draft.sequence) ? draft.sequence : null,
+      source: 'lesson',
+      version: draft.version ?? draft.revision ?? null,
+      updated_at: draft.updated_at ?? null
+    });
+  }
+
+  return hydrated.sort((a, b) => {
+    const byDate = String(a.date).localeCompare(String(b.date));
+    if (byDate) return byDate;
+    return Number(a.schedule_order ?? 0) - Number(b.schedule_order ?? 0);
+  });
+}
+
+/** Current-turn teaching constraints. Not stored preferences. */
+export function statedTeachingConstraints(message) {
+  const text = String(message ?? '');
+  const lower = text.toLowerCase();
+  const minuteMatch = lower.match(/\b(?:only\s+(?:got\s+|have\s+)?(?:about\s+|around\s+)?)?(\d{1,3})\s*(?:minutes|mins|min)\b/);
+  const hourMatch = lower.match(/\b(?:only\s+(?:got\s+|have\s+)?(?:about\s+|around\s+)?)?(\d(?:\.\d+)?)\s*hours?\b/);
+  let minutes = null;
+  if (minuteMatch) minutes = Number(minuteMatch[1]);
+  else if (hourMatch) minutes = Math.round(Number(hourMatch[1]) * 60);
+  if (!Number.isFinite(minutes) || minutes <= 0) minutes = null;
+
+  const classCode = text.match(/\b([0-9]{1,2}[A-Z]{2,}[A-Z0-9]*)\b/);
+  const yearClass = lower.match(/\byear\s*([0-9]{1,2})\b/);
+  return {
+    minutes,
+    classHint: classCode ? classCode[1] : null,
+    yearHint: yearClass ? `year ${yearClass[1]}` : null,
+    wantsToday: /\b(today|this morning|this afternoon)\b/.test(lower),
+    wantsTomorrow: /\btomorrow\b/.test(lower),
+    wantsNext: /\b(what(?:'s| is) next|next (?:for|lesson|class)|follow(?:s|ing)?\b.*\blesson|after (?:this|the) (?:lesson|class))\b/.test(lower),
+    wantsGaps: /\b(missing|gap|gaps|incomplete|prepare|preparation|intentions?|outcomes?)\b/.test(lower),
+    wantsSequence: /\b(sequence|unit|scope|follow|following|connect(?:s|ed|ion)?)\b/.test(lower)
+  };
+}
+
+function matchTeachingClass(activeClasses, query, stated = {}) {
+  const q = String(query ?? '').trim().toLowerCase();
+  const hint = String(stated.classHint ?? stated.yearHint ?? '').toLowerCase();
+  const hay = hint || q;
+  if (!hay) return null;
+  return activeClasses.find(c =>
+    [c.code, c.display_name, c.title, c.id].some(v => String(v ?? '').toLowerCase().includes(hay))
+  ) ?? activeClasses.find(c =>
+    hay.split(/\s+/).filter(t => t.length >= 2).some(token =>
+      [c.code, c.display_name, c.title].some(v => String(v ?? '').toLowerCase().includes(token))
+    )
+  ) ?? null;
+}
+
+function matchTeachingLesson(upcoming, query, stated = {}, classId = null) {
+  const pool = classId ? upcoming.filter(l => l.class_id === classId) : upcoming;
+  if (!pool.length) return null;
+  if (stated.wantsToday) {
+    const todayHit = pool.find(l => l.date === (stated.today || null));
+    if (todayHit) return todayHit;
+  }
+  const q = String(query ?? '').trim().toLowerCase();
+  if (q) {
+    const direct = pool.find(l =>
+      [l.title, l.id, l.lesson_id, l.scheduled_id].some(v => String(v ?? '').toLowerCase().includes(q))
+    );
+    if (direct) return direct;
+    const tokens = q.split(/\s+/).filter(t => t.length >= 3 && !['the', 'and', 'for', 'this', 'what', 'next', 'lesson', 'class', 'teach', 'teaching', 'today', 'tomorrow'].includes(t));
+    const scored = pool
+      .map(l => ({
+        lesson: l,
+        score: tokens.reduce((n, token) => n + (String(l.title ?? '').toLowerCase().includes(token) ? 1 : 0), 0)
+      }))
+      .filter(row => row.score > 0)
+      .sort((a, b) => b.score - a.score);
+    if (scored[0]) return scored[0].lesson;
+  }
+  return pool[0] ?? null;
+}
+
+function nextFromUnitSequence(lesson, units = [], drafts = []) {
+  if (!lesson?.unit_id) return { next: null, basis: 'unavailable_source' };
+  const unit = (units ?? []).find(u => u.id === lesson.unit_id) ?? null;
+  const ids = Array.isArray(unit?.lesson_ids) ? unit.lesson_ids : [];
+  const currentId = lesson.lesson_id ?? lesson.id;
+  const idx = ids.indexOf(currentId);
+  if (idx < 0) return { next: null, basis: 'unavailable_source', unit };
+  if (idx >= ids.length - 1) return { next: null, basis: 'unit_end', unit };
+  const nextId = ids[idx + 1];
+  const draft = (drafts ?? []).find(d => d.id === nextId) ?? null;
+  return {
+    unit,
+    basis: 'unit_lesson_ids',
+    next: {
+      id: nextId,
+      title: draft?.title ?? draft?.display_title ?? null,
+      sequence: Number.isFinite(draft?.sequence) ? draft.sequence : null,
+      unit_id: lesson.unit_id,
+      path: draft?.path ?? null
+    }
+  };
+}
+
 export function searchTeaching({ query, classes = [], lessons = [], units = [], limit = DEFAULT_LIMIT } = {}) {
   const q = String(query ?? '').trim();
   if (q.length < 2) return { ok: false, error: 'empty_query', store: 'teaching_hub' };
   const cap = capLimit(limit);
-  const hits = [
+  const { drafts } = partitionTeachingLessons(lessons);
+  const lessonPool = drafts.length ? drafts : lessons;
+  let hits = [
     ...searchTeachingRecords(q, classes, 'class'),
-    ...searchTeachingRecords(q, lessons, 'lesson'),
+    ...searchTeachingRecords(q, lessonPool, 'lesson'),
     ...searchTeachingRecords(q, units, 'unit')
   ];
+  // Natural-language questions rarely equal a title; fall back to token hits.
+  if (!hits.length) {
+    const stop = new Set([
+      'the', 'and', 'for', 'this', 'that', 'what', 'when', 'where', 'which', 'with',
+      'from', 'have', 'next', 'about', 'please', 'help', 'teach', 'teaching', 'lesson',
+      'lessons', 'class', 'today', 'tomorrow', 'should', 'would', 'could', 'into', 'over'
+    ]);
+    const toks = tokens(q).filter(t => t.length >= 3 && !stop.has(t));
+    if (toks.length) {
+      const scoreRecord = (item, type) => {
+        const hay = ['title', 'display_title', 'display_name', 'code', 'id']
+          .map(field => String(item?.[field] ?? '').toLowerCase())
+          .join(' ');
+        const score = toks.reduce((n, token) => n + (hay.includes(token) ? 1 : 0), 0);
+        if (!score || !item?.id) return null;
+        return {
+          type,
+          id: item.id,
+          title: item.title ?? item.display_name ?? item.code ?? item.id,
+          snippet: item.title ?? item.display_name ?? item.code ?? item.id,
+          match: 'token',
+          score
+        };
+      };
+      hits = [
+        ...classes.map(item => scoreRecord(item, 'class')),
+        ...lessonPool.map(item => scoreRecord(item, 'lesson')),
+        ...units.map(item => scoreRecord(item, 'unit'))
+      ]
+        .filter(Boolean)
+        .sort((a, b) => b.score - a.score || String(a.title).localeCompare(String(b.title)));
+    }
+  }
   const slice = hits.slice(0, cap);
   return {
     ok: true,
@@ -415,61 +748,119 @@ export function getTeachingContext({
   lessons = [],
   units = [],
   query = '',
-  now = new Date()
+  now = new Date(),
+  message = ''
 } = {}) {
-  const today = now.toISOString().slice(0, 10);
+  const today = (now instanceof Date ? now : new Date(now)).toISOString().slice(0, 10);
   const until = addCalendarDays(today, 14);
-  const q = String(query ?? '').trim().toLowerCase();
+  const stated = statedTeachingConstraints(message || query);
+  stated.today = today;
   const activeClasses = (classes ?? []).filter(c => c && c.status !== 'trashed' && c.status !== 'archived');
-  const upcoming = (lessons ?? [])
-    .filter(l => l?.date && l.date >= today && l.date <= until && l.delivery_status !== 'cancelled')
-    .sort((a, b) => a.date.localeCompare(b.date));
-  let matchedClass = null;
-  let matchedLesson = null;
-  let matchedUnit = null;
-  if (q) {
-    matchedClass = activeClasses.find(c =>
-      [c.code, c.display_name, c.title].some(v => String(v ?? '').toLowerCase().includes(q))
-    ) ?? null;
-    matchedLesson = upcoming.find(l =>
-      [l.title, l.display_title, l.id].some(v => String(v ?? '').toLowerCase().includes(q))
-    ) ?? upcoming[0] ?? null;
+  const { drafts } = partitionTeachingLessons(lessons);
+  const upcoming = hydrateTeachingSchedule(lessons, { now, windowDays: 14 });
+  const matchedClass = matchTeachingClass(activeClasses, query, stated);
+  const matchedLesson = matchTeachingLesson(upcoming, query, stated, matchedClass?.id ?? null);
+  let matchedUnit = matchedLesson?.unit_id
+    ? (units ?? []).find(u => u.id === matchedLesson.unit_id) ?? null
+    : null;
+  if (!matchedUnit) {
+    const q = String(query ?? '').trim().toLowerCase();
     matchedUnit = (units ?? []).find(u =>
       [u.title, u.id, u.code].some(v => String(v ?? '').toLowerCase().includes(q))
     ) ?? null;
-  } else {
-    matchedLesson = upcoming[0] ?? null;
-    if (matchedLesson?.class_id) {
-      matchedClass = activeClasses.find(c => c.id === matchedLesson.class_id) ?? null;
-    }
   }
+
+  const classUpcoming = matchedClass
+    ? upcoming.filter(l => l.class_id === matchedClass.id)
+    : upcoming;
+  const todayLessons = classUpcoming.filter(l => l.date === today);
+  const nextLesson = matchedLesson
+    ?? classUpcoming.find(l => l.date > today)
+    ?? classUpcoming[0]
+    ?? null;
+  const previous = matchedLesson
+    ? [...upcoming]
+      .filter(l =>
+        l.class_id === matchedLesson.class_id
+        && l.date
+        && (l.date < matchedLesson.date || (l.date === matchedLesson.date && Number(l.schedule_order ?? 0) < Number(matchedLesson.schedule_order ?? 0)))
+      )
+      .sort((a, b) => b.date.localeCompare(a.date) || Number(b.schedule_order ?? 0) - Number(a.schedule_order ?? 0))[0] ?? null
+    : null;
+  const sequence = nextFromUnitSequence(matchedLesson, units, drafts);
+  const nextScheduled = matchedLesson
+    ? classUpcoming.find(l =>
+      l.date > matchedLesson.date
+      || (l.date === matchedLesson.date && Number(l.schedule_order ?? 0) > Number(matchedLesson.schedule_order ?? 0))
+    ) ?? null
+    : classUpcoming[0] ?? null;
+
+  const lessonOut = matchedLesson
+    ? {
+        id: matchedLesson.id,
+        scheduled_id: matchedLesson.scheduled_id,
+        date: matchedLesson.date,
+        start_time: matchedLesson.start_time,
+        title: matchedLesson.title,
+        class_id: matchedLesson.class_id,
+        unit_id: matchedLesson.unit_id,
+        path: matchedLesson.path,
+        sequence: matchedLesson.sequence,
+        outcome_ids: matchedLesson.outcome_ids ?? [],
+        block_count: matchedLesson.blocks?.length ?? 0,
+        source: matchedLesson.source
+      }
+    : null;
+
   return {
     ok: true,
     store: 'teaching_hub',
     today,
     window_to: until,
+    stated_constraints: {
+      minutes: stated.minutes,
+      class_hint: stated.classHint,
+      year_hint: stated.yearHint
+    },
     class: matchedClass
-      ? { id: matchedClass.id, code: matchedClass.code, display_name: matchedClass.display_name }
+      ? { id: matchedClass.id, code: matchedClass.code, display_name: matchedClass.display_name ?? matchedClass.title }
       : null,
-    lesson: matchedLesson
+    lesson: lessonOut,
+    unit: matchedUnit
       ? {
-          id: matchedLesson.id,
-          date: matchedLesson.date,
-          title: matchedLesson.title ?? matchedLesson.display_title,
-          class_id: matchedLesson.class_id,
-          unit_id: matchedLesson.unit_id
+          id: matchedUnit.id,
+          title: matchedUnit.title,
+          code: matchedUnit.code,
+          lesson_ids: Array.isArray(matchedUnit.lesson_ids) ? matchedUnit.lesson_ids : [],
+          outcome_ids: matchedUnit.outcome_ids ?? []
         }
       : null,
-    unit: matchedUnit
-      ? { id: matchedUnit.id, title: matchedUnit.title, code: matchedUnit.code }
+    today_lessons: todayLessons.map(l => ({
+      id: l.id,
+      date: l.date,
+      title: l.title,
+      class_id: l.class_id,
+      start_time: l.start_time
+    })),
+    previous_lesson: previous
+      ? { id: previous.id, date: previous.date, title: previous.title, class_id: previous.class_id }
       : null,
+    next_scheduled: nextScheduled
+      ? { id: nextScheduled.id, date: nextScheduled.date, title: nextScheduled.title, class_id: nextScheduled.class_id }
+      : null,
+    next_in_unit: sequence.next,
+    next_in_unit_basis: sequence.basis,
     upcoming_count: upcoming.length,
     upcoming: upcoming.slice(0, 8).map(l => ({
       id: l.id,
       date: l.date,
-      title: l.title ?? l.display_title,
-      class_id: l.class_id
+      title: l.title,
+      class_id: l.class_id,
+      start_time: l.start_time
     })),
+    focus_lesson: nextLesson
+      ? { id: nextLesson.id, date: nextLesson.date, title: nextLesson.title, class_id: nextLesson.class_id }
+      : null,
     ...truncatedMeta(upcoming.length, Math.min(upcoming.length, 8))
   };
 }
@@ -489,9 +880,11 @@ export function searchKnowledge(pages = [], { query, limit = DEFAULT_LIMIT } = {
     results: slice.map(page => ({
       id: page.id,
       title: page.title,
+      path: page.path ?? null,
       tags: page.tags ?? [],
       excerpt: page.excerpt ?? null,
-      connected: page.connected ?? []
+      connected: page.connected ?? page.backlinks ?? [],
+      score: page.score ?? null
     })),
     how_to_read: 'Retrieved Knowledge notes. Distinguish these from any new synthesis you add.'
   };

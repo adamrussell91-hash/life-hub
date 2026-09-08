@@ -28,21 +28,30 @@ import {
   searchTeaching,
   getTeachingContext,
   searchKnowledge,
-  inspectHubSignals
+  inspectHubSignals,
+  statedTeachingConstraints
 } from './domain-retrieval.mjs';
 import {
   getTasksOpenLoops,
   getNutritionDayRemaining,
+  compareNutritionPeriods,
   compareDiaryPeriods,
   extractDiaryThemes,
   compareMindSessions,
   getSkincareResponseEvidence,
   getTeachingDiagnosis,
   getKnowledgeSynthesis,
-  getHammondAttentionPack
+  getHammondAttentionPack,
+  analyseNutritionEvidence,
+  analyseSkincareEvidence,
+  analyseDiaryEvidence,
+  analyseMindEvidence,
+  penelopeSemanticRetrievalGate,
+  skippedDiarySemanticSearch,
+  skippedDiaryThemeExtraction
 } from './domain-analysis.mjs';
 import { getWeekReview } from './hammond-week.mjs';
-import { searchMedicalRecords, briefMedicalAppointment } from './medical-overview-read.mjs';
+import { searchMedicalRecords, briefMedicalAppointment, analyseMedicalEvidence, statedHealthConstraints } from './medical-overview-read.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
 import { planWork, statedPlannerInputs } from './clare-work.mjs';
 import { composeEvidenceClaims } from './evidence-packs.mjs';
@@ -97,33 +106,43 @@ const CAPTURE = new Set(['create', 'add', 'dump', 'inbox', 'capture']);
 const GREET = new Set(['hi', 'hey', 'hello', 'yo', 'thanks', 'cheers', 'bro', 'mate', 'just', 'saying']);
 const HEALTH = new Set([
   'health', 'medical', 'appointment', 'timeline', 'weight', 'flare',
-  'bloods', 'visit', 'clinic', 'gp', 'doctor', 'symptom', 'medication',
-  'body', 'unusual'
+  'bloods', 'visit', 'clinic', 'gp', 'doctor', 'symptom', 'symptoms', 'medication',
+  'medications', 'meds', 'body', 'unusual', 'history', 'pathology', 'lab', 'labs',
+  'brief', 'result', 'results', 'compare', 'trend'
 ]);
 const LESSON = new Set([
   'lesson', 'lessons', 'class', 'unit', 'teach', 'teaching', 'improve',
-  'hinge', 'tomorrow', 'curriculum', 'year', 'pupil', 'student', 'repair'
+  'hinge', 'tomorrow', 'today', 'curriculum', 'year', 'pupil', 'student', 'repair',
+  'prepare', 'preparation', 'intention', 'intentions', 'outcome', 'outcomes',
+  'sequence', 'follow', 'following', 'missing', 'gap', 'gaps', 'next', 'previous',
+  'planned', 'schedule', 'scheduled', 'resources', 'period', 'timetable'
 ]);
 const KNOW = new Set([
-  'know', 'notes', 'archive', 'research', 'already', 'corpus', 'knowledge',
-  'synthesis', 'topic', 'about'
+  'know', 'notes', 'note', 'archive', 'research', 'already', 'corpus', 'knowledge',
+  'synthesis', 'topic', 'about', 'theme', 'themes', 'connect', 'connected', 'link',
+  'links', 'disagree', 'conflict', 'evidence', 'project', 'written', 'wrote', 'gap',
+  'gaps', 'related', 'bridge', 'idea', 'ideas'
 ]);
 const FOOD = new Set([
   'eat', 'ate', 'eaten', 'meal', 'meals', 'nutrition', 'calorie', 'calories',
   'macro', 'macros', 'adherence', 'logged', 'protein', 'diet', 'food',
-  'eating', 'intake'
+  'eating', 'intake', 'targets', 'target', 'remaining', 'left', 'miss',
+  'hitting', 'lately', 'breakfast', 'lunch', 'dinner', 'snack', 'week'
 ]);
 const SKIN = new Set([
   'skin', 'routine', 'helping', 'product', 'flare', 'breakout', 'skincare',
-  'treatment', 'cream', 'serum'
+  'treatment', 'cream', 'serum', 'recently', 'used', 'use', 'irritation',
+  'response', 'adherence', 'reaction', 'face', 'moisturizer'
 ]);
 const DIARY = new Set([
   'diary', 'feeling', 'often', 'pattern', 'patterns', 'recur', 'recurrence',
-  'journal', 'mood', 'felt', 'like'
+  'journal', 'mood', 'felt', 'like', 'themes', 'theme', 'before', 'entries',
+  'entry', 'emotional', 'anxious', 'feelings'
 ]);
 const MIND = new Set([
   'session', 'sessions', 'reflect', 'reflection', 'therapy', 'mind',
-  'longitudinal', 'pattern', 'patterns', 'across'
+  'longitudinal', 'pattern', 'patterns', 'across', 'themes', 'theme',
+  'changed', 'discuss', 'discussed', 'disagree', 'therapist', 'clinical'
 ]);
 
 export function agentKernelEnabled({ env = {}, flag, slug } = {}) {
@@ -211,13 +230,14 @@ export function planTurn({ slug, message } = {}) {
 
   if (slug === 'sara' && !greetingOnly && hits(words, HEALTH)) {
     const appointment = words.some(word => ['appointment', 'visit', 'clinic', 'gp', 'doctor'].includes(word));
-    const required = ['get_body_state', 'get_weight_trend', 'search_medical_records'];
+    const required = ['get_body_state', 'get_weight_trend', 'search_medical_records', 'analyse_medical_evidence'];
     if (appointment) required.push('brief_medical_appointment');
+    const stated = statedHealthConstraints(message);
     return validatePlan({
       workflow: 'health_timeline',
       goal: appointment
         ? 'Brief the appointment from medical records with provenance'
-        : 'Build a health timeline from body, weight, and medical records',
+        : 'Build a health timeline from body, weight, and medical records without temporal leakage',
       domain: 'health',
       requiredSources: required,
       optionalSources: [],
@@ -225,14 +245,23 @@ export function planTurn({ slug, message } = {}) {
       risk: 'high',
       writeIntent: false,
       retrieve: true,
-      completion: ['body_or_named_gap', 'medical_or_named_gap']
+      completion: ['body_or_named_gap', 'medical_or_named_gap'],
+      statedConstraints: {
+        current_symptom: stated.current_symptom
+      }
     });
   }
 
   if (slug === 'ann' && !greetingOnly && hits(words, LESSON)) {
+    const stated = statedTeachingConstraints(message);
+    const dayFocus = stated.wantsToday || stated.wantsTomorrow || stated.wantsNext;
     return validatePlan({
       workflow: 'lesson_diagnosis',
-      goal: 'Diagnose the lesson from class, unit, and calendar context before proposing a repair',
+      goal: dayFocus
+        ? 'Resolve what is scheduled and what comes next from Teaching Hub records'
+        : stated.wantsGaps
+          ? 'Diagnose stored lesson gaps before proposing a repair'
+          : 'Diagnose the lesson from class, unit, and calendar context before proposing a repair',
       domain: 'teaching',
       requiredSources: ['search_teaching', 'get_teaching_context', 'get_teaching_diagnosis'],
       optionalSources: [],
@@ -240,7 +269,12 @@ export function planTurn({ slug, message } = {}) {
       risk: 'low',
       writeIntent: false,
       retrieve: true,
-      completion: ['context_or_named_gap']
+      completion: ['context_or_named_gap'],
+      statedConstraints: {
+        minutes: stated.minutes,
+        classHint: stated.classHint,
+        yearHint: stated.yearHint
+      }
     });
   }
 
@@ -264,11 +298,17 @@ export function planTurn({ slug, message } = {}) {
       workflow: 'nutrition_adherence',
       goal: 'Separate logged intake, missing days, and adherence from guesses',
       domain: 'nutrition',
-      requiredSources: ['get_nutrition_snapshot', 'get_nutrition_adherence', 'get_nutrition_day_remaining'],
-      optionalSources: ['get_nutrition_targets', 'search_nutrition_records'],
+      requiredSources: [
+        'get_nutrition_snapshot',
+        'get_nutrition_adherence',
+        'get_nutrition_day_remaining',
+        'analyse_nutrition_evidence'
+      ],
+      optionalSources: ['get_nutrition_targets', 'compare_nutrition_periods', 'search_nutrition_records'],
       tools: [
         'get_nutrition_snapshot', 'get_nutrition_adherence', 'get_nutrition_day_remaining',
-        'get_nutrition_targets', 'search_nutrition_records'
+        'analyse_nutrition_evidence', 'get_nutrition_targets', 'compare_nutrition_periods',
+        'search_nutrition_records'
       ],
       risk: 'low',
       writeIntent: false,
@@ -282,9 +322,17 @@ export function planTurn({ slug, message } = {}) {
       workflow: 'routine_response',
       goal: 'Compare routine adherence with observed response evidence',
       domain: 'skincare',
-      requiredSources: ['get_skincare_adherence', 'get_skincare_response_evidence', 'search_skincare_records'],
+      requiredSources: [
+        'get_skincare_adherence',
+        'get_skincare_response_evidence',
+        'search_skincare_records',
+        'analyse_skincare_evidence'
+      ],
       optionalSources: [],
-      tools: ['get_skincare_adherence', 'get_skincare_response_evidence', 'search_skincare_records'],
+      tools: [
+        'get_skincare_adherence', 'get_skincare_response_evidence',
+        'search_skincare_records', 'analyse_skincare_evidence'
+      ],
       risk: 'low',
       writeIntent: false,
       retrieve: true,
@@ -297,9 +345,17 @@ export function planTurn({ slug, message } = {}) {
       workflow: 'diary_recurrence',
       goal: 'Search diary history for recurrence without inventing a pattern',
       domain: 'diary',
-      requiredSources: ['search_diary_records', 'compare_diary_periods', 'extract_diary_themes'],
+      requiredSources: [
+        'search_diary_records',
+        'compare_diary_periods',
+        'extract_diary_themes',
+        'analyse_diary_evidence'
+      ],
       optionalSources: ['get_diary_range'],
-      tools: ['search_diary_records', 'compare_diary_periods', 'extract_diary_themes', 'get_diary_range'],
+      tools: [
+        'search_diary_records', 'compare_diary_periods', 'extract_diary_themes',
+        'analyse_diary_evidence', 'get_diary_range'
+      ],
       risk: 'low',
       writeIntent: false,
       retrieve: true,
@@ -312,9 +368,12 @@ export function planTurn({ slug, message } = {}) {
       workflow: 'mind_reflection',
       goal: 'Compare mind sessions and keep interpretations inside retrieved evidence',
       domain: 'mind',
-      requiredSources: ['search_mind_records', 'compare_mind_sessions'],
+      requiredSources: ['search_mind_records', 'compare_mind_sessions', 'analyse_mind_evidence'],
       optionalSources: ['search_diary_records'],
-      tools: ['search_mind_records', 'compare_mind_sessions', 'search_diary_records'],
+      tools: [
+        'search_mind_records', 'compare_mind_sessions', 'analyse_mind_evidence',
+        'search_diary_records'
+      ],
       risk: 'high',
       writeIntent: false,
       retrieve: true,
@@ -390,7 +449,7 @@ function runTool(name, stores, today, now, message, options = {}) {
   const lessons = stores.lessons ?? [];
   const meals = stores.meals ?? [];
   const loadErrors = stores.loadErrors ?? {};
-  const query = String(message ?? '').trim();
+  const query = options.query != null ? String(options.query).trim() : String(message ?? '').trim();
   const limit = options.limit;
 
   if (name === 'get_fitness_snapshot') return getFitnessSnapshot(workouts, today);
@@ -446,6 +505,15 @@ function runTool(name, stores, today, now, message, options = {}) {
   if (name === 'get_nutrition_day_remaining') {
     return getNutritionDayRemaining(meals, today, { nutritionChallenges: stores.nutritionChallenges });
   }
+  if (name === 'compare_nutrition_periods') {
+    return compareNutritionPeriods(meals, today);
+  }
+  if (name === 'analyse_nutrition_evidence') {
+    return analyseNutritionEvidence(meals, today, {
+      nutritionChallenges: stores.nutritionChallenges,
+      message
+    });
+  }
   if (name === 'search_nutrition_records') {
     return searchNutritionRecords(meals, { query: query || 'meal', limit: limit ?? 8 });
   }
@@ -461,9 +529,17 @@ function runTool(name, stores, today, now, message, options = {}) {
   if (name === 'brief_medical_appointment') {
     return briefMedicalAppointment(stores.medicalEvents ?? [], { date: today });
   }
+  if (name === 'analyse_medical_evidence') {
+    return analyseMedicalEvidence(stores.medicalEvents ?? [], {
+      today,
+      message,
+      compositionRecords: stores.composition ?? [],
+      measurementRecords: stores.measurements ?? []
+    });
+  }
   if (name === 'search_teaching') {
     return searchTeaching({
-      query: query || 'lesson',
+      query: query || message || 'lesson',
       classes: stores.classes ?? [],
       lessons,
       units: stores.units ?? [],
@@ -475,7 +551,8 @@ function runTool(name, stores, today, now, message, options = {}) {
       classes: stores.classes ?? [],
       lessons,
       units: stores.units ?? [],
-      query,
+      query: query || message,
+      message,
       now
     });
   }
@@ -484,7 +561,8 @@ function runTool(name, stores, today, now, message, options = {}) {
       classes: stores.classes ?? [],
       lessons,
       units: stores.units ?? [],
-      query,
+      query: query || message,
+      message,
       now
     });
   }
@@ -498,6 +576,9 @@ function runTool(name, stores, today, now, message, options = {}) {
   if (name === 'get_skincare_response_evidence') {
     return getSkincareResponseEvidence(stores.skincare ?? [], today);
   }
+  if (name === 'analyse_skincare_evidence') {
+    return analyseSkincareEvidence(stores.skincare ?? [], today, { message });
+  }
   if (name === 'search_skincare_records') {
     return searchSkincareRecords(stores.skincare ?? [], { query: query || 'routine', limit: limit ?? 10 });
   }
@@ -508,14 +589,31 @@ function runTool(name, stores, today, now, message, options = {}) {
   if (name === 'extract_diary_themes') {
     return extractDiaryThemes(stores.mindEvents ?? [], { query: query || 'feeling', limit: 12 });
   }
+  if (name === 'analyse_diary_evidence') {
+    return analyseDiaryEvidence(stores.mindEvents ?? [], today, { message, query: query || message });
+  }
   if (name === 'get_diary_range') {
     const from = `${String(today).slice(0, 8)}01`;
-    return getDiaryRange(stores.mindEvents ?? [], { from, to: today, limit: 12 });
+    const range = getDiaryRange(stores.mindEvents ?? [], { from, to: today, limit: 12 });
+    if (options.contextOnly && range && typeof range === 'object') {
+      return {
+        ...range,
+        context_only: true,
+        role: 'context_only',
+        how_to_read:
+          (range.how_to_read ? `${range.how_to_read} ` : '')
+          + 'Context-only recent diary range — not semantic recurrence matches and not a referent.'
+      };
+    }
+    return range;
   }
   if (name === 'search_mind_records') {
     return searchMindRecords(stores.mindEvents ?? [], { query: query || 'session', limit: limit ?? 10 });
   }
   if (name === 'compare_mind_sessions') return compareMindSessions(stores.mindEvents ?? [], today);
+  if (name === 'analyse_mind_evidence') {
+    return analyseMindEvidence(stores.mindEvents ?? [], today, { message, query: query || message });
+  }
   if (name === 'inspect_hub_signals') {
     return inspectHubSignals({
       tasks,
@@ -662,6 +760,16 @@ function plannedRetrieveNames(state) {
   if (state.slug === 'clementine' && ((state.stores.classes ?? []).length || (state.stores.lessons ?? []).length)) {
     names.push('search_teaching');
   }
+  if (state.slug === 'brisket') {
+    names.push('compare_nutrition_periods', 'get_nutrition_targets');
+    if (/\b(search|find|ate|meal|miss|contribut)/i.test(state.message || '')) {
+      names.push('search_nutrition_records');
+    }
+  }
+  if (state.slug === 'penelope') names.push('get_diary_range');
+  if (state.slug === 'vera' && /\b(feel|diary|mood)\b/i.test(state.message || '')) {
+    names.push('search_diary_records');
+  }
   return names;
 }
 
@@ -675,6 +783,14 @@ function doRetrieve(state) {
     : plannedRetrieveNames(state).map(tool => ({ tool }));
   state.nextRetrievals = [];
   const defer = (state.retrieveRound ?? 0) === 0 ? (state.deferredTools ?? []) : [];
+
+  // Penelope: resolve recurrence referent before semantic diary search/theme tools.
+  let penelopeGate = null;
+  if (state.plan?.workflow === 'diary_recurrence') {
+    penelopeGate = penelopeSemanticRetrievalGate(state.message);
+    state.penelopeRetrievalGate = penelopeGate;
+  }
+
   for (const item of queued) {
     const name = item.tool;
     if (defer.includes(name)) {
@@ -683,9 +799,28 @@ function doRetrieve(state) {
     }
     if (state.evidence[name] && item.limit == null) continue;
     if (item.limit != null) state.retrievalLimits = { ...(state.retrievalLimits ?? {}), [name]: item.limit };
-    state.evidence[name] = runTool(name, state.stores, state.today, state.now, state.message, {
-      limit: state.retrievalLimits?.[name]
-    });
+
+    if (penelopeGate && !penelopeGate.run_semantic_search && name === 'search_diary_records') {
+      state.evidence[name] = skippedDiarySemanticSearch(penelopeGate.skip_reason);
+      continue;
+    }
+    if (penelopeGate && !penelopeGate.run_theme_extraction && name === 'extract_diary_themes') {
+      state.evidence[name] = skippedDiaryThemeExtraction(penelopeGate.skip_reason);
+      continue;
+    }
+
+    const toolOpts = { limit: state.retrievalLimits?.[name] };
+    if (
+      penelopeGate?.search_query
+      && (name === 'search_diary_records' || name === 'extract_diary_themes')
+    ) {
+      toolOpts.query = penelopeGate.search_query;
+    }
+    if (penelopeGate && !penelopeGate.run_semantic_search && name === 'get_diary_range') {
+      toolOpts.contextOnly = true;
+    }
+
+    state.evidence[name] = runTool(name, state.stores, state.today, state.now, state.message, toolOpts);
   }
   const memoryNote = recallLayeredMemory(state);
   if (state.slug === 'hammond' && state.plan?.workflow === 'cross_hub_supervision' && !(state.handoffs ?? []).length) {
@@ -736,21 +871,29 @@ function boundSourceRefs(result) {
 
 function boundRetrieveTool(item, result, round) {
   const limit = limitationFor(item.tool, result);
+  const skipped = Boolean(result?.skipped);
   return {
     round,
     name: item.tool,
     intent: item.limit != null ? { limit: item.limit } : null,
-    kind: limit?.kind ?? (result == null ? 'missing' : result.ok === false || result.error ? 'failed' : 'ok'),
-    status: result == null ? 'missing' : result.ok === false || result.error ? 'error' : 'ok',
+    kind: skipped
+      ? 'skipped'
+      : limit?.kind ?? (result == null ? 'missing' : result.ok === false || result.error ? 'failed' : 'ok'),
+    status: skipped
+      ? 'skipped'
+      : result == null ? 'missing' : result.ok === false || result.error ? 'error' : 'ok',
+    skipped,
+    skip_reason: skipped ? (result.reason ?? null) : null,
     truncated: Boolean(result?.truncated),
     kept: result?.kept ?? null,
     omitted: result?.omitted ?? null,
-    sourceRefs: boundSourceRefs(result)
+    sourceRefs: skipped ? [] : boundSourceRefs(result)
   };
 }
 
 function limitationFor(tool, result) {
   if (result == null) return { tool, kind: 'missing', text: `${tool} returned nothing` };
+  if (result.skipped) return null;
   if (result.ok === false || result.error) {
     return { tool, kind: 'failed', text: String(result.error || `${tool} failed`) };
   }
@@ -843,6 +986,7 @@ export function assessEvidence(state) {
 
   if (state.plan?.workflow === 'lesson_diagnosis') {
     const ctx = state.evidence.get_teaching_context;
+    const diagnosis = state.evidence.get_teaching_diagnosis;
     if (ctx && ctx.ok !== false && !ctx.lesson) {
       limitations.push({
         tool: 'get_teaching_context',
@@ -851,10 +995,15 @@ export function assessEvidence(state) {
       });
       coverage.missing.push('lesson');
     }
+    if (diagnosis?.diagnosis_gaps?.length && ctx?.lesson) {
+      // Gaps are derived evidence, not a retrieve failure — do not force another round.
+      coverage.missing = coverage.missing.filter(item => item !== 'lesson');
+    }
   }
 
   if (state.plan?.workflow === 'knowledge_research') {
     const notes = state.evidence.search_knowledge;
+    const synthesis = state.evidence.get_knowledge_synthesis;
     if (notes && notes.ok !== false && (notes.count ?? 0) === 0) {
       limitations.push({
         tool: 'search_knowledge',
@@ -863,27 +1012,55 @@ export function assessEvidence(state) {
       });
       coverage.missing.push('knowledge_notes');
     }
+    if (synthesis?.coverage?.weak_match) {
+      limitations.push({
+        tool: 'get_knowledge_synthesis',
+        kind: 'weak_match',
+        text: 'Knowledge matches are lexically weak — do not treat them as strong conceptual links'
+      });
+    }
+    if (synthesis?.conflicts?.length) {
+      conflicts.push({
+        tool: 'get_knowledge_synthesis',
+        kind: 'conflict',
+        text: `${synthesis.conflicts.length} note conflict(s) in the retrieved set`
+      });
+      limitations.push({
+        tool: 'get_knowledge_synthesis',
+        kind: 'conflict',
+        text: `${synthesis.conflicts.length} note conflict(s) stay visible — do not flatten disagreement`
+      });
+    }
   }
 
   if (state.plan?.workflow === 'nutrition_adherence') {
     const snap = state.evidence.get_nutrition_snapshot;
+    const analysis = state.evidence.analyse_nutrition_evidence;
     const mealsToday = snap?.meals_today;
     const mealCount = Array.isArray(mealsToday)
       ? mealsToday.length
-      : (typeof mealsToday === 'number' ? mealsToday : 0);
-    if (snap && snap.ok !== false && mealCount === 0) {
+      : (typeof mealsToday === 'number' ? mealsToday : (analysis?.meals_today_count ?? 0));
+    if ((snap && snap.ok !== false && mealCount === 0) || analysis?.logging_status === 'no_log_today') {
       limitations.push({
         tool: 'get_nutrition_snapshot',
         kind: 'missing',
-        text: 'No meals logged today'
+        text: 'No meals logged today — missing evidence, not zero intake'
       });
       coverage.missing.push('meals_today');
+    }
+    if ((analysis?.unlogged_week_days ?? []).length) {
+      limitations.push({
+        tool: 'analyse_nutrition_evidence',
+        kind: 'incomplete_logging',
+        text: `${analysis.unlogged_week_days.length} week day(s) have no meal log`
+      });
     }
   }
 
   if (state.plan?.workflow === 'routine_response') {
     const adherence = state.evidence.get_skincare_adherence;
-    if (adherence && adherence.ok !== false && (adherence.days_with_log ?? 0) === 0) {
+    const analysis = state.evidence.analyse_skincare_evidence;
+    if ((adherence && adherence.ok !== false && (adherence.days_with_log ?? 0) === 0) || analysis?.missing_logs) {
       limitations.push({
         tool: 'get_skincare_adherence',
         kind: 'missing',
@@ -895,7 +1072,17 @@ export function assessEvidence(state) {
 
   if (state.plan?.workflow === 'diary_recurrence') {
     const diary = state.evidence.search_diary_records;
-    if (diary && diary.ok !== false && (diary.count ?? 0) === 0) {
+    const analysis = state.evidence.analyse_diary_evidence;
+    const hits = analysis?.supported_match_count ?? analysis?.hit_count ?? diary?.count ?? 0;
+    if (analysis?.recurrence_strength === 'unresolved_referent' || analysis?.referent_status === 'unresolved') {
+      limitations.push({
+        tool: 'analyse_diary_evidence',
+        kind: 'unresolved_referent',
+        text: 'Deictic recurrence question has no resolvable current-turn referent — not a retrieval-depth problem'
+      });
+      // Missing referent cannot be fixed by widening feel/felt search.
+      coverage.truncated = coverage.truncated.filter(tool => tool !== 'search_diary_records');
+    } else if (diary && diary.ok !== false && hits === 0 && !(analysis?.fallback_count > 0)) {
       limitations.push({
         tool: 'search_diary_records',
         kind: 'missing',
@@ -903,17 +1090,49 @@ export function assessEvidence(state) {
       });
       coverage.missing.push('diary_hits');
     }
+    if (analysis?.recurrence_strength === 'insufficient_match') {
+      limitations.push({
+        tool: 'analyse_diary_evidence',
+        kind: 'insufficient_match',
+        text: 'No supported full diary matches — partial or fallback context only'
+      });
+    }
+    if (analysis?.recurrence_strength === 'single_entry') {
+      limitations.push({
+        tool: 'analyse_diary_evidence',
+        kind: 'weak_match',
+        text: 'Only one genuine diary match — not enough for a recurrence pattern'
+      });
+    }
   }
 
   if (state.plan?.workflow === 'mind_reflection') {
     const compare = state.evidence.compare_mind_sessions;
-    if (compare && compare.ok !== false && (compare.recent_sessions?.length ?? 0) === 0) {
+    const analysis = state.evidence.analyse_mind_evidence;
+    if (
+      (compare && compare.ok !== false && (compare.recent_sessions?.length ?? 0) === 0)
+      || analysis?.session_count === 0
+    ) {
       limitations.push({
         tool: 'compare_mind_sessions',
         kind: 'missing',
         text: 'No mind sessions in the loaded window'
       });
       coverage.missing.push('mind_sessions');
+    }
+    if (analysis?.sparse) {
+      limitations.push({
+        tool: 'analyse_mind_evidence',
+        kind: 'weak_match',
+        text: 'Sparse session records — longitudinal claims stay weak'
+      });
+    }
+    if (analysis?.conflict_signals?.length) {
+      conflicts.push({
+        tool: 'analyse_mind_evidence',
+        kind: 'conflict',
+        text: `${analysis.conflict_signals.length} session conflict_signal(s)`
+      });
     }
   }
 
@@ -986,7 +1205,11 @@ export function assessEvidence(state) {
     const result = state.evidence[tool];
     const kept = Number(result?.kept ?? result?.results?.length ?? 0);
     const omitted = Number(result?.omitted ?? 0);
-    if (omitted > 0) next.push({ tool, limit: Math.min(20, Math.max(kept + omitted, kept + 4)) });
+    if (omitted <= 0) continue;
+    const widenTo = Math.min(20, Math.max(kept + omitted, kept + 4));
+    // Already at the bounded max — further rounds cannot resolve truncation.
+    if (widenTo <= kept) continue;
+    next.push({ tool, limit: widenTo });
   }
   for (const tool of required) {
     if (!state.evidence[tool]) next.push({ tool });
@@ -1034,6 +1257,10 @@ function describeSufficiency(state, anotherRound) {
     if (!anotherRound) {
       parts.push('omitted open items are outside the 12-cap; overdue and due-soon windows already retrieved so another round is not required');
     }
+  }
+  const diaryAnalysis = state.evidence?.analyse_diary_evidence;
+  if (diaryAnalysis?.recurrence_strength === 'unresolved_referent' || diaryAnalysis?.referent_status === 'unresolved') {
+    parts.push('unresolved deictic referent — further diary search cannot invent what "this" means');
   }
   if (anotherRound) {
     parts.push(`next=${(state.nextRetrievals ?? []).map(item => item.tool || item).join(',')}`);
@@ -1098,6 +1325,268 @@ function trainingCauseLines(state) {
   return lines;
 }
 
+function teachingInterpretationLines(state) {
+  if (state.plan?.workflow !== 'lesson_diagnosis') return [];
+  const lines = [];
+  const lessonTitle = state.claims.find(claim => claim.fact === 'lesson_title')?.value;
+  const gaps = state.evidence.get_teaching_diagnosis?.diagnosis_gaps ?? [];
+  const statedMinutes = state.evidence.get_teaching_context?.stated_constraints?.minutes
+    ?? state.evidence.get_teaching_diagnosis?.stated_constraints?.minutes
+    ?? state.plan?.statedConstraints?.minutes
+    ?? null;
+  const nextBasis = state.evidence.get_teaching_diagnosis?.next_in_unit_basis
+    ?? state.evidence.get_teaching_context?.next_in_unit_basis
+    ?? null;
+  const nextScheduled = state.evidence.get_teaching_context?.next_scheduled
+    ?? state.evidence.get_teaching_diagnosis?.next_scheduled
+    ?? null;
+  if (lessonTitle) {
+    lines.push(`- Lesson context is ${lessonTitle}. Diagnose that lesson; do not invent another class.`);
+  } else {
+    lines.push('- No matching lesson was retrieved. Do not invent a class, unit, hinge, or timetable.');
+  }
+  if (gaps.length) {
+    lines.push('- diagnosis_gaps are derived from stored Teaching fields. They are not permission to invent missing content.');
+  }
+  if (gaps.some(gap => /learning intention/i.test(gap))) {
+    lines.push('- No stored learning intention was retrieved. Syllabus outcome_ids are curriculum codes, not learning intentions.');
+  }
+  if (statedMinutes) {
+    lines.push(`- Adam stated a current-turn time budget (${statedMinutes} minutes). Treat it as user_stated_current_turn, not a stored timetable fact.`);
+  }
+  if (nextBasis === 'unit_lesson_ids') {
+    lines.push('- next_in_unit comes from stored unit.lesson_ids order. That is curriculum record fact, not a free-form teaching recommendation.');
+  } else if (nextScheduled?.title || nextScheduled?.id) {
+    lines.push('- Prefer next_scheduled from the Teaching calendar when answering what comes next.');
+  } else {
+    lines.push('- Do not invent the next lesson, student needs, assessment deadlines, or prior outcomes.');
+  }
+  lines.push('- Stored facts: schedule rows, draft titles, blocks, outcome_ids, unit links. Derived: diagnosis_gaps / preparation. Inference: any rewrite beyond those fields. Never describe an outcome code as a learning intention.');
+  return lines;
+}
+
+function knowledgeInterpretationLines(state) {
+  if (state.plan?.workflow !== 'knowledge_research') return [];
+  const lines = [];
+  const noteCount = Number(state.claims.find(claim => claim.tool === 'search_knowledge' && claim.fact === 'result_count')?.value ?? 0);
+  const synthesis = state.evidence.get_knowledge_synthesis;
+  if (noteCount) {
+    lines.push('- Archive notes were retrieved. Distinguish note facts from derived synthesis. Never invent pages.');
+  } else {
+    lines.push('- No archive notes matched. Do not invent a page or citation.');
+  }
+  if (synthesis?.graph_links?.length) {
+    lines.push('- graph_links are stored Knowledge connections. Cite both ends.');
+  }
+  if (synthesis?.inferred_relations?.length) {
+    lines.push('- inferred_relations are lexical/tag overlap only. Do not convert them into stored links.');
+  }
+  if (synthesis?.conflicts?.length) {
+    lines.push('- Retrieved notes show conflict_signal disagreement. Keep both sides visible; do not claim a proven contradiction or flatten disagreement.');
+  }
+  if (synthesis?.themes?.length) {
+    lines.push('- Recurring themes are derived across notes. They are not themselves stored page titles.');
+  }
+  if (synthesis?.coverage?.weak_match) {
+    lines.push('- Matches are lexically weak. Do not treat weak overlap as a strong conceptual relationship.');
+  }
+  if (state.evidence.search_teaching?.count > 0) {
+    lines.push('- Teaching bridge hits are Teaching Hub records, not Knowledge pages. Keep store provenance separate.');
+  }
+  return lines;
+}
+
+function saraInterpretationLines(state) {
+  if (state.plan?.workflow !== 'health_timeline') return [];
+  const lines = [];
+  const analysis = state.evidence.analyse_medical_evidence;
+  const weightConflict = state.limitations.some(item => item.kind === 'conflict' && item.tool === 'get_weight_trend');
+  const medicalHits = Number(state.claims.find(claim => claim.tool === 'search_medical_records' && claim.fact === 'result_count')?.value ?? 0);
+  const statedSymptom = analysis?.stated_constraints?.current_symptom
+    ?? state.plan?.statedConstraints?.current_symptom
+    ?? null;
+  if (weightConflict) {
+    lines.push('- Weight readings conflict. Do not treat them as one clean trend.');
+  }
+  if (medicalHits) {
+    lines.push('- Medical hits are retrieved dated records. Do not invent extra visits or results.');
+  } else {
+    lines.push('- No matching medical visits were retrieved. Do not invent an appointment or lab result.');
+  }
+  if ((analysis?.recent_visit_count ?? 0) > 0) {
+    lines.push('- Recent-window visits are recent historical evidence only. Recency does not prove a current symptom, current diagnosis, current medication use, or current abnormality.');
+  }
+  if ((analysis?.historical_visit_count ?? 0) > 0) {
+    lines.push('- Older historical medical visits stay historical. Do not convert them into a present condition, current medication adherence, or current lab result.');
+  }
+  if ((analysis?.missing_date_count ?? 0) > 0) {
+    lines.push('- Some medical records are missing dates. Keep the date missing — do not invent one.');
+  }
+  if (statedSymptom) {
+    lines.push(`- Adam stated a current-turn symptom/context (${statedSymptom}). Treat it as user_stated_current_turn, not a stored Medical Overview fact.`);
+  }
+  if (analysis?.comparisons?.length) {
+    lines.push('- Dated comparisons must preserve both dates. Do not collapse two readings into one undated claim.');
+  }
+  lines.push('- Current state requires user_stated_current_turn or explicit active stored evidence. Do not use unrelated historical findings as causal explanations. Do not diagnose or prescribe.');
+  return lines;
+}
+
+function brisketInterpretationLines(state) {
+  if (state.plan?.workflow !== 'nutrition_adherence') return [];
+  const lines = [];
+  const analysis = state.evidence.analyse_nutrition_evidence;
+  const status = analysis?.logging_status ?? state.evidence.get_nutrition_snapshot?.logging_status;
+  if (status === 'no_log_today' || state.coverage.missing.includes('meals_today')) {
+    lines.push('- No meals are logged today. That is missing evidence, not zero intake. Do not claim adherence or remaining macros as if the day is complete.');
+  } else if (status === 'partial_day') {
+    lines.push('- Today\'s log looks partial. Do not treat partial logging as full-day adherence or as a confirmed target miss.');
+  } else {
+    lines.push('- Intake claims must come from logged meals only.');
+  }
+  const week = analysis?.week_adherence;
+  if (week && typeof week === 'object') {
+    const hits = week.protein_target_hits;
+    const logged = week.days_logged;
+    const window = week.days_in_window;
+    const observed = week.observed_protein_hit_rate_pct ?? week.protein_hit_rate_pct;
+    const coverage = week.logging_coverage_pct;
+    if (logged === 0) {
+      lines.push('- No days were logged in the window. Observed protein hit rate is unavailable — do not report 0% adherence as if zero intake was observed.');
+    } else if (week.coverage_status === 'incomplete' || (coverage != null && coverage < 100)) {
+      lines.push(
+        `- Among logged days, ${hits}/${logged} hit the protein target`
+        + (observed != null ? ` (observed hit rate ${observed}%)` : '')
+        + `. Only ${logged}/${window} days were logged`
+        + (coverage != null ? ` (coverage ${coverage}%)` : '')
+        + ', so full-week adherence cannot be established.'
+      );
+    } else if (observed != null) {
+      lines.push(`- Observed protein hit rate among logged days is ${observed}% with full logging coverage in the window.`);
+    }
+  }
+  if ((analysis?.unlogged_week_days ?? []).length) {
+    lines.push('- Some recent days have no meal log. Do not infer adherence from incomplete logging and do not invent those meals.');
+  }
+  if ((analysis?.yesterday_meal_count ?? 0) > 0) {
+    lines.push('- Yesterday\'s meals stay on yesterday. Do not convert them into today\'s intake.');
+  }
+  if (analysis?.week_vs_previous?.comparison_limitation) {
+    lines.push(`- Period comparison limitation: ${analysis.week_vs_previous.comparison_limitation}`);
+  }
+  if (analysis?.below_target_day) {
+    lines.push(
+      `- On the most recent logged day where recorded protein remained below target (${analysis.below_target_day}), `
+      + 'these meals were logged. They are stored meal facts for that date, not proof the day is complete and not a causal explanation of a confirmed miss.'
+    );
+  } else if (analysis?.below_target_day_basis === 'no_observed_below_target_day') {
+    lines.push('- No defensible observed-below-target day was identified. Do not attribute arbitrary meals as contributors to a target miss.');
+  }
+  if (analysis?.stated_constraints?.current_intake_note) {
+    lines.push(`- Adam stated a current-turn intake note (${analysis.stated_constraints.current_intake_note}). Treat it as user_stated_current_turn, not a stored meal row.`);
+  }
+  lines.push('- Separate stored meal facts, target facts, derived adherence, and derived remaining macros. Do not invent meals or convert planned meals into consumed food.');
+  return lines;
+}
+
+function hyaluronicaInterpretationLines(state) {
+  if (state.plan?.workflow !== 'routine_response') return [];
+  const lines = [];
+  const analysis = state.evidence.analyse_skincare_evidence;
+  if (analysis?.missing_logs || state.coverage.missing.includes('skincare_logs')) {
+    lines.push('- No skincare logs in the window. Do not claim the routine is helping.');
+  } else {
+    lines.push('- Response claims need logged notes. Adherence is not the same as improvement.');
+  }
+  if ((analysis?.historical_irritation ?? []).length) {
+    lines.push('- Historical irritation logs stay historical. Do not describe them as current irritation.');
+  }
+  if ((analysis?.temporal_associations ?? []).length) {
+    lines.push('- Product-before-response timing is temporal association only. Do not claim causation.');
+  }
+  if (analysis?.stated_constraints?.current_irritation) {
+    lines.push(`- Adam stated current-turn irritation (${analysis.stated_constraints.current_irritation}). Treat it as user_stated_current_turn.`);
+  }
+  lines.push('- Separate stored routine events, stored response events, derived adherence, and inference. Do not infer product effectiveness from adherence alone.');
+  return lines;
+}
+
+function penelopeInterpretationLines(state) {
+  if (state.plan?.workflow !== 'diary_recurrence') return [];
+  const lines = [];
+  const analysis = state.evidence.analyse_diary_evidence;
+  const strength = analysis?.recurrence_strength;
+  const supported = analysis?.supported_match_count ?? analysis?.hit_count ?? 0;
+  if (strength === 'unresolved_referent' || analysis?.referent_status === 'unresolved') {
+    lines.push('- Adam asked a deictic recurrence question, but this turn does not establish what "this" refers to.');
+    lines.push('- Do not invent the referent from historical diary entries.');
+    lines.push('- Do not report a recurrence pattern.');
+    lines.push('- Ask a minimal clarification: what feeling or situation is meant?');
+    if ((analysis?.fallback_count ?? 0) > 0) {
+      lines.push('- Recent diary entries may appear as context only. They do not resolve the missing referent.');
+    }
+  } else if (!supported) {
+    if ((analysis?.partial_count ?? 0) > 0) {
+      lines.push('- No supported full diary matches. Partial token matches are context only and do not establish recurrence.');
+    } else if ((analysis?.fallback_count ?? 0) > 0 || strength === 'insufficient_match') {
+      lines.push('- No supported recurrence matched the requested feeling, theme, or situation.');
+      lines.push('- Recent diary entries retrieved as fallback context are context only. They are not evidence that the requested feeling recurred.');
+    } else {
+      lines.push('- No diary hits. Do not invent a recurring feeling or pattern.');
+    }
+  } else if (strength === 'single_entry') {
+    lines.push('- One genuine diary match is not a pattern. Keep recurrence weak or absent.');
+  } else if (strength === 'weak_recurrence') {
+    lines.push('- Recurrence evidence is weak. Do not overstate the pattern.');
+  } else if (strength === 'multi_entry_recurrence') {
+    lines.push('- Recurrence must stay grounded in genuine retrieved diary matches. Themes are derived frequency, not stored facts.');
+  }
+  if ((analysis?.partial_count ?? 0) > 0 && supported > 0) {
+    lines.push('- Partial token matches remain context only and do not increase recurrence strength.');
+  }
+  if ((analysis?.fallback_count ?? 0) > 0 && supported > 0) {
+    lines.push('- Fallback recent entries remain context only and do not increase recurrence strength.');
+  }
+  if ((analysis?.conflicting_moods ?? []).length) {
+    lines.push('- Diary moods conflict across entries. Keep disagreement visible.');
+  }
+  if (analysis?.stated_constraints?.current_mood) {
+    lines.push(
+      `- Adam stated a current-turn mood (${analysis.stated_constraints.current_mood}). `
+      + 'Treat it as user_stated_current_turn. Historical matches may be searched for that mood, '
+      + 'but historical entries do not establish that the current state came from those past events.'
+    );
+  } else if (analysis?.referent_kind === 'explicit_query' && analysis?.referent_value) {
+    lines.push(`- Recurrence search targets the explicitly named feeling/theme (${analysis.referent_value}).`);
+  }
+  lines.push('- Do not turn semantic similarity into a stored fact, label patterns as causal, or invent emotional states from unrelated text.');
+  return lines;
+}
+
+function veraInterpretationLines(state) {
+  if (state.plan?.workflow !== 'mind_reflection') return [];
+  const lines = [];
+  const analysis = state.evidence.analyse_mind_evidence;
+  if (!analysis?.session_count) {
+    lines.push('- No mind sessions were retrieved. Do not invent a longitudinal pattern.');
+  } else if (analysis.sparse) {
+    lines.push('- Session records are sparse. Keep longitudinal claims weak.');
+  } else {
+    lines.push('- Interpret only from retrieved sessions. Recurring themes are derived, not therapist conclusions.');
+  }
+  if (analysis?.changed_themes?.appeared_recently?.length || analysis?.changed_themes?.not_appeared_recently?.length) {
+    lines.push('- Theme change claims must cite recent vs prior session windows.');
+  }
+  if (analysis?.conflict_signals?.length) {
+    lines.push('- Session notes show conflict_signal disagreement. Keep both sides visible; do not flatten.');
+  }
+  if (analysis?.stated_constraints?.current_theme) {
+    lines.push(`- Adam stated a current-turn theme (${analysis.stated_constraints.current_theme}). Do not convert historical session content into a present symptom.`);
+  }
+  lines.push('- Do not diagnose. Do not invent therapist conclusions. Do not convert therapist notes into current clinical state.');
+  return lines;
+}
+
 function doCompose(state) {
   const composed = composeEvidenceClaims(state.evidence);
   state.claims = composed.claims;
@@ -1134,14 +1623,6 @@ function doCompose(state) {
   const overdue = state.claims.some(claim => claim.fact === 'overdue_title');
   const collisions = Number(state.claims.find(claim => claim.fact === 'collision_count')?.value ?? 0) > 0;
   const workflow = state.plan?.workflow;
-  const weightConflict = state.limitations.some(item => item.kind === 'conflict' && item.tool === 'get_weight_trend');
-  const medicalHits = Number(state.claims.find(claim => claim.tool === 'search_medical_records' && claim.fact === 'result_count')?.value ?? 0);
-  const lessonTitle = state.claims.find(claim => claim.fact === 'lesson_title')?.value;
-  const noteCount = Number(state.claims.find(claim => claim.tool === 'search_knowledge' && claim.fact === 'result_count')?.value ?? 0);
-  const mealsToday = state.coverage.missing.includes('meals_today');
-  const skinLogs = state.coverage.missing.includes('skincare_logs');
-  const diaryHits = state.coverage.missing.includes('diary_hits');
-  const mindSessions = state.coverage.missing.includes('mind_sessions');
   state.interpretationBlock = [
     'Kernel interpretation (authoritative for this turn):',
     '- Claims above are retrieved or calculated from Life Hub stores. Do not invent extra rows.',
@@ -1152,6 +1633,13 @@ function doCompose(state) {
         : '- No pain claim was retrieved this turn. Do not invent a pain constraint.')
       : '',
     ...trainingCauseLines(state),
+    ...teachingInterpretationLines(state),
+    ...knowledgeInterpretationLines(state),
+    ...saraInterpretationLines(state),
+    ...brisketInterpretationLines(state),
+    ...hyaluronicaInterpretationLines(state),
+    ...penelopeInterpretationLines(state),
+    ...veraInterpretationLines(state),
     workflow === 'daily_focus'
       ? (overdue
         ? `- Overdue work is present (${state.claims.find(claim => claim.fact === 'overdue_title')?.value}). Do not ignore it when naming the next move.`
@@ -1159,43 +1647,6 @@ function doCompose(state) {
       : '',
     workflow === 'daily_focus' && collisions
       ? '- Teaching and tasks collide on the planned day. Do not present the day as an empty workday from 08:00.'
-      : '',
-    workflow === 'health_timeline'
-      ? (weightConflict
-        ? '- Weight readings conflict. Do not treat them as one clean trend.'
-        : medicalHits
-          ? '- Medical hits are retrieved records. Do not invent extra visits or results.'
-          : '- No matching medical visits were retrieved. Do not invent an appointment or lab result.')
-      : '',
-    workflow === 'lesson_diagnosis'
-      ? (lessonTitle
-        ? `- Lesson context is ${lessonTitle}. Diagnose that lesson; do not invent another class.`
-        : '- No matching lesson was retrieved. Do not invent a class, unit, or hinge.')
-      : '',
-    workflow === 'knowledge_research'
-      ? (noteCount
-        ? '- Archive notes were retrieved. Distinguish them from new synthesis. Never invent pages.'
-        : '- No archive notes matched. Do not invent a page or citation.')
-      : '',
-    workflow === 'nutrition_adherence'
-      ? (mealsToday
-        ? '- No meals are logged today. Do not claim adherence or remaining macros as if the day is complete.'
-        : '- Intake claims must come from logged meals. Missing days stay missing.')
-      : '',
-    workflow === 'routine_response'
-      ? (skinLogs
-        ? '- No skincare logs in the window. Do not claim the routine is helping.'
-        : '- Response claims need logged notes. Adherence is not the same as improvement.')
-      : '',
-    workflow === 'diary_recurrence'
-      ? (diaryHits
-        ? '- No diary hits. Do not invent a recurring feeling or pattern.'
-        : '- Recurrence must be grounded in retrieved diary hits. One entry is not a pattern.')
-      : '',
-    workflow === 'mind_reflection'
-      ? (mindSessions
-        ? '- No mind sessions were retrieved. Do not invent a longitudinal pattern.'
-        : '- Interpret only from retrieved sessions. Do not diagnose beyond those records.')
       : '',
     workflow === 'cross_hub_supervision'
       ? '- Cross-hub synthesis is only as good as verified specialist returns.'
