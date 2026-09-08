@@ -2,7 +2,6 @@ import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { isBoardTask } from '@/domain/hierarchy';
 import {
-  adaptiveTodayTasks,
   addDays,
   overdueTasks,
   parseDue,
@@ -368,26 +367,15 @@ export function dashboardNextAction(
   projects: Project[],
   now: Date = new Date()
 ): DashboardNextAction | null {
-  const overdue = overdueTasks(tasks, now);
-  const firstOverdue = overdue[0];
-  if (firstOverdue) {
+  // Same order as the Home Today agenda (overdue → adaptive today).
+  const plate = todayPlateTasks(tasks, now)[0];
+  if (plate) {
     return {
-      kind: firstOverdue.status === 'in_progress' ? 'complete' : 'start',
-      title: firstOverdue.title,
+      kind: plate.status === 'in_progress' ? 'complete' : 'start',
+      title: plate.title,
       source: 'task',
-      href: taskHref(firstOverdue.id),
-      task: firstOverdue
-    };
-  }
-
-  const today = adaptiveTodayTasks(tasks, now)[0];
-  if (today) {
-    return {
-      kind: today.status === 'in_progress' ? 'complete' : 'start',
-      title: today.title,
-      source: 'task',
-      href: taskHref(today.id),
-      task: today
+      href: taskHref(plate.id),
+      task: plate
     };
   }
 

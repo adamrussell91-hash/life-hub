@@ -15,6 +15,7 @@ import {
 } from '@/domain/cards';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createMorphingClosedFieldPopover } from '../../design-kit/js/morphing-popover.js';
+import { formatTaskTimeRange } from '@/domain/time-grid';
 import { cardTransitionName, runContainerTransform } from '@/views/container-transform';
 import { closeCardMenu, renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import { domainFilterOptions, priorityFilterOptions, statusFilterOptions } from '@/views/hub-kit';
@@ -144,10 +145,14 @@ function statusChip(status: string, onSave?: (value: string) => void): HTMLEleme
   });
 }
 
-function dateBadge(due: string | null, prefix = ''): HTMLElement | null {
-  if (!due) return null;
+function dateBadge(due: string | null, prefix = '', timeLabel = ''): HTMLElement | null {
+  if (!due && !timeLabel) return null;
   const badge = el('span', 'date-badge');
-  badge.append(calendarIcon(), document.createTextNode(`${prefix}${formatDisplayDate(due)}`));
+  const parts = [
+    due ? `${prefix}${formatDisplayDate(due)}` : '',
+    timeLabel
+  ].filter(Boolean);
+  badge.append(calendarIcon(), document.createTextNode(parts.join(' · ')));
   return badge;
 }
 
@@ -275,7 +280,7 @@ export function renderTaskMicroCard(task: Task, handlers: TaskCardHandlers = {})
   );
   const foot = el('div', 'hub-row__foot');
   const meta = el('div', 'hub-row__foot-meta');
-  const due = dateBadge(task.due_date);
+  const due = dateBadge(task.due_date, '', formatTaskTimeRange(task));
   if (due) meta.append(due);
   meta.append(el('span', 'hub-row__updated', formatRelativeUpdated(task.updated_at)));
   foot.append(meta);
@@ -311,7 +316,7 @@ export function renderTaskExpandedCard(task: Task, handlers: TaskCardHandlers = 
   );
   for (const tag of stringList(task.tags)) chips.append(el('span', 'hub-chip', tag));
   tags.append(chips);
-  const due = dateBadge(task.due_date, 'Due ');
+  const due = dateBadge(task.due_date, 'Due ', formatTaskTimeRange(task));
   if (due) tags.append(due);
   card.append(head, title, tags);
   if (task.description) card.append(el('p', 'hub-card__meta', task.description));

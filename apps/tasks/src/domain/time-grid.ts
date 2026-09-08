@@ -43,6 +43,21 @@ export function endTimeFromStart(
   return hoursToDueTime(hours + durationMinutes / 60);
 }
 
+/** Card / list label for a task's start–end window. Empty when no `due_time`. */
+export function formatTaskTimeRange(task: {
+  due_time?: string | null;
+  estimated_duration?: number | null;
+}): string {
+  const start = parseDueTimeHours(task.due_time);
+  if (start == null) return '';
+  const end = endTimeFromStart(task.due_time, task.estimated_duration);
+  const startLabel = formatDialTime(start);
+  if (!end) return startLabel;
+  const endHours = parseDueTimeHours(end);
+  if (endHours == null) return startLabel;
+  return `${startLabel} – ${formatDialTime(endHours)}`;
+}
+
 /** Whole minutes between two `HH:mm` clocks. Null when either is bad or end ≤ start. */
 export function durationMinutesBetween(
   start: string | null | undefined,

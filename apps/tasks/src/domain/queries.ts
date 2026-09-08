@@ -1,6 +1,7 @@
 import type { Task, TaskDomain } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { isBoardTask } from '@/domain/hierarchy';
+import { parseDueTimeHours } from '@/domain/daily-dial';
 import { getTaskPropertiesSync } from '@/services/task-properties';
 
 const PRIORITY_RANK: Record<Task['priority'], number> = {
@@ -161,7 +162,11 @@ export function sortByPriorityThenDue(tasks: Task[]): Task[] {
     if (pr !== 0) return pr;
     const ad = parseDue(a.due_date)?.getTime() ?? Number.POSITIVE_INFINITY;
     const bd = parseDue(b.due_date)?.getTime() ?? Number.POSITIVE_INFINITY;
-    return ad - bd;
+    if (ad !== bd) return ad - bd;
+    // Same day: earliest clock first; untimed work sorts after timed.
+    const at = parseDueTimeHours(a.due_time) ?? Number.POSITIVE_INFINITY;
+    const bt = parseDueTimeHours(b.due_time) ?? Number.POSITIVE_INFINITY;
+    return at - bt;
   });
 }
 
