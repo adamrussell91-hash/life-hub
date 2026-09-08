@@ -129,7 +129,10 @@ describe('chat message bubbles', () => {
 
   it('clears the mobile nav under the full-page Clare canvas', () => {
     expect(viewsCss).toMatch(
-      /\.hub-layout\[data-hub-view='clare'\]\s+\.hub-canvas\s*\{[^}]*padding-bottom:\s*calc\(5\.5rem/
+      /\.hub-layout\[data-hub-view='clare'\]\s*\{[^}]*padding-bottom:\s*calc\(5\.5rem/
+    );
+    expect(viewsCss).toMatch(
+      /\.hub-layout\[data-hub-view='clare'\]\s+\.hub-canvas\s*\{[^}]*padding-bottom:\s*0/
     );
   });
 });

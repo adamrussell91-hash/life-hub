@@ -2497,12 +2497,6 @@
 }
 
 @media (max-width: 720px) {
-  .hub-layout[data-hub-view='clare'] .hub-canvas {
-    padding: var(--space-4);
-    /* Clear locked .hub-mobile-nav (MOBILE.md) — do not rely on outer shell padding alone. */
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
-  }
-
   /*
    * Full-page Chat must track the visual viewport (same contract as Life Hub).
    * height:100dvh does not shrink when the iOS keyboard opens, so the composer
@@ -2512,12 +2506,21 @@
    *
    * position:fixed pins the canvas to the visual frame — a plain height shrink
    * left a cotton gap under the composer when the outer shell was taller.
+   *
+   * mobile.css already pads .hub-layout for the locked nav; Clare must not also
+   * pad the canvas or the composer sits one nav-height above the bar.
    */
   .hub-layout[data-hub-view='clare'] {
     position: relative;
     height: 100dvh;
     max-height: 100dvh;
     overflow: hidden;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hub-layout[data-hub-view='clare'] .hub-canvas {
+    padding: var(--space-4);
+    padding-bottom: 0;
   }
 
   html.vv-keyboard-open .hub-layout[data-hub-view='clare'],
@@ -2530,6 +2533,7 @@
     width: 100%;
     height: var(--vv-height, 100dvh);
     max-height: var(--vv-height, 100dvh);
+    padding-bottom: 0;
   }
 
   html.vv-keyboard-open .hub-layout[data-hub-view='clare'] .hub-canvas,
