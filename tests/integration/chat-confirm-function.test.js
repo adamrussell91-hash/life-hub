@@ -1642,3 +1642,223 @@ test('P: valid confirm of A persists A, consumes A, and leaves B pending', async
   assert.equal(queue[0].id, 'act_b');
   assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('pending-actions.json')));
 });
+
+
+function clareTaskProposal(taskId, title) {
+  const path = `tasks:task:${taskId}`;
+  return {
+    path,
+    proposal: {
+      capability: 'os.propose-action',
+      agent: 'clare',
+      intent: `Create ${title}`,
+      reads: [],
+      writes: [{
+        path,
+        mode: 'create',
+        content: JSON.stringify({ title, status: 'open' }),
+        diff: `new ${title}`
+      }],
+      surfaces: ['governance_log']
+    }
+  };
+}
+
+function pendingActionsFetchImpl({ getQueue, setQueue, calls }) {
+  const queueSha = 'e'.repeat(40);
+  return async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'data/os/pending-actions.json', type: 'blob', sha: queueSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(JSON.stringify(getQueue()), 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      if (url.includes('pending-actions.json')) {
+        setQueue(JSON.parse(Buffer.from(JSON.parse(options.body).content, 'base64').toString('utf8')));
+      }
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+}
+
+test('Q: consumed pending id replay with same candidate is rejected; no second write', async () => {
+  const { path: pathQ, proposal } = clareTaskProposal('task_q', 'Task Q');
+  let queue = [{ id: 'act_q', createdAt: '2026-08-01', slug: 'clare', proposal }];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+
+  const first = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_q',
+    accept: [pathQ],
+    candidate: proposal
+  }));
+  assert.equal(first.status, 200);
+  assert.equal(store.data['tasks/task_q'].title, 'Task Q');
+  assert.equal(queue.length, 0);
+  const titleAfterFirst = store.data['tasks/task_q'].title;
+  const putsAfterFirst = calls.filter((call) => call.options?.method === 'PUT').length;
+
+  const replay = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_q',
+    accept: [pathQ],
+    candidate: proposal
+  }));
+  const replayPayload = await replay.json();
+  assert.equal(replay.status, 404);
+  assert.equal(replayPayload.error.code, 'pending_action_not_found');
+  assert.equal(store.data['tasks/task_q'].title, titleAfterFirst);
+  assert.equal(queue.length, 0);
+  assert.equal(calls.filter((call) => call.options?.method === 'PUT').length, putsAfterFirst);
+});
+
+test('R: fake id plus valid candidate fails closed; candidate does not execute', async () => {
+  const { path: pathR, proposal } = clareTaskProposal('task_r', 'Task R');
+  let queue = [];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_does_not_exist',
+    accept: [pathR],
+    candidate: proposal
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 404);
+  assert.equal(payload.error.code, 'pending_action_not_found');
+  assert.equal(store.data['tasks/task_r'], undefined);
+  assert.equal(calls.filter((call) => call.options?.method === 'PUT').length, 0);
+});
+
+test('S: wrong id plus valid A candidate rejects; A remains pending; nothing writes', async () => {
+  const a = clareTaskProposal('task_s_a', 'Task S A');
+  let queue = [{ id: 'act_s_a', createdAt: '2026-08-01', slug: 'clare', proposal: a.proposal }];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_unrelated',
+    accept: [a.path],
+    candidate: a.proposal
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 404);
+  assert.equal(payload.error.code, 'pending_action_not_found');
+  assert.equal(store.data['tasks/task_s_a'], undefined);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, 'act_s_a');
+  assert.equal(calls.filter((call) => call.options?.method === 'PUT').length, 0);
+});
+
+test('T: existing A id plus tampered candidate B uses stored A only', async () => {
+  const a = clareTaskProposal('task_t_a', 'Task T A');
+  const b = clareTaskProposal('task_t_b', 'Task T B');
+  let queue = [{ id: 'act_t_a', createdAt: '2026-08-01', slug: 'clare', proposal: a.proposal }];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_t_a',
+    accept: [a.path],
+    candidate: b.proposal
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(store.data['tasks/task_t_a'].title, 'Task T A');
+  assert.equal(store.data['tasks/task_t_b'], undefined);
+  assert.equal(queue.length, 0);
+});
+
+test('U: agent ownership mismatch rejects; nothing writes; pending remains', async () => {
+  const a = clareTaskProposal('task_u', 'Task U');
+  let queue = [{ id: 'act_u', createdAt: '2026-08-01', slug: 'clare', proposal: a.proposal }];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'brisket',
+    id: 'act_u',
+    accept: [a.path],
+    candidate: a.proposal
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 403);
+  assert.equal(payload.error.code, 'pending_action_agent_mismatch');
+  assert.equal(store.data['tasks/task_u'], undefined);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, 'act_u');
+  assert.equal(calls.filter((call) => call.options?.method === 'PUT').length, 0);
+});

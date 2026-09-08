@@ -14,6 +14,7 @@ import {
   getCalendarGhostBlocks,
   getCalendarGhostBlocksForProposal
 } from '@/views/calendar';
+import { detectStaleScheduleCollisions } from '@/domain/schedule-compose';
 import { ApiClientError } from '@/api/client';
 import { createDecisionStackCard } from '../../design-kit/js/agent-productivity-cards.js';
 
@@ -328,27 +329,45 @@ describe('Confirm proposal identity binding', () => {
     ).toBe(false);
   });
 
-  it('M: stale_schedule_collision renders exact revised server details on the Schedule Diff card', async () => {
-    const revised = {
-      status: 'needs_recompose',
-      note: 'Calendar changed since proposal — confirm blocked. Recompose against current hard busy.',
-      conflicts: [
+  it('M: stale_schedule_collision renders real detectStaleScheduleCollisions payload on the Schedule Diff card', async () => {
+    const collision = detectStaleScheduleCollisions({
+      proposedBlocks: [
         {
           temp_id: 'wb_mark_essays',
-          reason: 'Collides with Year 10 Pastoral'
-        }
-      ],
-      suggested_blocks: [
-        {
-          temp_id: 'wb_mark_essays',
+          task_id: 'task_mark',
           title: 'Mark essays',
           date: '2026-09-09',
-          start_time: '14:30'
+          start_time: '10:00',
+          duration_minutes: 45,
+          depth: 'deep',
+          selected: true
         }
       ],
-      suggested_start: '14:30',
-      suggested_end: '15:15'
-    };
+      hardBusy: [
+        {
+          start: 10 * 60,
+          end: 11 * 60,
+          title: 'Year 10 Pastoral',
+          kind: 'lesson'
+        }
+      ]
+    });
+    expect(collision.ok).toBe(false);
+    expect(collision.revised).toBeTruthy();
+    const revised = collision.revised!;
+    // Production shape only — no suggested_blocks / suggested_start / suggested_end.
+    expect(revised).toEqual(
+      expect.objectContaining({
+        status: expect.any(String),
+        note: expect.any(String),
+        conflicts: expect.any(Array),
+        hard_busy: expect.any(Array)
+      })
+    );
+    expect(revised).not.toHaveProperty('suggested_blocks');
+    expect(revised).not.toHaveProperty('suggested_start');
+    expect(revised).not.toHaveProperty('suggested_end');
+
     confirmChat.mockRejectedValueOnce(
       new ApiClientError(
         {
@@ -382,22 +401,26 @@ describe('Confirm proposal identity binding', () => {
     await vi.waitFor(() => expect(card.dataset.state).toBe('failed'));
     const cardText = card.textContent ?? '';
     expect(cardText).toContain('wb_mark_essays');
-    expect(cardText).toContain('Collides with Year 10 Pastoral');
-    expect(cardText).toContain('Mark essays → 2026-09-09 14:30');
-    expect(cardText).toContain('14:30');
-    expect(cardText).toContain('15:15');
+    expect(cardText).toMatch(/Collides with Year 10 Pastoral|Year 10 Pastoral/i);
+    expect(cardText).toContain(revised.note);
+    expect(cardText).toMatch(/needs_recompose|Hard busy/i);
+    expect(cardText).toContain('Year 10 Pastoral');
+    expect(cardText).toContain('10:00');
+    expect(cardText).not.toContain('suggested_start');
+    expect(cardText).not.toMatch(/Revised timing:|Suggested start:/);
     expect(cardText).toMatch(/nothing was written|stale/i);
     expect(getCalendarGhostBlocksForProposal('pending_stale_detail').length).toBe(1);
     expect(
       [...card.querySelectorAll('button')].find((btn) => btn.textContent?.includes('Confirm Selected'))
         ?.disabled
     ).toBe(false);
-    // Formatter itself preserves the same concrete values.
     const formatted = formatStaleScheduleCollisionDetails(revised);
     expect(formatted).toContain('wb_mark_essays');
-    expect(formatted).toContain('Collides with Year 10 Pastoral');
-    expect(formatted).toContain('Mark essays → 2026-09-09 14:30');
+    expect(formatted).toMatch(/Year 10 Pastoral/);
+    expect(formatted).toContain(revised.note);
+    expect(formatted).toContain('Hard busy: Year 10 Pastoral');
   });
+
 
   it('H: successful schedule Confirm becomes receipt only after persistence and clears that proposal ghosts', async () => {
     let resolveConfirm!: (value: unknown) => void;

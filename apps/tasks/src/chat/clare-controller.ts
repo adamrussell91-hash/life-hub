@@ -276,40 +276,37 @@ export function formatStaleScheduleCollisionDetails(details: unknown): string {
       'conflicts with calendar';
     lines.push(`Conflict: ${blockId} — ${reason}`);
   }
-  const revisedBlocks = Array.isArray(revised.revised_blocks)
-    ? revised.revised_blocks
-    : Array.isArray(revised.suggested_blocks)
-      ? revised.suggested_blocks
-      : Array.isArray(revised.blocks)
-        ? revised.blocks
-        : [];
-  for (const raw of revisedBlocks) {
+  // Production detectStaleScheduleCollisions returns status/note/conflicts/hard_busy —
+  // not invented suggested_start/end. Only render hard_busy when the server sent it.
+  const hardBusy = Array.isArray(revised.hard_busy)
+    ? revised.hard_busy
+    : Array.isArray(root.hard_busy)
+      ? root.hard_busy
+      : [];
+  for (const raw of hardBusy.slice(0, 6)) {
     if (!raw || typeof raw !== 'object') continue;
-    const block = raw as Record<string, unknown>;
+    const busy = raw as Record<string, unknown>;
     const title =
-      (typeof block.title === 'string' && block.title) ||
-      (typeof block.temp_id === 'string' && block.temp_id) ||
-      (typeof block.id === 'string' && block.id) ||
-      'block';
-    const when = [
-      typeof block.date === 'string' ? block.date : '',
-      typeof block.start_time === 'string'
-        ? block.start_time
-        : typeof block.suggested_start === 'string'
-          ? block.suggested_start
-          : typeof block.start === 'string'
-            ? block.start
-            : ''
-    ]
-      .filter(Boolean)
-      .join(' ');
-    if (when) lines.push(`Revised timing: ${title} → ${when}`);
+      (typeof busy.title === 'string' && busy.title) ||
+      (typeof busy.kind === 'string' && busy.kind) ||
+      'busy';
+    const start =
+      typeof busy.start === 'number'
+        ? `${String(Math.floor(busy.start / 60)).padStart(2, '0')}:${String(busy.start % 60).padStart(2, '0')}`
+        : typeof busy.start_time === 'string'
+          ? busy.start_time
+          : '';
+    const end =
+      typeof busy.end === 'number'
+        ? `${String(Math.floor(busy.end / 60)).padStart(2, '0')}:${String(busy.end % 60).padStart(2, '0')}`
+        : typeof busy.end_time === 'string'
+          ? busy.end_time
+          : '';
+    const when = [start, end].filter(Boolean).join('–');
+    lines.push(when ? `Hard busy: ${title} (${when})` : `Hard busy: ${title}`);
   }
-  if (typeof revised.suggested_start === 'string' && revised.suggested_start.trim()) {
-    lines.push(`Suggested start: ${revised.suggested_start.trim()}`);
-  }
-  if (typeof revised.suggested_end === 'string' && revised.suggested_end.trim()) {
-    lines.push(`Suggested end: ${revised.suggested_end.trim()}`);
+  if (hardBusy.length > 6) {
+    lines.push(`Hard busy: +${hardBusy.length - 6} more`);
   }
   return lines.join('\n');
 }
@@ -402,11 +399,12 @@ function appendActionProposalCard(
     card.dataset.state = 'submitting';
     setActionButtons(true);
     try {
+      // Server treats pending id as authoritative; do not send a candidate that
+      // could be mistaken for execution authority if the id were missing.
       await confirmChat({
         kind: 'action',
         id: pendingId,
-        slug: 'clare',
-        candidate: proposal
+        slug: 'clare'
       });
       card.dataset.state = 'confirmed';
       appendSavedCard(card);

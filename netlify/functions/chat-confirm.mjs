@@ -453,6 +453,10 @@ export function createChatConfirmHandler({
   }
 
   async function handleActionConfirm(parsed) {
+    // CASE A — no id: legacy candidate-only Confirm (deliberately retained).
+    // CASE B — id supplied: stored pending action is authoritative. Never fall
+    // back to a client candidate when the id is missing, consumed, invalid, or
+    // owned by another agent (pending-action identity invariant).
     let candidateProposal = null;
     if (!parsed.id) {
       if (!parsed.candidate) {
@@ -488,15 +492,47 @@ export function createChatConfirmHandler({
       return mapRepositoryError(error);
     }
 
-    const stored = parsed.id ? findPendingActionById(queue, parsed.id) : null;
-    const storedValidated = stored
-      ? validateProposeActionInput(stored.proposal, { agentSlug: stored.slug || parsed.slug })
-      : null;
-    const fallback = candidateProposal
-      ?? (parsed.candidate
-        ? validateProposeActionInput(parsed.candidate, { agentSlug: parsed.slug }).proposal
-        : null);
-    const proposal = storedValidated?.ok ? storedValidated.proposal : fallback;
+    let proposal = null;
+    let stored = null;
+    if (parsed.id) {
+      stored = findPendingActionById(queue, parsed.id);
+      if (!stored) {
+        // Fail closed: a supplied id that is absent/consumed must NOT execute
+        // any client candidate. Branch: handleActionConfirm → pending_action_not_found.
+        return errorResponse(
+          404,
+          'pending_action_not_found',
+          'No pending action matches this id. It may already be confirmed, discarded, or never existed.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      if (typeof stored.slug === 'string' && stored.slug.trim() && stored.slug !== parsed.slug) {
+        return errorResponse(
+          403,
+          'pending_action_agent_mismatch',
+          'This pending action belongs to a different agent.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      const storedValidated = validateProposeActionInput(stored.proposal, {
+        agentSlug: stored.slug || parsed.slug
+      });
+      if (!storedValidated.ok) {
+        return errorResponse(
+          400,
+          'invalid_action',
+          'The stored pending action could not be validated.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      // Client candidate is ignored entirely when id resolves.
+      proposal = storedValidated.proposal;
+    } else {
+      proposal = candidateProposal;
+    }
     if (!proposal) {
       return errorResponse(400, 'invalid_action', 'This proposed action could not be validated.', false, PRIVATE_CACHE);
     }
@@ -936,8 +972,9 @@ async function parseRequest(request) {
   }
 
   const hasCandidate = body.candidate && typeof body.candidate === 'object' && !Array.isArray(body.candidate);
-  // cn_patch / action may arrive as just an id (server looks the proposal up) or
-  // as a fallback candidate when a propose-time queue write failed.
+  // action with id: server loads the stored pending proposal (authoritative).
+  // action without id: legacy candidate-only Confirm.
+  // cn_patch may still arrive as id and/or candidate (separate contract).
   if ((kind === 'cn_patch' || kind === 'action') ? (!id && !hasCandidate) : !hasCandidate) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
