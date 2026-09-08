@@ -83,8 +83,11 @@ import {
   collectVisualEvidenceFromHistory,
   normalizeVisualEvidenceList,
   recordVisualEvidenceToolSchema,
-  visualTraceFields
+  visualTraceFields,
+  listHasMeaningfulVisualEvidence,
+  mergeVisualEvidenceLists
 } from '../../packages/design-kit/js/hub-visual-evidence.js';
+import { streamWithVisualEvidenceCapture } from './_shared/visual-evidence-capture.mjs';
 import {
   normalizeAuditSession,
   buildHammondAuditContract,
@@ -292,7 +295,6 @@ import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
 import { resolveForcedChadwickPlan } from './_shared/chadwick-plan-force.mjs';
 import { coerceChatWorkoutProposal } from '../../apps/life/js/core/workout-plan-detect.js';
-import { streamWithAgentLogForce } from './_shared/agent-log-force.mjs';
 import {
   forceStatusFor,
   isLogFinalize,
@@ -1205,9 +1207,12 @@ export function createChatHandler({
         } catch {
           promotedShortcutDrafts = [];
         }
-        const visualCtx = visualActivationContext(parsed.message, parsed.attachments);
         const priorVisualEvidence = collectVisualEvidenceFromHistory(parsed.history);
-        const needsVisualEvidenceTool = visualCtx.hasVisualEvidence || priorVisualEvidence.length > 0;
+        const visualCtx = visualActivationContext(parsed.message, parsed.attachments, {
+          priorVisualEvidence
+        });
+        const needsVisualEvidenceTool =
+          visualCtx.hasVisualEvidence || listHasMeaningfulVisualEvidence(priorVisualEvidence);
         let recordedVisualEvidence = [];
         tools = [
           ...buildAgentTools({
@@ -1601,8 +1606,8 @@ export function createChatHandler({
             executeTools: async event => {
               if (event.name === 'record_visual_evidence') {
                 const items = normalizeVisualEvidenceList(event.input?.items);
-                recordedVisualEvidence = items;
-                send({ type: 'visual_evidence', items });
+                recordedVisualEvidence = mergeVisualEvidenceLists(recordedVisualEvidence, items);
+                send({ type: 'visual_evidence', items: recordedVisualEvidence });
                 send({
                   type: 'status',
                   text: 'Noted visual evidence…',
@@ -2283,7 +2288,21 @@ export function createChatHandler({
               return null;
             }
           };
-          for await (const event of streamWithAgentLogForce(anthropic, streamOpts)) {
+          for await (const event of streamWithVisualEvidenceCapture(anthropic, {
+            ...streamOpts,
+            needsVisualCapture: visualCtx.hasVisualEvidence,
+            getRecordedVisualEvidence: () => recordedVisualEvidence,
+            setRecordedVisualEvidence: (items) => {
+              recordedVisualEvidence = mergeVisualEvidenceLists([], items);
+            },
+            onVisualEvidence: (items, meta) => {
+              send({ type: 'visual_evidence', items: recordedVisualEvidence, captureSource: meta?.captureSource });
+            },
+            attachments: parsed.attachments,
+            priorVisualEvidence,
+            keepFullDomainTools: visualCtx.keepFullDomainTools,
+            hasVisualEvidence: visualCtx.hasVisualEvidence
+          })) {
             if (event.type === 'tool_call' && event.name === 'log_entry') {
               let medicalInput = event.input;
               if (event.input?.type === 'medical') {
