@@ -467,6 +467,8 @@ async function runWeekMissionHandoff(input, ctx) {
   };
   if (ctx.tasksStore) {
     await setJSON(ctx.tasksStore, workflowKey, trace);
+    // Life Planning Mode reads a stable key for the active week mission strip.
+    await setJSON(ctx.tasksStore, 'workflow_state/week_mission:current', trace);
   }
 
   if (reconcile && reconcile.status !== 'accepted') {
