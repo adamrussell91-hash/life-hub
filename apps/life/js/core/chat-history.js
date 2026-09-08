@@ -46,6 +46,46 @@ function compactVisualEvidence(value) {
       }
     }
     if (Array.isArray(raw.numbers)) item.numbers = raw.numbers.slice(0, 20);
+    if (Array.isArray(raw.claims)) {
+      const claims = [];
+      for (const claim of raw.claims.slice(0, 40)) {
+        if (!claim || typeof claim !== 'object') continue;
+        const kind = typeof claim.kind === 'string' ? claim.kind.trim().slice(0, 64) : '';
+        const source = claim.source === 'direct_visual'
+          || claim.source === 'model_inference'
+          || claim.source === 'external_or_personal'
+          ? claim.source
+          : null;
+        if (!kind || !source) continue;
+        const row = { kind, source };
+        if (typeof claim.label === 'string' && claim.label.trim()) {
+          row.label = claim.label.trim().slice(0, 80);
+        }
+        if (
+          typeof claim.value === 'string'
+          || typeof claim.value === 'number'
+          || claim.value === null
+        ) {
+          row.value = typeof claim.value === 'string'
+            ? claim.value.trim().slice(0, 200)
+            : claim.value;
+        }
+        if (typeof claim.unit === 'string' && claim.unit.trim()) {
+          row.unit = claim.unit.trim().slice(0, 32);
+        }
+        if (typeof claim.text === 'string' && claim.text.trim()) {
+          row.text = claim.text.trim().slice(0, 400);
+        }
+        if (typeof claim.confidence === 'string' && claim.confidence.trim()) {
+          row.confidence = claim.confidence.trim().slice(0, 64);
+        }
+        if (typeof claim.uncertainty === 'string' && claim.uncertainty.trim()) {
+          row.uncertainty = claim.uncertainty.trim().slice(0, 200);
+        }
+        claims.push(row);
+      }
+      if (claims.length) item.claims = claims;
+    }
     items.push(item);
   }
   return items.length ? items : undefined;

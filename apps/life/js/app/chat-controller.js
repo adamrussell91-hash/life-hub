@@ -27,7 +27,8 @@ import { takeCompletedChatBlocks } from '../core/chat-blocks.js';
 import { HISTORY_WINDOW_MS, keepNewestHistory } from '../core/chat-history.js';
 import {
   normalizeVisualEvidenceList,
-  visualEvidenceStubFromAttachment
+  visualEvidenceStubFromAttachment,
+  mergeVisualEvidenceLists
 } from '../../../packages/design-kit/js/hub-visual-evidence.js';
 import { shouldNudgeUnsavedWorkoutPlan } from '../core/workout-plan-detect.js';
 import {
@@ -275,11 +276,7 @@ export function createChatController({
     for (let i = transcript.length - 1; i >= 0; i -= 1) {
       if (transcript[i].role !== 'user') continue;
       const existing = normalizeVisualEvidenceList(transcript[i].visualEvidence);
-      const byId = new Map(existing.map(item => [item.attachmentId, { ...item }]));
-      for (const item of normalized) {
-        byId.set(item.attachmentId, { ...(byId.get(item.attachmentId) || {}), ...item });
-      }
-      transcript[i].visualEvidence = [...byId.values()];
+      transcript[i].visualEvidence = mergeVisualEvidenceLists(existing, normalized);
       break;
     }
   }
