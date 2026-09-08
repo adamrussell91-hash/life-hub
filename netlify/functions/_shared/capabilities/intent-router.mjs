@@ -50,6 +50,16 @@ const KEYWORD_HINTS = [
     patterns: [/log (?:my |a )?meal/i, /calories/i, /macros/i, /\bate\b/i, /food library/i]
   },
   {
+    ids: ['log.delete-meal'],
+    patterns: [
+      /delete (?:the |my |this |that )?(?:meal|snack|breakfast|lunch|dinner|log|entry|duplicate)/i,
+      /remove (?:the |my |this |that )?(?:meal|snack|breakfast|lunch|dinner|log|entry|duplicate)/i,
+      /undo (?:the |my |this |that )?(?:meal|snack|log)/i,
+      /clear (?:the |my |this |that )?(?:meal|snack|duplicate)/i,
+      /duplicate (?:meal|snack|entry|log)/i
+    ]
+  },
+  {
     ids: ['log.entry', 'lookup.save-exercise-library'],
     patterns: [/workout/i, /session/i, /log (?:my )?sets/i]
   },
@@ -88,7 +98,7 @@ const KEYWORD_HINTS = [
 ];
 
 /** Domain write shortcuts that stay attached whenever the agent owns them. */
-const PINNED_CAPABILITY_IDS = ['tasks.create', 'tasks.update'];
+const PINNED_CAPABILITY_IDS = ['tasks.create', 'tasks.update', 'log.delete-meal'];
 
 /** Soft image presence — never inspect base64 contents. */
 function hasVisualAttachmentSignal(attachments) {

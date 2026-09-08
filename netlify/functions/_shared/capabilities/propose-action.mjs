@@ -15,7 +15,7 @@ const TASKS_PROJECTS_INDEX = 'projects/_index';
 export const PENDING_ACTIONS_PATH = 'data/os/pending-actions.json';
 export const MAX_PENDING_ACTIONS = 30;
 export const MAX_WRITE_CONTENT_CHARS = 64 * 1024;
-export const WRITE_MODES = ['create', 'overwrite', 'append'];
+export const WRITE_MODES = ['create', 'overwrite', 'append', 'delete'];
 
 export function proposeActionToolSchema() {
   return {
@@ -44,11 +44,11 @@ export function proposeActionToolSchema() {
               mode: {
                 type: 'string',
                 enum: WRITE_MODES,
-                description: 'create = new file only; overwrite = replace; append = add to end'
+                description: 'create = new file only; overwrite = replace; append = add to end; delete = remove file'
               },
               content: {
                 type: 'string',
-                description: 'Full file body for create/overwrite, or the chunk to append'
+                description: 'Full file body for create/overwrite, chunk to append, or empty string for delete'
               },
               diff: {
                 type: 'string',
@@ -130,6 +130,9 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
     }
     if (!WRITE_MODES.includes(mode)) return { ok: false, error: 'invalid_mode', detail: mode };
     if (content == null) return { ok: false, error: 'missing_content', detail: path };
+    if (mode === 'delete' && content.length > 0) {
+      return { ok: false, error: 'delete_content_not_empty', detail: path };
+    }
     if (content.length > MAX_WRITE_CONTENT_CHARS) {
       return { ok: false, error: 'content_too_large', detail: path };
     }
@@ -163,6 +166,7 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
 }
 
 function defaultDiffSummary(mode, path, content) {
+  if (mode === 'delete') return `delete ${path}`;
   const lines = content.split('\n').length;
   const bytes = Buffer.byteLength(content, 'utf8');
   if (mode === 'create') return `new file (${bytes} bytes, ${lines} lines)`;
@@ -412,12 +416,17 @@ export async function executeProposeActionWrites(client, proposal, {
   if (!proposal?.writes?.length) return { ok: false, error: 'missing_writes' };
 
   const needsGithub = proposal.writes.some(write => classifyWriteTarget(write.path).store === 'github');
+  const needsDelete = proposal.writes.some(write => write.mode === 'delete');
   if (needsGithub && (!client || typeof client.writeFile !== 'function')) {
+    return { ok: false, error: 'missing_client' };
+  }
+  if (needsDelete && typeof client?.deleteFile !== 'function') {
     return { ok: false, error: 'missing_client' };
   }
 
   const results = [];
   const state = { ...files };
+  const commitMessage = `chore(propose-action): ${proposal.agent} — ${proposal.intent}`.slice(0, 200);
 
   for (const write of proposal.writes) {
     const target = classifyWriteTarget(write.path);
@@ -426,6 +435,9 @@ export async function executeProposeActionWrites(client, proposal, {
     }
 
     if (target.store === 'tasks' || target.store === 'teaching') {
+      if (write.mode === 'delete') {
+        return { ok: false, error: 'blob_delete_unsupported', detail: write.path, results };
+      }
       const store = blobStores[target.store];
       if (!store) return { ok: false, error: `${target.store}_blobs_unbound`, detail: write.path, results };
       const existing = state[write.path]?.record
@@ -447,6 +459,18 @@ export async function executeProposeActionWrites(client, proposal, {
     let content = write.content;
     let sha = existing.sha;
 
+    if (write.mode === 'delete') {
+      if (!sha) {
+        results.push({ path: write.path, mode: 'delete', skipped: true });
+        delete state[write.path];
+        continue;
+      }
+      const result = await client.deleteFile({ path: write.path, sha, message: commitMessage });
+      results.push({ path: write.path, mode: 'delete', commitSha: result.commitSha });
+      delete state[write.path];
+      continue;
+    }
+
     if (write.mode === 'create' && sha) {
       return { ok: false, error: 'already_exists', detail: write.path, results };
     }
@@ -462,7 +486,7 @@ export async function executeProposeActionWrites(client, proposal, {
       path: write.path,
       content,
       ...(sha && write.mode !== 'create' ? { sha } : {}),
-      message: `chore(propose-action): ${proposal.agent} — ${proposal.intent}`.slice(0, 200)
+      message: commitMessage
     });
     results.push({ path: write.path, mode: write.mode, sha: result.sha, commitSha: result.commitSha });
     state[write.path] = { sha: result.sha, content };

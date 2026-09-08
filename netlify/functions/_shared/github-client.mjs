@@ -282,6 +282,42 @@ export function createGitHubClient({ env = process.env, fetchImpl = fetch } = {}
         throw new GitHubClientError('github_invalid_response', true);
       }
       return { sha: payload.content.sha, commitSha: payload.commit.sha };
+    },
+
+    async deleteFile({ path, sha, message }) {
+      if (typeof path !== 'string' || path.length === 0) throw new TypeError('A file path is required.');
+      if (!SHA.test(sha)) throw new TypeError('Invalid blob SHA.');
+      if (typeof message !== 'string' || message.length === 0) throw new TypeError('A commit message is required.');
+
+      let response;
+      try {
+        response = await fetchImpl(`${GITHUB_ORIGIN}${repositoryPath}/contents/${path.split('/').map(encodeURIComponent).join('/')}`, {
+          method: 'DELETE',
+          headers: {
+            accept: 'application/vnd.github+json',
+            authorization: `Bearer ${config.token}`,
+            'content-type': 'application/json',
+            'user-agent': 'life-hub',
+            'x-github-api-version': API_VERSION
+          },
+          body: JSON.stringify({ message, sha, branch: config.branch })
+        });
+      } catch {
+        throw new GitHubClientError('github_unavailable', true);
+      }
+      if (response.status === 409 || response.status === 422) throw new GitHubClientError('write_conflict', true);
+      if (!response.ok) throw mapGitHubFailure(response);
+
+      let payload;
+      try {
+        payload = await response.json();
+      } catch {
+        throw new GitHubClientError('github_invalid_response', true);
+      }
+      if (!SHA.test(payload?.commit?.sha)) {
+        throw new GitHubClientError('github_invalid_response', true);
+      }
+      return { commitSha: payload.commit.sha };
     }
   };
 }

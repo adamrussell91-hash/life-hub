@@ -82,6 +82,7 @@ export const WRITE_GATEWAY_TOOLS = Object.freeze([
   // lunch / "log it" turn can retrieve nutrition evidence and still have no
   // log_entry, so nothing reaches Nutrition graphs after Confirm.
   'log_entry',
+  'delete_meal',
   'record_visual_evidence',
   'create_task',
   'update_task',

@@ -1,0 +1,20 @@
+{
+  "id": "log.delete-meal",
+  "tool_name": "delete_meal",
+  "verb": "Delete",
+  "agents": ["brisket"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Propose deleting a confirmed meal slot (Confirm). Clears the nutrition file and refreshes day totals — use for remove/undo/duplicate, not macro corrections.",
+  "inputs": {
+    "date": "YYYY-MM-DD",
+    "meal": "breakfast|lunch|dinner|snack"
+  },
+  "side_effects": [
+    "Renders a Confirm card listing the meal file(s) to remove",
+    "On Confirm, deletes data/nutrition/… meal markdown (including snack-2 style variants)",
+    "Rebuilds Central Node Status Nutrition from remaining meals that day"
+  ],
+  "surfaces": ["confirm_card", "central_node", "nutrition_tab", "governance_log"],
+  "reads": ["data/nutrition"]
+}
