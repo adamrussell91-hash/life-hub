@@ -5,6 +5,7 @@ import {
   blockStyle,
   durationMinutesBetween,
   endTimeFromStart,
+  formatTaskTimeRange,
   hoursFromOffset,
   hoursToDueTime,
   layoutTimedBlocks,
@@ -78,6 +79,12 @@ describe('time grid', () => {
     expect(durationMinutesBetween('09:00', '10:30')).toBe(90);
     expect(durationMinutesBetween('10:30', '09:00')).toBeNull();
     expect(durationMinutesBetween('09:00', '')).toBeNull();
+  });
+
+  it('formats a task start–end range for cards', () => {
+    expect(formatTaskTimeRange({ due_time: '09:00', estimated_duration: 90 })).toBe('9 AM – 10:30 AM');
+    expect(formatTaskTimeRange({ due_time: '14:00', estimated_duration: null })).toBe('2 PM');
+    expect(formatTaskTimeRange({ due_time: null, estimated_duration: 30 })).toBe('');
   });
 
   it('keeps untimed work in the all-day row and lanes overlapping timed blocks', () => {

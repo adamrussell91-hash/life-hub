@@ -111,6 +111,21 @@ describe('hub cards', () => {
     expect([...slot.querySelectorAll('button')].some((btn) => btn.textContent === 'Open page')).toBe(false);
   });
 
+  it('shows start and end times on micro and expanded task cards', () => {
+    reduceMotion();
+    const host = document.createElement('div');
+    const timed = task({
+      id: 'task_timed',
+      title: 'Mark papers',
+      due_time: '09:00',
+      estimated_duration: 60
+    });
+    const slot = mountTaskCard(host, timed, {});
+    expect(slot.querySelector('.date-badge')?.textContent).toContain('9 AM – 10 AM');
+    slot.querySelector('.hub-row')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(slot.querySelector('.date-badge')?.textContent).toContain('9 AM – 10 AM');
+  });
+
   it('does not paint status move pills on board cards', () => {
     const list = document.createElement('ul');
     const slot = mountTaskCard(
