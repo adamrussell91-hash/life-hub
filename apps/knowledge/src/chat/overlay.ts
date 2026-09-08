@@ -615,8 +615,11 @@ function overlayHtml() {
         <div class="hub-ai-bar__field">
           <textarea id="overlay-chat-input" class="hub-ai-bar__input" rows="2" placeholder="${placeholder}" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
         </div>
-        <div class="hub-ai-bar__tools">
-          <button class="btn btn--primary" type="submit" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${fromBook ? "Make note" : makeNote ? "Research" : "Send"}</button>
+        <div class="hub-ai-bar__aside">
+          <div class="chat-attach-list" hidden></div>
+          <div class="hub-ai-bar__tools">
+            <button class="btn btn--primary" type="submit" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${fromBook ? "Make note" : makeNote ? "Research" : "Send"}</button>
+          </div>
         </div>
       </form>
     </section>

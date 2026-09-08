@@ -710,84 +710,83 @@ export function appendCnPatchProposal(root, { patch }) {
   return { card, confirm, discard };
 }
 
-/** Mode verb shown under a write when the primary line already carries the meaning. */
-function modeVerb(mode) {
-  switch (String(mode || '').toLowerCase()) {
-    case 'create':
-      return 'Create';
-    case 'overwrite':
-      return 'Update';
-    case 'append':
-      return 'Append';
-    case 'delete':
-      return 'Delete';
-    default:
-      return mode ? String(mode) : 'Write';
+/** Typed blob refs like tasks:task:id / teaching:unit:id — not file paths. */
+function parseTypedWritePath(path) {
+  if (typeof path !== 'string') return null;
+  const match = /^(tasks|teaching):([a-z][a-z0-9_]*):(.+)$/i.exec(path.trim());
+  if (!match) return null;
+  return { store: match[1].toLowerCase(), kind: match[2].toLowerCase(), id: match[3] };
+}
+
+function titleFromWriteContent(write) {
+  const content = write?.content;
+  if (content && typeof content === 'object' && !Array.isArray(content)) {
+    const title = typeof content.title === 'string' ? content.title.trim() : '';
+    return title || null;
   }
+  if (typeof content !== 'string') return null;
+  const trimmed = content.trim();
+  if (!trimmed.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    const title = typeof parsed?.title === 'string' ? parsed.title.trim() : '';
+    return title || null;
+  } catch {
+    return null;
+  }
+}
+
+function cleanWriteDiff(diff) {
+  if (typeof diff !== 'string') return '';
+  return diff
+    .trim()
+    .replace(/^(new\s+)?(task|project|subtask)\s*[:\-–—]?\s*[“"'`]?/i, '')
+    .replace(/[”"'`]\s*$/g, '')
+    .trim();
 }
 
 /**
- * Human lines for one Confirm-card write. Blob paths stay as the checkbox value;
- * Adam sees the title / diff, not `tasks:task:task_…`.
+ * Human-facing Confirm-card copy for one write.
+ * Checkbox value stays the raw path; labels must not dump blob ids.
  */
-export function formatActionWriteLines(write) {
+export function formatActionWriteDisplay(write) {
   const path = typeof write?.path === 'string' ? write.path.trim() : '';
-  const mode = typeof write?.mode === 'string' ? write.mode.trim() : 'write';
-  const diff = typeof write?.diff === 'string' ? write.diff.trim() : '';
+  const mode = typeof write?.mode === 'string' && write.mode.trim() ? write.mode.trim() : 'write';
+  const rawDiff = typeof write?.diff === 'string' ? write.diff.trim() : '';
+  const typed = parseTypedWritePath(path);
+  const title = titleFromWriteContent(write);
+  const cleaned = cleanWriteDiff(rawDiff);
 
-  // create_task / create_project / split: "new task: Title" or `new task “Title”`
-  const colon = diff.match(/^(new task|new project|subtask)\s*:\s*(.+)$/i);
-  if (colon) {
-    return { primary: colon[2].trim(), secondary: titleCaseKind(colon[1]), path };
-  }
-  const quoted = diff.match(/^(new task|new project|subtask)\s+[“"'](.+?)[”"']\s*$/i);
-  if (quoted) {
-    return { primary: quoted[2].trim(), secondary: titleCaseKind(quoted[1]), path };
-  }
-
-  if (diff) {
-    return { primary: diff, secondary: modeVerb(mode), path };
-  }
-
-  const fromContent = titleFromWriteContent(write?.content);
-  if (fromContent) {
-    return { primary: fromContent, secondary: modeVerb(mode), path };
+  if (typed) {
+    const kindLabel = typed.kind.replace(/_/g, ' ');
+    const label = title || cleaned || kindLabel;
+    let detail = null;
+    if (mode === 'create') {
+      // Intent already says "Create N tasks"; don't repeat "create: new task: …".
+      detail = null;
+    } else if (cleaned && cleaned !== label) {
+      detail = cleaned;
+    } else if (rawDiff && rawDiff !== label) {
+      detail = rawDiff;
+    } else {
+      detail = mode === 'append' ? `Append ${kindLabel}` : `Update ${kindLabel}`;
+    }
+    return {
+      path,
+      label,
+      detail,
+      useCode: false,
+      ariaLabel: `Accept ${label}`
+    };
   }
 
   return {
-    primary: friendlyWritePath(path) || '(unknown write)',
-    secondary: modeVerb(mode),
-    path
+    path,
+    label: path || '(unknown path)',
+    detail: rawDiff ? `${mode}: ${rawDiff}` : mode,
+    useCode: true,
+    ariaLabel: `Accept ${path || 'write'}`
   };
-}
-
-function titleCaseKind(kind) {
-  const lower = String(kind || '').toLowerCase();
-  if (lower === 'new task') return 'New task';
-  if (lower === 'new project') return 'New project';
-  if (lower === 'subtask') return 'Subtask';
-  return kind;
-}
-
-function titleFromWriteContent(content) {
-  if (typeof content !== 'string' || !content.trim()) return '';
-  try {
-    const parsed = JSON.parse(content);
-    if (parsed && typeof parsed.title === 'string' && parsed.title.trim()) {
-      return parsed.title.trim();
-    }
-  } catch {
-    // content is not always JSON
-  }
-  return '';
-}
-
-function friendlyWritePath(path) {
-  if (!path) return '';
-  // tasks:task:task_xxx → hide internal id; caller already preferred diff/title
-  if (/^tasks:(task|project):/i.test(path)) return '';
-  const slash = path.lastIndexOf('/');
-  return slash >= 0 ? path.slice(slash + 1) : path;
 }
 
 export function appendActionProposal(root, { proposal }) {
@@ -823,27 +822,26 @@ export function appendActionProposal(root, { proposal }) {
     const diffs = root.createElement('ul');
     diffs.className = 'action-proposal__diffs';
     for (const write of writes) {
-      const lines = formatActionWriteLines(write);
+      const display = formatActionWriteDisplay(write);
       const item = root.createElement('li');
       const row = root.createElement('label');
       row.className = 'action-proposal__write';
-      if (lines.path) row.title = lines.path;
       const box = root.createElement('input');
       box.type = 'checkbox';
       box.className = 'action-proposal__accept';
       box.checked = true;
-      box.value = lines.path || (typeof write?.path === 'string' ? write.path : '');
-      box.setAttribute('aria-label', `Accept ${lines.primary}`);
+      box.value = display.path;
+      box.setAttribute('aria-label', display.ariaLabel);
       acceptBoxes.push(box);
-      const title = root.createElement('span');
-      title.className = 'action-proposal__title';
-      title.textContent = lines.primary;
-      row.append(box, title);
+      const labelEl = root.createElement(display.useCode ? 'code' : 'span');
+      labelEl.className = display.useCode ? '' : 'action-proposal__label';
+      labelEl.textContent = display.label || '(unknown path)';
+      row.append(box, labelEl);
       item.append(row);
-      if (lines.secondary) {
+      if (display.detail) {
         const detail = root.createElement('div');
         detail.className = 'action-proposal__diff';
-        detail.textContent = lines.secondary;
+        detail.textContent = display.detail;
         item.append(detail);
       }
       diffs.append(item);

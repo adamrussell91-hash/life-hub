@@ -3239,8 +3239,12 @@ body.is-universe-fullscreen .local-banner {
   min-width: 0;
 }
 
+.chat-overlay .chat-form .hub-ai-bar__aside {
+  grid-column: 2;
+  justify-self: end;
+}
+
 .chat-overlay .chat-form textarea {
-  grid-column: 1;
   min-height: 2.75rem;
   max-height: 8rem;
   resize: none;
