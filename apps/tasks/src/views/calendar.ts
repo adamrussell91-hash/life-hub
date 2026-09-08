@@ -133,6 +133,9 @@ export function getCalendarGhostBlocks(): WorkBlock[] {
 export function getCalendarGhostBlocksForProposal(proposalId: string): WorkBlock[] {
   return ghostBlocksByProposalId.get(proposalId.trim()) ?? [];
 }
+
+let planWorkMode = false;
+
 let selectedDateKey: string | null = null;
 let selectedItemId: string | null = null;
 let composeDraft: { dateKey: string; dueTime: string | null } = { dateKey: '', dueTime: null };
