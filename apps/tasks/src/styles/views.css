@@ -5007,52 +5007,26 @@ body.is-universe-fullscreen .page-header {
   max-width: 100%;
 }
 
-.dashboard-overview__grid--merged {
-  grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+.dashboard-overview__grid--week {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 17rem);
   align-items: start;
 }
 
-.dashboard-overview__rail {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-}
-
-/* Week heat strip reads as a compact 7-wide block when it's
-   sharing the narrow rail column with the projects card. */
-.dashboard-overview__rail .dashboard-heat {
+.dashboard-overview__grid--week .dashboard-heat {
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
-.dashboard-overview__rail .dashboard-heat__cell {
+.dashboard-overview__grid--week .dashboard-heat__cell {
   padding: var(--space-1);
 }
 
 @media (max-width: 900px) {
-  .dashboard-overview__grid--merged {
+  .dashboard-overview__grid--week {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .dashboard-overview__grid--merged .dashboard-overview__tile--timeline {
-    order: -1;
-  }
-
-  .dashboard-overview__rail {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .dashboard-overview__rail .dashboard-overview__tile {
-    flex: 1 1 16rem;
-  }
-
-  .dashboard-overview__rail .dashboard-heat {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 }
 
-.dashboard-overview__grid--merged .dashboard-overview__tile {
+.dashboard-overview__grid--week .dashboard-overview__tile {
   min-height: 0;
   height: max-content;
 }
@@ -5072,9 +5046,8 @@ body.is-universe-fullscreen .page-header {
   padding: var(--space-3) var(--space-4);
 }
 
-.dashboard-overview__tile--timeline,
-.dashboard-overview__tile--projects,
-.dashboard-overview__tile--heat {
+.dashboard-overview__tile--week,
+.dashboard-overview__tile--projects {
   background: var(--hub-glass-fill);
 }
 
@@ -5735,17 +5708,6 @@ button.projects-mix__legend-row:focus-visible {
   border-color: var(--wave);
 }
 
-.dashboard-heat__peek {
-  margin: var(--space-2) 0 0;
-  font-size: var(--text-xs);
-  color: var(--muted);
-  line-height: var(--leading-snug);
-  min-height: 1.2em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .dashboard-heat__cell.is-drop,
 .dashboard-heat__cell:hover,
 .dashboard-heat__cell:focus-visible {
@@ -6104,7 +6066,7 @@ button.column-bar--row.is-active {
     margin-bottom: var(--space-3);
   }
 
-  .dashboard-overview__grid--merged {
+  .dashboard-overview__grid--week {
     grid-template-columns: minmax(0, 1fr);
   }
 

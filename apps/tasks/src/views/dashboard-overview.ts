@@ -329,22 +329,12 @@ function renderTimelineGroup(
   return group;
 }
 
-function renderTimelineCard(
+function renderAgendaBody(
   items: DashboardTimelineItem[],
   options: DashboardOverviewOptions,
   now: Date,
   selectedKey: string
 ): HTMLElement {
-  const card = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--timeline');
-  card.setAttribute('aria-label', 'Agenda');
-  const head = el('div', 'dashboard-overview__head');
-  head.append(el('p', 'hub-card__eyebrow', 'Agenda'));
-  head.append(viewLink('#/timeline', 'Open Timeline'));
-  card.append(head);
-
-  const next = renderNextAction(options, now);
-  if (next) card.append(next);
-
   const todayKey = toDateKey(now);
   const dayItems = itemsForDay(items, selectedKey, todayKey);
   const agenda = el('div', 'dashboard-timeline');
@@ -359,7 +349,10 @@ function renderTimelineCard(
       ),
       el('p', 'empty-state empty-state--compact', 'Clear.')
     );
-  } else if (selectedKey === todayKey) {
+    return agenda;
+  }
+
+  if (selectedKey === todayKey) {
     const overdueItems = dayItems.filter((item) => item.daysOut < 0);
     const todayItems = dayItems.filter((item) => item.daysOut >= 0);
     if (overdueItems.length) {
@@ -368,11 +361,11 @@ function renderTimelineCard(
     if (todayItems.length) {
       agenda.append(renderTimelineGroup('Today', todayItems, options));
     }
-  } else {
-    agenda.append(renderTimelineGroup(formatDisplayDate(selectedKey), dayItems, options));
+    return agenda;
   }
-  card.append(agenda);
-  return card;
+
+  agenda.append(renderTimelineGroup(formatDisplayDate(selectedKey), dayItems, options));
+  return agenda;
 }
 
 function renderProjectsCard(
@@ -429,14 +422,16 @@ function bindHeatDrop(
   });
 }
 
-function renderHeatCard(
+function renderWeekCard(
   days: DashboardHeatDay[],
   selectedKey: string,
+  timeline: DashboardTimelineItem[],
   options: DashboardOverviewOptions,
+  now: Date,
   onSelectDay: (dateKey: string) => void
 ): HTMLElement {
   const selected = days.find((day) => day.date_key === selectedKey) ?? days[0];
-  const card = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--heat');
+  const card = el('section', 'hub-card dashboard-overview__tile dashboard-overview__tile--week');
   card.setAttribute('aria-label', 'This week');
   const head = el('div', 'dashboard-overview__head');
   head.append(el('p', 'hub-card__eyebrow', 'This week'));
@@ -465,18 +460,9 @@ function renderHeatCard(
   }
   card.append(row);
 
-  const peek = el('p', 'dashboard-heat__peek');
-  if (!selected?.items.length) {
-    peek.textContent = selected
-      ? `Nothing dated ${selected.isToday ? 'today' : formatDisplayDate(selected.date_key)}.`
-      : 'Nothing dated this week.';
-  } else {
-    const titles = selected.items.map((item) => item.title);
-    const shown = titles.slice(0, 3);
-    const extra = titles.length - shown.length;
-    peek.textContent = extra > 0 ? `${shown.join(' · ')} · +${extra} more` : shown.join(' · ');
-  }
-  card.append(peek);
+  const next = renderNextAction(options, now);
+  if (next) card.append(next);
+  card.append(renderAgendaBody(timeline, options, now, selectedKey));
   return card;
 }
 
@@ -501,7 +487,7 @@ function setOverviewOpen(root: HTMLElement, open: boolean): void {
   if (peek) peek.hidden = open;
 }
 
-/** Overview band for the home dashboard — focus, week strip, agenda, projects. */
+/** Overview band for the home dashboard — focus, week+agenda, projects. */
 export function renderDashboardOverview(host: HTMLElement, options: DashboardOverviewOptions): void {
   const now = options.now ?? new Date();
   const { tasks, projects, onChanged } = options;
@@ -582,15 +568,12 @@ export function renderDashboardOverview(host: HTMLElement, options: DashboardOve
     );
   }
 
-  const rail = el('div', 'dashboard-overview__rail');
-  rail.append(
-    renderHeatCard(heatDays, selectedKey, options, selectDay),
+  const timeline = dashboardTimeline(tasks, projects, now);
+  const grid = el('div', 'dashboard-overview__grid dashboard-overview__grid--week');
+  grid.append(
+    renderWeekCard(heatDays, selectedKey, timeline, options, now, selectDay),
     renderProjectsCard(projects, tasks, now, options)
   );
-
-  const grid = el('div', 'dashboard-overview__grid dashboard-overview__grid--merged');
-  const timeline = dashboardTimeline(tasks, projects, now);
-  grid.append(rail, renderTimelineCard(timeline, options, now, selectedKey));
   panel.append(grid);
 
   const pressure = el('div', 'dashboard-overview__pressure');
