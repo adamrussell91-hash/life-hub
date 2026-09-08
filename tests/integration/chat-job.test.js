@@ -151,6 +151,57 @@ test('agentKernel survives start → persisted job body → reconstructed chat-r
   assert.ok(payload.data.events.some(event => event.type === 'kernel_trace'));
 });
 
+test('photo attachments survive start → job body → reconstructed chat-run request', async () => {
+  const store = createMemoryChatJobStore();
+  let reconstructed = null;
+  const dataUrl = `data:image/jpeg;base64,${Buffer.alloc(40_000, 7).toString('base64')}`;
+  const attachment = {
+    id: 'att_lunch',
+    kind: 'image',
+    mime: 'image/jpeg',
+    name: 'lunch.jpg',
+    dataUrl
+  };
+  const start = createChatStartHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getStore: async () => store,
+    invokeBackground: async (_request, jobId) => {
+      await runStoredChatJob({
+        jobId,
+        store,
+        createHandler: () => async request => {
+          reconstructed = await request.clone().json();
+          const encoder = new TextEncoder();
+          return new Response(new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode('data: {"type":"agent","slug":"brisket"}\n\n'));
+              controller.enqueue(encoder.encode('data: {"type":"text","delta":"Looks like Chicken Vodka Penne."}\n\n'));
+              controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+              controller.close();
+            }
+          }), { headers: { 'content-type': 'text/event-stream' } });
+        }
+      });
+      return true;
+    }
+  });
+
+  const started = await start(startRequest({
+    message: 'This is my lunch!',
+    priorAgentSlug: 'brisket',
+    attachments: [attachment]
+  }));
+  assert.equal(started.status, 202);
+  const { data } = await started.json();
+  const job = await store.get(data.jobId);
+  const stored = JSON.parse(job.body);
+  assert.equal(stored.attachments?.[0]?.id, 'att_lunch');
+  assert.equal(stored.attachments?.[0]?.dataUrl, dataUrl);
+  assert.equal(reconstructed?.attachments?.[0]?.id, 'att_lunch');
+  assert.equal(reconstructed?.attachments?.[0]?.dataUrl, dataUrl);
+});
+
 test('POST /api/chat streams live when the background job cannot start', async () => {
   const start = createChatStartHandler({
     env: validEnv,

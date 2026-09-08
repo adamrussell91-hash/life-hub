@@ -694,6 +694,47 @@ test('rejects an empty or oversized message', async () => {
   assert.equal((await handler(request({ message: 'x'.repeat(5000) }))).status, 400);
 });
 
+test('accepts a phone-photo attachment and delivers image blocks to the model', async () => {
+  let capturedMessages = null;
+  const dataUrl = `data:image/jpeg;base64,${Buffer.alloc(40_000, 3).toString('base64')}`;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: githubFetchStub(),
+    createAnthropicClient: () => ({
+      streamMessage: async function* ({ messages }) {
+        capturedMessages = messages;
+        yield { type: 'agent', slug: 'brisket' };
+        yield { type: 'text', delta: 'Got the label.' };
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const response = await handler(request({
+    message: 'This is my lunch!',
+    priorAgentSlug: 'brisket',
+    attachments: [{
+      id: 'att_lunch',
+      kind: 'image',
+      mime: 'image/jpeg',
+      name: 'lunch.jpg',
+      dataUrl
+    }]
+  }));
+  assert.equal(response.status, 200, 'photo chat must not 413 on a compressed phone image');
+  assert.match(response.headers.get('content-type') ?? '', /event-stream/);
+  const events = contentEvents(await readSse(response));
+  assert.ok(events.some(event => event.type === 'text'));
+  const user = capturedMessages?.find(entry => entry.role === 'user');
+  assert.ok(Array.isArray(user?.content), 'user content must be multimodal blocks');
+  assert.ok(user.content.some(block => block.type === 'image'));
+  assert.match(
+    user.content.find(block => block.type === 'text')?.text ?? '',
+    /Attachment delivered to model/
+  );
+});
+
 test('reports misconfiguration when ANTHROPIC_API_KEY is absent', async () => {
   const { ANTHROPIC_API_KEY, ...withoutKey } = validEnv;
   const handler = createChatHandler({ env: withoutKey });
