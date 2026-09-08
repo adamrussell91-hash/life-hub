@@ -224,7 +224,9 @@ export function buildAgentTools({
   needsVeraMindTools = false,
   needsSaraMedicalTools = false,
   needsPenelopeDiaryTools = false,
-  message = null
+  message = null,
+  attachments,
+  keepFullDomainTools = false
 } = {}) {
   if (typeof slug !== 'string' || !slug) throw new TypeError('slug is required');
 
@@ -236,9 +238,13 @@ export function buildAgentTools({
   const allIds = capabilityIdsForAgent(slug);
   // Intent pass narrows Phase 1–3 shortcuts only; legacy/domain tools stay
   // available whenever their feature flags / allowlists say so.
-  const selectedIds = message == null
-    ? allIds
-    : selectCapabilityIdsForTurn({ slug, message });
+  // Visual turns (or keepFullDomainTools) keep the full capability set.
+  const selectedIds = selectCapabilityIdsForTurn({
+    slug,
+    message,
+    attachments,
+    keepFullDomainTools: keepFullDomainTools || message == null
+  });
   const has = id => allIds.includes(id);
 
   if (has('os.propose-action')) {

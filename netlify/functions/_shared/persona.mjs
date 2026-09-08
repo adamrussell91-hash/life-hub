@@ -56,6 +56,9 @@ export function buildSystemPrompt({
   hubContext = '',
   activationCatalogue = '',
   activationDirective = '',
+  visualIntelligenceBlock = '',
+  agentVisualCueBlock: agentVisualCue = '',
+  visualBlock = '',
   evidencePackBlock = '',
   kernelBlock = '',
   clareProtocol = '',
@@ -329,6 +332,9 @@ export function buildSystemPrompt({
     'Before answering what Adam already knows about a topic, call search_knowledge. Distinguish retrieved notes from new synthesis. Never invent archive pages.'
   ] : [];
 
+  const visualShared = String(visualBlock || visualIntelligenceBlock || '').trim();
+  const visualCue = String(agentVisualCue || '').trim();
+
   return [
     shared,
     `You are ${agent.name}, Adam's ${agent.domain ?? 'general'} agent.`,
@@ -339,6 +345,8 @@ export function buildSystemPrompt({
     capacityBlock,
     activationCatalogue,
     activationDirective,
+    visualShared,
+    visualCue,
     evidencePackBlock
       ? `Retrieved evidence pack (server-assembled before this reply — treat as primary evidence; label record vs calculation vs inference; call continuation tools only if a section is truncated/missing):\n${evidencePackBlock}`
       : '',

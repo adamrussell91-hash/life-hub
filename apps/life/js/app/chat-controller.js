@@ -25,6 +25,11 @@ import {
 } from './hammond-audit-session-storage.js';
 import { takeCompletedChatBlocks } from '../core/chat-blocks.js';
 import { HISTORY_WINDOW_MS, keepNewestHistory } from '../core/chat-history.js';
+import {
+  normalizeVisualEvidenceList,
+  visualEvidenceStubFromAttachment,
+  mergeVisualEvidenceLists
+} from '../../../packages/design-kit/js/hub-visual-evidence.js';
 import { shouldNudgeUnsavedWorkoutPlan } from '../core/workout-plan-detect.js';
 import {
   MISSING_LOG_NUDGE_TEXT,
@@ -145,7 +150,11 @@ export function createChatController({
   function recentHistory() {
     const cutoff = now() - HISTORY_WINDOW_MS;
     transcript = transcript.filter(entry => entry.at >= cutoff);
-    return keepNewestHistory(transcript.map(({ role, content }) => ({ role, content })));
+    return keepNewestHistory(transcript.map(({ role, content, visualEvidence }) => ({
+      role,
+      content,
+      ...(visualEvidence ? { visualEvidence } : {})
+    })));
   }
 
   // A live thread (clicked avatar or an agent who already answered) never
@@ -249,14 +258,27 @@ export function createChatController({
     paintRoster();
   }
 
-  function remember(role, content) {
+  function remember(role, content, extra = {}) {
     const trimmed = content.trim();
     if (!trimmed) return;
-    transcript.push({
+    const entry = {
       role,
       content: trimmed,
       at: now()
-    });
+    };
+    if (extra.visualEvidence) entry.visualEvidence = extra.visualEvidence;
+    transcript.push(entry);
+  }
+
+  function mergeVisualEvidenceOntoLatestUser(items) {
+    const normalized = normalizeVisualEvidenceList(items);
+    if (!normalized.length) return;
+    for (let i = transcript.length - 1; i >= 0; i -= 1) {
+      if (transcript[i].role !== 'user') continue;
+      const existing = normalizeVisualEvidenceList(transcript[i].visualEvidence);
+      transcript[i].visualEvidence = mergeVisualEvidenceLists(existing, normalized);
+      break;
+    }
   }
 
   function talkingToVera() {
@@ -492,7 +514,10 @@ export function createChatController({
     turnAnchor = null;
     turnFollow = false;
     if (!hiddenUser) {
-      remember('user', message);
+      const stubs = (Array.isArray(attachments) ? attachments : [])
+        .map(item => visualEvidenceStubFromAttachment(item))
+        .filter(Boolean);
+      remember('user', message, stubs.length ? { visualEvidence: stubs } : {});
       const userBubble = appendMessage(root, {
         role: 'user',
         text: message,
@@ -732,6 +757,8 @@ export function createChatController({
             agentSlug: assistantSlug,
             text: `Central Node updated: ${summary}`
           });
+        } else if (event.type === 'visual_evidence') {
+          mergeVisualEvidenceOntoLatestUser(event.items);
         } else if (event.type === 'record_rejected') {
           turnSignaled = true;
           clearWorkingBubble();

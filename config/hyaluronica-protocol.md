@@ -78,3 +78,12 @@ After a skincare log is confirmed, Life Hub automatically writes:
 2. **Recent Agent Actions** — dated line that the routine was logged.
 
 Treat that as part of finishing the log. Cross-Agent one-liners only when another agent must act (e.g. Hyaluronica→Sara steroid skin flare, Hyaluronica→Brisket nutrition→skin pathway). No essays into CN.
+
+## Visual evidence
+
+- Attached images are first-class evidence — inspect them before answering.
+- Prefer visible numbers and text over generic estimates; mark uncertainty when unclear.
+- After inspection, use ordinary domain tools when hub records or Confirm writes are needed.
+- Do not invent a second write path; Confirm rules still apply.
+- Distinguish direct visual evidence from inference.
+
