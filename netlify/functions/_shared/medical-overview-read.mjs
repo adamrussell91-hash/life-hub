@@ -149,7 +149,7 @@ export function searchMedicalRecords(events, { query, limit = DEFAULT_SEARCH_LIM
     return { ok: false, error: 'empty_query' };
   }
   const cap = Math.min(Math.max(Number(limit) || DEFAULT_SEARCH_LIMIT, 1), MAX_SEARCH_LIMIT);
-  const hits = (events ?? [])
+  const matchedAll = (events ?? [])
     .filter(e => e?.record?.type === 'medical')
     .map(event => {
       const haystack = visitHaystack(event);
@@ -160,7 +160,8 @@ export function searchMedicalRecords(events, { query, limit = DEFAULT_SEARCH_LIM
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return (b.event.record.date ?? '').localeCompare(a.event.record.date ?? '');
-    })
+    });
+  const hits = matchedAll
     .slice(0, cap)
     .map(({ event, score }) => formatVisitSummary(event, { score }));
 
@@ -169,6 +170,9 @@ export function searchMedicalRecords(events, { query, limit = DEFAULT_SEARCH_LIM
     store: 'life_hub_medical_overview',
     query,
     count: hits.length,
+    truncated: matchedAll.length > hits.length,
+    kept: hits.length,
+    omitted: Math.max(0, matchedAll.length - hits.length),
     results: hits
   };
 }
@@ -254,4 +258,152 @@ export async function briefMedicalAppointmentWithFallback({
 
   const merged = [...(events ?? []), ...resolved];
   return briefMedicalAppointment(merged, { date });
+}
+
+/** Current-turn health statements. Not stored medical facts. */
+export function statedHealthConstraints(message) {
+  const text = String(message ?? '');
+  const lower = text.toLowerCase();
+  const symptomMatch = lower.match(
+    /\b(?:i(?:'m| am)\s+(?:having|getting|feeling)|today(?:'s)?\s+(?:pain|symptom)|current(?:ly)?\s+(?:have|having)|right now)\b[^.!?]{0,80}/
+  );
+  const symptom = symptomMatch
+    ? symptomMatch[0].replace(/^(i(?:'m| am)\s+|today(?:'s)?\s+|current(?:ly)?\s+|right now\s+)/, '').trim()
+    : null;
+  const simpleSymptom = lower.match(/\b(?:my|this)\s+([a-z\s]{3,40}?)\s+(?:hurts|is sore|is flaring|flare)\b/);
+  return {
+    current_symptom: symptom || (simpleSymptom ? simpleSymptom[1].trim() : null),
+    asks_compare: /\b(compare|versus|vs|trend|change|changed|delta)\b/.test(lower),
+    asks_current: /\b(current|today|now|present|right now)\b/.test(lower),
+    asks_history: /\b(history|historical|previous|past|old|earlier|last year|months? ago)\b/.test(lower)
+  };
+}
+
+const RECENT_WINDOW_DAYS = 14;
+
+function daysBetweenYmd(from, to) {
+  if (!isCalendarDate(from) || !isCalendarDate(to)) return null;
+  const a = Date.parse(`${from}T00:00:00Z`);
+  const b = Date.parse(`${to}T00:00:00Z`);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
+
+function classifyRecency(date, today) {
+  if (!date) return 'missing_date';
+  const age = daysBetweenYmd(date, today);
+  if (age == null) return 'missing_date';
+  if (age < 0) return 'future';
+  if (age <= RECENT_WINDOW_DAYS) return 'recent_window';
+  return 'historical';
+}
+
+/**
+ * Temporal discipline for Sara: recent dated records stay recent historical evidence.
+ * Recency alone never proves a current symptom, diagnosis, medication use, or abnormality.
+ */
+export function analyseMedicalEvidence(events = [], {
+  today,
+  message = '',
+  compositionRecords = [],
+  measurementRecords = []
+} = {}) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date', store: 'life_hub_medical_overview' };
+  const stated = statedHealthConstraints(message);
+  const medical = (events ?? []).filter(e => e?.record?.type === 'medical');
+  const bloods = (events ?? []).filter(e => e?.record?.type === 'bloods');
+
+  const visits = medical.map(event => {
+    const date = event.record?.date ?? null;
+    return {
+      id: event.record?.id ?? null,
+      path: event.path ?? null,
+      date,
+      title: event.record?.title ?? null,
+      provider: event.record?.provider ?? null,
+      record_type: event.record?.record_type ?? null,
+      recency: classifyRecency(date, today),
+      medications: event.record?.medications ?? event.record?.meds ?? null,
+      symptoms: event.record?.symptoms ?? null
+    };
+  });
+
+  const labs = bloods.map(event => {
+    const date = event.record?.date ?? null;
+    return {
+      id: event.record?.id ?? null,
+      path: event.path ?? null,
+      date,
+      recency: classifyRecency(date, today),
+      markers: event.record?.markers ?? event.record?.panels ?? null
+    };
+  });
+
+  const historicalVisits = visits.filter(v => v.recency === 'historical');
+  const recentVisits = visits.filter(v => v.recency === 'recent_window');
+  const undated = visits.filter(v => v.recency === 'missing_date');
+  const futureVisits = visits.filter(v => v.recency === 'future');
+
+  const datedWeights = (compositionRecords ?? [])
+    .filter(r => typeof r.weight_kg === 'number')
+    .map(r => ({
+      date: r.date ?? null,
+      weight_kg: r.weight_kg,
+      path: r.path ?? null,
+      recency: classifyRecency(r.date, today)
+    }))
+    .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
+
+  const comparisons = [];
+  if (datedWeights.length >= 2) {
+    const [latest, previous] = datedWeights;
+    comparisons.push({
+      kind: 'weight',
+      latest,
+      previous,
+      delta_kg: Math.round((latest.weight_kg - previous.weight_kg) * 10) / 10,
+      dates_preserved: Boolean(latest.date && previous.date)
+    });
+  }
+  if (labs.length >= 2) {
+    const sorted = [...labs].sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
+    comparisons.push({
+      kind: 'bloods',
+      latest: sorted[0],
+      previous: sorted[1],
+      dates_preserved: Boolean(sorted[0]?.date && sorted[1]?.date)
+    });
+  }
+
+  return {
+    ok: true,
+    store: 'life_hub_medical_overview',
+    kind: 'calculation',
+    today,
+    recent_window_days: RECENT_WINDOW_DAYS,
+    stated_constraints: stated,
+    visits,
+    labs,
+    historical_visit_count: historicalVisits.length,
+    recent_visit_count: recentVisits.length,
+    missing_date_count: undated.length,
+    future_visit_count: futureVisits.length,
+    historical_visits: historicalVisits.slice(0, 8),
+    recent_visits: recentVisits.slice(0, 8),
+    comparisons,
+    temporal_rules: [
+      'A recent dated visit is recent historical evidence, not a current condition.',
+      'Historical visits are not current conditions.',
+      'Medications listed on a dated visit are not current adherence.',
+      'Abnormal labs on a dated visit are not today\'s results.',
+      'Current-turn symptoms are user_stated_current_turn until Confirm writes them.',
+      'Missing dates stay missing — do not invent them.',
+      'Unrelated historical findings are not causal explanations.'
+    ],
+    how_to_read:
+      'Use recency labels (recent_window / historical / missing_date / future). '
+      + 'Recency alone does not establish a current symptom, diagnosis, medication use, or abnormality. '
+      + 'Current state needs user_stated_current_turn or an explicit active stored state (none invented here). '
+      + 'Stated current symptoms are user input this turn, not Medical Overview facts.'
+  };
 }
