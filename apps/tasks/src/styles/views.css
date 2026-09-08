@@ -2531,6 +2531,8 @@
     left: 0;
     right: 0;
     width: 100%;
+    /* min-height:100dvh from the mobile shell must not beat --vv-height. */
+    min-height: 0;
     height: var(--vv-height, 100dvh);
     max-height: var(--vv-height, 100dvh);
     padding-bottom: 0;
