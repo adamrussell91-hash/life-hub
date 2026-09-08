@@ -223,12 +223,14 @@ function paintTaskPage(
     value: endTimeFromStart(task.due_time, task.estimated_duration),
     className: 'page-card__end'
   });
-  start.input.addEventListener('change', () => {
+  start.input.addEventListener('change', onStartChange);
+  start.input.addEventListener('input', onStartChange);
+  function onStartChange() {
     const due_time = start.input.value || null;
     persist({ due_time });
     end.input.value = endTimeFromStart(due_time, current.estimated_duration);
-  });
-  end.input.addEventListener('change', () => {
+  }
+  function onEndChange() {
     const value = end.input.value;
     if (!value) {
       persist({ estimated_duration: null });
@@ -248,7 +250,9 @@ function paintTaskPage(
       return;
     }
     persist({ estimated_duration: minutes });
-  });
+  }
+  end.input.addEventListener('change', onEndChange);
+  end.input.addEventListener('input', onEndChange);
   const project = pageFilter(
     'page-card__project',
     'Project',
