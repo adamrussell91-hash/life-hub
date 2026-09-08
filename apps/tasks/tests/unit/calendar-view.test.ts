@@ -9,6 +9,19 @@ vi.mock('@/services/client-api', () => ({
   tasksApi: {
     listTasks: vi.fn(),
     listProjects: vi.fn(),
+    listWorkBlocks: vi.fn(async () => []),
+    getPlanningProfile: vi.fn(async () => ({
+      schema_version: 1,
+      id: 'default',
+      active_project_limit: null,
+      work_windows: { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] },
+      protected_windows: { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] },
+      deep_work_preference: { target_blocks_per_week: null, min_block_minutes: 90 },
+      shutdown_preference: { preferred_time: null, require_tomorrow_block: false },
+      runway_buffer_minutes: null,
+      updated_at: null
+    })),
+    createWorkBlock: vi.fn(),
     updateTask: vi.fn(),
     createTask: vi.fn(),
     deleteTask: vi.fn()

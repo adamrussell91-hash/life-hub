@@ -63,6 +63,8 @@ export function eventDetailTitle(record, body = '') {
       return record.title || 'Lesson';
     case 'task':
       return record.title || 'Task';
+    case 'work_block':
+      return record.title || 'Work block';
     case 'knowledge_page':
       return record.title || 'Page';
     default:
@@ -126,6 +128,13 @@ export function eventBrief(event) {
       return record.delivery_status ? `Teaching · ${record.delivery_status}` : 'Teaching';
     case 'task':
       return record.status ? `Tasks · ${record.status}` : 'Tasks';
+    case 'work_block': {
+      const parts = ['Work block'];
+      if (record.depth) parts.push(String(record.depth));
+      if (record.status) parts.push(String(record.status));
+      if (record.ghost) parts.push('ghost');
+      return parts.join(' · ');
+    }
     case 'knowledge_page':
       return record.area ? `Knowledge · ${record.area}` : 'Knowledge';
     case 'heart':
@@ -144,6 +153,7 @@ export function resolveCalendarDayClick(expandedDate, clickedDate) {
 
 function eventDurationMin(record) {
   if (record?.type === 'workout' && record.duration_min != null) return Number(record.duration_min);
+  if (record?.type === 'work_block' && record.duration_min != null) return Number(record.duration_min);
   if (record?.type === 'sleep' && record.duration_h != null) return Number(record.duration_h) * 60;
   return 60;
 }
@@ -160,7 +170,10 @@ export function eventsForDate(events, date) {
       title: eventDetailTitle(event.record, event.body),
       brief: eventBrief(event),
       snippet: String(event.body ?? '').trim().slice(0, 160),
-      categories: buildCalendarMarkers([event])[date] ?? []
+      categories: buildCalendarMarkers([event])[date] ?? [],
+      ghost: Boolean(event.record.ghost),
+      depth: event.record.depth ?? null,
+      status: event.record.status ?? null
     }))
     .sort((a, b) => {
       const timeA = a.time ?? '99:99';
@@ -173,7 +186,11 @@ export function buildCalendarModel({
   events,
   date,
   selectedDate,
-  viewMonth
+  viewMonth,
+  planningLens = false,
+  mission = null,
+  protectedWindows = [],
+  ghostPreview = false
 }) {
   if (!date) throw new RangeError('Calendar display date is unavailable');
   const selected = selectedDate && isCalendarDate(selectedDate) ? selectedDate : date;
@@ -188,17 +205,29 @@ export function buildCalendarModel({
       .map(day => [day, eventsForDate(events, day)])
   );
 
+  const protectedByDate = {};
+  for (const day of weekDates) {
+    protectedByDate[day] = (protectedWindows ?? [])
+      .filter((w) => w.date === day || (!w.date && day === selected))
+      .map((w) => ({ ...w, date: day }));
+  }
+
   return {
     date,
     selectedDate: selected,
     viewMonth: month,
     monthLabel: monthLabel(month),
     weekStart,
+    planningLens: Boolean(planningLens),
+    ghostPreview: Boolean(ghostPreview),
+    mission: mission ?? null,
+    protectedByDate,
     weekDays: weekDates.map(day => ({
       date: day,
       letter: weekdayLetter(day),
       categories: markers[day] ?? [],
       events: eventsByDate[day] ?? [],
+      protected: protectedByDate[day] ?? [],
       isToday: day === date,
       isSelected: day === selected
     })),

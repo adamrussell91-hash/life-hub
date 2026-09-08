@@ -3,7 +3,7 @@ import { bindHubAccordion, openHubAccordion, renderHubPreview } from '../shell/h
 import { renderHubPulse } from '../shell/render-hub-pulse.js';
 import { renderClareResult } from '../shell/render-tasks.js';
 import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
-import { tasksEventsFromTasks } from '../shell/tasks-calendar.js';
+import { tasksEventsFromTasks, tasksEventsFromWorkBlocks } from '../shell/tasks-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -153,6 +153,7 @@ export function createAppController(dependencies) {
   let calendarViewMonth = null;
   let calendarView = 'week';
   let calendarViewExplicit = false;
+  let calendarPlanningLens = false;
   let calendarMobilePanel = 'schedule';
   let calendarCompose = { date: null, time: null, type: 'diary' };
   let calendarSelectedEventId = null;
@@ -796,9 +797,15 @@ export function createAppController(dependencies) {
   function loadTasksCalendar() {
     if (!tasksApi?.listTasks) return Promise.resolve();
     if (tasksCalendarInFlight) return tasksCalendarInFlight;
-    tasksCalendarInFlight = tasksApi.listTasks()
-      .then(tasks => {
-        tasksEvents = tasksEventsFromTasks(tasks);
+    const listBlocks = typeof tasksApi.listWorkBlocks === 'function'
+      ? tasksApi.listWorkBlocks().catch(() => [])
+      : Promise.resolve([]);
+    tasksCalendarInFlight = Promise.all([tasksApi.listTasks(), listBlocks])
+      .then(([tasks, blocks]) => {
+        tasksEvents = [
+          ...tasksEventsFromTasks(tasks),
+          ...tasksEventsFromWorkBlocks(blocks)
+        ];
       })
       .catch(() => {
         tasksEvents = [];
@@ -1101,7 +1108,17 @@ export function createAppController(dependencies) {
       events: [...(latestResult.events ?? []), ...teachingEvents, ...knowledgeEvents, ...tasksEvents],
       date,
       selectedDate: calendarSelectedDate,
-      viewMonth: calendarViewMonth
+      viewMonth: calendarViewMonth,
+      planningLens: calendarPlanningLens,
+      mission: calendarPlanningLens
+        ? {
+            outcomes: [],
+            activeProjects: { count: null, limit: null, label: 'Not set' },
+            deepWork: { planned: null, available: null, label: 'Available windows' },
+            capacity: { planned: null, available: null, label: 'Not set' }
+          }
+        : null,
+      protectedWindows: []
     });
     const focusCompose = calendarFocusCompose;
     calendarFocusCompose = false;
@@ -1115,6 +1132,10 @@ export function createAppController(dependencies) {
       selectedEventId: calendarSelectedEventId,
       focusCompose,
       now: now(),
+      onTogglePlanningLens: () => {
+        calendarPlanningLens = !calendarPlanningLens;
+        renderCalendarSection();
+      },
       onSelectDate: (next, options = {}) => {
         if (!next) return;
         const nextMonth = next.slice(0, 7);

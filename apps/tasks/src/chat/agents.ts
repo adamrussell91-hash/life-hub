@@ -1,6 +1,6 @@
 import {
   CLARE_ADHD_PROTOCOLS,
-  CLARE_PROTOCOLS,
+  CLARE_VIEW_PROTOCOLS,
   CLARE_WAIT_LINES
 } from '@/domain/clare-protocols';
 
@@ -44,7 +44,7 @@ export const CHAT_AGENTS: readonly ChatAgent[] = [
     avatarSrc: '/assets/agents/clare.png',
     placeholder: 'Dump the chaos. One thing, or twelve.',
     canEyebrow: 'Clare can',
-    protocols: CLARE_PROTOCOLS,
+    protocols: CLARE_VIEW_PROTOCOLS,
     stuckEyebrow: 'When stuck',
     stuckProtocols: CLARE_ADHD_PROTOCOLS,
     waitLines: CLARE_WAIT_LINES

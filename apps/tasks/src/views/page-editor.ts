@@ -1,5 +1,5 @@
 import type { Task, TaskDomain, TaskPriority, TaskStatus } from '@/schemas/task';
-import type { Project, ProjectStatus } from '@/schemas/project';
+import type { Project, ProjectStatus, QualityBar } from '@/schemas/project';
 import type { Block } from '@/schemas/block';
 import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountBlockCanvas, type BlockCanvasHandle } from '@/teacher/lesson-canvas/mount-page';
@@ -16,6 +16,7 @@ import { bindEditablePageTitle } from '@/shell/shell';
 import {
   createHubField,
   createHubFilter,
+  createHubPills,
   createHubTextarea,
   domainFilterOptions,
   labeledField,
@@ -24,6 +25,7 @@ import {
   type HubFilterOption
 } from '@/views/hub-kit';
 import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
+import { projectNextActionHealth } from '@/views/projects';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -336,6 +338,9 @@ function paintProjectPage(
           arc_summary: current.arc_summary,
           status: current.status,
           current_end_date: current.current_end_date,
+          quality_bar: current.quality_bar,
+          purpose: current.purpose,
+          desired_outcome: current.desired_outcome,
           page_blocks: current.page_blocks
         })
         .then(
@@ -363,6 +368,8 @@ function paintProjectPage(
   const card = el('article', 'hub-card page-card');
   const head = el('header', 'task-card__head');
   head.append(backLink('#/projects', '← Projects'));
+  const health = projectNextActionHealth(project, tasks);
+  if (health) head.append(health);
 
   const fields = el('div', 'page-card__fields hub-toolbar');
   const status = pageFilter(
@@ -380,6 +387,29 @@ function paintProjectPage(
     onChange: (value) => persist({ current_end_date: value || null })
   });
   fields.append(status.el, due.el);
+
+  let qualityValue = (project.quality_bar ?? 'good_enough') as QualityBar;
+  const qualityHost = el('div', 'page-card__quality');
+  const paintQuality = () => {
+    qualityHost.replaceChildren(
+      createHubPills({
+        label: 'Quality bar',
+        role: 'tablist',
+        items: [
+          { id: 'good_enough', label: 'Good enough' },
+          { id: 'high_quality', label: 'High quality' },
+          { id: 'exceptional', label: 'Exceptional' }
+        ],
+        value: qualityValue,
+        onSelect: (id) => {
+          qualityValue = id as QualityBar;
+          persist({ quality_bar: qualityValue });
+          paintQuality();
+        }
+      })
+    );
+  };
+  paintQuality();
 
   const notes = createHubTextarea({
     ariaLabel: 'Summary',
@@ -403,7 +433,7 @@ function paintProjectPage(
   const foot = el('footer', 'task-card__foot');
   foot.append(updated);
 
-  card.append(head, fields, notes.el, metrics, track);
+  card.append(head, fields, labeledField('Quality bar', qualityHost), notes.el, metrics, track);
   card.append(
     renderQuickAdd(
       () => void renderPageEditor(canvas, { kind: 'project', id: project.id }, { header }),

@@ -10,11 +10,15 @@ import { renderTaskEditor } from '@/views/task-editor';
 import { projectPageHash } from '@/domain/cards';
 import { formatTagsInput, parseTagsInput } from '@/domain/hierarchy';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
-import { createHubFilter, createHubSearch, createHubToolbar, el } from '@/views/hub-kit';
+import { createHubFilter, createHubPills, createHubSearch, createHubToolbar, el } from '@/views/hub-kit';
 import { createPlusAdd } from '@/views/plus-add';
+import { createHierarchyTraceCard, createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
+import { activeProjectMeter } from '@/domain/hammond-portfolio';
+import { DEFAULT_PLANNING_PROFILE } from '@/schemas/planning-profile';
 
 let goalArea = 'all';
 let goalQuery = '';
+let horizonsMode = false;
 
 function tagRow(tags: string[]): HTMLElement {
   const row = el('div', 'hierarchy-tags');
@@ -238,6 +242,15 @@ function paintGoals(
   filters.panel.append(search.el, areaFilter.el);
   toolbar.append(
     filters.root,
+    createHubPills({
+      label: 'Horizons',
+      items: [{ id: 'horizons', label: 'Horizons mode' }],
+      value: horizonsMode ? (['horizons'] as const) : [],
+      onSelect: () => {
+        horizonsMode = !horizonsMode;
+        paintGoals(canvas, areas, goals, projects, tasks);
+      }
+    }),
     createPlusAdd({
       ariaLabel: 'Add a goal or project',
       panel: addPanel,
@@ -260,6 +273,53 @@ function paintGoals(
     }
     return true;
   });
+
+  const meterHost = el('div', 'goals-meter-host');
+  meterHost.append(
+    createActiveProjectsMeter(document, {
+      meter: activeProjectMeter(projects, DEFAULT_PLANNING_PROFILE)
+    })
+  );
+  canvas.append(meterHost);
+
+  if (horizonsMode) {
+    const lens = el('div', 'horizons-lens');
+    lens.append(
+      el('p', 'page-header__eyebrow', 'Horizons'),
+      el(
+        'p',
+        'hierarchy-meta',
+        'Purpose → Vision → Area → Goal → Project → Next Action'
+      )
+    );
+    const focusProject = projects.find((p) => p.status === 'active') ?? null;
+    const focusGoal = focusProject
+      ? goals.find((g) => g.id === focusProject.parent_goal_id) ?? null
+      : activeGoals[0] ?? null;
+    const focusArea = focusGoal?.parent_area_id
+      ? areasById.get(focusGoal.parent_area_id)
+      : undefined;
+    const next = focusProject
+      ? tasks.find(
+          (t) =>
+            t.parent_project_id === focusProject.id &&
+            (t.status === 'open' || t.status === 'in_progress') &&
+            !t.waiting_on
+        )
+      : null;
+    lens.append(
+      createHierarchyTraceCard(document, {
+        purpose: 'Purpose (set in planning direction)',
+        vision: 'Vision (set in planning direction)',
+        area: focusArea?.title,
+        goal: focusGoal?.title,
+        project: focusProject?.title,
+        nextAction: next?.title ?? 'Add next action'
+      })
+    );
+    canvas.append(lens);
+  }
+
   const grouped = new Map<string, Goal[]>();
   for (const goal of activeGoals) {
     const key = goal.parent_area_id ?? 'ungrouped';

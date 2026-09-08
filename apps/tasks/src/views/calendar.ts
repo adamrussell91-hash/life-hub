@@ -8,6 +8,8 @@ import {
   addCalendarRange,
   calendarHash,
   collectCalendarItems,
+  collectPlanningMarkers,
+  collectWorkBlockItems,
   dayTaskMinutes,
   filterCalendarItems,
   formatLoad,
@@ -24,8 +26,13 @@ import {
   weekdayShort,
   type CalendarFilters,
   type CalendarItem,
-  type CalendarMode
+  type CalendarMode,
+  type PlanningLayer
 } from '@/domain/calendar';
+import type { WorkBlock } from '@/schemas/work-block';
+import type { PlanningProfile } from '@/schemas/planning-profile';
+import { dayCapacity, protectedSpansForDate } from '@/domain/hammond-capacity';
+import { DEFAULT_PLANNING_PROFILE } from '@/schemas/planning-profile';
 import {
   blockStyle,
   formatBlockTime,
@@ -35,7 +42,9 @@ import {
   nowLineOffset,
   parseGoToDate,
   splitDayItems,
-  timeGridHours
+  timeGridHours,
+  TIME_GRID_START_HOUR,
+  TIME_GRID_HOUR_PX
 } from '@/domain/time-grid';
 import { hourCaption } from '@/domain/daily-dial';
 import { formatDisplayDate, formatDisplayDateRange } from '../../design-kit/js/format-display-date.js';
@@ -70,8 +79,22 @@ const sessionFilters: CalendarFilters = {
   projectId: 'all',
   query: '',
   includeDone: false,
-  includeDates: true
+  includeDates: true,
+  planningLens: false,
+  layers: ['hard_deadline', 'planned_work', 'protected_time', 'target', 'review']
 };
+
+/** Pending schedule-diff ghost blocks (preview only — no write). */
+let pendingGhostBlocks: WorkBlock[] = [];
+let planWorkMode = false;
+
+export function setCalendarGhostBlocks(blocks: WorkBlock[]): void {
+  pendingGhostBlocks = blocks;
+}
+
+export function getCalendarGhostBlocks(): WorkBlock[] {
+  return pendingGhostBlocks;
+}
 
 let selectedDateKey: string | null = null;
 let selectedItemId: string | null = null;
@@ -93,6 +116,7 @@ type EventTint = 'blue' | 'sage' | 'peach' | 'gold' | 'lilac' | 'sand';
 function eventTint(item: CalendarItem): EventTint {
   if (item.kind === 'key_date') return 'sand';
   if (item.kind === 'milestone') return 'gold';
+  if (item.kind === 'work_block') return 'lilac';
   switch (item.domain) {
     case 'teaching':
       return 'blue';
@@ -136,8 +160,9 @@ function renderEventChip(
   if (item.task) chip.dataset.taskId = item.task.id;
   if (item.status === 'done' || item.status === 'dead') chip.classList.add('is-done');
   if (item.priority === 'urgent') chip.classList.add('is-urgent');
+  if (item.ghost) chip.classList.add('is-ghost');
   chip.setAttribute('aria-label', eventLabel(item));
-  chip.draggable = item.movable;
+  chip.draggable = item.movable && item.kind === 'task';
 
   const title = el('span', 'event-chip__title', item.title);
   chip.append(title);
@@ -228,10 +253,18 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   showViewLoading(canvas, 'Loading…', '.hub-calendar');
   let tasks: Task[];
   let projects: Project[];
+  let workBlocks: WorkBlock[] = [];
+  let planningProfile: PlanningProfile = DEFAULT_PLANNING_PROFILE;
   try {
-    [tasks, projects] = await Promise.all([
+    [tasks, projects, workBlocks, planningProfile] = await Promise.all([
       tasksApi.listTasks(),
-      tasksApi.listProjects().catch(() => [] as Project[])
+      tasksApi.listProjects().catch(() => [] as Project[]),
+      typeof tasksApi.listWorkBlocks === 'function'
+        ? tasksApi.listWorkBlocks().catch(() => [] as WorkBlock[])
+        : Promise.resolve([] as WorkBlock[]),
+      typeof tasksApi.getPlanningProfile === 'function'
+        ? tasksApi.getPlanningProfile().catch(() => DEFAULT_PLANNING_PROFILE)
+        : Promise.resolve(DEFAULT_PLANNING_PROFILE)
     ]);
   } catch (err) {
     liveCalendar = null;
@@ -279,7 +312,18 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   }
 
   function allItems(): CalendarItem[] {
-    return filterCalendarItems(collectCalendarItems(tasks, projects), sessionFilters);
+    const base = collectCalendarItems(tasks, projects);
+    const blocks = collectWorkBlockItems(workBlocks, projects);
+    const ghosts = collectWorkBlockItems(pendingGhostBlocks, projects, { ghost: true });
+    const markers = sessionFilters.planningLens
+      ? collectPlanningMarkers(tasks, projects)
+      : [];
+    const merged = [...base, ...blocks, ...ghosts, ...markers];
+    const filters: CalendarFilters = {
+      ...sessionFilters,
+      layers: sessionFilters.planningLens ? sessionFilters.layers : undefined
+    };
+    return filterCalendarItems(merged, filters);
   }
 
   async function reload(): Promise<void> {
@@ -320,6 +364,32 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       preview.append(actions);
       return;
     }
+    if (item.kind === 'work_block' && item.work_block) {
+      const block = item.work_block;
+      preview.replaceChildren(
+        el('p', 'graph-preview__eyebrow', item.ghost ? 'Ghost work block' : 'Planned work'),
+        el('h3', 'graph-preview__title', block.title),
+        el(
+          'p',
+          'graph-preview__meta',
+          [
+            formatDisplayDate(block.date),
+            block.start_time,
+            `${block.duration_minutes}m`,
+            block.depth,
+            block.status
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        ),
+        el(
+          'p',
+          'task-editor__planned-link',
+          'Planned work is a block — not a deadline. Drag on the calendar still moves deadlines unless Plan work is on.'
+        )
+      );
+      return;
+    }
     preview.replaceChildren(
       el('p', 'graph-preview__eyebrow', item.subtitle ?? item.kind.replace('_', ' ')),
       el('h3', 'graph-preview__title', item.title),
@@ -332,6 +402,35 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   }
 
   function dropTask(taskId: string, dateKey: string, dueTime?: string | null): void {
+    if (planWorkMode) {
+      const task = tasks.find((entry) => entry.id === taskId);
+      const title = task?.title ?? 'Work block';
+      const start = dueTime || '09:00';
+      void tasksApi
+        .createWorkBlock({
+          title,
+          date: dateKey,
+          start_time: start,
+          duration_minutes: task?.estimated_duration ?? 60,
+          task_id: task?.id ?? null,
+          project_id: task?.parent_project_id ?? null,
+          depth: task?.depth ?? 'shallow',
+          status: 'confirmed',
+          source: 'manual'
+        })
+        .then((block) => {
+          workBlocks = [...workBlocks, block];
+          paint();
+        })
+        .catch((err: unknown) => {
+          const host = canvas.querySelector('.calendar-preview');
+          if (host instanceof HTMLElement) {
+            host.hidden = false;
+            host.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not create work block')));
+          }
+        });
+      return;
+    }
     const task = tasks.find((entry) => entry.id === taskId);
     const timeUnchanged = dueTime === undefined || task?.due_time === dueTime;
     if (!task || (task.due_date === dateKey && timeUnchanged)) return;
@@ -517,9 +616,58 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
           else sessionFilters.includeDates = !sessionFilters.includeDates;
           paint();
         }
+      }),
+      createHubPills({
+        label: 'Planning',
+        items: [
+          { id: 'lens', label: 'Planning lens' },
+          { id: 'plan_work', label: planWorkMode ? 'Plan work · on' : 'Plan work' }
+        ],
+        value: [
+          ...(sessionFilters.planningLens ? (['lens'] as const) : []),
+          ...(planWorkMode ? (['plan_work'] as const) : [])
+        ],
+        onSelect: (id) => {
+          if (id === 'lens') sessionFilters.planningLens = !sessionFilters.planningLens;
+          else planWorkMode = !planWorkMode;
+          paint();
+        }
       })
     );
+    if (sessionFilters.planningLens) {
+      const layerIds = (sessionFilters.layers ?? []) as PlanningLayer[];
+      filters.panel.append(
+        createHubPills({
+          label: 'Planning layers',
+          items: [
+            { id: 'hard_deadline', label: 'Deadlines' },
+            { id: 'planned_work', label: 'Planned work' },
+            { id: 'protected_time', label: 'Protected' },
+            { id: 'target', label: 'Target' },
+            { id: 'review', label: 'Review' },
+            { id: 'deep_filter', label: 'Deep' }
+          ],
+          value: layerIds,
+          onSelect: (id) => {
+            const next = new Set(sessionFilters.layers ?? []);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            sessionFilters.layers = [...next] as PlanningLayer[];
+            paint();
+          }
+        })
+      );
+    }
     canvas.append(filters.root);
+
+    const capacity = dayCapacity(selectedDateKey || toDateKey(today), planningProfile);
+    canvas.append(
+      el(
+        'p',
+        'hub-calendar__capacity',
+        `Capacity ${Math.round(capacity.available_minutes / 60)}h available (${capacity.work_source === 'profile' ? 'profile' : 'fallback 08:00–16:30'})`
+      )
+    );
 
     if (session.mode === 'week') {
       const pressure = el('div', 'pressure-host');
@@ -580,7 +728,10 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
           today,
           showPreview,
           selectDay,
-          dropTask
+          dropTask,
+          sessionFilters.planningLens && sessionFilters.layers.includes('protected_time')
+            ? planningProfile
+            : null
         )
       );
     }
@@ -994,7 +1145,8 @@ function renderTimeGrid(
   now: Date,
   onOpen: (item: CalendarItem) => void,
   onSelect: (day: Date, dueTime?: string | null, focusCompose?: boolean) => void,
-  onDrop: (taskId: string, dateKey: string, dueTime?: string | null) => void
+  onDrop: (taskId: string, dateKey: string, dueTime?: string | null) => void,
+  planningProfile: PlanningProfile | null = null
 ): HTMLElement {
   const grid = el('div', 'hub-calendar__timegrid');
   grid.style.setProperty('--days', String(days.length));
@@ -1047,6 +1199,19 @@ function renderTimeGrid(
     hours.dataset.date = key;
     hours.dataset.dropDate = key;
     if (key === selectedKey) hours.dataset.selected = 'true';
+    if (planningProfile) {
+      for (const span of protectedSpansForDate(key, planningProfile)) {
+        const top = ((span.start / 60 - TIME_GRID_START_HOUR) * TIME_GRID_HOUR_PX);
+        const height = ((span.end - span.start) / 60) * TIME_GRID_HOUR_PX;
+        if (height <= 0) continue;
+        const bg = el('div', 'hub-calendar__protected-bg');
+        bg.style.top = `${Math.max(0, top)}px`;
+        bg.style.height = `${height}px`;
+        bg.setAttribute('aria-hidden', 'true');
+        bg.title = span.title;
+        hours.append(bg);
+      }
+    }
     if (key === todayKey) {
       const offset = nowLineOffset(now);
       if (offset != null) {
@@ -1216,6 +1381,16 @@ export function resetCalendarSession(): void {
   sessionFilters.query = '';
   sessionFilters.includeDone = false;
   sessionFilters.includeDates = true;
+  sessionFilters.planningLens = false;
+  sessionFilters.layers = [
+    'hard_deadline',
+    'planned_work',
+    'protected_time',
+    'target',
+    'review'
+  ];
+  planWorkMode = false;
+  pendingGhostBlocks = [];
   selectedDateKey = null;
   selectedItemId = null;
   composeDraft = { dateKey: '', dueTime: null };

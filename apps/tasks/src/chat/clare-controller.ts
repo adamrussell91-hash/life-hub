@@ -21,6 +21,7 @@ import {
   appendSavedCard,
   appendChoiceCard,
   appendPlanStatusCard,
+  appendProductivityCard,
   renderInlineMarkdown,
   setChatBusy,
   setChatUnread,
@@ -545,6 +546,61 @@ export function createClareChatController({
             onDismiss: () => {}
           });
           continue;
+        }
+        {
+          const raw = event as {
+            type?: string;
+            card_type?: string;
+            kind?: string;
+            payload?: Record<string, unknown>;
+            options?: Record<string, unknown>;
+            title?: string;
+            hint?: string;
+          };
+          if (
+            raw.type === 'productivity_card' ||
+            raw.type === 'card' ||
+            (typeof raw.card_type === 'string' && raw.card_type)
+          ) {
+            stopWait();
+            const type =
+              typeof raw.card_type === 'string'
+                ? raw.card_type
+                : typeof raw.kind === 'string'
+                  ? raw.kind
+                  : '';
+            if (type) {
+              appendProductivityCard(root, type, {
+                ...(typeof raw.payload === 'object' && raw.payload ? raw.payload : {}),
+                ...(typeof raw.options === 'object' && raw.options ? raw.options : {}),
+                title: raw.title,
+                hint: raw.hint,
+                onConfirmSelected: (picks: unknown) => {
+                  void send(
+                    `Confirm selected: ${Array.isArray(picks) ? picks.map((p: { text?: string }) => p.text).join('; ') : ''}`
+                  );
+                },
+                onConfirmAll: (picks: unknown) => {
+                  void send(
+                    `Confirm all: ${Array.isArray(picks) ? picks.map((p: { text?: string }) => p.text).join('; ') : ''}`
+                  );
+                },
+                onConfirm: (picks: unknown) => {
+                  void send(
+                    `Confirm schedule: ${Array.isArray(picks) ? picks.length : 0} blocks`
+                  );
+                },
+                onDiscard: () => {},
+                onPreview: () => {},
+                onClose: (payload: unknown) => {
+                  void send(
+                    `Shutdown decisions recorded (${Array.isArray(payload) ? payload.length : 0}).`
+                  );
+                }
+              });
+            }
+            continue;
+          }
         }
         if (event.type === 'dump_result' && event.result) {
           result = event.result;

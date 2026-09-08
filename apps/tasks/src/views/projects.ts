@@ -37,6 +37,21 @@ import {
   el
 } from '@/views/hub-kit';
 import { createPlusAdd } from '@/views/plus-add';
+import { inspectProjectHealth } from '@/domain/project-health';
+import { activeProjectMeter } from '@/domain/hammond-portfolio';
+import { createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
+import { DEFAULT_PLANNING_PROFILE } from '@/schemas/planning-profile';
+
+/** Quiet when healthy; prompt when next action missing. */
+export function projectNextActionHealth(project: Project, tasks: Task[]): HTMLElement | null {
+  if (project.status === 'archived_dead' || project.status === 'paused') return null;
+  const result = inspectProjectHealth(project, tasks);
+  if (result.health === 'healthy' || result.health === 'waiting_only') return null;
+  if (result.health !== 'missing_next_action') return null;
+  const hint = el('span', 'proj-health proj-health--warn', 'Add next action');
+  hint.setAttribute('role', 'status');
+  return hint;
+}
 
 let projectQuery = '';
 let groupBy: ProjectsGroupBy = 'status';
@@ -249,6 +264,8 @@ function renderProjectBoardCard(
   const top = el('div', 'pcard__top');
   const title = el('span', 'pcard__title', card.project.title);
   top.append(title);
+  const healthHint = projectNextActionHealth(card.project, tasks);
+  if (healthHint) top.append(healthHint);
   if (card.lifecycle === 'stalled') {
     top.append(el('span', 'status-badge tint-peach', 'Stalled'));
   } else {
@@ -595,12 +612,14 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
   let tasks: Task[];
   let goals: Goal[] = [];
   let reviews: Awaited<ReturnType<typeof tasksApi.listReviewLogs>> = [];
+  let planningProfile = DEFAULT_PLANNING_PROFILE;
   try {
-    [projects, tasks, goals, reviews] = await Promise.all([
+    [projects, tasks, goals, reviews, planningProfile] = await Promise.all([
       tasksApi.listProjects(),
       tasksApi.listTasks(),
       tasksApi.listGoals().catch(() => [] as Goal[]),
-      tasksApi.listReviewLogs().catch(() => [])
+      tasksApi.listReviewLogs().catch(() => []),
+      tasksApi.getPlanningProfile().catch(() => DEFAULT_PLANNING_PROFILE)
     ]);
   } catch (err) {
     renderLoadError(canvas, err, () => void renderProjectsView(canvas), 'Could not load projects');
@@ -727,6 +746,10 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       renderQuickAddProject(ctx.goals, acceptProject)
     );
     canvas.append(toolbar);
+    const meter = activeProjectMeter(ctx.projects, planningProfile);
+    const meterHost = el('div', 'projects-meter-host');
+    meterHost.append(createActiveProjectsMeter(document, { meter }));
+    canvas.append(meterHost);
     canvas.append(renderBoard(ctx, closureConfirmHost, boardActions));
 
     const pulse = el('div', 'projects-pulse');

@@ -305,13 +305,25 @@ export async function renderTaskEditor(
 
   const due = createHubField({
     type: 'date',
-    ariaLabel: 'Due date',
+    ariaLabel: 'Deadline',
     value: task.due_date ?? ''
+  });
+
+  const target = createHubField({
+    type: 'date',
+    ariaLabel: 'Target date',
+    value: task.target_date ?? ''
+  });
+
+  const review = createHubField({
+    type: 'date',
+    ariaLabel: 'Review date',
+    value: task.review_at ?? ''
   });
 
   const start = createHubField({
     type: 'time',
-    ariaLabel: 'Start time',
+    ariaLabel: 'Deadline time',
     value: task.due_time ?? ''
   });
 
@@ -323,6 +335,18 @@ export async function renderTaskEditor(
   start.input.addEventListener('change', () => {
     end.input.value = endTimeFromStart(start.input.value || null, task.estimated_duration);
   });
+
+  const dates = el('div', 'task-editor__dates');
+  dates.append(
+    labeledField('Deadline', due.el),
+    labeledField('Target', target.el),
+    labeledField('Review', review.el),
+    el(
+      'p',
+      'task-editor__planned-link',
+      'Planned work lives on work blocks — not these date fields.'
+    )
+  );
 
   const recurrence = renderRecurrenceSection(task);
   const remind = renderRemindSection(task);
@@ -400,6 +424,8 @@ export async function renderTaskEditor(
         title: nextTitle,
         due_date: dueValue,
         due_time: dueTimeValue,
+        target_date: target.input.value || null,
+        review_at: review.input.value || null,
         estimated_duration,
         domain: domain.getValue(),
         priority: priority.getValue(),
@@ -420,7 +446,7 @@ export async function renderTaskEditor(
   actions.append(discard, save);
   card.append(
     title.el,
-    labeledField('Due', due.el),
+    dates,
     labeledField('Start', start.el),
     labeledField('End', end.el),
     domain.el,
