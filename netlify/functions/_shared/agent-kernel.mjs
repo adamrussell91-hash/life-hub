@@ -45,7 +45,10 @@ import {
   analyseNutritionEvidence,
   analyseSkincareEvidence,
   analyseDiaryEvidence,
-  analyseMindEvidence
+  analyseMindEvidence,
+  penelopeSemanticRetrievalGate,
+  skippedDiarySemanticSearch,
+  skippedDiaryThemeExtraction
 } from './domain-analysis.mjs';
 import { getWeekReview } from './hammond-week.mjs';
 import { searchMedicalRecords, briefMedicalAppointment, analyseMedicalEvidence, statedHealthConstraints } from './medical-overview-read.mjs';
@@ -446,7 +449,7 @@ function runTool(name, stores, today, now, message, options = {}) {
   const lessons = stores.lessons ?? [];
   const meals = stores.meals ?? [];
   const loadErrors = stores.loadErrors ?? {};
-  const query = String(message ?? '').trim();
+  const query = options.query != null ? String(options.query).trim() : String(message ?? '').trim();
   const limit = options.limit;
 
   if (name === 'get_fitness_snapshot') return getFitnessSnapshot(workouts, today);
@@ -591,7 +594,18 @@ function runTool(name, stores, today, now, message, options = {}) {
   }
   if (name === 'get_diary_range') {
     const from = `${String(today).slice(0, 8)}01`;
-    return getDiaryRange(stores.mindEvents ?? [], { from, to: today, limit: 12 });
+    const range = getDiaryRange(stores.mindEvents ?? [], { from, to: today, limit: 12 });
+    if (options.contextOnly && range && typeof range === 'object') {
+      return {
+        ...range,
+        context_only: true,
+        role: 'context_only',
+        how_to_read:
+          (range.how_to_read ? `${range.how_to_read} ` : '')
+          + 'Context-only recent diary range — not semantic recurrence matches and not a referent.'
+      };
+    }
+    return range;
   }
   if (name === 'search_mind_records') {
     return searchMindRecords(stores.mindEvents ?? [], { query: query || 'session', limit: limit ?? 10 });
@@ -769,6 +783,14 @@ function doRetrieve(state) {
     : plannedRetrieveNames(state).map(tool => ({ tool }));
   state.nextRetrievals = [];
   const defer = (state.retrieveRound ?? 0) === 0 ? (state.deferredTools ?? []) : [];
+
+  // Penelope: resolve recurrence referent before semantic diary search/theme tools.
+  let penelopeGate = null;
+  if (state.plan?.workflow === 'diary_recurrence') {
+    penelopeGate = penelopeSemanticRetrievalGate(state.message);
+    state.penelopeRetrievalGate = penelopeGate;
+  }
+
   for (const item of queued) {
     const name = item.tool;
     if (defer.includes(name)) {
@@ -777,9 +799,28 @@ function doRetrieve(state) {
     }
     if (state.evidence[name] && item.limit == null) continue;
     if (item.limit != null) state.retrievalLimits = { ...(state.retrievalLimits ?? {}), [name]: item.limit };
-    state.evidence[name] = runTool(name, state.stores, state.today, state.now, state.message, {
-      limit: state.retrievalLimits?.[name]
-    });
+
+    if (penelopeGate && !penelopeGate.run_semantic_search && name === 'search_diary_records') {
+      state.evidence[name] = skippedDiarySemanticSearch(penelopeGate.skip_reason);
+      continue;
+    }
+    if (penelopeGate && !penelopeGate.run_theme_extraction && name === 'extract_diary_themes') {
+      state.evidence[name] = skippedDiaryThemeExtraction(penelopeGate.skip_reason);
+      continue;
+    }
+
+    const toolOpts = { limit: state.retrievalLimits?.[name] };
+    if (
+      penelopeGate?.search_query
+      && (name === 'search_diary_records' || name === 'extract_diary_themes')
+    ) {
+      toolOpts.query = penelopeGate.search_query;
+    }
+    if (penelopeGate && !penelopeGate.run_semantic_search && name === 'get_diary_range') {
+      toolOpts.contextOnly = true;
+    }
+
+    state.evidence[name] = runTool(name, state.stores, state.today, state.now, state.message, toolOpts);
   }
   const memoryNote = recallLayeredMemory(state);
   if (state.slug === 'hammond' && state.plan?.workflow === 'cross_hub_supervision' && !(state.handoffs ?? []).length) {
@@ -830,21 +871,29 @@ function boundSourceRefs(result) {
 
 function boundRetrieveTool(item, result, round) {
   const limit = limitationFor(item.tool, result);
+  const skipped = Boolean(result?.skipped);
   return {
     round,
     name: item.tool,
     intent: item.limit != null ? { limit: item.limit } : null,
-    kind: limit?.kind ?? (result == null ? 'missing' : result.ok === false || result.error ? 'failed' : 'ok'),
-    status: result == null ? 'missing' : result.ok === false || result.error ? 'error' : 'ok',
+    kind: skipped
+      ? 'skipped'
+      : limit?.kind ?? (result == null ? 'missing' : result.ok === false || result.error ? 'failed' : 'ok'),
+    status: skipped
+      ? 'skipped'
+      : result == null ? 'missing' : result.ok === false || result.error ? 'error' : 'ok',
+    skipped,
+    skip_reason: skipped ? (result.reason ?? null) : null,
     truncated: Boolean(result?.truncated),
     kept: result?.kept ?? null,
     omitted: result?.omitted ?? null,
-    sourceRefs: boundSourceRefs(result)
+    sourceRefs: skipped ? [] : boundSourceRefs(result)
   };
 }
 
 function limitationFor(tool, result) {
   if (result == null) return { tool, kind: 'missing', text: `${tool} returned nothing` };
+  if (result.skipped) return null;
   if (result.ok === false || result.error) {
     return { tool, kind: 'failed', text: String(result.error || `${tool} failed`) };
   }

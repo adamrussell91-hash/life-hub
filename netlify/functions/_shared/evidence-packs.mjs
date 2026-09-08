@@ -47,7 +47,10 @@ import {
   analyseNutritionEvidence,
   analyseSkincareEvidence,
   analyseDiaryEvidence,
-  analyseMindEvidence
+  analyseMindEvidence,
+  penelopeSemanticRetrievalGate,
+  skippedDiarySemanticSearch,
+  skippedDiaryThemeExtraction
 } from './domain-analysis.mjs';
 import { searchMedicalRecords, analyseMedicalEvidence } from './medical-overview-read.mjs';
 import { searchMindRecords } from './mind-session-read.mjs';
@@ -64,6 +67,7 @@ function kindFor(result, preferred = 'record') {
   if (result == null) return 'missing';
   if (result.ok === false || result.error) return 'missing';
   if (result.found === false) return 'missing';
+  if (result.skipped) return 'calculation';
   if (result.conflict) return 'conflict';
   if (result.truncated) return 'truncated';
   return preferred;
@@ -274,20 +278,79 @@ export function assembleEvidencePack({
 
   if (slug === 'penelope') {
     storesTouched.push('life_hub_diary');
-    const q = queryFromMessage(message, 'feeling');
-    push(sections, toolsExecuted, 'search_diary_records', 'Diary search', searchDiaryRecords(mindEvents, { query: q, limit: 10 }), 'record');
+    // Same referent gate as runAgentKernel — unresolved deixis must not search feel/felt.
+    const gate = penelopeSemanticRetrievalGate(message);
+    const q = gate.search_query || queryFromMessage(message, 'feeling');
+    if (gate.run_semantic_search) {
+      push(
+        sections,
+        toolsExecuted,
+        'search_diary_records',
+        'Diary search',
+        searchDiaryRecords(mindEvents, { query: q, limit: 10 }),
+        'record'
+      );
+    } else {
+      push(
+        sections,
+        toolsExecuted,
+        'search_diary_records',
+        'Diary search skipped (unresolved referent)',
+        skippedDiarySemanticSearch(gate.skip_reason),
+        'calculation'
+      );
+    }
     push(sections, toolsExecuted, 'compare_diary_periods', 'Diary period compare', compareDiaryPeriods(mindEvents, today), 'calculation');
-    push(sections, toolsExecuted, 'extract_diary_themes', 'Diary themes', extractDiaryThemes(mindEvents, { query: q, limit: 12 }), 'calculation');
+    if (gate.run_theme_extraction) {
+      push(
+        sections,
+        toolsExecuted,
+        'extract_diary_themes',
+        'Diary themes',
+        extractDiaryThemes(mindEvents, { query: q, limit: 12 }),
+        'calculation'
+      );
+    } else {
+      push(
+        sections,
+        toolsExecuted,
+        'extract_diary_themes',
+        'Diary themes skipped (unresolved referent)',
+        skippedDiaryThemeExtraction(gate.skip_reason),
+        'calculation'
+      );
+    }
     push(
       sections,
       toolsExecuted,
       'analyse_diary_evidence',
       'Diary recurrence analysis',
-      analyseDiaryEvidence(mindEvents, today, { message, query: q }),
+      analyseDiaryEvidence(mindEvents, today, {
+        message,
+        query: gate.search_query || message
+      }),
       'calculation'
     );
     const from = `${String(today).slice(0, 8)}01`;
-    push(sections, toolsExecuted, 'get_diary_range', 'Diary range (month-to-date)', getDiaryRange(mindEvents, { from, to: today, limit: 12 }), 'record');
+    const range = getDiaryRange(mindEvents, { from, to: today, limit: 12 });
+    const rangePayload = !gate.run_semantic_search && range && typeof range === 'object'
+      ? {
+          ...range,
+          context_only: true,
+          role: 'context_only',
+          how_to_read:
+            (range.how_to_read ? `${range.how_to_read} ` : '')
+            + 'Context-only recent diary range — not semantic recurrence matches and not a referent.'
+        }
+      : range;
+    push(
+      sections,
+      toolsExecuted,
+      'get_diary_range',
+      gate.run_semantic_search ? 'Diary range (month-to-date)' : 'Diary range (context-only)',
+      rangePayload,
+      'record'
+    );
   }
 
   if (slug === 'vera') {
@@ -616,6 +679,22 @@ export function composeEvidenceClaims(evidence = {}) {
       });
       continue;
     }
+    // Skipped semantic tools (e.g. unresolved deictic referent) — status only, not empty-search "evidence".
+    if (result.skipped) {
+      const skipReason = String(result.reason || 'skipped');
+      limitations.push({
+        tool,
+        kind: 'skipped',
+        text: `${tool} skipped: ${skipReason}`
+      });
+      pushClaim(claims, tool, 'search_skipped_reason', skipReason, 'calculation', claimProvenance(result, tool, {
+        reason: skipReason,
+        calculation: 'semantic_retrieval_skipped',
+        store: result.store,
+        output: skipReason
+      }));
+      continue;
+    }
     if (result.truncated) {
       limitations.push({
         tool,
@@ -774,17 +853,41 @@ export function composeEvidenceClaims(evidence = {}) {
         inputs: ['teaching_hub']
       }));
     }
-    const first = result.results?.[0] ?? null;
-    pushClaim(claims, tool, 'result_count', result.count, 'calculation', calc('result_count', 'result_count'));
-    if (first) {
-      const firstProv = recordOf(first);
-      pushClaim(claims, tool, 'first_result_id', first.id, 'record', firstProv);
-      pushClaim(claims, tool, 'first_result_title', first.title, 'record', firstProv);
-      pushClaim(claims, tool, 'first_result_excerpt', first.excerpt ?? first.notes_excerpt, 'record', firstProv);
-      pushClaim(claims, tool, 'first_result_tags', first.tags, 'record', firstProv);
-      pushClaim(claims, tool, 'first_result_connected', first.connected, 'record', firstProv);
-      pushClaim(claims, tool, 'first_result_provider', first.provider, 'record', firstProv);
-      pushClaim(claims, tool, 'first_result_notes', first.notes_excerpt ?? first.notes, 'record', firstProv);
+    // Context-only diary range (unresolved deixis): never emit search-match first_result_* claims.
+    if (result.context_only) {
+      pushClaim(claims, tool, 'context_only', true, 'calculation', calc('context_only', 'context_only_range', {
+        reason: 'unresolved_referent',
+        store: result.store ?? 'life_hub_diary',
+        output: true
+      }));
+      pushClaim(claims, tool, 'context_entry_count', result.count, 'calculation', calc('context_entry_count', 'context_only_range', {
+        reason: 'unresolved_referent',
+        store: result.store ?? 'life_hub_diary'
+      }));
+      if (Array.isArray(result.results)) {
+        for (const row of result.results.slice(0, 5)) {
+          pushClaim(claims, tool, 'context_record', row.date ?? row.id, 'record', claimProvenance(result, tool, {
+            record: row,
+            sourceType: 'record',
+            store: result.store ?? 'life_hub_diary',
+            date: row.date,
+            reason: 'context_only'
+          }));
+        }
+      }
+    } else {
+      const first = result.results?.[0] ?? null;
+      pushClaim(claims, tool, 'result_count', result.count, 'calculation', calc('result_count', 'result_count'));
+      if (first) {
+        const firstProv = recordOf(first);
+        pushClaim(claims, tool, 'first_result_id', first.id, 'record', firstProv);
+        pushClaim(claims, tool, 'first_result_title', first.title, 'record', firstProv);
+        pushClaim(claims, tool, 'first_result_excerpt', first.excerpt ?? first.notes_excerpt, 'record', firstProv);
+        pushClaim(claims, tool, 'first_result_tags', first.tags, 'record', firstProv);
+        pushClaim(claims, tool, 'first_result_connected', first.connected, 'record', firstProv);
+        pushClaim(claims, tool, 'first_result_provider', first.provider, 'record', firstProv);
+        pushClaim(claims, tool, 'first_result_notes', first.notes_excerpt ?? first.notes, 'record', firstProv);
+      }
     }
     if (Array.isArray(result.hits) && result.hits[0]) {
       for (const hit of result.hits.slice(0, 5)) {
@@ -1103,7 +1206,10 @@ export function composeEvidenceClaims(evidence = {}) {
         store: result.store ?? 'life_hub_diary'
       }));
     }
-    if (Array.isArray(result.recurring_terms) && result.recurring_terms[0]) {
+    const unresolvedReferent = result.referent_status === 'unresolved'
+      || result.recurrence_strength === 'unresolved_referent';
+    // Unresolved deixis: never emit theme/mood match-style claims from fallback context.
+    if (!unresolvedReferent && Array.isArray(result.recurring_terms) && result.recurring_terms[0]) {
       pushClaim(claims, tool, 'diary_theme', result.recurring_terms[0].term, 'calculation', calc('diary_theme', 'derived_diary_theme', {
         store: result.store ?? 'life_hub_diary',
         inputs: ['life_hub_diary']
@@ -1111,12 +1217,22 @@ export function composeEvidenceClaims(evidence = {}) {
     }
     if (Array.isArray(result.sample_entries) && result.sample_entries[0]) {
       const entry = result.sample_entries[0];
-      pushClaim(claims, tool, 'diary_entry_mood', entry.mood, 'record', recordOf(entry, {
-        store: result.store ?? 'life_hub_diary',
-        date: entry.date
-      }));
+      if (unresolvedReferent || entry.context_only || entry.kind === 'fallback_context_entry') {
+        pushClaim(claims, tool, 'context_entry_date', entry.date, 'record', claimProvenance(result, tool, {
+          record: entry,
+          sourceType: 'record',
+          store: result.store ?? 'life_hub_diary',
+          date: entry.date,
+          reason: 'context_only'
+        }));
+      } else {
+        pushClaim(claims, tool, 'diary_entry_mood', entry.mood, 'record', recordOf(entry, {
+          store: result.store ?? 'life_hub_diary',
+          date: entry.date
+        }));
+      }
     }
-    if (Array.isArray(result.conflicting_moods) && result.conflicting_moods.length) {
+    if (!unresolvedReferent && Array.isArray(result.conflicting_moods) && result.conflicting_moods.length) {
       pushClaim(claims, tool, 'conflicting_mood_count', result.conflicting_moods.length, 'calculation', calc('conflicting_mood_count', 'conflicting_moods', {
         store: result.store ?? 'life_hub_diary'
       }));

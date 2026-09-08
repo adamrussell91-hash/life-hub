@@ -552,6 +552,67 @@ export function resolveDiaryRecurrenceReferent(message = '', { boundReferent = n
   };
 }
 
+/**
+ * Gate Penelope semantic diary retrieval on referent resolution.
+ * Unresolved deictic turns must not search generic feel/felt/this.
+ */
+export function penelopeSemanticRetrievalGate(message = '', { boundReferent = null } = {}) {
+  const referent = resolveDiaryRecurrenceReferent(message, { boundReferent });
+  if (referent.kind === 'unresolved') {
+    return {
+      referent,
+      run_semantic_search: false,
+      run_theme_extraction: false,
+      search_query: null,
+      skip_reason: 'unresolved_referent'
+    };
+  }
+  if (referent.use_message_query) {
+    return {
+      referent,
+      run_semantic_search: true,
+      run_theme_extraction: true,
+      search_query: String(message ?? '').trim() || null,
+      skip_reason: null
+    };
+  }
+  return {
+    referent,
+    run_semantic_search: true,
+    run_theme_extraction: true,
+    search_query: referent.query || String(message ?? '').trim() || null,
+    skip_reason: null
+  };
+}
+
+export function skippedDiarySemanticSearch(reason = 'unresolved_referent') {
+  return {
+    ok: true,
+    skipped: true,
+    reason,
+    count: 0,
+    results: [],
+    partial_results: [],
+    store: 'life_hub_diary',
+    how_to_read:
+      'Semantic diary search skipped because the recurrence referent is unresolved. '
+      + 'Generic feel/felt/this is not a search target and must not produce match claims.'
+  };
+}
+
+export function skippedDiaryThemeExtraction(reason = 'unresolved_referent') {
+  return {
+    ok: true,
+    skipped: true,
+    reason,
+    recurring_terms: [],
+    store: 'life_hub_diary',
+    how_to_read:
+      'Diary theme extraction skipped because the recurrence referent is unresolved. '
+      + 'Do not derive diary_theme from generic feel/felt search.'
+  };
+}
+
 function searchDiaryForReferent(events, referentValue, limit = 12) {
   const variants = diaryMoodSearchVariants(referentValue);
   const fullByKey = new Map();
