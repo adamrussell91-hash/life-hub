@@ -4,8 +4,47 @@ import { parseDue, toDateKey } from '@/domain/queries';
 
 export type DueChipKind = 'today' | 'soon' | 'later';
 
+/** Board-facing names for the stock status ids (todo → open, doing → in_progress). */
+export const BOARD_STATUS_LABELS: Record<string, string> = {
+  open: 'To do',
+  in_progress: 'Doing',
+  done: 'Done',
+  deferred: 'Deferred',
+  dead: 'Dead'
+};
+
+/** Pre-board labels still sitting in seeded / saved property configs. */
+const LEGACY_STOCK_STATUS_LABELS: Record<string, string> = {
+  open: 'open',
+  in_progress: 'in progress',
+  done: 'done',
+  deferred: 'deferred',
+  dead: 'dead'
+};
+
 export function statusLabel(status: string): string {
-  return status.replace(/_/g, ' ');
+  return BOARD_STATUS_LABELS[status] ?? status.replace(/_/g, ' ');
+}
+
+/**
+ * Rewrite stock status labels that still say "open" / "in progress" so the
+ * task page matches Board columns (To do / Doing / Done). Custom labels stay.
+ */
+export function alignStockStatusLabelsWithBoard<
+  T extends { statuses: Array<{ id: string; label: string }> }
+>(config: T): T {
+  let changed = false;
+  const statuses = config.statuses.map((entry) => {
+    const board = BOARD_STATUS_LABELS[entry.id];
+    const legacy = LEGACY_STOCK_STATUS_LABELS[entry.id];
+    if (!board) return entry;
+    if (entry.label === legacy || entry.label === entry.id) {
+      changed = true;
+      return { ...entry, label: board };
+    }
+    return entry;
+  });
+  return changed ? { ...config, statuses } : config;
 }
 
 export function statusBadgeClass(status: string): string {

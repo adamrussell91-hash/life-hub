@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   blockStyle,
+  durationMinutesBetween,
+  endTimeFromStart,
   hoursFromOffset,
   hoursToDueTime,
   layoutTimedBlocks,
@@ -67,6 +69,15 @@ describe('time grid', () => {
     expect(hoursToDueTime(13.5)).toBe('13:30');
     expect(snapHours(9.2)).toBe(9.25);
     expect(hoursFromOffset(52, 52, 6)).toBe(7);
+  });
+
+  it('derives end time from start + duration and duration from a span', () => {
+    expect(endTimeFromStart('09:00', 90)).toBe('10:30');
+    expect(endTimeFromStart(null, 90)).toBe('');
+    expect(endTimeFromStart('09:00', null)).toBe('');
+    expect(durationMinutesBetween('09:00', '10:30')).toBe(90);
+    expect(durationMinutesBetween('10:30', '09:00')).toBeNull();
+    expect(durationMinutesBetween('09:00', '')).toBeNull();
   });
 
   it('keeps untimed work in the all-day row and lanes overlapping timed blocks', () => {

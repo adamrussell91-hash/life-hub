@@ -28,6 +28,7 @@ import {
   priorityFilterOptions
 } from '@/views/hub-kit';
 import { createPlusAdd } from '@/views/plus-add';
+import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
 
 const FREQUENCIES: RecurrenceFrequency[] = ['daily', 'weekly', 'monthly', 'yearly'];
 const WEEKDAYS = [
@@ -150,7 +151,6 @@ function renderRecurrenceSection(task: Task): {
 
 function renderRemindSection(task: Task): {
   section: HTMLElement;
-  dueTimeInput: HTMLInputElement;
   read: (dueDate: string | null, dueTime: string | null) => {
     remind_at: string | null;
     remind_dismissed_at: string | null;
@@ -160,11 +160,6 @@ function renderRemindSection(task: Task): {
   section.append(el('h3', 'task-editor__remind-title', 'Notify me'));
 
   const initialPreset = inferRemindPreset(task.remind_at, task.due_date, task.due_time);
-  const dueTime = createHubField({
-    type: 'time',
-    ariaLabel: 'Due time',
-    value: task.due_time ?? ''
-  });
 
   const custom = createHubField({
     type: 'datetime-local',
@@ -190,28 +185,17 @@ function renderRemindSection(task: Task): {
     }
   });
 
-  section.append(
-    preset.el,
-    el('label', 'task-editor__field-label', 'Due time (optional)'),
-    dueTime.el,
-    custom.el
-  );
+  section.append(preset.el, custom.el);
 
   return {
     section,
-    dueTimeInput: dueTime.input,
-    read: (dueDate, dueTimeValue) => {
+    read: (dueDate, dueTime) => {
       const selected = preset.getValue() as RemindPreset;
       const customIso =
         selected === 'custom' && custom.input.value
           ? new Date(custom.input.value).toISOString()
           : null;
-      const remind_at = remindAtFromPreset(
-        selected,
-        dueDate,
-        dueTimeValue,
-        customIso
-      );
+      const remind_at = remindAtFromPreset(selected, dueDate, dueTime, customIso);
       const remind_dismissed_at =
         remind_at && task.remind_at && remind_at !== task.remind_at ? null : task.remind_dismissed_at;
       return { remind_at, remind_dismissed_at };
@@ -325,6 +309,21 @@ export async function renderTaskEditor(
     value: task.due_date ?? ''
   });
 
+  const start = createHubField({
+    type: 'time',
+    ariaLabel: 'Start time',
+    value: task.due_time ?? ''
+  });
+
+  const end = createHubField({
+    type: 'time',
+    ariaLabel: 'End time',
+    value: endTimeFromStart(task.due_time, task.estimated_duration)
+  });
+  start.input.addEventListener('change', () => {
+    end.input.value = endTimeFromStart(start.input.value || null, task.estimated_duration);
+  });
+
   const recurrence = renderRecurrenceSection(task);
   const remind = renderRemindSection(task);
 
@@ -385,12 +384,23 @@ export async function renderTaskEditor(
     discard.disabled = true;
     try {
       const dueValue = due.input.value || null;
-      const dueTimeValue = remind.dueTimeInput.value || null;
+      let dueTimeValue = start.input.value || null;
+      let estimated_duration = task.estimated_duration;
+      if (!dueTimeValue && end.input.value) {
+        dueTimeValue = end.input.value;
+        estimated_duration = null;
+      } else if (dueTimeValue && end.input.value) {
+        const minutes = durationMinutesBetween(dueTimeValue, end.input.value);
+        if (minutes != null) estimated_duration = minutes;
+      } else if (dueTimeValue && !end.input.value) {
+        estimated_duration = null;
+      }
       const reminder = remind.read(dueValue, dueTimeValue);
       const updated = await tasksApi.updateTask(task.id, {
         title: nextTitle,
         due_date: dueValue,
         due_time: dueTimeValue,
+        estimated_duration,
         domain: domain.getValue(),
         priority: priority.getValue(),
         parent_project_id: project.getValue() || null,
@@ -408,7 +418,17 @@ export async function renderTaskEditor(
     }
   });
   actions.append(discard, save);
-  card.append(title.el, due.el, domain.el, priority.el, project.el, tags.el, notes.el);
+  card.append(
+    title.el,
+    labeledField('Due', due.el),
+    labeledField('Start', start.el),
+    labeledField('End', end.el),
+    domain.el,
+    priority.el,
+    project.el,
+    tags.el,
+    notes.el
+  );
   if (task.kind !== 'step' && !task.parent_task_id) {
     card.append(recurrence.section, remind.section);
   }

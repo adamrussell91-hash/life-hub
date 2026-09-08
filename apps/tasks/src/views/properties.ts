@@ -26,7 +26,7 @@ const SECTION_META: Record<
   },
   statuses: {
     title: 'Statuses',
-    lede: 'Where a task sits on the board: open, in progress, done, deferred, or dead.'
+    lede: 'Where a task sits on the board: To do, Doing, Done — plus Deferred or Dead.'
   },
   kinds: {
     title: 'Kinds',

@@ -115,6 +115,12 @@ describe('page editor', () => {
     expect(canvas.querySelector('.page-card__domain')?.tagName).toBe('BUTTON');
     expect(canvas.querySelector('.page-card__status')?.classList.contains('hub-filter')).toBe(true);
     expect(canvas.querySelector('.page-card__notes')?.tagName).toBe('TEXTAREA');
+    expect(canvas.querySelector('.page-card__start')?.querySelector('input')?.getAttribute('type')).toBe(
+      'time'
+    );
+    expect(canvas.querySelector('.page-card__end')?.querySelector('input')?.getAttribute('type')).toBe(
+      'time'
+    );
 
     const title = header.querySelector<HTMLInputElement>('.page-header__title-input')!;
     expect(title.value).toBe('Finish lesson pack');
@@ -152,6 +158,41 @@ describe('page editor', () => {
     };
     expect(patch.page_blocks[0]?.block_type).toBe('heading');
     expect(patch.page_blocks[0]?.content.text).toBe('Term brief');
+  });
+
+  it('saves start and end times as due_time and estimated_duration', async () => {
+    vi.useFakeTimers();
+    const sample = task();
+    vi.mocked(tasksApi.getTask).mockResolvedValue(sample);
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([project]);
+    vi.mocked(tasksApi.updateTask).mockImplementation(async (_id, patch) => ({
+      ...sample,
+      ...(patch as Partial<Task>)
+    }));
+
+    const canvas = document.createElement('main');
+    await renderPageEditor(canvas, { kind: 'task', id: 'task_lesson' });
+
+    const start = canvas.querySelector<HTMLInputElement>('.page-card__start input')!;
+    const end = canvas.querySelector<HTMLInputElement>('.page-card__end input')!;
+    expect(end.value).toBe('');
+
+    start.value = '09:00';
+    start.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(400);
+    expect(end.value).toBe('09:45');
+    expect(tasksApi.updateTask).toHaveBeenCalledWith(
+      'task_lesson',
+      expect.objectContaining({ due_time: '09:00', estimated_duration: 45 })
+    );
+
+    end.value = '10:30';
+    end.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(400);
+    expect(tasksApi.updateTask).toHaveBeenCalledWith(
+      'task_lesson',
+      expect.objectContaining({ due_time: '09:00', estimated_duration: 90 })
+    );
   });
 
   it('deletes the open task from the card menu and returns to the dashboard', async () => {

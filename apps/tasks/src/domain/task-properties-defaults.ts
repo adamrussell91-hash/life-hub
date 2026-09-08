@@ -24,12 +24,13 @@ export const DEFAULT_TASK_PROPERTY_CONFIG: TaskPropertyConfig = {
     { id: 'medium', label: 'medium' },
     { id: 'low', label: 'low' }
   ],
+  // Labels match the Board columns (To do / Doing / Done). Ids stay stable for storage.
   statuses: [
-    { id: 'open', label: 'open' },
-    { id: 'in_progress', label: 'in progress' },
-    { id: 'done', label: 'done' },
-    { id: 'deferred', label: 'deferred' },
-    { id: 'dead', label: 'dead' }
+    { id: 'open', label: 'To do' },
+    { id: 'in_progress', label: 'Doing' },
+    { id: 'done', label: 'Done' },
+    { id: 'deferred', label: 'Deferred' },
+    { id: 'dead', label: 'Dead' }
   ],
   kinds: [
     { id: 'task', label: 'task' },

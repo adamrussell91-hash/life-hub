@@ -6,6 +6,7 @@ import {
   type TaskPropertyConfig
 } from '@/schemas/task-properties';
 import { DEFAULT_TASK_PROPERTY_CONFIG } from '@/domain/task-properties-defaults';
+import { alignStockStatusLabelsWithBoard } from '@/domain/cards';
 import { ProjectSchema } from '@/schemas/project';
 import {
   FrameworkEntrySchema,
@@ -214,7 +215,14 @@ async function readTaskProperties(
   keys: KeyBuilders
 ): Promise<TaskPropertyConfig> {
   const raw = await kv.getJSON<TaskPropertyConfig>(keys.taskPropertiesKey());
-  if (raw) return validateTaskPropertyConfig(TaskPropertyConfigSchema.parse(raw));
+  if (raw) {
+    const parsed = validateTaskPropertyConfig(TaskPropertyConfigSchema.parse(raw));
+    const aligned = alignStockStatusLabelsWithBoard(parsed);
+    if (aligned !== parsed) {
+      await kv.setJSON(keys.taskPropertiesKey(), aligned);
+    }
+    return aligned;
+  }
   const defaults = DEFAULT_TASK_PROPERTY_CONFIG;
   await kv.setJSON(keys.taskPropertiesKey(), defaults);
   return defaults;
