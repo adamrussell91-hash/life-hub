@@ -44,6 +44,7 @@ import { renderBranchView } from '@/views/branch';
 import { renderConstellationView } from '@/views/constellation';
 import { renderClareView } from '@/views/clare';
 import { installClareSession } from '@/chat/clare-session';
+import { attachVisualViewportInset } from '@/chat/visual-viewport';
 import { renderExcursionsView, renderNewExcursionPage } from '@/views/excursions';
 import { renderProgramsView } from '@/views/programs';
 import { renderStressView } from '@/views/stress';
@@ -156,6 +157,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
   });
   const clare = installClareSession(root);
   void clare.start();
+  attachVisualViewportInset();
   await loadTaskProperties();
 
   let lastView: HubViewId | null = null;

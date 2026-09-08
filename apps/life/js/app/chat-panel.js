@@ -1,4 +1,4 @@
-import { attachVisualViewportInset, detachVisualViewportInset } from './visual-viewport.js';
+import { attachVisualViewportInset } from './visual-viewport.js';
 
 export function createChatPanelController({ root }) {
   const panel = root.querySelector('#chat-view');
@@ -13,12 +13,13 @@ export function createChatPanelController({ root }) {
     panel.hidden = false;
     panel.dataset.panelMode = 'overlay';
     panel.style.setProperty('--agent-accent', accentColour);
+    // Idempotent — main also attaches so full-page Chat keeps the contract.
     attachVisualViewportInset();
     openSlot = slot;
   }
 
   function close() {
-    detachVisualViewportInset();
+    // Do not detach: full-page Chat still needs vv-keyboard-open / --vv-*.
     if (!openSlot) return;
     homeSlot.append(panel);
     panel.hidden = true;

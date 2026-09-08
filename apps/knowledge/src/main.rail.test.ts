@@ -111,7 +111,7 @@ describe("Knowledge Hub rail", () => {
     expect(css).not.toMatch(/\.new-note__menu\s*\{[^}]*\btop\s*:/);
     expect(css).not.toMatch(/\.new-note__menu\s*\{[^}]*\bright\s*:/);
     expect(css).toContain(".chat__composer");
-    expect(css).toContain("--keyboard-inset");
+    expect(css).toContain("--vv-offset-bottom");
     expect(css).toContain(".chat__hats");
   });
 
