@@ -48,7 +48,8 @@ export async function renderClareView(canvas: HTMLElement): Promise<void> {
     canvas.replaceChildren();
     session.showPage(canvas);
     await session.start();
-    await session.appendExtras(canvas);
+    // Mount inside the chat view (above the composer) so the input stays on the floor.
+    await session.appendExtras(session.view);
     return;
   }
   await mountStandalone(canvas);

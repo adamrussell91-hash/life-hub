@@ -2900,7 +2900,7 @@ body.is-universe-fullscreen .local-banner {
   bottom: 0;
   z-index: 2;
   margin-top: auto;
-  padding: var(--space-3) 0 max(var(--space-3), calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-inset, 0px)));
+  padding: var(--space-3) 0 max(var(--space-3), calc(env(safe-area-inset-bottom, 0px) + var(--vv-offset-bottom, 0px)));
   background: linear-gradient(180deg, transparent, var(--paper) 1.25rem);
 }
 

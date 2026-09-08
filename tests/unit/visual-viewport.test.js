@@ -6,7 +6,7 @@ import {
   notifyChatViewport,
   VV_HEIGHT_STICK_PX,
   VV_KEYBOARD_OPEN_PX
-} from '../../apps/life/js/app/visual-viewport.js';
+} from '../../packages/design-kit/js/visual-viewport.js';
 
 function mockDocument() {
   const style = new Map();
@@ -85,6 +85,19 @@ test('vv-keyboard-open stays off when the visual viewport barely shrinks', () =>
 
   attachVisualViewportInset();
   assert.equal(classList.contains('vv-keyboard-open'), false);
+  detachVisualViewportInset();
+});
+
+test('DevTools innerHeight−vv.height noise does not open keyboard mode', () => {
+  const { style, classList } = mockDocument();
+  globalThis.innerHeight = 1012;
+  globalThis.screen = { height: 844 };
+  mockVisualViewport({ offsetTop: 0, height: 844 });
+
+  attachVisualViewportInset();
+  assert.equal(classList.contains('vv-keyboard-open'), false);
+  assert.equal(style.has('--vv-height'), false);
+  assert.equal(style.has('--vv-offset-bottom'), false);
   detachVisualViewportInset();
 });
 
