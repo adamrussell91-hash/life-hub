@@ -960,7 +960,7 @@ function renderNowRing(root, { value, target }) {
 
   const ring = buildRingTarget(
     { value, target: target > 0 ? target : 1 },
-    { size: 48, strokeWidth: 3 }
+    { size: 48, strokeWidth: 5 }
   );
   const fraction = target > 0 ? ring.fraction : 0;
   const dashoffset = ring.circumference * (1 - fraction);
