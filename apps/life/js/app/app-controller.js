@@ -1581,7 +1581,12 @@ export function createAppController(dependencies) {
     getDisplayDate: () => latestResult?.date ?? null,
     getAgentsConfig: () => latestResult?.agentsConfig ?? null,
     getFitnessLibraryContext: () => fitnessLibraryContext(),
-    applySkincareShelf
+    applySkincareShelf,
+    openCalendarCompose: () => {
+      calendarFocusCompose = true;
+      if (currentSection !== 'calendar') showSection('calendar');
+      else renderCalendarSection();
+    }
   };
 }
 

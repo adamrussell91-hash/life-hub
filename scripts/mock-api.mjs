@@ -8,6 +8,7 @@ import { TYPE_DOMAINS } from '../apps/life/js/core/records.js';
 import { listNamedShortcuts } from '../netlify/functions/_shared/capabilities/registry.mjs';
 
 import { SESSION_MS } from '../netlify/functions/_shared/auth-security.mjs';
+import { getSydneyTimestamp } from '../apps/life/js/core/time.js';
 
 const PASSPHRASE = 'life-hub-local';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
@@ -60,14 +61,15 @@ function confirmedPath(candidate, slug) {
 
 function confirmedMarkdown(candidate, slug) {
   const fields = candidate?.fields && typeof candidate.fields === 'object' ? candidate.fields : {};
+  const stamp = getSydneyTimestamp();
   const front = {
     schema_version: 1,
     id: slug,
     type: candidate.type,
     date: candidate.date,
     ...(candidate.time ? { time: candidate.time } : {}),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: stamp,
+    updated_at: stamp,
     source: 'chat',
     ...fields
   };

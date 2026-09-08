@@ -126,6 +126,10 @@ function matches(node, selector) {
   if (selector.startsWith('[data-panel=')) {
     return node.dataset.panel === selector.slice('[data-panel="'.length, -2);
   }
+  if (selector.startsWith('[data-role=')) {
+    return node.attributes['data-role'] === selector.slice('[data-role="'.length, -2)
+      || node.getAttribute?.('data-role') === selector.slice('[data-role="'.length, -2);
+  }
   if (selector.startsWith('[role=')) {
     return node.attributes.role === selector.slice(7, -2);
   }
@@ -194,6 +198,7 @@ test('mobile day view paints Now card, day strip, and segmented control', () => 
 
   const calendar = root._host.children[0];
   assert.ok(calendar.className.includes('hub-calendar--mobile-day'));
+  assert.ok(calendar.className.includes('hub-calendar--mobile'));
   assert.ok(calendar.querySelector('[data-calendar="now-card"]'));
   assert.ok(calendar.querySelector('[data-calendar="day-strip"]'));
   assert.ok(calendar.querySelector('[data-calendar="mobile-segments"]'));
@@ -204,6 +209,62 @@ test('mobile day view paints Now card, day strip, and segmented control', () => 
   );
   assert.equal(calendar.querySelector('.hub-calendar__timegrid'), null);
   assert.equal(calendar.querySelector('.hub-calendar__rail'), null);
+});
+
+test('mobile Now ring reflects timed schedule progress, not clock time', () => {
+  const root = fakeRoot({ mobile: true });
+  renderCalendar(root, model([
+    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' },
+    { record: { type: 'meal', date: '2026-08-05', time: '12:30', meal: 'Lunch' }, body: '', path: 'm' }
+  ]), { view: 'day', now: new Date('2026-08-05T10:00:00') });
+
+  const ring = root._host.querySelector('[data-calendar="now-ring"]');
+  assert.equal(ring?.dataset.value, '1');
+  assert.equal(ring?.dataset.target, '2');
+  const fill = ring?.querySelector?.('[data-role="fill"]');
+  assert.ok(fill);
+  const dasharray = Number(fill.getAttribute('stroke-dasharray'));
+  const dashoffset = Number(fill.getAttribute('stroke-dashoffset'));
+  assert.ok(dasharray > 0);
+  assert.ok(Math.abs(dashoffset - dasharray * 0.5) < 0.01);
+
+  const title = root._host.querySelector('.hub-calendar__now-card-title')?.textContent;
+  assert.equal(title, 'Lunch');
+});
+
+test('mobile week view uses shared shell with week agenda, not time-grid', () => {
+  const root = fakeRoot({ mobile: true });
+  renderCalendar(root, model([
+    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' },
+    { record: { type: 'meal', date: '2026-08-06', time: '12:30', meal: 'Lunch' }, body: '', path: 'm' }
+  ]), { view: 'week', now: new Date('2026-08-05T08:00:00') });
+
+  const calendar = root._host.children[0];
+  assert.ok(calendar.className.includes('hub-calendar--mobile-week'));
+  assert.ok(calendar.querySelector('[data-calendar="now-card"]'));
+  assert.ok(calendar.querySelector('[data-calendar="day-strip"]'));
+  assert.ok(calendar.querySelector('[data-calendar="week-agenda"]'));
+  assert.equal(calendar.querySelector('.hub-calendar__timegrid'), null);
+  assert.equal(calendar.querySelector('.hub-calendar__rail'), null);
+  const rows = calendar.querySelectorAll('[data-calendar="mobile-row"]');
+  assert.equal(rows.length, 2);
+});
+
+test('mobile month view uses month grid + day panels, not desktop workspace', () => {
+  const root = fakeRoot({ mobile: true });
+  renderCalendar(root, model([
+    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' }
+  ]), { view: 'month', now: new Date('2026-08-05T08:00:00') });
+
+  const calendar = root._host.children[0];
+  assert.ok(calendar.className.includes('hub-calendar--mobile-month'));
+  assert.ok(calendar.querySelector('[data-calendar="now-card"]'));
+  assert.ok(calendar.querySelector('[data-calendar="mobile-month-grid"]'));
+  assert.ok(calendar.querySelector('[data-calendar="mobile-segments"]'));
+  assert.ok(calendar.querySelector('[data-calendar="schedule-list"]'));
+  assert.equal(calendar.querySelector('.hub-calendar__workspace'), null);
+  assert.equal(calendar.querySelector('.hub-calendar__rail'), null);
+  assert.ok(calendar.querySelectorAll('[data-calendar="mobile-month-day"]').length >= 28);
 });
 
 test('mobile Schedule panel lists only timed items', () => {
@@ -287,6 +348,7 @@ test('desktop day view stays on the time-grid path', () => {
   ]), { view: 'day' });
   const calendar = root._host.children[0];
   assert.equal(calendar.className.includes('hub-calendar--mobile-day'), false);
+  assert.equal(calendar.className.includes('hub-calendar--mobile'), false);
   assert.ok(calendar.querySelector('.hub-calendar__timegrid'));
   assert.ok(calendar.querySelector('.hub-calendar__rail'));
   assert.equal(calendar.querySelector('[data-calendar="now-card"]'), null);
