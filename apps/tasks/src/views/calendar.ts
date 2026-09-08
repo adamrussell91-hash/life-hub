@@ -3,13 +3,14 @@ import type { Project } from '@/schemas/project';
 import type { ClareDumpResult, ClareProposal } from '@/domain/clare';
 import { tasksApi } from '@/services/client-api';
 import { hashQuery } from '@/shell/shell';
-import { backlogTasks, toDateKey } from '@/domain/queries';
+import { backlogTasks, parseDue, toDateKey } from '@/domain/queries';
 import { somedayTasks } from '@/domain/hierarchy';
 import { detectPinchPoints, type PinchPoint } from '@/domain/pinch';
 import { buildDayCapacity } from '@/domain/capacity';
 import { findStallCandidates } from '@/domain/stall';
 import { buildProjectPulseCard } from '@/domain/projects-pulse';
 import { projectPageHash } from '@/domain/cards';
+import { getTaskPropertiesSync } from '@/services/task-properties';
 import {
   addCalendarRange,
   calendarHash,
@@ -557,6 +558,8 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       if (stallBanner) body.append(stallBanner);
       const pulseStrip = renderProjectPulseStrip(projects, tasks);
       if (pulseStrip) body.append(pulseStrip);
+      const touchedStrip = renderDomainActivityStrip(tasks);
+      if (touchedStrip) body.append(touchedStrip);
       body.append(
         renderMonthGrid(
           days,
@@ -1437,6 +1440,46 @@ function renderProjectPulseStrip(projects: Project[], tasks: Task[]): HTMLElemen
       location.hash = projectPageHash(card.project.id);
     });
     strip.append(btn);
+  }
+  return strip;
+}
+
+/** Real per-domain "last touched" signal, most-stale first. Reads the live domain
+ *  list from Tools → Properties rather than a hardcoded set, and uses the most
+ *  recent task `updated_at` in each domain as the activity timestamp — there is
+ *  no explicit "review" action in this app, so this is honestly "last touched",
+ *  not "last reviewed". Domains with no tasks ever show "no activity yet" rather
+ *  than a fabricated date. */
+function renderDomainActivityStrip(tasks: Task[]): HTMLElement | null {
+  const domains = getTaskPropertiesSync().domains;
+  if (!domains.length) return null;
+  const rows = domains
+    .map((entry) => {
+      let lastTouched: Date | null = null;
+      for (const task of tasks) {
+        if (task.domain !== entry.id) continue;
+        const stamp = parseDue(task.updated_at);
+        if (stamp && (!lastTouched || stamp.getTime() > lastTouched.getTime())) lastTouched = stamp;
+      }
+      const idleDays = lastTouched
+        ? Math.floor((Date.now() - lastTouched.getTime()) / 86_400_000)
+        : null;
+      return { label: entry.label, idleDays };
+    })
+    .sort((a, b) => (b.idleDays ?? -1) - (a.idleDays ?? -1));
+
+  const strip = el('div', 'calendar-touched-strip');
+  for (const row of rows) {
+    const level = row.idleDays == null ? 'stale' : row.idleDays <= 7 ? 'ok' : row.idleDays <= 21 ? 'watch' : 'stale';
+    const chip = el('span', 'calendar-touched-chip');
+    const dot = el('span', `calendar-touched-dot calendar-touched-dot--${level}`);
+    dot.setAttribute('aria-hidden', 'true');
+    chip.append(
+      dot,
+      el('span', 'calendar-touched-chip__name', row.label),
+      el('span', 'calendar-touched-chip__age', row.idleDays == null ? 'no activity yet' : `${row.idleDays}d ago`)
+    );
+    strip.append(chip);
   }
   return strip;
 }
