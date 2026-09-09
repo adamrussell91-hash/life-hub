@@ -34,7 +34,9 @@ describe('clarify', () => {
       ['next_action', 'waiting', 'someday', 'calendar', 'trash', 'project']
     );
     assert.match(stack.items[1].waiting_on ?? '', /Acme/i);
-    assert.ok(stack.items[5].project_next_action);
+    assert.equal(stack.items[5].project_next_action, null);
+    assert.equal(stack.items[5].ambiguous, true);
+    assert.ok(stack.items[5].missing?.includes('project_next_action'));
   });
 });
 
