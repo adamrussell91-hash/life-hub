@@ -20,6 +20,15 @@ vi.mock('@/services/client-api', () => ({
   }
 }));
 
+const streamChat = vi.fn();
+const confirmChat = vi.fn();
+
+vi.mock('@/services/chat-api', () => ({
+  streamChat: (...args: unknown[]) => streamChat(...args),
+  confirmChat: (...args: unknown[]) => confirmChat(...args),
+  clareWorkChat: vi.fn()
+}));
+
 const frameworks: FrameworkEntry[] = [
   {
     schema_version: 1,
@@ -92,6 +101,24 @@ function pendingDumpStream() {
   return { stream: stream(), resolve };
 }
 
+async function* chatStreamFromText(text: string) {
+  yield { type: 'status' as const, text: 'On it…' };
+  yield { type: 'text' as const, delta: text };
+  yield { type: 'done' as const };
+}
+
+function pendingChatStream() {
+  let resolve!: (text: string) => void;
+  const promise = new Promise<string>((done) => {
+    resolve = done;
+  });
+  async function* stream() {
+    const text = await promise;
+    yield* chatStreamFromText(text);
+  }
+  return { stream: stream(), resolve };
+}
+
 describe('Clare protocol controls', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -105,6 +132,7 @@ describe('Clare protocol controls', () => {
     vi.mocked(tasksApi.listClareCalibrations).mockResolvedValue([]);
     vi.mocked(tasksApi.briefWithClare).mockResolvedValue(briefing);
     vi.mocked(tasksApi.listAgentInbox).mockResolvedValue([]);
+    streamChat.mockImplementation(() => chatStreamFromText('Got it.'));
   });
 
   it('renders five one-sentence hover cards on real protocol controls', async () => {
@@ -139,20 +167,25 @@ describe('Clare protocol controls', () => {
     }
   });
 
-  it('sends the selected protocol through Clare and rotates wait copy until the result arrives', async () => {
+  it('sends the selected protocol through Life Hub /api/chat and rotates wait copy until the reply arrives', async () => {
     vi.useFakeTimers();
-    const pendingStream = pendingDumpStream();
-    vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(pendingStream.stream);
+    const pendingStream = pendingChatStream();
+    streamChat.mockReturnValue(pendingStream.stream);
     const canvas = document.createElement('main');
     await renderClareView(canvas);
     const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
     dump.value = proposal.title;
 
     canvas.querySelector<HTMLButtonElement>('[data-protocol-id="shrink-first-step"]')!.click();
-    await vi.waitFor(() => expect(tasksApi.streamDumpWithClare).toHaveBeenCalledTimes(1));
-    expect(tasksApi.streamDumpWithClare).toHaveBeenCalledWith(
-      expect.objectContaining({ protocol_id: 'shrink-first-step', text: proposal.title })
+    await vi.waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1));
+    expect(streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: proposal.title,
+        protocolId: 'shrink-first-step',
+        priorAgentSlug: 'clare'
+      })
     );
+    expect(tasksApi.streamDumpWithClare).not.toHaveBeenCalled();
     const first = canvas.querySelector('.chat-message--status')?.textContent;
     expect(first).toBeTruthy();
     expect(first).not.toMatch(/thinking|working/i);
@@ -172,36 +205,19 @@ describe('Clare protocol controls', () => {
     expect(second).not.toBe(first);
     expect(canvas.querySelectorAll('.chat-message--status')).toHaveLength(1);
 
-    pendingStream.resolve({
-      voice: 'Right — one thing, and it actually has a shape. Here is my take.',
-      proposals: [proposal],
-      questions: [],
-      notes: [],
-      toolkit: null,
-      mutations: [],
-      agent: 'clare'
-    });
+    pendingStream.resolve('Right — three distinct cards, not one mega-title.');
     await vi.runOnlyPendingTimersAsync();
     await Promise.resolve();
     expect(canvas.querySelector('.canvas-status')).toBeNull();
-    expect(canvas.textContent).toContain('Right — one thing');
-    expect(canvas.textContent).toContain(proposal.title);
+    expect(canvas.textContent).toContain('three distinct cards');
     expect(canvas.textContent).not.toContain('Here’s what that protocol means');
     vi.useRealTimers();
   });
 
-  it('shows Saving… on Confirm then Saved. after the write', async () => {
-    vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(dumpStreamFromResult({
-      voice: 'Right — one thing, and it actually has a shape. Here is my take.',
-      proposals: [proposal],
-      questions: [],
-      notes: [],
-      toolkit: null,
-      mutations: [],
-      agent: 'clare'
-    }))
-    const pending = deferred<unknown>();
-    vi.mocked(tasksApi.acceptClareBatch).mockReturnValue(pending.promise as Promise<never>);
+  it('routes freeform Clare turns through /api/chat, not the dump stream', async () => {
+    streamChat.mockReturnValue(
+      chatStreamFromText('Captured as separate cards — confirm when ready.')
+    );
     const canvas = document.createElement('main');
     await renderClareView(canvas);
     const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
@@ -209,25 +225,22 @@ describe('Clare protocol controls', () => {
     canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
       new Event('submit', { bubbles: true, cancelable: true })
     );
-    await vi.waitFor(() => expect(tasksApi.streamDumpWithClare).toHaveBeenCalledTimes(1));
-    await vi.waitFor(() => expect(canvas.querySelector('.record-proposal__confirm')).not.toBeNull());
-
-    expect(canvas.querySelector('.record-proposal .page-header__title')?.textContent).toBe(proposal.title);
-    expect(canvas.querySelector('.record-proposal__fields')).not.toBeNull();
-
-    const confirm = canvas.querySelector<HTMLButtonElement>('.record-proposal__confirm')!;
-    confirm.click();
-    await vi.waitFor(() => expect(confirm.textContent).toBe('Saving…'));
-    expect(confirm.disabled).toBe(true);
-
-    pending.resolve({ tasks: [] });
-    await vi.waitFor(() => expect(canvas.textContent).toMatch(/saved\./i));
-    expect(tasksApi.acceptClareBatch).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1));
+    expect(streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: proposal.title,
+        priorAgentSlug: 'clare'
+      })
+    );
+    expect(tasksApi.streamDumpWithClare).not.toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(canvas.textContent).toContain('Captured as separate cards')
+    );
   });
 
-  it('drops a dump that finishes after New chat', async () => {
-    const pendingStream = pendingDumpStream();
-    vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(pendingStream.stream);
+  it('drops a Clare chat reply that finishes after New chat', async () => {
+    const pendingStream = pendingChatStream();
+    streamChat.mockReturnValue(pendingStream.stream);
     const canvas = document.createElement('main');
     await renderClareView(canvas);
     const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
@@ -235,22 +248,13 @@ describe('Clare protocol controls', () => {
     canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
       new Event('submit', { bubbles: true, cancelable: true })
     );
-    await vi.waitFor(() => expect(tasksApi.streamDumpWithClare).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1));
 
     canvas.querySelector<HTMLButtonElement>('#chat-new')!.click();
-    pendingStream.resolve({
-      voice: 'Stale dump that should not land.',
-      proposals: [proposal],
-      questions: [],
-      notes: [],
-      toolkit: null,
-      mutations: [],
-      agent: 'clare'
-    });
+    pendingStream.resolve('Stale chat reply that should not land.');
     await Promise.resolve();
     await Promise.resolve();
-    expect(canvas.textContent).not.toContain('Stale dump that should not land.');
-    expect(canvas.querySelector('.record-proposal__confirm')).toBeNull();
+    expect(canvas.textContent).not.toContain('Stale chat reply that should not land.');
     expect(canvas.textContent).toContain(briefing.closer);
   });
 
@@ -301,9 +305,11 @@ describe('Clare protocol controls', () => {
     expect(avatars.at(-1)?.getAttribute('src')).toBe('/assets/agents/hammond.jpg');
   });
 
-  it('removes the status bubble on failure and new chat', async () => {
+  it('removes the status bubble on Clare chat failure and new chat', async () => {
     vi.useFakeTimers();
-    vi.mocked(tasksApi.streamDumpWithClare).mockImplementation(async function* () { throw new Error('Clare could not reply.'); });
+    streamChat.mockImplementation(async function* () {
+      throw new Error('Clare could not reply.');
+    });
     const canvas = document.createElement('main');
     await renderClareView(canvas);
     const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
@@ -314,9 +320,10 @@ describe('Clare protocol controls', () => {
     await vi.waitFor(() => expect(canvas.querySelector('.chat-error, #chat-error')?.textContent).toMatch(/could not reply/i));
     expect(canvas.querySelector('.chat-message--status')).toBeNull();
     expect(canvas.querySelector('.hub-loader, .typing-indicator')).toBeNull();
+    expect(tasksApi.streamDumpWithClare).not.toHaveBeenCalled();
 
-    const pendingStream = pendingDumpStream();
-    vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(pendingStream.stream);
+    const pendingStream = pendingChatStream();
+    streamChat.mockReturnValue(pendingStream.stream);
     dump.value = 'Again';
     canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
       new Event('submit', { bubbles: true, cancelable: true })
