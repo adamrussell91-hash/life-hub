@@ -35,3 +35,8 @@ test('buildPlannedCandidateFromTemplate coerces none cable_type to constant forc
   }, { date: '2026-08-07' });
   assert.equal(built.candidate.fields.exercises[0].sets[0].cable_type, 'constant_force');
 });
+
+test('buildPlannedCandidateFromTemplate uses workout-planned for empty titles', () => {
+  const built = buildPlannedCandidateFromTemplate({ title: '' }, { date: '2026-08-07' });
+  assert.equal(built.slug, 'workout-planned');
+});
