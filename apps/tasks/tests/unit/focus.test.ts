@@ -8,6 +8,7 @@ import {
   normalizeCalendarItemId,
   parseFocusParam,
   serializeFocusParam,
+  focusedTaskId,
   setFocus,
   subscribeFocus
 } from '@/domain/focus';
@@ -71,5 +72,12 @@ describe('focus contract', () => {
     const next = mergeFocusIntoHash(getFocus(), '#/week');
     expect(next).toBe('#/week?focus=task%3Akeep-me');
     expect(hydrateFocusFromHash('#/timeline')).toEqual({ type: 'task', id: 'keep-me' });
+  });
+
+  it('reads this-task from board focus or the open task page hash', () => {
+    expect(focusedTaskId('#/board')).toBeNull();
+    expect(focusedTaskId('#/task/task_demo_mw_brief')).toBe('task_demo_mw_brief');
+    setFocus({ type: 'task', id: 'from-board' }, { persistUrl: false });
+    expect(focusedTaskId('#/task/other')).toBe('from-board');
   });
 });

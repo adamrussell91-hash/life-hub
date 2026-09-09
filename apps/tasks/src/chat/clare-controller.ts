@@ -6,6 +6,7 @@ import { mutationLabel } from '@/domain/agent-mutations';
 import { briefingToMarkdown, toolkitToMarkdown, type ClareBriefing } from '@/domain/clare-desk';
 import { isBriefingProtocol, type ClareProtocolId } from '@/domain/clare-protocols';
 import { preferredDomains } from '@/domain/queries';
+import { focusedTaskId } from '@/domain/focus';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createHubField, createHubFilter } from '@/views/hub-kit';
 import { tasksApi } from '@/services/client-api';
@@ -474,12 +475,14 @@ export function createClareChatController({
 
   async function submitDump(text: string): Promise<void> {
     const recent_thread = collectRecentThread(root);
+    const taskId = focusedTaskId();
     const body = {
       text,
       domain: preferredDomains()[0] ?? 'teaching',
       protocol_id: selectedProtocolId as ClareProtocolId | undefined,
       recent_thread,
-      agent_slug: selectedSlug
+      agent_slug: selectedSlug,
+      focus: taskId ? { type: 'task' as const, id: taskId } : undefined
     };
     const mine = ++turn;
     sending = true;

@@ -143,6 +143,35 @@ describe('clare store dump + batch', () => {
     expect(tasks.some((t) => t.tags.includes('comms'))).toBe(true);
   });
 
+  it('turns a time-edit direction into a mutation, not a new task', async () => {
+    const kv = memoryKv();
+    await seedIfEmpty(kv, keys, seed);
+    const store = createTasksStore(kv, keys);
+    const created = await store.createTask({
+      title: 'Parent meeting',
+      domain: 'teaching',
+      due_time: '01:00'
+    });
+
+    const dump = await store.processDumpWithClare({
+      text: 'edit this task to be 1pm not 1am',
+      domain: 'teaching',
+      now: new Date('2026-09-09T09:00:00'),
+      judge: null,
+      focus: { type: 'task', id: created.id }
+    });
+
+    expect(dump.proposals).toHaveLength(0);
+    expect(dump.mutations).toEqual([
+      expect.objectContaining({
+        kind: 'task_update',
+        task_id: created.id,
+        patch: { due_time: '13:00' }
+      })
+    ]);
+    expect(dump.voice).toMatch(/Parent meeting|1pm/i);
+  });
+
   it('rewrites wording corrections instead of proposing them as new tasks', async () => {
     const kv = memoryKv();
     await seedIfEmpty(kv, keys, seed);

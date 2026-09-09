@@ -48,6 +48,8 @@ export type ClareDumpDigest = {
   operating_protocol: string;
   /** Prior turns in this chat window for continuity. */
   recent_thread: Array<{ role: 'user' | 'assistant'; text: string }>;
+  /** Board focus when Adam says “this task” from the overlay. */
+  focused_task: { id: string; title: string; due_date: string | null; due_time: string | null } | null;
 };
 
 function typicalDelta(cal: ClareCalibration): number | null {
@@ -71,6 +73,7 @@ export function buildClareDumpDigest(input: {
   lifeContext?: LifeContextDigest | null;
   operatingProtocol?: string;
   recentThread?: Array<{ role: 'user' | 'assistant'; text: string }>;
+  focus?: { type?: string; id?: string } | null;
 }): ClareDumpDigest {
   const now = input.now ?? new Date();
   const timezone = input.timezone ?? HUB_TZ;
@@ -121,6 +124,17 @@ export function buildClareDumpDigest(input: {
     recent_thread: (input.recentThread ?? []).slice(-12).map((turn) => ({
       role: turn.role,
       text: turn.text.slice(0, 500)
-    }))
+    })),
+    focused_task: (() => {
+      if (input.focus?.type !== 'task' || !input.focus.id) return null;
+      const hit = input.tasks.find((task) => task.id === input.focus!.id);
+      if (!hit) return null;
+      return {
+        id: hit.id,
+        title: hit.title,
+        due_date: hit.due_date,
+        due_time: hit.due_time ?? null
+      };
+    })()
   };
 }

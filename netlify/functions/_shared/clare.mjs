@@ -292,3 +292,23 @@ export function assembleDumpResult(
     ...(choice ? { choice } : {})
   };
 }
+
+export function dumpResultFromDirection(direction, agent = 'clare') {
+  return {
+    voice: direction.voice,
+    proposals: [],
+    questions: direction.question ? [direction.question] : [],
+    notes: [],
+    toolkit: null,
+    mutations:
+      direction.task_id && direction.patch
+        ? [{
+            kind: 'task_update',
+            task_id: direction.task_id,
+            patch: direction.patch,
+            summary: direction.summary || 'Update task'
+          }]
+        : [],
+    agent
+  };
+}
