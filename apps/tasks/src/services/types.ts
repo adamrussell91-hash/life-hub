@@ -119,6 +119,7 @@ export interface TasksStore {
     lifeContext?: import('@/domain/life-context').LifeContextDigest | null;
     recent_thread?: Array<{ role: 'user' | 'assistant'; text: string }>;
     agent_slug?: import('@/domain/agent-protocol').AgentProtocolSlug;
+    focus?: { type?: string; id?: string } | null;
   }): Promise<ClareDumpResult>;
   applyAgentMutations(
     mutations: import('@/domain/agent-mutations').AgentMutation[]

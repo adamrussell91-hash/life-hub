@@ -161,6 +161,7 @@ export const tasksApi = {
     protocol_id?: import('@/domain/clare-protocols').ClareProtocolId;
     recent_thread?: Array<{ role: 'user' | 'assistant'; text: string }>;
     agent_slug?: import('@/domain/agent-protocol').AgentProtocolSlug;
+    focus?: { type?: string; id?: string } | null;
   }) =>
     apiPost<import('@/domain/clare').ClareDumpResult>('/api/clare', { action: 'dump', ...body }),
 
@@ -170,6 +171,7 @@ export const tasksApi = {
     protocol_id?: import('@/domain/clare-protocols').ClareProtocolId;
     recent_thread?: Array<{ role: 'user' | 'assistant'; text: string }>;
     agent_slug?: import('@/domain/agent-protocol').AgentProtocolSlug;
+    focus?: { type?: string; id?: string } | null;
   }) {
     const url = `${getApiBaseUrl()}/api/clare`;
     let response: Response;

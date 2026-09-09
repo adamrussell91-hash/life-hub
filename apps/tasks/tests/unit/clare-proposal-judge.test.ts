@@ -38,6 +38,8 @@ describe('Clare dump digest clock', () => {
     expect(CLARE_PROPOSAL_SYSTEM).toMatch(/Talk like Claude/);
     expect(CLARE_PROPOSAL_SYSTEM).toMatch(/mutations/);
     expect(CLARE_PROPOSAL_SYSTEM).toMatch(/repo_file/);
+    expect(CLARE_PROPOSAL_SYSTEM).toMatch(/focused_task/);
+    expect(CLARE_PROPOSAL_SYSTEM).toMatch(/1pm not 1am/);
   });
 });
 

@@ -350,7 +350,11 @@ export function createMockApi({ seed }: MockApiOptions) {
             agent_slug:
               b.agent_slug === undefined
                 ? undefined
-                : (String(b.agent_slug) as import('../src/domain/agent-protocol').AgentProtocolSlug)
+                : (String(b.agent_slug) as import('../src/domain/agent-protocol').AgentProtocolSlug),
+            focus:
+              b.focus && typeof b.focus === 'object'
+                ? (b.focus as { type?: string; id?: string })
+                : undefined
           });
           if (b.action === 'dump') {
             return json(200, { ok: true, data: dump });
@@ -688,6 +692,14 @@ export function createMockApi({ seed }: MockApiOptions) {
         }
       }
       const result = await handle(req.method ?? 'GET', req.url ?? '/', body);
+      if (result instanceof Response) {
+        res.statusCode = result.status;
+        result.headers.forEach((value, key) => {
+          res.setHeader(key, value);
+        });
+        res.end(await result.text());
+        return;
+      }
       res.statusCode = result.status;
       res.setHeader('content-type', 'application/json; charset=utf-8');
       res.setHeader('cache-control', 'no-store');

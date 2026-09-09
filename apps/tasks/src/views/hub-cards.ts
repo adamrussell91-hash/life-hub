@@ -198,6 +198,7 @@ function boardCardInteractive(target: EventTarget | null): boolean {
 }
 
 function openTaskPage(task: Task, handlers: TaskCardHandlers): void {
+  setFocus({ type: 'task', id: task.id });
   if (handlers.onOpenPage) handlers.onOpenPage(task);
   else location.hash = taskPageHash(task.id);
 }
