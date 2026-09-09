@@ -1429,6 +1429,251 @@
   margin-bottom: var(--space-5);
 }
 
+.excursion-compliance {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.excursion-compliance__group-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}
+
+.excursion-compliance__name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.excursion-compliance__critical {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--warning);
+  background: var(--warning-surface);
+  padding: 0.05rem var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.excursion-compliance__sub {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+/* ---------- muster + escalation ladder ---------- */
+.excursion-muster__headcount {
+  max-width: 12rem;
+  margin-bottom: var(--space-3);
+}
+
+.excursion-muster__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.excursion-muster__stop {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.excursion-muster__stop-btn {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: var(--space-2) var(--space-1);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+}
+
+.excursion-muster__stop.is-confirmed .excursion-muster__stop-btn {
+  border-color: rgba(47, 122, 79, 0.28);
+  background: var(--success-surface);
+}
+
+.excursion-muster__stop.is-short .excursion-muster__stop-btn {
+  border-color: var(--danger-line);
+  background: var(--danger-surface);
+}
+
+.excursion-muster__dot {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: #fff;
+  background: var(--shallow);
+}
+
+.excursion-muster__stop.is-confirmed .excursion-muster__dot {
+  background: var(--success);
+}
+
+.excursion-muster__stop.is-short .excursion-muster__dot {
+  background: var(--danger);
+}
+
+.excursion-muster__lab {
+  font-size: var(--text-2xs);
+  text-align: center;
+  color: var(--ink);
+}
+
+.excursion-muster__time {
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+
+.excursion-muster__short-btn {
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  padding: 0.1rem;
+}
+
+.excursion-muster__add {
+  margin-top: var(--space-2);
+}
+
+.excursion-ladder {
+  border: 1px solid var(--danger-line);
+  background: var(--danger-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.excursion-ladder__tiers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.excursion-ladder__tier {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  opacity: 0.45;
+}
+
+.excursion-ladder__tier.is-active {
+  opacity: 1;
+}
+
+.excursion-ladder__tier-label {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  color: #fff;
+  background: var(--wave);
+  border-radius: var(--radius-full);
+  padding: 0.1rem 0.5rem;
+  flex: none;
+}
+
+.excursion-ladder__tier--warn.is-active .excursion-ladder__tier-label {
+  background: var(--high-sea);
+  color: var(--depth);
+}
+
+.excursion-ladder__tier--danger.is-active .excursion-ladder__tier-label {
+  background: var(--danger);
+}
+
+.excursion-muster__log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+/* ---------- folder builder ---------- */
+.excursion-folder__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  margin: 0 0 var(--space-2);
+}
+
+.excursion-folder__list {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.excursion-folder__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.excursion-folder__item.is-on .task-name {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--line);
+}
+
+.excursion-folder__export {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.excursion-confirm__field {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-4);
+  max-width: 20rem;
+}
+
+.excursion-confirm__date {
+  max-width: 12rem;
+}
+
+.excursion-confirm__slack {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.excursion-confirm__slack-row {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.excursion-confirm__slack-row.is-tight {
+  color: var(--warning);
+  font-weight: var(--weight-medium);
+}
+
 .excursion-key-dates__list {
   list-style: none;
   margin: 0 0 var(--space-4);
@@ -1565,6 +1810,65 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+.excursion-gate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+}
+
+.excursion-gate--warn {
+  background: var(--warning-surface);
+  border-color: rgba(246, 134, 32, 0.3);
+}
+
+.excursion-gate--go {
+  background: var(--success-surface);
+  border-color: rgba(47, 122, 79, 0.28);
+}
+
+.excursion-gate__dot {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  flex: none;
+}
+
+.excursion-gate--warn .excursion-gate__dot {
+  background: var(--warning);
+}
+
+.excursion-gate--go .excursion-gate__dot {
+  background: var(--success);
+}
+
+.excursion-gate__copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.excursion-gate__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.excursion-gate--warn .excursion-gate__title {
+  color: var(--warning);
+}
+
+.excursion-gate--go .excursion-gate__title {
+  color: var(--success);
+}
+
+.excursion-gate__sub {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
 }
 
 .page-card .excursion-progress {

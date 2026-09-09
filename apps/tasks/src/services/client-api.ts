@@ -1,7 +1,7 @@
 import { ApiClientError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 import type { Task } from '@/schemas/task';
-import { ProjectSchema, type Project } from '@/schemas/project';
+import { ProjectSchema, type ComplianceModule, type Project } from '@/schemas/project';
 import {
   filterCachedTasks,
   mergeListedTasks,
@@ -164,6 +164,7 @@ export const tasksApi = {
     event_date: string;
     student_group_reference?: string | null;
     description?: string;
+    compliance_modules?: ComplianceModule[];
   }) =>
     apiPost<{ project: Project; tasks: Task[] }>('/api/templates', {
       action: 'create_excursion_from_template',

@@ -13,7 +13,9 @@ import {
   statusLabel,
   taskPageHash
 } from '@/domain/cards';
-import { adminTaskKind, shiftExcursionDates } from '@/domain/excursion';
+import { adminTaskKind, excursionClearance, shiftExcursionDates } from '@/domain/excursion';
+import { renderComplianceBundle } from '@/views/excursion-compliance';
+import { renderFolderSection, renderMusterSection } from '@/views/excursion-dayof';
 import {
   collectExcursionStops,
   layoutExcursionTimeline,
@@ -87,6 +89,38 @@ function renderProgress(project: Project, tasks: Task[]): HTMLElement {
   fill.style.width = `${progress.pct}%`;
   track.append(fill);
   host.append(copy, track);
+  return host;
+}
+
+/** Depart-readiness — the safety-critical subset, not the overall % done. */
+function renderClearanceGate(project: Project, tasks: Task[]): HTMLElement {
+  const clearance = excursionClearance(project, tasks);
+  const host = el(
+    'section',
+    `excursion-gate ${clearance.cleared ? 'excursion-gate--go' : 'excursion-gate--warn'}`
+  );
+  host.setAttribute('role', 'status');
+  const dot = el('span', 'excursion-gate__dot');
+  dot.setAttribute('aria-hidden', 'true');
+  const copy = el('div', 'excursion-gate__copy');
+  const outstanding = clearance.items.filter((item) => !item.done);
+  copy.append(
+    el(
+      'p',
+      'excursion-gate__title',
+      clearance.cleared ? 'Cleared to depart' : 'Not cleared to depart'
+    ),
+    el(
+      'p',
+      'excursion-gate__sub',
+      clearance.cleared
+        ? `All ${clearance.items.length} critical items confirmed`
+        : `${outstanding.length} of ${clearance.items.length} critical items outstanding: ${outstanding
+            .map((item) => item.label)
+            .join('; ')}`
+    )
+  );
+  host.append(dot, copy);
   return host;
 }
 
@@ -297,6 +331,30 @@ function renderPermissionTracker(
   return host;
 }
 
+function renderComplianceSection(
+  project: Project,
+  persist: (patch: Partial<Project>) => void,
+  onChange: () => void
+): HTMLElement {
+  const modules = [...(project.compliance_modules ?? [])];
+  const host = el('section', 'excursion-tracker');
+  host.append(el('p', 'hub-card__eyebrow', 'Compliance bundle'));
+  if (!modules.length) {
+    host.append(el('p', 'empty-state', 'No compliance bundle on this excursion yet.'));
+    return host;
+  }
+  host.append(
+    renderComplianceBundle(modules, (id) => {
+      const module = modules.find((m) => m.id === id);
+      if (!module) return;
+      module.on = !module.on;
+      persist({ compliance_modules: [...modules] });
+      onChange();
+    })
+  );
+  return host;
+}
+
 function renderTimeline(
   project: Project,
   tasks: Task[],
@@ -362,7 +420,13 @@ export function paintExcursionPage(
           milestones: current.milestones,
           permission_notes: current.permission_notes,
           cover: current.cover ?? null,
-          page_blocks: current.page_blocks
+          page_blocks: current.page_blocks,
+          compliance_modules: current.compliance_modules,
+          expected_headcount: current.expected_headcount,
+          day_of_muster: current.day_of_muster,
+          active_escalation: current.active_escalation,
+          muster_log: current.muster_log,
+          folder_items: current.folder_items
         })
         .then(
           (next) => {
@@ -453,11 +517,21 @@ export function paintExcursionPage(
     }
   };
 
+  const gateHost = el('div', 'excursion-gate-host');
+  const refreshGate = () => {
+    gateHost.replaceChildren(renderClearanceGate(current, tasks));
+  };
+  refreshGate();
+
   card.append(
     head,
     fields,
+    gateHost,
     renderProgress(project, tasks),
+    renderComplianceSection(project, persist, refreshGate),
+    renderMusterSection(project, persist, () => {}),
     renderPermissionTracker(project, persist),
+    renderFolderSection(project, tasks, persist),
     renderQuickAdd(() => void reload(), project.id),
     foot
   );

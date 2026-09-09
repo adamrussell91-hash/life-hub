@@ -4,6 +4,7 @@ import type { Project } from '@/schemas/project';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { projectMilestones } from '@/domain/project-milestones';
 import { addDays, parseDue, startOfDay, toDateKey } from '@/domain/queries';
+import { projectChildTasks } from '@/domain/cards';
 
 export type AdminTaskKind =
   | 'permission_note'
@@ -426,4 +427,87 @@ export function formatLeadTimes(template: ExcursionTemplate): string {
   ];
   if (l.payment_days !== undefined) parts.push(`payment −${l.payment_days}d`);
   return parts.join(' · ');
+}
+
+/** Safety-critical subset of the checklist — gates depart-readiness, distinct from overall % done. */
+export const CRITICAL_ADMIN_KINDS: KeyDateKind[] = ['risk_assessment', 'permission_note'];
+
+export type ClearanceItem = {
+  /** A KeyDateKind for the legacy fallback, or a ComplianceModule id when the bundle is present. */
+  kind: string;
+  label: string;
+  done: boolean;
+};
+
+export type ExcursionClearance = {
+  cleared: boolean;
+  items: ClearanceItem[];
+};
+
+/**
+ * Cleared-to-depart state. Prefers the compliance bundle's critical items
+ * (project.compliance_modules) when present — falls back to the two
+ * critical admin-task kinds for excursions created before that bundle
+ * existed, so old excursions still compute a sensible gate.
+ */
+export function excursionClearance(project: Project, tasks: Task[]): ExcursionClearance {
+  if (project.compliance_modules?.length) {
+    const critical = project.compliance_modules.filter((module) => module.critical);
+    const items: ClearanceItem[] = critical.map((module) => ({
+      kind: module.id,
+      label: module.label,
+      done: module.on
+    }));
+    return { cleared: items.every((item) => item.done), items };
+  }
+
+  const children = projectChildTasks(project, tasks);
+  const items: ClearanceItem[] = CRITICAL_ADMIN_KINDS.map((kind) => {
+    const def = KEY_DATE_DEFS.find((row) => row.kind === kind);
+    const task = matchAdminTask(children, kind);
+    return {
+      kind,
+      label: def?.label ?? kind,
+      done: task ? task.status === 'done' : false
+    };
+  });
+  return { cleared: items.every((item) => item.done), items };
+}
+
+export type LeadTimeSlack = {
+  kind: KeyDateKind;
+  label: string;
+  leadDays: number;
+  slackDays: number;
+  tight: boolean;
+};
+
+/**
+ * Runway a candidate event date gives each of a template's lead times.
+ * Negative slack means that admin task cannot get its normal lead time and
+ * needs to be lodged as soon as the excursion is created, not scheduled ahead.
+ */
+export function leadTimeSlack(
+  template: ExcursionTemplate,
+  eventDate: string,
+  now = new Date()
+): LeadTimeSlack[] {
+  const event = parseDue(eventDate);
+  if (!event) return [];
+  const runwayDays = Math.round(
+    (startOfDay(event).getTime() - startOfDay(now).getTime()) / 86_400_000
+  );
+  const leads = template.default_lead_times;
+  const rows: Array<{ kind: KeyDateKind; label: string; days: number | undefined }> = [
+    { kind: 'risk_assessment', label: 'Risk assessment lodged', days: leads.risk_assessment_days },
+    { kind: 'permission_note', label: 'Permission notes sent', days: leads.permission_note_days },
+    { kind: 'staff_email', label: 'Staff absence email sent', days: leads.staff_email_days },
+    { kind: 'payment', label: 'Payment confirmed', days: leads.payment_days }
+  ];
+  return rows
+    .filter((row): row is { kind: KeyDateKind; label: string; days: number } => row.days !== undefined)
+    .map((row) => {
+      const slackDays = runwayDays - row.days;
+      return { kind: row.kind, label: row.label, leadDays: row.days, slackDays, tight: slackDays < 0 };
+    });
 }
