@@ -1,8 +1,18 @@
 /**
  * Build a chat-confirm candidate from a Fitness workout template.
+ *
+ * Do not import netlify/ from browser modules — prepare-web does not publish
+ * Functions into Pages, and a missing import kills the whole main.js graph
+ * (sign-in never binds → native POST to action="#" → GitHub Pages 405).
  */
-import { normalizeLoggerCableType } from './fitness-logger-draft.js';
-import { buildPlannedWorkoutSlug } from '../../../../netlify/functions/_shared/chat-schema.mjs';
+import { normalizeLoggerCableType, slugifyWorkoutTitle } from './fitness-logger-draft.js';
+
+/** Matches netlify chat-schema buildPlannedWorkoutSlug (client-safe copy). */
+function buildPlannedWorkoutSlug(title) {
+  const stem = slugifyWorkoutTitle(title);
+  if (!stem || stem === 'workout') return 'workout-planned';
+  return `workout-${stem}`;
+}
 
 export function buildPlannedCandidateFromTemplate(template, { date, time = '07:30' } = {}) {
   if (!template || typeof template !== 'object') {
