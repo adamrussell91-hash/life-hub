@@ -20,6 +20,7 @@ import {
 } from './_shared/tasks-blobs.mjs';
 import { DEFAULT_EXCURSION_TEMPLATE, buildExcursionPlan } from './_shared/excursion-plan.mjs';
 import { cloneDefaultComplianceModules } from './_shared/excursion-modules.mjs';
+import { cloneDefaultFolderItems } from './_shared/excursion-folder.mjs';
 
 export const config = { path: '/api/templates' };
 
@@ -277,6 +278,7 @@ export function createTemplatesHandler(deps = {}) {
           milestones,
           generated_admin_tasks: taskIds,
           compliance_modules,
+          folder_items: cloneDefaultFolderItems(),
           created_at: nowIso,
           updated_at: nowIso
         };

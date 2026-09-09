@@ -15,6 +15,7 @@ import {
 } from '@/domain/cards';
 import { adminTaskKind, excursionClearance, shiftExcursionDates } from '@/domain/excursion';
 import { renderComplianceBundle } from '@/views/excursion-compliance';
+import { renderFolderSection, renderMusterSection } from '@/views/excursion-dayof';
 import {
   collectExcursionStops,
   layoutExcursionTimeline,
@@ -419,7 +420,13 @@ export function paintExcursionPage(
           milestones: current.milestones,
           permission_notes: current.permission_notes,
           cover: current.cover ?? null,
-          page_blocks: current.page_blocks
+          page_blocks: current.page_blocks,
+          compliance_modules: current.compliance_modules,
+          expected_headcount: current.expected_headcount,
+          day_of_muster: current.day_of_muster,
+          active_escalation: current.active_escalation,
+          muster_log: current.muster_log,
+          folder_items: current.folder_items
         })
         .then(
           (next) => {
@@ -522,7 +529,9 @@ export function paintExcursionPage(
     gateHost,
     renderProgress(project, tasks),
     renderComplianceSection(project, persist, refreshGate),
+    renderMusterSection(project, persist, () => {}),
     renderPermissionTracker(project, persist),
+    renderFolderSection(project, tasks, persist),
     renderQuickAdd(() => void reload(), project.id),
     foot
   );

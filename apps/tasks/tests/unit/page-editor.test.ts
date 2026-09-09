@@ -525,12 +525,15 @@ describe('page editor', () => {
     const canvas = document.createElement('main');
     await renderPageEditor(canvas, { kind: 'project', id: excursion.id });
 
+    const permissionTracker = [...canvas.querySelectorAll<HTMLElement>('.excursion-tracker')].find(
+      (section) => section.querySelector('.hub-card__eyebrow')?.textContent === 'Permission notes'
+    )!;
     const add = canvas.querySelector<HTMLInputElement>('[aria-label="Student name"]')!;
     add.value = 'Samira';
     add.dispatchEvent(new Event('input', { bubbles: true }));
-    canvas.querySelector<HTMLButtonElement>('.excursion-tracker .btn')!.click();
+    permissionTracker.querySelector<HTMLButtonElement>('.btn')!.click();
 
-    expect(canvas.querySelector('.excursion-tracker .task-name')?.textContent).toBe('Samira');
+    expect(permissionTracker.querySelector('.task-name')?.textContent).toBe('Samira');
     await vi.advanceTimersByTimeAsync(400);
     expect(tasksApi.updateProject).toHaveBeenCalled();
     const patch = vi.mocked(tasksApi.updateProject).mock.calls.at(-1)?.[1] as {
@@ -539,5 +542,50 @@ describe('page editor', () => {
     expect(patch.permission_notes).toEqual([
       expect.objectContaining({ name: 'Samira', returned: false })
     ]);
+  });
+
+  it('adds a muster stop and persists the confirmed count, not just local state', async () => {
+    vi.useFakeTimers();
+    const excursion: Project = {
+      ...project,
+      id: 'proj_ex_muster',
+      title: 'Free-Thinkers Forum',
+      type: 'excursion',
+      current_end_date: '2026-09-02',
+      competition_or_event_type: 'ext_excursion'
+    };
+    vi.mocked(tasksApi.getProject).mockResolvedValue(excursion);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
+    vi.mocked(tasksApi.listTemplates).mockResolvedValue({
+      frameworks: [],
+      excursion_templates: [],
+      task_templates: [],
+      project_templates: []
+    });
+    vi.mocked(tasksApi.updateProject).mockResolvedValue({
+      ...excursion,
+      updated_at: '2026-08-28T00:00:00.000Z'
+    });
+
+    const canvas = document.createElement('main');
+    await renderPageEditor(canvas, { kind: 'project', id: excursion.id });
+
+    const musterSection = canvas.querySelector<HTMLElement>('.excursion-muster')!;
+    const labelInput = musterSection.querySelector<HTMLInputElement>('[aria-label="Stop label"]')!;
+    labelInput.value = 'Board 415';
+    labelInput.dispatchEvent(new Event('input', { bubbles: true }));
+    musterSection.querySelector<HTMLButtonElement>('.excursion-muster__add .btn')!.click();
+
+    const stopBtn = musterSection.querySelector<HTMLButtonElement>('.excursion-muster__stop-btn')!;
+    expect(stopBtn.textContent).toContain('Board 415');
+    stopBtn.click();
+
+    await vi.advanceTimersByTimeAsync(400);
+    expect(tasksApi.updateProject).toHaveBeenCalled();
+    const patch = vi.mocked(tasksApi.updateProject).mock.calls.at(-1)?.[1] as {
+      day_of_muster: Array<{ label: string; status: string }>;
+    };
+    expect(patch.day_of_muster).toHaveLength(1);
+    expect(patch.day_of_muster[0]).toMatchObject({ label: 'Board 415', status: 'confirmed' });
   });
 });
