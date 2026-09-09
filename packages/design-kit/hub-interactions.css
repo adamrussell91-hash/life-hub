@@ -111,40 +111,61 @@
   outline: none;
 }
 
-/* Conversation composer: always-open field + send, not the compact Ask chip. */
+/* Conversation composer: full-width text box, Attach/Send on the row below.
+   Side-by-side tools stole width and sat inside the shared paper chrome. */
 .hub-ai-bar--thread {
-  align-items: flex-end;
-  border-radius: var(--radius-lg);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .hub-ai-bar--thread .hub-ai-bar__field {
   display: block;
-  flex: 1;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  box-shadow: var(--elev-1);
 }
 
-/* Attachment chips stack above Attach/Send so the message field keeps width. */
+/* Tools sit under the text box so typed lines use the full field width. */
 .hub-ai-bar__aside {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
   gap: var(--space-1);
   flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
 }
 
 .hub-ai-bar--thread .hub-ai-bar__tools {
   display: inline-flex;
-  align-items: flex-end;
+  align-items: center;
   flex-wrap: nowrap;
+  gap: var(--space-1);
 }
 
 .hub-ai-bar--thread .hub-ai-bar__input {
+  width: 100%;
   min-height: 2.5rem;
   max-height: 10rem;
   padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: transparent;
   resize: none;
   line-height: 1.45;
+  box-sizing: border-box;
 }
 
 .chat-attach-list {
@@ -152,7 +173,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.35rem;
-  max-width: min(11rem, 42vw);
+  max-width: 100%;
   padding: 0;
 }
 

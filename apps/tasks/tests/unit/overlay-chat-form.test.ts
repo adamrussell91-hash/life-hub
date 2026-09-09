@@ -28,8 +28,11 @@ describe('desktop overlay chat panel', () => {
 });
 
 describe('mobile overlay chat form', () => {
-  it('keeps Send beside the textarea on mobile instead of stacking the composer', () => {
+  it('stacks Attach/Send under a full-width textarea on mobile', () => {
     expect(viewsCss).toMatch(
+      /\.chat-view\s+\.chat-form\s*\{[^}]*flex-direction:\s*column/
+    );
+    expect(viewsCss).not.toMatch(
       /\.chat-view\s+\.chat-form\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/
     );
   });

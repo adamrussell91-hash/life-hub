@@ -384,28 +384,36 @@ test('Mind fills the shared 76rem shell; only Chat lifts the canvas width', asyn
   assert.match(css, /\.mind-board\s*\{[^}]*max-width:\s*100%/);
 });
 
-test('chat attach chips stack above Attach/Send in the shared composer aside', async () => {
+test('chat composer stacks Attach/Send under a full-width text field', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const kit = await readFile(
     new URL('../../packages/design-kit/hub-interactions.css', import.meta.url),
     'utf8'
   );
+  const lifeCss = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
   const form = html.slice(html.indexOf('id="chat-form"'), html.indexOf('</form>', html.indexOf('id="chat-form"')) + 7);
   assert.match(form, /hub-ai-bar__aside/);
   assert.match(
     form,
-    /hub-ai-bar__aside[\s\S]*id="chat-attach-list"[\s\S]*hub-ai-bar__tools[\s\S]*id="chat-attach"[\s\S]*id="chat-send"/
+    /hub-ai-bar__field[\s\S]*hub-ai-bar__aside[\s\S]*id="chat-attach-list"[\s\S]*hub-ai-bar__tools[\s\S]*id="chat-attach"[\s\S]*id="chat-send"/
   );
   assert.doesNotMatch(
     form,
     /id="chat-attach-list"[\s\S]*hub-ai-bar__field/,
-    'attach list must not sit before the message field as a sibling that steals row width'
+    'attach list must not sit before the message field'
   );
 
-  assert.match(kit, /\.hub-ai-bar__aside\s*\{[^}]*flex-direction:\s*column/);
-  assert.match(kit, /\.hub-ai-bar__aside\s*\{[^}]*align-items:\s*flex-end/);
-  assert.match(kit, /\.chat-attach-list\s*\{[^}]*max-width:\s*min\(11rem,\s*42vw\)/);
+  assert.match(kit, /\.hub-ai-bar--thread\s*\{[^}]*flex-direction:\s*column/);
+  assert.match(kit, /\.hub-ai-bar--thread\s+\.hub-ai-bar__field\s*\{[^}]*width:\s*100%/);
+  assert.match(kit, /\.hub-ai-bar__aside\s*\{[^}]*width:\s*100%/);
+  assert.match(kit, /\.hub-ai-bar__aside\s*\{[^}]*justify-content:\s*flex-end/);
+  assert.match(lifeCss, /\.chat-form\s*\{[^}]*flex-direction:\s*column/);
+  assert.doesNotMatch(
+    lifeCss,
+    /\.chat-view\s+\.chat-form\s*\{[^}]*flex-direction:\s*row/,
+    'mobile Chat must not put Attach/Send beside the textarea'
+  );
 });
 
 test('service worker paints cached images immediately and keeps scripts network-first', async () => {
