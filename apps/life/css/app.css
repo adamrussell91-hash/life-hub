@@ -6460,10 +6460,8 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
     border-bottom-left-radius: 0.35rem;
   }
 
-  .chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker,
-  .chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker__avatar {
-    display: none;
-  }
+  /* Avatars already hide via the shared engaged height:0 collapse — do not
+   * display:none .agent-picker here (same host as #agent-picker; scrollbar bounce). */
 
   .chat-view[data-panel-mode="overlay"] {
     inset: auto;
