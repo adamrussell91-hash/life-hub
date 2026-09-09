@@ -4908,8 +4908,6 @@ main { max-width: 76rem; margin: 0 auto; }
 @media (max-width: 48rem) {
   .mind-mood-mix__donut { width: 11.75rem; height: 11.75rem; }
   .mind-mood-mix__value { font-size: var(--text-lg); }
-  .mind-energy-orbit__kicker { font-size: var(--text-xs); }
-  .mind-energy-orbit__status { font-size: var(--text-md); }
 }
 .mind-energy-orbit-card .mind-tile__legend {
   padding-bottom: var(--space-3);
@@ -5033,6 +5031,10 @@ main { max-width: 76rem; margin: 0 auto; }
   margin: var(--space-3) 0 0;
   color: var(--muted);
   font-size: var(--text-xs);
+}
+@media (max-width: 48rem) {
+  .mind-energy-orbit__kicker { font-size: var(--text-xs); }
+  .mind-energy-orbit__status { font-size: var(--text-md); }
 }
 .mind-chart {
   width: 100%;
