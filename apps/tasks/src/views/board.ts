@@ -72,6 +72,7 @@ function persistMove(
   detail: BoardMoveDetail,
   byId: Map<string, Task>,
   errorHost: HTMLElement,
+  onSaved: (updated: Task) => void,
   onReload: () => void
 ): void {
   const task = byId.get(detail.id);
@@ -83,12 +84,13 @@ function persistMove(
   void tasksApi.updateTask(task.id, { status }).then(
     (updated) => {
       byId.set(updated.id, updated);
+      onSaved(updated);
       void import('../../design-kit/js/hub-feedback.js').then(({ offerTimedUndo }) => {
         offerTimedUndo({
           message: `Moved “${task.title}”`,
           onUndo: () => {
             void tasksApi.updateTask(updated.id, { status: previous }).then(
-              () => onReload(),
+              (restored) => onSaved(restored),
               () => onReload()
             );
           }
@@ -317,22 +319,34 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     if (nav) syncBoardColumnNavCounts(nav, board);
   }
 
-  function upsertTask(task: Task): void {
+  function rememberTask(task: Task): void {
     const index = tasks.findIndex((entry) => entry.id === task.id);
     if (index >= 0) tasks[index] = task;
     else tasks.push(task);
     byId.set(task.id, task);
-    const existing = board.querySelector<HTMLElement>(`[data-id="${task.id}"]`);
-    if (!inScope(task, runningIds)) {
-      existing?.remove();
-      syncChrome();
-      paintOverview();
-      return;
-    }
-    const column = columnForTask(task, byId);
-    const list = listForColumn(board, column);
-    if (!list) return;
-    existing?.remove();
+  }
+
+  function captureViewport(): {
+    canvasTop: number;
+    windowX: number;
+    windowY: number;
+    boardLeft: number;
+  } {
+    return {
+      canvasTop: canvas.scrollTop,
+      windowX: window.scrollX,
+      windowY: window.scrollY,
+      boardLeft: board.scrollLeft
+    };
+  }
+
+  function restoreViewport(saved: ReturnType<typeof captureViewport>): void {
+    canvas.scrollTop = saved.canvasTop;
+    window.scrollTo(saved.windowX, saved.windowY);
+    board.scrollLeft = saved.boardLeft;
+  }
+
+  function remountBoardCard(task: Task, column: BoardColumnId, list: HTMLElement): HTMLElement {
     const card = appendBoardCard(
       list,
       task,
@@ -350,10 +364,44 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     card.dataset.col = column;
     const hint = list.querySelector('.empty-hint');
     if (hint) list.insertBefore(card, hint);
+    return card;
+  }
+
+  function upsertTask(task: Task): void {
+    rememberTask(task);
+    const saved = captureViewport();
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && overviewHost.contains(focused)) {
+      focused.blur();
+    }
+
+    const existing = board.querySelector<HTMLElement>(`[data-id="${task.id}"]`);
+    if (!inScope(task, runningIds)) {
+      existing?.remove();
+      syncChrome();
+      paintOverview();
+      restoreViewport(saved);
+      return;
+    }
+    const column = columnForTask(task, byId);
+    const list = listForColumn(board, column);
+    if (!list) {
+      paintOverview();
+      restoreViewport(saved);
+      return;
+    }
+
+    const alreadyThere = existing?.closest('.card-list') === list;
+    if (!alreadyThere) {
+      existing?.remove();
+      const card = remountBoardCard(task, column, list);
+      if (document.activeElement === card) card.blur();
+      // Completing jumps the mobile column tabs to Done and feels like a full-screen flash.
+      if (column !== 'done') showBoardColumn?.(column);
+    }
     syncChrome();
-    // Completing jumps the mobile column tabs to Done and feels like a full-screen flash.
-    if (column !== 'done') showBoardColumn?.(column);
     paintOverview();
+    restoreViewport(saved);
   }
 
   applyTask = upsertTask;
@@ -428,7 +476,7 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
   showBoardColumn = columnNavHandle.showColumn;
   teardownColumnNav = columnNavHandle.teardown;
   teardownBoard = initBoard(board, {
-    onCardMoved: (detail) => persistMove(detail, byId, confirmHost, () => void renderBoardView(canvas))
+    onCardMoved: (detail) => persistMove(detail, byId, confirmHost, upsertTask, () => void renderBoardView(canvas))
   });
 }
 
