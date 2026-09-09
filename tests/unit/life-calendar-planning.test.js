@@ -68,6 +68,7 @@ test('scheduleDiffActiveProposed suppresses terminal ghosts (SD26)', async () =>
   );
 });
 
+test('calendar model keeps protected backgrounds and work_block briefs', () => {
   const taskEvents = tasksEventsFromTasks([
     { id: 't1', title: 'Deadline', due_date: '2026-09-08', status: 'open' }
   ]);
