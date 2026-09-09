@@ -12,6 +12,7 @@ vi.mock('@/services/client-api', () => ({
     listTasks: vi.fn(),
     listGoals: vi.fn(),
     listReviewLogs: vi.fn(),
+    getPlanningProfile: vi.fn(),
     closeProject: vi.fn(),
     createProject: vi.fn(),
     deleteProject: vi.fn(),
@@ -147,6 +148,7 @@ describe('projects view rebuild', () => {
       }
     ]);
     vi.mocked(tasksApi.listReviewLogs).mockResolvedValue([]);
+    vi.mocked(tasksApi.getPlanningProfile).mockRejectedValue(new Error('no profile'));
     location.hash = '#/projects';
   });
 
