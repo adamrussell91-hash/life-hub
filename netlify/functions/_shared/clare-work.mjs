@@ -464,37 +464,14 @@ export function isClareWorkTool(name) {
   return CLARE_WORK_NAMES.has(name);
 }
 
-/** Intent-sensitive Clare productivity subset. Full set only when message is broad/unspecified. */
-const CLARE_TOOL_HINTS = [
-  { names: ['clarify_dump'], patterns: [/dump/i, /capture/i, /inbox/i, /clarify/i, /triage/i] },
-  { names: ['weekly_review'], patterns: [/weekly review/i, /week review/i, /weekly-review/i] },
-  { names: ['compose_schedule', 'plan_work'], patterns: [/plan (?:my |the )?day/i, /schedule/i, /time block/i, /compose/i, /plan-day/i] },
-  { names: ['project_plan'], patterns: [/project plan/i, /natural plan/i, /project-plan/i, /plan (?:this |the )?project/i] },
-  { names: ['waiting_review'], patterns: [/waiting/i, /follow[- ]?up/i, /blocked on/i] },
-  { names: ['shutdown_day'], patterns: [/shutdown/i, /close (?:the )?day/i, /wrap up/i] },
-  { names: ['focus_block'], patterns: [/focus/i, /deep work/i, /pomodoro/i, /start (?:a )?block/i] },
-  { names: ['deadline_runway'], patterns: [/runway/i, /deadline/i, /due date/i, /hard date/i] },
-  { names: ['context_match'], patterns: [/fit/i, /energy/i, /\d+\s*min/i, /what can i do/i, /context/i] },
-  { names: ['project_health'], patterns: [/project health/i, /stuck project/i, /next action/i] }
-];
-
-export function selectClareWorkSchemas({ message = '', protocolId = null } = {}) {
-  const all = clareWorkSchemas();
-  const text = `${protocolId || ''} ${message || ''}`.trim();
-  if (!text) return all;
-  const selected = new Set();
-  if (protocolId === 'weekly-review') selected.add('weekly_review');
-  if (protocolId === 'plan-day') ['compose_schedule', 'plan_work', 'context_match'].forEach(n => selected.add(n));
-  if (protocolId === 'project-plan') selected.add('project_plan');
-  if (protocolId === 'waiting') selected.add('waiting_review');
-  if (protocolId === 'shutdown') selected.add('shutdown_day');
-  for (const hint of CLARE_TOOL_HINTS) {
-    if (hint.patterns.some(re => re.test(text))) hint.names.forEach(n => selected.add(n));
-  }
-  if (!selected.size) return all;
-  // Always keep clarify_dump available for capture turns.
-  selected.add('clarify_dump');
-  return all.filter(schema => selected.has(schema.name));
+/**
+ * Clare’s full workbench on every turn.
+ * Intent trimming used to drop research/plan/mutate tools on dump-shaped messages —
+ * that made “chat Clare” and “dump Clare” different agents. Adam’s rule: same Clare,
+ * full capabilities, everywhere. message/protocolId kept for call-site compatibility.
+ */
+export function selectClareWorkSchemas(_opts = {}) {
+  return clareWorkSchemas();
 }
 
 
