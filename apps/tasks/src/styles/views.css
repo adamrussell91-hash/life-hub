@@ -2122,10 +2122,8 @@
     height: 2.4rem;
   }
 
-  .chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker,
-  .chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker__avatar {
-    display: none;
-  }
+  /* Shared engaged collapse is height:0 on .agent-picker — never display:none
+   * the host (scrollbar bounce). Avatars already hide in the non-phone block. */
 
   /* Mobile texting proportions — nearly full width, not a 17.5rem desk card. */
   .chat-message {

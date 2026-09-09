@@ -238,8 +238,18 @@ test('full-page Chat uses the canvas width and hides the Messenger who-header wh
   );
   assert.doesNotMatch(
     css,
-    /\.chat-view\[data-chrome='engaged'\] #agent-picker\s*\{\s*display:\s*none/,
+    /\.chat-view\[data-chrome='engaged'\][^{]*#agent-picker\s*\{\s*display:\s*none/,
     'engaged must not collapse the picker host — that bounced the thread scrollbar'
+  );
+  assert.doesNotMatch(
+    css,
+    /\.chat-view\[data-chrome='engaged'\][^{]*\.agent-picker\s*,[\s\S]*?\{\s*display:\s*none/,
+    'engaged must not display:none .agent-picker (same host as #agent-picker)'
+  );
+  assert.doesNotMatch(
+    css,
+    /\.chat-view\[data-chrome='engaged'\][^{]*\.agent-picker\s*\{\s*display:\s*none/,
+    'engaged must not display:none .agent-picker alone'
   );
   assert.match(
     css,
