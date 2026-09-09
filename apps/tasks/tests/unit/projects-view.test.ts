@@ -356,6 +356,7 @@ describe('projects view rebuild', () => {
     expect(pulse).not.toBeNull();
     expect(heat).not.toBeNull();
     expect(chart).not.toBeNull();
+    expect(canvas.querySelector('.projects-toolbar')).not.toBeNull();
     expect(board!.compareDocumentPosition(pulse!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(pulse!.compareDocumentPosition(heat!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(canvas.textContent).not.toContain('Portfolio health');
