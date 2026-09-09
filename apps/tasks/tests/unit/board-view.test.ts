@@ -54,7 +54,9 @@ describe('board view mutations', () => {
     vi.mocked(tasksApi.listTasks).mockReset();
     vi.mocked(tasksApi.listProjects).mockReset();
     vi.mocked(tasksApi.createTask).mockReset();
+    vi.mocked(tasksApi.updateTask).mockReset();
     vi.mocked(tasksApi.deleteTask).mockReset();
+    vi.mocked(tasksApi.getTask).mockReset();
     vi.mocked(tasksApi.listProjects).mockResolvedValue(projects);
     vi.spyOn(window, 'matchMedia').mockReturnValue({
       matches: true,
@@ -218,8 +220,116 @@ describe('board view mutations', () => {
     expect(canvas.querySelector('.board')).toBe(board);
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
     expect(canvas.querySelector('.column[data-col="done"] [data-id="task_tick"]')).not.toBeNull();
+    expect(canvas.querySelector('#timeline-today [data-source="task"]')?.textContent ?? '').not.toContain(
+      'Tick me'
+    );
     // Completing must not jump the mobile column tabs to Done (that reads as a flash).
     const activeTab = canvas.querySelector('.board-col-nav [aria-selected="true"]');
     expect(activeTab?.textContent ?? '').not.toMatch(/Done/i);
+  });
+
+  it('does not scroll the page to the board card when ticking Today', async () => {
+    const open = task({ id: 'task_tick', title: 'Tick me', status: 'open', due_date: '2026-08-27' });
+    const done = task({ id: 'task_tick', title: 'Tick me', status: 'done', due_date: '2026-08-27' });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(done);
+    vi.mocked(tasksApi.getTask).mockResolvedValue(done);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => undefined);
+
+    const box = canvas.querySelector<HTMLInputElement>('.dashboard-row .task-check input');
+    box!.checked = true;
+    box!.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.column[data-col="done"] [data-id="task_tick"]')).not.toBeNull();
+    });
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('removes a Today row when the board card is marked Done', async () => {
+    const open = task({ id: 'task_board', title: 'Board done', status: 'open', due_date: '2026-08-27' });
+    const done = task({ id: 'task_board', title: 'Board done', status: 'done', due_date: '2026-08-27' });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(done);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    expect(canvas.querySelector('#timeline-today .dashboard-row__title')?.textContent).toBe('Board done');
+
+    canvas.querySelector<HTMLButtonElement>('.card-menu')?.click();
+    document.querySelector<HTMLButtonElement>('[data-card-menu-item="toggle"]')?.click();
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith('task_board', { status: 'done' });
+      expect(canvas.querySelector('.column[data-col="done"] [data-id="task_board"]')).not.toBeNull();
+    });
+    expect(canvas.querySelector('#timeline-today [data-source="task"]')?.textContent ?? '').not.toContain(
+      'Board done'
+    );
+  });
+
+  it('removes a Today row when a card is dropped on Done', async () => {
+    const open = task({ id: 'task_drop', title: 'Drop done', status: 'open', due_date: '2026-08-27' });
+    const done = task({ id: 'task_drop', title: 'Drop done', status: 'done', due_date: '2026-08-27' });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(done);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    const card = canvas.querySelector<HTMLElement>('[data-id="task_drop"]')!;
+    card.focus();
+    card.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    card.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    card.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    card.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith('task_drop', { status: 'done' });
+      expect(canvas.querySelector('.column[data-col="done"] [data-id="task_drop"]')).not.toBeNull();
+    });
+    expect(canvas.querySelector('#timeline-today [data-source="task"]')?.textContent ?? '').not.toContain(
+      'Drop done'
+    );
+  });
+
+  it('starts Next up by moving the board card to Doing', async () => {
+    const open = task({
+      id: 'task_next',
+      title: 'Mark Year 11 papers',
+      status: 'open',
+      due_date: '2026-08-27'
+    });
+    const started = task({
+      id: 'task_next',
+      title: 'Mark Year 11 papers',
+      status: 'in_progress',
+      due_date: '2026-08-27'
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(started);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    canvas.querySelector<HTMLButtonElement>('.dashboard-next .btn')?.click();
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith('task_next', { status: 'in_progress' });
+      expect(canvas.querySelector('.column[data-col="doing"] [data-id="task_next"]')).not.toBeNull();
+    });
+    expect(canvas.querySelector('#timeline-today .dashboard-row__title')?.textContent).toBe(
+      'Mark Year 11 papers'
+    );
   });
 });
