@@ -3001,13 +3001,8 @@ body.is-universe-fullscreen .local-banner {
   flex: 0 0 auto;
 }
 
-.chat-overlay__who {
-  margin: 0;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
+.chat-overlay .chat-view__who {
+  flex: 1 1 auto;
 }
 
 .agent-protocol-pills {
@@ -3127,7 +3122,7 @@ body.is-universe-fullscreen .local-banner {
 .chat-overlay .chat-message {
   display: flex;
   gap: var(--space-2);
-  align-items: flex-start;
+  align-items: flex-end;
   padding: 0;
   border-radius: 0;
   background: transparent;
