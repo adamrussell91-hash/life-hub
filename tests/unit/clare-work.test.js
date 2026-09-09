@@ -21,7 +21,8 @@ import {
   isBlockedFetchHost,
   isClareWorkTool,
   lookupAuDates,
-  planWork
+  planWork,
+  selectClareWorkSchemas
 } from '../../netlify/functions/_shared/clare-work.mjs';
 import {
   executeProposeActionWrites,
@@ -133,6 +134,22 @@ test('activation forces parse_dump on a dump and research_topic on official-sour
   assert.equal(research.intentClass, 'clare_research');
   assert.deepEqual(research.requiredTools, ['research_topic']);
 });
+
+test('selectClareWorkSchemas keeps the full workbench on dump-shaped turns', () => {
+  const full = clareWorkSchemas().map(tool => tool.name).sort();
+  const dumpTurn = selectClareWorkSchemas({
+    message: 'Here is a dump: finish the excursion, start year 11 reports, do Liv marking'
+  })
+    .map(tool => tool.name)
+    .sort();
+  assert.deepEqual(dumpTurn, full);
+  assert.ok(dumpTurn.includes('research_topic'));
+  assert.ok(dumpTurn.includes('compose_schedule'));
+  assert.ok(dumpTurn.includes('clare_mutate'));
+  assert.ok(dumpTurn.includes('parse_dump'));
+  assert.ok(dumpTurn.includes('clarify_dump'));
+});
+
 
 test('SSRF guard blocks private hosts and accepts public https', () => {
   assert.equal(isBlockedFetchHost('localhost'), true);

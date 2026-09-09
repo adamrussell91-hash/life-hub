@@ -45,7 +45,16 @@ const NON_ACTIONABLE = [
   /\bstop trying to\b/i,
   /\bcontext drop(ped)?\b/i,
   /\bsomething got misread\b/i,
-  /\bmisread (?:that|this|it)\b/i
+  /\bmisread (?:that|this|it)\b/i,
+  /^(?:ok|okay),?\s*let'?s think\b/i,
+  /\blet'?s think what needs to get done\b/i,
+  /\bwhat'?s coming up into the next\b/i,
+  /^(?:i don'?t know|dunno)\.?$/i,
+  /\bdrawing a blank\b/i,
+  /\bdon'?t actually know what else\b/i,
+  /\bhit this point where\b/i,
+  /\bgenuinely drawing a blank\b/i,
+  /\bwhat else is really on my agenda\b/i
 ];
 const CLAUSE_VERBS = [
   'sort out', 'work on', 'deal with', 'look at', 'follow up', 'figure out', 'set up',
@@ -54,9 +63,15 @@ const CLAUSE_VERBS = [
   'laminate', 'return', 'collect', 'deliver', 'order', 'follow', 'meet', 'sign',
   'upload', 'download', 'share', 'finish', 'complete', 'prep', 'prepare', 'write',
   'plan', 'organise', 'organize', 'schedule', 'update', 'fix', 'handle', 'tackle',
-  'reply', 'draft', 'clean', 'tidy', 'pack', 'file'
+  'reply', 'draft', 'clean', 'tidy', 'pack', 'file', 'start', 'begin', 'do'
 ];
 const CLAUSE_SPLIT = new RegExp(`,\\s+(?=(?:${CLAUSE_VERBS.join('|')})\\b)`, 'i');
+const AND_VERB_SPLIT = new RegExp(`\\s+and\\s+(?=(?:${CLAUSE_VERBS.join('|')})\\b)`, 'i');
+/** Mid-ramble “I need to / I have to” resets — not a lone “need to” after “I”. */
+const INTENTION_RESET =
+  /\s+(?=i(?:'ve|\s+have)?\s+(?:really\s+|just\s+|actually\s+|probably\s+)?(?:need|have|want|ought|should|gotta|got)\s+to\b)/i;
+const SENTENCE_SPLIT = /(?<=[.!?])\s+(?=(?:[A-Z"'“‘]|I\b|i\b))/;
+const BURIED_ONCE = /\bonce i (?:get|am) (?:over|through|past|done with)\s+(.+?)(?:\s+i\b|\s*$)/i;
 
 function includesAny(hay, needles) {
   return needles.some(n => hay.includes(n));
@@ -64,6 +79,43 @@ function includesAny(hay, needles) {
 
 function splitClauses(line) {
   return line.split(CLAUSE_SPLIT);
+}
+
+function extractBuriedActions(line) {
+  const match = BURIED_ONCE.exec(line);
+  if (!match?.[1]) return [line];
+  const buried = match[1].trim().replace(/[.!?]+$/, '');
+  return buried ? [buried] : [line];
+}
+
+function hasActionSignal(line) {
+  if (
+    /\bi(?:'ve|\s+have)?\s+(?:really\s+|just\s+|actually\s+|probably\s+)?(?:need|have|want|ought|should|gotta|got)\s+to\b/i.test(
+      line
+    )
+  ) {
+    return true;
+  }
+  return CLAUSE_VERBS.some(verb => new RegExp(`\\b${verb}\\b`, 'i').test(line));
+}
+
+const PREAMBLE_ONLY =
+  /^(?:today|tomorrow|tonight|this afternoon|this morning|this evening|this week|next week|(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|at some point|at some stage|eventually|later|soon|first)$/i;
+
+/** Keep “tomorrow I need to…” / “At some point I need to…” as one item. */
+function reattachShortPreamble(parts) {
+  const out = [];
+  for (const part of parts) {
+    const trimmed = String(part ?? '').trim();
+    if (!trimmed) continue;
+    const prev = out[out.length - 1];
+    if (prev && PREAMBLE_ONLY.test(prev) && hasActionSignal(trimmed)) {
+      out[out.length - 1] = `${prev} ${trimmed}`;
+    } else {
+      out.push(trimmed);
+    }
+  }
+  return out;
 }
 
 function stripListPrefix(line) {
@@ -545,18 +597,51 @@ export function splitDumpLines(text) {
   if (!raw) return [];
   const chunks = raw
     .split(/\n+|(?:^|\s)(?:[-*•]|\d+[.)])\s+|;\s+|\s+and then\s+|,\s+(?:also|then|plus)\s+/i)
+    .flatMap(line => line.split(SENTENCE_SPLIT))
+    .flatMap(line => line.split(INTENTION_RESET))
     .flatMap(line => splitClauses(line))
+    .flatMap(line => line.split(AND_VERB_SPLIT))
+    .flatMap(line => extractBuriedActions(line))
     .map(line => stripListPrefix(line))
     .filter(Boolean);
+  const merged = reattachShortPreamble(chunks);
   const unique = [];
   const seen = new Set();
-  for (const line of chunks) {
+  for (const line of merged) {
     const key = line.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     unique.push(line);
   }
   return unique.map(line => stripListPrefix(line));
+}
+
+/** True when a title still looks like several pieces of work glued together. */
+export function looksLikeCompoundDumpTitle(title) {
+  const text = String(title ?? '').trim();
+  if (text.length > 120) return true;
+  if (text.length > 80 && /[.!?]/.test(text)) return true;
+  if (
+    text.length > 60 &&
+    /\bi(?:'ve|\s+have)?\s+(?:really\s+|just\s+|actually\s+|probably\s+)?(?:need|have|want|ought|should|gotta|got)\s+to\b/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+  return splitDumpLines(text).length > 1;
+}
+
+/**
+ * Safety net: if a single proposed title is still a multi-item dump paste,
+ * explode it into distinct actionable titles. Never invent work — only split.
+ */
+export function explodeCompoundDumpTitle(title, options = {}) {
+  if (!looksLikeCompoundDumpTitle(title)) return null;
+  const items = parseBrainDump(String(title ?? ''), options).filter(
+    item => item.actionable && item.kind !== 'note' && item.kind !== 'meta'
+  );
+  return items.length > 1 ? items : null;
 }
 
 export function parseBrainDump(text, options = {}) {

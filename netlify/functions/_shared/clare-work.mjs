@@ -154,6 +154,7 @@ export function formatClareJobsForPrompt() {
     `Clare workbench — ${CLARE_JOBS.length} jobs you can actually do from this chat. Use the named tool. Do not say you cannot do these.`,
     'Internet research: web_search finds pages; fetch_url opens a specific URL; research_topic cites sources; lookup_au_dates / lookup_place / compare_options for dates, venues, and options.',
     'Prefer create_task / update_task for ordinary capture and edits. Other writes (complete/reschedule/split/trash/move/estimate/tag/waiting-on/research notes/batch/pin/create project) go through clare_mutate. Writes wait for Adam to Confirm. Never claim a write landed until the tool returns awaiting_confirm or applied.',
+    'Never merge distinct pieces of work into one create_task title or one Confirm card. One card per distinct action. Rambling dumps are multiple cards.',
     'Productivity OS: clarify_dump before capture writes; project_health / waiting_review / context_match / compose_schedule / deadline_runway / focus_block / shutdown_day / weekly_review / project_plan for deterministic planning. Hard deadlines never move via schedule tools.',
     'Weekly review: staged and resumable. Missing next actions stay informational without grounded titles. confirm:true only builds a stored Confirm proposal — never claim saved until /api/chat/confirm succeeds.',
     'You cannot send email. draft_comms writes a draft only.',
@@ -463,37 +464,14 @@ export function isClareWorkTool(name) {
   return CLARE_WORK_NAMES.has(name);
 }
 
-/** Intent-sensitive Clare productivity subset. Full set only when message is broad/unspecified. */
-const CLARE_TOOL_HINTS = [
-  { names: ['clarify_dump'], patterns: [/dump/i, /capture/i, /inbox/i, /clarify/i, /triage/i] },
-  { names: ['weekly_review'], patterns: [/weekly review/i, /week review/i, /weekly-review/i] },
-  { names: ['compose_schedule', 'plan_work'], patterns: [/plan (?:my |the )?day/i, /schedule/i, /time block/i, /compose/i, /plan-day/i] },
-  { names: ['project_plan'], patterns: [/project plan/i, /natural plan/i, /project-plan/i, /plan (?:this |the )?project/i] },
-  { names: ['waiting_review'], patterns: [/waiting/i, /follow[- ]?up/i, /blocked on/i] },
-  { names: ['shutdown_day'], patterns: [/shutdown/i, /close (?:the )?day/i, /wrap up/i] },
-  { names: ['focus_block'], patterns: [/focus/i, /deep work/i, /pomodoro/i, /start (?:a )?block/i] },
-  { names: ['deadline_runway'], patterns: [/runway/i, /deadline/i, /due date/i, /hard date/i] },
-  { names: ['context_match'], patterns: [/fit/i, /energy/i, /\d+\s*min/i, /what can i do/i, /context/i] },
-  { names: ['project_health'], patterns: [/project health/i, /stuck project/i, /next action/i] }
-];
-
-export function selectClareWorkSchemas({ message = '', protocolId = null } = {}) {
-  const all = clareWorkSchemas();
-  const text = `${protocolId || ''} ${message || ''}`.trim();
-  if (!text) return all;
-  const selected = new Set();
-  if (protocolId === 'weekly-review') selected.add('weekly_review');
-  if (protocolId === 'plan-day') ['compose_schedule', 'plan_work', 'context_match'].forEach(n => selected.add(n));
-  if (protocolId === 'project-plan') selected.add('project_plan');
-  if (protocolId === 'waiting') selected.add('waiting_review');
-  if (protocolId === 'shutdown') selected.add('shutdown_day');
-  for (const hint of CLARE_TOOL_HINTS) {
-    if (hint.patterns.some(re => re.test(text))) hint.names.forEach(n => selected.add(n));
-  }
-  if (!selected.size) return all;
-  // Always keep clarify_dump available for capture turns.
-  selected.add('clarify_dump');
-  return all.filter(schema => selected.has(schema.name));
+/**
+ * Clare’s full workbench on every turn.
+ * Intent trimming used to drop research/plan/mutate tools on dump-shaped messages —
+ * that made “chat Clare” and “dump Clare” different agents. Adam’s rule: same Clare,
+ * full capabilities, everywhere. message/protocolId kept for call-site compatibility.
+ */
+export function selectClareWorkSchemas(_opts = {}) {
+  return clareWorkSchemas();
 }
 
 

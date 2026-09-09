@@ -627,11 +627,12 @@ export function createClareChatController({
   const input = () => root.querySelector<HTMLTextAreaElement>('#chat-input');
   const currentAgent = () => agentBySlug(selectedSlug);
 
+  /**
+   * Clare always uses Life Hub /api/chat — same prompt posture and full workbench.
+   * Dump-stream is for other agents only. Briefing pills still hit /api/clare brief.
+   */
   function useChatRuntime(): boolean {
-    return (
-      selectedSlug === 'clare' &&
-      (productivityActive || isProductivityProtocol(selectedProtocolId))
-    );
+    return selectedSlug === 'clare';
   }
 
   function chatHistory() {
@@ -1199,7 +1200,9 @@ export function createClareChatController({
         message: text,
         history: chatHistoryForSend(text),
         priorAgentSlug: 'clare',
-        protocolId: protocolId || (isProductivityProtocol(selectedProtocolId) ? selectedProtocolId : undefined)
+        protocolId:
+          protocolId ||
+          (selectedProtocolId && selectedSlug === 'clare' ? selectedProtocolId : undefined)
       })) {
         if (mine !== turn) return;
         if (event.type === 'status') {
@@ -1365,7 +1368,7 @@ export function createClareChatController({
     if (useChatRuntime()) {
       await submitChat(
         text,
-        isProductivityProtocol(selectedProtocolId) ? selectedProtocolId : undefined
+        selectedProtocolId && selectedSlug === 'clare' ? selectedProtocolId : undefined
       );
       return;
     }

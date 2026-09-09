@@ -1,7 +1,7 @@
 import { CLARE_PROPOSAL_MODEL } from '@/ai/models';
 import { createAnthropicMessageWithTools } from '@/ai/anthropic';
 import type { ClareDumpDigest } from '@/domain/clare-digest';
-import type { DumpKind } from '@/domain/clare-dump';
+import { explodeCompoundDumpTitle, type DumpKind } from '@/domain/clare-dump';
 import { CLARE_AGENT_TOOLS, createClareToolHandler, type ClareToolRuntime } from '@/domain/clare-tools';
 import { parseAgentMutations, type AgentMutation } from '@/domain/agent-mutations';
 import type { AgentProtocolSlug } from '@/domain/agent-protocol';
@@ -33,6 +33,7 @@ Tools (use freely — do not guess):
 Confirm-before-write: return structured JSON. Task creates go in items[]. Hub/repo edits go in mutations[]. Protocol/timezone tools apply immediately.
 
 items[] — new tasks/comms/notes (Clare-shaped). Empty when there is no new work.
+NEVER merge distinct pieces of work into one items[] row. One card per distinct action. A rambling dump with multiple “I need to” / sentence / and-then clauses is multiple cards. Never paste the raw dump (or a multi-clause paragraph) as a single title.
 mutations[] — any of:
 - {"kind":"task_update","task_id":"...","patch":{...},"summary":"..."}
 - {"kind":"project_update","project_id":"...","patch":{...},"summary":"..."}
@@ -172,20 +173,21 @@ export function parseClareProposalJudgment(text: string, digest: ClareDumpDigest
     if (!row || typeof row !== 'object') continue;
     const bodyRow = row as Record<string, unknown>;
 
-    const title = cleanTitle(bodyRow.title);
-    if (!title) continue;
+    const rawTitle = String(bodyRow.title ?? '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[.!?]+$/g, '');
+    if (rawTitle.length < 3) continue;
 
     const kindRaw = String(bodyRow.kind ?? 'task').trim() as DumpKind;
     const domainRaw = String(bodyRow.domain ?? digest.preferred_domain).trim();
     const priorityRaw = String(bodyRow.priority ?? 'medium').trim();
     const frameworkId = String(bodyRow.framework_id ?? 'fw_timeboxing').trim();
-
-    items.push({
-      title,
+    const base = {
       description: cleanText(bodyRow.description, 500),
-      kind: KINDS.has(kindRaw) ? kindRaw : 'task',
-      domain: DOMAINS.has(domainRaw) ? (domainRaw as TaskDomain) : digest.preferred_domain,
-      priority: PRIORITIES.has(priorityRaw) ? (priorityRaw as TaskPriority) : 'medium',
+      kind: (KINDS.has(kindRaw) ? kindRaw : 'task') as DumpKind,
+      domain: (DOMAINS.has(domainRaw) ? domainRaw : digest.preferred_domain) as TaskDomain,
+      priority: (PRIORITIES.has(priorityRaw) ? priorityRaw : 'medium') as TaskPriority,
       due_date: readDueDate(bodyRow.due_date),
       framework_id: FRAMEWORK_IDS.has(frameworkId) ? frameworkId : 'fw_timeboxing',
       reasoning: cleanText(bodyRow.reasoning, 280),
@@ -196,7 +198,31 @@ export function parseClareProposalJudgment(text: string, digest: ClareDumpDigest
         typeof bodyRow.question === 'string' && bodyRow.question.trim()
           ? cleanText(bodyRow.question, 240)
           : null
-    });
+    };
+
+    const exploded =
+      base.kind !== 'meta' && base.kind !== 'note'
+        ? explodeCompoundDumpTitle(rawTitle, {
+            preferredDomain: base.domain,
+            timezone: digest.timezone
+          })
+        : null;
+    const parts = exploded?.length
+      ? exploded
+      : [{ title: cleanTitle(rawTitle) ?? rawTitle.slice(0, 96), due_date: base.due_date, domain: base.domain, priority: base.priority }];
+
+    for (const part of parts) {
+      if (items.length >= MAX_ITEMS) break;
+      const title = cleanTitle(part.title) ?? String(part.title).slice(0, 96);
+      if (!title) continue;
+      items.push({
+        title,
+        ...base,
+        domain: ('domain' in part && part.domain) || base.domain,
+        priority: ('priority' in part && part.priority) || base.priority,
+        due_date: ('due_date' in part ? part.due_date : null) ?? base.due_date
+      });
+    }
   }
 
   return {

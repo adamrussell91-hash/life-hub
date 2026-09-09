@@ -48,8 +48,9 @@ function splitCommitments(text) {
     .map((s) => s.trim())
     .filter(Boolean);
   if (lines.length > 1) return lines;
+  // Same spirit as Clare dump split: sentences, then mid-ramble “I need to”.
   return raw
-    .split(/(?<=[.!?])\s+(?=[A-Z])|(?:\s*;\s*)/)
+    .split(/(?<=[.!?])\s+(?=[A-Z"'“‘I])|(?:\s*;\s*)|\s+(?=i(?:'ve|\s+have)?\s+(?:really\s+|just\s+|actually\s+|probably\s+)?(?:need|have|want|ought|should|gotta|got)\s+to\b)/i)
     .map((s) => s.trim())
     .filter((s) => s.length > 2);
 }

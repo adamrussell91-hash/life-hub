@@ -98,4 +98,24 @@ describe('Clare productivity chat routing', () => {
     );
     expect(tasksApi.streamDumpWithClare).not.toHaveBeenCalled();
   });
+
+  it('routes freeform Clare chat through /api/chat even with no productivity protocol', async () => {
+    const root = buildChatView();
+    document.body.replaceChildren(root);
+    const controller = createClareChatController({ root, isVisible: () => true });
+    await controller.start();
+
+    await controller.send(
+      'Finish organising the State finals excursion, start year 11 reports, and do Liv marking'
+    );
+    await vi.waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1));
+    expect(streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message:
+          'Finish organising the State finals excursion, start year 11 reports, and do Liv marking',
+        priorAgentSlug: 'clare'
+      })
+    );
+    expect(tasksApi.streamDumpWithClare).not.toHaveBeenCalled();
+  });
 });

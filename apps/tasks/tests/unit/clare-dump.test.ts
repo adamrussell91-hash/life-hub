@@ -105,6 +105,34 @@ describe('brain dump parsing', () => {
     expect(result.proposals).toHaveLength(4);
   });
 
+  it('never collapses a rambling multi-need dump into one Proposed Write card', () => {
+    const text =
+      "OK, let's think what needs to get done or what's coming up into the next few days I need to completely finish organizing the tournament of minds State finals excursion. I need to probably start writing year 11 reports be great to try and get those done before the weekend. I don't know. I'm genuinely drawing a blank on what else needs to be done at the moment like it's so weird I've hit this point where I'm like once I get over this year 11 Liv marking and Wright their reports I don't actually know what else is really on my agenda";
+    const items = parseBrainDump(text, {
+      now: new Date(2026, 8, 10),
+      preferredDomain: 'teaching'
+    });
+    const result = assembleDumpResult(items, frameworks, () => null);
+    expect(result.proposals.length).toBeGreaterThanOrEqual(3);
+    expect(result.voice).not.toMatch(/Right — one thing/i);
+    expect(result.proposals.every((p) => p.title.length < text.length / 2)).toBe(true);
+    expect(result.proposals.some((p) => /tournament|excursion/i.test(p.title))).toBe(true);
+    expect(result.proposals.some((p) => /year 11 reports|writing year 11/i.test(p.title))).toBe(true);
+    expect(result.proposals.some((p) => /liv|wright|marking/i.test(p.title))).toBe(true);
+  });
+
+  it('splits and + verb chains without breaking Year 9 and 10', () => {
+    const items = parseBrainDump(
+      'finish organizing the excursion and start year 11 reports and do marking for Liv',
+      { now: new Date(2026, 8, 10), preferredDomain: 'teaching' }
+    );
+    expect(items.map((i) => i.title)).toEqual([
+      'Finish organizing the excursion',
+      'Start year 11 reports',
+      'Do marking for Liv'
+    ]);
+  });
+
   it('does not propose notes or existing titles', () => {
     const items = parseBrainDump('Finish lesson pack for Year 12\nremember: bring the USB', {
       now: new Date(2026, 7, 25),
