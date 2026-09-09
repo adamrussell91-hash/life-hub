@@ -19,6 +19,7 @@ import {
   writeTaskIndex
 } from './_shared/tasks-blobs.mjs';
 import { DEFAULT_EXCURSION_TEMPLATE, buildExcursionPlan } from './_shared/excursion-plan.mjs';
+import { cloneDefaultComplianceModules } from './_shared/excursion-modules.mjs';
 
 export const config = { path: '/api/templates' };
 
@@ -198,6 +199,9 @@ export function createTemplatesHandler(deps = {}) {
         const description = typeof body.description === 'string' ? body.description : '';
         const student_group_reference =
           typeof body.student_group_reference === 'string' ? body.student_group_reference : null;
+        const compliance_modules = Array.isArray(body.compliance_modules)
+          ? body.compliance_modules
+          : cloneDefaultComplianceModules();
 
         // Single generic template today (see excursion-catalog.ts) — any id maps to it.
         const template = DEFAULT_EXCURSION_TEMPLATE;
@@ -272,6 +276,7 @@ export function createTemplatesHandler(deps = {}) {
           drafted_documents: plan.drafted_documents,
           milestones,
           generated_admin_tasks: taskIds,
+          compliance_modules,
           created_at: nowIso,
           updated_at: nowIso
         };

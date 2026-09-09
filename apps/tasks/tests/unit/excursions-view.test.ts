@@ -143,9 +143,41 @@ describe('excursions list', () => {
     expect(tasksApi.createExcursionFromTemplate).toHaveBeenCalledWith({
       excursion_template_id: 'ext_excursion',
       title: 'Excursion',
-      event_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+      event_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      compliance_modules: expect.any(Array)
     });
     expect(location.hash).toBe('#/project/proj_new');
+  });
+
+  it('shows the compliance bundle on the confirm card and lets you untoggle an item before creating', async () => {
+    location.hash = '#/excursions';
+    const created = { ...excursion, id: 'proj_new', title: 'Excursion' };
+    vi.mocked(tasksApi.createExcursionFromTemplate).mockResolvedValue({
+      project: created,
+      tasks: [task]
+    });
+    const canvas = await mount();
+
+    canvas.querySelector<HTMLButtonElement>('.btn--primary')!.click();
+    const complianceBox = canvas.querySelector<HTMLElement>('.excursion-compliance');
+    expect(complianceBox).not.toBeNull();
+    expect(complianceBox?.textContent).toContain('WWCC verified');
+    expect(complianceBox?.querySelectorAll('.excursion-compliance__critical').length).toBeGreaterThan(0);
+
+    const wwccBox = [...complianceBox!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+      (input) => input.getAttribute('aria-label')?.includes('WWCC')
+    )!;
+    expect(wwccBox.checked).toBe(true);
+    wwccBox.checked = false;
+    wwccBox.dispatchEvent(new Event('change'));
+
+    canvas.querySelector<HTMLButtonElement>('.confirm-card .btn--primary')!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const call = vi.mocked(tasksApi.createExcursionFromTemplate).mock.calls.at(-1)![0];
+    const wwccModule = call.compliance_modules!.find((m) => m.id === 'wwcc')!;
+    expect(wwccModule.on).toBe(false);
   });
 
   it('uses a plus button instead of an inline create form', async () => {
@@ -198,7 +230,8 @@ describe('new excursion page', () => {
       expect(tasksApi.createExcursionFromTemplate).toHaveBeenCalledWith({
         excursion_template_id: 'ext_excursion',
         title: 'Excursion',
-        event_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+        event_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        compliance_modules: expect.any(Array)
       });
       expect(location.hash).toBe('#/project/proj_ex_ethics_seed');
     });

@@ -75,6 +75,8 @@ test('create_excursion_from_template schedules real admin tasks and key dates, n
   assert.equal(project.key_dates.payment_due, '2026-09-17');
   assert.ok(project.drafted_documents.permission_note_draft.includes('Ethics State Round'));
   assert.ok(project.milestones.length > 0);
+  assert.ok(Array.isArray(project.compliance_modules) && project.compliance_modules.length > 0);
+  assert.ok(project.compliance_modules.some((m) => m.id === 'wwcc' && m.critical));
 
   assert.ok(tasks.length > 0);
   assert.equal(project.generated_admin_tasks.length, tasks.length);
