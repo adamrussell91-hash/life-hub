@@ -709,7 +709,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       );
     }
 
-    const toolbar = createHubToolbar();
+    const toolbar = createHubToolbar('projects-toolbar');
     const search = createHubSearch({
       placeholder: 'Filter projects…',
       ariaLabel: 'Filter projects',
