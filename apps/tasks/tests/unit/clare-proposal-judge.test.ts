@@ -90,6 +90,29 @@ describe('parseClareProposalJudgment', () => {
     ]);
   });
 
+  it('explodes a single mega dump-title into distinct cards instead of one paste', () => {
+    const mega =
+      "OK, let's think what needs to get done I need to completely finish organizing the tournament of minds State finals excursion. I need to probably start writing year 11 reports before the weekend. Once I get over this year 11 Liv marking and Wright their reports I don't actually know what else is on my agenda";
+    const judgment = parseClareProposalJudgment(
+      JSON.stringify({
+        voice: 'Right — one thing, and it actually has a shape. Here is my take.',
+        items: [
+          {
+            title: mega,
+            kind: 'task',
+            framework_id: 'fw_timeboxing',
+            reasoning: 'Timeboxing',
+            proposed_minutes: 60
+          }
+        ]
+      }),
+      digest
+    );
+    expect(judgment.ok).toBe(true);
+    expect(judgment.items.length).toBeGreaterThanOrEqual(3);
+    expect(judgment.items.every((i) => i.title.length < mega.length / 2)).toBe(true);
+  });
+
   it('flags unparseable replies as not ok, so callers fall back instead of trusting an empty read', () => {
     const judgment = parseClareProposalJudgment('not json at all', digest);
     expect(judgment.ok).toBe(false);

@@ -154,6 +154,7 @@ export function formatClareJobsForPrompt() {
     `Clare workbench — ${CLARE_JOBS.length} jobs you can actually do from this chat. Use the named tool. Do not say you cannot do these.`,
     'Internet research: web_search finds pages; fetch_url opens a specific URL; research_topic cites sources; lookup_au_dates / lookup_place / compare_options for dates, venues, and options.',
     'Prefer create_task / update_task for ordinary capture and edits. Other writes (complete/reschedule/split/trash/move/estimate/tag/waiting-on/research notes/batch/pin/create project) go through clare_mutate. Writes wait for Adam to Confirm. Never claim a write landed until the tool returns awaiting_confirm or applied.',
+    'Never merge distinct pieces of work into one create_task title or one Confirm card. One card per distinct action. Rambling dumps are multiple cards.',
     'Productivity OS: clarify_dump before capture writes; project_health / waiting_review / context_match / compose_schedule / deadline_runway / focus_block / shutdown_day / weekly_review / project_plan for deterministic planning. Hard deadlines never move via schedule tools.',
     'Weekly review: staged and resumable. Missing next actions stay informational without grounded titles. confirm:true only builds a stored Confirm proposal — never claim saved until /api/chat/confirm succeeds.',
     'You cannot send email. draft_comms writes a draft only.',
