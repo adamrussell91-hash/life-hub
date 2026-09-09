@@ -432,7 +432,8 @@ export function formatLeadTimes(template: ExcursionTemplate): string {
 export const CRITICAL_ADMIN_KINDS: KeyDateKind[] = ['risk_assessment', 'permission_note'];
 
 export type ClearanceItem = {
-  kind: KeyDateKind;
+  /** A KeyDateKind for the legacy fallback, or a ComplianceModule id when the bundle is present. */
+  kind: string;
   label: string;
   done: boolean;
 };
@@ -443,10 +444,22 @@ export type ExcursionClearance = {
 };
 
 /**
- * Cleared-to-depart state: every critical admin task lodged/sent (status "done"),
- * not merely created. A task that hasn't been materialised yet counts as outstanding.
+ * Cleared-to-depart state. Prefers the compliance bundle's critical items
+ * (project.compliance_modules) when present — falls back to the two
+ * critical admin-task kinds for excursions created before that bundle
+ * existed, so old excursions still compute a sensible gate.
  */
 export function excursionClearance(project: Project, tasks: Task[]): ExcursionClearance {
+  if (project.compliance_modules?.length) {
+    const critical = project.compliance_modules.filter((module) => module.critical);
+    const items: ClearanceItem[] = critical.map((module) => ({
+      kind: module.id,
+      label: module.label,
+      done: module.on
+    }));
+    return { cleared: items.every((item) => item.done), items };
+  }
+
   const children = projectChildTasks(project, tasks);
   const items: ClearanceItem[] = CRITICAL_ADMIN_KINDS.map((kind) => {
     const def = KEY_DATE_DEFS.find((row) => row.kind === kind);

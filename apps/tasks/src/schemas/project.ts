@@ -19,6 +19,24 @@ export const PermissionNoteSchema = z.object({
   returned: z.boolean()
 });
 
+export const ComplianceModuleCategorySchema = z.enum([
+  'staff',
+  'medical',
+  'transport',
+  'docs',
+  'dayof',
+  'post'
+]);
+
+export const ComplianceModuleSchema = z.object({
+  id: z.string().min(1),
+  category: ComplianceModuleCategorySchema,
+  label: z.string().min(1),
+  sub: z.string().nullable().default(null),
+  on: z.boolean(),
+  critical: z.boolean()
+});
+
 export const PageCoverSchema = z.object({
   url: z.string().min(1)
 });
@@ -72,7 +90,9 @@ export const ProjectSchema = z.object({
     .nullable()
     .default(null),
   cover: PageCoverSchema.nullable().optional(),
-  page_blocks: z.array(PageBlockSchema).optional()
+  page_blocks: z.array(PageBlockSchema).optional(),
+  /** Compliance bundle — checklist categories attached to an excursion (present when type === 'excursion'). */
+  compliance_modules: z.array(ComplianceModuleSchema).optional()
 });
 
 export type Project = z.infer<typeof ProjectSchema>;
@@ -81,6 +101,8 @@ export type QualityBar = z.infer<typeof QualityBarSchema>;
 export type Milestone = z.infer<typeof MilestoneSchema>;
 export type PermissionNote = z.infer<typeof PermissionNoteSchema>;
 export type PageCover = z.infer<typeof PageCoverSchema>;
+export type ComplianceModule = z.infer<typeof ComplianceModuleSchema>;
+export type ComplianceModuleCategory = z.infer<typeof ComplianceModuleCategorySchema>;
 
 export const ProjectCreateSchema = ProjectSchema.omit({
   schema_version: true,
@@ -110,7 +132,8 @@ export const ProjectCreateSchema = ProjectSchema.omit({
   generated_admin_tasks: true,
   drafted_documents: true,
   cover: true,
-  page_blocks: true
+  page_blocks: true,
+  compliance_modules: true
 }).extend({
   title: z.string().min(1)
 });

@@ -1,5 +1,5 @@
 import type { Task } from '@/schemas/task';
-import type { Project } from '@/schemas/project';
+import type { ComplianceModule, Project } from '@/schemas/project';
 import type {
   FrameworkEntry,
   ExcursionTemplate,
@@ -88,6 +88,7 @@ export interface TasksStore {
     event_date: string;
     student_group_reference?: string | null;
     description?: string;
+    compliance_modules?: ComplianceModule[];
   }): Promise<{ project: Project; tasks: Task[] }>;
 
   getClareCalibration(domain: Task['domain']): Promise<ClareCalibration>;

@@ -14,6 +14,7 @@ import {
   taskPageHash
 } from '@/domain/cards';
 import { adminTaskKind, excursionClearance, shiftExcursionDates } from '@/domain/excursion';
+import { renderComplianceBundle } from '@/views/excursion-compliance';
 import {
   collectExcursionStops,
   layoutExcursionTimeline,
@@ -329,6 +330,30 @@ function renderPermissionTracker(
   return host;
 }
 
+function renderComplianceSection(
+  project: Project,
+  persist: (patch: Partial<Project>) => void,
+  onChange: () => void
+): HTMLElement {
+  const modules = [...(project.compliance_modules ?? [])];
+  const host = el('section', 'excursion-tracker');
+  host.append(el('p', 'hub-card__eyebrow', 'Compliance bundle'));
+  if (!modules.length) {
+    host.append(el('p', 'empty-state', 'No compliance bundle on this excursion yet.'));
+    return host;
+  }
+  host.append(
+    renderComplianceBundle(modules, (id) => {
+      const module = modules.find((m) => m.id === id);
+      if (!module) return;
+      module.on = !module.on;
+      persist({ compliance_modules: [...modules] });
+      onChange();
+    })
+  );
+  return host;
+}
+
 function renderTimeline(
   project: Project,
   tasks: Task[],
@@ -485,11 +510,18 @@ export function paintExcursionPage(
     }
   };
 
+  const gateHost = el('div', 'excursion-gate-host');
+  const refreshGate = () => {
+    gateHost.replaceChildren(renderClearanceGate(current, tasks));
+  };
+  refreshGate();
+
   card.append(
     head,
     fields,
-    renderClearanceGate(project, tasks),
+    gateHost,
     renderProgress(project, tasks),
+    renderComplianceSection(project, persist, refreshGate),
     renderPermissionTracker(project, persist),
     renderQuickAdd(() => void reload(), project.id),
     foot

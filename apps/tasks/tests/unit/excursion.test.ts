@@ -324,6 +324,24 @@ describe('excursionClearance', () => {
     ];
     expect(excursionClearance(project, tasks).cleared).toBe(false);
   });
+
+  it('prefers the compliance bundle over the legacy admin-task check when present', () => {
+    const withBundle = {
+      ...project,
+      compliance_modules: [
+        { id: 'wwcc', category: 'staff' as const, label: 'WWCC verified', sub: null, on: true, critical: true },
+        { id: 'medical_cross_check', category: 'medical' as const, label: 'Medical cross-check', sub: null, on: false, critical: true },
+        { id: 'logs_scanned', category: 'post' as const, label: 'Logs scanned', sub: null, on: false, critical: false }
+      ]
+    } as Project;
+    const clearance = excursionClearance(withBundle, []);
+    expect(clearance.cleared).toBe(false);
+    expect(clearance.items).toHaveLength(2); // only the two critical modules
+    expect(clearance.items.map((i) => i.kind)).toEqual(['wwcc', 'medical_cross_check']);
+
+    withBundle.compliance_modules![1]!.on = true;
+    expect(excursionClearance(withBundle, []).cleared).toBe(true);
+  });
 });
 
 describe('leadTimeSlack', () => {

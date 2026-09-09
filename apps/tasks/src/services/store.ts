@@ -45,6 +45,7 @@ import { carryReminderForward } from '@/domain/reminders';
 import { mindWorks2026Map } from '@/domain/maps-seed';
 import { catalogPrograms } from '@/domain/programs-seed';
 import { buildExcursionPlan, excursionDatesFromAdminTask } from '@/domain/excursion';
+import { cloneDefaultComplianceModules } from '@/domain/excursion-modules';
 import {
   catalogExcursionTemplates,
   resolveExcursionTemplateId
@@ -717,7 +718,8 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         student_group_reference: input.student_group_reference ?? null,
         drafted_documents: plan.drafted_documents,
         generated_admin_tasks: [],
-        milestones: []
+        milestones: [],
+        compliance_modules: input.compliance_modules ?? cloneDefaultComplianceModules()
       });
 
       const milestones = plan.milestones.map((m) => ({

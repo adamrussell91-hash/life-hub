@@ -1429,6 +1429,41 @@
   margin-bottom: var(--space-5);
 }
 
+.excursion-compliance {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.excursion-compliance__group-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}
+
+.excursion-compliance__name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.excursion-compliance__critical {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--warning);
+  background: var(--warning-surface);
+  padding: 0.05rem var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.excursion-compliance__sub {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
 .excursion-confirm__field {
   display: grid;
   gap: var(--space-2);

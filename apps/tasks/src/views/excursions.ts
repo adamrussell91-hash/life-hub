@@ -1,7 +1,8 @@
-import type { Project } from '@/schemas/project';
+import type { ComplianceModule, Project } from '@/schemas/project';
 import type { ExcursionTemplate } from '@/schemas/templates';
 import { tasksApi } from '@/services/client-api';
 import { defaultExcursionEventDate, formatLeadTimes, leadTimeSlack } from '@/domain/excursion';
+import { cloneDefaultComplianceModules } from '@/domain/excursion-modules';
 import { DEFAULT_EXCURSION_TITLE } from '@/domain/excursion-catalog';
 import { newExcursionHash, projectPageHash } from '@/domain/cards';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
@@ -11,6 +12,7 @@ import { deleteProjectNow } from '@/views/card-actions';
 import { requestToggleDone } from '@/views/dashboard';
 import { renderQuickAdd } from '@/views/task-editor';
 import { mountProjectCard } from '@/views/hub-cards';
+import { renderComplianceBundle } from '@/views/excursion-compliance';
 import { createHubField, el } from '@/views/hub-kit';
 
 function showConfirm(
@@ -59,11 +61,16 @@ function openProjectPage(project: Project): void {
   location.hash = projectPageHash(project.id);
 }
 
-async function createFromTemplate(template: ExcursionTemplate, eventDate: string): Promise<Project> {
+async function createFromTemplate(
+  template: ExcursionTemplate,
+  eventDate: string,
+  complianceModules: ComplianceModule[]
+): Promise<Project> {
   const result = await tasksApi.createExcursionFromTemplate({
     excursion_template_id: template.id,
     title: DEFAULT_EXCURSION_TITLE,
-    event_date: eventDate
+    event_date: eventDate,
+    compliance_modules: complianceModules
   });
   return result.project;
 }
@@ -96,6 +103,7 @@ function confirmCreate(
   onCreated: (project: Project) => void
 ): void {
   let eventDate = defaultExcursionEventDate();
+  let complianceModules = cloneDefaultComplianceModules();
 
   const slackList = el('ul', 'excursion-confirm__slack');
   renderSlackList(slackList, template, eventDate);
@@ -116,14 +124,25 @@ function confirmCreate(
   const fieldWrap = el('div', 'excursion-confirm__field');
   fieldWrap.append(dateField.el, slackList);
 
+  const complianceHeading = el(
+    'p',
+    'excursion-confirm__field-label',
+    'Compliance bundle — on by default, untoggle what this trip doesn’t need'
+  );
+  const complianceWrap = renderComplianceBundle(complianceModules, (id) => {
+    const module = complianceModules.find((m) => m.id === id);
+    if (!module) return;
+    module.on = !module.on;
+  });
+
   showConfirm(
     host,
     `Create “${DEFAULT_EXCURSION_TITLE}”`,
     confirmSummary(template, eventDate),
     async () => {
-      onCreated(await createFromTemplate(template, eventDate));
+      onCreated(await createFromTemplate(template, eventDate, complianceModules));
     },
-    [fieldWrap]
+    [fieldWrap, complianceHeading, complianceWrap]
   );
 }
 
