@@ -18,6 +18,7 @@ import {
   writeIndex,
   writeTaskIndex
 } from './_shared/tasks-blobs.mjs';
+import { DEFAULT_EXCURSION_TEMPLATE, buildExcursionPlan } from './_shared/excursion-plan.mjs';
 
 export const config = { path: '/api/templates' };
 
@@ -194,26 +195,90 @@ export function createTemplatesHandler(deps = {}) {
             env
           );
         }
+        const description = typeof body.description === 'string' ? body.description : '';
+        const student_group_reference =
+          typeof body.student_group_reference === 'string' ? body.student_group_reference : null;
+
+        // Single generic template today (see excursion-catalog.ts) — any id maps to it.
+        const template = DEFAULT_EXCURSION_TEMPLATE;
+        const plan = buildExcursionPlan(template, {
+          title,
+          event_date,
+          student_group_reference,
+          description
+        });
+
+        const projectId = newRecordId('proj');
+        const taskIds = [];
+        const tasks = [];
+        for (const planned of plan.admin_tasks) {
+          const task = {
+            schema_version: 1,
+            id: newTaskId(),
+            title: planned.title,
+            description: planned.description,
+            kind: 'task',
+            bucket: 'active',
+            step_order: 0,
+            domain: 'teaching',
+            framework_used: null,
+            estimated_duration: planned.estimated_duration,
+            actual_duration: null,
+            due_date: planned.due_date,
+            created_at: nowIso,
+            updated_at: nowIso,
+            completed_at: null,
+            status: 'open',
+            blocked_since: null,
+            priority: planned.priority,
+            parent_project_id: projectId,
+            parent_task_id: null,
+            depends_on: [],
+            tags: planned.tags,
+            recurrence_rule: null,
+            due_time: null,
+            remind_at: null,
+            remind_dismissed_at: null,
+            attachments: [],
+            source: 'auto_generated_from_excursion'
+          };
+          await setJSON(store, taskKey(task.id), task);
+          taskIds.push(task.id);
+          tasks.push(task);
+        }
+        const taskIndexIds = await readIndex(store, 'tasks/_index');
+        await writeTaskIndex(store, [...taskIndexIds, ...taskIds]);
+
+        const milestones = plan.milestones.map((m) => ({
+          id: newRecordId('ms'),
+          project_id: projectId,
+          title: m.title,
+          due_date: m.due_date,
+          status: m.status
+        }));
+
         const project = {
           schema_version: 1,
-          id: newRecordId('proj'),
+          id: projectId,
           title,
-          description: typeof body.description === 'string' ? body.description : '',
+          description,
           type: 'excursion',
           status: 'active',
-          baseline_end_date: event_date,
-          current_end_date: event_date,
-          competition_or_event_type: typeof body.excursion_template_id === 'string' ? body.excursion_template_id : null,
-          student_group_reference: typeof body.student_group_reference === 'string' ? body.student_group_reference : null,
-          milestones: [],
-          generated_admin_tasks: [],
+          baseline_end_date: plan.event_date,
+          current_end_date: plan.event_date,
+          competition_or_event_type: template.id,
+          key_dates: plan.key_dates,
+          student_group_reference,
+          drafted_documents: plan.drafted_documents,
+          milestones,
+          generated_admin_tasks: taskIds,
           created_at: nowIso,
           updated_at: nowIso
         };
         await setJSON(store, projectKey(project.id), project);
         const ids = await readIndex(store, PROJECTS_INDEX);
         await writeIndex(store, PROJECTS_INDEX, [...ids, project.id]);
-        return withCors(okResponse(201, { project, tasks: [] }), request, env);
+        return withCors(okResponse(201, { project, tasks }), request, env);
       }
 
       return withCors(errorResponse(400, 'unknown_action', 'Unknown templates action', false), request, env);

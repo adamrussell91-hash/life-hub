@@ -13,7 +13,7 @@ import {
   statusLabel,
   taskPageHash
 } from '@/domain/cards';
-import { adminTaskKind, shiftExcursionDates } from '@/domain/excursion';
+import { adminTaskKind, excursionClearance, shiftExcursionDates } from '@/domain/excursion';
 import {
   collectExcursionStops,
   layoutExcursionTimeline,
@@ -87,6 +87,38 @@ function renderProgress(project: Project, tasks: Task[]): HTMLElement {
   fill.style.width = `${progress.pct}%`;
   track.append(fill);
   host.append(copy, track);
+  return host;
+}
+
+/** Depart-readiness — the safety-critical subset, not the overall % done. */
+function renderClearanceGate(project: Project, tasks: Task[]): HTMLElement {
+  const clearance = excursionClearance(project, tasks);
+  const host = el(
+    'section',
+    `excursion-gate ${clearance.cleared ? 'excursion-gate--go' : 'excursion-gate--warn'}`
+  );
+  host.setAttribute('role', 'status');
+  const dot = el('span', 'excursion-gate__dot');
+  dot.setAttribute('aria-hidden', 'true');
+  const copy = el('div', 'excursion-gate__copy');
+  const outstanding = clearance.items.filter((item) => !item.done);
+  copy.append(
+    el(
+      'p',
+      'excursion-gate__title',
+      clearance.cleared ? 'Cleared to depart' : 'Not cleared to depart'
+    ),
+    el(
+      'p',
+      'excursion-gate__sub',
+      clearance.cleared
+        ? `All ${clearance.items.length} critical items confirmed`
+        : `${outstanding.length} of ${clearance.items.length} critical items outstanding: ${outstanding
+            .map((item) => item.label)
+            .join('; ')}`
+    )
+  );
+  host.append(dot, copy);
   return host;
 }
 
@@ -456,6 +488,7 @@ export function paintExcursionPage(
   card.append(
     head,
     fields,
+    renderClearanceGate(project, tasks),
     renderProgress(project, tasks),
     renderPermissionTracker(project, persist),
     renderQuickAdd(() => void reload(), project.id),

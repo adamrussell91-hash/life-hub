@@ -1,7 +1,7 @@
 import type { Project } from '@/schemas/project';
 import type { ExcursionTemplate } from '@/schemas/templates';
 import { tasksApi } from '@/services/client-api';
-import { defaultExcursionEventDate, formatLeadTimes } from '@/domain/excursion';
+import { defaultExcursionEventDate, formatLeadTimes, leadTimeSlack } from '@/domain/excursion';
 import { DEFAULT_EXCURSION_TITLE } from '@/domain/excursion-catalog';
 import { newExcursionHash, projectPageHash } from '@/domain/cards';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
@@ -11,13 +11,14 @@ import { deleteProjectNow } from '@/views/card-actions';
 import { requestToggleDone } from '@/views/dashboard';
 import { renderQuickAdd } from '@/views/task-editor';
 import { mountProjectCard } from '@/views/hub-cards';
-import { el } from '@/views/hub-kit';
+import { createHubField, el } from '@/views/hub-kit';
 
 function showConfirm(
   host: HTMLElement,
   title: string,
   summary: string,
-  onConfirm: () => Promise<void>
+  onConfirm: () => Promise<void>,
+  extra?: HTMLElement[]
 ): void {
   host.replaceChildren();
   const card = el('section', 'confirm-card');
@@ -25,7 +26,9 @@ function showConfirm(
   card.setAttribute('aria-label', 'Confirm change');
   card.append(el('p', 'page-header__eyebrow', 'Proposed write'));
   card.append(el('h2', 'page-header__title', title));
-  card.append(el('p', 'page-header__supporting', `${summary} Do not apply until Confirm.`));
+  const summaryEl = el('p', 'page-header__supporting', `${summary} Do not apply until Confirm.`);
+  card.append(summaryEl);
+  if (extra?.length) card.append(...extra);
   const actions = el('div', 'confirm-card__actions');
   const cancel = el('button', 'btn btn--ghost', 'Discard');
   cancel.type = 'button';
@@ -56,13 +59,35 @@ function openProjectPage(project: Project): void {
   location.hash = projectPageHash(project.id);
 }
 
-async function createFromTemplate(template: ExcursionTemplate): Promise<Project> {
+async function createFromTemplate(template: ExcursionTemplate, eventDate: string): Promise<Project> {
   const result = await tasksApi.createExcursionFromTemplate({
     excursion_template_id: template.id,
     title: DEFAULT_EXCURSION_TITLE,
-    event_date: defaultExcursionEventDate()
+    event_date: eventDate
   });
   return result.project;
+}
+
+function confirmSummary(template: ExcursionTemplate, eventDate: string): string {
+  return `On ${formatDisplayDate(eventDate)}. This will add dated admin tasks (${formatLeadTimes(template)}) and draft the permission note + staff email.`;
+}
+
+/** Live lead-time slack under the date field — flags what can't get its normal runway. */
+function renderSlackList(host: HTMLElement, template: ExcursionTemplate, eventDate: string): void {
+  host.replaceChildren();
+  const slack = leadTimeSlack(template, eventDate);
+  if (!slack.length) return;
+  for (const row of slack) {
+    host.append(
+      el(
+        'li',
+        `excursion-confirm__slack-row${row.tight ? ' is-tight' : ''}`,
+        row.tight
+          ? `${row.label} — needs ${Math.abs(row.slackDays)} more days than this date gives; expedite on create`
+          : `${row.label} — ${row.slackDays}d to spare`
+      )
+    );
+  }
 }
 
 function confirmCreate(
@@ -70,14 +95,35 @@ function confirmCreate(
   template: ExcursionTemplate,
   onCreated: (project: Project) => void
 ): void {
-  const eventDate = defaultExcursionEventDate();
+  let eventDate = defaultExcursionEventDate();
+
+  const slackList = el('ul', 'excursion-confirm__slack');
+  renderSlackList(slackList, template, eventDate);
+
+  const dateField = createHubField({
+    ariaLabel: 'Event date',
+    type: 'date',
+    value: eventDate,
+    className: 'excursion-confirm__date',
+    onChange: (value) => {
+      if (!value) return;
+      eventDate = value;
+      renderSlackList(slackList, template, eventDate);
+      const summaryEl = host.querySelector('.page-header__supporting');
+      if (summaryEl) summaryEl.textContent = `${confirmSummary(template, eventDate)} Do not apply until Confirm.`;
+    }
+  });
+  const fieldWrap = el('div', 'excursion-confirm__field');
+  fieldWrap.append(dateField.el, slackList);
+
   showConfirm(
     host,
     `Create “${DEFAULT_EXCURSION_TITLE}”`,
-    `On ${formatDisplayDate(eventDate)}. This will add dated admin tasks (${formatLeadTimes(template)}) and draft the permission note + staff email.`,
+    confirmSummary(template, eventDate),
     async () => {
-      onCreated(await createFromTemplate(template));
-    }
+      onCreated(await createFromTemplate(template, eventDate));
+    },
+    [fieldWrap]
   );
 }
 
@@ -165,7 +211,7 @@ export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
   canvas.append(listHost);
 }
 
-/** Confirm a template, then write — no Template / date / group form. */
+/** Confirm a template, then write — event date is editable inline, no separate Template / group form. */
 export async function renderNewExcursionPage(canvas: HTMLElement): Promise<void> {
   canvas.replaceChildren(el('p', 'canvas-status', 'Loading excursion…'));
   const templatesPayload = await tasksApi.listTemplates();
