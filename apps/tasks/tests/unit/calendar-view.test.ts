@@ -122,8 +122,11 @@ describe('calendar views', () => {
     vi.mocked(tasksApi.listProjects).mockReset();
     vi.mocked(tasksApi.updateTask).mockReset();
     vi.mocked(tasksApi.createTask).mockReset();
-    vi.mocked(tasksApi.listTasks).mockResolvedValue(tasks);
-    vi.mocked(tasksApi.listProjects).mockResolvedValue(projects);
+    // Return fresh clones, not the fixture's own objects — the calendar's drag/drop and
+    // optimistic-update paths mutate task fields in place, which would otherwise leak
+    // between tests (and calls) that all share this one `tasks` array by reference.
+    vi.mocked(tasksApi.listTasks).mockImplementation(async () => tasks.map((entry) => ({ ...entry })));
+    vi.mocked(tasksApi.listProjects).mockImplementation(async () => projects.map((entry) => ({ ...entry })));
     vi.mocked(tasksApi.updateTask).mockImplementation(async (id, body) => {
       const found = tasks.find((entry) => entry.id === id)!;
       return { ...found, ...(body as Partial<Task>) };
@@ -189,6 +192,54 @@ describe('calendar views', () => {
       expect(canvas.querySelector('.task-editor')).not.toBeNull();
     });
     expect(canvas.querySelector('.task-editor [aria-label="Title"]')).toBeTruthy();
+  });
+
+  it('blooms a day open inline with the full item list when it overflows', async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValueOnce([
+      task({ id: 'task_a', title: 'Mark Year 11 papers — batch 1', due_date: '2026-08-20' }),
+      task({ id: 'task_b', title: 'Sample review call w/ Seth', due_date: '2026-08-20' }),
+      task({ id: 'task_c', title: 'Umbrella hub sync', due_date: '2026-08-20' })
+    ]);
+    const canvas = document.createElement('main');
+    await renderMonthView(canvas);
+
+    const cell = canvas.querySelector<HTMLElement>('[data-date="2026-08-20"]')!;
+    expect(cell.querySelectorAll('.event-chip')).toHaveLength(2);
+    const more = cell.querySelector<HTMLButtonElement>('.event-chip-more')!;
+    expect(more.textContent).toBe('+1 more');
+
+    more.click();
+    const drawer = canvas.querySelector('.hub-calendar__bloom');
+    expect(drawer).not.toBeNull();
+    expect(drawer?.querySelectorAll('.event-chip')).toHaveLength(3);
+    expect(drawer?.textContent).toContain('Umbrella hub sync');
+    expect(canvas.querySelector('[data-date="2026-08-20"]')?.getAttribute('data-bloom')).toBe('true');
+
+    canvas.querySelector<HTMLButtonElement>('.hub-calendar__bloom-close')?.click();
+    expect(canvas.querySelector('.hub-calendar__bloom')).toBeNull();
+  });
+
+  it('opens the real task card from a bloomed item and scrolls it into view', async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValueOnce([
+      task({ id: 'task_a', title: 'Mark Year 11 papers — batch 1', due_date: '2026-08-20' }),
+      task({ id: 'task_b', title: 'Sample review call w/ Seth', due_date: '2026-08-20' }),
+      task({ id: 'task_c', title: 'Umbrella hub sync', due_date: '2026-08-20' })
+    ]);
+    const canvas = document.createElement('main');
+    await renderMonthView(canvas);
+
+    canvas.querySelector<HTMLButtonElement>('.event-chip-more')?.click();
+    const scrollSpy = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {});
+    canvas.querySelector<HTMLButtonElement>('.hub-calendar__bloom [data-task-id="task_c"]')?.click();
+
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.task-editor')).not.toBeNull();
+    });
+    expect(canvas.querySelector<HTMLInputElement>('.task-editor [aria-label="Title"]')?.value).toBe(
+      'Umbrella hub sync'
+    );
+    expect(scrollSpy).toHaveBeenCalled();
+    scrollSpy.mockRestore();
   });
 
   it('renders seven week columns and a dated quick-add on the selected day', async () => {

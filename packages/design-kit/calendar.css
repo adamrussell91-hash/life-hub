@@ -258,6 +258,11 @@
   color: #fff;
 }
 
+.hub-calendar__day[data-bloom='true'] {
+  background: color-mix(in srgb, var(--wave) 10%, var(--warm-white));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--wave) 55%, transparent);
+}
+
 .hub-calendar__day .event-chip {
   min-width: 0;
   width: 100%;
@@ -356,6 +361,81 @@
   background: transparent;
   cursor: pointer;
   text-align: left;
+}
+
+/* Bloom drawer — the full item list for one day, unfolded inline directly
+ * below its week row. Spans the whole 7-column grid so it never competes
+ * with a day cell for width. */
+.hub-calendar__bloom {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 2px solid var(--wave);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--wave) 5%, var(--warm-white));
+  transform-origin: top;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hub-calendar__bloom {
+    animation: hub-cal-bloom 160ms ease-out;
+  }
+}
+
+@keyframes hub-cal-bloom {
+  from {
+    opacity: 0;
+    transform: scaleY(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+.hub-calendar__bloom-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.hub-calendar__bloom-date {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.hub-calendar__bloom-close {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--warm-white);
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.hub-calendar__bloom-close:hover {
+  color: var(--ink);
+  border-color: var(--wave);
+}
+
+.hub-calendar__bloom-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Chips inside the drawer get the whole row width, so let their title wrap
+ * and read in full instead of the day cell's clamped/truncated rendering. */
+.hub-calendar__bloom-list .event-chip {
+  width: 100%;
 }
 
 .hub-calendar__workspace {
@@ -749,8 +829,18 @@
     padding: var(--space-1);
   }
 
+  /* Compact bars, not clamped paragraphs: one line, real ellipsis, no
+   * mid-word clipping. Full text lives in the bloom drawer instead. */
   .hub-calendar__day .event-chip {
+    display: block;
     font-size: var(--text-2xs);
-    padding: 0.1rem 0.2rem;
+    padding: 0.15rem 0.35rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hub-calendar__day .event-chip__meta {
+    display: none;
   }
 }
