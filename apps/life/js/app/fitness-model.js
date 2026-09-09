@@ -133,13 +133,19 @@ function withHeroMeta(event) {
 }
 
 function selectHeroSession(events, date) {
+  // Prefer a remaining planned session so a second same-day workout (walk after
+  // weights, evening pump, etc.) stays on the Fitness logger after an earlier
+  // completed session. Fall back to today's latest completed, then prior history.
+  const todaysPlanned = events
+    .filter(({ record }) => record.date === date && record.status === 'planned')
+    .sort((a, b) => String(a.record.time ?? '').localeCompare(String(b.record.time ?? ''))
+      || String(a.record.title ?? '').localeCompare(String(b.record.title ?? '')));
+  if (todaysPlanned[0]) return withHeroMeta(todaysPlanned[0]);
+
   const todaysCompleted = events
     .filter(({ record }) => record.date === date && record.status === 'completed')
     .sort((a, b) => String(b.record.time ?? '').localeCompare(String(a.record.time ?? '')));
   if (todaysCompleted[0]) return withHeroMeta(todaysCompleted[0]);
-
-  const planned = events.find(({ record }) => record.date === date && record.status === 'planned');
-  if (planned) return withHeroMeta(planned);
 
   const prior = events
     .filter(({ record }) => record.status === 'completed' && record.date <= date)

@@ -4,13 +4,21 @@ import { renderMuscleStrip } from './render-fitness.js';
 import { buildPlannedCandidateFromTemplate } from './template-to-planned.js';
 import { formatDisplayDate, getSydneyDateKey, getSydneyTimestamp } from '../core/time.js';
 
+function matchingPlannedSession(ctx, title) {
+  const wanted = String(title ?? '').trim().toLowerCase();
+  if (!wanted) return null;
+  const planned = Array.isArray(ctx?.plannedSessions)
+    ? ctx.plannedSessions
+    : (ctx?.plannedToday ? [ctx.plannedToday] : []);
+  return planned.find(session => String(session?.title ?? '').trim().toLowerCase() === wanted) ?? null;
+}
+
 export function createFitnessTemplateLibrary({
   root,
   templatesApi,
   chatApi,
   getFitnessContext,
-  onPlanned,
-  confirmPrompt = (message) => (typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true)
+  onPlanned
 } = {}) {
   let state = { status: 'idle', templates: [], libraryByName: null };
   let selected = null;
@@ -89,16 +97,22 @@ export function createFitnessTemplateLibrary({
 
     const note = root.querySelector('#fitness-template-sheet-note');
     const ctx = getFitnessContext?.() ?? {};
-    const completedToday = Boolean(ctx.completedToday);
+    const matchingPlanned = matchingPlannedSession(ctx, template.title);
     const btn = useButton();
     if (btn) {
-      btn.disabled = completedToday;
-      btn.textContent = completedToday ? 'Today’s already logged' : 'Use today';
+      btn.disabled = false;
+      btn.textContent = matchingPlanned ? 'Update today’s plan' : 'Use today';
     }
     if (note) {
-      note.textContent = completedToday
-        ? 'A completed session is already on today’s hero.'
-        : (template.source_session_date ? `Last actuals ${formatDisplayDate(template.source_session_date)}` : '');
+      if (matchingPlanned) {
+        note.textContent = `Will update the existing “${matchingPlanned.title}” plan.`;
+      } else if (ctx.completedToday || ctx.plannedToday) {
+        note.textContent = 'Adds another session for today — same-day doubles are fine.';
+      } else {
+        note.textContent = template.source_session_date
+          ? `Last actuals ${formatDisplayDate(template.source_session_date)}`
+          : '';
+      }
     }
 
     if (typeof dialog.showModal === 'function') dialog.showModal();
@@ -108,12 +122,7 @@ export function createFitnessTemplateLibrary({
   async function useToday() {
     if (!selected || useBusy) return;
     const ctx = getFitnessContext?.() ?? {};
-    if (ctx.completedToday) return;
-
-    if (ctx.plannedToday && ctx.plannedToday.title !== selected.title) {
-      const ok = confirmPrompt(`Replace today’s plan (“${ctx.plannedToday.title}”) with “${selected.title}”?`);
-      if (!ok) return;
-    }
+    const matchingPlanned = matchingPlannedSession(ctx, selected.title);
 
     useBusy = true;
     const btn = useButton();
@@ -126,7 +135,7 @@ export function createFitnessTemplateLibrary({
       await chatApi.confirm({
         candidate: built.candidate,
         slug: built.slug,
-        overwrite: Boolean(ctx.plannedToday)
+        overwrite: Boolean(matchingPlanned)
       });
       sheet()?.close?.();
       sheet()?.removeAttribute('open');
@@ -134,7 +143,7 @@ export function createFitnessTemplateLibrary({
     } catch (error) {
       const note = root.querySelector('#fitness-template-sheet-note');
       if (note) note.textContent = error?.message ?? 'Could not create today’s plan.';
-      if (btn && !ctx.completedToday) btn.disabled = false;
+      if (btn) btn.disabled = false;
     } finally {
       useBusy = false;
     }

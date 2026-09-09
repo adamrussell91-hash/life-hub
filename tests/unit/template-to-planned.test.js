@@ -25,7 +25,7 @@ test('buildPlannedCandidateFromTemplate copies prescription into a planned worko
   assert.deepEqual(built.candidate.fields.focus, ['chest', 'arms']);
   assert.equal(built.candidate.fields.exercises[0].name, 'Cable Fly');
   assert.equal(built.candidate.fields.exercises[0].sets[0].cable_type, 'constant_force');
-  assert.equal(built.slug, 'workout-planned');
+  assert.equal(built.slug, 'workout-chest-and-curls');
 });
 
 test('buildPlannedCandidateFromTemplate coerces none cable_type to constant force', () => {

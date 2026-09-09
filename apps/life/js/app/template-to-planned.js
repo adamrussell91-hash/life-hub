@@ -2,6 +2,7 @@
  * Build a chat-confirm candidate from a Fitness workout template.
  */
 import { normalizeLoggerCableType } from './fitness-logger-draft.js';
+import { buildPlannedWorkoutSlug } from '../../../../netlify/functions/_shared/chat-schema.mjs';
 
 export function buildPlannedCandidateFromTemplate(template, { date, time = '07:30' } = {}) {
   if (!template || typeof template !== 'object') {
@@ -11,7 +12,7 @@ export function buildPlannedCandidateFromTemplate(template, { date, time = '07:3
     throw new TypeError('date must be YYYY-MM-DD');
   }
   const clock = typeof time === 'string' && /^\d{2}:\d{2}$/.test(time) ? time : '07:30';
-  const slug = 'workout-planned';
+  const slug = buildPlannedWorkoutSlug(template.title);
 
   return {
     type: 'workout',
