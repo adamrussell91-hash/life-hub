@@ -74,6 +74,7 @@ import {
   detectStaleScheduleCollisions,
   FALLBACK_WORKDAY
 } from './_shared/productivity-os.mjs';
+import { markWeeklyReviewComplete } from './_shared/clare-work.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -702,6 +703,7 @@ export function createChatConfirmHandler({
       // Writes already landed; governance is audit trail only.
     }
 
+    let pendingConsumed = false;
     if (parsed.id) {
       try {
         await client.writeFile({
@@ -710,8 +712,26 @@ export function createChatConfirmHandler({
           ...(queueSha ? { sha: queueSha } : {}),
           message: `chore(propose-action): confirm ${proposal.intent}`.slice(0, 200)
         });
+        pendingConsumed = true;
       } catch {
         // Stale queue entry is harmless.
+      }
+    }
+
+    // Weekly Review completes only after writes succeed and the pending action is consumed.
+    if (
+      pendingConsumed
+      && stored?.workflowKind === 'weekly_review'
+      && typeof stored?.workflowId === 'string'
+      && stored.workflowId
+    ) {
+      try {
+        const tasksStore = await getTasksStore(env);
+        if (tasksStore) {
+          await markWeeklyReviewComplete(tasksStore, stored.workflowId);
+        }
+      } catch {
+        // Writes + dequeue already landed; workflow completion is durable metadata.
       }
     }
 

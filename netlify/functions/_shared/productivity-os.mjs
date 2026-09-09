@@ -90,7 +90,10 @@ function classifyOne(text, index) {
     destination = 'reference';
   } else if (PROJECT_RE.test(text) || /\band\b.+\band\b/i.test(text)) {
     destination = 'project';
-    project_next_action = `Define first next action for: ${text.slice(0, 80)}`;
+    project_next_action = null;
+    missing.push('project_next_action');
+    ambiguous = true;
+    question = 'What is the first concrete next action for this project?';
   } else {
     destination = 'next_action';
   }
@@ -130,7 +133,10 @@ export function reclassifyItem(stack, itemId, destination) {
         next.question = 'Who or what are you waiting on?';
       }
       if (destination === 'project' && !next.project_next_action) {
-        next.project_next_action = `Define first next action for: ${next.text.slice(0, 80)}`;
+        next.project_next_action = null;
+        next.missing = ['project_next_action'];
+        next.ambiguous = true;
+        next.question = 'What is the first concrete next action for this project?';
       }
       return next;
     })
@@ -1142,14 +1148,30 @@ export function buildWeeklyPendingChanges(state) {
 
   const capture = (state.capture?.items ?? [])
     .filter((i) => i.destination !== 'trash' && i.destination !== 'reference')
-    .map((i) => ({
-      id: i.id,
-      kind: 'capture',
-      destination: i.destination,
-      summary: `Clarify → ${i.destination}: ${i.text.slice(0, 60)}`,
-      selected: true,
-      confirmable: true
-    }));
+    .map((i) => {
+      const needsClarify = Boolean(i.ambiguous) || (Array.isArray(i.missing) && i.missing.length > 0)
+        || (i.destination === 'waiting' && !String(i.waiting_on ?? '').trim())
+        || (i.destination === 'project' && !String(i.project_next_action ?? '').trim());
+      if (needsClarify) {
+        return {
+          id: i.id,
+          kind: 'informational',
+          destination: i.destination,
+          summary: i.question
+            || `Clarify needed before capture can write: ${i.text.slice(0, 60)}`,
+          selected: false,
+          confirmable: false
+        };
+      }
+      return {
+        id: i.id,
+        kind: 'capture',
+        destination: i.destination,
+        summary: `Clarify → ${i.destination}: ${i.text.slice(0, 60)}`,
+        selected: true,
+        confirmable: true
+      };
+    });
 
   const nextActions = [];
   for (const h of state.project_health ?? []) {

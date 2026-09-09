@@ -318,12 +318,13 @@ const REVIEW_STAGE_LABELS = {
   confirm: 'Confirm'
 };
 
-/** Weekly Review — 8 stages; completed collapse, current open. */
+/** Weekly Review — 8 stages; completed collapse, current open. Confirm stage lists pending changes. */
 export function createReviewProgressCard(root, options = {}) {
   const create = createEl(root);
   const stages = options.stages ?? Object.keys(REVIEW_STAGE_LABELS);
   const completed = new Set(options.completed ?? []);
   const current = options.current ?? stages[0];
+  const pendingChanges = Array.isArray(options.pendingChanges) ? options.pendingChanges : [];
 
   const card = shell(create, {
     cardType: 'review-progress',
@@ -355,7 +356,9 @@ export function createReviewProgressCard(root, options = {}) {
     const body = create('div');
     body.className = 'prod-card__stage-body';
     body.hidden = !isCurrent;
-    if (isCurrent && options.currentDetail) {
+    if (isCurrent && stage === 'confirm' && pendingChanges.length) {
+      body.append(renderWeeklyConfirmDecisions(create, pendingChanges, options));
+    } else if (isCurrent && options.currentDetail) {
       body.textContent = options.currentDetail;
     } else if (done) {
       body.textContent = 'Done';
@@ -388,6 +391,75 @@ export function createReviewProgressCard(root, options = {}) {
   );
   return card;
 }
+
+function renderWeeklyConfirmDecisions(create, pendingChanges, options) {
+  const wrap = create('div');
+  wrap.className = 'prod-card__review-decisions';
+  wrap.dataset.reviewDecisions = 'true';
+
+  const selected = new Set(
+    pendingChanges.filter((c) => c && c.confirmable === true && c.selected !== false).map((c) => c.id)
+  );
+
+  const list = create('ul');
+  list.className = 'prod-card__review-change-list';
+  wrap.append(list);
+
+  for (const change of pendingChanges) {
+    if (!change || !change.id) continue;
+    const confirmable = change.confirmable === true;
+    const li = create('li');
+    li.className = 'prod-card__review-change';
+    li.dataset.changeId = change.id;
+    li.dataset.confirmable = confirmable ? 'true' : 'false';
+
+    if (confirmable) {
+      const label = create('label');
+      label.className = 'prod-card__review-change-label';
+      const box = create('input');
+      box.type = 'checkbox';
+      box.className = 'prod-card__review-change-check';
+      box.value = change.id;
+      box.checked = selected.has(change.id);
+      box.addEventListener('change', () => {
+        if (box.checked) selected.add(change.id);
+        else selected.delete(change.id);
+        options.onSelectionChange?.([...selected]);
+      });
+      const text = create('span');
+      text.className = 'prod-card__review-change-summary';
+      text.textContent = change.summary || change.title || change.id;
+      label.append(box, text);
+      li.append(label);
+    } else {
+      const text = create('p');
+      text.className = 'prod-card__review-change-summary is-informational';
+      text.textContent = change.summary || 'Needs clarification before it can be confirmed.';
+      const badge = create('span');
+      badge.className = 'prod-card__review-change-badge';
+      badge.textContent = 'Informational — not confirmable';
+      li.append(text, badge);
+    }
+    list.append(li);
+  }
+
+  const actions = create('div');
+  actions.className = 'prod-card__review-actions';
+  const generate = create('button');
+  generate.type = 'button';
+  generate.className = 'btn btn--primary';
+  generate.textContent = 'Generate Confirm proposal';
+  generate.addEventListener('click', () => {
+    options.onGenerateProposal?.([...selected]);
+  });
+  const note = create('p');
+  note.className = 'prod-card__hint';
+  note.textContent = 'Generates a Confirm proposal. Nothing is saved until Adam confirms.';
+  actions.append(generate, note);
+  wrap.append(actions);
+  return wrap;
+}
+
 
 /**
  * Schedule Diff — mini time grid; ghost blocks translucent; Confirm Selected / Discard / Preview.

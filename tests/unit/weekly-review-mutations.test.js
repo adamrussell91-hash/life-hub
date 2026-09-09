@@ -119,7 +119,11 @@ describe('Weekly Review durable mutations W1–W12', () => {
     const task = JSON.parse(write.content);
     assert.equal(task.title, 'Score Year 10 essays');
     assert.equal(task.parent_project_id, 'proj_marking');
-    assert.equal(result.state.status, 'awaiting_confirm');
+    assert.equal(result.kind, 'propose');
+    assert.ok(result.proposal?.writes?.length);
+    // awaiting_confirm is set only after chat queue persistence (see WR product-boundary tests).
+    assert.equal(result.state.status, 'in_progress');
+    assert.equal(result.workflow_kind, 'weekly_review');
   });
 
   it('W4: deselected next action is not written', async () => {

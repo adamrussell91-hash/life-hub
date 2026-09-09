@@ -152,6 +152,7 @@ export function formatClareJobsForPrompt() {
     'Internet research: web_search finds pages; fetch_url opens a specific URL; research_topic cites sources; lookup_au_dates / lookup_place / compare_options for dates, venues, and options.',
     'Prefer create_task / update_task for ordinary capture and edits. Other writes (complete/reschedule/split/trash/move/estimate/tag/waiting-on/research notes/batch/pin/create project) go through clare_mutate. Writes wait for Adam to Confirm. Never claim a write landed until the tool returns awaiting_confirm or applied.',
     'Productivity OS: clarify_dump before capture writes; project_health / waiting_review / context_match / compose_schedule / deadline_runway / focus_block / shutdown_day / weekly_review / project_plan for deterministic planning. Hard deadlines never move via schedule tools.',
+    'Weekly review: staged and resumable. Missing next actions stay informational without grounded titles. confirm:true only builds a stored Confirm proposal — never claim saved until /api/chat/confirm succeeds.',
     'You cannot send email. draft_comms writes a draft only.',
     ...CLARE_JOBS.map(item => `${item.id}. ${item.job} — ${item.tool}`)
   ].join('\n');
@@ -286,14 +287,64 @@ export function clareWorkSchemas() {
       follow_up_at: { type: 'string' },
       waiting_on: { type: 'string' }
     }),
-    tool('weekly_review', 'Create or advance Clare weekly review stages. Deterministic capture → calendars → waiting → projects → someday → build → confirm.', {
-      review_id: { type: 'string' },
-      state: { type: 'object' },
-      dump_text: { type: 'string' },
+    tool('weekly_review', 'Create or advance Clare weekly review stages. Deterministic capture → calendars → waiting → projects → someday → build → confirm. confirm:true builds a stored Confirm proposal — it does not persist writes until Adam confirms via /api/chat/confirm.', {
+      review_id: { type: 'string', description: 'Stable weekly review workflow id. Resume with the same id.' },
+      state: { type: 'object', description: 'Optional in-memory state. Prefer review_id so the store is the source of truth.' },
+      dump_text: { type: 'string', description: 'Capture-stage brain dump text.' },
       past_notes: { type: 'array', items: { type: 'string' } },
       upcoming_notes: { type: 'array', items: { type: 'string' } },
       today_key: { type: 'string' },
-      advance: { type: 'boolean' }
+      advance: { type: 'boolean', description: 'Advance one stage when true (default). Set false to attach decisions without advancing.' },
+      next_action_titles: {
+        type: 'object',
+        description: 'Map of project_id → concrete next-action title. Only grounded titles Adam stated or that are clearly evidenced. Never invent placeholders.',
+        additionalProperties: { type: 'string' }
+      },
+      waiting_decisions: {
+        type: 'object',
+        description: 'Map of task_id → waiting decision. Each value is { action: follow_up|move_follow_up|resolved|return_to_active, follow_up_at?: ISO date }.',
+        additionalProperties: {
+          type: 'object',
+          properties: {
+            action: { type: 'string', enum: ['follow_up', 'move_follow_up', 'resolved', 'return_to_active'] },
+            follow_up_at: { type: 'string' }
+          },
+          required: ['action']
+        }
+      },
+      someday_decisions: {
+        type: 'object',
+        description: 'Map of task_id → someday decision. Each value is { action: keep|activate|remove, review_at?: ISO date }.',
+        additionalProperties: {
+          type: 'object',
+          properties: {
+            action: { type: 'string', enum: ['keep', 'activate', 'remove'] },
+            review_at: { type: 'string' }
+          },
+          required: ['action']
+        }
+      },
+      selected_changes: {
+        type: 'array',
+        description: 'Stable pending change ids to include when confirm:true. Omit to use currently selected confirmable rows.',
+        items: { type: 'string' }
+      },
+      confirm: {
+        type: 'boolean',
+        description: 'When true at the confirm stage, generate a stored Confirm proposal (pending action). Does NOT write tasks/projects yet — Adam must Confirm.'
+      },
+      finalize: {
+        type: 'boolean',
+        description: 'Alias of confirm.'
+      },
+      repropose: {
+        type: 'boolean',
+        description: 'When already awaiting_confirm, allow rebuilding a proposal.'
+      },
+      schedule: {
+        type: 'object',
+        description: 'Optional composed week schedule for the build_week stage.'
+      }
     }),
     tool('project_plan', 'Natural project planning: purpose → desired outcome → brainstorm → organise → next action.', {
       project_title: { type: 'string' },
@@ -1158,11 +1209,11 @@ function lessonBusy(lesson) {
   return lessonToBusySpan(lesson);
 }
 
-function workflowStateKey(id) {
+export function workflowStateKey(id) {
   return `workflow_state/${id}`;
 }
 
-async function loadWorkflowState(store, id) {
+export async function loadWorkflowState(store, id) {
   if (!store || !id) return null;
   try {
     const raw = await getJSON(store, workflowStateKey(id));
@@ -1172,11 +1223,37 @@ async function loadWorkflowState(store, id) {
   }
 }
 
-async function saveWorkflowState(store, id, state) {
+export async function saveWorkflowState(store, id, state) {
   if (!store || !id || !state) return state;
   const next = { ...state, id, updated_at: new Date().toISOString() };
   await setJSON(store, workflowStateKey(id), next);
   return next;
+}
+
+/** Mark weekly review awaiting_confirm only after a durable pending action id exists. */
+export async function markWeeklyReviewAwaitingConfirm(store, reviewId, { pendingActionId, stamp } = {}) {
+  const state = await loadWorkflowState(store, reviewId);
+  if (!state) return null;
+  return saveWorkflowState(store, reviewId, {
+    ...state,
+    status: 'awaiting_confirm',
+    pending_action_id: pendingActionId ?? state.pending_action_id ?? null,
+    updated_at: stamp || new Date().toISOString()
+  });
+}
+
+/** Complete weekly review only after Confirm writes succeeded and the pending action was consumed. */
+export async function markWeeklyReviewComplete(store, reviewId, { stamp } = {}) {
+  const state = await loadWorkflowState(store, reviewId);
+  if (!state) return null;
+  const completedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, reviewId, {
+    ...state,
+    status: 'complete',
+    completed_at: completedAt,
+    pending_action_id: null,
+    updated_at: completedAt
+  });
 }
 
 function calendarNotesFromCtx({ lessons = [], workBlocks = [], tasks = [], todayKey, past = false }) {
@@ -1531,6 +1608,9 @@ function writesFromClarifyItems(items, stamp) {
     const title = String(item.text ?? '').trim();
     if (!title) continue;
     if (destination === 'project') {
+      const nextTitle = String(item.project_next_action ?? '').trim();
+      // No fabricated next-action placeholders — skip durable write until grounded.
+      if (!nextTitle) continue;
       const projectId = newRecordId('proj');
       const project = {
         schema_version: 1,
@@ -1546,7 +1626,6 @@ function writesFromClarifyItems(items, stamp) {
         project,
         `weekly capture project — ${title}`
       ));
-      const nextTitle = String(item.project_next_action ?? '').trim() || `First next action for ${title}`;
       const task = buildTaskRecord({
         title: nextTitle,
         project_id: projectId,
@@ -1562,7 +1641,10 @@ function writesFromClarifyItems(items, stamp) {
     }
     const patch = { title, bucket: destination === 'someday' ? 'someday' : 'active' };
     if (destination === 'waiting') {
-      patch.waiting_on = item.waiting_on || 'Unknown';
+      const waitingOn = String(item.waiting_on ?? '').trim();
+      // No durable waiting_on = 'Unknown' stand-in — remain informational until known.
+      if (!waitingOn) continue;
+      patch.waiting_on = waitingOn;
       patch.waiting_status = 'waiting';
       patch.waiting_since = stamp;
     }
@@ -1737,7 +1819,33 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       ? input.state
       : (await loadWorkflowState(tasksStore, reviewId)) || createWeeklyReview(reviewId);
     if (!state.id) state = { ...state, id: reviewId };
+    if (state.status === 'complete') {
+      return ok({
+        stages: WEEKLY_REVIEW_STAGES,
+        state,
+        workflow_state_key: workflowStateKey(reviewId),
+        already_complete: true
+      });
+    }
     const todayKey = input.today_key || toHubDateKey(now) || now.toISOString().slice(0, 10);
+
+    // Decisions must land in state before any persist so a crash/reload keeps them.
+    state = {
+      ...state,
+      next_action_titles: {
+        ...(state.next_action_titles && typeof state.next_action_titles === 'object' ? state.next_action_titles : {}),
+        ...(input.next_action_titles && typeof input.next_action_titles === 'object' ? input.next_action_titles : {})
+      },
+      waiting_decisions: {
+        ...(state.waiting_decisions && typeof state.waiting_decisions === 'object' ? state.waiting_decisions : {}),
+        ...(input.waiting_decisions && typeof input.waiting_decisions === 'object' ? input.waiting_decisions : {})
+      },
+      someday_decisions: {
+        ...(state.someday_decisions && typeof state.someday_decisions === 'object' ? state.someday_decisions : {}),
+        ...(input.someday_decisions && typeof input.someday_decisions === 'object' ? input.someday_decisions : {})
+      }
+    };
+
     if (input.advance !== false) {
       let schedule = input.schedule ?? null;
       if (state.current_stage === 'build_week' && !schedule) {
@@ -1753,9 +1861,9 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       }
       const stageInput = {
         dump_text: input.dump_text,
-        next_action_titles: input.next_action_titles,
-        waiting_decisions: input.waiting_decisions,
-        someday_decisions: input.someday_decisions,
+        next_action_titles: state.next_action_titles,
+        waiting_decisions: state.waiting_decisions,
+        someday_decisions: state.someday_decisions,
         past_notes: input.past_notes
           ?? (state.current_stage === 'past_calendar'
             ? calendarNotesFromCtx({ lessons, workBlocks, tasks, todayKey, past: true })
@@ -1771,30 +1879,16 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       };
       state = runWeeklyReviewStage(state, stageInput);
     }
-    state = await saveWorkflowState(tasksStore, reviewId, state);
 
-    // Keep decision maps from this turn even when not advancing.
-    state = {
-      ...state,
-      next_action_titles: {
-        ...(state.next_action_titles ?? {}),
-        ...(input.next_action_titles && typeof input.next_action_titles === 'object' ? input.next_action_titles : {})
-      },
-      waiting_decisions: {
-        ...(state.waiting_decisions ?? {}),
-        ...(input.waiting_decisions && typeof input.waiting_decisions === 'object' ? input.waiting_decisions : {})
-      },
-      someday_decisions: {
-        ...(state.someday_decisions ?? {}),
-        ...(input.someday_decisions && typeof input.someday_decisions === 'object' ? input.someday_decisions : {})
-      }
-    };
     if ((!state.pending_changes || !state.pending_changes.length) && state.current_stage === 'confirm') {
       state = { ...state, pending_changes: buildWeeklyPendingChanges(state) };
     } else if (state.current_stage === 'confirm') {
       // Rebuild when decisions/titles arrived so informational rows can become confirmable.
       state = { ...state, pending_changes: buildWeeklyPendingChanges(state) };
     }
+
+    // Persist after decisions + pending_changes are merged (never save then mutate).
+    state = await saveWorkflowState(tasksStore, reviewId, state);
 
     const finalize = Boolean(input.confirm || input.finalize);
     if (finalize && state.current_stage === 'confirm') {
@@ -1818,10 +1912,13 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       if (!writes.length) {
         return deny('no_selected_weekly_changes');
       }
+      // Do NOT set awaiting_confirm here. That status means a durable pending action
+      // id exists — chat sets it only after proposeOsAction queue persistence succeeds.
       state = await saveWorkflowState(tasksStore, reviewId, {
         ...state,
         pending_changes: selected,
-        status: 'awaiting_confirm',
+        status: 'in_progress',
+        pending_action_id: null,
         updated_at: stamp
       });
       const proposal = propose(
@@ -1833,12 +1930,15 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
         ...proposal,
         stages: WEEKLY_REVIEW_STAGES,
         state,
-        workflow_state_key: workflowStateKey(reviewId)
+        workflow_state_key: workflowStateKey(reviewId),
+        workflow_kind: 'weekly_review',
+        workflow_id: reviewId
       };
     }
 
     return ok({ stages: WEEKLY_REVIEW_STAGES, state, workflow_state_key: workflowStateKey(reviewId) });
   }
+
   if (name === 'project_plan') {
     const projectId = input.project_id ? String(input.project_id).trim() : '';
     const stateId = projectId ? `project_plan:${projectId}` : 'project_plan';

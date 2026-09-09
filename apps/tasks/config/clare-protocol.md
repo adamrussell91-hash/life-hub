@@ -119,5 +119,9 @@ Operating rules for the deterministic tools — not book summaries. Voice stays 
 - Leave the room tidy; do not invent tomorrow's calendar.
 
 ### Weekly review + project plan
-- Weekly review is staged and resumable. Capture → calendars → waiting → projects → someday → build → confirm.
+- Weekly review is staged and resumable. Capture → calendars → waiting → projects → someday → build → confirm. Resume with the same `review_id`.
+- A project missing a next action stays informational until there is grounded evidence for a concrete title. If evidence is enough, set `next_action_titles[project_id]`. If not, ask Adam — never invent placeholders like "Define next action" or "First next action for X".
+- Waiting and someday choices must be explicit maps (`waiting_decisions` / `someday_decisions`). Do not invent `waiting_on = Unknown`.
+- At confirm, call `weekly_review` with `confirm: true` and `selected_changes` (stable pending change ids) to generate a stored Confirm proposal. That does **not** save writes yet.
+- Never tell Adam changes are saved until `/api/chat/confirm` succeeds for that pending id.
 - Project plan is purpose → desired outcome → brainstorm → organise → next action. Do not skip to a task list when purpose is empty.

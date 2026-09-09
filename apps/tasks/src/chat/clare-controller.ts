@@ -792,7 +792,25 @@ export function createClareChatController({
       onConfirm: (picks: unknown) => runBoundConfirm(picks),
       onDiscard: () => runBoundConfirm(undefined, true),
       onPreview: () => {},
-      onClose: (payloadClose: unknown) => runBoundConfirm(payloadClose)
+      onClose: (payloadClose: unknown) => runBoundConfirm(payloadClose),
+      // Confirm-stage Weekly Review: generate proposal via tool runtime — not a second Confirm path.
+      onGenerateProposal:
+        type === 'review-progress'
+          ? (ids: unknown) => {
+              const selected = Array.isArray(ids)
+                ? ids.map((id) => String(id)).filter(Boolean)
+                : [];
+              const reviewId =
+                typeof payload.reviewId === 'string' && payload.reviewId.trim()
+                  ? payload.reviewId.trim()
+                  : 'weekly_review';
+              void send(
+                selected.length
+                  ? `Generate the Weekly Review Confirm proposal for review_id ${reviewId} with selected_changes: ${selected.join(', ')}. Call weekly_review with confirm:true and those ids only. Do not claim anything is saved.`
+                  : `Generate the Weekly Review Confirm proposal for review_id ${reviewId}. Call weekly_review with confirm:true for the currently selected confirmable changes. Do not claim anything is saved.`
+              );
+            }
+          : undefined
     });
   }
 

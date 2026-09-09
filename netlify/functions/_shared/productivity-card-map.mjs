@@ -34,11 +34,23 @@ function shapePayload(toolName, cardType, result, pendingId) {
   if (pendingId) base.pendingId = pendingId;
 
   if (toolName === 'weekly_review' && result?.state) {
+    const pending = Array.isArray(result.state.pending_changes) ? result.state.pending_changes : [];
     return {
       ...base,
       stages: result.stages,
       completed: result.state.completed ?? [],
-      current: result.state.current_stage
+      current: result.state.current_stage,
+      pendingChanges: pending.map((change) => ({
+        id: change.id,
+        kind: change.kind,
+        summary: change.summary,
+        confirmable: change.confirmable === true,
+        selected: change.selected !== false && change.confirmable === true,
+        project_id: change.project_id ?? null,
+        task_id: change.task_id ?? null,
+        title: change.title ?? null
+      })),
+      reviewId: result.workflow_id || result.state.id || null
     };
   }
   if (toolName === 'compose_schedule' || (toolName === 'plan_work' && result?.proposed)) {

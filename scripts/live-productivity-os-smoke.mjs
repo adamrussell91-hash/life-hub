@@ -104,7 +104,8 @@ const TASKS = {
     id: 'proj_orphan',
     title: 'Open day stall',
     status: 'active',
-    purpose: 'Run a stall',
+    purpose: 'Run the open-day foyer stall with clear signage and a short visitor brief ready before doors open.',
+    notes: 'Recent context: foyer display needs a one-page signage brief for volunteers.',
     created_at: '2026-09-01T00:00:00.000Z',
     updated_at: '2026-09-01T00:00:00.000Z'
   },
@@ -388,7 +389,7 @@ const scenarios = [
     id: 'clare-weekly',
     slug: 'clare',
     message:
-      'Start Weekly Review now. Call the weekly_review tool immediately and advance from the capture stage.',
+      'Start Weekly Review now for real. Call weekly_review with the declared schema. Advance stages. For project proj_orphan (Open day stall), the grounded next action is Prepare signage brief — set next_action_titles accordingly. At confirm, call weekly_review with confirm:true and selected_changes including next_action:proj_orphan so an action_proposal pending id is emitted. Do not claim anything is saved.',
     protocolId: 'weekly-review',
     expectTools: ['weekly_review']
   },
@@ -686,6 +687,36 @@ for (const scenario of scenarios) {
 
 
 mkdirSync('/opt/cursor/artifacts', { recursive: true });
+
+// LEVEL 5 Weekly Review autonomy signal (does not fail the smoke when LIMITED).
+{
+  const weeklyLine = [...lines].reverse().find((line) => {
+    try {
+      return JSON.parse(line).id === 'clare-weekly';
+    } catch {
+      return false;
+    }
+  });
+  let level5 = 'LIMITED';
+  let detail = { reason: 'clare-weekly_result_missing' };
+  if (weeklyLine) {
+    const weekly = JSON.parse(weeklyLine);
+    const toolOk = Array.isArray(weekly.toolsHit) && weekly.toolsHit.includes('weekly_review');
+    const pendingOk = Array.isArray(weekly.pendingIds) && weekly.pendingIds.some(Boolean);
+    const proposalOk = Number(weekly.proposals || 0) > 0;
+    if (toolOk && pendingOk && proposalOk) level5 = 'PASS';
+    else if (toolOk) level5 = 'LIMITED';
+    else level5 = 'FAIL';
+    detail = {
+      toolsHit: weekly.toolsHit,
+      proposals: weekly.proposals,
+      pendingIds: weekly.pendingIds,
+      ok: weekly.ok
+    };
+  }
+  log(JSON.stringify({ id: 'clare-weekly-level5', level5, ...detail }));
+}
+
 writeFileSync(OUT, `${lines.join('\n')}\nfailed=${failed}\n`, 'utf8');
 log(`failed=${failed}`);
 process.exit(failed ? 1 : 0);

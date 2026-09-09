@@ -215,7 +215,7 @@ import {
   listJSON as listTeachingJSON
 } from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
-import { executeClareWork, isClareWorkTool, statedPlannerInputs } from './_shared/clare-work.mjs';
+import { executeClareWork, isClareWorkTool, statedPlannerInputs, markWeeklyReviewAwaitingConfirm } from './_shared/clare-work.mjs';
 import { buildProductivityCardEvent } from './_shared/productivity-card-map.mjs';
 import {
   executeHammondProductivity,
@@ -1552,7 +1552,7 @@ export function createChatHandler({
         };
 
         // os.propose-action: validate allowlist, persist pending queue, emit Confirm card with diffs.
-        const proposeOsAction = async proposal => {
+        const proposeOsAction = async (proposal, extras = {}) => {
           let persistedId = null;
           try {
             let bases = snapshotGithubBases(proposal.writes, repoTree);
@@ -1596,7 +1596,8 @@ export function createChatHandler({
               bases,
               turnId,
               actionId,
-              ...(resumeUnavailable ? { resumeUnavailable, checkpointError } : {})
+              ...(resumeUnavailable ? { resumeUnavailable, checkpointError } : {}),
+              ...(extras && typeof extras === 'object' ? extras : {})
             };
             const nextQueue = addPendingAction(pendingActions, entry);
             const result = await client.writeFile({
@@ -2366,11 +2367,31 @@ export function createChatHandler({
                       ...(validated.detail ? { detail: validated.detail } : {})
                     });
                   }
-                  const pendingId = await proposeOsAction(validated.proposal);
-                  const proposeCard = buildProductivityCardEvent(event.name, result, {
+                  const pendingId = await proposeOsAction(validated.proposal, {
+                    ...(result.workflow_kind ? { workflowKind: result.workflow_kind } : {}),
+                    ...(result.workflow_id ? { workflowId: result.workflow_id } : {})
+                  });
+                  let workflowState = result.state ?? null;
+                  if (pendingId && result.workflow_kind === 'weekly_review' && result.workflow_id && hubTasksStore) {
+                    workflowState = await markWeeklyReviewAwaitingConfirm(hubTasksStore, result.workflow_id, {
+                      pendingActionId: pendingId
+                    });
+                  }
+                  const proposeCard = buildProductivityCardEvent(event.name, {
+                    ...result,
+                    ...(workflowState ? { state: workflowState } : {})
+                  }, {
                     pendingId: pendingId || undefined
                   });
                   if (proposeCard) send(proposeCard);
+                  if (!pendingId) {
+                    return JSON.stringify({
+                      ok: false,
+                      error: 'pending_queue_persist_failed',
+                      status: workflowState?.status || result.state?.status || 'in_progress',
+                      ...(workflowState ? { state: workflowState } : result.state ? { state: result.state } : {})
+                    });
+                  }
                   return JSON.stringify({
                     ok: true,
                     status: 'awaiting_confirm',
@@ -2380,9 +2401,9 @@ export function createChatHandler({
                       mode: write.mode,
                       diff: write.diff
                     })),
-                    ...(pendingId ? { pendingId } : {}),
+                    pendingId,
                     ...(result.session_id ? { session_id: result.session_id } : {}),
-                    ...(result.state ? { state: result.state } : {})
+                    ...(workflowState ? { state: workflowState } : result.state ? { state: result.state } : {})
                   });
                 }
                 const card = buildProductivityCardEvent(event.name, result);
