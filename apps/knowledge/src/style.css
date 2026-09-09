@@ -3001,13 +3001,16 @@ body.is-universe-fullscreen .local-banner {
   flex: 0 0 auto;
 }
 
-.chat-overlay__who {
-  margin: 0;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
+.chat-overlay .chat-view__who {
+  flex: 1 1 auto;
+}
+
+.chat-overlay[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+  display: none;
+}
+
+.chat-overlay[data-chrome='engaged'] .agent-picker__name {
+  display: none;
 }
 
 .agent-protocol-pills {
@@ -3127,7 +3130,7 @@ body.is-universe-fullscreen .local-banner {
 .chat-overlay .chat-message {
   display: flex;
   gap: var(--space-2);
-  align-items: flex-start;
+  align-items: flex-end;
   padding: 0;
   border-radius: 0;
   background: transparent;
@@ -3334,6 +3337,19 @@ body.is-universe-fullscreen .local-banner {
   .chat-overlay .agent-picker__avatar {
     width: 2.4rem;
     height: 2.4rem;
+  }
+
+  .chat-overlay[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+    display: none;
+  }
+
+  .chat-overlay[data-chrome='engaged'] .agent-picker__name {
+    display: none;
+  }
+
+  .chat-overlay .chat-view__who-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 
   body:has(.chat-overlay) .floating-chat-button {

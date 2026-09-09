@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, formatActionWriteDisplay, renderChatMarkdown, renderInlineMarkdown, scrollChatIfPinned } from '../../apps/life/js/app/render-chat.js';
+import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, formatActionWriteDisplay, renderChatMarkdown, renderInlineMarkdown, scrollChatIfPinned, syncAssistantMessageTails } from '../../apps/life/js/app/render-chat.js';
 
 class FakeElement {
   constructor(tag) {
@@ -663,5 +663,25 @@ test('appendCnPatchProposal renders structured diff rows for match/text payloads
   const blob = collectCardText(card);
   assert.match(blob, /old directive/);
   assert.match(blob, /new directive/);
+});
+
+test('syncAssistantMessageTails marks only the last bubble in a consecutive assistant run', () => {
+  const list = new FakeElement('ul');
+  const user = new FakeElement('li');
+  user.className = 'chat-message chat-message--user';
+  const a1 = new FakeElement('li');
+  a1.className = 'chat-message chat-message--assistant';
+  const a2 = new FakeElement('li');
+  a2.className = 'chat-message chat-message--assistant';
+  const a3 = new FakeElement('li');
+  a3.className = 'chat-message chat-message--assistant chat-message--status';
+  list.append(user, a1, a2, a3);
+
+  syncAssistantMessageTails(list);
+
+  assert.doesNotMatch(user.className, /chat-message--tail/);
+  assert.doesNotMatch(a1.className, /chat-message--tail/);
+  assert.doesNotMatch(a2.className, /chat-message--tail/);
+  assert.match(a3.className, /chat-message--tail/);
 });
 

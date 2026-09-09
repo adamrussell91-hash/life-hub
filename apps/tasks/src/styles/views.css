@@ -2029,6 +2029,20 @@
   min-width: 0;
 }
 
+.chat-view__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Picker already names the agent. Messenger who-header for overlay + engaged threads. */
+.chat-view:not([data-panel-mode]):not([data-chrome='engaged']) #chat-who {
+  display: none;
+}
+
 .chat-new-button {
   min-height: 2.2rem;
 }
@@ -2094,6 +2108,14 @@
     height: 2.4rem;
   }
 
+  .chat-view[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+    display: none;
+  }
+
+  .chat-view[data-chrome='engaged'] .agent-picker__name {
+    display: none;
+  }
+
   /* Mobile texting proportions — nearly full width, not a 17.5rem desk card. */
   .chat-message {
     max-width: min(92%, 100%);
@@ -2103,7 +2125,8 @@
   .chat-message__avatar {
     width: 1.6rem;
     height: 1.6rem;
-    margin-top: 0.15rem;
+    margin-top: 0;
+    margin-bottom: 0.15rem;
   }
 
   /* Messenger body density — beat chat-prose assistant specificity. */
@@ -2212,7 +2235,7 @@
 .chat-message {
   display: flex;
   gap: var(--space-2);
-  align-items: flex-start;
+  align-items: flex-end;
   width: fit-content;
   max-width: min(36rem, 100%);
 }
@@ -2224,7 +2247,7 @@
   object-fit: cover;
   object-position: center;
   flex: 0 0 auto;
-  margin-top: 0.25rem;
+  margin-bottom: 0.15rem;
 }
 
 .chat-message--user .chat-message__avatar {
@@ -2502,6 +2525,15 @@
   display: none;
 }
 
+/* Overlay engaged: who-header already names the agent — keep only the active face. */
+.chat-view[data-panel-mode='overlay'][data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+  display: none;
+}
+
+.chat-view[data-panel-mode='overlay'][data-chrome='engaged'] .agent-picker__name {
+  display: none;
+}
+
 @media (max-width: 720px) {
   /*
    * Full-page Chat must track the visual viewport (same contract as Life Hub).
@@ -2617,11 +2649,6 @@
 
   .chat-view[data-panel-mode='overlay'] .chat-close-button {
     display: inline-flex;
-  }
-
-  .chat-view[data-panel-mode='overlay'] .chat-view__toolbar .btn {
-    min-height: 2.2rem;
-    padding-inline: var(--space-2);
   }
 
   .chat-view[data-panel-mode='overlay'] .agent-picker__avatar {
