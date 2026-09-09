@@ -3005,6 +3005,14 @@ body.is-universe-fullscreen .local-banner {
   flex: 1 1 auto;
 }
 
+.chat-overlay[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+  display: none;
+}
+
+.chat-overlay[data-chrome='engaged'] .agent-picker__name {
+  display: none;
+}
+
 .agent-protocol-pills {
   margin: -0.15rem 0 0;
   overflow: visible;
@@ -3329,6 +3337,19 @@ body.is-universe-fullscreen .local-banner {
   .chat-overlay .agent-picker__avatar {
     width: 2.4rem;
     height: 2.4rem;
+  }
+
+  .chat-overlay[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+    display: none;
+  }
+
+  .chat-overlay[data-chrome='engaged'] .agent-picker__name {
+    display: none;
+  }
+
+  .chat-overlay .chat-view__who-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 
   body:has(.chat-overlay) .floating-chat-button {

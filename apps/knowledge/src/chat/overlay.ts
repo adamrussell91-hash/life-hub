@@ -535,7 +535,7 @@ function overlayHtml() {
       ? "The topic, question, or thinking process to research…"
       : `Ask ${escapeHtml(who.shortName)}…`;
   return `
-    <section class="chat-overlay" aria-label="Chat">
+    <section class="chat-overlay" aria-label="Chat"${turns.length || working ? ' data-chrome="engaged"' : ""}>
       <div class="chat-overlay__top">
         <div class="chat-view__who" id="chat-who">
           <img class="chat-view__who-avatar" src="${who.avatarSrc}" alt="${escapeHtml(who.name)}" width="40" height="40" />
