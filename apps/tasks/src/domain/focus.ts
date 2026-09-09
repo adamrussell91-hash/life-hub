@@ -154,3 +154,15 @@ export function hydrateFocusFromHash(hash = typeof location !== 'undefined' ? lo
 export function isFocusedTaskId(taskId: string): boolean {
   return current?.type === 'task' && current.id === taskId;
 }
+
+/** Board focus, or the open `#/task/:id` page — what “this task” means in overlay chat. */
+export function focusedTaskId(hash = typeof location !== 'undefined' ? location.hash : ''): string | null {
+  if (current?.type === 'task') return current.id;
+  const match = /^#\/task\/([^/?]+)/.exec(hash);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
