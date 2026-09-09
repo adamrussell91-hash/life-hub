@@ -368,7 +368,7 @@ const scenarios = [
     id: 'clare-schedule',
     slug: 'clare',
     message:
-      'Plan tomorrow around my classes using protected evenings. Call compose_schedule and return a Confirmable schedule diff.',
+      'Plan 2026-09-09 around my classes with protected evenings. Call compose_schedule with date:"2026-09-09" and task_ids:["task_mark"] so Mark Year 10 essays is placed, and return a Confirmable schedule-diff action_proposal.',
     expectTools: ['compose_schedule'],
     expectProposal: true
   },
@@ -396,7 +396,8 @@ const scenarios = [
   {
     id: 'hammond-too-much',
     slug: 'hammond',
-    message: 'I am doing too much. Which projects should stay active given my limit of 3?',
+    message:
+      'I am doing too much. Call portfolio_meter with active_project_limit:3 and tell me which projects should stay active.',
     expectTools: ['portfolio_meter']
   },
   {
@@ -438,11 +439,12 @@ for (const scenario of scenarios) {
     const toolsHit = (scenario.expectTools || []).filter((name) => result.tools.includes(name));
     // Tool SSE names vary; structured productivity cards / proposals also prove the tool path ran.
     const cardProof = Array.isArray(result.cards) && result.cards.length > 0;
-    const toolsOk =
+    const toolsOk = Boolean(
       !scenario.expectTools?.length ||
       toolsHit.length > 0 ||
       cardProof ||
-      (scenario.expectProposal && result.proposals > 0);
+      (scenario.expectProposal && result.proposals > 0)
+    );
     const proposalOk = !scenario.expectProposal || result.proposals > 0;
     const textOk = result.text.trim().length > 20 || cardProof || result.proposals > 0;
     const ok =
