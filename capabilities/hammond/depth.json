@@ -1,0 +1,15 @@
+{
+  "id": "hammond.depth",
+  "tool_name": "depth_budget",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Allocate deep-work windows to projects.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

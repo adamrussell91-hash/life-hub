@@ -1,0 +1,15 @@
+{
+  "id": "clare.deadline-runway",
+  "tool_name": "deadline_runway",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Backward-plan from a hard deadline without moving it.",
+  "surfaces": [
+    "chat",
+    "confirm_card"
+  ]
+}

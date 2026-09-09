@@ -1,9 +1,10 @@
 import type { Task, TaskDomain, TaskPriority } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
+import type { WorkBlock } from '@/schemas/work-block';
 import { KEY_DATE_DEFS, matchAdminTask } from '@/domain/excursion';
 import { addDays, parseDue, startOfDay, toDateKey, weekDays } from '@/domain/queries';
 
-export type CalendarKind = 'task' | 'milestone' | 'key_date';
+export type CalendarKind = 'task' | 'milestone' | 'key_date' | 'work_block';
 
 export type CalendarItem = {
   id: string;
@@ -18,7 +19,20 @@ export type CalendarItem = {
   subtitle: string | null;
   task: Task | null;
   movable: boolean;
+  work_block?: WorkBlock | null;
+  start_time?: string | null;
+  duration_minutes?: number | null;
+  ghost?: boolean;
+  layer?: PlanningLayer | null;
 };
+
+export type PlanningLayer =
+  | 'hard_deadline'
+  | 'planned_work'
+  | 'protected_time'
+  | 'target'
+  | 'review'
+  | 'deep_filter';
 
 export type CalendarFilters = {
   domain: TaskDomain | 'all';
@@ -26,6 +40,8 @@ export type CalendarFilters = {
   query: string;
   includeDone: boolean;
   includeDates: boolean;
+  planningLens?: boolean;
+  layers?: PlanningLayer[];
 };
 
 export type CalendarMode = 'day' | 'week' | 'month';
@@ -33,7 +49,8 @@ export type CalendarMode = 'day' | 'week' | 'month';
 const KIND_RANK: Record<CalendarKind, number> = {
   key_date: 0,
   milestone: 1,
-  task: 2
+  work_block: 2,
+  task: 3
 };
 
 const PRIORITY_RANK: Record<TaskPriority, number> = {
@@ -156,7 +173,9 @@ export function collectCalendarItems(tasks: Task[], projects: Project[]): Calend
       project_title: project?.title ?? null,
       subtitle: null,
       task,
-      movable: true
+      movable: true,
+      start_time: task.due_time,
+      layer: 'hard_deadline'
     });
   }
 
@@ -209,6 +228,87 @@ export function collectCalendarItems(tasks: Task[], projects: Project[]): Calend
   return items.sort(sortItems);
 }
 
+/** Target / review markers — only for planning lens. */
+export function collectPlanningMarkers(tasks: Task[], projects: Project[] = []): CalendarItem[] {
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const items: CalendarItem[] = [];
+  for (const task of tasks) {
+    const target = parseDue(task.target_date);
+    if (target) {
+      const project = task.parent_project_id ? projectById.get(task.parent_project_id) : undefined;
+      items.push({
+        id: `target:${task.id}`,
+        kind: 'task',
+        title: task.title,
+        date_key: toDateKey(target),
+        domain: task.domain,
+        priority: task.priority,
+        status: task.status,
+        project_id: task.parent_project_id,
+        project_title: project?.title ?? null,
+        subtitle: 'Target',
+        task,
+        movable: false,
+        layer: 'target'
+      });
+    }
+    const review = parseDue(task.review_at);
+    if (review) {
+      const project = task.parent_project_id ? projectById.get(task.parent_project_id) : undefined;
+      items.push({
+        id: `review:${task.id}`,
+        kind: 'task',
+        title: task.title,
+        date_key: toDateKey(review),
+        domain: task.domain,
+        priority: task.priority,
+        status: task.status,
+        project_id: task.parent_project_id,
+        project_title: project?.title ?? null,
+        subtitle: 'Review',
+        task,
+        movable: false,
+        layer: 'review'
+      });
+    }
+  }
+  return items.sort(sortItems);
+}
+
+/** Collect planned work blocks as calendar items (distinct from hard deadlines). */
+export function collectWorkBlockItems(
+  blocks: WorkBlock[],
+  projects: Project[] = [],
+  opts: { ghost?: boolean } = {}
+): CalendarItem[] {
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const items: CalendarItem[] = [];
+  for (const block of blocks) {
+    if (block.status === 'cancelled') continue;
+    const project = block.project_id ? projectById.get(block.project_id) : undefined;
+    items.push({
+      id: `work_block:${block.id}`,
+      kind: 'work_block',
+      title: block.title,
+      date_key: block.date,
+      domain: null,
+      priority: null,
+      status: block.status,
+      project_id: block.project_id,
+      project_title: project?.title ?? null,
+      subtitle: `Work · ${block.start_time} · ${block.duration_minutes}m`,
+      task: null,
+      movable: !block.locked && block.status !== 'done',
+      work_block: block,
+      start_time: block.start_time,
+      duration_minutes: block.duration_minutes,
+      ghost: Boolean(opts.ghost || block.status === 'proposed'),
+      layer: 'planned_work'
+    });
+  }
+  return items.sort(sortItems);
+}
+
 export function itemsForDay(items: CalendarItem[], day: Date | string): CalendarItem[] {
   const key = typeof day === 'string' ? day : toDateKey(day);
   return items.filter((item) => item.date_key === key).sort(sortItems);
@@ -216,13 +316,39 @@ export function itemsForDay(items: CalendarItem[], day: Date | string): Calendar
 
 export function filterCalendarItems(items: CalendarItem[], filters: CalendarFilters): CalendarItem[] {
   const query = filters.query.trim().toLowerCase();
+  const layers = filters.layers;
   return items.filter((item) => {
-    if (!filters.includeDates && item.kind !== 'task') return false;
-    if (!filters.includeDone && (item.status === 'done' || item.status === 'dead')) return false;
+    if (!filters.includeDates && item.kind !== 'task' && item.kind !== 'work_block') return false;
+    if (!filters.includeDone && (item.status === 'done' || item.status === 'dead' || item.status === 'cancelled')) {
+      return false;
+    }
     if (filters.domain !== 'all') {
-      if (item.kind !== 'task' || item.domain !== filters.domain) return false;
+      if (item.kind === 'work_block') {
+        /* work blocks stay visible in planning lens regardless of domain */
+        if (!filters.planningLens) return false;
+      } else if (item.kind !== 'task' || item.domain !== filters.domain) {
+        return false;
+      }
     }
     if (filters.projectId !== 'all' && item.project_id !== filters.projectId) return false;
+    if (layers && layers.length) {
+      if (item.kind === 'task' && !layers.includes('hard_deadline') && !item.ghost) {
+        /* hard deadline chips */
+        if (!item.layer || item.layer === 'hard_deadline') {
+          if (!layers.includes('hard_deadline')) return false;
+        }
+      }
+      if (item.kind === 'work_block') {
+        const wantPlanned = layers.includes('planned_work');
+        const wantDeep = layers.includes('deep_filter');
+        if (!wantPlanned && !wantDeep) return false;
+        if (wantDeep && item.work_block?.depth !== 'deep') return false;
+      }
+      if (item.layer === 'target' && !layers.includes('target')) return false;
+      if (item.layer === 'review' && !layers.includes('review')) return false;
+      if (item.layer === 'deep_filter' && !layers.includes('deep_filter')) return false;
+      if (item.layer === 'protected_time' && !layers.includes('protected_time')) return false;
+    }
     if (query) {
       const haystack = `${item.title} ${item.project_title ?? ''} ${item.subtitle ?? ''}`.toLowerCase();
       if (!haystack.includes(query)) return false;

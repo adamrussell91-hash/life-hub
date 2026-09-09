@@ -199,11 +199,66 @@ export function serializePendingActions(list) {
   return JSON.stringify(Array.isArray(list) ? list : [], null, 2);
 }
 
+export const PENDING_ACTION_STATUS_PENDING = 'pending';
+export const PENDING_ACTION_STATUS_EXECUTING = 'executing';
+export const PENDING_ACTION_STATUS_CONSUMED = 'consumed';
+export const PENDING_ACTION_STATUS_DISMISSED = 'dismissed';
+
+const TERMINAL_PENDING_ACTION_STATUSES = new Set([
+  PENDING_ACTION_STATUS_CONSUMED,
+  PENDING_ACTION_STATUS_DISMISSED
+]);
+
+/** Entries without status are treated as pending (backward compatible). */
+export function isPendingActionExecutable(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  const status = typeof entry.status === 'string' ? entry.status.trim() : '';
+  return !status || status === PENDING_ACTION_STATUS_PENDING;
+}
+
+export function getPendingActionStatus(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const status = typeof entry.status === 'string' ? entry.status.trim() : '';
+  if (!status) return PENDING_ACTION_STATUS_PENDING;
+  return status;
+}
+
+/** Live = pending/executing (or missing status). Consumed/dismissed tombstones are terminal history. */
+export function isPendingActionLive(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  return !TERMINAL_PENDING_ACTION_STATUSES.has(getPendingActionStatus(entry));
+}
+
+/**
+ * Trim terminal consumed/dismissed tombstones before ever dropping live pending/executing authority.
+ * If live entries alone exceed `max`, allow temporary overflow rather than silent eviction.
+ * Kept terminal tombstones are the newest ones (by queue order).
+ */
+export function trimPendingActions(list, { max = MAX_PENDING_ACTIONS } = {}) {
+  const base = Array.isArray(list) ? list : [];
+  const live = [];
+  const terminal = [];
+  for (const entry of base) {
+    if (!entry?.id) continue;
+    if (isPendingActionLive(entry)) live.push(entry);
+    else terminal.push(entry);
+  }
+  if (live.length >= max) {
+    // Prefer temporary growth over deleting live Confirm authority.
+    return live;
+  }
+  const room = max - live.length;
+  const keptTerminal = terminal.length > room
+    ? terminal.slice(terminal.length - room)
+    : terminal;
+  const keep = new Set([...live, ...keptTerminal].map((entry) => entry.id));
+  return base.filter((entry) => entry?.id && keep.has(entry.id));
+}
+
 export function addPendingAction(list, entry) {
   const base = Array.isArray(list) ? list : [];
   if (!entry?.id) return base;
-  const next = [...base, entry];
-  return next.length > MAX_PENDING_ACTIONS ? next.slice(next.length - MAX_PENDING_ACTIONS) : next;
+  return trimPendingActions([...base, entry]);
 }
 
 export function removePendingActionById(list, id) {
@@ -218,6 +273,92 @@ export function findPendingActionById(list, id) {
   return base.find(entry => entry.id === id) ?? null;
 }
 
+/**
+ * Mark a pending action terminally consumed in place so replay cannot re-execute
+ * even if a later physical cleanup write fails.
+ */
+export function markPendingActionConsumed(list, id, { consumedAt, extra } = {}) {
+  const base = Array.isArray(list) ? list : [];
+  if (typeof id !== 'string' || !id.trim()) return base;
+  let found = false;
+  const next = base.map((entry) => {
+    if (entry?.id !== id) return entry;
+    found = true;
+    return {
+      ...entry,
+      status: PENDING_ACTION_STATUS_CONSUMED,
+      consumedAt: consumedAt || new Date().toISOString(),
+      ...(extra && typeof extra === 'object' ? extra : {})
+    };
+  });
+  return found ? next : base;
+}
+
+/**
+ * Mark a pending action terminally dismissed in place.
+ * Tombstone is positive evidence that the action must never execute and may reconcile workflows.
+ */
+export function markPendingActionDismissed(list, id, { dismissedAt, extra } = {}) {
+  const base = Array.isArray(list) ? list : [];
+  if (typeof id !== 'string' || !id.trim()) return base;
+  let found = false;
+  const next = base.map((entry) => {
+    if (entry?.id !== id) return entry;
+    found = true;
+    const {
+      executionStartedAt: _dropStarted,
+      ...rest
+    } = entry;
+    return {
+      ...rest,
+      status: PENDING_ACTION_STATUS_DISMISSED,
+      dismissedAt: dismissedAt || new Date().toISOString(),
+      ...(extra && typeof extra === 'object' ? extra : {})
+    };
+  });
+  return found ? next : base;
+}
+
+export function markPendingActionExecuting(list, id, { executionStartedAt, extra } = {}) {
+  const base = Array.isArray(list) ? list : [];
+  if (typeof id !== 'string' || !id.trim()) return base;
+  let found = false;
+  const next = base.map((entry) => {
+    if (entry?.id !== id) return entry;
+    found = true;
+    return {
+      ...entry,
+      status: PENDING_ACTION_STATUS_EXECUTING,
+      executionStartedAt: executionStartedAt || new Date().toISOString(),
+      ...(extra && typeof extra === 'object' ? extra : {})
+    };
+  });
+  return found ? next : base;
+}
+
+export function markPendingActionPending(list, id, { extra } = {}) {
+  const base = Array.isArray(list) ? list : [];
+  if (typeof id !== 'string' || !id.trim()) return base;
+  let found = false;
+  const next = base.map((entry) => {
+    if (entry?.id !== id) return entry;
+    found = true;
+    const {
+      executionStartedAt: _dropStarted,
+      consumedAt: _dropConsumed,
+      dismissedAt: _dropDismissed,
+      ...rest
+    } = entry;
+    return {
+      ...rest,
+      status: PENDING_ACTION_STATUS_PENDING,
+      ...(extra && typeof extra === 'object' ? extra : {})
+    };
+  });
+  return found ? next : base;
+}
+
+
 export function classifyWriteTarget(path) {
   const raw = typeof path === 'string' ? path.trim() : '';
   if (!raw) return { store: 'github', path: '' };
@@ -230,6 +371,12 @@ export function classifyWriteTarget(path) {
   }
   if (store === 'tasks' && kind === 'task' && BLOB_ID.test(id)) {
     return { store: 'tasks', kind, id, key: `tasks/${id}`, path: raw };
+  }
+  if (store === 'tasks' && kind === 'work_block' && BLOB_ID.test(id)) {
+    return { store: 'tasks', kind, id, key: `work_blocks/${id}`, path: raw };
+  }
+  if (store === 'tasks' && kind === 'work_session' && BLOB_ID.test(id)) {
+    return { store: 'tasks', kind, id, key: `work_sessions/${id}`, path: raw };
   }
   if (store === 'teaching' && kind === 'unit' && BLOB_ID.test(id)) {
     return { store: 'teaching', kind, id, key: `units/${id}`, path: raw };
@@ -303,6 +450,102 @@ export function selectAcceptedWrites(writes, accept) {
     accepted: list.filter(write => wanted.has(write.path)),
     rejected: list.filter(write => !wanted.has(write.path))
   };
+}
+
+const START_TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const SCHEDULE_OVERRIDE_KEYS = new Set(['path', 'start_time']);
+
+/**
+ * Apply narrow Schedule Diff overrides onto accepted work_block writes.
+ * Only `start_time` may change. Path must be an accepted write. Unknown keys fail closed.
+ * Does not trust client task_id / title / write path replacement.
+ */
+export function applyScheduleOverrides(writes, overrides) {
+  const list = Array.isArray(writes) ? writes.map((write) => ({ ...write })) : [];
+  if (overrides == null) return { ok: true, writes: list };
+  if (!Array.isArray(overrides)) return { ok: false, error: 'invalid_schedule_overrides' };
+  if (!overrides.length) return { ok: true, writes: list };
+
+  const byPath = new Map(list.map((write) => [write.path, write]));
+  const applied = new Map();
+
+  for (const raw of overrides) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return { ok: false, error: 'invalid_schedule_override' };
+    }
+    for (const key of Object.keys(raw)) {
+      if (!SCHEDULE_OVERRIDE_KEYS.has(key)) {
+        return { ok: false, error: 'schedule_override_unknown_field', detail: key };
+      }
+    }
+    const path = typeof raw.path === 'string' ? raw.path.trim() : '';
+    const startTime = typeof raw.start_time === 'string' ? raw.start_time.trim() : '';
+    if (!path || !byPath.has(path)) {
+      return { ok: false, error: 'schedule_override_unknown_path', detail: path || null };
+    }
+    if (!START_TIME_RE.test(startTime)) {
+      return { ok: false, error: 'schedule_override_invalid_start_time', detail: startTime || null };
+    }
+    const target = classifyWriteTarget(path);
+    if (target.kind !== 'work_block') {
+      return { ok: false, error: 'schedule_override_not_work_block', detail: path };
+    }
+    applied.set(path, startTime);
+  }
+
+  for (const [path, startTime] of applied) {
+    const write = byPath.get(path);
+    let record;
+    try {
+      record = JSON.parse(write.content);
+    } catch {
+      return { ok: false, error: 'schedule_override_invalid_content', detail: path };
+    }
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      return { ok: false, error: 'schedule_override_invalid_content', detail: path };
+    }
+    const next = { ...record, start_time: startTime };
+    write.content = JSON.stringify(next);
+    if (typeof write.diff === 'string' && write.diff.trim()) {
+      write.diff = `schedule ${next.date || ''} ${startTime} · ${next.title || 'block'}`.trim();
+    }
+  }
+
+  return { ok: true, writes: list };
+}
+
+/**
+ * After authoritative Confirm, Schedule Diff work blocks become durable confirmed.
+ * Proposal-time content may remain status:proposed; Confirm reconstructs status.
+ */
+export function promoteScheduleDiffWorkBlockWrites(writes, { stamp } = {}) {
+  const updatedAt = typeof stamp === 'string' && stamp ? stamp : new Date().toISOString();
+  return (Array.isArray(writes) ? writes : []).map((write) => {
+    if (!write || typeof write !== 'object') return write;
+    const target = classifyWriteTarget(write.path);
+    if (target.kind !== 'work_block') return write;
+    let record;
+    try {
+      record = JSON.parse(write.content);
+    } catch {
+      return write;
+    }
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return write;
+    return {
+      ...write,
+      content: JSON.stringify({
+        ...record,
+        status: 'confirmed',
+        updated_at: updatedAt
+      })
+    };
+  });
+}
+
+export function isScheduleDiffProposal(stored, proposal) {
+  if (stored?.workflowKind === 'schedule_diff') return true;
+  const surfaces = proposal?.surfaces ?? stored?.proposal?.surfaces;
+  return Array.isArray(surfaces) && surfaces.includes('schedule_diff');
 }
 
 export function decisionFieldsFromAction({
@@ -381,7 +624,14 @@ async function executeBlobWrite(write, target, {
   if (!record.created_at) record.created_at = existing?.created_at || timestamp;
   await setJSON(store, target.key, record);
   if (touchIndex && write.mode === 'create') {
-    const indexKey = target.kind === 'task' ? TASKS_INDEX_KEY : TASKS_PROJECTS_INDEX;
+    const indexKey =
+      target.kind === 'task'
+        ? TASKS_INDEX_KEY
+        : target.kind === 'work_block'
+          ? 'work_blocks/_index'
+          : target.kind === 'work_session'
+            ? 'work_sessions/_index'
+            : TASKS_PROJECTS_INDEX;
     const ids = await readIndex(store, indexKey);
     await writeIndex(store, indexKey, [...ids, target.id]);
   }

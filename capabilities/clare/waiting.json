@@ -1,0 +1,15 @@
+{
+  "id": "clare.waiting",
+  "tool_name": "waiting_review",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "List waiting items and propose waiting patches (Confirm).",
+  "surfaces": [
+    "chat",
+    "confirm_card"
+  ]
+}

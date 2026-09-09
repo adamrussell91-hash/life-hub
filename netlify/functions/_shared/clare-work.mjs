@@ -3,7 +3,7 @@
  * Reads execute immediately. Writes return { kind: 'propose', proposal }
  * for the existing Confirm card / tasks:task:* blob path.
  */
-import { newRecordId, newTaskId } from './tasks-blobs.mjs';
+import { newRecordId, newTaskId, getJSON, setJSON } from './tasks-blobs.mjs';
 import { parseBrainDump } from './clare-dump.mjs';
 import { buildClareBriefing } from './clare-desk.mjs';
 import {
@@ -18,6 +18,33 @@ import {
   toHubDateKey,
   weekDays
 } from './clare-dates.mjs';
+import {
+  clarifyDump,
+  reclassifyItem,
+  inspectProjectHealth,
+  inspectActiveProjectsHealth,
+  listWaitingItems,
+  waitingPatch,
+  matchActionsNow,
+  composeDaySchedule,
+  validateProposedBlocks,
+  workdayForDate,
+  workWindowsForDate,
+  buildAuthoritativeHardBusy,
+  normalizeProtectedWindowSpans,
+  computeDeadlineRunway,
+  createFocusBlock,
+  startFocusBlock,
+  finishFocusBlock,
+  buildShutdown,
+  createWeeklyReview,
+  runWeeklyReviewStage,
+  buildWeeklyPendingChanges,
+  WEEKLY_REVIEW_STAGES,
+  createProjectPlan,
+  updateProjectPlanStage,
+  lessonToBusySpan
+} from './productivity-os.mjs';
 const MAX_PROTOCOL_CHARS = 24_000;
 
 function applyProtocolUpdate(current, input) {
@@ -92,7 +119,17 @@ export const CLARE_JOBS = Object.freeze([
   { id: 37, tool: 'check_calendars', job: 'Check Teaching calendar' },
   { id: 38, tool: 'check_calendars', job: 'Check Life / task calendar' },
   { id: 39, tool: 'check_clock', job: 'Read the hub clock in Australia/Sydney' },
-  { id: 40, tool: 'parse_dump', job: 'Parse a dump into task proposals; read or update your protocol' }
+  { id: 40, tool: 'parse_dump', job: 'Parse a dump into task proposals; read or update your protocol' },
+  { id: 41, tool: 'clarify_dump', job: 'Classify a brain dump into destinations before writing' },
+  { id: 42, tool: 'project_health', job: 'Inspect next-action coverage for active projects' },
+  { id: 43, tool: 'waiting_review', job: 'List waiting items and propose waiting patches' },
+  { id: 44, tool: 'weekly_review', job: 'Run Clare weekly review stages' },
+  { id: 45, tool: 'project_plan', job: 'Natural project planning stages' },
+  { id: 46, tool: 'context_match', job: 'Match open actions to current constraints' },
+  { id: 47, tool: 'compose_schedule', job: 'Compose a day around lessons and protected time' },
+  { id: 48, tool: 'focus_block', job: 'Create, start, or finish a focus block' },
+  { id: 49, tool: 'shutdown_day', job: 'Build end-of-day shutdown decisions' },
+  { id: 50, tool: 'deadline_runway', job: 'Backward-plan from a hard deadline without moving it' }
 ]);
 
 const MUTATE_OPS = [
@@ -114,9 +151,11 @@ const OFFICIAL_AU = [
 
 export function formatClareJobsForPrompt() {
   return [
-    'Clare workbench — 40 jobs you can actually do from this chat. Use the named tool. Do not say you cannot do these.',
+    `Clare workbench — ${CLARE_JOBS.length} jobs you can actually do from this chat. Use the named tool. Do not say you cannot do these.`,
     'Internet research: web_search finds pages; fetch_url opens a specific URL; research_topic cites sources; lookup_au_dates / lookup_place / compare_options for dates, venues, and options.',
     'Prefer create_task / update_task for ordinary capture and edits. Other writes (complete/reschedule/split/trash/move/estimate/tag/waiting-on/research notes/batch/pin/create project) go through clare_mutate. Writes wait for Adam to Confirm. Never claim a write landed until the tool returns awaiting_confirm or applied.',
+    'Productivity OS: clarify_dump before capture writes; project_health / waiting_review / context_match / compose_schedule / deadline_runway / focus_block / shutdown_day / weekly_review / project_plan for deterministic planning. Hard deadlines never move via schedule tools.',
+    'Weekly review: staged and resumable. Missing next actions stay informational without grounded titles. confirm:true only builds a stored Confirm proposal — never claim saved until /api/chat/confirm succeeds.',
     'You cannot send email. draft_comms writes a draft only.',
     ...CLARE_JOBS.map(item => `${item.id}. ${item.job} — ${item.tool}`)
   ].join('\n');
@@ -168,10 +207,27 @@ export function clareWorkSchemas() {
       priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
       due_date: { type: 'string' },
       due_time: { type: 'string' },
+      target_date: { type: 'string' },
+      review_at: { type: 'string' },
       status: { type: 'string' },
       estimated_duration: { type: 'number' },
       tags: { type: 'array', items: { type: 'string' } },
       waiting_on: { type: 'string' },
+      waiting_since: { type: 'string' },
+      follow_up_at: { type: 'string' },
+      waiting_status: { type: 'string', enum: ['waiting', 'follow_up_due', 'resolved'] },
+      contexts: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            kind: { type: 'string', enum: ['device', 'place', 'person', 'energy', 'other'] },
+            value: { type: 'string' }
+          }
+        }
+      },
+      cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
+      depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] },
       notes: { type: 'string' },
       subtasks: { type: 'array', items: { type: 'string' } },
       task_ids: { type: 'array', items: { type: 'string' } },
@@ -182,15 +238,192 @@ export function clareWorkSchemas() {
       project_id: { type: 'string' },
       query: { type: 'string' }
     }, ['view']),
-    tool('plan_work', 'Plan a day or week: time-block, free 15-minute slots, collisions, weekly load, or energy-aware order. Pass energy, capacity_minutes, and workday_start/end when Adam stated them this turn. Do not invent a standing preference. If omitted, the planner uses labelled fallbacks (default 08:00–16:30 is a fallback, not a saved preference).', {
-      view: { type: 'string', enum: ['time_block', 'free_slots', 'collisions', 'week_load', 'energy'] },
+    tool('plan_work', 'Plan a day or week: time-block, free slots, collisions, weekly load, energy order, compose (calendar-aware), or schedule_diff. Pass energy, capacity_minutes, workday_start/end, protected_windows, and confirmed_blocks when known. Do not invent standing preferences. Hard deadlines never move.', {
+      view: { type: 'string', enum: ['time_block', 'free_slots', 'collisions', 'week_load', 'energy', 'compose', 'schedule_diff'] },
       date: { type: 'string' },
       energy_level: { type: 'string', enum: ['low', 'medium', 'high'] },
       cognitive_load: { type: 'number' },
       capacity_minutes: { type: 'number' },
       workday_start: { type: 'string', description: 'HH:MM when Adam stated a start. Omit to use the labelled fallback.' },
-      workday_end: { type: 'string', description: 'HH:MM when Adam stated an end. Omit to use the labelled fallback.' }
+      workday_end: { type: 'string', description: 'HH:MM when Adam stated an end. Omit to use the labelled fallback.' },
+      protected_windows: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            start: { type: 'number', description: 'Minutes from midnight' },
+            end: { type: 'number' },
+            title: { type: 'string' }
+          }
+        }
+      },
+      confirmed_blocks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            start: { type: 'number' },
+            end: { type: 'number' },
+            title: { type: 'string' }
+          }
+        }
+      },
+      task_ids: { type: 'array', items: { type: 'string' } }
     }, ['view']),
+    tool('clarify_dump', 'Classify a brain dump into structured destinations (next_action, project, waiting, calendar, someday, reference, trash) before any write. Reclassify one item when Adam corrects.', {
+      text: { type: 'string' },
+      reclassify_item_id: { type: 'string' },
+      reclassify_destination: {
+        type: 'string',
+        enum: ['next_action', 'project', 'waiting', 'calendar', 'someday', 'reference', 'trash']
+      },
+      stack: { type: 'object' }
+    }),
+    tool('project_health', 'Inspect next-action coverage for one project or all active projects.', {
+      project_id: { type: 'string' },
+      all_active: { type: 'boolean' }
+    }),
+    tool('waiting_review', 'List waiting items with age and follow-up needs. Optionally propose a waiting patch (Confirm).', {
+      today_key: { type: 'string' },
+      action: { type: 'string', enum: ['list', 'follow_up', 'move_follow_up', 'resolved', 'return_to_active'] },
+      task_id: { type: 'string' },
+      follow_up_at: { type: 'string' },
+      waiting_on: { type: 'string' }
+    }),
+    tool('weekly_review', 'Create or advance Clare weekly review stages. Deterministic capture → calendars → waiting → projects → someday → build → confirm. confirm:true builds a stored Confirm proposal — it does not persist writes until Adam confirms via /api/chat/confirm.', {
+      review_id: { type: 'string', description: 'Stable weekly review workflow id. Resume with the same id.' },
+      state: { type: 'object', description: 'Optional in-memory state. Prefer review_id so the store is the source of truth.' },
+      dump_text: { type: 'string', description: 'Capture-stage brain dump text.' },
+      past_notes: { type: 'array', items: { type: 'string' } },
+      upcoming_notes: { type: 'array', items: { type: 'string' } },
+      today_key: { type: 'string' },
+      advance: { type: 'boolean', description: 'Advance one stage when true (default). Set false to attach decisions without advancing.' },
+      next_action_titles: {
+        type: 'object',
+        description: 'Map of project_id → concrete next-action title. Only grounded titles Adam stated or that are clearly evidenced. Never invent placeholders.',
+        additionalProperties: { type: 'string' }
+      },
+      waiting_decisions: {
+        type: 'object',
+        description: 'Map of task_id → waiting decision. Each value is { action: follow_up|move_follow_up|resolved|return_to_active, follow_up_at?: ISO date }.',
+        additionalProperties: {
+          type: 'object',
+          properties: {
+            action: { type: 'string', enum: ['follow_up', 'move_follow_up', 'resolved', 'return_to_active'] },
+            follow_up_at: { type: 'string' }
+          },
+          required: ['action']
+        }
+      },
+      someday_decisions: {
+        type: 'object',
+        description: 'Map of task_id → someday decision. Each value is { action: keep|activate|remove, review_at?: ISO date }.',
+        additionalProperties: {
+          type: 'object',
+          properties: {
+            action: { type: 'string', enum: ['keep', 'activate', 'remove'] },
+            review_at: { type: 'string' }
+          },
+          required: ['action']
+        }
+      },
+      selected_changes: {
+        type: 'array',
+        description: 'Stable pending change ids to include when confirm:true. Omit to use currently selected confirmable rows.',
+        items: { type: 'string' }
+      },
+      confirm: {
+        type: 'boolean',
+        description: 'When true at the confirm stage, generate a stored Confirm proposal (pending action). Does NOT write tasks/projects yet — Adam must Confirm.'
+      },
+      finalize: {
+        type: 'boolean',
+        description: 'Alias of confirm.'
+      },
+      repropose: {
+        type: 'boolean',
+        description: 'When already awaiting_confirm, allow rebuilding a proposal.'
+      },
+      schedule: {
+        type: 'object',
+        description: 'Optional composed week schedule for the build_week stage.'
+      }
+    }),
+    tool('project_plan', 'Natural project planning: purpose → desired outcome → brainstorm → organise → next action.', {
+      project_title: { type: 'string' },
+      project_id: { type: 'string' },
+      state: { type: 'object' },
+      purpose: { type: 'string' },
+      constraints: { type: 'string' },
+      desired_outcome: { type: 'string' },
+      brainstorm: { type: 'array', items: { type: 'string' } },
+      organised: { type: 'array', items: { type: 'object' } },
+      next_actions: { type: 'array', items: { type: 'string' } },
+      milestones: { type: 'array', items: { type: 'string' } },
+      advance: { type: 'boolean' }
+    }),
+    tool('context_match', 'Match open actionable work to current constraints. Does not invent energy.', {
+      available_minutes: { type: 'number' },
+      energy_level: { type: 'string', enum: ['low', 'medium', 'high'] },
+      cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
+      device: { type: 'string' },
+      place: { type: 'string' },
+      person: { type: 'string' },
+      deep_work_ok: { type: 'boolean' },
+      now_key: { type: 'string' }
+    }),
+    tool('compose_schedule', 'Compose a day schedule around lessons, events, confirmed blocks, and protected windows. Never moves due_date.', {
+      date: { type: 'string' },
+      energy_level: { type: 'string', enum: ['low', 'medium', 'high'] },
+      workday_start: { type: 'string' },
+      workday_end: { type: 'string' },
+      task_ids: { type: 'array', items: { type: 'string' } },
+      protected_windows: { type: 'array', items: { type: 'object' } },
+      confirmed_blocks: { type: 'array', items: { type: 'object' } },
+      validate_proposed: { type: 'array', items: { type: 'object' } }
+    }),
+    tool('focus_block', 'Create, start, or finish a focus block. Returns deterministic focus state / session payloads.', {
+      action: { type: 'string', enum: ['create', 'start', 'finish'] },
+      state: { type: 'object' },
+      outcome: { type: 'string' },
+      task_id: { type: 'string' },
+      project_id: { type: 'string' },
+      work_block_id: { type: 'string' },
+      planned_duration_minutes: { type: 'number' },
+      finish_condition: { type: 'string' },
+      depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] },
+      start_time: { type: 'string' },
+      result: { type: 'string', enum: ['done', 'partial', 'stopped'] },
+      session_id: { type: 'string' }
+    }, ['action']),
+    tool('shutdown_day', 'Build end-of-day shutdown decisions: loose ends, unresolved today, waiting follow-ups, tomorrow.', {
+      today_key: { type: 'string' },
+      tomorrow_key: { type: 'string' },
+      loose_texts: { type: 'array', items: { type: 'string' } },
+      unconfirmed_titles: { type: 'array', items: { type: 'string' } },
+      tomorrow_events: { type: 'array', items: { type: 'object' } },
+      protected_tomorrow: { type: 'object' }
+    }),
+    tool('deadline_runway', 'Backward-plan from a hard deadline. Never moves the deadline. Reports clear / tight / impossible.', {
+      deadline: { type: 'string' },
+      remaining_minutes: { type: 'number' },
+      calibration_factor: { type: 'number' },
+      already_scheduled_minutes: { type: 'number' },
+      available_minutes_until_deadline: { type: 'number' },
+      buffer_minutes: { type: 'number' },
+      today: { type: 'string' },
+      dependencies: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            title: { type: 'string' },
+            satisfied: { type: 'boolean' }
+          }
+        }
+      }
+    }, ['deadline', 'remaining_minutes']),
     tool('run_desk_protocol', 'Run Morning Sweep, Tomorrow Setup, Weekly Reset, or High Stakes from chat — same briefing as the Clare desk.', {
       protocol_id: { type: 'string', enum: ['morning-sweep', 'tomorrow-setup', 'weekly-reset', 'high-stakes'] }
     }, ['protocol_id']),
@@ -229,6 +462,40 @@ const CLARE_WORK_NAMES = new Set(clareWorkSchemas().map(item => item.name));
 export function isClareWorkTool(name) {
   return CLARE_WORK_NAMES.has(name);
 }
+
+/** Intent-sensitive Clare productivity subset. Full set only when message is broad/unspecified. */
+const CLARE_TOOL_HINTS = [
+  { names: ['clarify_dump'], patterns: [/dump/i, /capture/i, /inbox/i, /clarify/i, /triage/i] },
+  { names: ['weekly_review'], patterns: [/weekly review/i, /week review/i, /weekly-review/i] },
+  { names: ['compose_schedule', 'plan_work'], patterns: [/plan (?:my |the )?day/i, /schedule/i, /time block/i, /compose/i, /plan-day/i] },
+  { names: ['project_plan'], patterns: [/project plan/i, /natural plan/i, /project-plan/i, /plan (?:this |the )?project/i] },
+  { names: ['waiting_review'], patterns: [/waiting/i, /follow[- ]?up/i, /blocked on/i] },
+  { names: ['shutdown_day'], patterns: [/shutdown/i, /close (?:the )?day/i, /wrap up/i] },
+  { names: ['focus_block'], patterns: [/focus/i, /deep work/i, /pomodoro/i, /start (?:a )?block/i] },
+  { names: ['deadline_runway'], patterns: [/runway/i, /deadline/i, /due date/i, /hard date/i] },
+  { names: ['context_match'], patterns: [/fit/i, /energy/i, /\d+\s*min/i, /what can i do/i, /context/i] },
+  { names: ['project_health'], patterns: [/project health/i, /stuck project/i, /next action/i] }
+];
+
+export function selectClareWorkSchemas({ message = '', protocolId = null } = {}) {
+  const all = clareWorkSchemas();
+  const text = `${protocolId || ''} ${message || ''}`.trim();
+  if (!text) return all;
+  const selected = new Set();
+  if (protocolId === 'weekly-review') selected.add('weekly_review');
+  if (protocolId === 'plan-day') ['compose_schedule', 'plan_work', 'context_match'].forEach(n => selected.add(n));
+  if (protocolId === 'project-plan') selected.add('project_plan');
+  if (protocolId === 'waiting') selected.add('waiting_review');
+  if (protocolId === 'shutdown') selected.add('shutdown_day');
+  for (const hint of CLARE_TOOL_HINTS) {
+    if (hint.patterns.some(re => re.test(text))) hint.names.forEach(n => selected.add(n));
+  }
+  if (!selected.size) return all;
+  // Always keep clarify_dump available for capture turns.
+  selected.add('clarify_dump');
+  return all.filter(schema => selected.has(schema.name));
+}
+
 
 function deny(error, extra = {}) {
   return { ok: false, error, ...extra };
@@ -656,7 +923,11 @@ export function planWork(view, {
   now = new Date(),
   energy = null,
   workday = null,
-  capacity_minutes = null
+  capacity_minutes = null,
+  protected_windows = null,
+  confirmed_blocks = null,
+  task_ids = null,
+  planning_profile = null
 } = {}) {
   const key = dayKey(date, now);
   const day = parseDue(key) ?? startOfDay(now);
@@ -665,6 +936,82 @@ export function planWork(view, {
   const seen = new Set(dueToday.map(task => task.id));
   const dayTasks = [...overdue.filter(task => !seen.has(task.id)), ...dueToday];
   const dayLessons = (lessons ?? []).filter(lesson => String(lessonDate(lesson) ?? '') === key);
+
+  if (view === 'compose' || view === 'schedule_diff') {
+    const idFilter = Array.isArray(task_ids) && task_ids.length
+      ? new Set(task_ids.map(String))
+      : null;
+    const pool = (idFilter
+      ? tasks.filter(task => idFilter.has(String(task.id)))
+      : dayTasks
+    ).filter(task => task.status !== 'done' && task.status !== 'dead');
+    const lessonSpans = dayLessons.map(lessonToBusySpan).filter(Boolean);
+    const composed = composeDaySchedule({
+      date: key,
+      tasks: pool.map(task => ({
+        id: task.id,
+        title: task.title,
+        estimated_duration: task.estimated_duration,
+        depth: task.depth ?? null,
+        cognitive_load: task.cognitive_load ?? null,
+        priority: task.priority ?? null,
+        due_date: task.due_date ?? null,
+        target_date: task.target_date ?? null,
+        depends_on: task.depends_on ?? [],
+        blocked: Boolean(task.blocked_since || task.waiting_on)
+      })),
+      lessons: lessonSpans,
+      protected_windows: Array.isArray(protected_windows) ? protected_windows.map(span => {
+        if (Number.isFinite(Number(span.start)) && Number.isFinite(Number(span.end))) {
+          return {
+            start: Number(span.start),
+            end: Number(span.end),
+            title: span.title ?? 'Protected',
+            kind: 'protected'
+          };
+        }
+        const start = minutesOf(span.start);
+        const end = minutesOf(span.end);
+        if (start == null || end == null) return null;
+        return {
+          start,
+          end,
+          title: span.title ?? span.label ?? 'Protected',
+          kind: 'protected'
+        };
+      }).filter(Boolean) : [],
+      confirmed_blocks: Array.isArray(confirmed_blocks) ? confirmed_blocks.map(span => {
+        if (Number.isFinite(Number(span.start)) && Number.isFinite(Number(span.end))) {
+          return {
+            start: Number(span.start),
+            end: Number(span.end),
+            title: span.title ?? 'Confirmed',
+            kind: 'locked'
+          };
+        }
+        const start = minutesOf(span.start_time || span.start);
+        if (start == null) return null;
+        return {
+          start,
+          end: start + (Number(span.duration_minutes) || 60),
+          title: span.title ?? 'Confirmed',
+          kind: 'locked'
+        };
+      }).filter(Boolean) : [],
+      workday: workday?.start && workday?.end
+        ? { start: workday.start, end: workday.end, source: workday.source || 'tool_input' }
+        : null,
+      energy: energy?.level ?? null,
+      planning_profile
+    });
+    return ok({
+      view,
+      ...composed,
+      note: view === 'schedule_diff'
+        ? 'Proposed ghost blocks vs hard busy. Confirm before writing work blocks. Deadlines unchanged.'
+        : 'Compose uses hard constraints first. Deadlines unchanged.'
+    });
+  }
 
   if (view === 'collisions') {
     const collisions = [];
@@ -862,10 +1209,313 @@ function resolveWorkday({ workday, now, date }) {
 }
 
 function lessonBusy(lesson) {
-  const start = minutesOf(lesson.starts_at || lesson.start || lesson.start_time);
-  if (start == null) return null;
-  const minutes = Number(lesson.duration_minutes || lesson.minutes) || 60;
-  return { start, end: start + minutes, title: lesson.title, kind: 'lesson' };
+  return lessonToBusySpan(lesson);
+}
+
+export function workflowStateKey(id) {
+  return `workflow_state/${id}`;
+}
+
+export async function loadWorkflowState(store, id) {
+  if (!store || !id) return null;
+  try {
+    const raw = await getJSON(store, workflowStateKey(id));
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveWorkflowState(store, id, state) {
+  if (!store || !id || !state) return state;
+  const next = { ...state, id, updated_at: new Date().toISOString() };
+  await setJSON(store, workflowStateKey(id), next);
+  return next;
+}
+
+/** Mark weekly review awaiting_confirm only after a durable pending action id exists. */
+export async function markWeeklyReviewAwaitingConfirm(store, reviewId, { pendingActionId, stamp } = {}) {
+  const state = await loadWorkflowState(store, reviewId);
+  if (!state) return null;
+  return saveWorkflowState(store, reviewId, {
+    ...state,
+    status: 'awaiting_confirm',
+    pending_action_id: pendingActionId ?? state.pending_action_id ?? null,
+    pending_action_status: 'pending',
+    updated_at: stamp || new Date().toISOString()
+  });
+}
+
+/**
+ * Record that the Weekly Review pending action executed its writes.
+ * Leaves status awaiting_confirm until markWeeklyReviewComplete succeeds.
+ */
+export async function markWeeklyReviewPendingConsumed(store, reviewId, { pendingActionId, stamp } = {}) {
+  const state = await loadWorkflowState(store, reviewId);
+  if (!state) return null;
+  return saveWorkflowState(store, reviewId, {
+    ...state,
+    status: state.status === 'complete' ? 'complete' : 'awaiting_confirm',
+    pending_action_id: pendingActionId ?? state.pending_action_id ?? null,
+    pending_action_status: 'consumed',
+    pending_action_consumed_at: stamp || new Date().toISOString(),
+    updated_at: stamp || new Date().toISOString()
+  });
+}
+
+/** Complete weekly review only after Confirm writes succeeded and the pending action was consumed. */
+export async function markWeeklyReviewComplete(store, reviewId, { stamp } = {}) {
+  const state = await loadWorkflowState(store, reviewId);
+  if (!state) return null;
+  const completedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, reviewId, {
+    ...state,
+    status: 'complete',
+    completed_at: completedAt,
+    pending_action_id: null,
+    pending_action_status: 'consumed',
+    updated_at: completedAt
+  });
+}
+
+/**
+ * If workflow is awaiting_confirm but its pending action is positively marked consumed,
+ * heal to complete. Missing pending alone is NOT evidence of completion.
+ */
+export async function reconcileWeeklyReviewIfPendingConsumed(store, reviewId) {
+  const state = await loadWorkflowState(store, reviewId);
+  if (!state) return null;
+  if (state.status !== 'awaiting_confirm') return state;
+  if (state.pending_action_status !== 'consumed') return state;
+  return markWeeklyReviewComplete(store, reviewId);
+}
+
+/**
+ * Pre-queue Schedule Diff preview. Not active — ghosts require awaiting_confirm + durable id.
+ * Compose persists this before proposeOsAction; queue success promotes to awaiting_confirm.
+ */
+export async function markScheduleDiffPreparing(store, {
+  stamp,
+  scheduleContext = null,
+  proposed = null,
+  writes = null,
+  date = null
+} = {}) {
+  if (!store) return null;
+  const updatedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    id: 'schedule_diff:current',
+    kind: 'schedule_diff',
+    ...(date ? { date } : {}),
+    ...(Array.isArray(proposed) ? { proposed } : { proposed: [] }),
+    ...(Array.isArray(writes) ? { writes } : {}),
+    status: 'preparing',
+    pending_action_id: null,
+    pending_action_status: null,
+    ...(scheduleContext && typeof scheduleContext === 'object' ? { schedule_context: scheduleContext } : {}),
+    updated_at: updatedAt
+  });
+}
+
+/** Mark schedule_diff:current awaiting_confirm with the durable pending action id. */
+export async function markScheduleDiffAwaitingConfirm(store, {
+  pendingActionId,
+  stamp,
+  scheduleContext = null,
+  proposed = null,
+  writes = null,
+  date = null
+} = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = (await loadWorkflowState(store, 'schedule_diff:current')) || {
+    id: 'schedule_diff:current',
+    kind: 'schedule_diff'
+  };
+  const updatedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    ...state,
+    id: 'schedule_diff:current',
+    kind: 'schedule_diff',
+    ...(date ? { date } : {}),
+    ...(Array.isArray(proposed) ? { proposed } : {}),
+    ...(Array.isArray(writes) ? { writes } : {}),
+    status: 'awaiting_confirm',
+    pending_action_id: pendingActionId,
+    pending_action_status: 'pending',
+    ...(scheduleContext && typeof scheduleContext === 'object' ? { schedule_context: scheduleContext } : {}),
+    updated_at: updatedAt
+  });
+}
+
+/**
+ * Stamp positive Confirm consume evidence without claiming terminal confirmed yet.
+ * Identity guard: never stamp a newer workflow bound to a different pending id.
+ */
+export async function markScheduleDiffPendingConsumed(store, {
+  pendingActionId,
+  stamp,
+  selectedWritePaths = null
+} = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  if (state.status === 'confirmed') return state;
+  const consumedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    ...state,
+    status: state.status === 'discarded' ? state.status : 'awaiting_confirm',
+    pending_action_id: pendingActionId,
+    pending_action_status: 'consumed',
+    pending_action_consumed_at: consumedAt,
+    ...(Array.isArray(selectedWritePaths) ? { selected_write_paths: selectedWritePaths } : {}),
+    updated_at: consumedAt
+  });
+}
+
+/**
+ * Confirm terminal reconciliation — only when pending_action_id matches.
+ * Identity guard: never terminate a newer workflow bound to a different pending id.
+ */
+export async function markScheduleDiffConfirmed(store, {
+  pendingActionId,
+  stamp,
+  selectedWritePaths = null
+} = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  const confirmedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    ...state,
+    status: 'confirmed',
+    pending_action_id: pendingActionId,
+    pending_action_status: 'consumed',
+    confirmed_at: confirmedAt,
+    ...(Array.isArray(selectedWritePaths) ? { selected_write_paths: selectedWritePaths } : {}),
+    proposed: [],
+    updated_at: confirmedAt
+  });
+}
+
+/**
+ * Heal awaiting_confirm → confirmed only with positive consume evidence + identity match.
+ * Never infers terminal state from a missing pending id alone.
+ */
+export async function reconcileScheduleDiffIfPendingConsumed(store, {
+  pendingActionId,
+  stamp,
+  selectedWritePaths = null,
+  queueEvidenceConsumed = false
+} = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  if (state.status === 'confirmed') return state;
+  const positive =
+    state.pending_action_status === 'consumed'
+    || queueEvidenceConsumed === true;
+  if (!positive) return state;
+  return markScheduleDiffConfirmed(store, {
+    pendingActionId,
+    stamp,
+    selectedWritePaths: selectedWritePaths ?? state.selected_write_paths ?? null
+  });
+}
+
+/**
+ * Stamp positive dismiss evidence without claiming terminal discarded yet.
+ */
+export async function markScheduleDiffPendingDismissed(store, { pendingActionId, stamp } = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  if (state.status === 'discarded' || state.status === 'confirmed') return state;
+  const dismissedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    ...state,
+    status: 'awaiting_confirm',
+    pending_action_id: pendingActionId,
+    pending_action_status: 'dismissed',
+    pending_action_dismissed_at: dismissedAt,
+    updated_at: dismissedAt
+  });
+}
+
+/** Discard terminal reconciliation — identity guard on pending_action_id. */
+export async function markScheduleDiffDiscarded(store, { pendingActionId, stamp } = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  const discardedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    ...state,
+    status: 'discarded',
+    pending_action_id: pendingActionId,
+    pending_action_status: 'dismissed',
+    discarded_at: discardedAt,
+    proposed: [],
+    updated_at: discardedAt
+  });
+}
+
+/**
+ * Heal to discarded only with positive dismiss evidence + identity match.
+ * Queue tombstone (queueEvidenceDismissed) is primary recovery when workflow stamp never landed.
+ */
+export async function reconcileScheduleDiffIfPendingDismissed(store, {
+  pendingActionId,
+  stamp,
+  queueEvidenceDismissed = false
+} = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  if (state.status === 'discarded') return state;
+  const positive =
+    state.pending_action_status === 'dismissed'
+    || queueEvidenceDismissed === true;
+  if (!positive) return state;
+  return markScheduleDiffDiscarded(store, { pendingActionId, stamp });
+}
+
+/**
+ * Active Schedule Diff ghosts require awaiting_confirm + durable pending id + proposed[].
+ * preparing / terminal / missing id → no ghosts.
+ */
+export function scheduleDiffActiveProposed(state) {
+  if (!state || typeof state !== 'object') return [];
+  if (state.status !== 'awaiting_confirm') return [];
+  const id = typeof state.pending_action_id === 'string' ? state.pending_action_id.trim() : '';
+  if (!id) return [];
+  return Array.isArray(state.proposed) && state.proposed.length ? state.proposed : [];
+}
+
+function calendarNotesFromCtx({ lessons = [], workBlocks = [], tasks = [], todayKey, past = false }) {
+  const day = parseDue(todayKey);
+  if (!day) return [];
+  const notes = [];
+  for (let i = 1; i <= 7; i += 1) {
+    const d = addDays(day, past ? -i : i);
+    const key = toDateKey(d);
+    const dayLessons = (lessons ?? []).filter(l => String(lessonDate(l) ?? '') === key);
+    const dayBlocks = (workBlocks ?? []).filter(b => b.date === key && b.status !== 'cancelled');
+    const dayTasks = tasksForDay(tasks, d);
+    if (!dayLessons.length && !dayBlocks.length && !dayTasks.length) continue;
+    const bits = [
+      key,
+      dayLessons.length ? `${dayLessons.length} lesson(s)` : null,
+      dayBlocks.length ? `${dayBlocks.length} work block(s)` : null,
+      dayTasks.length ? `${dayTasks.length} task(s)` : null
+    ].filter(Boolean);
+    notes.push(bits.join(' · '));
+  }
+  return notes;
 }
 
 function overlaps(a, b) {
@@ -926,10 +1576,31 @@ function buildTaskRecord(input, existing, nowIso) {
   if (typeof input.status === 'string') base.status = input.status;
   if (Number.isFinite(Number(input.estimated_duration))) base.estimated_duration = Number(input.estimated_duration);
   if (typeof input.project_id === 'string') base.parent_project_id = input.project_id;
+  if (typeof input.bucket === 'string') base.bucket = input.bucket;
+  if (typeof input.review_at === 'string' || input.review_at === null) base.review_at = input.review_at;
   if (Array.isArray(input.tags)) {
     base.tags = [...new Set([...(base.tags ?? []), ...input.tags.map(tag => String(tag).trim()).filter(Boolean)])];
   }
   if (typeof input.waiting_on === 'string') base.waiting_on = input.waiting_on.trim();
+  else if (input.waiting_on === null) base.waiting_on = null;
+  if (typeof input.waiting_since === 'string' || input.waiting_since === null) {
+    base.waiting_since = input.waiting_since;
+  }
+  if (typeof input.follow_up_at === 'string' || input.follow_up_at === null) {
+    base.follow_up_at = input.follow_up_at;
+  }
+  if (typeof input.waiting_status === 'string' || input.waiting_status === null) {
+    base.waiting_status = input.waiting_status;
+  }
+  if (typeof input.target_date === 'string' || input.target_date === null) {
+    base.target_date = input.target_date;
+  }
+  if (typeof input.review_at === 'string' || input.review_at === null) {
+    base.review_at = input.review_at;
+  }
+  if (Array.isArray(input.contexts)) base.contexts = input.contexts;
+  if (typeof input.cognitive_load === 'string') base.cognitive_load = input.cognitive_load;
+  if (typeof input.depth === 'string') base.depth = input.depth;
   base.updated_at = nowIso;
   return base;
 }
@@ -1026,6 +1697,12 @@ export function buildClareMutation(input, { tasks = [], projects = [], nowIso = 
     patch.tags = [...(existing.tags ?? []), 'clare-focus'];
     patch.priority = existing.priority === 'low' ? 'high' : existing.priority;
   }
+  if (op === 'set_waiting_on') {
+    if (typeof patch.waiting_on === 'string' && patch.waiting_on.trim()) {
+      if (!patch.waiting_since) patch.waiting_since = stamp;
+      if (!patch.waiting_status) patch.waiting_status = 'waiting';
+    }
+  }
   if (op === 'attach_research') {
     const notes = String(input.notes ?? '').trim();
     if (!notes) return deny('missing_notes');
@@ -1068,12 +1745,201 @@ export function formatClareDraft({ task, audience, intent, points }) {
   ].filter(line => line !== null).join('\n');
 }
 
+
+
+function selectWeeklyPendingChanges(pending, input) {
+  const selectedIds = new Set(
+    (Array.isArray(input.selected_changes) ? input.selected_changes : [])
+      .map((item) => (typeof item === 'string' ? item : item?.id))
+      .filter(Boolean)
+  );
+  return (pending ?? []).filter((change) => {
+    if (!change || change.confirmable === false || change.kind === 'informational') return false;
+    if (selectedIds.size) return selectedIds.has(change.id);
+    return change.selected !== false;
+  });
+}
+
+function writesFromWeeklyPendingChanges(selected, state, tasks, stamp) {
+  const writes = [];
+  const captureIds = new Set(selected.filter((c) => c.kind === 'capture').map((c) => c.id));
+  if (captureIds.size) {
+    const captureItems = (state.capture?.items ?? []).filter((item) => captureIds.has(item.id));
+    writes.push(...writesFromClarifyItems(captureItems, stamp));
+  }
+
+  for (const change of selected) {
+    if (change.kind === 'next_action') {
+      const title = String(change.title ?? '').trim();
+      const projectId = String(change.project_id ?? '').trim();
+      if (!title || !projectId) {
+        return { ok: false, error: 'invalid_next_action', detail: change.id };
+      }
+      const task = buildTaskRecord({ title, project_id: projectId, bucket: 'active' }, null, stamp);
+      writes.push(writeEntry(
+        `tasks:task:${task.id}`,
+        'create',
+        task,
+        `weekly review next action — ${title}`
+      ));
+      continue;
+    }
+    if (change.kind === 'waiting') {
+      const existing = findTask(tasks, change.task_id);
+      if (!existing) return { ok: false, error: 'waiting_task_not_found', detail: change.task_id };
+      const patch = waitingPatch(change.action, {
+        follow_up_at: change.follow_up_at,
+        nowIso: stamp
+      });
+      if (!patch || !Object.keys(patch).length) {
+        return { ok: false, error: 'invalid_waiting_action', detail: change.action };
+      }
+      const record = buildTaskRecord(patch, existing, stamp);
+      writes.push(writeEntry(
+        `tasks:task:${record.id}`,
+        'overwrite',
+        record,
+        `weekly review waiting ${change.action} — ${existing.title}`
+      ));
+      continue;
+    }
+    if (change.kind === 'someday') {
+      const existing = findTask(tasks, change.task_id);
+      if (!existing) return { ok: false, error: 'someday_task_not_found', detail: change.task_id };
+      let patch;
+      if (change.action === 'keep') {
+        patch = { review_at: change.review_at || stamp.slice(0, 10) };
+      } else if (change.action === 'activate') {
+        patch = { bucket: 'active', review_at: null };
+      } else if (change.action === 'remove') {
+        patch = { bucket: 'trash' };
+      } else {
+        return { ok: false, error: 'invalid_someday_action', detail: change.action };
+      }
+      const record = buildTaskRecord(patch, existing, stamp);
+      writes.push(writeEntry(
+        `tasks:task:${record.id}`,
+        'overwrite',
+        record,
+        `weekly review someday ${change.action} — ${existing.title}`
+      ));
+      continue;
+    }
+  }
+
+  const scheduleIds = new Set(selected.filter((c) => c.kind === 'schedule_block').map((c) => c.id));
+  if (scheduleIds.size) {
+    const proposed = (state.schedule?.proposed ?? state.schedule?.blocks ?? []).filter((block, index) => {
+      const id = block.write_path || block.id || `schedule:${index}`;
+      return scheduleIds.has(id) && block.selected !== false;
+    });
+    writes.push(...writesFromScheduleProposed(proposed, stamp).writes);
+  }
+
+  return { ok: true, writes };
+}
+
+function writesFromClarifyItems(items, stamp) {
+  const writes = [];
+  for (const item of items ?? []) {
+    if (!item || item.selected === false) continue;
+    const destination = item.destination;
+    if (destination === 'trash' || destination === 'reference') continue;
+    const title = String(item.text ?? '').trim();
+    if (!title) continue;
+    if (destination === 'project') {
+      const nextTitle = String(item.project_next_action ?? '').trim();
+      // No fabricated next-action placeholders — skip durable write until grounded.
+      if (!nextTitle) continue;
+      const projectId = newRecordId('proj');
+      const project = {
+        schema_version: 1,
+        id: projectId,
+        title,
+        status: 'active',
+        created_at: stamp,
+        updated_at: stamp
+      };
+      writes.push(writeEntry(
+        `tasks:project:${projectId}`,
+        'create',
+        project,
+        `weekly capture project — ${title}`
+      ));
+      const task = buildTaskRecord({
+        title: nextTitle,
+        project_id: projectId,
+        bucket: 'active'
+      }, null, stamp);
+      writes.push(writeEntry(
+        `tasks:task:${task.id}`,
+        'create',
+        task,
+        `weekly capture next action — ${nextTitle}`
+      ));
+      continue;
+    }
+    const patch = { title, bucket: destination === 'someday' ? 'someday' : 'active' };
+    if (destination === 'waiting') {
+      const waitingOn = String(item.waiting_on ?? '').trim();
+      // No durable waiting_on = 'Unknown' stand-in — remain informational until known.
+      if (!waitingOn) continue;
+      patch.waiting_on = waitingOn;
+      patch.waiting_status = 'waiting';
+      patch.waiting_since = stamp;
+    }
+    if (destination === 'calendar' && item.calendar_date) {
+      patch.due_date = item.calendar_date;
+    }
+    const task = buildTaskRecord(patch, null, stamp);
+    writes.push(writeEntry(
+      `tasks:task:${task.id}`,
+      'create',
+      task,
+      `weekly capture → ${destination}: ${title}`
+    ));
+  }
+  return writes;
+}
+
+function writesFromScheduleProposed(proposed, stamp) {
+  const writes = [];
+  const blocks = [];
+  for (const block of proposed ?? []) {
+    if (!block || block.selected === false) continue;
+    const id = newRecordId('wblock');
+    const record = {
+      schema_version: 1,
+      id,
+      task_id: block.task_id ?? null,
+      project_id: block.project_id ?? null,
+      title: block.title || 'Planned work',
+      date: block.date,
+      start_time: block.start_time || block.start || '09:00',
+      duration_minutes: Number(block.duration_minutes) || 30,
+      depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
+      status: 'proposed',
+      source: 'clare',
+      locked: false,
+      created_at: stamp,
+      updated_at: stamp
+    };
+    const path = `tasks:work_block:${id}`;
+    writes.push(writeEntry(path, 'create', record, `schedule ${record.date} ${record.start_time} · ${record.title}`));
+    blocks.push({ ...block, ...record, id: path, write_path: path, selected: true });
+  }
+  return { writes, blocks };
+}
+
 export async function executeClareWork(name, input = {}, ctx = {}) {
   const now = ctx.now ?? new Date();
   const fetchImpl = ctx.fetchImpl ?? fetch;
   const tasks = ctx.tasks ?? [];
   const projects = ctx.projects ?? [];
   const lessons = ctx.lessons ?? [];
+  const workBlocks = ctx.workBlocks ?? ctx.work_blocks ?? [];
+  const planningProfile = ctx.planning_profile ?? null;
+  const tasksStore = ctx.tasksStore ?? null;
 
   if (name === 'check_clock') {
     return ok({ ...readClock(now, ctx.timezone || HUB_TZ), reason: input.reason ?? null });
@@ -1143,8 +2009,533 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       now,
       energy,
       workday,
-      capacity_minutes: input.capacity_minutes ?? ctx.capacity_minutes ?? null
+      capacity_minutes: input.capacity_minutes ?? ctx.capacity_minutes ?? null,
+      protected_windows: input.protected_windows ?? null,
+      confirmed_blocks: input.confirmed_blocks ?? null,
+      task_ids: input.task_ids ?? null,
+      planning_profile: planningProfile
     });
+  }
+  if (name === 'clarify_dump') {
+    if (input.reclassify_item_id && input.reclassify_destination && input.stack) {
+      return ok(reclassifyItem(input.stack, input.reclassify_item_id, input.reclassify_destination));
+    }
+    const text = String(input.text ?? '').trim();
+    if (!text) return deny('missing_text');
+    return ok(clarifyDump(text));
+  }
+  if (name === 'project_health') {
+    if (input.all_active || !input.project_id) {
+      return ok({
+        results: inspectActiveProjectsHealth(projects, tasks, now.toISOString())
+      });
+    }
+    const project = findProject(projects, input.project_id);
+    if (!project) return deny('project_not_found', { project_id: input.project_id });
+    return ok(inspectProjectHealth(project, tasks, now.toISOString()));
+  }
+  if (name === 'waiting_review') {
+    const todayKey = input.today_key || toHubDateKey(now) || now.toISOString().slice(0, 10);
+    const action = input.action || 'list';
+    if (action === 'list') {
+      return ok({ today_key: todayKey, items: listWaitingItems(tasks, todayKey) });
+    }
+    const existing = findTask(tasks, input.task_id);
+    if (!existing) return deny('task_not_found', { task_id: input.task_id ?? null });
+    const patch = waitingPatch(action, {
+      follow_up_at: input.follow_up_at,
+      waiting_on: input.waiting_on,
+      nowIso: now.toISOString()
+    });
+    if (typeof input.waiting_on === 'string') patch.waiting_on = input.waiting_on.trim();
+    const record = buildTaskRecord(patch, existing, now.toISOString());
+    return propose(`Waiting ${action}: ${existing.title}`, [
+      writeEntry(`tasks:task:${record.id}`, 'overwrite', record, `waiting ${action} — ${existing.title}`)
+    ]);
+  }
+  if (name === 'weekly_review') {
+    const reviewId = String(input.review_id || 'weekly_review').trim() || 'weekly_review';
+    let state = input.state && typeof input.state === 'object'
+      ? input.state
+      : (await loadWorkflowState(tasksStore, reviewId)) || createWeeklyReview(reviewId);
+    if (!state.id) state = { ...state, id: reviewId };
+    // Heal stranded awaiting_confirm only when pending_action_status is positively consumed.
+    if (tasksStore && state.status === 'awaiting_confirm' && state.pending_action_status === 'consumed') {
+      state = (await reconcileWeeklyReviewIfPendingConsumed(tasksStore, reviewId)) || state;
+    }
+    if (state.status === 'complete') {
+      return ok({
+        stages: WEEKLY_REVIEW_STAGES,
+        state,
+        workflow_state_key: workflowStateKey(reviewId),
+        already_complete: true
+      });
+    }
+    const todayKey = input.today_key || toHubDateKey(now) || now.toISOString().slice(0, 10);
+
+    // Decisions must land in state before any persist so a crash/reload keeps them.
+    state = {
+      ...state,
+      next_action_titles: {
+        ...(state.next_action_titles && typeof state.next_action_titles === 'object' ? state.next_action_titles : {}),
+        ...(input.next_action_titles && typeof input.next_action_titles === 'object' ? input.next_action_titles : {})
+      },
+      waiting_decisions: {
+        ...(state.waiting_decisions && typeof state.waiting_decisions === 'object' ? state.waiting_decisions : {}),
+        ...(input.waiting_decisions && typeof input.waiting_decisions === 'object' ? input.waiting_decisions : {})
+      },
+      someday_decisions: {
+        ...(state.someday_decisions && typeof state.someday_decisions === 'object' ? state.someday_decisions : {}),
+        ...(input.someday_decisions && typeof input.someday_decisions === 'object' ? input.someday_decisions : {})
+      }
+    };
+
+    if (input.advance !== false) {
+      let schedule = input.schedule ?? null;
+      if (state.current_stage === 'build_week' && !schedule) {
+        const composed = planWork('compose', {
+          tasks,
+          lessons,
+          date: todayKey,
+          now,
+          planning_profile: planningProfile,
+          confirmed_blocks: workBlocks.filter(b => b.status === 'confirmed' || b.status === 'in_progress')
+        });
+        schedule = composed;
+      }
+      const stageInput = {
+        dump_text: input.dump_text,
+        next_action_titles: state.next_action_titles,
+        waiting_decisions: state.waiting_decisions,
+        someday_decisions: state.someday_decisions,
+        past_notes: input.past_notes
+          ?? (state.current_stage === 'past_calendar'
+            ? calendarNotesFromCtx({ lessons, workBlocks, tasks, todayKey, past: true })
+            : undefined),
+        upcoming_notes: input.upcoming_notes
+          ?? (state.current_stage === 'upcoming_calendar'
+            ? calendarNotesFromCtx({ lessons, workBlocks, tasks, todayKey, past: false })
+            : undefined),
+        tasks,
+        projects,
+        today_key: todayKey,
+        schedule
+      };
+      state = runWeeklyReviewStage(state, stageInput);
+    }
+
+    if ((!state.pending_changes || !state.pending_changes.length) && state.current_stage === 'confirm') {
+      state = { ...state, pending_changes: buildWeeklyPendingChanges(state) };
+    } else if (state.current_stage === 'confirm') {
+      // Rebuild when decisions/titles arrived so informational rows can become confirmable.
+      state = { ...state, pending_changes: buildWeeklyPendingChanges(state) };
+    }
+
+    // Persist after decisions + pending_changes are merged (never save then mutate).
+    state = await saveWorkflowState(tasksStore, reviewId, state);
+
+    const finalize = Boolean(input.confirm || input.finalize);
+    if (finalize && state.current_stage === 'confirm') {
+      if (state.status === 'awaiting_confirm' && !input.repropose) {
+        return ok({
+          stages: WEEKLY_REVIEW_STAGES,
+          state,
+          workflow_state_key: workflowStateKey(reviewId),
+          already_awaiting_confirm: true
+        });
+      }
+      const stamp = now.toISOString();
+      const selected = selectWeeklyPendingChanges(state.pending_changes, input);
+      const invalid = selected.find((c) => c.kind === 'next_action' && !String(c.title ?? '').trim());
+      if (invalid) {
+        return deny('invalid_weekly_pending_change', { id: invalid.id, reason: 'next_action_missing_title' });
+      }
+      const built = writesFromWeeklyPendingChanges(selected, state, tasks, stamp);
+      if (!built.ok) return deny(built.error, { detail: built.detail ?? null });
+      const writes = built.writes;
+      if (!writes.length) {
+        return deny('no_selected_weekly_changes');
+      }
+      // Do NOT set awaiting_confirm here. That status means a durable pending action
+      // id exists — chat sets it only after proposeOsAction queue persistence succeeds.
+      state = await saveWorkflowState(tasksStore, reviewId, {
+        ...state,
+        pending_changes: selected,
+        status: 'in_progress',
+        pending_action_id: null,
+        updated_at: stamp
+      });
+      const proposal = propose(
+        `Weekly review confirm (${writes.length} change${writes.length === 1 ? '' : 's'})`,
+        writes,
+        ['confirm_card', 'tasks_hub', 'weekly_review']
+      );
+      return {
+        ...proposal,
+        stages: WEEKLY_REVIEW_STAGES,
+        state,
+        workflow_state_key: workflowStateKey(reviewId),
+        workflow_kind: 'weekly_review',
+        workflow_id: reviewId
+      };
+    }
+
+    return ok({ stages: WEEKLY_REVIEW_STAGES, state, workflow_state_key: workflowStateKey(reviewId) });
+  }
+
+  if (name === 'project_plan') {
+    const projectId = input.project_id ? String(input.project_id).trim() : '';
+    const stateId = projectId ? `project_plan:${projectId}` : 'project_plan';
+    let state = input.state && typeof input.state === 'object'
+      ? input.state
+      : await loadWorkflowState(tasksStore, stateId);
+    if (!state) {
+      const title = String(input.project_title ?? '').trim();
+      if (!title) return deny('missing_project_title');
+      state = createProjectPlan({
+        project_title: title,
+        project_id: input.project_id ?? null,
+        purpose: input.purpose,
+        desired_outcome: input.desired_outcome
+      });
+    }
+    const patch = {};
+    for (const key of ['purpose', 'constraints', 'desired_outcome', 'brainstorm', 'organised', 'next_actions', 'milestones']) {
+      if (input[key] !== undefined) patch[key] = input[key];
+    }
+    state = updateProjectPlanStage(state, patch, Boolean(input.advance));
+    state = await saveWorkflowState(tasksStore, stateId, state);
+
+    const finalize = Boolean(input.confirm || input.finalize);
+    const onNext = state.current_stage === 'next_action';
+    const actions = Array.isArray(state.next_actions) ? state.next_actions.filter(Boolean) : [];
+    if (finalize && onNext) {
+      const stamp = now.toISOString();
+      const writes = [];
+      let projectId = state.project_id ? String(state.project_id) : '';
+      const existing = projectId ? findProject(projects, projectId) : null;
+      if (!existing) {
+        projectId = newRecordId('proj');
+        const project = {
+          schema_version: 1,
+          id: projectId,
+          title: state.project_title || 'Untitled project',
+          status: 'active',
+          purpose: state.purpose || '',
+          desired_outcome: state.desired_outcome || '',
+          notes: Array.isArray(state.brainstorm) ? state.brainstorm.join('\n') : '',
+          created_at: stamp,
+          updated_at: stamp
+        };
+        writes.push(writeEntry(
+          `tasks:project:${projectId}`,
+          'create',
+          project,
+          `create project — ${project.title}`
+        ));
+      } else {
+        const project = {
+          ...existing,
+          purpose: state.purpose || existing.purpose || '',
+          desired_outcome: state.desired_outcome || existing.desired_outcome || '',
+          updated_at: stamp
+        };
+        writes.push(writeEntry(
+          `tasks:project:${projectId}`,
+          'append',
+          project,
+          `update project plan — ${project.title}`
+        ));
+      }
+      for (const action of actions) {
+        const title = typeof action === 'string' ? action.trim() : String(action?.title ?? '').trim();
+        if (!title) continue;
+        const task = buildTaskRecord({
+          title,
+          project_id: projectId,
+          bucket: 'active'
+        }, null, stamp);
+        writes.push(writeEntry(
+          `tasks:task:${task.id}`,
+          'create',
+          task,
+          `next action — ${title}`
+        ));
+      }
+      if (writes.length) {
+        const proposal = propose(
+          `Confirm project plan: ${state.project_title || projectId}`,
+          writes,
+          ['confirm_card', 'tasks_hub', 'project_plan']
+        );
+        return { ...proposal, state, workflow_state_key: workflowStateKey(stateId) };
+      }
+    }
+
+    return ok({ state, workflow_state_key: workflowStateKey(stateId) });
+  }
+  if (name === 'context_match') {
+    return ok(matchActionsNow(tasks, {
+      available_minutes: input.available_minutes,
+      energy_level: input.energy_level,
+      cognitive_load: input.cognitive_load,
+      device: input.device,
+      place: input.place,
+      person: input.person,
+      deep_work_ok: input.deep_work_ok,
+      now_key: input.now_key || toHubDateKey(now) || now.toISOString().slice(0, 10)
+    }));
+  }
+  if (name === 'compose_schedule') {
+    const dateKey = dayKey(input.date, now);
+    const explicitWorkday = input.workday_start && input.workday_end
+      ? { start: input.workday_start, end: input.workday_end, source: 'tool_input' }
+      : null;
+    const effectiveWorkday = workdayForDate(dateKey, planningProfile, explicitWorkday);
+    const effectiveWindows = workWindowsForDate(dateKey, planningProfile);
+    const authoritativeBlocks = Array.isArray(input.confirmed_blocks)
+      ? input.confirmed_blocks
+      : workBlocks.filter(b => b.status === 'confirmed' || b.status === 'in_progress');
+    const lifeEvents = ctx.lifeEvents ?? ctx.events ?? [];
+    const explicitProtected = normalizeProtectedWindowSpans(input.protected_windows);
+    const hardBusy = buildAuthoritativeHardBusy({
+      date: dateKey,
+      lessons: lessons ?? [],
+      workBlocks: authoritativeBlocks,
+      planningProfile,
+      extraProtectedWindows: explicitProtected,
+      events: lifeEvents
+    });
+
+    if (Array.isArray(input.validate_proposed) && input.validate_proposed.length) {
+      return ok(validateProposedBlocks(input.validate_proposed, hardBusy, effectiveWorkday));
+    }
+    const composed = planWork('compose', {
+      tasks,
+      lessons,
+      date: input.date,
+      now,
+      energy: input.energy_level ? { level: input.energy_level } : null,
+      workday: effectiveWorkday,
+      protected_windows: hardBusy.filter((span) =>
+        span.kind === 'protected'
+        || span.kind === 'outside_work_window'
+        || span.kind === 'life_event'
+      ),
+      confirmed_blocks: authoritativeBlocks,
+      task_ids: input.task_ids,
+      planning_profile: planningProfile
+    });
+    const scheduleContext = {
+      date: dateKey,
+      workday: composed?.workday ?? effectiveWorkday,
+      work_windows: effectiveWindows,
+      protected_windows: explicitProtected,
+      hardBusy
+    };
+    const rawProposed = Array.isArray(composed?.proposed) ? composed.proposed : [];
+    const selected = rawProposed.filter(block => block && block.selected !== false);
+    if (!selected.length) {
+      return {
+        ...composed,
+        hardBusy,
+        workday: composed?.workday ?? effectiveWorkday,
+        work_windows: effectiveWindows,
+        schedule_context: scheduleContext,
+        workflow_kind: 'schedule_diff',
+        workflow_id: 'schedule_diff:current'
+      };
+    }
+
+    const stamp = now.toISOString();
+    const writes = [];
+    const proposed = [];
+    for (const block of selected) {
+      const id = newRecordId('wblock');
+      const record = {
+        schema_version: 1,
+        id,
+        task_id: block.task_id ?? null,
+        project_id: block.project_id ?? null,
+        title: block.title || 'Planned work',
+        date: block.date || dateKey,
+        start_time: block.start_time || block.start || '09:00',
+        duration_minutes: Number(block.duration_minutes) || 30,
+        depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
+        status: 'proposed',
+        source: 'clare',
+        locked: false,
+        created_at: stamp,
+        updated_at: stamp
+      };
+      const path = `tasks:work_block:${id}`;
+      writes.push(writeEntry(
+        path,
+        'create',
+        record,
+        `schedule ${record.date} ${record.start_time} · ${record.title}`
+      ));
+      // Card Confirm Selected uses item.id as accept path.
+      proposed.push({
+        ...block,
+        ...record,
+        id: path,
+        write_path: path,
+        selected: true
+      });
+    }
+
+    const proposal = propose(
+      `Schedule ${writes.length} work block${writes.length === 1 ? '' : 's'}`,
+      writes,
+      ['confirm_card', 'tasks_hub', 'schedule_diff', 'calendar_ghost']
+    );
+
+    // Pre-queue preparing state — not active until chat stamps awaiting_confirm + real pending id.
+    await markScheduleDiffPreparing(tasksStore, {
+      stamp,
+      date: dateKey,
+      proposed,
+      writes: writes.map(w => ({ path: w.path, diff: w.diff })),
+      scheduleContext
+    });
+
+    return {
+      ...proposal,
+      ...composed,
+      proposed,
+      hardBusy,
+      workday: composed?.workday ?? effectiveWorkday,
+      work_windows: effectiveWindows,
+      schedule_context: scheduleContext,
+      workflow_kind: 'schedule_diff',
+      workflow_id: 'schedule_diff:current',
+      note: 'Ghost blocks only until Confirm. Deadlines unchanged.'
+    };
+  }
+  if (name === 'focus_block') {
+    const action = input.action || 'create';
+    if (action === 'create') {
+      const outcome = String(input.outcome ?? '').trim();
+      if (!outcome) return deny('missing_outcome');
+      const state = createFocusBlock({
+        outcome,
+        task_id: input.task_id ?? null,
+        project_id: input.project_id ?? null,
+        work_block_id: input.work_block_id ?? null,
+        planned_duration_minutes: Number(input.planned_duration_minutes) || 50,
+        finish_condition: String(input.finish_condition ?? 'Outcome met'),
+        depth: input.depth || 'shallow',
+        start_time: input.start_time ?? null
+      });
+      return ok({ state });
+    }
+    if (!input.state || typeof input.state !== 'object') return deny('missing_focus_state');
+    if (action === 'start') {
+      const started = startFocusBlock(input.state, now.toISOString());
+      const sessionId = String(input.session_id || newRecordId('wsession')).trim();
+      const record = {
+        schema_version: 1,
+        id: sessionId,
+        task_id: started.sessionCreate.task_id ?? null,
+        project_id: started.sessionCreate.project_id ?? null,
+        work_block_id: started.sessionCreate.work_block_id ?? null,
+        started_at: started.sessionCreate.started_at,
+        finished_at: null,
+        actual_duration_minutes: null,
+        depth: started.sessionCreate.depth ?? 'shallow',
+        work_mode: started.sessionCreate.work_mode ?? 'predefined',
+        work_mode_confidence: started.sessionCreate.work_mode_confidence ?? 'explicit',
+        result: 'open',
+        source: 'focus_block',
+        notes: ''
+      };
+      const proposal = propose(`Start focus session: ${input.state?.spec?.outcome || sessionId}`, [
+        writeEntry(`tasks:work_session:${sessionId}`, 'create', record, `focus session start — ${sessionId}`)
+      ]);
+      return {
+        ...proposal,
+        session_id: sessionId,
+        state: {
+          ...started.state,
+          session: { ...started.state.session, id: sessionId }
+        }
+      };
+    }
+    if (action === 'finish') {
+      const finished = finishFocusBlock(input.state, input.result || 'done', now.toISOString());
+      const sessionId = String(
+        input.session_id || input.state?.session?.id || newRecordId('wsession')
+      ).trim();
+      const patch = {
+        id: sessionId,
+        ...finished.sessionPatch,
+        result: finished.sessionPatch.result || input.result || 'done'
+      };
+      // Prefer Confirm path: append/overwrite existing session.
+      const mode = input.session_id || input.state?.session?.id ? 'append' : 'create';
+      const record = mode === 'create'
+        ? {
+            schema_version: 1,
+            id: sessionId,
+            task_id: input.state?.spec?.task_id ?? null,
+            project_id: input.state?.spec?.project_id ?? null,
+            work_block_id: input.state?.spec?.work_block_id ?? null,
+            started_at: input.state?.session?.started_at || now.toISOString(),
+            depth: input.state?.spec?.depth || 'shallow',
+            work_mode: 'predefined',
+            work_mode_confidence: 'explicit',
+            source: 'focus_block',
+            notes: '',
+            ...patch
+          }
+        : patch;
+      const proposal = propose(`Finish focus session: ${input.state?.spec?.outcome || sessionId}`, [
+        writeEntry(
+          `tasks:work_session:${sessionId}`,
+          mode === 'create' ? 'create' : 'append',
+          record,
+          `focus session finish — ${sessionId}`
+        )
+      ]);
+      return {
+        ...proposal,
+        session_id: sessionId,
+        state: finished.state
+      };
+    }
+    return deny('unknown_focus_action');
+  }
+  if (name === 'shutdown_day') {
+    const todayKey = input.today_key || toHubDateKey(now) || now.toISOString().slice(0, 10);
+    const tomorrowKey = input.tomorrow_key || (() => {
+      const d = parseDue(todayKey);
+      return d ? toDateKey(addDays(d, 1)) : todayKey;
+    })();
+    return ok(buildShutdown({
+      today_key: todayKey,
+      tomorrow_key: tomorrowKey,
+      tasks,
+      loose_texts: input.loose_texts,
+      unconfirmed_titles: input.unconfirmed_titles,
+      tomorrow_events: input.tomorrow_events,
+      protected_tomorrow: input.protected_tomorrow ?? null
+    }));
+  }
+  if (name === 'deadline_runway') {
+    if (!input.deadline || !Number.isFinite(Number(input.remaining_minutes))) {
+      return deny('missing_runway_inputs');
+    }
+    return ok(computeDeadlineRunway({
+      deadline: input.deadline,
+      remaining_minutes: Number(input.remaining_minutes),
+      calibration_factor: input.calibration_factor,
+      already_scheduled_minutes: input.already_scheduled_minutes,
+      available_minutes_until_deadline: input.available_minutes_until_deadline,
+      buffer_minutes: input.buffer_minutes,
+      today: input.today || toHubDateKey(now) || now.toISOString().slice(0, 10),
+      dependencies: input.dependencies
+    }));
   }
   if (name === 'check_calendars') {
     const from = dayKey(input.from, now);

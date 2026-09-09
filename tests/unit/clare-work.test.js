@@ -80,15 +80,16 @@ const LESSONS = [
   { id: 'l1', title: 'Year 10 essay', date: '2026-09-06', class_id: 'c1' }
 ];
 
-test('Clare workbench catalogues exactly 40 jobs and 15 tools', () => {
-  assert.equal(CLARE_JOBS.length, 40);
-  assert.equal(new Set(CLARE_JOBS.map(item => item.id)).size, 40);
+test('Clare workbench catalogues exactly 50 jobs and 25 tools', () => {
+  assert.equal(CLARE_JOBS.length, 50);
+  assert.equal(new Set(CLARE_JOBS.map(item => item.id)).size, 50);
   const schemas = clareWorkSchemas();
-  assert.equal(schemas.length, 15);
+  assert.equal(schemas.length, 25);
   for (const job of CLARE_JOBS) {
     assert.ok(isClareWorkTool(job.tool), job.tool);
   }
   assert.ok(formatClareJobsForPrompt().includes('Fetch a URL'));
+  assert.ok(formatClareJobsForPrompt().includes('clarify_dump'));
 });
 
 test('buildAgentTools attaches Clare workbench only for Clare', () => {
@@ -96,16 +97,19 @@ test('buildAgentTools attaches Clare workbench only for Clare', () => {
   const clare = buildAgentTools({ slug: 'clare' }).map(tool => tool.name);
   const brisket = buildAgentTools({ slug: 'brisket', allowedTypes: ['meal'] }).map(tool => tool.name);
   const hammond = buildAgentTools({ slug: 'hammond', needsHammondTools: true }).map(tool => tool.name);
-  for (const name of ['fetch_url', 'research_topic', 'clare_mutate', 'parse_dump', 'check_clock']) {
+  for (const name of ['fetch_url', 'research_topic', 'clare_mutate', 'parse_dump', 'check_clock', 'clarify_dump']) {
     assert.ok(clare.includes(name), name);
     assert.ok(!brisket.includes(name), name);
     assert.ok(!hammond.includes(name), name);
   }
   assert.ok(clare.includes('web_search'));
   assert.ok(clare.includes('get_tasks_focus'));
+  assert.ok(hammond.includes('portfolio_meter'));
+  assert.ok(hammond.includes('horizons_chain'));
+  assert.ok(!clare.includes('portfolio_meter'));
 });
 
-test('Clare prompt delivers the 40-job catalogue; other agents do not', () => {
+test('Clare prompt delivers the 50-job catalogue; other agents do not', () => {
   const act = activationForTurn({ slug: 'clare', message: 'What should I focus on today?' });
   const clare = buildSystemPrompt({
     slug: 'clare',

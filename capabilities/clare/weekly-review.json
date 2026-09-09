@@ -1,0 +1,15 @@
+{
+  "id": "clare.weekly-review",
+  "tool_name": "weekly_review",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Run Clare weekly review stages.",
+  "surfaces": [
+    "chat",
+    "confirm_card"
+  ]
+}

@@ -23,6 +23,10 @@ import type { Program } from '@/schemas/program';
 import type { Area } from '@/schemas/area';
 import type { Goal } from '@/schemas/goal';
 import type { TaskPropertyConfig } from '@/schemas/task-properties';
+import type { WorkBlock } from '@/schemas/work-block';
+import type { WorkSession } from '@/schemas/work-session';
+import type { PlanningProfile } from '@/schemas/planning-profile';
+import type { PlanningDirection } from '@/schemas/planning-direction';
 
 export interface SeedData {
   tasks: Task[];
@@ -210,4 +214,36 @@ export interface TasksStore {
 
   getTaskProperties(): Promise<TaskPropertyConfig>;
   updateTaskProperties(config: TaskPropertyConfig): Promise<TaskPropertyConfig>;
+
+  listWorkBlocks(): Promise<WorkBlock[]>;
+  getWorkBlock(id: string): Promise<WorkBlock | null>;
+  createWorkBlock(
+    input: Partial<WorkBlock> & {
+      title: string;
+      date: string;
+      start_time: string;
+      duration_minutes: number;
+    }
+  ): Promise<WorkBlock>;
+  updateWorkBlock(id: string, patch: Partial<WorkBlock>): Promise<WorkBlock>;
+  deleteWorkBlock(id: string): Promise<void>;
+
+  listWorkSessions(): Promise<WorkSession[]>;
+  getWorkSession(id: string): Promise<WorkSession | null>;
+  createWorkSession(
+    input: Partial<WorkSession> & { started_at: string }
+  ): Promise<WorkSession>;
+  updateWorkSession(id: string, patch: Partial<WorkSession>): Promise<WorkSession>;
+  deleteWorkSession(id: string): Promise<void>;
+
+  getPlanningProfile(): Promise<PlanningProfile>;
+  updatePlanningProfile(patch: Partial<PlanningProfile>): Promise<PlanningProfile>;
+  getPlanningDirection(): Promise<PlanningDirection>;
+  updatePlanningDirection(patch: Partial<PlanningDirection>): Promise<PlanningDirection>;
+
+  getWorkflowState(id: string): Promise<Record<string, unknown> | null>;
+  setWorkflowState(
+    id: string,
+    state: Record<string, unknown>
+  ): Promise<Record<string, unknown>>;
 }

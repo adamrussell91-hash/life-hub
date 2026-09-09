@@ -216,7 +216,10 @@ test('chat dismiss rejects the persisted turn and does not write the proposal', 
   const turns = JSON.parse(github.blobs.get(AGENT_TURNS_PATH).content);
   assert.equal(turns[pending.turnId].actions[0].status, 'rejected');
   const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
-  assert.equal(queue.some(item => item.id === card.id), false);
+  const tomb = queue.find(item => item.id === card.id);
+  assert.ok(tomb, 'dismissed action remains as a durable tombstone');
+  assert.equal(tomb.status, 'dismissed');
+  assert.ok(typeof tomb.dismissedAt === 'string' && tomb.dismissedAt);
 });
 
 test('failed required checkpoint does not bind a turnId to the pending action', async () => {

@@ -1,0 +1,15 @@
+{
+  "id": "hammond.horizons",
+  "tool_name": "horizons_chain",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Walk purpose through next actions for a focus.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

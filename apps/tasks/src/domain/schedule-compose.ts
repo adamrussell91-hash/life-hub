@@ -1,0 +1,480 @@
+/**
+ * Calendar-aware schedule composition.
+ * Hard constraints first; soft preferences second.
+ * Never mutates due_date. Never compresses past capacity.
+ * May split one task across multiple blocks with the same task_id.
+ */
+
+export type TimedSpan = {
+  start: number; // minutes from midnight
+  end: number;
+  title?: string;
+  kind?: 'lesson' | 'event' | 'work_block' | 'protected' | 'locked';
+};
+
+export type ScheduleTaskInput = {
+  id: string;
+  title: string;
+  estimated_duration?: number | null;
+  depth?: 'deep' | 'shallow' | 'admin' | null;
+  cognitive_load?: 'low' | 'medium' | 'high' | null;
+  priority?: string | null;
+  due_date?: string | null;
+  target_date?: string | null;
+  depends_on?: string[];
+  blocked?: boolean;
+};
+
+export type ProposedBlock = {
+  temp_id: string;
+  task_id: string;
+  title: string;
+  date: string;
+  start_time: string;
+  duration_minutes: number;
+  depth: 'deep' | 'shallow' | 'admin';
+  selected: boolean;
+};
+
+export type UnscheduledItem = {
+  task_id: string;
+  title: string;
+  reason: string;
+  remaining_minutes?: number;
+};
+
+export type ScheduleComposeResult = {
+  status: 'fully_scheduled' | 'partially_scheduled' | 'impossible' | 'missing_info';
+  date: string;
+  proposed: ProposedBlock[];
+  unscheduled: UnscheduledItem[];
+  free_windows: Array<{ start: string; end: string; minutes: number }>;
+  workday: { start: string; end: string; source: string };
+  collisions: string[];
+};
+
+export function minutesOf(hhmm: string | null | undefined): number | null {
+  if (!hhmm) return null;
+  const m = String(hhmm).match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function formatMinutes(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function overlaps(a: TimedSpan, b: TimedSpan): boolean {
+  return a.start < b.end && b.start < a.end;
+}
+
+function freeSlots(
+  bounds: { start: number; end: number },
+  busy: TimedSpan[],
+  minMinutes = 15
+): Array<{ start: number; end: number }> {
+  const sorted = [...busy].sort((a, b) => a.start - b.start);
+  const gaps: Array<{ start: number; end: number }> = [];
+  let cursor = bounds.start;
+  for (const span of sorted) {
+    if (span.end <= bounds.start || span.start >= bounds.end) continue;
+    const start = Math.max(span.start, bounds.start);
+    const end = Math.min(span.end, bounds.end);
+    if (start > cursor && start - cursor >= minMinutes) {
+      gaps.push({ start: cursor, end: start });
+    }
+    cursor = Math.max(cursor, end);
+  }
+  if (bounds.end - cursor >= minMinutes) gaps.push({ start: cursor, end: bounds.end });
+  return gaps;
+}
+
+function firstFit(
+  gaps: Array<{ start: number; end: number }>,
+  minutes: number,
+  preferDeep: boolean
+): { start: number; end: number } | null {
+  const ordered = preferDeep
+    ? [...gaps].sort((a, b) => b.end - b.start - (a.end - a.start))
+    : gaps;
+  for (const gap of ordered) {
+    if (gap.end - gap.start >= minutes) {
+      return { start: gap.start, end: gap.start + minutes };
+    }
+  }
+  return null;
+}
+
+/** Teaching lessons: date + start_time (HH:MM); default duration 60. */
+export function lessonToBusySpan(lesson: {
+  title?: string;
+  start?: number;
+  end?: number;
+  start_minutes?: number;
+  end_minutes?: number;
+  starts_at?: string;
+  start_time?: string;
+  duration_minutes?: number;
+  minutes?: number;
+  duration?: number;
+}): TimedSpan | null {
+  if (!lesson) return null;
+  if (Number.isFinite(Number(lesson.start)) && Number.isFinite(Number(lesson.end))) {
+    return {
+      start: Number(lesson.start),
+      end: Number(lesson.end),
+      title: lesson.title ?? 'Lesson',
+      kind: 'lesson'
+    };
+  }
+  if (
+    Number.isFinite(Number(lesson.start_minutes)) &&
+    Number.isFinite(Number(lesson.end_minutes))
+  ) {
+    return {
+      start: Number(lesson.start_minutes),
+      end: Number(lesson.end_minutes),
+      title: lesson.title ?? 'Lesson',
+      kind: 'lesson'
+    };
+  }
+  const start =
+    minutesOf(lesson.starts_at || lesson.start_time) ??
+    (Number.isFinite(Number(lesson.start_minutes)) ? Number(lesson.start_minutes) : null);
+  if (start == null) return null;
+  const minutes = Number(lesson.duration_minutes || lesson.minutes || lesson.duration) || 60;
+  return {
+    start,
+    end: start + Math.max(1, Math.round(minutes)),
+    title: lesson.title ?? 'Lesson',
+    kind: 'lesson'
+  };
+}
+
+function minBlockMinutesForDepth(
+  depth: string,
+  profile: { deep_work_preference?: { min_block_minutes?: number } } | null | undefined
+): number {
+  if (depth === 'deep') {
+    const pref = Number(profile?.deep_work_preference?.min_block_minutes);
+    return Number.isFinite(pref) && pref > 0 ? pref : 90;
+  }
+  return 25;
+}
+
+export const FALLBACK_WORKDAY = {
+  start: '08:00',
+  end: '16:30',
+  source: 'fallback'
+} as const;
+
+function placeTaskBlocks(
+  task: ScheduleTaskInput,
+  opts: {
+    date: string;
+    bounds: { start: number; end: number };
+    hardBusy: TimedSpan[];
+    plannedSpans: TimedSpan[];
+    energy?: 'low' | 'medium' | 'high' | null;
+    profile?: { deep_work_preference?: { min_block_minutes?: number } } | null;
+  }
+): { proposed: ProposedBlock[]; remaining: number; reason: string | null } {
+  const known = Number(task.estimated_duration);
+  if (!Number.isFinite(known) || known <= 0) {
+    return {
+      proposed: [],
+      remaining: 0,
+      reason: 'Missing required duration estimate'
+    };
+  }
+  let remaining = Math.max(15, Math.round(known));
+  const depth = (task.depth ?? 'shallow') as ProposedBlock['depth'];
+  const minBlock = minBlockMinutesForDepth(depth, opts.profile);
+  const preferDeep = depth === 'deep' && opts.energy !== 'low';
+  const proposed: ProposedBlock[] = [];
+
+  while (remaining > 0) {
+    const busy = [...opts.hardBusy, ...opts.plannedSpans];
+    const gaps = freeSlots(opts.bounds, busy, Math.min(minBlock, remaining));
+    let slot = firstFit(gaps, remaining, preferDeep);
+    let chunk = remaining;
+    if (!slot) {
+      const ordered = preferDeep
+        ? [...gaps].sort((a, b) => b.end - b.start - (a.end - a.start))
+        : gaps;
+      const fit = ordered.find((g) => {
+        const size = g.end - g.start;
+        return size >= Math.min(minBlock, remaining);
+      });
+      if (!fit) break;
+      chunk = Math.min(remaining, fit.end - fit.start);
+      if (chunk < remaining && chunk < minBlock) break;
+      slot = { start: fit.start, end: fit.start + chunk };
+    }
+    proposed.push({
+      temp_id: `ghost_${task.id}_${formatMinutes(slot.start)}`,
+      task_id: task.id,
+      title: task.title,
+      date: opts.date,
+      start_time: formatMinutes(slot.start),
+      duration_minutes: chunk,
+      depth,
+      selected: true
+    });
+    opts.plannedSpans.push({
+      start: slot.start,
+      end: slot.end,
+      title: task.title,
+      kind: 'work_block'
+    });
+    remaining -= chunk;
+  }
+
+  return {
+    proposed,
+    remaining,
+    reason: remaining > 0 ? 'No free window under hard constraints' : null,
+    complete: remaining === 0 && proposed.length > 0
+  };
+}
+
+export function composeDaySchedule(input: {
+  date: string;
+  tasks: ScheduleTaskInput[];
+  lessons?: TimedSpan[];
+  events?: TimedSpan[];
+  confirmed_blocks?: TimedSpan[];
+  protected_windows?: TimedSpan[];
+  workday?: { start: string; end: string; source?: string } | null;
+  energy?: 'low' | 'medium' | 'high' | null;
+  planning_profile?: { deep_work_preference?: { min_block_minutes?: number } } | null;
+  profile?: { deep_work_preference?: { min_block_minutes?: number } } | null;
+}): ScheduleComposeResult {
+  const workday = input.workday?.start && input.workday?.end
+    ? {
+        start: input.workday.start,
+        end: input.workday.end,
+        source: input.workday.source || 'profile'
+      }
+    : { ...FALLBACK_WORKDAY };
+
+  const bounds = {
+    start: minutesOf(workday.start) ?? 8 * 60,
+    end: minutesOf(workday.end) ?? 16 * 60 + 30
+  };
+
+  const hardBusy: TimedSpan[] = [
+    ...(input.lessons ?? []),
+    ...(input.events ?? []),
+    ...(input.confirmed_blocks ?? []),
+    ...(input.protected_windows ?? [])
+  ];
+
+  const collisions: string[] = [];
+  for (let i = 0; i < hardBusy.length; i++) {
+    for (let j = i + 1; j < hardBusy.length; j++) {
+      if (overlaps(hardBusy[i]!, hardBusy[j]!)) {
+        collisions.push(
+          `${hardBusy[i]!.title ?? 'block'} overlaps ${hardBusy[j]!.title ?? 'block'}`
+        );
+      }
+    }
+  }
+
+  const proposed: ProposedBlock[] = [];
+  const unscheduled: UnscheduledItem[] = [];
+  const plannedSpans: TimedSpan[] = [];
+  const doneIds = new Set<string>();
+  const profile = input.planning_profile ?? input.profile ?? null;
+
+  const sorted = [...input.tasks].sort((a, b) => {
+    const depthScore = (d: string | null | undefined) =>
+      d === 'deep' ? 0 : d === 'shallow' ? 1 : 2;
+    if (a.due_date !== b.due_date) {
+      if (a.due_date && !b.due_date) return -1;
+      if (!a.due_date && b.due_date) return 1;
+      if (a.due_date && b.due_date) return a.due_date < b.due_date ? -1 : 1;
+    }
+    return depthScore(a.depth) - depthScore(b.depth);
+  });
+
+  for (const task of sorted) {
+    if (task.blocked) {
+      unscheduled.push({ task_id: task.id, title: task.title, reason: 'Blocked' });
+      continue;
+    }
+    const deps = task.depends_on ?? [];
+    if (deps.some((id) => !doneIds.has(id) && sorted.some((t) => t.id === id))) {
+      const unmet = deps.filter((id) => sorted.some((t) => t.id === id) && !doneIds.has(id));
+      if (unmet.length) {
+        unscheduled.push({
+          task_id: task.id,
+          title: task.title,
+          reason: `Depends on ${unmet.join(', ')}`
+        });
+        continue;
+      }
+    }
+
+    const placed = placeTaskBlocks(task, {
+      date: input.date,
+      bounds,
+      hardBusy,
+      plannedSpans,
+      energy: input.energy,
+      profile
+    });
+    if (placed.complete) {
+      proposed.push(...placed.proposed);
+      doneIds.add(task.id);
+    } else if (placed.reason) {
+      for (let i = 0; i < placed.proposed.length; i += 1) plannedSpans.pop();
+      unscheduled.push({
+        task_id: task.id,
+        title: task.title,
+        reason: placed.reason,
+        remaining_minutes: placed.remaining || undefined
+      });
+    }
+  }
+
+  const stillUnsched: UnscheduledItem[] = [];
+  for (const item of unscheduled) {
+    if (!item.reason.startsWith('Depends on')) {
+      stillUnsched.push(item);
+      continue;
+    }
+    const task = sorted.find((t) => t.id === item.task_id);
+    if (!task) {
+      stillUnsched.push(item);
+      continue;
+    }
+    const deps = task.depends_on ?? [];
+    if (deps.some((id) => sorted.some((t) => t.id === id) && !doneIds.has(id))) {
+      stillUnsched.push(item);
+      continue;
+    }
+    const placed = placeTaskBlocks(task, {
+      date: input.date,
+      bounds,
+      hardBusy,
+      plannedSpans,
+      energy: input.energy,
+      profile
+    });
+    if (placed.complete) {
+      proposed.push(...placed.proposed);
+      doneIds.add(task.id);
+    } else if (placed.reason) {
+      for (let i = 0; i < placed.proposed.length; i += 1) plannedSpans.pop();
+      stillUnsched.push({
+        task_id: task.id,
+        title: task.title,
+        reason: placed.reason,
+        remaining_minutes: placed.remaining || undefined
+      });
+    }
+  }
+
+  const finalGaps = freeSlots(bounds, [...hardBusy, ...plannedSpans]);
+  let status: ScheduleComposeResult['status'] = 'fully_scheduled';
+  if (!proposed.length && stillUnsched.length) {
+    status = stillUnsched.every((u) => u.reason.includes('Missing'))
+      ? 'missing_info'
+      : 'impossible';
+  } else if (stillUnsched.length) {
+    status = 'partially_scheduled';
+  }
+
+  return {
+    status,
+    date: input.date,
+    proposed,
+    unscheduled: stillUnsched,
+    free_windows: finalGaps.map((g) => ({
+      start: formatMinutes(g.start),
+      end: formatMinutes(g.end),
+      minutes: g.end - g.start
+    })),
+    workday,
+    collisions
+  };
+}
+
+/** Validate a proposed ghost set against current hard busy — used before Confirm. */
+export function validateProposedBlocks(
+  proposed: ProposedBlock[],
+  hardBusy: TimedSpan[],
+  workday = FALLBACK_WORKDAY
+): { ok: boolean; conflicts: Array<{ temp_id: string; reason: string }> } {
+  const bounds = {
+    start: minutesOf(workday.start) ?? 8 * 60,
+    end: minutesOf(workday.end) ?? 16 * 60 + 30
+  };
+  const conflicts: Array<{ temp_id: string; reason: string }> = [];
+  const accepted: TimedSpan[] = [];
+  for (const block of proposed) {
+    if (!block.selected) continue;
+    const start = minutesOf(block.start_time);
+    if (start == null) {
+      conflicts.push({ temp_id: block.temp_id, reason: 'Invalid start time' });
+      continue;
+    }
+    const span: TimedSpan = {
+      start,
+      end: start + block.duration_minutes,
+      title: block.title,
+      kind: 'work_block'
+    };
+    if (span.start < bounds.start || span.end > bounds.end) {
+      conflicts.push({ temp_id: block.temp_id, reason: 'Outside work boundaries' });
+      continue;
+    }
+    const hit = [...hardBusy, ...accepted].find((b) => overlaps(b, span));
+    if (hit) {
+      conflicts.push({
+        temp_id: block.temp_id,
+        reason: `Collides with ${hit.title ?? hit.kind ?? 'busy time'}`
+      });
+      continue;
+    }
+    accepted.push(span);
+  }
+  return { ok: conflicts.length === 0, conflicts };
+}
+
+export function detectStaleScheduleCollisions(input: {
+  proposedBlocks: ProposedBlock[];
+  hardBusy: TimedSpan[];
+  workday?: { start: string; end: string; source?: string };
+}): {
+  ok: boolean;
+  error?: string;
+  conflicts: Array<{ temp_id: string; reason: string }>;
+  revised?: {
+    status: string;
+    note: string;
+    conflicts: Array<{ temp_id: string; reason: string }>;
+    hard_busy: TimedSpan[];
+  };
+} {
+  const check = validateProposedBlocks(
+    input.proposedBlocks ?? [],
+    input.hardBusy ?? [],
+    input.workday ?? FALLBACK_WORKDAY
+  );
+  if (check.ok) return { ok: true, conflicts: [] };
+  return {
+    ok: false,
+    error: 'stale_schedule_collision',
+    conflicts: check.conflicts,
+    revised: {
+      status: 'needs_recompose',
+      note: 'Calendar changed since proposal — confirm blocked. Recompose against current hard busy.',
+      conflicts: check.conflicts,
+      hard_busy: input.hardBusy
+    }
+  };
+}

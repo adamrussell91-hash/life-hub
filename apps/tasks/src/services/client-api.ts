@@ -396,5 +396,47 @@ export const tasksApi = {
 
   getTaskProperties: () => apiGet<import('@/schemas/task-properties').TaskPropertyConfig>('/api/task-properties'),
   updateTaskProperties: (body: import('@/schemas/task-properties').TaskPropertyConfig) =>
-    apiPut<import('@/schemas/task-properties').TaskPropertyConfig>('/api/task-properties', body)
+    apiPut<import('@/schemas/task-properties').TaskPropertyConfig>('/api/task-properties', body),
+
+  listWorkBlocks: () =>
+    apiGet<{ work_blocks: import('@/schemas/work-block').WorkBlock[] }>('/api/work-blocks').then(
+      (r) => r.work_blocks
+    ),
+  getWorkBlock: (id: string) =>
+    apiGet<import('@/schemas/work-block').WorkBlock>(
+      `/api/work-blocks?id=${encodeURIComponent(id)}`
+    ),
+  createWorkBlock: (body: unknown) =>
+    apiPost<import('@/schemas/work-block').WorkBlock>('/api/work-blocks', body),
+  updateWorkBlock: (id: string, body: unknown) =>
+    apiPatch<import('@/schemas/work-block').WorkBlock>(
+      `/api/work-blocks?id=${encodeURIComponent(id)}`,
+      body
+    ),
+  deleteWorkBlock: (id: string) =>
+    apiDelete<{ deleted: boolean }>(`/api/work-blocks?id=${encodeURIComponent(id)}`),
+
+  listWorkSessions: () =>
+    apiGet<{ work_sessions: import('@/schemas/work-session').WorkSession[] }>(
+      '/api/work-sessions'
+    ).then((r) => r.work_sessions),
+  createWorkSession: (body: unknown) =>
+    apiPost<import('@/schemas/work-session').WorkSession>('/api/work-sessions', body),
+  updateWorkSession: (id: string, body: unknown) =>
+    apiPatch<import('@/schemas/work-session').WorkSession>(
+      `/api/work-sessions?id=${encodeURIComponent(id)}`,
+      body
+    ),
+
+  getPlanningProfile: () =>
+    apiGet<import('@/schemas/planning-profile').PlanningProfile>('/api/planning-profile'),
+  updatePlanningProfile: (body: unknown) =>
+    apiPatch<import('@/schemas/planning-profile').PlanningProfile>('/api/planning-profile', body),
+  getPlanningDirection: () =>
+    apiGet<import('@/schemas/planning-direction').PlanningDirection>('/api/planning-direction'),
+  updatePlanningDirection: (body: unknown) =>
+    apiPatch<import('@/schemas/planning-direction').PlanningDirection>(
+      '/api/planning-direction',
+      body
+    )
 };

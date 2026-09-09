@@ -327,6 +327,258 @@
         "governance_log"
       ],
       "tool_name": "update_task"
+    },
+    "clare.clarify": {
+      "file": "clare/clarify.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "clarify_dump"
+    },
+    "clare.project-health": {
+      "file": "clare/project-health.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "project_health"
+    },
+    "clare.waiting": {
+      "file": "clare/waiting.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "waiting_review"
+    },
+    "clare.weekly-review": {
+      "file": "clare/weekly-review.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "weekly_review"
+    },
+    "clare.project-plan": {
+      "file": "clare/project-plan.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "project_plan"
+    },
+    "clare.context-match": {
+      "file": "clare/context-match.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "context_match"
+    },
+    "clare.compose-schedule": {
+      "file": "clare/compose-schedule.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "compose_schedule"
+    },
+    "clare.focus-block": {
+      "file": "clare/focus-block.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "focus_block"
+    },
+    "clare.shutdown": {
+      "file": "clare/shutdown.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "shutdown_day"
+    },
+    "clare.deadline-runway": {
+      "file": "clare/deadline-runway.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "deadline_runway"
+    },
+    "hammond.horizons": {
+      "file": "hammond/horizons.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "horizons_chain"
+    },
+    "hammond.portfolio": {
+      "file": "hammond/portfolio.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "portfolio_meter"
+    },
+    "hammond.capacity": {
+      "file": "hammond/capacity.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "capacity_day"
+    },
+    "hammond.multiscale": {
+      "file": "hammond/multiscale.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "multiscale_plan"
+    },
+    "hammond.pace": {
+      "file": "hammond/pace.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "pace_audit"
+    },
+    "hammond.threefold": {
+      "file": "hammond/threefold.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "threefold_audit"
+    },
+    "hammond.attention": {
+      "file": "hammond/attention.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "attention_audit"
+    },
+    "hammond.depth": {
+      "file": "hammond/depth.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "depth_budget"
+    },
+    "hammond.strategic-review": {
+      "file": "hammond/strategic-review.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "strategic_review"
+    },
+    "hammond.week-mission-handoff": {
+      "file": "hammond/week-mission-handoff.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "week_mission_handoff"
+    },
+    "hammond.reconcile-clare-schedule": {
+      "file": "hammond/reconcile-clare-schedule.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "reconcile_clare_schedule"
     }
   }
 }

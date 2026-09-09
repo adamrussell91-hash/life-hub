@@ -1,0 +1,15 @@
+{
+  "id": "hammond.capacity",
+  "tool_name": "capacity_day",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Day capacity from profile work and protected windows.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

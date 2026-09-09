@@ -1,0 +1,15 @@
+{
+  "id": "clare.context-match",
+  "tool_name": "context_match",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Match open actions to current constraints.",
+  "surfaces": [
+    "chat",
+    "confirm_card"
+  ]
+}
