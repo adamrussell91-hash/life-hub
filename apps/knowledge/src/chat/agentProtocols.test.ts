@@ -33,7 +33,7 @@ describe("agentProtocols", () => {
   it("resolves the hat from a selected protocol", () => {
     expect(protocolHat("clementine", "methods")).toBe("methods");
     expect(protocolHat("ann", "close-read")).toBe("synthesis");
-    expect(protocolHat("clementine", null)).toBe("synthesis");
+    expect(protocolHat("clementine", null)).toBe("scoping");
   });
 
   it("keeps camelCase hat protocol ids", () => {

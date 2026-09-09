@@ -284,6 +284,31 @@ describe("runChatTurn", () => {
     expect(result).toMatchObject({ status: "researching", researchSessionId: "sess-1" });
   });
 
+  it("routes existence checks onto quick research even when synthesis is selected", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => researchResult({ findings: [finding] }),
+    });
+    const complete = vi.fn();
+    const result = await runChatTurn({
+      voice,
+      universityJob,
+      hat: "synthesis",
+      depth: "iterative",
+      messages: [{ role: "user", content: "Do I already have a note on coincidence reasoning?" }],
+      kernel: { url: "https://kernel.test", secret: "k", fetchImpl: fetchImpl as unknown as typeof fetch },
+      complete,
+    });
+    expect(fetchImpl.mock.calls[0]?.[0]).toBe("https://kernel.test/quick_research");
+    expect(JSON.parse(String((fetchImpl.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({
+      query: "coincidence reasoning",
+      k: 32,
+      maxRounds: 1,
+    });
+    expect(complete).not.toHaveBeenCalled();
+    expect(result.status).toBe("compose");
+  });
+
   it("polls a finished deep session then completes", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,

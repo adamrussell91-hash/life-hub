@@ -3,7 +3,8 @@ import { newHubPageId } from "../domain/page";
 import { escapeHtml, showToast } from "../lib/dom";
 import { bindKeyboardInset } from "../lib/keyboardInset";
 import { findProtocol, protocolHat } from "./agentProtocols";
-import { isWebFileNoteHat, resolveChatPlan } from "./hats";
+import { hatForArchiveMessage, isWebFileNoteHat, resolveChatPlan } from "./hats";
+import { isArchiveLookupQuery } from "../research/topicQuery";
 import {
   bookContextLine,
   bookOrigin,
@@ -156,7 +157,13 @@ function nextWaitLine(exclude?: string) {
 }
 
 function overlayTickText(state: OverlayWorking): string {
-  const plan = resolveChatPlan(protocolHat(personality, selectedProtocolId));
+  const lastUser = [...turns].reverse().find(turn => turn.role === "user")?.content ?? "";
+  const selected = protocolHat(personality, selectedProtocolId);
+  const remapped = hatForArchiveMessage(selected, lastUser, isArchiveLookupQuery);
+  const plan = resolveChatPlan(remapped.hat, {
+    depth: remapped.depth,
+    scope: remapped.scope,
+  });
   const hasResearchMeta = Boolean(
     state.research &&
       (state.research.round != null ||
@@ -334,10 +341,18 @@ async function send(outgoingOverride?: string) {
   persist();
   if (!(continuing && paintWorkingStatus())) paint();
   try {
+    const selectedHat = protocolHat(personality, selectedProtocolId);
+    const queryForPlan =
+      outgoing ||
+      [...history].reverse().find(turn => turn.role === "user")?.content ||
+      "";
+    const remapped = hatForArchiveMessage(selectedHat, queryForPlan, isArchiveLookupQuery);
     const result = await runChat({
-      hat: protocolHat(personality, selectedProtocolId),
+      hat: remapped.hat,
+      depth: remapped.depth,
+      scope: remapped.scope,
       personality,
-      protocolId: pill ? selectedProtocolId ?? undefined : undefined,
+      protocolId: remapped.hat === selectedHat ? (pill ? selectedProtocolId ?? undefined : undefined) : undefined,
       bookContext,
       messages: history.map(({ role, content }) => ({ role, content })),
       noteContext: notes[0],
