@@ -2468,7 +2468,9 @@
   max-height: min(70vh, 40rem);
   padding: var(--space-3);
   border-radius: var(--radius-lg);
-  background: var(--hub-glass-fill);
+  background: var(--paper);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid rgba(255, 255, 255, 0.92);
   border-left: 0.25rem solid var(--agent-accent, var(--wave));
   box-shadow: var(--elev-4);

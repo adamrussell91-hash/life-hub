@@ -76,6 +76,7 @@ const NOTE = ['remember', 'note:', 'fyi', 'just so', 'ref:', 'for later', 'idea:
 
 /** Corrections, questions-about-Clare, and other chat turns that are not work to capture. */
 const NON_ACTIONABLE = [
+  /^(?:hi|hey|hello|thanks|thank you|cheers|ok|okay|ta|got it)\.?$/i,
   /\bit was a question\b/i,
   /\bnot something to create\b/i,
   /\bnot a task\b/i,
@@ -241,6 +242,7 @@ function inferPriority(text: string): TaskPriority {
 
 function isNonActionable(text: string): boolean {
   if (NON_ACTIONABLE.some((pattern) => pattern.test(text))) return true;
+  if (looksLikeTaskDirection(text)) return true;
   // Lexical wording fixes (“Encouraging is supposed to be incursion”) — not new work.
   if (parseWordingCorrection(text)) return true;
   if (/\?\s*$/.test(text.trim()) && !includesAny(text, COMMS)) {
@@ -394,6 +396,7 @@ function looksLikeLexicalSwap(wrong: string, right: string, full: string): boole
   ) {
     return false;
   }
+  if (/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(full)) return false;
   if (/\b(?:sent|done|finished|ready|due|scheduled)\b/i.test(right)) return false;
   const wWords = wrong.trim().split(/\s+/).filter(Boolean).length;
   const rWords = right.trim().split(/\s+/).filter(Boolean).length;
@@ -506,6 +509,217 @@ export function resolveWordingCorrectionFollowUp(
     wrong: parsed.wrong,
     right: parsed.right,
     correctedTitles
+  };
+}
+
+const CLOCK_TOKEN = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i;
+const CLOCK_24 = /\b([01]?\d|2[0-3]):([0-5]\d)\b/;
+
+/** Board due_time is HH:mm. */
+export function parseClockTime(token: string): string | null {
+  const mer = CLOCK_TOKEN.exec(token.trim());
+  if (mer) {
+    const hour = Number(mer[1]);
+    const minute = mer[2] ? Number(mer[2]) : 0;
+    const suffix = mer[3]!.toLowerCase();
+    if (hour < 1 || hour > 12 || minute > 59) return null;
+    let h = hour % 12;
+    if (suffix === 'pm') h += 12;
+    return `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  }
+  const twentyFour = CLOCK_24.exec(token.trim());
+  if (!twentyFour) return null;
+  return `${String(Number(twentyFour[1])).padStart(2, '0')}:${twentyFour[2]}`;
+}
+
+export function formatClockTime(hhmm: string): string {
+  const [hourPart, minutePart] = hhmm.split(':');
+  const hour = Number(hourPart);
+  const minute = Number(minutePart);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return hhmm;
+  const mer = hour >= 12 ? 'pm' : 'am';
+  const twelve = hour % 12 || 12;
+  return minute ? `${twelve}:${String(minute).padStart(2, '0')}${mer}` : `${twelve}${mer}`;
+}
+
+function extractTargetTime(text: string): string | null {
+  const toBe =
+    /(?:to be|make it|set (?:it|this|that) to|change (?:it |this |that |the time |the due(?: time)? )?to|at)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i.exec(
+      text
+    );
+  if (toBe?.[1]) {
+    const parsed = parseClockTime(toBe[1]);
+    if (parsed) return parsed;
+  }
+  const xNotY =
+    /(\d{1,2}(?::\d{2})?\s*(?:am|pm))\s+not\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i.exec(text);
+  if (xNotY?.[1]) {
+    const parsed = parseClockTime(xNotY[1]);
+    if (parsed) return parsed;
+  }
+  const notThen =
+    /\bnot\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b[,\s—-]+(?:it'?s\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i.exec(
+      text
+    );
+  if (notThen?.[2]) {
+    const parsed = parseClockTime(notThen[2]);
+    if (parsed) return parsed;
+  }
+  const clocks = [...text.matchAll(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi)];
+  if (clocks.length === 1) return parseClockTime(clocks[0]![0]!);
+  return null;
+}
+
+/** Edit / reschedule talk — not a new card to capture. */
+export function looksLikeTaskDirection(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (
+    /\b(?:edit|change|fix|update|move|reschedule)\s+(?:this|that)(?:\s+task|\s+one|\s+card)?\b/i.test(t)
+  ) {
+    return true;
+  }
+  if (/\b(?:edit|change|fix|update|move|reschedule)\s+the\s+(?:task|time|due(?: date| time)?)\b/i.test(t)) {
+    return true;
+  }
+  if (/\b(?:this|that)\s+task\b/i.test(t) && /\b(?:edit|update|change|fix|move|make|set|be|not)\b/i.test(t)) {
+    return true;
+  }
+  if (/\bmake (?:it|this|that)\b/i.test(t) && CLOCK_TOKEN.test(t)) return true;
+  if (/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\s+not\s+\d/i.test(t)) return true;
+  if (
+    /\bnot\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(t) &&
+    /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(t)
+  ) {
+    return true;
+  }
+  if (/\bchange (?:the )?(?:time|due(?: date| time)?)\b/i.test(t)) return true;
+  if (
+    /^(?:can you |please )?(?:edit|update|change|move|fix|reschedule)\b/i.test(t) &&
+    !/\b(?:email|mark|write|book|call|prep|finish)\b/i.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export type TaskDirectionFocus = {
+  type?: string;
+  id?: string;
+};
+
+export type TaskDirection = {
+  voice: string;
+  question: string | null;
+  task_id: string | null;
+  patch: Record<string, unknown> | null;
+  summary: string | null;
+};
+
+function openTaskRows<T extends { id: string; title: string; status?: string; due_time?: string | null }>(
+  tasks: T[]
+): T[] {
+  return tasks.filter((task) => task.status !== 'done' && task.status !== 'dead');
+}
+
+function resolveDirectionTask<T extends { id: string; title: string; status?: string; due_time?: string | null }>(
+  text: string,
+  tasks: T[],
+  focus?: TaskDirectionFocus | null,
+  recentThread?: Array<{ role: string; text: string }>
+): T | null {
+  const open = openTaskRows(tasks);
+  if (focus?.type === 'task' && focus.id) {
+    return open.find((task) => task.id === focus.id) ?? null;
+  }
+  const lower = text.toLowerCase();
+  let best: T | null = null;
+  for (const task of open) {
+    const title = task.title.trim().toLowerCase();
+    if (title.length < 4) continue;
+    if (lower.includes(title) && (!best || title.length > best.title.length)) best = task;
+  }
+  if (best) return best;
+
+  const rejected = [...text.matchAll(/\bnot\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/gi)]
+    .map((match) => parseClockTime(match[1] ?? ''))
+    .filter((value): value is string => Boolean(value));
+  if (rejected.length) {
+    const timed = open.filter((task) => task.due_time && rejected.includes(task.due_time));
+    if (timed.length === 1) return timed[0]!;
+  }
+
+  if (recentThread?.length) {
+    for (let i = recentThread.length - 1; i >= 0; i -= 1) {
+      const turn = recentThread[i]!;
+      for (const match of turn.text.matchAll(/[“"]([^”"]{3,})[”"]/g)) {
+        const title = match[1]?.trim().toLowerCase();
+        if (!title) continue;
+        const hit = open.find((task) => task.title.trim().toLowerCase() === title);
+        if (hit) return hit;
+      }
+    }
+  }
+  return null;
+}
+
+function describeDirectionPatch(patch: Record<string, unknown>): string {
+  const bits: string[] = [];
+  if (typeof patch.due_time === 'string') bits.push(formatClockTime(patch.due_time));
+  if (typeof patch.due_date === 'string') bits.push(patch.due_date);
+  return bits.join(' · ') || 'that change';
+}
+
+/**
+ * “Edit this task to be 1pm not 1am” is a direction, not a new dump card.
+ * Returns null when the line is ordinary capture.
+ */
+export function resolveTaskDirection(
+  text: string,
+  options: {
+    focus?: TaskDirectionFocus | null;
+    tasks?: Array<{ id: string; title: string; status?: string; due_time?: string | null }>;
+    recentThread?: Array<{ role: string; text: string }>;
+    now?: Date;
+    timezone?: string;
+  } = {}
+): TaskDirection | null {
+  const trimmed = text.trim();
+  if (!trimmed || !looksLikeTaskDirection(trimmed)) return null;
+
+  const due_time = extractTargetTime(trimmed);
+  const { due_date } = inferDue(trimmed.toLowerCase(), options.now ?? new Date(), options.timezone ?? HUB_TZ);
+  const patch: Record<string, unknown> = {};
+  if (due_time) patch.due_time = due_time;
+  if (due_date) patch.due_date = due_date;
+
+  const task = resolveDirectionTask(trimmed, options.tasks ?? [], options.focus, options.recentThread);
+  if (!task) {
+    const hint = Object.keys(patch).length ? describeDirectionPatch(patch) : 'that change';
+    return {
+      voice: `That's a direction, not a new card. Which task should I set to ${hint}?`,
+      question: 'Name the task, or open it on the board first.',
+      task_id: null,
+      patch: null,
+      summary: null
+    };
+  }
+  if (!Object.keys(patch).length) {
+    return {
+      voice: `I hear the edit on “${task.title}” — what should change?`,
+      question: `What should change on “${task.title}”?`,
+      task_id: task.id,
+      patch: null,
+      summary: null
+    };
+  }
+  const summary = `Change ${task.title} to ${describeDirectionPatch(patch)}`;
+  return {
+    voice: `Updating “${task.title}” to ${describeDirectionPatch(patch)}. Confirm when ready.`,
+    question: null,
+    task_id: task.id,
+    patch,
+    summary
   };
 }
 

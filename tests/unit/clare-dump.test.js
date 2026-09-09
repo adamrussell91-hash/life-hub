@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assembleDumpResult } from '../../netlify/functions/_shared/clare.mjs';
+import { assembleDumpResult, dumpResultFromDirection } from '../../netlify/functions/_shared/clare.mjs';
 import {
+  looksLikeTaskDirection,
   parseBrainDump,
+  parseClockTime,
   parseWordingCorrection,
   resolveDuplicateFollowUp,
+  resolveTaskDirection,
   resolveWordingCorrectionFollowUp,
   splitDumpLines
 } from '../../netlify/functions/_shared/clare-dump.mjs';
@@ -137,6 +140,30 @@ test('rewrites the prior quoted title when Adam corrects a word', () => {
   assert.ok(result.proposals.length >= 1);
   assert.ok(result.proposals.every(p => /incursion/i.test(p.title)));
   assert.ok(result.proposals.every(p => !/supposed to be/i.test(p.title)));
+});
+
+test('time-edit directions are not new dump cards', () => {
+  assert.equal(looksLikeTaskDirection('edit this task to be 1pm not 1am'), true);
+  assert.equal(parseClockTime('1pm'), '13:00');
+  assert.equal(parseWordingCorrection('edit this task to be 1pm not 1am'), null);
+  const items = parseBrainDump('edit this task to be 1pm not 1am', {
+    now: new Date(2026, 8, 9),
+    preferredDomain: 'teaching'
+  });
+  assert.equal(items[0].kind, 'meta');
+  assert.equal(items[0].actionable, false);
+  assert.equal(assembleDumpResult(items, frameworks, () => null).proposals.length, 0);
+  const direction = resolveTaskDirection('edit this task to be 1pm not 1am', {
+    focus: { type: 'task', id: 'task_meet' },
+    tasks: [{ id: 'task_meet', title: 'Parent meeting', status: 'open', due_time: '01:00' }]
+  });
+  assert.equal(direction.task_id, 'task_meet');
+  assert.deepEqual(direction.patch, { due_time: '13:00' });
+  const result = dumpResultFromDirection(direction);
+  assert.equal(result.proposals.length, 0);
+  assert.equal(result.mutations[0].kind, 'task_update');
+  assert.equal(result.mutations[0].task_id, 'task_meet');
+  assert.deepEqual(result.mutations[0].patch, { due_time: '13:00' });
 });
 
 test('scheduling supposed-to-be lines stay actionable', () => {
