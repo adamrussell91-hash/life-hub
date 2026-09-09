@@ -3,7 +3,6 @@ import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { layoutOrbit, separateCloseAngles, taskUrgency, type OrbitBody } from '@/domain/orbit';
 import { layoutProjectBranch } from '@/domain/branch';
-import { buildConstellation } from '@/domain/constellation';
 
 const baseTask = (partial: Partial<Task> & Pick<Task, 'id' | 'title'>): Task => ({
   schema_version: 1,
@@ -161,43 +160,5 @@ describe('branch layout', () => {
       layout.edges.some((e) => e.from === 't_root' && e.to === 't_blocked' && e.kind === 'depends_on')
     ).toBe(true);
     expect(layout.nodes.find((n) => n.id === 't_child')!.depth).toBe(2);
-  });
-});
-
-describe('constellation', () => {
-  it('lights completed stars and dims fill when overdue', () => {
-    const from = new Date('2026-08-16T12:00:00.000Z');
-    const tasks = [
-      baseTask({
-        id: 'done1',
-        title: 'Done A',
-        status: 'done',
-        completed_at: '2026-08-15T00:00:00.000Z'
-      }),
-      baseTask({
-        id: 'done2',
-        title: 'Done B',
-        status: 'done',
-        completed_at: '2026-08-14T00:00:00.000Z'
-      }),
-      baseTask({
-        id: 'open1',
-        title: 'Open',
-        status: 'open',
-        due_date: '2026-08-10'
-      }),
-      baseTask({
-        id: 'open2',
-        title: 'Also open',
-        status: 'open',
-        due_date: '2026-08-12'
-      })
-    ];
-    const model = buildConstellation(tasks, from);
-    expect(model.completed_count).toBe(2);
-    expect(model.overdue_count).toBe(2);
-    expect(model.stars.filter((s) => s.lit).length).toBe(2);
-    expect(model.fill_ratio).toBeLessThan(0.5);
-    expect(model.headline.length).toBeGreaterThan(0);
   });
 });

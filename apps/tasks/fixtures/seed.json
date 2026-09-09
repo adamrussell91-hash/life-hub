@@ -743,7 +743,7 @@
       "schema_version": 1,
       "id": "task_demo_walk_done",
       "title": "Evening walk — done",
-      "description": "Seed completion so the constellation has a lit star.",
+      "description": "Seed completion for a done task.",
       "domain": "health",
       "framework_used": null,
       "estimated_duration": 25,

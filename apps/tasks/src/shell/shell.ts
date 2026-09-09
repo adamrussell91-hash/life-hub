@@ -46,7 +46,6 @@ export type HubViewId =
   | 'orbit'
   | 'universe'
   | 'branch'
-  | 'constellation'
   | 'day'
   | 'week'
   | 'month'
@@ -133,14 +132,13 @@ export function resetRailDisclosureStateForTests(): void {
   railDisclosure.reset();
 }
 
-const STRETCH_VIEWS: HubViewId[] = ['orbit', 'universe', 'branch', 'constellation'];
+const STRETCH_VIEWS: HubViewId[] = ['orbit', 'universe', 'branch'];
 
 const NAV: NavItem[] = [
   ...NAV_SECTIONS.flatMap((section) => section.items),
   { id: 'orbit', label: 'Orbit', href: '#/orbit' },
   { id: 'universe', label: 'Universe', href: '#/universe' },
-  { id: 'branch', label: 'Branch', href: '#/branch' },
-  { id: 'constellation', label: 'Sky', href: '#/constellation' }
+  { id: 'branch', label: 'Branch', href: '#/branch' }
 ];
 
 export function railHighlightId(view: HubViewId): HubViewId {

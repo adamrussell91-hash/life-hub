@@ -41,7 +41,6 @@ import { renderTimelineView } from '@/views/timeline';
 import { renderOrbitView } from '@/views/orbit';
 import { renderUniverseView } from '@/views/universe';
 import { renderBranchView } from '@/views/branch';
-import { renderConstellationView } from '@/views/constellation';
 import { renderClareView } from '@/views/clare';
 import { installClareSession } from '@/chat/clare-session';
 import { attachVisualViewportInset } from '@/chat/visual-viewport';
@@ -107,8 +106,6 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       return renderUniverseView(canvas);
     case 'branch':
       return renderBranchView(canvas);
-    case 'constellation':
-      return renderConstellationView(canvas);
     case 'day':
       return renderDayView(canvas);
     case 'week':

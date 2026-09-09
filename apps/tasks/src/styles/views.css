@@ -3024,11 +3024,10 @@
   color: var(--navy);
 }
 
-/* Stretch views — Orbit / Branch / Constellation (spec §6.5) */
+/* Stretch views — Orbit / Branch (spec §6.5) */
 
 .orbit-svg,
-.branch-svg,
-.constellation-svg {
+.branch-svg {
   display: block;
   width: 100%;
 }
@@ -3434,76 +3433,6 @@
 .graph-stage {
   position: relative;
   min-height: 12rem;
-}
-
-.constellation-sky {
-  transition: opacity 0.8s ease;
-}
-
-.constellation-haze {
-  fill: var(--warning-surface);
-  animation: constellation-breathe 4.5s ease-in-out infinite;
-}
-
-@keyframes constellation-breathe {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 0.85;
-  }
-}
-
-.constellation-line {
-  stroke: var(--pastel-gold);
-  stroke-width: 1;
-  opacity: 0;
-  animation: constellation-line-in 0.8s ease forwards;
-  animation-delay: var(--line-delay, 0ms);
-}
-
-@keyframes constellation-line-in {
-  to {
-    opacity: 0.55;
-  }
-}
-
-.constellation-star circle {
-  fill: rgba(255, 255, 255, 0.28);
-  stroke: transparent;
-}
-
-.constellation-star--lit circle {
-  fill: var(--pastel-gold);
-  stroke: var(--pastel-gold-ink);
-  stroke-width: 0.6;
-  animation: constellation-twinkle 2.8s ease-in-out infinite;
-  animation-delay: var(--star-delay, 0ms);
-}
-
-@keyframes constellation-twinkle {
-  0%,
-  100% {
-    opacity: 0.75;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.15);
-  }
-}
-
-.constellation-star--lit {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.constellation-fill {
-  fill: var(--on-dark);
-  font-family: var(--font-ui);
-  font-size: var(--text-xs);
-  opacity: 0.85;
 }
 
 .map-page {
@@ -4478,7 +4407,6 @@ html.is-map-fullscreen .map-page .map-preview {
 
 .orbit-host,
 .branch-host,
-.constellation-host,
 .graph-host {
   overflow: auto;
 }
@@ -5095,15 +5023,11 @@ body.is-universe-fullscreen .page-header {
 
   .orbit-spin,
   .branch-edge,
-  .branch-node,
-  .constellation-haze,
-  .constellation-line,
-  .constellation-star--lit circle {
+  .branch-node {
     animation: none;
   }
 
-  .branch-node,
-  .constellation-line {
+  .branch-node {
     opacity: 1;
   }
 

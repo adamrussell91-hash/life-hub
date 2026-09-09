@@ -140,15 +140,15 @@ describe('graph view mode pills', () => {
 
     canvas.replaceChildren();
     const leftover = document.createElement('div');
-    leftover.className = 'constellation-host graph-host';
-    leftover.textContent = 'sky leftover';
+    leftover.className = 'orbit-host graph-host';
+    leftover.textContent = 'orbit leftover';
     canvas.append(leftover);
 
     location.hash = '#/graph?mode=workstreams';
     await renderGraphView(canvas);
 
     expect(canvas.querySelector('.graph-stage')).not.toBeNull();
-    expect(canvas.textContent).not.toContain('sky leftover');
+    expect(canvas.textContent).not.toContain('orbit leftover');
     const workstreams = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
       (btn) => btn.textContent === 'Workstreams'
     );

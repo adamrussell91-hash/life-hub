@@ -16,8 +16,7 @@ const MODES: Array<{ id: HubViewId; label: string; href: string }> = [
   { id: 'graph', label: 'Workstreams', href: '#/graph?mode=workstreams' },
   { id: 'universe', label: 'Universe', href: '#/universe' },
   { id: 'orbit', label: 'Orbit', href: '#/orbit' },
-  { id: 'branch', label: 'Branch', href: '#/branch' },
-  { id: 'constellation', label: 'Sky', href: '#/constellation' }
+  { id: 'branch', label: 'Branch', href: '#/branch' }
 ];
 
 /** Graph page pills — blockers / workstreams plus stretch views. */
