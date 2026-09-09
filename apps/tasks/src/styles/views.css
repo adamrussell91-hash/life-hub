@@ -2108,6 +2108,14 @@
     height: 2.4rem;
   }
 
+  .chat-view[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+    display: none;
+  }
+
+  .chat-view[data-chrome='engaged'] .agent-picker__name {
+    display: none;
+  }
+
   /* Mobile texting proportions — nearly full width, not a 17.5rem desk card. */
   .chat-message {
     max-width: min(92%, 100%);
@@ -2117,7 +2125,8 @@
   .chat-message__avatar {
     width: 1.6rem;
     height: 1.6rem;
-    margin-top: 0.15rem;
+    margin-top: 0;
+    margin-bottom: 0.15rem;
   }
 
   /* Messenger body density — beat chat-prose assistant specificity. */
