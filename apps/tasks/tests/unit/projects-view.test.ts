@@ -12,6 +12,7 @@ vi.mock('@/services/client-api', () => ({
     listTasks: vi.fn(),
     listGoals: vi.fn(),
     listReviewLogs: vi.fn(),
+    getPlanningProfile: vi.fn(),
     closeProject: vi.fn(),
     createProject: vi.fn(),
     deleteProject: vi.fn(),
@@ -147,6 +148,7 @@ describe('projects view rebuild', () => {
       }
     ]);
     vi.mocked(tasksApi.listReviewLogs).mockResolvedValue([]);
+    vi.mocked(tasksApi.getPlanningProfile).mockRejectedValue(new Error('no profile'));
     location.hash = '#/projects';
   });
 
@@ -170,6 +172,17 @@ describe('projects view rebuild', () => {
     expect(legend.some((text) => text?.includes('Not started') && text.includes('1'))).toBe(true);
     expect(legend.some((text) => text?.includes('Completed') && text.includes('1'))).toBe(true);
     expect(legend.some((text) => text?.includes('Stalled') && text.includes('1'))).toBe(true);
+  });
+
+  it('still paints when a stored project omitted milestones', async () => {
+    const legacy = project({ id: 'proj_legacy', title: 'Blob without milestones' });
+    delete (legacy as { milestones?: Project['milestones'] }).milestones;
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([legacy]);
+    const canvas = document.createElement('main');
+    await renderProjectsView(canvas);
+    expect(canvas.textContent).not.toMatch(/Could not load Projects/);
+    expect(canvas.querySelector('.projects-chart')).not.toBeNull();
+    expect(canvas.textContent).toContain('Blob without milestones');
   });
 
   it('puts a plus-add on the toolbar so a project can be created', async () => {
@@ -356,6 +369,7 @@ describe('projects view rebuild', () => {
     expect(pulse).not.toBeNull();
     expect(heat).not.toBeNull();
     expect(chart).not.toBeNull();
+    expect(canvas.querySelector('.projects-toolbar')).not.toBeNull();
     expect(board!.compareDocumentPosition(pulse!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(pulse!.compareDocumentPosition(heat!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(canvas.textContent).not.toContain('Portfolio health');

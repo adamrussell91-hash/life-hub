@@ -141,6 +141,9 @@ let selectedItemId: string | null = null;
 let composeDraft: { dateKey: string; dueTime: string | null } = { dateKey: '', dueTime: null };
 let lastMonthDelta = 0;
 let focusComposeOnPaint = false;
+/** Month view: the date_key whose "bloom" drawer (full item list, inline) is open. */
+let bloomDateKey: string | null = null;
+let scrollToPreviewOnPaint = false;
 
 type LiveCalendar = {
   canvas: HTMLElement;
@@ -502,6 +505,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     }
     if (session.mode === next && !date) return;
     session.mode = next;
+    bloomDateKey = null;
     paint();
     const nextHash = calendarHash(next, anchor);
     if (location.hash !== nextHash) location.hash = nextHash;
@@ -512,6 +516,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     anchor = addCalendarRange(anchor, session.mode, delta);
     if (session.mode === 'day') selectedDateKey = toDateKey(anchor);
     else selectedDateKey = null;
+    bloomDateKey = null;
     replaceHash(session.mode, anchor);
     paint();
   }
@@ -520,21 +525,16 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     lastMonthDelta = 0;
     anchor = date;
     selectedDateKey = toDateKey(date);
+    bloomDateKey = null;
     paint();
     const nextHash = calendarHash(session.mode, date);
     if (location.hash !== nextHash) location.hash = nextHash;
   }
 
-  function selectDay(day: Date, dueTime?: string | null, focusCompose = false): void {
+  function applySelection(day: Date, dueTime?: string | null): void {
     selectedDateKey = toDateKey(day);
     selectedItemId = null;
     composeDraft = { dateKey: selectedDateKey, dueTime: dueTime ?? null };
-    if (focusCompose) focusComposeOnPaint = true;
-    // Week/month have no standing Add / day agenda — open Day when the user wants to compose.
-    if (focusCompose && (session.mode === 'week' || session.mode === 'month')) {
-      switchMode('day', day);
-      return;
-    }
     if (session.mode === 'month' && !isSameMonth(day, anchor)) {
       anchor = day;
       replaceHash(session.mode, day);
@@ -543,6 +543,26 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       anchor = day;
       replaceHash(session.mode, day);
     }
+  }
+
+  function selectDay(day: Date, dueTime?: string | null, focusCompose = false): void {
+    applySelection(day, dueTime);
+    if (focusCompose) focusComposeOnPaint = true;
+    // Week/month have no standing Add / day agenda — open Day when the user wants to compose.
+    if (focusCompose && (session.mode === 'week' || session.mode === 'month')) {
+      switchMode('day', day);
+      return;
+    }
+    paint();
+  }
+
+  /** Month view only: select the day and toggle its inline "bloom" drawer — the
+   * full-text item list unfolded directly under that week, so overflow never
+   * costs a scroll to the rail on a small screen. */
+  function toggleBloom(day: Date): void {
+    applySelection(day);
+    const key = toDateKey(day);
+    bloomDateKey = bloomDateKey === key ? null : key;
     paint();
   }
 
@@ -762,7 +782,9 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
           showPreview,
           selectDay,
           dropTask,
-          lastMonthDelta
+          lastMonthDelta,
+          bloomDateKey,
+          toggleBloom
         )
       );
     } else {
@@ -816,17 +838,21 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     calendar.append(workspace);
     canvas.append(calendar);
 
+    const scrollToPreview = scrollToPreviewOnPaint;
+    scrollToPreviewOnPaint = false;
+
     const selected = items.find((item) => item.id === selectedItemId);
     if (selected) {
       if (agenda) agenda.hidden = true;
       void openItem(selected, preview).finally(() => {
-        canvas.scrollTop = scrollTop;
+        if (scrollToPreview) preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        else canvas.scrollTop = scrollTop;
       });
     } else {
       preview.hidden = true;
     }
 
-    canvas.scrollTop = scrollTop;
+    if (!scrollToPreview) canvas.scrollTop = scrollTop;
     if (searchFocused) {
       const input = canvas.querySelector<HTMLInputElement>('.calendar-search');
       if (input) {
@@ -990,7 +1016,9 @@ function renderMonthGrid(
   onOpen: (item: CalendarItem) => void,
   onSelect: (day: Date, dueTime?: string | null, focusCompose?: boolean) => void,
   onDrop: (taskId: string, dateKey: string, dueTime?: string | null) => void,
-  monthDelta: number
+  monthDelta: number,
+  bloomKey: string | null,
+  onToggleBloom: (day: Date) => void
 ): HTMLElement {
   const grid = el('div', 'hub-calendar__grid');
   grid.setAttribute('role', 'grid');
@@ -1001,56 +1029,115 @@ function renderMonthGrid(
   for (const heading of WEEKDAY_HEADINGS) {
     grid.append(el('span', 'hub-calendar__weekday', heading));
   }
-  for (const day of days) {
-    const key = toDateKey(day);
-    const pinch = pinchesByKey.get(key);
-    const outside = !isSameMonth(day, monthAnchor);
-    const cell = el('div', 'hub-calendar__day');
-    cell.setAttribute('role', 'gridcell');
-    cell.tabIndex = 0;
-    cell.dataset.date = key;
-    if (!outside) {
-      /* in-month — no data-outside */
-    } else {
-      cell.dataset.outside = 'true';
-    }
-    if (key === todayKey) {
-      cell.dataset.today = 'true';
-      cell.setAttribute('aria-current', 'date');
-    }
-    if (key === selectedKey) cell.dataset.selected = 'true';
-    if (pinch) cell.dataset.pinch = pinch.severity;
-    wireDropTarget(cell, key, onDrop);
-    const selectDay = (): void => onSelect(day);
-    cell.addEventListener('click', selectDay);
-    cell.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      selectDay();
-    });
-    cell.addEventListener('dblclick', (event) => {
-      event.preventDefault();
-      onSelect(day, null, true);
-    });
 
-    const num = el('span', 'hub-calendar__day-num', String(day.getDate()));
-    cell.append(num);
+  for (let w = 0; w < days.length; w += 7) {
+    const week = days.slice(w, w + 7);
+    let bloomDay: Date | null = null;
 
-    const dayItems = itemsForDay(items, day);
-    const { visible, hidden } = visibleOverflow(dayItems, MONTH_EVENT_LIMIT);
-    for (const item of visible) cell.append(renderEventChip(item, onOpen));
-    if (hidden) {
-      const more = el('button', 'event-chip-more', `+${hidden} more`);
-      more.type = 'button';
-      more.addEventListener('click', (event) => {
-        event.stopPropagation();
-        onSelect(day);
+    for (const day of week) {
+      const key = toDateKey(day);
+      const pinch = pinchesByKey.get(key);
+      const outside = !isSameMonth(day, monthAnchor);
+      const cell = el('div', 'hub-calendar__day');
+      cell.setAttribute('role', 'gridcell');
+      cell.tabIndex = 0;
+      cell.dataset.date = key;
+      if (outside) cell.dataset.outside = 'true';
+      if (key === todayKey) {
+        cell.dataset.today = 'true';
+        cell.setAttribute('aria-current', 'date');
+      }
+      if (key === selectedKey) cell.dataset.selected = 'true';
+      if (pinch) cell.dataset.pinch = pinch.severity;
+      wireDropTarget(cell, key, onDrop);
+
+      const dayItems = itemsForDay(items, day);
+      if (key === bloomKey) {
+        cell.dataset.bloom = 'true';
+        bloomDay = day;
+      }
+
+      const activate = (): void => {
+        if (dayItems.length) onToggleBloom(day);
+        else onSelect(day);
+      };
+      cell.addEventListener('click', activate);
+      cell.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        activate();
       });
-      cell.append(more);
+      cell.addEventListener('dblclick', (event) => {
+        event.preventDefault();
+        onSelect(day, null, true);
+      });
+
+      const num = el('span', 'hub-calendar__day-num', String(day.getDate()));
+      cell.append(num);
+
+      const { visible, hidden } = visibleOverflow(dayItems, MONTH_EVENT_LIMIT);
+      for (const item of visible) cell.append(renderEventChip(item, onOpen));
+      if (hidden) {
+        const more = el('button', 'event-chip-more', `+${hidden} more`);
+        more.type = 'button';
+        more.setAttribute('aria-label', `${hidden} more on ${formatDisplayDate(key)}`);
+        more.addEventListener('click', (event) => {
+          event.stopPropagation();
+          onToggleBloom(day);
+        });
+        cell.append(more);
+      }
+      grid.append(cell);
     }
-    grid.append(cell);
+
+    if (bloomDay) {
+      grid.append(renderBloomDrawer(bloomDay, itemsForDay(items, bloomDay), onOpen, onToggleBloom));
+    }
   }
   return grid;
+}
+
+/** Month view: the full-text item list for one day, unfolded inline directly
+ * below its week. Tapping an item opens the same task card the rest of the
+ * calendar opens — it just also scrolls that card into view, since on a
+ * phone the preview pane sits well below the fold. */
+function renderBloomDrawer(
+  day: Date,
+  dayItems: CalendarItem[],
+  onOpen: (item: CalendarItem) => void,
+  onToggleBloom: (day: Date) => void
+): HTMLElement {
+  const wrap = el('div', 'hub-calendar__bloom');
+  wrap.setAttribute('role', 'group');
+  wrap.setAttribute('aria-label', `${formatDisplayDate(toDateKey(day))} — full list`);
+
+  const head = el('div', 'hub-calendar__bloom-head');
+  head.append(el('span', 'hub-calendar__bloom-date', formatDisplayDate(toDateKey(day))));
+  const close = el('button', 'hub-calendar__bloom-close', 'Close');
+  close.type = 'button';
+  close.setAttribute('aria-label', `Close ${formatDisplayDate(toDateKey(day))}`);
+  close.addEventListener('click', (event) => {
+    event.stopPropagation();
+    onToggleBloom(day);
+  });
+  head.append(close);
+  wrap.append(head);
+
+  const list = el('div', 'hub-calendar__bloom-list');
+  if (!dayItems.length) {
+    list.append(el('p', 'hub-calendar__detail-empty', 'Nothing on this day.'));
+  } else {
+    for (const item of dayItems) {
+      list.append(
+        renderEventChip(item, (opened) => {
+          scrollToPreviewOnPaint = true;
+          onOpen(opened);
+        })
+      );
+    }
+  }
+  wrap.append(list);
+  return wrap;
 }
 
 function renderStandingCompose(
@@ -1817,6 +1904,8 @@ export function resetCalendarSession(): void {
   composeDraft = { dateKey: '', dueTime: null };
   focusComposeOnPaint = false;
   lastMonthDelta = 0;
+  bloomDateKey = null;
+  scrollToPreviewOnPaint = false;
   liveCalendar?.dispose();
   liveCalendar = null;
 }

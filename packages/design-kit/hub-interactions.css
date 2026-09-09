@@ -111,40 +111,61 @@
   outline: none;
 }
 
-/* Conversation composer: always-open field + send, not the compact Ask chip. */
+/* Conversation composer: full-width text box, Attach/Send on the row below.
+   Side-by-side tools stole width and sat inside the shared paper chrome. */
 .hub-ai-bar--thread {
-  align-items: flex-end;
-  border-radius: var(--radius-lg);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .hub-ai-bar--thread .hub-ai-bar__field {
   display: block;
-  flex: 1;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  box-shadow: var(--elev-1);
 }
 
-/* Attachment chips stack above Attach/Send so the message field keeps width. */
+/* Tools sit under the text box so typed lines use the full field width. */
 .hub-ai-bar__aside {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
   gap: var(--space-1);
   flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
 }
 
 .hub-ai-bar--thread .hub-ai-bar__tools {
   display: inline-flex;
-  align-items: flex-end;
+  align-items: center;
   flex-wrap: nowrap;
+  gap: var(--space-1);
 }
 
 .hub-ai-bar--thread .hub-ai-bar__input {
+  width: 100%;
   min-height: 2.5rem;
   max-height: 10rem;
   padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: transparent;
   resize: none;
   line-height: 1.45;
+  box-sizing: border-box;
 }
 
 .chat-attach-list {
@@ -152,7 +173,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.35rem;
-  max-width: min(11rem, 42vw);
+  max-width: 100%;
   padding: 0;
 }
 
@@ -1092,6 +1113,64 @@
   color: var(--ink);
 }
 
+/* Messenger-style contact identity — same chrome in every hub chat window. */
+.chat-view__who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chat-view__who-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  flex: 0 0 auto;
+}
+
+.chat-view__who-copy {
+  min-width: 0;
+}
+
+.chat-view__who-name {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-view__who-status {
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-view__who-status:empty {
+  display: none;
+}
+
+/* Messenger: avatar sits on the last bubble of a consecutive assistant run. */
+.chat-message.chat-message--assistant,
+.chat-message.chat-message--status {
+  align-items: flex-end;
+}
+
+.chat-message.chat-message--assistant:not(.chat-message--tail) > .chat-message__avatar,
+.chat-message.chat-message--status:not(.chat-message--tail) > .chat-message__avatar {
+  visibility: hidden;
+}
+
 @media (max-width: 720px) {
   .prod-card__funnel {
     grid-template-columns: 1fr;
@@ -1099,6 +1178,11 @@
 
   .prod-card__time-grid {
     max-height: 12rem;
+  }
+
+  .chat-view__who-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 }
 

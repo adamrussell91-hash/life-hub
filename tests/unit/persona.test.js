@@ -859,6 +859,8 @@ test('clare prompt instructs Cross-Agent read before dump and a restricted CN pa
   assert.match(prompt, /Do not invent GitHub file paths for tasks/);
   assert.match(prompt, /Never name tools, schemas, batch caps/);
   assert.match(prompt, /split silently and keep adding/);
+  assert.match(prompt, /NEVER merge distinct pieces of work/);
+  assert.match(prompt, /One card per distinct action/);
 });
 
 test('clare prompt does not include hubContext even when provided', () => {

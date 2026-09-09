@@ -654,41 +654,6 @@ main { max-width: 76rem; margin: 0 auto; }
   min-width: 0;
 }
 
-.chat-view__who {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.chat-view__who-avatar {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 50%;
-  object-fit: cover;
-  flex: 0 0 auto;
-}
-
-.chat-view__who-eyebrow {
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-
-.chat-view__who-name {
-  margin: 0;
-  overflow: hidden;
-  color: var(--ink);
-  font-size: var(--text-base);
-  font-weight: var(--weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .chat-view__actions {
   display: flex;
   flex-wrap: nowrap;
@@ -750,7 +715,7 @@ main { max-width: 76rem; margin: 0 auto; }
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  align-items: flex-start;
+  align-items: flex-end;
   width: fit-content;
   max-width: min(40rem, 100%);
   padding: 0;
@@ -1189,17 +1154,20 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .chat-form {
   display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  align-items: flex-end;
+  align-items: stretch;
   width: 100%;
   min-width: 0;
 }
 .chat-form .hub-ai-bar__field {
-  flex: 1;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
 }
 .chat-form .hub-ai-bar__aside {
   flex: 0 0 auto;
+  width: 100%;
 }
 .chat-input,
 #chat-input {
@@ -4325,7 +4293,8 @@ main { max-width: 76rem; margin: 0 auto; }
   object-fit: cover;
   object-position: center;
   flex: 0 0 auto;
-  margin-top: 0.2rem;
+  margin-top: 0;
+  margin-bottom: 0.15rem;
 }
 .chat-message--user .chat-message__avatar {
   display: none;
@@ -4942,8 +4911,6 @@ main { max-width: 76rem; margin: 0 auto; }
 @media (max-width: 48rem) {
   .mind-mood-mix__donut { width: 11.75rem; height: 11.75rem; }
   .mind-mood-mix__value { font-size: var(--text-lg); }
-  .mind-energy-orbit__kicker { font-size: var(--text-sm); }
-  .mind-energy-orbit__status { font-size: var(--text-lg); }
 }
 .mind-energy-orbit-card .mind-tile__legend {
   padding-bottom: var(--space-3);
@@ -5026,7 +4993,7 @@ main { max-width: 76rem; margin: 0 auto; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 32%;
+  width: 28%;
   transform: translate(-50%, -50%);
   text-align: center;
   pointer-events: none;
@@ -5034,14 +5001,14 @@ main { max-width: 76rem; margin: 0 auto; }
 .mind-energy-orbit__kicker {
   margin: 0;
   color: var(--marine);
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
 }
 .mind-energy-orbit__status {
   margin: var(--space-1) 0 0;
   color: var(--ink);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-tight);
   line-height: var(--leading-tight);
@@ -5049,8 +5016,12 @@ main { max-width: 76rem; margin: 0 auto; }
 .mind-energy-orbit__status[data-energy="high"] { color: var(--wave); }
 .mind-energy-orbit__status[data-energy="medium"] { color: var(--marine); }
 .mind-energy-orbit__status[data-energy="low"] { color: var(--high-sea-ink); }
-.mind-energy-orbit__period {
+.mind-energy-orbit__meta {
   margin: var(--space-2) 0 0;
+  text-align: center;
+}
+.mind-energy-orbit__period {
+  margin: 0;
   color: var(--muted);
   font-size: var(--text-sm);
 }
@@ -5063,6 +5034,10 @@ main { max-width: 76rem; margin: 0 auto; }
   margin: var(--space-3) 0 0;
   color: var(--muted);
   font-size: var(--text-xs);
+}
+@media (max-width: 48rem) {
+  .mind-energy-orbit__kicker { font-size: var(--text-xs); }
+  .mind-energy-orbit__status { font-size: var(--text-md); }
 }
 .mind-chart {
   width: 100%;
@@ -6242,7 +6217,7 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   min-height: 0;
 }
 
-/* Picker already names the selected agent. Keep Talking to for overlay + engaged threads. */
+/* Picker already names the selected agent. Keep Messenger who-header for overlay + engaged threads. */
 .chat-view:not([data-panel-mode]):not([data-chrome='engaged']) #chat-who {
   display: none;
 }
@@ -6309,6 +6284,15 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 .chat-view[data-panel-mode="overlay"] .chat-view__actions .btn {
   min-height: 2.2rem;
   padding-inline: var(--space-2);
+}
+
+/* Overlay engaged: who-header already names the agent — keep only the active face. */
+.chat-view[data-panel-mode="overlay"][data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+  display: none;
+}
+
+.chat-view[data-panel-mode="overlay"][data-chrome='engaged'] .agent-picker__name {
+  display: none;
 }
 
 @media (max-width: 720px) {
@@ -6388,7 +6372,7 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   }
 
   /*
-   * Engaged phone Chat already has Talking to + Tools / New chat.
+   * Engaged phone Chat already has the Messenger who-header + Tools / New chat.
    * Drop the redundant page title and date chip; keep refresh / sign-out.
    */
   .app-shell:has(#chat-view[data-chrome='engaged']:not([hidden]):not([data-panel-mode])) .page-header {
@@ -6409,8 +6393,8 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 
   .chat-view .chat-form {
     display: flex;
-    flex-direction: row;
-    align-items: flex-end;
+    flex-direction: column;
+    align-items: stretch;
     gap: var(--space-2);
     width: 100%;
     min-width: 0;
@@ -7035,7 +7019,7 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 
 
 /* Attachment chip layout lives in design-kit hub-interactions.css
-   (.hub-ai-bar__aside stacks chips above Attach/Send). */
+   (.hub-ai-bar__aside sits under the full-width text field with Attach/Send). */
 .chat-message__attachments {
   display: flex;
   flex-wrap: wrap;

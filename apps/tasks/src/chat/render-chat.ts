@@ -57,7 +57,7 @@ export function appendMessage(
   const item = document.createElement('li');
   item.className = `chat-message chat-message--${role}`;
   if (role !== 'user') item.dataset.agent = agent;
-  if (role === 'assistant') {
+  if (role === 'assistant' || role === 'status') {
     applyAgentAvatarToBubble(item, agent);
   }
   const body = document.createElement('div');
@@ -69,9 +69,32 @@ export function appendMessage(
   }
   item.append(body);
   list.append(item);
+  syncAssistantMessageTails(list);
   list.scrollTop = list.scrollHeight;
   syncChatChrome(root);
   return item;
+}
+
+/** Messenger: only the last bubble in a consecutive assistant/status run shows the avatar. */
+export function syncAssistantMessageTails(list: ParentNode): void {
+  const items = [...list.querySelectorAll('.chat-message')];
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+    if (!(item instanceof HTMLElement)) continue;
+    const incoming =
+      item.classList.contains('chat-message--assistant') ||
+      item.classList.contains('chat-message--status');
+    if (!incoming) {
+      item.classList.remove('chat-message--tail');
+      continue;
+    }
+    const next = items[i + 1];
+    const nextIncoming =
+      next instanceof HTMLElement &&
+      (next.classList.contains('chat-message--assistant') ||
+        next.classList.contains('chat-message--status'));
+    item.classList.toggle('chat-message--tail', !nextIncoming);
+  }
 }
 
 export function renderInlineMarkdown(

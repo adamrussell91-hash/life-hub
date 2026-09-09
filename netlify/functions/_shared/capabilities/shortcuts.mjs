@@ -52,6 +52,7 @@ import {
   serializeMemoryStore
 } from '../agent-memory.mjs';
 import { findMealDeletePaths, isMealSlot } from '../delete-meal.mjs';
+import { explodeCompoundDumpTitle } from '../clare-dump.mjs';
 
 const CN_OPS = ['upsert_field', 'append_line', 'replace_section', 'delete_lines', 'condense'];
 
@@ -400,7 +401,7 @@ export function shortcutSchemas() {
     create_task: {
       name: 'create_task',
       description:
-        `Create one or more Tasks Hub rows (Confirm). Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). Never mention this limit or the tool name in chat.`,
+        `Create one or more Tasks Hub rows (Confirm). Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). NEVER merge distinct actions into one title — one card per distinct piece of work. Never mention this limit or the tool name in chat.`,
       input_schema: {
         type: 'object',
         properties: {
@@ -1226,11 +1227,32 @@ function normalizeTaskItem(raw) {
 }
 
 function collectCreateTaskItems(input) {
-  if (Array.isArray(input?.items) && input.items.length) {
-    return input.items.map(normalizeTaskItem).filter(Boolean);
+  const raw = Array.isArray(input?.items) && input.items.length
+    ? input.items.map(normalizeTaskItem).filter(Boolean)
+    : (() => {
+        const one = normalizeTaskItem(input);
+        return one ? [one] : [];
+      })();
+  const expanded = [];
+  for (const item of raw) {
+    const parts = explodeCompoundDumpTitle(item.title, {
+      preferredDomain: item.domain || 'teaching'
+    });
+    if (!parts?.length) {
+      expanded.push(item);
+      continue;
+    }
+    for (const part of parts) {
+      expanded.push({
+        ...item,
+        title: part.title,
+        domain: part.domain || item.domain,
+        priority: part.priority || item.priority,
+        due_date: part.due_date || item.due_date
+      });
+    }
   }
-  const one = normalizeTaskItem(input);
-  return one ? [one] : [];
+  return expanded;
 }
 
 function buildTaskRecord(item, { id, now }) {

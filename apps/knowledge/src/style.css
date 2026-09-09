@@ -3001,13 +3001,16 @@ body.is-universe-fullscreen .local-banner {
   flex: 0 0 auto;
 }
 
-.chat-overlay__who {
-  margin: 0;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--muted);
+.chat-overlay .chat-view__who {
+  flex: 1 1 auto;
+}
+
+.chat-overlay[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+  display: none;
+}
+
+.chat-overlay[data-chrome='engaged'] .agent-picker__name {
+  display: none;
 }
 
 .agent-protocol-pills {
@@ -3127,7 +3130,7 @@ body.is-universe-fullscreen .local-banner {
 .chat-overlay .chat-message {
   display: flex;
   gap: var(--space-2);
-  align-items: flex-start;
+  align-items: flex-end;
   padding: 0;
   border-radius: 0;
   background: transparent;
@@ -3184,14 +3187,13 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .chat-overlay .chat-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  align-items: end;
+  align-items: stretch;
 }
 
 .chat-form__label {
-  grid-column: 1 / -1;
   margin: 0;
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
@@ -3201,7 +3203,17 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .chat-overlay .chat-form textarea,
-.chat-overlay .chat-form input,
+.chat-overlay .chat-form input {
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  box-sizing: border-box;
+}
+
 .chat-overlay__book input {
   min-height: 2.75rem;
   padding: var(--space-2) var(--space-3);
@@ -3235,13 +3247,13 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .chat-overlay .chat-form .hub-ai-bar__field {
-  grid-column: 1;
+  width: 100%;
   min-width: 0;
 }
 
 .chat-overlay .chat-form .hub-ai-bar__aside {
-  grid-column: 2;
-  justify-self: end;
+  width: 100%;
+  justify-content: flex-end;
 }
 
 .chat-overlay .chat-form textarea {
@@ -3297,7 +3309,7 @@ body.is-universe-fullscreen .local-banner {
   }
 
   .chat-overlay .chat-form {
-    grid-template-columns: minmax(0, 1fr) auto;
+    flex-direction: column;
   }
 
   .chat-overlay .chat-form textarea,
@@ -3334,6 +3346,19 @@ body.is-universe-fullscreen .local-banner {
   .chat-overlay .agent-picker__avatar {
     width: 2.4rem;
     height: 2.4rem;
+  }
+
+  .chat-overlay[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+    display: none;
+  }
+
+  .chat-overlay[data-chrome='engaged'] .agent-picker__name {
+    display: none;
+  }
+
+  .chat-overlay .chat-view__who-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 
   body:has(.chat-overlay) .floating-chat-button {
