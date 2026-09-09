@@ -71,9 +71,9 @@ test('builds the seven markdown sections from central-node.md via js/core/constr
 
 test('Recent Agent Actions display collapses stacked same-action clones', () => {
   const spam = `${markdown}
-**29 Aug:** Chadwick Flexington: Logged a 30-min workout_30 session (Biceps and Boobs, 20 mins).
-**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).
-**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).
+**30 Jul:** Chadwick Flexington: Logged a 30-min workout_30 session (Biceps and Boobs, 20 mins).
+**30 Jul:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).
+**30 Jul:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).
 `;
   const model = buildCentralNodeModel({
     events,
@@ -108,6 +108,22 @@ test('liveStatus exposes checklist flags and macro snapshot from events', () => 
   assert.equal(model.liveStatus.snapshot.protein_g, 80);
   assert.equal(model.liveStatus.snapshot.calories, 1130);
   assert.match(model.sections.todaysStatus, /Stable today/);
+  assert.match(model.sections.todaysStatus, /\*\*Nutrition:\*\*/);
+  assert.match(model.sections.todaysStatus, /\*\*Exercise:\*\*/);
+});
+
+test('stale Status prose is replaced by live event logs for the display date', () => {
+  const stale = markdown.replace('Thursday 30 July 2026', 'Monday 6 July 2026')
+    .replace('Stable today.', 'Ancient status.');
+  const model = buildCentralNodeModel({
+    events,
+    targetsConfig,
+    centralNodeMarkdown: stale,
+    date: '2026-07-30'
+  });
+  assert.doesNotMatch(model.sections.todaysStatus, /Ancient status/);
+  assert.match(model.sections.todaysStatus, /\*\*Nutrition:\*\*/);
+  assert.match(model.sections.todaysStatus, /\*\*Exercise:\*\*/);
 });
 
 test('builds a 7-day protein series ending on the display date, for the reused sparkline component', () => {

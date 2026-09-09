@@ -4,6 +4,7 @@ import {
   applyLogToCentralNode,
   appendRecentAction,
   buildNutritionStatusLine,
+  compactTitle,
   formatLogDate,
   humanizeDayType,
   shouldUpdateWorkoutStatus,
@@ -38,7 +39,7 @@ export function describeRecordForLog(record, notes, { medicalAppend = false } = 
         record.protein_g != null ? `${record.protein_g}g protein` : null,
         record.fat_g != null ? `${record.fat_g}g fat` : null
       ].filter(Boolean).join(', ');
-      const what = label ? `${label} for ${record.meal}` : record.meal;
+      const what = label ? `${compactTitle(label, { max: 72 })} for ${record.meal}` : record.meal;
       return `Logged ${what}${macros ? ` (${macros})` : ''}.`;
     }
     case 'workout': {
@@ -52,14 +53,15 @@ export function describeRecordForLog(record, notes, { medicalAppend = false } = 
         ? record.focus.map(item => String(item).trim()).filter(Boolean).slice(0, 3).join('/')
         : null;
       const detail = [moveCount, duration, focus].filter(Boolean).join(', ');
-      const label = typeof notes === 'string' && notes.trim() !== ''
+      const noteLabel = typeof notes === 'string' && notes.trim() !== ''
         ? notes.trim().replace(/\s+/g, ' ')
         : null;
+      const shortNote = noteLabel ? compactTitle(noteLabel, { max: 80 }) : null;
       const head = title
-        ? `Logged ${title}`
+        ? `Logged ${compactTitle(title)}`
         : `Logged a ${dayLabel} session`;
       const mid = detail ? ` (${detail})` : '';
-      const verdict = label ? ` — ${label}` : '';
+      const verdict = shortNote ? ` — ${shortNote}` : '';
       return `${head}${mid}${verdict}.`;
     }
     case 'skincare':
