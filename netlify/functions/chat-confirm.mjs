@@ -45,7 +45,12 @@ import {
   removePendingActionById,
   findPendingActionById,
   markPendingActionConsumed,
+  markPendingActionExecuting,
+  markPendingActionPending,
   isPendingActionExecutable,
+  getPendingActionStatus,
+  PENDING_ACTION_STATUS_EXECUTING,
+  PENDING_ACTION_STATUS_CONSUMED,
   validateProposeActionInput,
   executeProposeActionWrites,
   classifyWriteTarget,
@@ -514,16 +519,8 @@ export function createChatConfirmHandler({
           PRIVATE_CACHE
         );
       }
-      if (!isPendingActionExecutable(stored)) {
-        return errorResponse(
-          409,
-          'pending_action_consumed',
-          'This pending action was already executed and cannot run again.',
-          false,
-          PRIVATE_CACHE
-        );
-      }
       // Positive workflow consume stamp also blocks replay if queue cleanup lagged.
+      let workflowConsumed = false;
       if (
         stored?.workflowKind === 'weekly_review'
         && typeof stored?.workflowId === 'string'
@@ -541,18 +538,40 @@ export function createChatConfirmHandler({
                 || workflow.status === 'complete'
               )
             ) {
-              return errorResponse(
-                409,
-                'pending_action_consumed',
-                'This pending action was already executed and cannot run again.',
-                false,
-                PRIVATE_CACHE
-              );
+              workflowConsumed = true;
             }
           }
         } catch {
           // Fall through to normal execution if workflow store is unavailable.
         }
+      }
+      if (workflowConsumed) {
+        return errorResponse(
+          409,
+          'pending_action_consumed',
+          'This pending action was already executed and cannot run again.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      if (!isPendingActionExecutable(stored)) {
+        const status = getPendingActionStatus(stored);
+        if (status === PENDING_ACTION_STATUS_EXECUTING) {
+          return errorResponse(
+            409,
+            'pending_action_execution_in_progress',
+            'This pending action is already executing. Do not retry blindly — wait for recovery.',
+            true,
+            PRIVATE_CACHE
+          );
+        }
+        return errorResponse(
+          409,
+          'pending_action_consumed',
+          'This pending action was already executed and cannot run again.',
+          false,
+          PRIVATE_CACHE
+        );
       }
       if (typeof stored.slug === 'string' && stored.slug.trim() && stored.slug !== parsed.slug) {
         return errorResponse(
@@ -670,6 +689,116 @@ export function createChatConfirmHandler({
       }
     }
 
+    // Pre-execution fence: pending → executing before any durable proposal writes.
+    // Replay/concurrent confirm must fail closed once executing is persisted.
+    let executionFenced = !parsed.id;
+    if (parsed.id) {
+      const executionStartedAt = new Date(now()).toISOString();
+      let fenceQueue = markPendingActionExecuting(queue, parsed.id, { executionStartedAt });
+      let fencePersisted = false;
+      let fenceError = null;
+      for (let attempt = 0; attempt < 2 && !fencePersisted; attempt += 1) {
+        try {
+          const written = await client.writeFile({
+            path: PENDING_ACTIONS_PATH,
+            content: serializePendingActions(fenceQueue),
+            ...(queueSha ? { sha: queueSha } : {}),
+            message: `chore(propose-action): execute ${proposal.intent}`.slice(0, 200)
+          });
+          queue = fenceQueue;
+          queueSha = written?.sha || queueSha;
+          stored = findPendingActionById(queue, parsed.id) || stored;
+          fencePersisted = true;
+          executionFenced = true;
+        } catch (error) {
+          fenceError = error;
+          if (!(error instanceof GitHubClientError && error.code === 'write_conflict')) {
+            break;
+          }
+          // Lost the SHA race — reload and fail closed if another request owns execution.
+          try {
+            const current = await client.resolveTree();
+            tree = current.tree;
+            const queueEntry = current.tree.find(item => item.path === PENDING_ACTIONS_PATH && item.type === 'blob');
+            if (!queueEntry) {
+              return errorResponse(
+                404,
+                'pending_action_not_found',
+                'No pending action matches this id. It may already be confirmed, discarded, or never existed.',
+                false,
+                PRIVATE_CACHE
+              );
+            }
+            queue = parsePendingActions(decodeBlob(await client.readBlob(queueEntry.sha)));
+            queueSha = queueEntry.sha;
+            stored = findPendingActionById(queue, parsed.id);
+            if (!stored) {
+              return errorResponse(
+                404,
+                'pending_action_not_found',
+                'No pending action matches this id. It may already be confirmed, discarded, or never existed.',
+                false,
+                PRIVATE_CACHE
+              );
+            }
+            const status = getPendingActionStatus(stored);
+            if (status === PENDING_ACTION_STATUS_CONSUMED) {
+              return errorResponse(
+                409,
+                'pending_action_consumed',
+                'This pending action was already executed and cannot run again.',
+                false,
+                PRIVATE_CACHE
+              );
+            }
+            if (status === PENDING_ACTION_STATUS_EXECUTING || !isPendingActionExecutable(stored)) {
+              return errorResponse(
+                409,
+                'pending_action_execution_in_progress',
+                'This pending action is already executing. Do not retry blindly — wait for recovery.',
+                true,
+                PRIVATE_CACHE
+              );
+            }
+            fenceQueue = markPendingActionExecuting(queue, parsed.id, { executionStartedAt });
+          } catch (reloadError) {
+            return mapRepositoryError(reloadError);
+          }
+        }
+      }
+      if (!fencePersisted) {
+        if (fenceError instanceof GitHubClientError && fenceError.code === 'write_conflict') {
+          return errorResponse(
+            409,
+            'pending_action_execution_in_progress',
+            'This pending action is already executing. Do not retry blindly — wait for recovery.',
+            true,
+            PRIVATE_CACHE
+          );
+        }
+        return mapRepositoryError(fenceError || new Error('execution fence failed'));
+      }
+    }
+
+    const restorePendingIfSafe = async () => {
+      if (!parsed.id || !executionFenced) return;
+      try {
+        const restored = markPendingActionPending(queue, parsed.id, {
+          extra: { executionRolledBack: true }
+        });
+        const written = await client.writeFile({
+          path: PENDING_ACTIONS_PATH,
+          content: serializePendingActions(restored),
+          ...(queueSha ? { sha: queueSha } : {}),
+          message: `chore(propose-action): rollback execute ${parsed.id}`.slice(0, 200)
+        });
+        queue = restored;
+        queueSha = written?.sha || queueSha;
+      } catch {
+        // Leave executing if rollback cannot be persisted — fail closed on replay.
+      }
+    };
+
     let writeResult = { ok: true, results: [] };
     if (accepted.length) {
       try {
@@ -679,14 +808,49 @@ export function createChatConfirmHandler({
           nowIso: () => new Date(now()).toISOString()
         });
       } catch (error) {
+        // Exception after fence: write outcome is uncertain — do not restore to pending.
         if (error instanceof GitHubClientError && error.code === 'write_conflict') {
-          return errorResponse(409, 'write_conflict', 'A target file changed while confirming. Try again.', true, PRIVATE_CACHE);
+          return errorResponse(
+            409,
+            'pending_action_execution_unknown',
+            'A target file changed while confirming after execution began. Do not retry blindly.',
+            true,
+            PRIVATE_CACHE
+          );
         }
-        return mapRepositoryError(error);
+        return errorResponse(
+          503,
+          'pending_action_execution_unknown',
+          'Execution began but the write outcome is uncertain. Do not retry blindly — recover before confirming again.',
+          true,
+          PRIVATE_CACHE
+        );
       }
       if (!writeResult.ok) {
+        const provenNone = !Array.isArray(writeResult.results) || writeResult.results.length === 0;
+        if (provenNone) {
+          await restorePendingIfSafe();
+        }
         if (writeResult.error === 'already_exists') {
+          if (!provenNone) {
+            return errorResponse(
+              409,
+              'pending_action_execution_unknown',
+              'Execution may have partially applied. Do not retry blindly.',
+              true,
+              PRIVATE_CACHE
+            );
+          }
           return errorResponse(409, 'write_conflict', `File already exists: ${writeResult.detail}`, true, PRIVATE_CACHE);
+        }
+        if (!provenNone) {
+          return errorResponse(
+            503,
+            'pending_action_execution_unknown',
+            'Execution may have partially applied. Do not retry blindly.',
+            true,
+            PRIVATE_CACHE
+          );
         }
         return errorResponse(400, writeResult.error ?? 'apply_failed', 'The proposed action could not be applied.', false, PRIVATE_CACHE);
       }
@@ -949,6 +1113,19 @@ export function createChatConfirmHandler({
         return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
       }
       const queue = parsePendingActions(decodeBlob(await client.readBlob(entry.sha)));
+      const dismissTarget = findPendingActionById(queue, parsed.id);
+      if (dismissTarget && getPendingActionStatus(dismissTarget) === PENDING_ACTION_STATUS_EXECUTING) {
+        return errorResponse(
+          409,
+          'pending_action_execution_in_progress',
+          'This pending action is executing and cannot be discarded.',
+          true,
+          PRIVATE_CACHE
+        );
+      }
+      if (dismissTarget && getPendingActionStatus(dismissTarget) === PENDING_ACTION_STATUS_CONSUMED) {
+        return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true, alreadyConsumed: true } }, PRIVATE_CACHE);
+      }
       const next = removePendingActionById(queue, parsed.id);
       if (next.length !== queue.length) {
         await client.writeFile({

@@ -823,12 +823,20 @@ export function createClareChatController({
                     typeof data?.pendingId === 'string' ? data.pendingId.trim() : '';
                   if (pendingId) lastPendingActionId = pendingId;
                   if (data?.proposal && pendingId) {
-                    appendProductivityCard(root, 'confirm', {
-                      ...(typeof data.proposal === 'object' ? data.proposal : {}),
+                    // Reuse the authoritative action_proposal Confirm card (same as SSE path).
+                    appendActionProposalCard(
+                      root,
+                      (typeof data.proposal === 'object' && data.proposal
+                        ? data.proposal
+                        : {}) as {
+                        intent?: string;
+                        writes?: Array<{ path?: string; mode?: string; diff?: string }>;
+                      },
                       pendingId,
-                      reviewId,
-                      selected_changes: selected
-                    });
+                      () => {
+                        lastPendingActionId = null;
+                      }
+                    );
                   }
                 } catch (err) {
                   const message =

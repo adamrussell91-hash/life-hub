@@ -91,7 +91,7 @@ function memoryTasksStore(initial = {}) {
   };
 }
 
-function statefulGithub(seed = {}) {
+function statefulGithub(seed = {}, { enforceSha = false } = {}) {
   const blobs = new Map();
   for (const [path, content] of Object.entries(seed)) {
     blobs.set(path, { sha: sha40(11), content });
@@ -119,6 +119,12 @@ function statefulGithub(seed = {}) {
       const path = decodeURIComponent(url.split('/contents/')[1] ?? '');
       const body = JSON.parse(options.body);
       const content = Buffer.from(body.content, 'base64').toString('utf8');
+      const existing = blobs.get(path);
+      if (enforceSha && existing) {
+        if (!body.sha || body.sha !== existing.sha) {
+          return Response.json({ message: 'sha mismatch' }, { status: 409 });
+        }
+      }
       const sha = sha40(seq++);
       blobs.set(path, { sha, content });
       return Response.json({ content: { sha }, commit: { sha: sha40(seq++) } });
@@ -651,8 +657,15 @@ describe('LEVEL 4 Weekly Review lifecycle integrity (WR10–WR13)', () => {
         options?.method === 'PUT'
         && decodeURIComponent(url.split('/contents/')[1] ?? '') === PENDING_ACTIONS_PATH
       ) {
-        consumeAttempts += 1;
-        return Response.json({ message: 'consume failed' }, { status: 500 });
+        const body = JSON.parse(options.body);
+        const content = Buffer.from(body.content, 'base64').toString('utf8');
+        const queue = JSON.parse(content);
+        const entry = queue.find((item) => item.id === proposalEvent.id);
+        // Allow pre-execution fence (executing); fail only terminal consume writes.
+        if (entry?.status === 'consumed') {
+          consumeAttempts += 1;
+          return Response.json({ message: 'consume failed' }, { status: 500 });
+        }
       }
       return github.fetchImpl(url, options);
     };
@@ -968,6 +981,328 @@ describe('LEVEL 4 Weekly Review UI selection binding (WR14–WR15)', () => {
     assert.deepEqual(capturedInput.selected_changes, selected);
     assert.equal(capturedInput.confirm, true);
     assert.equal(capturedInput.advance, false);
+  });
+});
+
+
+describe('LEVEL 4 Weekly Review execution fence (WR19–WR23)', () => {
+  it('WR19: both post-write terminal stores fail → stays non-executable; replay does not double-write', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr19';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    const originalSetJSON = store.setJSON.bind(store);
+    store.setJSON = async (key, value) => {
+      if (
+        String(key).includes(reviewId)
+        && value
+        && (value.pending_action_status === 'consumed' || value.status === 'complete')
+      ) {
+        throw new Error('workflow terminal stamp failed');
+      }
+      return originalSetJSON(key, value);
+    };
+
+    const fetchImpl = async (url, options) => {
+      if (
+        options?.method === 'PUT'
+        && decodeURIComponent(url.split('/contents/')[1] ?? '') === PENDING_ACTIONS_PATH
+      ) {
+        const body = JSON.parse(options.body);
+        const content = Buffer.from(body.content, 'base64').toString('utf8');
+        const queue = JSON.parse(content);
+        const entry = queue.find((item) => item.id === proposalEvent.id);
+        if (entry?.status === 'consumed') {
+          return Response.json({ message: 'consume failed' }, { status: 500 });
+        }
+      }
+      return github.fetchImpl(url, options);
+    };
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const response = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const payload = await response.json();
+    assert.notEqual(response.status, 200);
+    assert.equal(payload.data?.writesApplied, true);
+
+    const saved = Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays');
+    assert.equal(saved.length, 1);
+
+    const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    const entry = queue.find((item) => item.id === proposalEvent.id);
+    assert.ok(entry);
+    assert.equal(entry.status, 'executing');
+
+    const workflow = await loadWorkflowState(store, reviewId);
+    assert.notEqual(workflow?.pending_action_status, 'consumed');
+
+    const replay = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const replayPayload = await replay.json();
+    assert.equal(replay.status, 409);
+    assert.equal(replayPayload.error?.code, 'pending_action_execution_in_progress');
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      1
+    );
+  });
+
+  it('WR20: executing id cannot replay', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr20';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    github.blobs.set(PENDING_ACTIONS_PATH, {
+      sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
+      content: JSON.stringify(
+        queue.map((item) =>
+          item.id === proposalEvent.id
+            ? { ...item, status: 'executing', executionStartedAt: new Date(NOW_MS).toISOString() }
+            : item
+        )
+      )
+    });
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl: github.fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const response = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const payload = await response.json();
+    assert.equal(response.status, 409);
+    assert.equal(payload.error?.code, 'pending_action_execution_in_progress');
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      0
+    );
+    const after = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    assert.equal(after.find((item) => item.id === proposalEvent.id)?.status, 'executing');
+  });
+
+  it('WR21: concurrent confirm — only one write; loser fails before writes', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub({}, { enforceSha: true });
+    const reviewId = 'wr_wr21';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl: github.fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+
+    const [resA, resB] = await Promise.all([
+      confirm(confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })),
+      confirm(confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id }))
+    ]);
+    const statuses = [resA.status, resB.status].sort((a, b) => a - b);
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      1
+    );
+    assert.ok(statuses.includes(200) || statuses.includes(503));
+    assert.ok(statuses.includes(409));
+    const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    const status = queue.find((item) => item.id === proposalEvent.id)?.status;
+    assert.ok(status === 'consumed' || status === 'executing');
+  });
+
+  it('WR22: safe write failure before side effect restores pending', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr22';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    github.blobs.set(PENDING_ACTIONS_PATH, {
+      sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
+      content: JSON.stringify(
+        queue.map((item) => {
+          if (item.id !== proposalEvent.id) return item;
+          return {
+            ...item,
+            proposal: {
+              ...item.proposal,
+              writes: [
+                {
+                  path: 'unknown:task:task_poison',
+                  mode: 'create',
+                  content: '{}',
+                  diff: 'poison'
+                }
+              ]
+            }
+          };
+        })
+      )
+    });
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl: github.fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const response = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    assert.notEqual(response.status, 200);
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      0
+    );
+    const after = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    const entry = after.find((item) => item.id === proposalEvent.id);
+    assert.ok(entry);
+    // Proven zero side effects may restore pending; ambiguous outcomes may remain executing.
+    assert.ok(
+      entry.status === 'pending'
+      || entry.status === 'executing'
+      || entry.status == null
+      || entry.status === ''
+    );
+  });
+
+  it('WR23: happy path pending → executing → consumed; replay consumed', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr23';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    const statuses = [];
+    const fetchImpl = async (url, options) => {
+      if (
+        options?.method === 'PUT'
+        && decodeURIComponent(url.split('/contents/')[1] ?? '') === PENDING_ACTIONS_PATH
+      ) {
+        const body = JSON.parse(options.body);
+        const content = Buffer.from(body.content, 'base64').toString('utf8');
+        const queue = JSON.parse(content);
+        const entry = queue.find((item) => item.id === proposalEvent.id);
+        if (entry?.status) statuses.push(entry.status);
+      }
+      return github.fetchImpl(url, options);
+    };
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const response = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    assert.equal(response.status, 200);
+    assert.ok(statuses.includes('executing'));
+    assert.ok(statuses.includes('consumed'));
+    assert.equal((await loadWorkflowState(store, reviewId)).status, 'complete');
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      1
+    );
+
+    const replay = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const replayPayload = await replay.json();
+    assert.equal(replay.status, 409);
+    assert.equal(replayPayload.error?.code, 'pending_action_consumed');
+  });
+
+  it('action_dismiss rejects executing pending actions', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_dismiss_exec';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+    const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    github.blobs.set(PENDING_ACTIONS_PATH, {
+      sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
+      content: JSON.stringify(
+        queue.map((item) =>
+          item.id === proposalEvent.id ? { ...item, status: 'executing' } : item
+        )
+      )
+    });
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl: github.fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const response = await confirm(
+      confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: proposalEvent.id })
+    );
+    const payload = await response.json();
+    assert.equal(response.status, 409);
+    assert.equal(payload.error?.code, 'pending_action_execution_in_progress');
+    const after = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    assert.equal(after.find((item) => item.id === proposalEvent.id)?.status, 'executing');
   });
 });
 

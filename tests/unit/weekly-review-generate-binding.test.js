@@ -17,7 +17,7 @@ describe('WR15 Weekly Review Generate proposal model bypass', () => {
     const source = readFileSync(controllerPath, 'utf8');
     const generateIdx = source.indexOf('onGenerateProposal:');
     assert.ok(generateIdx > 0);
-    const window = source.slice(generateIdx, generateIdx + 1800);
+    const window = source.slice(generateIdx, generateIdx + 2600);
 
     assert.match(window, /clareWorkChat\s*\(/);
     assert.match(window, /selected_changes:\s*selected/);
@@ -26,6 +26,8 @@ describe('WR15 Weekly Review Generate proposal model bypass', () => {
     assert.doesNotMatch(window, /\bsend\s*\(/);
     assert.doesNotMatch(window, /\bstreamChat\s*\(/);
     assert.doesNotMatch(window, /Generate the Weekly Review Confirm proposal/);
+    assert.match(window, /appendActionProposalCard\s*\(/);
+    assert.doesNotMatch(window, /appendProductivityCard\s*\(\s*root\s*,\s*['\"]confirm['\"]/);
   });
 
   it('chat-api exposes /api/chat/clare-work structured invoke', () => {
