@@ -1109,10 +1109,14 @@ export function createAppController(dependencies) {
     const date = latestResult?.date;
     const events = latestResult?.events ?? [];
     const todays = events.filter(({ record }) => record?.type === 'workout' && record.date === date);
+    const plannedSessions = todays
+      .filter(({ record }) => record.status === 'planned')
+      .map(({ record }) => record);
     return {
       date,
       completedToday: todays.some(({ record }) => record.status === 'completed'),
-      plannedToday: todays.find(({ record }) => record.status === 'planned')?.record ?? null
+      plannedToday: plannedSessions[0] ?? null,
+      plannedSessions
     };
   }
 

@@ -41,29 +41,33 @@ class FakeRoot {
   }
 }
 
-test('Use today is disabled when a completed session already exists today', async () => {
+test('Use today still works when a completed session already exists today', async () => {
   const root = new FakeRoot();
   const confirms = [];
   const library = createFitnessTemplateLibrary({
     root,
     templatesApi: { list: async () => ({ templates: [], libraryIndex: {} }) },
     chatApi: { confirm: async (payload) => { confirms.push(payload); return { ok: true }; } },
-    getFitnessContext: () => ({ date: '2026-08-07', completedToday: true, plannedToday: null }),
+    getFitnessContext: () => ({ date: '2026-08-07', completedToday: true, plannedToday: null, plannedSessions: [] }),
     onPlanned: async () => {}
   });
 
   library.openTemplate({
-    title: 'Chest and Curls',
-    focus: ['chest'],
-    exercises: [{ name: 'Fly', sets: [{ reps: 10, weight_kg: 20, cable_type: 'constant_force' }] }]
+    title: 'Evening Walk',
+    focus: ['legs'],
+    exercises: [{ name: 'Walk', sets: [{ reps: 1, weight_kg: 0, cable_type: 'none' }] }]
   });
 
   const btn = root.querySelector('#fitness-template-use-today');
-  assert.equal(btn.disabled, true);
-  assert.match(btn.textContent, /already logged/i);
+  assert.equal(btn.disabled, false);
+  assert.match(btn.textContent, /use today/i);
+  assert.match(root.querySelector('#fitness-template-sheet-note').textContent, /another session/i);
 
   await library.useToday();
-  assert.equal(confirms.length, 0);
+  assert.equal(confirms.length, 1);
+  assert.equal(confirms[0].candidate.fields.title, 'Evening Walk');
+  assert.equal(confirms[0].overwrite, false);
+  assert.equal(confirms[0].slug, 'workout-evening-walk');
 });
 
 test('Use today confirms a planned candidate from the selected template', async () => {
@@ -78,7 +82,7 @@ test('Use today confirms a planned candidate from the selected template', async 
         return { ok: true };
       }
     },
-    getFitnessContext: () => ({ date: '2026-08-07', completedToday: false, plannedToday: null }),
+    getFitnessContext: () => ({ date: '2026-08-07', completedToday: false, plannedToday: null, plannedSessions: [] }),
     onPlanned: async () => {}
   });
 
@@ -94,5 +98,32 @@ test('Use today confirms a planned candidate from the selected template', async 
   assert.equal(confirms.length, 1);
   assert.equal(confirms[0].candidate.fields.status, 'planned');
   assert.equal(confirms[0].candidate.fields.title, 'Chest and Curls');
+  assert.equal(confirms[0].slug, 'workout-chest-and-curls');
   assert.equal(confirms[0].overwrite, false);
+});
+
+test('Use today overwrites only when the same titled plan already exists', async () => {
+  const root = new FakeRoot();
+  const confirms = [];
+  const library = createFitnessTemplateLibrary({
+    root,
+    templatesApi: { list: async () => ({ templates: [], libraryIndex: {} }) },
+    chatApi: { confirm: async (payload) => { confirms.push(payload); return { ok: true }; } },
+    getFitnessContext: () => ({
+      date: '2026-08-07',
+      completedToday: false,
+      plannedToday: { title: 'Chest and Curls' },
+      plannedSessions: [{ title: 'Chest and Curls' }, { title: 'Dog Walk' }]
+    }),
+    onPlanned: async () => {}
+  });
+
+  library.openTemplate({
+    title: 'Chest and Curls',
+    exercises: [{ name: 'Fly', sets: [{ reps: 10, weight_kg: 20, cable_type: 'constant_force' }] }]
+  });
+  assert.match(root.querySelector('#fitness-template-use-today').textContent, /update/i);
+
+  await library.useToday();
+  assert.equal(confirms[0].overwrite, true);
 });

@@ -1028,7 +1028,7 @@ export function createChatController({
       proposal.confirm.disabled = false;
       proposal.confirm.textContent = previousLabel;
       if (error.code === 'write_conflict' && !overwrite) {
-        showChatError(root, 'A record already exists for that day. Confirm again to overwrite it.');
+        showChatError(root, 'A record already exists for that session. Confirm again to overwrite it.');
         proposal.confirm.dataset.overwrite = '1';
       } else {
         showChatError(root, 'Saving that record failed. You can try again.');
