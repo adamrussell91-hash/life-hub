@@ -782,10 +782,17 @@ main { max-width: 76rem; margin: 0 auto; }
   padding-left: 3.4rem;
 }
 
-.chat-message:hover .chat-message__actions,
 .chat-message:focus-within .chat-message__actions,
 .chat-message--latest .chat-message__actions {
   display: flex;
+}
+
+/* Desktop pointer only — sticky :hover on phones re-opens the row and
+ * recreates the blank gap under mid-thread bubbles. */
+@media (hover: hover) and (min-width: 721px) {
+  .chat-message:hover .chat-message__actions {
+    display: flex;
+  }
 }
 
 .chat-view.is-busy .chat-message__actions {

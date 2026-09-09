@@ -306,7 +306,11 @@ test('short chat bubbles are sized by text, not Copy/Retry, and status lines do 
   assert.doesNotMatch(actionsRule, /visibility:\s*hidden/);
   assert.match(
     css,
-    /\.chat-message:hover \.chat-message__actions[\s\S]*?display:\s*flex/
+    /@media \(hover:\s*hover\) and \(min-width:\s*721px\)\s*\{[\s\S]*?\.chat-message:hover \.chat-message__actions[\s\S]*?display:\s*flex/
+  );
+  assert.match(
+    css,
+    /\.chat-message:focus-within \.chat-message__actions[\s\S]*?display:\s*flex/
   );
   assert.doesNotMatch(css, /chat-status-pulse/);
 });
