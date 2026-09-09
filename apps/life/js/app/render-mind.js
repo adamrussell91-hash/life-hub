@@ -1079,6 +1079,7 @@ function renderEnergyOrbit(root, model) {
   if (!svg) return;
   const empty = root.querySelector('[data-mind="energy-empty"]');
   const center = root.querySelector('[data-mind="energy-center"]');
+  const meta = root.querySelector('[data-mind="energy-meta"]');
   const hint = root.querySelector('[data-mind="energy-hint"]');
   const legend = root.querySelector('[data-mind="energy-legend"]');
   const chart = buildEnergyOrbit(model.energyOrbit ?? [], {
@@ -1092,6 +1093,7 @@ function renderEnergyOrbit(root, model) {
   if (empty) empty.hidden = hasPoints;
   if (hint) hint.hidden = !hasPoints;
   if (center) center.hidden = !hasPoints;
+  if (meta) meta.hidden = !hasPoints;
   if (!hasPoints) {
     svg.replaceChildren?.();
     svg.setAttribute?.('hidden', '');
@@ -1243,7 +1245,10 @@ function setEnergyCenter(root, headline) {
   const period = root.querySelector('[data-mind="energy-period"]');
   const trend = root.querySelector('[data-mind="energy-trend"]');
   if (status) status.textContent = headline?.status ?? '—';
-  if (period) period.textContent = headline?.period ?? '';
+  if (period) {
+    period.textContent = headline?.period ?? '';
+    period.hidden = !headline?.period;
+  }
   if (trend) {
     trend.textContent = headline?.trend ?? '';
     trend.hidden = !headline?.trend;
