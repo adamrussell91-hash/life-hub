@@ -6277,6 +6277,15 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   padding-inline: var(--space-2);
 }
 
+/* Overlay engaged: who-header already names the agent — keep only the active face. */
+.chat-view[data-panel-mode="overlay"][data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
+  display: none;
+}
+
+.chat-view[data-panel-mode="overlay"][data-chrome='engaged'] .agent-picker__name {
+  display: none;
+}
+
 @media (max-width: 720px) {
   /*
    * Full-page Chat must track the visual viewport (same contract as overlay).
