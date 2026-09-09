@@ -27,15 +27,17 @@ import {
   parsePendingActions,
   serializePendingActions
 } from '../../netlify/functions/_shared/capabilities/propose-action.mjs';
-import { executeClareWork } from '../../netlify/functions/_shared/clare-work.mjs';
+import { executeClareWork, loadWorkflowState } from '../../netlify/functions/_shared/clare-work.mjs';
 import { buildProductivityCardEvent } from '../../netlify/functions/_shared/productivity-card-map.mjs';
 import {
   FALLBACK_WORKDAY,
   buildAuthoritativeHardBusy,
   detectStaleScheduleCollisions,
-  workdayForDate
+  workdayForDate,
+  workWindowGapSpans
 } from '../../netlify/functions/_shared/productivity-os.mjs';
 import { createScheduleDiffCard } from '../../packages/design-kit/js/agent-productivity-cards.js';
+import { scheduleDiffActiveProposed } from '../../apps/life/js/shell/tasks-calendar.js';
 
 const SECRET = 's'.repeat(32);
 const validEnv = {
@@ -161,11 +163,13 @@ function workBlockWrite(id, {
   };
 }
 
-function pendingEntry(id, writes) {
+function pendingEntry(id, writes, extras = {}) {
   return {
     id,
     createdAt: `${DAY}T12:00:00.000Z`,
     slug: 'clare',
+    workflowKind: 'schedule_diff',
+    workflowId: 'schedule_diff:current',
     proposal: {
       capability: 'os.propose-action',
       agent: 'clare',
@@ -173,7 +177,8 @@ function pendingEntry(id, writes) {
       reads: [],
       writes,
       surfaces: ['confirm_card', 'tasks_hub', 'schedule_diff']
-    }
+    },
+    ...extras
   };
 }
 
@@ -1089,5 +1094,567 @@ describe('SD20 ghost cleanup after Confirm/Discard (LEVEL 4 controller seam)', (
     );
     assert.equal(gone.status, 200);
     assert.equal(tasksDiscard.data['work_blocks/d'], undefined);
+  });
+});
+
+describe('SD21/SD22 durable confirmed status (LEVEL 4)', () => {
+  it('SD21 Confirm promotes work block status proposed → confirmed', async () => {
+    const write = workBlockWrite('sd21', { start_time: '10:00' });
+    const before = JSON.parse(write.content);
+    assert.equal(before.status, 'proposed');
+    const github = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([pendingEntry('act_sd21', [write])])
+    });
+    const tasks = memoryStore({ 'meta/planning_profile': planningProfile() });
+    const teaching = memoryStore();
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const response = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd21',
+        accept: ['tasks:work_block:sd21'],
+        schedule_overrides: [{ path: 'tasks:work_block:sd21', start_time: '10:00' }]
+      })
+    );
+    assert.equal(response.status, 200, await response.clone().text());
+    assert.equal(tasks.data['work_blocks/sd21']?.status, 'confirmed');
+    assert.notEqual(tasks.data['work_blocks/sd21']?.status, 'proposed');
+    const entry = findPendingActionById(
+      parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+      'act_sd21'
+    );
+    assert.equal(getPendingActionStatus(entry), 'consumed');
+  });
+
+  it('SD22 confirmed block is hard busy for a later Confirm', async () => {
+    const githubA = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([
+        pendingEntry('act_sd22a', [workBlockWrite('a22', { start_time: '10:00', title: 'Block A' })])
+      ])
+    });
+    const tasks = memoryStore({ 'meta/planning_profile': planningProfile() });
+    const teaching = memoryStore();
+    const confirmA = confirmHandler({ github: githubA, tasks, teaching });
+    const first = await confirmA(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd22a',
+        accept: ['tasks:work_block:a22'],
+        schedule_overrides: [{ path: 'tasks:work_block:a22', start_time: '10:00' }]
+      })
+    );
+    assert.equal(first.status, 200, await first.clone().text());
+    assert.equal(tasks.data['work_blocks/a22']?.status, 'confirmed');
+
+    const hardBusy = buildAuthoritativeHardBusy({
+      date: DAY,
+      lessons: [],
+      workBlocks: [tasks.data['work_blocks/a22']],
+      planningProfile: planningProfile()
+    });
+    assert.ok(hardBusy.some((span) => span.kind === 'locked' && /Block A/i.test(span.title)));
+
+    const githubB = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([
+        pendingEntry('act_sd22b', [workBlockWrite('b22', { start_time: '09:00', title: 'Block B' })])
+      ])
+    });
+    const confirmB = confirmHandler({ github: githubB, tasks, teaching });
+    const blocked = await confirmB(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd22b',
+        accept: ['tasks:work_block:b22'],
+        schedule_overrides: [{ path: 'tasks:work_block:b22', start_time: '10:15' }]
+      })
+    );
+    const body = await blocked.json();
+    assert.equal(blocked.status, 409);
+    assert.equal(body.error, 'stale_schedule_collision');
+    assert.equal(tasks.data['work_blocks/b22'], undefined);
+    assert.equal(
+      isPendingActionExecutable(
+        findPendingActionById(
+          parsePendingActions(githubB.blobs.get(PENDING_ACTIONS_PATH).content),
+          'act_sd22b'
+        )
+      ),
+      true
+    );
+  });
+});
+
+describe('SD23–SD26 schedule_diff workflow lifecycle (LEVEL 2/4)', () => {
+  it('SD23 Confirm reconciles persisted workflow with pending identity', async () => {
+    const github = statefulGithub({});
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 60,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+    const teaching = memoryStore();
+    const chat = createChatHandler({
+      env: validEnv,
+      now: () => NOW_MS,
+      fetchImpl: github.fetchImpl,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching,
+      createAnthropicClient: () => ({
+        async *streamMessage(args) {
+          await args.executeTools({
+            id: 'call_sd23',
+            name: 'compose_schedule',
+            input: { date: DAY, task_ids: ['task_a'] }
+          });
+          yield { type: 'done' };
+        }
+      })
+    });
+    const events = await readSse(
+      await chat(
+        chatRequest({
+          message: 'Compose Tuesday schedule.',
+          priorAgentSlug: 'clare',
+          agentKernel: true
+        })
+      )
+    );
+    const proposalEvent = events.find((e) => e.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+    const wfBefore = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wfBefore?.status, 'awaiting_confirm');
+    assert.equal(wfBefore?.pending_action_id, proposalEvent.id);
+    assert.ok(Array.isArray(wfBefore?.proposed) && wfBefore.proposed.length >= 1);
+
+    const paths = (wfBefore.proposed || []).map((b) => b.write_path || b.id);
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const ok = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: proposalEvent.id,
+        accept: paths
+      })
+    );
+    assert.equal(ok.status, 200, await ok.clone().text());
+    const wfAfter = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wfAfter?.status, 'confirmed');
+    assert.equal(wfAfter?.pending_action_id, proposalEvent.id);
+    assert.deepEqual(scheduleDiffActiveProposed(wfAfter), []);
+    const durable = Object.values(tasks.data).find(
+      (v) => v && typeof v === 'object' && v.status === 'confirmed' && v.source === 'clare'
+    );
+    assert.ok(durable, 'durable confirmed work block missing');
+  });
+
+  it('SD24 Discard reconciles persisted workflow', async () => {
+    const github = statefulGithub({});
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+    const teaching = memoryStore();
+    const chat = createChatHandler({
+      env: validEnv,
+      now: () => NOW_MS,
+      fetchImpl: github.fetchImpl,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching,
+      createAnthropicClient: () => ({
+        async *streamMessage(args) {
+          await args.executeTools({
+            id: 'call_sd24',
+            name: 'compose_schedule',
+            input: { date: DAY, task_ids: ['task_a'] }
+          });
+          yield { type: 'done' };
+        }
+      })
+    });
+    const events = await readSse(
+      await chat(
+        chatRequest({
+          message: 'Compose Tuesday schedule for discard.',
+          priorAgentSlug: 'clare',
+          agentKernel: true
+        })
+      )
+    );
+    const proposalEvent = events.find((e) => e.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const gone = await confirm(
+      confirmRequest({
+        kind: 'action_dismiss',
+        slug: 'clare',
+        id: proposalEvent.id
+      })
+    );
+    assert.equal(gone.status, 200);
+    assert.equal(
+      Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')),
+      false
+    );
+    const wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wf?.status, 'discarded');
+    assert.equal(wf?.pending_action_id, proposalEvent.id);
+    assert.deepEqual(scheduleDiffActiveProposed(wf), []);
+  });
+
+  it('SD25 confirming old A does not terminate newer workflow B', async () => {
+    const github = statefulGithub({});
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+    const teaching = memoryStore();
+    let round = 0;
+    const chat = createChatHandler({
+      env: validEnv,
+      now: () => NOW_MS,
+      fetchImpl: github.fetchImpl,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching,
+      createAnthropicClient: () => ({
+        async *streamMessage(args) {
+          round += 1;
+          await args.executeTools({
+            id: `call_sd25_${round}`,
+            name: 'compose_schedule',
+            input: { date: DAY, task_ids: ['task_a'] }
+          });
+          yield { type: 'done' };
+        }
+      })
+    });
+    const eventsA = await readSse(
+      await chat(chatRequest({ message: 'Compose A', priorAgentSlug: 'clare', agentKernel: true }))
+    );
+    const idA = eventsA.find((e) => e.type === 'action_proposal')?.id;
+    assert.ok(idA);
+    const eventsB = await readSse(
+      await chat(chatRequest({ message: 'Compose B', priorAgentSlug: 'clare', agentKernel: true }))
+    );
+    const idB = eventsB.find((e) => e.type === 'action_proposal')?.id;
+    assert.ok(idB);
+    assert.notEqual(idA, idB);
+    const wfB = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wfB?.pending_action_id, idB);
+    assert.equal(wfB?.status, 'awaiting_confirm');
+
+    const pathsA = (parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content)
+      .find((e) => e.id === idA)?.proposal?.writes || []).map((w) => w.path);
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const ok = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: idA,
+        accept: pathsA
+      })
+    );
+    assert.equal(ok.status, 200, await ok.clone().text());
+    const wfAfter = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wfAfter?.status, 'awaiting_confirm');
+    assert.equal(wfAfter?.pending_action_id, idB);
+    assert.ok(scheduleDiffActiveProposed(wfAfter).length >= 1);
+  });
+
+  it('SD26 Life Hub reload does not resurrect terminal ghosts', () => {
+    assert.deepEqual(
+      scheduleDiffActiveProposed({
+        status: 'confirmed',
+        proposed: [{ id: 'tasks:work_block:x', title: 'X', date: DAY, start_time: '10:00' }]
+      }),
+      []
+    );
+    assert.deepEqual(
+      scheduleDiffActiveProposed({
+        status: 'discarded',
+        proposed: [{ id: 'tasks:work_block:y', title: 'Y', date: DAY, start_time: '11:00' }]
+      }),
+      []
+    );
+    const active = scheduleDiffActiveProposed({
+      status: 'awaiting_confirm',
+      pending_action_id: 'act_live',
+      proposed: [{ id: 'tasks:work_block:z', title: 'Z', date: DAY, start_time: '12:00' }]
+    });
+    assert.equal(active.length, 1);
+    assert.equal(active[0].id, 'tasks:work_block:z');
+  });
+});
+
+describe('SD27–SD29 multiple work windows (LEVEL 2/3/4)', () => {
+  const splitProfile = planningProfile({
+    work_windows: {
+      tue: [
+        { start: '09:00', end: '12:00' },
+        { start: '13:00', end: '17:00' }
+      ]
+    }
+  });
+
+  it('SD27 compose respects midday gap between windows', async () => {
+    const gaps = workWindowGapSpans(DAY, splitProfile);
+    assert.ok(gaps.some((g) => g.start === 12 * 60 && g.end === 13 * 60));
+    const { result } = await composeFixture({
+      planning_profile: splitProfile,
+      task: {
+        id: 'task_a',
+        title: 'Midday work',
+        status: 'open',
+        estimated_duration: 60,
+        depth: 'shallow'
+      }
+    });
+    assert.equal(result.kind, 'propose');
+    assert.ok(result.hardBusy.some((s) => s.kind === 'outside_work_window'));
+    for (const block of result.proposed || []) {
+      const start = minutesOfTime(block.start_time);
+      const end = start + (Number(block.duration_minutes) || 0);
+      assert.ok(!(start < 13 * 60 && end > 12 * 60), `block overlaps gap: ${block.start_time}`);
+    }
+  });
+
+  it('SD28 client move into work-window gap is invalid', async () => {
+    withDom();
+    const { result } = await composeFixture({
+      planning_profile: splitProfile,
+      task: {
+        id: 'task_a',
+        title: 'Gap probe',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      }
+    });
+    const cardEvent = buildProductivityCardEvent('compose_schedule', result, { pendingId: 'act_sd28' });
+    assert.ok(cardEvent.payload.hardBusy.some((s) => s.kind === 'outside_work_window'));
+    const built = createScheduleDiffCard(document, {
+      pendingId: cardEvent.payload.pendingId,
+      blocks: cardEvent.payload.blocks,
+      hardBusy: cardEvent.payload.hardBusy,
+      workday: cardEvent.payload.workday
+    });
+    document.body.append(built.card);
+    const path = built.getBlocks()[0].id;
+    assert.equal(built.moveBlockForTest(path, '12:15'), true);
+    const invalid = built.getBlocks()[0];
+    assert.equal(invalid.invalid, true);
+    assert.match(String(invalid.invalidReason || ''), /Outside work window|work window|unavailable/i);
+    const confirmBtn = [...built.card.querySelectorAll('button')].find(
+      (btn) => btn.textContent === 'Confirm Selected'
+    );
+    assert.equal(confirmBtn?.disabled, true);
+  });
+
+  it('SD29 server rejects crafted gap override', async () => {
+    const github = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([pendingEntry('act_sd29', [workBlockWrite('g')])])
+    });
+    const tasks = memoryStore({ 'meta/planning_profile': splitProfile });
+    const teaching = memoryStore();
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const blocked = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd29',
+        accept: ['tasks:work_block:g'],
+        schedule_overrides: [{ path: 'tasks:work_block:g', start_time: '12:15' }]
+      })
+    );
+    assert.equal(blocked.status, 409);
+    assert.equal(tasks.data['work_blocks/g'], undefined);
+    assert.equal(
+      isPendingActionExecutable(
+        findPendingActionById(
+          parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+          'act_sd29'
+        )
+      ),
+      true
+    );
+  });
+});
+
+describe('SD30 explicit one-off protected windows (LEVEL 3/4)', () => {
+  it('compose hardBusy includes Dentist travel; Confirm rejects 14:15', async () => {
+    const dentist = [{ start: '14:00', end: '14:45', label: 'Dentist travel' }];
+    const { result } = await composeFixture({
+      planning_profile: planningProfile({
+        work_windows: { tue: [{ start: '08:00', end: '16:30' }] }
+      }),
+      input: { date: DAY, task_ids: ['task_a'], protected_windows: dentist }
+    });
+    assert.equal(result.kind, 'propose');
+    assert.ok(result.hardBusy.some((s) => /Dentist travel/i.test(s.title)));
+    for (const block of result.proposed || []) {
+      const start = minutesOfTime(block.start_time);
+      const end = start + (Number(block.duration_minutes) || 0);
+      assert.ok(!(start < 14 * 60 + 45 && end > 14 * 60), 'composed over dentist');
+    }
+
+    const write = workBlockWrite('dent', { start_time: '09:00' });
+    const github = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([
+        pendingEntry('act_sd30', [write], {
+          scheduleContext: {
+            date: DAY,
+            protected_windows: result.schedule_context.protected_windows
+          }
+        })
+      ])
+    });
+    const tasks = memoryStore({
+      'meta/planning_profile': planningProfile({
+        work_windows: { tue: [{ start: '08:00', end: '16:30' }] }
+      })
+    });
+    const teaching = memoryStore();
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const blocked = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd30',
+        accept: ['tasks:work_block:dent'],
+        schedule_overrides: [{ path: 'tasks:work_block:dent', start_time: '14:15' }]
+      })
+    );
+    assert.equal(blocked.status, 409);
+    assert.equal(tasks.data['work_blocks/dent'], undefined);
+  });
+});
+
+describe('SD31/SD32 Life calendar events (LEVEL 3/4)', () => {
+  it('SD31 Life Doctor event blocks compose and appears in hardBusy', async () => {
+    const doctor = {
+      type: 'medical',
+      title: 'Doctor',
+      date: DAY,
+      time: '13:00',
+      duration_minutes: 60
+    };
+    const { result } = await composeFixture({
+      planning_profile: planningProfile(),
+      task: {
+        id: 'task_a',
+        title: 'Mark essays',
+        status: 'open',
+        estimated_duration: 60,
+        depth: 'shallow'
+      }
+    });
+    // Re-compose with life events via executeClareWork ctx
+    const saved = new Map();
+    const withDoctor = await executeClareWork(
+      'compose_schedule',
+      { date: DAY, task_ids: ['task_a'] },
+      {
+        now: new Date(`${DAY}T08:00:00Z`),
+        tasks: [{
+          id: 'task_a',
+          title: 'Mark essays',
+          status: 'open',
+          estimated_duration: 60,
+          depth: 'shallow'
+        }],
+        projects: [],
+        lessons: [],
+        workBlocks: [],
+        planning_profile: planningProfile(),
+        lifeEvents: [doctor],
+        tasksStore: {
+          async get(key) {
+            return saved.has(key) ? saved.get(key) : null;
+          },
+          async setJSON(key, value) {
+            saved.set(key, value);
+          },
+          async set(key, value) {
+            saved.set(key, typeof value === 'string' ? JSON.parse(value) : value);
+          }
+        }
+      }
+    );
+    assert.equal(withDoctor.kind, 'propose');
+    assert.ok(withDoctor.hardBusy.some((s) => /Doctor/i.test(s.title) && s.kind === 'life_event'));
+    for (const block of withDoctor.proposed || []) {
+      const start = minutesOfTime(block.start_time);
+      const end = start + (Number(block.duration_minutes) || 0);
+      assert.ok(!(start < 14 * 60 && end > 13 * 60), `overlaps Doctor: ${block.start_time}`);
+    }
+    void result;
+  });
+
+  it('SD32 new Life event after proposal invalidates Confirm', async () => {
+    const github = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([
+        pendingEntry('act_sd32', [workBlockWrite('life32', { start_time: '13:15' })])
+      ])
+    });
+    const tasks = memoryStore({ 'meta/planning_profile': planningProfile() });
+    const teaching = memoryStore();
+    let lifeEvents = [];
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl: github.fetchImpl,
+      now: () => NOW_MS,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching,
+      getLifeEvents: async () => lifeEvents
+    });
+    // Proposal-time free; then Doctor appears before Confirm.
+    lifeEvents = [{
+      type: 'medical',
+      title: 'Doctor',
+      date: DAY,
+      time: '13:00',
+      duration_minutes: 60
+    }];
+    const blocked = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd32',
+        accept: ['tasks:work_block:life32'],
+        schedule_overrides: [{ path: 'tasks:work_block:life32', start_time: '13:15' }]
+      })
+    );
+    const body = await blocked.json();
+    assert.equal(blocked.status, 409);
+    assert.equal(body.error, 'stale_schedule_collision');
+    assert.equal(tasks.data['work_blocks/life32'], undefined);
+    assert.equal(
+      isPendingActionExecutable(
+        findPendingActionById(
+          parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+          'act_sd32'
+        )
+      ),
+      true
+    );
   });
 });

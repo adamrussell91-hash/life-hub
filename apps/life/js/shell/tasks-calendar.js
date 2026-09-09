@@ -65,3 +65,17 @@ export function protectedBackgroundFromWindows(date, windows = []) {
       kind: 'protected'
     }));
 }
+
+/**
+ * Active Schedule Diff ghosts only while awaiting_confirm.
+ * Terminal confirmed/discarded must not resurrect proposed overlays on reload.
+ */
+export function scheduleDiffActiveProposed(state) {
+  if (!state || typeof state !== 'object') return [];
+  const status = typeof state.status === 'string' ? state.status : '';
+  if (status === 'confirmed' || status === 'discarded' || status === 'complete') return [];
+  if (status && status !== 'awaiting_confirm') return [];
+  // Legacy proposed with no status: require pending_action_id evidence.
+  if (!status && !state.pending_action_id) return [];
+  return Array.isArray(state.proposed) ? state.proposed : [];
+}

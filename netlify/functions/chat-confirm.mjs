@@ -59,6 +59,8 @@ import {
   detectStaleWrites,
   selectAcceptedWrites,
   applyScheduleOverrides,
+  promoteScheduleDiffWorkBlockWrites,
+  isScheduleDiffProposal,
   decisionFieldsFromAction,
   getTasksJSON,
   getTeachingJSON
@@ -86,8 +88,11 @@ import {
   markWeeklyReviewComplete,
   markWeeklyReviewPendingConsumed,
   reconcileWeeklyReviewIfPendingConsumed,
-  loadWorkflowState
+  loadWorkflowState,
+  markScheduleDiffConfirmed,
+  markScheduleDiffDiscarded
 } from './_shared/clare-work.mjs';
+import { loadTimedLifeEventsFromTree } from './_shared/life-schedule-events.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -113,7 +118,8 @@ export function createChatConfirmHandler({
   continueConversation,
   now = Date.now,
   getTasksStore = defaultGetTasksStore,
-  getTeachingStore = defaultGetTeachingStore
+  getTeachingStore = defaultGetTeachingStore,
+  getLifeEvents = null
 } = {}) {
   return async function chatConfirmHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -648,7 +654,12 @@ export function createChatConfirmHandler({
     }
     const blobStores = blobStoresResult.stores;
 
-    const scheduleCollision = await checkStaleWorkBlockCollisions(accepted, blobStores);
+    const scheduleCollision = await checkStaleWorkBlockCollisions(accepted, blobStores, {
+      stored,
+      client,
+      tree,
+      getLifeEvents
+    });
     if (scheduleCollision?.unavailable) {
       return errorResponse(
         503,
@@ -665,6 +676,11 @@ export function createChatConfirmHandler({
         data: scheduleCollision.revised
       }, PRIVATE_CACHE);
     }
+
+    // Schedule Diff Confirm promotes durable work blocks to confirmed (server-side).
+    const acceptedForWrite = isScheduleDiffProposal(stored, proposal)
+      ? promoteScheduleDiffWorkBlockWrites(accepted, { stamp: new Date(now()).toISOString() })
+      : accepted;
 
     const storedBases = stored?.bases && typeof stored.bases === 'object' && !Array.isArray(stored.bases)
       ? stored.bases
@@ -824,9 +840,9 @@ export function createChatConfirmHandler({
     };
 
     let writeResult = { ok: true, results: [] };
-    if (accepted.length) {
+    if (acceptedForWrite.length) {
       try {
-        writeResult = await executeProposeActionWrites(client, { ...proposal, writes: accepted }, {
+        writeResult = await executeProposeActionWrites(client, { ...proposal, writes: acceptedForWrite }, {
           files,
           blobStores,
           nowIso: () => new Date(now()).toISOString()
@@ -982,6 +998,21 @@ export function createChatConfirmHandler({
           }
         } catch {
           // Queue consume is the primary replay gate; workflow stamp is secondary.
+        }
+      }
+
+      if (pendingConsumed && isScheduleDiffProposal(stored, proposal)) {
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            await markScheduleDiffConfirmed(tasksStore, {
+              pendingActionId: parsed.id,
+              stamp: consumedAt,
+              selectedWritePaths: accepted.map((w) => w.path)
+            });
+          }
+        } catch {
+          // Pending consume is authoritative; workflow stamp is secondary for ghost cleanup.
         }
       }
 
@@ -1158,6 +1189,21 @@ export function createChatConfirmHandler({
           sha: entry.sha,
           message: `chore(propose-action): dismiss ${parsed.id}`
         });
+      }
+
+      try {
+        const stored = findPendingActionById(queue, parsed.id);
+        if (stored && isScheduleDiffProposal(stored, stored.proposal)) {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            await markScheduleDiffDiscarded(tasksStore, {
+              pendingActionId: parsed.id,
+              stamp: new Date(now()).toISOString()
+            });
+          }
+        }
+      } catch {
+        // Queue dismiss is primary; workflow stamp is secondary.
       }
 
       try {
@@ -1410,7 +1456,12 @@ function proposedBlocksFromWrites(writes) {
   return blocks;
 }
 
-async function checkStaleWorkBlockCollisions(writes, blobStores) {
+async function checkStaleWorkBlockCollisions(writes, blobStores, {
+  stored = null,
+  client = null,
+  tree = null,
+  getLifeEvents = null
+} = {}) {
   const proposed = proposedBlocksFromWrites(writes);
   if (!proposed.length) return { ok: true };
   const dates = [...new Set(proposed.map((b) => b.date).filter(Boolean))];
@@ -1419,6 +1470,7 @@ async function checkStaleWorkBlockCollisions(writes, blobStores) {
   let lessons = [];
   let workBlocks = [];
   let profile = null;
+  let lifeEvents = [];
   try {
     if (teachingStore) {
       lessons = await listTeachingJSON(teachingStore, SCHEDULED_LESSON_PREFIX);
@@ -1427,6 +1479,11 @@ async function checkStaleWorkBlockCollisions(writes, blobStores) {
       workBlocks = await listTasksJSON(tasksStore, 'work_blocks/');
       profile = await getTasksMetaJSON(tasksStore, 'meta/planning_profile');
     }
+    const loadLife = typeof getLifeEvents === 'function'
+      ? getLifeEvents
+      : async ({ dates: dayKeys, client: gh, tree: ghTree }) =>
+        loadTimedLifeEventsFromTree({ client: gh, tree: ghTree, dates: dayKeys });
+    lifeEvents = await loadLife({ dates, client, tree });
   } catch {
     // Fail closed: unavailable schedule truth must never look like "no conflict".
     return {
@@ -1437,13 +1494,21 @@ async function checkStaleWorkBlockCollisions(writes, blobStores) {
   }
 
   const planningProfile = profile && typeof profile === 'object' ? profile : null;
+  const trustedProtected = Array.isArray(stored?.scheduleContext?.protected_windows)
+    ? stored.scheduleContext.protected_windows
+    : Array.isArray(stored?.schedule_context?.protected_windows)
+      ? stored.schedule_context.protected_windows
+      : [];
+
   for (const date of dates) {
     const dayProposed = proposed.filter((b) => b.date === date);
     const hardBusy = buildAuthoritativeHardBusy({
       date,
       lessons,
       workBlocks,
-      planningProfile
+      planningProfile,
+      extraProtectedWindows: trustedProtected,
+      events: lifeEvents
     });
     const workday = workdayForDate(date, planningProfile);
     const check = detectStaleScheduleCollisions({

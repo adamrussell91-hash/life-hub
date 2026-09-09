@@ -29,7 +29,9 @@ import {
   composeDaySchedule,
   validateProposedBlocks,
   workdayForDate,
+  workWindowsForDate,
   buildAuthoritativeHardBusy,
+  normalizeProtectedWindowSpans,
   computeDeadlineRunway,
   createFocusBlock,
   startFocusBlock,
@@ -1288,6 +1290,91 @@ export async function reconcileWeeklyReviewIfPendingConsumed(store, reviewId) {
   return markWeeklyReviewComplete(store, reviewId);
 }
 
+/** Mark schedule_diff:current awaiting_confirm with the durable pending action id. */
+export async function markScheduleDiffAwaitingConfirm(store, {
+  pendingActionId,
+  stamp,
+  scheduleContext = null,
+  proposed = null,
+  writes = null,
+  date = null
+} = {}) {
+  if (!store) return null;
+  const state = (await loadWorkflowState(store, 'schedule_diff:current')) || {
+    id: 'schedule_diff:current',
+    kind: 'schedule_diff'
+  };
+  const updatedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    ...state,
+    id: 'schedule_diff:current',
+    kind: 'schedule_diff',
+    ...(date ? { date } : {}),
+    ...(Array.isArray(proposed) ? { proposed } : {}),
+    ...(Array.isArray(writes) ? { writes } : {}),
+    status: 'awaiting_confirm',
+    pending_action_id: pendingActionId ?? state.pending_action_id ?? null,
+    pending_action_status: 'pending',
+    ...(scheduleContext && typeof scheduleContext === 'object' ? { schedule_context: scheduleContext } : {}),
+    updated_at: updatedAt
+  });
+}
+
+/**
+ * Confirm terminal reconciliation — only when pending_action_id matches.
+ * Identity guard: never terminate a newer workflow bound to a different pending id.
+ */
+export async function markScheduleDiffConfirmed(store, {
+  pendingActionId,
+  stamp,
+  selectedWritePaths = null
+} = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  const confirmedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    ...state,
+    status: 'confirmed',
+    pending_action_id: pendingActionId,
+    pending_action_status: 'consumed',
+    confirmed_at: confirmedAt,
+    ...(Array.isArray(selectedWritePaths) ? { selected_write_paths: selectedWritePaths } : {}),
+    proposed: [],
+    updated_at: confirmedAt
+  });
+}
+
+/** Discard terminal reconciliation — identity guard on pending_action_id. */
+export async function markScheduleDiffDiscarded(store, { pendingActionId, stamp } = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  const discardedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    ...state,
+    status: 'discarded',
+    pending_action_id: pendingActionId,
+    pending_action_status: 'dismissed',
+    discarded_at: discardedAt,
+    proposed: [],
+    updated_at: discardedAt
+  });
+}
+
+/** Active Schedule Diff ghosts only while awaiting_confirm. */
+export function scheduleDiffActiveProposed(state) {
+  if (!state || typeof state !== 'object') return [];
+  const status = typeof state.status === 'string' ? state.status : '';
+  if (status === 'confirmed' || status === 'discarded' || status === 'complete') return [];
+  if (status && status !== 'awaiting_confirm') return [];
+  // Legacy: proposed with no status → treat as awaiting only when pending_action_id present.
+  if (!status && !state.pending_action_id) return [];
+  return Array.isArray(state.proposed) ? state.proposed : [];
+}
+
 function calendarNotesFromCtx({ lessons = [], workBlocks = [], tasks = [], todayKey, past = false }) {
   const day = parseDue(todayKey);
   if (!day) return [];
@@ -2084,14 +2171,19 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       ? { start: input.workday_start, end: input.workday_end, source: 'tool_input' }
       : null;
     const effectiveWorkday = workdayForDate(dateKey, planningProfile, explicitWorkday);
+    const effectiveWindows = workWindowsForDate(dateKey, planningProfile);
     const authoritativeBlocks = Array.isArray(input.confirmed_blocks)
       ? input.confirmed_blocks
       : workBlocks.filter(b => b.status === 'confirmed' || b.status === 'in_progress');
+    const lifeEvents = ctx.lifeEvents ?? ctx.events ?? [];
+    const explicitProtected = normalizeProtectedWindowSpans(input.protected_windows);
     const hardBusy = buildAuthoritativeHardBusy({
       date: dateKey,
       lessons: lessons ?? [],
       workBlocks: authoritativeBlocks,
-      planningProfile
+      planningProfile,
+      extraProtectedWindows: explicitProtected,
+      events: lifeEvents
     });
 
     if (Array.isArray(input.validate_proposed) && input.validate_proposed.length) {
@@ -2104,18 +2196,33 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       now,
       energy: input.energy_level ? { level: input.energy_level } : null,
       workday: effectiveWorkday,
-      protected_windows: hardBusy.filter((span) => span.kind === 'protected'),
+      protected_windows: hardBusy.filter((span) =>
+        span.kind === 'protected'
+        || span.kind === 'outside_work_window'
+        || span.kind === 'life_event'
+      ),
       confirmed_blocks: authoritativeBlocks,
       task_ids: input.task_ids,
       planning_profile: planningProfile
     });
+    const scheduleContext = {
+      date: dateKey,
+      workday: composed?.workday ?? effectiveWorkday,
+      work_windows: effectiveWindows,
+      protected_windows: explicitProtected,
+      hardBusy
+    };
     const rawProposed = Array.isArray(composed?.proposed) ? composed.proposed : [];
     const selected = rawProposed.filter(block => block && block.selected !== false);
     if (!selected.length) {
       return {
         ...composed,
         hardBusy,
-        workday: composed?.workday ?? effectiveWorkday
+        workday: composed?.workday ?? effectiveWorkday,
+        work_windows: effectiveWindows,
+        schedule_context: scheduleContext,
+        workflow_kind: 'schedule_diff',
+        workflow_id: 'schedule_diff:current'
       };
     }
 
@@ -2164,6 +2271,7 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     );
 
     // Shared preview identity for Tasks + Life calendars (ghosts until Confirm).
+    // pending_action_id is stamped after the queue write in chat.mjs.
     await saveWorkflowState(tasksStore, 'schedule_diff:current', {
       id: 'schedule_diff:current',
       kind: 'schedule_diff',
@@ -2171,6 +2279,9 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       proposed,
       writes: writes.map(w => ({ path: w.path, diff: w.diff })),
       status: 'awaiting_confirm',
+      pending_action_id: null,
+      pending_action_status: null,
+      schedule_context: scheduleContext,
       updated_at: stamp
     });
 
@@ -2180,6 +2291,10 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       proposed,
       hardBusy,
       workday: composed?.workday ?? effectiveWorkday,
+      work_windows: effectiveWindows,
+      schedule_context: scheduleContext,
+      workflow_kind: 'schedule_diff',
+      workflow_id: 'schedule_diff:current',
       note: 'Ghost blocks only until Confirm. Deadlines unchanged.'
     };
   }

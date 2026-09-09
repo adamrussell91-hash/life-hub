@@ -215,8 +215,9 @@ import {
   listJSON as listTeachingJSON
 } from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
-import { executeClareWork, isClareWorkTool, statedPlannerInputs, markWeeklyReviewAwaitingConfirm } from './_shared/clare-work.mjs';
+import { executeClareWork, isClareWorkTool, statedPlannerInputs, markWeeklyReviewAwaitingConfirm, markScheduleDiffAwaitingConfirm } from './_shared/clare-work.mjs';
 import { buildProductivityCardEvent } from './_shared/productivity-card-map.mjs';
+import { loadTimedLifeEventsFromTree } from './_shared/life-schedule-events.mjs';
 import {
   executeHammondProductivity,
   isHammondProductivityTool
@@ -336,7 +337,8 @@ export function createChatHandler({
   now = Date.now,
   loadHubAgentContext: loadHubContext = loadHubAgentContext,
   getTasksStore = defaultGetTasksStore,
-  getTeachingStore = defaultGetTeachingStore
+  getTeachingStore = defaultGetTeachingStore,
+  getLifeEvents = null
 } = {}) {
   return async function chatHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -2344,6 +2346,28 @@ export function createChatHandler({
                 });
                 send({ type: 'status', text: 'Working…' });
                 const stated = statedPlannerInputs(parsed.message);
+                let hubLifeEvents = [];
+                if (event.name === 'compose_schedule' || event.name === 'plan_work') {
+                  try {
+                    const dateHint = typeof event.input?.date === 'string'
+                      ? event.input.date
+                      : today;
+                    const loadLife = typeof getLifeEvents === 'function'
+                      ? getLifeEvents
+                      : async ({ dates }) => loadTimedLifeEventsFromTree({
+                        client,
+                        tree: repoTree,
+                        dates
+                      });
+                    hubLifeEvents = await loadLife({
+                      dates: [dateHint].filter(Boolean),
+                      client,
+                      tree: repoTree
+                    });
+                  } catch {
+                    hubLifeEvents = [];
+                  }
+                }
                 const result = await executeClareWork(event.name, event.input ?? {}, {
                   tasks: hubTasks,
                   projects: hubProjects,
@@ -2351,6 +2375,8 @@ export function createChatHandler({
                   workBlocks: hubWorkBlocks,
                   work_blocks: hubWorkBlocks,
                   planning_profile: hubPlanningProfile,
+                  lifeEvents: hubLifeEvents,
+                  events: hubLifeEvents,
                   protocol: clareProtocol,
                   now: nowInstant,
                   energy: stated.energy,
@@ -2369,12 +2395,24 @@ export function createChatHandler({
                   }
                   const pendingId = await proposeOsAction(validated.proposal, {
                     ...(result.workflow_kind ? { workflowKind: result.workflow_kind } : {}),
-                    ...(result.workflow_id ? { workflowId: result.workflow_id } : {})
+                    ...(result.workflow_id ? { workflowId: result.workflow_id } : {}),
+                    ...(result.schedule_context ? { scheduleContext: result.schedule_context } : {})
                   });
                   let workflowState = result.state ?? null;
                   if (pendingId && result.workflow_kind === 'weekly_review' && result.workflow_id && hubTasksStore) {
                     workflowState = await markWeeklyReviewAwaitingConfirm(hubTasksStore, result.workflow_id, {
                       pendingActionId: pendingId
+                    });
+                  }
+                  if (pendingId && result.workflow_kind === 'schedule_diff' && hubTasksStore) {
+                    workflowState = await markScheduleDiffAwaitingConfirm(hubTasksStore, {
+                      pendingActionId: pendingId,
+                      scheduleContext: result.schedule_context,
+                      proposed: result.proposed,
+                      date: result.schedule_context?.date,
+                      writes: Array.isArray(result.proposal?.writes)
+                        ? result.proposal.writes.map((w) => ({ path: w.path, diff: w.diff }))
+                        : null
                     });
                   }
                   const proposeCard = buildProductivityCardEvent(event.name, {

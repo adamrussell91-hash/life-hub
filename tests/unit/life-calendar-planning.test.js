@@ -42,7 +42,32 @@ test('protected backgrounds stay as spans not chips', () => {
   assert.equal(spans[0].start, '12:00');
 });
 
-test('calendar model keeps protected backgrounds and work_block briefs', () => {
+test('scheduleDiffActiveProposed suppresses terminal ghosts (SD26)', async () => {
+  const { scheduleDiffActiveProposed } = await import('../../apps/life/js/shell/tasks-calendar.js');
+  assert.equal(
+    scheduleDiffActiveProposed({
+      status: 'confirmed',
+      proposed: [{ id: 'x', date: '2026-09-08', start_time: '10:00' }]
+    }).length,
+    0
+  );
+  assert.equal(
+    scheduleDiffActiveProposed({
+      status: 'discarded',
+      proposed: [{ id: 'y', date: '2026-09-08', start_time: '11:00' }]
+    }).length,
+    0
+  );
+  assert.equal(
+    scheduleDiffActiveProposed({
+      status: 'awaiting_confirm',
+      pending_action_id: 'act',
+      proposed: [{ id: 'z', date: '2026-09-08', start_time: '12:00' }]
+    }).length,
+    1
+  );
+});
+
   const taskEvents = tasksEventsFromTasks([
     { id: 't1', title: 'Deadline', due_date: '2026-09-08', status: 'open' }
   ]);

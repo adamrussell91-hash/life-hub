@@ -3,7 +3,7 @@ import { bindHubAccordion, openHubAccordion, renderHubPreview } from '../shell/h
 import { renderHubPulse } from '../shell/render-hub-pulse.js';
 import { renderClareResult } from '../shell/render-tasks.js';
 import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
-import { tasksEventsFromTasks, tasksEventsFromWorkBlocks } from '../shell/tasks-calendar.js';
+import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, scheduleDiffActiveProposed } from '../shell/tasks-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -819,15 +819,13 @@ export function createAppController(dependencies) {
       scheduleDiffP
     ])
       .then(([tasks, blocks, profile, mission, scheduleDiff]) => {
-        const ghostBlocks = Array.isArray(scheduleDiff?.proposed)
-          ? scheduleDiff.proposed.map((block, index) => ({
+        const ghostBlocks = scheduleDiffActiveProposed(scheduleDiff).map((block, index) => ({
               ...block,
               id: block.id || block.temp_id || `ghost_${index}`,
               status: 'proposed',
               ghost: true,
               source: block.source || 'clare'
-            }))
-          : [];
+            }));
         tasksEvents = [
           ...tasksEventsFromTasks(tasks),
           ...tasksEventsFromWorkBlocks(blocks),

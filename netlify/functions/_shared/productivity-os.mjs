@@ -527,10 +527,52 @@ export const FALLBACK_WORKDAY = {
 };
 
 /**
- * Resolve effective workday for a calendar date.
+ * Discrete profile (or fallback) work windows for a date — not collapsed.
+ */
+export function workWindowsForDate(date, planningProfile = null) {
+  if (date && planningProfile && typeof planningProfile === 'object') {
+    const cap = dayCapacity(date, planningProfile);
+    if (cap.work_source === 'profile' && Array.isArray(cap.work_windows) && cap.work_windows.length) {
+      return cap.work_windows
+        .map((w) => ({ start: w.start, end: w.end }))
+        .filter((w) => minutesOf(w.start) != null && minutesOf(w.end) != null);
+    }
+  }
+  return [{ start: FALLBACK_WORKDAY.start, end: FALLBACK_WORKDAY.end }];
+}
+
+/**
+ * Gaps between discrete work windows are unavailable (hard busy), e.g. 12:00–13:00
+ * between 09:00–12:00 and 13:00–17:00. Single-window profiles yield no gaps.
+ */
+export function workWindowGapSpans(date, planningProfile = null) {
+  const windows = workWindowsForDate(date, planningProfile)
+    .map((w) => ({ start: minutesOf(w.start), end: minutesOf(w.end) }))
+    .filter((w) => w.start != null && w.end != null && w.end > w.start)
+    .sort((a, b) => a.start - b.start);
+  if (windows.length < 2) return [];
+  const gaps = [];
+  for (let i = 0; i < windows.length - 1; i += 1) {
+    const cur = windows[i];
+    const next = windows[i + 1];
+    if (next.start > cur.end) {
+      gaps.push({
+        start: cur.end,
+        end: next.start,
+        title: 'Outside work window',
+        kind: 'outside_work_window'
+      });
+    }
+  }
+  return gaps;
+}
+
+/**
+ * Resolve effective workday envelope for a calendar date (outer min→max).
+ * Gaps between discrete windows are NOT schedulable — see workWindowGapSpans.
  * Priority:
  * 1. explicit trusted workday (tool_input / compose metadata)
- * 2. planning_profile.work_windows for that weekday
+ * 2. planning_profile.work_windows for that weekday (envelope)
  * 3. FALLBACK_WORKDAY
  * Confirm must not trust client-supplied workday overrides.
  */
@@ -557,6 +599,76 @@ export function workdayForDate(date, planningProfile = null, explicitWorkday = n
     }
   }
   return { ...FALLBACK_WORKDAY };
+}
+
+/** Normalize HH:MM or minutes windows into canonical busy spans. */
+export function normalizeProtectedWindowSpans(windows) {
+  return (Array.isArray(windows) ? windows : [])
+    .map((w) => {
+      if (!w || typeof w !== 'object') return null;
+      if (Number.isFinite(Number(w.start)) && Number.isFinite(Number(w.end))) {
+        const start = Number(w.start);
+        const end = Number(w.end);
+        if (!(end > start)) return null;
+        return {
+          start,
+          end,
+          title: w.title ?? w.label ?? 'Protected',
+          kind: 'protected'
+        };
+      }
+      const start = minutesOf(w.start);
+      const end = minutesOf(w.end);
+      if (start == null || end == null || !(end > start)) return null;
+      return {
+        start,
+        end,
+        title: w.title ?? w.label ?? 'Protected',
+        kind: 'protected'
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Timed Life Hub commitments → hard-busy spans.
+ * Requires a start time. medical/workout default to 60m; other types need duration or end.
+ */
+export function lifeEventToBusySpan(event) {
+  const record = event?.record && typeof event.record === 'object' ? event.record : event;
+  if (!record || typeof record !== 'object') return null;
+  const start = minutesOf(record.time || record.start_time || record.start);
+  if (start == null) return null;
+  let end = minutesOf(record.end_time || record.end);
+  if (end == null) {
+    const dur = Number(record.duration_minutes ?? record.duration_min ?? record.minutes);
+    if (Number.isFinite(dur) && dur > 0) end = start + Math.round(dur);
+  }
+  const type = String(record.type || '');
+  const hardType = type === 'medical' || type === 'workout';
+  if (end == null) {
+    if (!hardType) return null;
+    end = start + 60;
+  }
+  if (!(end > start)) return null;
+  return {
+    start,
+    end,
+    title: record.title || record.meal || type || 'Life event',
+    kind: 'life_event'
+  };
+}
+
+export function lifeEventsToBusySpans(events, date = null) {
+  return (Array.isArray(events) ? events : [])
+    .filter((event) => {
+      const record = event?.record && typeof event.record === 'object' ? event.record : event;
+      if (!record) return false;
+      if (!date) return true;
+      return String(record.date ?? '') === date;
+    })
+    .map(lifeEventToBusySpan)
+    .filter(Boolean);
 }
 
 function placeTaskBlocks(task, {
@@ -788,7 +900,9 @@ export function buildAuthoritativeHardBusy({
   lessons = [],
   workBlocks = [],
   planningProfile = null,
-  protected_windows = null
+  protected_windows = null,
+  extraProtectedWindows = null,
+  events = null
 }) {
   const lessonSpans = (lessons ?? [])
     .filter((lesson) => {
@@ -818,31 +932,18 @@ export function buildAuthoritativeHardBusy({
     })
     .filter(Boolean);
 
-  const protectedSpans = Array.isArray(protected_windows)
-    ? protected_windows
-        .map((w) => {
-          if (Number.isFinite(Number(w.start)) && Number.isFinite(Number(w.end))) {
-            return {
-              start: Number(w.start),
-              end: Number(w.end),
-              title: w.title ?? w.label ?? 'Protected',
-              kind: 'protected'
-            };
-          }
-          const start = minutesOf(w.start);
-          const end = minutesOf(w.end);
-          if (start == null || end == null) return null;
-          return {
-            start,
-            end,
-            title: w.title ?? w.label ?? 'Protected',
-            kind: 'protected'
-          };
-        })
-        .filter(Boolean)
-    : protectedSpansForDate(date, planningProfile);
+  // Profile protected always apply; explicit/tool windows are additive (never overwrite).
+  const profileProtected = protectedSpansForDate(date, planningProfile);
+  const explicitProtected = normalizeProtectedWindowSpans(
+    protected_windows ?? extraProtectedWindows
+  );
+  // Legacy: callers that passed protected_windows as the sole list still merge with profile.
+  const protectedSpans = [...profileProtected, ...explicitProtected];
 
-  return [...lessonSpans, ...confirmed, ...protectedSpans];
+  const lifeSpans = lifeEventsToBusySpans(events, date);
+  const gaps = workWindowGapSpans(date, planningProfile);
+
+  return [...lessonSpans, ...confirmed, ...protectedSpans, ...lifeSpans, ...gaps];
 }
 
 /**

@@ -482,6 +482,40 @@ export function applyScheduleOverrides(writes, overrides) {
   return { ok: true, writes: list };
 }
 
+/**
+ * After authoritative Confirm, Schedule Diff work blocks become durable confirmed.
+ * Proposal-time content may remain status:proposed; Confirm reconstructs status.
+ */
+export function promoteScheduleDiffWorkBlockWrites(writes, { stamp } = {}) {
+  const updatedAt = typeof stamp === 'string' && stamp ? stamp : new Date().toISOString();
+  return (Array.isArray(writes) ? writes : []).map((write) => {
+    if (!write || typeof write !== 'object') return write;
+    const target = classifyWriteTarget(write.path);
+    if (target.kind !== 'work_block') return write;
+    let record;
+    try {
+      record = JSON.parse(write.content);
+    } catch {
+      return write;
+    }
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return write;
+    return {
+      ...write,
+      content: JSON.stringify({
+        ...record,
+        status: 'confirmed',
+        updated_at: updatedAt
+      })
+    };
+  });
+}
+
+export function isScheduleDiffProposal(stored, proposal) {
+  if (stored?.workflowKind === 'schedule_diff') return true;
+  const surfaces = proposal?.surfaces ?? stored?.proposal?.surfaces;
+  return Array.isArray(surfaces) && surfaces.includes('schedule_diff');
+}
+
 export function decisionFieldsFromAction({
   proposal,
   accepted = [],
