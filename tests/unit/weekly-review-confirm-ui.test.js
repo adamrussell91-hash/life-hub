@@ -1,14 +1,23 @@
 /**
  * WR8 — Weekly Review Confirm-stage decision UI.
  * LEVEL 2 UI: informational non-confirmable; selection → callback ids; no Saved claim / no direct persist.
+ *
+ * Root CI only installs workspace root deps. happy-dom lives under apps/tasks —
+ * skip cleanly when that install is absent so Pages deploy is not blocked.
  */
 import assert from 'node:assert/strict';
 import { describe, it, before, after } from 'node:test';
-import { Window } from '../../apps/tasks/node_modules/happy-dom/lib/index.js';
 import { createReviewProgressCard } from '../../packages/design-kit/js/agent-productivity-cards.js';
 
-describe('WR8 Weekly Review Confirm decision UI', () => {
-  /** @type {Window} */
+let Window = null;
+try {
+  ({ Window } = await import('../../apps/tasks/node_modules/happy-dom/lib/index.js'));
+} catch {
+  Window = null;
+}
+
+describe('WR8 Weekly Review Confirm decision UI', { skip: !Window }, () => {
+  /** @type {InstanceType<NonNullable<typeof Window>>} */
   let window;
 
   before(() => {

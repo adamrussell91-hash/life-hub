@@ -744,16 +744,16 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .chat-message--assistant .chat-message__body {
   max-width: 38rem;
-  padding: 0;
-  background: transparent;
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--ink) 7%, var(--paper));
   color: var(--ink);
   font-size: var(--text-base);
   line-height: var(--leading-snug);
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: 0.35rem;
 }
 
 .chat-message--assistant[data-agent] .chat-message__body {
-  /* Avatar already carries the agent colour. Keep the inset so outside
-     list markers (10., 11.) are not clipped; do not paint a leftover bar. */
   border-left: 0;
   padding-left: var(--space-3);
 }
@@ -6252,6 +6252,26 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   display: none;
 }
 
+/*
+ * Engaged thread: the Messenger who-header already names the agent.
+ * Collapse the picker strip (including the active face) unless Tools expands it.
+ * Height/opacity — not display:none on #agent-picker — so the thread scrollbar
+ * does not bounce when chrome collapses.
+ */
+.chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker {
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker__avatar {
+  display: none;
+}
+
 .chat-view[data-panel-mode="overlay"] {
   position: fixed;
   z-index: 25;
@@ -6286,11 +6306,18 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   padding-inline: var(--space-2);
 }
 
-/* Overlay engaged: who-header already names the agent — keep only the active face. */
-.chat-view[data-panel-mode="overlay"][data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
-  display: none;
+/* Overlay engaged: who-header already names the agent — collapse the picker strip. */
+.chat-view[data-panel-mode="overlay"][data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker {
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
+.chat-view[data-panel-mode="overlay"][data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker__avatar,
 .chat-view[data-panel-mode="overlay"][data-chrome='engaged'] .agent-picker__name {
   display: none;
 }
@@ -6436,9 +6463,14 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
     padding: 0.35rem 0.7rem;
   }
 
-  .chat-view[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
-    display: none;
+  .chat-message--assistant .chat-message__body {
+    background: color-mix(in srgb, var(--ink) 7%, var(--paper));
+    border-radius: 1.1rem;
+    border-bottom-left-radius: 0.35rem;
   }
+
+  /* Avatars already hide via the shared engaged height:0 collapse — do not
+   * display:none .agent-picker here (same host as #agent-picker; scrollbar bounce). */
 
   .chat-view[data-panel-mode="overlay"] {
     inset: auto;
