@@ -241,6 +241,17 @@ test('full-page Chat uses the canvas width and hides the Messenger who-header wh
     /\.chat-view\[data-chrome='engaged'\] #agent-picker\s*\{\s*display:\s*none/,
     'engaged must not collapse the picker host — that bounced the thread scrollbar'
   );
+  assert.match(
+    css,
+    /\.chat-view\[data-chrome='engaged'\]:not\(\[data-chrome-expanded='true'\]\) \.agent-picker\s*\{[^}]*height:\s*0/,
+    'engaged collapses the picker strip so the orphan active face cannot sit under the who-header'
+  );
+});
+
+test('Messenger who-header has no Talking to eyebrow', async () => {
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
+  assert.match(html, /chat-view__who-status/);
+  assert.doesNotMatch(html, /chat-view__who-eyebrow|Talking to/);
 });
 
 test('engaged phone Chat drops the page title stack and assistant left bar', async () => {

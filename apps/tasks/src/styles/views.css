@@ -2080,6 +2080,20 @@
   display: inline-flex;
 }
 
+.chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker {
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker__avatar {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .hub-layout[data-hub-view='clare'] .page-header {
     margin-bottom: var(--space-2);
@@ -2108,11 +2122,8 @@
     height: 2.4rem;
   }
 
-  .chat-view[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
-    display: none;
-  }
-
-  .chat-view[data-chrome='engaged'] .agent-picker__name {
+  .chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker,
+  .chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker__avatar {
     display: none;
   }
 
@@ -2525,11 +2536,18 @@
   display: none;
 }
 
-/* Overlay engaged: who-header already names the agent — keep only the active face. */
-.chat-view[data-panel-mode='overlay'][data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
-  display: none;
+/* Overlay engaged: who-header already names the agent — collapse the picker strip. */
+.chat-view[data-panel-mode='overlay'][data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker {
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
+.chat-view[data-panel-mode='overlay'][data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker__avatar,
 .chat-view[data-panel-mode='overlay'][data-chrome='engaged'] .agent-picker__name {
   display: none;
 }
