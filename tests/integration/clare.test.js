@@ -162,7 +162,7 @@ test('dump treats a time-edit direction as a mutation, not a new task', async ()
   });
   const handler = createClareHandler({
     env,
-    now: () => Date.parse('2026-09-09T01:00:00Z'),
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
     getContentStore: async () => store
   });
 
