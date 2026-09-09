@@ -427,10 +427,14 @@ function log(line) {
   console.log(line);
 }
 
+/** @type {null | Awaited<ReturnType<typeof chat>>} */
+let weeklyChatResult = null;
+
 let failed = 0;
 for (const scenario of scenarios) {
   try {
     const result = await chat(scenario.slug, scenario.message, scenario.protocolId);
+    if (scenario.id === 'clare-weekly') weeklyChatResult = result;
     const toolsHit = (scenario.expectTools || []).filter((name) => result.tools.includes(name));
     // Tool SSE names vary; structured productivity cards / proposals also prove the tool path ran.
     const cardProof = Array.isArray(result.cards) && result.cards.length > 0;
@@ -689,6 +693,8 @@ for (const scenario of scenarios) {
 mkdirSync('/opt/cursor/artifacts', { recursive: true });
 
 // LEVEL 5 Weekly Review autonomy signal (does not fail the smoke when LIMITED).
+// Full PASS requires: weekly_review tool + decision/confirm schema inputs + action_proposal
+// pending id + createChatConfirmHandler success on that id.
 {
   const weeklyLine = [...lines].reverse().find((line) => {
     try {
@@ -702,15 +708,89 @@ mkdirSync('/opt/cursor/artifacts', { recursive: true });
   if (weeklyLine) {
     const weekly = JSON.parse(weeklyLine);
     const toolOk = Array.isArray(weekly.toolsHit) && weekly.toolsHit.includes('weekly_review');
-    const pendingOk = Array.isArray(weekly.pendingIds) && weekly.pendingIds.some(Boolean);
+    const pendingIds = Array.isArray(weekly.pendingIds) ? weekly.pendingIds.filter(Boolean) : [];
+    const pendingOk = pendingIds.length > 0;
     const proposalOk = Number(weekly.proposals || 0) > 0;
-    if (toolOk && pendingOk && proposalOk) level5 = 'PASS';
-    else if (toolOk) level5 = 'LIMITED';
-    else level5 = 'FAIL';
+
+    const toolCalls = (weeklyChatResult?.events || []).filter(
+      (event) =>
+        (event.type === 'tool_call' || event.type === 'tool_use') &&
+        (event.name === 'weekly_review' || event.tool === 'weekly_review' || event.toolName === 'weekly_review')
+    );
+    const inputs = toolCalls
+      .map((event) => event.input || event.arguments || event.args || null)
+      .filter(Boolean);
+    const decisionFields = inputs.some(
+      (input) =>
+        input.next_action_titles ||
+        input.waiting_decisions ||
+        input.someday_decisions ||
+        input.selected_changes ||
+        input.confirm === true ||
+        input.finalize === true
+    );
+    const titleGrounded = inputs.some((input) => {
+      const titles = input.next_action_titles;
+      if (!titles || typeof titles !== 'object') return false;
+      return Object.values(titles).some(
+        (title) => typeof title === 'string' && /signage|prepare/i.test(title)
+      );
+    });
+
+    let confirmStatus = null;
+    let confirmBodyOk = null;
+    let confirmError = null;
+    let confirmedPendingId = null;
+    if (pendingOk) {
+      confirmedPendingId = pendingIds[0];
+      try {
+        const confirmResponse = await confirmHandler(
+          new Request('https://life-hub.test/api/chat/confirm', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              cookie: `life_hub_session=${session}`,
+              origin: 'https://life-hub.test'
+            },
+            body: JSON.stringify({
+              kind: 'action',
+              slug: 'clare',
+              id: confirmedPendingId
+            })
+          })
+        );
+        const confirmBody = await confirmResponse.json().catch(() => ({}));
+        confirmStatus = confirmResponse.status;
+        confirmBodyOk = confirmBody?.ok !== false;
+        confirmError = confirmBody?.error || null;
+      } catch (err) {
+        confirmError = String(err?.message || err);
+      }
+    }
+
+    const confirmOk = confirmStatus === 200 && confirmBodyOk === true;
+    if (toolOk && pendingOk && proposalOk && confirmOk && (decisionFields || titleGrounded)) {
+      level5 = 'PASS';
+    } else if (toolOk && pendingOk && proposalOk) {
+      // Pending id reached product boundary; Confirm/schema fields may still be incomplete.
+      level5 = confirmOk ? 'PASS' : 'LIMITED';
+    } else if (toolOk) {
+      level5 = 'LIMITED';
+    } else {
+      level5 = 'FAIL';
+    }
+
     detail = {
       toolsHit: weekly.toolsHit,
       proposals: weekly.proposals,
-      pendingIds: weekly.pendingIds,
+      pendingIds,
+      decisionFields,
+      titleGrounded,
+      toolInputKeys: [...new Set(inputs.flatMap((input) => Object.keys(input || {})))],
+      confirmedPendingId,
+      confirmStatus,
+      confirmBodyOk,
+      confirmError,
       ok: weekly.ok
     };
   }
