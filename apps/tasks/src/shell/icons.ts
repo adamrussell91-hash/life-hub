@@ -21,7 +21,6 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
     'M18.4 8.2a1.35 1.35 0 1 1 0-2.7 1.35 1.35 0 0 1 0 2.7z'
   ],
   branch: ['M6 5v14', 'M6 8h8a3 3 0 0 1 3 3v0', 'M6 16h8a3 3 0 0 0 3-3'],
-  constellation: ['M12 4l1.4 4.2H18l-3.6 2.6 1.4 4.2L12 12.4 8.2 15l1.4-4.2L6 8.2h4.6z'],
   day: ['M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z', 'M12 3v2', 'M12 19v2', 'M4 12h2', 'M18 12h2'],
   week: ['M6 4v3', 'M18 4v3', 'M5 7h14v13H5z', 'M5 11h14'],
   month: ['M6 4v3', 'M18 4v3', 'M5 7h14v13H5z', 'M9 14h2', 'M13 14h2', 'M9 17h2'],
