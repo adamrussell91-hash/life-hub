@@ -10,7 +10,15 @@ import { describe, it } from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createChatHandler } from '../../netlify/functions/chat.mjs';
 import { createChatConfirmHandler } from '../../netlify/functions/chat-confirm.mjs';
-import { PENDING_ACTIONS_PATH } from '../../netlify/functions/_shared/capabilities/propose-action.mjs';
+import {
+  PENDING_ACTIONS_PATH,
+  MAX_PENDING_ACTIONS,
+  addPendingAction,
+  trimPendingActions,
+  findPendingActionById,
+  isPendingActionExecutable,
+  getPendingActionStatus
+} from '../../netlify/functions/_shared/capabilities/propose-action.mjs';
 import {
   executeClareWork,
   loadWorkflowState,
@@ -985,7 +993,35 @@ describe('LEVEL 4 Weekly Review UI selection binding (WR14–WR15)', () => {
 });
 
 
-describe('LEVEL 4 Weekly Review execution fence (WR19–WR23)', () => {
+function stubPendingEntry(id, {
+  status = 'pending',
+  createdAt = '2026-09-08T12:00:00.000Z',
+  consumedAt
+} = {}) {
+  return {
+    id,
+    createdAt,
+    slug: 'clare',
+    ...(status ? { status } : {}),
+    ...(consumedAt ? { consumedAt } : {}),
+    proposal: {
+      capability: 'os.propose-action',
+      agent: 'clare',
+      intent: `stub ${id}`,
+      reads: [],
+      writes: [{
+        path: `tasks:task:${id}`,
+        mode: 'create',
+        content: JSON.stringify({ title: id, status: 'open' }),
+        diff: id
+      }],
+      surfaces: ['governance_log']
+    },
+    bases: {}
+  };
+}
+
+describe('LEVEL 4 Weekly Review execution fence (WR19–WR27)', () => {
   it('WR19: both post-write terminal stores fail → stays non-executable; replay does not double-write', async () => {
     const store = memoryTasksStore({ 'projects/proj_A': projectA });
     const github = statefulGithub();
@@ -1147,10 +1183,10 @@ describe('LEVEL 4 Weekly Review execution fence (WR19–WR23)', () => {
     assert.ok(status === 'consumed' || status === 'executing');
   });
 
-  it('WR22: safe write failure before side effect restores pending', async () => {
+  it('invalid stored proposal path is rejected before the execution fence', async () => {
     const store = memoryTasksStore({ 'projects/proj_A': projectA });
     const github = statefulGithub();
-    const reviewId = 'wr_wr22';
+    const reviewId = 'wr_invalid_before_fence';
     const { events } = await proposeWeeklyReviewViaChat({
       store,
       github,
@@ -1185,9 +1221,24 @@ describe('LEVEL 4 Weekly Review execution fence (WR19–WR23)', () => {
       )
     });
 
+    const statuses = [];
+    const fetchImpl = async (url, options) => {
+      if (
+        options?.method === 'PUT'
+        && decodeURIComponent(url.split('/contents/')[1] ?? '') === PENDING_ACTIONS_PATH
+      ) {
+        const body = JSON.parse(options.body);
+        const content = Buffer.from(body.content, 'base64').toString('utf8');
+        const next = JSON.parse(content);
+        const entry = next.find((item) => item.id === proposalEvent.id);
+        if (entry?.status) statuses.push(entry.status);
+      }
+      return github.fetchImpl(url, options);
+    };
+
     const confirm = createChatConfirmHandler({
       env: validEnv,
-      fetchImpl: github.fetchImpl,
+      fetchImpl,
       now: NOW,
       getTasksStore: async () => store
     });
@@ -1195,20 +1246,121 @@ describe('LEVEL 4 Weekly Review execution fence (WR19–WR23)', () => {
       confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
     );
     assert.notEqual(response.status, 200);
+    assert.equal(statuses.includes('executing'), false);
+    const after = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    assert.equal(getPendingActionStatus(after.find((item) => item.id === proposalEvent.id)), 'pending');
+  });
+
+  it('WR22: post-fence zero-side-effect write failure rolls executing → pending; retry succeeds once', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr22';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    const before = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    const original = before.find((item) => item.id === proposalEvent.id);
+    assert.equal(getPendingActionStatus(original), 'pending');
+    const originalWrite = original.proposal.writes.find((write) =>
+      String(write.path).startsWith('tasks:task:')
+    );
+    assert.ok(originalWrite);
+
+    // Keep allowlisted path/mode so validation + fence succeed; fail inside
+    // executeProposeActionWrites via invalid_blob_content (non-JSON body).
+    github.blobs.set(PENDING_ACTIONS_PATH, {
+      sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
+      content: JSON.stringify(
+        before.map((item) => {
+          if (item.id !== proposalEvent.id) return item;
+          return {
+            ...item,
+            proposal: {
+              ...item.proposal,
+              writes: item.proposal.writes.map((write) =>
+                write.path === originalWrite.path
+                  ? { ...write, content: 'NOT_JSON_BLOB_RECORD' }
+                  : write
+              )
+            }
+          };
+        })
+      )
+    });
+
+    const statuses = [];
+    const fetchImpl = async (url, options) => {
+      if (
+        options?.method === 'PUT'
+        && decodeURIComponent(url.split('/contents/')[1] ?? '') === PENDING_ACTIONS_PATH
+      ) {
+        const body = JSON.parse(options.body);
+        const content = Buffer.from(body.content, 'base64').toString('utf8');
+        const next = JSON.parse(content);
+        const entry = next.find((item) => item.id === proposalEvent.id);
+        if (entry?.status) statuses.push(entry.status);
+      }
+      return github.fetchImpl(url, options);
+    };
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const failed = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    assert.notEqual(failed.status, 200);
+    assert.ok(statuses.includes('executing'));
+    assert.equal(statuses.at(-1), 'pending');
     assert.equal(
       Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
       0
     );
-    const after = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
-    const entry = after.find((item) => item.id === proposalEvent.id);
-    assert.ok(entry);
-    // Proven zero side effects may restore pending; ambiguous outcomes may remain executing.
-    assert.ok(
-      entry.status === 'pending'
-      || entry.status === 'executing'
-      || entry.status == null
-      || entry.status === ''
+    const rolled = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    assert.equal(getPendingActionStatus(rolled.find((item) => item.id === proposalEvent.id)), 'pending');
+    assert.equal(isPendingActionExecutable(rolled.find((item) => item.id === proposalEvent.id)), true);
+
+    // Repair the deterministic failure and retry the same pending id.
+    github.blobs.set(PENDING_ACTIONS_PATH, {
+      sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
+      content: JSON.stringify(
+        rolled.map((item) => {
+          if (item.id !== proposalEvent.id) return item;
+          return {
+            ...item,
+            proposal: {
+              ...item.proposal,
+              writes: item.proposal.writes.map((write) =>
+                write.path === originalWrite.path
+                  ? { ...write, content: originalWrite.content }
+                  : write
+              )
+            }
+          };
+        })
+      )
+    });
+
+    const retry = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
     );
+    assert.equal(retry.status, 200);
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      1
+    );
+    const done = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    assert.equal(getPendingActionStatus(done.find((item) => item.id === proposalEvent.id)), 'consumed');
   });
 
   it('WR23: happy path pending → executing → consumed; replay consumed', async () => {
@@ -1303,6 +1455,195 @@ describe('LEVEL 4 Weekly Review execution fence (WR19–WR23)', () => {
     assert.equal(payload.error?.code, 'pending_action_execution_in_progress');
     const after = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
     assert.equal(after.find((item) => item.id === proposalEvent.id)?.status, 'executing');
+  });
+
+  it('WR24: consumed tombstones do not evict live pending under capacity pressure', () => {
+    let queue = [];
+    for (let i = 0; i < 28; i += 1) {
+      queue.push(stubPendingEntry(`tomb_old_${i}`, {
+        status: 'consumed',
+        consumedAt: `2026-09-08T11:${String(i).padStart(2, '0')}:00.000Z`
+      }));
+    }
+    queue.push(stubPendingEntry('live_pending_A', { status: 'pending' }));
+    assert.equal(queue.length, 29);
+
+    for (let i = 0; i < 10; i += 1) {
+      queue = addPendingAction(queue, stubPendingEntry(`tomb_new_${i}`, {
+        status: 'consumed',
+        consumedAt: `2026-09-08T13:${String(i).padStart(2, '0')}:00.000Z`
+      }));
+    }
+    queue = addPendingAction(queue, stubPendingEntry('live_pending_B', { status: 'pending' }));
+
+    const liveA = findPendingActionById(queue, 'live_pending_A');
+    const liveB = findPendingActionById(queue, 'live_pending_B');
+    assert.ok(liveA, 'live pending A must survive tombstone capacity pressure');
+    assert.ok(liveB, 'new live pending B must remain');
+    assert.equal(isPendingActionExecutable(liveA), true);
+    assert.equal(getPendingActionStatus(liveA), 'pending');
+    assert.equal(queue.length <= MAX_PENDING_ACTIONS, true);
+    assert.equal(queue.some((item) => item.id === 'tomb_old_0'), false);
+    assert.equal(queue.filter((item) => item.status === 'consumed').length, MAX_PENDING_ACTIONS - 2);
+  });
+
+  it('WR25: executing action survives capacity trim; Confirm still rejects as in progress', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr25';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    let queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    queue = queue.map((item) =>
+      item.id === proposalEvent.id
+        ? { ...item, status: 'executing', executionStartedAt: '2026-09-08T12:00:00.000Z' }
+        : item
+    );
+    for (let i = 0; i < 28; i += 1) {
+      queue = [stubPendingEntry(`wr25_tomb_${i}`, {
+        status: 'consumed',
+        consumedAt: `2026-09-08T10:${String(i).padStart(2, '0')}:00.000Z`
+      }), ...queue];
+    }
+    for (let i = 0; i < 8; i += 1) {
+      queue = addPendingAction(queue, stubPendingEntry(`wr25_new_${i}`, {
+        status: i % 2 === 0 ? 'consumed' : 'pending',
+        consumedAt: i % 2 === 0 ? `2026-09-08T14:0${i}:00.000Z` : undefined
+      }));
+    }
+    queue = trimPendingActions(queue);
+
+    const executing = findPendingActionById(queue, proposalEvent.id);
+    assert.ok(executing, 'executing action must survive capacity trim');
+    assert.equal(getPendingActionStatus(executing), 'executing');
+    assert.equal(isPendingActionExecutable(executing), false);
+
+    github.blobs.set(PENDING_ACTIONS_PATH, {
+      sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
+      content: JSON.stringify(queue)
+    });
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl: github.fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const response = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const payload = await response.json();
+    assert.equal(response.status, 409);
+    assert.equal(payload.error?.code, 'pending_action_execution_in_progress');
+    const after = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    assert.equal(getPendingActionStatus(after.find((item) => item.id === proposalEvent.id)), 'executing');
+  });
+
+  it('WR26: live capacity overflow keeps every live entry (no silent eviction)', () => {
+    let queue = [];
+    for (let i = 0; i < 12; i += 1) {
+      queue.push(stubPendingEntry(`wr26_tomb_${i}`, {
+        status: 'consumed',
+        consumedAt: `2026-09-08T09:${String(i).padStart(2, '0')}:00.000Z`
+      }));
+    }
+    for (let i = 0; i < MAX_PENDING_ACTIONS + 5; i += 1) {
+      queue = addPendingAction(queue, stubPendingEntry(`wr26_live_${i}`, { status: 'pending' }));
+    }
+
+    assert.ok(queue.length > MAX_PENDING_ACTIONS, 'temporary live overflow above nominal cap');
+    assert.equal(queue.filter((item) => item.status === 'consumed').length, 0);
+    for (let i = 0; i < MAX_PENDING_ACTIONS + 5; i += 1) {
+      const entry = findPendingActionById(queue, `wr26_live_${i}`);
+      assert.ok(entry, `live ${i} must not be silently evicted`);
+      assert.equal(isPendingActionExecutable(entry), true);
+    }
+  });
+
+  it('WR27: rollback persist failure leaves executing; retry fail-closed', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr27';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    const before = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    const original = before.find((item) => item.id === proposalEvent.id);
+    const originalWrite = original.proposal.writes.find((write) =>
+      String(write.path).startsWith('tasks:task:')
+    );
+    assert.ok(originalWrite);
+    github.blobs.set(PENDING_ACTIONS_PATH, {
+      sha: github.blobs.get(PENDING_ACTIONS_PATH).sha,
+      content: JSON.stringify(
+        before.map((item) => {
+          if (item.id !== proposalEvent.id) return item;
+          return {
+            ...item,
+            proposal: {
+              ...item.proposal,
+              writes: item.proposal.writes.map((write) =>
+                write.path === originalWrite.path
+                  ? { ...write, content: 'NOT_JSON_BLOB_RECORD' }
+                  : write
+              )
+            }
+          };
+        })
+      )
+    });
+
+    const fetchImpl = async (url, options) => {
+      if (
+        options?.method === 'PUT'
+        && decodeURIComponent(url.split('/contents/')[1] ?? '') === PENDING_ACTIONS_PATH
+      ) {
+        const body = JSON.parse(options.body);
+        if (String(body.message || '').includes('rollback execute')) {
+          return Response.json({ message: 'rollback write failed' }, { status: 500 });
+        }
+      }
+      return github.fetchImpl(url, options);
+    };
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const failed = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    assert.notEqual(failed.status, 200);
+    const mid = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    assert.equal(getPendingActionStatus(mid.find((item) => item.id === proposalEvent.id)), 'executing');
+
+    const retry = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const retryPayload = await retry.json();
+    assert.equal(retry.status, 409);
+    assert.equal(retryPayload.error?.code, 'pending_action_execution_in_progress');
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      0
+    );
   });
 });
 

@@ -199,13 +199,6 @@ export function serializePendingActions(list) {
   return JSON.stringify(Array.isArray(list) ? list : [], null, 2);
 }
 
-export function addPendingAction(list, entry) {
-  const base = Array.isArray(list) ? list : [];
-  if (!entry?.id) return base;
-  const next = [...base, entry];
-  return next.length > MAX_PENDING_ACTIONS ? next.slice(next.length - MAX_PENDING_ACTIONS) : next;
-}
-
 export const PENDING_ACTION_STATUS_PENDING = 'pending';
 export const PENDING_ACTION_STATUS_EXECUTING = 'executing';
 export const PENDING_ACTION_STATUS_CONSUMED = 'consumed';
@@ -222,6 +215,44 @@ export function getPendingActionStatus(entry) {
   const status = typeof entry.status === 'string' ? entry.status.trim() : '';
   if (!status) return PENDING_ACTION_STATUS_PENDING;
   return status;
+}
+
+/** Live = pending/executing (or missing status). Consumed tombstones are terminal history. */
+export function isPendingActionLive(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  return getPendingActionStatus(entry) !== PENDING_ACTION_STATUS_CONSUMED;
+}
+
+/**
+ * Trim terminal consumed tombstones before ever dropping live pending/executing authority.
+ * If live entries alone exceed `max`, allow temporary overflow rather than silent eviction.
+ * Kept consumed tombstones are the newest ones (by queue order).
+ */
+export function trimPendingActions(list, { max = MAX_PENDING_ACTIONS } = {}) {
+  const base = Array.isArray(list) ? list : [];
+  const live = [];
+  const consumed = [];
+  for (const entry of base) {
+    if (!entry?.id) continue;
+    if (isPendingActionLive(entry)) live.push(entry);
+    else consumed.push(entry);
+  }
+  if (live.length >= max) {
+    // Prefer temporary growth over deleting live Confirm authority.
+    return live;
+  }
+  const room = max - live.length;
+  const keptConsumed = consumed.length > room
+    ? consumed.slice(consumed.length - room)
+    : consumed;
+  const keep = new Set([...live, ...keptConsumed].map((entry) => entry.id));
+  return base.filter((entry) => entry?.id && keep.has(entry.id));
+}
+
+export function addPendingAction(list, entry) {
+  const base = Array.isArray(list) ? list : [];
+  if (!entry?.id) return base;
+  return trimPendingActions([...base, entry]);
 }
 
 export function removePendingActionById(list, id) {
