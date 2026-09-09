@@ -4,6 +4,7 @@ import { assembleClementinePrompt, loadKnowledgePrompt } from './knowledge-promp
 import { formatKnowledgeQualityBlock } from './load-humanizer.mjs';
 import {
   coverageFromResearch,
+  isArchiveLookupQuery,
   parseResearchResult,
   topicQuery
 } from './knowledge-research.mjs';
@@ -23,6 +24,13 @@ function lastUserQuery(messages) {
     if (messages[i]?.role === 'user') return messages[i].content;
   }
   return '';
+}
+
+function withArchiveLookupPlan(input) {
+  if (input.researchSessionId || input.writeSessionId || input.compose) return input;
+  if (input.hat === 'fromBook' || input.hat === 'makeNote') return input;
+  if (!isArchiveLookupQuery(lastUserQuery(input.messages))) return input;
+  return { ...input, hat: 'scoping', depth: 'single', scope: 'wide' };
 }
 
 function notesInPlay(input) {
@@ -327,6 +335,7 @@ async function pollDeep(input) {
 }
 
 export async function runChatTurn(input) {
+  input = withArchiveLookupPlan(input);
   assembleClementinePrompt({
     voice: input.voice,
     job: input.universityJob,
