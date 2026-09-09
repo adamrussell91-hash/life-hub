@@ -16,6 +16,17 @@ const kitChatCss = readFileSync(
   'utf8'
 );
 
+describe('desktop overlay chat panel', () => {
+  it('paints the desktop overlay solid so the board does not show through', () => {
+    const start = viewsCss.indexOf(".chat-view[data-panel-mode='overlay'] {");
+    const rest = viewsCss.slice(start);
+    const desktop = rest.slice(0, rest.indexOf('@media (max-width: 720px)'));
+    expect(desktop).toMatch(/background:\s*var\(--paper\)/);
+    expect(desktop).not.toMatch(/--hub-glass-fill/);
+    expect(desktop).toMatch(/backdrop-filter:\s*none/);
+  });
+});
+
 describe('mobile overlay chat form', () => {
   it('keeps Send beside the textarea on mobile instead of stacking the composer', () => {
     expect(viewsCss).toMatch(

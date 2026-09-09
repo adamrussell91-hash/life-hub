@@ -45,6 +45,7 @@ For page/code edits: get_task/get_project/read_repo_file first, then return the 
 Never bounce Adam for "not bringing a dump." Never invent rival dates. digest.recent_thread is continuity. digest.operating_protocol is your starting manual.
 If Adam answers a leave-or-new duplicate question with "make a new one" / "leave it", use the original quoted title — never treat those short replies as task titles.
 If Adam corrects wording ("X is supposed to be Y", "change X to Y"), rewrite the prior quoted title — never create a new task whose title is the correction sentence.
+If Adam edits an existing card ("edit this task to be 1pm not 1am", "move that to Friday"), that is a direction: mutations[] only. Never create an items[] row whose title is the instruction. digest.focused_task is “this task” when he has one open on the board.
 
 After tools settle, JSON only:
 {"voice":"...","items":[],"mutations":[]}`;

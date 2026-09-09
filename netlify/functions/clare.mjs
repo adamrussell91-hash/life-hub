@@ -7,6 +7,7 @@ import {
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import {
   assembleDumpResult,
+  dumpResultFromDirection,
   backlogTitles,
   buildProposal,
   CLARE_CALIBRATION_PREFIX,
@@ -21,7 +22,7 @@ import {
 } from './_shared/clare.mjs';
 import { HUB_TZ } from './_shared/clare-dates.mjs';
 import { buildClareBriefing } from './_shared/clare-desk.mjs';
-import { parseBrainDump, resolveDuplicateFollowUp, resolveWordingCorrectionFollowUp } from './_shared/clare-dump.mjs';
+import { parseBrainDump, resolveDuplicateFollowUp, resolveTaskDirection, resolveWordingCorrectionFollowUp } from './_shared/clare-dump.mjs';
 import {
   applyRecordPatch,
   mutationLabel,
@@ -177,6 +178,16 @@ async function computeDumpResult(store, body, nowIso) {
       : wording
         ? wording.correctedTitles.join('\n')
         : text;
+  if (followUp?.action !== 'make_new' && !wording) {
+    const direction = resolveTaskDirection(dumpText, {
+      focus: body.focus && typeof body.focus === 'object' ? body.focus : null,
+      tasks,
+      recentThread: body.recent_thread,
+      now: new Date(nowIso),
+      timezone: HUB_TZ
+    });
+    if (direction) return dumpResultFromDirection(direction, agent);
+  }
   const items = parseBrainDump(dumpText, {
     now: new Date(nowIso),
     timezone: HUB_TZ,

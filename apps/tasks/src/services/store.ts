@@ -55,6 +55,7 @@ import {
 import {
   assembleDumpResult,
   assembleJudgedDumpResult,
+  dumpResultFromDirection,
   buildProposal,
   emptyCalibration,
   recordActualSample,
@@ -62,7 +63,12 @@ import {
   type ClareProposalInput
 } from '@/domain/clare';
 import { buildClareDumpDigest } from '@/domain/clare-digest';
-import { parseBrainDump, resolveDuplicateFollowUp, resolveWordingCorrectionFollowUp } from '@/domain/clare-dump';
+import {
+  parseBrainDump,
+  resolveDuplicateFollowUp,
+  resolveTaskDirection,
+  resolveWordingCorrectionFollowUp
+} from '@/domain/clare-dump';
 import {
   defaultClareProposalJudge,
   type ClareProposalJudge
@@ -919,6 +925,16 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
             ? wording.correctedTitles.join('\n')
             : input.text;
       const forceNewTitles = followUp?.action === 'make_new';
+      if (!forceNewTitles && !wording) {
+        const direction = resolveTaskDirection(dumpText, {
+          focus: input.focus,
+          tasks,
+          recentThread: input.recent_thread,
+          now,
+          timezone
+        });
+        if (direction) return dumpResultFromDirection(direction, agentSlug);
+      }
       // Twin follow-ups are shared across agents; Clare also uses the offline parser for dumps.
       const items =
         agentSlug === 'clare' || forceNewTitles
@@ -978,7 +994,8 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
           timezone,
           lifeContext,
           operatingProtocol: protocolDoc.markdown,
-          recentThread: input.recent_thread
+          recentThread: input.recent_thread,
+          focus: input.focus
         });
         try {
           const judgment = await judge(digest);
