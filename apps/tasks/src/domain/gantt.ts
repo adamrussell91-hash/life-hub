@@ -1,6 +1,7 @@
 import type { Task, DependencyType, DependencyLink } from '@/schemas/task';
 import type { Project, Milestone } from '@/schemas/project';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { projectMilestones } from '@/domain/project-milestones';
 import { addDays, parseDue, startOfDay, toDateKey } from '@/domain/queries';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -121,7 +122,7 @@ export function collectDependencies(tasks: Task[], projects: Project[] = []): Ga
     }
   }
   for (const project of projects) {
-    for (const milestone of project.milestones) {
+    for (const milestone of projectMilestones(project)) {
       for (const fromId of milestone.depends_on ?? []) {
         links.push({ fromId, toId: milestone.id, type: 'FS', offsetDays: 0 });
       }
@@ -257,7 +258,7 @@ export function buildProjectGanttRows(project: Project, tasks: Task[]): GanttRow
     if (row) rows.push(row);
   }
 
-  for (const milestone of project.milestones) {
+  for (const milestone of projectMilestones(project)) {
     const row = rowFromMilestone(milestone, project, projectTasks);
     if (row) rows.push(row);
   }

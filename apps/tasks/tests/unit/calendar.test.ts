@@ -18,6 +18,7 @@ import {
 import { toDateKey } from '@/domain/queries';
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
+import { projectMilestones } from '@/domain/project-milestones';
 
 function task(partial: Partial<Task> & Pick<Task, 'id' | 'title'>): Task {
   return {
@@ -138,6 +139,13 @@ describe('calendar domain', () => {
     ]);
     expect(itemsForDay(items, '2026-08-17').map((item) => item.title)).toEqual(['Lesson pack']);
     expect(items.find((item) => item.kind === 'milestone')?.project_title).toBe('MindWorks');
+  });
+
+  it('does not crash the hub when a blob project omitted milestones', () => {
+    const legacy = project({ id: 'p_legacy', title: 'Broken create' });
+    delete (legacy as { milestones?: Project['milestones'] }).milestones;
+    expect(() => collectCalendarItems([], [legacy])).not.toThrow();
+    expect(projectMilestones(legacy)).toEqual([]);
   });
 
   it('does not duplicate a key date when the matching admin task is already on the calendar', () => {
