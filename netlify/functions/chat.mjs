@@ -203,7 +203,8 @@ import {
 import {
   TASK_PREFIX,
   defaultGetTasksStore,
-  listJSON as listTasksJSON
+  listJSON as listTasksJSON,
+  getJSON as getTasksJSON
 } from './_shared/tasks-blobs.mjs';
 import {
   CLASS_PREFIX,
@@ -214,7 +215,13 @@ import {
   listJSON as listTeachingJSON
 } from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
-import { executeClareWork, isClareWorkTool, statedPlannerInputs } from './_shared/clare-work.mjs';
+import { executeClareWork, isClareWorkTool, statedPlannerInputs, markWeeklyReviewAwaitingConfirm, markScheduleDiffAwaitingConfirm, loadWorkflowState } from './_shared/clare-work.mjs';
+import { buildProductivityCardEvent } from './_shared/productivity-card-map.mjs';
+import { loadTimedLifeEventsFromTree, LifeEventSourceUnavailableError } from './_shared/life-schedule-events.mjs';
+import {
+  executeHammondProductivity,
+  isHammondProductivityTool
+} from './_shared/hammond-productivity.mjs';
 import { loadIntuitionFor, formatIntuitionForPrompt } from './_shared/capabilities/intuition.mjs';
 import {
   GOVERNANCE_LOG_PATH,
@@ -330,7 +337,8 @@ export function createChatHandler({
   now = Date.now,
   loadHubAgentContext: loadHubContext = loadHubAgentContext,
   getTasksStore = defaultGetTasksStore,
-  getTeachingStore = defaultGetTeachingStore
+  getTeachingStore = defaultGetTeachingStore,
+  getLifeEvents = null
 } = {}) {
   return async function chatHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -550,6 +558,13 @@ export function createChatHandler({
         let skincareHistoryRecords = [];
         let hubTasks = [];
         let hubProjects = [];
+        let hubAreas = [];
+        let hubGoals = [];
+        let hubWorkBlocks = [];
+        let hubWorkSessions = [];
+        let hubPlanningProfile = null;
+        let hubPlanningDirection = null;
+        let hubTasksStore = null;
         let hubClasses = [];
         let hubLessons = [];
         let hubUnits = [];
@@ -787,7 +802,21 @@ export function createChatHandler({
                 getTasksStore(env),
                 getTeachingStore(env)
               ]);
-              const [tasks, projects, classes, lessons, units, scheduled] = await Promise.all([
+              hubTasksStore = tasksStore;
+              const [
+                tasks,
+                projects,
+                areas,
+                goals,
+                workBlocks,
+                workSessions,
+                planningProfile,
+                planningDirection,
+                classes,
+                lessons,
+                units,
+                scheduled
+              ] = await Promise.all([
                 listTasksJSON(tasksStore, TASK_PREFIX).catch(err => {
                   hubLoadErrors.tasks = err?.code || 'load_failed';
                   return [];
@@ -796,6 +825,24 @@ export function createChatHandler({
                   hubLoadErrors.projects = err?.code || 'load_failed';
                   return [];
                 }),
+                listTasksJSON(tasksStore, 'areas/').catch(err => {
+                  hubLoadErrors.areas = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'goals/').catch(err => {
+                  hubLoadErrors.goals = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'work_blocks/').catch(err => {
+                  hubLoadErrors.work_blocks = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'work_sessions/').catch(err => {
+                  hubLoadErrors.work_sessions = err?.code || 'load_failed';
+                  return [];
+                }),
+                getTasksJSON(tasksStore, 'meta/planning_profile').catch(() => null),
+                getTasksJSON(tasksStore, 'meta/planning_direction').catch(() => null),
                 listTeachingJSON(teachingStore, CLASS_PREFIX).catch(err => {
                   hubLoadErrors.classes = err?.code || 'load_failed';
                   return [];
@@ -815,6 +862,16 @@ export function createChatHandler({
               ]);
               hubTasks = Array.isArray(tasks) ? tasks : [];
               hubProjects = Array.isArray(projects) ? projects : [];
+              hubAreas = Array.isArray(areas) ? areas : [];
+              hubGoals = Array.isArray(goals) ? goals : [];
+              hubWorkBlocks = Array.isArray(workBlocks) ? workBlocks : [];
+              hubWorkSessions = Array.isArray(workSessions) ? workSessions : [];
+              hubPlanningProfile =
+                planningProfile && typeof planningProfile === 'object' ? planningProfile : null;
+              hubPlanningDirection =
+                planningDirection && typeof planningDirection === 'object'
+                  ? planningDirection
+                  : null;
               hubClasses = Array.isArray(classes) ? classes : [];
               hubLessons = [
                 ...(Array.isArray(lessons) ? lessons : []),
@@ -1217,6 +1274,7 @@ export function createChatHandler({
         tools = [
           ...buildAgentTools({
             slug,
+            protocolId: typeof protocolId === 'string' ? protocolId : null,
             allowedTypes,
             stripWebSearch,
             needsFoodLibrary,
@@ -1496,7 +1554,7 @@ export function createChatHandler({
         };
 
         // os.propose-action: validate allowlist, persist pending queue, emit Confirm card with diffs.
-        const proposeOsAction = async proposal => {
+        const proposeOsAction = async (proposal, extras = {}) => {
           let persistedId = null;
           try {
             let bases = snapshotGithubBases(proposal.writes, repoTree);
@@ -1540,7 +1598,8 @@ export function createChatHandler({
               bases,
               turnId,
               actionId,
-              ...(resumeUnavailable ? { resumeUnavailable, checkpointError } : {})
+              ...(resumeUnavailable ? { resumeUnavailable, checkpointError } : {}),
+              ...(extras && typeof extras === 'object' ? extras : {})
             };
             const nextQueue = addPendingAction(pendingActions, entry);
             const result = await client.writeFile({
@@ -1759,6 +1818,34 @@ export function createChatHandler({
                     ...(hammondLifeLoadFailed ? { life: 'load_failed' } : {})
                   }
                 }));
+              }
+              if (slug === 'hammond' && isHammondProductivityTool(event.name)) {
+                send({
+                  type: 'tool_call',
+                  id: event.id,
+                  name: event.name,
+                  input: event.input ?? {}
+                });
+                send({ type: 'status', text: 'Working…' });
+                const hammondResult = await executeHammondProductivity(event.name, event.input ?? {}, {
+                  tasks: hubTasks,
+                  projects: hubProjects,
+                  areas: hubAreas,
+                  goals: hubGoals,
+                  sessions: hubWorkSessions,
+                  workSessions: hubWorkSessions,
+                  blocks: hubWorkBlocks,
+                  workBlocks: hubWorkBlocks,
+                  planning_profile: hubPlanningProfile,
+                  planning_direction: hubPlanningDirection,
+                  lessons: hubLessons,
+                  now: nowInstant,
+                  tasksStore: hubTasksStore,
+                  executeClareWork
+                });
+                const hammondCard = buildProductivityCardEvent(event.name, hammondResult);
+                if (hammondCard) send(hammondCard);
+                return JSON.stringify(hammondResult);
               }
               if (event.name === 'search_medical_records') {
                 send({ type: 'status', text: 'Searching Medical Overview…' });
@@ -2249,17 +2336,62 @@ export function createChatHandler({
                 });
               }
               if (slug === 'clare' && isClareWorkTool(event.name)) {
+                // executeTools swallows tool_call events; re-emit so clients/live
+                // acceptance can observe the deterministic productivity trajectory.
+                send({
+                  type: 'tool_call',
+                  id: event.id,
+                  name: event.name,
+                  input: event.input ?? {}
+                });
                 send({ type: 'status', text: 'Working…' });
                 const stated = statedPlannerInputs(parsed.message);
+                let hubLifeEvents = [];
+                if (event.name === 'compose_schedule' || event.name === 'plan_work') {
+                  try {
+                    const dateHint = typeof event.input?.date === 'string'
+                      ? event.input.date
+                      : today;
+                    const loadLife = typeof getLifeEvents === 'function'
+                      ? getLifeEvents
+                      : async ({ dates }) => loadTimedLifeEventsFromTree({
+                        client,
+                        tree: repoTree,
+                        dates
+                      });
+                    hubLifeEvents = await loadLife({
+                      dates: [dateHint].filter(Boolean),
+                      client,
+                      tree: repoTree
+                    });
+                  } catch (error) {
+                    // Fail closed: incomplete calendar truth must not produce a Schedule Diff proposal.
+                    const code = error instanceof LifeEventSourceUnavailableError
+                      || error?.code === 'schedule_validation_unavailable'
+                      ? 'schedule_validation_unavailable'
+                      : 'schedule_context_unavailable';
+                    return JSON.stringify({
+                      ok: false,
+                      error: code,
+                      message: 'Authoritative Life calendar events could not be loaded. Schedule was not composed.'
+                    });
+                  }
+                }
                 const result = await executeClareWork(event.name, event.input ?? {}, {
                   tasks: hubTasks,
                   projects: hubProjects,
                   lessons: hubLessons,
+                  workBlocks: hubWorkBlocks,
+                  work_blocks: hubWorkBlocks,
+                  planning_profile: hubPlanningProfile,
+                  lifeEvents: hubLifeEvents,
+                  events: hubLifeEvents,
                   protocol: clareProtocol,
                   now: nowInstant,
                   energy: stated.energy,
                   capacity_minutes: stated.capacity_minutes,
-                  workday: stated.workday
+                  workday: stated.workday,
+                  tasksStore: hubTasksStore
                 });
                 if (result?.kind === 'propose' && result.proposal) {
                   const validated = validateProposeActionInput(result.proposal, { agentSlug: slug });
@@ -2270,7 +2402,52 @@ export function createChatHandler({
                       ...(validated.detail ? { detail: validated.detail } : {})
                     });
                   }
-                  const pendingId = await proposeOsAction(validated.proposal);
+                  const pendingId = await proposeOsAction(validated.proposal, {
+                    ...(result.workflow_kind ? { workflowKind: result.workflow_kind } : {}),
+                    ...(result.workflow_id ? { workflowId: result.workflow_id } : {}),
+                    ...(result.schedule_context ? { scheduleContext: result.schedule_context } : {})
+                  });
+                  let workflowState = result.state ?? null;
+                  if (pendingId && result.workflow_kind === 'weekly_review' && result.workflow_id && hubTasksStore) {
+                    workflowState = await markWeeklyReviewAwaitingConfirm(hubTasksStore, result.workflow_id, {
+                      pendingActionId: pendingId
+                    });
+                  }
+                  if (pendingId && result.workflow_kind === 'schedule_diff' && hubTasksStore) {
+                    workflowState = await markScheduleDiffAwaitingConfirm(hubTasksStore, {
+                      pendingActionId: pendingId,
+                      scheduleContext: result.schedule_context,
+                      proposed: result.proposed,
+                      date: result.schedule_context?.date,
+                      writes: Array.isArray(result.proposal?.writes)
+                        ? result.proposal.writes.map((w) => ({ path: w.path, diff: w.diff }))
+                        : null
+                    });
+                  }
+                  const proposeCard = buildProductivityCardEvent(event.name, {
+                    ...result,
+                    ...(workflowState ? { state: workflowState } : {})
+                  }, {
+                    pendingId: pendingId || undefined
+                  });
+                  // Only emit a Confirmable Schedule Diff card when a durable pending id exists.
+                  if (proposeCard && pendingId) send(proposeCard);
+                  if (!pendingId) {
+                    // Leave preparing / non-active workflow — never promote awaiting_confirm without an id.
+                    if (hubTasksStore && result.workflow_kind === 'schedule_diff') {
+                      try {
+                        workflowState = await loadWorkflowState(hubTasksStore, 'schedule_diff:current');
+                      } catch {
+                        workflowState = workflowState || null;
+                      }
+                    }
+                    return JSON.stringify({
+                      ok: false,
+                      error: 'pending_queue_persist_failed',
+                      status: workflowState?.status || 'preparing',
+                      ...(workflowState ? { state: workflowState } : {})
+                    });
+                  }
                   return JSON.stringify({
                     ok: true,
                     status: 'awaiting_confirm',
@@ -2280,9 +2457,13 @@ export function createChatHandler({
                       mode: write.mode,
                       diff: write.diff
                     })),
-                    ...(pendingId ? { pendingId } : {})
+                    pendingId,
+                    ...(result.session_id ? { session_id: result.session_id } : {}),
+                    ...(workflowState ? { state: workflowState } : result.state ? { state: result.state } : {})
                   });
                 }
+                const card = buildProductivityCardEvent(event.name, result);
+                if (card) send(card);
                 return JSON.stringify(result);
               }
               return null;

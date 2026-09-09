@@ -16,7 +16,14 @@ export type ClareToolkitId =
   | 'context-switch'
   | 'interest-filter';
 
-export type ClareProtocolId = ClareSprintId | ClareToolkitId;
+export type ClareProductivityId =
+  | 'weekly-review'
+  | 'plan-day'
+  | 'project-plan'
+  | 'waiting'
+  | 'shutdown';
+
+export type ClareProtocolId = ClareSprintId | ClareToolkitId | ClareProductivityId;
 
 export type ClareProtocol = {
   id: ClareProtocolId;
@@ -61,6 +68,43 @@ export const CLARE_PROTOCOLS: readonly ClareProtocol[] = [
     label: 'Comms follow-up',
     explain: 'Clare lists follow-ups at or past due and offers to resolve each.'
   }
+];
+
+/** Productivity OS entry pills — restrained set, not a second dozen. */
+export const CLARE_PRODUCTIVITY_PROTOCOLS: readonly ClareProtocol[] = [
+  {
+    id: 'weekly-review',
+    label: 'Weekly Review',
+    explain: 'Clare runs the eight-stage weekly review with confirm before write.'
+  },
+  {
+    id: 'plan-day',
+    label: 'Plan Day',
+    explain: 'Clare proposes work blocks for the day — ghost until you confirm.'
+  },
+  {
+    id: 'project-plan',
+    label: 'Project Plan',
+    explain: 'Clare walks purpose → outcome → next actions for one project.'
+  },
+  {
+    id: 'waiting',
+    label: 'Waiting',
+    explain: 'Clare lists waiting items and follow-ups that need a nudge.'
+  },
+  {
+    id: 'shutdown',
+    label: 'Shutdown',
+    explain: 'Clare closes the day: carry, defer, or leave each open loop.'
+  }
+];
+
+/** Main Clare tray: keep briefing sprints + productivity entries under twelve pills. */
+export const CLARE_VIEW_PROTOCOLS: readonly ClareProtocol[] = [
+  ...CLARE_PROTOCOLS.filter(
+    (p) => p.id !== 'appointment-prep' && p.id !== 'comms-followup' && p.id !== 'weekly-reset'
+  ),
+  ...CLARE_PRODUCTIVITY_PROTOCOLS
 ];
 
 /** ADHD executive-function tools. Run from a dump, not as a silent write. */
@@ -136,6 +180,25 @@ export function isBriefingProtocol(id: ClareProtocolId | undefined): boolean {
     id === 'comms-followup'
   );
 }
+
+export function isProductivityProtocol(id: ClareProtocolId | string | undefined): id is ClareProductivityId {
+  return (
+    id === 'weekly-review' ||
+    id === 'plan-day' ||
+    id === 'project-plan' ||
+    id === 'waiting' ||
+    id === 'shutdown'
+  );
+}
+
+/** Launch copy for empty-composer productivity protocol pills → /api/chat. */
+export const PRODUCTIVITY_LAUNCH_MESSAGES: Record<ClareProductivityId, string> = {
+  'weekly-review': 'Start Weekly Review',
+  'plan-day': 'Plan my day',
+  'project-plan': 'Start project planning',
+  waiting: 'Review waiting items',
+  shutdown: 'Run shutdown'
+};
 
 export const CLARE_WAIT_LINES = [
   'Untangling the moving parts…',

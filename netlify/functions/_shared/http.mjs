@@ -21,10 +21,11 @@ export function okResponse(status, data, headers = {}) {
   return jsonResponse(status, { ok: true, data }, headers);
 }
 
-export function errorResponse(status, code, message, retryable, headers = {}) {
+export function errorResponse(status, code, message, retryable, headers = {}, data = undefined) {
   return jsonResponse(status, {
     ok: false,
-    error: { code, message, retryable }
+    error: { code, message, retryable },
+    ...(data !== undefined ? { data } : {})
   }, headers);
 }
 

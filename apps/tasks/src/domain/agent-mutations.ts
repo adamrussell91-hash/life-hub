@@ -148,7 +148,16 @@ export function sanitizeTaskPatch(patch: Record<string, unknown>): Partial<Task>
     'tags',
     'page_blocks',
     'bucket',
-    'kind'
+    'kind',
+    'target_date',
+    'review_at',
+    'waiting_on',
+    'waiting_since',
+    'follow_up_at',
+    'waiting_status',
+    'contexts',
+    'cognitive_load',
+    'depth'
   ] as const;
   for (const key of allow) {
     if (key in patch) out[key] = patch[key];
@@ -166,7 +175,11 @@ export function sanitizeProjectPatch(patch: Record<string, unknown>): Partial<Pr
     'current_end_date',
     'page_blocks',
     'tags',
-    'arc_summary'
+    'arc_summary',
+    'purpose',
+    'desired_outcome',
+    'quality_bar',
+    'review_at'
   ] as const;
   for (const key of allow) {
     if (key in patch) out[key] = patch[key];

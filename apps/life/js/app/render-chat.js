@@ -10,6 +10,7 @@ import { notifyChatViewport } from './visual-viewport.js';
 import { createAgentChoiceCard } from '../../../../packages/design-kit/js/agent-choice-card.js';
 import { createAgentSourcesCard } from '../../../../packages/design-kit/js/agent-sources-card.js';
 import { createAgentPlanCard } from '../../../../packages/design-kit/js/agent-plan-card.js';
+import { createProductivityCard } from '../../../../packages/design-kit/js/agent-productivity-cards.js';
 
 const HIDDEN_FIELDS = new Set(['schema_version', 'id', 'type', 'date', 'created_at', 'updated_at', 'source', 'exercises', 'focus', 'tags', 'highlights', 'challenges', 'products', 'system_note']);
 const WORKOUT_HEADER_FIELDS = new Set(['title', 'session_kind', 'day_type', 'status', 'duration_min']);
@@ -911,6 +912,21 @@ export function appendChoiceCard(root, opts = {}) {
   const item = root.createElement('li');
   item.className = 'chat-message chat-message--structured';
   const card = createAgentChoiceCard(root, opts);
+  item.append(card);
+  appendChatThreadItem(list, item);
+  markLatestMessage(list);
+  scrollChatIfPinned(list);
+  syncChatChrome(root);
+  return { item, card };
+}
+
+export function appendProductivityCard(root, type, opts = {}) {
+  const list = root.querySelector('#chat-messages');
+  if (!list) return null;
+  const card = createProductivityCard(root, type, opts);
+  if (!card) return null;
+  const item = root.createElement('li');
+  item.className = 'chat-message chat-message--structured';
   item.append(card);
   appendChatThreadItem(list, item);
   markLatestMessage(list);

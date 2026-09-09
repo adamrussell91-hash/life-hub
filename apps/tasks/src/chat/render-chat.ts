@@ -2,6 +2,25 @@ import { syncChatChrome } from '@/chat/chat-chrome';
 import { applyAgentAvatarToBubble } from '@/chat/render-agent-picker';
 import { createAgentChoiceCard } from '../../design-kit/js/agent-choice-card.js';
 import { createAgentPlanCard } from '../../design-kit/js/agent-plan-card.js';
+import {
+  createProductivityCard,
+  createDecisionStackCard,
+  createScheduleDiffCard,
+  createReviewProgressCard,
+  createRunwayCard,
+  createMetricAuditStripCard,
+  createHierarchyTraceCard,
+  createFocusBlockCard,
+  createWaitingCard,
+  createShutdownCard,
+  createGoodFitsCard,
+  createDepthBudgetCard,
+  createActiveProjectsMeter,
+  createStrategicReviewCard,
+  createProductivityFunnelCard,
+  createAttentionAuditCard,
+  createPlanningStackCard
+} from '../../design-kit/js/agent-productivity-cards.js';
 
 export type ChatRole = 'user' | 'assistant' | 'status';
 
@@ -180,5 +199,139 @@ export function appendPlanStatusCard(
   list.append(item);
   list.scrollTop = list.scrollHeight;
   return item;
+}
+
+function appendStructuredCard(root: ParentNode, card: HTMLElement | null): HTMLElement | null {
+  const list = root.querySelector('#chat-messages');
+  if (!list || !card) return null;
+  const item = document.createElement('li');
+  item.className = 'chat-message chat-message--structured';
+  item.append(card);
+  list.append(item);
+  list.scrollTop = list.scrollHeight;
+  return item;
+}
+
+/** Append a productivity card from a structured payload (`data-card-type`). */
+export function appendProductivityCard(
+  root: ParentNode,
+  type: string,
+  opts: Record<string, unknown> = {}
+): HTMLElement | null {
+  const card = createProductivityCard(document, type, opts);
+  return appendStructuredCard(root, card);
+}
+
+export function appendDecisionStackCard(
+  root: ParentNode,
+  opts: Parameters<typeof createDecisionStackCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createDecisionStackCard(document, opts));
+}
+
+export function appendScheduleDiffCard(
+  root: ParentNode,
+  opts: Parameters<typeof createScheduleDiffCard>[1]
+): HTMLElement | null {
+  const built = createScheduleDiffCard(document, opts);
+  return appendStructuredCard(root, built.card);
+}
+
+export function appendReviewProgressCard(
+  root: ParentNode,
+  opts: Parameters<typeof createReviewProgressCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createReviewProgressCard(document, opts));
+}
+
+export function appendRunwayCard(
+  root: ParentNode,
+  opts: Parameters<typeof createRunwayCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createRunwayCard(document, opts));
+}
+
+export function appendMetricAuditStripCard(
+  root: ParentNode,
+  opts: Parameters<typeof createMetricAuditStripCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createMetricAuditStripCard(document, opts));
+}
+
+export function appendHierarchyTraceCard(
+  root: ParentNode,
+  opts: Parameters<typeof createHierarchyTraceCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createHierarchyTraceCard(document, opts));
+}
+
+export function appendFocusBlockCard(
+  root: ParentNode,
+  opts: Parameters<typeof createFocusBlockCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createFocusBlockCard(document, opts));
+}
+
+export function appendWaitingCard(
+  root: ParentNode,
+  opts: Parameters<typeof createWaitingCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createWaitingCard(document, opts));
+}
+
+export function appendShutdownCard(
+  root: ParentNode,
+  opts: Parameters<typeof createShutdownCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createShutdownCard(document, opts));
+}
+
+export function appendGoodFitsCard(
+  root: ParentNode,
+  opts: Parameters<typeof createGoodFitsCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createGoodFitsCard(document, opts));
+}
+
+export function appendDepthBudgetCard(
+  root: ParentNode,
+  opts: Parameters<typeof createDepthBudgetCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createDepthBudgetCard(document, opts));
+}
+
+export function appendActiveProjectsMeter(
+  root: ParentNode,
+  opts: Parameters<typeof createActiveProjectsMeter>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createActiveProjectsMeter(document, opts));
+}
+
+export function appendStrategicReviewCard(
+  root: ParentNode,
+  opts: Parameters<typeof createStrategicReviewCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createStrategicReviewCard(document, opts));
+}
+
+export function appendProductivityFunnelCard(
+  root: ParentNode,
+  opts: Parameters<typeof createProductivityFunnelCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createProductivityFunnelCard(document, opts));
+}
+
+export function appendAttentionAuditCard(
+  root: ParentNode,
+  opts: Parameters<typeof createAttentionAuditCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createAttentionAuditCard(document, opts));
+}
+
+export function appendPlanningStackCard(
+  root: ParentNode,
+  opts: Parameters<typeof createPlanningStackCard>[1]
+): HTMLElement | null {
+  return appendStructuredCard(root, createPlanningStackCard(document, opts));
 }
 

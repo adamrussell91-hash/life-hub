@@ -44,9 +44,39 @@ export const CLARE_ADHD_PROTOCOLS = [
   }
 ];
 
+/** Productivity OS entry pills — keep in sync with apps/tasks/src/domain/clare-protocols.ts */
+export const CLARE_PRODUCTIVITY_PROTOCOLS = [
+  {
+    id: 'weekly-review',
+    label: 'Weekly Review',
+    explain: 'Clare runs the eight-stage weekly review with confirm before write.'
+  },
+  {
+    id: 'plan-day',
+    label: 'Plan Day',
+    explain: 'Clare proposes work blocks for the day — ghost until you confirm.'
+  },
+  {
+    id: 'project-plan',
+    label: 'Project Plan',
+    explain: 'Clare walks purpose → outcome → next actions for one project.'
+  },
+  {
+    id: 'waiting',
+    label: 'Waiting',
+    explain: 'Clare lists waiting items and follow-ups that need a nudge.'
+  },
+  {
+    id: 'shutdown',
+    label: 'Shutdown',
+    explain: 'Clare closes the day: carry, defer, or leave each open loop.'
+  }
+];
+
 export const CLARE_PROTOCOL_IDS = new Set([
   ...CLARE_PROTOCOLS.map(item => item.id),
-  ...CLARE_ADHD_PROTOCOLS.map(item => item.id)
+  ...CLARE_ADHD_PROTOCOLS.map(item => item.id),
+  ...CLARE_PRODUCTIVITY_PROTOCOLS.map(item => item.id)
 ]);
 
 export function isBriefingProtocol(id) {
@@ -55,6 +85,16 @@ export function isBriefingProtocol(id) {
 
 export function isClareToolkit(id) {
   return id === 'shatter-start' || id === 'time-map' || id === 'open-loops';
+}
+
+export function isProductivityProtocol(id) {
+  return (
+    id === 'weekly-review' ||
+    id === 'plan-day' ||
+    id === 'project-plan' ||
+    id === 'waiting' ||
+    id === 'shutdown'
+  );
 }
 
 export function readProtocolId(value) {

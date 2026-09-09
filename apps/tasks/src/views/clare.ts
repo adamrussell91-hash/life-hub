@@ -1,11 +1,17 @@
 import { buildChatView } from '@/chat/build-chat-view';
 import { createClareChatController } from '@/chat/clare-controller';
 import { getClareSession } from '@/chat/clare-session';
-import { CLARE_ADHD_PROTOCOLS, CLARE_PROTOCOLS, CLARE_WAIT_LINES } from '@/domain/clare-protocols';
+import { CLARE_ADHD_PROTOCOLS, CLARE_PROTOCOLS, CLARE_VIEW_PROTOCOLS, CLARE_WAIT_LINES } from '@/domain/clare-protocols';
 import { renderLoadError } from '@/views/feedback';
 import { tasksApi } from '@/services/client-api';
 
-export { CLARE_ADHD_PROTOCOLS, CLARE_PROTOCOLS, CLARE_WAIT_LINES } from '@/domain/clare-protocols';
+export {
+  CLARE_ADHD_PROTOCOLS,
+  CLARE_PROTOCOLS,
+  CLARE_VIEW_PROTOCOLS,
+  CLARE_WAIT_LINES
+} from '@/domain/clare-protocols';
+export { CLARE_PRODUCTIVITY_PROTOCOLS } from '@/domain/clare-protocols';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,

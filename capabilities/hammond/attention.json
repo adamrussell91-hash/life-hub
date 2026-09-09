@@ -1,0 +1,15 @@
+{
+  "id": "hammond.attention",
+  "tool_name": "attention_audit",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Recurring attention patterns with evidence.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

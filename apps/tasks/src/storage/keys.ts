@@ -141,3 +141,32 @@ export function goalKey(id: string): string {
 export function goalsIndexKey(): string {
   return 'goals/_index';
 }
+
+export function workBlockKey(id: string): string {
+  return `work_blocks/${id}`;
+}
+
+export function workBlocksIndexKey(): string {
+  return 'work_blocks/_index';
+}
+
+export function workSessionKey(id: string): string {
+  return `work_sessions/${id}`;
+}
+
+export function workSessionsIndexKey(): string {
+  return 'work_sessions/_index';
+}
+
+export function planningProfileKey(): string {
+  return 'meta/planning_profile';
+}
+
+export function planningDirectionKey(): string {
+  return 'meta/planning_direction';
+}
+
+/** Resumable Clare/Hammond workflow state (weekly review, schedule diff, etc.). */
+export function workflowStateKey(id: string): string {
+  return `workflow_state/${id}`;
+}

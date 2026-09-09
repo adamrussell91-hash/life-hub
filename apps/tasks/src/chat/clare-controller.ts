@@ -4,12 +4,25 @@ import { scheduleDiffFromMutation, scheduleGhostWeek, type ScheduleDiffItem } fr
 import type { AgentMutation } from '@/domain/agent-mutations';
 import { mutationLabel } from '@/domain/agent-mutations';
 import { briefingToMarkdown, toolkitToMarkdown, type ClareBriefing } from '@/domain/clare-desk';
-import { isBriefingProtocol, type ClareProtocolId } from '@/domain/clare-protocols';
+import {
+  isBriefingProtocol,
+  isProductivityProtocol,
+  PRODUCTIVITY_LAUNCH_MESSAGES,
+  type ClareProductivityId,
+  type ClareProtocolId
+} from '@/domain/clare-protocols';
 import { preferredDomains } from '@/domain/queries';
 import { focusedTaskId } from '@/domain/focus';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createHubField, createHubFilter } from '@/views/hub-kit';
 import { tasksApi } from '@/services/client-api';
+import { confirmChat, streamChat, clareWorkChat } from '@/services/chat-api';
+import { ApiClientError } from '@/api/client';
+import {
+  setCalendarGhostBlocksForProposal,
+  clearCalendarGhostBlocksForProposal
+} from '@/views/calendar';
+import type { WorkBlock } from '@/schemas/work-block';
 import { agentBySlug, DEFAULT_AGENT_SLUG, type ChatAgentSlug } from '@/chat/agents';
 import { paintProtocolTrays } from '@/chat/build-chat-view';
 import {
@@ -22,6 +35,7 @@ import {
   appendSavedCard,
   appendChoiceCard,
   appendPlanStatusCard,
+  appendProductivityCard,
   renderInlineMarkdown,
   setChatBusy,
   setChatUnread,
@@ -208,6 +222,209 @@ function paintScheduleGhostWeek(host: HTMLElement, diff: ScheduleDiffItem): void
   }
 }
 
+function clearActionProposalFailure(card: HTMLElement): void {
+  card.querySelector('.confirm-card__failure')?.remove();
+}
+
+function showActionProposalFailure(card: HTMLElement, message: string): void {
+  clearActionProposalFailure(card);
+  const note = el('p', 'confirm-card__failure', message);
+  note.setAttribute('role', 'alert');
+  card.append(note);
+}
+
+/**
+ * Format server-provided stale_schedule_collision details for the same Schedule Diff card.
+ * Only surfaces fields that actually exist — never invents revised times.
+ */
+export function formatStaleScheduleCollisionDetails(details: unknown): string {
+  const root =
+    details && typeof details === 'object' && !Array.isArray(details)
+      ? (details as Record<string, unknown>)
+      : null;
+  if (!root) {
+    return 'Schedule collision — nothing was written. Ghosts kept. Review the revised schedule and confirm again.';
+  }
+  const revised =
+    root.revised && typeof root.revised === 'object' && !Array.isArray(root.revised)
+      ? (root.revised as Record<string, unknown>)
+      : root;
+  const lines: string[] = [
+    'Schedule collision — nothing was written. This proposal is stale. Ghosts kept. The revision below is informational; create or confirm a new valid proposal before anything persists.'
+  ];
+  if (typeof revised.note === 'string' && revised.note.trim()) {
+    lines.push(revised.note.trim());
+  } else if (typeof revised.status === 'string' && revised.status.trim()) {
+    lines.push(`Status: ${revised.status.trim()}`);
+  }
+  const conflicts = Array.isArray(revised.conflicts)
+    ? revised.conflicts
+    : Array.isArray(root.conflicts)
+      ? root.conflicts
+      : [];
+  for (const raw of conflicts) {
+    if (!raw || typeof raw !== 'object') continue;
+    const conflict = raw as Record<string, unknown>;
+    const blockId =
+      (typeof conflict.temp_id === 'string' && conflict.temp_id) ||
+      (typeof conflict.block_id === 'string' && conflict.block_id) ||
+      (typeof conflict.id === 'string' && conflict.id) ||
+      (typeof conflict.title === 'string' && conflict.title) ||
+      'block';
+    const reason =
+      (typeof conflict.reason === 'string' && conflict.reason) ||
+      (typeof conflict.message === 'string' && conflict.message) ||
+      'conflicts with calendar';
+    lines.push(`Conflict: ${blockId} — ${reason}`);
+  }
+  // Production detectStaleScheduleCollisions returns status/note/conflicts/hard_busy —
+  // not invented suggested_start/end. Only render hard_busy when the server sent it.
+  const hardBusy = Array.isArray(revised.hard_busy)
+    ? revised.hard_busy
+    : Array.isArray(root.hard_busy)
+      ? root.hard_busy
+      : [];
+  for (const raw of hardBusy.slice(0, 6)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const busy = raw as Record<string, unknown>;
+    const title =
+      (typeof busy.title === 'string' && busy.title) ||
+      (typeof busy.kind === 'string' && busy.kind) ||
+      'busy';
+    const start =
+      typeof busy.start === 'number'
+        ? `${String(Math.floor(busy.start / 60)).padStart(2, '0')}:${String(busy.start % 60).padStart(2, '0')}`
+        : typeof busy.start_time === 'string'
+          ? busy.start_time
+          : '';
+    const end =
+      typeof busy.end === 'number'
+        ? `${String(Math.floor(busy.end / 60)).padStart(2, '0')}:${String(busy.end % 60).padStart(2, '0')}`
+        : typeof busy.end_time === 'string'
+          ? busy.end_time
+          : '';
+    const when = [start, end].filter(Boolean).join('–');
+    lines.push(when ? `Hard busy: ${title} (${when})` : `Hard busy: ${title}`);
+  }
+  if (hardBusy.length > 6) {
+    lines.push(`Hard busy: +${hardBusy.length - 6} more`);
+  }
+  return lines.join('\n');
+}
+
+function appendActionProposalCard(
+  root: ParentNode,
+  proposal: { intent?: string; writes?: Array<{ path?: string; mode?: string; diff?: string }> },
+  pendingId: string | null,
+  onSaved: () => void
+): void {
+  const list = root.querySelector('#chat-messages');
+  if (!list) return;
+  const card = el('li', 'record-proposal action-proposal confirm-card');
+  card.dataset.state = 'ready';
+  card.setAttribute('role', 'region');
+  card.setAttribute('aria-label', 'Confirm change');
+  card.append(el('p', 'page-header__eyebrow', 'Proposed action'));
+  card.append(
+    el(
+      'h3',
+      'page-header__title',
+      typeof proposal.intent === 'string' && proposal.intent.trim()
+        ? proposal.intent.trim()
+        : 'Proposed durable write'
+    )
+  );
+  const writes = Array.isArray(proposal.writes) ? proposal.writes : [];
+  if (writes.length) {
+    const diffs = el('ul', 'hub-chips');
+    for (const write of writes.slice(0, 8)) {
+      diffs.append(
+        el(
+          'span',
+          'chip chip--muted',
+          typeof write.diff === 'string' && write.diff.trim()
+            ? write.diff.trim()
+            : String(write.path ?? 'write')
+        )
+      );
+    }
+    card.append(diffs);
+  }
+  const actions = el('div', 'confirm-card__actions');
+  const discard = el('button', 'btn btn--ghost record-proposal__discard', 'Discard');
+  discard.type = 'button';
+  const confirm = el('button', 'btn btn--primary record-proposal__confirm', 'Confirm');
+  confirm.type = 'button';
+
+  const setActionButtons = (busy: boolean, confirmLabel = 'Confirm') => {
+    setConfirmBusy(confirm, busy, confirmLabel);
+    discard.disabled = busy;
+    discard.textContent = busy ? 'Discarding…' : 'Discard';
+  };
+
+  discard.addEventListener('click', () => {
+    if (card.dataset.state === 'submitting') return;
+    if (!pendingId) {
+      card.dataset.state = 'discarded';
+      card.remove();
+      return;
+    }
+    clearActionProposalFailure(card);
+    const previousConfirm = confirm.textContent || 'Confirm';
+    card.dataset.state = 'submitting';
+    setActionButtons(true);
+    void (async () => {
+      try {
+        await confirmChat({ kind: 'action_dismiss', id: pendingId, slug: 'clare' });
+        card.dataset.state = 'discarded';
+        card.remove();
+      } catch (err) {
+        card.dataset.state = 'failed';
+        setActionButtons(false, previousConfirm);
+        const message =
+          err instanceof Error ? err.message : 'Discard failed. The proposal is still available.';
+        showActionProposalFailure(card, message);
+        showChatError(root, message);
+      }
+    })();
+  });
+
+  confirm.addEventListener('click', async () => {
+    if (card.dataset.state === 'submitting') return;
+    if (!pendingId) {
+      showChatError(root, 'That proposal has no pending id. Discard and ask again.');
+      return;
+    }
+    const previous = confirm.textContent || 'Confirm';
+    clearActionProposalFailure(card);
+    card.dataset.state = 'submitting';
+    setActionButtons(true);
+    try {
+      // Server treats pending id as authoritative; do not send a candidate that
+      // could be mistaken for execution authority if the id were missing.
+      await confirmChat({
+        kind: 'action',
+        id: pendingId,
+        slug: 'clare'
+      });
+      card.dataset.state = 'confirmed';
+      appendSavedCard(card);
+      onSaved();
+    } catch (err) {
+      card.dataset.state = 'failed';
+      setActionButtons(false, previous);
+      const message =
+        err instanceof Error ? err.message : 'Confirming that action failed. You can try again.';
+      showActionProposalFailure(card, message);
+      showChatError(root, message);
+    }
+  });
+  actions.append(discard, confirm);
+  card.append(actions);
+  list.append(card);
+  list.scrollTop = list.scrollHeight;
+}
+
 function appendMutationCard(
   root: ParentNode,
   mutation: AgentMutation,
@@ -356,6 +573,34 @@ export type ClareChatController = {
   send: (text?: string) => Promise<void>;
 };
 
+
+/** Resolve Confirm accept paths and reject anything outside this proposal's write set. */
+export function assertAcceptPathsForProposal(
+  accept: unknown,
+  allowedWritePaths?: ReadonlySet<string> | null
+): string[] {
+  if (!Array.isArray(accept)) return [];
+  const paths = accept
+    .map((item) => {
+      if (typeof item === 'string') return item.trim();
+      if (!item || typeof item !== 'object') return '';
+      const row = item as { write_path?: string; path?: string; id?: string };
+      if (typeof row.write_path === 'string' && row.write_path.trim()) return row.write_path.trim();
+      if (typeof row.path === 'string' && row.path.trim()) return row.path.trim();
+      if (typeof row.id === 'string' && row.id.trim()) return row.id.trim();
+      return '';
+    })
+    .filter(Boolean);
+  if (allowedWritePaths && paths.length) {
+    for (const path of paths) {
+      if (!allowedWritePaths.has(path)) {
+        throw new Error(`Write path is not part of this proposal: ${path}`);
+      }
+    }
+  }
+  return paths;
+}
+
 export function createClareChatController({
   root,
   isVisible,
@@ -374,9 +619,323 @@ export function createClareChatController({
   let waitTimer: number | null = null;
   let waitIndex = 0;
   let statusBubble: HTMLElement | null = null;
+  /** True while a Tasks productivity workflow is in flight via /api/chat. */
+  let productivityActive = false;
+  /** Last action_proposal id — Confirm Selected/All bind here, not free-text. */
+  let lastPendingActionId: string | null = null;
 
   const input = () => root.querySelector<HTMLTextAreaElement>('#chat-input');
   const currentAgent = () => agentBySlug(selectedSlug);
+
+  function useChatRuntime(): boolean {
+    return (
+      selectedSlug === 'clare' &&
+      (productivityActive || isProductivityProtocol(selectedProtocolId))
+    );
+  }
+
+  function chatHistory() {
+    return collectRecentThread(root).map((entry) => ({
+      role: entry.role,
+      content: entry.text
+    }));
+  }
+
+  /** Drop the just-appended user turn so it is not duplicated in history. */
+  function chatHistoryForSend(currentText: string) {
+    const all = chatHistory();
+    const last = all[all.length - 1];
+    if (last?.role === 'user' && last.content === currentText) return all.slice(0, -1);
+    return all;
+  }
+
+  async function confirmPendingAction(
+    pendingId: string,
+    accept?: unknown,
+    options: {
+      dismiss?: boolean;
+      allowedWritePaths?: ReadonlySet<string>;
+      schedule_overrides?: Array<{ path: string; start_time: string }> | null;
+    } = {}
+  ): Promise<void> {
+    const id = typeof pendingId === 'string' ? pendingId.trim() : '';
+    if (!id) {
+      throw new Error('This card has no proposal id. Re-run the protocol.');
+    }
+    const resolvePaths = (value: unknown): string[] => assertAcceptPathsForProposal(value, options.allowedWritePaths);
+    try {
+      if (options.dismiss) {
+        await confirmChat({ kind: 'action_dismiss', id, slug: 'clare' });
+        if (lastPendingActionId === id) lastPendingActionId = null;
+        return;
+      }
+      const paths = resolvePaths(accept);
+      const overrides = Array.isArray(options.schedule_overrides)
+        ? options.schedule_overrides.filter(
+            (row) =>
+              row
+              && typeof row.path === 'string'
+              && row.path.trim()
+              && typeof row.start_time === 'string'
+              && /^\d{2}:\d{2}$/.test(row.start_time.trim())
+          )
+        : [];
+      await confirmChat({
+        kind: 'action',
+        id,
+        slug: 'clare',
+        ...(paths.length ? { accept: paths } : {}),
+        ...(overrides.length ? { schedule_overrides: overrides } : {})
+      });
+      if (lastPendingActionId === id) lastPendingActionId = null;
+    } catch (err) {
+      let message = err instanceof Error ? err.message : 'Confirm failed. You can try again.';
+      if (err instanceof ApiClientError && err.code === 'stale_schedule_collision') {
+        message = formatStaleScheduleCollisionDetails(err.details);
+        showChatError(root, message);
+        throw new ApiClientError(
+          { code: err.code, message, details: err.details },
+          err.status
+        );
+      }
+      showChatError(root, message);
+      throw err instanceof Error ? err : new Error(message);
+    }
+  }
+
+  function collectAllowedWritePaths(payload: Record<string, unknown>): Set<string> {
+    const allowed = new Set<string>();
+    const add = (value: unknown) => {
+      if (typeof value === 'string' && value.trim()) allowed.add(value.trim());
+    };
+    const writes = Array.isArray(payload.writes)
+      ? payload.writes
+      : Array.isArray((payload.proposal as { writes?: unknown } | undefined)?.writes)
+        ? ((payload.proposal as { writes: unknown[] }).writes)
+        : [];
+    for (const write of writes) {
+      if (!write || typeof write !== 'object') continue;
+      add((write as { path?: string }).path);
+      add((write as { write_path?: string }).write_path);
+    }
+    const blocks = Array.isArray(payload.blocks)
+      ? payload.blocks
+      : Array.isArray(payload.proposed)
+        ? payload.proposed
+        : [];
+    for (const block of blocks) {
+      if (!block || typeof block !== 'object') continue;
+      add((block as { write_path?: string }).write_path);
+      add((block as { path?: string }).path);
+      add((block as { id?: string }).id);
+    }
+    return allowed;
+  }
+
+  function paintProductivityCard(
+    type: string,
+    payload: Record<string, unknown>,
+    title?: string,
+    hint?: string
+  ): void {
+    // Cards bind only their own SSE pendingId — never the conversation's latest proposal.
+    const cardPendingId =
+      typeof payload.pendingId === 'string' && payload.pendingId.trim()
+        ? payload.pendingId.trim()
+        : null;
+    const allowedWritePaths = collectAllowedWritePaths(payload);
+
+    if (type === 'schedule-diff') {
+      const rawBlocks = Array.isArray(payload.blocks)
+        ? payload.blocks
+        : Array.isArray(payload.proposed)
+          ? payload.proposed
+          : [];
+      const ghosts = rawBlocks
+        .filter((block): block is Record<string, unknown> => Boolean(block) && typeof block === 'object')
+        .map((block, index) => {
+          const id =
+            typeof block.id === 'string' && block.id
+              ? block.id
+              : typeof block.temp_id === 'string' && block.temp_id
+                ? block.temp_id
+                : `ghost_${index}`;
+          return {
+            schema_version: 1,
+            id,
+            task_id: typeof block.task_id === 'string' ? block.task_id : null,
+            project_id: typeof block.project_id === 'string' ? block.project_id : null,
+            title: typeof block.title === 'string' ? block.title : 'Planned work',
+            date: typeof block.date === 'string' ? block.date : '',
+            start_time:
+              typeof block.start_time === 'string'
+                ? block.start_time
+                : typeof block.start === 'string'
+                  ? block.start
+                  : '09:00',
+            duration_minutes: Number(block.duration_minutes) || 30,
+            depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
+            status: 'proposed',
+            source: 'clare',
+            locked: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } satisfies WorkBlock;
+        })
+        .filter((block) => Boolean(block.date));
+      if (cardPendingId) setCalendarGhostBlocksForProposal(cardPendingId, ghosts);
+    }
+
+    const ghostsFromBlocks = (rows: unknown): WorkBlock[] => {
+      if (!Array.isArray(rows)) return [];
+      return rows
+        .filter((block): block is Record<string, unknown> => Boolean(block) && typeof block === 'object')
+        .map((block, index) => {
+          const id =
+            typeof block.write_path === 'string' && block.write_path
+              ? block.write_path
+              : typeof block.id === 'string' && block.id
+                ? block.id
+                : `ghost_${index}`;
+          return {
+            schema_version: 1,
+            id,
+            task_id: typeof block.task_id === 'string' ? block.task_id : null,
+            project_id: typeof block.project_id === 'string' ? block.project_id : null,
+            title: typeof block.title === 'string' ? block.title : 'Planned work',
+            date: typeof block.date === 'string' ? block.date : '',
+            start_time:
+              typeof block.time === 'string'
+                ? block.time
+                : typeof block.start_time === 'string'
+                  ? block.start_time
+                  : '09:00',
+            duration_minutes: Number(block.durationMin ?? block.duration_minutes) || 30,
+            depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
+            status: 'proposed',
+            source: 'clare',
+            locked: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } satisfies WorkBlock;
+        })
+        .filter((block) => Boolean(block.date));
+    };
+
+    const runBoundConfirm = async (
+      picks?: unknown,
+      dismiss = false,
+      meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }
+    ): Promise<void> => {
+      if (!cardPendingId) {
+        throw new Error('This card has no proposal id. Re-run the protocol.');
+      }
+      const overridesFromPicks = Array.isArray(picks)
+        ? picks
+            .map((row) => {
+              if (!row || typeof row !== 'object') return null;
+              const path =
+                typeof (row as { write_path?: string }).write_path === 'string'
+                  ? (row as { write_path: string }).write_path.trim()
+                  : typeof (row as { id?: string }).id === 'string'
+                    ? (row as { id: string }).id.trim()
+                    : '';
+              const start =
+                typeof (row as { time?: string }).time === 'string'
+                  ? (row as { time: string }).time.trim()
+                  : typeof (row as { start_time?: string }).start_time === 'string'
+                    ? (row as { start_time: string }).start_time.trim()
+                    : '';
+              if (!path || !start) return null;
+              return { path, start_time: start };
+            })
+            .filter((row): row is { path: string; start_time: string } => Boolean(row))
+        : [];
+      await confirmPendingAction(cardPendingId, picks, {
+        dismiss,
+        allowedWritePaths,
+        schedule_overrides: meta?.schedule_overrides ?? overridesFromPicks
+      });
+      if (type === 'schedule-diff') clearCalendarGhostBlocksForProposal(cardPendingId);
+    };
+
+    appendProductivityCard(root, type, {
+      ...payload,
+      pendingId: cardPendingId ?? undefined,
+      title,
+      hint,
+      onConfirmSelected: (picks: unknown, meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }) =>
+        runBoundConfirm(picks, false, meta),
+      onConfirmAll: (picks: unknown, meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }) =>
+        runBoundConfirm(picks, false, meta),
+      onConfirm: (picks: unknown, meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }) =>
+        runBoundConfirm(picks, false, meta),
+      onDiscard: () => runBoundConfirm(undefined, true),
+      onPreview: (active: boolean, rows?: unknown) => {
+        if (type !== 'schedule-diff' || !cardPendingId) return;
+        if (active) setCalendarGhostBlocksForProposal(cardPendingId, ghostsFromBlocks(rows));
+        else clearCalendarGhostBlocksForProposal(cardPendingId);
+      },
+      onBlocksChange: (rows: unknown) => {
+        if (type !== 'schedule-diff' || !cardPendingId) return;
+        setCalendarGhostBlocksForProposal(cardPendingId, ghostsFromBlocks(rows));
+      },
+      onClose: (payloadClose: unknown) => runBoundConfirm(payloadClose),
+      // Confirm-stage Weekly Review: generate proposal via tool runtime — not a second Confirm path.
+      onGenerateProposal:
+        type === 'review-progress'
+          ? (ids: unknown) => {
+              const selected = Array.isArray(ids)
+                ? ids.map((id) => String(id)).filter(Boolean)
+                : [];
+              const reviewId =
+                typeof payload.reviewId === 'string' && payload.reviewId.trim()
+                  ? payload.reviewId.trim()
+                  : 'weekly_review';
+              // Deterministic path: exact selected ids → /api/chat/clare-work.
+              // Do not route selection through a model turn.
+              void (async () => {
+                try {
+                  showChatError(root, '');
+                  const data = await clareWorkChat({
+                    tool: 'weekly_review',
+                    slug: 'clare',
+                    input: {
+                      review_id: reviewId,
+                      advance: false,
+                      confirm: true,
+                      selected_changes: selected
+                    }
+                  });
+                  const pendingId =
+                    typeof data?.pendingId === 'string' ? data.pendingId.trim() : '';
+                  if (pendingId) lastPendingActionId = pendingId;
+                  if (data?.proposal && pendingId) {
+                    // Reuse the authoritative action_proposal Confirm card (same as SSE path).
+                    appendActionProposalCard(
+                      root,
+                      (typeof data.proposal === 'object' && data.proposal
+                        ? data.proposal
+                        : {}) as {
+                        intent?: string;
+                        writes?: Array<{ path?: string; mode?: string; diff?: string }>;
+                      },
+                      pendingId,
+                      () => {
+                        lastPendingActionId = null;
+                      }
+                    );
+                  }
+                } catch (err) {
+                  const message =
+                    err instanceof Error ? err.message : 'Could not generate Confirm proposal.';
+                  showChatError(root, message);
+                }
+              })();
+            }
+          : undefined
+    });
+  }
 
   function paintRoster(): void {
     const agent = currentAgent();
@@ -549,6 +1108,42 @@ export function createClareChatController({
           });
           continue;
         }
+        {
+          const raw = event as {
+            type?: string;
+            card_type?: string;
+            kind?: string;
+            payload?: Record<string, unknown>;
+            options?: Record<string, unknown>;
+            title?: string;
+            hint?: string;
+          };
+          if (
+            raw.type === 'productivity_card' ||
+            raw.type === 'card' ||
+            (typeof raw.card_type === 'string' && raw.card_type)
+          ) {
+            stopWait();
+            const type =
+              typeof raw.card_type === 'string'
+                ? raw.card_type
+                : typeof raw.kind === 'string'
+                  ? raw.kind
+                  : '';
+            if (type) {
+              paintProductivityCard(
+                type,
+                {
+                  ...(typeof raw.payload === 'object' && raw.payload ? raw.payload : {}),
+                  ...(typeof raw.options === 'object' && raw.options ? raw.options : {})
+                },
+                raw.title,
+                raw.hint
+              );
+            }
+            continue;
+          }
+        }
         if (event.type === 'dump_result' && event.result) {
           result = event.result;
           continue;
@@ -587,11 +1182,169 @@ export function createClareChatController({
     }
   }
 
+  async function submitChat(text: string, protocolId?: string): Promise<void> {
+    const mine = ++turn;
+    sending = true;
+    productivityActive = true;
+    setChatBusy(root, true);
+    waitIndex = 0;
+    showWaitLine();
+    waitTimer = window.setInterval(showWaitLine, STATUS_ROTATE_MS);
+
+    let voiceBubble: HTMLElement | null = null;
+    let voiceText = '';
+
+    try {
+      for await (const event of streamChat({
+        message: text,
+        history: chatHistoryForSend(text),
+        priorAgentSlug: 'clare',
+        protocolId: protocolId || (isProductivityProtocol(selectedProtocolId) ? selectedProtocolId : undefined)
+      })) {
+        if (mine !== turn) return;
+        if (event.type === 'status') {
+          showWaitLine();
+          continue;
+        }
+        if (event.type === 'text' && typeof event.delta === 'string' && event.delta) {
+          stopWait();
+          voiceText += event.delta;
+          if (!voiceBubble) {
+            voiceBubble = appendMessage(root, {
+              role: 'assistant',
+              text: voiceText,
+              agent: 'clare'
+            });
+          } else {
+            const bodyEl = voiceBubble.querySelector('.chat-message__body');
+            if (bodyEl instanceof HTMLElement) {
+              renderInlineMarkdown(bodyEl, voiceText, { multiline: true });
+            }
+            const list = root.querySelector('#chat-messages');
+            if (list) list.scrollTop = list.scrollHeight;
+          }
+          continue;
+        }
+        if (event.type === 'plan_status') {
+          appendPlanStatusCard(root, {
+            id: typeof event.id === 'string' ? event.id : undefined,
+            heading: typeof event.heading === 'string' ? event.heading : undefined,
+            steps: Array.isArray(event.steps) ? (event.steps as string[]) : [],
+            current: Number.isFinite(event.current) ? Number(event.current) : 0
+          });
+          continue;
+        }
+        if (event.type === 'choice') {
+          stopWait();
+          appendChoiceCard(root, {
+            title: typeof event.title === 'string' ? event.title : undefined,
+            hint: typeof event.hint === 'string' ? event.hint : undefined,
+            choices: Array.isArray(event.choices)
+              ? (event.choices as Array<{ id: string; label: string; detail?: string }>)
+              : [],
+            multi: Boolean(event.multi),
+            confirmLabel: typeof event.confirmLabel === 'string' ? event.confirmLabel : undefined,
+            onConfirm: (picks) => {
+              const labels = picks.map((pick) => pick.label).filter(Boolean);
+              if (!labels.length) return;
+              void send(labels.join(', '));
+            },
+            onDismiss: () => {}
+          });
+          continue;
+        }
+        if (event.type === 'action_proposal') {
+          stopWait();
+          const pendingId =
+            typeof event.id === 'string' && event.id.trim() ? event.id.trim() : null;
+          if (pendingId) lastPendingActionId = pendingId;
+          appendActionProposalCard(
+            root,
+            (event.proposal as {
+              intent?: string;
+              writes?: Array<{ path?: string; mode?: string; diff?: string }>;
+            }) ?? {},
+            pendingId,
+            () => {
+              lastPendingActionId = null;
+            }
+          );
+          continue;
+        }
+        {
+          const raw = event as {
+            type?: string;
+            card_type?: string;
+            kind?: string;
+            payload?: Record<string, unknown>;
+            options?: Record<string, unknown>;
+            title?: string;
+            hint?: string;
+          };
+          if (
+            raw.type === 'productivity_card' ||
+            raw.type === 'card' ||
+            (typeof raw.card_type === 'string' && raw.card_type)
+          ) {
+            stopWait();
+            const type =
+              typeof raw.card_type === 'string'
+                ? raw.card_type
+                : typeof raw.kind === 'string'
+                  ? raw.kind
+                  : '';
+            if (type) {
+              paintProductivityCard(
+                type,
+                {
+                  ...(typeof raw.payload === 'object' && raw.payload ? raw.payload : {}),
+                  ...(typeof raw.options === 'object' && raw.options ? raw.options : {})
+                },
+                raw.title,
+                raw.hint
+              );
+            }
+            continue;
+          }
+        }
+        if (event.type === 'error') {
+          const code = typeof event.code === 'string' ? event.code : '';
+          throw new Error(
+            code === 'turn_incomplete'
+              ? `${currentAgent().firstName} stopped mid-turn. Try again.`
+              : `${currentAgent().firstName} could not reply.`
+          );
+        }
+      }
+      if (mine !== turn) return;
+      markUnreadIfHidden();
+    } catch (err) {
+      if (mine !== turn) return;
+      stopWait();
+      showChatError(
+        root,
+        err instanceof Error ? err.message : `${currentAgent().firstName} could not reply.`
+      );
+    } finally {
+      if (mine === turn) {
+        stopWait();
+        sending = false;
+        setChatBusy(root, false);
+      }
+    }
+  }
+
   async function send(raw?: string): Promise<void> {
     const field = input();
     const text = (raw ?? field?.value ?? '').trim();
     collapseTools();
     if (!text) {
+      if (selectedSlug === 'clare' && isProductivityProtocol(selectedProtocolId)) {
+        const launch = PRODUCTIVITY_LAUNCH_MESSAGES[selectedProtocolId];
+        appendMessage(root, { role: 'user', text: launch });
+        await submitChat(launch, selectedProtocolId);
+        return;
+      }
       if (selectedSlug !== 'clare') {
         await submitDump(
           selectedProtocolId
@@ -609,6 +1362,13 @@ export function createClareChatController({
     }
     appendMessage(root, { role: 'user', text });
     if (field) field.value = '';
+    if (useChatRuntime()) {
+      await submitChat(
+        text,
+        isProductivityProtocol(selectedProtocolId) ? selectedProtocolId : undefined
+      );
+      return;
+    }
     await submitDump(text);
   }
 
@@ -629,6 +1389,18 @@ export function createClareChatController({
       void send(text || `Run protocol ${id}`);
       return;
     }
+    if (isProductivityProtocol(id)) {
+      productivityActive = true;
+      if (text) {
+        void send(text);
+        return;
+      }
+      const launch = PRODUCTIVITY_LAUNCH_MESSAGES[id as ClareProductivityId];
+      appendMessage(root, { role: 'user', text: launch });
+      void submitChat(launch, id);
+      return;
+    }
+    productivityActive = false;
     if (text) {
       void send(text);
       return;
@@ -649,6 +1421,8 @@ export function createClareChatController({
     if (slug === selectedSlug) return;
     selectedSlug = slug;
     selectedProtocolId = undefined;
+    productivityActive = false;
+    lastPendingActionId = null;
     paintRoster();
     const empty = !root.querySelector('#chat-messages')?.childElementCount;
     if (empty) void newChat();
@@ -660,6 +1434,8 @@ export function createClareChatController({
     sending = false;
     setChatBusy(root, false);
     selectedProtocolId = undefined;
+    productivityActive = false;
+    lastPendingActionId = null;
     markActive(root, undefined);
     clearThread();
     paintRoster();

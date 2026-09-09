@@ -33,6 +33,7 @@ const TYPE_TINT = {
   sleep: 'sage',
   scheduled_lesson: 'blue',
   task: 'sage',
+  work_block: 'lilac',
   knowledge_page: 'sand',
   medical: 'lilac'
 };
@@ -51,6 +52,7 @@ const COMPOSE_TYPES = [
 
 const TYPE_LABEL = {
   task: 'Tasks',
+  work_block: 'Work block',
   scheduled_lesson: 'Teaching',
   knowledge_page: 'Knowledge',
   meal: 'Meal',
@@ -125,6 +127,9 @@ export function renderCalendar(root, model, {
     calendar.className = [...classes].join(' ');
   }
   calendar.append(renderNav(root, model, mode));
+  if (model.planningLens && mode === 'week') {
+    calendar.append(renderMissionStrip(root, model.mission));
+  }
 
   const draft = composeDraft ?? { date: model.selectedDate, time: null, type: 'diary' };
 
@@ -256,7 +261,15 @@ function renderNav(root, model, view) {
     tabs.append(tab);
   }
 
-  nav.append(paging, tabs);
+  const lens = root.createElement('button');
+  lens.type = 'button';
+  lens.className = 'hub-pills__btn calendar-planning-lens';
+  lens.dataset.calendar = 'planning-lens';
+  lens.setAttribute('aria-pressed', model.planningLens ? 'true' : 'false');
+  if (model.planningLens) lens.classList.add('is-selected');
+  lens.textContent = model.planningLens ? 'Planning · on' : 'Planning';
+
+  nav.append(paging, tabs, lens);
   return nav;
 }
 
@@ -293,6 +306,13 @@ function bindNav(calendar) {
     tab.dataset.bound = '1';
     tab.addEventListener('click', () => {
       handlersByRoot.get(calendar)?.onSwitchView?.(tab.dataset.calendarView);
+    });
+  }
+  const lens = calendar.querySelector('[data-calendar="planning-lens"]');
+  if (lens && !lens.dataset.bound) {
+    lens.dataset.bound = '1';
+    lens.addEventListener('click', () => {
+      handlersByRoot.get(calendar)?.onTogglePlanningLens?.();
     });
   }
 }
@@ -497,6 +517,18 @@ function renderTimeGrid(root, model, view, now) {
       const dueTime = hoursToDueTime(hoursFromOffset((event.clientY ?? 0) - top));
       selectDay(grid, day.date, dueTime, true);
     });
+    const protectedSpans = day.protected ?? model.protectedByDate?.[day.date] ?? [];
+    for (const span of protectedSpans) {
+      const start = parseTimeHours(span.start);
+      const end = parseTimeHours(span.end);
+      if (start == null || end == null) continue;
+      const bg = root.createElement('div');
+      bg.className = 'hub-calendar__protected-bg';
+      bg.setAttribute('aria-hidden', 'true');
+      bg.title = span.label || 'Protected';
+      Object.assign(bg.style, blockStyle({ start, end, lane: 0, lanes: 1 }));
+      hours.append(bg);
+    }
     for (const block of layoutTimedBlocks(timed)) {
       const chip = renderChip(root, block.item, grid);
       chip.classList?.add?.('event-chip--timed');
@@ -578,6 +610,10 @@ function renderChip(root, event, fromNode) {
   chip.type = 'button';
   chip.className = 'event-chip';
   chip.dataset.tint = TYPE_TINT[event.type] ?? TINT[event.categories?.[0]] ?? 'sage';
+  chip.dataset.kind = event.type;
+  if (event.ghost || (event.type === 'work_block' && event.status === 'proposed')) {
+    chip.classList.add('is-ghost');
+  }
   chip.title = event.title;
   chip.addEventListener('click', ev => {
     ev.stopPropagation();
@@ -689,14 +725,33 @@ function renderAgenda(root, selected, scrollToDetail) {
   heading.textContent = selected.title;
   const meta = root.createElement('p');
   meta.className = 'hub-calendar__detail-empty';
-  meta.textContent = [
+  const bits = [
     selected.time ? selected.time : 'All day',
-    selected.brief,
-    isWritableCalendarType(selected.type) ? 'Life log' : selected.type
-  ].filter(Boolean).join(' · ');
+    selected.type === 'work_block'
+      ? [
+          'Planned work',
+          selected.durationMin != null ? `${selected.durationMin}m` : null,
+          selected.depth,
+          selected.ghost ? 'ghost preview' : selected.status
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : selected.brief,
+    selected.type === 'work_block'
+      ? null
+      : isWritableCalendarType(selected.type)
+        ? 'Life log'
+        : selected.type
+  ].filter(Boolean);
+  meta.textContent = bits.join(' · ');
   const snippet = root.createElement('p');
   snippet.className = 'metric-caption';
-  snippet.textContent = selected.snippet || 'No notes.';
+  snippet.textContent =
+    selected.type === 'work_block'
+      ? selected.ghost
+        ? 'Ghost proposal — not saved until confirmed.'
+        : selected.snippet || 'Planned work block.'
+      : selected.snippet || 'No notes.';
   detail.append(heading, meta, snippet);
   if (scrollToDetail) {
     delete detail.dataset.motion;
@@ -705,6 +760,25 @@ function renderAgenda(root, selected, scrollToDetail) {
     scrollDetailIntoView(root, detail);
   }
   return detail;
+}
+
+function renderMissionStrip(root, mission) {
+  const strip = root.createElement('div');
+  strip.className = 'hub-calendar__mission';
+  strip.setAttribute('role', 'status');
+  const data = mission ?? {};
+  const cells = [
+    ['Outcomes', data.outcomes ?? 'Not set'],
+    ['Active', data.active_count != null ? String(data.active_count) : 'Not set'],
+    ['Deep work', data.deep_work ?? 'Not set'],
+    ['Capacity', data.capacity ?? 'Not set']
+  ];
+  for (const [label, value] of cells) {
+    const cell = root.createElement('span');
+    cell.textContent = `${label}: ${value}`;
+    strip.append(cell);
+  }
+  return strip;
 }
 
 function renderShortcutHint(root) {

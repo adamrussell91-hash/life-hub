@@ -1,0 +1,15 @@
+{
+  "id": "clare.compose-schedule",
+  "tool_name": "compose_schedule",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Compose a day around lessons and protected time.",
+  "surfaces": [
+    "chat",
+    "confirm_card"
+  ]
+}

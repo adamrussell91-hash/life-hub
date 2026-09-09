@@ -1,0 +1,15 @@
+{
+  "id": "hammond.strategic-review",
+  "tool_name": "strategic_review",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Keep pause protect strategic review.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

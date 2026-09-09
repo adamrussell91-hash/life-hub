@@ -1,0 +1,15 @@
+{
+  "id": "clare.shutdown",
+  "tool_name": "shutdown_day",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Build end-of-day shutdown decisions.",
+  "surfaces": [
+    "chat",
+    "confirm_card"
+  ]
+}

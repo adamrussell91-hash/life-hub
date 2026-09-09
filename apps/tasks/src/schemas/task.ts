@@ -20,6 +20,16 @@ export const DependencyLinkSchema = z.object({
   offset_days: z.number().int().default(0)
 });
 
+/** Compact action-matching contexts (place, device, person, …). */
+export const TaskContextSchema = z.object({
+  kind: z.enum(['place', 'device', 'person', 'other']).default('other'),
+  value: z.string().min(1)
+});
+
+export const CognitiveLoadSchema = z.enum(['low', 'medium', 'high']);
+export const TaskDepthSchema = z.enum(['deep', 'shallow', 'admin']);
+export const WaitingStatusSchema = z.enum(['waiting', 'follow_up_due', 'resolved']);
+
 export const TaskSchema = z.object({
   schema_version: schemaVersion,
   id: z.string().min(1),
@@ -32,6 +42,7 @@ export const TaskSchema = z.object({
   framework_used: z.string().nullable().default(null),
   estimated_duration: z.number().nonnegative().nullable().default(null),
   actual_duration: z.number().nonnegative().nullable().default(null),
+  /** Hard deadline. Distinct from target_date, review_at, and planned work blocks. */
   due_date: z.string().nullable().default(null),
   created_at: z.string(),
   updated_at: z.string(),
@@ -46,12 +57,24 @@ export const TaskSchema = z.object({
   dependency_links: z.array(DependencyLinkSchema).optional(),
   tags: z.array(z.string()).default([]),
   recurrence_rule: z.string().nullable().default(null),
+  /** Time of hard deadline when known. Not planned-work start. */
   due_time: z.string().nullable().default(null),
   remind_at: z.string().nullable().default(null),
   remind_dismissed_at: z.string().nullable().default(null),
   attachments: z.array(z.string()).default([]),
   source: TaskSourceSchema.default('manual'),
-  page_blocks: z.array(PageBlockSchema).optional()
+  page_blocks: z.array(PageBlockSchema).optional(),
+  /** Internal desired completion — never treated as hard overdue. */
+  target_date: z.string().nullable().default(null),
+  /** When the item should return to attention (Someday / review). */
+  review_at: z.string().nullable().default(null),
+  waiting_on: z.string().nullable().default(null),
+  waiting_since: z.string().nullable().default(null),
+  follow_up_at: z.string().nullable().default(null),
+  waiting_status: WaitingStatusSchema.nullable().default(null),
+  contexts: z.array(TaskContextSchema).default([]),
+  cognitive_load: CognitiveLoadSchema.nullable().default(null),
+  depth: TaskDepthSchema.nullable().default(null)
 });
 
 export type Task = z.infer<typeof TaskSchema>;
@@ -60,6 +83,10 @@ export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
 export type DependencyType = z.infer<typeof DependencyTypeSchema>;
 export type DependencyLink = z.infer<typeof DependencyLinkSchema>;
+export type TaskContext = z.infer<typeof TaskContextSchema>;
+export type CognitiveLoad = z.infer<typeof CognitiveLoadSchema>;
+export type TaskDepth = z.infer<typeof TaskDepthSchema>;
+export type WaitingStatus = z.infer<typeof WaitingStatusSchema>;
 
 export const TaskCreateSchema = TaskSchema.omit({
   schema_version: true,
@@ -90,7 +117,16 @@ export const TaskCreateSchema = TaskSchema.omit({
   remind_dismissed_at: true,
   attachments: true,
   source: true,
-  page_blocks: true
+  page_blocks: true,
+  target_date: true,
+  review_at: true,
+  waiting_on: true,
+  waiting_since: true,
+  follow_up_at: true,
+  waiting_status: true,
+  contexts: true,
+  cognitive_load: true,
+  depth: true
 }).extend({
   title: z.string().min(1),
   domain: TaskDomainSchema

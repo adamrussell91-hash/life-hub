@@ -3,7 +3,7 @@ import { bindHubAccordion, openHubAccordion, renderHubPreview } from '../shell/h
 import { renderHubPulse } from '../shell/render-hub-pulse.js';
 import { renderClareResult } from '../shell/render-tasks.js';
 import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
-import { tasksEventsFromTasks } from '../shell/tasks-calendar.js';
+import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, scheduleDiffActiveProposed } from '../shell/tasks-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -153,6 +153,9 @@ export function createAppController(dependencies) {
   let calendarViewMonth = null;
   let calendarView = 'week';
   let calendarViewExplicit = false;
+  let calendarPlanningLens = false;
+  let calendarPlanningProfile = null;
+  let calendarWeekMission = null;
   let calendarMobilePanel = 'schedule';
   let calendarCompose = { date: null, time: null, type: 'diary' };
   let calendarSelectedEventId = null;
@@ -796,9 +799,40 @@ export function createAppController(dependencies) {
   function loadTasksCalendar() {
     if (!tasksApi?.listTasks) return Promise.resolve();
     if (tasksCalendarInFlight) return tasksCalendarInFlight;
-    tasksCalendarInFlight = tasksApi.listTasks()
-      .then(tasks => {
-        tasksEvents = tasksEventsFromTasks(tasks);
+    const listBlocks = typeof tasksApi.listWorkBlocks === 'function'
+      ? tasksApi.listWorkBlocks().catch(() => [])
+      : Promise.resolve([]);
+    const profileP = typeof tasksApi.getPlanningProfile === 'function'
+      ? tasksApi.getPlanningProfile().catch(() => null)
+      : Promise.resolve(null);
+    const missionP = typeof tasksApi.getWorkflowState === 'function'
+      ? tasksApi.getWorkflowState('week_mission:current').catch(() => null)
+      : Promise.resolve(null);
+    const scheduleDiffP = typeof tasksApi.getWorkflowState === 'function'
+      ? tasksApi.getWorkflowState('schedule_diff:current').catch(() => null)
+      : Promise.resolve(null);
+    tasksCalendarInFlight = Promise.all([
+      tasksApi.listTasks(),
+      listBlocks,
+      profileP,
+      missionP,
+      scheduleDiffP
+    ])
+      .then(([tasks, blocks, profile, mission, scheduleDiff]) => {
+        const ghostBlocks = scheduleDiffActiveProposed(scheduleDiff).map((block, index) => ({
+              ...block,
+              id: block.id || block.temp_id || `ghost_${index}`,
+              status: 'proposed',
+              ghost: true,
+              source: block.source || 'clare'
+            }));
+        tasksEvents = [
+          ...tasksEventsFromTasks(tasks),
+          ...tasksEventsFromWorkBlocks(blocks),
+          ...tasksEventsFromWorkBlocks(ghostBlocks)
+        ];
+        calendarPlanningProfile = profile;
+        calendarWeekMission = mission;
       })
       .catch(() => {
         tasksEvents = [];
@@ -808,6 +842,59 @@ export function createAppController(dependencies) {
         if (currentSection === 'calendar') renderCalendarSection();
       });
     return tasksCalendarInFlight;
+  }
+
+  function protectedWindowsForCalendar(selectedDate) {
+    const profile = calendarPlanningProfile;
+    if (!profile?.protected_windows || !selectedDate) return [];
+    const day = new Date(`${selectedDate}T12:00:00Z`).getUTCDay();
+    const keys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const weekday = keys[day];
+    const windows = profile.protected_windows[weekday] ?? [];
+    // Expand profile weekday windows across the visible week around selectedDate.
+    const start = new Date(`${selectedDate}T12:00:00Z`);
+    const mondayOffset = (start.getUTCDay() + 6) % 7;
+    const weekStart = new Date(start);
+    weekStart.setUTCDate(start.getUTCDate() - mondayOffset);
+    const out = [];
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(weekStart);
+      d.setUTCDate(weekStart.getUTCDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      const wd = keys[d.getUTCDay()];
+      for (const w of profile.protected_windows[wd] ?? []) {
+        out.push({
+          date: key,
+          start: w.start,
+          end: w.end,
+          label: w.label || 'Protected'
+        });
+      }
+    }
+    return out.length ? out : windows.map((w) => ({
+      date: selectedDate,
+      start: w.start,
+      end: w.end,
+      label: w.label || 'Protected'
+    }));
+  }
+
+  function missionStripModel() {
+    const profile = calendarPlanningProfile;
+    const mission = calendarWeekMission;
+    const outcomes = Array.isArray(mission?.handoff?.selected_outcomes)
+      ? mission.handoff.selected_outcomes.map((o) => o.title).filter(Boolean).join(', ')
+      : (typeof mission?.outcomes === 'string' ? mission.outcomes : '');
+    const limit = profile?.active_project_limit ?? null;
+    const activeCount = mission?.handoff?.linked_projects?.filter((p) => p.decision === 'keep' || p.decision === 'protect')?.length
+      ?? null;
+    const deepTarget = profile?.deep_work_preference?.target_blocks_per_week ?? null;
+    return {
+      outcomes: outcomes || 'Not set',
+      active_count: activeCount != null ? activeCount : (limit != null ? `limit ${limit}` : null),
+      deep_work: deepTarget != null ? `${deepTarget}/wk target` : 'Not set',
+      capacity: profile?.work_windows ? 'Profile windows' : 'Not set'
+    };
   }
 
   let shortcutsPanel = { catalog: [], promoted: [], proposal: null, agentSlug: null };
@@ -1101,7 +1188,10 @@ export function createAppController(dependencies) {
       events: [...(latestResult.events ?? []), ...teachingEvents, ...knowledgeEvents, ...tasksEvents],
       date,
       selectedDate: calendarSelectedDate,
-      viewMonth: calendarViewMonth
+      viewMonth: calendarViewMonth,
+      planningLens: calendarPlanningLens,
+      mission: calendarPlanningLens ? missionStripModel() : null,
+      protectedWindows: protectedWindowsForCalendar(calendarSelectedDate)
     });
     const focusCompose = calendarFocusCompose;
     calendarFocusCompose = false;
@@ -1115,6 +1205,10 @@ export function createAppController(dependencies) {
       selectedEventId: calendarSelectedEventId,
       focusCompose,
       now: now(),
+      onTogglePlanningLens: () => {
+        calendarPlanningLens = !calendarPlanningLens;
+        renderCalendarSection();
+      },
       onSelectDate: (next, options = {}) => {
         if (!next) return;
         const nextMonth = next.slice(0, 7);

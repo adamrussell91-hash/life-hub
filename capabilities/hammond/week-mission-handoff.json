@@ -1,0 +1,15 @@
+{
+  "id": "hammond.week-mission-handoff",
+  "tool_name": "week_mission_handoff",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Hammond to Clare week mission handoff.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

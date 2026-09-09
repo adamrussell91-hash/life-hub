@@ -1,0 +1,15 @@
+{
+  "id": "hammond.portfolio",
+  "tool_name": "portfolio_meter",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Active project meter and new commitment assessment.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

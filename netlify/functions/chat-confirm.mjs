@@ -42,8 +42,16 @@ import {
   PENDING_ACTIONS_PATH,
   parsePendingActions,
   serializePendingActions,
-  removePendingActionById,
   findPendingActionById,
+  markPendingActionConsumed,
+  markPendingActionExecuting,
+  markPendingActionPending,
+  markPendingActionDismissed,
+  isPendingActionExecutable,
+  getPendingActionStatus,
+  PENDING_ACTION_STATUS_EXECUTING,
+  PENDING_ACTION_STATUS_CONSUMED,
+  PENDING_ACTION_STATUS_DISMISSED,
   validateProposeActionInput,
   executeProposeActionWrites,
   classifyWriteTarget,
@@ -51,6 +59,9 @@ import {
   snapshotBlobBases,
   detectStaleWrites,
   selectAcceptedWrites,
+  applyScheduleOverrides,
+  promoteScheduleDiffWorkBlockWrites,
+  isScheduleDiffProposal,
   decisionFieldsFromAction,
   getTasksJSON,
   getTeachingJSON
@@ -63,8 +74,30 @@ import {
 } from './_shared/agent-turn-store.mjs';
 import { continueAfterConfirm, resumeConfirmedTurn } from './_shared/agent-confirm.mjs';
 import { createAnthropicClient } from './_shared/anthropic-client.mjs';
-import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
-import { defaultGetContentStore as defaultGetTeachingStore } from './_shared/teaching-blobs.mjs';
+import { defaultGetTasksStore, listJSON as listTasksJSON, getJSON as getTasksMetaJSON } from './_shared/tasks-blobs.mjs';
+import {
+  defaultGetContentStore as defaultGetTeachingStore,
+  listJSON as listTeachingJSON,
+  SCHEDULED_LESSON_PREFIX
+} from './_shared/teaching-blobs.mjs';
+import {
+  buildAuthoritativeHardBusy,
+  detectStaleScheduleCollisions,
+  workdayForDate
+} from './_shared/productivity-os.mjs';
+import {
+  markWeeklyReviewComplete,
+  markWeeklyReviewPendingConsumed,
+  reconcileWeeklyReviewIfPendingConsumed,
+  loadWorkflowState,
+  markScheduleDiffConfirmed,
+  markScheduleDiffDiscarded,
+  markScheduleDiffPendingConsumed,
+  markScheduleDiffPendingDismissed,
+  reconcileScheduleDiffIfPendingConsumed,
+  reconcileScheduleDiffIfPendingDismissed
+} from './_shared/clare-work.mjs';
+import { loadTimedLifeEventsFromTree } from './_shared/life-schedule-events.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -90,7 +123,8 @@ export function createChatConfirmHandler({
   continueConversation,
   now = Date.now,
   getTasksStore = defaultGetTasksStore,
-  getTeachingStore = defaultGetTeachingStore
+  getTeachingStore = defaultGetTeachingStore,
+  getLifeEvents = null
 } = {}) {
   return async function chatConfirmHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -444,6 +478,10 @@ export function createChatConfirmHandler({
   }
 
   async function handleActionConfirm(parsed) {
+    // CASE A — no id: legacy candidate-only Confirm (deliberately retained).
+    // CASE B — id supplied: stored pending action is authoritative. Never fall
+    // back to a client candidate when the id is missing, consumed, invalid, or
+    // owned by another agent (pending-action identity invariant).
     let candidateProposal = null;
     if (!parsed.id) {
       if (!parsed.candidate) {
@@ -479,15 +517,168 @@ export function createChatConfirmHandler({
       return mapRepositoryError(error);
     }
 
-    const stored = parsed.id ? findPendingActionById(queue, parsed.id) : null;
-    const storedValidated = stored
-      ? validateProposeActionInput(stored.proposal, { agentSlug: stored.slug || parsed.slug })
-      : null;
-    const fallback = candidateProposal
-      ?? (parsed.candidate
-        ? validateProposeActionInput(parsed.candidate, { agentSlug: parsed.slug }).proposal
-        : null);
-    const proposal = storedValidated?.ok ? storedValidated.proposal : fallback;
+    let proposal = null;
+    let stored = null;
+    if (parsed.id) {
+      stored = findPendingActionById(queue, parsed.id);
+      if (!stored) {
+        // Fail closed: a supplied id that is absent must NOT execute any client candidate.
+        return errorResponse(
+          404,
+          'pending_action_not_found',
+          'No pending action matches this id. It may already be confirmed, discarded, or never existed.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      // Positive workflow consume stamp also blocks replay if queue cleanup lagged.
+      let workflowConsumed = false;
+      let scheduleDiffReconciled = null;
+      if (
+        stored?.workflowKind === 'weekly_review'
+        && typeof stored?.workflowId === 'string'
+        && stored.workflowId
+      ) {
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            const workflow = await loadWorkflowState(tasksStore, stored.workflowId);
+            if (
+              workflow
+              && workflow.pending_action_status === 'consumed'
+              && (
+                workflow.pending_action_id === parsed.id
+                || workflow.status === 'complete'
+              )
+            ) {
+              workflowConsumed = true;
+            }
+          }
+        } catch {
+          // Fall through to normal execution if workflow store is unavailable.
+        }
+      }
+      if (isScheduleDiffProposal(stored, stored?.proposal) && !isPendingActionExecutable(stored)) {
+        const status = getPendingActionStatus(stored);
+        if (status === PENDING_ACTION_STATUS_DISMISSED) {
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                pendingActionId: parsed.id,
+                queueEvidenceDismissed: true,
+                stamp: new Date(now()).toISOString()
+              });
+            }
+          } catch {
+            // Rejection is authoritative; workflow heal is best-effort.
+          }
+          return errorResponse(
+            409,
+            'pending_action_dismissed',
+            'This pending action was discarded and cannot be confirmed.',
+            false,
+            PRIVATE_CACHE,
+            {
+              writesApplied: false,
+              pendingActionStatus: 'dismissed',
+              pendingId: parsed.id
+            }
+          );
+        }
+        if (status === PENDING_ACTION_STATUS_CONSUMED) {
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              scheduleDiffReconciled = await reconcileScheduleDiffIfPendingConsumed(tasksStore, {
+                pendingActionId: parsed.id,
+                queueEvidenceConsumed: true,
+                stamp: new Date(now()).toISOString()
+              });
+            }
+          } catch {
+            scheduleDiffReconciled = null;
+          }
+          return errorResponse(
+            409,
+            'pending_action_consumed',
+            'This pending action was already executed and cannot run again.',
+            false,
+            PRIVATE_CACHE,
+            {
+              writesApplied: true,
+              pendingActionStatus: 'consumed',
+              scheduleDiff: scheduleDiffReconciled?.status === 'confirmed'
+                ? 'confirmed'
+                : (scheduleDiffReconciled?.status || 'awaiting_reconciliation'),
+              pendingId: parsed.id
+            }
+          );
+        }
+      }
+      if (workflowConsumed) {
+        return errorResponse(
+          409,
+          'pending_action_consumed',
+          'This pending action was already executed and cannot run again.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      if (!isPendingActionExecutable(stored)) {
+        const status = getPendingActionStatus(stored);
+        if (status === PENDING_ACTION_STATUS_EXECUTING) {
+          return errorResponse(
+            409,
+            'pending_action_execution_in_progress',
+            'This pending action is already executing. Do not retry blindly — wait for recovery.',
+            true,
+            PRIVATE_CACHE
+          );
+        }
+        if (status === PENDING_ACTION_STATUS_DISMISSED) {
+          return errorResponse(
+            409,
+            'pending_action_dismissed',
+            'This pending action was discarded and cannot be confirmed.',
+            false,
+            PRIVATE_CACHE
+          );
+        }
+        return errorResponse(
+          409,
+          'pending_action_consumed',
+          'This pending action was already executed and cannot run again.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      if (typeof stored.slug === 'string' && stored.slug.trim() && stored.slug !== parsed.slug) {
+        return errorResponse(
+          403,
+          'pending_action_agent_mismatch',
+          'This pending action belongs to a different agent.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      const storedValidated = validateProposeActionInput(stored.proposal, {
+        agentSlug: stored.slug || parsed.slug
+      });
+      if (!storedValidated.ok) {
+        return errorResponse(
+          400,
+          'invalid_action',
+          'The stored pending action could not be validated.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      // Client candidate is ignored entirely when id resolves.
+      proposal = storedValidated.proposal;
+    } else {
+      proposal = candidateProposal;
+    }
     if (!proposal) {
       return errorResponse(400, 'invalid_action', 'This proposed action could not be validated.', false, PRIVATE_CACHE);
     }
@@ -510,7 +701,21 @@ export function createChatConfirmHandler({
         PRIVATE_CACHE
       );
     }
-    const { accepted, rejected } = selected;
+    const { accepted: acceptedRaw, rejected } = selected;
+
+    // Schedule Diff may send narrow start_time overrides keyed by stored write path.
+    // Server loads the proposal by id and only mutates allowed schedule coordinates.
+    const overridden = applyScheduleOverrides(acceptedRaw, parsed.schedule_overrides);
+    if (!overridden.ok) {
+      return errorResponse(
+        400,
+        overridden.error ?? 'invalid_schedule_overrides',
+        'schedule_overrides must reference accepted work_block writes and may only set start_time.',
+        false,
+        PRIVATE_CACHE
+      );
+    }
+    const accepted = overridden.writes;
 
     const blobStoresResult = await loadBlobStoresForWrites(accepted, {
       env,
@@ -521,6 +726,34 @@ export function createChatConfirmHandler({
       return errorResponse(503, blobStoresResult.error, 'The blob store is temporarily unavailable.', true, PRIVATE_CACHE);
     }
     const blobStores = blobStoresResult.stores;
+
+    const scheduleCollision = await checkStaleWorkBlockCollisions(accepted, blobStores, {
+      stored,
+      client,
+      tree,
+      getLifeEvents
+    });
+    if (scheduleCollision?.unavailable) {
+      return errorResponse(
+        503,
+        'schedule_validation_unavailable',
+        'Authoritative schedule data could not be loaded. Confirm was not run.',
+        true,
+        PRIVATE_CACHE
+      );
+    }
+    if (scheduleCollision && !scheduleCollision.ok) {
+      return jsonResponse(409, {
+        ok: false,
+        error: 'stale_schedule_collision',
+        data: scheduleCollision.revised
+      }, PRIVATE_CACHE);
+    }
+
+    // Schedule Diff Confirm promotes durable work blocks to confirmed (server-side).
+    const acceptedForWrite = isScheduleDiffProposal(stored, proposal)
+      ? promoteScheduleDiffWorkBlockWrites(accepted, { stamp: new Date(now()).toISOString() })
+      : accepted;
 
     const storedBases = stored?.bases && typeof stored.bases === 'object' && !Array.isArray(stored.bases)
       ? stored.bases
@@ -569,23 +802,168 @@ export function createChatConfirmHandler({
       }
     }
 
-    let writeResult = { ok: true, results: [] };
-    if (accepted.length) {
+    // Pre-execution fence: pending → executing before any durable proposal writes.
+    // Replay/concurrent confirm must fail closed once executing is persisted.
+    let executionFenced = !parsed.id;
+    if (parsed.id) {
+      const executionStartedAt = new Date(now()).toISOString();
+      let fenceQueue = markPendingActionExecuting(queue, parsed.id, { executionStartedAt });
+      let fencePersisted = false;
+      let fenceError = null;
+      for (let attempt = 0; attempt < 2 && !fencePersisted; attempt += 1) {
+        try {
+          const written = await client.writeFile({
+            path: PENDING_ACTIONS_PATH,
+            content: serializePendingActions(fenceQueue),
+            ...(queueSha ? { sha: queueSha } : {}),
+            message: `chore(propose-action): execute ${proposal.intent}`.slice(0, 200)
+          });
+          queue = fenceQueue;
+          queueSha = written?.sha || queueSha;
+          stored = findPendingActionById(queue, parsed.id) || stored;
+          fencePersisted = true;
+          executionFenced = true;
+        } catch (error) {
+          fenceError = error;
+          if (!(error instanceof GitHubClientError && error.code === 'write_conflict')) {
+            break;
+          }
+          // Lost the SHA race — reload and fail closed if another request owns execution.
+          try {
+            const current = await client.resolveTree();
+            tree = current.tree;
+            const queueEntry = current.tree.find(item => item.path === PENDING_ACTIONS_PATH && item.type === 'blob');
+            if (!queueEntry) {
+              return errorResponse(
+                404,
+                'pending_action_not_found',
+                'No pending action matches this id. It may already be confirmed, discarded, or never existed.',
+                false,
+                PRIVATE_CACHE
+              );
+            }
+            queue = parsePendingActions(decodeBlob(await client.readBlob(queueEntry.sha)));
+            queueSha = queueEntry.sha;
+            stored = findPendingActionById(queue, parsed.id);
+            if (!stored) {
+              return errorResponse(
+                404,
+                'pending_action_not_found',
+                'No pending action matches this id. It may already be confirmed, discarded, or never existed.',
+                false,
+                PRIVATE_CACHE
+              );
+            }
+            const status = getPendingActionStatus(stored);
+            if (status === PENDING_ACTION_STATUS_CONSUMED) {
+              return errorResponse(
+                409,
+                'pending_action_consumed',
+                'This pending action was already executed and cannot run again.',
+                false,
+                PRIVATE_CACHE
+              );
+            }
+            if (status === PENDING_ACTION_STATUS_EXECUTING || !isPendingActionExecutable(stored)) {
+              return errorResponse(
+                409,
+                'pending_action_execution_in_progress',
+                'This pending action is already executing. Do not retry blindly — wait for recovery.',
+                true,
+                PRIVATE_CACHE
+              );
+            }
+            fenceQueue = markPendingActionExecuting(queue, parsed.id, { executionStartedAt });
+          } catch (reloadError) {
+            return mapRepositoryError(reloadError);
+          }
+        }
+      }
+      if (!fencePersisted) {
+        if (fenceError instanceof GitHubClientError && fenceError.code === 'write_conflict') {
+          return errorResponse(
+            409,
+            'pending_action_execution_in_progress',
+            'This pending action is already executing. Do not retry blindly — wait for recovery.',
+            true,
+            PRIVATE_CACHE
+          );
+        }
+        return mapRepositoryError(fenceError || new Error('execution fence failed'));
+      }
+    }
+
+    const restorePendingIfSafe = async () => {
+      if (!parsed.id || !executionFenced) return;
       try {
-        writeResult = await executeProposeActionWrites(client, { ...proposal, writes: accepted }, {
+        const restored = markPendingActionPending(queue, parsed.id, {
+          extra: { executionRolledBack: true }
+        });
+        const written = await client.writeFile({
+          path: PENDING_ACTIONS_PATH,
+          content: serializePendingActions(restored),
+          ...(queueSha ? { sha: queueSha } : {}),
+          message: `chore(propose-action): rollback execute ${parsed.id}`.slice(0, 200)
+        });
+        queue = restored;
+        queueSha = written?.sha || queueSha;
+      } catch {
+        // Leave executing if rollback cannot be persisted — fail closed on replay.
+      }
+    };
+
+    let writeResult = { ok: true, results: [] };
+    if (acceptedForWrite.length) {
+      try {
+        writeResult = await executeProposeActionWrites(client, { ...proposal, writes: acceptedForWrite }, {
           files,
           blobStores,
           nowIso: () => new Date(now()).toISOString()
         });
       } catch (error) {
+        // Exception after fence: write outcome is uncertain — do not restore to pending.
         if (error instanceof GitHubClientError && error.code === 'write_conflict') {
-          return errorResponse(409, 'write_conflict', 'A target file changed while confirming. Try again.', true, PRIVATE_CACHE);
+          return errorResponse(
+            409,
+            'pending_action_execution_unknown',
+            'A target file changed while confirming after execution began. Do not retry blindly.',
+            true,
+            PRIVATE_CACHE
+          );
         }
-        return mapRepositoryError(error);
+        return errorResponse(
+          503,
+          'pending_action_execution_unknown',
+          'Execution began but the write outcome is uncertain. Do not retry blindly — recover before confirming again.',
+          true,
+          PRIVATE_CACHE
+        );
       }
       if (!writeResult.ok) {
+        const provenNone = !Array.isArray(writeResult.results) || writeResult.results.length === 0;
+        if (provenNone) {
+          await restorePendingIfSafe();
+        }
         if (writeResult.error === 'already_exists') {
+          if (!provenNone) {
+            return errorResponse(
+              409,
+              'pending_action_execution_unknown',
+              'Execution may have partially applied. Do not retry blindly.',
+              true,
+              PRIVATE_CACHE
+            );
+          }
           return errorResponse(409, 'write_conflict', `File already exists: ${writeResult.detail}`, true, PRIVATE_CACHE);
+        }
+        if (!provenNone) {
+          return errorResponse(
+            503,
+            'pending_action_execution_unknown',
+            'Execution may have partially applied. Do not retry blindly.',
+            true,
+            PRIVATE_CACHE
+          );
         }
         return errorResponse(400, writeResult.error ?? 'apply_failed', 'The proposed action could not be applied.', false, PRIVATE_CACHE);
       }
@@ -648,16 +1026,207 @@ export function createChatConfirmHandler({
       // Writes already landed; governance is audit trail only.
     }
 
+    // Writes succeeded. The pending id must become non-replayable before any "success".
+    let pendingConsumed = !parsed.id; // legacy candidate-only confirms have no durable id
+    let pendingConsumeError = null;
+    let weeklyReviewCompleted = false;
+    let weeklyReviewCompletionError = null;
+    const isWeeklyReview =
+      stored?.workflowKind === 'weekly_review'
+      && typeof stored?.workflowId === 'string'
+      && Boolean(stored.workflowId);
+
     if (parsed.id) {
+      const consumedAt = new Date(now()).toISOString();
+      const markedQueue = markPendingActionConsumed(queue, parsed.id, {
+        consumedAt,
+        extra: { writesApplied: true }
+      });
+      let consumePersisted = false;
+      for (let attempt = 0; attempt < 3 && !consumePersisted; attempt += 1) {
+        try {
+          await client.writeFile({
+            path: PENDING_ACTIONS_PATH,
+            content: serializePendingActions(markedQueue),
+            ...(queueSha ? { sha: queueSha } : {}),
+            message: `chore(propose-action): consume ${proposal.intent}`.slice(0, 200)
+          });
+          queue = markedQueue;
+          pendingConsumed = true;
+          consumePersisted = true;
+        } catch (error) {
+          pendingConsumeError = error;
+        }
+      }
+
+      // Backup evidence on the Weekly Review workflow so load can heal even if queue cleanup drifts.
+      if (isWeeklyReview) {
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            await markWeeklyReviewPendingConsumed(tasksStore, stored.workflowId, {
+              pendingActionId: parsed.id,
+              stamp: consumedAt
+            });
+          }
+        } catch {
+          // Queue consume is the primary replay gate; workflow stamp is secondary.
+        }
+      }
+
+      if (pendingConsumed && isScheduleDiffProposal(stored, proposal)) {
+        let scheduleDiffCompleted = false;
+        let scheduleDiffCompletionError = null;
+        const selectedWritePaths = accepted.map((w) => w.path);
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (!tasksStore) {
+            scheduleDiffCompletionError = new Error('tasks_store_unavailable');
+          } else {
+            const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+            // No matching workflow (legacy pending) or newer workflow B bound to another id:
+            // do not require terminal mutation; never terminate B while confirming A.
+            if (!existing || existing.pending_action_id !== parsed.id) {
+              scheduleDiffCompleted = true;
+            } else {
+              await markScheduleDiffPendingConsumed(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp: consumedAt,
+                selectedWritePaths
+              });
+              await markScheduleDiffConfirmed(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp: consumedAt,
+                selectedWritePaths
+              });
+              let healed = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              scheduleDiffCompleted =
+                healed?.status === 'confirmed'
+                && healed?.pending_action_id === parsed.id;
+              if (!scheduleDiffCompleted) {
+                healed = await reconcileScheduleDiffIfPendingConsumed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: consumedAt,
+                  selectedWritePaths,
+                  queueEvidenceConsumed: true
+                });
+                scheduleDiffCompleted =
+                  healed?.status === 'confirmed'
+                  && healed?.pending_action_id === parsed.id;
+              }
+            }
+          }
+        } catch (error) {
+          scheduleDiffCompletionError = error;
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              if (!existing || existing.pending_action_id !== parsed.id) {
+                scheduleDiffCompleted = true;
+              } else {
+                const reconciled = await reconcileScheduleDiffIfPendingConsumed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: consumedAt,
+                  selectedWritePaths,
+                  queueEvidenceConsumed: true
+                });
+                scheduleDiffCompleted =
+                  reconciled?.status === 'confirmed'
+                  && reconciled?.pending_action_id === parsed.id;
+              }
+            }
+          } catch {
+            scheduleDiffCompleted = false;
+          }
+        }
+
+        if (!scheduleDiffCompleted) {
+          return errorResponse(
+            503,
+            'schedule_diff_completion_pending',
+            'Writes landed and the pending action is consumed, but Schedule Diff workflow completion did not persist. Do not re-confirm writes — retry reconciliation.',
+            true,
+            PRIVATE_CACHE,
+            {
+              writesApplied: true,
+              pendingId: parsed.id,
+              pendingActionStatus: 'consumed',
+              scheduleDiff: 'awaiting_reconciliation',
+              lifecycle: {
+                writes: 'applied',
+                pendingAction: 'consumed',
+                scheduleDiff: 'awaiting_reconciliation'
+              },
+              ...(scheduleDiffCompletionError?.message
+                ? { detail: String(scheduleDiffCompletionError.message).slice(0, 200) }
+                : {})
+            }
+          );
+        }
+      }
+
+      if (!pendingConsumed) {
+        return errorResponse(
+          503,
+          'pending_action_consume_failed',
+          'Writes landed but the pending action could not be marked consumed. Do not re-confirm blindly — retry may be required after recovery.',
+          true,
+          PRIVATE_CACHE,
+          {
+            writesApplied: true,
+            pendingId: parsed.id,
+            lifecycle: {
+              writes: 'applied',
+              pendingAction: 'consume_failed',
+              weeklyReview: isWeeklyReview ? 'awaiting_confirm' : null
+            }
+          }
+        );
+      }
+    }
+
+    if (pendingConsumed && isWeeklyReview) {
       try {
-        await client.writeFile({
-          path: PENDING_ACTIONS_PATH,
-          content: serializePendingActions(removePendingActionById(queue, parsed.id)),
-          ...(queueSha ? { sha: queueSha } : {}),
-          message: `chore(propose-action): confirm ${proposal.intent}`.slice(0, 200)
-        });
-      } catch {
-        // Stale queue entry is harmless.
+        const tasksStore = await getTasksStore(env);
+        if (tasksStore) {
+          await markWeeklyReviewComplete(tasksStore, stored.workflowId);
+          weeklyReviewCompleted = true;
+        }
+      } catch (error) {
+        weeklyReviewCompletionError = error;
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            await reconcileWeeklyReviewIfPendingConsumed(tasksStore, stored.workflowId);
+            const healed = await loadWorkflowState(tasksStore, stored.workflowId);
+            weeklyReviewCompleted = healed?.status === 'complete';
+          }
+        } catch {
+          weeklyReviewCompleted = false;
+        }
+      }
+
+      if (!weeklyReviewCompleted) {
+        // Writes + consume landed; do not claim clean success or invite re-confirm.
+        return errorResponse(
+          503,
+          'weekly_review_completion_pending',
+          'Writes landed and the pending action is consumed, but Weekly Review completion did not persist. Do not re-confirm — reload/reconcile the review.',
+          true,
+          PRIVATE_CACHE,
+          {
+            writesApplied: true,
+            pendingId: parsed.id,
+            pendingActionStatus: 'consumed',
+            workflowId: stored.workflowId,
+            lifecycle: {
+              writes: 'applied',
+              pendingAction: 'consumed',
+              weeklyReview: 'awaiting_confirm'
+            }
+          }
+        );
       }
     }
 
@@ -723,7 +1292,12 @@ export function createChatConfirmHandler({
         results: writeResult.results,
         ...(centralNodeUpdated != null ? { centralNodeUpdated } : {}),
         ...(turnResume?.state?.id ? { turnId: turnResume.state.id, turnResumed: true } : {}),
-        ...(continuation ? { continuation } : {})
+        ...(continuation ? { continuation } : {}),
+        lifecycle: {
+          writes: 'applied',
+          pendingAction: parsed.id ? 'consumed' : 'none',
+          weeklyReview: isWeeklyReview ? 'complete' : null
+        }
       }
     }, PRIVATE_CACHE);
   }
@@ -743,19 +1317,144 @@ export function createChatConfirmHandler({
       if (!entry) {
         return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
       }
-      const queue = parsePendingActions(decodeBlob(await client.readBlob(entry.sha)));
-      const next = removePendingActionById(queue, parsed.id);
-      if (next.length !== queue.length) {
-        await client.writeFile({
-          path: PENDING_ACTIONS_PATH,
-          content: serializePendingActions(next),
-          sha: entry.sha,
-          message: `chore(propose-action): dismiss ${parsed.id}`
-        });
+      let queue = parsePendingActions(decodeBlob(await client.readBlob(entry.sha)));
+      let queueSha = entry.sha;
+      const dismissTarget = findPendingActionById(queue, parsed.id);
+      if (!dismissTarget) {
+        // Absence alone is not positive dismiss evidence — do not invent discarded.
+        return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+      }
+      const dismissStatus = getPendingActionStatus(dismissTarget);
+      if (dismissStatus === PENDING_ACTION_STATUS_EXECUTING) {
+        return errorResponse(
+          409,
+          'pending_action_execution_in_progress',
+          'This pending action is executing and cannot be discarded.',
+          true,
+          PRIVATE_CACHE
+        );
+      }
+      if (dismissStatus === PENDING_ACTION_STATUS_CONSUMED) {
+        return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true, alreadyConsumed: true } }, PRIVATE_CACHE);
+      }
+      if (dismissStatus === PENDING_ACTION_STATUS_DISMISSED) {
+        // Idempotent replay — reconcile Schedule Diff from queue tombstone if needed.
+        if (isScheduleDiffProposal(dismissTarget, dismissTarget.proposal)) {
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                pendingActionId: parsed.id,
+                queueEvidenceDismissed: true,
+                stamp: new Date(now()).toISOString()
+              });
+            }
+          } catch {
+            // Already dismissed in queue; workflow heal is best-effort on replay.
+          }
+        }
+        return jsonResponse(200, {
+          ok: true,
+          data: { id: parsed.id, dismissed: true, alreadyDismissed: true }
+        }, PRIVATE_CACHE);
+      }
+
+      // Authoritative dismissal: persist pending → dismissed tombstone (do not remove).
+      const dismissedAt = new Date(now()).toISOString();
+      const next = markPendingActionDismissed(queue, parsed.id, { dismissedAt });
+      await client.writeFile({
+        path: PENDING_ACTIONS_PATH,
+        content: serializePendingActions(next),
+        sha: queueSha,
+        message: `chore(propose-action): dismiss ${parsed.id}`
+      });
+      queue = next;
+      const storedForDismiss = findPendingActionById(queue, parsed.id);
+
+      if (storedForDismiss && isScheduleDiffProposal(storedForDismiss, storedForDismiss.proposal)) {
+        let scheduleDiffDiscarded = false;
+        let scheduleDiffDiscardError = null;
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (!tasksStore) {
+            scheduleDiffDiscardError = new Error('tasks_store_unavailable');
+          } else {
+            const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+            if (!existing || existing.pending_action_id !== parsed.id) {
+              // Legacy / newer workflow B — do not mutate unrelated schedule_diff:current.
+              scheduleDiffDiscarded = true;
+            } else {
+              await markScheduleDiffPendingDismissed(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp: dismissedAt
+              });
+              await markScheduleDiffDiscarded(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp: dismissedAt
+              });
+              let healed = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              scheduleDiffDiscarded =
+                healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
+              if (!scheduleDiffDiscarded) {
+                healed = await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: dismissedAt,
+                  queueEvidenceDismissed: true
+                });
+                scheduleDiffDiscarded =
+                  healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
+              }
+            }
+          }
+        } catch (error) {
+          scheduleDiffDiscardError = error;
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              if (!existing || existing.pending_action_id !== parsed.id) {
+                scheduleDiffDiscarded = true;
+              } else {
+                const healed = await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: dismissedAt,
+                  queueEvidenceDismissed: true
+                });
+                scheduleDiffDiscarded =
+                  healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
+              }
+            }
+          } catch {
+            scheduleDiffDiscarded = false;
+          }
+        }
+        if (!scheduleDiffDiscarded) {
+          return errorResponse(
+            503,
+            'schedule_diff_discard_pending',
+            'The pending action was dismissed, but Schedule Diff workflow discard did not persist. Do not Confirm — retry discard reconciliation.',
+            true,
+            PRIVATE_CACHE,
+            {
+              writesApplied: false,
+              pendingId: parsed.id,
+              pendingActionStatus: 'dismissed',
+              scheduleDiff: 'awaiting_reconciliation',
+              lifecycle: {
+                writes: 'none',
+                pendingAction: 'dismissed',
+                scheduleDiff: 'awaiting_reconciliation'
+              },
+              ...(scheduleDiffDiscardError?.message
+                ? { detail: String(scheduleDiffDiscardError.message).slice(0, 200) }
+                : {})
+            }
+          );
+        }
       }
 
       try {
-        const stored = findPendingActionById(queue, parsed.id);
+        const stored = storedForDismiss;
         if (stored?.turnId) {
           const turnEntry = current.tree.find(item => item.path === AGENT_TURNS_PATH && item.type === 'blob');
           const turns = turnEntry
@@ -783,7 +1482,7 @@ export function createChatConfirmHandler({
 
       // Log rejection for the audit trail.
       try {
-        const stored = findPendingActionById(queue, parsed.id);
+        const stored = storedForDismiss;
         const govEntry = current.tree.find(item => item.path === GOVERNANCE_LOG_PATH && item.type === 'blob');
         let govContent = emptyGovernanceLog();
         let govSha;
@@ -918,14 +1617,27 @@ async function parseRequest(request) {
   }
 
   const hasCandidate = body.candidate && typeof body.candidate === 'object' && !Array.isArray(body.candidate);
-  // cn_patch / action may arrive as just an id (server looks the proposal up) or
-  // as a fallback candidate when a propose-time queue write failed.
+  // action with id: server loads the stored pending proposal (authoritative).
+  // action without id: legacy candidate-only Confirm.
+  // cn_patch may still arrive as id and/or candidate (separate contract).
   if ((kind === 'cn_patch' || kind === 'action') ? (!id && !hasCandidate) : !hasCandidate) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
 
   if (kind === 'action' && 'accept' in body && !Array.isArray(body.accept)) {
     return { error: errorResponse(400, 'invalid_accept', 'accept must be an array of write paths.', false, PRIVATE_CACHE) };
+  }
+
+  if (kind === 'action' && 'schedule_overrides' in body && body.schedule_overrides != null && !Array.isArray(body.schedule_overrides)) {
+    return {
+      error: errorResponse(
+        400,
+        'invalid_schedule_overrides',
+        'schedule_overrides must be an array of { path, start_time }.',
+        false,
+        PRIVATE_CACHE
+      )
+    };
   }
 
   return {
@@ -935,6 +1647,8 @@ async function parseRequest(request) {
     kind,
     id,
     accept: kind === 'action' && Array.isArray(body.accept) ? body.accept : null,
+    schedule_overrides:
+      kind === 'action' && Array.isArray(body.schedule_overrides) ? body.schedule_overrides : null,
     ...extras
   };
 }
@@ -949,7 +1663,8 @@ function parseActionDecisionFields(body) {
 async function loadBlobStoresForWrites(writes, { env, getTasksStore, getTeachingStore }) {
   const stores = {};
   const needsTasks = writes.some(write => classifyWriteTarget(write.path).store === 'tasks');
-  const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching');
+  const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching')
+    || writes.some(write => classifyWriteTarget(write.path).kind === 'work_block');
   try {
     if (needsTasks) stores.tasks = await getTasksStore(env);
     if (needsTeaching) stores.teaching = await getTeachingStore(env);
@@ -959,6 +1674,98 @@ async function loadBlobStoresForWrites(writes, { env, getTasksStore, getTeaching
   if (needsTasks && !stores.tasks) return { ok: false, error: 'tasks_blobs_unbound' };
   if (needsTeaching && !stores.teaching) return { ok: false, error: 'teaching_blobs_unbound' };
   return { ok: true, stores };
+}
+
+function proposedBlocksFromWrites(writes) {
+  const blocks = [];
+  for (const write of writes ?? []) {
+    const target = classifyWriteTarget(write.path);
+    if (target.kind !== 'work_block') continue;
+    let record;
+    try {
+      record = JSON.parse(write.content);
+    } catch {
+      continue;
+    }
+    if (!record || typeof record !== 'object') continue;
+    if (!record.start_time || !record.date) continue;
+    blocks.push({
+      temp_id: record.id || target.id,
+      task_id: record.task_id ?? '',
+      title: record.title ?? 'Work block',
+      date: record.date,
+      start_time: record.start_time,
+      duration_minutes: Number(record.duration_minutes) || 60,
+      depth: record.depth || 'shallow',
+      selected: true
+    });
+  }
+  return blocks;
+}
+
+async function checkStaleWorkBlockCollisions(writes, blobStores, {
+  stored = null,
+  client = null,
+  tree = null,
+  getLifeEvents = null
+} = {}) {
+  const proposed = proposedBlocksFromWrites(writes);
+  if (!proposed.length) return { ok: true };
+  const dates = [...new Set(proposed.map((b) => b.date).filter(Boolean))];
+  const tasksStore = blobStores.tasks;
+  const teachingStore = blobStores.teaching;
+  let lessons = [];
+  let workBlocks = [];
+  let profile = null;
+  let lifeEvents = [];
+  try {
+    if (teachingStore) {
+      lessons = await listTeachingJSON(teachingStore, SCHEDULED_LESSON_PREFIX);
+    }
+    if (tasksStore) {
+      workBlocks = await listTasksJSON(tasksStore, 'work_blocks/');
+      profile = await getTasksMetaJSON(tasksStore, 'meta/planning_profile');
+    }
+    const loadLife = typeof getLifeEvents === 'function'
+      ? getLifeEvents
+      : async ({ dates: dayKeys, client: gh, tree: ghTree }) =>
+        loadTimedLifeEventsFromTree({ client: gh, tree: ghTree, dates: dayKeys });
+    lifeEvents = await loadLife({ dates, client, tree });
+  } catch {
+    // Fail closed: unavailable schedule truth must never look like "no conflict".
+    return {
+      ok: false,
+      unavailable: true,
+      error: 'schedule_validation_unavailable'
+    };
+  }
+
+  const planningProfile = profile && typeof profile === 'object' ? profile : null;
+  const trustedProtected = Array.isArray(stored?.scheduleContext?.protected_windows)
+    ? stored.scheduleContext.protected_windows
+    : Array.isArray(stored?.schedule_context?.protected_windows)
+      ? stored.schedule_context.protected_windows
+      : [];
+
+  for (const date of dates) {
+    const dayProposed = proposed.filter((b) => b.date === date);
+    const hardBusy = buildAuthoritativeHardBusy({
+      date,
+      lessons,
+      workBlocks,
+      planningProfile,
+      extraProtectedWindows: trustedProtected,
+      events: lifeEvents
+    });
+    const workday = workdayForDate(date, planningProfile);
+    const check = detectStaleScheduleCollisions({
+      proposedBlocks: dayProposed,
+      hardBusy,
+      workday
+    });
+    if (!check.ok) return check;
+  }
+  return { ok: true };
 }
 
 async function readAtMost(stream, limit) {
