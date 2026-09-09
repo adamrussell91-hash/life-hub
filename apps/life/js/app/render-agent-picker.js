@@ -63,11 +63,13 @@ export function renderChatWho(root, slug) {
   who.hidden = false;
   const img = who.querySelector?.('.chat-view__who-avatar');
   const name = who.querySelector?.('.chat-view__who-name');
+  const status = who.querySelector?.('.chat-view__who-status');
   if (img) {
     img.src = agent.src;
     img.alt = agent.name;
   }
   if (name) name.textContent = agent.shortName || agent.name;
+  if (status) status.textContent = agent.purpose || '';
 }
 
 export function syncChatComposerHint(root, slug) {

@@ -2029,6 +2029,20 @@
   min-width: 0;
 }
 
+.chat-view__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Picker already names the agent. Messenger who-header for overlay + engaged threads. */
+.chat-view:not([data-panel-mode]):not([data-chrome='engaged']) #chat-who {
+  display: none;
+}
+
 .chat-new-button {
   min-height: 2.2rem;
 }
@@ -2212,7 +2226,7 @@
 .chat-message {
   display: flex;
   gap: var(--space-2);
-  align-items: flex-start;
+  align-items: flex-end;
   width: fit-content;
   max-width: min(36rem, 100%);
 }
@@ -2224,7 +2238,7 @@
   object-fit: cover;
   object-position: center;
   flex: 0 0 auto;
-  margin-top: 0.25rem;
+  margin-bottom: 0.15rem;
 }
 
 .chat-message--user .chat-message__avatar {

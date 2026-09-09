@@ -537,7 +537,13 @@ function overlayHtml() {
   return `
     <section class="chat-overlay" aria-label="Chat">
       <div class="chat-overlay__top">
-        <p class="chat-overlay__who">Talking to ${escapeHtml(who.shortName)}</p>
+        <div class="chat-view__who" id="chat-who">
+          <img class="chat-view__who-avatar" src="${who.avatarSrc}" alt="${escapeHtml(who.name)}" width="40" height="40" />
+          <div class="chat-view__who-copy">
+            <p class="chat-view__who-name">${escapeHtml(who.shortName)}</p>
+            <p class="chat-view__who-status"></p>
+          </div>
+        </div>
         <div class="chat-overlay__tools">
           <button class="btn btn--ghost" type="button" data-new-chat ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>New chat</button>
           <button class="hub-icon-btn chat-overlay__close" type="button" data-close-overlay aria-label="Close chat">
@@ -567,11 +573,13 @@ function overlayHtml() {
         ${
           turns.length
             ? turns
-                .map(turn => {
+                .map((turn, index) => {
                   if (turn.role === "user") {
                     return `<li class="chat-message chat-message--user"><div class="chat-message__body">${escapeHtml(turn.content)}</div></li>`;
                   }
-                  return `<li class="chat-message chat-message--assistant" data-agent="${personality}">
+                  const next = turns[index + 1];
+                  const tail = !next || next.role === "user" ? (working ? "" : " chat-message--tail") : "";
+                  return `<li class="chat-message chat-message--assistant${tail}" data-agent="${personality}">
                     <img class="chat-message__avatar" src="${who.avatarSrc}" alt="${escapeHtml(who.name)}" width="52" height="52" />
                     <div class="chat-message__body">${renderChatMarkdown(turn.content, turn.findings, notes, currentHost?.archiveNotes)}</div>
                     ${
@@ -593,14 +601,14 @@ function overlayHtml() {
                 .join("")
             : working
               ? ""
-              : `<li class="chat-message chat-message--assistant" data-agent="${personality}">
+              : `<li class="chat-message chat-message--assistant chat-message--tail" data-agent="${personality}">
                 <img class="chat-message__avatar" src="${who.avatarSrc}" alt="${escapeHtml(who.name)}" width="52" height="52" />
                 <div class="chat-message__body">${empty}</div>
               </li>`
         }
         ${
           working
-            ? `<li class="chat-message chat-message--assistant chat-message--status" data-agent="${personality}" style="--agent-colour:${who.colour}">
+            ? `<li class="chat-message chat-message--assistant chat-message--status chat-message--tail" data-agent="${personality}" style="--agent-colour:${who.colour}">
                 <img class="chat-message__avatar" src="${who.avatarSrc}" alt="${escapeHtml(who.name)}" width="52" height="52" />
                 <div class="chat-message__body" role="status" aria-live="polite">${escapeHtml(overlayTickText(working))}</div>
               </li>`

@@ -72,6 +72,28 @@ function markLatestMessage(list) {
   for (const item of items) toggleClass(item, 'chat-message--latest', false);
   const last = items[items.length - 1];
   if (last) toggleClass(last, 'chat-message--latest', true);
+  syncAssistantMessageTails(list);
+}
+
+/** Messenger: only the last bubble in a consecutive assistant/status run shows the avatar. */
+export function syncAssistantMessageTails(list) {
+  if (!list?.children) return;
+  const queried = list.querySelectorAll?.('.chat-message');
+  const pool = queried?.length ? queried : list.children;
+  const items = [...pool].filter(node => String(node.className || '').includes('chat-message'));
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+    const cls = String(item.className || '');
+    const incoming = cls.includes('chat-message--assistant') || cls.includes('chat-message--status');
+    if (!incoming) {
+      toggleClass(item, 'chat-message--tail', false);
+      continue;
+    }
+    const next = items[i + 1];
+    const nextCls = String(next?.className || '');
+    const nextIncoming = nextCls.includes('chat-message--assistant') || nextCls.includes('chat-message--status');
+    toggleClass(item, 'chat-message--tail', !nextIncoming);
+  }
 }
 
 export function appendMessage(root, { role, agentSlug, text = '', actions = true, attachments } = {}) {

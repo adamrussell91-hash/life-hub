@@ -221,7 +221,7 @@ test('author styles preserve the semantic hidden state', async () => {
   assert.match(css, /\[hidden\]\s*{\s*display:\s*none\s*!important;?\s*}/);
 });
 
-test('full-page Chat uses the canvas width and hides the Talking to chip while empty', async () => {
+test('full-page Chat uses the canvas width and hides the Messenger who-header while empty', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
   assert.match(
@@ -245,7 +245,7 @@ test('full-page Chat uses the canvas width and hides the Talking to chip while e
 
 test('engaged phone Chat drops the page title stack and assistant left bar', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
-  const phoneChat = css.slice(css.indexOf('Engaged phone Chat already has Talking to'));
+  const phoneChat = css.slice(css.indexOf('Engaged phone Chat already has the Messenger who-header'));
   assert.ok(phoneChat.length > 80, 'engaged phone Chat chrome block exists');
   assert.match(
     phoneChat,
