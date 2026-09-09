@@ -20,7 +20,12 @@ import {
   trimCrossAgentSection,
   upsertStatusField,
   mergeFlagsIntoStatus,
-  buildWorkoutFlagsLine
+  buildWorkoutFlagsLine,
+  sanitizeCentralNode,
+  buildLiveStatusProse,
+  buildMultiExerciseStatusLine,
+  compactTitle,
+  CENTRAL_NODE_HISTORY_CUTOFF
 } from '../../apps/life/js/core/central-node-write.js';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -628,4 +633,105 @@ test('mergeFlagsIntoStatus appends instead of clobbering, and workout flags allo
   );
   assert.ok(flags.length <= 280 + '**Flags:** '.length);
   assert.match(flags, /left knee: grind/);
+});
+
+test('sanitizeCentralNode drops pre-August Cross-Agent lines, penicillin TBC, past appointments, and day dumps', () => {
+  const dirty = [
+    '# Purpose',
+    '---',
+    '## 🔴 Current Constraints & Priorities',
+    '### Medical Status',
+    '- Entocort course completed. Now ceased.',
+    '### Upcoming Appointments',
+    '- **7 Jul 2026 (11:00 AM):** Mary-anne Chamoun, Dietitian.',
+    '- **TBC:** Dr Monica Falk (Allergist, penicillin challenge)',
+    '- **TBC:** Dr Chris Keily follow-up (biologics review)',
+    '- **20 Sep 2026:** Future keep.',
+    '---',
+    "## ⚡ Today's Status (Tuesday 8 September 2026)",
+    '**Health:** Entocort taper active (Week 7, 6mg).',
+    '---',
+    '## 📅 This Week (7 – 13 September 2026)',
+    'Mon 7 Sep: 1,578 kcal, 139.5g P, 33.3g F.',
+    '- Key: keep this.',
+    '---',
+    '## 📊 This Month (September 2026)',
+    '- **TBC:** Dr Monica Falk (Allergist, penicillin challenge)',
+    '---',
+    '## 📈 Long-Term Trends & Patterns',
+    '- Entocort Day 38, Week 6 of 8. Taper to 6mg begins ~3 Apr.',
+    '- Protein feast-or-famine persists.',
+    '---',
+    '## 🤝 Cross-Agent Coordination',
+    '- Chadwick→Brisket: 30 Jul session completed.',
+    '- Chadwick→Sara: 8 Sep AC quiet today.',
+    '---',
+    '## 📝 Recent Agent Actions',
+    '**8 Sep:** Chadwick: session logged.',
+    '**30 Jul:** Chadwick: ancient session.'
+  ].join('\n');
+
+  const next = sanitizeCentralNode(dirty, '2026-09-09');
+  assert.doesNotMatch(next, /penicillin challenge/i);
+  assert.doesNotMatch(next, /Mary-anne Chamoun/);
+  assert.match(next, /Future keep/);
+  assert.match(next, /Dr Chris Keily/);
+  assert.doesNotMatch(next, /30 Jul session completed/);
+  assert.match(next, /8 Sep AC quiet today/);
+  assert.doesNotMatch(next, /1,578 kcal/);
+  assert.match(next, /Key: keep this/);
+  assert.doesNotMatch(next, /Entocort Day 38/);
+  assert.doesNotMatch(next, /Entocort taper active/);
+  assert.match(next, /Protein feast-or-famine persists/);
+  assert.doesNotMatch(next, /\*\*30 Jul:\*\*/);
+  assert.match(next, /\*\*8 Sep:\*\*/);
+  assert.equal(CENTRAL_NODE_HISTORY_CUTOFF, '2026-08-01');
+});
+
+test('compactTitle and multi-exercise status stay scannable', () => {
+  assert.equal(compactTitle('Short'), 'Short');
+  assert.match(compactTitle('A'.repeat(60)), /…$/);
+  const line = buildMultiExerciseStatusLine([
+    { title: 'Chest Density Blitz', duration_min: 20, status: 'completed' },
+    { title: 'Pull Strength', duration_min: 25, status: 'completed' }
+  ]);
+  assert.match(line, /2 sessions/);
+  assert.match(line, /45 min total/);
+});
+
+test('buildLiveStatusProse mirrors today\'s meal and workout events', () => {
+  const prose = buildLiveStatusProse([
+    { record: { type: 'meal', date: '2026-09-09', calories: 500, protein_g: 40, fat_g: 12 } },
+    { record: { type: 'workout', date: '2026-09-09', status: 'completed', title: 'A', duration_min: 20 } },
+    { record: { type: 'workout', date: '2026-09-09', status: 'completed', title: 'B', duration_min: 25 } }
+  ], '2026-09-09');
+  assert.match(prose, /\*\*Nutrition:\*\*/);
+  assert.match(prose, /2 sessions/);
+  assert.equal(buildLiveStatusProse([], '2026-09-09'), null);
+});
+
+test('applyLogToCentralNode merges a second completed workout into a multi-session Exercise line', () => {
+  const first = applyLogToCentralNode(base, {
+    record: {
+      type: 'workout',
+      date: '2026-09-09',
+      status: 'completed',
+      title: 'Chest Blitz',
+      duration_min: 20,
+      day_type: 'workout_30'
+    },
+    actionLine: '\n**9 Sep:** Chadwick: Logged Chest Blitz.'
+  });
+  const second = applyLogToCentralNode(first, {
+    record: {
+      type: 'workout',
+      date: '2026-09-09',
+      status: 'completed',
+      title: 'Pull Strength',
+      duration_min: 25,
+      day_type: 'workout_30'
+    },
+    actionLine: '\n**9 Sep:** Chadwick: Logged Pull Strength.'
+  });
+  assert.match(second, /\*\*Exercise:\*\* 2 sessions · Chest Blitz; Pull Strength · 45 min total\./);
 });

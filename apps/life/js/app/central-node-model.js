@@ -8,7 +8,13 @@ import {
   extractThisWeek,
   extractTodaysStatus
 } from '../core/constraints.js';
-import { dedupeRecentActions } from '../core/central-node-write.js';
+import {
+  buildLiveStatusProse,
+  dedupeRecentActions,
+  extractTodaysStatusBlock,
+  mergeLiveStatusOverMarkdown,
+  sanitizeCentralNode
+} from '../core/central-node-write.js';
 import { openGovernanceEntries } from '../core/governance-log.js';
 import { getDayTargets } from '../core/targets.js';
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
@@ -40,6 +46,22 @@ function eatingTargetsForDay(events, date, targetsConfig) {
   return { date, hitEatingTargets: hitProtein && underFatCeiling };
 }
 
+function statusProseForDisplay(markdown, events, date) {
+  const live = buildLiveStatusProse(events, date);
+  if (!live) {
+    const block = extractTodaysStatusBlock(markdown);
+    if (block.dateKey && block.dateKey !== date && block.body) {
+      return `${block.body}\n\n_Status stamp is ${block.dateKey}; live logs for ${date} not found._`;
+    }
+    return extractTodaysStatus(markdown);
+  }
+  const block = extractTodaysStatusBlock(markdown);
+  if (block.dateKey === date && block.body) {
+    return mergeLiveStatusOverMarkdown(block.body, live);
+  }
+  return live;
+}
+
 export function buildCentralNodeModel({
   events,
   targetsConfig,
@@ -50,7 +72,7 @@ export function buildCentralNodeModel({
   urlWatches
 }) {
   if (!date) throw new RangeError('Central Node display date is unavailable');
-  const markdown = centralNodeMarkdown ?? '';
+  const markdown = sanitizeCentralNode(centralNodeMarkdown ?? '', date);
 
   const weekDates = enumerateDateKeys(addCalendarDays(date, -(WEEK_DAYS - 1)), date);
   const monthDates = enumerateDateKeys(addCalendarDays(date, -(MONTH_DAYS - 1)), date);
@@ -86,7 +108,7 @@ export function buildCentralNodeModel({
     date,
     sections: {
       constraints: extractConstraints(markdown),
-      todaysStatus: extractTodaysStatus(markdown),
+      todaysStatus: statusProseForDisplay(markdown, events, date),
       thisWeek: extractThisWeek(markdown),
       thisMonth: extractThisMonth(markdown),
       longTermTrends: extractLongTermTrends(markdown),
