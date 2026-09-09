@@ -43,11 +43,18 @@ export type StreamChatOptions = {
   protocolId?: string;
 };
 
+export type ScheduleOverride = {
+  path: string;
+  start_time: string;
+};
+
 export type ConfirmChatOptions = {
   kind?: string;
   id?: string;
   slug?: string;
   accept?: string[] | null;
+  /** Narrow Schedule Diff edits: start_time only, keyed by stored write path. */
+  schedule_overrides?: ScheduleOverride[] | null;
   candidate?: unknown;
   overwrite?: boolean;
   reason?: string;
@@ -188,6 +195,7 @@ export function createChatApi(
       kind,
       id,
       accept,
+      schedule_overrides,
       reason,
       revisit
     }: ConfirmChatOptions = {}) {
@@ -203,6 +211,7 @@ export function createChatApi(
           ...(kind ? { kind } : {}),
           ...(id ? { id } : {}),
           ...(Array.isArray(accept) ? { accept } : {}),
+          ...(Array.isArray(schedule_overrides) ? { schedule_overrides } : {}),
           ...(typeof reason === 'string' && reason.trim() ? { reason: reason.trim() } : {}),
           ...(typeof revisit === 'string' && revisit.trim() ? { revisit: revisit.trim() } : {})
         })

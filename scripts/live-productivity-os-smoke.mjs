@@ -557,9 +557,11 @@ for (const scenario of scenarios) {
 // LIVE acceptance gate: /api/chat → compose_schedule → pending id on SSE → confirm by that id.
 {
   try {
-    const { PENDING_ACTIONS_PATH } = await import(
-      '../netlify/functions/_shared/capabilities/propose-action.mjs'
-    );
+    const {
+      PENDING_ACTIONS_PATH,
+      isPendingActionExecutable,
+      getPendingActionStatus
+    } = await import('../netlify/functions/_shared/capabilities/propose-action.mjs');
     const beforeBlocks = Object.keys(tasksMap).filter(
       (key) => key.startsWith('work_blocks/') && !key.endsWith('/_index')
     ).length;
@@ -634,18 +636,28 @@ for (const scenario of scenarios) {
         ? JSON.parse(githubBlobs.get(PENDING_ACTIONS_PATH).content)
         : [];
       const queueAfterIds = Array.isArray(queueAfter) ? queueAfter.map((entry) => entry.id) : [];
-      const firstConsumed = !queueAfterIds.includes(firstPendingId);
+      // Consumed tombstones remain in the queue — Confirm success is terminal status, not physical removal.
+      const firstEntry = Array.isArray(queueAfter)
+        ? queueAfter.find((entry) => entry?.id === firstPendingId)
+        : null;
+      const secondEntry = Array.isArray(queueAfter)
+        ? queueAfter.find((entry) => entry?.id === secondPendingId)
+        : null;
+      const firstConsumed =
+        Boolean(firstEntry) &&
+        getPendingActionStatus(firstEntry) === 'consumed' &&
+        isPendingActionExecutable(firstEntry) === false;
       const secondStillPending =
-        !secondPendingId ||
-        secondPendingId === firstPendingId ||
-        queueAfterIds.includes(secondPendingId);
+        Boolean(secondEntry) &&
+        getPendingActionStatus(secondEntry) === 'pending' &&
+        isPendingActionExecutable(secondEntry) === true;
       const isolationOk =
         Boolean(secondPendingId) &&
         secondPendingId !== firstPendingId &&
         queueIds.includes(firstPendingId) &&
         queueIds.includes(secondPendingId) &&
         firstConsumed &&
-        queueAfterIds.includes(secondPendingId);
+        secondStillPending;
 
       const confirmOk =
         confirmResponse.status === 200 &&
@@ -667,7 +679,11 @@ for (const scenario of scenarios) {
           beforeBlocks,
           afterBlocks,
           firstConsumed,
-          secondStillPending: queueAfterIds.includes(secondPendingId),
+          firstStatus: firstEntry ? getPendingActionStatus(firstEntry) : null,
+          firstExecutable: firstEntry ? isPendingActionExecutable(firstEntry) : null,
+          secondStillPending,
+          secondStatus: secondEntry ? getPendingActionStatus(secondEntry) : null,
+          secondExecutable: secondEntry ? isPendingActionExecutable(secondEntry) : null,
           isolationOk,
           queueBeforeCount: queueIds.length,
           queueAfterCount: queueAfterIds.length,

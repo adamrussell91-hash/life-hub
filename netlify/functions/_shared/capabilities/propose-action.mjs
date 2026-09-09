@@ -420,6 +420,68 @@ export function selectAcceptedWrites(writes, accept) {
   };
 }
 
+const START_TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const SCHEDULE_OVERRIDE_KEYS = new Set(['path', 'start_time']);
+
+/**
+ * Apply narrow Schedule Diff overrides onto accepted work_block writes.
+ * Only `start_time` may change. Path must be an accepted write. Unknown keys fail closed.
+ * Does not trust client task_id / title / write path replacement.
+ */
+export function applyScheduleOverrides(writes, overrides) {
+  const list = Array.isArray(writes) ? writes.map((write) => ({ ...write })) : [];
+  if (overrides == null) return { ok: true, writes: list };
+  if (!Array.isArray(overrides)) return { ok: false, error: 'invalid_schedule_overrides' };
+  if (!overrides.length) return { ok: true, writes: list };
+
+  const byPath = new Map(list.map((write) => [write.path, write]));
+  const applied = new Map();
+
+  for (const raw of overrides) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return { ok: false, error: 'invalid_schedule_override' };
+    }
+    for (const key of Object.keys(raw)) {
+      if (!SCHEDULE_OVERRIDE_KEYS.has(key)) {
+        return { ok: false, error: 'schedule_override_unknown_field', detail: key };
+      }
+    }
+    const path = typeof raw.path === 'string' ? raw.path.trim() : '';
+    const startTime = typeof raw.start_time === 'string' ? raw.start_time.trim() : '';
+    if (!path || !byPath.has(path)) {
+      return { ok: false, error: 'schedule_override_unknown_path', detail: path || null };
+    }
+    if (!START_TIME_RE.test(startTime)) {
+      return { ok: false, error: 'schedule_override_invalid_start_time', detail: startTime || null };
+    }
+    const target = classifyWriteTarget(path);
+    if (target.kind !== 'work_block') {
+      return { ok: false, error: 'schedule_override_not_work_block', detail: path };
+    }
+    applied.set(path, startTime);
+  }
+
+  for (const [path, startTime] of applied) {
+    const write = byPath.get(path);
+    let record;
+    try {
+      record = JSON.parse(write.content);
+    } catch {
+      return { ok: false, error: 'schedule_override_invalid_content', detail: path };
+    }
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      return { ok: false, error: 'schedule_override_invalid_content', detail: path };
+    }
+    const next = { ...record, start_time: startTime };
+    write.content = JSON.stringify(next);
+    if (typeof write.diff === 'string' && write.diff.trim()) {
+      write.diff = `schedule ${next.date || ''} ${startTime} · ${next.title || 'block'}`.trim();
+    }
+  }
+
+  return { ok: true, writes: list };
+}
+
 export function decisionFieldsFromAction({
   proposal,
   accepted = [],

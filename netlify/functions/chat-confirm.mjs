@@ -58,6 +58,7 @@ import {
   snapshotBlobBases,
   detectStaleWrites,
   selectAcceptedWrites,
+  applyScheduleOverrides,
   decisionFieldsFromAction,
   getTasksJSON,
   getTeachingJSON
@@ -621,7 +622,21 @@ export function createChatConfirmHandler({
         PRIVATE_CACHE
       );
     }
-    const { accepted, rejected } = selected;
+    const { accepted: acceptedRaw, rejected } = selected;
+
+    // Schedule Diff may send narrow start_time overrides keyed by stored write path.
+    // Server loads the proposal by id and only mutates allowed schedule coordinates.
+    const overridden = applyScheduleOverrides(acceptedRaw, parsed.schedule_overrides);
+    if (!overridden.ok) {
+      return errorResponse(
+        400,
+        overridden.error ?? 'invalid_schedule_overrides',
+        'schedule_overrides must reference accepted work_block writes and may only set start_time.',
+        false,
+        PRIVATE_CACHE
+      );
+    }
+    const accepted = overridden.writes;
 
     const blobStoresResult = await loadBlobStoresForWrites(accepted, {
       env,
@@ -1311,6 +1326,18 @@ async function parseRequest(request) {
     return { error: errorResponse(400, 'invalid_accept', 'accept must be an array of write paths.', false, PRIVATE_CACHE) };
   }
 
+  if (kind === 'action' && 'schedule_overrides' in body && body.schedule_overrides != null && !Array.isArray(body.schedule_overrides)) {
+    return {
+      error: errorResponse(
+        400,
+        'invalid_schedule_overrides',
+        'schedule_overrides must be an array of { path, start_time }.',
+        false,
+        PRIVATE_CACHE
+      )
+    };
+  }
+
   return {
     candidate: body.candidate,
     slug: body.slug,
@@ -1318,6 +1345,8 @@ async function parseRequest(request) {
     kind,
     id,
     accept: kind === 'action' && Array.isArray(body.accept) ? body.accept : null,
+    schedule_overrides:
+      kind === 'action' && Array.isArray(body.schedule_overrides) ? body.schedule_overrides : null,
     ...extras
   };
 }

@@ -6,10 +6,14 @@
 import {
   TIME_GRID_END_HOUR,
   TIME_GRID_HOUR_PX,
+  TIME_GRID_SNAP_MINUTES,
   TIME_GRID_START_HOUR,
   blockStyle,
+  hoursFromOffset,
+  hoursToDueTime,
   layoutTimedBlocks,
   parseTimeHours,
+  snapHours,
   timeGridHours
 } from './time-grid.js';
 
@@ -467,29 +471,49 @@ function renderWeeklyConfirmDecisions(create, pendingChanges, options) {
  */
 export function createScheduleDiffCard(root, options = {}) {
   const create = createEl(root);
-  const blocks = (options.blocks ?? []).map((b, i) => ({
-    id: b.id || `block_${i + 1}`,
-    title: b.title || 'Block',
-    time: b.start_time || b.time || '09:00',
-    durationMin: b.duration_minutes ?? b.durationMin ?? 60,
-    ghost: b.ghost !== false,
-    selected: b.selected !== false,
-    date: b.date || null
-  }));
+  const blocks = (options.blocks ?? []).map((b, i) => {
+    const writePath =
+      (typeof b.write_path === 'string' && b.write_path.trim())
+      || (typeof b.path === 'string' && b.path.trim())
+      || (typeof b.id === 'string' && b.id.includes(':') ? b.id.trim() : '');
+    return {
+      id: writePath || b.id || `block_${i + 1}`,
+      write_path: writePath || b.id || `block_${i + 1}`,
+      title: b.title || 'Block',
+      time: b.start_time || b.time || '09:00',
+      durationMin: b.duration_minutes ?? b.durationMin ?? 60,
+      ghost: b.ghost !== false,
+      selected: b.selected !== false,
+      date: b.date || null,
+      task_id: b.task_id ?? null,
+      invalid: false,
+      invalidReason: null
+    };
+  });
 
   const card = shell(create, {
     cardType: 'schedule-diff',
     eyebrow: options.eyebrow || 'Schedule',
     title: options.title || 'Proposed schedule',
-    hint: options.hint || 'Ghost blocks are preview only until confirmed.',
+    hint: options.hint || 'Ghost blocks are preview only until confirmed. Drag or use Earlier/Later to move.',
     ariaLabel: 'Schedule diff'
   });
 
   const selected = new Set(blocks.filter((b) => b.selected).map((b) => b.id));
+  const hardBusy = normalizeHardBusy(options.hardBusy);
+  const workday = {
+    start: options.workday?.start || '08:00',
+    end: options.workday?.end || '16:30'
+  };
+
+  const status = create('p');
+  status.className = 'prod-card__move-status';
+  status.setAttribute('aria-live', 'polite');
+  status.textContent = '';
 
   const grid = create('div');
   grid.className = 'prod-card__time-grid';
-  grid.setAttribute('role', 'img');
+  grid.setAttribute('role', 'group');
   grid.setAttribute(
     'aria-label',
     `Time grid from ${TIME_GRID_START_HOUR}:00 to ${TIME_GRID_END_HOUR}:00 with ${blocks.length} proposed block${blocks.length === 1 ? '' : 's'}`
@@ -509,6 +533,172 @@ export function createScheduleDiffCard(root, options = {}) {
   lane.className = 'prod-card__time-lane';
   lane.style.height = `${(TIME_GRID_END_HOUR - TIME_GRID_START_HOUR) * TIME_GRID_HOUR_PX}px`;
 
+  const removeRow = create('div');
+  removeRow.className = 'prod-card__block-list';
+
+  let confirmBtn = null;
+  let dragState = null;
+
+  function selectedBlocks() {
+    return blocks.filter((b) => selected.has(b.id) && lane.querySelector(`[data-block-id="${CSS.escape(b.id)}"]`));
+  }
+
+  function scheduleOverridesFor(picks) {
+    return picks.map((b) => ({ path: b.write_path, start_time: b.time }));
+  }
+
+  function validateItem(item) {
+    const start = parseTimeHours(item.time);
+    if (start == null) {
+      item.invalid = true;
+      item.invalidReason = 'Invalid start time';
+      return;
+    }
+    const end = start + item.durationMin / 60;
+    const dayStart = parseTimeHours(workday.start) ?? 8;
+    const dayEnd = parseTimeHours(workday.end) ?? 16.5;
+    if (start < dayStart || end > dayEnd) {
+      item.invalid = true;
+      item.invalidReason = 'Outside workday';
+      return;
+    }
+    const hit = hardBusy.find((busy) => start < busy.end && end > busy.start);
+    if (hit) {
+      item.invalid = true;
+      item.invalidReason = `Collides with ${hit.title}`;
+      return;
+    }
+    item.invalid = false;
+    item.invalidReason = null;
+  }
+
+  function paintItem(item) {
+    validateItem(item);
+    const node = lane.querySelector(`[data-block-id="${CSS.escape(item.id)}"]`);
+    const row = removeRow.querySelector(`[data-block-id="${CSS.escape(item.id)}"]`);
+    if (node) {
+      const laid = layoutTimedBlocks([item])[0];
+      if (laid) Object.assign(node.style, blockStyle(laid));
+      node.classList.toggle('is-selected', selected.has(item.id));
+      node.classList.toggle('is-invalid', Boolean(item.invalid));
+      node.setAttribute('aria-pressed', selected.has(item.id) ? 'true' : 'false');
+      node.setAttribute(
+        'aria-label',
+        `${item.title} at ${item.time} for ${item.durationMin} minutes${item.ghost ? ', ghost proposal' : ''}${item.invalid ? `, invalid: ${item.invalidReason}` : ''}`
+      );
+      node.textContent = `${item.title} · ${item.time}`;
+    }
+    if (row) {
+      const label = row.querySelector('.prod-card__block-label');
+      if (label) {
+        label.textContent = item.invalid
+          ? `${item.title} · ${item.time} — ${item.invalidReason}`
+          : `${item.title} · ${item.time}`;
+      }
+      row.classList.toggle('is-invalid', Boolean(item.invalid));
+    }
+  }
+
+  function refreshConfirmEnabled() {
+    const picks = selectedBlocks();
+    const blocked = picks.some((b) => b.invalid);
+    if (confirmBtn) {
+      confirmBtn.disabled = (!options.pendingId && !options.allowUnbound) || !picks.length || blocked;
+    }
+    const invalid = picks.filter((b) => b.invalid);
+    status.textContent = invalid.length
+      ? invalid.map((b) => `${b.title}: ${b.invalidReason}`).join(' · ')
+      : picks.length
+        ? `Selected ${picks.length} · snap ${TIME_GRID_SNAP_MINUTES}m`
+        : '';
+  }
+
+  function emitChange(reason) {
+    for (const item of blocks) paintItem(item);
+    refreshConfirmEnabled();
+    options.onBlocksChange?.(blocks.map((b) => ({ ...b })), reason);
+    options.onSelectChange?.(selectedBlocks());
+  }
+
+  function moveItem(item, nextTime, reason = 'move') {
+    const hours = parseTimeHours(nextTime);
+    if (hours == null) return;
+    const snapped = hoursToDueTime(snapHours(hours, TIME_GRID_SNAP_MINUTES));
+    if (snapped === item.time) return;
+    item.time = snapped;
+    emitChange(reason);
+    status.textContent = item.invalid
+      ? `${item.title} → ${item.time} (${item.invalidReason})`
+      : `${item.title} → ${item.time}`;
+  }
+
+  function nudgeItem(item, deltaMinutes) {
+    const hours = parseTimeHours(item.time);
+    if (hours == null) return;
+    moveItem(item, hoursToDueTime(hours + deltaMinutes / 60), 'keyboard');
+  }
+
+  function bindGhostNode(item, node) {
+    node.addEventListener('click', (event) => {
+      if (dragState?.moved) return;
+      if (selected.has(item.id)) selected.delete(item.id);
+      else selected.add(item.id);
+      paintItem(item);
+      refreshConfirmEnabled();
+      options.onSelectChange?.(selectedBlocks());
+    });
+
+    node.addEventListener('pointerdown', (event) => {
+      if (event.button != null && event.button !== 0) return;
+      event.preventDefault();
+      node.setPointerCapture?.(event.pointerId);
+      dragState = {
+        id: item.id,
+        startY: event.clientY,
+        originTime: item.time,
+        moved: false
+      };
+      selected.add(item.id);
+      paintItem(item);
+    });
+
+    node.addEventListener('pointermove', (event) => {
+      if (!dragState || dragState.id !== item.id) return;
+      const deltaY = event.clientY - dragState.startY;
+      if (Math.abs(deltaY) > 3) dragState.moved = true;
+      const originHours = parseTimeHours(dragState.originTime);
+      if (originHours == null) return;
+      const next = hoursToDueTime(
+        snapHours(originHours + deltaY / TIME_GRID_HOUR_PX, TIME_GRID_SNAP_MINUTES)
+      );
+      if (next !== item.time) {
+        item.time = next;
+        paintItem(item);
+        refreshConfirmEnabled();
+        options.onBlocksChange?.(blocks.map((b) => ({ ...b })), 'drag');
+      }
+    });
+
+    const endDrag = () => {
+      if (!dragState || dragState.id !== item.id) return;
+      const moved = dragState.moved;
+      dragState = null;
+      if (moved) emitChange('drag');
+    };
+    node.addEventListener('pointerup', endDrag);
+    node.addEventListener('pointercancel', endDrag);
+
+    node.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        nudgeItem(item, -TIME_GRID_SNAP_MINUTES);
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        nudgeItem(item, TIME_GRID_SNAP_MINUTES);
+      }
+    });
+  }
+
   const laid = layoutTimedBlocks(blocks);
   for (const block of laid) {
     const item = block.item;
@@ -516,35 +706,41 @@ export function createScheduleDiffCard(root, options = {}) {
     node.type = 'button';
     node.className = 'prod-card__ghost-block';
     if (item.ghost) node.classList.add('is-ghost');
-    if (selected.has(item.id)) node.classList.add('is-selected');
     node.dataset.blockId = item.id;
     Object.assign(node.style, blockStyle(block));
-    node.textContent = item.title;
-    node.setAttribute(
-      'aria-label',
-      `${item.title} at ${item.time} for ${item.durationMin} minutes${item.ghost ? ', ghost proposal' : ''}`
-    );
-    node.setAttribute('aria-pressed', selected.has(item.id) ? 'true' : 'false');
-    node.addEventListener('click', () => {
-      if (selected.has(item.id)) selected.delete(item.id);
-      else selected.add(item.id);
-      node.classList.toggle('is-selected', selected.has(item.id));
-      node.setAttribute('aria-pressed', selected.has(item.id) ? 'true' : 'false');
-      options.onSelectChange?.(selectedBlocks());
-    });
+    node.textContent = `${item.title} · ${item.time}`;
+    bindGhostNode(item, node);
     lane.append(node);
   }
 
   grid.append(hours, lane);
   card.append(grid);
+  card.append(status);
 
-  const removeRow = create('div');
-  removeRow.className = 'prod-card__block-list';
   for (const item of blocks) {
     const row = create('div');
     row.className = 'prod-card__block-row';
+    row.dataset.blockId = item.id;
     const label = create('span');
+    label.className = 'prod-card__block-label';
     label.textContent = `${item.title} · ${item.time}`;
+    const controls = create('div');
+    controls.className = 'prod-card__block-controls';
+
+    const earlier = create('button');
+    earlier.type = 'button';
+    earlier.className = 'btn btn--ghost';
+    earlier.textContent = 'Earlier';
+    earlier.setAttribute('aria-label', `Move ${item.title} earlier by ${TIME_GRID_SNAP_MINUTES} minutes`);
+    earlier.addEventListener('click', () => nudgeItem(item, -TIME_GRID_SNAP_MINUTES));
+
+    const later = create('button');
+    later.type = 'button';
+    later.className = 'btn btn--ghost';
+    later.textContent = 'Later';
+    later.setAttribute('aria-label', `Move ${item.title} later by ${TIME_GRID_SNAP_MINUTES} minutes`);
+    later.addEventListener('click', () => nudgeItem(item, TIME_GRID_SNAP_MINUTES));
+
     const remove = create('button');
     remove.type = 'button';
     remove.className = 'btn btn--ghost';
@@ -552,18 +748,16 @@ export function createScheduleDiffCard(root, options = {}) {
     remove.addEventListener('click', () => {
       selected.delete(item.id);
       row.remove();
-      lane.querySelector(`[data-block-id="${item.id}"]`)?.remove();
+      lane.querySelector(`[data-block-id="${CSS.escape(item.id)}"]`)?.remove();
       options.onRemove?.(item);
-      options.onSelectChange?.(selectedBlocks());
+      emitChange('remove');
     });
-    row.append(label, remove);
+
+    controls.append(earlier, later, remove);
+    row.append(label, controls);
     removeRow.append(row);
   }
   card.append(removeRow);
-
-  function selectedBlocks() {
-    return blocks.filter((b) => selected.has(b.id) && lane.querySelector(`[data-block-id="${b.id}"]`));
-  }
 
   let previewActive = Boolean(options.previewActive);
 
@@ -603,23 +797,65 @@ export function createScheduleDiffCard(root, options = {}) {
       disabled: !options.pendingId && !options.allowUnbound,
       onClick: (btn, host) => {
         const picks = selectedBlocks();
-        if (!picks.length) return;
+        if (!picks.length || picks.some((b) => b.invalid)) return;
         void runDurableCardAction(card, create, host, {
-          action: () => options.onConfirm?.(picks),
+          action: () => options.onConfirm?.(picks, {
+            schedule_overrides: scheduleOverridesFor(picks)
+          }),
           successText: `Confirmed ${picks.length} block${picks.length === 1 ? '' : 's'}.`,
           controls: card.querySelectorAll('button, input, select')
         });
       }
     }
   ]);
+  confirmBtn = [...actions.querySelectorAll('button')].find((b) => b.textContent === 'Confirm Selected') || null;
   card.append(actions);
   card.append(
     srText(
       create,
-      `${blocks.length} proposed work block${blocks.length === 1 ? '' : 's'}. Preview does not save.`
+      `${blocks.length} proposed work block${blocks.length === 1 ? '' : 's'}. Preview does not save. Use Earlier/Later or arrow keys to move.`
     )
   );
-  return { card, getSelected: selectedBlocks, isPreview: () => previewActive };
+
+  for (const item of blocks) paintItem(item);
+  refreshConfirmEnabled();
+
+  return {
+    card,
+    getSelected: selectedBlocks,
+    getBlocks: () => blocks.map((b) => ({ ...b })),
+    getScheduleOverrides: () => scheduleOverridesFor(selectedBlocks()),
+    isPreview: () => previewActive,
+    moveBlockForTest: (id, startTime) => {
+      const item = blocks.find((b) => b.id === id || b.write_path === id);
+      if (!item) return false;
+      moveItem(item, startTime, 'test');
+      return true;
+    }
+  };
+}
+
+function normalizeHardBusy(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    let start = typeof entry.start === 'number' ? entry.start : null;
+    let end = typeof entry.end === 'number' ? entry.end : null;
+    if (start == null && typeof entry.start_time === 'string') start = parseTimeHours(entry.start_time);
+    if (end == null && typeof entry.end_time === 'string') end = parseTimeHours(entry.end_time);
+    if (start == null && typeof entry.start === 'string') start = parseTimeHours(entry.start);
+    if (end == null && typeof entry.end === 'string') end = parseTimeHours(entry.end);
+    if (start == null) continue;
+    if (end == null && entry.duration_minutes != null) end = start + Number(entry.duration_minutes) / 60;
+    if (end == null) continue;
+    out.push({
+      start,
+      end,
+      title: typeof entry.title === 'string' ? entry.title : 'busy'
+    });
+  }
+  return out;
 }
 
 /** Horizontal Now → Deadline runway segments (DOM/SVG). */

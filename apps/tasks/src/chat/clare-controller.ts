@@ -652,7 +652,11 @@ export function createClareChatController({
   async function confirmPendingAction(
     pendingId: string,
     accept?: unknown,
-    options: { dismiss?: boolean; allowedWritePaths?: ReadonlySet<string> } = {}
+    options: {
+      dismiss?: boolean;
+      allowedWritePaths?: ReadonlySet<string>;
+      schedule_overrides?: Array<{ path: string; start_time: string }> | null;
+    } = {}
   ): Promise<void> {
     const id = typeof pendingId === 'string' ? pendingId.trim() : '';
     if (!id) {
@@ -666,11 +670,22 @@ export function createClareChatController({
         return;
       }
       const paths = resolvePaths(accept);
+      const overrides = Array.isArray(options.schedule_overrides)
+        ? options.schedule_overrides.filter(
+            (row) =>
+              row
+              && typeof row.path === 'string'
+              && row.path.trim()
+              && typeof row.start_time === 'string'
+              && /^\d{2}:\d{2}$/.test(row.start_time.trim())
+          )
+        : [];
       await confirmChat({
         kind: 'action',
         id,
         slug: 'clare',
-        ...(paths.length ? { accept: paths } : {})
+        ...(paths.length ? { accept: paths } : {}),
+        ...(overrides.length ? { schedule_overrides: overrides } : {})
       });
       if (lastPendingActionId === id) lastPendingActionId = null;
     } catch (err) {
@@ -771,13 +786,75 @@ export function createClareChatController({
       if (cardPendingId) setCalendarGhostBlocksForProposal(cardPendingId, ghosts);
     }
 
-    const runBoundConfirm = async (picks?: unknown, dismiss = false): Promise<void> => {
+    const ghostsFromBlocks = (rows: unknown): WorkBlock[] => {
+      if (!Array.isArray(rows)) return [];
+      return rows
+        .filter((block): block is Record<string, unknown> => Boolean(block) && typeof block === 'object')
+        .map((block, index) => {
+          const id =
+            typeof block.write_path === 'string' && block.write_path
+              ? block.write_path
+              : typeof block.id === 'string' && block.id
+                ? block.id
+                : `ghost_${index}`;
+          return {
+            schema_version: 1,
+            id,
+            task_id: typeof block.task_id === 'string' ? block.task_id : null,
+            project_id: typeof block.project_id === 'string' ? block.project_id : null,
+            title: typeof block.title === 'string' ? block.title : 'Planned work',
+            date: typeof block.date === 'string' ? block.date : '',
+            start_time:
+              typeof block.time === 'string'
+                ? block.time
+                : typeof block.start_time === 'string'
+                  ? block.start_time
+                  : '09:00',
+            duration_minutes: Number(block.durationMin ?? block.duration_minutes) || 30,
+            depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
+            status: 'proposed',
+            source: 'clare',
+            locked: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } satisfies WorkBlock;
+        })
+        .filter((block) => Boolean(block.date));
+    };
+
+    const runBoundConfirm = async (
+      picks?: unknown,
+      dismiss = false,
+      meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }
+    ): Promise<void> => {
       if (!cardPendingId) {
         throw new Error('This card has no proposal id. Re-run the protocol.');
       }
+      const overridesFromPicks = Array.isArray(picks)
+        ? picks
+            .map((row) => {
+              if (!row || typeof row !== 'object') return null;
+              const path =
+                typeof (row as { write_path?: string }).write_path === 'string'
+                  ? (row as { write_path: string }).write_path.trim()
+                  : typeof (row as { id?: string }).id === 'string'
+                    ? (row as { id: string }).id.trim()
+                    : '';
+              const start =
+                typeof (row as { time?: string }).time === 'string'
+                  ? (row as { time: string }).time.trim()
+                  : typeof (row as { start_time?: string }).start_time === 'string'
+                    ? (row as { start_time: string }).start_time.trim()
+                    : '';
+              if (!path || !start) return null;
+              return { path, start_time: start };
+            })
+            .filter((row): row is { path: string; start_time: string } => Boolean(row))
+        : [];
       await confirmPendingAction(cardPendingId, picks, {
         dismiss,
-        allowedWritePaths
+        allowedWritePaths,
+        schedule_overrides: meta?.schedule_overrides ?? overridesFromPicks
       });
       if (type === 'schedule-diff') clearCalendarGhostBlocksForProposal(cardPendingId);
     };
@@ -787,11 +864,22 @@ export function createClareChatController({
       pendingId: cardPendingId ?? undefined,
       title,
       hint,
-      onConfirmSelected: (picks: unknown) => runBoundConfirm(picks),
-      onConfirmAll: (picks: unknown) => runBoundConfirm(picks),
-      onConfirm: (picks: unknown) => runBoundConfirm(picks),
+      onConfirmSelected: (picks: unknown, meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }) =>
+        runBoundConfirm(picks, false, meta),
+      onConfirmAll: (picks: unknown, meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }) =>
+        runBoundConfirm(picks, false, meta),
+      onConfirm: (picks: unknown, meta?: { schedule_overrides?: Array<{ path: string; start_time: string }> }) =>
+        runBoundConfirm(picks, false, meta),
       onDiscard: () => runBoundConfirm(undefined, true),
-      onPreview: () => {},
+      onPreview: (active: boolean, rows?: unknown) => {
+        if (type !== 'schedule-diff' || !cardPendingId) return;
+        if (active) setCalendarGhostBlocksForProposal(cardPendingId, ghostsFromBlocks(rows));
+        else clearCalendarGhostBlocksForProposal(cardPendingId);
+      },
+      onBlocksChange: (rows: unknown) => {
+        if (type !== 'schedule-diff' || !cardPendingId) return;
+        setCalendarGhostBlocksForProposal(cardPendingId, ghostsFromBlocks(rows));
+      },
       onClose: (payloadClose: unknown) => runBoundConfirm(payloadClose),
       // Confirm-stage Weekly Review: generate proposal via tool runtime — not a second Confirm path.
       onGenerateProposal:
