@@ -847,8 +847,17 @@ function normalizeHardBusy(raw) {
     if (start == null && typeof entry.start === 'string') start = parseTimeHours(entry.start);
     if (end == null && typeof entry.end === 'string') end = parseTimeHours(entry.end);
     if (start == null) continue;
-    if (end == null && entry.duration_minutes != null) end = start + Number(entry.duration_minutes) / 60;
+    if (end == null && entry.duration_minutes != null) {
+      const duration = Number(entry.duration_minutes);
+      // start may still be minutes-from-midnight here
+      end = start > 24 ? start + duration : start + duration / 60;
+    }
     if (end == null) continue;
+    // Canonical hard-busy uses minutes from midnight (e.g. 660). Card math uses fractional hours.
+    if (start > 24 || end > 24) {
+      start = start / 60;
+      end = end / 60;
+    }
     out.push({
       start,
       end,

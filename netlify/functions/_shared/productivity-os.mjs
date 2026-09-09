@@ -526,6 +526,39 @@ export const FALLBACK_WORKDAY = {
   source: 'fallback'
 };
 
+/**
+ * Resolve effective workday for a calendar date.
+ * Priority:
+ * 1. explicit trusted workday (tool_input / compose metadata)
+ * 2. planning_profile.work_windows for that weekday
+ * 3. FALLBACK_WORKDAY
+ * Confirm must not trust client-supplied workday overrides.
+ */
+export function workdayForDate(date, planningProfile = null, explicitWorkday = null) {
+  if (explicitWorkday?.start && explicitWorkday?.end) {
+    return {
+      start: explicitWorkday.start,
+      end: explicitWorkday.end,
+      source: explicitWorkday.source || 'tool_input'
+    };
+  }
+  if (date && planningProfile && typeof planningProfile === 'object') {
+    const cap = dayCapacity(date, planningProfile);
+    if (cap.work_source === 'profile' && Array.isArray(cap.work_windows) && cap.work_windows.length) {
+      const starts = cap.work_windows.map((w) => minutesOf(w.start)).filter((n) => n != null);
+      const ends = cap.work_windows.map((w) => minutesOf(w.end)).filter((n) => n != null);
+      if (starts.length && ends.length) {
+        return {
+          start: formatMinutes(Math.min(...starts)),
+          end: formatMinutes(Math.max(...ends)),
+          source: 'planning_profile'
+        };
+      }
+    }
+  }
+  return { ...FALLBACK_WORKDAY };
+}
+
 function placeTaskBlocks(task, {
   date,
   bounds,
@@ -596,24 +629,27 @@ function placeTaskBlocks(task, {
 }
 
 export function composeDaySchedule(input) {
-  const workday = input.workday?.start && input.workday?.end
-    ? {
-        start: input.workday.start,
-        end: input.workday.end,
-        source: input.workday.source || 'profile'
-      }
-    : { ...FALLBACK_WORKDAY };
+  const profile = input.planning_profile ?? input.profile ?? null;
+  const workday = workdayForDate(
+    input.date,
+    profile,
+    input.workday?.start && input.workday?.end ? input.workday : null
+  );
 
   const bounds = {
     start: minutesOf(workday.start) ?? 8 * 60,
     end: minutesOf(workday.end) ?? 16 * 60 + 30
   };
 
+  const protectedSpans = Array.isArray(input.protected_windows) && input.protected_windows.length
+    ? input.protected_windows
+    : protectedSpansForDate(input.date, profile);
+
   const hardBusy = [
     ...(input.lessons ?? []),
     ...(input.events ?? []),
     ...(input.confirmed_blocks ?? []),
-    ...(input.protected_windows ?? [])
+    ...protectedSpans
   ];
 
   const collisions = [];
@@ -631,7 +667,6 @@ export function composeDaySchedule(input) {
   const unscheduled = [];
   const plannedSpans = [];
   const doneIds = new Set();
-  const profile = input.planning_profile ?? input.profile ?? null;
 
   const sorted = [...input.tasks].sort((a, b) => {
     const depthScore = (d) => (d === 'deep' ? 0 : d === 'shallow' ? 1 : 2);

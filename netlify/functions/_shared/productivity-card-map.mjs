@@ -56,7 +56,13 @@ function shapePayload(toolName, cardType, result, pendingId) {
   if (toolName === 'compose_schedule' || (toolName === 'plan_work' && result?.proposed)) {
     return {
       ...base,
-      blocks: result.proposed ?? result.blocks ?? []
+      blocks: result.proposed ?? result.blocks ?? [],
+      hardBusy: Array.isArray(result.hardBusy)
+        ? result.hardBusy
+        : Array.isArray(result.hard_busy)
+          ? result.hard_busy
+          : [],
+      workday: result.workday && typeof result.workday === 'object' ? result.workday : null
     };
   }
   if (toolName === 'focus_block' && result?.state) {

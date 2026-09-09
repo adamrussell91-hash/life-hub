@@ -28,7 +28,8 @@ import {
   matchActionsNow,
   composeDaySchedule,
   validateProposedBlocks,
-  FALLBACK_WORKDAY,
+  workdayForDate,
+  buildAuthoritativeHardBusy,
   computeDeadlineRunway,
   createFocusBlock,
   startFocusBlock,
@@ -2078,43 +2079,45 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     }));
   }
   if (name === 'compose_schedule') {
-    if (Array.isArray(input.validate_proposed) && input.validate_proposed.length) {
-      const hardBusy = [
-        ...(Array.isArray(input.protected_windows) ? input.protected_windows : []),
-        ...(Array.isArray(input.confirmed_blocks) ? input.confirmed_blocks : []),
-        ...(lessons ?? [])
-          .filter(lesson => {
-            const key = dayKey(input.date, now);
-            return String(lessonDate(lesson) ?? '') === key;
-          })
-          .map(lessonToBusySpan)
-          .filter(Boolean)
-      ];
-      const workday = input.workday_start && input.workday_end
-        ? { start: input.workday_start, end: input.workday_end, source: 'tool_input' }
-        : FALLBACK_WORKDAY;
-      return ok(validateProposedBlocks(input.validate_proposed, hardBusy, workday));
-    }
+    const dateKey = dayKey(input.date, now);
+    const explicitWorkday = input.workday_start && input.workday_end
+      ? { start: input.workday_start, end: input.workday_end, source: 'tool_input' }
+      : null;
+    const effectiveWorkday = workdayForDate(dateKey, planningProfile, explicitWorkday);
     const authoritativeBlocks = Array.isArray(input.confirmed_blocks)
       ? input.confirmed_blocks
       : workBlocks.filter(b => b.status === 'confirmed' || b.status === 'in_progress');
+    const hardBusy = buildAuthoritativeHardBusy({
+      date: dateKey,
+      lessons: lessons ?? [],
+      workBlocks: authoritativeBlocks,
+      planningProfile
+    });
+
+    if (Array.isArray(input.validate_proposed) && input.validate_proposed.length) {
+      return ok(validateProposedBlocks(input.validate_proposed, hardBusy, effectiveWorkday));
+    }
     const composed = planWork('compose', {
       tasks,
       lessons,
       date: input.date,
       now,
       energy: input.energy_level ? { level: input.energy_level } : null,
-      workday: input.workday_start && input.workday_end
-        ? { start: input.workday_start, end: input.workday_end, source: 'tool_input' }
-        : null,
-      protected_windows: input.protected_windows,
+      workday: effectiveWorkday,
+      protected_windows: hardBusy.filter((span) => span.kind === 'protected'),
       confirmed_blocks: authoritativeBlocks,
       task_ids: input.task_ids,
       planning_profile: planningProfile
     });
     const rawProposed = Array.isArray(composed?.proposed) ? composed.proposed : [];
     const selected = rawProposed.filter(block => block && block.selected !== false);
-    if (!selected.length) return composed;
+    if (!selected.length) {
+      return {
+        ...composed,
+        hardBusy,
+        workday: composed?.workday ?? effectiveWorkday
+      };
+    }
 
     const stamp = now.toISOString();
     const writes = [];
@@ -2127,7 +2130,7 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
         task_id: block.task_id ?? null,
         project_id: block.project_id ?? null,
         title: block.title || 'Planned work',
-        date: block.date || dayKey(input.date, now),
+        date: block.date || dateKey,
         start_time: block.start_time || block.start || '09:00',
         duration_minutes: Number(block.duration_minutes) || 30,
         depth: block.depth === 'deep' ? 'deep' : block.depth === 'admin' ? 'admin' : 'shallow',
@@ -2164,7 +2167,7 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
     await saveWorkflowState(tasksStore, 'schedule_diff:current', {
       id: 'schedule_diff:current',
       kind: 'schedule_diff',
-      date: dayKey(input.date, now),
+      date: dateKey,
       proposed,
       writes: writes.map(w => ({ path: w.path, diff: w.diff })),
       status: 'awaiting_confirm',
@@ -2175,6 +2178,8 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       ...proposal,
       ...composed,
       proposed,
+      hardBusy,
+      workday: composed?.workday ?? effectiveWorkday,
       note: 'Ghost blocks only until Confirm. Deadlines unchanged.'
     };
   }

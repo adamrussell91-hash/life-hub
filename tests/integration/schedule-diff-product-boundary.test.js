@@ -1,16 +1,21 @@
 /**
- * Schedule Diff product boundary (SD1–SD11).
+ * Schedule Diff product boundary (SD1–SD20).
  *
  * Evidence levels — do not upgrade by renaming:
  * LEVEL 1 = override helper / hard-busy domain
- * LEVEL 2 = Schedule Diff card move preview (no durable write)
- * LEVEL 4 = pending id → createChatConfirmHandler → work_block persistence / fail-closed
- * LEVEL 5 = live smoke (clare-live-pending-confirm) — not this file
+ * LEVEL 2 = Schedule Diff card move preview / payload→card wiring (no durable write)
+ * LEVEL 3 = compose_schedule / planning profile domain
+ * LEVEL 4 = createChatHandler or createChatConfirmHandler → queue / SSE / persistence / fail-closed
+ * LEVEL 5 = live smoke — not this file
+ *
+ * SD1 (legacy): compose + manual queue insert — LEVEL 2/3 seam only, not chat→queue→SSE.
+ * SD19: real createChatHandler → pending queue → SSE identity — LEVEL 4.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { JSDOM } from 'jsdom';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
+import { createChatHandler } from '../../netlify/functions/chat.mjs';
 import { createChatConfirmHandler } from '../../netlify/functions/chat-confirm.mjs';
 import {
   PENDING_ACTIONS_PATH,
@@ -27,7 +32,8 @@ import { buildProductivityCardEvent } from '../../netlify/functions/_shared/prod
 import {
   FALLBACK_WORKDAY,
   buildAuthoritativeHardBusy,
-  detectStaleScheduleCollisions
+  detectStaleScheduleCollisions,
+  workdayForDate
 } from '../../netlify/functions/_shared/productivity-os.mjs';
 import { createScheduleDiffCard } from '../../packages/design-kit/js/agent-productivity-cards.js';
 
@@ -259,7 +265,111 @@ describe('LEVEL 1 schedule override + hard busy', () => {
   });
 });
 
-describe('SD1 compose proposal identity (LEVEL 4 seam)', () => {
+function chatRequest(body) {
+  return new Request('https://life.example/api/chat', {
+    method: 'POST',
+    headers: {
+      cookie: `life_hub_session=${session}`,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+}
+
+async function readSse(response) {
+  const text = await response.text();
+  return text
+    .trim()
+    .split('\n\n')
+    .filter(Boolean)
+    .map((frame) => JSON.parse(frame.replace(/^data: /, '')));
+}
+
+function planningProfile(overrides = {}) {
+  return {
+    work_windows: {
+      mon: [],
+      tue: [{ start: '08:00', end: '16:30' }],
+      wed: [],
+      thu: [],
+      fri: [],
+      sat: [],
+      sun: [],
+      ...(overrides.work_windows || {})
+    },
+    protected_windows: {
+      mon: [],
+      tue: [],
+      wed: [],
+      thu: [],
+      fri: [],
+      sat: [],
+      sun: [],
+      ...(overrides.protected_windows || {})
+    }
+  };
+}
+
+function minutesOfTime(hhmm) {
+  const [h, m] = String(hhmm).split(':').map(Number);
+  return h * 60 + m;
+}
+
+function failingListStore(base) {
+  return {
+    data: base.data,
+    async get(key, ...rest) {
+      return base.get(key, ...rest);
+    },
+    async setJSON(key, value) {
+      return base.setJSON(key, value);
+    },
+    async set(key, value) {
+      return base.set(key, value);
+    },
+    async list() {
+      throw new Error('authoritative_schedule_read_failed');
+    }
+  };
+}
+
+async function composeFixture({
+  lessons = [],
+  planning_profile = planningProfile(),
+  task = {
+    id: 'task_a',
+    title: 'Mark Year 10',
+    status: 'open',
+    estimated_duration: 60,
+    depth: 'shallow'
+  },
+  workBlocks = [],
+  input = { date: DAY, task_ids: ['task_a'] }
+} = {}) {
+  const saved = new Map();
+  const result = await executeClareWork('compose_schedule', input, {
+    now: new Date(`${DAY}T08:00:00Z`),
+    tasks: [task],
+    projects: [],
+    lessons,
+    workBlocks,
+    planning_profile,
+    tasksStore: {
+      async get(key) {
+        return saved.has(key) ? saved.get(key) : null;
+      },
+      async setJSON(key, value) {
+        saved.set(key, value);
+      },
+      async set(key, value) {
+        saved.set(key, typeof value === 'string' ? JSON.parse(value) : value);
+      }
+    }
+  });
+  return { result, saved };
+}
+
+describe('SD1 compose proposal identity (LEVEL 2/3 — not chat→queue→SSE)', () => {
   it('compose_schedule emits work_block writes mapped on schedule-diff card', async () => {
     const saved = new Map();
     const result = await executeClareWork(
@@ -623,5 +733,361 @@ describe('LEVEL 4 Schedule Diff confirm (SD3–SD11)', () => {
     );
     assert.ok(replay.status === 409 || replay.status === 400 || replay.status === 404);
     assert.equal(tasks.data['work_blocks/a']?.start_time, '10:00');
+  });
+});
+
+describe('SD13 authoritative schedule read failure fails closed (LEVEL 4)', () => {
+  it('Teaching/Tasks schedule read throw → 503 schedule_validation_unavailable; retry succeeds', async () => {
+    const github = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([pendingEntry('act_sd13', [workBlockWrite('a')])])
+    });
+    const tasks = memoryStore({
+      'meta/planning_profile': planningProfile()
+    });
+    const teachingOk = memoryStore({
+      'scheduled_lessons/lesson_y10': {
+        id: 'lesson_y10',
+        title: 'Year 10 English',
+        date: DAY,
+        start_time: '11:00',
+        duration_minutes: 60
+      }
+    });
+    const teachingFail = failingListStore(teachingOk);
+    const confirmFail = confirmHandler({ github, tasks, teaching: teachingFail });
+    const blocked = await confirmFail(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd13',
+        accept: ['tasks:work_block:a'],
+        schedule_overrides: [{ path: 'tasks:work_block:a', start_time: '13:00' }]
+      })
+    );
+    const blockedBody = await blocked.json();
+    assert.equal(blocked.status, 503);
+    assert.equal(blockedBody.error?.code, 'schedule_validation_unavailable');
+    assert.equal(blockedBody.error?.retryable, true);
+    assert.equal(tasks.data['work_blocks/a'], undefined);
+    const pendingAfter = findPendingActionById(
+      parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+      'act_sd13'
+    );
+    assert.equal(getPendingActionStatus(pendingAfter), 'pending');
+    assert.equal(isPendingActionExecutable(pendingAfter), true);
+
+    const confirmOk = confirmHandler({ github, tasks, teaching: teachingOk });
+    const ok = await confirmOk(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd13',
+        accept: ['tasks:work_block:a'],
+        schedule_overrides: [{ path: 'tasks:work_block:a', start_time: '13:00' }]
+      })
+    );
+    assert.equal(ok.status, 200, await ok.clone().text());
+    assert.equal(tasks.data['work_blocks/a']?.start_time, '13:00');
+  });
+});
+
+describe('SD14/SD15 real card receives authoritative hard-busy from compose payload (LEVEL 2)', () => {
+  it('SD14 Year 10 English hard busy via compose→card payload (not injected)', async () => {
+    withDom();
+    const confirms = [];
+    const { result } = await composeFixture({
+      lessons: [{
+        id: 'lesson_y10',
+        title: 'Year 10 English',
+        date: DAY,
+        start_time: '11:00',
+        duration_minutes: 60
+      }],
+      planning_profile: planningProfile({
+        work_windows: { tue: [{ start: '08:00', end: '16:30' }] }
+      })
+    });
+    assert.equal(result.kind, 'propose');
+    assert.ok(Array.isArray(result.hardBusy));
+    assert.ok(result.hardBusy.some((span) => /Year 10 English/i.test(span.title)));
+
+    const cardEvent = buildProductivityCardEvent('compose_schedule', result, { pendingId: 'act_sd14' });
+    assert.equal(cardEvent?.card_type, 'schedule-diff');
+    assert.ok(Array.isArray(cardEvent.payload.hardBusy));
+    assert.ok(cardEvent.payload.hardBusy.some((span) => /Year 10 English/i.test(span.title)));
+
+    const built = createScheduleDiffCard(document, {
+      pendingId: cardEvent.payload.pendingId,
+      blocks: cardEvent.payload.blocks,
+      hardBusy: cardEvent.payload.hardBusy,
+      workday: cardEvent.payload.workday,
+      onConfirm: () => confirms.push('confirm')
+    });
+    document.body.append(built.card);
+    const path = built.getBlocks()[0].id;
+    assert.equal(built.moveBlockForTest(path, '11:15'), true);
+    const invalid = built.getBlocks()[0];
+    assert.equal(invalid.invalid, true);
+    assert.match(String(invalid.invalidReason || ''), /Year 10 English/i);
+    const confirmBtn = [...built.card.querySelectorAll('button')].find(
+      (btn) => btn.textContent === 'Confirm Selected'
+    );
+    assert.equal(confirmBtn?.disabled, true);
+    assert.deepEqual(confirms, []);
+
+    assert.equal(built.moveBlockForTest(path, '13:00'), true);
+    assert.equal(built.getBlocks()[0].invalid, false);
+    assert.equal(confirmBtn?.disabled, false);
+  });
+
+  it('SD15 protected Pickup via compose→card payload (not injected)', async () => {
+    withDom();
+    const { result } = await composeFixture({
+      planning_profile: planningProfile({
+        work_windows: { tue: [{ start: '08:00', end: '16:30' }] },
+        protected_windows: {
+          tue: [{ start: '15:00', end: '16:30', label: 'Pickup' }]
+        }
+      }),
+      task: {
+        id: 'task_a',
+        title: 'Admin batch',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'admin'
+      }
+    });
+    assert.equal(result.kind, 'propose');
+    assert.ok(result.hardBusy.some((span) => /Pickup/i.test(span.title)));
+
+    const cardEvent = buildProductivityCardEvent('compose_schedule', result, { pendingId: 'act_sd15' });
+    const built = createScheduleDiffCard(document, {
+      pendingId: cardEvent.payload.pendingId,
+      blocks: cardEvent.payload.blocks,
+      hardBusy: cardEvent.payload.hardBusy,
+      workday: cardEvent.payload.workday
+    });
+    document.body.append(built.card);
+    const path = built.getBlocks()[0].id;
+    assert.equal(built.moveBlockForTest(path, '15:00'), true);
+    const invalid = built.getBlocks()[0];
+    assert.equal(invalid.invalid, true);
+    assert.match(String(invalid.invalidReason || ''), /Pickup/i);
+  });
+});
+
+describe('SD16–SD18 planning profile workday (LEVEL 3/4)', () => {
+  it('SD16 compose uses stored Tuesday work window 09:30–15:30', async () => {
+    const profile = planningProfile({
+      work_windows: { tue: [{ start: '09:30', end: '15:30' }] }
+    });
+    const { result } = await composeFixture({
+      planning_profile: profile,
+      input: { date: DAY, task_ids: ['task_a'] }
+    });
+    assert.equal(result.kind, 'propose');
+    const resolved = workdayForDate(DAY, profile);
+    assert.equal(resolved.start, '09:30');
+    assert.equal(resolved.end, '15:30');
+    assert.equal(resolved.source, 'planning_profile');
+    assert.equal(result.workday?.start, '09:30');
+    assert.equal(result.workday?.end, '15:30');
+    assert.equal(result.workday?.source, 'planning_profile');
+    for (const block of result.proposed || []) {
+      const start = minutesOfTime(block.start_time);
+      const end = start + (Number(block.duration_minutes) || 0);
+      assert.ok(start >= minutesOfTime('09:30'), `start ${block.start_time}`);
+      assert.ok(end <= minutesOfTime('15:30'), `end beyond workday for ${block.start_time}`);
+    }
+  });
+
+  it('SD17 Confirm enforces current profile workday (08:15 rejected, in-window ok)', async () => {
+    const github = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([pendingEntry('act_sd17', [workBlockWrite('a')])])
+    });
+    const tasks = memoryStore({
+      'meta/planning_profile': planningProfile({
+        work_windows: { tue: [{ start: '09:30', end: '15:30' }] }
+      })
+    });
+    const teaching = memoryStore();
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const early = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd17',
+        accept: ['tasks:work_block:a'],
+        schedule_overrides: [{ path: 'tasks:work_block:a', start_time: '08:15' }]
+      })
+    );
+    const earlyBody = await early.json();
+    assert.equal(early.status, 409);
+    assert.equal(earlyBody.error, 'stale_schedule_collision');
+    assert.equal(tasks.data['work_blocks/a'], undefined);
+    const pending = findPendingActionById(
+      parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+      'act_sd17'
+    );
+    assert.equal(isPendingActionExecutable(pending), true);
+
+    const ok = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd17',
+        accept: ['tasks:work_block:a'],
+        schedule_overrides: [{ path: 'tasks:work_block:a', start_time: '10:00' }]
+      })
+    );
+    assert.equal(ok.status, 200, await ok.clone().text());
+    assert.equal(tasks.data['work_blocks/a']?.start_time, '10:00');
+  });
+
+  it('SD18 profile change after proposal invalidates Confirm at 09:00', async () => {
+    const github = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([
+        pendingEntry('act_sd18', [workBlockWrite('a', { start_time: '09:00' })])
+      ])
+    });
+    const tasks = memoryStore({
+      'meta/planning_profile': planningProfile({
+        work_windows: { tue: [{ start: '08:00', end: '16:30' }] }
+      })
+    });
+    const teaching = memoryStore();
+    // Proposal-time window would have allowed 09:00; Confirm-time profile does not.
+    tasks.data['meta/planning_profile'] = planningProfile({
+      work_windows: { tue: [{ start: '10:00', end: '15:00' }] }
+    });
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const response = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd18',
+        accept: ['tasks:work_block:a'],
+        schedule_overrides: [{ path: 'tasks:work_block:a', start_time: '09:00' }]
+      })
+    );
+    const body = await response.json();
+    assert.equal(response.status, 409);
+    assert.equal(body.error, 'stale_schedule_collision');
+    assert.equal(tasks.data['work_blocks/a'], undefined);
+    assert.equal(
+      isPendingActionExecutable(
+        findPendingActionById(
+          parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+          'act_sd18'
+        )
+      ),
+      true
+    );
+  });
+});
+
+describe('SD19 real chat → queue → SSE Schedule Diff identity (LEVEL 4)', () => {
+  it('createChatHandler compose_schedule persists pending and matches card id', async () => {
+    const github = statefulGithub({});
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 60,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile({
+        work_windows: { tue: [{ start: '08:00', end: '16:30' }] }
+      })
+    });
+    const teaching = memoryStore();
+    const chat = createChatHandler({
+      env: validEnv,
+      now: () => NOW_MS,
+      fetchImpl: github.fetchImpl,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching,
+      createAnthropicClient: () => ({
+        async *streamMessage(args) {
+          await args.executeTools({
+            id: 'call_sd19_compose',
+            name: 'compose_schedule',
+            input: { date: DAY, task_ids: ['task_a'] }
+          });
+          yield { type: 'done' };
+        }
+      })
+    });
+    const events = await readSse(
+      await chat(
+        chatRequest({
+          message: 'Compose Tuesday schedule for Mark Year 10 using compose_schedule.',
+          priorAgentSlug: 'clare',
+          agentKernel: true
+        })
+      )
+    );
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    const cardEvent = events.find(
+      (event) => event.type === 'productivity_card' && event.card_type === 'schedule-diff'
+    );
+    assert.ok(proposalEvent, 'missing action_proposal SSE');
+    assert.ok(typeof proposalEvent.id === 'string' && proposalEvent.id.trim(), 'empty pending id');
+    assert.ok(cardEvent, 'missing schedule-diff card');
+    assert.equal(cardEvent.payload?.pendingId, proposalEvent.id);
+
+    const queueRaw = github.blobs.get(PENDING_ACTIONS_PATH)?.content;
+    assert.ok(queueRaw, 'PENDING_ACTIONS_PATH missing');
+    const entry = findPendingActionById(parsePendingActions(queueRaw), proposalEvent.id);
+    assert.ok(entry, 'pending id not in queue');
+    assert.equal(isPendingActionExecutable(entry), true);
+    const writes = entry.proposal?.writes || [];
+    assert.ok(writes.length >= 1);
+    const blocks = cardEvent.payload.blocks || [];
+    assert.ok(blocks.length >= 1);
+    for (const block of blocks) {
+      const path = block.write_path || block.id;
+      assert.ok(writes.some((write) => write.path === path), `ghost ${path} missing from proposal writes`);
+    }
+  });
+});
+
+describe('SD20 ghost cleanup after Confirm/Discard (LEVEL 4 controller seam)', () => {
+  it('Confirm persists work block; Discard writes nothing (ghost overlay cleared by controller)', async () => {
+    // Controller clears via clearCalendarGhostBlocksForProposal after Confirm/Discard
+    // (apps/tasks confirm-proposal-binding SD20). Here prove the durable side.
+    const githubConfirm = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([pendingEntry('act_sd20_c', [workBlockWrite('c')])])
+    });
+    const tasksConfirm = memoryStore({ 'meta/planning_profile': planningProfile() });
+    const teaching = memoryStore();
+    const confirm = confirmHandler({ github: githubConfirm, tasks: tasksConfirm, teaching });
+    const ok = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd20_c',
+        accept: ['tasks:work_block:c'],
+        schedule_overrides: [{ path: 'tasks:work_block:c', start_time: '10:00' }]
+      })
+    );
+    assert.equal(ok.status, 200, await ok.clone().text());
+    assert.equal(tasksConfirm.data['work_blocks/c']?.start_time, '10:00');
+
+    const githubDiscard = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([pendingEntry('act_sd20_d', [workBlockWrite('d')])])
+    });
+    const tasksDiscard = memoryStore({ 'meta/planning_profile': planningProfile() });
+    const discard = confirmHandler({ github: githubDiscard, tasks: tasksDiscard, teaching });
+    const gone = await discard(
+      confirmRequest({
+        kind: 'action_dismiss',
+        slug: 'clare',
+        id: 'act_sd20_d'
+      })
+    );
+    assert.equal(gone.status, 200);
+    assert.equal(tasksDiscard.data['work_blocks/d'], undefined);
   });
 });

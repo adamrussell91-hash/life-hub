@@ -80,7 +80,7 @@ import {
 import {
   buildAuthoritativeHardBusy,
   detectStaleScheduleCollisions,
-  FALLBACK_WORKDAY
+  workdayForDate
 } from './_shared/productivity-os.mjs';
 import {
   markWeeklyReviewComplete,
@@ -649,6 +649,15 @@ export function createChatConfirmHandler({
     const blobStores = blobStoresResult.stores;
 
     const scheduleCollision = await checkStaleWorkBlockCollisions(accepted, blobStores);
+    if (scheduleCollision?.unavailable) {
+      return errorResponse(
+        503,
+        'schedule_validation_unavailable',
+        'Authoritative schedule data could not be loaded. Confirm was not run.',
+        true,
+        PRIVATE_CACHE
+      );
+    }
     if (scheduleCollision && !scheduleCollision.ok) {
       return jsonResponse(409, {
         ok: false,
@@ -1419,21 +1428,28 @@ async function checkStaleWorkBlockCollisions(writes, blobStores) {
       profile = await getTasksMetaJSON(tasksStore, 'meta/planning_profile');
     }
   } catch {
-    return { ok: true };
+    // Fail closed: unavailable schedule truth must never look like "no conflict".
+    return {
+      ok: false,
+      unavailable: true,
+      error: 'schedule_validation_unavailable'
+    };
   }
 
+  const planningProfile = profile && typeof profile === 'object' ? profile : null;
   for (const date of dates) {
     const dayProposed = proposed.filter((b) => b.date === date);
     const hardBusy = buildAuthoritativeHardBusy({
       date,
       lessons,
       workBlocks,
-      planningProfile: profile && typeof profile === 'object' ? profile : null
+      planningProfile
     });
+    const workday = workdayForDate(date, planningProfile);
     const check = detectStaleScheduleCollisions({
       proposedBlocks: dayProposed,
       hardBusy,
-      workday: FALLBACK_WORKDAY
+      workday
     });
     if (!check.ok) return check;
   }

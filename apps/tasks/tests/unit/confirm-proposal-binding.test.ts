@@ -459,6 +459,53 @@ describe('Confirm proposal identity binding', () => {
     expect(getCalendarGhostBlocksForProposal('pending_ok')).toEqual([]);
   });
 
+  it('SD20 Confirm: successful Confirm clears proposal ghosts after durable ok', async () => {
+    confirmChat.mockResolvedValueOnce({ ok: true });
+    streamChat.mockImplementation(() =>
+      streamWithCards([
+        {
+          card_type: 'schedule-diff',
+          payload: {
+            pendingId: 'pending_sd20_confirm',
+            blocks: [block('tasks:work_block:sd20c', 'Mark essays SD20')]
+          }
+        }
+      ])
+    );
+    const root = buildChatView();
+    document.body.replaceChildren(root);
+    const controller = createClareChatController({ root, isVisible: () => true });
+    await controller.start();
+    controller.pickProtocol('plan-day');
+    await controller.send('Plan');
+    await vi.waitFor(() => expect(cardNodes(root).length).toBe(1));
+    expect(getCalendarGhostBlocksForProposal('pending_sd20_confirm').length).toBe(1);
+    clickLabel(cardNodes(root)[0], 'Confirm Selected');
+    await vi.waitFor(() => expect(cardNodes(root)[0].dataset.state).toBe('confirmed'));
+    expect(getCalendarGhostBlocksForProposal('pending_sd20_confirm')).toEqual([]);
+  });
+
+  it('SD20 Discard: successful Discard clears only that proposal ghosts and never writes', async () => {
+    streamChat.mockImplementation(() => streamWithCards(scheduleCards('pending_sd20_a', 'pending_sd20_b')));
+    const root = buildChatView();
+    document.body.replaceChildren(root);
+    const controller = createClareChatController({ root, isVisible: () => true });
+    await controller.start();
+    controller.pickProtocol('plan-day');
+    await controller.send('Plan');
+    await vi.waitFor(() => expect(cardNodes(root).length).toBe(2));
+    const [cardA] = cardNodes(root);
+    expect(getCalendarGhostBlocksForProposal('pending_sd20_a').length).toBeGreaterThan(0);
+    clickLabel(cardA, 'Discard');
+    await vi.waitFor(() => expect(cardA.dataset.state).toBe('discarded'));
+    expect(confirmChat).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'action_dismiss', id: 'pending_sd20_a' })
+    );
+    expect(confirmChat.mock.calls.every((call) => call[0].kind !== 'action')).toBe(true);
+    expect(getCalendarGhostBlocksForProposal('pending_sd20_a')).toEqual([]);
+    expect(getCalendarGhostBlocksForProposal('pending_sd20_b').length).toBeGreaterThan(0);
+  });
+
   it('I: successful Discard clears only that proposal ghosts and never writes', async () => {
     streamChat.mockImplementation(() => streamWithCards(scheduleCards('pending_a', 'pending_b')));
     const root = buildChatView();
