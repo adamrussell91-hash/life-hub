@@ -530,8 +530,8 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     selectedItemId = null;
     composeDraft = { dateKey: selectedDateKey, dueTime: dueTime ?? null };
     if (focusCompose) focusComposeOnPaint = true;
-    // Week has no standing Add / day agenda — open Day when the user wants to compose.
-    if (focusCompose && session.mode === 'week') {
+    // Week/month have no standing Add / day agenda — open Day when the user wants to compose.
+    if (focusCompose && (session.mode === 'week' || session.mode === 'month')) {
       switchMode('day', day);
       return;
     }
@@ -786,7 +786,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       );
     }
     const rail = el('div', 'hub-calendar__rail');
-    // Week rail is locks / dump / links — not a second day desk (Add + Open day/month).
+    // Week/month rails are not a second day desk (no Add + Open day/week/month agenda).
     let agenda: HTMLElement | null = null;
     if (session.mode === 'week') {
       rail.append(preview, renderShortcutHint());
@@ -797,6 +797,8 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       );
       rail.append(renderDumpWidget(onCreated));
       rail.append(renderQuickLinksWidget(tasks));
+    } else if (session.mode === 'month') {
+      rail.append(preview, renderShortcutHint());
     } else {
       agenda = renderAgenda(
         items,
@@ -844,7 +846,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   bindCalendarKeys(canvas, keys.signal, {
     onAdd: () => {
       focusComposeOnPaint = true;
-      if (session.mode === 'week') {
+      if (session.mode === 'week' || session.mode === 'month') {
         switchMode('day', selectedDateKey ? parseCalendarAnchor(selectedDateKey) : anchor);
         return;
       }

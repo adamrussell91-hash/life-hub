@@ -164,6 +164,32 @@ describe('calendar views', () => {
     expect(canvas.querySelector('[data-kind="milestone"]')?.textContent).toContain('Term brief locked');
     expect(canvas.querySelector('.hub-calendar__month-label')?.textContent).toMatch(/August 2026/);
     expect(canvas.querySelector('[data-date="2026-08-17"][data-kind="task"]')).not.toBeNull();
+    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose')).toBeNull();
+    expect(
+      [...canvas.querySelectorAll('button')].some((btn) => btn.textContent === 'Open day')
+    ).toBe(false);
+    expect(
+      [...canvas.querySelectorAll('button')].some((btn) => btn.textContent === 'Open week')
+    ).toBe(false);
+  });
+
+  it('opens day compose when a month day is double-clicked', async () => {
+    location.hash = '#/month?date=2026-08-17';
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderMonthView(canvas);
+
+    const cell = canvas.querySelector<HTMLElement>('.hub-calendar__day[data-date="2026-08-19"]')!;
+    cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+    expect(canvas.querySelector('.hub-calendar__timegrid')?.getAttribute('data-days')).toBe('1');
+    expect(canvas.querySelector('.calendar-compose [aria-label="New task title"]')).not.toBeNull();
+    expect(location.hash).toContain('layout=day');
+    expect(document.activeElement).toBe(
+      canvas.querySelector('[aria-label="New task title"]')
+    );
+    canvas.remove();
   });
 
   it('hides calendar filters behind an icon until it is opened', async () => {
