@@ -40,6 +40,7 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
     Messenger contact identity (`.chat-view__who` + bubble `--tail` avatars) lives in `hub-interactions.css`. Same chrome in every hub chat window — do not invent a parallel who-header.
     Chat keyboard / composer floor: `hub-chat-viewport.css` + `js/visual-viewport.js`. Call `attachVisualViewportInset()` once per hub. Composer stays on the canvas floor (`margin-top: auto`); phone typing hides `.hub-mobile-nav` and shells pin to `--vv-height`. Do not invent a second inset helper per hub.
 20. `js/hub-ai-bar.js` — contextual AI bar + agent select. `createContextualAiBar`, `createSelectAiAgent`.
+    Thread chat composers (`.hub-ai-bar--thread`): full-width text field; Attach/Send live on the row under the field — never beside/inside the text box. Do not restyle hubs back to a side-by-side composer.
 21. `js/hub-inline-edit.js` / `js/hub-create-disclosure.js` / `js/hub-capture.js` — stay-in-place edit, chips/tags, create-pill grid, voice + paste.
 22. `js/hub-command-search.js` — shared command palette. Teaching keeps `.search-palette` markup; call `enhanceSearchPalette` on that panel. Other hubs use `openHubCommandSearch`.
 23. `js/hub-surfaces.js` — pin list, labeled progress, step indicator, run widget, schedule/slots/reminders, task/activities/collection disclosure, scroll island, progressive input stack, journal nav, save toggle, status picker.
