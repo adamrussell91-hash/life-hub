@@ -30,12 +30,12 @@ function tagRow(tags: string[]): HTMLElement {
 
 function renderMilestones(project: Project): HTMLElement {
   const wrap = el('div', 'hierarchy-milestones');
-  if (project.milestones.length === 0) {
+  if ((project.milestones ?? []).length === 0) {
     wrap.append(el('p', 'hierarchy-meta', 'No milestones yet.'));
     return wrap;
   }
   const list = el('ul', 'hierarchy-milestone-list');
-  for (const milestone of project.milestones) {
+  for (const milestone of project.milestones ?? []) {
     const item = el('li', 'hierarchy-milestone');
     item.append(
       el('span', 'hierarchy-milestone__title', milestone.title),
@@ -82,8 +82,8 @@ function renderProjectCard(
   const meta = el(
     'p',
     'hierarchy-meta',
-    `${openCount} open task${openCount === 1 ? '' : 's'} · ${project.milestones.length} milestone${
-      project.milestones.length === 1 ? '' : 's'
+    `${openCount} open task${openCount === 1 ? '' : 's'} · ${(project.milestones ?? []).length} milestone${
+      (project.milestones ?? []).length === 1 ? '' : 's'
     }`
   );
   card.append(head, meta);

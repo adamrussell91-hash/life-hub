@@ -23,6 +23,7 @@ export function createProjectsHandler(deps = {}) {
           type: typeof body.type === 'string' ? body.type : 'standard',
           status: 'active',
           parent_goal_id: typeof body.parent_goal_id === 'string' ? body.parent_goal_id : null,
+          milestones: Array.isArray(body.milestones) ? body.milestones : [],
           created_at: timestamp,
           updated_at: timestamp
         }

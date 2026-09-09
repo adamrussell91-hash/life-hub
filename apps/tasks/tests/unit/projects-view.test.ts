@@ -174,6 +174,17 @@ describe('projects view rebuild', () => {
     expect(legend.some((text) => text?.includes('Stalled') && text.includes('1'))).toBe(true);
   });
 
+  it('still paints when a stored project omitted milestones', async () => {
+    const legacy = project({ id: 'proj_legacy', title: 'Blob without milestones' });
+    delete (legacy as { milestones?: Project['milestones'] }).milestones;
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([legacy]);
+    const canvas = document.createElement('main');
+    await renderProjectsView(canvas);
+    expect(canvas.textContent).not.toMatch(/Could not load Projects/);
+    expect(canvas.querySelector('.projects-chart')).not.toBeNull();
+    expect(canvas.textContent).toContain('Blob without milestones');
+  });
+
   it('puts a plus-add on the toolbar so a project can be created', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);

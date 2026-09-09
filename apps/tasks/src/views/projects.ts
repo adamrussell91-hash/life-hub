@@ -330,7 +330,7 @@ function renderProjectBoardCard(
 
   const chips = el('div', 'pcard__row');
   chips.append(el('span', `status-badge status-badge--${card.lifecycle}`, LIFECYCLE_LABEL[card.lifecycle]));
-  card.project.milestones.slice(0, 3).forEach((milestone, index) => {
+  (card.project.milestones ?? []).slice(0, 3).forEach((milestone, index) => {
     chips.append(el('span', `hub-chip ${milestoneTint(index)}`, milestone.title));
   });
   article.append(chips);

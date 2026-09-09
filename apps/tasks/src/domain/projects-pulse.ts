@@ -291,7 +291,7 @@ export function buildProjectPulseCard(
     linkedLabel:
       pageBlocks > 0
         ? `${pageBlocks} linked docs · ${children.length} related tasks`
-        : `${children.length} related tasks · ${project.milestones.length} milestones`,
+        : `${children.length} related tasks · ${(project.milestones ?? []).length} milestones`,
     readyToClose: variance.ready_to_close,
     slipDays: variance.slip_days,
     openTaskCount: variance.open_task_count,
@@ -530,7 +530,7 @@ export function findRetroCandidate(
   let nearest: RetroCandidate | null = null;
   for (const card of cards) {
     if (card.lifecycle === 'completed' || card.lifecycle === 'stalled') continue;
-    for (const milestone of card.project.milestones) {
+    for (const milestone of card.project.milestones ?? []) {
       const due = parseDue(milestone.due_date);
       if (!due) continue;
       const daysOut = Math.round((startOfDay(due).getTime() - startOfDay(now).getTime()) / 86_400_000);
