@@ -454,3 +454,15 @@ test('web app manifest stays installable without hub-tile icons', async () => {
   assert.equal(manifest.start_url, './');
   assert.deepEqual(manifest.icons, []);
 });
+
+test('Life browser modules do not import netlify Functions (Pages does not publish them)', async () => {
+  const root = new URL('../../apps/life/js/', import.meta.url);
+  const files = await walkSourceFiles(root);
+  const hits = [];
+  const netlifyImport = /from\s+['"][^'"]*netlify\//;
+  for (const file of files) {
+    const text = await readFile(file, 'utf8');
+    if (netlifyImport.test(text)) hits.push(fileURLToPath(file));
+  }
+  assert.deepEqual(hits, [], 'browser import of netlify/ breaks the main.js module graph on Pages');
+});
