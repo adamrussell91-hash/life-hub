@@ -8,13 +8,16 @@ import {
   adminTaskKind,
   buildExcursionPlan,
   defaultExcursionEventDate,
+  excursionClearance,
   excursionDatesFromAdminTask,
+  leadTimeSlack,
   matchAdminTask,
   planAdminTaskForKind,
   shiftExcursionDates
 } from '@/domain/excursion';
 import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
+import type { ExcursionTemplate } from '@/schemas/templates';
 
 function memoryKv(): KvAdapter {
   const map = new Map<string, unknown>();
@@ -254,5 +257,126 @@ describe('admin task matching', () => {
         due_date: '2026-10-20'
       })
     ).toEqual({ current_end_date: '2026-10-20' });
+  });
+});
+
+describe('excursionClearance', () => {
+  const project = { id: 'proj_ex', title: 'Heat' } as Project;
+
+  function adminTask(overrides: Partial<Task> & Pick<Task, 'id' | 'tags'>): Task {
+    return {
+      schema_version: 1,
+      title: 'Admin task',
+      description: '',
+      kind: 'task',
+      bucket: 'active',
+      step_order: 0,
+      domain: 'teaching',
+      framework_used: null,
+      estimated_duration: 30,
+      actual_duration: null,
+      due_date: '2026-09-24',
+      created_at: '2026-08-01T00:00:00.000Z',
+      updated_at: '2026-08-01T00:00:00.000Z',
+      completed_at: null,
+      status: 'open',
+      blocked_since: null,
+      priority: 'high',
+      parent_project_id: 'proj_ex',
+      parent_task_id: null,
+      depends_on: [],
+      recurrence_rule: null,
+      due_time: null,
+      remind_at: null,
+      remind_dismissed_at: null,
+      attachments: [],
+      source: 'auto_generated_from_excursion',
+      ...overrides
+    };
+  }
+
+  it('is not cleared when critical admin tasks are missing or open', () => {
+    const clearance = excursionClearance(project, []);
+    expect(clearance.cleared).toBe(false);
+    expect(clearance.items.map((i) => i.kind)).toEqual(['risk_assessment', 'permission_note']);
+    expect(clearance.items.every((i) => !i.done)).toBe(true);
+  });
+
+  it('clears once both critical admin tasks are done, ignoring non-critical ones', () => {
+    const tasks: Task[] = [
+      adminTask({ id: 't-risk', tags: ['excursion', 'admin', 'risk'], status: 'done' }),
+      adminTask({ id: 't-perm', tags: ['excursion', 'admin', 'permission'], status: 'done' }),
+      adminTask({ id: 't-staff', tags: ['excursion', 'admin', 'staff'], status: 'open' })
+    ];
+    const clearance = excursionClearance(project, tasks);
+    expect(clearance.cleared).toBe(true);
+    expect(clearance.items.every((i) => i.done)).toBe(true);
+  });
+
+  it('ignores tasks belonging to a different project', () => {
+    const tasks: Task[] = [
+      adminTask({
+        id: 't-other',
+        parent_project_id: 'proj_other',
+        tags: ['excursion', 'admin', 'risk'],
+        status: 'done'
+      })
+    ];
+    expect(excursionClearance(project, tasks).cleared).toBe(false);
+  });
+
+  it('prefers the compliance bundle over the legacy admin-task check when present', () => {
+    const withBundle = {
+      ...project,
+      compliance_modules: [
+        { id: 'wwcc', category: 'staff' as const, label: 'WWCC verified', sub: null, on: true, critical: true },
+        { id: 'medical_cross_check', category: 'medical' as const, label: 'Medical cross-check', sub: null, on: false, critical: true },
+        { id: 'logs_scanned', category: 'post' as const, label: 'Logs scanned', sub: null, on: false, critical: false }
+      ]
+    } as Project;
+    const clearance = excursionClearance(withBundle, []);
+    expect(clearance.cleared).toBe(false);
+    expect(clearance.items).toHaveLength(2); // only the two critical modules
+    expect(clearance.items.map((i) => i.kind)).toEqual(['wwcc', 'medical_cross_check']);
+
+    withBundle.compliance_modules![1]!.on = true;
+    expect(excursionClearance(withBundle, []).cleared).toBe(true);
+  });
+});
+
+describe('leadTimeSlack', () => {
+  const template: ExcursionTemplate = {
+    schema_version: 1,
+    id: 'ext_excursion',
+    name: 'excursion template',
+    default_lead_times: {
+      permission_note_days: 21,
+      staff_email_days: 21,
+      risk_assessment_days: 42,
+      payment_days: 28
+    },
+    checklist_items: []
+  };
+  const now = new Date('2026-08-01T00:00:00.000Z');
+
+  it('gives every lead time slack to spare on a roomy runway', () => {
+    const rows = leadTimeSlack(template, '2026-10-15', now); // 75 days out
+    expect(rows).toHaveLength(4);
+    expect(rows.every((r) => !r.tight)).toBe(true);
+    const risk = rows.find((r) => r.kind === 'risk_assessment')!;
+    expect(risk.slackDays).toBe(75 - 42);
+  });
+
+  it('flags lead times that cannot fit a short runway', () => {
+    const rows = leadTimeSlack(template, '2026-08-15', now); // 14 days out
+    const risk = rows.find((r) => r.kind === 'risk_assessment')!;
+    expect(risk.tight).toBe(true);
+    expect(risk.slackDays).toBe(14 - 42);
+    const permission = rows.find((r) => r.kind === 'permission_note')!;
+    expect(permission.tight).toBe(true);
+  });
+
+  it('returns an empty list for an invalid date', () => {
+    expect(leadTimeSlack(template, 'not-a-date', now)).toEqual([]);
   });
 });

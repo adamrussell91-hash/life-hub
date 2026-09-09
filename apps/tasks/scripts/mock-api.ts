@@ -3,7 +3,7 @@ import { createTasksStore, seedIfEmpty, type KvAdapter } from '../src/services/s
 import type { SeedData } from '../src/services/types';
 import { searchEntities } from '../src/domain/queries';
 import { TaskCreateSchema, TaskUpdateSchema } from '../src/schemas/task';
-import { ProjectCreateSchema, ProjectUpdateSchema } from '../src/schemas/project';
+import { ProjectCreateSchema, ProjectUpdateSchema, type ComplianceModule } from '../src/schemas/project';
 import { TransitMapCreateSchema, TransitMapUpdateSchema } from '../src/schemas/map';
 import { ProgramCreateSchema, ProgramUpdateSchema } from '../src/schemas/program';
 import { AreaCreateSchema, AreaUpdateSchema } from '../src/schemas/area';
@@ -283,7 +283,10 @@ export function createMockApi({ seed }: MockApiOptions) {
                 b.student_group_reference === undefined || b.student_group_reference === null
                   ? null
                   : String(b.student_group_reference),
-              description: b.description === undefined ? undefined : String(b.description)
+              description: b.description === undefined ? undefined : String(b.description),
+              compliance_modules: Array.isArray(b.compliance_modules)
+                ? (b.compliance_modules as ComplianceModule[])
+                : undefined
             })
           });
         }
