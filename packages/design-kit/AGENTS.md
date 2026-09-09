@@ -37,6 +37,7 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
 18. `view-on-map.css` + `js/view-on-map.js` — compact **View on Map** pill that morphs into an embedded Google Map. Use on place-backed cards (medical visits, program venues). Not on task cards without an address. `createViewOnMap({ address, locationName })`.
 19. `hub-interactions.css` + `js/hub-feedback.js` — shared toast, copy-confirm, timed undo. `showHubToast`, `showCopyConfirm`, `offerTimedUndo`. User-initiated feedback only — agent writes still use `.confirm-card`.
     Chat reply typography lives in `chat-prose.css` (imported by `hub-interactions.css`). Headings, lists, quotes, code, tables on `.chat-message__body` / `.coach-msg__body`. Do not invent a second chat-prose sheet.
+    Messenger contact identity (`.chat-view__who` + bubble `--tail` avatars) lives in `hub-interactions.css`. Same chrome in every hub chat window — do not invent a parallel who-header.
     Chat keyboard / composer floor: `hub-chat-viewport.css` + `js/visual-viewport.js`. Call `attachVisualViewportInset()` once per hub. Composer stays on the canvas floor (`margin-top: auto`); phone typing hides `.hub-mobile-nav` and shells pin to `--vv-height`. Do not invent a second inset helper per hub.
 20. `js/hub-ai-bar.js` — contextual AI bar + agent select. `createContextualAiBar`, `createSelectAiAgent`.
 21. `js/hub-inline-edit.js` / `js/hub-create-disclosure.js` / `js/hub-capture.js` — stay-in-place edit, chips/tags, create-pill grid, voice + paste.

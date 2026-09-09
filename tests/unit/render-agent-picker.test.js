@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderAgentPicker, applyAgentAvatarToBubble, renderChatEmpty } from '../../apps/life/js/app/render-agent-picker.js';
+import { renderAgentPicker, applyAgentAvatarToBubble, renderChatEmpty, renderChatWho } from '../../apps/life/js/app/render-agent-picker.js';
 
 class FakeClassList {
   constructor(owner) {
@@ -108,6 +108,16 @@ class FakeDocument {
     this.pickerHost = new FakeElement('div');
     this.empty = new FakeElement('div');
     this.empty.id = 'chat-empty';
+    this.who = new FakeElement('div');
+    this.who.id = 'chat-who';
+    this.who.hidden = true;
+    this.whoAvatar = new FakeElement('img');
+    this.whoAvatar.className = 'chat-view__who-avatar';
+    this.whoName = new FakeElement('p');
+    this.whoName.className = 'chat-view__who-name';
+    this.whoStatus = new FakeElement('p');
+    this.whoStatus.className = 'chat-view__who-status';
+    this.who.children = [this.whoAvatar, this.whoName, this.whoStatus];
   }
 
   createElement(tag) {
@@ -116,6 +126,7 @@ class FakeDocument {
 
   querySelector(selector) {
     if (selector === '#chat-empty') return this.empty;
+    if (selector === '#chat-who') return this.who;
     return null;
   }
 
@@ -147,6 +158,17 @@ test('renderChatEmpty shows purpose only and does not repeat the agent name', ()
   assert.match(root.empty.children[0].textContent, /meals, macros/i);
   assert.equal(root.empty.children.some(child => /brisket/i.test(child.textContent)), false);
   assert.equal(root.empty.children.some(child => child.tagName === 'img'), false);
+});
+
+test('renderChatWho paints Messenger contact chrome with name + purpose', () => {
+  const root = new FakeDocument();
+  renderChatWho(root, 'brisket');
+
+  assert.equal(root.who.hidden, false);
+  assert.match(root.whoName.textContent, /Brisket/i);
+  assert.match(root.whoStatus.textContent, /meals, macros/i);
+  assert.equal(root.whoAvatar.src, 'assets/agents/brisket.jpg');
+  assert.match(root.whoAvatar.alt, /Brisket/i);
 });
 
 test('renderChatEmpty without an agent asks to pick a personality', () => {

@@ -1092,6 +1092,64 @@
   color: var(--ink);
 }
 
+/* Messenger-style contact identity — same chrome in every hub chat window. */
+.chat-view__who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chat-view__who-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  flex: 0 0 auto;
+}
+
+.chat-view__who-copy {
+  min-width: 0;
+}
+
+.chat-view__who-name {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-view__who-status {
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-view__who-status:empty {
+  display: none;
+}
+
+/* Messenger: avatar sits on the last bubble of a consecutive assistant run. */
+.chat-message.chat-message--assistant,
+.chat-message.chat-message--status {
+  align-items: flex-end;
+}
+
+.chat-message.chat-message--assistant:not(.chat-message--tail) > .chat-message__avatar,
+.chat-message.chat-message--status:not(.chat-message--tail) > .chat-message__avatar {
+  visibility: hidden;
+}
+
 @media (max-width: 720px) {
   .prod-card__funnel {
     grid-template-columns: 1fr;
@@ -1099,6 +1157,11 @@
 
   .prod-card__time-grid {
     max-height: 12rem;
+  }
+
+  .chat-view__who-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 }
 

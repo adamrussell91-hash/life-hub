@@ -47,6 +47,27 @@ export function renderAgentPicker(
       button.setAttribute('aria-selected', String(active));
     }
   }
+  renderChatWho(root, selectedSlug);
+}
+
+export function renderChatWho(root: ParentNode, slug: string | null | undefined): void {
+  const who = root.querySelector<HTMLElement>('#chat-who');
+  if (!who) return;
+  const agent = slug ? agentBySlug(slug) : null;
+  if (!agent) {
+    who.hidden = true;
+    return;
+  }
+  who.hidden = false;
+  const img = who.querySelector<HTMLImageElement>('.chat-view__who-avatar');
+  const name = who.querySelector('.chat-view__who-name');
+  const status = who.querySelector('.chat-view__who-status');
+  if (img) {
+    img.src = agent.avatarSrc;
+    img.alt = agent.name;
+  }
+  if (name) name.textContent = agent.firstName;
+  if (status) status.textContent = '';
 }
 
 export function applyAgentAvatarToBubble(bubble: HTMLElement, slug: string): void {

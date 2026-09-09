@@ -87,6 +87,17 @@ export function buildChatView(): HTMLElement {
   view.style.setProperty('--agent-accent', 'var(--wave)');
 
   const heading = el('div', 'section-heading chat-view__toolbar');
+  const who = el('div', 'chat-view__who');
+  who.id = 'chat-who';
+  who.hidden = true;
+  const whoAvatar = el('img', 'chat-view__who-avatar') as HTMLImageElement;
+  whoAvatar.alt = '';
+  whoAvatar.width = 40;
+  whoAvatar.height = 40;
+  const whoCopy = el('div', 'chat-view__who-copy');
+  whoCopy.append(el('p', 'chat-view__who-name'), el('p', 'chat-view__who-status'));
+  who.append(whoAvatar, whoCopy);
+  const actions = el('div', 'chat-view__actions');
   const skip = el('label', 'clare-prefs__skip');
   const skipInput = document.createElement('input');
   skipInput.type = 'checkbox';
@@ -106,7 +117,8 @@ export function buildChatView(): HTMLElement {
   close.type = 'button';
   close.id = 'chat-close';
   close.setAttribute('aria-label', 'Close chat');
-  heading.append(skip, neu, toolsBtn, close);
+  actions.append(skip, neu, toolsBtn, close);
+  heading.append(who, actions);
   view.append(heading);
 
   const picker = el('div', 'agent-picker hub-ai-agent hub-ai-agent--portraits');
