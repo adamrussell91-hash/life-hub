@@ -1154,17 +1154,20 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .chat-form {
   display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  align-items: flex-end;
+  align-items: stretch;
   width: 100%;
   min-width: 0;
 }
 .chat-form .hub-ai-bar__field {
-  flex: 1;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
 }
 .chat-form .hub-ai-bar__aside {
   flex: 0 0 auto;
+  width: 100%;
 }
 .chat-input,
 #chat-input {
@@ -6384,8 +6387,8 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 
   .chat-view .chat-form {
     display: flex;
-    flex-direction: row;
-    align-items: flex-end;
+    flex-direction: column;
+    align-items: stretch;
     gap: var(--space-2);
     width: 100%;
     min-width: 0;
@@ -7010,7 +7013,7 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 
 
 /* Attachment chip layout lives in design-kit hub-interactions.css
-   (.hub-ai-bar__aside stacks chips above Attach/Send). */
+   (.hub-ai-bar__aside sits under the full-width text field with Attach/Send). */
 .chat-message__attachments {
   display: flex;
   flex-wrap: wrap;
