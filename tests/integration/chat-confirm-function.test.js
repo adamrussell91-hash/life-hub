@@ -567,8 +567,8 @@ test('planned workout confirm does not write Central Node and reports the sync a
   assert.ok(!calls.some(call => call.options?.method === 'PUT' && call.url.includes('central-node.md')));
 });
 
-test('planned workout confirm overwrites today’s existing planned file instead of creating a second one', async () => {
-  const existingPath = 'data/fitness/2026/08/2026-08-01-workout-1607.md';
+test('planned workout confirm amends the matching titled plan instead of a different same-day session', async () => {
+  const existingPath = 'data/fitness/2026/08/2026-08-01-workout-the-full-send.md';
   const existingSha = 'e'.repeat(40);
   const existingMarkdown = [
     '---',
@@ -588,14 +588,28 @@ test('planned workout confirm overwrites today’s existing planned file instead
     type: 'workout',
     date: '2026-08-01',
     fields: {
-      title: 'The Full Send — amended',
+      title: 'The Full Send',
       session_kind: 'strength',
       day_type: 'workout_45_60',
       status: 'planned',
       recovery_flag_next_day: false,
       exercises: [
-        { name: 'Bar Squat', sets: [{ reps: 10, weight_kg: 30, cable_type: 'none' }, { reps: 10, weight_kg: 30, cable_type: 'none' }] }
+        { name: 'Bar Squat', sets: [{ reps: 10, weight_kg: 35, cable_type: 'none' }, { reps: 10, weight_kg: 35, cable_type: 'none' }] }
       ],
+      pain_flags: []
+    }
+  };
+  const walkCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Dog Walk Around the Block',
+      session_kind: 'walk',
+      day_type: 'movement',
+      status: 'planned',
+      duration_min: 35,
+      recovery_flag_next_day: false,
+      exercises: [],
       pain_flags: []
     }
   };
@@ -623,20 +637,33 @@ test('planned workout confirm overwrites today’s existing planned file instead
   };
   const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
 
-  const response = await handler(request({
+  const amendResponse = await handler(request({
     candidate: plannedCandidate,
-    slug: 'workout-1609',
+    slug: 'workout-the-full-send',
     overwrite: false
   }));
-  const payload = await response.json();
-  assert.equal(response.status, 200);
-  assert.equal(payload.data.path, existingPath);
-  const workoutPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes(existingPath));
-  assert.ok(workoutPut, 'must overwrite the existing planned file');
-  assert.equal(JSON.parse(workoutPut.options.body).sha, existingSha);
-  assert.ok(!calls.some(call => call.options?.method === 'PUT' && call.url.includes('workout-1609')));
-});
+  const amendPayload = await amendResponse.json();
+  assert.equal(amendResponse.status, 200);
+  assert.equal(amendPayload.data.path, existingPath);
+  const amendPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes(existingPath));
+  assert.ok(amendPut, 'must overwrite the matching planned file');
+  assert.equal(JSON.parse(amendPut.options.body).sha, existingSha);
 
+  calls.length = 0;
+  const walkResponse = await handler(request({
+    candidate: walkCandidate,
+    slug: 'workout-dog-walk-around-the-block',
+    overwrite: false
+  }));
+  const walkPayload = await walkResponse.json();
+  assert.equal(walkResponse.status, 200);
+  assert.equal(walkPayload.data.path, 'data/fitness/2026/08/2026-08-01-workout-dog-walk-around-the-block.md');
+  assert.ok(calls.some(call => (
+    call.options?.method === 'PUT'
+    && call.url.includes('workout-dog-walk-around-the-block')
+  )), 'must create a second same-day planned file');
+  assert.ok(!calls.some(call => call.options?.method === 'PUT' && call.url.includes(existingPath)));
+});
 test('a failing template upsert never fails the confirm response', async () => {
   const workoutCandidate = {
     type: 'workout',

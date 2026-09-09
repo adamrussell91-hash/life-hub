@@ -4,6 +4,7 @@ import { isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { buildMedicalSlug } from '../../../apps/life/js/app/medical-model.js';
 import { coerceCalendarDate, normalizeMedicalFields } from '../../../apps/life/js/app/medical-normalize.js';
 import { collapseSetSplitExercises } from './workout-history.mjs';
+import { slugifyWorkoutTitle } from './workout-templates.mjs';
 
 const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare', 'mind_session', 'medical'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -261,9 +262,20 @@ export function buildCanonicalPath({ type, date, slug }) {
 export const PLANNED_WORKOUT_SLUG = 'workout-planned';
 
 /**
+ * Path slug for a planned workout. Title-stable so amending the same session
+ * updates one file, while a different title the same day gets its own file
+ * (weights + walk, two pumps, etc.). Legacy untitled plans keep workout-planned.
+ */
+export function buildPlannedWorkoutSlug(title) {
+  const stem = slugifyWorkoutTitle(title);
+  if (!stem || stem === 'workout') return PLANNED_WORKOUT_SLUG;
+  return `workout-${stem}`;
+}
+
+/**
  * Stable path slug for a validated record.
  * Meals use slot-only slugs so same-day corrections overwrite the same file.
- * Planned workouts stay on one file per day so amend/save updates the same plan.
+ * Planned workouts key off title so multiple sessions can share a calendar day.
  */
 export function buildRecordSlug(record) {
   if (!record || typeof record !== 'object') throw new TypeError('record is required');
@@ -273,7 +285,9 @@ export function buildRecordSlug(record) {
     }
     return record.meal;
   }
-  if (record.type === 'workout' && record.status === 'planned') return PLANNED_WORKOUT_SLUG;
+  if (record.type === 'workout' && record.status === 'planned') {
+    return buildPlannedWorkoutSlug(record.title);
+  }
   if (record.type === 'mind_session') return 'session';
   if (record.type === 'medical') return buildMedicalSlug(record.title, record.time);
   const label = record.type === 'skincare' ? record.routine : record.type;

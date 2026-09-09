@@ -96,6 +96,18 @@ test('hero prefers today planned over older completed', () => {
   assert.equal(model.heroSession.status, 'planned');
 });
 
+test('hero prefers a remaining planned session over today’s completed one', () => {
+  const model = buildFitnessModel({
+    events: events([
+      workout({ date: '2026-07-30', status: 'completed', title: 'Morning Pump', time: '09:00' }),
+      workout({ date: '2026-07-30', status: 'planned', title: 'Dog Walk', time: '18:00', exercises: [] })
+    ]),
+    date: '2026-07-30'
+  });
+  assert.equal(model.heroSession.title, 'Dog Walk');
+  assert.equal(model.heroSession.status, 'planned');
+});
+
 test('hero session carries path and notes body from the event', () => {
   const model = buildFitnessModel({
     events: [{
@@ -110,10 +122,9 @@ test('hero session carries path and notes body from the event', () => {
   assert.equal(model.heroSession.notes, 'Felt sharp today');
 });
 
-test('hero prefers today completed over today planned', () => {
+test('hero falls back to today completed when no planned session remains', () => {
   const model = buildFitnessModel({
     events: events([
-      workout({ date: '2026-07-30', status: 'planned', title: 'Planned Pump', exercises: [] }),
       workout({ date: '2026-07-30', status: 'completed', title: 'Done Pump', time: '18:00' })
     ]),
     date: '2026-07-30'
@@ -121,7 +132,6 @@ test('hero prefers today completed over today planned', () => {
   assert.equal(model.heroSession.title, 'Done Pump');
   assert.equal(model.heroSession.status, 'completed');
 });
-
 test('hero falls back to latest completed on or before display date', () => {
   const model = buildFitnessModel({
     events: events([

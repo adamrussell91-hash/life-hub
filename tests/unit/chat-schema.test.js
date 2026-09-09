@@ -26,16 +26,30 @@ test('non-meal slugs still include time when present', () => {
   assert.equal(buildRecordSlug({ type: 'diary', time: '21:15' }), 'diary-2115');
 });
 
-test('planned workouts use a stable slug so the same day keeps one plan file', () => {
-  assert.equal(buildRecordSlug({ type: 'workout', time: '16:07', status: 'planned' }), 'workout-planned');
-  assert.equal(buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned' }), 'workout-planned');
+test('planned workouts use a title-stable slug so same-day sessions stay distinct', () => {
+  assert.equal(
+    buildRecordSlug({ type: 'workout', time: '16:07', status: 'planned', title: 'The Full Send' }),
+    'workout-the-full-send'
+  );
+  assert.equal(
+    buildRecordSlug({ type: 'workout', time: '18:00', status: 'planned', title: 'Dog Walk Around the Block' }),
+    'workout-dog-walk-around-the-block'
+  );
+  assert.equal(
+    buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned', title: 'The Full Send' }),
+    'workout-the-full-send'
+  );
   assert.equal(
     buildCanonicalPath({
       type: 'workout',
       date: '2026-09-05',
-      slug: buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned' })
+      slug: buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned', title: 'The Full Send' })
     }),
-    'data/fitness/2026/09/2026-09-05-workout-planned.md'
+    'data/fitness/2026/09/2026-09-05-workout-the-full-send.md'
+  );
+  assert.equal(
+    buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned' }),
+    'workout-planned'
   );
 });
 
