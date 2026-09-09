@@ -530,6 +530,11 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     selectedItemId = null;
     composeDraft = { dateKey: selectedDateKey, dueTime: dueTime ?? null };
     if (focusCompose) focusComposeOnPaint = true;
+    // Week has no standing Add / day agenda — open Day when the user wants to compose.
+    if (focusCompose && session.mode === 'week') {
+      switchMode('day', day);
+      return;
+    }
     if (session.mode === 'month' && !isSameMonth(day, anchor)) {
       anchor = day;
       replaceHash(session.mode, day);
@@ -781,18 +786,10 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       );
     }
     const rail = el('div', 'hub-calendar__rail');
-    const agenda = renderAgenda(
-      items,
-      selectedDateKey!,
-      session.mode,
-      showPreview,
-      onCreated,
-      switchMode,
-      false,
-      () => void reload()
-    );
-    rail.append(renderStandingCompose(composeDraft, onCreated), agenda, preview, renderShortcutHint());
+    // Week rail is locks / dump / links — not a second day desk (Add + Open day/month).
+    let agenda: HTMLElement | null = null;
     if (session.mode === 'week') {
+      rail.append(preview, renderShortcutHint());
       rail.append(renderLocksWidget(days, items, showPreview));
       rail.append(renderDeepHoursWidget(tasks, projects, days));
       rail.append(
@@ -800,6 +797,18 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       );
       rail.append(renderDumpWidget(onCreated));
       rail.append(renderQuickLinksWidget(tasks));
+    } else {
+      agenda = renderAgenda(
+        items,
+        selectedDateKey!,
+        session.mode,
+        showPreview,
+        onCreated,
+        switchMode,
+        false,
+        () => void reload()
+      );
+      rail.append(renderStandingCompose(composeDraft, onCreated), agenda, preview, renderShortcutHint());
     }
     workspace.append(body, rail);
     calendar.append(workspace);
@@ -807,7 +816,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
 
     const selected = items.find((item) => item.id === selectedItemId);
     if (selected) {
-      agenda.hidden = true;
+      if (agenda) agenda.hidden = true;
       void openItem(selected, preview).finally(() => {
         canvas.scrollTop = scrollTop;
       });
@@ -835,6 +844,10 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   bindCalendarKeys(canvas, keys.signal, {
     onAdd: () => {
       focusComposeOnPaint = true;
+      if (session.mode === 'week') {
+        switchMode('day', selectedDateKey ? parseCalendarAnchor(selectedDateKey) : anchor);
+        return;
+      }
       paint();
     },
     onToday: () => goTo(today),

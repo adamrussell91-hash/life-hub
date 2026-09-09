@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { tasksApi } from '@/services/client-api';
 import { renderMonthView, renderWeekView, resetCalendarSession } from '@/views/calendar';
 import { resetCollapsibleFiltersForTests } from '@/views/collapsible-filters';
+import { setFocus } from '@/domain/focus';
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 
@@ -117,6 +118,12 @@ describe('calendar views', () => {
   beforeEach(() => {
     resetCalendarSession();
     resetCollapsibleFiltersForTests();
+    setFocus(null, { persistUrl: false });
+    for (const entry of tasks) {
+      if (entry.id === 'task_lesson') entry.due_date = '2026-08-17';
+      if (entry.id === 'task_florist') entry.due_date = '2026-08-18';
+      if (entry.id === 'task_done') entry.due_date = '2026-08-17';
+    }
     location.hash = '#/month?date=2026-08-17';
     vi.mocked(tasksApi.listTasks).mockReset();
     vi.mocked(tasksApi.listProjects).mockReset();
@@ -191,7 +198,7 @@ describe('calendar views', () => {
     expect(canvas.querySelector('.task-editor [aria-label="Title"]')).toBeTruthy();
   });
 
-  it('renders seven week columns and a dated quick-add on the selected day', async () => {
+  it('renders a week time grid without Add or day-agenda rail blocks', async () => {
     location.hash = '#/week?date=2026-08-17';
     const canvas = document.createElement('main');
     await renderWeekView(canvas);
@@ -199,8 +206,15 @@ describe('calendar views', () => {
     expect(canvas.querySelectorAll('.hub-calendar__week-day')).toHaveLength(7);
     expect(canvas.querySelector('[data-task-id="task_lesson"]')).not.toBeNull();
     expect(canvas.querySelector('[data-task-id="task_florist"]')).not.toBeNull();
-    const due = canvas.querySelector<HTMLInputElement>('.hub-calendar__detail input[type="date"]');
-    expect(due?.value).toBe('2026-08-17');
+    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose')).toBeNull();
+    expect(
+      [...canvas.querySelectorAll('button')].some((btn) => btn.textContent === 'Open day')
+    ).toBe(false);
+    expect(
+      [...canvas.querySelectorAll('button')].some((btn) => btn.textContent === 'Open month')
+    ).toBe(false);
+    expect(canvas.textContent).toMatch(/This week's locks/);
     expect(canvas.querySelector('.hub-calendar__month-label')?.textContent).toMatch(/17\/08\/26/);
   });
 
@@ -230,8 +244,8 @@ describe('calendar views', () => {
     });
   });
 
-  it('adds a task on the selected calendar day', async () => {
-    location.hash = '#/week?date=2026-08-19';
+  it('adds a task from day compose, not from the week rail', async () => {
+    location.hash = '#/week?date=2026-08-19&layout=day';
     const canvas = document.createElement('main');
     await renderWeekView(canvas);
 
@@ -288,15 +302,38 @@ describe('calendar views', () => {
     expect(location.hash).toMatch(/^#\/month/);
   });
 
-  it('renders a week time grid with a standing compose field', async () => {
+  it('renders a week time grid without a standing compose field', async () => {
     location.hash = '#/week?date=2026-08-17';
     const canvas = document.createElement('main');
     await renderWeekView(canvas);
 
     expect(canvas.querySelector('.hub-calendar__timegrid')).not.toBeNull();
     expect(canvas.querySelectorAll('.hub-calendar__hours')).toHaveLength(7);
+    expect(canvas.querySelector('.calendar-compose')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+  });
+
+  it('opens day compose when an empty week hour is clicked', async () => {
+    location.hash = '#/week?date=2026-08-17';
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderWeekView(canvas);
+
+    const hours = canvas.querySelector<HTMLElement>('.hub-calendar__hours[data-date="2026-08-17"]')!;
+    hours.getBoundingClientRect = () =>
+      ({ top: 0, left: 0, bottom: 832, right: 200, width: 200, height: 832, x: 0, y: 0, toJSON() {} });
+    hours.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, clientX: 20, clientY: 156 })
+    );
+
+    expect(canvas.querySelector('.hub-calendar__timegrid')?.getAttribute('data-days')).toBe('1');
     expect(canvas.querySelector('.calendar-compose [aria-label="New task title"]')).not.toBeNull();
-    expect(canvas.querySelector('.calendar-compose [aria-label="Start time"]')).not.toBeNull();
+    const time = canvas.querySelector<HTMLInputElement>('[aria-label="Start time"]');
+    const title = canvas.querySelector<HTMLInputElement>('[aria-label="New task title"]');
+    expect(time?.value).toBe('09:00');
+    expect(document.activeElement).toBe(title);
+    expect(location.hash).toContain('layout=day');
+    canvas.remove();
   });
 
   it('keeps the current week when the hash drops the date', async () => {
