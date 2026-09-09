@@ -150,6 +150,42 @@ test('Clare propose and accept stay behind the Life session and write Tasks', as
   assert.equal(anon.status, 401);
 });
 
+test('dump treats a time-edit direction as a mutation, not a new task', async () => {
+  const store = memoryStore({
+    'tasks/task_meet': {
+      id: 'task_meet',
+      title: 'Parent meeting',
+      status: 'open',
+      domain: 'teaching',
+      due_time: '01:00'
+    }
+  });
+  const handler = createClareHandler({
+    env,
+    now: () => Date.parse('2026-09-09T01:00:00Z'),
+    getContentStore: async () => store
+  });
+
+  const dumped = await handler(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/clare',
+    body: {
+      action: 'dump',
+      text: 'edit this task to be 1pm not 1am',
+      domain: 'teaching',
+      focus: { type: 'task', id: 'task_meet' }
+    }
+  }));
+  assert.equal(dumped.status, 200);
+  const dump = (await dumped.json()).data;
+  assert.equal(dump.proposals.length, 0);
+  assert.equal(dump.mutations.length, 1);
+  assert.equal(dump.mutations[0].kind, 'task_update');
+  assert.equal(dump.mutations[0].task_id, 'task_meet');
+  assert.deepEqual(dump.mutations[0].patch, { due_time: '13:00' });
+  assert.match(dump.voice, /Parent meeting|1pm/i);
+});
+
 test('dump_stream emits status, voice chunks, dump_result, and done over SSE', async () => {
   const store = memoryStore();
   const handler = createClareHandler({

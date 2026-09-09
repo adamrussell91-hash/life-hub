@@ -3,7 +3,7 @@ import type { Task, TaskDomain, TaskPriority } from '@/schemas/task';
 import type { ClareCalibration } from '@/schemas/clare';
 import type { ClareJudgedProposalRow } from '@/ai/clare-proposal-judge';
 import type { ClareProtocolId } from '@/domain/clare-protocols';
-import type { DumpItem, DumpKind } from '@/domain/clare-dump';
+import type { DumpItem, DumpKind, TaskDirection } from '@/domain/clare-dump';
 import { dumpVoiceLine, duplicateOnBoardQuestion } from '@/domain/clare-dump';
 import type { AgentMutation } from '@/domain/agent-mutations';
 import type { AgentProtocolSlug } from '@/domain/agent-protocol';
@@ -318,6 +318,31 @@ export type ClareDumpResult = {
     choices: Array<{ id: string; label: string; detail?: string }>;
   } | null;
 };
+
+export function dumpResultFromDirection(
+  direction: TaskDirection,
+  agent: AgentProtocolSlug = 'clare'
+): ClareDumpResult {
+  return {
+    voice: direction.voice,
+    proposals: [],
+    questions: direction.question ? [direction.question] : [],
+    notes: [],
+    toolkit: null,
+    mutations:
+      direction.task_id && direction.patch
+        ? [
+            {
+              kind: 'task_update',
+              task_id: direction.task_id,
+              patch: direction.patch,
+              summary: direction.summary || 'Update task'
+            }
+          ]
+        : [],
+    agent
+  };
+}
 
 function proposalFromDumpItem(
   item: DumpItem,

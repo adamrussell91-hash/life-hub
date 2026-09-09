@@ -25,6 +25,7 @@ const COMMS = [
 ];
 const NOTE = ['remember', 'note:', 'fyi', 'just so', 'ref:', 'for later', 'idea:'];
 const NON_ACTIONABLE = [
+  /^(?:hi|hey|hello|thanks|thank you|cheers|ok|okay|ta|got it)\.?$/i,
   /\bit was a question\b/i,
   /\bnot something to create\b/i,
   /\bnot a task\b/i,
@@ -132,6 +133,7 @@ function inferPriority(text) {
 
 function isNonActionable(text) {
   if (NON_ACTIONABLE.some(pattern => pattern.test(text))) return true;
+  if (looksLikeTaskDirection(text)) return true;
   if (parseWordingCorrection(text)) return true;
   if (/\?\s*$/.test(text.trim()) && !includesAny(text, COMMS)) {
     const actionish =
@@ -253,6 +255,7 @@ function looksLikeLexicalSwap(wrong, right, full) {
   ) {
     return false;
   }
+  if (/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(full)) return false;
   if (/\b(?:sent|done|finished|ready|due|scheduled)\b/i.test(right)) return false;
   const wWords = wrong.trim().split(/\s+/).filter(Boolean).length;
   const rWords = right.trim().split(/\s+/).filter(Boolean).length;
@@ -352,6 +355,177 @@ export function resolveWordingCorrectionFollowUp(text, recentThread) {
     wrong: parsed.wrong,
     right: parsed.right,
     correctedTitles
+  };
+}
+
+const CLOCK_TOKEN = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i;
+const CLOCK_24 = /\b([01]?\d|2[0-3]):([0-5]\d)\b/;
+
+export function parseClockTime(token) {
+  const mer = CLOCK_TOKEN.exec(String(token ?? '').trim());
+  if (mer) {
+    const hour = Number(mer[1]);
+    const minute = mer[2] ? Number(mer[2]) : 0;
+    const suffix = mer[3].toLowerCase();
+    if (hour < 1 || hour > 12 || minute > 59) return null;
+    let h = hour % 12;
+    if (suffix === 'pm') h += 12;
+    return `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  }
+  const twentyFour = CLOCK_24.exec(String(token ?? '').trim());
+  if (!twentyFour) return null;
+  return `${String(Number(twentyFour[1])).padStart(2, '0')}:${twentyFour[2]}`;
+}
+
+export function formatClockTime(hhmm) {
+  const [hourPart, minutePart] = String(hhmm ?? '').split(':');
+  const hour = Number(hourPart);
+  const minute = Number(minutePart);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return hhmm;
+  const mer = hour >= 12 ? 'pm' : 'am';
+  const twelve = hour % 12 || 12;
+  return minute ? `${twelve}:${String(minute).padStart(2, '0')}${mer}` : `${twelve}${mer}`;
+}
+
+function extractTargetTime(text) {
+  const toBe =
+    /(?:to be|make it|set (?:it|this|that) to|change (?:it |this |that |the time |the due(?: time)? )?to|at)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i.exec(
+      text
+    );
+  if (toBe?.[1]) {
+    const parsed = parseClockTime(toBe[1]);
+    if (parsed) return parsed;
+  }
+  const xNotY =
+    /(\d{1,2}(?::\d{2})?\s*(?:am|pm))\s+not\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i.exec(text);
+  if (xNotY?.[1]) {
+    const parsed = parseClockTime(xNotY[1]);
+    if (parsed) return parsed;
+  }
+  const notThen =
+    /\bnot\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b[,\s—-]+(?:it'?s\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i.exec(
+      text
+    );
+  if (notThen?.[2]) {
+    const parsed = parseClockTime(notThen[2]);
+    if (parsed) return parsed;
+  }
+  const clocks = [...String(text).matchAll(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi)];
+  if (clocks.length === 1) return parseClockTime(clocks[0][0]);
+  return null;
+}
+
+export function looksLikeTaskDirection(text) {
+  const t = String(text ?? '').trim();
+  if (!t) return false;
+  if (/\b(?:edit|change|fix|update|move|reschedule)\s+(?:this|that)(?:\s+task|\s+one|\s+card)?\b/i.test(t)) {
+    return true;
+  }
+  if (/\b(?:edit|change|fix|update|move|reschedule)\s+the\s+(?:task|time|due(?: date| time)?)\b/i.test(t)) {
+    return true;
+  }
+  if (/\b(?:this|that)\s+task\b/i.test(t) && /\b(?:edit|update|change|fix|move|make|set|be|not)\b/i.test(t)) {
+    return true;
+  }
+  if (/\bmake (?:it|this|that)\b/i.test(t) && CLOCK_TOKEN.test(t)) return true;
+  if (/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\s+not\s+\d/i.test(t)) return true;
+  if (/\bnot\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(t) && /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(t)) {
+    return true;
+  }
+  if (/\bchange (?:the )?(?:time|due(?: date| time)?)\b/i.test(t)) return true;
+  if (
+    /^(?:can you |please )?(?:edit|update|change|move|fix|reschedule)\b/i.test(t) &&
+    !/\b(?:email|mark|write|book|call|prep|finish)\b/i.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function openTaskRows(tasks) {
+  return (tasks ?? []).filter(task => task.status !== 'done' && task.status !== 'dead');
+}
+
+function resolveDirectionTask(text, tasks, focus, recentThread) {
+  const open = openTaskRows(tasks);
+  if (focus?.type === 'task' && focus.id) {
+    return open.find(task => task.id === focus.id) ?? null;
+  }
+  const lower = String(text).toLowerCase();
+  let best = null;
+  for (const task of open) {
+    const title = typeof task.title === 'string' ? task.title.trim().toLowerCase() : '';
+    if (title.length < 4) continue;
+    if (lower.includes(title) && (!best || title.length > best.title.length)) best = task;
+  }
+  if (best) return best;
+
+  const rejected = [...String(text).matchAll(/\bnot\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/gi)]
+    .map(match => parseClockTime(match[1] ?? ''))
+    .filter(Boolean);
+  if (rejected.length) {
+    const timed = open.filter(task => task.due_time && rejected.includes(task.due_time));
+    if (timed.length === 1) return timed[0];
+  }
+
+  if (Array.isArray(recentThread)) {
+    for (let i = recentThread.length - 1; i >= 0; i -= 1) {
+      const turn = recentThread[i];
+      for (const match of String(turn?.text ?? '').matchAll(/[“"]([^”"]{3,})[”"]/g)) {
+        const title = match[1]?.trim().toLowerCase();
+        if (!title) continue;
+        const hit = open.find(task => String(task.title ?? '').trim().toLowerCase() === title);
+        if (hit) return hit;
+      }
+    }
+  }
+  return null;
+}
+
+function describeDirectionPatch(patch) {
+  const bits = [];
+  if (typeof patch.due_time === 'string') bits.push(formatClockTime(patch.due_time));
+  if (typeof patch.due_date === 'string') bits.push(patch.due_date);
+  return bits.join(' · ') || 'that change';
+}
+
+export function resolveTaskDirection(text, options = {}) {
+  const trimmed = String(text ?? '').trim();
+  if (!trimmed || !looksLikeTaskDirection(trimmed)) return null;
+
+  const due_time = extractTargetTime(trimmed);
+  const { due_date } = inferDue(trimmed.toLowerCase(), options.now ?? new Date(), options.timezone ?? HUB_TZ);
+  const patch = {};
+  if (due_time) patch.due_time = due_time;
+  if (due_date) patch.due_date = due_date;
+
+  const task = resolveDirectionTask(trimmed, options.tasks ?? [], options.focus, options.recentThread);
+  if (!task) {
+    const hint = Object.keys(patch).length ? describeDirectionPatch(patch) : 'that change';
+    return {
+      voice: `That's a direction, not a new card. Which task should I set to ${hint}?`,
+      question: 'Name the task, or open it on the board first.',
+      task_id: null,
+      patch: null,
+      summary: null
+    };
+  }
+  if (!Object.keys(patch).length) {
+    return {
+      voice: `I hear the edit on “${task.title}” — what should change?`,
+      question: `What should change on “${task.title}”?`,
+      task_id: task.id,
+      patch: null,
+      summary: null
+    };
+  }
+  const summary = `Change ${task.title} to ${describeDirectionPatch(patch)}`;
+  return {
+    voice: `Updating “${task.title}” to ${describeDirectionPatch(patch)}. Confirm when ready.`,
+    question: null,
+    task_id: task.id,
+    patch,
+    summary
   };
 }
 

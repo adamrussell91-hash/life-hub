@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  looksLikeTaskDirection,
   parseBrainDump,
+  parseClockTime,
   parseWordingCorrection,
   resolveDuplicateFollowUp,
+  resolveTaskDirection,
   resolveWordingCorrectionFollowUp,
   splitDumpLines
 } from '@/domain/clare-dump';
-import { assembleDumpResult } from '@/domain/clare';
+import { assembleDumpResult, dumpResultFromDirection } from '@/domain/clare';
 import type { FrameworkEntry } from '@/schemas/templates';
 
 const frameworks: FrameworkEntry[] = [
@@ -142,6 +145,60 @@ describe('brain dump parsing', () => {
     expect(result.proposals).toHaveLength(0);
     expect(result.questions.some((q) => /already on the board/i.test(q))).toBe(true);
     expect(result.notes.some((n) => /usb/i.test(n))).toBe(true);
+  });
+
+  it('does not capture a time-edit direction as a new task', () => {
+    expect(looksLikeTaskDirection('edit this task to be 1pm not 1am')).toBe(true);
+    expect(parseClockTime('1pm')).toBe('13:00');
+    expect(parseClockTime('1am')).toBe('01:00');
+    expect(parseWordingCorrection('edit this task to be 1pm not 1am')).toBeNull();
+
+    const items = parseBrainDump('edit this task to be 1pm not 1am', {
+      now: new Date(2026, 8, 9),
+      preferredDomain: 'teaching'
+    });
+    expect(items[0]!.kind).toBe('meta');
+    expect(items[0]!.actionable).toBe(false);
+    expect(assembleDumpResult(items, frameworks, () => null).proposals).toHaveLength(0);
+
+    const direction = resolveTaskDirection('edit this task to be 1pm not 1am', {
+      focus: { type: 'task', id: 'task_meet' },
+      tasks: [
+        {
+          id: 'task_meet',
+          title: 'Parent meeting',
+          status: 'open',
+          due_time: '01:00'
+        }
+      ]
+    });
+    expect(direction).not.toBeNull();
+    expect(direction!.task_id).toBe('task_meet');
+    expect(direction!.patch).toEqual({ due_time: '13:00' });
+    const result = dumpResultFromDirection(direction!);
+    expect(result.proposals).toHaveLength(0);
+    expect(result.mutations).toEqual([
+      expect.objectContaining({
+        kind: 'task_update',
+        task_id: 'task_meet',
+        patch: { due_time: '13:00' }
+      })
+    ]);
+  });
+
+  it('asks which task when the direction has no board focus', () => {
+    const direction = resolveTaskDirection('edit this task to be 1pm not 1am', {
+      tasks: []
+    });
+    expect(direction?.task_id).toBeNull();
+    expect(direction?.patch).toBeNull();
+    expect(dumpResultFromDirection(direction!).proposals).toHaveLength(0);
+    expect(dumpResultFromDirection(direction!).mutations).toHaveLength(0);
+  });
+
+  it('still treats a real dump as capture', () => {
+    expect(looksLikeTaskDirection('email parents about camp')).toBe(false);
+    expect(looksLikeTaskDirection('I need to update the website')).toBe(false);
   });
 
   it('treats meta-commentary and corrections as non-actionable', () => {
