@@ -217,6 +217,38 @@ export function createChatApi(
         );
       }
       return payload.data;
+    },
+
+    /**
+     * Deterministic Clare work invoke (Weekly Review Confirm-stage selection).
+     * Does not run a model turn — selected_changes are applied exactly.
+     */
+    async clareWork({
+      tool,
+      input,
+      slug = 'clare'
+    }: {
+      tool: string;
+      input: Record<string, unknown>;
+      slug?: string;
+    }) {
+      const base = baseUrl ?? getApiBaseUrl();
+      const response = await fetchImpl(`${base}/api/chat/clare-work`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tool, input, slug })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError(
+          'Clare work request failed',
+          response.status,
+          confirmErrorCode(payload),
+          payload?.data ?? payload
+        );
+      }
+      return payload.data;
     }
   };
 }
@@ -233,4 +265,13 @@ export async function* streamChat(
 /** POST /api/chat/confirm bound to a pending action id. */
 export function confirmChat(opts: ConfirmChatOptions) {
   return defaultApi.confirm(opts);
+}
+
+/** POST /api/chat/clare-work — structured Weekly Review proposal generation. */
+export function clareWorkChat(opts: {
+  tool: string;
+  input: Record<string, unknown>;
+  slug?: string;
+}) {
+  return defaultApi.clareWork(opts);
 }

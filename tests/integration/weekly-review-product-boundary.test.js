@@ -356,7 +356,9 @@ describe('LEVEL 4 Weekly Review Confirm chain', () => {
     assert.equal(saved.parent_project_id, 'proj_A');
 
     const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
-    assert.equal(queue.some((item) => item.id === proposalEvent.id), false);
+    const consumed = queue.find((item) => item.id === proposalEvent.id);
+    assert.ok(consumed, 'pending id remains as terminal consumed tombstone');
+    assert.equal(consumed.status, 'consumed');
     assert.equal((await loadWorkflowState(store, reviewId)).status, 'complete');
   });
 
@@ -406,7 +408,9 @@ describe('LEVEL 4 Weekly Review Confirm chain', () => {
     );
 
     const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
-    assert.equal(queue.some((item) => item.id === proposalEvent.id), false);
+    const consumedA = queue.find((item) => item.id === proposalEvent.id);
+    assert.ok(consumedA);
+    assert.equal(consumedA.status, 'consumed');
     const stillB = queue.find((item) => item.id === 'act_unrelated_B');
     assert.ok(stillB);
     assert.equal(stillB.proposal.intent, unrelated.proposal.intent);
@@ -622,6 +626,348 @@ describe('LEVEL 4 Weekly Review Confirm chain', () => {
       nextActionTitles: { proj_A: 'Score Year 10 essays' }
     });
     assert.ok(retry.events.find((event) => event.type === 'action_proposal' && event.id));
+  });
+});
+
+
+describe('LEVEL 4 Weekly Review lifecycle integrity (WR10–WR13)', () => {
+  it('WR10: writes succeed, queue consume fails → non-replayable + truthful response', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr10';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    let consumeAttempts = 0;
+    const fetchImpl = async (url, options) => {
+      if (
+        options?.method === 'PUT'
+        && decodeURIComponent(url.split('/contents/')[1] ?? '') === PENDING_ACTIONS_PATH
+      ) {
+        consumeAttempts += 1;
+        return Response.json({ message: 'consume failed' }, { status: 500 });
+      }
+      return github.fetchImpl(url, options);
+    };
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const response = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const payload = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(payload.error?.code, 'pending_action_consume_failed');
+    assert.equal(payload.data?.writesApplied, true);
+    assert.ok(consumeAttempts >= 1);
+
+    const saved = Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays');
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].parent_project_id, 'proj_A');
+
+    // Workflow stamp should make the id non-replayable even though queue entry may still look pending.
+    const workflow = await loadWorkflowState(store, reviewId);
+    assert.equal(workflow.pending_action_status, 'consumed');
+    assert.notEqual(workflow.status, 'complete');
+
+    const replay = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const replayPayload = await replay.json();
+    assert.equal(replay.status, 409);
+    assert.equal(replayPayload.error?.code, 'pending_action_consumed');
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      1
+    );
+  });
+
+  it('WR11: complete save fails → consumed + awaiting_confirm; reconcile heals', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr11';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    const originalSetJSON = store.setJSON.bind(store);
+    let blockComplete = true;
+    store.setJSON = async (key, value) => {
+      if (
+        blockComplete
+        && String(key).includes(reviewId)
+        && value
+        && value.status === 'complete'
+      ) {
+        throw new Error('complete persist failed');
+      }
+      return originalSetJSON(key, value);
+    };
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl: github.fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const response = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const payload = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(payload.error?.code, 'weekly_review_completion_pending');
+    assert.equal(payload.data?.pendingActionStatus, 'consumed');
+
+    let workflow = await loadWorkflowState(store, reviewId);
+    assert.equal(workflow.status, 'awaiting_confirm');
+    assert.equal(workflow.pending_action_status, 'consumed');
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      1
+    );
+
+    const queue = JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    assert.equal(queue.find((item) => item.id === proposalEvent.id)?.status, 'consumed');
+
+    blockComplete = false;
+    const healed = await executeClareWork(
+      'weekly_review',
+      { review_id: reviewId, advance: false },
+      {
+        now: new Date('2026-09-08T12:00:00Z'),
+        tasks: [],
+        projects: [projectA],
+        tasksStore: store
+      }
+    );
+    workflow = await loadWorkflowState(store, reviewId);
+    assert.equal(workflow.status, 'complete');
+    assert.notEqual(healed?.kind, 'propose');
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      1
+    );
+  });
+
+  it('WR12: lost-response retry is idempotent', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr12';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl: github.fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const first = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    assert.equal(first.status, 200);
+    assert.equal((await loadWorkflowState(store, reviewId)).status, 'complete');
+
+    const second = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const secondPayload = await second.json();
+    assert.equal(second.status, 409);
+    assert.equal(secondPayload.error?.code, 'pending_action_consumed');
+    assert.equal(
+      Object.values(store.data).filter((row) => row && row.title === 'Score Year 10 essays').length,
+      1
+    );
+    assert.equal((await loadWorkflowState(store, reviewId)).status, 'complete');
+  });
+
+  it('WR13: normal happy path still completes', async () => {
+    const store = memoryTasksStore({ 'projects/proj_A': projectA });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr13';
+    const { events } = await proposeWeeklyReviewViaChat({
+      store,
+      github,
+      reviewId,
+      selectedChanges: ['next_action:proj_A'],
+      nextActionTitles: { proj_A: 'Score Year 10 essays' }
+    });
+    const proposalEvent = events.find((event) => event.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl: github.fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store
+    });
+    const response = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: proposalEvent.id })
+    );
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.data?.lifecycle?.pendingAction, 'consumed');
+    assert.equal(payload.data?.lifecycle?.weeklyReview, 'complete');
+    assert.equal((await loadWorkflowState(store, reviewId)).status, 'complete');
+    assert.equal(
+      JSON.parse(github.blobs.get(PENDING_ACTIONS_PATH).content).find((item) => item.id === proposalEvent.id)?.status,
+      'consumed'
+    );
+  });
+});
+
+describe('LEVEL 4 Weekly Review UI selection binding (WR14–WR15)', () => {
+  it('WR14: Generate Confirm proposal sends exact selected_changes', async () => {
+    const store = memoryTasksStore({
+      'projects/proj_A': projectA,
+      'tasks/task_wait_B': waitingTask
+    });
+    const github = statefulGithub();
+    const reviewId = 'wr_wr14';
+    // Seed an awaiting confirm-stage review with two confirmable rows via chat proposal path machinery.
+    const state = advanceToConfirm({
+      review_id: reviewId,
+      next_action_titles: { proj_A: 'Score Year 10 essays' },
+      waiting_decisions: {
+        task_wait_B: { action: 'follow_up', follow_up_at: '2026-09-20' }
+      },
+      tasks: [waitingTask],
+      projects: [projectA]
+    });
+    await saveWorkflowState(store, reviewId, state);
+
+    const selected = ['next_action:proj_A'];
+    let capturedInput = null;
+    const { createChatClareWorkHandler } = await import('../../netlify/functions/chat-clare-work.mjs');
+    const { invokeWeeklyReviewProposal } = await import(
+      '../../netlify/functions/_shared/invoke-weekly-review-proposal.mjs'
+    );
+
+    const result = await invokeWeeklyReviewProposal({
+      tool: 'weekly_review',
+      slug: 'clare',
+      input: {
+        review_id: reviewId,
+        advance: false,
+        confirm: true,
+        selected_changes: selected
+      },
+      githubClient: {
+        resolveTree: async () => ({
+          tree: [...github.blobs.entries()].map(([path, blob]) => ({
+            path,
+            type: 'blob',
+            sha: blob.sha
+          }))
+        }),
+        readBlob: async (sha) => {
+          const found = [...github.blobs.values()].find((item) => item.sha === sha);
+          return {
+            encoding: 'base64',
+            content: Buffer.from(found.content, 'utf8').toString('base64')
+          };
+        },
+        writeFile: async ({ path, content, sha }) => {
+          github.blobs.set(path, { sha: sha || 'f'.repeat(40), content });
+          return { content: { sha: 'f'.repeat(40) } };
+        }
+      },
+      tasksStore: store,
+      now: NOW_MS
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.selected_changes, selected);
+    assert.ok(result.pendingId);
+    const writes = result.proposal?.writes || [];
+    assert.equal(
+      writes.some((write) => {
+        const content = typeof write.content === 'string' ? JSON.parse(write.content) : write.content;
+        return content?.title === 'Score Year 10 essays';
+      }),
+      true
+    );
+    assert.equal(
+      writes.some((write) => {
+        const content = typeof write.content === 'string' ? JSON.parse(write.content) : write.content;
+        return content?.id === 'task_wait_B' || content?.follow_up_at === '2026-09-20';
+      }),
+      false
+    );
+
+    // Endpoint rejects model-shaped prose and requires structured selected_changes.
+    const handler = createChatClareWorkHandler({
+      env: validEnv,
+      fetchImpl: github.fetchImpl,
+      now: NOW,
+      getTasksStore: async () => store,
+      createGitHubClient: () => ({
+        resolveTree: async () => ({ tree: [] }),
+        readBlob: async () => ({ encoding: 'base64', content: '' }),
+        writeFile: async () => ({ content: { sha: '1'.repeat(40) } })
+      }),
+      invokeWeeklyReviewProposal: async (args) => {
+        capturedInput = args.input;
+        return {
+          ok: true,
+          pendingId: 'act_ui_bind',
+          proposal: { intent: 'test', writes: [] },
+          selected_changes: args.input.selected_changes,
+          review_id: reviewId,
+          state: { status: 'awaiting_confirm' },
+          workflow_kind: 'weekly_review',
+          workflow_id: reviewId
+        };
+      }
+    });
+    const response = await handler(
+      new Request('https://life.example/api/chat/clare-work', {
+        method: 'POST',
+        headers: {
+          cookie: `life_hub_session=${session}`,
+          'content-type': 'application/json',
+          origin: 'https://life.example'
+        },
+        body: JSON.stringify({
+          tool: 'weekly_review',
+          slug: 'clare',
+          input: {
+            review_id: reviewId,
+            advance: false,
+            confirm: true,
+            selected_changes: selected
+          }
+        })
+      })
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(capturedInput.selected_changes, selected);
+    assert.equal(capturedInput.confirm, true);
+    assert.equal(capturedInput.advance, false);
   });
 });
 

@@ -1638,8 +1638,12 @@ test('P: valid confirm of A persists A, consumes A, and leaves B pending', async
   assert.equal(payload.ok, true);
   assert.equal(store.data['tasks/task_a'].title, 'Task A');
   assert.equal(store.data['tasks/task_b'], undefined);
-  assert.equal(queue.length, 1);
-  assert.equal(queue[0].id, 'act_b');
+  assert.equal(queue.length, 2);
+  const consumedA = queue.find((item) => item.id === 'act_a');
+  const pendingB = queue.find((item) => item.id === 'act_b');
+  assert.equal(consumedA?.status, 'consumed');
+  assert.ok(pendingB);
+  assert.notEqual(pendingB.status, 'consumed');
   assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('pending-actions.json')));
 });
 
@@ -1718,7 +1722,9 @@ test('Q: consumed pending id replay with same candidate is rejected; no second w
   }));
   assert.equal(first.status, 200);
   assert.equal(store.data['tasks/task_q'].title, 'Task Q');
-  assert.equal(queue.length, 0);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, 'act_q');
+  assert.equal(queue[0].status, 'consumed');
   const titleAfterFirst = store.data['tasks/task_q'].title;
   const putsAfterFirst = calls.filter((call) => call.options?.method === 'PUT').length;
 
@@ -1730,10 +1736,11 @@ test('Q: consumed pending id replay with same candidate is rejected; no second w
     candidate: proposal
   }));
   const replayPayload = await replay.json();
-  assert.equal(replay.status, 404);
-  assert.equal(replayPayload.error.code, 'pending_action_not_found');
+  assert.equal(replay.status, 409);
+  assert.equal(replayPayload.error.code, 'pending_action_consumed');
   assert.equal(store.data['tasks/task_q'].title, titleAfterFirst);
-  assert.equal(queue.length, 0);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].status, 'consumed');
   assert.equal(calls.filter((call) => call.options?.method === 'PUT').length, putsAfterFirst);
 });
 
@@ -1828,7 +1835,9 @@ test('T: existing A id plus tampered candidate B uses stored A only', async () =
   assert.equal(payload.ok, true);
   assert.equal(store.data['tasks/task_t_a'].title, 'Task T A');
   assert.equal(store.data['tasks/task_t_b'], undefined);
-  assert.equal(queue.length, 0);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, 'act_t_a');
+  assert.equal(queue[0].status, 'consumed');
 });
 
 test('U: agent ownership mismatch rejects; nothing writes; pending remains', async () => {

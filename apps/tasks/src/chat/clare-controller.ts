@@ -16,7 +16,7 @@ import { focusedTaskId } from '@/domain/focus';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createHubField, createHubFilter } from '@/views/hub-kit';
 import { tasksApi } from '@/services/client-api';
-import { confirmChat, streamChat } from '@/services/chat-api';
+import { confirmChat, streamChat, clareWorkChat } from '@/services/chat-api';
 import { ApiClientError } from '@/api/client';
 import {
   setCalendarGhostBlocksForProposal,
@@ -804,11 +804,38 @@ export function createClareChatController({
                 typeof payload.reviewId === 'string' && payload.reviewId.trim()
                   ? payload.reviewId.trim()
                   : 'weekly_review';
-              void send(
-                selected.length
-                  ? `Generate the Weekly Review Confirm proposal for review_id ${reviewId} with selected_changes: ${selected.join(', ')}. Call weekly_review with confirm:true and those ids only. Do not claim anything is saved.`
-                  : `Generate the Weekly Review Confirm proposal for review_id ${reviewId}. Call weekly_review with confirm:true for the currently selected confirmable changes. Do not claim anything is saved.`
-              );
+              // Deterministic path: exact selected ids → /api/chat/clare-work.
+              // Do not route selection through a model turn.
+              void (async () => {
+                try {
+                  showChatError(root, '');
+                  const data = await clareWorkChat({
+                    tool: 'weekly_review',
+                    slug: 'clare',
+                    input: {
+                      review_id: reviewId,
+                      advance: false,
+                      confirm: true,
+                      selected_changes: selected
+                    }
+                  });
+                  const pendingId =
+                    typeof data?.pendingId === 'string' ? data.pendingId.trim() : '';
+                  if (pendingId) lastPendingActionId = pendingId;
+                  if (data?.proposal && pendingId) {
+                    appendProductivityCard(root, 'confirm', {
+                      ...(typeof data.proposal === 'object' ? data.proposal : {}),
+                      pendingId,
+                      reviewId,
+                      selected_changes: selected
+                    });
+                  }
+                } catch (err) {
+                  const message =
+                    err instanceof Error ? err.message : 'Could not generate Confirm proposal.';
+                  showChatError(root, message);
+                }
+              })();
             }
           : undefined
     });

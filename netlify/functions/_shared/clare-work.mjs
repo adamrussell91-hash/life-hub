@@ -1238,6 +1238,24 @@ export async function markWeeklyReviewAwaitingConfirm(store, reviewId, { pending
     ...state,
     status: 'awaiting_confirm',
     pending_action_id: pendingActionId ?? state.pending_action_id ?? null,
+    pending_action_status: 'pending',
+    updated_at: stamp || new Date().toISOString()
+  });
+}
+
+/**
+ * Record that the Weekly Review pending action executed its writes.
+ * Leaves status awaiting_confirm until markWeeklyReviewComplete succeeds.
+ */
+export async function markWeeklyReviewPendingConsumed(store, reviewId, { pendingActionId, stamp } = {}) {
+  const state = await loadWorkflowState(store, reviewId);
+  if (!state) return null;
+  return saveWorkflowState(store, reviewId, {
+    ...state,
+    status: state.status === 'complete' ? 'complete' : 'awaiting_confirm',
+    pending_action_id: pendingActionId ?? state.pending_action_id ?? null,
+    pending_action_status: 'consumed',
+    pending_action_consumed_at: stamp || new Date().toISOString(),
     updated_at: stamp || new Date().toISOString()
   });
 }
@@ -1252,8 +1270,21 @@ export async function markWeeklyReviewComplete(store, reviewId, { stamp } = {}) 
     status: 'complete',
     completed_at: completedAt,
     pending_action_id: null,
+    pending_action_status: 'consumed',
     updated_at: completedAt
   });
+}
+
+/**
+ * If workflow is awaiting_confirm but its pending action is positively marked consumed,
+ * heal to complete. Missing pending alone is NOT evidence of completion.
+ */
+export async function reconcileWeeklyReviewIfPendingConsumed(store, reviewId) {
+  const state = await loadWorkflowState(store, reviewId);
+  if (!state) return null;
+  if (state.status !== 'awaiting_confirm') return state;
+  if (state.pending_action_status !== 'consumed') return state;
+  return markWeeklyReviewComplete(store, reviewId);
 }
 
 function calendarNotesFromCtx({ lessons = [], workBlocks = [], tasks = [], todayKey, past = false }) {
@@ -1819,6 +1850,10 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       ? input.state
       : (await loadWorkflowState(tasksStore, reviewId)) || createWeeklyReview(reviewId);
     if (!state.id) state = { ...state, id: reviewId };
+    // Heal stranded awaiting_confirm only when pending_action_status is positively consumed.
+    if (tasksStore && state.status === 'awaiting_confirm' && state.pending_action_status === 'consumed') {
+      state = (await reconcileWeeklyReviewIfPendingConsumed(tasksStore, reviewId)) || state;
+    }
     if (state.status === 'complete') {
       return ok({
         stages: WEEKLY_REVIEW_STAGES,

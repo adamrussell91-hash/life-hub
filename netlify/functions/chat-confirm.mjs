@@ -44,6 +44,8 @@ import {
   serializePendingActions,
   removePendingActionById,
   findPendingActionById,
+  markPendingActionConsumed,
+  isPendingActionExecutable,
   validateProposeActionInput,
   executeProposeActionWrites,
   classifyWriteTarget,
@@ -74,7 +76,12 @@ import {
   detectStaleScheduleCollisions,
   FALLBACK_WORKDAY
 } from './_shared/productivity-os.mjs';
-import { markWeeklyReviewComplete } from './_shared/clare-work.mjs';
+import {
+  markWeeklyReviewComplete,
+  markWeeklyReviewPendingConsumed,
+  reconcileWeeklyReviewIfPendingConsumed,
+  loadWorkflowState
+} from './_shared/clare-work.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
@@ -498,8 +505,7 @@ export function createChatConfirmHandler({
     if (parsed.id) {
       stored = findPendingActionById(queue, parsed.id);
       if (!stored) {
-        // Fail closed: a supplied id that is absent/consumed must NOT execute
-        // any client candidate. Branch: handleActionConfirm → pending_action_not_found.
+        // Fail closed: a supplied id that is absent must NOT execute any client candidate.
         return errorResponse(
           404,
           'pending_action_not_found',
@@ -507,6 +513,46 @@ export function createChatConfirmHandler({
           false,
           PRIVATE_CACHE
         );
+      }
+      if (!isPendingActionExecutable(stored)) {
+        return errorResponse(
+          409,
+          'pending_action_consumed',
+          'This pending action was already executed and cannot run again.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      // Positive workflow consume stamp also blocks replay if queue cleanup lagged.
+      if (
+        stored?.workflowKind === 'weekly_review'
+        && typeof stored?.workflowId === 'string'
+        && stored.workflowId
+      ) {
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            const workflow = await loadWorkflowState(tasksStore, stored.workflowId);
+            if (
+              workflow
+              && workflow.pending_action_status === 'consumed'
+              && (
+                workflow.pending_action_id === parsed.id
+                || workflow.status === 'complete'
+              )
+            ) {
+              return errorResponse(
+                409,
+                'pending_action_consumed',
+                'This pending action was already executed and cannot run again.',
+                false,
+                PRIVATE_CACHE
+              );
+            }
+          }
+        } catch {
+          // Fall through to normal execution if workflow store is unavailable.
+        }
       }
       if (typeof stored.slug === 'string' && stored.slug.trim() && stored.slug !== parsed.slug) {
         return errorResponse(
@@ -703,35 +749,115 @@ export function createChatConfirmHandler({
       // Writes already landed; governance is audit trail only.
     }
 
-    let pendingConsumed = false;
+    // Writes succeeded. The pending id must become non-replayable before any "success".
+    let pendingConsumed = !parsed.id; // legacy candidate-only confirms have no durable id
+    let pendingConsumeError = null;
+    let weeklyReviewCompleted = false;
+    let weeklyReviewCompletionError = null;
+    const isWeeklyReview =
+      stored?.workflowKind === 'weekly_review'
+      && typeof stored?.workflowId === 'string'
+      && Boolean(stored.workflowId);
+
     if (parsed.id) {
-      try {
-        await client.writeFile({
-          path: PENDING_ACTIONS_PATH,
-          content: serializePendingActions(removePendingActionById(queue, parsed.id)),
-          ...(queueSha ? { sha: queueSha } : {}),
-          message: `chore(propose-action): confirm ${proposal.intent}`.slice(0, 200)
-        });
-        pendingConsumed = true;
-      } catch {
-        // Stale queue entry is harmless.
+      const consumedAt = new Date(now()).toISOString();
+      const markedQueue = markPendingActionConsumed(queue, parsed.id, {
+        consumedAt,
+        extra: { writesApplied: true }
+      });
+      let consumePersisted = false;
+      for (let attempt = 0; attempt < 3 && !consumePersisted; attempt += 1) {
+        try {
+          await client.writeFile({
+            path: PENDING_ACTIONS_PATH,
+            content: serializePendingActions(markedQueue),
+            ...(queueSha ? { sha: queueSha } : {}),
+            message: `chore(propose-action): consume ${proposal.intent}`.slice(0, 200)
+          });
+          queue = markedQueue;
+          pendingConsumed = true;
+          consumePersisted = true;
+        } catch (error) {
+          pendingConsumeError = error;
+        }
+      }
+
+      // Backup evidence on the Weekly Review workflow so load can heal even if queue cleanup drifts.
+      if (isWeeklyReview) {
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            await markWeeklyReviewPendingConsumed(tasksStore, stored.workflowId, {
+              pendingActionId: parsed.id,
+              stamp: consumedAt
+            });
+          }
+        } catch {
+          // Queue consume is the primary replay gate; workflow stamp is secondary.
+        }
+      }
+
+      if (!pendingConsumed) {
+        return errorResponse(
+          503,
+          'pending_action_consume_failed',
+          'Writes landed but the pending action could not be marked consumed. Do not re-confirm blindly — retry may be required after recovery.',
+          true,
+          PRIVATE_CACHE,
+          {
+            writesApplied: true,
+            pendingId: parsed.id,
+            lifecycle: {
+              writes: 'applied',
+              pendingAction: 'consume_failed',
+              weeklyReview: isWeeklyReview ? 'awaiting_confirm' : null
+            }
+          }
+        );
       }
     }
 
-    // Weekly Review completes only after writes succeed and the pending action is consumed.
-    if (
-      pendingConsumed
-      && stored?.workflowKind === 'weekly_review'
-      && typeof stored?.workflowId === 'string'
-      && stored.workflowId
-    ) {
+    if (pendingConsumed && isWeeklyReview) {
       try {
         const tasksStore = await getTasksStore(env);
         if (tasksStore) {
           await markWeeklyReviewComplete(tasksStore, stored.workflowId);
+          weeklyReviewCompleted = true;
         }
-      } catch {
-        // Writes + dequeue already landed; workflow completion is durable metadata.
+      } catch (error) {
+        weeklyReviewCompletionError = error;
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            await reconcileWeeklyReviewIfPendingConsumed(tasksStore, stored.workflowId);
+            const healed = await loadWorkflowState(tasksStore, stored.workflowId);
+            weeklyReviewCompleted = healed?.status === 'complete';
+          }
+        } catch {
+          weeklyReviewCompleted = false;
+        }
+      }
+
+      if (!weeklyReviewCompleted) {
+        // Writes + consume landed; do not claim clean success or invite re-confirm.
+        return errorResponse(
+          503,
+          'weekly_review_completion_pending',
+          'Writes landed and the pending action is consumed, but Weekly Review completion did not persist. Do not re-confirm — reload/reconcile the review.',
+          true,
+          PRIVATE_CACHE,
+          {
+            writesApplied: true,
+            pendingId: parsed.id,
+            pendingActionStatus: 'consumed',
+            workflowId: stored.workflowId,
+            lifecycle: {
+              writes: 'applied',
+              pendingAction: 'consumed',
+              weeklyReview: 'awaiting_confirm'
+            }
+          }
+        );
       }
     }
 
@@ -797,7 +923,12 @@ export function createChatConfirmHandler({
         results: writeResult.results,
         ...(centralNodeUpdated != null ? { centralNodeUpdated } : {}),
         ...(turnResume?.state?.id ? { turnId: turnResume.state.id, turnResumed: true } : {}),
-        ...(continuation ? { continuation } : {})
+        ...(continuation ? { continuation } : {}),
+        lifecycle: {
+          writes: 'applied',
+          pendingAction: parsed.id ? 'consumed' : 'none',
+          weeklyReview: isWeeklyReview ? 'complete' : null
+        }
       }
     }, PRIVATE_CACHE);
   }

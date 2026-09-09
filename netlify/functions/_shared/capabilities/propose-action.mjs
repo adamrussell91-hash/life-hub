@@ -206,6 +206,16 @@ export function addPendingAction(list, entry) {
   return next.length > MAX_PENDING_ACTIONS ? next.slice(next.length - MAX_PENDING_ACTIONS) : next;
 }
 
+export const PENDING_ACTION_STATUS_PENDING = 'pending';
+export const PENDING_ACTION_STATUS_CONSUMED = 'consumed';
+
+/** Entries without status are treated as pending (backward compatible). */
+export function isPendingActionExecutable(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  const status = typeof entry.status === 'string' ? entry.status.trim() : '';
+  return !status || status === PENDING_ACTION_STATUS_PENDING;
+}
+
 export function removePendingActionById(list, id) {
   const base = Array.isArray(list) ? list : [];
   if (typeof id !== 'string' || !id.trim()) return base;
@@ -216,6 +226,27 @@ export function findPendingActionById(list, id) {
   const base = Array.isArray(list) ? list : [];
   if (typeof id !== 'string' || !id.trim()) return null;
   return base.find(entry => entry.id === id) ?? null;
+}
+
+/**
+ * Mark a pending action terminally consumed in place so replay cannot re-execute
+ * even if a later physical cleanup write fails.
+ */
+export function markPendingActionConsumed(list, id, { consumedAt, extra } = {}) {
+  const base = Array.isArray(list) ? list : [];
+  if (typeof id !== 'string' || !id.trim()) return base;
+  let found = false;
+  const next = base.map((entry) => {
+    if (entry?.id !== id) return entry;
+    found = true;
+    return {
+      ...entry,
+      status: PENDING_ACTION_STATUS_CONSUMED,
+      consumedAt: consumedAt || new Date().toISOString(),
+      ...(extra && typeof extra === 'object' ? extra : {})
+    };
+  });
+  return found ? next : base;
 }
 
 export function classifyWriteTarget(path) {
