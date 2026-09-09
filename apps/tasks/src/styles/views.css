@@ -5664,6 +5664,12 @@ button.projects-mix__legend-row:focus-visible {
 @media (max-width: 720px) {
   .projects-mix__row {
     gap: var(--space-3);
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .projects-mix__donut {
+    align-self: center;
   }
 
   .projects-mix__question {
@@ -5673,6 +5679,7 @@ button.projects-mix__legend-row:focus-visible {
   .projects-mix__legend {
     max-width: none;
     width: 100%;
+    flex: 1 1 auto;
   }
 }
 
@@ -6971,6 +6978,21 @@ button.column-bar--row.is-active {
   .projects-board,
   .retro-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Side-by-side column is 16rem; once stacked, use the full canvas. */
+  .projects-chart {
+    width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Group-by pills fill the row between the filter and + controls. */
+  .projects-toolbar > .hub-pills {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    width: auto;
   }
 }
 

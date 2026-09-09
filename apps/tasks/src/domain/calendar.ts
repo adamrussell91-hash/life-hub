@@ -2,6 +2,7 @@ import type { Task, TaskDomain, TaskPriority } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import type { WorkBlock } from '@/schemas/work-block';
 import { KEY_DATE_DEFS, matchAdminTask } from '@/domain/excursion';
+import { projectMilestones } from '@/domain/project-milestones';
 import { addDays, parseDue, startOfDay, toDateKey, weekDays } from '@/domain/queries';
 
 export type CalendarKind = 'task' | 'milestone' | 'key_date' | 'work_block';
@@ -180,7 +181,7 @@ export function collectCalendarItems(tasks: Task[], projects: Project[]): Calend
   }
 
   for (const project of projects) {
-    for (const milestone of project.milestones) {
+    for (const milestone of projectMilestones(project)) {
       const due = parseDue(milestone.due_date);
       if (!due) continue;
       items.push({

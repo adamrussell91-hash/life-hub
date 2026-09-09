@@ -2,6 +2,7 @@ import type { Task, TaskDomain } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { isBoardTask } from '@/domain/hierarchy';
 import { parseDueTimeHours } from '@/domain/daily-dial';
+import { projectMilestones } from '@/domain/project-milestones';
 import { getTaskPropertiesSync } from '@/services/task-properties';
 
 const PRIORITY_RANK: Record<Task['priority'], number> = {
@@ -253,7 +254,7 @@ export function milestonesInMonth(projects: Project[], month: Date): Array<{
   const m = month.getMonth();
   const out: Array<{ project: Project; milestone: Project['milestones'][number] }> = [];
   for (const project of projects) {
-    for (const milestone of project.milestones) {
+    for (const milestone of projectMilestones(project)) {
       const due = parseDue(milestone.due_date);
       if (due && due.getFullYear() === y && due.getMonth() === m) {
         out.push({ project, milestone });
