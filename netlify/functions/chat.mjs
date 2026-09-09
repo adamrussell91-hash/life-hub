@@ -229,7 +229,7 @@ import {
   emptyGovernanceLog,
   recentGovernanceTail
 } from '../../apps/life/js/core/governance-log.js';
-import { rollStaleSections, purgeStaleRecentActions } from '../../apps/life/js/core/central-node-write.js';
+import { sanitizeCentralNode } from '../../apps/life/js/core/central-node-write.js';
 import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   emptyProductLibrary,
@@ -912,9 +912,7 @@ export function createChatHandler({
 
           const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
           if (decodedCentralNode !== null) {
-            const centralNodeForTurn = needsHammondTools
-              ? purgeStaleRecentActions(rollStaleSections(decodedCentralNode, today), today)
-              : decodedCentralNode;
+            const centralNodeForTurn = sanitizeCentralNode(decodedCentralNode, today);
             constraints = extractConstraints(centralNodeForTurn);
             // Chadwick needs This Week so the EP day-before rule can see Veronica.
             const needsThisWeek = needsNutritionChallenges || slug === 'chadwick';
