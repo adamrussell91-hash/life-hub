@@ -14,6 +14,23 @@ export function isWebFileNoteHat(id: ChatHatId): boolean {
   return id === "makeNote" || id === "fromBook";
 }
 
+/** Cheap default when no protocol pill is selected — archive map, not thematic synthesis. */
+export const DEFAULT_CHAT_HAT: ChatHatId = "scoping";
+
+/**
+ * Existence / "what do I have on X" questions must not enter deep multi-round research,
+ * even if Thematic synthesis (or another deep hat) is selected.
+ */
+export function hatForArchiveMessage(
+  hatId: ChatHatId,
+  message: string,
+  isLookup: (raw: string) => boolean,
+): { hat: ChatHatId; depth?: ChatDepth; scope?: ChatScope } {
+  if (isWebFileNoteHat(hatId)) return { hat: hatId };
+  if (!isLookup(message)) return { hat: hatId };
+  return { hat: "scoping", depth: "single", scope: "wide" };
+}
+
 export type ChatScope = "narrow" | "standard" | "wide";
 export type ChatDepth = "single" | "verified" | "iterative" | "exhaustive";
 export type KernelPath = "quick" | "deep";

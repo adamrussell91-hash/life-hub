@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CHAT_HATS, hatById, resolveChatPlan } from "./hats";
+import { CHAT_HATS, DEFAULT_CHAT_HAT, hatById, hatForArchiveMessage, resolveChatPlan } from "./hats";
+import { isArchiveLookupQuery } from "../research/topicQuery";
 
 describe("chat hats", () => {
   it("ships nine hats including Ask Clementine and From a book and no Consolidation", () => {
@@ -14,10 +15,21 @@ describe("chat hats", () => {
       "methods",
       "writing",
     ]);
+    expect(DEFAULT_CHAT_HAT).toBe("scoping");
     expect(CHAT_HATS.some(hat => /consolidat/i.test(hat.label))).toBe(false);
     for (const hat of CHAT_HATS) {
       expect(hat.explain).toMatch(/^[A-Z][^.?!]*[.?!]$/);
     }
+  });
+
+  it("forces Scope the archive for existence checks even under synthesis", () => {
+    expect(
+      hatForArchiveMessage("synthesis", "Do I already have a note on coincidence reasoning?", isArchiveLookupQuery),
+    ).toEqual({ hat: "scoping", depth: "single", scope: "wide" });
+    expect(hatForArchiveMessage("makeNote", "Do I already have a note on X?", isArchiveLookupQuery)).toEqual({
+      hat: "makeNote",
+    });
+    expect(resolveChatPlan("scoping")).toMatchObject({ kernel: "quick", maxRounds: 1 });
   });
 
   it("uses cheap defaults and lets discrete dials override them", () => {

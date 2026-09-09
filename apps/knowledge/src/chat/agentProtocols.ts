@@ -1,4 +1,4 @@
-import { CHAT_HATS, hatById, type ChatHatId } from "./hats";
+import { CHAT_HATS, DEFAULT_CHAT_HAT, hatById, type ChatHatId } from "./hats";
 import type { ChatPersonalityId } from "./personalities";
 
 export type AgentProtocolPill = {
@@ -92,7 +92,7 @@ export function findProtocol(personalityId: ChatPersonalityId | null | undefined
 export function protocolHat(
   personalityId: ChatPersonalityId,
   protocolId: string | null | undefined,
-  fallback: ChatHatId = "synthesis",
+  fallback: ChatHatId = DEFAULT_CHAT_HAT,
 ): ChatHatId {
   const pill = findProtocol(personalityId, protocolId);
   return pill?.hat ?? fallback;

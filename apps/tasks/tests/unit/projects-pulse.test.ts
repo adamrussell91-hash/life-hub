@@ -139,6 +139,18 @@ describe('project lifecycle mix', () => {
     expect(card.impactLabel).toContain('High impact');
   });
 
+  it('tolerates blob projects that never stored a milestones array', () => {
+    const legacy = project({
+      id: 'proj_legacy',
+      title: 'Legacy blob project'
+    });
+    // Production Netlify create omitted milestones; Safari then throws on .length.
+    delete (legacy as { milestones?: Project['milestones'] }).milestones;
+    expect(() => buildProjectPulseCard(legacy, [], new Set(), now)).not.toThrow();
+    const card = buildProjectPulseCard(legacy, [], new Set(), now);
+    expect(card.linkedLabel).toMatch(/0 milestones/);
+  });
+
   it('groups cards by lifecycle and deadline', () => {
     const cards = [
       buildProjectPulseCard(
