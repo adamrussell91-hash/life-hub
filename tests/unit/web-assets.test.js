@@ -299,6 +299,15 @@ test('short chat bubbles are sized by text, not Copy/Retry, and status lines do 
   assert.doesNotMatch(bodyRule, /12rem/);
   assert.match(actionsRule, /width:\s*0/);
   assert.match(actionsRule, /min-width:\s*100%/);
+  // Idle Copy/Retry must leave the layout (display:none) — opacity/visibility
+  // alone reserved a blank row under every bubble on mobile.
+  assert.match(actionsRule, /display:\s*none/);
+  assert.doesNotMatch(actionsRule, /opacity:\s*0/);
+  assert.doesNotMatch(actionsRule, /visibility:\s*hidden/);
+  assert.match(
+    css,
+    /\.chat-message:hover \.chat-message__actions[\s\S]*?display:\s*flex/
+  );
   assert.doesNotMatch(css, /chat-status-pulse/);
 });
 
