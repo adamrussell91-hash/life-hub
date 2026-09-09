@@ -94,6 +94,7 @@ test('projects, areas, and goals use the Life session and share the Tasks store'
   assert.equal(createdProject.status, 201);
   const project = (await createdProject.json()).data;
   assert.match(project.id, /^proj_/);
+  assert.deepEqual(project.milestones, []);
 
   const listed = await createProjectsHandler(deps)(
     request({ url: 'https://api.adam-russell.com/api/projects' })

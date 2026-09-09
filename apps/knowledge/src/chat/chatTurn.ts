@@ -1,10 +1,17 @@
 import { assembleClementinePrompt } from "../clementine/assemble";
-import { topicQuery } from "../research/topicQuery";
+import { topicQuery, isArchiveLookupQuery } from "../research/topicQuery";
 import { ResearchResultSchema, type ResearchResult } from "../research/schema";
 import { compactArchiveNote, compactSittingNote, compactSynthesisNote } from "./archiveNote";
 import { coverageFromResearch, type CoverageRead } from "./coverage";
 import { protocolSteerBlock } from "./agentProtocols";
-import { resolveChatPlan, isWebFileNoteHat, type ChatDepth, type ChatHatId, type ChatScope } from "./hats";
+import {
+  resolveChatPlan,
+  isWebFileNoteHat,
+  hatForArchiveMessage,
+  type ChatDepth,
+  type ChatHatId,
+  type ChatScope,
+} from "./hats";
 import type { ChatPersonalityId } from "./personalities";
 import { corpusAuditFromResearch, formatCorpusAudit, SYNTHESIS_WRITE_TOKENS, thematicSynthesisProtocol } from "./synthesisProtocol";
 import { BOOK_NOTE_WRITE_TOKENS, MAKE_NOTE_WRITE_TOKENS, bookContextLine, selectBestFindings, type BookContext } from "./bookNote";
@@ -106,6 +113,22 @@ function lastUserQuery(messages: ChatMessage[]): string {
     if (messages[i]?.role === "user") return messages[i]!.content;
   }
   return "";
+}
+
+/** Remap existence checks onto Scope the archive / quick kernel before planning. */
+export function withArchiveLookupPlan(input: ChatTurnInput): ChatTurnInput {
+  if (input.researchSessionId || input.writeSessionId || input.compose) return input;
+  const query = lastUserQuery(input.messages);
+  const remapped = hatForArchiveMessage(input.hat, query, isArchiveLookupQuery);
+  if (remapped.hat === input.hat && remapped.depth === undefined) return input;
+  return {
+    ...input,
+    hat: remapped.hat,
+    depth: remapped.depth ?? input.depth,
+    scope: remapped.scope ?? input.scope,
+    // Drop conflicting protocol steer when we force the cheap map.
+    protocolId: remapped.hat === input.hat ? input.protocolId : undefined,
+  };
 }
 
 function searchBody(input: ChatTurnInput) {
@@ -433,6 +456,7 @@ async function finishArchive(input: ChatTurnInput, archive: ArchivePack): Promis
 }
 
 export async function runChatTurn(input: ChatTurnInput): Promise<ChatTurnResult> {
+  input = withArchiveLookupPlan(input);
   assembleClementinePrompt({
     voice: input.voice,
     job: input.universityJob,

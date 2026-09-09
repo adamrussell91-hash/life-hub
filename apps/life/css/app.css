@@ -744,16 +744,16 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .chat-message--assistant .chat-message__body {
   max-width: 38rem;
-  padding: 0;
-  background: transparent;
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--ink) 7%, var(--paper));
   color: var(--ink);
   font-size: var(--text-base);
   line-height: var(--leading-snug);
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: 0.35rem;
 }
 
 .chat-message--assistant[data-agent] .chat-message__body {
-  /* Avatar already carries the agent colour. Keep the inset so outside
-     list markers (10., 11.) are not clipped; do not paint a leftover bar. */
   border-left: 0;
   padding-left: var(--space-3);
 }
@@ -1154,17 +1154,20 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .chat-form {
   display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  align-items: flex-end;
+  align-items: stretch;
   width: 100%;
   min-width: 0;
 }
 .chat-form .hub-ai-bar__field {
-  flex: 1;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
 }
 .chat-form .hub-ai-bar__aside {
   flex: 0 0 auto;
+  width: 100%;
 }
 .chat-input,
 #chat-input {
@@ -4908,8 +4911,6 @@ main { max-width: 76rem; margin: 0 auto; }
 @media (max-width: 48rem) {
   .mind-mood-mix__donut { width: 11.75rem; height: 11.75rem; }
   .mind-mood-mix__value { font-size: var(--text-lg); }
-  .mind-energy-orbit__kicker { font-size: var(--text-sm); }
-  .mind-energy-orbit__status { font-size: var(--text-lg); }
 }
 .mind-energy-orbit-card .mind-tile__legend {
   padding-bottom: var(--space-3);
@@ -4992,7 +4993,7 @@ main { max-width: 76rem; margin: 0 auto; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 32%;
+  width: 28%;
   transform: translate(-50%, -50%);
   text-align: center;
   pointer-events: none;
@@ -5000,14 +5001,14 @@ main { max-width: 76rem; margin: 0 auto; }
 .mind-energy-orbit__kicker {
   margin: 0;
   color: var(--marine);
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
 }
 .mind-energy-orbit__status {
   margin: var(--space-1) 0 0;
   color: var(--ink);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-tight);
   line-height: var(--leading-tight);
@@ -5015,8 +5016,12 @@ main { max-width: 76rem; margin: 0 auto; }
 .mind-energy-orbit__status[data-energy="high"] { color: var(--wave); }
 .mind-energy-orbit__status[data-energy="medium"] { color: var(--marine); }
 .mind-energy-orbit__status[data-energy="low"] { color: var(--high-sea-ink); }
-.mind-energy-orbit__period {
+.mind-energy-orbit__meta {
   margin: var(--space-2) 0 0;
+  text-align: center;
+}
+.mind-energy-orbit__period {
+  margin: 0;
   color: var(--muted);
   font-size: var(--text-sm);
 }
@@ -5029,6 +5034,10 @@ main { max-width: 76rem; margin: 0 auto; }
   margin: var(--space-3) 0 0;
   color: var(--muted);
   font-size: var(--text-xs);
+}
+@media (max-width: 48rem) {
+  .mind-energy-orbit__kicker { font-size: var(--text-xs); }
+  .mind-energy-orbit__status { font-size: var(--text-md); }
 }
 .mind-chart {
   width: 100%;
@@ -6243,6 +6252,26 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   display: none;
 }
 
+/*
+ * Engaged thread: the Messenger who-header already names the agent.
+ * Collapse the picker strip (including the active face) unless Tools expands it.
+ * Height/opacity — not display:none on #agent-picker — so the thread scrollbar
+ * does not bounce when chrome collapses.
+ */
+.chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker {
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chat-view[data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker__avatar {
+  display: none;
+}
+
 .chat-view[data-panel-mode="overlay"] {
   position: fixed;
   z-index: 25;
@@ -6277,11 +6306,18 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   padding-inline: var(--space-2);
 }
 
-/* Overlay engaged: who-header already names the agent — keep only the active face. */
-.chat-view[data-panel-mode="overlay"][data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
-  display: none;
+/* Overlay engaged: who-header already names the agent — collapse the picker strip. */
+.chat-view[data-panel-mode="overlay"][data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker {
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
+.chat-view[data-panel-mode="overlay"][data-chrome='engaged']:not([data-chrome-expanded='true']) .agent-picker__avatar,
 .chat-view[data-panel-mode="overlay"][data-chrome='engaged'] .agent-picker__name {
   display: none;
 }
@@ -6384,8 +6420,8 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 
   .chat-view .chat-form {
     display: flex;
-    flex-direction: row;
-    align-items: flex-end;
+    flex-direction: column;
+    align-items: stretch;
     gap: var(--space-2);
     width: 100%;
     min-width: 0;
@@ -6427,9 +6463,14 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
     padding: 0.35rem 0.7rem;
   }
 
-  .chat-view[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
-    display: none;
+  .chat-message--assistant .chat-message__body {
+    background: color-mix(in srgb, var(--ink) 7%, var(--paper));
+    border-radius: 1.1rem;
+    border-bottom-left-radius: 0.35rem;
   }
+
+  /* Avatars already hide via the shared engaged height:0 collapse — do not
+   * display:none .agent-picker here (same host as #agent-picker; scrollbar bounce). */
 
   .chat-view[data-panel-mode="overlay"] {
     inset: auto;
@@ -7010,7 +7051,7 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 
 
 /* Attachment chip layout lives in design-kit hub-interactions.css
-   (.hub-ai-bar__aside stacks chips above Attach/Send). */
+   (.hub-ai-bar__aside sits under the full-width text field with Attach/Send). */
 .chat-message__attachments {
   display: flex;
   flex-wrap: wrap;

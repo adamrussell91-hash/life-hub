@@ -2,6 +2,7 @@ import type { ExcursionTemplate } from '@/schemas/templates';
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { projectMilestones } from '@/domain/project-milestones';
 import { addDays, parseDue, startOfDay, toDateKey } from '@/domain/queries';
 import { projectChildTasks } from '@/domain/cards';
 
@@ -397,7 +398,7 @@ export function shiftExcursionDates(
     project: {
       current_end_date: nextKey,
       key_dates,
-      milestones: project.milestones.map((item) => ({
+      milestones: projectMilestones(project).map((item) => ({
         ...item,
         due_date: item.due_date ? shiftDateKey(item.due_date, delta) : item.due_date
       }))

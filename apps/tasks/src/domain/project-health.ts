@@ -1,5 +1,6 @@
 import type { Task } from '@/schemas/task';
 import type { Project, Milestone } from '@/schemas/project';
+import { projectMilestones } from '@/domain/project-milestones';
 
 export type ProjectHealth =
   | 'healthy'
@@ -54,7 +55,7 @@ function isBlockedByDeps(task: Task, all: Task[]): boolean {
 }
 
 function openMilestones(project: Project): Milestone[] {
-  return (project.milestones ?? []).filter((m) => m.status === 'open');
+  return projectMilestones(project).filter((m) => m.status === 'open');
 }
 
 /**

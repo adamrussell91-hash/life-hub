@@ -89,7 +89,7 @@ export const ProjectSchema = z.object({
   /** When the project should return for review. */
   review_at: z.string().nullable().default(null),
   type: ProjectTypeSchema.default('standard'),
-  milestones: z.array(MilestoneSchema).default([]),
+  milestones: z.array(MilestoneSchema).nullish().transform((value) => value ?? []),
   status: ProjectStatusSchema.default('active'),
   baseline_end_date: z.string().nullable().default(null),
   current_end_date: z.string().nullable().default(null),

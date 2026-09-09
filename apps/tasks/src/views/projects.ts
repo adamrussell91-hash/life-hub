@@ -38,6 +38,7 @@ import {
 } from '@/views/hub-kit';
 import { createPlusAdd } from '@/views/plus-add';
 import { inspectProjectHealth } from '@/domain/project-health';
+import { projectMilestones } from '@/domain/project-milestones';
 import { activeProjectMeter } from '@/domain/hammond-portfolio';
 import { createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
 import { DEFAULT_PLANNING_PROFILE } from '@/schemas/planning-profile';
@@ -330,7 +331,7 @@ function renderProjectBoardCard(
 
   const chips = el('div', 'pcard__row');
   chips.append(el('span', `status-badge status-badge--${card.lifecycle}`, LIFECYCLE_LABEL[card.lifecycle]));
-  card.project.milestones.slice(0, 3).forEach((milestone, index) => {
+  projectMilestones(card.project).slice(0, 3).forEach((milestone, index) => {
     chips.append(el('span', `hub-chip ${milestoneTint(index)}`, milestone.title));
   });
   article.append(chips);
@@ -709,7 +710,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       );
     }
 
-    const toolbar = createHubToolbar();
+    const toolbar = createHubToolbar('projects-toolbar');
     const search = createHubSearch({
       placeholder: 'Filter projects…',
       ariaLabel: 'Filter projects',

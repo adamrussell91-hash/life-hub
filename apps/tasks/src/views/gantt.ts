@@ -2,6 +2,7 @@ import type { Task, TaskDomain } from '@/schemas/task';
 import type { Project, Milestone } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
 import { hashQuery } from '@/shell/shell';
+import { projectMilestones } from '@/domain/project-milestones';
 import {
   GANTT_BAR_HEIGHT,
   GANTT_GROUP_HEADER_HEIGHT,
@@ -116,7 +117,7 @@ function schedulables(tasks: Task[], projects: Project[]): GanttSchedulable[] {
       estimated_duration: task.estimated_duration
     })),
     ...projects.flatMap((project) =>
-      project.milestones.map((milestone) => ({
+      projectMilestones(project).map((milestone) => ({
         id: milestone.id,
         kind: 'milestone' as const,
         due_date: milestone.due_date,
@@ -128,7 +129,7 @@ function schedulables(tasks: Task[], projects: Project[]): GanttSchedulable[] {
 
 function findMilestone(projects: Project[], id: string): { project: Project; milestone: Milestone } | null {
   for (const project of projects) {
-    const milestone = project.milestones.find((item) => item.id === id);
+    const milestone = projectMilestones(project).find((item) => item.id === id);
     if (milestone) return { project, milestone };
   }
   return null;
@@ -340,7 +341,7 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
         const found = findMilestone(projects, id);
         if (!found) continue;
         await persistProject(found.project.id, {
-          milestones: found.project.milestones.map((milestone) =>
+          milestones: projectMilestones(found.project).map((milestone) =>
             milestone.id === id ? { ...milestone, due_date: due } : milestone
           )
         });
@@ -564,7 +565,7 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
       const next = shiftDueDate(found.milestone.due_date, days);
       if (!next) return;
       await persistProject(found.project.id, {
-        milestones: found.project.milestones.map((milestone) =>
+        milestones: projectMilestones(found.project).map((milestone) =>
           milestone.id === id ? { ...milestone, due_date: next } : milestone
         )
       });
@@ -602,7 +603,7 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
       const found = findMilestone(projects, toId);
       if (!found) return;
       await persistProject(found.project.id, {
-        milestones: found.project.milestones.map((milestone) =>
+        milestones: projectMilestones(found.project).map((milestone) =>
           milestone.id === toId
             ? { ...milestone, depends_on: [...(milestone.depends_on ?? []), fromId] }
             : milestone
@@ -635,7 +636,7 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
       const found = findMilestone(projects, edge.toId);
       if (found) {
         await persistProject(found.project.id, {
-          milestones: found.project.milestones.map((milestone) =>
+          milestones: projectMilestones(found.project).map((milestone) =>
             milestone.id === edge.toId
               ? { ...milestone, depends_on: (milestone.depends_on ?? []).filter((id) => id !== edge.fromId) }
               : milestone

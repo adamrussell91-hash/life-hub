@@ -53,8 +53,17 @@ export function buildMealFlagsLine(notes) {
   return `**Flags:** ${compact}`;
 }
 
+/** Cap long workout / challenge titles so Status and Recent Actions stay scannable. */
+export function compactTitle(title, { max = 48 } = {}) {
+  const text = typeof title === 'string' ? title.trim().replace(/\s+/g, ' ') : '';
+  if (!text) return '';
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(1, max - 1)).trimEnd()}…`;
+}
+
 export function buildExerciseStatusLine(record) {
-  const title = record.title ? record.title : (record.day_type ?? 'workout');
+  const rawTitle = record.title ? record.title : (record.day_type ?? 'workout');
+  const title = compactTitle(rawTitle) || 'workout';
   const duration = record.duration_min != null ? `${record.duration_min} min` : null;
   const moveCount = Array.isArray(record.exercises) && record.exercises.length > 0
     ? `${record.exercises.length} moves`
@@ -63,6 +72,20 @@ export function buildExerciseStatusLine(record) {
     ? record.focus.map(item => String(item).trim()).filter(Boolean).slice(0, 4).join('/')
     : null;
   const bits = [title, duration, moveCount, focus || null, record.status].filter(Boolean);
+  return `**Exercise:** ${bits.join(' · ')}.`;
+}
+
+/** Multi-session Exercise line when more than one finish lands on the same day. */
+export function buildMultiExerciseStatusLine(records) {
+  const sessions = (Array.isArray(records) ? records : []).filter(Boolean);
+  if (sessions.length === 0) return '**Exercise:** none logged.';
+  if (sessions.length === 1) return buildExerciseStatusLine(sessions[0]);
+  const titles = sessions
+    .map(record => compactTitle(record.title || record.day_type || 'session', { max: 28 }))
+    .filter(Boolean);
+  const totalMin = sessions.reduce((sum, record) => sum + (Number(record.duration_min) || 0), 0);
+  const duration = totalMin > 0 ? `${totalMin} min total` : null;
+  const bits = [`${sessions.length} sessions`, titles.join('; ') || null, duration].filter(Boolean);
   return `**Exercise:** ${bits.join(' · ')}.`;
 }
 
@@ -539,9 +562,36 @@ export function applyLogToCentralNode(content, {
   } else if (record.type === 'workout') {
     // Protocol: Central Node after finish — planned autosaves leave Status alone.
     if (!shouldUpdateWorkoutStatus(record)) {
-      return dedupeRecentActions(next);
+      return sanitizeCentralNode(dedupeRecentActions(next), record.date);
     }
-    body = upsertStatusField(body, 'Exercise', buildExerciseStatusLine(record));
+    const existingExercise = /\*\*Exercise:\*\*\s*(.+)/i.exec(body)?.[1]?.replace(/\.\s*$/, '').trim();
+    const looksLikeFinishedSession = Boolean(existingExercise) && (
+      /\b(completed|skipped)\b/i.test(existingExercise)
+      || /^\d+\s+sessions\b/i.test(existingExercise)
+    );
+    if (looksLikeFinishedSession) {
+      const incomingTitle = compactTitle(record.title || record.day_type || 'session', { max: 28 });
+      if (existingExercise.includes(incomingTitle)) {
+        body = upsertStatusField(body, 'Exercise', buildExerciseStatusLine(record));
+      } else if (/^\d+\s+sessions\b/i.test(existingExercise)) {
+        const countMatch = /^(\d+)\s+sessions\s*·\s*(.+?)(?:\s*·\s*(\d+)\s*min total)?$/i.exec(existingExercise);
+        const priorTitles = (countMatch?.[2] ?? existingExercise).split(/\s*;\s*/).map(part => part.trim()).filter(Boolean);
+        if (!priorTitles.includes(incomingTitle)) priorTitles.push(incomingTitle);
+        const totalMin = (Number(countMatch?.[3]) || 0) + (Number(record.duration_min) || 0);
+        const duration = totalMin > 0 ? `${totalMin} min total` : null;
+        const bits = [`${priorTitles.length} sessions`, priorTitles.join('; '), duration].filter(Boolean);
+        body = upsertStatusField(body, 'Exercise', `**Exercise:** ${bits.join(' · ')}.`);
+      } else {
+        const priorTitle = compactTitle(existingExercise.split(/\s*·\s*/)[0], { max: 28 });
+        const totalMin = (Number(record.duration_min) || 0)
+          + (Number(/\b(\d+)\s*min\b/i.exec(existingExercise)?.[1]) || 0);
+        const duration = totalMin > 0 ? `${totalMin} min total` : null;
+        const bits = ['2 sessions', [priorTitle, incomingTitle].filter(Boolean).join('; '), duration].filter(Boolean);
+        body = upsertStatusField(body, 'Exercise', `**Exercise:** ${bits.join(' · ')}.`);
+      }
+    } else {
+      body = upsertStatusField(body, 'Exercise', buildExerciseStatusLine(record));
+    }
     const flags = buildWorkoutFlagsLine(record, flagNotes);
     if (flags) body = mergeFlagsIntoStatus(body, flags);
   } else if (record.type === 'diary') {
@@ -591,10 +641,171 @@ export function applyLogToCentralNode(content, {
   // two steps earlier. Removed 2026-08-11; the honest signal is Today's Status Exercise.
   next = dedupeCrossAgentSection(next);
   next = trimCrossAgentSection(next);
-  next = rollStaleSections(next, record.date);
-  next = purgeStaleRecentActions(next, record.date);
+  next = sanitizeCentralNode(next, record.date);
   next = dedupeRecentActions(next);
   return next;
+}
+
+/**
+ * Adam's floor: Central Node is a pattern board, not an archive.
+ * Anything dated before August 2026 is noise; unbooked penicillin TBC is noise;
+ * day-by-day macro dumps and present-tense Entocort taper copy are noise.
+ */
+export const CENTRAL_NODE_HISTORY_CUTOFF = '2026-08-01';
+
+const UPCOMING_APPOINTMENTS_HEADING = '### Upcoming Appointments';
+const DAY_MACRO_DUMP_RE = /^\s*(?:[-*]\s*)?(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b[^:\n]{0,24}:\s*.*\b(?:kcal|g P|protein)\b/i;
+const WEEK_NONE_LOGGED_RE = /^\s*(?:[-*]\s*)?(?:\*\*)?Exercise:\s*none logged\b/i;
+const ENTCORT_ACTIVE_RE = /\bEntocort\b.*\b(taper|Day\s+\d+|Week\s+\d+|active|begins|6mg|9mg)\b|\b(taper|active).*\bEntocort\b/i;
+const PENICILLIN_CHALLENGE_RE = /penicillin\s+challenge/i;
+const CROSS_AGENT_DATE_RE = /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\b/i;
+const APPT_DATE_RE = /^\s*[-*]\s*\*\*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\b/;
+
+/**
+ * Mechanical Central Node hygiene. Safe to run on every read and every write.
+ * Does not invent pattern prose — only removes stale / cancelled / dump noise.
+ */
+export function sanitizeCentralNode(content, today, {
+  historyCutoff = CENTRAL_NODE_HISTORY_CUTOFF
+} = {}) {
+  if (typeof content !== 'string' || !isCalendarDate(today)) return content;
+  let next = content;
+  next = rollStaleSections(next, today);
+  next = purgeStaleRecentActions(next, today);
+  next = purgePastUpcomingAppointments(next, today);
+  next = purgePenicillinChallengeLines(next);
+  // August floor only engages once we are in/after August — otherwise July fixtures
+  // and mid-year writes would wipe the current month's Cross-Agent lines.
+  if (today >= historyCutoff) {
+    next = purgeCrossAgentBeforeCutoff(next, historyCutoff, today);
+  }
+  next = stripDayByDayMacroDumps(next);
+  next = stripEntocortActiveNoiseOutsideConstraints(next);
+  next = dedupeCrossAgentSection(next);
+  next = trimCrossAgentSection(next);
+  next = dedupeRecentActions(next);
+  return next;
+}
+
+/** Drop dated Upcoming Appointments that are already past. Keep undated TBC (except penicillin). */
+export function purgePastUpcomingAppointments(content, today) {
+  if (typeof content !== 'string' || !isCalendarDate(today)) return content;
+  const headingIndex = content.indexOf(UPCOMING_APPOINTMENTS_HEADING);
+  if (headingIndex === -1) return content;
+  const sectionStart = headingIndex + UPCOMING_APPOINTMENTS_HEADING.length;
+  const after = content.slice(sectionStart);
+  const endRel = after.search(/\n### |\n## /);
+  const section = endRel === -1 ? after : after.slice(0, endRel);
+  const rest = endRel === -1 ? '' : after.slice(endRel);
+  const lines = section.split('\n');
+  const kept = lines.filter(line => {
+    if (!/^\s*[-*]\s+\S/.test(line)) return true;
+    const match = APPT_DATE_RE.exec(line);
+    if (!match) return true;
+    const day = Number(match[1]);
+    const month = MONTH_INDEX[match[2].toLowerCase()];
+    const year = Number(match[3]);
+    const key = toDateKey(year, month, day);
+    if (!key) return true;
+    return key >= today;
+  });
+  if (kept.length === lines.length) return content;
+  return `${content.slice(0, sectionStart)}${kept.join('\n')}${rest}`;
+}
+
+export function purgePenicillinChallengeLines(content) {
+  if (typeof content !== 'string' || !content) return content;
+  const lines = content.split('\n');
+  const kept = lines.filter(line => !PENICILLIN_CHALLENGE_RE.test(line));
+  return kept.length === lines.length ? content : kept.join('\n');
+}
+
+export function purgeCrossAgentBeforeCutoff(content, cutoff, today) {
+  if (typeof content !== 'string' || !isCalendarDate(cutoff)) return content;
+  const headingIndex = content.indexOf(CROSS_AGENT_HEADING);
+  if (headingIndex === -1) return content;
+  const sectionStart = headingIndex + CROSS_AGENT_HEADING.length;
+  const after = content.slice(sectionStart);
+  const endRel = after.search(/\n## /);
+  const section = endRel === -1 ? after : after.slice(0, endRel);
+  const rest = endRel === -1 ? '' : after.slice(endRel);
+  const yearHint = isCalendarDate(today) ? today : cutoff;
+  const lines = section.split('\n');
+  const kept = lines.filter(line => {
+    if (!/^\s*[-*]\s+\S/.test(line)) return true;
+    const match = CROSS_AGENT_DATE_RE.exec(line);
+    if (!match) return true;
+    const day = Number(match[1]);
+    const month = MONTH_INDEX[match[2].toLowerCase()];
+    if (!month || !Number.isFinite(day)) return true;
+    let key = toDateKey(Number(yearHint.slice(0, 4)), month, day);
+    if (!key) return true;
+    if (isCalendarDate(today) && key > today) {
+      key = toDateKey(Number(yearHint.slice(0, 4)) - 1, month, day) ?? key;
+    }
+    return key >= cutoff;
+  });
+  if (kept.length === lines.length) return content;
+  return `${content.slice(0, sectionStart)}${kept.join('\n')}${rest}`;
+}
+
+/** Writing Rule 5: This Week is averages and key events — not daily calorie essays. */
+export function stripDayByDayMacroDumps(content) {
+  if (typeof content !== 'string' || !content) return content;
+  let next = content;
+  for (const headingRe of [THIS_WEEK_HEADING_RE, THIS_MONTH_HEADING_RE]) {
+    const match = headingRe.exec(next);
+    if (!match) continue;
+    const start = match.index + match[0].length;
+    const after = next.slice(start);
+    const endRel = NEXT_SECTION_RE.exec(after);
+    const section = endRel ? after.slice(0, endRel.index) : after;
+    const rest = endRel ? after.slice(endRel.index) : '';
+    const cleaned = section
+      .split('\n')
+      .filter(line => !DAY_MACRO_DUMP_RE.test(line))
+      .join('\n');
+    if (cleaned !== section) {
+      next = `${next.slice(0, start)}${cleaned}${rest}`;
+    }
+  }
+  return next;
+}
+
+/**
+ * Entocort course is ceased — present-tense taper copy outside Constraints is stale.
+ * Constraints keep the medical history; everywhere else drops active-taper framing.
+ */
+export function stripEntocortActiveNoiseOutsideConstraints(content) {
+  if (typeof content !== 'string' || !content) return content;
+  const constraintsStart = content.indexOf('## 🔴 Current Constraints & Priorities');
+  const constraintsEnd = constraintsStart === -1
+    ? -1
+    : (() => {
+      const after = content.slice(constraintsStart + 1);
+      const rel = after.search(/\n## /);
+      return rel === -1 ? content.length : constraintsStart + 1 + rel;
+    })();
+
+  const lines = content.split('\n');
+  let offset = 0;
+  const kept = [];
+  for (const line of lines) {
+    const lineStart = offset;
+    offset += line.length + 1;
+    const inConstraints = constraintsStart !== -1
+      && lineStart >= constraintsStart
+      && lineStart < constraintsEnd;
+    if (!inConstraints && ENTCORT_ACTIVE_RE.test(line)) continue;
+    // Agent Directory one-liner still advertising an active taper protocol.
+    if (!inConstraints && /Entocort taper skin protocol/i.test(line)) {
+      kept.push(line.replace(/,\s*Entocort taper skin protocol/i, ''));
+      continue;
+    }
+    kept.push(line);
+  }
+  const next = kept.join('\n');
+  return next === content ? content : next;
 }
 
 /**
@@ -645,6 +856,67 @@ export function parseRecentActionDateKey(line, today) {
     key = toDateKey(year - 1, month, day);
   }
   return key;
+}
+
+/**
+ * Build Today's Status fields from live event files for `date`.
+ * Returns null when nothing was logged that day — caller keeps markdown.
+ */
+export function buildLiveStatusProse(events, date) {
+  if (!isCalendarDate(date) || !Array.isArray(events)) return null;
+  const records = events.map(item => item?.record ?? item).filter(record => record?.date === date);
+  if (records.length === 0) return null;
+
+  const lines = [];
+  const meals = records.filter(record => record.type === 'meal');
+  if (meals.length > 0) {
+    const totals = meals.reduce((acc, meal) => ({
+      calories: (acc.calories ?? 0) + (Number(meal.calories) || 0),
+      protein_g: (acc.protein_g ?? 0) + (Number(meal.protein_g) || 0),
+      fat_g: (acc.fat_g ?? 0) + (Number(meal.fat_g) || 0),
+      sodium_mg: (acc.sodium_mg ?? 0) + (Number(meal.sodium_mg) || 0),
+      calcium_mg: (acc.calcium_mg ?? 0) + (Number(meal.calcium_mg) || 0),
+      polyphenol_score: (acc.polyphenol_score ?? 0) + (Number(meal.polyphenol_score) || 0)
+    }), {});
+    for (const key of Object.keys(totals)) {
+      totals[key] = Math.round(totals[key] * 10) / 10;
+    }
+    lines.push(buildNutritionStatusLine(totals));
+  }
+
+  const workouts = records.filter(record =>
+    record.type === 'workout' && (record.status === 'completed' || record.status === 'skipped')
+  );
+  if (workouts.length > 0) lines.push(buildMultiExerciseStatusLine(workouts));
+
+  const diary = records.find(record => record.type === 'diary');
+  if (diary) {
+    const mood = diary.mood_score != null ? `${diary.mood_score}/10` : (diary.mood ?? 'logged');
+    lines.push(`**Mood:** ${mood}.`);
+    if (diary.energy) lines.push(`**Energy:** ${diary.energy}.`);
+  }
+
+  const mind = records.find(record => record.type === 'mind_session');
+  if (mind) {
+    const theme = typeof mind.theme === 'string' && mind.theme.trim()
+      ? mind.theme.trim()
+      : 'session logged';
+    lines.push(`**Mind:** ${compactTitle(theme, { max: 72 })}.`);
+  }
+
+  return lines.length > 0 ? lines.join('\n') : null;
+}
+
+/** Prefer live Nutrition / Exercise / Mood / Energy / Mind; keep other markdown fields (Flags, Health). */
+export function mergeLiveStatusOverMarkdown(markdownBody, liveBody) {
+  let body = typeof markdownBody === 'string' ? markdownBody : '';
+  const live = typeof liveBody === 'string' ? liveBody : '';
+  if (!live) return body;
+  for (const field of ['Nutrition', 'Exercise', 'Mood', 'Energy', 'Mind']) {
+    const match = new RegExp(`^\\*\\*${field}:\\*\\*\\s*.+$`, 'im').exec(live);
+    if (match) body = upsertStatusField(body, field, match[0].trim());
+  }
+  return body;
 }
 
 export { TODAYS_STATUS_HEADING, RECENT_ACTIONS_HEADING, CROSS_AGENT_HEADING };

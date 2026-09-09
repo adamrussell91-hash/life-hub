@@ -1,7 +1,7 @@
 import { ApiClientError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 import type { Task } from '@/schemas/task';
-import type { ComplianceModule, Project } from '@/schemas/project';
+import { ProjectSchema, type ComplianceModule, type Project } from '@/schemas/project';
 import {
   filterCachedTasks,
   mergeListedTasks,
@@ -20,6 +20,29 @@ import type {
 } from '@/schemas/templates';
 
 /** Browser client that mirrors the shared TasksStore surface (Clare will use the same server store). */
+
+function parseProject(raw: unknown): Project | null {
+  const first = ProjectSchema.safeParse(raw);
+  if (first.success) return first.data;
+  if (!raw || typeof raw !== 'object') return null;
+  const record = raw as Record<string, unknown>;
+  const patched = {
+    ...record,
+    milestones: Array.isArray(record.milestones) ? record.milestones : [],
+    tags: Array.isArray(record.tags) ? record.tags : [],
+    generated_admin_tasks: Array.isArray(record.generated_admin_tasks)
+      ? record.generated_admin_tasks
+      : []
+  };
+  const retry = ProjectSchema.safeParse(patched);
+  return retry.success ? retry.data : null;
+}
+
+function requireProject(raw: unknown): Project {
+  const project = parseProject(raw);
+  if (!project) throw new Error('Invalid project record');
+  return project;
+}
 
 async function* readClareDumpSse(body: ReadableStream<Uint8Array>): AsyncGenerator<
   | { type: 'status'; text?: string }
@@ -95,11 +118,18 @@ export const tasksApi = {
     }
   },
 
-  listProjects: () => apiGet<{ projects: Project[] }>('/api/projects').then((r) => r.projects),
-  getProject: (id: string) => apiGet<Project>(`/api/projects?id=${encodeURIComponent(id)}`),
-  createProject: (body: unknown) => apiPost<Project>('/api/projects', body),
+  listProjects: () =>
+    apiGet<{ projects: Project[] }>('/api/projects').then((r) =>
+      r.projects.flatMap((raw) => {
+        const project = parseProject(raw);
+        return project ? [project] : [];
+      })
+    ),
+  getProject: (id: string) =>
+    apiGet<Project>(`/api/projects?id=${encodeURIComponent(id)}`).then(requireProject),
+  createProject: (body: unknown) => apiPost<Project>('/api/projects', body).then(requireProject),
   updateProject: (id: string, body: unknown) =>
-    apiPatch<Project>(`/api/projects?id=${encodeURIComponent(id)}`, body),
+    apiPatch<Project>(`/api/projects?id=${encodeURIComponent(id)}`, body).then(requireProject),
   deleteProject: (id: string, meta?: { agent?: string; reason?: string }) =>
     apiDelete<{ deleted: boolean }>(`/api/projects?id=${encodeURIComponent(id)}`, meta),
 

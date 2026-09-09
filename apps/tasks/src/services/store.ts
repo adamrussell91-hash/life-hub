@@ -8,6 +8,7 @@ import {
 import { DEFAULT_TASK_PROPERTY_CONFIG } from '@/domain/task-properties-defaults';
 import { alignStockStatusLabelsWithBoard } from '@/domain/cards';
 import { ProjectSchema } from '@/schemas/project';
+import { projectMilestones } from '@/domain/project-milestones';
 import {
   FrameworkEntrySchema,
   ExcursionTemplateSchema,
@@ -635,7 +636,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         name,
         type: project.type,
         excursion_template_id: project.competition_or_event_type,
-        default_milestones: project.milestones.map((m) => ({
+        default_milestones: projectMilestones(project).map((m) => ({
           title: m.title,
           due_date: null,
           status: 'open' as const

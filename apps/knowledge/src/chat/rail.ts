@@ -7,9 +7,11 @@ import { filterPickerOptions, optionPickerListHtml } from "../ui/optionPicker";
 import { bookContextLine, bookOrigin, normalizeBookContext, resolveBookLabel, type BookContext } from "./bookNote";
 import {
   CHAT_HATS,
+  DEFAULT_CHAT_HAT,
   DEPTHS,
   SCOPES,
   hatById,
+  hatForArchiveMessage,
   isChatHatId,
   isWebFileNoteHat,
   resolveChatPlan,
@@ -17,6 +19,7 @@ import {
   type ChatHatId,
   type ChatScope,
 } from "./hats";
+import { isArchiveLookupQuery } from "../research/topicQuery";
 import { renderChatMarkdown, type NoteTitle } from "./noteLinks";
 import { CHAT_PERSONALITIES } from "./personalities";
 import { researchFromFindings, searchedNotesHtml, thinkingHistoryHtml } from "./sources";
@@ -54,7 +57,7 @@ type ChatTurn = {
 
 const STORAGE_KEY = "knowledge-hub-chat-v1";
 
-let hat: ChatHatId = "synthesis";
+let hat: ChatHatId = DEFAULT_CHAT_HAT;
 let scope: ChatScope | undefined;
 let depth: ChatDepth | undefined;
 let showDials = false;
@@ -190,7 +193,7 @@ export function leaveChatRail() {
     resetSitting();
     noteContext = undefined;
     bookContext = undefined;
-    hat = "synthesis";
+    hat = DEFAULT_CHAT_HAT;
   }
   persist();
 }
@@ -204,7 +207,12 @@ function lastAssistant(): ChatTurn | undefined {
 }
 
 function sitting() {
-  return resolveChatPlan(hat, { scope, depth });
+  const lastUser = [...turns].reverse().find(turn => turn.role === "user")?.content ?? input;
+  const remapped = hatForArchiveMessage(hat, lastUser, isArchiveLookupQuery);
+  return resolveChatPlan(remapped.hat, {
+    scope: remapped.scope ?? scope,
+    depth: remapped.depth ?? depth,
+  });
 }
 
 function waitPool() {
@@ -309,11 +317,16 @@ async function send(host: ChatRailHost, extras: { searchOutside?: boolean } = {}
   if (continuing) paintWorkingChrome(host);
   else host.render();
   try {
+    const queryForPlan =
+      outgoing ||
+      [...history].reverse().find(turn => turn.role === "user")?.content ||
+      "";
+    const remapped = hatForArchiveMessage(hat, queryForPlan, isArchiveLookupQuery);
     const result = await runChat(
       {
-        hat,
-        scope,
-        depth,
+        hat: remapped.hat,
+        scope: remapped.scope ?? scope,
+        depth: remapped.depth ?? depth,
         messages: history.map(({ role, content }) => ({ role, content })),
         workingThesis: thesis || undefined,
         draft: draft || undefined,

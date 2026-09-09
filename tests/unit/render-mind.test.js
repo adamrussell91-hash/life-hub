@@ -163,6 +163,9 @@ function fakeRoot() {
   energyCenter.hidden = true;
   const energyStatus = el('p');
   energyStatus.dataset.mind = 'energy-status';
+  const energyMeta = el('div');
+  energyMeta.dataset.mind = 'energy-meta';
+  energyMeta.hidden = true;
   const energyPeriod = el('p');
   energyPeriod.dataset.mind = 'energy-period';
   const energyTrend = el('p');
@@ -170,7 +173,8 @@ function fakeRoot() {
   const energyHint = el('p');
   energyHint.dataset.mind = 'energy-hint';
   energyHint.hidden = true;
-  energyCenter.append(energyStatus, energyPeriod, energyTrend);
+  energyCenter.append(energyStatus);
+  energyMeta.append(energyPeriod, energyTrend);
   const hero = el('div');
   hero.id = 'mind-hero';
   const themes = el('div');
@@ -311,6 +315,7 @@ function fakeRoot() {
     '[data-mind="energy-legend"]': energyLegend,
     '[data-mind="energy-center"]': energyCenter,
     '[data-mind="energy-status"]': energyStatus,
+    '[data-mind="energy-meta"]': energyMeta,
     '[data-mind="energy-period"]': energyPeriod,
     '[data-mind="energy-trend"]': energyTrend,
     '[data-mind="energy-hint"]': energyHint,
@@ -478,6 +483,9 @@ test('renderMind renders energy orbit, session mood-shift, insights, and silence
 
   assert.equal(root._energyEmpty.hidden, true);
   assert.equal(root._energyStatus.textContent, 'Mostly Low');
+  assert.match(root.querySelector('[data-mind="energy-period"]').textContent, /Past/i);
+  assert.equal(root.querySelector('[data-mind="energy-period"]').parentNode?.dataset?.mind, 'energy-meta');
+  assert.equal(root.querySelector('[data-mind="energy-meta"]').hidden, false);
   const energyPoints = root._energyOrbit.querySelectorAll('[data-role="point"]');
   assert.equal(energyPoints.length, 3);
   assert.equal(energyPoints[0].dataset.energy, 'low');

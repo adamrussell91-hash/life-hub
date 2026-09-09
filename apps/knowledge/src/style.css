@@ -3005,10 +3005,18 @@ body.is-universe-fullscreen .local-banner {
   flex: 1 1 auto;
 }
 
-.chat-overlay[data-chrome='engaged'] .agent-picker__avatar:not(.is-active) {
-  display: none;
+.chat-overlay[data-chrome='engaged'] .agent-picker {
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
+.chat-overlay[data-chrome='engaged'] .agent-picker__avatar:not(.is-active),
+.chat-overlay[data-chrome='engaged'] .agent-picker__avatar,
 .chat-overlay[data-chrome='engaged'] .agent-picker__name {
   display: none;
 }
@@ -3157,8 +3165,12 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .chat-overlay .chat-message--assistant .chat-message__body {
-  padding-left: var(--space-3);
-  border-left: 0.2rem solid var(--wave);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: 0.35rem;
+  border-left: 0;
+  background: color-mix(in srgb, var(--ink) 7%, var(--paper));
+  color: var(--ink);
   /* Size/leading come from design-kit/chat-prose.css (Messenger density). */
 }
 
@@ -3187,14 +3199,13 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .chat-overlay .chat-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  align-items: end;
+  align-items: stretch;
 }
 
 .chat-form__label {
-  grid-column: 1 / -1;
   margin: 0;
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
@@ -3204,7 +3215,17 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .chat-overlay .chat-form textarea,
-.chat-overlay .chat-form input,
+.chat-overlay .chat-form input {
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  box-sizing: border-box;
+}
+
 .chat-overlay__book input {
   min-height: 2.75rem;
   padding: var(--space-2) var(--space-3);
@@ -3238,13 +3259,13 @@ body.is-universe-fullscreen .local-banner {
 }
 
 .chat-overlay .chat-form .hub-ai-bar__field {
-  grid-column: 1;
+  width: 100%;
   min-width: 0;
 }
 
 .chat-overlay .chat-form .hub-ai-bar__aside {
-  grid-column: 2;
-  justify-self: end;
+  width: 100%;
+  justify-content: flex-end;
 }
 
 .chat-overlay .chat-form textarea {
@@ -3300,7 +3321,7 @@ body.is-universe-fullscreen .local-banner {
   }
 
   .chat-overlay .chat-form {
-    grid-template-columns: minmax(0, 1fr) auto;
+    flex-direction: column;
   }
 
   .chat-overlay .chat-form textarea,

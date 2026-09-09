@@ -38,7 +38,9 @@ function formatTaskLine(task, now) {
         : until === 1
           ? 'due tomorrow'
           : `due ${due}`;
-  return `${task.title} — ${when}, ${task.priority}.`;
+  const title = String(task.title || 'task').trim().replace(/\s+/g, ' ');
+  const short = title.length > 56 ? `${title.slice(0, 55).trimEnd()}…` : title;
+  return `${short} — ${when}, ${task.priority}.`;
 }
 
 function openBoard(tasks) {
