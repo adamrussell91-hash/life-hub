@@ -3,6 +3,7 @@ import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { computeProjectVariance } from '@/domain/closure';
 import { projectChildTasks, projectProgress } from '@/domain/cards';
+import { projectMilestones } from '@/domain/project-milestones';
 import { lastProjectActivityAt } from '@/domain/stall';
 import { addDays, parseDue, startOfDay } from '@/domain/queries';
 
@@ -291,7 +292,7 @@ export function buildProjectPulseCard(
     linkedLabel:
       pageBlocks > 0
         ? `${pageBlocks} linked docs · ${children.length} related tasks`
-        : `${children.length} related tasks · ${(project.milestones ?? []).length} milestones`,
+        : `${children.length} related tasks · ${projectMilestones(project).length} milestones`,
     readyToClose: variance.ready_to_close,
     slipDays: variance.slip_days,
     openTaskCount: variance.open_task_count,
@@ -530,7 +531,7 @@ export function findRetroCandidate(
   let nearest: RetroCandidate | null = null;
   for (const card of cards) {
     if (card.lifecycle === 'completed' || card.lifecycle === 'stalled') continue;
-    for (const milestone of card.project.milestones ?? []) {
+    for (const milestone of projectMilestones(card.project)) {
       const due = parseDue(milestone.due_date);
       if (!due) continue;
       const daysOut = Math.round((startOfDay(due).getTime() - startOfDay(now).getTime()) / 86_400_000);

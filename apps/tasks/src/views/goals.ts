@@ -16,6 +16,7 @@ import { createHubFilter, createHubPills, createHubSearch, createHubToolbar, el 
 import { createPlusAdd } from '@/views/plus-add';
 import { createHierarchyTraceCard, createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
 import { activeProjectMeter } from '@/domain/hammond-portfolio';
+import { projectMilestones } from '@/domain/project-milestones';
 
 let goalArea = 'all';
 let goalQuery = '';
@@ -30,12 +31,12 @@ function tagRow(tags: string[]): HTMLElement {
 
 function renderMilestones(project: Project): HTMLElement {
   const wrap = el('div', 'hierarchy-milestones');
-  if ((project.milestones ?? []).length === 0) {
+  if (projectMilestones(project).length === 0) {
     wrap.append(el('p', 'hierarchy-meta', 'No milestones yet.'));
     return wrap;
   }
   const list = el('ul', 'hierarchy-milestone-list');
-  for (const milestone of project.milestones ?? []) {
+  for (const milestone of projectMilestones(project)) {
     const item = el('li', 'hierarchy-milestone');
     item.append(
       el('span', 'hierarchy-milestone__title', milestone.title),
@@ -82,8 +83,8 @@ function renderProjectCard(
   const meta = el(
     'p',
     'hierarchy-meta',
-    `${openCount} open task${openCount === 1 ? '' : 's'} · ${(project.milestones ?? []).length} milestone${
-      (project.milestones ?? []).length === 1 ? '' : 's'
+    `${openCount} open task${openCount === 1 ? '' : 's'} · ${projectMilestones(project).length} milestone${
+      projectMilestones(project).length === 1 ? '' : 's'
     }`
   );
   card.append(head, meta);
