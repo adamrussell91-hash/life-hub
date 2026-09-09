@@ -90,7 +90,11 @@ import {
   reconcileWeeklyReviewIfPendingConsumed,
   loadWorkflowState,
   markScheduleDiffConfirmed,
-  markScheduleDiffDiscarded
+  markScheduleDiffDiscarded,
+  markScheduleDiffPendingConsumed,
+  markScheduleDiffPendingDismissed,
+  reconcileScheduleDiffIfPendingConsumed,
+  reconcileScheduleDiffIfPendingDismissed
 } from './_shared/clare-work.mjs';
 import { loadTimedLifeEventsFromTree } from './_shared/life-schedule-events.mjs';
 import {
@@ -528,6 +532,7 @@ export function createChatConfirmHandler({
       }
       // Positive workflow consume stamp also blocks replay if queue cleanup lagged.
       let workflowConsumed = false;
+      let scheduleDiffReconciled = null;
       if (
         stored?.workflowKind === 'weekly_review'
         && typeof stored?.workflowId === 'string'
@@ -550,6 +555,38 @@ export function createChatConfirmHandler({
           }
         } catch {
           // Fall through to normal execution if workflow store is unavailable.
+        }
+      }
+      if (isScheduleDiffProposal(stored, stored?.proposal) && !isPendingActionExecutable(stored)) {
+        const status = getPendingActionStatus(stored);
+        if (status === PENDING_ACTION_STATUS_CONSUMED) {
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              scheduleDiffReconciled = await reconcileScheduleDiffIfPendingConsumed(tasksStore, {
+                pendingActionId: parsed.id,
+                queueEvidenceConsumed: true,
+                stamp: new Date(now()).toISOString()
+              });
+            }
+          } catch {
+            scheduleDiffReconciled = null;
+          }
+          return errorResponse(
+            409,
+            'pending_action_consumed',
+            'This pending action was already executed and cannot run again.',
+            false,
+            PRIVATE_CACHE,
+            {
+              writesApplied: true,
+              pendingActionStatus: 'consumed',
+              scheduleDiff: scheduleDiffReconciled?.status === 'confirmed'
+                ? 'confirmed'
+                : (scheduleDiffReconciled?.status || 'awaiting_reconciliation'),
+              pendingId: parsed.id
+            }
+          );
         }
       }
       if (workflowConsumed) {
@@ -1002,17 +1039,94 @@ export function createChatConfirmHandler({
       }
 
       if (pendingConsumed && isScheduleDiffProposal(stored, proposal)) {
+        let scheduleDiffCompleted = false;
+        let scheduleDiffCompletionError = null;
+        const selectedWritePaths = accepted.map((w) => w.path);
         try {
           const tasksStore = await getTasksStore(env);
-          if (tasksStore) {
-            await markScheduleDiffConfirmed(tasksStore, {
-              pendingActionId: parsed.id,
-              stamp: consumedAt,
-              selectedWritePaths: accepted.map((w) => w.path)
-            });
+          if (!tasksStore) {
+            scheduleDiffCompletionError = new Error('tasks_store_unavailable');
+          } else {
+            const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+            // No matching workflow (legacy pending) or newer workflow B bound to another id:
+            // do not require terminal mutation; never terminate B while confirming A.
+            if (!existing || existing.pending_action_id !== parsed.id) {
+              scheduleDiffCompleted = true;
+            } else {
+              await markScheduleDiffPendingConsumed(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp: consumedAt,
+                selectedWritePaths
+              });
+              await markScheduleDiffConfirmed(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp: consumedAt,
+                selectedWritePaths
+              });
+              let healed = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              scheduleDiffCompleted =
+                healed?.status === 'confirmed'
+                && healed?.pending_action_id === parsed.id;
+              if (!scheduleDiffCompleted) {
+                healed = await reconcileScheduleDiffIfPendingConsumed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: consumedAt,
+                  selectedWritePaths,
+                  queueEvidenceConsumed: true
+                });
+                scheduleDiffCompleted =
+                  healed?.status === 'confirmed'
+                  && healed?.pending_action_id === parsed.id;
+              }
+            }
           }
-        } catch {
-          // Pending consume is authoritative; workflow stamp is secondary for ghost cleanup.
+        } catch (error) {
+          scheduleDiffCompletionError = error;
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              if (!existing || existing.pending_action_id !== parsed.id) {
+                scheduleDiffCompleted = true;
+              } else {
+                const reconciled = await reconcileScheduleDiffIfPendingConsumed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: consumedAt,
+                  selectedWritePaths,
+                  queueEvidenceConsumed: true
+                });
+                scheduleDiffCompleted =
+                  reconciled?.status === 'confirmed'
+                  && reconciled?.pending_action_id === parsed.id;
+              }
+            }
+          } catch {
+            scheduleDiffCompleted = false;
+          }
+        }
+
+        if (!scheduleDiffCompleted) {
+          return errorResponse(
+            503,
+            'schedule_diff_completion_pending',
+            'Writes landed and the pending action is consumed, but Schedule Diff workflow completion did not persist. Do not re-confirm writes — retry reconciliation.',
+            true,
+            PRIVATE_CACHE,
+            {
+              writesApplied: true,
+              pendingId: parsed.id,
+              pendingActionStatus: 'consumed',
+              scheduleDiff: 'awaiting_reconciliation',
+              lifecycle: {
+                writes: 'applied',
+                pendingAction: 'consumed',
+                scheduleDiff: 'awaiting_reconciliation'
+              },
+              ...(scheduleDiffCompletionError?.message
+                ? { detail: String(scheduleDiffCompletionError.message).slice(0, 200) }
+                : {})
+            }
+          );
         }
       }
 
@@ -1181,8 +1295,10 @@ export function createChatConfirmHandler({
       if (dismissTarget && getPendingActionStatus(dismissTarget) === PENDING_ACTION_STATUS_CONSUMED) {
         return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true, alreadyConsumed: true } }, PRIVATE_CACHE);
       }
+      const storedForDismiss = findPendingActionById(queue, parsed.id);
       const next = removePendingActionById(queue, parsed.id);
-      if (next.length !== queue.length) {
+      const dismissedFromQueue = next.length !== queue.length;
+      if (dismissedFromQueue) {
         await client.writeFile({
           path: PENDING_ACTIONS_PATH,
           content: serializePendingActions(next),
@@ -1191,23 +1307,102 @@ export function createChatConfirmHandler({
         });
       }
 
-      try {
-        const stored = findPendingActionById(queue, parsed.id);
-        if (stored && isScheduleDiffProposal(stored, stored.proposal)) {
+      if (storedForDismiss && isScheduleDiffProposal(storedForDismiss, storedForDismiss.proposal)) {
+        let scheduleDiffDiscarded = false;
+        let scheduleDiffDiscardError = null;
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (!tasksStore) {
+            scheduleDiffDiscardError = new Error('tasks_store_unavailable');
+          } else {
+            const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+            if (!existing || existing.pending_action_id !== parsed.id) {
+              // Legacy / newer workflow B — do not mutate unrelated schedule_diff:current.
+              scheduleDiffDiscarded = true;
+            } else {
+              const stamp = new Date(now()).toISOString();
+              await markScheduleDiffPendingDismissed(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp
+              });
+              await markScheduleDiffDiscarded(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp
+              });
+              let healed = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              scheduleDiffDiscarded =
+                healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
+              if (!scheduleDiffDiscarded) {
+                healed = await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp
+                });
+                scheduleDiffDiscarded =
+                  healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
+              }
+            }
+          }
+        } catch (error) {
+          scheduleDiffDiscardError = error;
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              if (!existing || existing.pending_action_id !== parsed.id) {
+                scheduleDiffDiscarded = true;
+              } else {
+                const healed = await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: new Date(now()).toISOString()
+                });
+                scheduleDiffDiscarded =
+                  healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
+              }
+            }
+          } catch {
+            scheduleDiffDiscarded = false;
+          }
+        }
+        if (!scheduleDiffDiscarded) {
+          return errorResponse(
+            503,
+            'schedule_diff_discard_pending',
+            'The pending action was dismissed, but Schedule Diff workflow discard did not persist. Do not Confirm — retry discard reconciliation.',
+            true,
+            PRIVATE_CACHE,
+            {
+              writesApplied: false,
+              pendingId: parsed.id,
+              pendingActionStatus: 'dismissed',
+              scheduleDiff: 'awaiting_reconciliation',
+              lifecycle: {
+                writes: 'none',
+                pendingAction: 'dismissed',
+                scheduleDiff: 'awaiting_reconciliation'
+              },
+              ...(scheduleDiffDiscardError?.message
+                ? { detail: String(scheduleDiffDiscardError.message).slice(0, 200) }
+                : {})
+            }
+          );
+        }
+      } else if (!dismissedFromQueue) {
+        // Already absent from queue — attempt heal from positive dismiss stamp only.
+        try {
           const tasksStore = await getTasksStore(env);
           if (tasksStore) {
-            await markScheduleDiffDiscarded(tasksStore, {
+            await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
               pendingActionId: parsed.id,
               stamp: new Date(now()).toISOString()
             });
           }
+        } catch {
+          // No positive evidence → do not invent discarded.
         }
-      } catch {
-        // Queue dismiss is primary; workflow stamp is secondary.
       }
 
       try {
-        const stored = findPendingActionById(queue, parsed.id);
+        const stored = storedForDismiss;
         if (stored?.turnId) {
           const turnEntry = current.tree.find(item => item.path === AGENT_TURNS_PATH && item.type === 'blob');
           const turns = turnEntry

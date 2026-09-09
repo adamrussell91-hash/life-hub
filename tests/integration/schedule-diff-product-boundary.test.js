@@ -1,5 +1,5 @@
 /**
- * Schedule Diff product boundary (SD1–SD20).
+ * Schedule Diff product boundary (SD1–SD41).
  *
  * Evidence levels — do not upgrade by renaming:
  * LEVEL 1 = override helper / hard-busy domain
@@ -10,6 +10,7 @@
  *
  * SD1 (legacy): compose + manual queue insert — LEVEL 2/3 seam only, not chat→queue→SSE.
  * SD19: real createChatHandler → pending queue → SSE identity — LEVEL 4.
+ * SD33–SD41: failure-path consistency (queue orphan, terminal workflow, Life event source).
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -27,7 +28,7 @@ import {
   parsePendingActions,
   serializePendingActions
 } from '../../netlify/functions/_shared/capabilities/propose-action.mjs';
-import { executeClareWork, loadWorkflowState } from '../../netlify/functions/_shared/clare-work.mjs';
+import { executeClareWork, loadWorkflowState, reconcileScheduleDiffIfPendingConsumed, reconcileScheduleDiffIfPendingDismissed } from '../../netlify/functions/_shared/clare-work.mjs';
 import { buildProductivityCardEvent } from '../../netlify/functions/_shared/productivity-card-map.mjs';
 import {
   FALLBACK_WORKDAY,
@@ -1656,5 +1657,544 @@ describe('SD31/SD32 Life calendar events (LEVEL 3/4)', () => {
       ),
       true
     );
+  });
+});
+
+function lifeEventMarkdown({
+  type = 'medical',
+  title = 'Doctor',
+  date = DAY,
+  time = '13:00',
+  duration_minutes = 60
+} = {}) {
+  return [
+    '---',
+    'schema_version: 1',
+    `type: ${type}`,
+    `title: ${title}`,
+    `date: ${date}`,
+    `time: "${time}"`,
+    `duration_minutes: ${duration_minutes}`,
+    '---',
+    '',
+    title
+  ].join('\n');
+}
+
+function diaryMarkdown({ date = DAY, title = 'Journal' } = {}) {
+  return [
+    '---',
+    'schema_version: 1',
+    'type: diary',
+    `title: ${title}`,
+    `date: ${date}`,
+    '---',
+    '',
+    'No timed commitment.'
+  ].join('\n');
+}
+
+describe('SD33/SD34 queue failure and ghost gate (LEVEL 2/4)', () => {
+  it('SD33 queue write failure leaves preparing / no active ghosts', async () => {
+    const github = statefulGithub({});
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+    const teaching = memoryStore();
+    const fetchImpl = async (url, options) => {
+      if (
+        options?.method === 'PUT'
+        && decodeURIComponent(url.split('/contents/')[1] ?? '') === PENDING_ACTIONS_PATH
+      ) {
+        return Response.json({ message: 'queue write failed' }, { status: 500 });
+      }
+      return github.fetchImpl(url, options);
+    };
+    const chat = createChatHandler({
+      env: validEnv,
+      now: () => NOW_MS,
+      fetchImpl,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching,
+      createAnthropicClient: () => ({
+        async *streamMessage(args) {
+          await args.executeTools({
+            id: 'call_sd33',
+            name: 'compose_schedule',
+            input: { date: DAY, task_ids: ['task_a'] }
+          });
+          yield { type: 'done' };
+        }
+      })
+    });
+    const events = await readSse(
+      await chat(chatRequest({ message: 'Compose Tuesday', priorAgentSlug: 'clare', agentKernel: true }))
+    );
+    const proposalEvent = events.find((e) => e.type === 'action_proposal');
+    assert.ok(!proposalEvent?.id, 'must not emit durable pending id');
+    const cardEvent = events.find(
+      (e) => e.type === 'productivity_card' && e.card_type === 'schedule-diff'
+    );
+    assert.equal(cardEvent, undefined, 'no schedule-diff card without pending id');
+    assert.equal(github.blobs.has(PENDING_ACTIONS_PATH), false);
+    const wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.ok(wf);
+    assert.notEqual(wf.status, 'awaiting_confirm');
+    assert.equal(wf.pending_action_id, null);
+    assert.ok(wf.status === 'preparing' || !wf.pending_action_id);
+    assert.deepEqual(scheduleDiffActiveProposed(wf), []);
+    assert.equal(Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')), false);
+  });
+
+  it('SD34 awaiting_confirm requires real pending id', () => {
+    assert.deepEqual(
+      scheduleDiffActiveProposed({
+        status: 'awaiting_confirm',
+        pending_action_id: null,
+        proposed: [{ id: 'tasks:work_block:x', title: 'X', date: DAY, start_time: '10:00' }]
+      }),
+      []
+    );
+    assert.deepEqual(
+      scheduleDiffActiveProposed({
+        status: 'preparing',
+        pending_action_id: null,
+        proposed: [{ id: 'tasks:work_block:x', title: 'X', date: DAY, start_time: '10:00' }]
+      }),
+      []
+    );
+    const ghosts = scheduleDiffActiveProposed({
+      status: 'awaiting_confirm',
+      pending_action_id: 'act_real',
+      proposed: [{ id: 'tasks:work_block:x', title: 'X', date: DAY, start_time: '10:00' }]
+    });
+    assert.equal(ghosts.length, 1);
+  });
+});
+
+describe('SD35–SD38 terminal workflow failure + recovery (LEVEL 4)', () => {
+  async function proposeScheduleViaChat(tasks, github, teaching, label = 'sd') {
+    const chat = createChatHandler({
+      env: validEnv,
+      now: () => NOW_MS,
+      fetchImpl: github.fetchImpl,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching,
+      createAnthropicClient: () => ({
+        async *streamMessage(args) {
+          await args.executeTools({
+            id: `call_${label}`,
+            name: 'compose_schedule',
+            input: { date: DAY, task_ids: ['task_a'] }
+          });
+          yield { type: 'done' };
+        }
+      })
+    });
+    const events = await readSse(
+      await chat(chatRequest({ message: `Compose ${label}`, priorAgentSlug: 'clare', agentKernel: true }))
+    );
+    const proposalEvent = events.find((e) => e.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+    return proposalEvent.id;
+  }
+
+  it('SD35 Confirm workflow terminal save failure then reconcile', async () => {
+    const github = statefulGithub({});
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+    const teaching = memoryStore();
+    const idA = await proposeScheduleViaChat(tasks, github, teaching, 'sd35');
+    const paths = (await loadWorkflowState(tasks, 'schedule_diff:current'))?.proposed
+      ?.map((b) => b.write_path || b.id) || [];
+
+    const originalSetJSON = tasks.setJSON.bind(tasks);
+    let blockConfirmed = true;
+    tasks.setJSON = async (key, value) => {
+      if (
+        blockConfirmed
+        && String(key).includes('schedule_diff:current')
+        && value
+        && value.status === 'confirmed'
+      ) {
+        throw new Error('confirmed persist failed');
+      }
+      return originalSetJSON(key, value);
+    };
+
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const failed = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: idA, accept: paths })
+    );
+    const failedBody = await failed.json();
+    assert.equal(failed.status, 503);
+    assert.equal(failedBody.error?.code, 'schedule_diff_completion_pending');
+    assert.equal(failedBody.data?.writesApplied, true);
+    assert.equal(failedBody.data?.pendingActionStatus, 'consumed');
+    assert.equal(getPendingActionStatus(findPendingActionById(
+      parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+      idA
+    )), 'consumed');
+    const blocks = Object.values(tasks.data).filter(
+      (v) => v && typeof v === 'object' && v.source === 'clare' && v.status === 'confirmed'
+    );
+    assert.equal(blocks.length, 1);
+    let wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.notEqual(wf?.status, 'confirmed');
+    assert.equal(wf?.pending_action_status, 'consumed');
+
+    blockConfirmed = false;
+    const retry = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: idA, accept: paths })
+    );
+    assert.equal(retry.status, 409);
+    const retryBody = await retry.json();
+    assert.equal(retryBody.error?.code, 'pending_action_consumed');
+    wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wf?.status, 'confirmed');
+    assert.deepEqual(scheduleDiffActiveProposed(wf), []);
+    assert.equal(
+      Object.values(tasks.data).filter(
+        (v) => v && typeof v === 'object' && v.source === 'clare' && v.status === 'confirmed'
+      ).length,
+      1
+    );
+  });
+
+  it('SD36 lost-response retry does not duplicate work blocks', async () => {
+    const github = statefulGithub({});
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+    const teaching = memoryStore();
+    const idA = await proposeScheduleViaChat(tasks, github, teaching, 'sd36');
+    const paths = (await loadWorkflowState(tasks, 'schedule_diff:current'))?.proposed
+      ?.map((b) => b.write_path || b.id) || [];
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const first = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: idA, accept: paths })
+    );
+    assert.equal(first.status, 200, await first.clone().text());
+    assert.equal((await loadWorkflowState(tasks, 'schedule_diff:current'))?.status, 'confirmed');
+    const second = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: idA, accept: paths })
+    );
+    const secondBody = await second.json();
+    assert.equal(second.status, 409);
+    assert.equal(secondBody.error?.code, 'pending_action_consumed');
+    assert.equal(
+      Object.values(tasks.data).filter(
+        (v) => v && typeof v === 'object' && v.source === 'clare' && v.status === 'confirmed'
+      ).length,
+      1
+    );
+    assert.equal((await loadWorkflowState(tasks, 'schedule_diff:current'))?.status, 'confirmed');
+  });
+
+  it('SD37 Discard workflow save failure then reconcile', async () => {
+    const github = statefulGithub({});
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+    const teaching = memoryStore();
+    const idB = await proposeScheduleViaChat(tasks, github, teaching, 'sd37');
+
+    const originalSetJSON = tasks.setJSON.bind(tasks);
+    let blockDiscarded = true;
+    tasks.setJSON = async (key, value) => {
+      if (
+        blockDiscarded
+        && String(key).includes('schedule_diff:current')
+        && value
+        && value.status === 'discarded'
+      ) {
+        throw new Error('discarded persist failed');
+      }
+      return originalSetJSON(key, value);
+    };
+
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const failed = await confirm(
+      confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: idB })
+    );
+    const failedBody = await failed.json();
+    assert.equal(failed.status, 503);
+    assert.equal(failedBody.error?.code, 'schedule_diff_discard_pending');
+    assert.equal(failedBody.data?.writesApplied, false);
+    assert.equal(Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')), false);
+    assert.equal(
+      findPendingActionById(parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content), idB),
+      null
+    );
+    let wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.notEqual(wf?.status, 'discarded');
+    assert.equal(wf?.pending_action_status, 'dismissed');
+
+    blockDiscarded = false;
+    const healed = await reconcileScheduleDiffIfPendingDismissed(tasks, {
+      pendingActionId: idB,
+      stamp: new Date(NOW_MS).toISOString()
+    });
+    assert.equal(healed?.status, 'discarded');
+    wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wf?.status, 'discarded');
+    assert.deepEqual(scheduleDiffActiveProposed(wf), []);
+    // Retry Confirm must not execute — id is gone from queue.
+    const replay = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: idB,
+        accept: ['tasks:work_block:nope']
+      })
+    );
+    assert.equal(replay.status, 404);
+    assert.equal(Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')), false);
+  });
+
+  it('SD38 old terminal recovery cannot touch newer workflow B', async () => {
+    const github = statefulGithub({});
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+    const teaching = memoryStore();
+    const idA = await proposeScheduleViaChat(tasks, github, teaching, 'sd38a');
+    const pathsA = (await loadWorkflowState(tasks, 'schedule_diff:current'))?.proposed
+      ?.map((b) => b.write_path || b.id) || [];
+
+    const originalSetJSON = tasks.setJSON.bind(tasks);
+    let blockConfirmed = true;
+    tasks.setJSON = async (key, value) => {
+      if (
+        blockConfirmed
+        && String(key).includes('schedule_diff:current')
+        && value
+        && value.status === 'confirmed'
+      ) {
+        throw new Error('confirmed persist failed');
+      }
+      return originalSetJSON(key, value);
+    };
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const failed = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: idA, accept: pathsA })
+    );
+    assert.equal(failed.status, 503);
+
+    blockConfirmed = false;
+    const idB = await proposeScheduleViaChat(tasks, github, teaching, 'sd38b');
+    assert.notEqual(idA, idB);
+    const wfB = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wfB?.status, 'awaiting_confirm');
+    assert.equal(wfB?.pending_action_id, idB);
+    assert.ok(scheduleDiffActiveProposed(wfB).length >= 1);
+
+    const reconciled = await reconcileScheduleDiffIfPendingConsumed(tasks, {
+      pendingActionId: idA,
+      queueEvidenceConsumed: true,
+      stamp: new Date(NOW_MS).toISOString()
+    });
+    assert.equal(reconciled?.pending_action_id, idB);
+    assert.equal(reconciled?.status, 'awaiting_confirm');
+    const retry = await confirm(
+      confirmRequest({ kind: 'action', slug: 'clare', id: idA, accept: pathsA })
+    );
+    assert.equal(retry.status, 409);
+    const wfAfter = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wfAfter?.status, 'awaiting_confirm');
+    assert.equal(wfAfter?.pending_action_id, idB);
+    assert.ok(scheduleDiffActiveProposed(wfAfter).length >= 1);
+  });
+});
+
+describe('SD39–SD41 Life event source integrity (LEVEL 3/4)', () => {
+  const doctorPath = `data/body/2026/09/${DAY}-doctor.md`;
+  const diaryPath = `data/mind/2026/09/${DAY}-journal.md`;
+
+  it('SD39 default Life event read failure blocks Confirm', async () => {
+    const doctorSha = sha40(77);
+    const github = statefulGithub({
+      [PENDING_ACTIONS_PATH]: serializePendingActions([
+        pendingEntry('act_sd39', [workBlockWrite('life39', { start_time: '13:15' })])
+      ]),
+      [doctorPath]: lifeEventMarkdown()
+    });
+    // Pin known sha for doctor blob so we can fail that read specifically.
+    github.blobs.set(doctorPath, { sha: doctorSha, content: lifeEventMarkdown() });
+    const tasks = memoryStore({ 'meta/planning_profile': planningProfile() });
+    const teaching = memoryStore();
+    const fetchImpl = async (url, options) => {
+      if (!options?.method && url.includes(`/git/blobs/${doctorSha}`)) {
+        return Response.json({ message: 'blob read failed' }, { status: 500 });
+      }
+      return github.fetchImpl(url, options);
+    };
+    const confirm = createChatConfirmHandler({
+      env: validEnv,
+      fetchImpl,
+      now: () => NOW_MS,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching
+      // default Life loader — no getLifeEvents injection
+    });
+    const blocked = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: 'act_sd39',
+        accept: ['tasks:work_block:life39'],
+        schedule_overrides: [{ path: 'tasks:work_block:life39', start_time: '13:15' }]
+      })
+    );
+    const body = await blocked.json();
+    assert.equal(blocked.status, 503);
+    assert.equal(body.error?.code || body.error, 'schedule_validation_unavailable');
+    assert.equal(tasks.data['work_blocks/life39'], undefined);
+    assert.equal(
+      isPendingActionExecutable(
+        findPendingActionById(
+          parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+          'act_sd39'
+        )
+      ),
+      true
+    );
+  });
+
+  it('SD40 Life event read failure blocks compose', async () => {
+    const doctorSha = sha40(88);
+    const github = statefulGithub({
+      [doctorPath]: lifeEventMarkdown()
+    });
+    github.blobs.set(doctorPath, { sha: doctorSha, content: lifeEventMarkdown() });
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+    const teaching = memoryStore();
+    const fetchImpl = async (url, options) => {
+      if (!options?.method && url.includes(`/git/blobs/${doctorSha}`)) {
+        return Response.json({ message: 'blob read failed' }, { status: 500 });
+      }
+      return github.fetchImpl(url, options);
+    };
+    const chat = createChatHandler({
+      env: validEnv,
+      now: () => NOW_MS,
+      fetchImpl,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching,
+      createAnthropicClient: () => ({
+        async *streamMessage(args) {
+          await args.executeTools({
+            id: 'call_sd40',
+            name: 'compose_schedule',
+            input: { date: DAY, task_ids: ['task_a'] }
+          });
+          yield { type: 'done' };
+        }
+      })
+    });
+    const events = await readSse(
+      await chat(chatRequest({ message: 'Compose Tuesday', priorAgentSlug: 'clare', agentKernel: true }))
+    );
+    const proposalEvent = events.find((e) => e.type === 'action_proposal');
+    assert.ok(!proposalEvent?.id);
+    assert.equal(
+      events.find((e) => e.type === 'productivity_card' && e.card_type === 'schedule-diff'),
+      undefined
+    );
+    assert.equal(github.blobs.has(PENDING_ACTIONS_PATH), false);
+    const wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.deepEqual(scheduleDiffActiveProposed(wf), []);
+    assert.ok(!wf || wf.status !== 'awaiting_confirm' || !wf.pending_action_id);
+  });
+
+  it('SD41 irrelevant Life diary record skips safely', async () => {
+    const github = statefulGithub({
+      [diaryPath]: diaryMarkdown()
+    });
+    const tasks = memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+    const teaching = memoryStore();
+    const chat = createChatHandler({
+      env: validEnv,
+      now: () => NOW_MS,
+      fetchImpl: github.fetchImpl,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching,
+      createAnthropicClient: () => ({
+        async *streamMessage(args) {
+          await args.executeTools({
+            id: 'call_sd41',
+            name: 'compose_schedule',
+            input: { date: DAY, task_ids: ['task_a'] }
+          });
+          yield { type: 'done' };
+        }
+      })
+    });
+    const events = await readSse(
+      await chat(chatRequest({ message: 'Compose Tuesday', priorAgentSlug: 'clare', agentKernel: true }))
+    );
+    const proposalEvent = events.find((e) => e.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+    const card = events.find((e) => e.type === 'productivity_card' && e.card_type === 'schedule-diff');
+    assert.ok(card);
+    const hardBusy = card.payload?.hardBusy || [];
+    assert.equal(hardBusy.some((s) => /Journal/i.test(s.title || '')), false);
+    const wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wf?.status, 'awaiting_confirm');
+    assert.equal(wf?.pending_action_id, proposalEvent.id);
   });
 });

@@ -61,6 +61,22 @@ test('scheduleDiffActiveProposed suppresses terminal ghosts (SD26)', async () =>
   assert.equal(
     scheduleDiffActiveProposed({
       status: 'awaiting_confirm',
+      pending_action_id: null,
+      proposed: [{ id: 'legacy', date: '2026-09-08', start_time: '09:00' }]
+    }).length,
+    0
+  );
+  assert.equal(
+    scheduleDiffActiveProposed({
+      status: 'preparing',
+      pending_action_id: null,
+      proposed: [{ id: 'prep', date: '2026-09-08', start_time: '09:00' }]
+    }).length,
+    0
+  );
+  assert.equal(
+    scheduleDiffActiveProposed({
+      status: 'awaiting_confirm',
       pending_action_id: 'act',
       proposed: [{ id: 'z', date: '2026-09-08', start_time: '12:00' }]
     }).length,

@@ -215,9 +215,9 @@ import {
   listJSON as listTeachingJSON
 } from './_shared/teaching-blobs.mjs';
 import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
-import { executeClareWork, isClareWorkTool, statedPlannerInputs, markWeeklyReviewAwaitingConfirm, markScheduleDiffAwaitingConfirm } from './_shared/clare-work.mjs';
+import { executeClareWork, isClareWorkTool, statedPlannerInputs, markWeeklyReviewAwaitingConfirm, markScheduleDiffAwaitingConfirm, loadWorkflowState } from './_shared/clare-work.mjs';
 import { buildProductivityCardEvent } from './_shared/productivity-card-map.mjs';
-import { loadTimedLifeEventsFromTree } from './_shared/life-schedule-events.mjs';
+import { loadTimedLifeEventsFromTree, LifeEventSourceUnavailableError } from './_shared/life-schedule-events.mjs';
 import {
   executeHammondProductivity,
   isHammondProductivityTool
@@ -2364,8 +2364,17 @@ export function createChatHandler({
                       client,
                       tree: repoTree
                     });
-                  } catch {
-                    hubLifeEvents = [];
+                  } catch (error) {
+                    // Fail closed: incomplete calendar truth must not produce a Schedule Diff proposal.
+                    const code = error instanceof LifeEventSourceUnavailableError
+                      || error?.code === 'schedule_validation_unavailable'
+                      ? 'schedule_validation_unavailable'
+                      : 'schedule_context_unavailable';
+                    return JSON.stringify({
+                      ok: false,
+                      error: code,
+                      message: 'Authoritative Life calendar events could not be loaded. Schedule was not composed.'
+                    });
                   }
                 }
                 const result = await executeClareWork(event.name, event.input ?? {}, {
@@ -2421,13 +2430,22 @@ export function createChatHandler({
                   }, {
                     pendingId: pendingId || undefined
                   });
-                  if (proposeCard) send(proposeCard);
+                  // Only emit a Confirmable Schedule Diff card when a durable pending id exists.
+                  if (proposeCard && pendingId) send(proposeCard);
                   if (!pendingId) {
+                    // Leave preparing / non-active workflow — never promote awaiting_confirm without an id.
+                    if (hubTasksStore && result.workflow_kind === 'schedule_diff') {
+                      try {
+                        workflowState = await loadWorkflowState(hubTasksStore, 'schedule_diff:current');
+                      } catch {
+                        workflowState = workflowState || null;
+                      }
+                    }
                     return JSON.stringify({
                       ok: false,
                       error: 'pending_queue_persist_failed',
-                      status: workflowState?.status || result.state?.status || 'in_progress',
-                      ...(workflowState ? { state: workflowState } : result.state ? { state: result.state } : {})
+                      status: workflowState?.status || 'preparing',
+                      ...(workflowState ? { state: workflowState } : {})
                     });
                   }
                   return JSON.stringify({

@@ -1,10 +1,23 @@
 /**
  * Load timed Life Hub vault events for Schedule Diff hard-busy.
  * Reuses Life calendar vault paths (data/**) — not a new store.
+ *
+ * Safe skip: file readable but not a hard timed calendar event.
+ * Fail closed: candidate blob read/decode unavailable (source failure).
  */
 import { parseEventDocument } from '../../../apps/life/js/core/records.js';
 import { lifeEventToBusySpan } from './productivity-os.mjs';
 import { decodeBlob } from './decode-blob.mjs';
+
+export class LifeEventSourceUnavailableError extends Error {
+  constructor(message = 'life_event_source_unavailable', { path = null, cause = null } = {}) {
+    super(message);
+    this.name = 'LifeEventSourceUnavailableError';
+    this.code = 'schedule_validation_unavailable';
+    this.path = path;
+    if (cause) this.cause = cause;
+  }
+}
 
 let loadYamlImpl = null;
 async function yamlLoader() {
@@ -32,15 +45,36 @@ export async function loadTimedLifeEventsFromTree({ client, tree, dates }) {
   });
   const out = [];
   for (const entry of candidates.slice(0, 100)) {
+    let blob;
     try {
-      const content = decodeBlob(await client.readBlob(entry.sha));
-      if (content == null) continue;
+      blob = await client.readBlob(entry.sha);
+    } catch (error) {
+      throw new LifeEventSourceUnavailableError('life_event_blob_read_failed', {
+        path: entry.path,
+        cause: error
+      });
+    }
+    let content;
+    try {
+      content = decodeBlob(blob);
+    } catch (error) {
+      throw new LifeEventSourceUnavailableError('life_event_blob_decode_failed', {
+        path: entry.path,
+        cause: error
+      });
+    }
+    if (content == null) {
+      throw new LifeEventSourceUnavailableError('life_event_blob_decode_unavailable', {
+        path: entry.path
+      });
+    }
+    try {
       const { record } = parseEventDocument(content, entry.path, loadYaml);
       if (!record || typeof record !== 'object') continue;
       if (!lifeEventToBusySpan(record)) continue;
       out.push(record);
     } catch {
-      // Skip unreadable / non-canonical vault files.
+      // Readable but not a supported/canonical timed event — safe skip.
     }
   }
   return out;

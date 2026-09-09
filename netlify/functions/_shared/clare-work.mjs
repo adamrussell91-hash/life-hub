@@ -1290,6 +1290,33 @@ export async function reconcileWeeklyReviewIfPendingConsumed(store, reviewId) {
   return markWeeklyReviewComplete(store, reviewId);
 }
 
+/**
+ * Pre-queue Schedule Diff preview. Not active — ghosts require awaiting_confirm + durable id.
+ * Compose persists this before proposeOsAction; queue success promotes to awaiting_confirm.
+ */
+export async function markScheduleDiffPreparing(store, {
+  stamp,
+  scheduleContext = null,
+  proposed = null,
+  writes = null,
+  date = null
+} = {}) {
+  if (!store) return null;
+  const updatedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    id: 'schedule_diff:current',
+    kind: 'schedule_diff',
+    ...(date ? { date } : {}),
+    ...(Array.isArray(proposed) ? { proposed } : { proposed: [] }),
+    ...(Array.isArray(writes) ? { writes } : {}),
+    status: 'preparing',
+    pending_action_id: null,
+    pending_action_status: null,
+    ...(scheduleContext && typeof scheduleContext === 'object' ? { schedule_context: scheduleContext } : {}),
+    updated_at: updatedAt
+  });
+}
+
 /** Mark schedule_diff:current awaiting_confirm with the durable pending action id. */
 export async function markScheduleDiffAwaitingConfirm(store, {
   pendingActionId,
@@ -1299,7 +1326,7 @@ export async function markScheduleDiffAwaitingConfirm(store, {
   writes = null,
   date = null
 } = {}) {
-  if (!store) return null;
+  if (!store || !pendingActionId) return null;
   const state = (await loadWorkflowState(store, 'schedule_diff:current')) || {
     id: 'schedule_diff:current',
     kind: 'schedule_diff'
@@ -1313,10 +1340,36 @@ export async function markScheduleDiffAwaitingConfirm(store, {
     ...(Array.isArray(proposed) ? { proposed } : {}),
     ...(Array.isArray(writes) ? { writes } : {}),
     status: 'awaiting_confirm',
-    pending_action_id: pendingActionId ?? state.pending_action_id ?? null,
+    pending_action_id: pendingActionId,
     pending_action_status: 'pending',
     ...(scheduleContext && typeof scheduleContext === 'object' ? { schedule_context: scheduleContext } : {}),
     updated_at: updatedAt
+  });
+}
+
+/**
+ * Stamp positive Confirm consume evidence without claiming terminal confirmed yet.
+ * Identity guard: never stamp a newer workflow bound to a different pending id.
+ */
+export async function markScheduleDiffPendingConsumed(store, {
+  pendingActionId,
+  stamp,
+  selectedWritePaths = null
+} = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  if (state.status === 'confirmed') return state;
+  const consumedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    ...state,
+    status: state.status === 'discarded' ? state.status : 'awaiting_confirm',
+    pending_action_id: pendingActionId,
+    pending_action_status: 'consumed',
+    pending_action_consumed_at: consumedAt,
+    ...(Array.isArray(selectedWritePaths) ? { selected_write_paths: selectedWritePaths } : {}),
+    updated_at: consumedAt
   });
 }
 
@@ -1346,6 +1399,52 @@ export async function markScheduleDiffConfirmed(store, {
   });
 }
 
+/**
+ * Heal awaiting_confirm → confirmed only with positive consume evidence + identity match.
+ * Never infers terminal state from a missing pending id alone.
+ */
+export async function reconcileScheduleDiffIfPendingConsumed(store, {
+  pendingActionId,
+  stamp,
+  selectedWritePaths = null,
+  queueEvidenceConsumed = false
+} = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  if (state.status === 'confirmed') return state;
+  const positive =
+    state.pending_action_status === 'consumed'
+    || queueEvidenceConsumed === true;
+  if (!positive) return state;
+  return markScheduleDiffConfirmed(store, {
+    pendingActionId,
+    stamp,
+    selectedWritePaths: selectedWritePaths ?? state.selected_write_paths ?? null
+  });
+}
+
+/**
+ * Stamp positive dismiss evidence without claiming terminal discarded yet.
+ */
+export async function markScheduleDiffPendingDismissed(store, { pendingActionId, stamp } = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  if (state.status === 'discarded' || state.status === 'confirmed') return state;
+  const dismissedAt = stamp || new Date().toISOString();
+  return saveWorkflowState(store, 'schedule_diff:current', {
+    ...state,
+    status: 'awaiting_confirm',
+    pending_action_id: pendingActionId,
+    pending_action_status: 'dismissed',
+    pending_action_dismissed_at: dismissedAt,
+    updated_at: dismissedAt
+  });
+}
+
 /** Discard terminal reconciliation — identity guard on pending_action_id. */
 export async function markScheduleDiffDiscarded(store, { pendingActionId, stamp } = {}) {
   if (!store || !pendingActionId) return null;
@@ -1364,15 +1463,32 @@ export async function markScheduleDiffDiscarded(store, { pendingActionId, stamp 
   });
 }
 
-/** Active Schedule Diff ghosts only while awaiting_confirm. */
+/**
+ * Heal to discarded only with positive dismiss evidence + identity match.
+ */
+export async function reconcileScheduleDiffIfPendingDismissed(store, {
+  pendingActionId,
+  stamp
+} = {}) {
+  if (!store || !pendingActionId) return null;
+  const state = await loadWorkflowState(store, 'schedule_diff:current');
+  if (!state) return null;
+  if (state.pending_action_id !== pendingActionId) return state;
+  if (state.status === 'discarded') return state;
+  if (state.pending_action_status !== 'dismissed') return state;
+  return markScheduleDiffDiscarded(store, { pendingActionId, stamp });
+}
+
+/**
+ * Active Schedule Diff ghosts require awaiting_confirm + durable pending id + proposed[].
+ * preparing / terminal / missing id → no ghosts.
+ */
 export function scheduleDiffActiveProposed(state) {
   if (!state || typeof state !== 'object') return [];
-  const status = typeof state.status === 'string' ? state.status : '';
-  if (status === 'confirmed' || status === 'discarded' || status === 'complete') return [];
-  if (status && status !== 'awaiting_confirm') return [];
-  // Legacy: proposed with no status → treat as awaiting only when pending_action_id present.
-  if (!status && !state.pending_action_id) return [];
-  return Array.isArray(state.proposed) ? state.proposed : [];
+  if (state.status !== 'awaiting_confirm') return [];
+  const id = typeof state.pending_action_id === 'string' ? state.pending_action_id.trim() : '';
+  if (!id) return [];
+  return Array.isArray(state.proposed) && state.proposed.length ? state.proposed : [];
 }
 
 function calendarNotesFromCtx({ lessons = [], workBlocks = [], tasks = [], todayKey, past = false }) {
@@ -2270,19 +2386,13 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       ['confirm_card', 'tasks_hub', 'schedule_diff', 'calendar_ghost']
     );
 
-    // Shared preview identity for Tasks + Life calendars (ghosts until Confirm).
-    // pending_action_id is stamped after the queue write in chat.mjs.
-    await saveWorkflowState(tasksStore, 'schedule_diff:current', {
-      id: 'schedule_diff:current',
-      kind: 'schedule_diff',
+    // Pre-queue preparing state — not active until chat stamps awaiting_confirm + real pending id.
+    await markScheduleDiffPreparing(tasksStore, {
+      stamp,
       date: dateKey,
       proposed,
       writes: writes.map(w => ({ path: w.path, diff: w.diff })),
-      status: 'awaiting_confirm',
-      pending_action_id: null,
-      pending_action_status: null,
-      schedule_context: scheduleContext,
-      updated_at: stamp
+      scheduleContext
     });
 
     return {
