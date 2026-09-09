@@ -1,5 +1,5 @@
 /**
- * Schedule Diff product boundary (SD1–SD41).
+ * Schedule Diff product boundary (SD1–SD48).
  *
  * Evidence levels — do not upgrade by renaming:
  * LEVEL 1 = override helper / hard-busy domain
@@ -11,6 +11,7 @@
  * SD1 (legacy): compose + manual queue insert — LEVEL 2/3 seam only, not chat→queue→SSE.
  * SD19: real createChatHandler → pending queue → SSE identity — LEVEL 4.
  * SD33–SD41: failure-path consistency (queue orphan, terminal workflow, Life event source).
+ * SD42–SD48: dismissed queue tombstones + first workflow dismiss-write recovery.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -20,13 +21,16 @@ import { createChatHandler } from '../../netlify/functions/chat.mjs';
 import { createChatConfirmHandler } from '../../netlify/functions/chat-confirm.mjs';
 import {
   PENDING_ACTIONS_PATH,
+  MAX_PENDING_ACTIONS,
   addPendingAction,
   applyScheduleOverrides,
   findPendingActionById,
   getPendingActionStatus,
   isPendingActionExecutable,
+  markPendingActionDismissed,
   parsePendingActions,
-  serializePendingActions
+  serializePendingActions,
+  trimPendingActions
 } from '../../netlify/functions/_shared/capabilities/propose-action.mjs';
 import { executeClareWork, loadWorkflowState, reconcileScheduleDiffIfPendingConsumed, reconcileScheduleDiffIfPendingDismissed } from '../../netlify/functions/_shared/clare-work.mjs';
 import { buildProductivityCardEvent } from '../../netlify/functions/_shared/productivity-card-map.mjs';
@@ -124,6 +128,10 @@ function statefulGithub(seed = {}) {
     if (options?.method === 'PUT') {
       const path = decodeURIComponent(url.split('/contents/')[1] ?? '');
       const body = JSON.parse(options.body);
+      const existing = blobs.get(path);
+      if (body.sha && existing && existing.sha !== body.sha) {
+        return Response.json({ message: 'conflict' }, { status: 409 });
+      }
       const content = Buffer.from(body.content, 'base64').toString('utf8');
       const sha = sha40(seq++);
       blobs.set(path, { sha, content });
@@ -1951,10 +1959,12 @@ describe('SD35–SD38 terminal workflow failure + recovery (LEVEL 4)', () => {
     assert.equal(failedBody.error?.code, 'schedule_diff_discard_pending');
     assert.equal(failedBody.data?.writesApplied, false);
     assert.equal(Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')), false);
-    assert.equal(
-      findPendingActionById(parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content), idB),
-      null
+    const tomb = findPendingActionById(
+      parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+      idB
     );
+    assert.ok(tomb, 'dismissed tombstone must remain in queue');
+    assert.equal(getPendingActionStatus(tomb), 'dismissed');
     let wf = await loadWorkflowState(tasks, 'schedule_diff:current');
     assert.notEqual(wf?.status, 'discarded');
     assert.equal(wf?.pending_action_status, 'dismissed');
@@ -1962,13 +1972,14 @@ describe('SD35–SD38 terminal workflow failure + recovery (LEVEL 4)', () => {
     blockDiscarded = false;
     const healed = await reconcileScheduleDiffIfPendingDismissed(tasks, {
       pendingActionId: idB,
-      stamp: new Date(NOW_MS).toISOString()
+      stamp: new Date(NOW_MS).toISOString(),
+      queueEvidenceDismissed: true
     });
     assert.equal(healed?.status, 'discarded');
     wf = await loadWorkflowState(tasks, 'schedule_diff:current');
     assert.equal(wf?.status, 'discarded');
     assert.deepEqual(scheduleDiffActiveProposed(wf), []);
-    // Retry Confirm must not execute — id is gone from queue.
+    // Retry Confirm must not execute — id is dismissed tombstone.
     const replay = await confirm(
       confirmRequest({
         kind: 'action',
@@ -1977,7 +1988,8 @@ describe('SD35–SD38 terminal workflow failure + recovery (LEVEL 4)', () => {
         accept: ['tasks:work_block:nope']
       })
     );
-    assert.equal(replay.status, 404);
+    assert.equal(replay.status, 409);
+    assert.equal((await replay.json()).error?.code, 'pending_action_dismissed');
     assert.equal(Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')), false);
   });
 
@@ -2196,5 +2208,358 @@ describe('SD39–SD41 Life event source integrity (LEVEL 3/4)', () => {
     const wf = await loadWorkflowState(tasks, 'schedule_diff:current');
     assert.equal(wf?.status, 'awaiting_confirm');
     assert.equal(wf?.pending_action_id, proposalEvent.id);
+  });
+});
+
+describe('SD42–SD48 dismissed queue tombstones (LEVEL 2/4)', () => {
+  async function proposeScheduleViaChat(tasks, github, teaching, label = 'sd') {
+    const chat = createChatHandler({
+      env: validEnv,
+      now: () => NOW_MS,
+      fetchImpl: github.fetchImpl,
+      getTasksStore: async () => tasks,
+      getTeachingStore: async () => teaching,
+      createAnthropicClient: () => ({
+        async *streamMessage(args) {
+          await args.executeTools({
+            id: `call_${label}`,
+            name: 'compose_schedule',
+            input: { date: DAY, task_ids: ['task_a'] }
+          });
+          yield { type: 'done' };
+        }
+      })
+    });
+    const events = await readSse(
+      await chat(chatRequest({ message: `Compose ${label}`, priorAgentSlug: 'clare', agentKernel: true }))
+    );
+    const proposalEvent = events.find((e) => e.type === 'action_proposal');
+    assert.ok(proposalEvent?.id);
+    return proposalEvent.id;
+  }
+
+  function taskStore() {
+    return memoryStore({
+      'tasks/task_a': {
+        id: 'task_a',
+        title: 'Mark Year 10',
+        status: 'open',
+        estimated_duration: 45,
+        depth: 'shallow'
+      },
+      'meta/planning_profile': planningProfile()
+    });
+  }
+
+  it('SD42 dismiss persists dismissed tombstone', async () => {
+    const github = statefulGithub({});
+    const tasks = taskStore();
+    const teaching = memoryStore();
+    const idA = await proposeScheduleViaChat(tasks, github, teaching, 'sd42');
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const response = await confirm(
+      confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: idA })
+    );
+    assert.equal(response.status, 200, await response.clone().text());
+    const queue = parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    const tomb = findPendingActionById(queue, idA);
+    assert.ok(tomb);
+    assert.equal(getPendingActionStatus(tomb), 'dismissed');
+    assert.ok(typeof tomb.dismissedAt === 'string' && tomb.dismissedAt);
+    assert.equal(isPendingActionExecutable(tomb), false);
+    assert.equal(Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')), false);
+    const wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wf?.status, 'discarded');
+    assert.deepEqual(scheduleDiffActiveProposed(wf), []);
+  });
+
+  it('SD43 dismissed id cannot Confirm', async () => {
+    const github = statefulGithub({});
+    const tasks = taskStore();
+    const teaching = memoryStore();
+    const idA = await proposeScheduleViaChat(tasks, github, teaching, 'sd43');
+    const confirm = confirmHandler({ github, tasks, teaching });
+    assert.equal(
+      (await confirm(confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: idA }))).status,
+      200
+    );
+    const blocked = await confirm(
+      confirmRequest({
+        kind: 'action',
+        slug: 'clare',
+        id: idA,
+        accept: ['tasks:work_block:nope']
+      })
+    );
+    const body = await blocked.json();
+    assert.equal(blocked.status, 409);
+    assert.equal(body.error?.code, 'pending_action_dismissed');
+    assert.equal(Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')), false);
+    const tomb = findPendingActionById(
+      parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+      idA
+    );
+    assert.equal(getPendingActionStatus(tomb), 'dismissed');
+    assert.equal((await loadWorkflowState(tasks, 'schedule_diff:current'))?.status, 'discarded');
+  });
+
+  it('SD44 dismiss replay is idempotent', async () => {
+    const github = statefulGithub({});
+    const tasks = taskStore();
+    const teaching = memoryStore();
+    const idA = await proposeScheduleViaChat(tasks, github, teaching, 'sd44');
+    const confirm = confirmHandler({ github, tasks, teaching });
+    assert.equal(
+      (await confirm(confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: idA }))).status,
+      200
+    );
+    const before = parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    const firstTomb = findPendingActionById(before, idA);
+    const replay = await confirm(
+      confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: idA })
+    );
+    const replayBody = await replay.json();
+    assert.equal(replay.status, 200);
+    assert.equal(replayBody.data?.alreadyDismissed, true);
+    const after = parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    assert.equal(after.filter((e) => e.id === idA).length, 1);
+    assert.equal(getPendingActionStatus(findPendingActionById(after, idA)), 'dismissed');
+    assert.equal(findPendingActionById(after, idA)?.dismissedAt, firstTomb.dismissedAt);
+    assert.equal((await loadWorkflowState(tasks, 'schedule_diff:current'))?.status, 'discarded');
+    assert.equal(Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')), false);
+  });
+
+  it('SD45 first workflow dismiss stamp failure recovers from queue tombstone', async () => {
+    const github = statefulGithub({});
+    const tasks = taskStore();
+    const teaching = memoryStore();
+    const idB = await proposeScheduleViaChat(tasks, github, teaching, 'sd45');
+    assert.equal((await loadWorkflowState(tasks, 'schedule_diff:current'))?.pending_action_status, 'pending');
+
+    const originalSetJSON = tasks.setJSON.bind(tasks);
+    let blockFirstWorkflowDismiss = true;
+    let firstDismissWriteAttempted = false;
+    tasks.setJSON = async (key, value) => {
+      if (
+        blockFirstWorkflowDismiss
+        && String(key).includes('schedule_diff:current')
+        && value
+        && value.pending_action_status === 'dismissed'
+      ) {
+        firstDismissWriteAttempted = true;
+        throw new Error('first workflow dismiss stamp failed');
+      }
+      return originalSetJSON(key, value);
+    };
+
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const failed = await confirm(
+      confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: idB })
+    );
+    const failedBody = await failed.json();
+    assert.equal(failed.status, 503);
+    assert.equal(failedBody.error?.code, 'schedule_diff_discard_pending');
+    assert.equal(firstDismissWriteAttempted, true, 'must fail the FIRST workflow dismiss write');
+    assert.equal(Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')), false);
+
+    const tomb = findPendingActionById(
+      parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+      idB
+    );
+    assert.ok(tomb);
+    assert.equal(getPendingActionStatus(tomb), 'dismissed');
+
+    let wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wf?.status, 'awaiting_confirm');
+    assert.equal(wf?.pending_action_id, idB);
+    assert.equal(wf?.pending_action_status, 'pending');
+    assert.ok(scheduleDiffActiveProposed(wf).length >= 1);
+
+    blockFirstWorkflowDismiss = false;
+    const retry = await confirm(
+      confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: idB })
+    );
+    const retryBody = await retry.json();
+    assert.equal(retry.status, 200);
+    assert.equal(retryBody.data?.alreadyDismissed, true);
+    assert.equal(Object.keys(tasks.data).some((k) => k.startsWith('work_blocks/')), false);
+    const afterQueue = parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content);
+    assert.equal(getPendingActionStatus(findPendingActionById(afterQueue, idB)), 'dismissed');
+    assert.equal(afterQueue.filter((e) => e.id === idB).length, 1);
+    wf = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wf?.status, 'discarded');
+    assert.deepEqual(scheduleDiffActiveProposed(wf), []);
+  });
+
+  it('SD46 old dismissed A cannot discard newer workflow B', async () => {
+    const github = statefulGithub({});
+    const tasks = taskStore();
+    const teaching = memoryStore();
+    const idA = await proposeScheduleViaChat(tasks, github, teaching, 'sd46a');
+
+    const originalSetJSON = tasks.setJSON.bind(tasks);
+    let blockWorkflowDismiss = true;
+    tasks.setJSON = async (key, value) => {
+      if (
+        blockWorkflowDismiss
+        && String(key).includes('schedule_diff:current')
+        && value
+        && (value.pending_action_status === 'dismissed' || value.status === 'discarded')
+      ) {
+        throw new Error('workflow dismiss blocked for A');
+      }
+      return originalSetJSON(key, value);
+    };
+    const confirm = confirmHandler({ github, tasks, teaching });
+    const failed = await confirm(
+      confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: idA })
+    );
+    assert.equal(failed.status, 503);
+    assert.equal(
+      getPendingActionStatus(
+        findPendingActionById(parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content), idA)
+      ),
+      'dismissed'
+    );
+
+    blockWorkflowDismiss = false;
+    const idB = await proposeScheduleViaChat(tasks, github, teaching, 'sd46b');
+    assert.notEqual(idA, idB);
+    const wfB = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wfB?.status, 'awaiting_confirm');
+    assert.equal(wfB?.pending_action_id, idB);
+    assert.ok(scheduleDiffActiveProposed(wfB).length >= 1);
+
+    const retry = await confirm(
+      confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: idA })
+    );
+    assert.equal(retry.status, 200);
+    const wfAfter = await loadWorkflowState(tasks, 'schedule_diff:current');
+    assert.equal(wfAfter?.status, 'awaiting_confirm');
+    assert.equal(wfAfter?.pending_action_id, idB);
+    assert.ok(scheduleDiffActiveProposed(wfAfter).length >= 1);
+    assert.equal(
+      getPendingActionStatus(
+        findPendingActionById(parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content), idA)
+      ),
+      'dismissed'
+    );
+  });
+
+  it('SD47 terminal retention preserves live actions', () => {
+    let queue = [];
+    for (let i = 0; i < 12; i += 1) {
+      queue.push({
+        id: `cons_${i}`,
+        status: 'consumed',
+        consumedAt: `${DAY}T10:${String(i).padStart(2, '0')}:00.000Z`,
+        proposal: { capability: 'os.propose-action', agent: 'clare', intent: 'x', reads: [], writes: [], surfaces: [] }
+      });
+    }
+    for (let i = 0; i < 12; i += 1) {
+      queue = markPendingActionDismissed(
+        [...queue, {
+          id: `diss_${i}`,
+          status: 'pending',
+          proposal: { capability: 'os.propose-action', agent: 'clare', intent: 'x', reads: [], writes: [], surfaces: [] }
+        }],
+        `diss_${i}`,
+        { dismissedAt: `${DAY}T11:${String(i).padStart(2, '0')}:00.000Z` }
+      );
+    }
+    queue.push({
+      id: 'live_P',
+      status: 'pending',
+      proposal: { capability: 'os.propose-action', agent: 'clare', intent: 'p', reads: [], writes: [], surfaces: [] }
+    });
+    queue.push({
+      id: 'live_X',
+      status: 'executing',
+      executionStartedAt: `${DAY}T12:00:00.000Z`,
+      proposal: { capability: 'os.propose-action', agent: 'clare', intent: 'x', reads: [], writes: [], surfaces: [] }
+    });
+
+    for (let i = 0; i < 8; i += 1) {
+      queue = addPendingAction(queue, {
+        id: `new_live_${i}`,
+        status: 'pending',
+        proposal: { capability: 'os.propose-action', agent: 'clare', intent: 'n', reads: [], writes: [], surfaces: [] }
+      });
+    }
+    queue = trimPendingActions(queue);
+
+    assert.ok(findPendingActionById(queue, 'live_P'), 'old pending P must survive');
+    assert.ok(findPendingActionById(queue, 'live_X'), 'executing X must survive');
+    for (let i = 0; i < 8; i += 1) {
+      assert.ok(findPendingActionById(queue, `new_live_${i}`), `new live ${i} must survive`);
+    }
+    assert.equal(isPendingActionExecutable(findPendingActionById(queue, 'live_P')), true);
+    assert.equal(isPendingActionExecutable(findPendingActionById(queue, 'live_X')), false);
+    for (const entry of queue) {
+      if (entry.status === 'dismissed' || entry.status === 'consumed') {
+        assert.equal(isPendingActionExecutable(entry), false);
+      }
+    }
+    assert.ok(queue.length <= MAX_PENDING_ACTIONS || queue.every((e) => {
+      const s = getPendingActionStatus(e);
+      return s === 'pending' || s === 'executing';
+    }));
+  });
+
+  it('SD48 concurrent Confirm vs Discard fails safe', async () => {
+    const github = statefulGithub({});
+    const tasks = taskStore();
+    const teaching = memoryStore();
+    const idA = await proposeScheduleViaChat(tasks, github, teaching, 'sd48');
+    const paths = (await loadWorkflowState(tasks, 'schedule_diff:current'))?.proposed
+      ?.map((b) => b.write_path || b.id) || [];
+    const confirm = confirmHandler({ github, tasks, teaching });
+
+    // Deterministic race: both handlers resolve the same SHA then race PUT.
+    // SHA/CAS in statefulGithub ensures only one terminal transition lands.
+    const [confirmRes, dismissRes] = await Promise.all([
+      confirm(confirmRequest({ kind: 'action', slug: 'clare', id: idA, accept: paths })),
+      confirm(confirmRequest({ kind: 'action_dismiss', slug: 'clare', id: idA }))
+    ]);
+    const confirmBody = await confirmRes.json();
+    const dismissBody = await dismissRes.json();
+    const entry = findPendingActionById(
+      parsePendingActions(github.blobs.get(PENDING_ACTIONS_PATH).content),
+      idA
+    );
+    const status = getPendingActionStatus(entry);
+    const workCount = Object.values(tasks.data).filter(
+      (v) => v && typeof v === 'object' && v.source === 'clare' && v.status === 'confirmed'
+    ).length;
+
+    const confirmWon =
+      confirmRes.status === 200
+      && (status === 'consumed' || status === 'executing')
+      && workCount === 1
+      && (
+        dismissRes.status === 409
+        || (dismissRes.status === 200 && dismissBody.data?.alreadyConsumed === true)
+      );
+
+    const dismissWon =
+      dismissRes.status === 200
+      && status === 'dismissed'
+      && workCount === 0
+      && (
+        confirmRes.status === 409
+        && (
+          confirmBody.error?.code === 'pending_action_dismissed'
+          || confirmBody.error?.code === 'pending_action_execution_in_progress'
+          || confirmBody.error?.code === 'write_conflict'
+        )
+      );
+
+    assert.ok(
+      confirmWon || dismissWon,
+      `unsafe race outcome confirm=${confirmRes.status}/${confirmBody.error?.code} dismiss=${dismissRes.status}/${dismissBody.error?.code} status=${status} writes=${workCount}`
+    );
+    assert.notEqual(status === 'dismissed' && workCount > 0, true, 'dismissed + writes applied');
+    assert.notEqual(status === 'consumed' && status === 'dismissed', true);
+    assert.ok(workCount <= 1, 'duplicate writes');
   });
 });

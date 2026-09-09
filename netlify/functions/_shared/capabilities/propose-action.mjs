@@ -202,6 +202,12 @@ export function serializePendingActions(list) {
 export const PENDING_ACTION_STATUS_PENDING = 'pending';
 export const PENDING_ACTION_STATUS_EXECUTING = 'executing';
 export const PENDING_ACTION_STATUS_CONSUMED = 'consumed';
+export const PENDING_ACTION_STATUS_DISMISSED = 'dismissed';
+
+const TERMINAL_PENDING_ACTION_STATUSES = new Set([
+  PENDING_ACTION_STATUS_CONSUMED,
+  PENDING_ACTION_STATUS_DISMISSED
+]);
 
 /** Entries without status are treated as pending (backward compatible). */
 export function isPendingActionExecutable(entry) {
@@ -217,35 +223,35 @@ export function getPendingActionStatus(entry) {
   return status;
 }
 
-/** Live = pending/executing (or missing status). Consumed tombstones are terminal history. */
+/** Live = pending/executing (or missing status). Consumed/dismissed tombstones are terminal history. */
 export function isPendingActionLive(entry) {
   if (!entry || typeof entry !== 'object') return false;
-  return getPendingActionStatus(entry) !== PENDING_ACTION_STATUS_CONSUMED;
+  return !TERMINAL_PENDING_ACTION_STATUSES.has(getPendingActionStatus(entry));
 }
 
 /**
- * Trim terminal consumed tombstones before ever dropping live pending/executing authority.
+ * Trim terminal consumed/dismissed tombstones before ever dropping live pending/executing authority.
  * If live entries alone exceed `max`, allow temporary overflow rather than silent eviction.
- * Kept consumed tombstones are the newest ones (by queue order).
+ * Kept terminal tombstones are the newest ones (by queue order).
  */
 export function trimPendingActions(list, { max = MAX_PENDING_ACTIONS } = {}) {
   const base = Array.isArray(list) ? list : [];
   const live = [];
-  const consumed = [];
+  const terminal = [];
   for (const entry of base) {
     if (!entry?.id) continue;
     if (isPendingActionLive(entry)) live.push(entry);
-    else consumed.push(entry);
+    else terminal.push(entry);
   }
   if (live.length >= max) {
     // Prefer temporary growth over deleting live Confirm authority.
     return live;
   }
   const room = max - live.length;
-  const keptConsumed = consumed.length > room
-    ? consumed.slice(consumed.length - room)
-    : consumed;
-  const keep = new Set([...live, ...keptConsumed].map((entry) => entry.id));
+  const keptTerminal = terminal.length > room
+    ? terminal.slice(terminal.length - room)
+    : terminal;
+  const keep = new Set([...live, ...keptTerminal].map((entry) => entry.id));
   return base.filter((entry) => entry?.id && keep.has(entry.id));
 }
 
@@ -288,6 +294,31 @@ export function markPendingActionConsumed(list, id, { consumedAt, extra } = {}) 
   return found ? next : base;
 }
 
+/**
+ * Mark a pending action terminally dismissed in place.
+ * Tombstone is positive evidence that the action must never execute and may reconcile workflows.
+ */
+export function markPendingActionDismissed(list, id, { dismissedAt, extra } = {}) {
+  const base = Array.isArray(list) ? list : [];
+  if (typeof id !== 'string' || !id.trim()) return base;
+  let found = false;
+  const next = base.map((entry) => {
+    if (entry?.id !== id) return entry;
+    found = true;
+    const {
+      executionStartedAt: _dropStarted,
+      ...rest
+    } = entry;
+    return {
+      ...rest,
+      status: PENDING_ACTION_STATUS_DISMISSED,
+      dismissedAt: dismissedAt || new Date().toISOString(),
+      ...(extra && typeof extra === 'object' ? extra : {})
+    };
+  });
+  return found ? next : base;
+}
+
 export function markPendingActionExecuting(list, id, { executionStartedAt, extra } = {}) {
   const base = Array.isArray(list) ? list : [];
   if (typeof id !== 'string' || !id.trim()) return base;
@@ -315,6 +346,7 @@ export function markPendingActionPending(list, id, { extra } = {}) {
     const {
       executionStartedAt: _dropStarted,
       consumedAt: _dropConsumed,
+      dismissedAt: _dropDismissed,
       ...rest
     } = entry;
     return {

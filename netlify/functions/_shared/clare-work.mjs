@@ -1465,17 +1465,22 @@ export async function markScheduleDiffDiscarded(store, { pendingActionId, stamp 
 
 /**
  * Heal to discarded only with positive dismiss evidence + identity match.
+ * Queue tombstone (queueEvidenceDismissed) is primary recovery when workflow stamp never landed.
  */
 export async function reconcileScheduleDiffIfPendingDismissed(store, {
   pendingActionId,
-  stamp
+  stamp,
+  queueEvidenceDismissed = false
 } = {}) {
   if (!store || !pendingActionId) return null;
   const state = await loadWorkflowState(store, 'schedule_diff:current');
   if (!state) return null;
   if (state.pending_action_id !== pendingActionId) return state;
   if (state.status === 'discarded') return state;
-  if (state.pending_action_status !== 'dismissed') return state;
+  const positive =
+    state.pending_action_status === 'dismissed'
+    || queueEvidenceDismissed === true;
+  if (!positive) return state;
   return markScheduleDiffDiscarded(store, { pendingActionId, stamp });
 }
 

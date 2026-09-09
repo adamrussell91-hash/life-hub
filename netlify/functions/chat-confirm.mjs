@@ -42,15 +42,16 @@ import {
   PENDING_ACTIONS_PATH,
   parsePendingActions,
   serializePendingActions,
-  removePendingActionById,
   findPendingActionById,
   markPendingActionConsumed,
   markPendingActionExecuting,
   markPendingActionPending,
+  markPendingActionDismissed,
   isPendingActionExecutable,
   getPendingActionStatus,
   PENDING_ACTION_STATUS_EXECUTING,
   PENDING_ACTION_STATUS_CONSUMED,
+  PENDING_ACTION_STATUS_DISMISSED,
   validateProposeActionInput,
   executeProposeActionWrites,
   classifyWriteTarget,
@@ -559,6 +560,32 @@ export function createChatConfirmHandler({
       }
       if (isScheduleDiffProposal(stored, stored?.proposal) && !isPendingActionExecutable(stored)) {
         const status = getPendingActionStatus(stored);
+        if (status === PENDING_ACTION_STATUS_DISMISSED) {
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                pendingActionId: parsed.id,
+                queueEvidenceDismissed: true,
+                stamp: new Date(now()).toISOString()
+              });
+            }
+          } catch {
+            // Rejection is authoritative; workflow heal is best-effort.
+          }
+          return errorResponse(
+            409,
+            'pending_action_dismissed',
+            'This pending action was discarded and cannot be confirmed.',
+            false,
+            PRIVATE_CACHE,
+            {
+              writesApplied: false,
+              pendingActionStatus: 'dismissed',
+              pendingId: parsed.id
+            }
+          );
+        }
         if (status === PENDING_ACTION_STATUS_CONSUMED) {
           try {
             const tasksStore = await getTasksStore(env);
@@ -606,6 +633,15 @@ export function createChatConfirmHandler({
             'pending_action_execution_in_progress',
             'This pending action is already executing. Do not retry blindly — wait for recovery.',
             true,
+            PRIVATE_CACHE
+          );
+        }
+        if (status === PENDING_ACTION_STATUS_DISMISSED) {
+          return errorResponse(
+            409,
+            'pending_action_dismissed',
+            'This pending action was discarded and cannot be confirmed.',
+            false,
             PRIVATE_CACHE
           );
         }
@@ -1281,9 +1317,15 @@ export function createChatConfirmHandler({
       if (!entry) {
         return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
       }
-      const queue = parsePendingActions(decodeBlob(await client.readBlob(entry.sha)));
+      let queue = parsePendingActions(decodeBlob(await client.readBlob(entry.sha)));
+      let queueSha = entry.sha;
       const dismissTarget = findPendingActionById(queue, parsed.id);
-      if (dismissTarget && getPendingActionStatus(dismissTarget) === PENDING_ACTION_STATUS_EXECUTING) {
+      if (!dismissTarget) {
+        // Absence alone is not positive dismiss evidence — do not invent discarded.
+        return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+      }
+      const dismissStatus = getPendingActionStatus(dismissTarget);
+      if (dismissStatus === PENDING_ACTION_STATUS_EXECUTING) {
         return errorResponse(
           409,
           'pending_action_execution_in_progress',
@@ -1292,20 +1334,42 @@ export function createChatConfirmHandler({
           PRIVATE_CACHE
         );
       }
-      if (dismissTarget && getPendingActionStatus(dismissTarget) === PENDING_ACTION_STATUS_CONSUMED) {
+      if (dismissStatus === PENDING_ACTION_STATUS_CONSUMED) {
         return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true, alreadyConsumed: true } }, PRIVATE_CACHE);
       }
-      const storedForDismiss = findPendingActionById(queue, parsed.id);
-      const next = removePendingActionById(queue, parsed.id);
-      const dismissedFromQueue = next.length !== queue.length;
-      if (dismissedFromQueue) {
-        await client.writeFile({
-          path: PENDING_ACTIONS_PATH,
-          content: serializePendingActions(next),
-          sha: entry.sha,
-          message: `chore(propose-action): dismiss ${parsed.id}`
-        });
+      if (dismissStatus === PENDING_ACTION_STATUS_DISMISSED) {
+        // Idempotent replay — reconcile Schedule Diff from queue tombstone if needed.
+        if (isScheduleDiffProposal(dismissTarget, dismissTarget.proposal)) {
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                pendingActionId: parsed.id,
+                queueEvidenceDismissed: true,
+                stamp: new Date(now()).toISOString()
+              });
+            }
+          } catch {
+            // Already dismissed in queue; workflow heal is best-effort on replay.
+          }
+        }
+        return jsonResponse(200, {
+          ok: true,
+          data: { id: parsed.id, dismissed: true, alreadyDismissed: true }
+        }, PRIVATE_CACHE);
       }
+
+      // Authoritative dismissal: persist pending → dismissed tombstone (do not remove).
+      const dismissedAt = new Date(now()).toISOString();
+      const next = markPendingActionDismissed(queue, parsed.id, { dismissedAt });
+      await client.writeFile({
+        path: PENDING_ACTIONS_PATH,
+        content: serializePendingActions(next),
+        sha: queueSha,
+        message: `chore(propose-action): dismiss ${parsed.id}`
+      });
+      queue = next;
+      const storedForDismiss = findPendingActionById(queue, parsed.id);
 
       if (storedForDismiss && isScheduleDiffProposal(storedForDismiss, storedForDismiss.proposal)) {
         let scheduleDiffDiscarded = false;
@@ -1320,14 +1384,13 @@ export function createChatConfirmHandler({
               // Legacy / newer workflow B — do not mutate unrelated schedule_diff:current.
               scheduleDiffDiscarded = true;
             } else {
-              const stamp = new Date(now()).toISOString();
               await markScheduleDiffPendingDismissed(tasksStore, {
                 pendingActionId: parsed.id,
-                stamp
+                stamp: dismissedAt
               });
               await markScheduleDiffDiscarded(tasksStore, {
                 pendingActionId: parsed.id,
-                stamp
+                stamp: dismissedAt
               });
               let healed = await loadWorkflowState(tasksStore, 'schedule_diff:current');
               scheduleDiffDiscarded =
@@ -1335,7 +1398,8 @@ export function createChatConfirmHandler({
               if (!scheduleDiffDiscarded) {
                 healed = await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
                   pendingActionId: parsed.id,
-                  stamp
+                  stamp: dismissedAt,
+                  queueEvidenceDismissed: true
                 });
                 scheduleDiffDiscarded =
                   healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
@@ -1353,7 +1417,8 @@ export function createChatConfirmHandler({
               } else {
                 const healed = await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
                   pendingActionId: parsed.id,
-                  stamp: new Date(now()).toISOString()
+                  stamp: dismissedAt,
+                  queueEvidenceDismissed: true
                 });
                 scheduleDiffDiscarded =
                   healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
@@ -1386,19 +1451,6 @@ export function createChatConfirmHandler({
             }
           );
         }
-      } else if (!dismissedFromQueue) {
-        // Already absent from queue — attempt heal from positive dismiss stamp only.
-        try {
-          const tasksStore = await getTasksStore(env);
-          if (tasksStore) {
-            await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
-              pendingActionId: parsed.id,
-              stamp: new Date(now()).toISOString()
-            });
-          }
-        } catch {
-          // No positive evidence → do not invent discarded.
-        }
       }
 
       try {
@@ -1430,7 +1482,7 @@ export function createChatConfirmHandler({
 
       // Log rejection for the audit trail.
       try {
-        const stored = findPendingActionById(queue, parsed.id);
+        const stored = storedForDismiss;
         const govEntry = current.tree.find(item => item.path === GOVERNANCE_LOG_PATH && item.type === 'blob');
         let govContent = emptyGovernanceLog();
         let govSha;
