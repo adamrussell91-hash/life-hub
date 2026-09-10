@@ -264,6 +264,26 @@ test('Messenger who-header has no Talking to eyebrow', async () => {
   assert.doesNotMatch(html, /chat-view__who-eyebrow|Talking to/);
 });
 
+test('Messenger assistant bubbles keep the avatar beside the bubble, not stacked above it', async () => {
+  const kit = await readFile(
+    new URL('../../packages/design-kit/hub-interactions.css', import.meta.url),
+    'utf8'
+  );
+  assert.match(
+    kit,
+    /\.chat-message\.chat-message--assistant[\s\S]*?display:\s*grid/,
+    'assistant rows use grid so the avatar cannot wrap above the bubble'
+  );
+  assert.match(
+    kit,
+    /grid-template-columns:\s*auto minmax\(0,\s*max-content\)/
+  );
+  assert.match(
+    kit,
+    /\.chat-messages,\s*\.chat-overlay \.chat-messages\s*\{[^}]*gap:\s*0\.125rem/
+  );
+});
+
 test('engaged phone Chat drops the page title stack and assistant left bar', async () => {
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
   const phoneChat = css.slice(css.indexOf('Engaged phone Chat already has the Messenger who-header'));
@@ -294,9 +314,19 @@ test('short chat bubbles are sized by text, not Copy/Retry, and status lines do 
   const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
   const bodyRule = css.match(/(?:^|\n)\.chat-message__body\s*\{[^}]+\}/)?.[0] ?? '';
   const actionsRule = css.match(/(?:^|\n)\.chat-message__actions\s*\{[^}]+\}/)?.[0] ?? '';
-  assert.match(bodyRule, /flex:\s*1 1 auto/);
-  assert.match(bodyRule, /width:\s*max-content/);
+  assert.match(bodyRule, /flex:\s*1 1 0/);
+  assert.match(bodyRule, /width:\s*auto/);
   assert.doesNotMatch(bodyRule, /12rem/);
+  assert.match(
+    css,
+    /(?:^|\n)\.chat-message\s*\{[^}]*flex-wrap:\s*nowrap/,
+    'assistant avatar must stay beside the bubble — wrap stacked it in the gap'
+  );
+  assert.match(
+    css,
+    /(?:^|\n)\.chat-messages\s*\{[^}]*gap:\s*0\.125rem/,
+    'Messenger consecutive bubbles stay tight'
+  );
   assert.match(actionsRule, /width:\s*0/);
   assert.match(actionsRule, /min-width:\s*100%/);
   // Idle Copy/Retry must leave the layout (display:none) — opacity/visibility
