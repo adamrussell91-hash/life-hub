@@ -205,9 +205,26 @@ export function createTemplatesHandler(deps = {}) {
         const compliance_modules = Array.isArray(body.compliance_modules)
           ? body.compliance_modules
           : cloneDefaultComplianceModules();
+        const leadOverrides =
+          body.lead_time_overrides && typeof body.lead_time_overrides === 'object'
+            ? body.lead_time_overrides
+            : null;
 
         // Single generic template today (see excursion-catalog.ts) — any id maps to it.
-        const template = DEFAULT_EXCURSION_TEMPLATE;
+        const baseTemplate = DEFAULT_EXCURSION_TEMPLATE;
+        const template = leadOverrides
+          ? {
+              ...baseTemplate,
+              default_lead_times: {
+                ...baseTemplate.default_lead_times,
+                ...Object.fromEntries(
+                  Object.entries(leadOverrides).filter(
+                    ([key, value]) => key in baseTemplate.default_lead_times && Number.isFinite(value)
+                  )
+                )
+              }
+            }
+          : baseTemplate;
         const plan = buildExcursionPlan(template, {
           title,
           event_date,

@@ -107,6 +107,35 @@ test('GET ignores stale legacy templates left over in blob storage', async () =>
   assert.equal(excursion_templates[0].id, 'ext_excursion');
 });
 
+test('create_excursion_from_template applies lead_time_overrides on top of the template defaults', async () => {
+  const store = memoryStore();
+  const handler = createTemplatesHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  });
+
+  const created = await handler(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/templates',
+    body: {
+      action: 'create_excursion_from_template',
+      excursion_template_id: 'ext_excursion',
+      title: 'Short-notice excursion',
+      event_date: '2026-10-15',
+      lead_time_overrides: { risk_assessment_days: 10, bogus_field: 999, staff_email_days: 'not-a-number' }
+    }
+  }));
+  assert.equal(created.status, 201);
+  const { project } = (await created.json()).data;
+
+  // Overridden: 10 days before 2026-10-15.
+  assert.equal(project.key_dates.risk_assessment_due, '2026-10-05');
+  // Unrecognised/invalid overrides are ignored — defaults still apply.
+  assert.equal(project.key_dates.permission_note_due, '2026-09-24');
+  assert.equal(project.key_dates.staff_notification_due, '2026-09-24');
+});
+
 test('create_excursion_from_template rejects a missing/invalid event date', async () => {
   const store = memoryStore();
   const handler = createTemplatesHandler({

@@ -512,6 +512,31 @@ export function leadTimeSlack(
     });
 }
 
+export type NextExcursionAction = {
+  label: string;
+  dueDate: string;
+  overdue: boolean;
+};
+
+/** Earliest still-open dated child task — the one thing to look at next on a dashboard card. */
+export function nextExcursionAction(
+  project: Project,
+  tasks: Task[],
+  now = new Date()
+): NextExcursionAction | null {
+  const todayKey = toDateKey(startOfDay(now));
+  const dated = projectChildTasks(project, tasks)
+    .filter((task): task is Task & { due_date: string } => task.status !== 'done' && !!task.due_date)
+    .sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0));
+  const next = dated[0];
+  if (!next) return null;
+  return {
+    label: next.title,
+    dueDate: next.due_date,
+    overdue: next.due_date < todayKey
+  };
+}
+
 /** "N days to go" / "Today" / "N days ago" — no event date reads as unscheduled. */
 export function excursionCountdownLabel(
   dateStr: string | null | undefined,
