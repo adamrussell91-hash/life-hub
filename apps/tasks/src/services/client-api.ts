@@ -15,6 +15,7 @@ import type { Program } from '@/schemas/program';
 import type {
   FrameworkEntry,
   ExcursionTemplate,
+  LeadTimeOverrides,
   TaskTemplate,
   ProjectTemplate
 } from '@/schemas/templates';
@@ -165,6 +166,7 @@ export const tasksApi = {
     student_group_reference?: string | null;
     description?: string;
     compliance_modules?: ComplianceModule[];
+    lead_time_overrides?: LeadTimeOverrides;
   }) =>
     apiPost<{ project: Project; tasks: Task[] }>('/api/templates', {
       action: 'create_excursion_from_template',

@@ -10,7 +10,8 @@ vi.mock('@/services/client-api', () => ({
     listProjects: vi.fn(),
     listTasks: vi.fn(),
     listTemplates: vi.fn(),
-    createExcursionFromTemplate: vi.fn()
+    createExcursionFromTemplate: vi.fn(),
+    deleteProject: vi.fn()
   }
 }));
 
@@ -123,21 +124,47 @@ describe('excursions dashboard', () => {
     expect(location.hash).toBe('#/excursions/new?template=ext_excursion');
   });
 
-  it('shows a Clearance Gate status and countdown on each active excursion card', async () => {
+  it('shows a Clearance Gate pill, countdown, task progress, and the next outstanding action', async () => {
     location.hash = '#/excursions';
     const canvas = await mount();
 
-    const card = canvas.querySelector<HTMLElement>('.proj-row');
+    const card = canvas.querySelector<HTMLElement>('.excursion-card');
     expect(card).not.toBeNull();
     expect(card?.textContent).toContain('Ethics Olympiad heat');
 
-    const meta = canvas.querySelector<HTMLElement>('.excursion-list-meta');
-    expect(meta).not.toBeNull();
-    expect(meta?.classList.contains('is-warn')).toBe(true);
-    expect(meta?.textContent).toContain('Not cleared');
+    const pill = card?.querySelector<HTMLElement>('.excursion-card__pill');
+    expect(pill).not.toBeNull();
+    expect(pill?.classList.contains('is-warn')).toBe(true);
+    expect(pill?.textContent).toContain('Not cleared');
+
+    expect(card?.querySelector('.excursion-card__countdown')?.textContent).not.toBe('');
+    expect(card?.querySelector('.excursion-card__row-value')?.textContent).toContain('done');
+    expect(card?.querySelector('.excursion-card__next')?.textContent).toContain('Draft permission note');
 
     card?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(location.hash).toBe('#/project/proj_ex_ethics_seed');
+  });
+
+  it('does not navigate when the click lands on the card menu, and deletes via its Delete option', async () => {
+    vi.mocked(tasksApi.deleteProject).mockResolvedValue({ deleted: true });
+    location.hash = '#/excursions';
+    const canvas = await mount();
+
+    const menuBtn = canvas.querySelector<HTMLButtonElement>('.excursion-card .card-menu');
+    expect(menuBtn).not.toBeNull();
+    menuBtn!.click();
+    expect(location.hash).toBe('#/excursions');
+
+    const deleteOpt = document.querySelector<HTMLButtonElement>('[data-card-menu-item="delete"]');
+    expect(deleteOpt).not.toBeNull();
+    deleteOpt!.click();
+
+    await vi.waitFor(() => {
+      expect(tasksApi.deleteProject).toHaveBeenCalledWith(
+        'proj_ex_ethics_seed',
+        expect.objectContaining({ reason: expect.any(String) })
+      );
+    });
   });
 
   it('sends a template query straight through to the new excursion page', async () => {
@@ -241,6 +268,67 @@ describe('new excursion page', () => {
     const call = vi.mocked(tasksApi.createExcursionFromTemplate).mock.calls.at(-1)![0];
     const wwccModule = call.compliance_modules!.find((m) => m.id === 'wwcc')!;
     expect(wwccModule.on).toBe(false);
+  });
+
+  it('renders compliance items as toggle switches, not checkmarks', async () => {
+    mockList();
+    location.hash = '#/excursions/new?template=ext_excursion';
+    const canvas = document.createElement('main');
+    await renderNewExcursionPage(canvas);
+
+    const complianceBox = canvas.querySelector<HTMLElement>('.excursion-compliance');
+    expect(complianceBox?.querySelector('.toggle-switch')).not.toBeNull();
+    expect(complianceBox?.querySelector('.task-check')).toBeNull();
+  });
+
+  it('lets you edit the title before creating', async () => {
+    mockList();
+    vi.mocked(tasksApi.createExcursionFromTemplate).mockResolvedValue({
+      project: { ...excursion, id: 'proj_new' },
+      tasks: [task]
+    });
+    location.hash = '#/excursions/new?template=ext_excursion';
+    const canvas = document.createElement('main');
+    await renderNewExcursionPage(canvas);
+
+    const titleInput = canvas.querySelector<HTMLInputElement>('.excursion-confirm__title');
+    expect(titleInput).not.toBeNull();
+    titleInput!.value = 'Year 10 Ski Trip';
+    titleInput!.dispatchEvent(new Event('change'));
+
+    expect(canvas.querySelector('.confirm-card .page-header__title')?.textContent).toBe(
+      'Create “Year 10 Ski Trip”'
+    );
+
+    canvas.querySelector<HTMLButtonElement>('.confirm-card .btn--primary')!.click();
+    await vi.waitFor(() => {
+      const call = vi.mocked(tasksApi.createExcursionFromTemplate).mock.calls.at(-1)![0];
+      expect(call.title).toBe('Year 10 Ski Trip');
+    });
+  });
+
+  it('lets you edit a lead time before creating, sending it as a lead_time_overrides day count', async () => {
+    mockList();
+    vi.mocked(tasksApi.createExcursionFromTemplate).mockResolvedValue({
+      project: { ...excursion, id: 'proj_new' },
+      tasks: [task]
+    });
+    location.hash = '#/excursions/new?template=ext_excursion';
+    const canvas = document.createElement('main');
+    await renderNewExcursionPage(canvas);
+
+    const riskDays = [...canvas.querySelectorAll<HTMLInputElement>('.excursion-confirm__slack-days')].find(
+      (input) => input.closest('li')?.textContent?.includes('Risk assessment')
+    );
+    expect(riskDays).not.toBeUndefined();
+    riskDays!.value = '30';
+    riskDays!.dispatchEvent(new Event('change'));
+
+    canvas.querySelector<HTMLButtonElement>('.confirm-card .btn--primary')!.click();
+    await vi.waitFor(() => {
+      const call = vi.mocked(tasksApi.createExcursionFromTemplate).mock.calls.at(-1)![0];
+      expect(call.lead_time_overrides).toEqual(expect.objectContaining({ risk_assessment_days: 30 }));
+    });
   });
 
   it('returns to the list from Back to Excursions', async () => {

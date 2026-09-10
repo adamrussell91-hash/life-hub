@@ -3,6 +3,7 @@ import type { ComplianceModule, Project } from '@/schemas/project';
 import type {
   FrameworkEntry,
   ExcursionTemplate,
+  LeadTimeOverrides,
   TaskTemplate,
   ProjectTemplate,
   ReviewLog
@@ -89,6 +90,7 @@ export interface TasksStore {
     student_group_reference?: string | null;
     description?: string;
     compliance_modules?: ComplianceModule[];
+    lead_time_overrides?: LeadTimeOverrides;
   }): Promise<{ project: Project; tasks: Task[] }>;
 
   getClareCalibration(domain: Task['domain']): Promise<ClareCalibration>;
