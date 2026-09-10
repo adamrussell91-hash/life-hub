@@ -13,7 +13,7 @@ function failed(session, error) {
   next.status = 'failed';
   next.lease = null;
   next.allowedActions = ['retry', 'cancel'];
-  next.error = { code: error?.code ?? 'run_failed', message: 'This stage could not finish. Retry it to continue.', retryable: true };
+  next.error = { code: error?.code ?? 'run_failed', message: error?.message || 'This stage could not finish. Retry it to continue.', retryable: true };
   return next;
 }
 
