@@ -212,6 +212,11 @@ test('resolveExerciseRegion falls back to name regexes', () => {
   assert.equal(resolveExerciseRegion({ name: 'Incline Bench' }), 'chest');
   assert.equal(resolveExerciseRegion({ name: 'Chest Fly' }), 'chest');
   assert.equal(resolveExerciseRegion({ name: 'Chest Press' }), 'chest');
+  assert.equal(resolveExerciseRegion({ name: 'Bar Press' }), 'chest');
+  assert.equal(resolveExerciseRegion({ name: 'Bar Press' }, ['arms', 'chest', 'shoulders']), 'chest');
+  assert.equal(resolveExerciseRegion({ name: 'Alt Incline Press' }), 'chest');
+  assert.equal(resolveExerciseRegion({ name: 'Flat Fly' }), 'chest');
+  assert.equal(resolveExerciseRegion({ name: 'Bar Close Grip Press' }), 'chest');
   assert.equal(resolveExerciseRegion({ name: 'Barbell Curl' }), 'arms');
   assert.equal(resolveExerciseRegion({ name: 'Tricep Extension' }), 'arms');
   assert.equal(resolveExerciseRegion({ name: 'Bicep Curl' }), 'arms');
@@ -234,6 +239,47 @@ test('bare press names do not map to chest (Leg / Overhead / Shoulder Press)', (
   assert.equal(resolveExerciseRegion({ name: 'Leg Press' }), 'legs');
   assert.notEqual(resolveExerciseRegion({ name: 'Overhead Press' }), 'chest');
   assert.notEqual(resolveExerciseRegion({ name: 'Shoulder Press' }), 'chest');
+  assert.notEqual(resolveExerciseRegion({ name: 'Bar Seated Overhead Press' }), 'chest');
+});
+
+test('resolveExerciseRegion uses library target_area when name is ambiguous', () => {
+  const library = new Map([
+    ['mystery press', { name: 'Mystery Press', target_area: 'Chest' }]
+  ]);
+  assert.equal(
+    resolveExerciseRegion({ name: 'Mystery Press' }, ['arms', 'chest'], library),
+    'chest'
+  );
+});
+
+test('region strength counts Bar Press over Wide Bench in multi-focus sessions', () => {
+  // Repro: Jul 30 Wide Bench 42kg prior; tonight Bar Press 44kg ignored when name
+  // did not map to chest and session focus was multi-region → tile stuck at 0 / Wide Bench.
+  const model = buildFitnessModel({
+    events: events([
+      workout({
+        date: '2026-07-30',
+        focus: ['arms', 'chest', 'shoulders'],
+        exercises: [
+          { name: 'Bar Press', sets: [{ reps: 12, weight_kg: 42 }] },
+          { name: 'Bar Wide Bench Press', sets: [{ reps: 12, weight_kg: 42 }] }
+        ]
+      }),
+      workout({
+        date: '2026-09-10',
+        focus: ['arms', 'chest'],
+        exercises: [
+          { name: 'Bar Press', sets: [{ reps: 8, weight_kg: 44 }] },
+          { name: 'Bar Wide Bench Press', sets: [{ reps: 12, weight_kg: 40 }] }
+        ]
+      })
+    ]),
+    date: '2026-09-10'
+  });
+  const chest = model.regions.find(r => r.key === 'chest');
+  assert.equal(chest.currentBestKg, 44);
+  assert.equal(chest.bestSetDeltaKg, 2);
+  assert.equal(chest.colour, 'green');
 });
 
 test('longTerm weeklyVolume spans ~26 weeks with volumeDeltaPct', () => {
