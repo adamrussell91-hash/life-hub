@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { umbrellaSessionSecret } from './http.mjs';
 import { knowledgeR2Config } from './knowledge-r2.mjs';
 
 const PREFIX = 'cognitive-protocols/v1';
@@ -108,7 +109,8 @@ export async function defaultGetCognitiveStore(env) {
     endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey }
   });
-  const encryptionSecret = typeof env.SESSION_SECRET === 'string' ? env.SESSION_SECRET : '';
+  const sessionSecret = umbrellaSessionSecret(env);
+  const encryptionSecret = typeof sessionSecret === 'string' ? sessionSecret : '';
   if (Buffer.byteLength(encryptionSecret) < 32) return null;
   return createR2CognitiveStore({ client, bucket: config.bucket, encryptionSecret });
 }
