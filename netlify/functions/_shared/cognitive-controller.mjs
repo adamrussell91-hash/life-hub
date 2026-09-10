@@ -92,7 +92,9 @@ function validateOutput(raw,s,p){
  if(!raw||typeof raw.text!=='string'||!raw.text.trim())throw fault(502,'invalid_model_output','The voice returned no usable text. Retry this stage.');
  if(raw.question!=null&&typeof raw.question!=='string')throw fault(502,'invalid_model_output','The question format was invalid.');
  let text=raw.text.trim(),question=raw.question?.trim()||null;
- if(!question&&text.includes('?')){const i=text.indexOf('?');question=text.slice(text.lastIndexOf('\n',i)+1,i+1);if(text.slice(i+1).trim())throw fault(502,'invalid_model_output','The voice continued after asking a question. Retry this stage.');}
+ // A voice can use a question mark while reasoning. Only treat a final
+ // interrogative sentence as a checkpoint request, and retain its analysis.
+ if(!question&&(p.gate||p.stage==='dialogue')){const match=text.match(/(?:^|[\n.!])\s*([^\n.!?][^?\n.!]*\?)\s*$/u);if(match){question=match[1].trim();text=text.slice(0,match.index+(match[0].startsWith('\n')?1:0)).trim();}}
  const ids=raw.evidenceIds??[];if(!Array.isArray(ids)||ids.some(id=>!s.evidence.some(e=>e.id===id)))throw fault(502,'invalid_evidence','A voice referenced unavailable evidence.');
  if(/https?:\/\//i.test(text))throw fault(502,'invalid_evidence','A voice returned an unverified source link.');
  const quotes=raw.quotes??[];if(!Array.isArray(quotes))throw fault(502,'invalid_evidence','Invalid source quotation format.');
