@@ -79,21 +79,6 @@ async function serviceFor(env, deps) {
   });
 }
 
-function invokeBackground(request, sessionId, deps) {
-  if (deps.invokeBackground) return deps.invokeBackground(request, sessionId);
-  const cookie = request.headers.get('cookie');
-  const origin = request.headers.get('origin');
-  return fetch(new URL('/api/knowledge/protocols/run', request.url), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-cognitive-session-id': sessionId,
-      ...(cookie ? { cookie } : {}),
-      ...(origin ? { origin } : {})
-    }
-  }).then(response => response.ok).catch(() => false);
-}
-
 export function createKnowledgeProtocolsHandler(deps = {}) {
   return createSessionOriginHandler(async (request, context) => {
     const { env } = context;
@@ -120,9 +105,8 @@ export function createKnowledgeProtocolsHandler(deps = {}) {
       const session = body.sessionId
         ? await service.action(owner(env), body)
         : await service.create(owner(env), body);
-      const dispatched = await invokeBackground(request, session.id, deps);
-      const data = dispatched ? { session } : { session: { ...session, status: 'failed', error: { code: 'dispatch_failed', message: 'The protocol runner could not start. Retry this session.', retryable: true } } };
-      return withCors(okResponse(dispatched ? 202 : 202, data), request, env);
+      const advanced = await service.run(owner(env), session.id);
+      return withCors(okResponse(200, { session: advanced }), request, env);
     } catch (error) { return withCors(errorResponse(error.status ?? 502, error.code ?? 'protocol_failed', error.message ?? 'Protocol request failed.', error.status >= 500), request, env); }
   }, deps);
 }
