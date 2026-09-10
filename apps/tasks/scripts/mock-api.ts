@@ -286,7 +286,11 @@ export function createMockApi({ seed }: MockApiOptions) {
               description: b.description === undefined ? undefined : String(b.description),
               compliance_modules: Array.isArray(b.compliance_modules)
                 ? (b.compliance_modules as ComplianceModule[])
-                : undefined
+                : undefined,
+              lead_time_overrides:
+                b.lead_time_overrides && typeof b.lead_time_overrides === 'object'
+                  ? (b.lead_time_overrides as Record<string, number>)
+                  : undefined
             })
           });
         }

@@ -13,6 +13,7 @@ import {
   excursionDatesFromAdminTask,
   leadTimeSlack,
   matchAdminTask,
+  nextExcursionAction,
   planAdminTaskForKind,
   shiftExcursionDates
 } from '@/domain/excursion';
@@ -396,5 +397,66 @@ describe('excursionCountdownLabel', () => {
   it('says so when there is no event date', () => {
     expect(excursionCountdownLabel(null, now)).toBe('No event date set');
     expect(excursionCountdownLabel(undefined, now)).toBe('No event date set');
+  });
+});
+
+describe('nextExcursionAction', () => {
+  const project = { id: 'proj_ex', title: 'Heat' } as Project;
+  const now = new Date('2026-09-10T00:00:00.000Z');
+
+  function dated(id: string, due_date: string | null, status: Task['status'] = 'open'): Task {
+    return {
+      schema_version: 1,
+      id,
+      title: `Task ${id}`,
+      description: '',
+      kind: 'task',
+      bucket: 'active',
+      step_order: 0,
+      domain: 'teaching',
+      framework_used: null,
+      estimated_duration: 30,
+      actual_duration: null,
+      due_date,
+      created_at: '2026-08-01T00:00:00.000Z',
+      updated_at: '2026-08-01T00:00:00.000Z',
+      completed_at: null,
+      status,
+      blocked_since: null,
+      priority: 'high',
+      parent_project_id: 'proj_ex',
+      parent_task_id: null,
+      depends_on: [],
+      recurrence_rule: null,
+      due_time: null,
+      remind_at: null,
+      remind_dismissed_at: null,
+      attachments: [],
+      source: 'auto_generated_from_excursion'
+    };
+  }
+
+  it('returns null when there is nothing dated and open', () => {
+    expect(nextExcursionAction(project, [], now)).toBeNull();
+    expect(nextExcursionAction(project, [dated('t1', null)], now)).toBeNull();
+    expect(nextExcursionAction(project, [dated('t1', '2026-09-01', 'done')], now)).toBeNull();
+  });
+
+  it('picks the earliest open dated task, ignoring later ones', () => {
+    const tasks = [dated('t-later', '2026-10-01'), dated('t-soon', '2026-09-20')];
+    const next = nextExcursionAction(project, tasks, now);
+    expect(next?.label).toBe('Task t-soon');
+    expect(next?.dueDate).toBe('2026-09-20');
+    expect(next?.overdue).toBe(false);
+  });
+
+  it('flags an outstanding task with a due date in the past as overdue', () => {
+    const next = nextExcursionAction(project, [dated('t-late', '2026-09-01')], now);
+    expect(next?.overdue).toBe(true);
+  });
+
+  it('ignores tasks belonging to a different project', () => {
+    const other = { ...dated('t-other', '2026-09-15'), parent_project_id: 'proj_other' };
+    expect(nextExcursionAction(project, [other], now)).toBeNull();
   });
 });

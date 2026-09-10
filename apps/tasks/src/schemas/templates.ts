@@ -27,6 +27,10 @@ export const ExcursionTemplateSchema = z.object({
 
 export type ExcursionTemplate = z.infer<typeof ExcursionTemplateSchema>;
 
+/** Per-item day-count overrides for a template's default lead times — trip to trip these change. */
+export const LeadTimeOverridesSchema = ExcursionTemplateSchema.shape.default_lead_times.partial();
+export type LeadTimeOverrides = z.infer<typeof LeadTimeOverridesSchema>;
+
 export const TaskTemplateSchema = z.object({
   schema_version: schemaVersion,
   id: z.string().min(1),
