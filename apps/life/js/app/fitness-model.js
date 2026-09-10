@@ -323,20 +323,32 @@ function exerciseVolume(exercise) {
 function regionMetricsForPeriod(events, from, to, libraryByName = null) {
   const bestByRegion = Object.fromEntries(REGION_KEYS.map(key => [key, null]));
   const volumeByRegion = Object.fromEntries(REGION_KEYS.map(key => [key, 0]));
+  // Full Body is a conglomerate of all training in the window — not only library
+  // rows tagged "Full Body".
+  let overallBest = null;
+  let overallVolume = 0;
 
   for (const { record } of events) {
     if (record.status !== 'completed' || record.date < from || record.date > to) continue;
     for (const exercise of record.exercises ?? []) {
-      const region = resolveExerciseRegion(exercise, record.focus, libraryByName);
-      if (!region) continue;
       const weight = bestWorkingWeight(exercise);
+      const volume = exerciseVolume(exercise);
+      overallVolume += volume;
+      if (weight != null && (overallBest == null || weight > overallBest)) {
+        overallBest = weight;
+      }
+
+      const region = resolveExerciseRegion(exercise, record.focus, libraryByName);
+      if (!region || region === 'full_body') continue;
       if (weight != null && (bestByRegion[region] == null || weight > bestByRegion[region])) {
         bestByRegion[region] = weight;
       }
-      volumeByRegion[region] += exerciseVolume(exercise);
+      volumeByRegion[region] += volume;
     }
   }
 
+  bestByRegion.full_body = overallBest;
+  volumeByRegion.full_body = overallVolume;
   return { bestByRegion, volumeByRegion };
 }
 
@@ -412,6 +424,8 @@ function buildLongTerm(events, date, libraryByName = null) {
   const prior = regionMetricsForPeriod(events, priorFrom, priorTo, libraryByName);
   const strengthPcts = [];
   for (const key of REGION_KEYS) {
+    // Full Body is a rollup of every lift — exclude it so the average is not double-counted.
+    if (key === 'full_body') continue;
     const pct = percentDelta(current.bestByRegion[key], prior.bestByRegion[key]);
     if (pct != null) strengthPcts.push(pct);
   }
