@@ -361,10 +361,10 @@ function renderRegions(root, regions) {
   const grid = root.querySelector('#fitness-region-grid');
   const block = root.querySelector('.fitness-region-block');
   if (!grid) return;
-  const visible = (regions ?? []).filter(region => (
-    region.currentBestKg != null || (Number(region.currentVolume) > 0)
-  ));
-  setHidden(block, visible.length === 0);
+  // Always show every Region tile (including empty Shoulders / Full Body).
+  // Empty cards render "—" via formatKg / formatSignedKg.
+  const cards = Array.isArray(regions) ? regions : [];
+  setHidden(block, cards.length === 0);
 
   const existingByKey = new Map();
   for (const child of grid.children ?? []) {
@@ -372,7 +372,7 @@ function renderRegions(root, regions) {
     if (key) existingByKey.set(key, child);
   }
 
-  const next = visible.map(region => {
+  const next = cards.map(region => {
     const card = existingByKey.get(region.key);
     if (card) {
       updateRegionCard(card, region);

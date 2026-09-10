@@ -88,6 +88,57 @@ test('region cards show current best and volume when the 30-day delta is missing
   assert.equal(copy.children[2].textContent, '1,200 kg volume');
 });
 
+test('Region strength always renders every tile including empty Shoulders and Full Body', () => {
+  const root = fitnessRoot();
+  renderFitness(root, baseModel({
+    regions: [
+      {
+        key: 'chest', label: 'Chest', image: 'assets/fitness/regions/chest.png',
+        bestSetDeltaKg: 0, volumeDeltaPct: 10, currentBestKg: 42, currentVolume: 100, colour: 'neutral'
+      },
+      {
+        key: 'shoulders', label: 'Shoulders', image: 'assets/fitness/regions/shoulders.png',
+        bestSetDeltaKg: null, volumeDeltaPct: null, currentBestKg: null, currentVolume: 0, colour: 'neutral'
+      },
+      {
+        key: 'arms', label: 'Arms', image: 'assets/fitness/regions/arms.png',
+        bestSetDeltaKg: 14, volumeDeltaPct: 20, currentBestKg: 30, currentVolume: 200, colour: 'green'
+      },
+      {
+        key: 'abs', label: 'Abs', image: 'assets/fitness/regions/abs.png',
+        bestSetDeltaKg: null, volumeDeltaPct: null, currentBestKg: null, currentVolume: 0, colour: 'neutral'
+      },
+      {
+        key: 'legs', label: 'Legs', image: 'assets/fitness/regions/legs.png',
+        bestSetDeltaKg: 2, volumeDeltaPct: 5, currentBestKg: 60, currentVolume: 300, colour: 'green'
+      },
+      {
+        key: 'back', label: 'Back', image: 'assets/fitness/regions/back.png',
+        bestSetDeltaKg: null, volumeDeltaPct: null, currentBestKg: 32, currentVolume: 2070, colour: 'neutral'
+      },
+      {
+        key: 'full_body', label: 'Full Body', image: 'assets/fitness/regions/full_body.png',
+        bestSetDeltaKg: null, volumeDeltaPct: null, currentBestKg: null, currentVolume: 0, colour: 'neutral'
+      }
+    ]
+  }));
+
+  const grid = root.ensure('#fitness-region-grid');
+  const block = root.querySelector('.fitness-region-block');
+  assert.equal(grid.children.length, 7);
+  assert.equal(block?.attributes?.hidden != null, false);
+  const keys = [...grid.children].map(card => card.dataset.region);
+  assert.deepEqual(keys, [
+    'chest', 'shoulders', 'arms', 'abs', 'legs', 'back', 'full_body'
+  ]);
+  const shoulders = [...grid.children].find(card => card.dataset.region === 'shoulders');
+  const fullBody = [...grid.children].find(card => card.dataset.region === 'full_body');
+  assert.equal(shoulders.children[1].children[0].textContent, 'Shoulders');
+  assert.equal(shoulders.children[1].children[1].textContent, '—');
+  assert.equal(fullBody.children[1].children[0].textContent, 'Full Body');
+  assert.equal(fullBody.children[1].children[1].textContent, '—');
+});
+
 function heroSession(overrides = {}) {
   return {
     date: '2026-07-30',

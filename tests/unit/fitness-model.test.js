@@ -274,11 +274,56 @@ test('buildFitnessModel applies library target_area across all seven tiles in on
     abs: 15,
     legs: 80,
     back: 40,
-    full_body: 25
+    // Full Body is a conglomerate — best working weight across every lift.
+    full_body: 80
   });
+  const fullBody = model.regions.find(r => r.key === 'full_body');
+  assert.equal(fullBody.currentVolume, 5 * (50 + 30 + 20 + 15 + 80 + 40 + 25));
   assert.equal(model.regions.find(r => r.key === 'shoulders').image, 'assets/fitness/regions/shoulders.png');
-  assert.equal(model.regions.find(r => r.key === 'full_body').image, 'assets/fitness/regions/full_body.png');
-  assert.equal(model.regions.find(r => r.key === 'full_body').label, 'Full Body');
+  assert.equal(fullBody.image, 'assets/fitness/regions/full_body.png');
+  assert.equal(fullBody.label, 'Full Body');
+});
+
+test('Full Body tile rolls up all training; Shoulders only counts shoulder-tagged lifts', () => {
+  const library = new Map([
+    ['chest move', { name: 'Chest Move', target_area: 'Chest' }],
+    ['shoulder move', { name: 'Shoulder Move', target_area: 'Shoulders' }],
+    ['leg move', { name: 'Leg Move', target_area: 'Legs' }]
+  ]);
+  const model = buildFitnessModel({
+    events: events([
+      workout({
+        date: '2026-08-01',
+        focus: ['chest', 'shoulders', 'legs'],
+        exercises: [
+          { name: 'Chest Move', sets: [{ reps: 8, weight_kg: 40 }] },
+          { name: 'Shoulder Move', sets: [{ reps: 8, weight_kg: 20 }] },
+          { name: 'Leg Move', sets: [{ reps: 8, weight_kg: 60 }] }
+        ]
+      }),
+      workout({
+        date: '2026-09-10',
+        focus: ['chest', 'shoulders', 'legs'],
+        exercises: [
+          { name: 'Chest Move', sets: [{ reps: 8, weight_kg: 50 }] },
+          { name: 'Shoulder Move', sets: [{ reps: 8, weight_kg: 22 }] },
+          { name: 'Leg Move', sets: [{ reps: 8, weight_kg: 70 }] }
+        ]
+      })
+    ]),
+    date: '2026-09-10',
+    libraryByName: library
+  });
+  const byKey = Object.fromEntries(model.regions.map(r => [r.key, r]));
+  assert.equal(byKey.chest.bestSetDeltaKg, 10);
+  assert.equal(byKey.shoulders.bestSetDeltaKg, 2);
+  assert.equal(byKey.legs.bestSetDeltaKg, 10);
+  // Conglomerate best: prior max 60 → current max 70.
+  assert.equal(byKey.full_body.currentBestKg, 70);
+  assert.equal(byKey.full_body.bestSetDeltaKg, 10);
+  assert.equal(byKey.full_body.currentVolume, 8 * (50 + 22 + 70));
+  // Chest going up does not invent a shoulders delta beyond shoulder-tagged lifts.
+  assert.equal(byKey.shoulders.currentBestKg, 22);
 });
 test('resolveExerciseRegion uses unique workout focus, then name regex, without library', () => {
   assert.equal(resolveExerciseRegion({ name: 'Mystery Move' }, ['legs']), 'legs');
