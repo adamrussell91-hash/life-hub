@@ -6,7 +6,7 @@
 .protocol-card--horizon,.protocol-card--tribunal { --protocol-paper:var(--pastel-blue); }.protocol-card--refinery,.protocol-card--witness { --protocol-paper:var(--pastel-sage); }.protocol-card--cartographers { --protocol-paper:var(--pastel-gold); }.protocol-card--mirror { --protocol-paper:var(--pastel-lilac); }.protocol-card--consilium { --protocol-paper:var(--pastel-peach); }
 .protocol-card__inner { position:relative; width:100%; min-height:25rem; transform-style:preserve-3d; transition:transform .7s cubic-bezier(.2,.72,.18,1); }
 .protocol-card.is-open .protocol-card__inner { transform:rotateY(180deg); }
-.protocol-card__front,.protocol-card__back { position:absolute; inset:0; overflow:hidden; border:1px solid color-mix(in srgb,var(--protocol-ink) 32%,transparent); border-radius:var(--radius-md); box-shadow:var(--elev-2); backface-visibility:hidden; -webkit-backface-visibility:hidden; }
+.protocol-card__front,.protocol-card__back { position:absolute; inset:0; overflow:hidden; border:1px solid color-mix(in srgb,var(--protocol-ink) 32%,transparent); border-radius:var(--radius-md); box-shadow:var(--elev-2); backface-visibility:hidden; -webkit-backface-visibility:hidden; transform:rotateY(0deg) translateZ(1px); }
 .protocol-card__front { display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-end; width:100%; padding:var(--space-5); color:var(--protocol-ink); background:linear-gradient(145deg,color-mix(in srgb,var(--protocol-paper) 88%,var(--paper)),var(--protocol-paper)); text-align:left; cursor:pointer; }
 .protocol-card__front::before,.protocol-card__back::before { content:""; position:absolute; z-index:1; inset:var(--space-2); border:1px solid color-mix(in srgb,var(--protocol-ink) 28%,transparent); border-radius:calc(var(--radius-md) - var(--space-1)); pointer-events:none; }
 .protocol-card__front::after { content:""; position:absolute; z-index:0; inset:0; background:linear-gradient(180deg,transparent 36%,color-mix(in srgb,var(--protocol-paper) 96%,transparent) 92%); }
@@ -17,7 +17,7 @@
 .protocol-card__eyebrow { margin-bottom:var(--space-2); color:var(--muted); font-size:var(--text-xs); font-style:normal; letter-spacing:var(--tracking-caps); text-transform:uppercase; }
 .protocol-card__front strong { max-width:13rem; font-family:var(--font-display); font-size:clamp(1.45rem,2.2vw,2rem); line-height:var(--leading-tight); }
 .protocol-card__front em { margin-top:var(--space-3); color:var(--muted); font-size:var(--text-xs); font-style:normal; letter-spacing:var(--tracking-caps); text-transform:uppercase; }
-.protocol-card__back { display:flex; flex-direction:column; justify-content:flex-end; padding:var(--space-5); color:var(--paper); background:var(--navy); transform:rotateY(180deg); }
+.protocol-card__back { display:flex; flex-direction:column; justify-content:flex-end; padding:var(--space-5); color:var(--paper); background:var(--navy); transform:rotateY(180deg) translateZ(1px); }
 .protocol-card__back::after { content:""; position:absolute; inset:0; z-index:0; background:linear-gradient(180deg,color-mix(in srgb,var(--navy) 30%,transparent),color-mix(in srgb,var(--navy) 94%,transparent)); }
 .protocol-card__back > img { opacity:.58; mix-blend-mode:screen; }
 .protocol-card__back-copy,.protocol-card__actions { position:relative; z-index:2; }
