@@ -5,11 +5,20 @@ import { ProjectSchema, type ComplianceModule, type Project } from '@/schemas/pr
 import {
   filterCachedTasks,
   mergeListedTasks,
+  notifyTasksChanged,
   rememberCreatedTask,
   rememberDeletedTask,
   rememberUpdatedTask,
   restoreDeletedTask
 } from '@/services/task-cache';
+import {
+  mergeFetchedProject,
+  mergeListedProjects,
+  rememberCreatedProject,
+  rememberDeletedProject,
+  rememberUpdatedProject,
+  restoreDeletedProject
+} from '@/services/project-cache';
 import type { TransitMap } from '@/schemas/map';
 import type { Program } from '@/schemas/program';
 import type {
@@ -121,18 +130,40 @@ export const tasksApi = {
 
   listProjects: () =>
     apiGet<{ projects: Project[] }>('/api/projects').then((r) =>
-      r.projects.flatMap((raw) => {
-        const project = parseProject(raw);
-        return project ? [project] : [];
-      })
+      mergeListedProjects(
+        r.projects.flatMap((raw) => {
+          const project = parseProject(raw);
+          return project ? [project] : [];
+        })
+      )
     ),
   getProject: (id: string) =>
-    apiGet<Project>(`/api/projects?id=${encodeURIComponent(id)}`).then(requireProject),
-  createProject: (body: unknown) => apiPost<Project>('/api/projects', body).then(requireProject),
+    apiGet<Project>(`/api/projects?id=${encodeURIComponent(id)}`)
+      .then(requireProject)
+      .then(mergeFetchedProject),
+  createProject: (body: unknown) =>
+    apiPost<Project>('/api/projects', body)
+      .then(requireProject)
+      .then((project) => {
+        rememberCreatedProject(project);
+        return project;
+      }),
   updateProject: (id: string, body: unknown) =>
-    apiPatch<Project>(`/api/projects?id=${encodeURIComponent(id)}`, body).then(requireProject),
-  deleteProject: (id: string, meta?: { agent?: string; reason?: string }) =>
-    apiDelete<{ deleted: boolean }>(`/api/projects?id=${encodeURIComponent(id)}`, meta),
+    apiPatch<Project>(`/api/projects?id=${encodeURIComponent(id)}`, body)
+      .then(requireProject)
+      .then((project) => {
+        rememberUpdatedProject(project);
+        return project;
+      }),
+  deleteProject: async (id: string, meta?: { agent?: string; reason?: string }) => {
+    rememberDeletedProject(id);
+    try {
+      return await apiDelete<{ deleted: boolean }>(`/api/projects?id=${encodeURIComponent(id)}`, meta);
+    } catch (err) {
+      restoreDeletedProject(id);
+      throw err;
+    }
+  },
 
   listTemplates: () =>
     apiGet<{
@@ -171,6 +202,10 @@ export const tasksApi = {
     apiPost<{ project: Project; tasks: Task[] }>('/api/templates', {
       action: 'create_excursion_from_template',
       ...input
+    }).then((result) => {
+      rememberCreatedProject(result.project);
+      notifyTasksChanged(result.tasks);
+      return result;
     }),
 
   proposeWithClare: (body: {

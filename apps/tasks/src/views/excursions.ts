@@ -180,7 +180,7 @@ function confirmCreate(
     value: title,
     placeholder: DEFAULT_EXCURSION_TITLE,
     inputClass: 'hub-search__input excursion-confirm__title',
-    onChange: (value) => {
+    onInput: (value) => {
       title = value.trim() || DEFAULT_EXCURSION_TITLE;
       refreshHeading();
     }
@@ -358,7 +358,11 @@ export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
   addRow.append(newExcursionButton(newExcursionHash(templates[0]?.id)));
   canvas.append(addRow, confirmHost);
 
-  canvas.append(el('h2', 'section-title', 'Active'));
+  const heading = el('h2', 'section-title', 'Active');
+  heading.append(
+    el('span', 'section-title__count', excursions.length === 1 ? '1 excursion' : `${excursions.length} excursions`)
+  );
+  canvas.append(heading);
   if (!excursions.length) {
     listHost.append(el('p', 'empty-state', 'No excursions yet. Create one above.'));
   } else {

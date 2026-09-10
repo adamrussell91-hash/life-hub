@@ -425,6 +425,10 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
     async createProject(input) {
       const stamp = nowIso();
       const project = ProjectSchema.parse({
+        // Spread first so any field not explicitly normalised below (compliance_modules,
+        // folder_items, cover, muster fields, ...) still passes through instead of being
+        // silently dropped — this hand-written list has already gone stale once.
+        ...input,
         schema_version: 1,
         id: newId('proj'),
         title: input.title,

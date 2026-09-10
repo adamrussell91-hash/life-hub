@@ -162,6 +162,28 @@ describe('tasks store', () => {
     expect(created.project.key_dates?.permission_note_due).toBe('2026-09-24');
   });
 
+  it('keeps the compliance bundle and folder checklist on a freshly created excursion', async () => {
+    // Regression: createProject() used to hand-list which fields to persist and
+    // silently dropped anything not on that list, including compliance_modules
+    // and folder_items set by createExcursionFromTemplate.
+    const kv = memoryKv();
+    await seedIfEmpty(kv, keys, seed);
+    const store = createTasksStore(kv, keys);
+    const created = await store.createExcursionFromTemplate({
+      excursion_template_id: 'ext_excursion',
+      title: 'Regional Debate Final',
+      event_date: '2026-10-15'
+    });
+    expect(created.project.compliance_modules?.length).toBeGreaterThan(0);
+    expect(created.project.compliance_modules?.some((m) => m.id === 'wwcc')).toBe(true);
+    expect(created.project.folder_items?.length).toBeGreaterThan(0);
+
+    // The stored record (not just the in-memory return value) must carry them too.
+    const reloaded = await store.getProject(created.project.id);
+    expect(reloaded?.compliance_modules?.length).toBeGreaterThan(0);
+    expect(reloaded?.folder_items?.length).toBeGreaterThan(0);
+  });
+
   it('saves and instantiates task templates', async () => {
     const kv = memoryKv();
     await seedIfEmpty(kv, keys, seed);

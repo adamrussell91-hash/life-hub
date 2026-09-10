@@ -294,7 +294,7 @@ describe('new excursion page', () => {
     const titleInput = canvas.querySelector<HTMLInputElement>('.excursion-confirm__title');
     expect(titleInput).not.toBeNull();
     titleInput!.value = 'Year 10 Ski Trip';
-    titleInput!.dispatchEvent(new Event('change'));
+    titleInput!.dispatchEvent(new Event('input'));
 
     expect(canvas.querySelector('.confirm-card .page-header__title')?.textContent).toBe(
       'Create “Year 10 Ski Trip”'

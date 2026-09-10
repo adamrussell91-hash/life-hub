@@ -1394,8 +1394,15 @@
 
 .excursions-add {
   flex: none;
-  width: 2.75rem;
-  height: 2.75rem;
+}
+
+/* Always-visible count next to "Active" — makes a genuine 0 read as empty, not broken. */
+.section-title__count {
+  margin-left: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--muted);
+  letter-spacing: normal;
 }
 
 .excursions-add svg {
