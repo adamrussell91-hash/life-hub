@@ -1160,12 +1160,68 @@
   display: none;
 }
 
-/* Messenger: avatar sits on the last bubble of a consecutive assistant run. */
-.chat-message.chat-message--assistant,
-.chat-message.chat-message--status {
-  align-items: flex-end;
+/*
+ * Messenger bubble layout.
+ * Avatar must stay beside the bubble (bottom-aligned), never wrap above it.
+ * Life previously used flex-wrap + width:max-content on the body, which stacked
+ * the tail avatar in the gap between consecutive assistant bubbles.
+ */
+.chat-messages,
+.chat-overlay .chat-messages {
+  gap: 0.125rem;
 }
 
+.chat-message--user + .chat-message--assistant,
+.chat-message--user + .chat-message--status,
+.chat-message--assistant + .chat-message--user,
+.chat-message--status + .chat-message--user {
+  margin-top: 0.55rem;
+}
+
+.chat-message.chat-message--assistant,
+.chat-message.chat-message--status {
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content);
+  grid-template-rows: auto auto auto;
+  column-gap: var(--space-2);
+  row-gap: 0.1rem;
+  align-items: end;
+  justify-content: start;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.chat-message.chat-message--assistant > .chat-message__avatar,
+.chat-message.chat-message--status > .chat-message__avatar {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: end;
+}
+
+.chat-message.chat-message--assistant > .chat-message__body,
+.chat-message.chat-message--status > .chat-message__body {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chat-message.chat-message--assistant > .chat-message__attachments,
+.chat-message.chat-message--status > .chat-message__attachments {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.chat-message.chat-message--assistant > .chat-message__actions,
+.chat-message.chat-message--status > .chat-message__actions {
+  grid-column: 2;
+  grid-row: 3;
+  width: auto;
+  min-width: 0;
+  padding-left: 0;
+}
+
+/* Messenger: avatar sits on the last bubble of a consecutive assistant run. */
 .chat-message.chat-message--assistant:not(.chat-message--tail) > .chat-message__avatar,
 .chat-message.chat-message--status:not(.chat-message--tail) > .chat-message__avatar {
   visibility: hidden;
