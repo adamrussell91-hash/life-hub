@@ -89,6 +89,24 @@ test('create_excursion_from_template schedules real admin tasks and key dates, n
   assert.ok(kinds.some((t) => t.includes('event')));
 });
 
+test('GET ignores stale legacy templates left over in blob storage', async () => {
+  const store = memoryStore({
+    'excursion_templates/ext_da_vinci': { schema_version: 1, id: 'ext_da_vinci', name: 'Da Vinci Decathlon' },
+    'excursion_templates/ext_ethics_olympiad': { schema_version: 1, id: 'ext_ethics_olympiad', name: 'Ethics Olympiad' }
+  });
+  const handler = createTemplatesHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  });
+
+  const listed = await handler(request({ url: 'https://api.adam-russell.com/api/templates' }));
+  assert.equal(listed.status, 200);
+  const { excursion_templates } = (await listed.json()).data;
+  assert.equal(excursion_templates.length, 1);
+  assert.equal(excursion_templates[0].id, 'ext_excursion');
+});
+
 test('create_excursion_from_template rejects a missing/invalid event date', async () => {
   const store = memoryStore();
   const handler = createTemplatesHandler({

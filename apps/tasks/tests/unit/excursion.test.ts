@@ -9,6 +9,7 @@ import {
   buildExcursionPlan,
   defaultExcursionEventDate,
   excursionClearance,
+  excursionCountdownLabel,
   excursionDatesFromAdminTask,
   leadTimeSlack,
   matchAdminTask,
@@ -378,5 +379,22 @@ describe('leadTimeSlack', () => {
 
   it('returns an empty list for an invalid date', () => {
     expect(leadTimeSlack(template, 'not-a-date', now)).toEqual([]);
+  });
+});
+
+describe('excursionCountdownLabel', () => {
+  const now = new Date('2026-09-10T00:00:00.000Z');
+
+  it('counts days ahead, and names tomorrow/today/yesterday', () => {
+    expect(excursionCountdownLabel('2026-10-10', now)).toBe('30 days to go');
+    expect(excursionCountdownLabel('2026-09-11', now)).toBe('Tomorrow');
+    expect(excursionCountdownLabel('2026-09-10', now)).toBe('Today');
+    expect(excursionCountdownLabel('2026-09-09', now)).toBe('Yesterday');
+    expect(excursionCountdownLabel('2026-09-01', now)).toBe('9 days ago');
+  });
+
+  it('says so when there is no event date', () => {
+    expect(excursionCountdownLabel(null, now)).toBe('No event date set');
+    expect(excursionCountdownLabel(undefined, now)).toBe('No event date set');
   });
 });

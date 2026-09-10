@@ -25,7 +25,6 @@ import { cloneDefaultFolderItems } from './_shared/excursion-folder.mjs';
 export const config = { path: '/api/templates' };
 
 const FRAMEWORK_PREFIX = 'frameworks/';
-const EXCURSION_PREFIX = 'excursion_templates/';
 const TASK_TEMPLATE_PREFIX = 'task_templates/';
 const PROJECT_TEMPLATE_PREFIX = 'project_templates/';
 const PROJECT_PREFIX = 'projects/';
@@ -42,12 +41,15 @@ export function createTemplatesHandler(deps = {}) {
     const { env, store } = context;
     try {
       if (request.method === 'GET') {
-        const [frameworks, excursion_templates, task_templates, project_templates] = await Promise.all([
+        const [frameworks, task_templates, project_templates] = await Promise.all([
           listJSON(store, FRAMEWORK_PREFIX),
-          listJSON(store, EXCURSION_PREFIX),
           listJSON(store, TASK_TEMPLATE_PREFIX),
           listJSON(store, PROJECT_TEMPLATE_PREFIX)
         ]);
+        // Git source of truth — one generic excursion template, not per-competition
+        // copies. Never list excursion_templates/ from blobs: stale legacy rows
+        // (old per-competition templates) accumulate there and never get cleaned up.
+        const excursion_templates = [DEFAULT_EXCURSION_TEMPLATE];
         return withCors(
           okResponse(200, { frameworks, excursion_templates, task_templates, project_templates }),
           request,
