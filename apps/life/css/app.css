@@ -703,7 +703,8 @@ main { max-width: 76rem; margin: 0 auto; }
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  /* Messenger density — hub-interactions owns the exact gap; keep this tight. */
+  gap: 0.125rem;
   flex: 1 1 auto;
   min-height: 10rem;
   max-height: 60vh;
@@ -713,7 +714,7 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .chat-message {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-2);
   align-items: flex-end;
   width: fit-content;
@@ -724,7 +725,9 @@ main { max-width: 76rem; margin: 0 auto; }
   box-shadow: none;
 }
 
+/* User bubbles: actions wrap under the bubble; assistant uses grid in hub-interactions. */
 .chat-message--user {
+  flex-wrap: wrap;
   align-self: flex-end;
   background: transparent;
   color: inherit;
@@ -760,14 +763,20 @@ main { max-width: 76rem; margin: 0 auto; }
 
 .chat-message__body {
   min-width: 0;
-  /* Grow beside an avatar; size short replies to their text, not a fixed floor. */
-  flex: 1 1 auto;
-  width: max-content;
+  /* Grow beside an avatar; size short replies to their text, not a fixed floor.
+   * flex-basis 0 (not width:max-content) so the avatar cannot wrap above the bubble. */
+  flex: 1 1 0;
+  width: auto;
   max-width: 100%;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   font-size: var(--text-base);
   line-height: var(--leading-snug);
+}
+
+.chat-message--user .chat-message__body {
+  flex: 1 1 auto;
+  width: max-content;
 }
 
 .chat-message__actions {
