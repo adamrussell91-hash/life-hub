@@ -25,6 +25,15 @@ test('JSON voice output supplies the checkpoint question instead of failing the 
   }
   let s=start('fates','sprint');
   await assert.rejects(()=>advance(s,{model:async()=>({text:JSON.stringify({text:'Only analysis.',question:null,evidenceIds:[]}),evidenceIds:[]}),retrieve}),/omitted its required checkpoint question/);
+  s=start('fates','sprint');
+  s=await advance(s,{model:async()=>({text:'{"text":"Audience is still open.\\nTime is not.","question":"Which constraint should govern the first pass?","evidenceIds":[]}'.replace('\\n','\n'),evidenceIds:[]}),retrieve});
+  assert.equal(s.status,'waiting');
+  assert.equal(s.checkpoint.question,'Which constraint should govern the first pass?');
+  assert.match(s.transcript.at(-1).text,/Audience is still open/);
+  s=start('fates','sprint');
+  s=await advance(s,{model:async()=>({text:JSON.stringify({question:'Which constraint should govern the first pass?',evidenceIds:[]}),evidenceIds:[]}),retrieve});
+  assert.equal(s.status,'waiting');
+  assert.equal(s.checkpoint.question,'Which constraint should govern the first pass?');
 });
 test('Tribunal voices receive identical original context and cannot see outputs',async()=>{const {calls}=await run('tribunal');const v=calls.filter(c=>['inverter','scaler','context-shifter'].includes(c.speaker));assert.equal(v.length,3);assert.equal(v[0].user,v[1].user);assert.equal(v[1].user,v[2].user);assert.ok(!v[2].user.includes('Grounded contribution'));});
 test('Consilium adapts to next-speaker proposal, never Virtue first, and never analyses final reflection',async()=>{let s=start('consilium');const calls=[];const generate=async p=>{calls.push(p);return {text:'Duty and rights here require candour. Which constraint matters?',question:'Which constraint matters?',evidenceIds:[],nextSpeaker:'virtue'};};s=await advance(s,{model:generate,retrieve:async()=>({evidence:[],status:'none'})});assert.equal(calls.length,1);s=act(s,{action:'confirm',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.notEqual(calls.at(-1).speaker,'virtue');s=act(s,{action:'answer',text:'Protect anonymity',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.equal(calls.at(-1).speaker,'virtue');assert.ok(!s.allowedActions.includes('finish'));const {s:done,calls:all}=await run('consilium');assert.equal(done.transcript.at(-1).role,'user');assert.equal(all.at(-1).stage,'map');});

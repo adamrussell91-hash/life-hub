@@ -89,6 +89,28 @@ export function buildPrompt(s,currentStep){
  return {speaker,stage,gate,wordBudget:budget,system:[shared,protocol,instructions].join('\n\n'),user:JSON.stringify({originalInput:s.intake,mode:s.mode,evidence:s.evidence,evidenceStatus:s.evidenceStatus,...(!isolated?{conversation:previous,verification:s.verification??null}:{})})};
 }
 // Voices are prompted for JSON; the provider adapter streams that payload as text.
+// Models often put literal newlines inside strings, which JSON.parse rejects.
+function repairJsonStrings(s){
+ let out='',inString=false,escape=false;
+ for(const ch of s){
+  if(inString){
+   if(escape){out+=ch;escape=false;continue;}
+   if(ch==='\\'){out+=ch;escape=true;continue;}
+   if(ch==='"'){out+=ch;inString=false;continue;}
+   const code=ch.charCodeAt(0);
+   if(code<32){out+=ch==='\n'?'\\n':ch==='\r'?'\\r':ch==='\t'?'\\t':`\\u${code.toString(16).padStart(4,'0')}`;continue;}
+   out+=ch;continue;
+  }
+  if(ch==='"')inString=true;
+  out+=ch;
+ }
+ return out;
+}
+function voiceText(parsed){
+ if(typeof parsed.text==='string')return parsed.text;
+ if(Array.isArray(parsed.text))return parsed.text.filter(part=>typeof part==='string').join('\n');
+ return '';
+}
 function parseVoice(raw){
  if(!raw||typeof raw!=='object'||typeof raw.text!=='string')return raw;
  const trimmed=raw.text.trim();
@@ -96,11 +118,14 @@ function parseVoice(raw){
  const candidate=fenced?.[1]?.trim()??trimmed;
  const start=candidate.indexOf('{'),end=candidate.lastIndexOf('}');
  if(start<0||end<=start)return raw;
- try{
-  const parsed=JSON.parse(candidate.slice(start,end+1));
-  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)||typeof parsed.text!=='string')return raw;
-  return {...raw,...parsed,text:parsed.text,question:parsed.question??null,evidenceIds:Array.isArray(parsed.evidenceIds)?parsed.evidenceIds:(raw.evidenceIds??[])};
- }catch{return raw;}
+ const slice=candidate.slice(start,end+1);
+ let parsed;
+ try{parsed=JSON.parse(slice);}
+ catch{try{parsed=JSON.parse(repairJsonStrings(slice));}catch{return raw;}}
+ if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return raw;
+ const text=voiceText(parsed),question=typeof parsed.question==='string'?parsed.question:parsed.question??null;
+ if(!text&&typeof question!=='string')return raw;
+ return {...raw,...parsed,text:text||question,question:question??null,evidenceIds:Array.isArray(parsed.evidenceIds)?parsed.evidenceIds:(raw.evidenceIds??[])};
 }
 function validateOutput(raw,s,p){
  raw=parseVoice(raw);
