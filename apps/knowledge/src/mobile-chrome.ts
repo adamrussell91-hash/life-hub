@@ -8,6 +8,7 @@ export type KnowledgeMobileView =
   | "chat"
   | "podcast"
   | "quiz"
+  | "protocols"
   | string;
 
 const ARCHIVE = ["M4 7h16v12H4z", "M9 7V5h6v2", "M8 12h8"];
@@ -39,6 +40,7 @@ const NOTEBOOKS = [
   "M10 8h6",
   "M10 12h6"
 ];
+const PROTOCOLS = ["M5 4h14v16H5z", "M8 8h8", "M8 12h8", "M8 16h5"];
 
 export type KnowledgeMobileNav = {
   goArchive: () => void;
@@ -48,6 +50,7 @@ export type KnowledgeMobileNav = {
   goTimeline: () => void;
   goPodcast: () => void;
   goQuiz: () => void;
+  goProtocols: () => void;
 };
 
 /** Locked phone chrome — same bottom bar + More sheet as every other hub. */
@@ -105,6 +108,12 @@ export function syncKnowledgeMobileChrome(
         label: "Quiz",
         paths: QUIZ,
         onSelect: nav.goQuiz
+      },
+      {
+        id: "protocols",
+        label: "Protocols",
+        paths: PROTOCOLS,
+        onSelect: nav.goProtocols
       }
     ]
   });

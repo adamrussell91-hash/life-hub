@@ -1,5 +1,6 @@
 import "./tokens.css";
 import "./style.css";
+import "./protocols/style.css";
 import { startHubMotion } from "../design-kit/js/hub-motion.js";
 import { openHubCommandSearch } from "../design-kit/js/hub-command-search.js";
 import { autoUpdateHubFloating, positionHubFloating } from "../design-kit/js/hub-floating.js";
@@ -113,6 +114,7 @@ import { applyTopicTags, toggleTopicTag } from "./tidy/applyTags";
 import { remainingTopicTags, topicTagPickerHtml } from "./tidy/tagPicker";
 import { filterPickerOptions, optionPickerListHtml } from "./ui/optionPicker";
 import { syncKnowledgeMobileChrome } from "./mobile-chrome";
+import { renderProtocols } from "./protocols/view";
 import { notebookCards, notesForNotebook } from "./notebooks/catalog";
 import { bindNotebooksGrid, notebooksGridHtml } from "./notebooks/view";
 import { getQuizSchedule, saveQuiz } from "./api/quizClient";
@@ -130,7 +132,8 @@ type View =
   | "compose"
   | "chat"
   | "podcast"
-  | "quiz";
+  | "quiz"
+  | "protocols";
 type GraphMode = "constellation" | "showAll" | "universe";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -322,6 +325,7 @@ const icons = {
   quiz: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v16H8z"/><path d="M11 8h2M11 12h2M11 16h1"/></svg>`,
   timeline: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/></svg>`,
   notebooks: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h11a2 2 0 0 1 2 2v14H8a2 2 0 0 0-2 2V4z"/><path d="M8 20a2 2 0 0 1 2-2h9"/><path d="M10 8h6M10 12h6"/></svg>`,
+  protocols: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`,
 };
 
 function kindBadge(attachment: Attachment) {
@@ -602,6 +606,7 @@ function shell(main: string) {
         <button class="rail__btn hub-rail__link ${view === "chat" ? "is-current" : ""}" data-nav="chat" type="button">${icons.chat}<span>Chat</span></button>
         <button class="rail__btn hub-rail__link ${view === "podcast" ? "is-current" : ""}" data-nav="podcast" type="button">${icons.podcast}<span>Podcast</span></button>
         <button class="rail__btn hub-rail__link ${view === "quiz" ? "is-current" : ""}" data-nav="quiz" type="button">${icons.quiz}<span>Quiz</span></button>
+        <button class="rail__btn hub-rail__link ${view === "protocols" ? "is-current" : ""}" data-nav="protocols" type="button">${icons.protocols}<span>Protocols</span></button>
       </nav>
       ${hubSwitcherHtml("knowledge")}
     </aside>
@@ -621,6 +626,7 @@ function shell(main: string) {
         chat: "chat",
         podcast: "podcast",
         quiz: "quiz",
+        protocols: "protocols",
       };
       if (special[next]) {
         leaveSpecialRails();
@@ -711,6 +717,13 @@ function shell(main: string) {
       activePage = null;
       clearPageHash();
       enterQuizRail();
+      render();
+    },
+    goProtocols: () => {
+      leaveSpecialRails();
+      view = "protocols";
+      activePage = null;
+      clearPageHash();
       render();
     }
   });
@@ -1911,6 +1924,10 @@ function render() {
       render,
       onOpenPage: id => void openPage(id),
     });
+  } else if (view === "protocols") {
+    shell("<div class=\"protocols-root\"></div>");
+    const root = app.querySelector<HTMLElement>(".protocols-root");
+    if (root) renderProtocols({ host: root });
   } else {
     renderList();
   }
