@@ -6,6 +6,7 @@ import { createAnthropicClient } from './_shared/anthropic-client.mjs';
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
+import { readKnowledgeFile } from './_shared/knowledge-data.mjs';
 
 export const config = { path: '/api/knowledge/protocols' };
 
@@ -24,8 +25,48 @@ async function defaultModel(prompt, env, fetchImpl = fetch) {
   return { text, evidenceIds: [] };
 }
 
-function defaultRetrieve() {
-  return { evidence: [], status: 'No matching Knowledge Hub notes were retrieved. Claims remain self-report or uncertainty.' };
+function searchableTerms(session) {
+  return Object.values(session?.intake ?? {})
+    .join(' ')
+    .toLowerCase()
+    .match(/[a-z0-9]{3,}/g)
+    ?.filter((term, index, all) => all.indexOf(term) === index)
+    .slice(0, 18) ?? [];
+}
+
+function manifestRows(raw) {
+  return Array.isArray(raw) ? raw : Array.isArray(raw?.pages) ? raw.pages : [];
+}
+
+/** Read-only, bounded archive lookup. It deliberately avoids listKnowledgePages,
+ * whose recovery path may write a repaired manifest. */
+export async function defaultRetrieve(session, env, fetchImpl = fetch) {
+  const terms = searchableTerms(session);
+  if (!terms.length) return { evidence: [], status: 'No specific archive terms were supplied. Claims remain self-report or uncertainty.' };
+  try {
+    const raw = await readKnowledgeFile('manifest.json', { env, fetchImpl });
+    const ranked = manifestRows(raw).map(row => {
+      const title = typeof row?.title === 'string' ? row.title : '';
+      const excerpt = typeof row?.excerpt === 'string' ? row.excerpt : '';
+      const tags = Array.isArray(row?.tags) ? row.tags.filter(tag => typeof tag === 'string').join(' ') : '';
+      const haystack = `${title} ${excerpt} ${tags}`.toLowerCase();
+      return { row, score: terms.reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0) };
+    }).filter(({ row, score }) => typeof row?.id === 'string' && score > 0)
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 6);
+    const evidence = ranked.map(({ row }) => ({
+      id: `knowledge:${row.id}`,
+      kind: 'knowledge_hub_note',
+      title: typeof row.title === 'string' && row.title ? row.title : row.id,
+      text: typeof row.excerpt === 'string' ? row.excerpt.slice(0, 700) : '',
+      source: 'Knowledge Hub archive'
+    }));
+    return evidence.length
+      ? { evidence, status: `Retrieved ${evidence.length} matching Knowledge Hub note${evidence.length === 1 ? '' : 's'} for grounding.` }
+      : { evidence: [], status: 'No matching Knowledge Hub notes were retrieved. Claims remain self-report or uncertainty.' };
+  } catch {
+    return { evidence: [], status: 'Knowledge Hub archive is temporarily unavailable. Claims remain self-report or uncertainty.' };
+  }
 }
 
 async function serviceFor(env, deps) {
@@ -34,7 +75,7 @@ async function serviceFor(env, deps) {
   return createCognitiveService({
     store,
     model: deps.model ?? (prompt => defaultModel(prompt, env, deps.fetchImpl)),
-    retrieve: deps.retrieve ?? defaultRetrieve
+    retrieve: deps.retrieve ?? (session => defaultRetrieve(session, env, deps.fetchImpl))
   });
 }
 

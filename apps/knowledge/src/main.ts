@@ -222,6 +222,7 @@ async function rateActivePage(rating: QuizRating) {
 let entries: PageManifestEntry[] = [];
 let visible: PageManifestEntry[] = [];
 let view: View = "notebooks";
+let protocolTeardown: (() => void) | null = null;
 let pageReturnView: View = "notebooks";
 let query = "";
 let keywordFilter = "";
@@ -1886,6 +1887,10 @@ function afterSignedInPaint() {
 }
 
 function render() {
+  if (view !== "protocols" && protocolTeardown) {
+    protocolTeardown();
+    protocolTeardown = null;
+  }
   if (view !== "compose") composeVoice.stopMic();
   if (view === "compose" && compose) renderCompose(compose);
   else if (view === "page" && activePage) renderPage(activePage);
@@ -1925,9 +1930,10 @@ function render() {
       onOpenPage: id => void openPage(id),
     });
   } else if (view === "protocols") {
+    protocolTeardown?.();
     shell("<div class=\"protocols-root\"></div>");
     const root = app.querySelector<HTMLElement>(".protocols-root");
-    if (root) renderProtocols({ host: root });
+    if (root) protocolTeardown = renderProtocols({ host: root });
   } else {
     renderList();
   }
