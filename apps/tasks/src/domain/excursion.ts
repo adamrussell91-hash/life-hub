@@ -511,3 +511,18 @@ export function leadTimeSlack(
       return { kind: row.kind, label: row.label, leadDays: row.days, slackDays, tight: slackDays < 0 };
     });
 }
+
+/** "N days to go" / "Today" / "N days ago" — no event date reads as unscheduled. */
+export function excursionCountdownLabel(
+  dateStr: string | null | undefined,
+  now = new Date()
+): string {
+  const event = parseDue(dateStr ?? null);
+  if (!event) return 'No event date set';
+  const days = Math.round((startOfDay(event).getTime() - startOfDay(now).getTime()) / 86_400_000);
+  if (days > 1) return `${days} days to go`;
+  if (days === 1) return 'Tomorrow';
+  if (days === 0) return 'Today';
+  if (days === -1) return 'Yesterday';
+  return `${Math.abs(days)} days ago`;
+}
