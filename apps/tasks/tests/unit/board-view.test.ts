@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
+import { notifyTasksChanged, resetTaskCache } from '@/services/task-cache';
 import { renderBoardView } from '@/views/board';
 
 vi.mock('@/services/client-api', () => ({
@@ -71,6 +72,7 @@ describe('board view mutations', () => {
   });
 
   afterEach(() => {
+    resetTaskCache();
     document.body.replaceChildren();
     vi.restoreAllMocks();
   });
@@ -123,6 +125,24 @@ describe('board view mutations', () => {
     });
     expect(canvas.querySelector('.canvas-status')).toBeNull();
     expect(canvas.querySelector('.board')).not.toBeNull();
+    expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
+    expect(canvas.querySelector('.dashboard-board .view-lede')?.textContent).toMatch(/^2 open in scope/);
+  });
+
+  it('live-inserts a Clare-created task without remounting the board', async () => {
+    const existing = task({ id: 'task_old', title: 'Existing card' });
+    const created = task({ id: 'task_clare', title: 'Clare just added this' });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([existing]);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+    expect(canvas.querySelector('[data-id="task_old"]')?.textContent).toContain('Existing card');
+
+    notifyTasksChanged([created]);
+
+    expect(canvas.querySelector('[data-id="task_clare"]')?.textContent).toContain('Clare just added this');
+    expect(canvas.querySelector('.canvas-status')).toBeNull();
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
     expect(canvas.querySelector('.dashboard-board .view-lede')?.textContent).toMatch(/^2 open in scope/);
   });

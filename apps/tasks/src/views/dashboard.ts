@@ -34,6 +34,7 @@ import {
   priorityFilterOptions
 } from '@/views/hub-kit';
 import { mountDailyDial, type DailyDialHandle } from '@/views/daily-dial';
+import { onTasksChanged } from '@/services/task-cache';
 
 export { renderProjectsView } from '@/views/projects';
 
@@ -45,6 +46,8 @@ let backlogTag = '';
 let searchDomain: TaskDomain | 'all' = 'all';
 let searchKind: 'all' | 'tasks' | 'projects' = 'all';
 let templateKind: 'all' | 'task' | 'project' | 'excursion' = 'all';
+let teardownDay: (() => void) | null = null;
+let teardownBacklog: (() => void) | null = null;
 
 function appendTaskCard(
   host: HTMLElement,
@@ -129,6 +132,8 @@ export function requestToggleDone(
 }
 
 export async function renderDayView(canvas: HTMLElement): Promise<void> {
+  teardownDay?.();
+  teardownDay = null;
   showViewLoading(canvas, 'Loading…', '.day-view');
   let tasks: Task[];
   let projects: Project[];
@@ -293,9 +298,15 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
   }
 
   paint();
+  teardownDay = onTasksChanged((incoming) => {
+    for (const task of incoming) upsertTask(tasks, task);
+    paint();
+  });
 }
 
 export async function renderListView(canvas: HTMLElement): Promise<void> {
+  teardownBacklog?.();
+  teardownBacklog = null;
   showViewLoading(canvas, 'Loading…', '.backlog-view');
   let tasks: Task[];
   let projects: Project[];
@@ -409,6 +420,10 @@ export async function renderListView(canvas: HTMLElement): Promise<void> {
   }
 
   paint();
+  teardownBacklog = onTasksChanged((incoming) => {
+    for (const task of incoming) upsertTask(tasks, task);
+    paint();
+  });
 }
 
 export async function renderSearchView(canvas: HTMLElement): Promise<void> {

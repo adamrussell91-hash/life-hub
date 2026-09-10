@@ -422,6 +422,33 @@ test('create_task returns Confirm writes on tasks:task paths', async () => {
   assert.equal(first.title, 'Draft appraisal SMART goals');
   assert.equal(first.domain, 'teaching');
   assert.equal(first.source, 'suggested_by_agent');
+  assert.equal(first.due_date, '2026-08-31');
+});
+
+test('create_task writes immediately when a Tasks store is bound', async () => {
+  resetCapabilityCaches();
+  const { ctx } = mockCtx('clare');
+  const store = {
+    data: new Map(),
+    async setJSON(key, value) {
+      this.data.set(key, value);
+    },
+    async get(key) {
+      return this.data.get(key) ?? null;
+    }
+  };
+  ctx.tasksStore = store;
+  const result = await executeShortcut(
+    'create_task',
+    { title: 'Buy bread', domain: 'life' },
+    ctx
+  );
+  assert.equal(result.kind, 'ok');
+  assert.equal(result.status, 'applied');
+  assert.equal(result.tasks[0].title, 'Buy bread');
+  assert.equal(result.tasks[0].due_date, '2026-08-31');
+  assert.ok(store.data.has(`tasks/${result.ids[0]}`));
+  assert.ok((store.data.get('tasks/_index') ?? []).includes(result.ids[0]));
 });
 
 test('create_task accepts an 11-item teaching day and rejects 17', async () => {

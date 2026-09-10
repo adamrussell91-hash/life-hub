@@ -28,5 +28,5 @@
     "tasks:work_session:*",
     "apps/tasks/config/clare-protocol.md"
   ],
-  "notes": "Tasks specialist on the shared OS floor. Ordinary create/edit use create_task / update_task; other chat workbench writes use clare_mutate. Both go through propose-action `tasks:task:<id>` / `tasks:project:<id>` and wait for Confirm. Work blocks/sessions use `tasks:work_block:*` / `tasks:work_session:*`. Life remember/track/research use propose-action."
+  "notes": "Tasks specialist on the shared OS floor. Ordinary create uses create_task and writes immediately; edits use update_task (Confirm). Other chat workbench writes use clare_mutate and wait for Confirm. Paths are propose-action `tasks:task:<id>` / `tasks:project:<id>`. Work blocks/sessions use `tasks:work_block:*` / `tasks:work_session:*`. Life remember/track/research use propose-action."
 }
