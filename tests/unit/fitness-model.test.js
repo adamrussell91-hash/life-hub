@@ -198,13 +198,15 @@ test('heroSession includes muscleMapKeys from coarse focus', () => {
   assert.deepEqual(model.heroSession.muscleMapKeys, ['chest-whole', 'arm-bicep']);
 });
 
-test('REGION_KEYS lists the five strength card regions', () => {
-  assert.deepEqual(REGION_KEYS, ['chest', 'arms', 'abs', 'legs', 'back']);
+test('REGION_KEYS lists every strength card region including shoulders and full body', () => {
+  assert.deepEqual(REGION_KEYS, [
+    'chest', 'shoulders', 'arms', 'abs', 'legs', 'back', 'full_body'
+  ]);
 });
 
 test('library target_area feeds every Region tile — one shared path, not per-lift patches', () => {
   // Names deliberately avoid REGION_NAME_PATTERNS keywords. Multi-focus session
-  // also fails without library. Every mapped target_area must resolve.
+  // also fails without library. Every library target_area must resolve to a tile.
   const library = new Map([
     ['nova flat load', { name: 'Nova Flat Load', target_area: 'Chest' }],
     ['nova hinge pull', { name: 'Nova Hinge Pull', target_area: 'Arms' }],
@@ -219,7 +221,8 @@ test('library target_area feeds every Region tile — one shared path, not per-l
 
   for (const name of [
     'Nova Flat Load', 'Nova Hinge Pull', 'Nova Midline Hold',
-    'Nova Thruster', 'Nova Posterior Drive', 'Nova Yoke Pull'
+    'Nova Thruster', 'Nova Posterior Drive', 'Nova Yoke Pull',
+    'Nova Overhead Arc', 'Nova Metro Circuit'
   ]) {
     assert.equal(resolveExerciseRegion({ name }, multi), null, `${name} must need library`);
   }
@@ -230,30 +233,33 @@ test('library target_area feeds every Region tile — one shared path, not per-l
   assert.equal(resolveExerciseRegion({ name: 'Nova Thruster' }, multi, library), 'legs');
   assert.equal(resolveExerciseRegion({ name: 'Nova Posterior Drive' }, multi, library), 'legs');
   assert.equal(resolveExerciseRegion({ name: 'Nova Yoke Pull' }, multi, library), 'back');
-  // No Shoulders / Full Body tile exists — leave unmapped rather than invent a home.
-  assert.equal(resolveExerciseRegion({ name: 'Nova Overhead Arc' }, multi, library), null);
-  assert.equal(resolveExerciseRegion({ name: 'Nova Metro Circuit' }, multi, library), null);
+  assert.equal(resolveExerciseRegion({ name: 'Nova Overhead Arc' }, multi, library), 'shoulders');
+  assert.equal(resolveExerciseRegion({ name: 'Nova Metro Circuit' }, multi, library), 'full_body');
 });
 
-test('buildFitnessModel applies library target_area across all five tiles in one session', () => {
+test('buildFitnessModel applies library target_area across all seven tiles in one session', () => {
   const library = new Map([
     ['nova flat load', { name: 'Nova Flat Load', target_area: 'Chest' }],
+    ['nova overhead arc', { name: 'Nova Overhead Arc', target_area: 'Shoulders' }],
     ['nova hinge pull', { name: 'Nova Hinge Pull', target_area: 'Arms' }],
     ['nova midline hold', { name: 'Nova Midline Hold', target_area: 'Core' }],
     ['nova thruster', { name: 'Nova Thruster', target_area: 'Legs' }],
-    ['nova yoke pull', { name: 'Nova Yoke Pull', target_area: 'Back' }]
+    ['nova yoke pull', { name: 'Nova Yoke Pull', target_area: 'Back' }],
+    ['nova metro circuit', { name: 'Nova Metro Circuit', target_area: 'Full Body' }]
   ]);
   const model = buildFitnessModel({
     events: events([
       workout({
         date: '2026-09-10',
-        focus: ['chest', 'arms', 'legs', 'back', 'core'],
+        focus: ['chest', 'arms', 'legs', 'back', 'core', 'shoulders'],
         exercises: [
           { name: 'Nova Flat Load', sets: [{ reps: 5, weight_kg: 50 }] },
+          { name: 'Nova Overhead Arc', sets: [{ reps: 5, weight_kg: 30 }] },
           { name: 'Nova Hinge Pull', sets: [{ reps: 5, weight_kg: 20 }] },
           { name: 'Nova Midline Hold', sets: [{ reps: 5, weight_kg: 15 }] },
           { name: 'Nova Thruster', sets: [{ reps: 5, weight_kg: 80 }] },
-          { name: 'Nova Yoke Pull', sets: [{ reps: 5, weight_kg: 40 }] }
+          { name: 'Nova Yoke Pull', sets: [{ reps: 5, weight_kg: 40 }] },
+          { name: 'Nova Metro Circuit', sets: [{ reps: 5, weight_kg: 25 }] }
         ]
       })
     ]),
@@ -261,7 +267,18 @@ test('buildFitnessModel applies library target_area across all five tiles in one
     libraryByName: library
   });
   const best = Object.fromEntries(model.regions.map(r => [r.key, r.currentBestKg]));
-  assert.deepEqual(best, { chest: 50, arms: 20, abs: 15, legs: 80, back: 40 });
+  assert.deepEqual(best, {
+    chest: 50,
+    shoulders: 30,
+    arms: 20,
+    abs: 15,
+    legs: 80,
+    back: 40,
+    full_body: 25
+  });
+  assert.equal(model.regions.find(r => r.key === 'shoulders').image, 'assets/fitness/regions/shoulders.png');
+  assert.equal(model.regions.find(r => r.key === 'full_body').image, 'assets/fitness/regions/full_body.png');
+  assert.equal(model.regions.find(r => r.key === 'full_body').label, 'Full Body');
 });
 test('resolveExerciseRegion uses unique workout focus, then name regex, without library', () => {
   assert.equal(resolveExerciseRegion({ name: 'Mystery Move' }, ['legs']), 'legs');
@@ -287,11 +304,11 @@ test('resolveExerciseRegion uses unique workout focus, then name regex, without 
   assert.equal(resolveExerciseRegion({ name: 'Mystery Move' }, ['chest', 'arms']), null);
 });
 
-test('bare press names do not map to chest (Leg / Overhead / Shoulder Press)', () => {
+test('bare press names do not map to chest (Leg Press stays legs; overhead/shoulder → shoulders)', () => {
   assert.equal(resolveExerciseRegion({ name: 'Leg Press' }), 'legs');
   assert.notEqual(resolveExerciseRegion({ name: 'Overhead Press' }), 'chest');
-  assert.notEqual(resolveExerciseRegion({ name: 'Shoulder Press' }), 'chest');
-  assert.notEqual(resolveExerciseRegion({ name: 'Bar Seated Overhead Press' }), 'chest');
+  assert.equal(resolveExerciseRegion({ name: 'Shoulder Press' }), 'shoulders');
+  assert.equal(resolveExerciseRegion({ name: 'Bar Seated Overhead Press' }), 'shoulders');
 });
 
 test('exercise-level focus override still wins only when library has no target_area', () => {
@@ -428,7 +445,7 @@ test('regions expose best-set kg delta, volume delta, colour, and image path', (
     date: '2026-08-12'
   });
 
-  assert.equal(model.regions.length, 5);
+  assert.equal(model.regions.length, 7);
   const chest = model.regions.find(r => r.key === 'chest');
   assert.equal(chest.label, 'Chest');
   assert.equal(chest.image, 'assets/fitness/regions/chest.png');
@@ -450,6 +467,9 @@ test('regions expose best-set kg delta, volume delta, colour, and image path', (
   assert.equal(legs.currentBestKg, null);
   assert.equal(legs.currentVolume, 0);
   assert.equal(legs.volumeDeltaPct, null);
+
+  assert.equal(model.regions.find(r => r.key === 'shoulders').label, 'Shoulders');
+  assert.equal(model.regions.find(r => r.key === 'full_body').label, 'Full Body');
 });
 
 test('strengthDeltaPct averages region best-set percent changes with data', () => {

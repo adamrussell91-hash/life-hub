@@ -479,7 +479,7 @@ export function getRegionStrengthSchema() {
       properties: {
         region: {
           type: 'string',
-          description: `Optional region filter: ${REGION_KEYS.join(', ')} (or the label). Omit for all five.`
+          description: `Optional region filter: ${REGION_KEYS.join(', ')} (or the label). Omit for all regions.`
         }
       }
     }

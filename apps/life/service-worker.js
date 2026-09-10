@@ -213,7 +213,9 @@ const SHELL_FILES = [
   'assets/fitness/regions/arms.png',
   'assets/fitness/regions/back.png',
   'assets/fitness/regions/chest.png',
-  'assets/fitness/regions/legs.png'
+  'assets/fitness/regions/full_body.png',
+  'assets/fitness/regions/legs.png',
+  'assets/fitness/regions/shoulders.png'
 ];
 const PRECACHE_URLS = SHELL_FILES.map(file => SCOPE_PATH + file);
 const SHELL_PATHS = new Set(PRECACHE_URLS);

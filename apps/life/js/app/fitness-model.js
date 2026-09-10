@@ -8,39 +8,47 @@ const MONTH_DAYS = 30;
 const LONG_TERM_WEEKS = 26;
 const WORKOUT_TARGET_PER_WEEK = 4;
 
-export const REGION_KEYS = ['chest', 'arms', 'abs', 'legs', 'back'];
+export const REGION_KEYS = ['chest', 'shoulders', 'arms', 'abs', 'legs', 'back', 'full_body'];
 
 export const REGION_LABELS = {
   chest: 'Chest',
+  shoulders: 'Shoulders',
   arms: 'Arms',
   abs: 'Abs',
   legs: 'Legs',
-  back: 'Back'
+  back: 'Back',
+  full_body: 'Full Body'
 };
 
 /**
- * Map workout focus tags and exercise-library target_area values onto the five
+ * Map workout focus tags and exercise-library target_area values onto the
  * Region strength tiles. Library target_area is the source of truth for which
  * tile an exercise feeds — names are only a last-resort fallback.
  */
 const FOCUS_TO_REGION = {
   chest: 'chest',
+  shoulders: 'shoulders',
+  shoulder: 'shoulders',
   arms: 'arms',
   abs: 'abs',
   core: 'abs',
   legs: 'legs',
   glutes: 'legs',
-  back: 'back'
-  // Shoulders / Full Body stay unmapped — no matching region tile.
+  back: 'back',
+  'full body': 'full_body',
+  full_body: 'full_body',
+  fullbody: 'full_body'
 };
 
 /** Last-resort name regexes when library target_area is unavailable. */
 const REGION_NAME_PATTERNS = [
   ['chest', /bench|\bchest\b|chest press|pec/i],
+  ['shoulders', /\b(shoulder|delt|deltoid|overhead press)\b/i],
   ['arms', /\b(curl|tricep|triceps|bicep|biceps)\b/i],
   ['abs', /\b(crunch|plank|ab|abs|core)\b/i],
   ['legs', /\b(squat|deadlift|leg|lunge|rdl|calf|calves)\b/i],
-  ['back', /\b(row|pull[\s-]?up|pullup|lat|pulldown)\b/i]
+  ['back', /\b(row|pull[\s-]?up|pullup|lat|pulldown)\b/i],
+  ['full_body', /\bfull[\s_-]?body\b/i]
 ];
 
 export function canonicalExerciseName(name) {
