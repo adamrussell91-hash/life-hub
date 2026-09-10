@@ -24,15 +24,25 @@ async function catalog() {
   return body.data.catalog as Definition[];
 }
 
-function motif(definition: Definition) {
-  const shape = definition.id === "fates" ? "≈" : definition.id === "horizon" ? "⌁" : definition.id === "refinery" ? "◇" : definition.id === "cartographers" ? "⌇" : definition.id === "mirror" ? "◐" : definition.id === "consilium" ? "◡" : definition.id === "witness" ? "○" : "▣";
-  return `<span class="protocol-card__glyph" aria-hidden="true">${shape}</span>`;
+function cardArt(id: string) {
+  const paths: Record<string, string> = {
+    fates: '<path d="M42 18C86 44 34 72 78 102S30 158 74 190"/><path d="M78 18C34 44 86 72 42 102s48 56 4 88"/><circle cx="60" cy="102" r="24"/><path d="M49 102h22M60 91v22"/>',
+    horizon: '<path d="M18 129c18-16 36-16 54 0s36 16 54 0 36-16 54 0"/><path d="M18 151c18-16 36-16 54 0s36 16 54 0 36-16 54 0"/><path d="M60 38v66M36 62l24-24 24 24"/><circle cx="60" cy="38" r="10"/>',
+    refinery: '<path d="M60 22l40 40-40 40-40-40z"/><path d="M60 102l28 28-28 28-28-28z"/><path d="M22 158h76M32 174h56"/><circle cx="60" cy="62" r="12"/>',
+    cartographers: '<path d="M20 50c24-20 48 18 72-4s38 10 48-4"/><path d="M18 86c20-12 42 12 62-4s40 12 54-2"/><path d="M20 124c22-18 44 14 64-2s34 10 52-4"/><path d="M30 160l66-116"/><circle cx="30" cy="160" r="6"/><path d="M96 44l-4 12 12-4"/>',
+    mirror: '<path d="M60 24c30 0 46 25 46 57s-16 57-46 57-46-25-46-57 16-57 46-57z"/><path d="M60 24v114"/><path d="M39 166c12-12 30-12 42 0"/><path d="M48 78h1M71 78h1"/><path d="M47 103c8 7 18 7 26 0"/>',
+    consilium: '<path d="M22 156h76"/><path d="M30 156V98h60v58"/><path d="M38 98V62h44v36"/><path d="M46 62V38h28v24"/><path d="M50 122h20M50 138h20"/><circle cx="60" cy="26" r="8"/>',
+    witness: '<circle cx="60" cy="104" r="46"/><circle cx="60" cy="104" r="25"/><path d="M60 20v22M60 166v22M16 104h22M82 104h22"/><path d="M31 54l16 16M89 54L73 70M31 154l16-16M89 154l-16-16"/>',
+    tribunal: '<path d="M28 38h64v112H28z"/><path d="M18 54h64v112H18z"/><path d="M38 22h64v112H38z"/><path d="M48 78h20M48 94h20M48 110h20"/>'
+  };
+  return `<svg class="protocol-card__art" viewBox="0 0 120 208" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${paths[id] ?? paths.tribunal}</svg>`;
 }
 
 function cards(definitions: Definition[]) {
-  return definitions.map((d, index) => `<article class="protocol-card" data-protocol-card="${escapeHtml(d.id)}" style="--protocol-order:${index}">
-    <button type="button" class="protocol-card__face" aria-expanded="false" aria-controls="protocol-detail-${escapeHtml(d.id)}">
-      <span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span>${motif(d)}<strong>${escapeHtml(d.name)}</strong><span>${escapeHtml(d.description)}</span><em>Turn card</em>
+  return definitions.map((d, index) => `<article class="protocol-card protocol-card--${escapeHtml(d.id)}" data-protocol-card="${escapeHtml(d.id)}" style="--protocol-order:${index}">
+    <button type="button" class="protocol-card__face" aria-expanded="false" aria-controls="protocol-detail-${escapeHtml(d.id)}" aria-label="Turn ${escapeHtml(d.name)} card">
+      <span class="protocol-card__back" aria-hidden="true"><span class="protocol-card__back-mark">✦</span><span>Cognitive<br>Protocols</span><span class="protocol-card__back-mark">✦</span></span>
+      <span class="protocol-card__front"><span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span>${cardArt(d.id)}<strong>${escapeHtml(d.name)}</strong><em>Turn to enter</em></span>
     </button>
     <section id="protocol-detail-${escapeHtml(d.id)}" class="protocol-card__detail" hidden>
       <p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => escapeHtml(v.name)).join(" · ")}</p>
