@@ -202,21 +202,29 @@ test('REGION_KEYS lists the five strength card regions', () => {
   assert.deepEqual(REGION_KEYS, ['chest', 'arms', 'abs', 'legs', 'back']);
 });
 
-test('resolveExerciseRegion prefers focus tags over exercise name', () => {
-  assert.equal(resolveExerciseRegion({ name: 'Bench Press', focus: ['arms'] }), 'arms');
-  assert.equal(resolveExerciseRegion({ name: 'Mystery Move' }, ['legs']), 'legs');
-  assert.equal(resolveExerciseRegion({ name: 'Mystery Move' }, ['core']), 'abs');
+test('resolveExerciseRegion prefers library target_area over name and multi-focus', () => {
+  const library = new Map([
+    ['bar press', { name: 'Bar Press', target_area: 'Chest' }],
+    ['cable kickback', { name: 'Cable Kickback', target_area: 'Glutes' }]
+  ]);
+  // Bar Press does not match the chest name regex — library target_area is required.
+  assert.equal(resolveExerciseRegion({ name: 'Bar Press' }, ['arms', 'chest', 'shoulders']), null);
+  assert.equal(
+    resolveExerciseRegion({ name: 'Bar Press' }, ['arms', 'chest', 'shoulders'], library),
+    'chest'
+  );
+  assert.equal(
+    resolveExerciseRegion({ name: 'Cable Kickback' }, ['glutes', 'legs'], library),
+    'legs'
+  );
 });
 
-test('resolveExerciseRegion falls back to name regexes', () => {
+test('resolveExerciseRegion uses unique workout focus, then name regex, without library', () => {
+  assert.equal(resolveExerciseRegion({ name: 'Mystery Move' }, ['legs']), 'legs');
+  assert.equal(resolveExerciseRegion({ name: 'Mystery Move' }, ['core']), 'abs');
   assert.equal(resolveExerciseRegion({ name: 'Incline Bench' }), 'chest');
   assert.equal(resolveExerciseRegion({ name: 'Chest Fly' }), 'chest');
   assert.equal(resolveExerciseRegion({ name: 'Chest Press' }), 'chest');
-  assert.equal(resolveExerciseRegion({ name: 'Bar Press' }), 'chest');
-  assert.equal(resolveExerciseRegion({ name: 'Bar Press' }, ['arms', 'chest', 'shoulders']), 'chest');
-  assert.equal(resolveExerciseRegion({ name: 'Alt Incline Press' }), 'chest');
-  assert.equal(resolveExerciseRegion({ name: 'Flat Fly' }), 'chest');
-  assert.equal(resolveExerciseRegion({ name: 'Bar Close Grip Press' }), 'chest');
   assert.equal(resolveExerciseRegion({ name: 'Barbell Curl' }), 'arms');
   assert.equal(resolveExerciseRegion({ name: 'Tricep Extension' }), 'arms');
   assert.equal(resolveExerciseRegion({ name: 'Bicep Curl' }), 'arms');
@@ -242,19 +250,25 @@ test('bare press names do not map to chest (Leg / Overhead / Shoulder Press)', (
   assert.notEqual(resolveExerciseRegion({ name: 'Bar Seated Overhead Press' }), 'chest');
 });
 
-test('resolveExerciseRegion uses library target_area when name is ambiguous', () => {
+test('exercise-level focus override still wins only when library has no target_area', () => {
+  // Library target_area is authoritative when present.
   const library = new Map([
-    ['mystery press', { name: 'Mystery Press', target_area: 'Chest' }]
+    ['bench press', { name: 'Bench Press', target_area: 'Chest' }]
   ]);
   assert.equal(
-    resolveExerciseRegion({ name: 'Mystery Press' }, ['arms', 'chest'], library),
+    resolveExerciseRegion({ name: 'Bench Press', focus: ['arms'] }, [], library),
     'chest'
   );
+  assert.equal(resolveExerciseRegion({ name: 'Bench Press', focus: ['arms'] }), 'arms');
 });
 
-test('region strength counts Bar Press over Wide Bench in multi-focus sessions', () => {
-  // Repro: Jul 30 Wide Bench 42kg prior; tonight Bar Press 44kg ignored when name
-  // did not map to chest and session focus was multi-region → tile stuck at 0 / Wide Bench.
+test('region strength uses library target_area so Bar Press feeds the chest tile', () => {
+  // Repro: multi-focus sessions + Bar Press (name ≠ "chest") ignored library →
+  // Wide Bench kept winning the tile. Library target_area: Chest must fix it.
+  const library = new Map([
+    ['bar press', { name: 'Bar Press', target_area: 'Chest' }],
+    ['bar wide bench press', { name: 'Bar Wide Bench Press', target_area: 'Chest' }]
+  ]);
   const model = buildFitnessModel({
     events: events([
       workout({
@@ -274,12 +288,29 @@ test('region strength counts Bar Press over Wide Bench in multi-focus sessions',
         ]
       })
     ]),
-    date: '2026-09-10'
+    date: '2026-09-10',
+    libraryByName: library
   });
   const chest = model.regions.find(r => r.key === 'chest');
   assert.equal(chest.currentBestKg, 44);
   assert.equal(chest.bestSetDeltaKg, 2);
   assert.equal(chest.colour, 'green');
+
+  const withoutLibrary = buildFitnessModel({
+    events: events([
+      workout({
+        date: '2026-09-10',
+        focus: ['arms', 'chest'],
+        exercises: [
+          { name: 'Bar Press', sets: [{ reps: 8, weight_kg: 44 }] },
+          { name: 'Bar Wide Bench Press', sets: [{ reps: 12, weight_kg: 40 }] }
+        ]
+      })
+    ]),
+    date: '2026-09-10'
+  });
+  // Without library, only Wide Bench name-matches chest — proves target_area is load-bearing.
+  assert.equal(withoutLibrary.regions.find(r => r.key === 'chest').currentBestKg, 40);
 });
 
 test('longTerm weeklyVolume spans ~26 weeks with volumeDeltaPct', () => {

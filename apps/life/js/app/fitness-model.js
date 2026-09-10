@@ -18,20 +18,25 @@ export const REGION_LABELS = {
   back: 'Back'
 };
 
+/**
+ * Map workout focus tags and exercise-library target_area values onto the five
+ * Region strength tiles. Library target_area is the source of truth for which
+ * tile an exercise feeds — names are only a last-resort fallback.
+ */
 const FOCUS_TO_REGION = {
   chest: 'chest',
   arms: 'arms',
   abs: 'abs',
   core: 'abs',
   legs: 'legs',
+  glutes: 'legs',
   back: 'back'
+  // Shoulders / Full Body stay unmapped — no matching region tile.
 };
 
-/** Name regex fallbacks — checked in REGION_KEYS order. */
+/** Last-resort name regexes when library target_area is unavailable. */
 const REGION_NAME_PATTERNS = [
-  // Bar Press / incline / fly are Adam's chest lifts; do not match bare "press"
-  // (Overhead / Shoulder Press) or Leg Press (caught by legs via \bleg\b).
-  ['chest', /bench|\bchest\b|chest press|\bbar press\b|incline press|close grip press|\bfly\b|pec/i],
+  ['chest', /bench|\bchest\b|chest press|pec/i],
   ['arms', /\b(curl|tricep|triceps|bicep|biceps)\b/i],
   ['abs', /\b(crunch|plank|ab|abs|core)\b/i],
   ['legs', /\b(squat|deadlift|leg|lunge|rdl|calf|calves)\b/i],
@@ -125,18 +130,22 @@ function regionFromLibrary(exercise, libraryByName) {
 }
 
 /**
- * Map an exercise to a strength region.
- * Prefer exercise focus tags, then exercise-library target_area, then unique
- * workout focus, then name regex.
+ * Map an exercise to a Region strength tile.
+ *
+ * Order:
+ * 1. exercise-library target_area (authoritative — names need not match the tile)
+ * 2. exercise-level focus tags (rare per-set override)
+ * 3. unique workout focus when the session has exactly one region
+ * 4. name regex last resort when the library row is missing
  */
 export function resolveExerciseRegion(exercise, workoutFocus = [], libraryByName = null) {
+  const fromLibrary = regionFromLibrary(exercise, libraryByName);
+  if (fromLibrary) return fromLibrary;
+
   for (const tag of asFocusList(exercise?.focus ?? exercise?.focus_areas)) {
     const region = focusToRegion(tag);
     if (region) return region;
   }
-
-  const fromLibrary = regionFromLibrary(exercise, libraryByName);
-  if (fromLibrary) return fromLibrary;
 
   const workoutRegions = [...new Set(
     asFocusList(workoutFocus).map(focusToRegion).filter(Boolean)
