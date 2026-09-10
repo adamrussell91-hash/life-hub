@@ -1,7 +1,14 @@
 import type { ComplianceModule, Project } from '@/schemas/project';
+import type { Task } from '@/schemas/task';
 import type { ExcursionTemplate } from '@/schemas/templates';
 import { tasksApi } from '@/services/client-api';
-import { defaultExcursionEventDate, formatLeadTimes, leadTimeSlack } from '@/domain/excursion';
+import {
+  defaultExcursionEventDate,
+  excursionClearance,
+  excursionCountdownLabel,
+  formatLeadTimes,
+  leadTimeSlack
+} from '@/domain/excursion';
 import { cloneDefaultComplianceModules } from '@/domain/excursion-modules';
 import { DEFAULT_EXCURSION_TITLE } from '@/domain/excursion-catalog';
 import { newExcursionHash, projectPageHash } from '@/domain/cards';
@@ -146,40 +153,35 @@ function confirmCreate(
   );
 }
 
-function plusButton(label: string, href: string): HTMLButtonElement {
-  const button = el('button', 'icon-plus-btn excursions-add') as HTMLButtonElement;
+function newExcursionButton(href: string): HTMLButtonElement {
+  const button = el('button', 'btn btn--primary excursions-add') as HTMLButtonElement;
   button.type = 'button';
-  button.setAttribute('aria-label', label);
-  button.title = label;
-  button.append(plusIcon());
+  button.append(plusIcon(), document.createTextNode('New excursion'));
   button.addEventListener('click', () => {
     location.hash = href;
   });
   return button;
 }
 
-function appendTemplateRows(
-  host: HTMLElement,
-  templates: ExcursionTemplate[],
-  confirmHost: HTMLElement
-): void {
-  const stack = el('div', 'task-stack');
-  for (const template of templates) {
-    const row = el('article', 'task-row');
-    const actions = el('div', 'task-row__actions');
-    const use = el('button', 'btn btn--primary', 'Use');
-    use.type = 'button';
-    use.addEventListener('click', () => {
-      confirmCreate(confirmHost, template, openProjectPage);
-    });
-    actions.append(use);
-    row.append(el('h3', 'task-row__title', template.name), actions);
-    stack.append(row);
-  }
-  host.append(stack);
+/** Glanceable Clearance Gate + countdown above the existing project card — card itself untouched. */
+function renderExcursionMeta(project: Project, tasks: Task[]): HTMLElement {
+  const clearance = excursionClearance(project, tasks);
+  const strip = el(
+    'div',
+    `excursion-list-meta ${clearance.cleared ? 'is-go' : 'is-warn'}`
+  );
+  strip.append(
+    el('span', 'excursion-list-meta__dot'),
+    el(
+      'span',
+      'excursion-list-meta__text',
+      `${clearance.cleared ? 'Cleared to depart' : 'Not cleared'} · ${excursionCountdownLabel(project.current_end_date)}`
+    )
+  );
+  return strip;
 }
 
-/** Excursions list — use a template (confirm → page), no extra create form. */
+/** Excursions dashboard — one template, so "New excursion" goes straight to the confirm flow. */
 export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
   const prefillId = hashQuery().get('template');
   if (prefillId) {
@@ -200,23 +202,20 @@ export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
   const confirmHost = el('div', 'excursion-confirm');
   const listHost = el('div', 'task-stack');
   const addRow = el('div', 'excursions-toolbar');
-  addRow.append(plusButton('New excursion', newExcursionHash()));
+  addRow.append(newExcursionButton(newExcursionHash(templates[0]?.id)));
   canvas.append(addRow, confirmHost);
-
-  if (templates.length) {
-    canvas.append(el('h2', 'section-title', 'Templates'));
-    appendTemplateRows(canvas, templates, confirmHost);
-  }
 
   canvas.append(el('h2', 'section-title', 'Active'));
   if (!excursions.length) {
-    listHost.append(el('p', 'empty-state', 'No excursions yet. Use a template above.'));
+    listHost.append(el('p', 'empty-state', 'No excursions yet. Create one above.'));
   } else {
     const reload = async () => {
       await renderExcursionsView(canvas);
     };
     for (const project of excursions) {
-      mountProjectCard(listHost, project, tasks, {
+      const item = el('div', 'excursion-list-item');
+      item.append(renderExcursionMeta(project, tasks));
+      mountProjectCard(item, project, tasks, {
         onToggleChild: (task) => requestToggleDone(confirmHost, task, reload),
         onAddTask: () => {
           confirmHost.replaceChildren(renderQuickAdd(() => void reload(), project.id));
@@ -225,12 +224,13 @@ export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
         onActivate: openProjectPage,
         onDelete: (current) => deleteProjectNow(current, reload, confirmHost)
       });
+      listHost.append(item);
     }
   }
   canvas.append(listHost);
 }
 
-/** Confirm a template, then write — event date is editable inline, no separate Template / group form. */
+/** Confirm the (single) template, then write — event date is editable inline, no template picker. */
 export async function renderNewExcursionPage(canvas: HTMLElement): Promise<void> {
   canvas.replaceChildren(el('p', 'canvas-status', 'Loading excursion…'));
   const templatesPayload = await tasksApi.listTemplates();
@@ -256,11 +256,7 @@ export async function renderNewExcursionPage(canvas: HTMLElement): Promise<void>
     return;
   }
 
-  if (prefillId) {
-    confirmCreate(confirmHost, prefillTpl, openProjectPage);
-  } else {
-    appendTemplateRows(page, templates, confirmHost);
-  }
+  confirmCreate(confirmHost, prefillTpl, openProjectPage);
 
   canvas.replaceChildren(page);
 }
