@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Task } from '@/schemas/task';
 import { tasksApi } from '@/services/client-api';
+import { notifyTasksChanged, resetTaskCache } from '@/services/task-cache';
 import { renderDayView } from '@/views/dashboard';
 import { hubCalendarDate, toDateKey } from '@/domain/queries';
 
@@ -67,6 +68,7 @@ describe('Today view mutations', () => {
   });
 
   afterEach(() => {
+    resetTaskCache();
     document.body.replaceChildren();
     vi.restoreAllMocks();
   });
@@ -117,6 +119,23 @@ describe('Today view mutations', () => {
       due_time: time.value,
       estimated_duration: 60
     });
+  });
+
+  it('live-inserts a Clare-created Today task without a second list fetch', async () => {
+    const created = task({ id: 'task_clare', title: 'Clare today add', due_time: '10:00' });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderDayView(canvas);
+    expect(canvas.textContent).toContain('Nothing due today');
+
+    notifyTasksChanged([created]);
+
+    expect(canvas.textContent).toContain('Clare today add');
+    expect(canvas.textContent).not.toContain('Nothing due today');
+    expect(canvas.querySelector('.canvas-status')).toBeNull();
+    expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
   });
 
   it('seeds start time when an hour on the dial is tapped', async () => {

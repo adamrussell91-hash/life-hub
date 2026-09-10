@@ -40,7 +40,7 @@ import {
   classifyCentralNodePatchRisk
 } from '../../../../apps/life/js/core/central-node-patch.js';
 import { applyIntuitionEdit } from './intuition.mjs';
-import { validateProposeActionInput } from './propose-action.mjs';
+import { executeProposeActionWrites, validateProposeActionInput } from './propose-action.mjs';
 import { newTaskId } from '../tasks-blobs.mjs';
 import {
   addMemory,
@@ -401,7 +401,7 @@ export function shortcutSchemas() {
     create_task: {
       name: 'create_task',
       description:
-        `Create one or more Tasks Hub rows (Confirm). Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). NEVER merge distinct actions into one title — one card per distinct piece of work. Never mention this limit or the tool name in chat.`,
+        `Create one or more Tasks Hub rows immediately. Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). Omit due_date only when the work is not for today — otherwise it lands on Today. NEVER merge distinct actions into one title — one card per distinct piece of work. Never mention this limit or the tool name in chat.`,
       input_schema: {
         type: 'object',
         properties: {
@@ -1255,7 +1255,7 @@ function collectCreateTaskItems(input) {
   return expanded;
 }
 
-function buildTaskRecord(item, { id, now }) {
+function buildTaskRecord(item, { id, now, today }) {
   const record = {
     schema_version: 1,
     id,
@@ -1268,7 +1268,7 @@ function buildTaskRecord(item, { id, now }) {
     framework_used: null,
     estimated_duration: item.estimated_duration,
     actual_duration: null,
-    due_date: item.due_date,
+    due_date: item.due_date || today || null,
     created_at: now,
     updated_at: now,
     completed_at: null,
@@ -1299,30 +1299,49 @@ function buildTaskRecord(item, { id, now }) {
   return record;
 }
 
-function handleCreateTask(ctx, input) {
+async function handleCreateTask(ctx, input) {
   const items = collectCreateTaskItems(input);
   if (!items.length) return deny('title or items[].title is required');
   if (items.length > CREATE_TASK_MAX_ITEMS) {
     return deny(`at most ${CREATE_TASK_MAX_ITEMS} tasks per create_task call`);
   }
   const now = new Date().toISOString();
+  const today = typeof ctx.today === 'string' && ctx.today.trim() ? ctx.today.trim() : null;
   const writes = items.map(item => {
     const id = newTaskId();
     return {
       path: `tasks:task:${id}`,
       mode: 'create',
-      content: serializeJson(buildTaskRecord(item, { id, now })),
+      content: serializeJson(buildTaskRecord(item, { id, now, today })),
       diff: `new task: ${item.title}`
     };
   });
-  return propose(
-    buildProposal({
-      agentSlug: ctx.agentSlug,
-      intent: items.length === 1 ? `Create task: ${items[0].title}` : `Create ${items.length} tasks`,
-      surfaces: ['confirm_card', 'governance_log'],
-      writes
-    })
-  );
+  const proposal = buildProposal({
+    agentSlug: ctx.agentSlug,
+    intent: items.length === 1 ? `Create task: ${items[0].title}` : `Create ${items.length} tasks`,
+    surfaces: ['confirm_card', 'governance_log'],
+    writes
+  });
+  if (ctx.tasksStore) {
+    const applied = await executeProposeActionWrites({}, proposal, {
+      blobStores: { tasks: ctx.tasksStore }
+    });
+    if (!applied.ok) return deny(applied.error || 'create_failed');
+    const tasks = writes.map((write, index) => {
+      const record = JSON.parse(write.content);
+      const stamp = applied.results[index]?.updated_at;
+      if (stamp) {
+        record.updated_at = stamp;
+        if (!record.created_at) record.created_at = stamp;
+      }
+      return record;
+    });
+    return ok(
+      items.length === 1 ? `Created ${items[0].title}` : `Created ${items.length} tasks`,
+      { status: 'applied', tasks, ids: tasks.map(task => task.id) }
+    );
+  }
+  return propose(proposal);
 }
 
 function handleUpdateTask(ctx, input) {
@@ -1414,7 +1433,7 @@ export async function executeShortcut(toolName, input, ctx) {
       case 'os_run_promoted_shortcut':
         return await handleOsRunPromotedShortcut(ctx, input);
       case 'create_task':
-        return handleCreateTask(ctx, input);
+        return await handleCreateTask(ctx, input);
       case 'update_task':
         return handleUpdateTask(ctx, input);
       default:

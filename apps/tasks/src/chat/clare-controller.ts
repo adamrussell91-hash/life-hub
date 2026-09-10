@@ -16,7 +16,9 @@ import { focusedTaskId } from '@/domain/focus';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createHubField, createHubFilter } from '@/views/hub-kit';
 import { tasksApi } from '@/services/client-api';
+import { notifyTasksChanged } from '@/services/task-cache';
 import { confirmChat, streamChat, clareWorkChat } from '@/services/chat-api';
+import type { Task } from '@/schemas/task';
 import { ApiClientError } from '@/api/client';
 import {
   setCalendarGhostBlocksForProposal,
@@ -51,6 +53,40 @@ export function skipReasoning(): boolean {
 
 export function setSkipReasoning(on: boolean): void {
   localStorage.setItem(SKIP_REASONING_KEY, on ? '1' : '0');
+}
+
+function taskIdsFromConfirm(result: unknown): string[] {
+  if (!result || typeof result !== 'object') return [];
+  const results = (result as { results?: unknown }).results;
+  if (!Array.isArray(results)) return [];
+  const ids: string[] = [];
+  for (const row of results) {
+    if (!row || typeof row !== 'object') continue;
+    const path = typeof (row as { path?: unknown }).path === 'string' ? (row as { path: string }).path : '';
+    const id = typeof (row as { id?: unknown }).id === 'string' ? (row as { id: string }).id.trim() : '';
+    if (path.startsWith('tasks:task:')) {
+      ids.push(path.slice('tasks:task:'.length));
+      continue;
+    }
+    if (id && !path) ids.push(id);
+  }
+  return ids.filter(Boolean);
+}
+
+async function liveInConfirmedTasks(result: unknown): Promise<void> {
+  const ids = taskIdsFromConfirm(result);
+  if (!ids.length) return;
+  const tasks = (
+    await Promise.all(ids.map((id) => tasksApi.getTask(id).catch(() => null)))
+  ).filter((task): task is Task => Boolean(task));
+  if (tasks.length) notifyTasksChanged(tasks);
+}
+
+function liveInStreamedTasks(event: Record<string, unknown>): void {
+  const raw = event.tasks;
+  if (!Array.isArray(raw) || !raw.length) return;
+  const tasks = raw.filter((row): row is Task => Boolean(row && typeof row === 'object' && typeof (row as Task).id === 'string' && (row as Task).title));
+  if (tasks.length) notifyTasksChanged(tasks);
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -168,13 +204,16 @@ function appendProposalCard(
     setConfirmBusy(confirm, true);
     discard.disabled = true;
     try {
-      await tasksApi.acceptClareBatch([
+      const accepted = await tasksApi.acceptClareBatch([
         {
           proposal,
           accepted_minutes: Number(minutes.input.value) || proposal.proposed_minutes,
           framework_id: framework.getValue() || proposal.framework_id
         }
       ]);
+      if (Array.isArray(accepted?.tasks) && accepted.tasks.length) {
+        notifyTasksChanged(accepted.tasks);
+      }
       appendSavedCard(card);
       onSaved();
     } catch (err) {
@@ -402,11 +441,12 @@ function appendActionProposalCard(
     try {
       // Server treats pending id as authoritative; do not send a candidate that
       // could be mistaken for execution authority if the id were missing.
-      await confirmChat({
+      const confirmed = await confirmChat({
         kind: 'action',
         id: pendingId,
         slug: 'clare'
       });
+      await liveInConfirmedTasks(confirmed);
       card.dataset.state = 'confirmed';
       appendSavedCard(card);
       onSaved();
@@ -681,13 +721,14 @@ export function createClareChatController({
               && /^\d{2}:\d{2}$/.test(row.start_time.trim())
           )
         : [];
-      await confirmChat({
+      const confirmed = await confirmChat({
         kind: 'action',
         id,
         slug: 'clare',
         ...(paths.length ? { accept: paths } : {}),
         ...(overrides.length ? { schedule_overrides: overrides } : {})
       });
+      await liveInConfirmedTasks(confirmed);
       if (lastPendingActionId === id) lastPendingActionId = null;
     } catch (err) {
       let message = err instanceof Error ? err.message : 'Confirm failed. You can try again.';
@@ -1254,6 +1295,10 @@ export function createClareChatController({
             },
             onDismiss: () => {}
           });
+          continue;
+        }
+        if (event.type === 'tasks_changed') {
+          liveInStreamedTasks(event);
           continue;
         }
         if (event.type === 'action_proposal') {
