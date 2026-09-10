@@ -98,12 +98,6 @@ export function syncKnowledgeMobileChrome(
         onSelect: nav.goTimeline
       },
       {
-        id: "podcast",
-        label: "Podcast",
-        paths: PODCAST,
-        onSelect: nav.goPodcast
-      },
-      {
         id: "quiz",
         label: "Quiz",
         paths: QUIZ,
@@ -111,9 +105,15 @@ export function syncKnowledgeMobileChrome(
       },
       {
         id: "protocols",
-        label: "Protocols",
+        label: "Thinking",
         paths: PROTOCOLS,
         onSelect: nav.goProtocols
+      },
+      {
+        id: "podcast",
+        label: "Podcast",
+        paths: PODCAST,
+        onSelect: nav.goPodcast
       }
     ]
   });
