@@ -698,8 +698,14 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
     async createExcursionFromTemplate(input) {
       const templateId = resolveExcursionTemplateId(input.excursion_template_id);
       const catalog = await syncExcursionTemplateCatalog(kv, keys);
-      const template = catalog.find((item) => item.id === templateId);
-      if (!template) throw new Error(`Excursion template not found: ${templateId}`);
+      const baseTemplate = catalog.find((item) => item.id === templateId);
+      if (!baseTemplate) throw new Error(`Excursion template not found: ${templateId}`);
+      const template = input.lead_time_overrides
+        ? {
+            ...baseTemplate,
+            default_lead_times: { ...baseTemplate.default_lead_times, ...input.lead_time_overrides }
+          }
+        : baseTemplate;
       const plan = buildExcursionPlan(template, {
         title: input.title,
         event_date: input.event_date,

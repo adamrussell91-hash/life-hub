@@ -147,6 +147,21 @@ describe('tasks store', () => {
     expect(created.project.competition_or_event_type).toBe('ext_excursion');
   });
 
+  it('applies lead_time_overrides on top of the template defaults when creating an excursion', async () => {
+    const kv = memoryKv();
+    await seedIfEmpty(kv, keys, seed);
+    const store = createTasksStore(kv, keys);
+    const created = await store.createExcursionFromTemplate({
+      excursion_template_id: 'ext_excursion',
+      title: 'Short-notice excursion',
+      event_date: '2026-10-15',
+      lead_time_overrides: { risk_assessment_days: 10 }
+    });
+    expect(created.project.key_dates?.risk_assessment_due).toBe('2026-10-05');
+    // Untouched lead times keep the template default (21 days before event).
+    expect(created.project.key_dates?.permission_note_due).toBe('2026-09-24');
+  });
+
   it('saves and instantiates task templates', async () => {
     const kv = memoryKv();
     await seedIfEmpty(kv, keys, seed);

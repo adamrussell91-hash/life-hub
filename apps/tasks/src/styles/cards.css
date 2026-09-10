@@ -372,6 +372,79 @@
   border-color: var(--marine);
 }
 
+/* ---------- toggle switch — on/off inclusion, distinct from a done checkbox ---------- */
+.toggle-switch {
+  position: relative;
+  flex: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  width: 2.75rem;
+  height: 1.5rem;
+}
+
+.toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.toggle-track {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  border: 1.5px solid color-mix(in srgb, var(--marine) 22%, var(--line));
+  background: color-mix(in srgb, var(--paper) 92%, white);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  position: relative;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 0.14rem;
+  left: 0.14rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 30, 45, 0.28);
+  transition: transform 0.16s ease;
+}
+
+.toggle-switch:hover .toggle-track {
+  border-color: color-mix(in srgb, var(--wave) 45%, var(--line));
+}
+
+.toggle-switch input:focus-visible + .toggle-track {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.toggle-switch input:checked + .toggle-track {
+  background: var(--wave);
+  border-color: var(--wave);
+  box-shadow: none;
+}
+
+.toggle-switch input:checked + .toggle-track::after {
+  transform: translateX(1.2rem);
+}
+
+.toggle-switch input:checked:hover + .toggle-track {
+  background: var(--marine);
+  border-color: var(--marine);
+}
+
 .priority-dot {
   width: 0.5rem;
   height: 0.5rem;
@@ -949,6 +1022,11 @@ button.hub-chip {
   .check-box {
     width: 1.375rem;
     height: 1.375rem;
+  }
+
+  .toggle-switch {
+    width: 3rem;
+    height: 1.65rem;
   }
 }
 

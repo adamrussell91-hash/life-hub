@@ -4,8 +4,9 @@ import { el } from '@/views/hub-kit';
 
 /**
  * The excursion compliance bundle — six real checklist categories, each item
- * a checkbox. Shared between the New Excursion confirm flow (views/excursions.ts)
- * and the overview page (views/excursion-timeline.ts) so both stay in sync.
+ * a toggle (on = included in this excursion). Shared between the New Excursion
+ * confirm flow (views/excursions.ts) and the overview page
+ * (views/excursion-timeline.ts) so both stay in sync.
  */
 export function renderComplianceBundle(
   modules: ComplianceModule[],
@@ -18,13 +19,13 @@ export function renderComplianceBundle(
     const list = el('ul', 'task-list');
     for (const module of group.modules) {
       const item = el('li', 'task-item');
-      const label = el('label', 'task-check');
+      const label = el('label', 'toggle-switch');
       const box = document.createElement('input');
       box.type = 'checkbox';
       box.checked = module.on;
       box.setAttribute('aria-label', module.label);
       box.addEventListener('change', () => onToggle(module.id));
-      label.append(box, el('span', 'check-box'));
+      label.append(box, el('span', 'toggle-track'));
       const body = el('div', 'task-body');
       const nameRow = el('div', 'excursion-compliance__name-row');
       nameRow.append(el('span', 'task-name', module.label));
