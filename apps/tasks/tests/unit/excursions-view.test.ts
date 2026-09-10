@@ -100,65 +100,128 @@ async function mount(): Promise<HTMLElement> {
   return canvas;
 }
 
-describe('excursions list', () => {
-  it('lists templates and cards without a create form', async () => {
+describe('excursions dashboard', () => {
+  it('has one New excursion button and no template picker, since there is only one template', async () => {
     location.hash = '#/excursions';
     const canvas = await mount();
 
     expect(canvas.querySelector('form')).toBeNull();
-    expect(canvas.textContent).not.toContain('Review & create');
-    expect(canvas.querySelector('.task-row__title')?.textContent).toBe('excursion template');
-    expect(canvas.querySelector('.btn--primary')?.textContent).toBe('Use');
+    expect(canvas.querySelector('.task-row')).toBeNull();
+    expect(canvas.textContent).not.toContain('Templates');
+
+    const add = canvas.querySelector<HTMLButtonElement>('.excursions-add');
+    expect(add).not.toBeNull();
+    expect(add?.classList.contains('btn--primary')).toBe(true);
+    expect(add?.textContent).toContain('New excursion');
+  });
+
+  it('routes New excursion straight to the confirm flow for the single template', async () => {
+    location.hash = '#/excursions';
+    const canvas = await mount();
+
+    canvas.querySelector<HTMLButtonElement>('.excursions-add')!.click();
+    expect(location.hash).toBe('#/excursions/new?template=ext_excursion');
+  });
+
+  it('shows a Clearance Gate status and countdown on each active excursion card', async () => {
+    location.hash = '#/excursions';
+    const canvas = await mount();
 
     const card = canvas.querySelector<HTMLElement>('.proj-row');
     expect(card).not.toBeNull();
     expect(card?.textContent).toContain('Ethics Olympiad heat');
-    expect(card?.textContent).toContain('Excursion');
+
+    const meta = canvas.querySelector<HTMLElement>('.excursion-list-meta');
+    expect(meta).not.toBeNull();
+    expect(meta?.classList.contains('is-warn')).toBe(true);
+    expect(meta?.textContent).toContain('Not cleared');
 
     card?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(location.hash).toBe('#/project/proj_ex_ethics_seed');
   });
 
-  it('confirms a template then creates and opens the page', async () => {
+  it('sends a template query straight through to the new excursion page', async () => {
+    mockList();
+    location.hash = '#/excursions?template=ext_excursion';
+    const canvas = document.createElement('main');
+    await renderExcursionsView(canvas);
+    expect(location.hash).toBe('#/excursions/new?template=ext_excursion');
+    expect(canvas.querySelector('.proj-row')).toBeNull();
+  });
+
+  it('shows an empty state and no meta strip when there are no excursions yet', async () => {
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([]);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
+    vi.mocked(tasksApi.listTemplates).mockResolvedValue({
+      frameworks: [],
+      excursion_templates: [template],
+      task_templates: [],
+      project_templates: []
+    });
     location.hash = '#/excursions';
-    const created = { ...excursion, id: 'proj_new', title: 'Excursion' };
+    const canvas = document.createElement('main');
+    await renderExcursionsView(canvas);
+
+    expect(canvas.textContent).toContain('No excursions yet. Create one above.');
+    expect(canvas.querySelector('.excursion-list-meta')).toBeNull();
+  });
+});
+
+describe('new excursion page', () => {
+  it('confirms the single template immediately — no picker step', async () => {
+    mockList();
     vi.mocked(tasksApi.createExcursionFromTemplate).mockResolvedValue({
-      project: created,
+      project: excursion,
       tasks: [task]
     });
-    const canvas = await mount();
+    location.hash = '#/excursions/new?template=ext_excursion';
+    const canvas = document.createElement('main');
+    await renderNewExcursionPage(canvas);
 
-    canvas.querySelector<HTMLButtonElement>('.btn--primary')!.click();
-    expect(canvas.querySelector('.confirm-card')).not.toBeNull();
-    expect(tasksApi.createExcursionFromTemplate).not.toHaveBeenCalled();
+    expect(canvas.querySelector('.excursion-page')).not.toBeNull();
+    expect(canvas.querySelector('form')).toBeNull();
+    expect(canvas.querySelector('.task-row')).toBeNull();
+    expect(canvas.querySelector('.confirm-card .page-header__title')?.textContent).toBe(
+      'Create “Excursion”'
+    );
 
-    canvas.querySelector<HTMLButtonElement>('.btn--ghost')!.click();
-    expect(canvas.querySelector('.confirm-card')).toBeNull();
-
-    canvas.querySelector<HTMLButtonElement>('.btn--primary')!.click();
-    canvas.querySelector<HTMLButtonElement>('.confirm-card .btn--primary')!.click();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(tasksApi.createExcursionFromTemplate).toHaveBeenCalledWith({
-      excursion_template_id: 'ext_excursion',
-      title: 'Excursion',
-      event_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      compliance_modules: expect.any(Array)
+    canvas.querySelector<HTMLButtonElement>('.confirm-card .btn--primary')?.click();
+    await vi.waitFor(() => {
+      expect(tasksApi.createExcursionFromTemplate).toHaveBeenCalledWith({
+        excursion_template_id: 'ext_excursion',
+        title: 'Excursion',
+        event_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        compliance_modules: expect.any(Array)
+      });
+      expect(location.hash).toBe('#/project/proj_ex_ethics_seed');
     });
-    expect(location.hash).toBe('#/project/proj_new');
+  });
+
+  it('also auto-confirms when the page is opened with no template query at all', async () => {
+    mockList();
+    vi.mocked(tasksApi.createExcursionFromTemplate).mockResolvedValue({
+      project: excursion,
+      tasks: [task]
+    });
+    location.hash = '#/excursions/new';
+    const canvas = document.createElement('main');
+    await renderNewExcursionPage(canvas);
+
+    expect(canvas.querySelector('.confirm-card .page-header__title')?.textContent).toBe(
+      'Create “Excursion”'
+    );
   });
 
   it('shows the compliance bundle on the confirm card and lets you untoggle an item before creating', async () => {
-    location.hash = '#/excursions';
-    const created = { ...excursion, id: 'proj_new', title: 'Excursion' };
+    mockList();
     vi.mocked(tasksApi.createExcursionFromTemplate).mockResolvedValue({
-      project: created,
+      project: { ...excursion, id: 'proj_new' },
       tasks: [task]
     });
-    const canvas = await mount();
+    location.hash = '#/excursions/new?template=ext_excursion';
+    const canvas = document.createElement('main');
+    await renderNewExcursionPage(canvas);
 
-    canvas.querySelector<HTMLButtonElement>('.btn--primary')!.click();
     const complianceBox = canvas.querySelector<HTMLElement>('.excursion-compliance');
     expect(complianceBox).not.toBeNull();
     expect(complianceBox?.textContent).toContain('WWCC verified');
@@ -180,63 +243,6 @@ describe('excursions list', () => {
     expect(wwccModule.on).toBe(false);
   });
 
-  it('uses a plus button instead of an inline create form', async () => {
-    mockList();
-    location.hash = '#/excursions';
-    const canvas = document.createElement('main');
-    await renderExcursionsView(canvas);
-
-    const add = canvas.querySelector<HTMLButtonElement>('.excursions-add');
-    expect(add?.getAttribute('aria-label')).toBe('New excursion');
-    expect(canvas.querySelector('.excursion-form')).toBeNull();
-    expect(canvas.textContent).not.toContain('Active excursions');
-    expect(canvas.textContent).not.toContain('Excursions are projects');
-    expect(canvas.textContent).not.toContain('Review & create');
-
-    add?.click();
-    expect(location.hash).toBe('#/excursions/new');
-  });
-
-  it('sends a template query to the new excursion page', async () => {
-    mockList();
-    location.hash = '#/excursions?template=ext_excursion';
-    const canvas = document.createElement('main');
-    await renderExcursionsView(canvas);
-    expect(location.hash).toBe('#/excursions/new?template=ext_excursion');
-    expect(canvas.querySelector('.proj-row')).toBeNull();
-  });
-});
-
-describe('new excursion page', () => {
-  it('confirms a prefilled template then creates', async () => {
-    mockList();
-    vi.mocked(tasksApi.createExcursionFromTemplate).mockResolvedValue({
-      project: excursion,
-      tasks: [task]
-    });
-    location.hash = '#/excursions/new?template=ext_excursion';
-    const canvas = document.createElement('main');
-    await renderNewExcursionPage(canvas);
-
-    expect(canvas.querySelector('.excursion-page')).not.toBeNull();
-    expect(canvas.querySelector('form')).toBeNull();
-    expect(canvas.textContent).not.toContain('Review & create');
-    expect(canvas.querySelector('.confirm-card .page-header__title')?.textContent).toBe(
-      'Create “Excursion”'
-    );
-
-    canvas.querySelector<HTMLButtonElement>('.confirm-card .btn--primary')?.click();
-    await vi.waitFor(() => {
-      expect(tasksApi.createExcursionFromTemplate).toHaveBeenCalledWith({
-        excursion_template_id: 'ext_excursion',
-        title: 'Excursion',
-        event_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-        compliance_modules: expect.any(Array)
-      });
-      expect(location.hash).toBe('#/project/proj_ex_ethics_seed');
-    });
-  });
-
   it('returns to the list from Back to Excursions', async () => {
     mockList();
     location.hash = '#/excursions/new';
@@ -247,5 +253,18 @@ describe('new excursion page', () => {
     );
     back?.click();
     expect(location.hash).toBe('#/excursions');
+  });
+
+  it('shows an empty state when there are no templates at all', async () => {
+    vi.mocked(tasksApi.listTemplates).mockResolvedValue({
+      frameworks: [],
+      excursion_templates: [],
+      task_templates: [],
+      project_templates: []
+    });
+    location.hash = '#/excursions/new';
+    const canvas = document.createElement('main');
+    await renderNewExcursionPage(canvas);
+    expect(canvas.textContent).toContain('No excursion templates yet.');
   });
 });

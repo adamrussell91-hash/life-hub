@@ -1644,6 +1644,48 @@
   gap: var(--space-2);
 }
 
+/* ---------- dashboard list meta (Clearance Gate + countdown) ---------- */
+.excursion-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.excursion-list-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+}
+
+.excursion-list-meta__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  flex: none;
+}
+
+.excursion-list-meta.is-warn .excursion-list-meta__dot {
+  background: var(--warning);
+}
+
+.excursion-list-meta.is-go .excursion-list-meta__dot {
+  background: var(--success);
+}
+
+.excursion-list-meta__text {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.excursion-list-meta.is-warn .excursion-list-meta__text {
+  color: var(--warning);
+}
+
+.excursion-list-meta.is-go .excursion-list-meta__text {
+  color: var(--success);
+}
+
 .excursion-confirm__field {
   display: grid;
   gap: var(--space-2);
