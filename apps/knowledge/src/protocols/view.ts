@@ -4,7 +4,7 @@ import { escapeHtml } from "../lib/dom";
 
 type Definition = { id: string; name: string; description: string; motif: string; defaultMode: string; modes: { id: string; label: string }[]; intake: { id: string; label: string; required: boolean; type: string; options?: { value: string; label: string }[] }[]; voices: { id: string; name: string; role: string }[] };
 type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: { id: string; role: string; speaker: string; stage: string; text: string }[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean } };
-const ASSET_ROOT = "/assets/cognitive-protocols";
+const ASSET_ROOT = `${import.meta.env.BASE_URL}assets/cognitive-protocols`;
 const voiceAsset: Record<string, string> = {
   "fates:clotho": "fates-clotho-spinner", "fates:atropos": "fates-atropos-cutter", "fates:lachesis": "fates-lachesis-measurer", "fates:weave": "fates-the-weave-witness",
   "horizon:ketill": "horizon-ketill-hearthkeeper", "horizon:alvar": "horizon-alvar-far-gazer", "horizon:sigrid": "horizon-sigrid-quiet",
@@ -54,22 +54,26 @@ function cardArt(id: string) {
 
 function cards(definitions: Definition[]) {
   return definitions.map((d, index) => `<article class="protocol-card protocol-card--${escapeHtml(d.id)}" data-protocol-card="${escapeHtml(d.id)}" style="--protocol-order:${index}">
-    <button type="button" class="protocol-card__face" aria-expanded="false" aria-controls="protocol-detail-${escapeHtml(d.id)}" aria-label="Turn ${escapeHtml(d.name)} card">
-      <span class="protocol-card__back" aria-hidden="true"><img src="${backAsset(d.id)}" alt=""><span class="protocol-card__back-mark">✦</span><span>Thinking</span><span class="protocol-card__back-mark">✦</span></span>
-      <span class="protocol-card__front"><img class="protocol-card__front-art" src="${frontAsset(d.id)}" alt=""><span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span><strong>${escapeHtml(d.name)}</strong><em>Turn to enter</em></span>
-    </button>
-    <section id="protocol-detail-${escapeHtml(d.id)}" class="protocol-card__detail" hidden>
-      <p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => escapeHtml(v.name)).join(" · ")}</p>
-      <button class="btn btn--primary" data-protocol-begin="${escapeHtml(d.id)}" type="button">Begin</button>
-    </section>
+    <div class="protocol-card__inner">
+      <button type="button" class="protocol-card__front" data-protocol-flip aria-expanded="false" aria-label="Show details for ${escapeHtml(d.name)}">
+        <img class="protocol-card__front-art" src="${frontAsset(d.id)}" alt="">
+        <span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span><strong>${escapeHtml(d.name)}</strong><em>View protocol</em>
+      </button>
+      <section class="protocol-card__back" aria-label="${escapeHtml(d.name)} details">
+        <img src="${backAsset(d.id)}" alt=""><div class="protocol-card__back-copy"><p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => escapeHtml(v.name)).join(" · ")}</p></div>
+        <div class="protocol-card__actions"><button class="btn btn--ghost" data-protocol-flip type="button">Back</button><button class="btn btn--primary" data-protocol-begin="${escapeHtml(d.id)}" type="button">Begin</button></div>
+      </section>
+    </div>
   </article>`).join("");
 }
 
 function intake(definition: Definition) {
-  const fields = definition.intake.map(field => field.type === "select"
-    ? `<label>${escapeHtml(field.label)}<select name="${escapeHtml(field.id)}">${(field.options ?? []).map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join("")}</select></label>`
-    : `<label>${escapeHtml(field.label)}${field.required ? " <span aria-hidden=\"true\">*</span>" : ""}<textarea name="${escapeHtml(field.id)}" ${field.required ? "required" : ""}></textarea></label>`).join("");
-  return `<section class="protocol-intake" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><button class="btn btn--ghost" type="button" data-protocol-close>← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label>${fields}<button class="btn btn--primary" type="submit">Start session</button></form><p class="protocol-intake__note">${USE_LOCAL_DATA ? "Local preview has no AI session service. The cards and intake are available here; a signed-in live hub starts the real protocol." : "Each named voice receives its own turn. Your answers pause the protocol before it advances."}</p></section>`;
+  return `<section class="protocol-intake" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><div class="protocol-intake__content"><button class="btn btn--ghost" type="button" data-protocol-close>← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label><label>What would you like to examine?<textarea name="prompt" required placeholder="Write the situation, question or claim in your own words."></textarea></label><button class="btn btn--primary" type="submit">Begin ${escapeHtml(definition.name)}</button></form><p class="protocol-intake__error" data-protocol-error hidden role="status"></p><p class="protocol-intake__note">One clear brief is enough. The protocol will ask for detail only when it needs it.</p></div></section>`;
+}
+
+function compactIntake(definition: Definition, prompt: string) {
+  const required: Record<string, string[]> = { fates: ["task"], horizon: ["focus"], refinery: ["claim", "context", "audience"], cartographers: ["topic", "purpose"], mirror: ["conflict"], consilium: ["dilemma", "parties", "constraints"], witness: ["instance"], tribunal: ["problem", "entrenchment", "framing"] };
+  return Object.fromEntries([...(required[definition.id] ?? []), "userContext"].map(key => [key, prompt]));
 }
 
 function sessionView(session: Session, definition: Definition) {
@@ -91,10 +95,10 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   };
   const paint = () => {
     host.innerHTML = currentSession && selected ? sessionView(currentSession, selected) : selected ? intake(selected) : `<section class="protocol-library"><header class="page-header"><div><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1>Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div></section>`;
-    host.querySelectorAll<HTMLButtonElement>(".protocol-card__face").forEach(button => button.onclick = () => { const card = button.closest<HTMLElement>("[data-protocol-card]")!; const detail = card.querySelector<HTMLElement>(".protocol-card__detail")!; const open = detail.hidden; detail.hidden = !open; button.setAttribute("aria-expanded", String(open)); card.classList.toggle("is-open", open); });
+    host.querySelectorAll<HTMLButtonElement>("[data-protocol-flip]").forEach(button => button.onclick = () => { const card = button.closest<HTMLElement>("[data-protocol-card]")!; const open = !card.classList.contains("is-open"); card.classList.toggle("is-open", open); card.querySelector<HTMLButtonElement>(".protocol-card__front")?.setAttribute("aria-expanded", String(open)); });
     host.querySelectorAll<HTMLButtonElement>("[data-protocol-begin]").forEach(button => button.onclick = () => { selected = definitions.find(d => d.id === button.dataset.protocolBegin) ?? null; paint(); });
     host.querySelector<HTMLButtonElement>("[data-protocol-close]")?.addEventListener("click", () => { stopPolling(); selected = null; currentSession = null; paint(); });
-    host.querySelector<HTMLFormElement>("[data-protocol-form]")?.addEventListener("submit", async event => { event.preventDefault(); if (USE_LOCAL_DATA || !selected) return; const form = new FormData(event.currentTarget); const intake = Object.fromEntries([...form.entries()].filter(([key]) => key !== "mode").map(([key, value]) => [key, String(value)])); const response = await fetch(`${API_BASE}/protocols`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ protocolId: selected.id, mode: form.get("mode"), intake, requestId: crypto.randomUUID() }) }); if (!response.ok) return; currentSession = (await response.json()).data.session; paint(); void poll(); });
+    host.querySelector<HTMLFormElement>("[data-protocol-form]")?.addEventListener("submit", async event => { event.preventDefault(); if (USE_LOCAL_DATA || !selected) return; const form = new FormData(event.currentTarget); const error = host.querySelector<HTMLElement>("[data-protocol-error]"); const prompt = String(form.get("prompt") ?? "").trim(); try { const response = await fetch(`${API_BASE}/protocols`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ protocolId: selected.id, mode: form.get("mode"), intake: compactIntake(selected, prompt), requestId: crypto.randomUUID() }) }); const body = await response.json(); if (!response.ok) throw new Error(body?.error?.message ?? "The protocol could not start."); currentSession = body.data.session; paint(); void poll(); } catch (reason) { if (error) { error.textContent = reason instanceof Error ? reason.message : "The protocol could not start."; error.hidden = false; } } });
     host.querySelector<HTMLFormElement>("[data-protocol-reply]")?.addEventListener("submit", async event => { event.preventDefault(); if (!currentSession) return; const form = new FormData(event.currentTarget); const kind = currentSession.checkpoint?.kind; const action = String(form.get("action") ?? (["verify", "confirm"].includes(kind ?? "") ? "confirm" : kind === "reflection" ? "reflect" : "answer")); const text = String(form.get("reply") ?? ""); const response = await fetch(`${API_BASE}/protocols`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ sessionId: currentSession.id, revision: currentSession.revision, requestId: crypto.randomUUID(), action, text }) }); if (response.ok) { currentSession = (await response.json()).data.session; paint(); void poll(); } });
     host.querySelector<HTMLButtonElement>("[data-protocol-action]")?.addEventListener("click", async event => { if (!currentSession) return; const action = (event.currentTarget as HTMLButtonElement).dataset.protocolAction; const response = await fetch(`${API_BASE}/protocols`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ sessionId: currentSession.id, revision: currentSession.revision, requestId: crypto.randomUUID(), action }) }); if (response.ok) { currentSession = (await response.json()).data.session; paint(); void poll(); } });
   };
