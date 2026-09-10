@@ -32,7 +32,7 @@ type Session = {id:string;protocolId:ProtocolId;mode:string;intake:Record<string
 
 Render `allowedActions` as authoritative. `answer`, `correct` and `reflect` require nonblank text. `confirm`, `uncertain` and `decline` are explicit user decisions. Confirmation cannot be replaced by model output. `finish` appears only when Consilium has adequate contributions and user responses; it requests the convergence map, whose reflection closes without further analysis. `correct` revises Witness' trace or restarts Mirror/framing from the correction. `pause` and `cancel` may stop a running call from publishing. `resume` restores the previous checkpoint when one existed. `retry` resumes a failed/interrupted stage without repeating committed turns. A provider call interrupted before commit may be reissued; exactly-once billing cannot be guaranteed.
 
-No automatic archive writes. Explicit Save session uses the existing reviewed Knowledge Hub page-save flow. Transcript download is local and requires no API mutation.
+No automatic archive writes. Protocols read a bounded set of matching archive-note summaries for grounding; the session itself stays separate from notes until a reviewed save flow is added.
 
 ## Modes and fields
 
