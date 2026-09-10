@@ -605,9 +605,9 @@ function shell(main: string) {
         <button class="rail__btn hub-rail__link ${view === "graph" ? "is-current" : ""}" data-nav="graph" type="button">${icons.graph}<span>Graph</span></button>
         <button class="rail__btn hub-rail__link ${view === "timeline" ? "is-current" : ""}" data-nav="timeline" type="button">${icons.timeline}<span>Timeline</span></button>
         <button class="rail__btn hub-rail__link ${view === "chat" ? "is-current" : ""}" data-nav="chat" type="button">${icons.chat}<span>Chat</span></button>
+        <button class="rail__btn hub-rail__link ${view === "protocols" ? "is-current" : ""}" data-nav="protocols" type="button">${icons.protocols}<span>Thinking</span></button>
         <button class="rail__btn hub-rail__link ${view === "podcast" ? "is-current" : ""}" data-nav="podcast" type="button">${icons.podcast}<span>Podcast</span></button>
         <button class="rail__btn hub-rail__link ${view === "quiz" ? "is-current" : ""}" data-nav="quiz" type="button">${icons.quiz}<span>Quiz</span></button>
-        <button class="rail__btn hub-rail__link ${view === "protocols" ? "is-current" : ""}" data-nav="protocols" type="button">${icons.protocols}<span>Protocols</span></button>
       </nav>
       ${hubSwitcherHtml("knowledge")}
     </aside>
@@ -2096,6 +2096,7 @@ document.addEventListener("keydown", event => {
         { id: "graph", label: "Graph", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=graph]")?.click() },
         { id: "timeline", label: "Timeline", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=timeline]")?.click() },
         { id: "chat", label: "Chat", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=chat]")?.click() },
+        { id: "protocols", label: "Thinking", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=protocols]")?.click() },
         { id: "podcast", label: "Podcast", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=podcast]")?.click() },
         { id: "quiz", label: "Quiz", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=quiz]")?.click() }
       ]

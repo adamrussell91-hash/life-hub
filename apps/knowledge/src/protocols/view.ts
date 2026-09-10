@@ -4,6 +4,20 @@ import { escapeHtml } from "../lib/dom";
 
 type Definition = { id: string; name: string; description: string; motif: string; defaultMode: string; modes: { id: string; label: string }[]; intake: { id: string; label: string; required: boolean; type: string; options?: { value: string; label: string }[] }[]; voices: { id: string; name: string; role: string }[] };
 type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: { id: string; role: string; speaker: string; stage: string; text: string }[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean } };
+const ASSET_ROOT = "/assets/cognitive-protocols";
+const voiceAsset: Record<string, string> = {
+  "fates:clotho": "fates-clotho-spinner", "fates:atropos": "fates-atropos-cutter", "fates:lachesis": "fates-lachesis-measurer", "fates:weave": "fates-the-weave-witness",
+  "horizon:ketill": "horizon-ketill-hearthkeeper", "horizon:alvar": "horizon-alvar-far-gazer", "horizon:sigrid": "horizon-sigrid-quiet",
+  "refinery:builder": "refinery-builder", "refinery:breaker": "refinery-breaker", "refinery:reforger": "refinery-reforger",
+  "cartographers:surveyor": "cartographers-surveyor", "cartographers:miner": "cartographers-miner", "cartographers:cartographer": "cartographers-cartographer",
+  "mirror:retrospective": "mirror-retrospective", "mirror:prospective": "mirror-prospective", "mirror:present": "mirror-present",
+  "consilium:principle": "consilium-principle", "consilium:consequence": "consilium-consequence", "consilium:virtue": "consilium-virtue",
+  "witness:trace": "witness-process-trace", "witness:patterns": "witness-pattern-match", "witness:recalibration": "witness-recalibration",
+  "tribunal:inverter": "tribunal-inverter", "tribunal:scaler": "tribunal-scaler", "tribunal:context-shifter": "tribunal-context-shifter"
+};
+function frontAsset(id: string) { return `${ASSET_ROOT}/card-fronts/${id === "fates" ? "fates-the-three-fates" : id}-card-front.png`; }
+function backAsset(id: string) { return `${ASSET_ROOT}/card-backs/${id}-card-back.png`; }
+function backgroundAsset(id: string) { return `${ASSET_ROOT}/backgrounds/${id}-background.png`; }
 
 const localCatalog: Definition[] = [
   ["fates", "The Three Fates", "Live dialectic across generative, critical and strategic voices.", "Greek threads", "normal", ["Normal", "Sprint", "Long"], ["Lachesis", "Clotho", "Atropos", "The Weave"]],
@@ -41,8 +55,8 @@ function cardArt(id: string) {
 function cards(definitions: Definition[]) {
   return definitions.map((d, index) => `<article class="protocol-card protocol-card--${escapeHtml(d.id)}" data-protocol-card="${escapeHtml(d.id)}" style="--protocol-order:${index}">
     <button type="button" class="protocol-card__face" aria-expanded="false" aria-controls="protocol-detail-${escapeHtml(d.id)}" aria-label="Turn ${escapeHtml(d.name)} card">
-      <span class="protocol-card__back" aria-hidden="true"><span class="protocol-card__back-mark">✦</span><span>Cognitive<br>Protocols</span><span class="protocol-card__back-mark">✦</span></span>
-      <span class="protocol-card__front"><span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span>${cardArt(d.id)}<strong>${escapeHtml(d.name)}</strong><em>Turn to enter</em></span>
+      <span class="protocol-card__back" aria-hidden="true"><img src="${backAsset(d.id)}" alt=""><span class="protocol-card__back-mark">✦</span><span>Thinking</span><span class="protocol-card__back-mark">✦</span></span>
+      <span class="protocol-card__front"><img class="protocol-card__front-art" src="${frontAsset(d.id)}" alt=""><span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span><strong>${escapeHtml(d.name)}</strong><em>Turn to enter</em></span>
     </button>
     <section id="protocol-detail-${escapeHtml(d.id)}" class="protocol-card__detail" hidden>
       <p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => escapeHtml(v.name)).join(" · ")}</p>
@@ -55,14 +69,14 @@ function intake(definition: Definition) {
   const fields = definition.intake.map(field => field.type === "select"
     ? `<label>${escapeHtml(field.label)}<select name="${escapeHtml(field.id)}">${(field.options ?? []).map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join("")}</select></label>`
     : `<label>${escapeHtml(field.label)}${field.required ? " <span aria-hidden=\"true\">*</span>" : ""}<textarea name="${escapeHtml(field.id)}" ${field.required ? "required" : ""}></textarea></label>`).join("");
-  return `<section class="protocol-intake"><button class="btn btn--ghost" type="button" data-protocol-close>← All protocols</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label>${fields}<button class="btn btn--primary" type="submit">Start session</button></form><p class="protocol-intake__note">${USE_LOCAL_DATA ? "Local preview has no AI session service. The cards and intake are available here; a signed-in live hub starts the real protocol." : "Each named voice receives its own turn. Your answers pause the protocol before it advances."}</p></section>`;
+  return `<section class="protocol-intake" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><button class="btn btn--ghost" type="button" data-protocol-close>← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label>${fields}<button class="btn btn--primary" type="submit">Start session</button></form><p class="protocol-intake__note">${USE_LOCAL_DATA ? "Local preview has no AI session service. The cards and intake are available here; a signed-in live hub starts the real protocol." : "Each named voice receives its own turn. Your answers pause the protocol before it advances."}</p></section>`;
 }
 
 function sessionView(session: Session, definition: Definition) {
   const turns = session.transcript.map(turn => `<article class="protocol-turn protocol-turn--${escapeHtml(turn.role)} ${turn.speaker === session.speaker ? "is-speaking" : ""}"><p>${escapeHtml(turn.speaker)}</p><div>${escapeHtml(turn.text)}</div></article>`).join("");
   const waiting = session.checkpoint ? `<form class="protocol-reply" data-protocol-reply><label>${escapeHtml(session.checkpoint.question)}<textarea name="reply" required></textarea></label><button class="btn btn--primary" type="submit">Continue</button>${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</form>` : "";
   const failure = session.error ? `<div class="confirm-card"><p>${escapeHtml(session.error.message)}</p>${session.allowedActions.includes("retry") ? `<button class="btn btn--primary" data-protocol-action="retry">Retry this voice</button>` : ""}</div>` : "";
-  return `<section class="protocol-session"><header><button class="btn btn--ghost" data-protocol-close type="button">← Protocols</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p><h1>${escapeHtml(session.speaker ?? "Session")}</h1><p class="protocol-session__status">${escapeHtml(session.status)} · ${escapeHtml(session.stage)}</p></header><div class="protocol-stage" aria-live="polite">${definition.voices.map(voice => `<div class="protocol-speaker ${voice.id === session.speaker ? "is-active" : ""}"><span>${escapeHtml(voice.name)}</span><small>${escapeHtml(voice.role)}</small></div>`).join("")}</div><div class="protocol-transcript">${turns || "<p>Preparing the first voice…</p>"}</div>${waiting}${failure}</section>`;
+  return `<section class="protocol-session" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p><h1>${escapeHtml(session.speaker ?? "Session")}</h1><p class="protocol-session__status">${escapeHtml(session.status)} · ${escapeHtml(session.stage)}</p></header><div class="protocol-stage" aria-live="polite">${definition.voices.map(voice => `<div class="protocol-speaker ${voice.id === session.speaker ? "is-active" : ""}"><img src="${ASSET_ROOT}/voices/${voiceAsset[`${definition.id}:${voice.id}`]}.png" alt=""><span>${escapeHtml(voice.name)}</span><small>${escapeHtml(voice.role)}</small></div>`).join("")}</div><div class="protocol-transcript">${turns || "<p>Preparing the first voice…</p>"}</div>${waiting}${failure}</section>`;
 }
 
 export function renderProtocols({ host }: { host: HTMLElement }) {
