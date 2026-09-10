@@ -9,7 +9,7 @@ function owner(env) { return env.COGNITIVE_OWNER_ID || 'operator'; }
 async function model(prompt, env, fetchImpl = fetch) {
   if (!env.ANTHROPIC_API_KEY) throw Object.assign(new Error('AI provider is not configured.'), { code: 'provider_unavailable' });
   const client = createAnthropicClient({ apiKey: env.ANTHROPIC_API_KEY, fetchImpl }); let text = '';
-  for await (const event of client.streamMessage({ system: prompt.system, messages: [{ role: 'user', content: prompt.user }], maxTokens: 1000 })) if (event.type === 'text') text += event.text ?? '';
+  for await (const event of client.streamMessage({ system: prompt.system, messages: [{ role: 'user', content: prompt.user }], maxTokens: 1000 })) if (event.type === 'text') text += event.delta ?? '';
   return { text, evidenceIds: [] };
 }
 export function createKnowledgeProtocolsRunHandler(deps = {}) {
