@@ -202,23 +202,67 @@ test('REGION_KEYS lists the five strength card regions', () => {
   assert.deepEqual(REGION_KEYS, ['chest', 'arms', 'abs', 'legs', 'back']);
 });
 
-test('resolveExerciseRegion prefers library target_area over name and multi-focus', () => {
+test('library target_area feeds every Region tile — one shared path, not per-lift patches', () => {
+  // Names deliberately avoid REGION_NAME_PATTERNS keywords. Multi-focus session
+  // also fails without library. Every mapped target_area must resolve.
   const library = new Map([
-    ['bar press', { name: 'Bar Press', target_area: 'Chest' }],
-    ['cable kickback', { name: 'Cable Kickback', target_area: 'Glutes' }]
+    ['nova flat load', { name: 'Nova Flat Load', target_area: 'Chest' }],
+    ['nova hinge pull', { name: 'Nova Hinge Pull', target_area: 'Arms' }],
+    ['nova midline hold', { name: 'Nova Midline Hold', target_area: 'Core' }],
+    ['nova thruster', { name: 'Nova Thruster', target_area: 'Legs' }],
+    ['nova posterior drive', { name: 'Nova Posterior Drive', target_area: 'Glutes' }],
+    ['nova yoke pull', { name: 'Nova Yoke Pull', target_area: 'Back' }],
+    ['nova overhead arc', { name: 'Nova Overhead Arc', target_area: 'Shoulders' }],
+    ['nova metro circuit', { name: 'Nova Metro Circuit', target_area: 'Full Body' }]
   ]);
-  // Bar Press does not match the chest name regex — library target_area is required.
-  assert.equal(resolveExerciseRegion({ name: 'Bar Press' }, ['arms', 'chest', 'shoulders']), null);
-  assert.equal(
-    resolveExerciseRegion({ name: 'Bar Press' }, ['arms', 'chest', 'shoulders'], library),
-    'chest'
-  );
-  assert.equal(
-    resolveExerciseRegion({ name: 'Cable Kickback' }, ['glutes', 'legs'], library),
-    'legs'
-  );
+  const multi = ['chest', 'arms', 'legs', 'back', 'shoulders'];
+
+  for (const name of [
+    'Nova Flat Load', 'Nova Hinge Pull', 'Nova Midline Hold',
+    'Nova Thruster', 'Nova Posterior Drive', 'Nova Yoke Pull'
+  ]) {
+    assert.equal(resolveExerciseRegion({ name }, multi), null, `${name} must need library`);
+  }
+
+  assert.equal(resolveExerciseRegion({ name: 'Nova Flat Load' }, multi, library), 'chest');
+  assert.equal(resolveExerciseRegion({ name: 'Nova Hinge Pull' }, multi, library), 'arms');
+  assert.equal(resolveExerciseRegion({ name: 'Nova Midline Hold' }, multi, library), 'abs');
+  assert.equal(resolveExerciseRegion({ name: 'Nova Thruster' }, multi, library), 'legs');
+  assert.equal(resolveExerciseRegion({ name: 'Nova Posterior Drive' }, multi, library), 'legs');
+  assert.equal(resolveExerciseRegion({ name: 'Nova Yoke Pull' }, multi, library), 'back');
+  // No Shoulders / Full Body tile exists — leave unmapped rather than invent a home.
+  assert.equal(resolveExerciseRegion({ name: 'Nova Overhead Arc' }, multi, library), null);
+  assert.equal(resolveExerciseRegion({ name: 'Nova Metro Circuit' }, multi, library), null);
 });
 
+test('buildFitnessModel applies library target_area across all five tiles in one session', () => {
+  const library = new Map([
+    ['nova flat load', { name: 'Nova Flat Load', target_area: 'Chest' }],
+    ['nova hinge pull', { name: 'Nova Hinge Pull', target_area: 'Arms' }],
+    ['nova midline hold', { name: 'Nova Midline Hold', target_area: 'Core' }],
+    ['nova thruster', { name: 'Nova Thruster', target_area: 'Legs' }],
+    ['nova yoke pull', { name: 'Nova Yoke Pull', target_area: 'Back' }]
+  ]);
+  const model = buildFitnessModel({
+    events: events([
+      workout({
+        date: '2026-09-10',
+        focus: ['chest', 'arms', 'legs', 'back', 'core'],
+        exercises: [
+          { name: 'Nova Flat Load', sets: [{ reps: 5, weight_kg: 50 }] },
+          { name: 'Nova Hinge Pull', sets: [{ reps: 5, weight_kg: 20 }] },
+          { name: 'Nova Midline Hold', sets: [{ reps: 5, weight_kg: 15 }] },
+          { name: 'Nova Thruster', sets: [{ reps: 5, weight_kg: 80 }] },
+          { name: 'Nova Yoke Pull', sets: [{ reps: 5, weight_kg: 40 }] }
+        ]
+      })
+    ]),
+    date: '2026-09-10',
+    libraryByName: library
+  });
+  const best = Object.fromEntries(model.regions.map(r => [r.key, r.currentBestKg]));
+  assert.deepEqual(best, { chest: 50, arms: 20, abs: 15, legs: 80, back: 40 });
+});
 test('resolveExerciseRegion uses unique workout focus, then name regex, without library', () => {
   assert.equal(resolveExerciseRegion({ name: 'Mystery Move' }, ['legs']), 'legs');
   assert.equal(resolveExerciseRegion({ name: 'Mystery Move' }, ['core']), 'abs');
