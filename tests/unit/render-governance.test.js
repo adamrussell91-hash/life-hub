@@ -11,6 +11,15 @@ class FakeElement {
     this._textContent = '';
     this.children = [];
     this.attributes = {};
+    this._listeners = {};
+  }
+
+  addEventListener(type, handler) {
+    this._listeners[type] = handler;
+  }
+
+  click() {
+    this._listeners.click?.();
   }
 
   set textContent(value) {
@@ -127,7 +136,8 @@ test('renderGovernance shows Chosen, Reasoning, and Revisit on decision records'
   const { root, container } = fakeRoot();
   renderGovernance(root, log, { today: '2026-09-05' });
   assert.match(container.textContent, /Chosen: Approved/);
-  assert.match(container.textContent, /Reasoning: Keep the week honest/);
+  assert.match(container.textContent, /Reasoning:/);
+  assert.match(container.textContent, /Keep the week honest/);
   assert.match(container.textContent, /Revisit: 12\/09\/26/);
 });
 
@@ -156,4 +166,107 @@ test('renderGovernance shows decision fields and a same-title timeline', () => {
   assert.match(container.textContent, /Drop one elective/);
   assert.match(container.textContent, /Teaching clash/);
   assert.match(container.textContent, /01\/10\/26/);
+});
+
+function findAll(el, predicate, out = []) {
+  if (!el) return out;
+  for (const child of el.children ?? []) {
+    if (predicate(child)) out.push(child);
+    findAll(child, predicate, out);
+  }
+  return out;
+}
+
+test('renderGovernance renders **bold** as real emphasis, not literal asterisks', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-09-10',
+    entryType: 'Capability Action',
+    title: 'Update task',
+    status: 'Resolved',
+    body: '**Agent:** clare\n**Intent:** Update task\n**Status:** Approved'
+  });
+  const { root, container } = fakeRoot();
+  renderGovernance(root, log, { today: '2026-09-10' });
+
+  assert.doesNotMatch(container.textContent, /\*\*/);
+  const strongEls = findAll(container, el => el.tagName === 'strong');
+  const strongLabels = strongEls.map(el => el.textContent);
+  assert.ok(strongLabels.includes('Agent:'));
+  assert.ok(strongLabels.includes('Intent:'));
+  assert.ok(strongLabels.includes('Status:'));
+});
+
+test('renderGovernance renders a multi-line bullet body as a real list, not one run-on line', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-09-10',
+    entryType: 'Capability Action',
+    title: 'Batch update',
+    body: [
+      '**Status:** Approved',
+      '',
+      '- `tasks:task:one` (append): update due date',
+      '- `tasks:task:two` (create): new task'
+    ].join('\n')
+  });
+  const { root, container } = fakeRoot();
+  renderGovernance(root, log, { today: '2026-09-10' });
+
+  const listItems = findAll(container, el => el.tagName === 'li');
+  assert.equal(listItems.length, 2);
+  assert.match(listItems[0].textContent, /update due date/);
+  assert.match(listItems[1].textContent, /new task/);
+});
+
+test('renderGovernance collapses long reasoning behind a toggle and expands on click', () => {
+  const sentence = 'Off-track on flare fat and sodium.';
+  const longReasoning = Array.from({ length: 20 }, (_, i) => `${sentence} (${i})`).join(' ');
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-09-09',
+    entryType: 'Weekly Review',
+    title: 'Recap',
+    reasoning: longReasoning,
+    body: 'Locked next week.'
+  });
+  const { root, container } = fakeRoot();
+  renderGovernance(root, log, { today: '2026-09-09' });
+
+  const toggle = findAll(container, el => el.className === 'governance-entry-toggle')[0];
+  assert.ok(toggle, 'expected a Show more toggle for long reasoning');
+  assert.equal(toggle.textContent, 'Show more');
+  const countMatches = text => (text.match(new RegExp(sentence.replace('.', '\\.'), 'g')) ?? []).length;
+  assert.ok(countMatches(container.textContent) < 20, 'preview should not include every repeated sentence');
+
+  toggle.click();
+  assert.equal(toggle.textContent, 'Show less');
+  assert.equal(countMatches(container.textContent), 20);
+});
+
+test('renderGovernance flags an open loop past 21 days as STALE', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-08-19',
+    entryType: 'Drift Detection',
+    title: 'Long-Term Trends purge',
+    body: 'Section needs condensing.'
+  });
+  const { root, container } = fakeRoot();
+  renderGovernance(root, log, { today: '2026-09-10' });
+
+  const heading = container.children[0].children[0];
+  assert.match(heading.textContent, /22d open — STALE/);
+  assert.match(heading.className, /governance-entry-heading--stale/);
+});
+
+test('renderGovernance does not flag a recently opened loop as STALE', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-09-05',
+    entryType: 'Drift Detection',
+    title: 'New tension',
+    body: 'Just opened.'
+  });
+  const { root, container } = fakeRoot();
+  renderGovernance(root, log, { today: '2026-09-10' });
+
+  const heading = container.children[0];
+  assert.match(heading.textContent, /5d open/);
+  assert.doesNotMatch(heading.textContent, /STALE/);
 });

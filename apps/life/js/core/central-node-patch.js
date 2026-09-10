@@ -38,6 +38,28 @@ const SECTION_HEADING = {
   recent_actions: RECENT_ACTIONS_HEADING
 };
 
+const WEEKDAY_DATE_RE = /\b(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?\s+\d{1,2}\b/gi;
+const ISO_DATE_RE = /\b\d{4}-\d{2}-\d{2}\b/g;
+
+function dayMarkerCount(text) {
+  const source = String(text ?? '');
+  const weekday = source.match(WEEKDAY_DATE_RE) ?? [];
+  const iso = source.match(ISO_DATE_RE) ?? [];
+  return Math.max(weekday.length, iso.length);
+}
+
+/**
+ * central-node.md Writing Rule 5: This Week is weekly averages and key
+ * events only -- no day-by-day exercise logs, no day-by-day macro dumps.
+ * Two or more per-day date markers in one write is that shape regardless
+ * of wording, so it is rejected here rather than left to prompt compliance.
+ */
+export function centralNodePatchContentError(patch) {
+  if (!patch || patch.section !== 'this_week') return null;
+  if (!['append_line', 'replace_section', 'condense'].includes(patch.op)) return null;
+  return dayMarkerCount(patch.payload?.text) >= 2 ? 'this_week_day_by_day_dump' : null;
+}
+
 export function classifyCentralNodePatchRisk(patch) {
   if (!patch || !CENTRAL_NODE_SECTIONS.includes(patch.section)) return 'confirm';
   const { section, op } = patch;

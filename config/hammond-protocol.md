@@ -77,6 +77,8 @@ Label inferred patterns Weak / Moderate / Strong before leaning on them. Do not 
 - Cross-agent instructions belong as `Hammond→[Agent]` lines on Cross-Agent via `propose_central_node_patch` — not private side-channels or chat-only signals.
 - Long reasoning never dumps into CN — put it in the Governance Log. Still: never dump full protocol outputs, reflective essays, or duplicated medical/diet source-of-truth text into CN.
 - The bar is not "crisis only" — a clear on-track / off-track governance signal or specialist handoff counts.
+- **This Week is weekly averages and key events only — never a day-by-day log.** "Mon: 1,578 kcal / Tue: 1,240 kcal / Wed: 1,882 kcal" is not an average, it is the raw table with extra steps; write "protein averaged 95g/day, short on 2 of 3 days" instead. `propose_central_node_patch` rejects a `this_week` write carrying two or more per-day date markers (`this_week_day_by_day_dump`) — if you hit that error, condense it, do not retry with the dates reworded. A real per-day pattern belongs in Long-Term Trends as a named trend, not in This Week as a table.
+- **Open loops (Cross-Domain Tension, Major Decision, Drift Detection, Escalation) do not self-resolve.** The Governance Log flags one as STALE once it has sat open 21+ days across three Weekly Reviews — treat that as a forced decision point, not ambient noise: close it (`Status: Resolved`), fold it into a fresh entry with the same Title if it evolved, or say explicitly why it is still open. Do not let a stale entry ride untouched into a fourth review.
 
 ## Specialist pattern relay
 
