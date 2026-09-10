@@ -12,7 +12,7 @@ export const config = { path: '/api/knowledge/protocols' };
 
 function owner(env) { return env.COGNITIVE_OWNER_ID || 'operator'; }
 
-async function defaultModel(prompt, env, fetchImpl = fetch) {
+export async function defaultModel(prompt, env, fetchImpl = fetch) {
   const apiKey = env.ANTHROPIC_API_KEY;
   if (!apiKey) throw Object.assign(new Error('AI provider is not configured.'), { code: 'provider_unavailable' });
   const client = createAnthropicClient({ apiKey, fetchImpl });
@@ -21,7 +21,7 @@ async function defaultModel(prompt, env, fetchImpl = fetch) {
     system: prompt.system,
     messages: [{ role: 'user', content: prompt.user }],
     maxTokens: Math.min(1200, Math.max(160, prompt.wordBudget * 2))
-  })) if (event.type === 'text') text += event.text ?? '';
+  })) if (event.type === 'text') text += event.delta ?? '';
   return { text, evidenceIds: [] };
 }
 
